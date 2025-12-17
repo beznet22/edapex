@@ -66,7 +66,7 @@ export class ResultService {
       siblings.map(async (s) => {
         if (!s.guardiansEmail) return false;
 
-        const props = { 
+        const props = {
           term: examType.title,
           title: "TERMLY SUMMARY OF PROGRESS REPORT",
           fullName: s.fullName,
@@ -85,9 +85,9 @@ export class ResultService {
           to: s.guardiansEmail,
           subject: "Result Notification",
           text: "Result Notification",
-          html
+          html,
         };
-        
+
         await new SMTPClient().sendMessage(payload);
       })
     );
@@ -175,10 +175,21 @@ export class ResultService {
    *
    * @param id id of the student
    * @param examId  exam term id
+   * @param adminNo admission number of the student
+   * @param withImages whether to include images in the response
    * @returns
    */
-  async getStudentResult(id: number, examId: number, withImages = false): Promise<ResultOutput | null> {
-    const studentData = await studentRepo.getStudentById(id);
+  async getStudentResult(params: {
+    id?: number;
+    examId: number;
+    isAdminNo?: boolean;
+    withImages?: boolean;
+  }): Promise<ResultOutput | null> {
+    let { id, examId, isAdminNo, withImages } = params;
+    const studentData = isAdminNo
+      ? await studentRepo.getStudentById(id, isAdminNo)
+      : await studentRepo.getStudentById(id);
+
     if (!studentData) return null;
     const resultData = await repo.result.queryResultData(studentData, examId);
     if (!resultData?.classResults?.length) return null;

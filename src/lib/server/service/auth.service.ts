@@ -248,7 +248,7 @@ class AuthService {
       walletBalance: user.walletBalance ?? undefined,
       isAdministrator: user.isAdministrator === "yes",
       academicId: user.accessStatus ?? undefined,
-      roleId: staff?.roleId ?? undefined,
+      roleId: user?.roleId ?? undefined,
       staffId: staff?.id,
       designationId: staff?.designationId ?? undefined,
       departmentId: staff?.departmentId ?? undefined,
@@ -528,19 +528,23 @@ class AuthService {
   }
 
   async logout() {
-    const event = getRequestEvent();
-
-    const refreshToken = cookies.get(REFRESH_COOKIE);
-    if (refreshToken) {
-      const payload = jwt.decode(refreshToken);
-      if (payload?.jti) {
-        await authRepo.revokeRefreshToken(payload.jti as string);
+    const { cookies } = getRequestEvent();
+    try {
+      const refreshToken = cookies.get(REFRESH_COOKIE);
+      if (refreshToken) {
+        const payload = jwt.decode(refreshToken);
+        if (payload?.jti) {
+          await authRepo.revokeRefreshToken(payload.jti as string);
+        }
       }
-    }
 
-    cookies.del(ACCESS_COOKIE);
-    cookies.del(REFRESH_COOKIE);
-    return { success: true };
+      // cookies.delete(ACCESS_COOKIE, { path: "/" });
+      // cookies.delete(REFRESH_COOKIE, { path: "/" });
+      return { success: true };
+    } catch (error) {
+      console.error("Failed to delete cookies:", error);
+      return { success: false };
+    }
   }
 
   async logoutAll(userId: number) {

@@ -90,7 +90,7 @@ export const createdDocumentTool = (
 };
 
 const addResultDataToMessage = async (messages: ModelMessage[]): Promise<ModelMessage[]> => {
-  const resultData = await result.getStudentResult(32, 5);
+  const resultData = await result.getStudentResult({ id: 20, examId: 5 });
   if (!resultData) return messages;
   resultData.student.studentPhoto = "";
   resultData.school.logo = "";
@@ -98,7 +98,7 @@ const addResultDataToMessage = async (messages: ModelMessage[]): Promise<ModelMe
   const lastMessage = messages.pop();
   if (!lastMessage) return messages;
   const data = `RESULT DATA: \n${JSON.stringify(resultData)}\n`;
-  const prompt = `Generate the report card for ${resultData.student.fullName} based on the result data provided and use the ${resultData.examType.title} as the title.`;
+  const prompt = `Generate the report card for ${resultData.student.fullName} based on the result data provided and use the ${resultData.examType?.title} as the title.`;
   return [...messages, { role: "user", content: `${lastMessage.content}\n${data}\n${prompt}` }];
 };
 

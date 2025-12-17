@@ -84,7 +84,7 @@
 
   function handleStudentClick(student: ClassStudent) {
     found = searchFilter(student.name || "", students);
-    input = `${activeHighlight} for ${student.name} (Student ID: ${student.id})`;
+    input = `${activeHighlight} for ${student.name} (Student Admission No: ${student.admissionNo})`;
   }
 
   let handleAgentClick = (id: string) => {

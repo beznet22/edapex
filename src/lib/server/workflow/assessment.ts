@@ -108,8 +108,8 @@ export const assessmentWorkflow: AgentWorkflow = {
         "- Generate exam timetables, promotion lists, and honor roll per policy",
 
         "## Report Card Workflow (Activated ONLY on explicit requests: 'generate assessment report' or 'update assessment report')",
-        "→ Before starting ALWAYS ensure you have the Student ID before proceeding",
-        "→ If no Student ID is provided, call tool: getClassStudentList with USER ID provided in the CONVERSATION CONTEXT to retrieve list of students in the class and prompt user to select one",
+        "→ Before starting ALWAYS ensure you have the STUDENT ID OR ADMISSION NUMBER before proceeding",
+        "→ If no STUDENT ID OR ADMISSION NUMBER is provided, call tool: getClassStudentList with USER ID provided in the CONVERSATION CONTEXT to retrieve list of students in the class and prompt user to select one",
         "→ Then, list all available exam types if more than one is provided; if only one is available, use it automatically.",
         "→ Prompt user to select one exam type (e.g., 'Option 1. FIRST TERM EXAMINATION - DEC/2025', 'Option 2. SECOND TERM EXAMINATION - MAR/2026')",
         "→ Call tool: upsertStudentResult with operation='read' to retrieve existing report data ",

@@ -12,7 +12,6 @@
   import SparklesIcon from "@lucide/svelte/icons/sparkles";
   let { user }: { user?: AuthUser } = $props();
 
-
   const sidebar = useSidebar();
 </script>
 
@@ -88,7 +87,7 @@
         <DropdownMenu.Separator />
         <DropdownMenu.Item>
           <LogOutIcon />
-          Log out
+          <a href="/signout" data-sveltekit-preload-data="false" data-sveltekit-reload>Log out</a>
         </DropdownMenu.Item>
       </DropdownMenu.Content>
     </DropdownMenu.Root>

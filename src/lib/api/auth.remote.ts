@@ -1,4 +1,4 @@
-import { form, getRequestEvent, query } from "$app/server";
+import { command, form, getRequestEvent, query } from "$app/server";
 import { authUserSchema, signupSchema } from "$lib/schema/auth";
 import { auth } from "$lib/server/service/auth.service";
 import { redirect } from "@sveltejs/kit";
@@ -13,9 +13,9 @@ export const login = form(authUserSchema, async ({ email, password }) => {
     redirect(303, "/");
 });
 
-export const signout = form(async () => {
+export const signout = query(async () => {
   await auth.logout();
-  redirect(303, "/signin");
+  // return redirect(303, "/signin");
 });
 
 export const getUser = query(async () => {

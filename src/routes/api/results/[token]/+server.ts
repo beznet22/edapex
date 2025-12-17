@@ -16,7 +16,7 @@ export const GET: RequestHandler = async ({ url, params }) => {
     const jsonString = new TextDecoder().decode(decoded);
     const { studentId, examId } = JSON.parse(jsonString);
 
-    const resultData = await result.getStudentResult(studentId, examId, preview);
+    const resultData = await result.getStudentResult({ id: studentId, examId });
     if (!resultData) throw new Error("Result not found");
     const props = { data: resultData };
     const { body, head } = render(ResultTemplate, { props });

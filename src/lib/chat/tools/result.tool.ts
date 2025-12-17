@@ -16,6 +16,10 @@ export const upsertStudentResult = tool({
     .object({
       studentId: z.number().describe("The Student ID - REQUIRED for all operations"),
       examTypeId: z.number().describe("The Exam Type ID - REQUIRED for all operations"),
+      adminNo: z
+        .number()
+        .optional()
+        .describe("The Student Admission Number - REQUIRED if studentId is not provided"),
       operation: z
         .enum(["create", "update", "read"])
         .default("read")
@@ -45,7 +49,7 @@ export const upsertStudentResult = tool({
       .describe("Structured student assessment data for head teacher review"),
   }),
   execute: async (input) => {
-    const { studentId, examTypeId, operation, marksData } = input;
+    const { studentId, examTypeId, operation, marksData, adminNo } = input;
     if (operation === "create" || operation === "update") {
       if (!marksData) {
         return {
@@ -56,7 +60,10 @@ export const upsertStudentResult = tool({
       await result.upsertStudentResult(marksData, 1);
     }
 
-    const resultData = await result.getStudentResult(studentId, examTypeId);
+    const resultData = adminNo
+      ? await result.getStudentResult({ isAdminNo: true, examId: examTypeId, id: adminNo })
+      : await result.getStudentResult({ id: studentId, examId: examTypeId });
+
     if (!resultData) {
       return {
         status: "denied",
@@ -96,7 +103,7 @@ export const getClassStudentList = tool({
       students: students || [],
     };
   },
-})
+});
 
 export type upsertResultInput = InferToolInput<typeof upsertStudentResult>;
 export type upsertResultOutput = InferToolOutput<typeof upsertStudentResult>;

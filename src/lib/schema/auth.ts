@@ -8,7 +8,7 @@ export const authUserSchema = z.object({
 export const signupSchema = z.object({
   name: z.string().check(z.minLength(4)),
   email: z.email(),
-  password: z.string().check(z.regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{12,}$/)),
+  password: z.string(), //.check(z.regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{12,}$/)),
   phoneNumber: z.string().optional(),
   usertype: z.string().optional(),
   schoolId: z.number().optional(),
