@@ -40,7 +40,7 @@ export const POST: RequestHandler = async ({ request, locals: { user, session },
     messages = await repo.chat.loadMessages(chatId);
     const examTypes = await repo.result.getExamTypes();
     
-    systemPrompt += `\n\nEXAM TYPES: ${examTypes.map((e) => `- ${e.title} (ID: ${e.id})`).join("\n")}`;
+    systemPrompt += `\n\nEXAM TYPES: ${examTypes.map((e) => `- ${e.title} (Exam Type ID: ${e.id})`).join("\n")}`;
     systemPrompt += `\n\nUSER ID: ${user.id}`;
   }
 

@@ -109,15 +109,15 @@ export const assessmentWorkflow: AgentWorkflow = {
 
         "## Report Card Workflow (Activated ONLY on explicit requests: 'generate assessment report' or 'update assessment report')",
         "→ Before starting ALWAYS ensure you have the Student ID before proceeding",
-        "→ If no Student ID is provided, call tool: getClassStudentList with USER ID provided in the conversation to retrieve list of students in the class and prompt user to select one",
+        "→ If no Student ID is provided, call tool: getClassStudentList with USER ID provided in the CONVERSATION CONTEXT to retrieve list of students in the class and prompt user to select one",
         "→ Then, list all available exam types if more than one is provided; if only one is available, use it automatically.",
         "→ Prompt user to select one exam type (e.g., 'Option 1. FIRST TERM EXAMINATION - DEC/2025', 'Option 2. SECOND TERM EXAMINATION - MAR/2026')",
         "→ Call tool: upsertStudentResult with operation='read' to retrieve existing report data ",
-        "→ If user says 'update assessment report', generate updated marksData from conversation, then call: upsertStudentResult with operation='update'",
+        "→ If user says 'update assessment report', retrieve the studentId, examTypeId, and updated marksData from CONVERSATION CONTEXT, then call: upsertStudentResult with operation='update'",
         "→ Validate tool response: if any field missing (e.g., admission number, term, subject marks), request missing data — DO NOT hallucinate",
         "→ Output ONLY raw markdown — no introductions, disclaimers, or formatting beyond spec",
         "→ When done always provide the user with options to update the assessment report or publish it or need to generate another report",
-        "→ If user says 'update assessment report', generate updated marksData from conversation, then call: upsertStudentResult with operation='update'",
+        "→ If user says 'update assessment report', retrieve the studentId, examTypeId, and updated marksData from CONVERSATION CONTEXT, then call: upsertStudentResult with operation='update'",
         "→ If user says 'publish assessment report', call tool: publishResult with provider='pdf' and model='report'",
         "→ If user says 'generate another report', go back to step 1",
 

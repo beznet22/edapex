@@ -7,7 +7,7 @@ import { studentRepo } from "$lib/server/repository/student.repo";
 export const upsertStudentResult = tool({
   description: [
     "Retrieves, creates, or update student assessment data for head teacher review",
-    "ALWAYS requires studentId and examTypeId to identify the record",
+    "ALWAYS requires studentId and examTypeId provided in CONVERSATION CONTEXT to identify the record",
     "When updating (update=true): provide complete marksData object with modifications",
     "When retrieving (update=false/default): returns existing result data and PDF generation link",
     "Output includes pdfUrl formatted as '/generate?id={studentId}&examId={examTypeId}'",

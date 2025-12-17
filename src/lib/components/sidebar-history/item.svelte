@@ -32,17 +32,11 @@
 </script>
 
 <SidebarMenuItem>
-  <SidebarMenuButton isActive={active}>
+  <SidebarMenuButton>
     {#snippet child({ props })}
-      <button
-        {...props}
-        onclick={() => {
-          goto(`/chat/${chat.id}`);
-          context.setOpenMobile(false);
-        }}
-      >
+      <a href={chat.id} {...props}>
         <span>{chat.title}</span>
-      </button>
+      </a>
     {/snippet}
   </SidebarMenuButton>
 

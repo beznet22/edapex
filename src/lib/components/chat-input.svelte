@@ -2,24 +2,23 @@
   import { PromptSuggestion } from "$lib/components/prompt-kit/prompt-suggestion";
   import { Button } from "$lib/components/ui/button";
   import { Separator } from "$lib/components/ui/separator";
-  import { ArrowUp, Package, Plus, Square } from "@lucide/svelte";
+  import { ArrowUp, Package, Square } from "@lucide/svelte";
 
   import { useChat } from "$lib/context/chat-context.svelte";
+  import { useFileActions } from "$lib/context/file-context.svelte";
+  import type { ClassStudent } from "$lib/server/repository/student.repo";
   import type { AuthUser } from "$lib/types/auth-types";
+  import { iconRegistry } from "$lib/utils/icons";
+  import { searchFilter } from "$lib/utils/search";
+  import { getContext } from "svelte";
+  import ChatMenu from "./chat-menu.svelte";
+  import DropZone from "./drop-zone.svelte";
   import {
     PromptInput,
     PromptInputAction,
     PromptInputActions,
     PromptInputTextarea,
   } from "./prompt-kit/prompt-input";
-  import { useFileActions } from "$lib/context/file-context.svelte";
-  import DropZone from "./drop-zone.svelte";
-  import ChatMenu from "./chat-menu.svelte";
-  import { iconRegistry } from "$lib/utils/icons";
-  import type { ClassStudent } from "$lib/server/repository/student.repo";
-  import type { ExamType } from "$lib/schema/result";
-  import { getContext } from "svelte";
-  import { searchFilter } from "$lib/utils/search";
 
   let {
     user,
@@ -84,7 +83,7 @@
 
   function handleStudentClick(student: ClassStudent) {
     found = searchFilter(student.name || "", students);
-    input = `${activeHighlight} for ${student.name} (ID: ${student.id})`;
+    input = `${activeHighlight} for ${student.name} (Student ID: ${student.id})`;
   }
 
   let handleAgentClick = (id: string) => {
@@ -208,5 +207,4 @@
 </div>
 
 <input type="file" onchange={file.onchange} class="hidden" id="file-upload" bind:this={file.fileInputRef} />
-
 <DropZone />
