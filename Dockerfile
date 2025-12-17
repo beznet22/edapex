@@ -4,10 +4,13 @@ FROM oven/bun:latest AS builder
 
 WORKDIR /app
 
-# Copy package files
+# Copy package files first to leverage Docker layer caching
 COPY package.json bun.lock* ./
 
-RUN bun install --frozen-lockfile
+# Install dependencies with frozen lockfile for reproducible builds
+RUN bun install --frozen-lockfile --prefer-offline
+
+# Copy source code excluding unnecessary files (using .dockerignore)
 COPY . .
 
 # Build the SvelteKit application
@@ -24,8 +27,8 @@ COPY --from=builder /app/build ./build
 COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/bun.lock* ./bun.lock*
 
-# Install only production dependencies
-RUN bun install --frozen-lockfile --production && \
+# Install only production dependencies with offline mode for speed
+RUN bun install --frozen-lockfile --production --prefer-offline && \
     # Clean up bun cache to reduce image size
     bun pm cache clean --force
 

@@ -1,0 +1,69 @@
+# Dependencies
+node_modules
+bun.lock
+
+# Environment variables
+.env
+.env.local
+.env.production
+.env.development
+
+# IDE files
+.vscode
+.idea
+*.swp
+*.swo
+.DS_Store
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Coverage directory used by tests
+coverage
+.nyc_output
+
+# Git
+.git
+.gitignore
+
+# OS generated files
+Thumbs.db
+ehthumbs.db
+Icon?
+.directory
+*.nib
+*.db
+
+# Build outputs
+dist
+build
+.output
+
+# Testing
+test
+tests
+
+# Documentation
+docs
+*.md
+*.txt
+
+# SvelteKit specific
+.svelte-kit
+.output
+.vercel
+.netlify
+
+# Temp files
+tmp
+temp
+*.tmp
+*.temp
+
+# Bun specific
+.bun
+!.bun/install/cache
