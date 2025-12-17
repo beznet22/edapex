@@ -31,7 +31,7 @@
   } = $props();
 
   // svelte-ignore state_referenced_locally
-  const students = getContext<ClassStudent[]>(user?.id);
+  const students = getContext<ClassStudent[]>(user?.id) || [];
 
   // State
   let input = $state("");
@@ -73,6 +73,7 @@
   function onValueChange(value: string) {
     input = value;
     activeSuggestions = [];
+
     found = searchFilter(value, students);
   }
 

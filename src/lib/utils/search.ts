@@ -46,7 +46,6 @@ export function searchFilter(query: string, students: ClassStudent[]) {
 
   // --- Tokenize the query ---
   const tokens = q.split(/\s+/).filter(Boolean);
-
   // --- Score each student ---
   const scored = students.map((s) => {
     const studentName = normalize(s.name || "");
