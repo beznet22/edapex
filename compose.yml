@@ -16,5 +16,5 @@ services:
       - MAIL_FROM_NAME=${MAIL_FROM_NAME}
       - MAIL_ENCRYPTION=${MAIL_ENCRYPTION}
     volumes:
-      - ./uploads:/app/uploads
+      - ${STORAGE_DIR}/uploads:/app/uploads
     restart: unless-stopped
