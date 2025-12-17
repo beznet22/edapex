@@ -20,7 +20,7 @@ jobs:
 
     steps:
       # ─────────────────────────────────────────────
-      # Checkout (full history required for tagging)
+      # Checkout repo with full history for tagging
       # ─────────────────────────────────────────────
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -54,7 +54,7 @@ jobs:
             type=raw,value=latest
 
       # ─────────────────────────────────────────────
-      # Build & Push image (THIS happens first)
+      # Build & Push Docker image
       # ─────────────────────────────────────────────
       - name: Build and push Docker image
         id: push
@@ -69,7 +69,7 @@ jobs:
           cache-to: type=gha,mode=max
 
       # ─────────────────────────────────────────────
-      # Create semantic version tag AFTER image push
+      # Create semantic version tag
       # ─────────────────────────────────────────────
       - name: Create semantic version tag
         id: tag
@@ -80,8 +80,19 @@ jobs:
           default_bump: patch   # patch | minor | major
 
       # ─────────────────────────────────────────────
-      # Push the new tag (triggers Dokploy)
+      # Ensure tag exists locally (fixes src refspec error)
+      # ─────────────────────────────────────────────
+      - name: Ensure tag exists locally
+        run: git tag ${{ steps.tag.outputs.new_tag }}
+
+      # ─────────────────────────────────────────────
+      # Push the tag to GitHub (triggers Dokploy)
       # ─────────────────────────────────────────────
       - name: Push git tag
-        run: |
-          git push origin ${{ steps.tag.outputs.new_tag }}
+        run: git push origin ${{ steps.tag.outputs.new_tag }}
+
+      # ─────────────────────────────────────────────
+      # Optional: Debug local tags
+      # ─────────────────────────────────────────────
+      - name: List local tags
+        run: git tag
