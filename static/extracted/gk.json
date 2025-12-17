@@ -1,0 +1,142 @@
+{
+    "studentData": {
+        "studentId": null,
+        "admissionNo": 91,
+        "fullName": "Tehilla Kelvin",
+        "class": "GRADE K",
+        "section": "A",
+        "classId": 22,
+        "sectionId": 5,
+        "studentCategory": "GRADEK",
+        "studentCategoryId": 3,
+        "term": "FIRST TERM EXAMINATION - DEC/2025",
+        "examTypeId": 5,
+        "attendance": {
+            "daysOpened": 105,
+            "daysPresent": 100,
+            "daysAbsent": 5
+        }
+    },
+    "marksData": [
+        {
+            "subjectCode": "BDL",
+            "subjectId": 42,
+            "examSetups": [
+                "MTA",
+                "CA",
+                "REPORT",
+                "EXAM"
+            ],
+            "marks": [
+                20,
+                19,
+                3,
+                50
+            ],
+            "total": 92,
+            "grade": "\u003Cspan class=\"bg-red-200 text-violet-600 py-1 px-3 rounded-full text-xs\"\u003EEXCEEDING\u003C/span\u003E"
+        },
+        {
+            "subjectCode": "BST",
+            "subjectId": 43,
+            "examSetups": [
+                "MTA",
+                "CA",
+                "REPORT",
+                "EXAM"
+            ],
+            "marks": [
+                20,
+                20,
+                4,
+                49
+            ],
+            "total": 93,
+            "grade": "\u003Cspan class=\"bg-red-200 text-violet-600 py-1 px-3 rounded-full text-xs\"\u003EEXCEEDING\u003C/span\u003E"
+        },
+        {
+            "subjectCode": "CRS",
+            "subjectId": 44,
+            "examSetups": [
+                "MTA",
+                "CA",
+                "REPORT",
+                "EXAM"
+            ],
+            "marks": [
+                20,
+                18,
+                3,
+                50
+            ],
+            "total": 91,
+            "grade": "\u003Cspan class=\"bg-red-200 text-violet-600 py-1 px-3 rounded-full text-xs\"\u003EEXCEEDING\u003C/span\u003E"
+        },
+        {
+            "subjectCode": "CIVIC",
+            "subjectId": 28,
+            "examSetups": [
+                "MTA",
+                "CA",
+                "REPORT",
+                "EXAM"
+            ],
+            "marks": [
+                20,
+                20,
+                4,
+                49
+            ],
+            "total": 93,
+            "grade": "\u003Cspan class=\"bg-red-200 text-violet-600 py-1 px-3 rounded-full text-xs\"\u003EEXCEEDING\u003C/span\u003E"
+        },
+        {
+            "subjectCode": "CCA",
+            "subjectId": 23,
+            "examSetups": [
+                "MTA",
+                "CA",
+                "REPORT",
+                "EXAM"
+            ],
+            "marks": [
+                19,
+                20,
+                4,
+                46
+            ],
+            "total": 89,
+            "grade": "\u003Cspan class=\"bg-blue-200 text-violet-600 py-1 px-3 rounded-full text-xs\"\u003EEXPECTED\u003C/span\u003E"
+        },
+        {
+            "subjectCode": "ENG",
+            "subjectId": 22,
+            "examSetups": [
+                "MTA",
+                "CA",
+                "REPORT",
+                "EXAM"
+            ],
+            "marks": [
+                20,
+                19,
+                3,
+                47
+            ],
+            "total": 89,
+            "grade": "\u003Cspan class=\"bg-blue-200 text-violet-600 py-1 px-3 rounded-full text-xs\"\u003EEXPECTED\u003C/span\u003E"
+        }
+    ],
+    "studentRatings": {
+        "adherent_and_independent": null,
+        "flexibility_and_creativity": null,
+        "meticulous": null,
+        "neatness": null,
+        "overall_progress": null,
+        "self_control_and_interaction": null
+    },
+    "teachersRemark": {
+        "comment": "TEHILLA IS A SMART CHILD. SHE CAN READ SIMPLE SENTENCES AND SOLVE SIMPLE MATHEMATICAL PROBLEMS.",
+        "note": null
+    }
+}

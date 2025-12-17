@@ -1,0 +1,59 @@
+{
+    "studentData": {
+        "studentId": null,
+        "admissionNo": 1001,
+        "fullName": "TOMUTER T. TERFA",
+        "class": "DAY CARE 1",
+        "section": "",
+        "classId": 22,
+        "sectionId": 5,
+        "studentCategory": "DAYCARE",
+        "studentCategoryId": 1,
+        "term": "FIRST TERM EXAMINATION - DEC/2025",
+        "examTypeId": 5,
+        "attendance": {
+            "daysOpened": 0,
+            "daysPresent": 0,
+            "daysAbsent": 0
+        }
+    },
+    "marksData": [
+        {
+            "subjectCode": "BDL",
+            "subjectId": 42,
+            "learningOutcome": "TOMUTER MAY LISTEN QUIETLY WITHOUT RESPONDING. HOWEVER HE SHOWS ENTHUSIASM WHEN BIBLE SONGS AND MOVEMENT ARE INCLUDED."
+        },
+        {
+            "subjectCode": "PHE",
+            "subjectId": 27,
+            "learningOutcome": "TOMUTER MAY NOT VERBALLY RESPOND DURING GROUP ACTIVITIES, BUT HIS WILLINGNESS TO PARTICIPATE ACTIVELY REFLECTS GROWTH. HE CONFIDENTLY EXPLORES HIS ENVIRONMENT, PRACTISE GROSS-MOTOR SKILLS SUCH AS WALKING, DANCING AND JUMPING. HIS ACTIVE PARTICIPATION SHOWS STRONG PHYSICAL GROWTH."
+        },
+        {
+            "subjectCode": "ENG",
+            "subjectId": 22,
+            "learningOutcome": "TOMUTER IS WORKING ON GIVING FEEDBACK DURING LEARNING ACTIVITIES. HIS EXCITEMENT DURING ACTIVITIES SHOW DEVELOPING AWARENESS OF THE WORLD AND EMERGING ABILITY TO MAKE CONNECTIONS THROUGH EXPLORATION. HE SCRIBBLES AND COLOURS WITHOUT AID"
+        },
+        {
+            "subjectCode": "BST",
+            "subjectId": 43,
+            "learningOutcome": "TOMUTER EXPRESSES HIMSELF WELL THROUGH ACTIONS. HE IS WORKING ON RECITING LETTERS. HE PAYS KEEN ATTENTION DURING JOLLY PHONICS SESSION. HE WILL DO BETTER AS HE ENGAGES MORE IN ACTIVITIES."
+        },
+        {
+            "subjectCode": "MATH",
+            "subjectId": 21,
+            "learningOutcome": "TOMUTER MAY NOT RESPOND VERBALLY TO COUNTING, BUT HIS INTEREST DURING HANDS-ON TASKS DEMONSTRATES GROWING PROBLEM-SOLVING ABILITIES. HE ENJOYS STACKING, AND EXPLORING SHAPES THROUGH PLAY."
+        }
+    ],
+    "studentRatings": {
+        "adherent_and_independent": null,
+        "flexibility_and_creativity": null,
+        "meticulous": null,
+        "neatness": null,
+        "overall_progress": null,
+        "self_control_and_interaction": null
+    },
+    "teachersRemark": {
+        "comment": null,
+        "note": null
+    }
+}
