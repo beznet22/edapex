@@ -15,7 +15,6 @@ import { sql } from "drizzle-orm";
 import { generateId } from "ai";
 export * from "./sms-schema";
 import { users, smStaffs, smStudents, smParents } from "./sms-schema";
-import { DrizzleMySQLAdapter } from "@lucia-auth/adapter-drizzle";
 
 export type User = typeof users.$inferSelect;
 export type Staff = typeof smStaffs.$inferSelect;
