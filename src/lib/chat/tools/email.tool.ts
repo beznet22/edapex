@@ -1,7 +1,6 @@
 
 import ResultEmail from "$lib/components/template/result-email.svelte";
 import { tool, type InferToolInput, type InferToolOutput } from "ai";
-import { render } from "svelte-email";
 import { z } from "zod";
 
 export const sendEmailTool = tool({
@@ -21,11 +20,8 @@ export const sendEmailTool = tool({
     message: z.string().optional().describe("Status details (e.g., 'Email sent', 'Email not sent')"),
   }),
   execute: async (input) => {
+    const { to, subject, body } = input;
     try {
-      const html = render({
-        template: ResultEmail as any,
-        props: { name: "Alex" },
-      });
       
       return { status: "approved", message: "Email sent successfully" };
     } catch (error) {

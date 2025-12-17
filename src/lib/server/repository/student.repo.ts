@@ -116,7 +116,8 @@ export class StudentRepository extends BaseRepository {
     return record?.student_records || null;
   }
 
-  async getStudentById(id: number, isAdminNo = false): Promise<StudentDetails | null> {
+  async getStudentById(id?: number, isAdminNo = false): Promise<StudentDetails | null> {
+    if (!id) return null;
     const field = isAdminNo ? smStudents.admissionNo : smStudents.id;
 
     const [student] = await this.db

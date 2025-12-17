@@ -1,10 +1,11 @@
 import { getRequestEvent } from "$app/server";
 import { command } from "$app/server";
 import z from "zod";
-import { generate, pageToHtml } from "$lib/server/helpers/pdf-generator";
+import { generate } from "$lib/server/helpers/pdf-generator";
 import { render } from "svelte/server";
 import ResultTemplate from "$lib/components/template/ResultTemplate.svelte";
 import { result } from "$lib/server/service/result.service";
+import { pageToHtml } from "$lib/server/helpers";
 
 export const generateResultPdf = command(
   z.object({
@@ -13,7 +14,7 @@ export const generateResultPdf = command(
   }),
   async ({ studentId, examId }) => {
     try {
-      const resultData = await result.getStudentResult(studentId, examId);
+      const resultData = await result.getStudentResult({ id: studentId, examId });
       if (!resultData) throw new Error("Result not found");
 
       const props = { data: resultData };

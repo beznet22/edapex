@@ -50,7 +50,7 @@ export const GET: RequestHandler = async ({ request }) => {
     const parsedResult = JSON.parse(readFileSync(filePath, "utf-8"));
     const marks = resultInputSchema.parse(parsedResult);
     const res = await result.upsertStudentResult(marks, 1);
-    const resultData = await result.getStudentResult(20, 5);
+    const resultData = await result.getStudentResult({ id: 20, examId: 5 });
 
     const props = { data: resultData };
     const { body, head } = render(ResultTemplate, { props });
