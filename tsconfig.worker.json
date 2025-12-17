@@ -1,0 +1,32 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "es2022",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "allowSyntheticDefaultImports": true,
+    "outDir": "./build",
+    "rootDir": "./src",
+    "types": ["node"],
+    "lib": ["ES2022", "WebWorker"],
+    "resolveJsonModule": true,
+    "allowJs": true,
+    "checkJs": false,
+    "baseUrl": ".",
+    "paths": {
+      "$lib/*": ["src/lib/*"]
+    }
+  },
+  "include": [
+    "src/lib/server/queue/worker.ts",
+    "src/lib/server/helpers/smtp.ts",
+    "src/lib/server/queue/jobs/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "build"
+  ]
+}

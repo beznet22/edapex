@@ -1,0 +1,194 @@
+{
+    "studentData": {
+        "studentId": null,
+        "admissionNo": 29,
+        "fullName": "MARTHA SULE",
+        "class": "MIDDLE BASIC 6",
+        "section": "A",
+        "studentCategory": "MIDDLE BASIC",
+        "studentCategoryId": 5,
+        "term": "FIRST TERM EXAMINATION - DEC/2025",
+        "examTypeId": 5,
+        "attendance": {
+            "daysOpened": 118,
+            "daysPresent": 116,
+            "daysAbsent": 2
+        }
+    },
+    "marksData": [
+        {
+            "subjectCode": "MATH",
+            "subjectId": 21,
+            "examTitles": [
+                "MTA",
+                "CA",
+                "REPORT",
+                "EXAM"
+            ],
+            "marks": [
+                30,
+                10,
+                10,
+                45
+            ],
+            "total": 95,
+            "grade": "\u003Cspan class=\"bg-purple-200 text-violet-600 py-1 px-3 rounded-full text-xs\"\u003EA\u003C/span\u003E"
+        },
+        {
+            "subjectCode": "ENG",
+            "subjectId": 22,
+            "examTitles": [
+                "MTA",
+                "CA",
+                "REPORT",
+                "EXAM"
+            ],
+            "marks": [
+                28,
+                10,
+                10,
+                40
+            ],
+            "total": 88,
+            "grade": "\u003Cspan class=\"bg-blue-200 text-violet-600 py-1 px-3 rounded-full text-xs\"\u003EB\u003C/span\u003E"
+        },
+        {
+            "subjectCode": "BDL",
+            "subjectId": 42,
+            "examTitles": [
+                "MTA",
+                "CA",
+                "REPORT",
+                "EXAM"
+            ],
+            "marks": [
+                25,
+                10,
+                10,
+                35
+            ],
+            "total": 80,
+            "grade": "\u003Cspan class=\"bg-red-200 text-violet-600 py-1 px-3 rounded-full text-xs\"\u003EE\u003C/span\u003E"
+        },
+        {
+            "subjectCode": "BST",
+            "subjectId": 43,
+            "examTitles": [
+                "MTA",
+                "CA",
+                "REPORT",
+                "EXAM"
+            ],
+            "marks": [
+                30,
+                10,
+                10,
+                39
+            ],
+            "total": 89,
+            "grade": "\u003Cspan class=\"bg-blue-200 text-violet-600 py-1 px-3 rounded-full text-xs\"\u003EB\u003C/span\u003E"
+        },
+        {
+            "subjectCode": "CRS",
+            "subjectId": 44,
+            "examTitles": [
+                "MTA",
+                "CA",
+                "REPORT",
+                "EXAM"
+            ],
+            "marks": [
+                30,
+                9,
+                8,
+                42
+            ],
+            "total": 89,
+            "grade": "\u003Cspan class=\"bg-blue-200 text-violet-600 py-1 px-3 rounded-full text-xs\"\u003EB\u003C/span\u003E"
+        },
+        {
+            "subjectCode": "PHE",
+            "subjectId": 27,
+            "examTitles": [
+                "MTA",
+                "CA",
+                "REPORT",
+                "EXAM"
+            ],
+            "marks": [
+                24,
+                7,
+                10,
+                43
+            ],
+            "total": 84,
+            "grade": "\u003Cspan class=\"bg-yellow-200 text-violet-600 py-1 px-3 rounded-full text-xs\"\u003EC\u003C/span\u003E"
+        },
+        {
+            "subjectCode": "CCA",
+            "subjectId": 23,
+            "examTitles": [
+                "MTA",
+                "CA",
+                "REPORT",
+                "EXAM"
+            ],
+            "marks": [
+                25,
+                3,
+                10,
+                50
+            ],
+            "total": 88,
+            "grade": "\u003Cspan class=\"bg-blue-200 text-violet-600 py-1 px-3 rounded-full text-xs\"\u003EB\u003C/span\u003E"
+        },
+        {
+            "subjectCode": "CIVIC",
+            "subjectId": 28,
+            "examTitles": [
+                "MTA",
+                "CA",
+                "REPORT",
+                "EXAM"
+            ],
+            "marks": [
+                23,
+                10,
+                10,
+                45
+            ],
+            "total": 88,
+            "grade": "\u003Cspan class=\"bg-blue-200 text-violet-600 py-1 px-3 rounded-full text-xs\"\u003EB\u003C/span\u003E"
+        },
+        {
+            "subjectCode": "FRENCH",
+            "subjectId": 29,
+            "examTitles": [
+                "MTA",
+                "CA",
+                "REPORT",
+                "EXAM"
+            ],
+            "marks": [
+                20,
+                10,
+                5,
+                50
+            ],
+            "total": 85,
+            "grade": "\u003Cspan class=\"bg-yellow-200 text-violet-600 py-1 px-3 rounded-full text-xs\"\u003EC\u003C/span\u003E"
+        }
+    ],
+    "teachersRemark": {
+        "comment": "SHE IS VERY COMMITTED TO LEARNING.",
+        "note": null
+    },
+    "studentRatings": {
+        "adherent_and_independent": 4,
+        "flexibility_and_creativity": 5,
+        "meticulous": 3,
+        "neatness": 4,
+        "overall_progress": 4,
+        "self_control_and_interaction": 3
+    }
+}
