@@ -3,8 +3,8 @@ import { SignJWT, jwtVerify, decodeJwt, type JWTPayload, base64url } from "jose"
 import { env } from "$env/dynamic/private";
 import crypto from "crypto";
 
-const SECRET = new TextEncoder().encode(env.JWT_SIGN_SECRET);
-const JWE_SECRET = base64url.decode(env.JWE_ENC_SECRET!);
+const SECRET = new TextEncoder().encode(env.JWT_SIGN_SECRET || "secret");
+const JWE_SECRET = base64url.decode(env.JWE_ENC_SECRET! || "secret");
 if (!SECRET.length) throw new Error("JWT_SIGN_SECRET required");
 if (!SECRET.length || !JWE_SECRET.length) {
   throw new Error("Missing SIGN_SECRET/JWE_SECRET environment variables");
