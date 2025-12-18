@@ -3,6 +3,7 @@ import type { UploadedData } from "$lib/types/chat-types";
 import { generateId } from "ai";
 import { getContext, setContext } from "svelte";
 import { toast } from "svelte-sonner";
+import UploadWorker from "$lib/chat/upload-worker.ts?worker";
 
 const FILES_CONTEXT_KEY = Symbol("attachments-context");
 
@@ -106,7 +107,7 @@ export class FilesContext {
 
       // Add to uploads immediately with unique ID
       this.uploads = [...this.uploads, upload];
-      const worker = new Worker(new URL("../chat/upload-worker.ts", import.meta.url), { type: "module" });
+      const worker = new UploadWorker({ name: `upload-worker-${fileId}` });
       worker.onmessage = ({ data }: MessageEvent<UploadedData>) => {
         if (!data.success) {
           this.uploads = this.uploads.filter((u) => u.id !== fileId);
@@ -117,8 +118,6 @@ export class FilesContext {
         // Update only this specific file's status
         this.uploads = this.uploads.map((u) => (u.id === fileId ? { ...u, ...data, success: true } : u));
         console.log(`Upload success for ${file.name}:`, data);
-        const result = studentDataSchema.parse(data.studentData);
-        console.log("Upload success: ", { result });
       };
 
       worker.onerror = (error) => {
