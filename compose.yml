@@ -1,6 +1,7 @@
 services:
   edapex:
     image: ghcr.io/beznet22/edapex:latest
+    pull_policy: always
     expose:
       - 3000
     environment:

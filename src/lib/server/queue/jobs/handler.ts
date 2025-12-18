@@ -1,4 +1,5 @@
 import { SMTPClient, type SMTPMessage, type SMTPResult } from "$lib/server/helpers/smtp";
+import { extractData } from "./extract";
 
 export type JobResult = SMTPResult | any;
 interface JobPayload {
@@ -26,15 +27,15 @@ export const jobHandlers: { [key: string]: (job: JobPayload) => Promise<JobResul
     console.log("Email sent successfully:", result.messageId);
     return result;
   },
-  "generate-pdf": async (payload) => {
-    console.log("Processing PDF generation job:", payload);
-    // Actual PDF generation logic would go here
-    // Example: await generatePdf(payload);
+  "extract-data": async (payload) => {
+    await extractData(payload);
   },
+
   "result-processing": async (payload) => {
     console.log("Processing result job:", payload);
     // Actual result processing logic would go here
     // Example: await processResult(payload);
   },
+
   // Add more job handlers as needed
 };

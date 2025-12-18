@@ -1,98 +1,54 @@
-import { json, type RequestHandler } from "@sveltejs/kit";
-import { jobRepo } from "$lib/server/repository";
-import { studentRepo } from "$lib/server/repository/student.repo";
-import { result } from "$lib/server/service/result.service";
 import { generateContent } from "$lib/server/helpers/chat-helper";
-import { resultInputSchema } from "$lib/schema/result";
+import { workerPool } from "$lib/server/queue/pool";
+import { json, type RequestHandler } from "@sveltejs/kit";
 import { readFileSync } from "fs";
-import { join, dirname } from "path";
-import { fileURLToPath } from "url";
-import { env } from "$env/dynamic/private";
-import { render } from "svelte/server";
-import ResultTemplate from "$lib/components/template/ResultTemplate.svelte";
-import { pageToHtml } from "$lib/server/helpers";
+import { join } from "path";
+import { result } from "$lib/server/service/result.service";
+import { resultInputSchema } from "$lib/schema/result";
+import { CredentialType } from "$lib/schema/chat-schema";
+import { useAgent } from "$lib/server/service/agent.service";
 
-// export const GET: RequestHandler = async ({ request }) => {
-//   try {
-//     // Resolve the path to the static directory
-//     const __filename = fileURLToPath(import.meta.url);
-//     const __dirname = dirname(__filename);
-//     const filePath = join(__dirname, "..", "..", "..", "static", "05_MB6a.jpeg");
-//   //  const parsedResult = await extractFromLocalFile(filePath);
-
-//     // Read the file as a buffer
-//     const fileBuffer = readFileSync(filePath);
-
-//     // Create a Blob from the buffer
-//     const fileBlob = new Blob([fileBuffer], { type: "image/jpeg" });
-
-//     // Convert buffer to base64 for testing
-//     // const base64 = fileBuffer.toString("base64");
-
-//     const data = await result.getMappingData(1);
-//     const mapString = JSON.stringify(data);
-//     const content = await generateContent(fileBlob, mapString);
-//     const parsedResult = JSON.parse(content.trim());
-//     const marks = resultInputSchema.parse(parsedResult);
-//     return json(marks);
-//   } catch (error: any) {
-//     console.error("Error creating job:", error);
-//     return new Response(error.message, { status: 500 });
-//   }
-// };
-
-export const GET: RequestHandler = async ({ request }) => {
+export const GET: RequestHandler = async ({ url }) => {
   try {
-    // Resolve the path to the static directory
-    const __filename = fileURLToPath(import.meta.url);
-    const __dirname = dirname(__filename);
-    const filePath = join(__dirname, "..", "..", "..", "static/extracted", "6a.json");
-    const parsedResult = JSON.parse(readFileSync(filePath, "utf-8"));
-    const marks = resultInputSchema.parse(parsedResult);
-    const res = await result.upsertStudentResult(marks, 1);
-    const resultData = await result.getStudentResult({ id: 20, examId: 5 });
+    const tid = url.searchParams.get("taskId");
+    if (tid) {
+      const task = workerPool.getTaskStatus(tid);
+      if (!task) {
+        return json({ error: "Task not found" }, { status: 404 });
+      }
+      // If the task is done or error, we return the result but it will be deleted soon
+      return json(task);
+    }
 
-    const props = { data: resultData };
-    const { body, head } = render(ResultTemplate, { props });
+    const filePath = join(process.cwd(), "static", "05_MB6a.jpeg");
+    // Read the file as a buffer
+    const fileBuffer = readFileSync(filePath);
 
-    const html = pageToHtml(body, head);
+    // Create a Blob from the buffer
+    const fileBlob = new Blob([fileBuffer], { type: "image/jpeg" });
 
-    return new Response(html, {
-      headers: {
-        "Content-Type": "text/html",
-      },
+    const data = await result.getMappingData(1);
+    const mapString = JSON.stringify(data);
+
+    const provider = await useAgent().use(CredentialType.QWEN_CODE).geModelProvider();
+    if (!provider) throw new Error("No provider found");
+
+    const taskId = await workerPool.runTask({ type: "extract-data" }, async (msg) => {
+      try {
+        const content = await generateContent(fileBlob, provider, mapString);
+        const parsedResult = JSON.parse(content.trim());
+        const marks = resultInputSchema.parse(parsedResult);
+        console.log(marks);
+        return { success: true, data: marks };
+      } catch (error: any) {
+        console.error("Error extracting data:", error);
+        return { success: false, error };
+      }
     });
 
-    return json(resultData);
+    return json({ success: true, taskId });
   } catch (error: any) {
     console.error("Error creating job:", error);
     return new Response(error.message, { status: 500 });
   }
 };
-
-async function extractFromLocalFile(filePath: string) {
-  // Read the file into a buffer
-  const fileBuffer = readFileSync(filePath);
-
-  // Prepare form-data using Web FormData + Blob
-  const form = new FormData();
-  form.append("file", new Blob([fileBuffer]), filePath.split("/").pop() || "file");
-  form.append("output_format", "markdown");
-  // form.append("json_options", "hierarchy_output");
-
-  // Make request
-  const response = await fetch("https://extraction-api.nanonets.com/api/v1/extract/sync", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${env.NANONETS_API_KEY}`,
-    },
-    body: form,
-  });
-
-  if (!response.ok) {
-    const errText = await response.text();
-    throw new Error(`Nanonets error ${response.status}: ${errText}`);
-  }
-
-  return response.json();
-}
