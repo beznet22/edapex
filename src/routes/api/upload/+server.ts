@@ -48,30 +48,31 @@ export const POST: RequestHandler = async ({ request, locals, url }) => {
     const mapString = JSON.stringify(mappingData);
 
     const taskId = crypto.randomUUID();
-    updateTaskStatus({ taskId, status: "queued" });
+    // updateTaskStatus({ taskId, status: "queued" });
     // (async () => {
-      try {
-        updateTaskStatus({ taskId, status: "processing" });
-        const content = await generateContent(validatedFile.data, provider, mapString);
-        const parsedResult = JSON.parse(content.trim());
-        const marks = resultInputSchema.parse(parsedResult);
-        const res = await result.upsertStudentResult(marks, 1);
-        if (!res.success) {
-          updateTaskStatus({ taskId, status: "error", error: res.message });
-        }
-
-        // dummy long running task
-        // await new Promise((resolve) => setTimeout(resolve, 5000));
-        updateTaskStatus({ taskId, status: "done", data: {} });
-      } catch (error: any) {
+    try {
+      // updateTaskStatus({ taskId, status: "processing" });
+      const content = await generateContent(validatedFile.data, provider, mapString);
+      const parsedResult = JSON.parse(content.trim());
+      const marks = resultInputSchema.parse(parsedResult);
+      const res = await result.upsertStudentResult(marks, 1);
+      if (!res.success) {
         console.error("Error extracting data:", error);
-        updateTaskStatus({ taskId, status: "error", error: error.message });
+        // updateTaskStatus({ taskId, status: "error", error: res.message });
       }
+
+      // dummy long running task
+      // await new Promise((resolve) => setTimeout(resolve, 5000));
+      // updateTaskStatus({ taskId, status: "done", data: {} });
+    } catch (error: any) {
+      console.error("Error extracting data:", error);
+      // updateTaskStatus({ taskId, status: "error", error: error.message });
+    }
     // })();
 
-    const task = getTaskStatus(taskId);
-    deleteTask(taskId);
-    return json(task);
+    // const task = getTaskStatus(taskId);
+    // deleteTask(taskId);
+    return json({ taskId, status: "queued", data: {} });
   } catch (e) {
     console.error(e);
     return error(500, "Failed to upload file, try again");
