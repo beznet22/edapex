@@ -10,6 +10,7 @@ import crypto from "crypto";
 import { mkdirSync, readFileSync, unlinkSync, writeFileSync } from "fs";
 import { join } from "path";
 import { CACHE_DIR } from "$lib/constants";
+import { del, put } from "$lib/utils/fs-blob";
 
 export const POST: RequestHandler = async ({ request, locals, url }) => {
   const { session, user } = locals;
@@ -52,6 +53,14 @@ export const POST: RequestHandler = async ({ request, locals, url }) => {
     // (async () => {
     try {
       // updateTaskStatus({ taskId, status: "processing" });
+
+      const buff = await file.arrayBuffer();
+      const data = await put(`${user.id}_${user.fullName}`, buff, {
+        token: user.id.toString(),
+        access: "public",
+        contentType: file.type,
+      });
+
       const content = await generateContent(validatedFile.data, provider, mapString);
       const parsedResult = JSON.parse(content.trim());
       const marks = resultInputSchema.parse(parsedResult);
@@ -60,7 +69,7 @@ export const POST: RequestHandler = async ({ request, locals, url }) => {
         console.error("Error extracting data:", error);
         // updateTaskStatus({ taskId, status: "error", error: res.message });
       }
-
+      del(data.pathname);
       // dummy long running task
       // await new Promise((resolve) => setTimeout(resolve, 5000));
       // updateTaskStatus({ taskId, status: "done", data: {} });
@@ -72,7 +81,8 @@ export const POST: RequestHandler = async ({ request, locals, url }) => {
 
     // const task = getTaskStatus(taskId);
     // deleteTask(taskId);
-    return json({ taskId, status: "queued", data: {} });
+
+    return json({ taskId, status: "queued", data });
   } catch (e) {
     console.error(e);
     return error(500, "Failed to upload file, try again");
