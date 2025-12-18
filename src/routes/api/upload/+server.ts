@@ -58,10 +58,10 @@ export const POST: RequestHandler = async ({ request, locals, url }) => {
         if (!res.success) {
           updateTaskStatus({ taskId, status: "error", error: res.message });
         }
+
         // dummy long running task
-        await new Promise((resolve) => setTimeout(resolve, 5000));
+        // await new Promise((resolve) => setTimeout(resolve, 5000));
         updateTaskStatus({ taskId, status: "done", data: {} });
-        console.log("Task done: ", taskId);
       } catch (error: any) {
         console.error("Error extracting data:", error);
         updateTaskStatus({ taskId, status: "error", error: error.message });
