@@ -64,7 +64,7 @@ export type UploadedData = {
   filename?: string;
   success: boolean;
   error?: string;
-  task?: TaskData;
+  data?: any;
 };
 
 // Tool set type - using any to avoid circular dependency with tools function

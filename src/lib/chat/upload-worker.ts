@@ -32,7 +32,7 @@ self.onmessage = async function (e) {
       filename: file.name,
       mediaType: file.type,     
       success: task.status === "queued" || task.status === "processing",
-      task
+      data: task
     };
     // Post the result back to the main thread
     self.postMessage(result);
@@ -41,7 +41,7 @@ self.onmessage = async function (e) {
       id,
       success: false,
       error: error instanceof Error ? error.message : "Unknown error occurred during upload",
-      task: {
+      data: {
         taskId: id,
         status: "error",
         error: error instanceof Error ? error.message : "Unknown error occurred during upload",
