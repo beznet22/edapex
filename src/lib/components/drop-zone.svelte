@@ -5,7 +5,7 @@
   import { toast } from "svelte-sonner";
   import { Check } from "@lucide/svelte";
   import { useFileActions } from "$lib/context/file-context.svelte";
-  import { displaySize, FileDropZone, MEGABYTE, type FileDropZoneProps } from "./file-drop-zone";
+  import { displaySize, FileDropZone, KILOBYTE, MEGABYTE, type FileDropZoneProps } from "./file-drop-zone";
   import * as Dialog from "$lib/components/ui/dialog/index.js";
   import { ScrollArea } from "./ui/scroll-area";
   import { Loader } from "./prompt-kit/loader";
@@ -70,9 +70,9 @@
         <FileDropZone
           {onUpload}
           {onFileRejected}
-          maxFileSize={2 * MEGABYTE}
+          maxFileSize={300 * KILOBYTE}
           accept="image/*"
-          maxFiles={30}
+          maxFiles={2}
           fileCount={filesContext.files.length}
         />
       </div>
