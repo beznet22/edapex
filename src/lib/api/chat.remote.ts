@@ -1,6 +1,6 @@
 import { command, getRequestEvent, query } from "$app/server";
 import { chatModels } from "$lib/chat/models";
-import { allowAnonymousChats } from "$lib/utils/constants";
+import { allowAnonymousChats } from "$lib/constants";
 import { chatVisibilitySchema, fileSchema } from "$lib/schema/chat-schema";
 import { resultInputSchema } from "$lib/schema/result";
 import { repo } from "$lib/server/repository";

@@ -3,7 +3,7 @@ import { workerPool } from "$lib/server/queue/pool";
 import { auth } from "$lib/server/service/auth.service";
 import { type Handle } from "@sveltejs/kit";
 
-workerPool.initializeWorkers();
+// workerPool.initializeWorkers();
 
 export const handle: Handle = async ({ event, resolve }) => {
   const session = await auth.getSession();

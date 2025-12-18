@@ -2,7 +2,7 @@ import { SelectedModel } from "$lib/context/sync.svelte";
 import { base } from "$lib/server/repository";
 import { redirect } from "@sveltejs/kit";
 import type { LayoutServerLoad } from "./$types";
-import { allowAnonymousChats } from "$lib/utils/constants";
+import { allowAnonymousChats } from "$lib/constants";
 import { AgentService } from "$lib/server/service/agent.service";
 import { studentRepo, type ClassStudent } from "$lib/server/repository/student.repo";
 import type { ExamType } from "$lib/schema/result";
@@ -24,7 +24,7 @@ export const load: LayoutServerLoad = async ({ cookies, locals }) => {
 
   return {
     agents,
-    user: user||undefined,
+    user: user || undefined,
     students,
     sidebarCollapsed,
     selectedChatModel: new SelectedModel(modelId),
