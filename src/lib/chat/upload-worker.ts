@@ -1,7 +1,7 @@
 // Worker to handle file uploads off the main thread
 // This will be used to perform fetch requests for file uploads without blocking the UI
 
-import type { UploadedData } from "$lib/types/chat-types";
+import type { TaskData, UploadedData } from "$lib/types/chat-types";
 interface UploadRequest {
   id: string;
   file: File;
@@ -25,23 +25,27 @@ self.onmessage = async function (e) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
 
-    const { studentData, marks } = await response.json();
-    console.log("marks: ", { marks });
+    const task = await response.json();
+    console.log("Task: ", task);
     const result: UploadedData = {
       id,
-      mediaType: file.type,
       filename: file.name,
-      success: true,
-      studentData,
+      mediaType: file.type,     
+      success: task.status === "queued" || task.status === "processing",
+      task
     };
-
     // Post the result back to the main thread
     self.postMessage(result);
   } catch (error) {
     const result: UploadedData = {
       id,
-      error: error instanceof Error ? error.message : "Unknown error occurred during upload",
       success: false,
+      error: error instanceof Error ? error.message : "Unknown error occurred during upload",
+      task: {
+        taskId: id,
+        status: "error",
+        error: error instanceof Error ? error.message : "Unknown error occurred during upload",
+      },
     };
 
     // Post the error back to the main thread

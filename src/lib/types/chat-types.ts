@@ -14,6 +14,13 @@ export interface Assistant {
   systemPrompt?: string;
 }
 
+export interface TaskData {
+  taskId: string;
+  status: "queued" | "processing" | "done" | "error";
+  data?: any;
+  error?: string;
+}
+
 export interface AgentWorkflow {
   id: string;
   label: string;
@@ -57,7 +64,7 @@ export type UploadedData = {
   filename?: string;
   success: boolean;
   error?: string;
-  studentData?: StudentDetail;
+  task?: TaskData;
 };
 
 // Tool set type - using any to avoid circular dependency with tools function
