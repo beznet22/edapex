@@ -46,7 +46,7 @@ export async function put(
 
 	return {
 		url,
-		pathname: uniqueFilename,
+		pathname: `${opts.token || ""}/${uniqueFilename}`,
 		contentType: opts.contentType || 'application/octet-stream'
 	};
 }
@@ -55,7 +55,7 @@ export async function put(
  * Delete a file from the uploads directory (optional additional function)
  */
 export async function del(pathname: string): Promise<void> {
-	const filePath = join(process.cwd(), 'uploads', pathname);
+	const filePath = join(process.cwd(), 'storage/uploads', pathname);
 
 	try {
 		const { unlink } = await import('fs/promises');
