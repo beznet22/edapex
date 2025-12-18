@@ -85,7 +85,7 @@ export const marksDataSchema = z
         .array(z.number())
         .optional()
         .describe("Array of numbers representing the actual values of the marks (e.g., 20, 19, 2, 3, 4, 50)"),
-      total: z.number().int().nonnegative().optional().describe("Total marks for the subject"),
+      total: z.number().positive().nonnegative().optional().describe("Total marks for the subject"),
       grade: z.string().min(1).optional().describe("Grade for the subject"),
     })
   )
