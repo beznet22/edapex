@@ -10,7 +10,7 @@ import crypto from "crypto";
 import { mkdirSync, readFileSync, unlinkSync, writeFileSync } from "fs";
 import { join } from "path";
 import { CACHE_DIR } from "$lib/constants";
-import { del, put } from "$lib/utils/fs-blob";
+import { del, put, type FsBlobResult } from "$lib/utils/fs-blob";
 
 export const POST: RequestHandler = async ({ request, locals, url }) => {
   const { session, user } = locals;
@@ -49,24 +49,31 @@ export const POST: RequestHandler = async ({ request, locals, url }) => {
     const mapString = JSON.stringify(mappingData);
 
     const taskId = crypto.randomUUID();
-    // updateTaskStatus({ taskId, status: "queued" });
-    // (async () => {
-    try {
-      // updateTaskStatus({ taskId, status: "processing" });
 
+    let data: FsBlobResult;
+    try {
       const buff = await file.arrayBuffer();
-      const data = await put(file.name, buff, {
+      data = await put(file.name, buff, {
         token: `${user.id.toString()}-${user.fullName}`,
         access: "public",
         contentType: file.type,
       });
+    } catch (e) {
+      console.error("Failed to save file:", e);
+      error(500, "Failed to save file");
+    }
 
+    // updateTaskStatus({ taskId, status: "queued" });
+    // (async () => {
+    try {
+      // updateTaskStatus({ taskId, status: "processing" });
       const content = await generateContent(validatedFile.data, provider, mapString);
       const parsedResult = JSON.parse(content.trim());
       const marks = resultInputSchema.parse(parsedResult);
       const res = await result.upsertStudentResult(marks, 1);
       if (!res.success) {
         console.error("Error extracting data:", error);
+        return json({ taskId, status: "queued", data });
         // updateTaskStatus({ taskId, status: "error", error: res.message });
       }
       del(data.pathname);
@@ -75,6 +82,7 @@ export const POST: RequestHandler = async ({ request, locals, url }) => {
       // updateTaskStatus({ taskId, status: "done", data: {} });
     } catch (error: any) {
       console.error("Error extracting data:", error);
+      return json({ taskId, status: "queued", data });
       // updateTaskStatus({ taskId, status: "error", error: error.message });
     }
     // })();
@@ -82,7 +90,7 @@ export const POST: RequestHandler = async ({ request, locals, url }) => {
     // const task = getTaskStatus(taskId);
     // deleteTask(taskId);
 
-    return json({ taskId, status: "queued", data });
+    return json({ taskId, status: "done", data });
   } catch (e) {
     console.error(e);
     return error(500, "Failed to upload file, try again");

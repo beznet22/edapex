@@ -31,7 +31,7 @@ self.onmessage = async function (e) {
       id,
       filename: file.name,
       mediaType: file.type,     
-      success: task.status === "queued" || task.status === "processing",
+      success: task.status === "queued" || task.status === "done",
       data: task
     };
     // Post the result back to the main thread
