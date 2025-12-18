@@ -49,7 +49,7 @@ export const POST: RequestHandler = async ({ request, locals, url }) => {
 
     const taskId = crypto.randomUUID();
     updateTaskStatus({ taskId, status: "queued" });
-    (async () => {
+    // (async () => {
       try {
         updateTaskStatus({ taskId, status: "processing" });
         const content = await generateContent(validatedFile.data, provider, mapString);
@@ -67,9 +67,10 @@ export const POST: RequestHandler = async ({ request, locals, url }) => {
         console.error("Error extracting data:", error);
         updateTaskStatus({ taskId, status: "error", error: error.message });
       }
-    })();
+    // })();
 
     const task = getTaskStatus(taskId);
+    deleteTask(taskId);
     return json(task);
   } catch (e) {
     console.error(e);
