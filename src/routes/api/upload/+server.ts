@@ -58,10 +58,12 @@ export const POST: RequestHandler = async ({ request, locals, url }) => {
         access: "public",
         contentType: file.type,
       });
+      del(data.pathname);
     } catch (e) {
       console.error("Failed to save file:", e);
       error(500, "Failed to save file");
     }
+
 
     // updateTaskStatus({ taskId, status: "queued" });
     // (async () => {
