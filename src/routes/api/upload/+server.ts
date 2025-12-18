@@ -42,7 +42,7 @@ export const POST: RequestHandler = async ({ request, locals, url }) => {
     }
 
     const provider = await useAgent().use(CredentialType.QWEN_CODE).geModelProvider();
-    if (!provider) throw new Error("No provider found");
+    if (!provider) error(500, "No provider found");
 
     const mappingData = await result.getMappingData(user.staffId || 1);
     // console.log("Mapping data: ", mappingData);
