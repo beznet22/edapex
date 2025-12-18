@@ -4,11 +4,12 @@ import { generateContent } from "$lib/server/helpers/chat-helper";
 import { useAgent } from "$lib/server/service/agent.service";
 import { result } from "$lib/server/service/result.service";
 import type { TaskData } from "$lib/types/chat-types";
-import { error, json } from "@sveltejs/kit";
-import { join } from "path";
-import crypto from "crypto";
 import type { RequestHandler } from "@sveltejs/kit";
-import { mkdirSync, readFileSync, writeFileSync, unlinkSync } from "fs";
+import { error, json } from "@sveltejs/kit";
+import crypto from "crypto";
+import { mkdirSync, readFileSync, unlinkSync, writeFileSync } from "fs";
+import { join } from "path";
+import { CACHE_DIR } from "$lib/constants";
 
 export const POST: RequestHandler = async ({ request, locals, url }) => {
   const { session, user } = locals;
@@ -76,7 +77,7 @@ export const POST: RequestHandler = async ({ request, locals, url }) => {
   }
 };
 
-const taskStoreDir = join(process.cwd(), "cache", "tasks");
+const taskStoreDir = join(CACHE_DIR, "tasks");
 
 // Create the task store directory if it doesn't exist
 try {

@@ -1,5 +1,5 @@
 import { command, getRequestEvent } from "$app/server";
-import { allowAnonymousChats } from "$lib/utils/constants";
+import { allowAnonymousChats } from "$lib/constants";
 import { CredentialType } from "$lib/schema/chat-schema";
 import { useAgent } from "$lib/server/service/agent.service";
 import z from "zod";

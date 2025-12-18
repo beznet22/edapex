@@ -1,0 +1,5 @@
+# Ignore all files in the storage directory except this .gitignore file
+*
+!.gitignore
+!uploads
+!cache

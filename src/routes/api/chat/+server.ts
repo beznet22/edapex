@@ -1,5 +1,5 @@
 import { tools } from "$lib/chat/tools";
-import { allowAnonymousChats } from "$lib/utils/constants";
+import { allowAnonymousChats } from "$lib/constants";
 import { CredentialType } from "$lib/schema/chat-schema";
 import { repo } from "$lib/server/repository";
 import { generateTitle } from "$lib/server/helpers/chat-helper";
@@ -39,8 +39,10 @@ export const POST: RequestHandler = async ({ request, locals: { user, session },
     await repo.chat.upsertMessage({ chatId, message });
     messages = await repo.chat.loadMessages(chatId);
     const examTypes = await repo.result.getExamTypes();
-    
-    systemPrompt += `\n\nEXAM TYPES: ${examTypes.map((e) => `- ${e.title} (Exam Type ID: ${e.id})`).join("\n")}`;
+
+    systemPrompt += `\n\nEXAM TYPES: ${examTypes
+      .map((e) => `- ${e.title} (Exam Type ID: ${e.id})`)
+      .join("\n")}`;
     systemPrompt += `\n\nUSER ID: ${user.id}`;
   }
 
