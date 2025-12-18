@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { signout } from "$lib/api/auth.remote";
   import * as DropdownMenu from "$lib/components/ui/dropdown-menu/index.js";
   import * as Sidebar from "$lib/components/ui/sidebar/index.js";
 
@@ -85,9 +86,17 @@
           </DropdownMenu.Item>
         </DropdownMenu.Group>
         <DropdownMenu.Separator />
-        <DropdownMenu.Item>
+        <DropdownMenu.Item
+          onSelect={async () => {
+            const result = await signout();
+            if (result) {
+              window.location.href = "/signin";
+            }
+          }}
+        >
           <LogOutIcon />
-          <a href="/signout" data-sveltekit-preload-data="false" data-sveltekit-reload>Log out</a>
+          Log out
+          <!-- <a href="/signout" data-sveltekit-preload-data="false" data-sveltekit-reload>Log out</a> -->
         </DropdownMenu.Item>
       </DropdownMenu.Content>
     </DropdownMenu.Root>
