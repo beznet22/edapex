@@ -528,7 +528,7 @@ class AuthService {
   }
 
   async logout() {
-    const { cookies } = getRequestEvent();
+    // const { cookies } = getRequestEvent();
     try {
       const refreshToken = cookies.get(REFRESH_COOKIE);
       if (refreshToken) {
@@ -538,8 +538,8 @@ class AuthService {
         }
       }
 
-      // cookies.delete(ACCESS_COOKIE, { path: "/" });
-      // cookies.delete(REFRESH_COOKIE, { path: "/" });
+      cookies.del(ACCESS_COOKIE);
+      cookies.del(REFRESH_COOKIE);
       return { success: true };
     } catch (error) {
       console.error("Failed to delete cookies:", error);

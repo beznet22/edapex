@@ -9,13 +9,13 @@ export const signup = form(signupSchema, async (user) => {
 });
 
 export const login = form(authUserSchema, async ({ email, password }) => {
-    await auth.login({ identifier: email, password });
-    redirect(303, "/");
+  await auth.login({ identifier: email, password });
+  redirect(303, "/");
 });
 
-export const signout = query(async () => {
+export const signout = command(async () => {
   await auth.logout();
-  // return redirect(303, "/signin");
+  return true;
 });
 
 export const getUser = query(async () => {
