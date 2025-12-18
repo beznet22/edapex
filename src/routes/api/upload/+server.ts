@@ -45,7 +45,7 @@ export const POST: RequestHandler = async ({ request, locals, url }) => {
     if (!provider) throw new Error("No provider found");
 
     const mappingData = await result.getMappingData(user.staffId || 1);
-    console.log("Mapping data: ", mappingData);
+    // console.log("Mapping data: ", mappingData);
     const mapString = JSON.stringify(mappingData);
 
     const taskId = crypto.randomUUID();
