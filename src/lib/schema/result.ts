@@ -74,7 +74,7 @@ export const marksDataSchema = z
     z.object({
       subjectCode: z.string().min(1, "Subject code required").describe("Subject code (e.g., PSRN/QR)"),
       subjectId: z.number().int().positive().describe("Mapped subject ID from subjects mapping"),
-      learningOutcome: z.string().optional().describe("Learning outcome (ONLY for DAYCARE)"),
+      learningOutcome: z.string().nullable().optional().describe("Learning outcome (ONLY for DAYCARE)"),
       examTitles: z
         .array(z.string())
         .optional()
