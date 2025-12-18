@@ -62,35 +62,34 @@ export class FilesContext {
   add = async (files: File[] | FileList) => {
     const incoming = Array.from(files);
 
-    // ✅ 1. Filter by accepted type
-    const accepted = this.accept ? incoming.filter((f) => this.#matchesAccept(f)) : incoming;
+    // // ✅ 1. Filter by accepted type
+    // const accepted = this.accept ? incoming.filter((f) => this.#matchesAccept(f)) : incoming;
 
-    if (!accepted.length) {
-      toast.error("No attachments match the accepted types.");
-      return;
-    }
+    // if (!accepted.length) {
+    //   toast.error("No attachments match the accepted types.");
+    //   return;
+    // }
 
-    // ✅ 2. Filter by max size
-    const sized = this.maxFileSize ? accepted.filter((f) => f.size <= this.maxFileSize!) : accepted;
+    // // ✅ 2. Filter by max size
+    // const sized = this.maxFileSize ? accepted.filter((f) => f.size <= this.maxFileSize!) : accepted;
 
-    if (!sized.length) {
-      toast.error("All attachments exceed the maximum size.");
-      return;
-    }
+    // if (!sized.length) {
+    //   toast.error("All attachments exceed the maximum size.");
+    //   return;
+    // }
 
-    // ✅ 3. Enforce max attachment count
-    const capacity =
-      typeof this.maxFiles === "number" ? Math.max(0, this.maxFiles - this.files.length) : undefined;
+    // // ✅ 3. Enforce max attachment count
+    // const capacity =
+    //   typeof this.maxFiles === "number" ? Math.max(0, this.maxFiles - this.files.length) : undefined;
 
-    const capped = typeof capacity === "number" ? sized.slice(0, capacity) : sized;
-
-    if (typeof capacity === "number" && sized.length > capacity) {
-      toast.error("Too many attachments. Some were not added.");
-    }
+    // const capped = typeof capacity === "number" ? sized.slice(0, capacity) : sized;
+    // if (typeof capacity === "number" && sized.length > capacity) {
+    //   toast.error("Too many attachments. Some were not added.");
+    // }
 
     // ✅ 4. Upload or create blob URLs
-    if (this.doUpload) this.#upload(capped);
-    this.files = [...this.files, ...capped];
+    if (this.doUpload) this.#upload(incoming);
+    this.files = [...this.files, ...incoming];
   };
 
   #upload = (files: File[]) => {
