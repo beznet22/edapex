@@ -55,8 +55,8 @@ export const POST: RequestHandler = async ({ request, locals, url }) => {
       // updateTaskStatus({ taskId, status: "processing" });
 
       const buff = await file.arrayBuffer();
-      const data = await put(`${user.id}_${user.fullName}`, buff, {
-        token: user.id.toString(),
+      const data = await put(file.name, buff, {
+        token: `${user.id.toString()}-${user.fullName}`,
         access: "public",
         contentType: file.type,
       });
