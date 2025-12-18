@@ -15,6 +15,7 @@ async function processJob(jobId: number | string, payload: any): Promise<void> {
     if (!payload || typeof payload !== "object" || !payload.type) {
       throw new Error("Invalid job payload: missing type field");
     }
+    console.log("Payload: ", payload);
 
     const { type } = payload;
     const handler = jobHandlers[type];
@@ -22,12 +23,19 @@ async function processJob(jobId: number | string, payload: any): Promise<void> {
       throw new Error(`No handler found for job type: ${type}`);
     }
 
+    // dummy long running task
+    // const result = await new Promise((resolve) =>
+    //   setTimeout(() => {
+    //     console.log("Payload: ", payload);
+    //     resolve(payload);
+    //   }, 5000)
+    // );
     // Execute the handler for this job type
-    const result = await handler(payload);
+    // const result = await handler(payload);
     const successMsg: WorkerMessage = {
       success: true,
       jobId,
-      result,
+      result: payload,
     };
 
     if (parentPort) {
@@ -49,6 +57,7 @@ async function processJob(jobId: number | string, payload: any): Promise<void> {
 // Listen for messages from the main thread
 if (parentPort) {
   parentPort.on("message", async (data) => {
+    console.log("Message: ", data);
     const { jobId, payload } = data;
     await processJob(jobId, payload);
   });

@@ -11,6 +11,7 @@ node_modules
 /drizzle
 /bin/lib
 /temp
+/cache
 
 # OS
 .DS_Store

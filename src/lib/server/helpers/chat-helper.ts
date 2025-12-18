@@ -42,7 +42,7 @@ export async function generateTitle({
   }
 }
 
-export const generateContent = async (file: Blob, mapString?: string) => {
+export const generateContent = async (file: Blob, provider: Provider, mapString?: string) => {
   let messages: Array<ModelMessage> = [];
   messages.push({
     role: "user",
@@ -63,9 +63,6 @@ export const generateContent = async (file: Blob, mapString?: string) => {
       },
     ],
   });
-
-  const provider = await useAgent().use(CredentialType.QWEN_CODE).geModelProvider();
-  if (!provider) throw new Error("No provider found");
 
   const result = await generateText({
     model: provider.languageModel("vision-model"),
