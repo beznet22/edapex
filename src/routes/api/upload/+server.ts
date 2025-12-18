@@ -58,7 +58,6 @@ export const POST: RequestHandler = async ({ request, locals, url }) => {
         access: "public",
         contentType: file.type,
       });
-      del(data.pathname);
     } catch (e) {
       console.error("Failed to save file:", e);
       error(500, "Failed to save file");
@@ -78,7 +77,7 @@ export const POST: RequestHandler = async ({ request, locals, url }) => {
         return json({ taskId, status: "queued", data });
         // updateTaskStatus({ taskId, status: "error", error: res.message });
       }
-      // del(data.pathname);
+      del(data.pathname);
       // dummy long running task
       // await new Promise((resolve) => setTimeout(resolve, 5000));
       // updateTaskStatus({ taskId, status: "done", data: {} });
