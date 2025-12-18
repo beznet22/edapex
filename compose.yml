@@ -17,5 +17,5 @@ services:
       - MAIL_FROM_NAME=${MAIL_FROM_NAME}
       - MAIL_ENCRYPTION=${MAIL_ENCRYPTION}
     volumes:
-      - ${STORAGE_DIR}/storage:/app/storage
+      - ${STORAGE_DIR}/storage:/app/storage/
     restart: unless-stopped
