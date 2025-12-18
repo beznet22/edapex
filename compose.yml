@@ -2,6 +2,7 @@ services:
   edapex:
     image: ghcr.io/beznet22/edapex:latest
     pull_policy: always
+    user: "${UID}:${GID}"
     expose:
       - 3000
     environment:
