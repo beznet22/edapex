@@ -34,6 +34,8 @@ RUN bun install --frozen-lockfile --production --prefer-offline && \
 
 # Copy static assets and other necessary files
 COPY --from=builder /app/static ./static
+COPY --from=builder /app/storage ./storage
+
 
 # Create non-root user for security
 RUN addgroup -g 1001 -S nodejs && \
