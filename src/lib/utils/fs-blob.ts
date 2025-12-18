@@ -62,7 +62,7 @@ export async function del(pathname: string): Promise<void> {
 		await unlink(filePath);
 	} catch (error) {
 		console.error('Failed to delete file:', error);
-		throw new Error('Failed to delete file');
+		throw error;
 	}
 }
 
