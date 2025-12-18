@@ -70,7 +70,6 @@ export const POST: RequestHandler = async ({ request, locals, url }) => {
     // })();
 
     const task = getTaskStatus(taskId);
-    deleteTask(taskId);
     return json(task);
   } catch (e) {
     console.error(e);
