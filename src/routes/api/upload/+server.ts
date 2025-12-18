@@ -76,12 +76,12 @@ export const POST: RequestHandler = async ({ request, locals, url }) => {
         return json({ taskId, status: "queued", data });
         // updateTaskStatus({ taskId, status: "error", error: res.message });
       }
-      del(data.pathname);
+      // del(data.pathname);
       // dummy long running task
       // await new Promise((resolve) => setTimeout(resolve, 5000));
       // updateTaskStatus({ taskId, status: "done", data: {} });
-    } catch (error: any) {
-      console.error("Error extracting data:", error);
+    } catch (e: any) {
+      console.error("Error extracting data:", e);
       return json({ taskId, status: "queued", data });
       // updateTaskStatus({ taskId, status: "error", error: error.message });
     }
