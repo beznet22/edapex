@@ -35,7 +35,7 @@ export const DELETE: RequestHandler = async ({ params, locals }) => {
 
   const { fileId } = params;
   if (!fileId) return error(400, "No file id provided");
-
+  
   const pathname = `${user.id}-${user.fullName}/${fileId}`;
   await del(pathname);
   return json({ success: true });

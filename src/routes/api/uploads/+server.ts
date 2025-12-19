@@ -13,11 +13,13 @@ export const POST: RequestHandler = async ({ request, locals, url }) => {
 
   try {
     const formData = await request.formData();
-    let file = formData.get("file") as File | string;
+    let file = formData.get("file") as File;
+    const filename = formData.get("filename") as string;
+
     let pathname = "";
-    if (typeof file === "string") {
-      pathname = `${user.id}-${user.fullName}/${file}`;
-      const { buffer } = await get(`${user.id}-${user.fullName}/${file}`);
+    if (filename) {
+      pathname = `${user.id}-${user.fullName}/${filename}`;
+      const { buffer } = await get(pathname);
       file = new Blob([buffer], { type: "image/jpeg" }) as File;
     }
 
@@ -27,8 +29,6 @@ export const POST: RequestHandler = async ({ request, locals, url }) => {
       console.error(errorMessage);
       return error(400, errorMessage);
     }
-
-    const filename = pathname.split("/").pop();
 
     try {
       const mappingData = await result.getMappingData(user.staffId || 1);
@@ -42,6 +42,7 @@ export const POST: RequestHandler = async ({ request, locals, url }) => {
       }
       del(pathname);
       return json({ status: "done", data: {}, filename });
+      throw new Error("Failed to process file");
     } catch {
       if (pathname) return json({ status: "pending", filename, data: {} });
       try {
@@ -52,6 +53,7 @@ export const POST: RequestHandler = async ({ request, locals, url }) => {
           access: "private",
           contentType: file.type,
         });
+
         const filename = data.pathname.split("/").pop();
         return json({ status: "pending", data, filename });
       } catch (e) {
