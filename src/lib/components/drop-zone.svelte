@@ -109,7 +109,6 @@
 
             <div class="shrink-0">
               {#if filesContext.uploads.some((u) => {
-                console.log("File name: ", file.name, "Upload name: ", u.filename);
                 return u.filename === file.name && u.status === "done";
               })}
                 <div class="flex items-center gap-1">
@@ -125,7 +124,6 @@
                   </Button>
                 </div>
               {:else if filesContext.uploads.some((u) => {
-                console.log("File name: ", file.name, "Upload name: ", u.filename);
                 return u.filename === file.name && u.status === "error";
               })}
                 <div class="flex items-center gap-1">
@@ -141,7 +139,6 @@
                   </Button>
                 </div>
               {:else if filesContext.uploads.some((u) => {
-                console.log("File name: ", file.name, "Upload name: ", u.filename);
                 return u.filename === file.name && (u.status === "started" || u.status === "error");
               })}
                 <div class="flex items-center justify-center h-8 w-8">
