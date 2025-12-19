@@ -24,6 +24,7 @@ WORKDIR /app
 
 # Copy built application from builder stage
 COPY --from=builder /app/build ./build
+COPY --from=builder /app/bin ./bin
 COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/bun.lock* ./bun.lock*
 
