@@ -25,28 +25,28 @@
     }
   }
 
-  onMount(async () => {
-    for (const upload of uploads) {
-      console.log("Retrying upload: ", upload);
-      fileCtx.retryUpload(upload);
+  // onMount(async () => {
+  //   for (const upload of uploads) {
+  //     console.log("Retrying upload: ", upload);
+  //     fileCtx.retryUpload(upload);
 
-      // Wait for the upload to complete by checking its status
-      await new Promise<void>((resolve) => {
-        const interval = setInterval(() => {
-          const updatedUpload = fileCtx.uploads.find((u) => u.id === upload.id);
-          if (
-            updatedUpload &&
-            (updatedUpload.success === true ||
-              updatedUpload.status === "done" ||
-              updatedUpload.status === "error")
-          ) {
-            clearInterval(interval);
-            resolve();
-          }
-        }, 100); // Check every 100ms
-      });
-    }
-  });
+  //     // Wait for the upload to complete by checking its status
+  //     await new Promise<void>((resolve) => {
+  //       const interval = setInterval(() => {
+  //         const updatedUpload = fileCtx.uploads.find((u) => u.id === upload.id);
+  //         if (
+  //           updatedUpload &&
+  //           (updatedUpload.success === true ||
+  //             updatedUpload.status === "done" ||
+  //             updatedUpload.status === "error")
+  //         ) {
+  //           clearInterval(interval);
+  //           resolve();
+  //         }
+  //       }, 100); // Check every 100ms
+  //     });
+  //   }
+  // });
 </script>
 
 {#if uploads.length > 0}
