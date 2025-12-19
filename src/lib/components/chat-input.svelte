@@ -165,12 +165,22 @@
       </div>
     </PromptInputActions>
   </PromptInput>
-  
+
   {#if isInitial}
     <div class="absolute top-full left-0 w-full flex flex-col items-center justify-center mt-2 gap-4">
-
       {#if activeSuggestions.length > 0}
-      <ChatResource {onFileSelected} />
+        <div class="flex w-full flex-col items-center justify-center space-y-1">
+          {#each activeSuggestions as suggestion}
+            <PromptSuggestion
+              highlight={activeHighlight}
+              onclick={() => handleSuggestionClick(suggestion)}
+              class="transition-all hover:scale-[1.02] hover:shadow-sm"
+            >
+              {suggestion}
+            </PromptSuggestion>
+            <Separator class="me-2" />
+          {/each}
+        </div>
       {:else if input.trim() && found.length > 0}
         <div class="flex w-full flex-col items-center justify-center space-y-1">
           {#each found as student}
