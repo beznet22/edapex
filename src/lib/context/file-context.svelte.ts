@@ -1,9 +1,9 @@
-import { studentDataSchema } from "$lib/schema/result";
 import type { UploadedData } from "$lib/types/chat-types";
 import { generateId } from "ai";
 import { getContext, setContext } from "svelte";
 import { toast } from "svelte-sonner";
 import UploadWorker from "$lib/chat/upload-worker.ts?worker";
+import type { index } from "drizzle-orm/gel-core";
 
 const FILES_CONTEXT_KEY = Symbol("attachments-context");
 
@@ -13,12 +13,9 @@ export class FilesContext {
   fileInputRef = $state<HTMLInputElement | null>(null);
   openModal = $state(false);
 
-  constructor(
-    public doUpload?: boolean,
-    private accept?: string,
-    private maxFiles?: number,
-    private maxFileSize?: number
-  ) {}
+  constructor(uploads: UploadedData[], public doUpload?: boolean) {
+    this.uploads = uploads;
+  }
 
   openFileDialog = () => {
     if (!this.fileInputRef) {
@@ -30,16 +27,6 @@ export class FilesContext {
 
   oprnFileDropZone = () => {
     this.openModal = true;
-  };
-
-  #matchesAccept = (file: File): boolean => {
-    if (!this.accept || this.accept.trim() === "") {
-      return true;
-    }
-    if (this.accept.includes("image/*")) {
-      return file.type.startsWith("image/");
-    }
-    return true;
   };
 
   toDataURL = (file: File): Promise<string> => {
@@ -61,71 +48,53 @@ export class FilesContext {
 
   add = async (files: File[] | FileList) => {
     const incoming = Array.from(files);
-
-    // // ✅ 1. Filter by accepted type
-    // const accepted = this.accept ? incoming.filter((f) => this.#matchesAccept(f)) : incoming;
-
-    // if (!accepted.length) {
-    //   toast.error("No attachments match the accepted types.");
-    //   return;
-    // }
-
-    // // ✅ 2. Filter by max size
-    // const sized = this.maxFileSize ? accepted.filter((f) => f.size <= this.maxFileSize!) : accepted;
-
-    // if (!sized.length) {
-    //   toast.error("All attachments exceed the maximum size.");
-    //   return;
-    // }
-
-    // // ✅ 3. Enforce max attachment count
-    // const capacity =
-    //   typeof this.maxFiles === "number" ? Math.max(0, this.maxFiles - this.files.length) : undefined;
-
-    // const capped = typeof capacity === "number" ? sized.slice(0, capacity) : sized;
-    // if (typeof capacity === "number" && sized.length > capacity) {
-    //   toast.error("Too many attachments. Some were not added.");
-    // }
-
-    // ✅ 4. Upload or create blob URLs
     if (this.doUpload) this.#upload(incoming);
     this.files = [...this.files, ...incoming];
   };
 
-  #upload = (files: File[]) => {
-    // const { default: WorkerConstructor } = await import('$lib/chat/upload-worker.ts?worker');
-    // Remove the id parameter
+  #upload = (files: File[] | string[], id?: string) => {
     for (const file of files) {
-      const fileId = generateId(); // Unique ID per file (not per batch)
-      const upload = {
+      const fileId = id ?? generateId(); // Unique ID per file (not per batch)
+      const name = typeof file === "string" ? file : file.name;
+      const upload: UploadedData = {
         id: fileId,
-        filename: file.name,
-        mediaType: file.type,
+        filename: name,
+        status: "started",
         success: false,
       };
 
-      // Add to uploads immediately with unique ID
-      this.uploads = [...this.uploads, upload];
+      if (id) {
+        this.updateUpload(upload);
+      } else {
+        this.uploads = [...this.uploads, upload];
+      }
       const worker = new UploadWorker({ name: `upload-worker-${fileId}` });
       worker.onmessage = ({ data }: MessageEvent<UploadedData>) => {
         if (!data.success) {
           this.uploads = this.uploads.filter((u) => u.id !== fileId);
+          console.error(`Upload failed: `, data.error);
           toast.error("File upload failed. Please try again.");
           return;
         }
 
         // Update only this specific file's status
-        this.uploads = this.uploads.map((u) => (u.id === fileId ? { ...u, ...data, success: true } : u));
-        console.log(`Upload success for ${file.name}:`, data);
+        this.uploads = this.uploads.map((u) =>
+          u.id === fileId ? { ...u, ...data, success: true, status: data.status } : u
+        );
+        console.log(`Upload success for ${name}:`, data);
       };
 
       worker.onerror = (error) => {
-        console.error(`Upload error for ${file.name}:`, error);
+        console.error(`Upload error for ${name}:`, error);
         this.uploads = this.uploads.filter((u) => u.id !== fileId);
-        toast.error(`Failed to upload ${file.name}`);
+        toast.error(`Failed to upload ${name}`);
       };
 
-      worker.postMessage({ id: fileId, file });
+      if (typeof file === "string") {
+        worker.postMessage({ id, name });
+        continue;
+      }
+      worker.postMessage({ fileId, file, name });
     }
   };
 
@@ -139,6 +108,10 @@ export class FilesContext {
     if (this.fileInputRef) {
       this.fileInputRef.value = "";
     }
+  };
+
+  retryUpload = (upload: UploadedData) => {
+    this.#upload([upload.filename], upload.id);
   };
 
   updateUpload = (upload: UploadedData) => {

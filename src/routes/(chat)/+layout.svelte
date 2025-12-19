@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { getHistory } from "$lib/api/chat.remote.js";
   import favicon from "$lib/assets/favicon.svg";
   import AppSidebar from "$lib/components/app-sidebar.svelte";
   import * as Sidebar from "$lib/components/ui/sidebar";

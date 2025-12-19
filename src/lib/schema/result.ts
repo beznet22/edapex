@@ -79,7 +79,7 @@ export const marksDataSchema = z
         .array(z.string())
         .optional()
         .describe(
-          "Array of string representing the actual names of the marks (e.g., CA1, CA2, HW, REPORT, PSYCHO, EXAM)"
+          "Array of string representing the actual titles of the marks (e.g., CA1, CA2, HW, REPORT, PSYCHO, EXAM)"
         ),
       marks: z
         .array(z.number())
