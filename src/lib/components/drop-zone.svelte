@@ -1,14 +1,14 @@
 <script lang="ts">
   import { Button } from "$lib/components/ui/button";
+  import * as Dialog from "$lib/components/ui/dialog/index.js";
+  import { useFileActions } from "$lib/context/file-context.svelte";
+  import { Check, CircleAlert, TriangleAlert } from "@lucide/svelte";
   import XIcon from "@lucide/svelte/icons/x";
   import { onDestroy } from "svelte";
   import { toast } from "svelte-sonner";
-  import { Check, TriangleAlert } from "@lucide/svelte";
-  import { useFileActions } from "$lib/context/file-context.svelte";
-  import { displaySize, FileDropZone, KILOBYTE, MEGABYTE, type FileDropZoneProps } from "./file-drop-zone";
-  import * as Dialog from "$lib/components/ui/dialog/index.js";
-  import { ScrollArea } from "./ui/scroll-area";
+  import { displaySize, FileDropZone, KILOBYTE, type FileDropZoneProps } from "./file-drop-zone";
   import { Loader } from "./prompt-kit/loader";
+  import { ScrollArea } from "./ui/scroll-area";
 
   const filesContext = useFileActions();
   let previewUrls = new Map<File, string>();
@@ -108,53 +108,26 @@
             </div>
 
             <div class="shrink-0">
-              {#if filesContext.uploads.some((u) => {
-                return u.filename === file.name && u.status === "done";
-              })}
-                <div class="flex items-center gap-1">
+              <div class="flex items-center gap-1">
+                {#if filesContext.uploads.some((u) => u.filename === file.name && u.status === "done")}
                   <Check class="size-4 text-green-500" />
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    class="h-8 w-8 text-muted-foreground hover:text-destructive"
-                    aria-label="Remove {file.name}"
-                    onclick={() => removeFile(i)}
-                  >
-                    <XIcon class="size-4" />
-                  </Button>
-                </div>
-              {:else if filesContext.uploads.some((u) => {
-                return u.filename === file.name && u.status === "error";
-              })}
-                <div class="flex items-center gap-1">
+                {:else if filesContext.uploads.some((u) => u.filename === file.name && u.status === "pending")}
                   <TriangleAlert class="size-4 text-primary" />
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    class="h-8 w-8 text-muted-foreground hover:text-destructive"
-                    aria-label="Remove {file.name}"
-                    onclick={() => removeFile(i)}
-                  >
-                    <XIcon class="size-4" />
-                  </Button>
-                </div>
-              {:else if filesContext.uploads.some((u) => {
-                return u.filename === file.name && (u.status === "started" || u.status === "error");
-              })}
-                <div class="flex items-center justify-center h-8 w-8">
+                {:else if filesContext.uploads.some((u) => u.filename === file.name && u.status === "started")}
                   <Loader variant="circular" size="sm" />
-                </div>
-              {:else}
+                  {:else if filesContext.uploads.some((u) => u.filename === file.name && u.status === "error")}
+                  <CircleAlert class="size-4 text-destructive" />
+                {/if}
                 <Button
                   variant="ghost"
                   size="icon"
-                  class="h-8 w-8 text-muted-foreground hover:text-destructive"
+                  class="h-8 w-8 text-muted-foreground hover:text-destructive cursor-pointer"
                   aria-label="Remove {file.name}"
                   onclick={() => removeFile(i)}
                 >
                   <XIcon class="size-4" />
                 </Button>
-              {/if}
+              </div>
             </div>
           </div>
         {/each}
