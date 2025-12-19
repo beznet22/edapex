@@ -16,7 +16,13 @@
   let { onFileSelected }: ChatResourceProps = $props();
 
   let fileCtx = $derived(useFileActions());
-  let uploads = $derived(fileCtx.uploads.filter((u) => u.status === "pending" || u.status === "started"));
+  let uploads = $derived(fileCtx.uploads.filter((u) => u.status === "pending"));
+  let fileId = $state<string>("");
+  let status = $derived(uploads.find((u) => u.id === fileId)?.status);
+
+  $effect(() => {
+    console.log("status: ", status);
+  });
 
   function handleFileChange(e: Event) {
     const target = e.target as HTMLInputElement;
@@ -93,11 +99,12 @@
                     class="absolute bottom-2 right-2 bg-black/70 text-white text-2xl font-semibold px-2 py-1 rounded-md cursor-pointer"
                     onclick={() => {
                       fileCtx.retryUpload(upload);
+                      fileId = upload.id;
                     }}
                   >
-                    {#if upload.status === "started"}
+                    {#if status === "pending"}
                       <Loader variant="circular" size="sm" />
-                    {:else if upload.status === "pending"}
+                    {:else}
                       <RotateCcw class="size-4" />
                     {/if}
                   </Button>

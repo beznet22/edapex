@@ -1,5 +1,5 @@
 import { STATIC_DIR, UPLOADS_DIR } from "$lib/constants";
-import { writeFile, mkdir, stat } from "fs/promises";
+import { writeFile, mkdir, stat, unlink } from "fs/promises";
 import { join } from "path";
 import { v4 as uuidv4 } from "uuid";
 
@@ -60,7 +60,6 @@ export async function del(pathname: string): Promise<void> {
   const filePath = join(UPLOADS_DIR, pathname);
 
   try {
-    const { unlink } = await import("fs/promises");
     await unlink(filePath);
   } catch (error) {
     console.error("Failed to delete file:", error);
