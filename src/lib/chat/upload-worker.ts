@@ -11,11 +11,11 @@ interface UploadRequest {
 // Listen for messages from the main thread
 self.onmessage = async function (e) {
   const { fileId, file, name }: UploadRequest = e.data;
-console
+  console;
   try {
     const formData = new FormData();
+    if (name) formData.append("filename", name);
     if (file) formData.append("file", file);
-    formData.append("file", name);
 
     const response = await fetch("/api/uploads", {
       method: "POST",

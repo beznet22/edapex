@@ -23,30 +23,33 @@ export async function put(
 ): Promise<FsBlobResult> {
   const uploadsDir = opts.access === "public" ? STATIC_DIR : UPLOADS_DIR;
   const uniqueFilename = `${uuidv4()}-${filename}`;
-  const filePath = join(uploadsDir, opts.token || "", uniqueFilename);
+  // Handle token as directory path - ensure subdirectories exist
+  const tokenPath = opts.token || "";
+  const filePath = join(uploadsDir, tokenPath, uniqueFilename);
 
-  // Ensure uploads directory exists
+  // Ensure the full directory path exists (including token subdirectory)
   try {
-    await mkdir(uploadsDir, { recursive: true });
+    const fileDir = join(uploadsDir, tokenPath);
+    await mkdir(fileDir, { recursive: true });
   } catch (error) {
     console.error("Failed to create uploads directory:", error);
     throw new Error("Failed to create upload directory");
   }
 
-  // Write file to disk
   try {
     const fileBuffer = buffer instanceof ArrayBuffer ? Buffer.from(buffer) : buffer;
     await writeFile(filePath, fileBuffer);
   } catch (error) {
-    console.error("Failed to write file:", error);
+    console.log("File path: ", filePath);
+    console.error("Failed to save file:", error);
     throw new Error("Failed to save file");
   }
 
   // Return blob-like result matching @vercel/blob API
-  const url = `/${opts.token || ""}/${uniqueFilename}`;
+  const url = `/${tokenPath}/${uniqueFilename}`;
   return {
     url,
-    pathname: `${opts.token || ""}/${uniqueFilename}`,
+    pathname: `${tokenPath}/${uniqueFilename}`,
     contentType: opts.contentType || "application/octet-stream",
   };
 }

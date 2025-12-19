@@ -50,51 +50,55 @@ export class FilesContext {
     const incoming = Array.from(files);
     if (this.doUpload) this.#upload(incoming);
     this.files = [...this.files, ...incoming];
+  }
+
+  #initWoeker = (fileId: string, name: string) => {
+    const worker = new UploadWorker({ name: `upload-worker-${generateId()}` });
+    worker.onmessage = ({ data }: MessageEvent<UploadedData>) => {
+      if (!data.success) {
+        this.uploads = this.uploads.filter((u) => u.id !== fileId);
+        console.error(`Upload failed: `, data.error);
+        toast.error("File upload failed. Please try again.");
+        return;
+      }
+
+      // Update only this specific file's status
+      this.uploads = this.uploads.map((u) =>
+        u.id === fileId ? { ...u, ...data, success: true, status: data.status } : u
+      );
+      console.log(`Upload success for ${name}:`, data);
+    };
+
+    worker.onerror = (error) => {
+      console.error(`Upload error for ${name}:`, error);
+      this.uploads = this.uploads.filter((u) => u.id !== fileId);
+      toast.error(`Failed to upload ${name}`);
+    };
+
+    return worker;
   };
 
-  #upload = (files: File[] | string[], id?: string) => {
+  #upload = (files: File[], uploadData?: UploadedData) => {
+    if (uploadData) {
+      uploadData.status = "started";
+      uploadData.success = false;
+      this.updateUpload(uploadData);
+      const worker = this.#initWoeker(uploadData.id, uploadData.filename);
+      worker.postMessage({ fileId: uploadData.id, name: uploadData.filename });
+    }
+
     for (const file of files) {
-      const fileId = id ?? generateId(); // Unique ID per file (not per batch)
-      const name = typeof file === "string" ? file : file.name;
+      const fileId = generateId(); // Unique ID per file (not per batch)
       const upload: UploadedData = {
         id: fileId,
-        filename: name,
+        filename: file.name,
         status: "started",
         success: false,
       };
 
-      if (id) {
-        this.updateUpload(upload);
-      } else {
-        this.uploads = [...this.uploads, upload];
-      }
-      const worker = new UploadWorker({ name: `upload-worker-${fileId}` });
-      worker.onmessage = ({ data }: MessageEvent<UploadedData>) => {
-        if (!data.success) {
-          this.uploads = this.uploads.filter((u) => u.id !== fileId);
-          console.error(`Upload failed: `, data.error);
-          toast.error("File upload failed. Please try again.");
-          return;
-        }
-
-        // Update only this specific file's status
-        this.uploads = this.uploads.map((u) =>
-          u.id === fileId ? { ...u, ...data, success: true, status: data.status } : u
-        );
-        console.log(`Upload success for ${name}:`, data);
-      };
-
-      worker.onerror = (error) => {
-        console.error(`Upload error for ${name}:`, error);
-        this.uploads = this.uploads.filter((u) => u.id !== fileId);
-        toast.error(`Failed to upload ${name}`);
-      };
-
-      if (typeof file === "string") {
-        worker.postMessage({ id, name });
-        continue;
-      }
-      worker.postMessage({ fileId, file, name });
+      this.uploads = [...this.uploads, upload];
+      const worker = this.#initWoeker(fileId, file.name);
+      worker.postMessage({ fileId, file });
     }
   };
 
@@ -111,7 +115,8 @@ export class FilesContext {
   };
 
   retryUpload = (upload: UploadedData) => {
-    this.#upload([upload.filename], upload.id);
+    console.log("Retrying upload: ", upload);
+    this.#upload([], upload);
   };
 
   updateUpload = (upload: UploadedData) => {

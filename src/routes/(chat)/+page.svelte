@@ -17,7 +17,7 @@
 
   chatContext.setContext();
 
-  const filesContext = new FilesContext(uploads, false);
+  const filesContext = new FilesContext(uploads, true);
   filesContext.setContext();
 
 
