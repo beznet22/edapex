@@ -65,6 +65,7 @@ export class ChatContext {
     this.messages = $derived(this.client?.messages ?? []);
     this.lastMessage = $derived(this.messages.at(-1));
     this.agents = $state(agents);
+    this.activeAgent = agents[0]
   }
 
   get loading() {
