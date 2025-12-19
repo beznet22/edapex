@@ -111,7 +111,7 @@ export class ResultService {
    */
   async upsertStudentResult(validatedReport: ResultInput, teacherId: number): Promise<MarksOutput> {
     try {
-      const { studentData, marksData, teachersRemark, studentRatings, attendanceData } = validatedReport;
+      const { studentData, marksData, teachersRemark, studentRatings } = validatedReport;
       const stdRec = await studentRepo.getStudentRecordByAdmissionNo(studentData.admissionNo);
       if (!stdRec) {
         return {
@@ -163,9 +163,9 @@ export class ResultService {
       }
 
       // upsert attendance
-      if (attendanceData) {
+      if (studentData.attendance) {
         await this.upsertAttendance({
-          attendance: attendanceData,
+          attendance: studentData.attendance,
           studentId: stdRec.studentId!,
           examTypeId: studentData.examTypeId,
         });

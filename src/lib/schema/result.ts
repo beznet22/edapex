@@ -114,7 +114,7 @@ export const resultInputSchema = z
     marksData: marksDataSchema,
     teachersRemark: teacherRemarkSchema,
     studentRatings: studentRatingsSchema.nullable().describe("Student's ratings for various attributes"),
-    attendanceData: attendanceSchema.nullable().describe("Student's attendance data"),
+    // attendanceData: attendanceSchema.nullable().describe("Student's attendance data"),
   })
   .describe("Schema for a student report card with proper ID mappings");
 export type ResultInput = z.infer<typeof resultInputSchema>;

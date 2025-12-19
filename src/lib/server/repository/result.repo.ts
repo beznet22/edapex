@@ -30,22 +30,30 @@ export class ResultsRepository extends BaseRepository {
     return this.withErrorHandling(async () => {
       const { id, createdAt, updatedAt, ...data } = attendance;
       const academicId = await this.getAcademicId();
+      
+      // Update data to include academicId from the current context
+      const updatedData = {
+        ...data,
+        academicId
+      };
+      
+      // Look for existing record based on the unique constraint (studentId, examTypeId)
       const [existing] = await this.db
         .select({ id: schema.classAttendances.id })
         .from(schema.classAttendances)
         .where(
           and(
             eq(schema.classAttendances.studentId, data.studentId!),
-            eq(schema.classAttendances.examTypeId, data.examTypeId!),
-            eq(schema.classAttendances.academicId, academicId)
+            eq(schema.classAttendances.examTypeId, data.examTypeId!)
           )
         )
         .limit(1);
+        
       if (existing) {
-        await this.db.update(schema.classAttendances).set(data).where(eq(schema.classAttendances.id, existing.id));
+        await this.db.update(schema.classAttendances).set(updatedData).where(eq(schema.classAttendances.id, existing.id));
         return existing.id;
       }
-      return (await this.db.insert(schema.classAttendances).values(data).$returningId())[0].id;
+      return (await this.db.insert(schema.classAttendances).values(updatedData).$returningId())[0].id;
     }, "upsertClassAttendance");
   }
 
@@ -244,7 +252,7 @@ export class ResultsRepository extends BaseRepository {
         await this.db
           .update(schema.smMarkStores)
           .set({ teacherRemarks })
-          .where(eq(schema.learningObjectives.id, existing.id));
+          .where(eq(schema.smMarkStores.id, existing.id));
         return existing.id;
       }
       return (await this.db.insert(schema.smMarkStores).values(outcome).$returningId())[0].id;

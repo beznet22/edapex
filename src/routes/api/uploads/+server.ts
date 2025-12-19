@@ -16,9 +16,8 @@ export const POST: RequestHandler = async ({ request, locals, url }) => {
     let file = formData.get("file") as File;
     const filename = formData.get("filename") as string;
 
-    let pathname = "";
+    let pathname = `${user.id}-${user.fullName}/${filename ?? file.name}`;
     if (filename) {
-      pathname = `${user.id}-${user.fullName}/${filename}`;
       const { buffer } = await get(pathname);
       file = new Blob([buffer], { type: "image/jpeg" }) as File;
     }
@@ -41,25 +40,29 @@ export const POST: RequestHandler = async ({ request, locals, url }) => {
         throw new Error(res.message);
       }
       del(pathname);
-      return json({ status: "done", data: {}, filename });
+      return json({ success: true, status: "done", data: {}, filename: filename ?? file.name });
     } catch (e) {
-      console.error(e);
-    } finally {
-      if (pathname) return json({ status: "pending", filename, data: {} });
-      try {
-        const token = `${user.id}-${user.fullName}`;
-        const buff = await file.arrayBuffer();
-        const data = await put(file.name, buff, {
-          token,
-          access: "private",
-          contentType: file.type,
-        });
+      console.error("Main processing error:", e);
+      // If we have a pathname and main processing failed, return pending for further trial
+      if (pathname) {
+        return json({ success: true, status: "pending", filename, data: {} });
+      } else {
+        // If no pathname (new file), save it and return done
+        try {
+          const token = `${user.id}-${user.fullName}`;
+          const buff = await file.arrayBuffer();
+          const data = await put(file.name, buff, {
+            token,
+            access: "private",
+            contentType: file.type,
+          });
 
-        const filename = data.pathname.split("/").pop();
-        return json({ status: "pending", data, filename });
-      } catch (e) {
-        console.error("Failed to save file:", e);
-        throw new Error("Failed to save file");
+          const filename = data.pathname.split("/").pop();
+          return json({ success: true, status: "pending", data, filename });
+        } catch (e) {
+          console.error("Failed to save file:", e);
+          throw new Error("Failed to save file");
+        }
       }
     }
   } catch (e) {
