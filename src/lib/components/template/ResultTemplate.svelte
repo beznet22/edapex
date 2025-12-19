@@ -1,5 +1,4 @@
 <script lang="ts">
-  import "./style.css";
   import ResultHeader from "./ResultHeader.svelte";
   import StudentInfo from "./StudentInfo.svelte";
   import RecordsTable from "./RecordsTable.svelte";
