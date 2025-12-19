@@ -22,10 +22,8 @@ export async function put(
   } = { access: "private" }
 ): Promise<FsBlobResult> {
   const uploadsDir = opts.access === "public" ? STATIC_DIR : UPLOADS_DIR;
-  const uniqueFilename = `${uuidv4()}-${filename}`;
-  // Handle token as directory path - ensure subdirectories exist
   const tokenPath = opts.token || "";
-  const filePath = join(uploadsDir, tokenPath, uniqueFilename);
+  const filePath = join(uploadsDir, tokenPath, filename);
 
   // Ensure the full directory path exists (including token subdirectory)
   try {
@@ -46,10 +44,10 @@ export async function put(
   }
 
   // Return blob-like result matching @vercel/blob API
-  const url = `/${tokenPath}/${uniqueFilename}`;
+  const url = `/${tokenPath}/${filename}`;
   return {
     url,
-    pathname: `${tokenPath}/${uniqueFilename}`,
+    pathname: `${tokenPath}/${filename}`,
     contentType: opts.contentType || "application/octet-stream",
   };
 }
