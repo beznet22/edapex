@@ -69,10 +69,18 @@ export class StudentRepository extends BaseRepository {
     const [staff] = await this.db.select().from(smStaffs).where(eq(smStaffs.userId, userId)).limit(1);
     if (!staff) return null;
 
+    const academicId = await this.getAcademicId();
+
     const [classSection] = await this.db
       .select()
       .from(smAssignSubjects)
-      .where(eq(smAssignSubjects.teacherId, staff.id))
+      .where(
+        and(
+          eq(smAssignSubjects.teacherId, staff.id),
+          eq(smAssignSubjects.academicId, academicId),
+          eq(smAssignSubjects.activeStatus, 1)
+        )
+      )
       .limit(1);
     if (!classSection) return null;
 
@@ -91,7 +99,9 @@ export class StudentRepository extends BaseRepository {
         and(
           eq(studentRecords.classId, classSection.classId || 0),
           eq(studentRecords.sectionId, classSection.sectionId || 0),
-          eq(smStudents.activeStatus, 1)
+          eq(smStudents.activeStatus, 1),
+          eq(studentRecords.isDefault, 1),
+          eq(studentRecords.academicId, academicId)
         )
       );
 

@@ -3,6 +3,7 @@
   import Chat from "$lib/components/chat.svelte";
   import { ChatContext } from "$lib/context/chat-context.svelte.js";
   import { FilesContext } from "$lib/context/file-context.svelte.js";
+  import { onMount } from "svelte";
 
   let { data } = $props();
   // svelte-ignore state_referenced_locally
@@ -18,6 +19,10 @@
 
   const filesContext = new FilesContext(uploads, false);
   filesContext.setContext();
+
+  // onMount(() => {
+  //  console.log("Users: ", user);
+  // });
 </script>
 
 <div class="">
