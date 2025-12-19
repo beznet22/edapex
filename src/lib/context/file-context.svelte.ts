@@ -51,7 +51,7 @@ export class FilesContext {
     if (this.doUpload) this.#upload(incoming);
     console.log("Files: ", incoming);
     this.files = [...this.files, ...incoming];
-  }
+  };
 
   #initWoeker = (fileId: string, name: string) => {
     const worker = new UploadWorker({ name: `upload-worker-${generateId()}` });
@@ -67,7 +67,11 @@ export class FilesContext {
       this.uploads = this.uploads.map((u) =>
         u.id === fileId ? { ...u, ...data, success: true, status: data.status } : u
       );
-      console.log(`Upload success for ${name}:`, data);
+
+      if (data.status === "done") {
+        toast.success("File uploaded successfully");
+        console.log(`Upload success for ${name}:`, data);
+      }
     };
 
     worker.onerror = (error) => {
