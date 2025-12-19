@@ -6,6 +6,9 @@ import { render } from "svelte/server";
 import ResultTemplate from "$lib/components/template/ResultTemplate.svelte";
 import { result } from "$lib/server/service/result.service";
 import { pageToHtml } from "$lib/server/helpers";
+import { del, get } from "$lib/utils/fs-blob";
+import { generateContent } from "$lib/server/helpers/chat-helper";
+import { resultInputSchema } from "$lib/schema/result";
 
 export const generateResultPdf = command(
   z.object({
@@ -53,6 +56,36 @@ export const publishResult = command(
       return { success: true, message: "Result published" };
     } catch (error) {
       return { success: false, message: "Failed to publish result" };
+    }
+  }
+);
+
+export const retryUpload = command(
+  z.object({
+    filename: z.string(),
+  }),
+  async ({ filename }) => {
+    const { user, session } = getRequestEvent().locals;
+    if (!user || !session) {
+      return { success: false, message: "User not authenticated" };
+    }
+    try {
+      const pathname = `${user.id}-${user.fullName}/${filename}`;
+      const { buffer } = await get(pathname);
+      const file = new Blob([buffer], { type: "image/jpeg" }) as File;
+      const mappingData = await result.getMappingData(user.staffId || 1);
+      const mapString = JSON.stringify(mappingData);
+      const content = await generateContent(file, mapString);
+      const parsedResult = JSON.parse(content.trim());
+      const marks = resultInputSchema.parse(parsedResult);
+      const res = await result.upsertStudentResult(marks, 1);
+      if (!res.success) {
+        throw new Error(res.message);
+      }
+      del(pathname);
+      return { success: true, message: "File uploaded successfully" };
+    } catch (error) {
+      return { success: false, message: "Failed to upload file" };
     }
   }
 );

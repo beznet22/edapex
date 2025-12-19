@@ -59,10 +59,9 @@ export type xMetadata = {
 
 export type UploadedData = {
   id: string;
-  url?: string;
-  mediaType?: string;
-  filename?: string;
+  filename: string;
   success: boolean;
+  status: "pending" | "started" | "done" | "error";
   error?: string;
   data?: any;
 };

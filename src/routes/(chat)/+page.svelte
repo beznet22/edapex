@@ -3,11 +3,10 @@
   import Chat from "$lib/components/chat.svelte";
   import { ChatContext } from "$lib/context/chat-context.svelte.js";
   import { FilesContext } from "$lib/context/file-context.svelte.js";
-  import { setContext } from "svelte";
 
   let { data } = $props();
   // svelte-ignore state_referenced_locally
-  const { user, agents } = data;
+  const { user, agents, uploads } = data;
 
   const chatContext = new ChatContext({
     initialMessages: [],
@@ -17,7 +16,7 @@
 
   chatContext.setContext();
 
-  const filesContext = new FilesContext(true);
+  const filesContext = new FilesContext(uploads, false);
   filesContext.setContext();
 </script>
 

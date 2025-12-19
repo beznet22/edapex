@@ -1,22 +1,23 @@
 // Worker to handle file uploads off the main thread
 // This will be used to perform fetch requests for file uploads without blocking the UI
 
-import type { TaskData, UploadedData } from "$lib/types/chat-types";
+import type { UploadedData } from "$lib/types/chat-types";
 interface UploadRequest {
-  id: string;
-  file: File;
+  fileId: string;
+  file?: File;
+  name: string;
 }
 
 // Listen for messages from the main thread
 self.onmessage = async function (e) {
-  const { id, file }: UploadRequest = e.data;
-  console.log("UploadID: ", id);
-
+  const { fileId, file, name }: UploadRequest = e.data;
+console
   try {
     const formData = new FormData();
-    formData.append("file", file);
+    if (file) formData.append("file", file);
+    formData.append("file", name);
 
-    const response = await fetch("/api/upload", {
+    const response = await fetch("/api/uploads", {
       method: "POST",
       body: formData,
     });
@@ -25,27 +26,23 @@ self.onmessage = async function (e) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
 
-    const task = await response.json();
-    console.log("Task: ", task);
+    const { data, status, filename } = await response.json();
     const result: UploadedData = {
-      id,
-      filename: file.name,
-      mediaType: file.type,     
-      success: task.status === "queued" || task.status === "done",
-      data: task
+      id: fileId,
+      filename,
+      success: status === "pending" || status === "done",
+      status,
+      data,
     };
-    // Post the result back to the main thread
+
     self.postMessage(result);
   } catch (error) {
     const result: UploadedData = {
-      id,
+      id: fileId,
+      filename: name,
       success: false,
+      status: "error",
       error: error instanceof Error ? error.message : "Unknown error occurred during upload",
-      data: {
-        taskId: id,
-        status: "error",
-        error: error instanceof Error ? error.message : "Unknown error occurred during upload",
-      },
     };
 
     // Post the error back to the main thread

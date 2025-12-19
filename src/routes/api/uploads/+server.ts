@@ -1,0 +1,66 @@
+import { fileSchema } from "$lib/schema/chat-schema";
+import { resultInputSchema } from "$lib/schema/result";
+import { generateContent } from "$lib/server/helpers/chat-helper";
+import { result } from "$lib/server/service/result.service";
+import { del, get, put } from "$lib/utils/fs-blob";
+import type { RequestHandler } from "@sveltejs/kit";
+import { error, json } from "@sveltejs/kit";
+
+export const POST: RequestHandler = async ({ request, locals, url }) => {
+  const { session, user } = locals;
+  if (!user || !session) error(401, "Unauthorized");
+  if (request.body === null) error(400, "Empty file received");
+
+  try {
+    const formData = await request.formData();
+    let file = formData.get("file") as File | string;
+    let pathname = "";
+    if (typeof file === "string") {
+      pathname = `${user.id}-${user.fullName}/${file}`;
+      const { buffer } = await get(`${user.id}-${user.fullName}/${file}`);
+      file = new Blob([buffer], { type: "image/jpeg" }) as File;
+    }
+
+    const validatedFile = fileSchema.safeParse(file);
+    if (!validatedFile.success) {
+      const errorMessage = validatedFile.error.issues.map((issue) => issue.message).join(", ");
+      console.error(errorMessage);
+      return error(400, errorMessage);
+    }
+
+    const filename = pathname.split("/").pop();
+
+    try {
+      const mappingData = await result.getMappingData(user.staffId || 1);
+      const mapString = JSON.stringify(mappingData);
+      const content = await generateContent(validatedFile.data, mapString);
+      const parsedResult = JSON.parse(content.trim());
+      const marks = resultInputSchema.parse(parsedResult);
+      const res = await result.upsertStudentResult(marks, 1);
+      if (!res.success) {
+        throw new Error(res.message);
+      }
+      del(pathname);
+      return json({ status: "done", data: {}, filename });
+    } catch {
+      if (pathname) return json({ status: "pending", filename, data: {} });
+      try {
+        const token = `${user.id}-${user.fullName}`;
+        const buff = await file.arrayBuffer();
+        const data = await put(file.name, buff, {
+          token,
+          access: "private",
+          contentType: file.type,
+        });
+        const filename = data.pathname.split("/").pop();
+        return json({ status: "pending", data, filename });
+      } catch (e) {
+        console.error("Failed to save file:", e);
+        throw new Error("Failed to save file");
+      }
+    }
+  } catch (e) {
+    console.error(e);
+    return error(500, "Failed to upload file, try again");
+  }
+};

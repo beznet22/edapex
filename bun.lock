@@ -13,9 +13,9 @@
       "devDependencies": {
         "@ai-sdk/openai-compatible": "^1.0.28",
         "@ai-sdk/svelte": "^3.0.106",
-        "@internationalized/date": "^3.8.1",
+        "@internationalized/date": "^3.10.0",
         "@lucia-auth/adapter-drizzle": "^1.1.0",
-        "@lucide/svelte": "^0.559.0",
+        "@lucide/svelte": "^0.561.0",
         "@oslojs/crypto": "^1.0.1",
         "@oslojs/encoding": "^1.1.0",
         "@sejohnson/svelte-themes": "^0.0.6",
@@ -29,13 +29,14 @@
         "@types/nodemailer": "^7.0.4",
         "ai": "^5.0.106",
         "bcrypt-ts": "^7.1.0",
-        "bits-ui": "^2.14.1",
+        "bits-ui": "^2.14.4",
         "clsx": "^2.1.1",
         "cpx": "^1.5.0",
         "date-fns": "^4.1.0",
         "dotenv": "^17.2.3",
         "drizzle-kit": "^0.31.7",
         "drizzle-orm": "^0.44.7",
+        "embla-carousel-svelte": "^8.6.0",
         "google-auth-library": "^10.5.0",
         "jose": "^6.1.2",
         "jszip": "^3.10.1",
@@ -251,7 +252,7 @@
 
     "@lucia-auth/adapter-drizzle": ["@lucia-auth/adapter-drizzle@1.1.0", "", { "peerDependencies": { "drizzle-orm": ">= 0.29 <1", "lucia": "3.x" } }, "sha512-iCTnZWvfI5lLZOdUHZYiXA1jaspIFEeo2extLxQ3DjP3uOVys7IPwBi7zezLIRu9dhro4H4Kji+7gSYyjcef2A=="],
 
-    "@lucide/svelte": ["@lucide/svelte@0.559.0", "", { "peerDependencies": { "svelte": "^5" } }, "sha512-ZIGuYvrayrbPR/GhNlhvFXesH45LyEz38WphtkIu6UEyKZsFnGHFQD7CAXDOoum6JiqN2PSIxilVRcHwWLBmoQ=="],
+    "@lucide/svelte": ["@lucide/svelte@0.561.0", "", { "peerDependencies": { "svelte": "^5" } }, "sha512-vofKV2UFVrKE6I4ewKJ3dfCXSV6iP6nWVmiM83MLjsU91EeJcEg7LoWUABLp/aOTxj1HQNbJD1f3g3L0JQgH9A=="],
 
     "@mermaid-js/parser": ["@mermaid-js/parser@0.6.3", "", { "dependencies": { "langium": "3.3.1" } }, "sha512-lnjOhe7zyHjc+If7yT4zoedx2vo4sHaTmtkl1+or8BRTnCtDmcTpAjpzDSfCZrshM5bCoz0GyidzadJAH1xobA=="],
 
@@ -804,6 +805,12 @@
     "ecdsa-sig-formatter": ["ecdsa-sig-formatter@1.0.11", "", { "dependencies": { "safe-buffer": "^5.0.1" } }, "sha512-nagl3RYrbNv6kQkeJIpt6NJZy8twLB/2vtz6yN9Z4vRKHN4/QZJIEbqohALSgwKdnksuY3k5Addp5lg8sVoVcQ=="],
 
     "editorconfig": ["editorconfig@1.0.4", "", { "dependencies": { "@one-ini/wasm": "0.1.1", "commander": "^10.0.0", "minimatch": "9.0.1", "semver": "^7.5.3" }, "bin": { "editorconfig": "bin/editorconfig" } }, "sha512-L9Qe08KWTlqYMVvMcTIvMAdl1cDUubzRNYL+WfA4bLDMHe4nemKkpmYzkznE1FwLKu0EEmy6obgQKzMJrg4x9Q=="],
+
+    "embla-carousel": ["embla-carousel@8.6.0", "", {}, "sha512-SjWyZBHJPbqxHOzckOfo8lHisEaJWmwd23XppYFYVh10bU66/Pn5tkVkbkCMZVdbUE5eTCI2nD8OyIP4Z+uwkA=="],
+
+    "embla-carousel-reactive-utils": ["embla-carousel-reactive-utils@8.6.0", "", { "peerDependencies": { "embla-carousel": "8.6.0" } }, "sha512-fMVUDUEx0/uIEDM0Mz3dHznDhfX+znCCDCeIophYb1QGVM7YThSWX+wz11zlYwWFOr74b4QLGg0hrGPJeG2s4A=="],
+
+    "embla-carousel-svelte": ["embla-carousel-svelte@8.6.0", "", { "dependencies": { "embla-carousel": "8.6.0", "embla-carousel-reactive-utils": "8.6.0" }, "peerDependencies": { "svelte": "^3.49.0 || ^4.0.0 || ^5.0.0" } }, "sha512-ZDsKk8Sdv+AUTygMYcwZjfRd1DTh+JSUzxkOo8b9iKAkYjg+39mzbY/lwHsE3jXSpKxdKWS69hPSNuzlOGtR2Q=="],
 
     "emoji-regex": ["emoji-regex@9.2.2", "", {}, "sha512-L18DaJsXSUk2+42pv8mLs5jJT2hqFkFE4j21wOmgbUqsZ2hL72NsUU785g9RXgo3s0ZNgVl42TiHp3ZtOv/Vyg=="],
 
