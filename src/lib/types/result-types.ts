@@ -16,6 +16,7 @@ export type NewExamSetup = typeof schema.smExamSetups.$inferInsert;
 export type StudentCategory = typeof schema.teacherRemarks.$inferInsert;
 export type Subject = typeof schema.smSubjects.$inferSelect;
 export type NewExam = typeof schema.smExams.$inferInsert;
+export type NewAttendance = typeof schema.classAttendances.$inferInsert;
 
 export type MarkStoreResult = typeof schema.smMarkStores.$inferSelect & {
   exam_title: string;

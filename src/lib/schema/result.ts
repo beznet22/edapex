@@ -101,12 +101,20 @@ export const teacherRemarkSchema = z
   .describe("Teacher's remark section");
 export type TeacherRemark = z.infer<typeof teacherRemarkSchema>;
 
+export const attendanceSchema = z.object({
+  daysOpened: z.number().describe("The number of days school opened"),
+  daysAbsent: z.number().describe("The number of days student was absent"),
+  daysPresent: z.number().describe("The number of days student was present"),
+});
+export type Attendance = z.infer<typeof attendanceSchema>;
+
 export const resultInputSchema = z
   .object({
     studentData: studentDataSchema,
     marksData: marksDataSchema,
     teachersRemark: teacherRemarkSchema,
     studentRatings: studentRatingsSchema.nullable().describe("Student's ratings for various attributes"),
+    attendanceData: attendanceSchema.nullable().describe("Student's attendance data"),
   })
   .describe("Schema for a student report card with proper ID mappings");
 export type ResultInput = z.infer<typeof resultInputSchema>;
@@ -194,13 +202,6 @@ export const remarkSchema = z.object({
   remark: z.string().nullable().describe("The teacher's remark"),
 });
 export type Remark = z.infer<typeof remarkSchema>;
-
-export const attendanceSchema = z.object({
-  daysOpened: z.number().describe("The number of days school opened"),
-  daysAbsent: z.number().describe("The number of days student was absent"),
-  daysPresent: z.number().describe("The number of days student was present"),
-});
-export type Attendance = z.infer<typeof attendanceSchema>;
 
 export const examType = z.object({
   id: z.number().describe("The ID of the exam type"),

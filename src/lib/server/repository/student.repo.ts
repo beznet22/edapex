@@ -2,6 +2,7 @@
 
 import { and, eq, isNotNull, ne, sql } from "drizzle-orm";
 import {
+  classAttendances,
   smAssignSubjects,
   smBaseSetups,
   smClasses,
@@ -13,6 +14,8 @@ import {
   studentRecords,
 } from "$lib/server/db/sms-schema";
 import { BaseRepository } from "./base.repo";
+import type { Attendance } from "$lib/schema/result";
+import type { NewAttendance } from "$lib/types/result-types";
 
 export type StudentDetails = {
   studentId: number;

@@ -1,5 +1,6 @@
 import {
   AttributeRemark,
+  type Attendance,
   type MarksData,
   type MarksInput,
   type MarksOutput,
@@ -15,6 +16,7 @@ import { base64url } from "jose";
 import { timelineRepo } from "../repository/timeline.repo";
 import { SMTPClient, type SMTPMessage } from "../helpers/smtp";
 import { render } from "svelte/server";
+import { resultRepo } from "../repository/result.repo";
 
 const GRADE_RANGES = {
   EYFS: [
@@ -93,12 +95,23 @@ export class ResultService {
     );
     return true;
   }
+
+  async upsertAttendance(params: { attendance: Attendance; studentId: number; examTypeId: number }) {
+    const { attendance, studentId, examTypeId } = params;
+    const data = {
+      ...attendance,
+      studentId,
+      examTypeId,
+    };
+    await resultRepo.upsertClassAttendance(data);
+  }
+
   /**
    * Store exam marks for a student from validated report data
    */
   async upsertStudentResult(validatedReport: ResultInput, teacherId: number): Promise<MarksOutput> {
     try {
-      const { studentData, marksData, teachersRemark, studentRatings } = validatedReport;
+      const { studentData, marksData, teachersRemark, studentRatings, attendanceData } = validatedReport;
       const stdRec = await studentRepo.getStudentRecordByAdmissionNo(studentData.admissionNo);
       if (!stdRec) {
         return {
@@ -146,6 +159,15 @@ export class ResultService {
           examTypeId: studentData.examTypeId,
           remark: teachersRemark.comment,
           academicId,
+        });
+      }
+
+      // upsert attendance
+      if (attendanceData) {
+        await this.upsertAttendance({
+          attendance: attendanceData,
+          studentId: stdRec.studentId!,
+          examTypeId: studentData.examTypeId,
         });
       }
 

@@ -95,7 +95,7 @@
                   {/each}
                 </MessageContent>
               </Message>
-              {#if chat.status === "submitted" && chat.lastMessage?.role === "user"}
+              {#if chat.status === "submitted" && message.id === chat.lastMessage?.id && chat.lastMessage?.role === "user"}
                 <Shimmer as="p" spread={3} duration={2} content_length={18}>
                   {#snippet children()}
                     Generating response...
