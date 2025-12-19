@@ -79,11 +79,14 @@
                 <Card.Content
                   class="relative flex aspect-square items-center justify-center px-4 h-full overflow-hidden"
                 >
-                  <img
-                    src={`api/uploads/${upload.filename}`}
-                    alt={upload.filename}
-                    class="h-full w-full object-cover rounded-lg"
-                  />
+                  {#if upload.status === "pending"}
+                    <img
+                      src={`api/uploads/${upload.filename}`}
+                      alt={upload.filename}
+                      class="h-full w-full object-cover rounded-lg"
+                    />
+                  {/if}
+
                   <Button
                     variant="ghost"
                     size="icon"

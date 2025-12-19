@@ -42,8 +42,9 @@ export const POST: RequestHandler = async ({ request, locals, url }) => {
       }
       del(pathname);
       return json({ status: "done", data: {}, filename });
-      throw new Error("Failed to process file");
-    } catch {
+    } catch (e) {
+      console.error(e);
+    } finally {
       if (pathname) return json({ status: "pending", filename, data: {} });
       try {
         const token = `${user.id}-${user.fullName}`;
