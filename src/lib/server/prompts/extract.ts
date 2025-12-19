@@ -32,6 +32,7 @@ export const extractPrompt = [
   '    "term": <string> (mapped), (mapped from examTypes.title)',
   '    "examTypeId": <int>, (mapped from examTypes.id)',
   '    "attendance": {"daysOpened":<int>,"daysPresent":<int>,"daysAbsent":<int>}',
+  '    NOTE: Number of days present OR absent from the image is the as daysPresent/daysAbsent is equal to daysOpened when summed',
   "  },",
   ' "NOTE: If studentCategory is "DAYCARE", include "learningOutcome" in the marksData and exclude "examTitles", "marks", "total", "grade"',
   '  "marksData": [',

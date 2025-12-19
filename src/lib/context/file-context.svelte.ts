@@ -49,6 +49,7 @@ export class FilesContext {
   add = async (files: File[] | FileList) => {
     const incoming = Array.from(files);
     if (this.doUpload) this.#upload(incoming);
+    console.log("Files: ", incoming);
     this.files = [...this.files, ...incoming];
   }
 

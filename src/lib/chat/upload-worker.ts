@@ -26,11 +26,11 @@ self.onmessage = async function (e) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
 
-    const { data, status, filename } = await response.json();
+    const { data, status, filename, success } = await response.json();
     const result: UploadedData = {
       id: fileId,
       filename,
-      success: status === "pending" || status === "done",
+      success,
       status,
       data,
     };

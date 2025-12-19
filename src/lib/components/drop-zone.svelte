@@ -97,7 +97,6 @@
                   />
                 </div>
               {/if}
-
               <div class="flex flex-col min-w-0 flex-1">
                 <span class="truncate text-sm font-medium leading-none" title={file.name}>
                   {file.name}
@@ -109,11 +108,10 @@
             </div>
 
             <div class="shrink-0">
-              {#if filesContext.uploads.some((u) => u.filename === file.name && !u.success)}
-                <div class="flex items-center justify-center h-8 w-8">
-                  <Loader variant="circular" size="sm" />
-                </div>
-              {:else if filesContext.uploads.some((u) => u.filename === file.name && u.status === "done")}
+              {#if filesContext.uploads.some((u) => {
+                console.log("File name: ", file.name, "Upload name: ", u.filename);
+                return u.filename === file.name && u.status === "done";
+              })}
                 <div class="flex items-center gap-1">
                   <Check class="size-4 text-green-500" />
                   <Button
@@ -126,7 +124,10 @@
                     <XIcon class="size-4" />
                   </Button>
                 </div>
-              {:else if filesContext.uploads.some((u) => u.filename === file.name && u.status === "pending")}
+              {:else if filesContext.uploads.some((u) => {
+                console.log("File name: ", file.name, "Upload name: ", u.filename);
+                return u.filename === file.name && u.status === "error";
+              })}
                 <div class="flex items-center gap-1">
                   <TriangleAlert class="size-4 text-primary" />
                   <Button
@@ -138,6 +139,13 @@
                   >
                     <XIcon class="size-4" />
                   </Button>
+                </div>
+              {:else if filesContext.uploads.some((u) => {
+                console.log("File name: ", file.name, "Upload name: ", u.filename);
+                return u.filename === file.name && (u.status === "started" || u.status === "error");
+              })}
+                <div class="flex items-center justify-center h-8 w-8">
+                  <Loader variant="circular" size="sm" />
                 </div>
               {:else}
                 <Button
