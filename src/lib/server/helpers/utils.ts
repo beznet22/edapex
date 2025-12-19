@@ -4,6 +4,7 @@ import { sql } from "drizzle-orm";
 import { genSaltSync, hashSync, compareSync } from "bcrypt-ts";
 import { getRequestEvent } from "$app/server";
 import type { DeviceInfo } from "$lib/types/auth-types";
+import css from "$lib/components/template/style.css?inline";
 
 // --- Auth Helpers ---
 export const hashPwd = (pwd: string, rounds = 10) => hashSync(pwd, genSaltSync(rounds));
@@ -190,15 +191,12 @@ export function ensureBase64Image(imageSource: string, fallbackPath?: string): s
  * @returns HTML string
  */
 export function pageToHtml(body: string, head: string) {
-  const cssPath = join(process.cwd(), "src/lib/components/template/style.css");
-  const cssContent = readFileSync(cssPath, "utf-8");
-
   return `
         <!DOCTYPE html>
         <html>
           <head>
             ${head}
-            <style>${cssContent}</style>
+            <style>${css}</style>
           </head>
           <body>${body}</body>
         </html>
