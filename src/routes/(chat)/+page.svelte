@@ -20,9 +20,7 @@
   const filesContext = new FilesContext(uploads, false);
   filesContext.setContext();
 
-  // onMount(() => {
-  //  console.log("Users: ", user);
-  // });
+
 </script>
 
 <div class="">

@@ -53,7 +53,9 @@ export const load: LayoutServerLoad = async ({ cookies, locals }) => {
     status: "pending",
     success: false,
   }));
-  console.log("Students: ", students);
+
+  // console.log("Students: ", students);
+
   return {
     agents,
     user: user || undefined,
