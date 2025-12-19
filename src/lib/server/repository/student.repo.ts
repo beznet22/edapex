@@ -91,7 +91,7 @@ export class StudentRepository extends BaseRepository {
         admissionNo: smStudents.admissionNo,
       })
       .from(smStudents)
-      .leftJoin(
+      .innerJoin(
         studentRecords,
         and(eq(smStudents.id, studentRecords.studentId), eq(studentRecords.activeStatus, 1))
       )
