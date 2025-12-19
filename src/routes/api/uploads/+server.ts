@@ -39,30 +39,27 @@ export const POST: RequestHandler = async ({ request, locals, url }) => {
       if (!res.success) {
         throw new Error(res.message);
       }
-      del(pathname);
+      if (filename) del(pathname);
       return json({ success: true, status: "done", data: {}, filename: filename ?? file.name });
     } catch (e) {
       console.error("Main processing error:", e);
-      // If we have a pathname and main processing failed, return pending for further trial
-      if (pathname) {
+      if (filename) {
         return json({ success: true, status: "pending", filename, data: {} });
-      } else {
-        // If no pathname (new file), save it and return done
-        try {
-          const token = `${user.id}-${user.fullName}`;
-          const buff = await file.arrayBuffer();
-          const data = await put(file.name, buff, {
-            token,
-            access: "private",
-            contentType: file.type,
-          });
+      }
+      try {
+        const token = `${user.id}-${user.fullName}`;
+        const buff = await file.arrayBuffer();
+        const data = await put(file.name, buff, {
+          token,
+          access: "private",
+          contentType: file.type,
+        });
 
-          const filename = data.pathname.split("/").pop();
-          return json({ success: true, status: "pending", data, filename });
-        } catch (e) {
-          console.error("Failed to save file:", e);
-          throw new Error("Failed to save file");
-        }
+        const filename = data.pathname.split("/").pop();
+        return json({ success: true, status: "pending", data, filename });
+      } catch (e) {
+        console.error("Failed to save file:", e);
+        throw new Error("Failed to save file");
       }
     }
   } catch (e) {

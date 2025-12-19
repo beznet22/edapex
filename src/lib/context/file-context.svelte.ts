@@ -81,7 +81,7 @@ export class FilesContext {
 
   #upload = (files: File[], uploadData?: UploadedData) => {
     if (uploadData) {
-      uploadData.status = "started";
+      uploadData.status = "pending";
       uploadData.success = false;
       this.updateUpload(uploadData);
       const worker = this.#initWoeker(uploadData.id, uploadData.filename);
