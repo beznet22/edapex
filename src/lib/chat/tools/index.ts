@@ -1,5 +1,11 @@
 import { type LanguageModel, type UIMessageStreamWriter } from "ai";
-import { getClassStudentList, upsertAttendance, upsertStudentResult } from "./result.tool";
+import {
+  getClassStudentList,
+  upsertAttendance,
+  upsertStudentRatings,
+  upsertStudentResult,
+  upsertTeacherRemark,
+} from "./result.tool";
 
 export const tools = (writer: UIMessageStreamWriter, model: LanguageModel) => {
   return {
@@ -7,5 +13,7 @@ export const tools = (writer: UIMessageStreamWriter, model: LanguageModel) => {
     upsertStudentResult,
     getClassStudentList,
     upsertAttendance,
+    upsertTeacherRemark,
+    upsertStudentRatings,
   };
 };

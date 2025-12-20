@@ -41,6 +41,8 @@ export const studentRatingsSchema = z.object({
   self_control_and_interaction: AttributeSchema.nullable(),
 });
 
+export type StudentRatings = z.infer<typeof studentRatingsSchema>;
+
 export const studentDataSchema = z.object({
   studentId: z.number().int().positive().nullable().describe("Unique student ID"),
   admissionNo: z.number().int().positive().describe("Unique admission/enrolment number"),
