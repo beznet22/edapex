@@ -120,6 +120,8 @@ export const assessmentWorkflow: AgentWorkflow = {
         "→ If user says 'update assessment report', retrieve the studentId, examTypeId, and updated marksData from CONVERSATION CONTEXT, then call: upsertStudentResult with operation='update'",
         "→ If user says 'publish assessment report', call tool: publishResult with provider='pdf' and model='report'",
         "→ If user says 'update attendance', retrieve the studentId, examTypeId, and updated attendanceData from CONVERSATION CONTEXT, then call: upsertAttendance with operation='update'",
+        "→ If user says 'update teacher's remark', retrieve the studentId, examTypeId, and updated remarkData from CONVERSATION CONTEXT, then call: upsertTeacherRemark with operation='update'",
+        "→ If user says 'update student ratings', retrieve the studentId, examTypeId, and updated ratingsData from CONVERSATION CONTEXT, then call: upsertStudentRatings with operation='update'",
         "→ If user says 'generate another report', go back to step 1",
 
         "## Output Structure (STRICT — Enforced for report cards ONLY)",

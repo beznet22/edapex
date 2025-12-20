@@ -33,6 +33,12 @@
         case "tool-upsertAttendance":
           if (part.state !== "output-available") return "";
           return `Status: ${part.output.status}\nMessage: ${part.output.message}`;
+        case "tool-upsertTeacherRemark":
+          if (part.state !== "output-available") return "";
+          return `Status: ${part.output.status}\nMessage: ${part.output.message}`;
+        case "tool-upsertStudentRatings":
+          if (part.state !== "output-available") return "";
+          return `Status: ${part.output.status}\nMessage: ${part.output.message}`;
         default:
           return JSON.stringify(part.output);
       }

@@ -6,8 +6,10 @@ import {
   type MarksOutput,
   type ResultInput,
   type ResultOutput,
+  type StudentRatings,
+  type TeacherRemark,
 } from "$lib/schema/result";
-import type { ClassAverage, ExamSetup, ResultData, ScoreData, StudentDetail } from "$lib/types/result-types";
+import type { ClassAverage, ExamSetup, RatingData, ResultData, ScoreData, StudentDetail } from "$lib/types/result-types";
 import { studentRepo, type StudentRecord } from "$lib/server/repository/student.repo";
 import ResultEmail from "$lib/components/template/result-email.svelte";
 import { base, repo } from "$lib/server/repository";
@@ -96,6 +98,9 @@ export class ResultService {
     return true;
   }
 
+  /**
+   * Store student attendance for an exam
+   */
   async upsertAttendance(params: { attendance: Attendance; studentId: number; examTypeId: number }) {
     const { attendance, studentId, examTypeId } = params;
     const data = {
@@ -104,6 +109,43 @@ export class ResultService {
       examTypeId,
     };
     await resultRepo.upsertClassAttendance(data);
+  }
+
+  /**
+   * Store teacher's remark for a student
+   */
+  async upsertTeacherRemark(params: { studentId: number; examTypeId: number; remark: string }) {
+    const { studentId, examTypeId, remark } = params;
+    const academicId = await repo.result.getAcademicId();
+    await resultRepo.upsertTeacherRemark({
+      studentId,
+      examTypeId,
+      remark,
+      academicId,
+    });
+  }
+
+  /**
+   * Store student ratings for a student
+   */
+  async upsertStudentRatings(params: { studentId: number; examTypeId: number; ratings: StudentRatings }) {
+    const { studentId, examTypeId, ratings } = params;
+    const academicId = await repo.result.getAcademicId();
+    await resultRepo.upsertStudentRatings(
+      Object.entries(ratings)
+        .map(([attribute, rating]) => {
+          if (!rating) return null;
+          return {
+            studentId,
+            examTypeId,
+            attribute,
+            rate: rating,
+            remark: AttributeRemark[rating as keyof typeof AttributeRemark],
+            academicId,
+          };
+        })
+        .filter((r) => r !== null) as any[]
+    );
   }
 
   /**
