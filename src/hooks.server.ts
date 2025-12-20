@@ -1,5 +1,5 @@
-import { startQueueWorker } from "$lib/server/queue";
-import { workerPool } from "$lib/server/queue/pool";
+import { startQueueWorker } from "$lib/server/worker";
+import { workerPool } from "$lib/server/worker/pool";
 import { auth } from "$lib/server/service/auth.service";
 import { type Handle } from "@sveltejs/kit";
 

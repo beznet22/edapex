@@ -8,6 +8,7 @@
   import type { CarouselAPI } from "$lib/components/ui/carousel/context.js";
   import { onMount } from "svelte";
   import Loader from "./prompt-kit/loader/loader.svelte";
+  import { upload } from "$lib/api/chat.remote";
 
   interface ChatResourceProps {
     onFileSelected: (files: FileList) => void;
@@ -17,8 +18,6 @@
 
   let fileCtx = $derived(useFileActions());
   let uploads = $derived(fileCtx.uploads.filter((u) => u.status === "pending"));
-  let fileId = $state<string>("");
-  let status = $derived(uploads.find((u) => u.id === fileId)?.status);
 
   $effect(() => {
     console.log("status: ", status);
@@ -99,10 +98,9 @@
                     class="absolute bottom-2 right-2 bg-black/70 text-white text-2xl font-semibold px-2 py-1 rounded-md cursor-pointer"
                     onclick={() => {
                       fileCtx.retryUpload(upload);
-                      fileId = upload.id;
                     }}
                   >
-                    {#if status === "pending"}
+                    {#if uploads.find((u) => u.id === upload.id)?.status === "retrying"}
                       <Loader variant="circular" size="sm" />
                     {:else}
                       <RotateCcw class="size-4" />

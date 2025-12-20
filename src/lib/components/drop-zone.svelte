@@ -113,7 +113,7 @@
                   <Check class="size-4 text-green-500" />
                 {:else if filesContext.uploads.some((u) => u.filename === file.name && u.status === "pending")}
                   <TriangleAlert class="size-4 text-primary" />
-                {:else if filesContext.uploads.some((u) => u.filename === file.name && u.status === "started")}
+                {:else if filesContext.uploads.some((u) => u.filename === file.name && u.status === "uploading")}
                   <Loader variant="circular" size="sm" />
                   {:else if filesContext.uploads.some((u) => u.filename === file.name && u.status === "error")}
                   <CircleAlert class="size-4 text-destructive" />
