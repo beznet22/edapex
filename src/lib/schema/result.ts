@@ -47,8 +47,7 @@ export const studentDataSchema = z.object({
   fullName: z.string().min(1, "Student full name required").describe("Full name of the student"),
   class: z
     .string()
-    .describe("Assigned class, only class, section should not be included (e.g., GRADE KA becomes GRADE K)"),
-  section: z.string().describe("Assigned section extracted from the class (e.g., A)"),
+    .describe("Assigned class (e.g. GRADE KA)"),
   studentCategory: z
     .string()
     .describe("Category of the student mapped from the class category (e.g., GRADE K)"),

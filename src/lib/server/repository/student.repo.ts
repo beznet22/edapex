@@ -1,11 +1,12 @@
 // /src/lib/server/repository/student.repo.ts
 
-import { and, eq, isNotNull, ne, sql } from "drizzle-orm";
+import { and, count, eq, isNotNull, ne, sql } from "drizzle-orm";
 import {
   classAttendances,
   smAssignSubjects,
   smBaseSetups,
   smClasses,
+  smMarkStores,
   smParents,
   smSections,
   smStaffs,
@@ -68,12 +69,12 @@ export class StudentRepository extends BaseRepository {
     return student || null;
   }
 
-  async getStudentsByUserId(userId: number): Promise<ClassStudent[] | null> {
+  async getStudentsByUserId(userId: number) {
     const [staff] = await this.db.select().from(smStaffs).where(eq(smStaffs.userId, userId)).limit(1);
     if (!staff) return null;
 
     const academicId = await this.getAcademicId();
-
+    const examType = await this.getCurrentTerm();
     const [classSection] = await this.db
       .select()
       .from(smAssignSubjects)
@@ -95,18 +96,22 @@ export class StudentRepository extends BaseRepository {
       })
       .from(smStudents)
       .innerJoin(
-        studentRecords,
-        and(eq(smStudents.id, studentRecords.studentId), eq(studentRecords.activeStatus, 1))
+        smMarkStores,
+        and(
+          eq(smMarkStores.studentId, smStudents.id),
+          eq(smMarkStores.examTermId, examType.id),
+          eq(smMarkStores.activeStatus, 1),
+          eq(smMarkStores.academicId, academicId),
+          eq(smMarkStores.classId, classSection.classId || 0),
+          eq(smMarkStores.sectionId, classSection.sectionId || 0),
+          eq(smMarkStores.activeStatus, smStudents.activeStatus),
+        )
       )
       .where(
         and(
-          eq(studentRecords.classId, classSection.classId || 0),
-          eq(studentRecords.sectionId, classSection.sectionId || 0),
           eq(smStudents.activeStatus, 1),
-          eq(studentRecords.isDefault, 1),
-          eq(studentRecords.academicId, academicId)
         )
-      );
+      ).groupBy(smStudents.id);
 
     return students;
   }
