@@ -156,6 +156,7 @@ export class ResultService {
       const { studentData, marksData, teachersRemark, studentRatings } = validatedReport;
       const stdRec = await studentRepo.getStudentRecordByAdmissionNo(studentData.admissionNo);
       if (!stdRec) {
+        console.error("Student not found", studentData.admissionNo);
         return {
           success: false,
           message: "Student not found",
@@ -166,6 +167,7 @@ export class ResultService {
       const examSetup = await this.getExamSetup(stdRec, studentData.examTypeId);
       const results = await this.processMarks(marksData, stdRec, examSetup, studentData.examTypeId);
       if (!results?.length) {
+        console.error("Failed to process marks", results);
         return {
           success: false,
           message: "Failed to process marks",
