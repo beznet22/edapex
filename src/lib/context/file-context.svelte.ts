@@ -85,7 +85,7 @@ export class FilesContext {
 
   #upload = (files: File[], uploadData?: UploadedData) => {
     if (uploadData) {
-      uploadData.status = "pending";
+      uploadData.status = "retrying";
       uploadData.success = false;
       this.updateUpload(uploadData);
       const worker = this.#initWoeker(uploadData.id, uploadData.filename);
@@ -97,7 +97,7 @@ export class FilesContext {
       const upload: UploadedData = {
         id: fileId,
         filename: file.name,
-        status: "started",
+        status: "uploading",
         success: false,
       };
 
