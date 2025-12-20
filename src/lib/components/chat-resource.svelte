@@ -17,7 +17,7 @@
   let { onFileSelected }: ChatResourceProps = $props();
 
   let fileCtx = $derived(useFileActions());
-  let uploads = $derived(fileCtx.uploads.filter((u) => u.status === "pending"));
+  let uploads = $derived(fileCtx.uploads.filter((u) => u.status === "pending" || u.status === "retrying"));
 
   $effect(() => {
     console.log("status: ", status);
@@ -84,13 +84,11 @@
                 <Card.Content
                   class="relative flex aspect-square items-center justify-center px-4 h-full overflow-hidden"
                 >
-                  {#if upload.status === "pending"}
-                    <img
-                      src={`api/uploads/${upload.filename}`}
-                      alt={upload.filename}
-                      class="h-full w-full object-cover rounded-lg"
-                    />
-                  {/if}
+                  <img
+                    src={`api/uploads/${upload.filename}`}
+                    alt={upload.filename}
+                    class="h-full w-full object-cover rounded-lg"
+                  />
 
                   <Button
                     variant="ghost"
