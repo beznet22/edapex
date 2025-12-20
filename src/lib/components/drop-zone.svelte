@@ -72,7 +72,7 @@
           {onFileRejected}
           maxFileSize={300 * KILOBYTE}
           accept="image/*"
-          maxFiles={2}
+          maxFiles={5}
           fileCount={filesContext.files.length}
         />
       </div>

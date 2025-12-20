@@ -33,7 +33,9 @@ export const POST: RequestHandler = async ({ request, locals, url }) => {
     }
 
     try {
+      
       const mappingData = await result.getMappingData(user.staffId || 1);
+      console.log("Mapping data:", mappingData);
       const mapString = JSON.stringify(mappingData);
       const content = await generateContent(validatedFile.data, mapString);
       const parsedResult = JSON.parse(content.trim());
