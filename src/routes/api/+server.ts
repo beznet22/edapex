@@ -1,11 +1,15 @@
-import { result } from "$lib/server/service/result.service";
+import { studentRepo } from "$lib/server/repository/student.repo";
 import { error, json, type RequestHandler } from "@sveltejs/kit";
 
-export const GET: RequestHandler = async ({ url }) => {
+export const GET: RequestHandler = async ({ locals }) => {
+  const { user, session } = locals;
+  if (!user || !session) {
+    error(401, "Unauthorized");
+  }
   try {
-    const resultData = await result.getStudentResult({ id: 20, examId: 5 });
+    const students = await studentRepo.getStudentsByUserId(user?.id);
 
-    return json(resultData);
+    return json({len: students?.length, students});
   } catch (e: any) {
     console.error("Error creating job:", e);
     return error(500, e.message);

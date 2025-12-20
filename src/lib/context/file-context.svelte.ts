@@ -49,7 +49,6 @@ export class FilesContext {
   add = async (files: File[] | FileList) => {
     const incoming = Array.from(files);
     if (this.doUpload) this.#upload(incoming);
-    console.log("Files: ", incoming);
     this.files = [...this.files, ...incoming];
   };
 
@@ -70,6 +69,7 @@ export class FilesContext {
 
       if (data.status === "done") {
         toast.success("File uploaded successfully");
+        // this.openModal = false;
         console.log(`Upload success for ${name}:`, data);
       }
     };
@@ -88,6 +88,7 @@ export class FilesContext {
       uploadData.status = "retrying";
       uploadData.success = false;
       this.updateUpload(uploadData);
+      console.log("Retrying upload: ", uploadData);
       const worker = this.#initWoeker(uploadData.id, uploadData.filename);
       worker.postMessage({ fileId: uploadData.id, name: uploadData.filename });
     }
@@ -120,7 +121,6 @@ export class FilesContext {
   };
 
   retryUpload = (upload: UploadedData) => {
-    console.log("Retrying upload: ", upload);
     this.#upload([], upload);
   };
 
