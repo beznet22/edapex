@@ -67,6 +67,10 @@ export class FilesContext {
         u.id === fileId ? { ...u, ...data, success: true, status: data.status } : u
       );
 
+      if(data.status === "pending") {
+        toast.error("File saved retry extraction");
+      }
+
       if (data.status === "done") {
         toast.success("File uploaded successfully");
         // this.openModal = false;

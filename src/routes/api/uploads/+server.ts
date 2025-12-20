@@ -1,3 +1,4 @@
+import { UPLOADS_DIR } from "$lib/constants";
 import { fileSchema } from "$lib/schema/chat-schema";
 import { resultInputSchema } from "$lib/schema/result";
 import { generateContent } from "$lib/server/helpers/chat-helper";
@@ -5,6 +6,8 @@ import { result } from "$lib/server/service/result.service";
 import { del, get, put } from "$lib/utils/fs-blob";
 import type { RequestHandler } from "@sveltejs/kit";
 import { error, json } from "@sveltejs/kit";
+import { rmdirSync } from "fs";
+import { join } from "path";
 
 export const POST: RequestHandler = async ({ request, locals, url }) => {
   const { session, user } = locals;
@@ -66,4 +69,15 @@ export const POST: RequestHandler = async ({ request, locals, url }) => {
     console.error(e);
     return error(500, "Failed to upload file, try again");
   }
+};
+
+export const DELETE: RequestHandler = async ({ url, locals }) => {
+  const { session, user } = locals;
+  if (!user || !session) error(401, "Unauthorized");
+  const clearAll = url.searchParams.get("clear") === "all";
+  if (clearAll) {
+  const uploadPath = join(UPLOADS_DIR, `${user.id}-${user.fullName}`);
+  rmdirSync(uploadPath, { recursive: true });
+  }
+  return json({ success: true });
 };
