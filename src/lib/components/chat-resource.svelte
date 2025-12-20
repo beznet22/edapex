@@ -1,14 +1,16 @@
 <script lang="ts">
   import * as Card from "$lib/components/ui/card/index.js";
   import * as Carousel from "$lib/components/ui/carousel/index.js";
-  import { RotateCcw, Upload } from "@lucide/svelte";
+  import { BrushCleaning, RotateCcw, Upload } from "@lucide/svelte";
   import { Separator } from "./ui/separator";
   import { useFileActions } from "$lib/context/file-context.svelte";
-  import Button from "./ui/button/button.svelte";
+  import Button, { buttonVariants } from "./ui/button/button.svelte";
+  import * as Tooltip from "$lib/components/ui/tooltip/index.js";
   import type { CarouselAPI } from "$lib/components/ui/carousel/context.js";
   import { onMount } from "svelte";
   import Loader from "./prompt-kit/loader/loader.svelte";
   import { upload } from "$lib/api/chat.remote";
+  import { toast } from "svelte-sonner";
 
   interface ChatResourceProps {
     onFileSelected: (files: FileList) => void;
@@ -17,7 +19,9 @@
   let { onFileSelected }: ChatResourceProps = $props();
 
   let fileCtx = $derived(useFileActions());
-  let uploads = $derived(fileCtx.uploads.filter((u) => u.status === "pending" || u.status === "retrying"));
+  let uploads = $derived(
+    fileCtx.uploads.filter((u) => u.status === "pending" || u.status === "retrying" || u.status === "error")
+  );
 
   $effect(() => {
     console.log("status: ", status);
@@ -52,10 +56,34 @@
   //     });
   //   }
   // });
+
+  const clearResource = async () => {
+    const resp = await fetch("/api/uploads?clear=all", {
+      method: "DELETE",
+    });
+
+    if (!resp.ok) {
+      toast("Failed to clear resources");
+      return;
+    }
+    toast("Resources cleared");
+    fileCtx.uploads = [];
+  };
 </script>
 
 {#if uploads.length > 0}
   <Carousel.Root class="relative w-full pt-12">
+    <Tooltip.Provider delayDuration={0}>
+      <Tooltip.Root>
+        <Tooltip.Trigger
+          class={buttonVariants({ variant: "ghost" }) + "m-4 absolute left-0 top-0 z-10 cursor-pointer"}
+          onclick={clearResource}
+        >
+          <BrushCleaning class="size-5" />
+        </Tooltip.Trigger>
+        <Tooltip.Content>Clear Resources</Tooltip.Content>
+      </Tooltip.Root>
+    </Tooltip.Provider>
     <div class="flex min-h-full items-center text-sm mx-4">
       <Separator />
     </div>
@@ -98,7 +126,7 @@
                       fileCtx.retryUpload(upload);
                     }}
                   >
-                    {#if uploads.find((u) => u.id === upload.id)?.status === "retrying"}
+                    {#if uploads.some((u) => u.id === upload.id && u.status === "retrying")}
                       <Loader variant="circular" size="sm" />
                     {:else}
                       <RotateCcw class="size-4" />

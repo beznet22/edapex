@@ -9,7 +9,7 @@ export const GET: RequestHandler = async ({ locals }) => {
   try {
     const students = await studentRepo.getStudentsByUserId(user?.id);
 
-    return json({len: students?.length, students});
+    return json({ staffId: user.staffId, len: students?.length, students });
   } catch (e: any) {
     console.error("Error creating job:", e);
     return error(500, e.message);
