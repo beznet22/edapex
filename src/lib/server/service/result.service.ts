@@ -9,7 +9,14 @@ import {
   type StudentRatings,
   type TeacherRemark,
 } from "$lib/schema/result";
-import type { ClassAverage, ExamSetup, RatingData, ResultData, ScoreData, StudentDetail } from "$lib/types/result-types";
+import type {
+  ClassAverage,
+  ExamSetup,
+  RatingData,
+  ResultData,
+  ScoreData,
+  StudentDetail,
+} from "$lib/types/result-types";
 import { studentRepo, type StudentRecord } from "$lib/server/repository/student.repo";
 import ResultEmail from "$lib/components/template/result-email.svelte";
 import { base, repo } from "$lib/server/repository";
@@ -156,10 +163,13 @@ export class ResultService {
       const { studentData, marksData, teachersRemark, studentRatings } = validatedReport;
       const stdRec = await studentRepo.getStudentRecordByAdmissionNo(studentData.admissionNo);
       if (!stdRec) {
-        console.error("Student not found", studentData.admissionNo);
+        console.error("ERROR: Student not found", studentData.admissionNo);
         return {
           success: false,
-          message: "Student not found",
+          message: [
+            `Student not found for admission number ${studentData.admissionNo}`,
+            `Ensure you hav uploaded the marks data for the student before proceeding.`,
+          ].join("\n"),
         };
       }
 
@@ -167,10 +177,13 @@ export class ResultService {
       const examSetup = await this.getExamSetup(stdRec, studentData.examTypeId);
       const results = await this.processMarks(marksData, stdRec, examSetup, studentData.examTypeId);
       if (!results?.length) {
-        console.error("Failed to process marks", results);
+        console.error("ERROR: Failed to process marks", results);
         return {
           success: false,
-          message: "Failed to process marks",
+          message: [
+            "Failed to process marks",
+            "Ensure you have uploaded the marks data for the student before proceeding.",
+          ].join("\n"),
         };
       }
 
