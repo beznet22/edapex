@@ -57,7 +57,13 @@ export const upsertStudentResult = tool({
           message: "Marks data is required for create or update operation",
         };
       }
-      await result.upsertStudentResult(marksData, 1);
+     const res = await result.upsertStudentResult(marksData, 1);
+     if (!res.success) {
+        return {
+          status: "denied",
+          message: res.message,
+        };
+      }
     }
 
     const resultData = adminNo
