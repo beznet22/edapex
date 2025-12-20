@@ -27,7 +27,7 @@ export class WorkerPool {
     this.poolSize = Math.max(1, os.cpus().length - 1);
     this.taskStoreDir = join(process.cwd(), "cache", "tasks");
     this.ensureTaskStoreDir();
-    // this.initializeWorkers();
+    this.initializeWorkers();
   }
 
   private ensureTaskStoreDir() {
@@ -42,7 +42,6 @@ export class WorkerPool {
     console.log("Initializing workers...");
     for (let i = 0; i < this.poolSize; i++) {
       const worker = new Worker(this.workerPath) as PooledWorker;
-
       worker.busy = false;
 
       worker.on("message", async (msg) => {
@@ -54,7 +53,7 @@ export class WorkerPool {
             const task = this.queue[taskIndex];
             
             // Execute the callback asynchronously without blocking the message handler
-            // This allows the heavy operations in the callback to not block the worker
+            // This allows heavy operations in the callback to not block the worker
             (async () => {
               try {
                 await task.resolve(msg);
@@ -238,5 +237,4 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const workerPath = join(__dirname, "worker.js");
 
-// Create a singleton instance
 export const workerPool = new WorkerPool(workerPath);

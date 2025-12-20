@@ -61,7 +61,7 @@ export type UploadedData = {
   id: string;
   filename: string;
   success: boolean;
-  status: "pending" | "started" | "done" | "error";
+  status: "pending" | "uploading" | "retrying" | "done" | "error";
   error?: string;
   data?: any;
 };

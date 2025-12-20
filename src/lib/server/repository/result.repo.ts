@@ -39,7 +39,7 @@ export class ResultsRepository extends BaseRepository {
       
       // Look for existing record based on the unique constraint (studentId, examTypeId)
       const [existing] = await this.db
-        .select({ id: schema.classAttendances.id })
+        .select({ id: schema.classAttendances.id,  })
         .from(schema.classAttendances)
         .where(
           and(
