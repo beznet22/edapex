@@ -43,34 +43,39 @@ export async function generateTitle({
 }
 
 export const generateContent = async (file: Blob, mapString?: string) => {
-  let messages: Array<ModelMessage> = [];
-  messages.push({
-    role: "user",
-    content: [
-      {
-        type: "text",
-        text: [
-          "Extract all visible data needed to generate an official report card.",
-          "",
-          "Mapping Data:",
-          mapString || "",
-        ].join("\n"),
-      },
-      {
-        type: "file",
-        data: await file.arrayBuffer(),
-        mediaType: file.type,
-      },
-    ],
-  });
+  try {
+    let messages: Array<ModelMessage> = [];
+    messages.push({
+      role: "user",
+      content: [
+        {
+          type: "text",
+          text: [
+            "Extract all visible data needed to generate an official report card.",
+            "",
+            "Mapping Data:",
+            mapString || "",
+          ].join("\n"),
+        },
+        {
+          type: "file",
+          data: await file.arrayBuffer(),
+          mediaType: file.type,
+        },
+      ],
+    });
 
-  const provider = await useAgent().use(CredentialType.QWEN_CODE).geModelProvider();
-  if (!provider) throw new Error("No provider found");
+    const provider = await useAgent().use(CredentialType.QWEN_CODE).geModelProvider();
+    if (!provider) return { success: false, message: "No provider found" };
 
-  const result = await generateText({
-    model: provider.languageModel("vision-model"),
-    system: extractPrompt,
-    messages,
-  });
-  return result.text;
+    const result = await generateText({
+      model: provider.languageModel("vision-model"),
+      system: extractPrompt,
+      messages,
+    });
+    return { success: true, content: result.text };
+  } catch (e) {
+    console.error("Failed to extract content", e);
+    return { success: false, message: "Failed to extract content" };
+  }
 };

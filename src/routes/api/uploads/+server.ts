@@ -33,10 +33,11 @@ export const POST: RequestHandler = async ({ request, locals, url }) => {
     }
 
     try {
-      
       const mappingData = await result.getMappingData(user.staffId || 1);
       const mapString = JSON.stringify(mappingData);
-      const content = await generateContent(validatedFile.data, mapString);
+      const { success, content, message } = await generateContent(validatedFile.data, mapString);
+      if (!content || !success) return error(400, message);
+
       const parsedResult = JSON.parse(content.trim());
       const marks = resultInputSchema.parse(parsedResult);
       const res = await result.upsertStudentResult(marks, 1);
@@ -77,8 +78,8 @@ export const DELETE: RequestHandler = async ({ url, locals }) => {
   if (!user || !session) error(401, "Unauthorized");
   const clearAll = url.searchParams.get("clear") === "all";
   if (clearAll) {
-  const uploadPath = join(UPLOADS_DIR, `${user.id}-${user.fullName}`);
-  rmdirSync(uploadPath, { recursive: true });
+    const uploadPath = join(UPLOADS_DIR, `${user.id}-${user.fullName}`);
+    rmdirSync(uploadPath, { recursive: true });
   }
   return json({ success: true });
 };
