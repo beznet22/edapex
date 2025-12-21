@@ -34,6 +34,7 @@ export const POST: RequestHandler = async ({ request, locals, url }) => {
 
     try {
       const mappingData = await result.getMappingData(user.staffId || 1);
+      if (mappingData.subjects.length === 0) return error(400, "You are not assigned to any subjects");
       const mapString = JSON.stringify(mappingData);
       const { success, content, message } = await generateContent(validatedFile.data, mapString);
       if (!content || !success) return error(400, message);

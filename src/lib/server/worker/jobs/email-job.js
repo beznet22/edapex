@@ -22,14 +22,10 @@ import { createTransport } from "nodemailer";
  */
 
 
-// Function to send email
-const sendEmail = async /** @type {(emailData: EmailData) => Promise<any>} */ (async (emailData) => {
+const sendEmail = async /** @type {(emailData: EmailData) => Promise<any>} */(async (emailData) => {
   const { to, subject, html, smtpConfig } = emailData;
-
-  // Create transporter
   const transporter = createTransporter(smtpConfig);
 
-  // Send email
   const info = await transporter.sendMail({
     from: smtpConfig.from || process.env.SMTP_FROM || '"Edapex" <noreply@edapex.com>',
     to,
@@ -49,7 +45,7 @@ const createTransporter = /** @type {(smtpConfig: any) => any} */ ((smtpConfig) 
       user: smtpConfig.user || process.env.SMTP_USER,
       pass: smtpConfig.pass || process.env.SMTP_PASS
     }
- });
+  });
 });
 
 // Process the email data passed to the worker
@@ -57,27 +53,21 @@ const processData = async () => {
   const { emailData, taskId } = workerData;
 
   try {
-    // Send the email
     const result = await sendEmail(emailData);
-
-    // Post success message back to main thread
-    parentPort?.postMessage({ 
-      jobId: taskId, 
-      status: "success", 
+    parentPort?.postMessage({
+      jobId: taskId,
+      status: "success",
       result: { messageId: result.messageId, response: result.response }
     });
   } catch (/** @type {any} */ err) {
-    // Post error message back to main thread
-    parentPort?.postMessage({ 
-      jobId: taskId, 
-      status: "error", 
-      error: err.message 
+    parentPort?.postMessage({
+      jobId: taskId,
+      status: "error",
+      error: err.message
     });
   } finally {
-    // Close the worker thread after processing
     parentPort?.close();
   }
 };
 
-// Start processing when worker starts
 processData();
