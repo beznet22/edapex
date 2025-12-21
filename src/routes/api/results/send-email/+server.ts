@@ -1,8 +1,6 @@
+import { JobWorker } from "$lib/server/worker";
 import type { RequestHandler } from "@sveltejs/kit";
 import { error, json } from "@sveltejs/kit";
-import { SingleTaskWorker } from "$lib/server/worker/single-task-worker";
-import { dirname, join } from "path";
-import { fileURLToPath } from "url";
 
 export const POST: RequestHandler = async ({ url, params, request, locals }) => {
   const { session, user } = locals;
@@ -19,13 +17,8 @@ export const POST: RequestHandler = async ({ url, params, request, locals }) => 
       return error(400, "Missing required email data (to, subject, html)");
     }
 
-    // Path to the email worker
-    const __filename = fileURLToPath(import.meta.url);
-    const __dirname = dirname(__filename);
-    const workerPath = join(__dirname, "..", "..", "..", "lib", "server", "worker", "email-worker.js");
-
     // Run the email task in a worker that auto-terminates
-    const result = await SingleTaskWorker.runTask(workerPath, { emailData });
+    const result = await JobWorker.runTask({ data: emailData, type: "send-email" });
 
     // Log the result
     if (result.status === "success") {
@@ -34,10 +27,10 @@ export const POST: RequestHandler = async ({ url, params, request, locals }) => 
       console.error(`Failed to send email: ${result.error}`);
     }
 
-    return json({ 
-      success: true, 
+    return json({
+      success: true,
       taskId: result.jobId,
-      result
+      result,
     });
   } catch (e) {
     console.error("Error in send-email endpoint:", e);
