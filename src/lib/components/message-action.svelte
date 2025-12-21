@@ -34,7 +34,7 @@
 
 {#if message.role === "assistant"}
   <Actions>
-    {#if doPreview}
+    <!-- {#if doPreview}
       <Action
         variant="outline"
         tooltip="Preview"
@@ -45,7 +45,7 @@
       >
         <PlayIcon class="size-4" />
       </Action>
-    {/if}
+    {/if} -->
     <Action
       tooltip="Copy"
       onclick={() =>
