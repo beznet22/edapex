@@ -1,6 +1,12 @@
-import { JobWorker } from "$lib/server/worker";
+import { JobWorker, type Payload } from "$lib/server/worker";
 import type { RequestHandler } from "@sveltejs/kit";
 import { error, json } from "@sveltejs/kit";
+
+interface EmailMessage {
+  to: string;
+  subject: string;
+  html: string;
+}
 
 export const POST: RequestHandler = async ({ url, params, request, locals }) => {
   const { session, user } = locals;
@@ -8,19 +14,12 @@ export const POST: RequestHandler = async ({ url, params, request, locals }) => 
   if (request.body === null) error(400, "Empty file received");
 
   try {
-    // Parse the request body
-    const requestData = await request.json();
-    const { emailData } = requestData;
-
-    // Validate required fields
-    if (!emailData || !emailData.to || !emailData.subject || !emailData.html) {
+    const data = (await request.json()) as EmailMessage;
+    if (!data || !data.to || !data.subject || !data.html) {
       return error(400, "Missing required email data (to, subject, html)");
     }
 
-    // Run the email task in a worker that auto-terminates
-    const result = await JobWorker.runTask({ data: emailData, type: "send-email" });
-
-    // Log the result
+    const result = await JobWorker.runTask({ type: "send-email", data: [data] });
     if (result.status === "success") {
       console.log(`Email sent successfully: ${result.result?.messageId}`);
     } else {
@@ -29,7 +28,7 @@ export const POST: RequestHandler = async ({ url, params, request, locals }) => 
 
     return json({
       success: true,
-      taskId: result.jobId,
+      jobId: result.jobId,
       result,
     });
   } catch (e) {

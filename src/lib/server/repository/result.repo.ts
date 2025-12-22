@@ -3,6 +3,8 @@ import { and, avg, eq, asc, sql } from "drizzle-orm";
 import { BaseRepository } from "./base.repo";
 import { type StudentDetails } from "./student.repo";
 import type {
+  AssignedSubject,
+  ClassSection,
   ExamSetup,
   GetExamSetupParams,
   GetMarkGradeParams,
@@ -16,8 +18,6 @@ import type {
   NewStudentRating,
   NewTeacherRemark,
   QueryResultData,
-  RatingData,
-  RemarkData,
   StudentCategory,
   StudentDetail,
   Subject,
@@ -26,20 +26,79 @@ import { jsonArrayAgg } from "../helpers";
 import type { Rating, Remark } from "$lib/schema/result";
 
 export class ResultsRepository extends BaseRepository {
+  async assignSubjects(assigned: Partial<AssignedSubject>[]) {
+    return this.withErrorHandling(async () => {
+      await this.db.insert(schema.smAssignSubjects).values(assigned);
+    }, "upsertAssignSubject");
+  }
+
+  getClassSections(): Promise<ClassSection[]> {
+    return this.withErrorHandling(async () => {
+      const academicId = await this.getAcademicId();
+      return await this.db
+        .select({
+          id: schema.smClassSections.id,
+          classId: schema.smClassSections.classId,
+          className: schema.smClasses.className,
+          sectionId: schema.smClassSections.sectionId,
+          sectionName: schema.smSections.sectionName,
+        })
+        .from(schema.smClassSections)
+        .leftJoin(schema.smClasses, eq(schema.smClassSections.classId, schema.smClasses.id))
+        .leftJoin(schema.smSections, eq(schema.smClassSections.sectionId, schema.smSections.id))
+        .where(
+          and(
+            eq(schema.smClassSections.activeStatus, 1),
+            eq(schema.smClasses.activeStatus, 1),
+            eq(schema.smSections.activeStatus, 1),
+            eq(schema.smClassSections.academicId, academicId)
+          )
+        )
+        .orderBy(asc(schema.smClassSections.classId));
+    }, "getClassSections");
+  }
+
+  async getAssignedSubjects(classId: number): Promise<AssignedSubject[]> {
+    return this.withErrorHandling(async () => {
+      const academicId = await this.getAcademicId();
+      const [assigned] = await this.db
+        .select()
+        .from(schema.smAssignSubjects)
+        .where(
+          and(
+            eq(schema.smAssignSubjects.classId, classId),
+            eq(schema.smAssignSubjects.academicId, academicId)
+          )
+        )
+        .groupBy(schema.smAssignSubjects.teacherId)
+        .limit(1);
+      if (!assigned || !assigned.teacherId) return [];
+      return await this.db
+        .select()
+        .from(schema.smAssignSubjects)
+        .where(
+          and(
+            eq(schema.smAssignSubjects.classId, classId),
+            eq(schema.smAssignSubjects.teacherId, assigned.teacherId),
+            eq(schema.smAssignSubjects.academicId, academicId)
+          )
+        );
+    }, "getAssignedSubjects");
+  }
+
   async upsertClassAttendance(attendance: NewAttendance) {
     return this.withErrorHandling(async () => {
       const { id, createdAt, updatedAt, ...data } = attendance;
       const academicId = await this.getAcademicId();
-      
       // Update data to include academicId from the current context
       const updatedData = {
         ...data,
-        academicId
+        academicId,
       };
-      
+
       // Look for existing record based on the unique constraint (studentId, examTypeId)
       const [existing] = await this.db
-        .select({ id: schema.classAttendances.id,  })
+        .select({ id: schema.classAttendances.id })
         .from(schema.classAttendances)
         .where(
           and(
@@ -48,9 +107,11 @@ export class ResultsRepository extends BaseRepository {
           )
         )
         .limit(1);
-        
       if (existing) {
-        await this.db.update(schema.classAttendances).set(updatedData).where(eq(schema.classAttendances.id, existing.id));
+        await this.db
+          .update(schema.classAttendances)
+          .set(updatedData)
+          .where(eq(schema.classAttendances.id, existing.id));
         return existing.id;
       }
       return (await this.db.insert(schema.classAttendances).values(updatedData).$returningId())[0].id;
@@ -507,7 +568,7 @@ export class ResultsRepository extends BaseRepository {
     }, "getStudentCategories");
   }
 
-  async getAssignedSubjects(staffId: number): Promise<Partial<Subject>[]> {
+  async getSubjectsAssignedToStaff(staffId: number): Promise<Partial<Subject>[]> {
     return this.withErrorHandling(async () => {
       const academicId = await this.getAcademicId();
       const subjects = await this.db

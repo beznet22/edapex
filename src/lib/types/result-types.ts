@@ -15,8 +15,17 @@ export type NewLearningOutcome = typeof schema.smMarkStores.$inferInsert;
 export type NewExamSetup = typeof schema.smExamSetups.$inferInsert;
 export type StudentCategory = typeof schema.teacherRemarks.$inferInsert;
 export type Subject = typeof schema.smSubjects.$inferSelect;
+export type AssignedSubject = typeof schema.smAssignSubjects.$inferSelect;
 export type NewExam = typeof schema.smExams.$inferInsert;
 export type NewAttendance = typeof schema.classAttendances.$inferInsert;
+
+export type ClassSection = {
+  id: number;
+  classId: number| null;
+  className: string | null;
+  sectionId: number | null;
+  sectionName: string | null;
+};
 
 export type MarkStoreResult = typeof schema.smMarkStores.$inferSelect & {
   exam_title: string;

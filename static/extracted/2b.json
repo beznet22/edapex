@@ -21,7 +21,7 @@
         {
             "subjectCode": "MATH",
             "subjectId": 21,
-            "examSetups": [
+            "titles": [
                 "MTA",
                 "CA",
                 "REPORT",
@@ -39,7 +39,7 @@
         {
             "subjectCode": "ENG",
             "subjectId": 22,
-            "examSetups": [
+            "titles": [
                 "MTA",
                 "CA",
                 "REPORT",
@@ -57,7 +57,7 @@
         {
             "subjectCode": "CCA",
             "subjectId": 23,
-            "examSetups": [
+            "titles": [
                 "MTA",
                 "CA",
                 "REPORT",
@@ -75,7 +75,7 @@
         {
             "subjectCode": "CRS",
             "subjectId": 44,
-            "examSetups": [
+            "titles": [
                 "MTA",
                 "CA",
                 "REPORT",
@@ -93,7 +93,7 @@
         {
             "subjectCode": "BST",
             "subjectId": 43,
-            "examSetups": [
+            "titles": [
                 "MTA",
                 "CA",
                 "REPORT",
@@ -111,7 +111,7 @@
         {
             "subjectCode": "ICT",
             "subjectId": 42,
-            "examSetups": [
+            "titles": [
                 "MTA",
                 "CA",
                 "REPORT",
@@ -129,7 +129,7 @@
         {
             "subjectCode": "PHE",
             "subjectId": 27,
-            "examSetups": [
+            "titles": [
                 "MTA",
                 "CA",
                 "REPORT",
@@ -147,7 +147,7 @@
         {
             "subjectCode": "CIVIC",
             "subjectId": 28,
-            "examSetups": [
+            "titles": [
                 "MTA",
                 "CA",
                 "REPORT",
