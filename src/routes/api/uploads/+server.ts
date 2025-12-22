@@ -43,7 +43,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
       const marks = resultInputSchema.parse(parsedResult);
       const res = await result.upsertStudentResult(marks, 1);
       if (!res.success) {
-        throw new Error(res.message);
+        error(400, res.message);
       }
       if (filename) del(pathname);
       return json({ success: true, status: "done", data: {}, filename: filename ?? file.name });
