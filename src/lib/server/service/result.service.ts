@@ -105,6 +105,25 @@ export class ResultService {
     return true;
   }
 
+  async assignSubjects(classId: number, sectionId: number, teacherId: number) {
+    // clones existing subjects from other sections of the same class
+    const assignedSubjects = await resultRepo.getAssignedSubjects(classId);
+    const assigned = assignedSubjects.map((s) => ({
+      classId,
+      sectionId,
+      teacherId,
+      subjectId: s.subjectId,
+      academicId: s.academicId,
+      schoolId: s.schoolId,
+      activeStatus: s.activeStatus,
+      parentId: s.parentId,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    }));
+    await resultRepo.assignSubjects(assigned);
+    return assigned;
+  }
+
   /**
    * Store student attendance for an exam
    */
@@ -367,7 +386,7 @@ export class ResultService {
       repo.result.getExamSetupsByStaffId(staffId),
       repo.result.getCurrentTerm(),
       repo.result.getStudentCategories(),
-      repo.result.getAssignedSubjects(staffId),
+      repo.result.getSubjectsAssignedToStaff(staffId),
     ]);
     return { examSetups, examTypes, studentCategories, subjects };
   }

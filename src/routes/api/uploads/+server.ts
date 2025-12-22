@@ -9,7 +9,7 @@ import { error, json } from "@sveltejs/kit";
 import { rmdirSync } from "fs";
 import { join } from "path";
 
-export const POST: RequestHandler = async ({ request, locals, url }) => {
+export const POST: RequestHandler = async ({ request, locals }) => {
   const { session, user } = locals;
   if (!user || !session) error(401, "Unauthorized");
   if (request.body === null) error(400, "Empty file received");

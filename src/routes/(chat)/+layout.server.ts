@@ -9,6 +9,8 @@ import { readdir, stat } from "fs/promises";
 import { join } from "path";
 import type { UploadedData } from "$lib/types/chat-types";
 import { existsSync, rm, rmdirSync, type Dirent } from "fs";
+import type { ClassSection } from "$lib/types/result-types";
+import { resultRepo } from "$lib/server/repository/result.repo";
 
 export const load: LayoutServerLoad = async ({ cookies, locals }) => {
   const { user, session } = locals;
@@ -21,7 +23,9 @@ export const load: LayoutServerLoad = async ({ cookies, locals }) => {
   let agents = AgentService.getAgentWorkflowByDesignation("examiner");
 
   let students: ClassStudent[] | null = null;
+  let classes: Partial<ClassSection>[] = [];
   if (user) {
+    classes = await resultRepo.getClassSections();
     students = await studentRepo.getStudentsByUserId(user?.id);
   }
 
@@ -60,6 +64,7 @@ export const load: LayoutServerLoad = async ({ cookies, locals }) => {
     agents,
     user: user || undefined,
     students,
+    classes,
     sidebarCollapsed,
     selectedChatModel: new SelectedModel(modelId),
     uploads,

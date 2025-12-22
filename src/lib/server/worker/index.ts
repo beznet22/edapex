@@ -14,7 +14,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 const registry = {
-  "send-email": join(__dirname, "jobs/email-job.js"),
+  "send-email": join(__dirname, "jobs/email-job.ts"),
   "generate-pdf": join(__dirname, "jobs/pdf-job.js"),
 } as const;
 
@@ -26,29 +26,31 @@ export type Payload = {
 };
 
 export class JobWorker {
-  static async runTask(payload: Payload): Promise<TaskResult> {
-    const { type } = payload;
+  static async runTask(payload: Payload, callback?: (result: TaskResult) => void): Promise<TaskResult> {
+    const { type, data } = payload;
     return new Promise((resolve, reject) => {
       const jobId = crypto.randomUUID();
 
       const worker = new Worker(registry[type], {
-        workerData: payload,
+        workerData: { data, jobId },
+        execArgv: ["--experimental-transform-types"],
       });
 
       worker.on("message", (msg) => {
         if (msg.jobId === jobId) {
-          if (msg.status === "success" || msg.status === "error") {
-            resolve(msg);
-          }
+          if (callback) callback(msg);
+          resolve(msg);
         }
       });
 
       worker.on("error", (err) => {
+        if (callback) callback({ jobId, status: "error", error: err.message });
         reject(new Error(`Worker error: ${err.message}`));
       });
 
       worker.on("exit", (code) => {
         if (code !== 0 && code !== null) {
+          if (callback) callback({ jobId, status: "error", error: `Worker stopped with exit code ${code}` });
           reject(new Error(`Worker stopped with exit code ${code}`));
         }
       });

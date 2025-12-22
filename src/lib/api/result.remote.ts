@@ -60,29 +60,19 @@ export const publishResult = command(
   }
 );
 
-export const retryUpload = command(
+export const assignSubjects = command(
   z.object({
-    filename: z.string(),
+    classId: z.number(),
+    sectionId: z.number(),
+    teacherId: z.number(),
   }),
-  async ({ filename }) => {
+  async ({ classId, sectionId, teacherId }) => {
     const { user, session } = getRequestEvent().locals;
     if (!user || !session) {
       return { success: false, message: "User not authenticated" };
     }
     try {
-      const pathname = `${user.id}-${user.fullName}/${filename}`;
-      const { buffer } = await get(pathname);
-      const file = new Blob([buffer], { type: "image/jpeg" }) as File;
-      const mappingData = await result.getMappingData(user.staffId || 1);
-      const mapString = JSON.stringify(mappingData);
-      const content = await generateContent(file, mapString);
-      const parsedResult = JSON.parse(content.trim());
-      const marks = resultInputSchema.parse(parsedResult);
-      const res = await result.upsertStudentResult(marks, 1);
-      if (!res.success) {
-        throw new Error(res.message);
-      }
-      del(pathname);
+      await result.assignSubjects(classId, sectionId, teacherId);
       return { success: true, message: "File uploaded successfully" };
     } catch (error) {
       return { success: false, message: "Failed to upload file" };
