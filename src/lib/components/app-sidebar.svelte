@@ -26,6 +26,7 @@
   import { SettingsIcon, SearchIcon, CircleQuestionMark, CommandIcon, Plus } from "@lucide/svelte";
   import { Button } from "./ui/button";
   import { goto } from "$app/navigation";
+  import ScrollArea from "./ui/scroll-area/scroll-area.svelte";
   let {
     user,
     ref = $bindable(null),
@@ -78,9 +79,9 @@
   </Sidebar.Header>
   <Sidebar.Content>
     <SidebarHistory {user} />
-    <NavSecondary items={data} class="mt-auto" />
   </Sidebar.Content>
   <Sidebar.Footer>
+    <NavSecondary items={data} class="mt-auto" />
     <NavUser {user} />
   </Sidebar.Footer>
   <Sidebar.Rail />

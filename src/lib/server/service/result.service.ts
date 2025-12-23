@@ -1,6 +1,7 @@
 import {
   AttributeRemark,
   type Attendance,
+  type Category,
   type MarksData,
   type MarksInput,
   type MarksOutput,
@@ -105,9 +106,9 @@ export class ResultService {
     return true;
   }
 
-  async assignSubjects(classId: number, sectionId: number, teacherId: number) {
+  async assignSubjects(classId: number, sectionId: number, teacherId?: number) {
     // clones existing subjects from other sections of the same class
-    const assignedSubjects = await resultRepo.getAssignedSubjects(classId);
+    const assignedSubjects = await resultRepo.getAssignedSubjects(classId, classId);
     const assigned = assignedSubjects.map((s) => ({
       classId,
       sectionId,
@@ -120,8 +121,7 @@ export class ResultService {
       createdAt: new Date(),
       updatedAt: new Date(),
     }));
-    await resultRepo.assignSubjects(assigned);
-    return assigned;
+    return await resultRepo.assignSubjects(assigned);
   }
 
   /**
@@ -182,12 +182,10 @@ export class ResultService {
       const { studentData, marksData, teachersRemark, studentRatings } = validatedReport;
       const stdRec = await studentRepo.getStudentRecordByAdmissionNo(studentData.admissionNo);
       if (!stdRec) {
-        console.error("ERROR: Student not found", studentData.admissionNo);
         return {
           success: false,
           message: [
-            `Student not found for admission number ${studentData.admissionNo}`,
-            `Ensure you hav uploaded the marks data for the student before proceeding.`,
+            `Student has not been assigned a class. Please contact the school admin to assign a class to the student.`,
           ].join("\n"),
         };
       }
@@ -353,7 +351,7 @@ export class ResultService {
     };
   }
 
-  private buildMarksRecords(marks: any[], objectives: any[], category: string) {
+  private buildMarksRecords(marks: any[], objectives: any[], category: Category) {
     const bySubject: Record<string, any[]> = {};
     for (const m of marks) (bySubject[m.subjectName || "Unknown"] ??= []).push(m);
 
@@ -376,19 +374,21 @@ export class ResultService {
         totalScore,
         grade: grade.grade,
         color: grade.color,
+        category,
       };
     });
     return { records, overAll };
   }
 
   async getMappingData(staffId: number) {
-    const [examSetups, examTypes, studentCategories, subjects] = await Promise.all([
+    const [examSetups, examTypes, studentCategories, subjects, classSection] = await Promise.all([
       repo.result.getExamSetupsByStaffId(staffId),
       repo.result.getCurrentTerm(),
       repo.result.getStudentCategories(),
       repo.result.getSubjectsAssignedToStaff(staffId),
+      repo.result.getAssignedClassSection(staffId),
     ]);
-    return { examSetups, examTypes, studentCategories, subjects };
+    return { examSetups, examTypes, studentCategories, subjects, classSection };
   }
 
   /**
@@ -587,9 +587,9 @@ export class ResultService {
     return Math.round((obtainedMark / fullMark) * 10000) / 100; // 2 decimal places
   }
 
-  getGrade(score: number, category: string, remark: string | null): { grade: string; color?: string } {
+  getGrade(score: number, category: Category, remark: string | null): { grade: string; color?: string } {
     if (remark) return { grade: remark };
-    const ranges = category === "GRADERS" ? GRADE_RANGES.GRADERS : GRADE_RANGES.EYFS;
+    const ranges = category === "LOWERBASIC" || "MIDDLEBASIC" ? GRADE_RANGES.GRADERS : GRADE_RANGES.EYFS;
     const match = ranges.find((r) => score >= r.min && score <= r.max);
     return match ? { grade: match.grade, color: match.color } : { grade: "N/A", color: "bg-gray-200" };
   }

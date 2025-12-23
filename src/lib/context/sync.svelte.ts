@@ -19,3 +19,13 @@ export class SelectedCategory extends SynchronizedCookie {
 		return super.fromContext('selected-category');
 	}
 }
+
+export class SelectedClass extends SynchronizedCookie {
+  constructor(value: string) {
+    super("selected-class", value);
+  }
+
+  static fromContext(): SelectedClass {
+    return super.fromContext("selected-class");
+  }
+}

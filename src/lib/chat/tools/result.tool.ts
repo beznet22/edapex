@@ -1,6 +1,12 @@
 import z from "zod";
 import { tool, type InferToolInput, type InferToolOutput } from "ai";
-import { attendanceSchema, resultInputSchema, resultOutputSchema, studentRatingsSchema, teacherRemarkSchema } from "$lib/schema/result";
+import {
+  attendanceSchema,
+  resultInputSchema,
+  resultOutputSchema,
+  studentRatingsSchema,
+  teacherRemarkSchema,
+} from "$lib/schema/result";
 import { result } from "$lib/server/service/result.service";
 import { studentRepo } from "$lib/server/repository/student.repo";
 
@@ -57,8 +63,8 @@ export const upsertStudentResult = tool({
           message: "Marks data is required for create or update operation",
         };
       }
-     const res = await result.upsertStudentResult(marksData, 1);
-     if (!res.success) {
+      const res = await result.upsertStudentResult(marksData, 1);
+      if (!res.success) {
         return {
           status: "denied",
           message: res.message,
@@ -87,10 +93,11 @@ export const upsertStudentResult = tool({
 
 export const getClassStudentList = tool({
   description: [
-    "Retrieves a list of students in a class by using User ID, returns empty array if no students found",
+    "Retrieves a list of students in a class by using STAFF ID provided in CONVERSATION CONTEXT",
+    "Returns empty array if no students found",
   ].join("\n"),
   inputSchema: z.object({
-    userId: z.number().describe("The User ID - REQUIRED to retrieve student list"),
+    staffId: z.number().describe("The Staff ID - REQUIRED to retrieve student list"),
   }),
   outputSchema: z.object({
     students: z
@@ -104,7 +111,7 @@ export const getClassStudentList = tool({
       .describe("List of students in the class"),
   }),
   execute: async (input) => {
-    const students = await studentRepo.getStudentsByUserId(input.userId);
+    const students = await studentRepo.getStudentsByStaffId(input.staffId);
     return {
       students: students || [],
     };

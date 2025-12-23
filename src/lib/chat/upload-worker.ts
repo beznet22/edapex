@@ -26,7 +26,11 @@ self.onmessage = async function (e) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
 
-    const { data, status, filename, success } = await response.json();
+    const { data, status, filename, success, error } = await response.json();
+    if (!success) {
+      throw new Error(`Upload failed: ${error}`);
+    }
+
     const result: UploadedData = {
       id: fileId,
       filename,
@@ -44,7 +48,6 @@ self.onmessage = async function (e) {
       status: "error",
       error: error instanceof Error ? error.message : "Unknown error occurred during upload",
     };
-
     // Post the error back to the main thread
     self.postMessage(result);
   }

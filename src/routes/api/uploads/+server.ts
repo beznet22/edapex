@@ -28,7 +28,6 @@ export const POST: RequestHandler = async ({ request, locals }) => {
     const validatedFile = fileSchema.safeParse(file);
     if (!validatedFile.success) {
       const errorMessage = validatedFile.error.issues.map((issue) => issue.message).join(", ");
-      console.error(errorMessage);
       return error(400, errorMessage);
     }
 
@@ -37,13 +36,13 @@ export const POST: RequestHandler = async ({ request, locals }) => {
       if (mappingData.subjects.length === 0) return error(400, "You are not assigned to any subjects");
       const mapString = JSON.stringify(mappingData);
       const { success, content, message } = await generateContent(validatedFile.data, mapString);
-      if (!content || !success) return error(400, message);
+      if (!content || !success) return json({ success: false, status: "error", error: message });
 
       const parsedResult = JSON.parse(content.trim());
       const marks = resultInputSchema.parse(parsedResult);
       const res = await result.upsertStudentResult(marks, 1);
       if (!res.success) {
-        error(400, res.message);
+       json({ success: false, status: "error", error: res.message });
       }
       if (filename) del(pathname);
       return json({ success: true, status: "done", data: {}, filename: filename ?? file.name });

@@ -28,7 +28,8 @@ import type { Rating, Remark } from "$lib/schema/result";
 export class ResultsRepository extends BaseRepository {
   async assignSubjects(assigned: Partial<AssignedSubject>[]) {
     return this.withErrorHandling(async () => {
-      await this.db.insert(schema.smAssignSubjects).values(assigned);
+      const ids = await this.db.insert(schema.smAssignSubjects).values(assigned).$returningId();
+      return ids.length > 0;
     }, "upsertAssignSubject");
   }
 
@@ -58,7 +59,7 @@ export class ResultsRepository extends BaseRepository {
     }, "getClassSections");
   }
 
-  async getAssignedSubjects(classId: number): Promise<AssignedSubject[]> {
+  async getAssignedSubjects(classId: number, sectionId: number): Promise<AssignedSubject[]> {
     return this.withErrorHandling(async () => {
       const academicId = await this.getAcademicId();
       const [assigned] = await this.db
@@ -84,6 +85,27 @@ export class ResultsRepository extends BaseRepository {
           )
         );
     }, "getAssignedSubjects");
+  }
+
+  async getAssignedClassSection(staffId: number) {
+    return this.withErrorHandling(async () => {
+      const academicId = await this.getAcademicId();
+      const [classSection] = await this.db
+        .select({
+          classId: schema.smAssignSubjects.classId,
+          sectionId: schema.smAssignSubjects.sectionId,
+        })
+        .from(schema.smAssignSubjects)
+        .where(
+          and(
+            eq(schema.smAssignSubjects.teacherId, staffId),
+            eq(schema.smAssignSubjects.activeStatus, 1),
+            eq(schema.smAssignSubjects.academicId, academicId)
+          )
+        )
+        .limit(1);
+      return classSection;
+    }, "getAssignedClassSection");
   }
 
   async upsertClassAttendance(attendance: NewAttendance) {

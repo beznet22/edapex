@@ -1,4 +1,4 @@
-import type { ExamType, Rating, Remark } from "$lib/schema/result";
+import type { Category, ExamType, Rating, Remark } from "$lib/schema/result";
 import * as schema from "$lib/server/db/schema";
 
 export type ResultData = typeof schema.smResultStores.$inferSelect;
@@ -113,7 +113,6 @@ export interface SchoolData {
   vacation_date: string;
 }
 
-export type Category = "DAYCARE" | "NURSERY" | "GRADEK" | "LOWERBASIC" | "MIDDLEBASIC";
 export interface StudentDetail {
   id: number;
   examId: number;

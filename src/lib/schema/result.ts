@@ -16,17 +16,15 @@ export const AttributeRemark = {
   5: "Excellent",
 };
 
-export const StudentCategory = ["DAYCARE", "NURSERY", "GRADEK	", "LOWERBASIC	", "MIDDLEBASIC"];
-
-export enum DesignationEnum {
-  Administrator = 1,
-  Principal,
-  HumanResource,
-  IT,
-  GradersCoordinator,
-  EYFSCoodinator,
-  Teacher,
-}
+export const categoryEnum = z.enum(["DAYCARE", "NURSERY", "GRADEK", "LOWERBASIC", "MIDDLEBASIC"]);
+export type Category = z.infer<typeof categoryEnum>;
+const TITLES_BY_CATEGORY: Record<Category, readonly string[]> = {
+  DAYCARE: [],
+  GRADEK: ["MTA", "CA", "REPORT", "EXAM"],
+  LOWERBASIC: ["MTA", "CA", "REPORT", "EXAM"],
+  MIDDLEBASIC: ["MTA", "CA", "REPORT", "EXAM"],
+  NURSERY: ["MTA", "CA", "REPORT", "PSYCHO", "ORAL", "EXAM"],
+};
 
 const AttributeSchema = z
   .number()
@@ -47,9 +45,9 @@ export const studentDataSchema = z.object({
   studentId: z.number().int().positive().nullable().describe("Unique student ID"),
   admissionNo: z.number().int().positive().describe("Unique admission/enrolment number"),
   fullName: z.string().min(1, "Student full name required").describe("Full name of the student"),
-  class: z
-    .string()
-    .describe("Assigned class (e.g. GRADE KA)"),
+  class: z.string().describe("Assigned class (e.g. GRADE KA)"),
+  classId: z.number().int().positive().describe("Mapped class ID from classes mapping"),
+  sectionId: z.number().int().positive().describe("Mapped section ID from sections mapping"),
   studentCategory: z
     .string()
     .describe("Category of the student mapped from the class category (e.g., GRADE K)"),
@@ -92,6 +90,7 @@ export const marksDataSchema = z
   )
   .nonempty("Marks data cannot be empty")
   .describe("Array of subjects with their marks and ID mappings");
+
 export type MarksData = z.infer<typeof marksDataSchema>;
 
 export const teacherRemarkSchema = z
@@ -139,7 +138,9 @@ export const studentSchema = z.object({
   parentName: z.string().describe("The parent name of the student"),
   term: z.string().describe("The term of the exam"),
   title: z.string().describe("The title of the exam"),
-  category: z.enum(["DAYCARE", "NURSERY", "GRADEK", "LOWERBASIC", "MIDDLEBASIC"]).describe("The category of the student"),
+  category: z
+    .enum(["DAYCARE", "NURSERY", "GRADEK", "LOWERBASIC", "MIDDLEBASIC"])
+    .describe("The category of the student"),
   className: z.string().describe("The class name of the student"),
   sectionName: z.string().describe("The section name of the student"),
   adminNo: z.number().describe("The admission number of the student"),
@@ -156,17 +157,41 @@ export const studentSchema = z.object({
 });
 export type Student = z.infer<typeof studentSchema>;
 
-export const recordSchema = z.object({
-  subjectId: z.number().describe("The ID of the subject"),
-  subject: z.string().describe("The name of the subject"),
-  subjectCode: z.string().describe("The code of the subject"),
-  objectives: z.array(z.string()).nullable().describe("The objectives of the subject"),
-  titles: z.array(z.string()).describe("The titles of the marks"),
-  marks: z.array(z.number()).describe("The marks for the subject"),
-  totalScore: z.number().describe("The total score for the subject"),
-  grade: z.string().describe("The grade for the subject"),
-  color: z.string().optional().describe("The color for the grade"),
-});
+export const recordSchema = z
+  .object({
+    subjectId: z.number().describe("The ID of the subject"),
+    subject: z.string().describe("The name of the subject"),
+    subjectCode: z.string().describe("The code of the subject"),
+    objectives: z.array(z.string()).nullable().describe("The objectives of the subject"),
+    titles: z.array(z.string()).describe("The titles of the marks"),
+    marks: z.array(z.number()).describe("The marks for the subject"),
+    totalScore: z.number().describe("The total score for the subject"),
+    grade: z.string().describe("The grade for the subject"),
+    color: z.string().optional().describe("The color for the grade"),
+    category: categoryEnum.describe("The category of the student"),
+  })
+  .superRefine((data, ctx) => {
+    const allowedTitles = TITLES_BY_CATEGORY[data.category];
+    if (data.titles.length !== allowedTitles.length) {
+      ctx.addIssue({
+        code: "custom",
+        message: `Number of titles must match number of allowed titles for category ${data.category}`,
+      });
+    }
+    const invalidTitles = data.titles.filter((title) => !allowedTitles.includes(title));
+    if (invalidTitles.length > 0) {
+      ctx.addIssue({
+        code: "custom",
+        message: `Invalid titles for category ${data.category}: ${invalidTitles.join(", ")}`,
+      });
+    }
+    if (data.marks.length !== data.titles.length) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Number of marks must match number of titles",
+      });
+    }
+  });
 
 export type MarksRecord = z.infer<typeof recordSchema>;
 

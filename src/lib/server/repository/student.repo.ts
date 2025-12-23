@@ -69,10 +69,9 @@ export class StudentRepository extends BaseRepository {
     return student || null;
   }
 
-  async getStudentsByUserId(userId: number) {
-    const [staff] = await this.db.select().from(smStaffs).where(eq(smStaffs.userId, userId)).limit(1);
-    if (!staff) return null;
 
+
+  async getStudentsByStaffId(staffId: number) {
     const academicId = await this.getAcademicId();
     const examType = await this.getCurrentTerm();
     const [classSection] = await this.db
@@ -80,7 +79,7 @@ export class StudentRepository extends BaseRepository {
       .from(smAssignSubjects)
       .where(
         and(
-          eq(smAssignSubjects.teacherId, staff.id),
+          eq(smAssignSubjects.teacherId, staffId),
           eq(smAssignSubjects.academicId, academicId),
           eq(smAssignSubjects.activeStatus, 1)
         )
@@ -93,6 +92,7 @@ export class StudentRepository extends BaseRepository {
         id: smStudents.id,
         name: smStudents.fullName,
         admissionNo: smStudents.admissionNo,
+        // categoryId: smStudents.studentCategoryId,
       })
       .from(smStudents)
       .innerJoin(
@@ -104,14 +104,11 @@ export class StudentRepository extends BaseRepository {
           eq(smMarkStores.academicId, academicId),
           eq(smMarkStores.classId, classSection.classId || 0),
           eq(smMarkStores.sectionId, classSection.sectionId || 0),
-          eq(smMarkStores.activeStatus, smStudents.activeStatus),
+          eq(smMarkStores.activeStatus, smStudents.activeStatus)
         )
       )
-      .where(
-        and(
-          eq(smStudents.activeStatus, 1),
-        )
-      ).groupBy(smStudents.id);
+      .where(and(eq(smStudents.activeStatus, 1)))
+      .groupBy(smStudents.id);
 
     return students;
   }

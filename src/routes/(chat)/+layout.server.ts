@@ -1,4 +1,4 @@
-import { SelectedModel } from "$lib/context/sync.svelte";
+import { SelectedClass, SelectedModel } from "$lib/context/sync.svelte";
 import { base } from "$lib/server/repository";
 import { redirect } from "@sveltejs/kit";
 import type { LayoutServerLoad } from "./$types";
@@ -11,6 +11,7 @@ import type { UploadedData } from "$lib/types/chat-types";
 import { existsSync, rm, rmdirSync, type Dirent } from "fs";
 import type { ClassSection } from "$lib/types/result-types";
 import { resultRepo } from "$lib/server/repository/result.repo";
+import { DESIGNATIONS, type Designation } from "$lib/types/sms-types";
 
 export const load: LayoutServerLoad = async ({ cookies, locals }) => {
   const { user, session } = locals;
@@ -24,9 +25,11 @@ export const load: LayoutServerLoad = async ({ cookies, locals }) => {
 
   let students: ClassStudent[] | null = null;
   let classes: Partial<ClassSection>[] = [];
+  let designation: Designation | undefined = undefined;
   if (user) {
+    designation = DESIGNATIONS[user.designationId || 0] || undefined;
     classes = await resultRepo.getClassSections();
-    students = await studentRepo.getStudentsByUserId(user?.id);
+    students = await studentRepo.getStudentsByStaffId(user?.id);
   }
 
   let pending: Dirent<string>[] = [];
@@ -64,9 +67,11 @@ export const load: LayoutServerLoad = async ({ cookies, locals }) => {
     agents,
     user: user || undefined,
     students,
+    designation,
     classes,
     sidebarCollapsed,
     selectedChatModel: new SelectedModel(modelId),
+    selectedClass: new SelectedClass("0"),
     uploads,
   };
 };

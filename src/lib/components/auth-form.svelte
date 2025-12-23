@@ -20,9 +20,7 @@
   import { login } from "$lib/api/auth.remote";
   import { Input } from "$lib/components/ui/input";
   import { Label } from "$lib/components/ui/label";
-  import type { SubmitFunction } from "@sveltejs/kit";
   import type { Snippet } from "svelte";
-  import { toast } from "svelte-sonner";
 
   let { form, submitButton, children }: AuthFormProps = $props();
 </script>

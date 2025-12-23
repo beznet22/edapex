@@ -1,11 +1,6 @@
 import type { smStaffs, users } from "$lib/server/db/sms-schema";
 import type { JWTPayload } from "jose";
 
-
-
-type StaffRow = typeof smStaffs.$inferSelect;
-type AuthUserV2 = typeof users.$inferSelect;
-
 export interface AuthUser {
   id: number;
   roleId?: number;
@@ -13,6 +8,7 @@ export interface AuthUser {
   designationId?: number;
   departmentId?: number;
   activeStatus?: number;
+  firstName?: string;
   fullName?: string;
   username?: string;
   email?: string;

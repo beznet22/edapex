@@ -58,7 +58,7 @@ export class FilesContext {
       if (!data.success) {
         this.uploads = this.uploads.filter((u) => u.id !== fileId);
         console.error(`Upload failed: `, data.error);
-        toast.error("File upload failed. Please try again.");
+        toast.error(data.error!);
         return;
       }
 
@@ -67,7 +67,7 @@ export class FilesContext {
         u.id === fileId ? { ...u, ...data, success: true, status: data.status } : u
       );
 
-      if(data.status === "pending") {
+      if (data.status === "pending") {
         toast.error("File saved retry extraction");
       }
 
