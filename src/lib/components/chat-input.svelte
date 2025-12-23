@@ -6,12 +6,13 @@
 
   import { useChat } from "$lib/context/chat-context.svelte";
   import { useFileActions } from "$lib/context/file-context.svelte";
+  import { UserContext } from "$lib/context/user-context.svelte";
   import type { ClassStudent } from "$lib/server/repository/student.repo";
   import type { AuthUser } from "$lib/types/auth-types";
   import { iconRegistry } from "$lib/utils/icons";
   import { searchFilter } from "$lib/utils/search";
-  import { getContext } from "svelte";
   import ChatMenu from "./chat-menu.svelte";
+  import ChatResource from "./chat-resource.svelte";
   import DropZone from "./drop-zone.svelte";
   import {
     PromptInput,
@@ -19,7 +20,8 @@
     PromptInputActions,
     PromptInputTextarea,
   } from "./prompt-kit/prompt-input";
-  import ChatResource from "./chat-resource.svelte";
+  import ClassSelector from "./class-selector.svelte";
+  import { onMount } from "svelte";
 
   let {
     user,
@@ -31,9 +33,6 @@
     isInitial?: boolean;
   } = $props();
 
-  // svelte-ignore state_referenced_locally
-  const students = getContext<ClassStudent[]>(user?.id) || [];
-
   // State
   let input = $state("");
   let found = $state<ClassStudent[]>([]);
@@ -43,6 +42,11 @@
   // Context
   const chat = $derived(useChat());
   const file = $derived(useFileActions());
+  const userContext = $derived(UserContext.fromContext());
+  const students = $derived(userContext.students);
+
+  // svelte-ignore state_referenced_locally
+  if (!userContext.user) chat.activeAgent = null;
 
   // Handlers
   function onSubmit() {
@@ -136,20 +140,25 @@
           </PromptInputAction>
         {/if}
       </div>
-      <div class="flex">
-        <PromptInputAction>
-          {#snippet tooltip()}
-            Add Resource
-          {/snippet}
-          <Button
-            variant="ghost"
-            size="icon"
-            class="size-9 rounded-full cursor-pointer"
-            onclick={() => file.oprnFileDropZone()}
-          >
-            <Package class="size-5" />
-          </Button>
-        </PromptInputAction>
+      <div class="flex gap-2">
+        {#if userContext.isCoordinator}
+          <ClassSelector />
+        {:else}
+          <PromptInputAction>
+            {#snippet tooltip()}
+              Add Resource
+            {/snippet}
+            <Button
+              variant="ghost"
+              size="icon"
+              class="size-9 rounded-full cursor-pointer"
+              onclick={() => file.oprnFileDropZone()}
+            >
+              <Package class="size-5" />
+            </Button>
+          </PromptInputAction>
+        {/if}
+
         <Button
           size="sm"
           class="h-9 w-9 rounded-full cursor-pointer"
@@ -166,7 +175,7 @@
     </PromptInputActions>
   </PromptInput>
 
-  {#if isInitial}
+  {#if isInitial && !userContext.isCoordinator}
     <div class="absolute top-full left-0 w-full flex flex-col items-center justify-center mt-2 gap-4">
       {#if activeSuggestions.length > 0}
         <div class="flex w-full flex-col items-center justify-center space-y-1">
@@ -208,7 +217,9 @@
           {/each}
         </div>
       {/if}
-      <ChatResource {onFileSelected} />
+      {#if !userContext.isCoordinator}
+        <ChatResource {onFileSelected} />
+      {/if}
     </div>
   {/if}
 </div>

@@ -4,11 +4,11 @@ import type { StudentDetail } from "./result-types";
 import type { tools } from "$lib/chat/tools";
 import type { IconName } from "$lib/utils/icons";
 
-export type Designation = "principal" | "teacher" | "examiner";
+export type AgentDesignation = "principal" | "teacher" | "examiner";
 
 export interface Assistant {
   workflowId: string;
-  designation: Designation;
+  designation: AgentDesignation;
   suggestions: readonly string[];
   highlight: string;
   systemPrompt?: string;

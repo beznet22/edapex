@@ -1,5 +1,6 @@
 import { reportSchema } from "$lib/schema/report-schema";
 import { resultRepo } from "$lib/server/repository/result.repo";
+import { staffRepo } from "$lib/server/repository/staff.repo";
 import { studentRepo } from "$lib/server/repository/student.repo";
 import { result } from "$lib/server/service/result.service";
 import { JobWorker } from "$lib/server/worker";
@@ -41,9 +42,11 @@ export const GET: RequestHandler = async ({ locals }) => {
     //   });
     // }
 
-    const assignedSubjects = await resultRepo.getClassSections();
-
-    return json(assignedSubjects); // Fixed: was returning 'data' which is undefined
+    const students = await studentRepo.getStudentsByStaffId(user?.id || 1);
+    const mappingData = await result.getMappingData(user?.staffId || 1);
+    const subjects = await resultRepo.getAssignedSubjects(20, 5);
+    const staff = await staffRepo.getStaffByClassSection({ classId: 20, sectionId: 5 });
+    return json({ staff }); // Fixed: was returning 'data' which is undefined
   } catch (e: any) {
     console.error("Error creating job:", e);
     return error(500, e.message);

@@ -2,18 +2,21 @@
   import favicon from "$lib/assets/favicon.svg";
   import AppSidebar from "$lib/components/app-sidebar.svelte";
   import * as Sidebar from "$lib/components/ui/sidebar";
+  import { UserContext } from "$lib/context/user-context.svelte.js";
   import { ChatHistory } from "$lib/context/chat-history.svelte.js";
   import { setContext } from "svelte";
   let { data, children } = $props();
 
   // svelte-ignore state_referenced_locally
-  let { user, chats, selectedChatModel, students } = data;
-
+  let { user, chats, selectedClass, selectedChatModel, students, classes } = data;
   const chatHistory = new ChatHistory(chats);
   chatHistory.setContext();
 
   selectedChatModel.setContext();
-  if (user) setContext(user.id, students);
+  selectedClass.setContext();
+  
+  const appContext = new UserContext(user, classes, students|| []);
+  appContext.setContext();
 </script>
 
 <svelte:head>

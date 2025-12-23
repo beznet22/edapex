@@ -57,6 +57,8 @@ class AuthService {
 
   /**
    * Generate PWA-optimized device fingerprint
+   * FIXME/SECURITY: This logic relies on client-provided headers which can be spoofed.
+   * Consider using a standard session management library or signed device tokens in the future.
    */
   private getDeviceFingerprint(request: Request): string {
     const ua = request.headers.get("user-agent") || "";
@@ -84,6 +86,8 @@ class AuthService {
   }
 
   private calculateSimilarity(a: string, b: string): number {
+    // FIXME/SECURITY: Custom similarity logic for auth is non-standard and potentially risky.
+    // Ensure this doesn't open doors for session hijacking via similar-enough user agents.
     // Focus on stable parts (first 20 chars = UA + display mode)
     const stableA = a.substring(0, 20);
     const stableB = b.substring(0, 20);
@@ -147,7 +151,7 @@ class AuthService {
       await new Promise((resolve) => setTimeout(resolve, 1000));
       throw new Error("Invalid credentials");
     }
-    
+
     failedAttempts.delete(identifier);
 
     // Generate tokens
@@ -239,6 +243,7 @@ class AuthService {
       id: user.id,
       email: user.email ?? undefined,
       username: user.username ?? undefined,
+      firstName: staff?.firstName ?? undefined,
       fullName: user.fullName ?? undefined,
       usertype: user.usertype ?? undefined,
       schoolId: user.schoolId ?? undefined,

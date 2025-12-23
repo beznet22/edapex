@@ -75,7 +75,7 @@ export class StaffRepository extends BaseRepository {
       .innerJoin(smStaffs, eq(smDesignations.id, smStaffs.designationId))
       .where(eq(smStaffs.userId, userId))
       .limit(1);
-      
+
     return designation || null;
   }
 
@@ -87,6 +87,28 @@ export class StaffRepository extends BaseRepository {
       .where(eq(smStaffs.userId, userId))
       .limit(1);
     return department || null;
+  }
+
+  async getStaffByClassSection(params: { classId: number; sectionId: number }) {
+    const { classId, sectionId } = params;
+    return this.withErrorHandling(async () => {
+      const academicId = await this.getAcademicId();
+      const [classSection] = await this.db
+        .select({
+          teacherId: smAssignSubjects.teacherId,
+        })
+        .from(smAssignSubjects)
+        .where(
+          and(
+            eq(smAssignSubjects.classId, classId),
+            eq(smAssignSubjects.sectionId, sectionId),
+            eq(smAssignSubjects.activeStatus, 1),
+            eq(smAssignSubjects.academicId, academicId)
+          )
+        )
+        .limit(1);
+      return classSection;
+    }, "getStaffClassSection");
   }
 }
 

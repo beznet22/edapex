@@ -3,6 +3,7 @@
   import { ChatHistory } from "$lib/context/chat-history.svelte";
   import type { AuthUser } from "$lib/types/auth-types";
   import * as AlertDialog from "../ui/alert-dialog";
+  import { ScrollArea } from "../ui/scroll-area";
   import { SidebarGroup, SidebarGroupContent, SidebarMenu } from "../ui/sidebar";
   import { Skeleton } from "../ui/skeleton";
   import ChatItem from "./item.svelte";
@@ -57,23 +58,25 @@
   <SidebarGroup>
     <SidebarGroupContent>
       <SidebarMenu>
-        {#each Object.entries(groupedChats) as [group, chats] (group)}
-          {#if chats.length > 0}
-            <div class="text-sidebar-foreground/50 px-2 py-1 text-xs">
-              {chatGroupTitles[group as keyof typeof chatGroupTitles]}
-            </div>
-            {#each chats as chat (chat.id)}
-              <ChatItem
-                {chat}
-                active={chat.id === page.params.chatId}
-                ondelete={(chatId) => {
-                  chatIdToDelete = chatId;
-                  chatHistory.alertDialogOpen = true;
-                }}
-              />
-            {/each}
-          {/if}
-        {/each}
+        <ScrollArea>
+          {#each Object.entries(groupedChats) as [group, chats] (group)}
+            {#if chats.length > 0}
+              <div class="text-sidebar-foreground/50 px-2 py-1 text-xs">
+                {chatGroupTitles[group as keyof typeof chatGroupTitles]}
+              </div>
+              {#each chats as chat (chat.id)}
+                <ChatItem
+                  {chat}
+                  active={chat.id === page.params.chatId}
+                  ondelete={(chatId) => {
+                    chatIdToDelete = chatId;
+                    chatHistory.alertDialogOpen = true;
+                  }}
+                />
+              {/each}
+            {/if}
+          {/each}
+        </ScrollArea>
       </SidebarMenu>
     </SidebarGroupContent>
   </SidebarGroup>

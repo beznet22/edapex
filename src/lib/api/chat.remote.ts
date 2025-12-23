@@ -73,6 +73,9 @@ export const syncCookie = command(
       case "selected-model":
         if (!chatModels.find((model) => model.id === value)) return null;
         break;
+      case "selected-class":
+        if (!value) return null;
+        break;
       default:
         return null;
     }
@@ -117,15 +120,16 @@ export const upload = command(
       return { success: false, message: "Unauthorized" };
     }
 
-    console.log("Uploading file: ", file);
-
     try {
       const mappingData = await result.getMappingData(user.staffId || 1);
       const mapString = JSON.stringify(mappingData);
-      const content = await generateContent(file, mapString);
+      const { success, content, message } = await generateContent(file, mapString);
+      if (!success || !content) {
+        return { success: false, message };
+      }
       const parsedResult = JSON.parse(content.trim());
       const marks = resultInputSchema.parse(parsedResult);
-      const res = await result.upsertStudentResult(marks);
+      const res = await result.upsertStudentResult(marks, 1);
       if (!res.success) {
         return { success: false, message: res.message };
       }

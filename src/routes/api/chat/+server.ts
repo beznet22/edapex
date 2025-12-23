@@ -44,6 +44,7 @@ export const POST: RequestHandler = async ({ request, locals: { user, session },
       .map((e) => `- ${e.title} (Exam Type ID: ${e.id})`)
       .join("\n")}`;
     systemPrompt += `\n\nUSER ID: ${user.id}`;
+    systemPrompt += `\n\nSTAFF ID: ${user.staffId}`;
   }
 
   const userStopSignal = new AbortController();

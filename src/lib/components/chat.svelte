@@ -14,6 +14,7 @@
   import { Markdown } from "./prompt-kit/markdown";
   import ToolMessage from "./tool-message.svelte";
   import Shimmer from "./ai-elements/shimmer/Shimmer.svelte";
+  import { UserContext } from "$lib/context/user-context.svelte";
 
   let {
     user,
@@ -36,6 +37,8 @@
         part.type === "tool-upsertStudentResult" && part.output?.status === "approved" && part.output?.data
     )
   );
+
+  const userContext = $derived(UserContext.fromContext());
 
   let copyMessage = (content: string, role: string) => {
     navigator.clipboard.writeText(content);
@@ -63,6 +66,9 @@
       <div
         class="absolute inset-x-0 top-1/2 mx-auto flex max-w-3xl -translate-y-1/2 flex-col gap-4 px-3 pb-3"
       >
+        <h1 class="flex justify-center text-4xl font-bold mb-10">
+          {`Good ${userContext.greeting()}, ${userContext.getName(user?.firstName) || "Guest"}!`}
+        </h1>
         <ChatInput {user} {readonly} />
       </div>
     </div>
