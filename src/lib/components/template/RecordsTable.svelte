@@ -107,7 +107,7 @@
             </span>
           </td>
         {:else if category == "DAYCARE"}
-          <td class="py-3 px-6 max-w-xs">
+          <td class="py-3 px-6 max-w-10">
             <span class="text-gray-400">{record.learningOutcome}</span>
           </td>
         {/if}
