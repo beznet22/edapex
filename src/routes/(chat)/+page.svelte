@@ -26,7 +26,7 @@
   const chat = $derived(ChatContext.fromContext());
 
   onMount(() => {
-    if (userContext.isTeacher && !userContext.subjects.length) open = true;
+    if (userContext.isTeacher && !userContext.students.length) open = true;
   });
 
   const doAssign = async () => {
