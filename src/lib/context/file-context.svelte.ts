@@ -4,6 +4,9 @@ import { getContext, setContext } from "svelte";
 import { toast } from "svelte-sonner";
 import UploadWorker from "$lib/chat/upload-worker.ts?worker";
 import type { index } from "drizzle-orm/gel-core";
+import { doExtraction } from "$lib/api/result.remote";
+import type { ClassSection } from "$lib/types/result-types";
+import { localStore } from "$lib/utils";
 
 const FILES_CONTEXT_KEY = Symbol("attachments-context");
 
@@ -12,9 +15,18 @@ export class FilesContext {
   uploads = $state<UploadedData[]>([]);
   fileInputRef = $state<HTMLInputElement | null>(null);
   openModal = $state(false);
+  #selectedClass = $state<ClassSection | null>(null);
 
   constructor(uploads: UploadedData[], public doUpload?: boolean) {
     this.uploads = uploads;
+  }
+
+  get selectedClass() {
+    return localStore<ClassSection | null>("selected-class");
+  }
+
+  set selectedClass(v: ClassSection | null) {
+    this.#selectedClass = localStore<ClassSection | null>("selected-class", v);
   }
 
   openFileDialog = () => {
@@ -40,16 +52,50 @@ export class FilesContext {
     });
   };
 
-  onchange = (event: Event) => {
+  onchange = async (event: Event) => {
+    if (!this.selectedClass || !this.selectedClass.classId || !this.selectedClass.sectionId) {
+      toast.error("Please select a class");
+      return;
+    }
+
     let files = (event.target as HTMLInputElement).files;
-    if (!files) return;
-    if (files) this.add(files);
+    if (!files?.length) return;
+    this.files = [...this.files, ...files];
+    const incoming = Array.from(files);
+    this.#upload({ files: incoming, selectedClass: this.selectedClass });
   };
 
   add = async (files: File[] | FileList) => {
     const incoming = Array.from(files);
-    if (this.doUpload) this.#upload(incoming);
+    if (this.doUpload) this.#upload({ files: incoming });
     this.files = [...this.files, ...incoming];
+  };
+
+  #upload = (params: { files: File[], selectedClass?: ClassSection }) => {
+    const { files, selectedClass } = params;
+    for (const file of files) {
+      const fileId = generateId(); // Unique ID per file (not per batch)
+      const upload: UploadedData = {
+        id: fileId,
+        filename: file.name,
+        status: "uploading",
+        success: false,
+      };
+
+      this.uploads = [...this.uploads, upload];
+      const worker = this.#initWoeker(fileId, file.name);
+      const { classId, sectionId } = selectedClass || {};
+      worker.postMessage({ fileId, file, classId, sectionId });
+    }
+  };
+
+  retryUpload = (upload: UploadedData) => {
+    upload.status = "retrying";
+    upload.success = false;
+    this.updateUpload(upload);
+    console.log("Retrying upload: ", upload);
+    const worker = this.#initWoeker(upload.id, upload.filename);
+    worker.postMessage({ fileId: upload.id, filename: upload.filename });
   };
 
   #initWoeker = (fileId: string, name: string) => {
@@ -57,6 +103,7 @@ export class FilesContext {
     worker.onmessage = ({ data }: MessageEvent<UploadedData>) => {
       if (!data.success) {
         this.uploads = this.uploads.filter((u) => u.id !== fileId);
+        this.files = this.files.filter((u) => u.name !== name);
         console.error(`Upload failed: `, data.error);
         toast.error(data.error!);
         return;
@@ -87,31 +134,6 @@ export class FilesContext {
     return worker;
   };
 
-  #upload = (files: File[], uploadData?: UploadedData) => {
-    if (uploadData) {
-      uploadData.status = "retrying";
-      uploadData.success = false;
-      this.updateUpload(uploadData);
-      console.log("Retrying upload: ", uploadData);
-      const worker = this.#initWoeker(uploadData.id, uploadData.filename);
-      worker.postMessage({ fileId: uploadData.id, name: uploadData.filename });
-    }
-
-    for (const file of files) {
-      const fileId = generateId(); // Unique ID per file (not per batch)
-      const upload: UploadedData = {
-        id: fileId,
-        filename: file.name,
-        status: "uploading",
-        success: false,
-      };
-
-      this.uploads = [...this.uploads, upload];
-      const worker = this.#initWoeker(fileId, file.name);
-      worker.postMessage({ fileId, file });
-    }
-  };
-
   removeAll = () => {
     this.clear();
   };
@@ -122,10 +144,6 @@ export class FilesContext {
     if (this.fileInputRef) {
       this.fileInputRef.value = "";
     }
-  };
-
-  retryUpload = (upload: UploadedData) => {
-    this.#upload([], upload);
   };
 
   updateUpload = (upload: UploadedData) => {

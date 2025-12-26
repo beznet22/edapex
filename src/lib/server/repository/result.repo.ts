@@ -1,5 +1,5 @@
 import * as schema from "$lib/server/db/schema";
-import { and, avg, eq, asc, sql } from "drizzle-orm";
+import { and, avg, eq, asc, sql, inArray } from "drizzle-orm";
 import { BaseRepository } from "./base.repo";
 import { type StudentDetails } from "./student.repo";
 import type {
@@ -9,6 +9,7 @@ import type {
   GetExamSetupParams,
   GetMarkGradeParams,
   GetSubjectFullMarkParams,
+  MarkData,
   NewAttendance,
   NewExam,
   NewExamSetup,
@@ -19,11 +20,10 @@ import type {
   NewTeacherRemark,
   QueryResultData,
   StudentCategory,
-  StudentDetail,
   Subject,
 } from "$lib/types/result-types";
 import { jsonArrayAgg } from "../helpers";
-import type { Rating, Remark } from "$lib/schema/result";
+import type { Rating, Remark, Student } from "$lib/schema/result-output";
 
 export class ResultsRepository extends BaseRepository {
   async assignSubjects(assigned: Partial<AssignedSubject>[]) {
@@ -189,18 +189,57 @@ export class ResultsRepository extends BaseRepository {
     );
   }
 
+  async deleteResultStore(resultId: number) {
+    return this.withErrorHandling(async () => {
+      await this.db.delete(schema.smResultStores).where(eq(schema.smResultStores.id, resultId));
+    }, "deleteResultStore");
+  }
+
+  async deleteMarkStore(markIds: number[]) {
+    return this.withErrorHandling(async () => {
+      await this.db.delete(schema.smMarkStores).where(inArray(schema.smMarkStores.id, markIds));
+    }, "deleteMarkStore");
+  }
+
+  async deleteExamSetup(titleIds: number[]) {
+    return this.withErrorHandling(async () => {
+      await this.db.delete(schema.smExamSetups).where(inArray(schema.smExamSetups.id, titleIds));
+    }, "deleteExamSetup");
+  }
+
   async queryResultData(student: StudentDetails, examId: number): Promise<QueryResultData | null> {
     return this.withErrorHandling(async () => {
       const id = student.studentId;
-      const [ratings, [remark], examType, academic, marks, [attendance]] = await Promise.all([
+
+      const [ratings, [remark], examType, academic, resultRecords, marks, [attendance]] = await Promise.all([
         this.getStudentRatings({ studentId: id, examTypeId: examId }),
         this.getTeacherRemarks({ studentId: id, examTypeId: examId }),
         this.getCurrentTerm(examId),
         this.getActiveAcademicYear(),
+        // Query 1: Fetch all result records from smResultStores (one per subject)
         this.db
           .select({
+            resultId: schema.smResultStores.id,
+            subjectId: schema.smResultStores.subjectId,
+            subjectName: schema.smSubjects.subjectName,
+            subjectCode: schema.smSubjects.subjectCode,
+            teacherRemarks: schema.smResultStores.teacherRemarks,
+          })
+          .from(schema.smResultStores)
+          .leftJoin(schema.smSubjects, eq(schema.smResultStores.subjectId, schema.smSubjects.id))
+          .where(
+            and(
+              eq(schema.smResultStores.studentId, id),
+              eq(schema.smResultStores.examTypeId, examId),
+              eq(schema.smResultStores.activeStatus, 1)
+            )
+          ),
+        // Query 2: Fetch marks from smMarkStores
+        this.db
+          .select({
+            markId: schema.smMarkStores.id,
+            subjectId: schema.smSubjects.id,
             totalMarks: schema.smMarkStores.totalMarks,
-            teacherRemarks: schema.smMarkStores.teacherRemarks,
             examTitle: schema.smExamSetups.examTitle,
             subjectCode: schema.smSubjects.subjectCode,
             isAbsent: schema.smMarkStores.isAbsent,
@@ -228,19 +267,28 @@ export class ResultsRepository extends BaseRepository {
       const classResults =
         classId && sectionId
           ? await this.db
-              .select()
-              .from(schema.smResultStores)
-              .where(
-                and(
-                  eq(schema.smResultStores.examTypeId, examId),
-                  eq(schema.smResultStores.classId, classId),
-                  eq(schema.smResultStores.sectionId, sectionId),
-                  eq(schema.smResultStores.activeStatus, 1)
-                )
+            .select()
+            .from(schema.smResultStores)
+            .where(
+              and(
+                eq(schema.smResultStores.examTypeId, examId),
+                eq(schema.smResultStores.classId, classId),
+                eq(schema.smResultStores.sectionId, sectionId),
+                eq(schema.smResultStores.activeStatus, 1)
               )
+            )
           : [];
 
-      return { examType, academic, classResults, marks, ratings, remark, attendance };
+      return {
+        examType,
+        academic,
+        classResults,
+        marks,
+        resultRecord: resultRecords,
+        ratings,
+        remark,
+        attendance
+      };
     }, "queryResultData");
   }
 
@@ -304,7 +352,7 @@ export class ResultsRepository extends BaseRepository {
     );
   }
 
-  async getObjectives(_student: StudentDetail): Promise<any[]> {
+  async getObjectives(_student: Student): Promise<any[]> {
     // Placeholder - requires objectives table schema
     return [];
   }
@@ -368,7 +416,7 @@ export class ResultsRepository extends BaseRepository {
           .insert(schema.teacherRemarks)
           .values(remark)
           .onDuplicateKeyUpdate({ set: { remark: remark.remark, updatedAt: new Date() } })
-          .then(() => {}),
+          .then(() => { }),
       "upsertTeacherRemark"
     );
   }

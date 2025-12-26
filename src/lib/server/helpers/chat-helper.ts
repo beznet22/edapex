@@ -2,7 +2,7 @@ import type { xUIMessage } from "$lib/types/chat-types";
 import { generateText, type LanguageModel, type ModelMessage, type Provider } from "ai";
 import type { DBMessage } from "../db/schema";
 import { CredentialType } from "$lib/schema/chat-schema";
-import { resultInputSchema } from "$lib/schema/result";
+import { resultInputSchema } from "$lib/schema/result-input";
 import { extractPrompt } from "../prompts/extract";
 import { useAgent } from "../service/agent.service";
 

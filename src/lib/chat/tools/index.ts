@@ -6,6 +6,7 @@ import {
   upsertStudentResult,
   upsertTeacherRemark,
 } from "./result.tool";
+import { sendClassResults, validateClassResults } from "./coordinator.tool";
 
 export const tools = (writer: UIMessageStreamWriter, model: LanguageModel) => {
   return {
@@ -15,5 +16,17 @@ export const tools = (writer: UIMessageStreamWriter, model: LanguageModel) => {
     upsertAttendance,
     upsertTeacherRemark,
     upsertStudentRatings,
+  };
+};
+
+export const emptyTools = (writer: UIMessageStreamWriter, model: LanguageModel) => {
+  return {};
+};
+
+export const coordinatorTools = (writer: UIMessageStreamWriter, model: LanguageModel) => {
+  return {
+    upsertStudentResult,
+    validateClassResults,
+    sendClassResults,
   };
 };

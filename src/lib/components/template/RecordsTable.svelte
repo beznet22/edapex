@@ -1,9 +1,5 @@
 <script lang="ts">
-  import { Pencil, Save, X } from "@lucide/svelte";
-  import Button from "$lib/components/ui/button/button.svelte";
-  import Input from "$lib/components/ui/input/input.svelte";
-  import type { RecordData } from "$lib/types/result-types";
-  import type { ResultOutput, Student } from "$lib/schema/result";
+  import type { ResultOutput, Student } from "$lib/schema/result-output";
 
   interface Props {
     records: ResultOutput["records"];
@@ -11,70 +7,14 @@
   }
 
   let { records, student }: Props = $props();
+  const { category, fullName } = student;
 
-  // Check if student type is GRADERS
-  let category = $derived(student.category);
-  // Edit mode state
-  let editingCell = $state<{ recordIndex: number; titleIndex: number } | null>(
-    null
-  );
-  let editValue = $state<string>("");
-
-  // Helper function to get mark by title
   function getMarkByTitle(
     record: ResultOutput["records"][0],
-    title: string
+    title: string,
   ): number | undefined {
     const index = record.titles.indexOf(title);
     return index !== -1 ? record.marks[index] : undefined;
-  }
-
-  // Start editing a cell
-  function startEdit(
-    recordIndex: number,
-    titleIndex: number,
-    currentValue: number | undefined
-  ) {
-    editingCell = { recordIndex, titleIndex };
-    editValue = currentValue?.toString() || "";
-  }
-
-  // Save the edited value
-  function saveEdit() {
-    if (editingCell && editValue) {
-      const { recordIndex, titleIndex } = editingCell;
-      const newValue = parseFloat(editValue);
-
-      if (!isNaN(newValue) && newValue >= 0) {
-        // Update the marks array
-        records[recordIndex].marks[titleIndex] = newValue;
-
-        // Recalculate total score
-        const validMarks = records[recordIndex].marks.filter(
-          (mark) => !isNaN(mark) && mark >= 0
-        );
-        records[recordIndex].totalScore = validMarks.reduce(
-          (sum, mark) => sum + mark,
-          0
-        );
-      }
-    }
-    cancelEdit();
-  }
-
-  // Cancel editing
-  function cancelEdit() {
-    editingCell = null;
-    editValue = "";
-  }
-
-  // Handle key press events
-  function handleKeydown(event: KeyboardEvent) {
-    if (event.key === "Enter") {
-      saveEdit();
-    } else if (event.key === "Escape") {
-      cancelEdit();
-    }
   }
 </script>
 
@@ -82,7 +22,7 @@
   class="min-w-max w-full table-auto mb-4 overflow-hidden"
   aria-label="Student Records"
 >
-  <caption class="sr-only">Student Records for {student.fullName}</caption>
+  <caption class="sr-only">Student Records for {fullName}</caption>
   {#if category == "MIDDLEBASIC" || "LOWERBASIC"}
     <thead>
       <tr
@@ -97,7 +37,7 @@
       </tr>
     </thead>
   {:else if category == "NURSERY" || category == "GRADEK"}
-    <thead>
+    <!-- <thead>
       <tr
         class="print:bg-violet-900 bg-neutral text-neutral-content uppercase print:text-slate-300 text-xs leading-normal"
       >
@@ -108,7 +48,7 @@
         <th class="py-1 px-6 text-center">Score</th>
         <th class="py-1 px-6 text-center">Grade</th>
       </tr>
-    </thead>
+    </thead> -->
   {:else if category == "DAYCARE"}
     <thead>
       <tr
@@ -119,7 +59,6 @@
       </tr>
     </thead>
   {/if}
-
   <tbody class="print:text-gray-600 text-sm font-light">
     {#each records as record}
       <tr class="border-b border-gray-200 hover:bg-base-300">
@@ -147,7 +86,7 @@
               {@html record.grade}
             {/if}
           </td>
-          {:else if category == "NURSERY" || category == "GRADEK"}
+        {:else if category == "NURSERY" || category == "GRADEK"}
           <td class="py-3 px-6 max-w-xs">
             {#if record.objectives && record.objectives.length > 0}
               <ul class="list-disc">

@@ -19,7 +19,7 @@
   class={cn(
     "border-primary animate-spin rounded-full border-2 border-t-transparent",
     sizeClasses[size],
-    className
+    className,
   )}
 >
   <span class="sr-only">Loading</span>

@@ -7,33 +7,31 @@
   import { ChatContext } from "$lib/context/chat-context.svelte.js";
   import { FilesContext } from "$lib/context/file-context.svelte.js";
   import { UserContext } from "$lib/context/user-context.svelte.js";
+  import type { ClassSection } from "$lib/types/result-types.js";
   import { onMount } from "svelte";
   import { toast } from "svelte-sonner";
 
   let { data } = $props();
   // svelte-ignore state_referenced_locally
-  const { user, agents, uploads } = data;
+  const { user, agents } = data;
   let open = $state(false);
   let value = $state<string | undefined>();
-  let app = $derived(UserContext.fromContext());
-  const selectedClass = $derived(app.classes.find((c) => c.id == value));
+  let userContext = $derived(UserContext.fromContext());
   const chatContext = new ChatContext({
     initialMessages: [],
     chatData: undefined,
     agents,
   });
-
   chatContext.setContext();
-  const filesContext = new FilesContext(uploads, true);
-  filesContext.setContext();
+  const chat = $derived(ChatContext.fromContext());
 
   onMount(() => {
-    if (app.isTeacher && !app.subjects.length) open = true;
+    if (userContext.isTeacher && !userContext.subjects.length) open = true;
   });
 
   const doAssign = async () => {
-    if (!selectedClass) return;
-    const { classId, sectionId } = selectedClass;
+    if (!chat.selectedClass) return;
+    const { classId, sectionId } = chat.selectedClass;
     if (!classId || !sectionId || !user || !user.staffId) return;
     const res = await assignSubjects({ classId, sectionId });
     if ((!res.success && res.message) || !res.assigned) {
@@ -41,7 +39,7 @@
       return;
     }
 
-    app.students = res.assigned;
+    userContext.students = res.assigned;
     open = false;
   };
 </script>
@@ -55,7 +53,7 @@
   <AlertDialog.Content>
     <AlertDialog.Header>
       <AlertDialog.Title>
-        {`${app.getDesignationTitle(app.designation)} Onboarding`}
+        {`${userContext.getDesignationTitle(userContext.designation)} Onboarding`}
       </AlertDialog.Title>
       <AlertDialog.Description>
         You are not assined to any class, Please select a class to work on.
@@ -64,19 +62,19 @@
     <div class="grid gap-4">
       <Select.Root type="single" name="classes" bind:value>
         <Select.Trigger class="w-full">
-          {#if !selectedClass}
+          {#if !chat.selectedClass}
             Select a class
           {:else}
-            {`${selectedClass?.className!} (${selectedClass?.sectionName!})`}
+            {`${chat.selectedClass?.className} (${chat.selectedClass?.sectionName})`}
           {/if}
         </Select.Trigger>
-        <Select.Content>
+        <Select.Content>  
           <Select.Group>
             <Select.Label>Classes and Sections</Select.Label>
-            {#each app.classes as cls (cls.id)}
-              <Select.Item value={`${cls.id}`} label={cls.className || ""}>
-                {`${cls.className} (${cls.sectionName})`}
-              </Select.Item>
+            {#each userContext.classes as cls (cls.id)}
+            <Select.Item value={`${cls.id}`} label={cls.className || ""}>
+              {`${cls.className} (${cls.sectionName})`}
+            </Select.Item>
             {/each}
           </Select.Group>
         </Select.Content>

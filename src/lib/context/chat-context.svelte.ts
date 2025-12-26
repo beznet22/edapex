@@ -1,6 +1,5 @@
 // @/src/lib/hooks/chat-context.svelte.ts
 import { goto, replaceState } from "$app/navigation";
-import type { StudentData } from "$lib/schema/result";
 import type { DBChat } from "$lib/server/db/schema";
 import type { AuthUser } from "$lib/types/auth-types";
 import type {
@@ -14,6 +13,9 @@ import { DefaultChatTransport, type ChatStatus } from "ai";
 import { getContext, setContext } from "svelte";
 import { toast } from "svelte-sonner";
 import { ChatHistory } from "./chat-history.svelte";
+import type { ClassSection } from "$lib/types/result-types";
+import type { Student } from "$lib/schema/result-output";
+import { localStore } from "$lib/utils";
 
 const CHAT_CONTEXT_KEY = Symbol("chat-context");
 
@@ -22,13 +24,15 @@ export type InitChat = {
   api?: string;
   chatData?: DBChat;
   agents: AgentWorkflow[];
+  selectedClass?: ClassSection;
 };
 
 export class ChatContext {
   // Reactive state using Svelte 5 runes
   user = $state<AuthUser | undefined>(undefined);
   activeAgent = $state<AgentWorkflow | null>(null);
-  studentData = $state<StudentData | undefined>(undefined);
+  studentData = $state<Student | undefined>(undefined);
+  selectedClass = $state<ClassSection | undefined>(undefined);
   openedDocumentId = $state<string | undefined>(undefined);
   openPanel = $state<boolean>(false);
   docPart = $state<CreateDocumentPart | undefined>(undefined);
@@ -45,7 +49,7 @@ export class ChatContext {
   chatData?: DBChat;
   chatHistory = ChatHistory.fromContext();
 
-  constructor({ initialMessages, api, chatData, agents }: InitChat) {
+  constructor({ initialMessages, api, chatData, agents, selectedClass }: InitChat) {
     this.client = $derived(
       new Chat<xUIMessage>({
         id: chatData?.id,
@@ -66,6 +70,7 @@ export class ChatContext {
     this.lastMessage = $derived(this.messages.at(-1));
     this.agents = $state(agents);
     this.activeAgent = agents[0]
+    this.selectedClass = localStore("selected-class", selectedClass) || undefined;
   }
 
   get loading() {
@@ -79,6 +84,7 @@ export class ChatContext {
         chatId: this.chatData?.id,
         agentId: this.activeAgent?.id,
         data: this.studentData,
+        selectedClass: this.selectedClass,
       },
     };
   };

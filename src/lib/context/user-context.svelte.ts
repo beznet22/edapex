@@ -10,22 +10,20 @@ const USER_CONTEXT_KEY = Symbol("user-context");
 export class UserContext {
   user = $state<AuthUser | undefined>(undefined);
   students = $state<ClassStudent[]>([]);
-  classes = $state<Partial<ClassSection>[]>([]);
+  classes = $state<ClassSection[]>([]);
   designation = $state<Designation | undefined>(undefined);
-  subjects = $state<Partial<AssignedSubject>[]>([]);
-  staff = $state<Partial<Staff> | undefined>(undefined);
+  subjects = $state<AssignedSubject[]>([]);
+  staff = $state<Staff | undefined>(undefined);
 
-  isAdmin = $derived(this.designation === "ict_admin");
+  isIt = $derived(this.designation === "it");
   isTeacher = $derived(this.designation === "class_teacher");
-  isGrader = $derived(this.designation === "graders_coordinator");
-  isEYFS = $derived(this.designation === "eyfs_coodinator");
-  isCoordinator = $derived(this.isGrader || this.isEYFS || this.isAdmin);
+  isCoordinator = $derived(this.designation === "coordinator");
 
-  constructor(user: AuthUser | undefined, classes: Partial<ClassSection>[], students: ClassStudent[]) {
+  constructor(user: AuthUser | undefined, classes: ClassSection[], students?: ClassStudent[]) {
     this.user = user;
-    this.classes = classes;
-    this.students = students;
-    this.designation = this.getDesignationById(user?.designationId || 0);
+    this.classes = classes; 
+    this.students = students || [];
+    this.designation = user?.designation;
   }
 
   greeting = () => {
@@ -39,10 +37,6 @@ export class UserContext {
     if (!name) return "";
     return name.charAt(0).toUpperCase() + name.slice(1);
   };
-
-  getDesignationById(designationId: number): Designation | undefined {
-    return DESIGNATIONS[designationId] as Designation | undefined;
-  }
 
   getDesignationTitle(Designation?: Designation): string | undefined {
     if (!Designation) return undefined;

@@ -2,7 +2,7 @@
   import type { xUIMessagePart } from "$lib/types/chat-types";
   import { Tool, ToolContent, ToolHeader, ToolInput, ToolOutput } from "./ai-elements/tool";
   import PreviewModal from "./pdf-preview.svelte";
-  import type { ResultOutput } from "$lib/schema/result";
+  import type { ResultOutput } from "$lib/schema/result-input";
   import { isToolUIPart } from "ai";
 
   type ToolPartOutput = {

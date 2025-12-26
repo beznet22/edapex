@@ -96,6 +96,9 @@ export class StaffRepository extends BaseRepository {
       const [classSection] = await this.db
         .select({
           teacherId: smAssignSubjects.teacherId,
+          classId: smAssignSubjects.classId,
+          sectionId: smAssignSubjects.sectionId,
+          subjectId: smAssignSubjects.subjectId,
         })
         .from(smAssignSubjects)
         .where(

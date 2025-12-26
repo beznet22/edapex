@@ -1,11 +1,12 @@
 import type { smStaffs, users } from "$lib/server/db/sms-schema";
 import type { JWTPayload } from "jose";
+import type { Designation } from "./sms-types";
 
 export interface AuthUser {
   id: number;
   roleId?: number;
   staffId?: number;
-  designationId?: number;
+  designation?: Designation;
   departmentId?: number;
   activeStatus?: number;
   firstName?: string;

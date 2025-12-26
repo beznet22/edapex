@@ -1,9 +1,9 @@
 <script lang="ts">
-  import type { ResultOutput } from "$lib/schema/result";
+  import type { Student } from "$lib/schema/result-output";
 
 
   interface Props {
-    student: ResultOutput["student"];
+    student: Student;
   }
 
   let { student }: Props = $props();
@@ -87,7 +87,7 @@
           Days Opened
         </span>
         <span class="py-2 pl-2 text-xs print:text-slate-500 uppercase"
-          >{student.opened}</span
+          >{student.daysOpened}</span
         >
       </div>
 
@@ -98,7 +98,7 @@
           Days Absent
         </span>
         <span class="py-2 pl-2 text-xs print:text-slate-500 uppercase"
-          >{student.absent}</span
+          >{student.daysAbsent}</span
         >
       </div>
 
@@ -109,7 +109,7 @@
           Days Present
         </span>
         <span class="py-2 pl-2 text-xs print:text-slate-500 uppercase"
-          >{student.present}</span
+          >{student.daysPresent}</span
         >
       </div>
     </div>

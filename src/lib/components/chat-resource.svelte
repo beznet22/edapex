@@ -9,7 +9,6 @@
   import type { CarouselAPI } from "$lib/components/ui/carousel/context.js";
   import { onMount } from "svelte";
   import Loader from "./prompt-kit/loader/loader.svelte";
-  import { upload } from "$lib/api/chat.remote";
   import { toast } from "svelte-sonner";
 
   interface ChatResourceProps {

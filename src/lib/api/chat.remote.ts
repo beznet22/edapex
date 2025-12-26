@@ -2,11 +2,12 @@ import { command, getRequestEvent, query } from "$app/server";
 import { chatModels } from "$lib/chat/models";
 import { allowAnonymousChats } from "$lib/constants";
 import { chatVisibilitySchema, fileSchema } from "$lib/schema/chat-schema";
-import { resultInputSchema } from "$lib/schema/result";
+import { resultInputSchema } from "$lib/schema/result-input";
 import { repo } from "$lib/server/repository";
 import { result } from "$lib/server/service/result.service";
 import { generateContent } from "$lib/server/helpers/chat-helper";
 import z from "zod";
+import { staffRepo } from "$lib/server/repository/staff.repo";
 
 export const updateHistory = command(
   z.object({
@@ -105,39 +106,6 @@ export const updateVisibility = command(
       await repo.chat.updateChatVisibilityById({ chatId, visibility });
       return { success: true };
     } catch {
-      return { success: false, message: "An error occurred while processing your request" };
-    }
-  }
-);
-
-export const upload = command(
-  z.object({
-    file: fileSchema,
-  }),
-  async ({ file }) => {
-    const { user } = getRequestEvent().locals;
-    if (!user) {
-      return { success: false, message: "Unauthorized" };
-    }
-
-    try {
-      const mappingData = await result.getMappingData(user.staffId || 1);
-      const mapString = JSON.stringify(mappingData);
-      const { success, content, message } = await generateContent(file, mapString);
-      if (!success || !content) {
-        return { success: false, message };
-      }
-      const parsedResult = JSON.parse(content.trim());
-      const marks = resultInputSchema.parse(parsedResult);
-      const res = await result.upsertStudentResult(marks, 1);
-      if (!res.success) {
-        return { success: false, message: res.message };
-      }
-
-      marks.studentData.studentId = res.data?.studentId || null;
-      return { studentData: marks.studentData, marks };
-    } catch (error) {
-      console.error("Failed to upload file", error);
       return { success: false, message: "An error occurred while processing your request" };
     }
   }

@@ -48,7 +48,7 @@ export const documentationWorkflow: AgentWorkflow = {
     // —— Teacher Assistant ——
     {
       workflowId: "documentation",
-      designation: "teacher",
+      designation: "class_teacher",
       highlight: "Curriculum & Classroom Resources",
       suggestions: [
         "Generate lesson notes per class and week",
@@ -82,10 +82,10 @@ export const documentationWorkflow: AgentWorkflow = {
       ].join("\n"),
     },
 
-    // —— Examiner Assistant ——
+    // —— Coordinator Assistant ——
     {
       workflowId: "documentation",
-      designation: "examiner",
+      designation: "coordinator",
       highlight: "Records & Certificates",
       suggestions: [
         "Draft certificates (transfer, testimonial, completion)",
@@ -96,7 +96,7 @@ export const documentationWorkflow: AgentWorkflow = {
         "Draft official letters for exam or result verification",
       ] as const,
       systemPrompt: [
-        "You are the Examiner’s Documentation Assistant — a meticulous archivist and certifier responsible for legally valid, tamper-resistant academic documentation.",
+        "You are the Coordinator’s Documentation Assistant — a meticulous archivist and certifier responsible for legally valid, tamper-resistant academic documentation.",
 
         "## Core Responsibilities",
         "- Generate official certificates: **Transfer**, **Testimonial**, **Completion**, **Promotion** — with school seal placeholder, signature lines, and unique ID",
@@ -116,5 +116,6 @@ export const documentationWorkflow: AgentWorkflow = {
         "- Output in PDF-suitable markdown or LaTeX (if supported by renderer)",
       ].join("\n"),
     },
+
   ] as const,
 };

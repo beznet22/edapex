@@ -1,0 +1,60 @@
+{
+    "studentData": {
+        "studentId": null,
+        "recordId": null,
+        "schoolId": null,
+        "admissionNo": 1012,
+        "fullName": "JOSEPHINE FAASEMA",
+        "class": "DAY CARE 1",
+        "classId": 16,
+        "sectionId": 5,
+        "studentCategory": "DAYCARE",
+        "studentCategoryId": 1,
+        "term": "FIRST TERM EXAMINATION - DEC/2025",
+        "examTypeId": 5,
+        "attendance": {
+            "daysOpened": 134,
+            "daysPresent": 116,
+            "daysAbsent": 18
+        }
+    },
+    "marksData": [
+        {
+            "subjectCode": "BIBLE",
+            "subjectId": 24,
+            "learningOutcome": "JOSEPHINE RESPONES WITH SMILES AND CURIOSITY DURING BIBLE LESSONS. SHE IS BEGINNING TO RECOGNIZE FAMILIAR SONGS, PRAYERS, AS WE ENGAGE IN THE ACTIVITIES IN CLASS. KEEP IT UP."
+        },
+        {
+            "subjectCode": "PSED/PD",
+            "subjectId": 36,
+            "learningOutcome": "JOSEPHINE IS BECOMING MORE EXPRESSIVE, SHOWING EXCITEMENT CLEARLY THROUGH GESTURES. SHE MOVES AROUND CONFIDENTLY, SHOWING IMPROVED BALANCE AND COORDINATION. SHE IS MAKING PROGRESS."
+        },
+        {
+            "subjectCode": "KUW/EAD",
+            "subjectId": 31,
+            "learningOutcome": "JOSEPHINE ENJOY INVESTIGATING NEW MATERIALS AND SHOWS INTEREST IN HOW THINGS WORK. SHE ENJOYS SCRIBBLING AND COLOURING AND SHE IS WORKING ON PENCIL GRIP. SHE CAN DO BETTER."
+        },
+        {
+            "subjectCode": "CLL/JP",
+            "subjectId": 34,
+            "learningOutcome": "JOSEPHINE CAN RECITE ALPHABET FROM A TO Z AND ENJOY SINGING A B C RHYME ALONG WITH THE TEACHER. SHE ENJOYS JOLLY PHONICS RHYMES AND IDENTIFIES SOUNDS SUCH AS /a/, /t/, /f/ ALONG WITH MATCHING OBJECTS. SHE IS PROGRESSING WELL."
+        },
+        {
+            "subjectCode": "PSRN",
+            "subjectId": 30,
+            "learningOutcome": "JOSEPHINE CAN COUNT NUMBERS FROM 1 TO 10 WITH THE TEACHER'S SUPPORT AND SHE IS ABLE TO IDENTIFY SHAPES SUCH AS CIRCLE AND STAR. SHE IS IMPROVING."
+        }
+    ],
+    "studentRatings": {
+        "adherent_and_independent": null,
+        "flexibility_and_creativity": null,
+        "meticulous": null,
+        "neatness": null,
+        "overall_progress": null,
+        "self_control_and_interaction": null
+    },
+    "teachersRemark": {
+        "comment": null,
+        "note": null
+    }
+}
