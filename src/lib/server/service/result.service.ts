@@ -27,7 +27,7 @@ import { SMTPClient, type SMTPMessage } from "../helpers/smtp";
 import { render } from "svelte/server";
 import { resultRepo } from "../repository/result.repo";
 import { id } from "zod/v4/locales";
-import type { Category, MarksRecord, ResultOutput, Student } from "$lib/schema/result-output";
+import { resultOutputSchema, type Category, type MarksRecord, type ResultOutput, type Student } from "$lib/schema/result-output";
 
 const GRADE_RANGES = {
   EYFS: [
@@ -50,8 +50,14 @@ export class ResultService {
   /**
    * Publish result to students and parents timeline and send email
    */
-  async publishResult(studentId: number, examId: number) {
-    this.sendResultEmail(examId);
+  async publishResult(params: { studentId: number; examId: number }) {
+    const { studentId, examId } = params;
+    const resultData = await result.getStudentResult({ id: studentId, examId, withImages: true });
+    const validatedResult = await resultOutputSchema.safeParseAsync(resultData);
+    if (!validatedResult.success) {
+      return null;
+    }
+    this.sendResultEmail({ examTypeId: examId });
     const timeline = {
       staffStudentId: studentId,
       type: `exam-${examId}`,
@@ -72,7 +78,8 @@ export class ResultService {
   /**
    * Send result email to parent
    */
-  async sendResultEmail(examTypeId: number) {
+  async sendResultEmail(params: { examTypeId: number }) {
+    const { examTypeId } = params;
     const siblings = await studentRepo.getStudentBySiblings();
     const examType = await base.getCurrentTerm(examTypeId);
     const settings = await base.getGeneralSettingBySchoolId(1);
@@ -287,7 +294,7 @@ export class ResultService {
     if (!resultData?.classResults?.length) return null;
 
     const { examType, academic, attendance, marks, ratings, remark, resultRecord } = resultData;
-    
+
     const student: Student = {
       id: studentData.studentId,
       examId: examType?.id || 0,

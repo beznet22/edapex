@@ -11,64 +11,42 @@ import { studentRepo } from "$lib/server/repository/student.repo";
 import { resultOutputSchema } from "$lib/schema/result-output";
 
 export const upsertStudentResult = tool({
-  description: [
-    "Retrieves, creates, or update student assessment data for head teacher review",
-    "ALWAYS requires studentId and examTypeId provided in CONVERSATION CONTEXT to identify the record",
-    "When updating (update=true): provide complete marksData object with modifications",
-    "When retrieving (update=false/default): returns existing result data and PDF generation link",
-    "Output includes pdfUrl formatted as '/generate?id={studentId}&examId={examTypeId}'",
-  ].join("\n"),
+  description: "Comprehensive tool for managing student academic results. Use 'read' to fetch existing scores and report data, 'create' to add new marks, and 'update' to modify existing marks. Requires 'studentId' and 'examTypeId'.",
   inputSchema: z
     .object({
-      studentId: z.number().describe("The Student ID - REQUIRED for all operations"),
-      examTypeId: z.number().describe("The Exam Type ID - REQUIRED for all operations"),
-      adminNo: z
-        .number()
-        .optional()
-        .describe("The Student Admission Number - REQUIRED if studentId is not provided"),
+      studentId: z.number().describe("The unique ID of the student."),
+      examTypeId: z.number().describe("The unique ID of the exam type/term."),
+      adminNo: z.number().optional().describe("Student Admission Number (fallback if Student ID is missing from CONVERSTION context)."),
       operation: z
         .enum(["create", "update", "read"])
         .default("read")
-        .describe(
-          "Operation to perform: 'create' to create a new record, 'update' to update an existing record, 'read' to retrieve an existing record"
-        ),
-      marksData: resultInputSchema
-        .optional()
-        .describe("COMPLETE student marks object - REQUIRED only when update=true"),
+        .describe("Action to perform: 'read' to fetch, 'create' to add, 'update' to modify."),
+      marksData: resultInputSchema.optional().describe("The structured marks data. Required only for 'create' or 'update' operations."),
     })
     .refine((data) => {
-      if (data.operation === "create" && !data.marksData) {
-        return false;
-      }
-      if (data.operation === "update" && !data.marksData) {
+      if ((data.operation === "create" || data.operation === "update") && !data.marksData) {
         return false;
       }
       return true;
     }),
   outputSchema: z.object({
-    status: z
-      .enum(["approved", "denied"])
-      .describe("Operation status: 'approved' if successful, 'denied' if record not found"),
-    message: z.string().optional().describe("Status details (e.g., 'Result retrieved', 'Result updated')"),
-    data: resultOutputSchema
-      .optional()
-      .describe("Structured student assessment data for head teacher review"),
+    status: z.enum(["approved", "denied"]).describe("Success status"),
+    message: z.string().optional(),
+    data: resultOutputSchema.optional().describe("Result data including records and summary"),
   }),
   execute: async (input) => {
     const { studentId, examTypeId, operation, marksData, adminNo } = input;
     if (operation === "create" || operation === "update") {
       if (!marksData) {
-        return {
-          status: "denied",
-          message: "Marks data is required for create or update operation",
-        };
+        return { status: "denied", message: "Marks data is required for create or update operation" };
       }
-      const res = await result.upsertStudentResult(marksData, 1);
-      if (!res.success) {
-        return {
-          status: "denied",
-          message: res.message,
-        };
+      try {
+        const res = await result.upsertStudentResult(marksData, 1);
+        if (!res) {
+          return { status: "denied", message: "Failed to upsert student result" };
+        }
+      } catch (error) {
+        return { status: "denied", message: "Failed to upsert student result" };
       }
     }
 
@@ -92,23 +70,20 @@ export const upsertStudentResult = tool({
 });
 
 export const getClassStudentList = tool({
-  description: [
-    "Retrieves a list of students in a class by using STAFF ID provided in CONVERSATION CONTEXT",
-    "Returns empty array if no students found",
-  ].join("\n"),
+  description: "Retrieves a list of all students assigned to a specific staff member. Returns student IDs, names, and admission numbers. Essential when 'studentId' or 'admissionNo' is unknown.",
   inputSchema: z.object({
-    staffId: z.number().describe("The Staff ID - REQUIRED to retrieve student list"),
+    staffId: z.number().describe("The unique ID of the staff member (teacher)."),
   }),
   outputSchema: z.object({
     students: z
       .array(
         z.object({
-          id: z.number().describe("The Student ID"),
-          name: z.string().describe("The Student Name"),
-          admissionNo: z.number().describe("The Student Admission Number"),
+          id: z.number(),
+          name: z.string(),
+          admissionNo: z.number(),
         })
       )
-      .describe("List of students in the class"),
+      .describe("List of students"),
   }),
   execute: async (input) => {
     const students = await studentRepo.getStudentsByStaffId(input.staffId);
@@ -119,42 +94,26 @@ export const getClassStudentList = tool({
 });
 
 export const upsertAttendance = tool({
-  description: [
-    "Creates, or update student attendance data for head teacher review",
-    "ALWAYS requires studentId and examTypeId provided in CONVERSATION CONTEXT to identify the record",
-    "When updating (update=true): provide complete attendanceData object with modifications",
-  ].join("\n"),
+  description: "Manages student attendance records (days opened, present, and absent) for a specific exam term. Use 'read' to fetch, 'create' to add, or 'update' to modify.",
   inputSchema: z
     .object({
-      studentId: z.number().describe("The Student ID - REQUIRED for all operations"),
-      examTypeId: z.number().describe("The Exam Type ID - REQUIRED for all operations"),
+      studentId: z.number().describe("The unique ID of the student."),
+      examTypeId: z.number().describe("The unique ID of the exam type/term."),
       operation: z
         .enum(["create", "update", "read"])
         .default("read")
-        .describe(
-          "Operation to perform: 'create' to create a new record, 'update' to update an existing record, 'read' to retrieve an existing record"
-        ),
-      attendanceData: attendanceSchema
-        .optional()
-        .describe("Student attendance data - REQUIRED only when update=true"),
+        .describe("Action to perform: 'read' to fetch, 'create' to add, 'update' to modify."),
+      attendanceData: attendanceSchema.optional().describe("Structured attendance data. Required only for 'create' or 'update' operations."),
     })
     .refine((data) => {
-      if (data.operation === "create" && !data.attendanceData) {
-        return false;
-      }
-      if (data.operation === "update" && !data.attendanceData) {
+      if ((data.operation === "create" || data.operation === "update") && !data.attendanceData) {
         return false;
       }
       return true;
     }),
   outputSchema: z.object({
-    status: z
-      .enum(["approved", "denied"])
-      .describe("Operation status: 'approved' if successful, 'denied' if record not found"),
-    message: z
-      .string()
-      .optional()
-      .describe("Status details (e.g., 'Attendance retrieved', 'Attendance updated')"),
+    status: z.enum(["approved", "denied"]),
+    message: z.string().optional(),
   }),
   execute: async (input) => {
     const { studentId, examTypeId, operation, attendanceData } = input;
@@ -169,46 +128,32 @@ export const upsertAttendance = tool({
     }
     return {
       status: "approved",
-      message: "Attendance data retrieved",
+      message: "Attendance data processed",
     };
   },
 });
 
 export const upsertTeacherRemark = tool({
-  description: [
-    "Creates, or update teacher's remark for a student for head teacher review",
-    "ALWAYS requires studentId and examTypeId provided in CONVERSATION CONTEXT to identify the record",
-    "When updating (update=true): provide complete remarkData object with modifications",
-    "When retrieving (update=false/default): returns existing remark data",
-  ].join("\n"),
+  description: "Manages the teacher's qualitative comments and remarks for a student's performance in a specific exam term. Use 'read' to fetch, 'create' to add, or 'update' to modify.",
   inputSchema: z
     .object({
-      studentId: z.number().describe("The Student ID - REQUIRED for all operations"),
-      examTypeId: z.number().describe("The Exam Type ID - REQUIRED for all operations"),
+      studentId: z.number().describe("The unique ID of the student."),
+      examTypeId: z.number().describe("The unique ID of the exam type/term."),
       operation: z
         .enum(["create", "update", "read"])
         .default("read")
-        .describe(
-          "Operation to perform: 'create' to create a new record, 'update' to update an existing record, 'read' to retrieve an existing record"
-        ),
-      remarkData: teacherRemarkSchema
-        .optional()
-        .describe("Teacher's remark data - REQUIRED only when update=true"),
+        .describe("Action to perform: 'read' to fetch, 'create' to add, 'update' to modify."),
+      remarkData: teacherRemarkSchema.optional().describe("Structured remark data containing the comment. Required only for 'create' or 'update' operations."),
     })
     .refine((data) => {
-      if (data.operation === "create" && !data.remarkData) {
-        return false;
-      }
-      if (data.operation === "update" && !data.remarkData) {
+      if ((data.operation === "create" || data.operation === "update") && !data.remarkData) {
         return false;
       }
       return true;
     }),
   outputSchema: z.object({
-    status: z
-      .enum(["approved", "denied"])
-      .describe("Operation status: 'approved' if successful, 'denied' if record not found"),
-    message: z.string().optional().describe("Status details (e.g., 'Remark retrieved', 'Remark updated')"),
+    status: z.enum(["approved", "denied"]),
+    message: z.string().optional(),
   }),
   execute: async (input) => {
     const { studentId, examTypeId, operation, remarkData } = input;
@@ -227,45 +172,32 @@ export const upsertTeacherRemark = tool({
     }
     return {
       status: "approved",
-      message: "Remark data retrieved",
+      message: "Remark data processed",
     };
   },
 });
 
 export const upsertStudentRatings = tool({
-  description: [
-    "Creates, or update student ratings for head teacher review",
-    "ALWAYS requires studentId and examTypeId provided in CONVERSATION CONTEXT to identify the record",
-    "When updating (update=true): provide complete ratingsData object with modifications",
-  ].join("\n"),
+  description: "Manages student behavioral ratings (affective and psychomotor domains) for a specific exam term. Use 'read' to fetch, 'create' to add, or 'update' to modify.",
   inputSchema: z
     .object({
-      studentId: z.number().describe("The Student ID - REQUIRED for all operations"),
-      examTypeId: z.number().describe("The Exam Type ID - REQUIRED for all operations"),
+      studentId: z.number().describe("The unique ID of the student."),
+      examTypeId: z.number().describe("The unique ID of the exam type/term."),
       operation: z
         .enum(["create", "update", "read"])
         .default("read")
-        .describe(
-          "Operation to perform: 'create' to create a new record, 'update' to update an existing record, 'read' to retrieve an existing record"
-        ),
-      ratingsData: studentRatingsSchema
-        .optional()
-        .describe("Student ratings data - REQUIRED only when update=true"),
+        .describe("Action to perform: 'read' to fetch, 'create' to add, 'update' to modify."),
+      ratingsData: studentRatingsSchema.optional().describe("Structured behavioral ratings. Required only for 'create' or 'update' operations."),
     })
     .refine((data) => {
-      if (data.operation === "create" && !data.ratingsData) {
-        return false;
-      }
-      if (data.operation === "update" && !data.ratingsData) {
+      if ((data.operation === "create" || data.operation === "update") && !data.ratingsData) {
         return false;
       }
       return true;
     }),
   outputSchema: z.object({
-    status: z
-      .enum(["approved", "denied"])
-      .describe("Operation status: 'approved' if successful, 'denied' if record not found"),
-    message: z.string().optional().describe("Status details (e.g., 'Ratings retrieved', 'Ratings updated')"),
+    status: z.enum(["approved", "denied"]),
+    message: z.string().optional(),
   }),
   execute: async (input) => {
     const { studentId, examTypeId, operation, ratingsData } = input;
@@ -284,8 +216,32 @@ export const upsertStudentRatings = tool({
     }
     return {
       status: "approved",
-      message: "Ratings data retrieved",
+      message: "Ratings data processed",
     };
+  },
+});
+
+export const publishResult = tool({
+  description: "Publishes a student's result to their timeline and sends a notification email to parents. This finalizes the report card for the student for the specified exam.",
+  inputSchema: z.object({
+    studentId: z.number().describe("The unique ID of the student."),
+    examTypeId: z.number().describe("The unique ID of the exam type/term."),
+  }),
+  outputSchema: z.object({
+    status: z.enum(["approved", "denied"]),
+    message: z.string().optional(),
+  }),
+  execute: async (input) => {
+    const { studentId, examTypeId } = input;
+    try {
+      const res = await result.publishResult({ studentId, examId: examTypeId });
+      if (!res) {
+        return { status: "denied", message: "Failed to publish result. Ensure result is validated first." };
+      }
+      return { status: "approved", message: "Result published successfully and notification sent." };
+    } catch (error) {
+      return { status: "denied", message: "An error occurred while publishing the result." };
+    }
   },
 });
 
@@ -295,3 +251,5 @@ export type upsertAttendanceInput = InferToolInput<typeof upsertAttendance>;
 export type upsertAttendanceOutput = InferToolOutput<typeof upsertAttendance>;
 export type upsertResultInput = InferToolInput<typeof upsertStudentResult>;
 export type upsertResultOutput = InferToolOutput<typeof upsertStudentResult>;
+export type publishResultInput = InferToolInput<typeof publishResult>;
+export type publishResultOutput = InferToolOutput<typeof publishResult>;

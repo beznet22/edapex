@@ -103,8 +103,8 @@ export const sendClassResults = tool({
     ].join("\n"),
     inputSchema: z.object({
         classId: z.number().describe("The Class ID."),
-        examTypeId: z.number().describe("The Exam Type ID."),
         sectionId: z.number().optional().describe("Optional Section ID."),
+        examTypeId: z.number().describe("The Exam Type ID."),
     }),
     outputSchema: z.object({
         successCount: z.number(),
@@ -122,6 +122,12 @@ export const sendClassResults = tool({
 
         for (const student of students) {
             try {
+    
+                await result.publishResult({
+                    studentId: student.id,
+                    examId: examTypeId,
+                });
+
                 await repo.base.create({
                     table: smStudentTimelines,
                     values: {
