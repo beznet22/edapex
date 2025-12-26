@@ -5,9 +5,7 @@
   import * as AlertDialog from "$lib/components/ui/alert-dialog";
   import * as Select from "$lib/components/ui/select";
   import { ChatContext } from "$lib/context/chat-context.svelte.js";
-  import { FilesContext } from "$lib/context/file-context.svelte.js";
   import { UserContext } from "$lib/context/user-context.svelte.js";
-  import type { ClassSection } from "$lib/types/result-types.js";
   import { onMount } from "svelte";
   import { toast } from "svelte-sonner";
 
