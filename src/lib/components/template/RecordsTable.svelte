@@ -23,12 +23,12 @@
   aria-label="Student Records"
 >
   <caption class="sr-only">Student Records for {fullName}</caption>
-  {#if category == "MIDDLEBASIC" || "LOWERBASIC"}
+  {#if category == "MIDDLEBASIC" || category == "LOWERBASIC"}
     <thead>
       <tr
         class="print:bg-violet-900 bg-neutral text-neutral-content uppercase print:text-slate-300 text-xs leading-normal"
       >
-        <th class="py-1 px-6 text-left">Subject</th>
+        <th class="py-1 px-6 text-left"></th>
         {#each records[0]?.titles || [] as title}
           <th class="py-1 px-6 text-center">{title}</th>
         {/each}
@@ -37,7 +37,7 @@
       </tr>
     </thead>
   {:else if category == "NURSERY" || category == "GRADEK"}
-    <!-- <thead>
+    <thead>
       <tr
         class="print:bg-violet-900 bg-neutral text-neutral-content uppercase print:text-slate-300 text-xs leading-normal"
       >
@@ -48,7 +48,7 @@
         <th class="py-1 px-6 text-center">Score</th>
         <th class="py-1 px-6 text-center">Grade</th>
       </tr>
-    </thead> -->
+    </thead>  
   {:else if category == "DAYCARE"}
     <thead>
       <tr
@@ -66,7 +66,7 @@
           {record.subject}
         </td>
 
-        {#if category == "MIDDLEBASIC" || "LOWERBASIC"}
+        {#if category == "MIDDLEBASIC" || category == "LOWERBASIC"}
           {#each record.titles as title}
             <td class="py-3 px-6 text-center whitespace-nowrap relative group">
               <span>{getMarkByTitle(record, title) ?? "-"}</span>
@@ -108,15 +108,7 @@
           </td>
         {:else if category == "DAYCARE"}
           <td class="py-3 px-6 max-w-xs">
-            {#if record.objectives && record.objectives.length > 0}
-              <ul class="list-disc">
-                {#each record.objectives as objective}
-                  <li>{objective}</li>
-                {/each}
-              </ul>
-            {:else}
-              <span class="text-gray-400">No objectives</span>
-            {/if}
+            <span class="text-gray-400">{record.learningOutcome}</span>
           </td>
         {/if}
       </tr>
