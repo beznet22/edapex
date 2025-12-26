@@ -5,21 +5,22 @@
   import ScoreSummary from "./ScoreSummary.svelte";
   import StudentRatings from "./StudentRatings.svelte";
   import TeacherRemark from "./TeacherRemark.svelte";
-    import type { ResultOutput } from "$lib/schema/result-output";
+  import type { ResultOutput } from "$lib/schema/result-output";
 
   interface Props {
     data: ResultOutput;
   }
 
   let { data }: Props = $props();
+  const { category } = data.student;
 
   // Check if student type is GRADERS to conditionally show ratings
-  const isBasic = $derived(data.student.category === "MIDDLEBASIC" || data.student.category === "LOWERBASIC");
 </script>
 
 <div class="w-full h-full bg-custom">
   <!-- Header Section -->
   <ResultHeader school={data.school} />
+
 
   <!-- Student Info Section -->
   <StudentInfo student={data.student} />
@@ -28,13 +29,17 @@
   <RecordsTable records={data.records} student={data.student} />
 
   <!-- Score Summary -->
-  <ScoreSummary score={data.score} student={data.student} />
+  {#if category !== "DAYCARE"}
+    <ScoreSummary score={data.score} student={data.student} />
+  {/if}
 
   <!-- Student Ratings (for GRADERS only) -->
-  {#if isBasic && data.ratings.length > 0}
+  {#if category === "MIDDLEBASIC" || (category === "LOWERBASIC" && data.ratings.length > 0)}
     <StudentRatings ratings={data.ratings} />
   {/if}
 
   <!-- Teacher's Remark -->
-  <TeacherRemark remark={data.remark} />
+  {#if category !== "DAYCARE"}
+    <TeacherRemark remark={data.remark} />
+  {/if}
 </div>

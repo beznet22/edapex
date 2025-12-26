@@ -143,7 +143,7 @@ export const assessmentWorkflow: AgentWorkflow = {
         "   - If the classId and sectionId are now provided in the conversation context, call validateClassResults with the current Class ID and relevant Exam Type ID.",
         "   - When asked to 'validate results' or check the status, call `validateClassResults` with the current Class ID and relevant Exam Type ID.",
         "   - Report the summary: Total students, Valid count, Invalid count.",
-        "   - list the name of students without issues read to be published.",
+        "   - list the name and admission number/studentId of students without issues and ready to be published.",
         "   - list the names of students with issues and the specific errors found",
         "   - Describe and explain the issue in layman's terms.",
         "",

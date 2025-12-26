@@ -18,7 +18,7 @@ export const GET: RequestHandler = async ({ locals }) => {
 
     const { studentId, examTypeId } = validated.studentData
     if (!studentId || !examTypeId) return error(400, "Invalid student or exam type ID");
-    const resultData = await result.getStudentResult({ id: studentId, examId: examTypeId, withImages: true });
+    const resultData = await result.getStudentResult({ id: 62, examId: 5, withImages: true, isAdminNo: true });
     const validatedResult = await resultOutputSchema.safeParseAsync(resultData);
     if (!validatedResult.success) {
       return json(validatedResult.error.issues)
@@ -35,19 +35,19 @@ export const GET: RequestHandler = async ({ locals }) => {
     const pdfResult = await generate(html, fileName);
     if (!pdfResult.success) throw new Error(pdfResult.error || "Failed to generate document");
     if (!pdfResult.pdfBuffer) throw new Error("PDF buffer is missing");
-    // return new Response(new Uint8Array(pdfResult.pdfBuffer), {
-    //   headers: {
-    //     "Content-Type": "application/pdf",
-    //     "Content-Disposition": `inline; filename=${fileName}.pdf`,
-    //   },
-    // });
-
-    return new Response(html, {
+    return new Response(new Uint8Array(pdfResult.pdfBuffer), {
       headers: {
-        "Content-Type": "text/html",
-        "Content-Disposition": `inline; filename=${fileName}.html`,
+        "Content-Type": "application/pdf",
+        "Content-Disposition": `inline; filename=${fileName}.pdf`,
       },
     });
+
+    // return new Response(html, {
+    //   headers: {
+    //     "Content-Type": "text/html",
+    //     "Content-Disposition": `inline; filename=${fileName}.html`,
+    //   },
+    // });
   } catch (e: any) {
     return error(500, e.message);
   }
