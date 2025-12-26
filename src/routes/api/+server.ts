@@ -7,40 +7,46 @@ import { error, json, type RequestHandler } from "@sveltejs/kit";
 import { readFileSync } from "fs";
 import { render } from "svelte/server";
 import ResultTemplate from "$lib/components/template/ResultTemplate.svelte";
+import { staffRepo } from "$lib/server/repository/staff.repo";
 
 export const GET: RequestHandler = async ({ locals }) => {
   const { session, user } = locals;
   try {
-    const filePath = `${process.cwd()}/static/extracted/dc.json`;
+    const filePath = `${process.cwd()}/static/extracted/parsed.json`;
     const data = readFileSync(filePath, "utf-8");
     const parsed = JSON.parse(data);
     const validated = await resultInputSchema.parseAsync(parsed)
 
-    const { studentId, examTypeId } = validated.studentData
-    if (!studentId || !examTypeId) return error(400, "Invalid student or exam type ID");
-    const resultData = await result.getStudentResult({ id: 62, examId: 5, withImages: true, isAdminNo: true });
+    // const { studentId, examTypeId, sectionId, classId } = validated.studentData
+    // const staff = await staffRepo.getStaffByClassSection({ classId, sectionId });
+    // if (!staff.teacherId) throw new Error("Class not assigned to any teacher")
+    // const res = await result.upsertStudentResult(validated, staff.teacherId);
+    // if (!studentId || !examTypeId) return error(400, "Invalid student or exam type ID");
+    const resultData = await result.getStudentResult({ id: validated.studentData.studentId!, examId: validated.studentData.examTypeId!, });
     const validatedResult = await resultOutputSchema.safeParseAsync(resultData);
     if (!validatedResult.success) {
       return json(validatedResult.error.issues)
     }
 
-    console.log(validatedResult.data.student)
-    const props = { data: validatedResult.data };
-    const { body, head } = render(ResultTemplate, { props });
+    return json({ resultData })
 
-    const html = pageToHtml(body, head);
-    const student = validatedResult.data.student;
-    const fileName = `res_${student.fullName}_a${student.adminNo}_e${examTypeId}_${Date.now()}`;
+    // console.log(validatedResult.data.student)
+    // const props = { data: validatedResult.data };
+    // const { body, head } = render(ResultTemplate, { props });
 
-    const pdfResult = await generate(html, fileName);
-    if (!pdfResult.success) throw new Error(pdfResult.error || "Failed to generate document");
-    if (!pdfResult.pdfBuffer) throw new Error("PDF buffer is missing");
-    return new Response(new Uint8Array(pdfResult.pdfBuffer), {
-      headers: {
-        "Content-Type": "application/pdf",
-        "Content-Disposition": `inline; filename=${fileName}.pdf`,
-      },
-    });
+    // const html = pageToHtml(body, head);
+    // const student = validatedResult.data.student;
+    // const fileName = `res_${student.fullName}_a${student.adminNo}_e${examTypeId}_${Date.now()}`;
+
+    // const pdfResult = await generate(html, fileName);
+    // if (!pdfResult.success) throw new Error(pdfResult.error || "Failed to generate document");
+    // if (!pdfResult.pdfBuffer) throw new Error("PDF buffer is missing");
+    // return new Response(new Uint8Array(pdfResult.pdfBuffer), {
+    //   headers: {
+    //     "Content-Type": "application/pdf",
+    //     "Content-Disposition": `inline; filename=${fileName}.pdf`,
+    //   },
+    // });
 
     // return new Response(html, {
     //   headers: {

@@ -141,6 +141,39 @@ export class StudentRepository extends BaseRepository {
     return students;
   }
 
+  async createIfNotExistsStudentRecord(params: { studentId?: number | null, classId?: number | null, sectionId?: number | null }) {
+    const { studentId, classId, sectionId } = params;
+    if (!studentId || !classId || !sectionId) return null;
+    const academicId = await this.getAcademicId();
+    const [record] = await this.db
+      .select()
+      .from(studentRecords)
+      .where(
+        and(
+          eq(studentRecords.studentId, studentId),
+          eq(studentRecords.classId, classId),
+          eq(studentRecords.sectionId, sectionId),
+          eq(studentRecords.isDefault, 1),
+          eq(studentRecords.academicId, academicId),
+          eq(studentRecords.activeStatus, 1)
+        )
+      )
+      .limit(1);
+    if (record) return record.id;
+    const [inserted] = await this.db.insert(studentRecords).values({
+      studentId,
+      classId,
+      sectionId,
+      isDefault: 1,
+      academicId,
+      sessionId: academicId,
+      schoolId: 1,
+      activeStatus: 1,
+    });
+    if (inserted.affectedRows === 0) return null;
+    return inserted.insertId;
+  }
+
   async getStudentRecordByAdmissionNo(admissionNo: number): Promise<StudentRecord | null> {
     const academicId = await this.getAcademicId();
     const [record] = await this.db
@@ -157,13 +190,14 @@ export class StudentRepository extends BaseRepository {
         schoolId: smStudents.schoolId,
       })
       .from(smStudents)
-      .leftJoin(studentRecords, eq(smStudents.id, studentRecords.studentId))
+      .leftJoin(studentRecords, and(eq(smStudents.id, studentRecords.studentId),
+        eq(studentRecords.academicId, academicId),
+        eq(studentRecords.isDefault, 1),
+        eq(studentRecords.activeStatus, 1)))
       .where(
         and(
           eq(smStudents.admissionNo, admissionNo),
-          eq(studentRecords.academicId, academicId),
           eq(smStudents.activeStatus, 1),
-          eq(studentRecords.isDefault, 1)
         )
       )
       .limit(1);
@@ -172,6 +206,7 @@ export class StudentRepository extends BaseRepository {
 
   async getStudentById(id?: number, isAdminNo = false): Promise<StudentDetails | null> {
     if (!id) return null;
+    const academicId = await this.getAcademicId();
     const field = isAdminNo ? smStudents.admissionNo : smStudents.id;
 
     const [student] = await this.db
@@ -206,6 +241,7 @@ export class StudentRepository extends BaseRepository {
         studentRecords,
         and(
           eq(smStudents.id, studentRecords.studentId),
+          eq(studentRecords.academicId, academicId),
           eq(studentRecords.activeStatus, 1),
           eq(studentRecords.isDefault, 1)
         )

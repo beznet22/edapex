@@ -42,6 +42,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 
     try {
       const mappingData = await result.getMappingData(staffId);
+      // console.log(mappingData)
       if (mappingData.subjects.length === 0) throw new Error("You are not assigned to any subjects");
       const mapString = JSON.stringify(mappingData);
       const { success, content, message } = await generateContent(validatedFile.data, mapString);
@@ -59,9 +60,10 @@ export const POST: RequestHandler = async ({ request, locals }) => {
         return json({ success: false, status: "error", error: error.map(issue => issue.message).join("\n") });
       }
 
-      // console.log("Validated data", validated.data);
+      console.log("Validated data", validated.data);
       const res = await result.upsertStudentResult(validated.data, staffId);
 
+    
       if (filename) del(pathname);
       return json({ success: true, status: "done", data: res, filename: filename ?? file.name });
     } catch (e) {

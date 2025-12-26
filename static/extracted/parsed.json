@@ -3,58 +3,177 @@
         "studentId": null,
         "recordId": null,
         "schoolId": null,
-        "admissionNo": 1012,
-        "fullName": "JOSEPHINE FAASEMA",
-        "class": "DAY CARE 1",
-        "classId": 16,
-        "sectionId": 5,
-        "studentCategory": "DAYCARE",
-        "studentCategoryId": 1,
+        "admissionNo": 474,
+        "fullName": "JOY UPELLE",
+        "class": "MIDDLE BASIC 4C",
+        "classId": 18,
+        "sectionId": 6,
+        "studentCategory": "MIDDLEBASIC",
+        "studentCategoryId": 5,
         "term": "FIRST TERM EXAMINATION - DEC/2025",
         "examTypeId": 5,
         "attendance": {
             "daysOpened": 134,
-            "daysPresent": 116,
-            "daysAbsent": 18
+            "daysPresent": 132,
+            "daysAbsent": 2
         }
     },
     "marksData": [
         {
-            "subjectCode": "BIBLE",
-            "subjectId": 24,
-            "learningOutcome": "JOSEPHINE RESPONES WITH SMILES AND CURIOSITY DURING BIBLE LESSONS. SHE IS BEGINNING TO RECOGNIZE FAMILIAR SONGS, PRAYERS, AS WE ENGAGE IN THE ACTIVITIES IN CLASS. KEEP IT UP."
+            "subjectCode": "MATH",
+            "subjectId": 21,
+            "examTitles": [
+                "MTA",
+                "CA",
+                "REPORT",
+                "EXAM"
+            ],
+            "marks": [
+                27,
+                10,
+                10,
+                49
+            ],
+            "total": 96,
+            "grade": "<span class=\"bg-purple-200 text-violet-600 py-1 px-3 rounded-full text-xs\">A</span>"
         },
         {
-            "subjectCode": "PSED/PD",
-            "subjectId": 36,
-            "learningOutcome": "JOSEPHINE IS BECOMING MORE EXPRESSIVE, SHOWING EXCITEMENT CLEARLY THROUGH GESTURES. SHE MOVES AROUND CONFIDENTLY, SHOWING IMPROVED BALANCE AND COORDINATION. SHE IS MAKING PROGRESS."
+            "subjectCode": "ENG",
+            "subjectId": 22,
+            "examTitles": [
+                "MTA",
+                "CA",
+                "REPORT",
+                "EXAM"
+            ],
+            "marks": [
+                27,
+                7,
+                10,
+                46
+            ],
+            "total": 90,
+            "grade": "<span class=\"bg-orange-200 text-violet-600 py-1 px-3 rounded-full text-xs\">D</span>"
         },
         {
-            "subjectCode": "KUW/EAD",
-            "subjectId": 31,
-            "learningOutcome": "JOSEPHINE ENJOY INVESTIGATING NEW MATERIALS AND SHOWS INTEREST IN HOW THINGS WORK. SHE ENJOYS SCRIBBLING AND COLOURING AND SHE IS WORKING ON PENCIL GRIP. SHE CAN DO BETTER."
+            "subjectCode": "BASIC SCIENCE",
+            "subjectId": 25,
+            "examTitles": [
+                "MTA",
+                "CA",
+                "REPORT",
+                "EXAM"
+            ],
+            "marks": [
+                22,
+                6,
+                10,
+                43
+            ],
+            "total": 81,
+            "grade": "<span class=\"bg-yellow-200 text-violet-600 py-1 px-3 rounded-full text-xs\">C</span>"
         },
         {
-            "subjectCode": "CLL/JP",
-            "subjectId": 34,
-            "learningOutcome": "JOSEPHINE CAN RECITE ALPHABET FROM A TO Z AND ENJOY SINGING A B C RHYME ALONG WITH THE TEACHER. SHE ENJOYS JOLLY PHONICS RHYMES AND IDENTIFIES SOUNDS SUCH AS /a/, /t/, /f/ ALONG WITH MATCHING OBJECTS. SHE IS PROGRESSING WELL."
+            "subjectCode": "CRS",
+            "subjectId": 44,
+            "examTitles": [
+                "MTA",
+                "CA",
+                "REPORT",
+                "EXAM"
+            ],
+            "marks": [
+                30,
+                10,
+                10,
+                46
+            ],
+            "total": 96,
+            "grade": "<span class=\"bg-purple-200 text-violet-600 py-1 px-3 rounded-full text-xs\">A</span>"
         },
         {
-            "subjectCode": "PSRN",
-            "subjectId": 30,
-            "learningOutcome": "JOSEPHINE CAN COUNT NUMBERS FROM 1 TO 10 WITH THE TEACHER'S SUPPORT AND SHE IS ABLE TO IDENTIFY SHAPES SUCH AS CIRCLE AND STAR. SHE IS IMPROVING."
+            "subjectCode": "PHE",
+            "subjectId": 27,
+            "examTitles": [
+                "MTA",
+                "CA",
+                "REPORT",
+                "EXAM"
+            ],
+            "marks": [
+                30,
+                10,
+                10,
+                45
+            ],
+            "total": 95,
+            "grade": "<span class=\"bg-purple-200 text-violet-600 py-1 px-3 rounded-full text-xs\">A</span>"
+        },
+        {
+            "subjectCode": "CCA",
+            "subjectId": 23,
+            "examTitles": [
+                "MTA",
+                "CA",
+                "REPORT",
+                "EXAM"
+            ],
+            "marks": [
+                27,
+                10,
+                10,
+                48
+            ],
+            "total": 95,
+            "grade": "<span class=\"bg-purple-200 text-violet-600 py-1 px-3 rounded-full text-xs\">A</span>"
+        },
+        {
+            "subjectCode": "CIVIC",
+            "subjectId": 28,
+            "examTitles": [
+                "MTA",
+                "CA",
+                "REPORT",
+                "EXAM"
+            ],
+            "marks": [
+                22,
+                8,
+                10,
+                43
+            ],
+            "total": 83,
+            "grade": "<span class=\"bg-yellow-200 text-violet-600 py-1 px-3 rounded-full text-xs\">C</span>"
+        },
+        {
+            "subjectCode": "ICT",
+            "subjectId": 26,
+            "examTitles": [
+                "MTA",
+                "CA",
+                "REPORT",
+                "EXAM"
+            ],
+            "marks": [
+                27,
+                8,
+                10,
+                45
+            ],
+            "total": 90,
+            "grade": "<span class=\"bg-orange-200 text-violet-600 py-1 px-3 rounded-full text-xs\">D</span>"
         }
     ],
     "studentRatings": {
-        "adherent_and_independent": null,
+        "adherent_and_independent": 5,
         "flexibility_and_creativity": null,
-        "meticulous": null,
-        "neatness": null,
-        "overall_progress": null,
-        "self_control_and_interaction": null
+        "meticulous": 5,
+        "neatness": 5,
+        "overall_progress": 5,
+        "self_control_and_interaction": 5
     },
     "teachersRemark": {
-        "comment": null,
+        "comment": "Joy is a disciplined and focused learner. An outstanding performance",
         "note": null
     }
 }
