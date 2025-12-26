@@ -48,7 +48,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
       if (!content || !success) throw new Error(message);
 
       const parsedResult = JSON.parse(content.trim());
-      console.log("Parsed result", parsedResult);
+      // console.log("Parsed result", parsedResult);
       const validated = await resultInputSchema.safeParseAsync(parsedResult);
       if (!validated.success) {
         const error = validated.error.issues.filter(
@@ -59,7 +59,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
         return json({ success: false, status: "error", error: error.map(issue => issue.message).join("\n") });
       }
 
-      console.log("Validated data", validated.data);
+      // console.log("Validated data", validated.data);
       const res = await result.upsertStudentResult(validated.data, staffId);
 
       if (filename) del(pathname);
