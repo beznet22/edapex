@@ -104,7 +104,7 @@ export class FilesContext {
       if (!data.success) {
         this.uploads = this.uploads.filter((u) => u.id !== fileId);
         this.files = this.files.filter((u) => u.name !== name);
-        console.error(`Upload failed: `, data.error);
+        console.log(`Upload failed: `, data.error);
         toast.error(data.error!);
         return;
       }

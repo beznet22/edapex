@@ -100,7 +100,7 @@ export const recordSchema = z
       }
     }
     if (data.category === "DAYCARE") {
-      if(data.titles.length > 0 || data.marks.length > 0) {
+      if (data.titles.length > 0 || data.marks.length > 0) {
         ctx.addIssue({
           code: "custom",
           message: "Titles and marks are not allowed for DAYCARE, must be empty",
@@ -170,11 +170,21 @@ export type ExamType = z.infer<typeof examType>;
 export const resultOutputSchema = z.object({
   school: schoolSchema,
   student: studentSchema,
+  subjectlen: z.number(),
   records: z.array(recordSchema).nonempty(),
   score: scoreSchema,
   ratings: ratingSchema,
   remark: remarkSchema,
   examType: examType.optional(),
+}).superRefine(async (data, ctx) => {
+  if (data.records.length !== data.subjectlen) {
+    ctx.addIssue({
+      code: "custom",
+      message: "Subjects records not complete",
+      path: ["records"],
+      continue: true,
+    });
+  }
 });
 
 export type ResultOutput = z.infer<typeof resultOutputSchema> & { extra?: any };

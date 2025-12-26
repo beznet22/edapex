@@ -86,7 +86,7 @@ export const studentDataSchema = z.object({
 }).superRefine(async (data, ctx) => {
   if (data.admissionNo) {
     const student = await studentRepo.getStudentRecordByAdmissionNo(data.admissionNo);
-    if (!student) {
+    if (!student || !student.classId || !student.sectionId || !student.fullName) {
       ctx.addIssue({
         code: "custom",
         message: `Student not found for admission number ${data.admissionNo}`,
@@ -111,9 +111,28 @@ export const studentDataSchema = z.object({
       });
     }
 
+    const studentId = student?.id || student?.studentId;
+    if (!student?.recordId) {
+      const recordId = await studentRepo.createIfNotExistsStudentRecord({
+        studentId,
+        classId: data.classId,
+        sectionId: data.sectionId,
+      });
+      if (!recordId) {
+        ctx.addIssue({
+          code: "custom",
+          message: `Student record not found for admission number ${data.admissionNo}, please ask the admin to assign a class to the student`,
+          path: ["admissionNo"],
+        });
+      } else {
+        data.recordId = recordId;
+      }
+    } else {
+      data.recordId = student.recordId;
+    }
+
     data.schoolId = student?.schoolId || 1;
-    data.recordId = student?.recordId || null;
-    data.studentId = student?.studentId || null;
+    data.studentId = studentId || null;
   }
 })
 export type StudentInput = z.infer<typeof studentDataSchema>;

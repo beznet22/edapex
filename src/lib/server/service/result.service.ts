@@ -13,6 +13,7 @@ import type {
   ClassAverage,
   ExamSetup,
   MarkData,
+  NewSmMarkStore,
   ResultData,
   ScoreData,
   StudentRecord,
@@ -123,7 +124,7 @@ export class ResultService {
     const assigned = assignedSubjects.map((s) => ({
       classId,
       sectionId,
-      teacherId,
+      teacherId: teacherId ?? s.teacherId,
       subjectId: s.subjectId,
       academicId: s.academicId,
       schoolId: s.schoolId,
@@ -212,7 +213,6 @@ export class ResultService {
       if (!examSetup) {
         throw new Error("Failed to fetch exam setup");
       }
-
       const results = await this.processMarks(marksData, examSetup);
       if (!results?.length) {
         throw new Error(
@@ -342,7 +342,9 @@ export class ResultService {
       maxScores: records.length * 100,
     };
 
+    const subjects = await resultRepo.getAssignedSubjects(studentData.classId!, studentData.sectionId!)
     return {
+      subjectlen: subjects.length,
       school,
       student,
       records,
@@ -461,11 +463,12 @@ export class ResultService {
       });
 
       if (this.category !== "DAYCARE") {
+
         if (!marks || !record.examTitles) continue;
         if (marks.length === 0) continue;
         if (marks.length !== record.examTitles.length) continue;
-
         // Process each mark part (e.g., FA1, FA2, SA)
+        let markIds: number[] = [];
         for (let i = 0; i < marks.length; i++) {
           const partMark = marks[i] ?? 0;
           const examTitle = record.examTitles[i] || "";
@@ -489,8 +492,8 @@ export class ResultService {
             continue;
           }
 
-          const markData = {
-            examTypeId,
+          await repo.result.upsertMarkRecord({
+            examTermId: examTypeId,
             classId,
             sectionId,
             subjectId,
@@ -502,11 +505,9 @@ export class ResultService {
             teacherRemarks: record.grade,
             schoolId,
             academicId,
-          };
-          await repo.result.upsertMarkRecord(markData);
+          });
         }
       }
-
       // Compute subject-level result
       const subjectFullMark = await repo.result.getSubjectFullMark({
         examTypeId,
@@ -519,8 +520,7 @@ export class ResultService {
 
       const percentage = this.subjectPercentageMark(totalMarksPerSubject, subjectFullMark);
       const [grade] = await repo.result.getMarkGrade({ percentage, academicId, schoolId });
-
-      const resultData = {
+      await repo.result.upsertResultRecord({
         classId,
         sectionId,
         subjectId,
@@ -534,8 +534,7 @@ export class ResultService {
         teacherRemarks: record.grade ?? record.learningOutcome,
         schoolId,
         academicId,
-      };
-      await repo.result.upsertResultRecord(resultData);
+      });
 
       results.push({
         subjectId,

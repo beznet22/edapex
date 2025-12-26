@@ -451,18 +451,26 @@ export class ResultsRepository extends BaseRepository {
     return this.withErrorHandling(async () => {
       const { id, createdAt, updatedAt, ...data } = mark;
       const [existing] = await this.db
-        .select({ id: schema.smMarkStores.id })
+        .select({ id: schema.smMarkStores.id, examTermId: schema.smMarkStores.examTermId })
         .from(schema.smMarkStores)
         .where(
           and(
             eq(schema.smMarkStores.studentId, data.studentId!),
+            eq(schema.smMarkStores.examTermId, data.examTermId!),
             eq(schema.smMarkStores.examSetupId, data.examSetupId!),
             eq(schema.smMarkStores.academicId, data.academicId!)
           )
         )
         .limit(1);
       if (existing) {
-        await this.db.update(schema.smMarkStores).set(data).where(eq(schema.smMarkStores.id, existing.id));
+        await this.db.update(schema.smMarkStores).set(data).where(
+          and(
+            eq(schema.smMarkStores.id, existing.id),
+            eq(schema.smMarkStores.examTermId, data.examTermId!),
+            eq(schema.smMarkStores.examSetupId, data.examSetupId!),
+            eq(schema.smMarkStores.studentId, data.studentId!),
+          )
+        );
         return existing.id;
       }
       return (await this.db.insert(schema.smMarkStores).values(data).$returningId())[0].id;
