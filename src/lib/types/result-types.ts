@@ -1,4 +1,4 @@
-import type { Category, ExamType, Rating, Remark } from "$lib/schema/result";
+import type { Category, ExamType, Rating, Remark } from "$lib/schema/result-output";
 import * as schema from "$lib/server/db/schema";
 
 export type ResultData = typeof schema.smResultStores.$inferSelect;
@@ -21,7 +21,7 @@ export type NewAttendance = typeof schema.classAttendances.$inferInsert;
 
 export type ClassSection = {
   id: number;
-  classId: number| null;
+  classId: number | null;
   className: string | null;
   sectionId: number | null;
   sectionName: string | null;
@@ -86,8 +86,10 @@ export interface GetExamSetupParams {
 }
 
 export type MarkData = {
+  markId: number | null;
+  titleId?: number | null;
+  subjectId: number | null;
   totalMarks: number;
-  teacherRemarks: string | null;
   examTitle: string | null;
   subjectCode: string | null;
   isAbsent: number;
@@ -99,8 +101,15 @@ export type QueryResultData = {
   academic?: AcademicYearData;
   classResults: ResultData[];
   marks: MarkData[];
+  resultRecord?: Array<{
+    resultId: number;
+    subjectId: number | null;
+    subjectName: string | null;
+    subjectCode: string | null;
+    teacherRemarks: string | null
+  }>;
   attendance: typeof schema.classAttendances.$inferSelect | undefined;
-  ratings:Rating;
+  ratings: Rating;
   remark: Remark;
 };
 
@@ -111,27 +120,6 @@ export interface SchoolData {
   state: string;
   title: string;
   vacation_date: string;
-}
-
-export interface StudentDetail {
-  id: number;
-  examId: number;
-  fullName: string;
-  gender: string;
-  parentEmail: string;
-  parentName: string;
-  term: string;
-  title: string;
-  category: Category;
-  className: string;
-  sectionName: string;
-  adminNo: number;
-  sessionYear: string;
-  opened: number;
-  absent: number;
-  present: number;
-  studentPhoto?: string;
-  token: string;
 }
 
 export type RecordData = {
@@ -154,3 +142,16 @@ export interface ScoreData {
   maxScores: number;
   classAverage: ClassAverage;
 }
+
+export type StudentRecord = {
+  id: number;
+  recordId: number | null;
+  classId: number | null;
+  sectionId: number | null;
+  studentId: number | null;
+  isDefault: number | null;
+  fullName: string | null;
+  admissionNo: number | null;
+  schoolId: number | null;
+};
+

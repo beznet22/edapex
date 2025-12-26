@@ -15,8 +15,8 @@ import {
   studentRecords,
 } from "$lib/server/db/sms-schema";
 import { BaseRepository } from "./base.repo";
-import type { Attendance } from "$lib/schema/result";
-import type { NewAttendance } from "$lib/types/result-types";
+import type { Attendance } from "$lib/schema/result-input";
+import type { NewAttendance, StudentRecord } from "$lib/types/result-types";
 
 export type StudentDetails = {
   studentId: number;
@@ -48,8 +48,6 @@ export type ClassStudent = {
   admissionNo: number | null;
 };
 
-export type StudentRecord = typeof studentRecords.$inferSelect;
-
 export class StudentRepository extends BaseRepository {
   async getStudentBySiblings() {
     const student = await this.db
@@ -71,7 +69,37 @@ export class StudentRepository extends BaseRepository {
 
 
 
-  async getStudentsByStaffId(staffId: number) {
+  async getStudentsByClassId(classId: number, sectionId?: number) {
+    const academicId = await this.getAcademicId();
+
+    // Build conditions array
+    const conditions = [
+      eq(studentRecords.classId, classId),
+      eq(studentRecords.academicId, academicId),
+      eq(smStudents.activeStatus, 1),
+      eq(studentRecords.activeStatus, 1),
+      eq(studentRecords.isDefault, 1)
+    ];
+
+    if (sectionId) {
+      conditions.push(eq(studentRecords.sectionId, sectionId));
+    }
+
+    const students = await this.db
+      .select({
+        id: smStudents.id,
+        name: smStudents.fullName,
+        admissionNo: smStudents.admissionNo,
+      })
+      .from(smStudents)
+      .innerJoin(studentRecords, eq(smStudents.id, studentRecords.studentId))
+      .where(and(...conditions));
+
+    return students;
+  }
+
+  async getStudentsByStaffId(staffId?: number) {
+    if (!staffId) return null;
     const academicId = await this.getAcademicId();
     const examType = await this.getCurrentTerm();
     const [classSection] = await this.db
@@ -116,9 +144,20 @@ export class StudentRepository extends BaseRepository {
   async getStudentRecordByAdmissionNo(admissionNo: number): Promise<StudentRecord | null> {
     const academicId = await this.getAcademicId();
     const [record] = await this.db
-      .select()
-      .from(studentRecords)
-      .innerJoin(smStudents, eq(studentRecords.studentId, smStudents.id))
+      .select({
+        id: smStudents.id,
+        recordId: studentRecords.id,
+        classId: studentRecords.classId,
+        sectionId: studentRecords.sectionId,
+        studentId: studentRecords.studentId,
+        isDefault: studentRecords.isDefault,
+        fullName: smStudents.fullName,
+        admissionNo: smStudents.admissionNo,
+        parentId: smStudents.parentId,
+        schoolId: smStudents.schoolId,
+      })
+      .from(smStudents)
+      .leftJoin(studentRecords, eq(smStudents.id, studentRecords.studentId))
       .where(
         and(
           eq(smStudents.admissionNo, admissionNo),
@@ -128,7 +167,7 @@ export class StudentRepository extends BaseRepository {
         )
       )
       .limit(1);
-    return record?.student_records || null;
+    return record || null;
   }
 
   async getStudentById(id?: number, isAdminNo = false): Promise<StudentDetails | null> {

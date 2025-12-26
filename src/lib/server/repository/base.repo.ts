@@ -2,7 +2,7 @@ import { getDatabase } from "../db";
 import type { MySql2Database } from "drizzle-orm/mysql2/driver";
 import { smAcademicYears, smExamTypes, smGeneralSettings } from "../db/sms-schema";
 import { eq, and, desc, type SQL } from "drizzle-orm";
-import type { ExamType } from "$lib/schema/result";
+import type { ExamType } from "$lib/schema/result-input";
 import { DbInternalError } from "$lib/server/helpers/errors";
 
 export type MySQLDrizzleClient = MySql2Database<any>;
@@ -27,12 +27,24 @@ const CACHE_TTL = 5 * 60 * 1000; // 5 minutes cache TTL
 export class BaseRepository {
   protected db!: MySQLDrizzleClient;
 
-  constructor() {}
+  constructor() { }
 
   static async build<T extends BaseRepository>(this: new () => T): Promise<T> {
     const inst = new this();
     inst.db = await getDatabase();
     return inst;
+  }
+
+  /**
+   * Generic create method to insert records into any table
+   */
+  async create<T extends { [key: string]: any }>(params: {
+    table: any;
+    values: T;
+  }) {
+    return this.withErrorHandling(async () => {
+      return await this.db.insert(params.table).values(params.values);
+    }, "create");
   }
 
   /**

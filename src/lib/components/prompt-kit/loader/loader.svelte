@@ -32,7 +32,12 @@
     class?: string;
   }
 
-  let { variant = "circular", size = "md", text, class: className }: Props = $props();
+  let {
+    variant = "circular",
+    size = "md",
+    text,
+    class: className,
+  }: Props = $props();
 </script>
 
 {#if variant === "circular"}

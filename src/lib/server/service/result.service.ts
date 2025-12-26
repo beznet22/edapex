@@ -1,24 +1,23 @@
 import {
-  AttributeRemark,
   type Attendance,
-  type Category,
   type MarksData,
   type MarksInput,
-  type MarksOutput,
+  type MarkResponse,
   type ResultInput,
-  type ResultOutput,
   type StudentRatings,
   type TeacherRemark,
-} from "$lib/schema/result";
+  AttributeRemark,
+  type StudentInput,
+} from "$lib/schema/result-input";
 import type {
   ClassAverage,
   ExamSetup,
-  RatingData,
+  MarkData,
   ResultData,
   ScoreData,
-  StudentDetail,
+  StudentRecord,
 } from "$lib/types/result-types";
-import { studentRepo, type StudentRecord } from "$lib/server/repository/student.repo";
+import { studentRepo } from "$lib/server/repository/student.repo";
 import ResultEmail from "$lib/components/template/result-email.svelte";
 import { base, repo } from "$lib/server/repository";
 import { ensureBase64Image, pageToHtml } from "../helpers";
@@ -27,6 +26,8 @@ import { timelineRepo } from "../repository/timeline.repo";
 import { SMTPClient, type SMTPMessage } from "../helpers/smtp";
 import { render } from "svelte/server";
 import { resultRepo } from "../repository/result.repo";
+import { id } from "zod/v4/locales";
+import type { Category, MarksRecord, ResultOutput, Student } from "$lib/schema/result-output";
 
 const GRADE_RANGES = {
   EYFS: [
@@ -44,10 +45,13 @@ const GRADE_RANGES = {
 } as const;
 
 export class ResultService {
+  category?: Category
+  studentInput?: StudentInput
   /**
    * Publish result to students and parents timeline and send email
    */
   async publishResult(studentId: number, examId: number) {
+    this.sendResultEmail(examId);
     const timeline = {
       staffStudentId: studentId,
       type: `exam-${examId}`,
@@ -90,7 +94,7 @@ export class ResultService {
           support: "support@sms.com",
         };
 
-        const { body, head } = render(ResultEmail, { props });
+        const { body, head } = render(ResultEmail as any, { props });
         const html = pageToHtml(body, head);
         const payload: SMTPMessage = {
           from: "School Management System <no-reply@sms.com>",
@@ -174,34 +178,39 @@ export class ResultService {
     );
   }
 
+  async cleanUpResultRecord(record: MarksRecord) {
+    await repo.result.deleteResultStore(record.resultId);
+    await repo.result.deleteMarkStore(record.markIds);
+    await repo.result.deleteExamSetup(record.titleIds);
+  }
+
   /**
    * Store exam marks for a student from validated report data
    */
-  async upsertStudentResult(validatedReport: ResultInput, teacherId: number): Promise<MarksOutput> {
+  async upsertStudentResult(validatedResult: ResultInput, teacherId: number): Promise<MarkResponse> {
+    const { studentData, marksData, teachersRemark, studentRatings } = validatedResult;
+    const { studentId, classId, sectionId, recordId, examTypeId } = studentData;
+
     try {
-      const { studentData, marksData, teachersRemark, studentRatings } = validatedReport;
-      const stdRec = await studentRepo.getStudentRecordByAdmissionNo(studentData.admissionNo);
-      if (!stdRec) {
-        return {
-          success: false,
-          message: [
-            `Student has not been assigned a class. Please contact the school admin to assign a class to the student.`,
-          ].join("\n"),
-        };
+
+      if (!studentId || !classId || !sectionId || !recordId || !examTypeId) {
+        throw new Error(
+          `Student record not found for admission number ${studentData.admissionNo}`
+        );
+      }
+      this.category = studentData.studentCategory as Category;
+      this.studentInput = studentData;
+
+      const examSetup = await this.getExamSetup(examTypeId);
+      if (!examSetup) {
+        throw new Error("Failed to fetch exam setup");
       }
 
-      // Fetch exam setup and process/store marks
-      const examSetup = await this.getExamSetup(stdRec, studentData.examTypeId);
-      const results = await this.processMarks(marksData, stdRec, examSetup, studentData.examTypeId);
+      const results = await this.processMarks(marksData, examSetup);
       if (!results?.length) {
-        console.error("ERROR: Failed to process marks", results);
-        return {
-          success: false,
-          message: [
-            "Failed to process marks",
-            "Ensure you have uploaded the marks data for the student before proceeding.",
-          ].join("\n"),
-        };
+        throw new Error(
+          "Failed to process marks. Ensure you have uploaded the marks data for the student before proceeding."
+        );
       }
 
       // Update student ratings if present
@@ -212,8 +221,8 @@ export class ResultService {
             .map(([attribute, rating]) => {
               if (!rating) return null;
               return {
-                studentId: stdRec.studentId!,
-                examTypeId: studentData.examTypeId,
+                studentId,
+                examTypeId,
                 attribute,
                 rate: rating,
                 remark: AttributeRemark[rating as keyof typeof AttributeRemark],
@@ -229,8 +238,8 @@ export class ResultService {
         const academicId = await repo.result.getAcademicId(); // Reuse repo’s helper
         await repo.result.upsertTeacherRemark({
           teacherId,
-          studentId: stdRec.studentId!,
-          examTypeId: studentData.examTypeId,
+          studentId,
+          examTypeId,
           remark: teachersRemark.comment,
           academicId,
         });
@@ -240,40 +249,27 @@ export class ResultService {
       if (studentData.attendance) {
         await this.upsertAttendance({
           attendance: studentData.attendance,
-          studentId: stdRec.studentId!,
-          examTypeId: studentData.examTypeId,
+          studentId,
+          examTypeId,
         });
       }
 
-      return {
-        success: true,
-        message: "Marks processed successfully",
-        data: {
-          studentId: stdRec.studentId!,
-          examId: studentData.examTypeId,
-          results,
-        },
-      };
+      return { studentId, examTypeId, results };
     } catch (error) {
       console.error("MarksService::store - Operation failed", {
         error: error instanceof Error ? error.message : "Unknown error",
         stack: error instanceof Error ? error.stack : undefined,
       });
-
-      return {
-        success: false,
-        message: `Processing failed: ${error instanceof Error ? error.message : "Unknown error"}`,
-      };
+      throw error;
     }
   }
 
   /**
-   *
    * @param id id of the student
    * @param examId  exam term id
    * @param adminNo admission number of the student
    * @param withImages whether to include images in the response
-   * @returns
+   * @returns ResultOutput
    */
   async getStudentResult(params: {
     id?: number;
@@ -290,9 +286,9 @@ export class ResultService {
     const resultData = await repo.result.queryResultData(studentData, examId);
     if (!resultData?.classResults?.length) return null;
 
-    const { examType, academic, attendance, marks, ratings, remark } = resultData;
-
-    const student: StudentDetail = {
+    const { examType, academic, attendance, marks, ratings, remark, resultRecord } = resultData;
+    
+    const student: Student = {
       id: studentData.studentId,
       examId: examType?.id || 0,
       fullName: studentData.fullName || "",
@@ -306,9 +302,9 @@ export class ResultService {
       sectionName: studentData.sectionName || "",
       adminNo: studentData.admissionNo || 0,
       sessionYear: academic ? `${academic.year}-[${academic.title}]` : "",
-      opened: attendance?.daysOpened || 0,
-      absent: attendance?.daysAbsent || 0,
-      present: attendance?.daysPresent || 0,
+      daysOpened: attendance?.daysOpened || 0,
+      daysAbsent: attendance?.daysAbsent || 0,
+      daysPresent: attendance?.daysPresent || 0,
       studentPhoto: withImages ? ensureBase64Image(studentData.studentPhoto || "", "/avatar.jpg") : undefined,
       token: base64url.encode(JSON.stringify({ studentId: id, examId })),
     };
@@ -331,8 +327,7 @@ export class ResultService {
     };
 
     const objectives = await this.getObjectives(student);
-    const { records, overAll } = this.buildMarksRecords(marks, objectives, student.category);
-
+    const { records, overAll } = this.buildMarksRecords(marks, objectives, student.category, resultRecord);
     const score: ScoreData = {
       total: overAll,
       average: records.length ? Math.floor(overAll / records.length) : 0,
@@ -351,30 +346,66 @@ export class ResultService {
     };
   }
 
-  private buildMarksRecords(marks: any[], objectives: any[], category: Category) {
-    const bySubject: Record<string, any[]> = {};
+  private buildMarksRecords(
+    marks: MarkData[],
+    objectives: any[],
+    category: Category,
+    resultRecords?: Array<{
+      resultId: number;
+      subjectId: number | null;
+      subjectName: string | null;
+      subjectCode: string | null;
+      teacherRemarks: string | null
+    }>
+  ): { records: MarksRecord[]; overAll: number } {
+    // Special handling for DAYCARE when marks is empty
+    if (category === "DAYCARE" && resultRecords && resultRecords.length > 0) {
+      const records = resultRecords.map((result) => ({
+        subject: result.subjectName || "Learning Outcome",
+        totalScore: 0,
+        category,
+        resultId: result.resultId,
+        subjectId: result.subjectId || 0,
+        markIds: [],
+        titleIds: [],
+        subjectCode: result.subjectCode || "",
+        objectives: [],
+        titles: [],
+        marks: [],
+        grade: "",
+        color: undefined,
+        learningOutcome: result.teacherRemarks,
+      }));
+      return { records, overAll: 0 };
+    }
+
+    const bySubject: Record<string, MarkData[]> = {};
     for (const m of marks) (bySubject[m.subjectName || "Unknown"] ??= []).push(m);
 
     let overAll = 0;
     const records = Object.entries(bySubject).map(([subject, sMarks]) => {
       const totalScore = Math.ceil(sMarks.reduce((s: number, m: any) => s + (m.totalMarks || 0), 0));
       const marksObj: Record<string, number> = {};
-      for (const m of sMarks) marksObj[m.examTitle] = m.totalMarks;
+      for (const m of sMarks) marksObj[m.examTitle || "Unknown"] = m.totalMarks;
       const first = sMarks[0];
       const obj = objectives?.find((o: any) => o.subjectCode === first?.subjectCode);
-      const grade = this.getGrade(totalScore, category, first?.teacherRemarks);
+      const matchingResult = resultRecords?.find(r => r.subjectId === first?.subjectId);
+      const grade = this.getGrade(totalScore, category, matchingResult?.teacherRemarks ?? null);
       overAll += totalScore;
       return {
-        subjectId: first?.subjectId || 0,
         subject,
+        totalScore,
+        category,
+        resultId: matchingResult?.resultId || 0,
+        subjectId: first?.subjectId || 0,
+        markIds: sMarks.map((m: MarkData) => m.markId || 0),
+        titleIds: sMarks.map((m: MarkData) => m.titleId || 0),
         subjectCode: first?.subjectCode || "",
         objectives: obj?.text?.split("|").map((s: string) => s.trim()) || ([] as string[]),
         titles: Object.keys(marksObj),
-        marks: Object.values(marksObj) as number[],
-        totalScore,
+        marks: Object.values(marksObj),
         grade: grade.grade,
         color: grade.color,
-        category,
       };
     });
     return { records, overAll };
@@ -394,17 +425,13 @@ export class ResultService {
   /**
    * Process marks and store in database
    */
-  private async processMarks(
-    markStore: MarksData,
-    studentRecord: StudentRecord,
-    examSetups: ExamSetup[],
-    examTermId: number
-  ): Promise<MarksInput[] | null> {
-    const { studentId, id, classId, sectionId, schoolId } = studentRecord;
+  private async processMarks(markStore: MarksData, examSetups: ExamSetup[]): Promise<MarksInput[] | null> {
+    if (!this.studentInput) return null;
+    const { studentId, recordId, classId, sectionId, schoolId, examTypeId } = this.studentInput;
     if (!classId || !sectionId || !schoolId || !studentId) {
       return null;
     }
-    const studentRecordId = id;
+    const studentRecordId = recordId;
 
     const academicId = await repo.result.getAcademicId();
     const results: MarksInput[] = [];
@@ -421,59 +448,61 @@ export class ResultService {
         classId,
         sectionId,
         subjectId,
-        examTypeId: examTermId,
+        examTypeId,
         academicId,
         schoolId,
       });
 
-      if (!marks || !record.examTitles) continue;
-      if (marks.length === 0) continue;
-      if (marks.length !== record.examTitles.length) continue;
+      if (this.category !== "DAYCARE") {
+        if (!marks || !record.examTitles) continue;
+        if (marks.length === 0) continue;
+        if (marks.length !== record.examTitles.length) continue;
 
-      // Process each mark part (e.g., FA1, FA2, SA)
-      for (let i = 0; i < marks.length; i++) {
-        const partMark = marks[i] ?? 0;
-        const examTitle = record.examTitles[i] || "";
-        let examSetupId = this.findExamSetupId(examSetups, subjectId, examTitle);
-        isAbsent = isAbsent || partMark === 0;
+        // Process each mark part (e.g., FA1, FA2, SA)
+        for (let i = 0; i < marks.length; i++) {
+          const partMark = marks[i] ?? 0;
+          const examTitle = record.examTitles[i] || "";
+          let examSetupId = this.findExamSetupId(examSetups, subjectId, examTitle);
+          isAbsent = isAbsent || partMark === 0;
 
-        examSetupId = await repo.result.upsertExamSetup({
-          id: examSetupId || undefined,
-          examTitle,
-          examMark: partMark,
-          subjectId,
-          examId,
-          examTermId,
-          classId,
-          sectionId,
-          academicId,
-          schoolId,
-        });
+          examSetupId = await repo.result.upsertExamSetup({
+            id: examSetupId || undefined,
+            examTitle,
+            examMark: partMark,
+            subjectId,
+            examId,
+            examTermId: examTypeId,
+            classId,
+            sectionId,
+            academicId,
+            schoolId,
+          });
 
-        if (!examSetupId) {
-          continue;
+          if (!examSetupId) {
+            continue;
+          }
+
+          const markData = {
+            examTypeId,
+            classId,
+            sectionId,
+            subjectId,
+            studentId,
+            studentRecordId,
+            totalMarks: partMark,
+            examSetupId,
+            isAbsent: isAbsent ? 1 : 0,
+            teacherRemarks: record.grade,
+            schoolId,
+            academicId,
+          };
+          await repo.result.upsertMarkRecord(markData);
         }
-
-        const markData = {
-          examTermId,
-          classId,
-          sectionId,
-          subjectId,
-          studentId,
-          studentRecordId,
-          totalMarks: partMark,
-          examSetupId,
-          isAbsent: isAbsent ? 1 : 0,
-          teacherRemarks: record.grade,
-          schoolId,
-          academicId,
-        };
-        await repo.result.upsertMarkRecord(markData);
       }
 
       // Compute subject-level result
       const subjectFullMark = await repo.result.getSubjectFullMark({
-        examTypeId: examTermId,
+        examTypeId,
         subjectId,
         classId,
         sectionId,
@@ -488,7 +517,7 @@ export class ResultService {
         classId,
         sectionId,
         subjectId,
-        examTypeId: examTermId,
+        examTypeId,
         studentId,
         studentRecordId,
         isAbsent: isAbsent ? 1 : 0,
@@ -500,15 +529,15 @@ export class ResultService {
         academicId,
       };
       await repo.result.upsertResultRecord(resultData);
-      if (record.learningOutcome) await repo.result.upsertMarkRecord(resultData);
 
       results.push({
         subjectId,
-        examId: examTermId,
+        examTypeId,
         totalMarks: totalMarksPerSubject,
         grade: grade?.gradeName ?? null,
         gpa: grade?.gpa ?? null,
         isAbsent,
+        teacherRemarks: record.grade ?? record.learningOutcome ?? undefined,
       });
     }
 
@@ -545,7 +574,7 @@ export class ResultService {
     };
   }
 
-  async getObjectives(student: StudentDetail) {
+  async getObjectives(student: Student) {
     if (student.category !== "NURSERY") return [];
     return await repo.result.getObjectives(student);
   }
@@ -553,11 +582,12 @@ export class ResultService {
   /**
    * Get exam setup data for a student and exam
    */
-  private async getExamSetup(student: StudentRecord, examId: number) {
+  private async getExamSetup(examId: number) {
+    if (!this.studentInput) return null;
     const academicId = await repo.result.getAcademicId();
     return await repo.result.getExamSetup({
-      studentClassId: student.classId || 0,
-      studentSectionId: student.sectionId || 0,
+      studentClassId: this.studentInput.classId,
+      studentSectionId: this.studentInput.sectionId,
       examTypeId: examId,
       academicId,
       schoolId: 1,

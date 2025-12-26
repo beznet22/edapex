@@ -7,6 +7,7 @@ import type { AuthUser, CookieOpts, Session } from "$lib/types/auth-types";
 import { error } from "@sveltejs/kit";
 import { getRequestEvent } from "$app/server";
 import { dev } from "$app/environment";
+import { DESIGNATIONS } from "$lib/types/sms-types";
 
 // Security constants
 const ACCESS_TTL = 15 * 60; // 15 minutes
@@ -255,7 +256,7 @@ class AuthService {
       academicId: user.accessStatus ?? undefined,
       roleId: user?.roleId ?? undefined,
       staffId: staff?.id,
-      designationId: staff?.designationId ?? undefined,
+      designation: DESIGNATIONS[staff?.designationId ?? 0],
       departmentId: staff?.departmentId ?? undefined,
       deviceToken: user.deviceToken ?? undefined,
     };

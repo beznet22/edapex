@@ -1,47 +1,48 @@
 {
     "studentData": {
         "studentId": null,
-        "admissionNo": 1001,
-        "fullName": "TOMUTER T. TERFA",
+        "recordId": null,
+        "schoolId": null,
+        "admissionNo": 984,
+        "fullName": "SHIEKUMA TULE",
         "class": "DAY CARE 1",
-        "section": "",
-        "classId": 22,
+        "classId": 16,
         "sectionId": 5,
         "studentCategory": "DAYCARE",
         "studentCategoryId": 1,
         "term": "FIRST TERM EXAMINATION - DEC/2025",
         "examTypeId": 5,
         "attendance": {
-            "daysOpened": 0,
-            "daysPresent": 0,
-            "daysAbsent": 0
+            "daysOpened": 134,
+            "daysPresent": 104,
+            "daysAbsent": 30
         }
     },
     "marksData": [
         {
-            "subjectCode": "BDL",
-            "subjectId": 42,
-            "learningOutcome": "TOMUTER MAY LISTEN QUIETLY WITHOUT RESPONDING. HOWEVER HE SHOWS ENTHUSIASM WHEN BIBLE SONGS AND MOVEMENT ARE INCLUDED."
+            "subjectCode": "BIBLE",
+            "subjectId": 24,
+            "learningOutcome": "Tomuter may listen quietly during Bible story time without responding. However, he shows excitement when Bible songs and movements are included."
         },
         {
-            "subjectCode": "PHE",
-            "subjectId": 27,
-            "learningOutcome": "TOMUTER MAY NOT VERBALLY RESPOND DURING GROUP ACTIVITIES, BUT HIS WILLINGNESS TO PARTICIPATE ACTIVELY REFLECTS GROWTH. HE CONFIDENTLY EXPLORES HIS ENVIRONMENT, PRACTISE GROSS-MOTOR SKILLS SUCH AS WALKING, DANCING AND JUMPING. HIS ACTIVE PARTICIPATION SHOWS STRONG PHYSICAL GROWTH."
+            "subjectCode": "PSED/PD",
+            "subjectId": 36,
+            "learningOutcome": "Tomuter shows growing confidence within the learning environment. He enjoys exploring and responds positively to his teachers and peers. He moves confidently and is developing good hand coordination during play activities."
         },
         {
-            "subjectCode": "ENG",
-            "subjectId": 22,
-            "learningOutcome": "TOMUTER IS WORKING ON GIVING FEEDBACK DURING LEARNING ACTIVITIES. HIS EXCITEMENT DURING ACTIVITIES SHOW DEVELOPING AWARENESS OF THE WORLD AND EMERGING ABILITY TO MAKE CONNECTIONS THROUGH EXPLORATION. HE SCRIBBLES AND COLOURS WITHOUT AID"
+            "subjectCode": "KUW/EAD",
+            "subjectId": 31,
+            "learningOutcome": "Tomuter's verbal responses are limited during class discussion. He demonstrates strong curiosity during hands-on activities. He scribbles and colours without aid."
         },
         {
-            "subjectCode": "BST",
-            "subjectId": 43,
-            "learningOutcome": "TOMUTER EXPRESSES HIMSELF WELL THROUGH ACTIONS. HE IS WORKING ON RECITING LETTERS. HE PAYS KEEN ATTENTION DURING JOLLY PHONICS SESSION. HE WILL DO BETTER AS HE ENGAGES MORE IN ACTIVITIES."
+            "subjectCode": "CLL/JP",
+            "subjectId": 34,
+            "learningOutcome": "Tomuter may be quiet during group communication moments. His excitement during activities shows developing awareness of an emerging ability to make connections through exploration. He may not join in verbally during Jolly Phonics sessions but he shows interest and excitement when songs and actions are introduced."
         },
         {
-            "subjectCode": "MATH",
-            "subjectId": 21,
-            "learningOutcome": "TOMUTER MAY NOT RESPOND VERBALLY TO COUNTING, BUT HIS INTEREST DURING HANDS-ON TASKS DEMONSTRATES GROWING PROBLEM-SOLVING ABILITIES. HE ENJOYS STACKING, AND EXPLORING SHAPES THROUGH PLAY."
+            "subjectCode": "PSRN",
+            "subjectId": 30,
+            "learningOutcome": "Tomuter may not respond verbally to counting or problem-solving prompts, but his engagement during activities shows emerging understanding. He enjoys stacking and exploring different kinds of toys through play."
         }
     ],
     "studentRatings": {

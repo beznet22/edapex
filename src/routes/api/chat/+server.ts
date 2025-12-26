@@ -12,11 +12,13 @@ import {
   createUIMessageStream,
   createUIMessageStreamResponse,
   stepCountIs,
+  generateText,
 } from "ai";
 import { AgentService, useAgent } from "$lib/server/service/agent.service";
+import type { ClassSection } from "$lib/types/result-types";
 
 export const POST: RequestHandler = async ({ request, locals: { user, session }, cookies }) => {
-  let { chatId, messages, agentId }: ChatResponse = await request.json();
+  let { chatId, messages, agentId, selectedClass }: ChatResponse & { selectedClass?: ClassSection } = await request.json();
   if ((!user || !session) && !allowAnonymousChats) error(401, "Unauthorized");
   const selectedChatModel = cookies.get("selected-model");
   if (messages.length === 0) error(400, "No user message found");
@@ -26,31 +28,25 @@ export const POST: RequestHandler = async ({ request, locals: { user, session },
   const provider = await agentService.use(CredentialType.QWEN_CODE).geModelProvider();
   if (!provider) error(400, "No provider found");
 
-  let systemPrompt = AgentService.getSystemPrompt("examiner", agentId);
   let message = messages[messages.length - 1];
   if (user && messages.length === 1) {
     if (!chatId) {
       chatId = await repo.chat.createChat({
-        userId: user?.id ?? null, // allow null if anon allowed
+        userId: user.id,
         title: "New Chat",
         model: selectedChatModel,
       });
     }
     await repo.chat.upsertMessage({ chatId, message });
     messages = await repo.chat.loadMessages(chatId);
-    const examTypes = await repo.result.getExamTypes();
-
-    systemPrompt += `\n\nEXAM TYPES: ${examTypes
-      .map((e) => `- ${e.title} (Exam Type ID: ${e.id})`)
-      .join("\n")}`;
-    systemPrompt += `\n\nUSER ID: ${user.id}`;
-    systemPrompt += `\n\nSTAFF ID: ${user.staffId}`;
   }
 
+  const tools = AgentService.getTools(user, agentId);
+  const systemPrompt = await AgentService.getSystemPrompt(user, agentId, selectedClass);
   const userStopSignal = new AbortController();
   const stream = createUIMessageStream<xUIMessage>({
     execute: async ({ writer }) => {
-      if (user && chatId) {
+      if (user && chatId && messages.length === 1) {
         generateTitle({ message, provider })
           .then(async (title) => {
             const chat = await repo.chat.updateChat({ id: chatId, title, model: selectedChatModel });
@@ -71,9 +67,12 @@ export const POST: RequestHandler = async ({ request, locals: { user, session },
         system: systemPrompt,
         messages: convertToModelMessages(messages),
         abortSignal: userStopSignal.signal,
-        tools: agentId ? tools(writer, model) : undefined,
         stopWhen: stepCountIs(5),
-        experimental_transform: smoothStream({ chunking: "word" }),
+        tools: tools(writer, model),
+        experimental_transform: smoothStream({
+          delayInMs: 20,
+          chunking: "line",
+        }),
       });
 
       result.consumeStream();

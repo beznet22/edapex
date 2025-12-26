@@ -3,7 +3,7 @@ import { jobRepo } from "$lib/server/repository";
 import { studentRepo } from "$lib/server/repository/student.repo";
 import { result } from "$lib/server/service/result.service";
 import { generateContent } from "$lib/server/helpers/chat-helper";
-import { resultInputSchema } from "$lib/schema/result";
+import { resultInputSchema } from "$lib/schema/result-input";
 import { readFileSync } from "fs";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
@@ -52,7 +52,7 @@ export const GET: RequestHandler = async ({ request, url }) => {
     const __dirname = dirname(__filename);
     const filePath = join(__dirname, "..", "..", "..", "static/extracted", "6a.json");
     const parsedResult = JSON.parse(readFileSync(filePath, "utf-8"));
-    const marks = resultInputSchema.parse(parsedResult);
+    const marks = await resultInputSchema.parseAsync(parsedResult);
     const res = await result.upsertStudentResult(marks, 1);
     const resultData = await result.getStudentResult({ id: 20, examId: 5 });
 
@@ -67,7 +67,7 @@ export const GET: RequestHandler = async ({ request, url }) => {
       },
     });
 
-    return json({  });
+    return json({});
   } catch (error: any) {
     console.error("Error creating job:", error);
     return new Response(error.message, { status: 500 });

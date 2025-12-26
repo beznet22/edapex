@@ -1,12 +1,13 @@
 import { UPLOADS_DIR } from "$lib/constants";
 import { fileSchema } from "$lib/schema/chat-schema";
-import { resultInputSchema } from "$lib/schema/result";
+import { resultInputSchema } from "$lib/schema/result-input";
 import { generateContent } from "$lib/server/helpers/chat-helper";
+import { staffRepo } from "$lib/server/repository/staff.repo";
 import { result } from "$lib/server/service/result.service";
 import { del, get, put } from "$lib/utils/fs-blob";
 import type { RequestHandler } from "@sveltejs/kit";
 import { error, json } from "@sveltejs/kit";
-import { rmdirSync } from "fs";
+import { rmdirSync, writeFileSync } from "fs";
 import { join } from "path";
 
 export const POST: RequestHandler = async ({ request, locals }) => {
@@ -18,39 +19,57 @@ export const POST: RequestHandler = async ({ request, locals }) => {
     const formData = await request.formData();
     let file = formData.get("file") as File;
     const filename = formData.get("filename") as string;
+    const classId = formData.get("classId") as number | null;
+    const sectionId = formData.get("sectionId") as number | null;
+    let staffId: number = user.staffId || 1;
+    if (classId && sectionId) {
+      const staff = await staffRepo.getStaffByClassSection({ classId, sectionId });
+      if (!staff.teacherId) throw new Error("Class not assigned to any teacher")
+      staffId = staff.teacherId;
+    }
 
     let pathname = `${user.id}-${user.fullName}/${filename ?? file.name}`;
     if (filename) {
       const { buffer } = await get(pathname);
-      file = new Blob([buffer], { type: "image/jpeg" }) as File;
+      file = new Blob([new Uint8Array(buffer)], { type: "image/jpeg" }) as File;
     }
 
     const validatedFile = fileSchema.safeParse(file);
     if (!validatedFile.success) {
       const errorMessage = validatedFile.error.issues.map((issue) => issue.message).join(", ");
-      return error(400, errorMessage);
+      throw new Error(errorMessage);
     }
 
     try {
-      const mappingData = await result.getMappingData(user.staffId || 1);
-      if (mappingData.subjects.length === 0) return error(400, "You are not assigned to any subjects");
+      const mappingData = await result.getMappingData(staffId);
+      if (mappingData.subjects.length === 0) throw new Error("You are not assigned to any subjects");
       const mapString = JSON.stringify(mappingData);
       const { success, content, message } = await generateContent(validatedFile.data, mapString);
-      if (!content || !success) return json({ success: false, status: "error", error: message });
+      if (!content || !success) throw new Error(message);
 
       const parsedResult = JSON.parse(content.trim());
-      const marks = resultInputSchema.parse(parsedResult);
-      const res = await result.upsertStudentResult(marks, 1);
-      if (!res.success) {
-       json({ success: false, status: "error", error: res.message });
+      console.log("Parsed result", parsedResult);
+      const validated = await resultInputSchema.safeParseAsync(parsedResult);
+      if (!validated.success) {
+        const error = validated.error.issues.filter(
+          issue => issue.code === "custom"
+        );
+        writeFileSync(process.cwd() + "/static/extracted/parsed.json", JSON.stringify(parsedResult));
+        console.log("Failed to upload file", validated.error.issues);
+        return json({ success: false, status: "error", error: error.map(issue => issue.message).join("\n") });
       }
+
+      console.log("Validated data", validated.data);
+      const res = await result.upsertStudentResult(validated.data, staffId);
+
       if (filename) del(pathname);
-      return json({ success: true, status: "done", data: {}, filename: filename ?? file.name });
+      return json({ success: true, status: "done", data: res, filename: filename ?? file.name });
     } catch (e) {
       console.error("Main processing error:", e);
       if (filename) {
-        return json({ success: true, status: "pending", filename, data: {} });
+        throw new Error("Failed to save file");
       }
+
       try {
         const token = `${user.id}-${user.fullName}`;
         const buff = await file.arrayBuffer();
@@ -64,12 +83,12 @@ export const POST: RequestHandler = async ({ request, locals }) => {
         return json({ success: true, status: "pending", data, filename });
       } catch (e) {
         console.error("Failed to save file:", e);
-        throw new Error("Failed to save file");
+        return json({ success: false, status: "error", error: e instanceof Error ? e.message : "Failed to upload file, try again" });
       }
     }
   } catch (e) {
     console.error(e);
-    return error(500, "Failed to upload file, try again");
+    return json({ success: false, status: "error", error: e instanceof Error ? e.message : "Failed to upload file, try again" });
   }
 };
 

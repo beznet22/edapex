@@ -3,12 +3,12 @@ import { tool, type InferToolInput, type InferToolOutput } from "ai";
 import {
   attendanceSchema,
   resultInputSchema,
-  resultOutputSchema,
   studentRatingsSchema,
   teacherRemarkSchema,
-} from "$lib/schema/result";
+} from "$lib/schema/result-input";
 import { result } from "$lib/server/service/result.service";
 import { studentRepo } from "$lib/server/repository/student.repo";
+import { resultOutputSchema } from "$lib/schema/result-output";
 
 export const upsertStudentResult = tool({
   description: [

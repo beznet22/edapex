@@ -2,7 +2,7 @@
   import { PromptSuggestion } from "$lib/components/prompt-kit/prompt-suggestion";
   import { Button } from "$lib/components/ui/button";
   import { Separator } from "$lib/components/ui/separator";
-  import { ArrowUp, Package, Square } from "@lucide/svelte";
+  import { ArrowUp, Package, Square, X } from "@lucide/svelte";
 
   import { useChat } from "$lib/context/chat-context.svelte";
   import { useFileActions } from "$lib/context/file-context.svelte";
@@ -22,6 +22,8 @@
   } from "./prompt-kit/prompt-input";
   import ClassSelector from "./class-selector.svelte";
   import { onMount } from "svelte";
+  import { Loader } from "./prompt-kit/loader";
+  import { Check, CircleAlert, TriangleAlert } from "@lucide/svelte";
 
   let {
     user,
@@ -40,10 +42,12 @@
   let activeHighlight = $state<string>("");
 
   // Context
-  const chat = $derived(useChat());
-  const file = $derived(useFileActions());
-  const userContext = $derived(UserContext.fromContext());
+  const chat = useChat();
+  const file = useFileActions();
+  const userContext = UserContext.fromContext();
   const students = $derived(userContext.students);
+
+  // const isUploading = true;
 
   // svelte-ignore state_referenced_locally
   if (!userContext.user) chat.activeAgent = null;
@@ -115,12 +119,46 @@
     {onValueChange}
     {onSubmit}
   >
+    {#if file.files.length > 0}
+      <div
+        class="flex flex-wrap gap-2 px-3 pb-2 transition-all duration-300 ease-in-out"
+      >
+        {#each file.files as f, i (f.name + i)}
+          <div
+            class="flex items-center gap-2 rounded-full border bg-muted px-2 py-1 text-xs"
+          >
+            <span class="max-w-[100px] truncate">{f.name}</span>
+            {#if file.uploads.some((u) => u.filename === f.name && u.status === "done")}
+              <Check class="size-3 text-green-500" />
+            {:else if file.uploads.some((u) => u.filename === f.name && u.status === "pending")}
+              <TriangleAlert class="size-3 text-primary" />
+            {:else if file.uploads.some((u) => u.filename === f.name && u.status === "uploading")}
+              <Loader variant="circular" class="size-3" />
+            {:else if file.uploads.some((u) => u.filename === f.name && u.status === "error")}
+              <CircleAlert class="size-3 text-destructive" />
+            {/if}
+            <Button
+              variant="ghost"
+              size="icon"
+              class="size-3 rounded-full cursor-pointer"
+              onclick={() => file.remove(i)}
+            >
+              <X class="size-3" />
+            </Button>
+          </div>
+        {/each}
+      </div>
+    {/if}
+
     <PromptInputTextarea
       placeholder="Ask anything..."
       class="min-h-11 pt-3 pl-4 text-base leading-[1.3] sm:text-base md:text-base"
       {onkeydown}
     />
-    <PromptInputActions class="mt-5 flex w-full items-end justify-between gap-2 px-3 pb-3">
+
+    <PromptInputActions
+      class="mt-5 flex w-full items-end justify-between gap-2 px-3 pb-3"
+    >
       <div class="flex gap-2">
         <ChatMenu {input} />
         {#if chat.activeAgent}
@@ -132,7 +170,9 @@
             <Button
               variant="outline"
               class="rounded-full cursor-pointer"
-              onclick={() => ((chat.activeAgent = null), (activeSuggestions = []))}
+              onclick={() => (
+                (chat.activeAgent = null), (activeSuggestions = [])
+              )}
             >
               <Icon class="size-4" />
               {chat.activeAgent.label}
@@ -141,7 +181,7 @@
         {/if}
       </div>
       <div class="flex gap-2">
-        {#if userContext.isCoordinator}
+        {#if userContext.isCoordinator || userContext.isIt}
           <ClassSelector />
         {:else}
           <PromptInputAction>
@@ -175,8 +215,10 @@
     </PromptInputActions>
   </PromptInput>
 
-  {#if isInitial && !userContext.isCoordinator}
-    <div class="absolute top-full left-0 w-full flex flex-col items-center justify-center mt-2 gap-4">
+  {#if isInitial && !userContext.isCoordinator && !userContext.isIt}
+    <div
+      class="absolute top-full left-0 w-full flex flex-col items-center justify-center mt-2 gap-4"
+    >
       {#if activeSuggestions.length > 0}
         <div class="flex w-full flex-col items-center justify-center space-y-1">
           {#each activeSuggestions as suggestion}
@@ -204,7 +246,9 @@
           {/each}
         </div>
       {:else}
-        <div class="relative flex w-full flex-wrap items-center justify-center gap-2">
+        <div
+          class="relative flex w-full flex-wrap items-center justify-center gap-2"
+        >
           {#each chat.agents as agent}
             <PromptSuggestion
               onclick={() => handleAgentClick(agent.id)}
@@ -217,12 +261,19 @@
           {/each}
         </div>
       {/if}
-      {#if !userContext.isCoordinator}
+      {#if !userContext.isCoordinator && !userContext.isIt}
         <ChatResource {onFileSelected} />
       {/if}
     </div>
   {/if}
 </div>
 
-<input type="file" onchange={file.onchange} class="hidden" id="file-upload" bind:this={file.fileInputRef} />
+<input
+  type="file"
+  onchange={file.onchange}
+  class="hidden"
+  id="file-upload"
+  accept=".png, .jpg, .jpeg"
+  bind:this={file.fileInputRef}
+/>
 <DropZone />

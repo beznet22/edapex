@@ -5,7 +5,7 @@
   import ScoreSummary from "./ScoreSummary.svelte";
   import StudentRatings from "./StudentRatings.svelte";
   import TeacherRemark from "./TeacherRemark.svelte";
-  import type { ResultOutput } from "$lib/schema/result";
+    import type { ResultOutput } from "$lib/schema/result-output";
 
   interface Props {
     data: ResultOutput;

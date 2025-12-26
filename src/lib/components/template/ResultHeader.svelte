@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { ResultOutput } from "$lib/schema/result";
+  import type { ResultOutput } from "$lib/schema/result-input";
 
 
   interface Props {
