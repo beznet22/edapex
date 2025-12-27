@@ -80,7 +80,7 @@ export const recordSchema = z
           path: ["titles"],
           continue: true,
         });
-        await result.cleanUpResultRecord(data);
+        // await result.cleanUpResultRecord(data);
       }
       const invalidTitles = data.titles.filter((title) => !allowedTitles.includes(title));
       if (invalidTitles.length > 0) {
@@ -90,7 +90,7 @@ export const recordSchema = z
           path: ["titles"],
           continue: true,
         });
-        await result.cleanUpResultRecord(data);
+        // await result.cleanUpResultRecord(data);
       }
       if (data.marks.length !== data.titles.length) {
         ctx.addIssue({
@@ -99,7 +99,7 @@ export const recordSchema = z
           path: ["marks"],
           continue: true,
         });
-        await result.cleanUpResultRecord(data);
+        // await result.cleanUpResultRecord(data);
       }
     }
     if (data.category === "DAYCARE") {
@@ -110,7 +110,7 @@ export const recordSchema = z
           path: ["titles"],
           continue: true,
         });
-        await result.cleanUpResultRecord(data);
+        // await result.cleanUpResultRecord(data);
       }
       if (!data.learningOutcome) {
         ctx.addIssue({
@@ -119,7 +119,7 @@ export const recordSchema = z
           path: ["learningOutcome"],
           continue: true,
         });
-        await result.cleanUpResultRecord(data);
+        // await result.cleanUpResultRecord(data);
       }
     }
   });
