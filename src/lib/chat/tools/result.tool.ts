@@ -221,35 +221,9 @@ export const upsertStudentRatings = tool({
   },
 });
 
-export const publishResult = tool({
-  description: "Publishes a student's result to their timeline and sends a notification email to parents. This finalizes the report card for the student for the specified exam.",
-  inputSchema: z.object({
-    studentId: z.number().describe("The unique ID of the student."),
-    examTypeId: z.number().describe("The unique ID of the exam type/term."),
-  }),
-  outputSchema: z.object({
-    status: z.enum(["approved", "denied"]),
-    message: z.string().optional(),
-  }),
-  execute: async (input) => {
-    const { studentId, examTypeId } = input;
-    try {
-      const res = await result.publishResult({ studentId, examId: examTypeId });
-      if (!res) {
-        return { status: "denied", message: "Failed to publish result. Ensure result is validated first." };
-      }
-      return { status: "approved", message: "Result published successfully and notification sent." };
-    } catch (error) {
-      return { status: "denied", message: "An error occurred while publishing the result." };
-    }
-  },
-});
-
 export type upsertTeacherRemarkInput = InferToolInput<typeof upsertTeacherRemark>;
 export type upsertTeacherRemarkOutput = InferToolOutput<typeof upsertTeacherRemark>;
 export type upsertAttendanceInput = InferToolInput<typeof upsertAttendance>;
 export type upsertAttendanceOutput = InferToolOutput<typeof upsertAttendance>;
 export type upsertResultInput = InferToolInput<typeof upsertStudentResult>;
 export type upsertResultOutput = InferToolOutput<typeof upsertStudentResult>;
-export type publishResultInput = InferToolInput<typeof publishResult>;
-export type publishResultOutput = InferToolOutput<typeof publishResult>;

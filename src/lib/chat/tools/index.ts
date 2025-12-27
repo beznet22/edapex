@@ -6,7 +6,7 @@ import {
     upsertStudentResult,
     upsertTeacherRemark,
 } from "./result.tool";
-import { sendClassResults, validateClassResults } from "./coordinator.tool";
+import { getStudentList, sendClassResults, validateClassResults } from "./coordinator.tool";
 
 export const tools = (writer: UIMessageStreamWriter, model: LanguageModel) => {
     return {
@@ -25,7 +25,7 @@ export const emptyTools = (writer: UIMessageStreamWriter, model: LanguageModel) 
 
 export const coordinatorTools = (writer: UIMessageStreamWriter, model: LanguageModel) => {
     return {
-        getClassStudentList,
+        getStudentList,
         upsertStudentResult,
         validateClassResults,
         sendClassResults,
