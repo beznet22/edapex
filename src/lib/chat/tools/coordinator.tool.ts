@@ -107,52 +107,21 @@ export const sendClassResults = tool({
         examTypeId: z.number().describe("The Exam Type ID."),
     }),
     outputSchema: z.object({
-        successCount: z.number(),
-        failCount: z.number(),
+        success: z.boolean(),
         message: z.string(),
     }),
     execute: async ({ classId, examTypeId, sectionId }) => {
         const students = await studentRepo.getStudentsByClassId(classId, sectionId);
         if (!students || students.length === 0) {
-            return { successCount: 0, failCount: 0, message: "No students found." };
+            return { success: false, message: "No students found." };
         }
 
-        let successCount = 0;
-        let failCount = 0;
-
-        for (const student of students) {
-            try {
-    
-                await result.publishResult({
-                    studentId: student.id,
-                    examId: examTypeId,
-                });
-
-                await repo.base.create({
-                    table: smStudentTimelines,
-                    values: {
-                        staffStudentId: student.id, // Assuming this maps to studentId in this context or linking table
-                        title: "Result Published",
-                        description: `Result for Exam Type ${examTypeId} has been published.`,
-                        type: "result_published",
-                        date: new Date().toISOString().split('T')[0],
-                        visibleToStudent: 1,
-                        activeStatus: 1,
-                        schoolId: 1, // Default or fetch from context
-                        academicId: 1, // Default or fetch from context
-                    }
-                });
-                successCount++;
-            } catch (e) {
-                console.error(`Failed to publish result for student ${student.id}`, e);
-                failCount++;
-            }
-        }
+        await result.publishResult({ studentIds: students.map((s) => s.id), examId: examTypeId })
+            .catch(e => console.error("Background Result Publication Failed:", e));
 
         return {
-            successCount,
-            failCount,
-            message: `Results sending process complete. Published: ${successCount}, Failed: ${failCount}.`
+            success: true,
+            message: `Results queued for publication.`
         };
     }
 });

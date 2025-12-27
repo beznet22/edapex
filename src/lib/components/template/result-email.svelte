@@ -1,42 +1,37 @@
 <script lang="ts">
-  // Interface for individual student data
-  interface StudentReport {
-    studentName: string;
-    reportUrl: string;
-    avatar?: string; // Optional avatar URL
-  }
-
   // Props for dynamic content
- interface ReportData {
-    schoolName?: string;
-    guardianName?: string;
-    principalName?: string;
-    contactEmail?: string;
-    contactPhone?: string;
-    students: StudentReport[];
+  interface Props {
+    schoolName: string;
+    receiverName: string; // Parent name or guardian
+    fullName: string; // Student full name
+    term: string;
+    principal: string;
+    contact: string;
+    support: string;
+    logo?: string;
   }
 
- let {
-    data = {
-      schoolName: "Lighthouse Leading Academy",
-      guardianName: "Mrs. Johnson",
-      principalName: "Dr. A. Smith",
-      contactEmail: "support@sms.com",
-      contactPhone: "1234567890",
-      students: [
-        {
-          studentName: "Alex Johnson",
-          reportUrl: "#",
-          avatar: "https://images.unsplash.com/photo-157954692962-711aa81148cf?ixlib=rb-4.0.3&auto=format&fit=crop&w=100&q=80",
-        },
-        {
-          studentName: "Emma Johnson",
-          reportUrl: "#",
-          avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b2930?ixlib=rb-4.0.3&auto=format&fit=crop&w=100&q=80",
-        },
-      ],
-    },
-  }: { data?: ReportData } = $props();
+  let {
+    schoolName = "Lighthouse Leading Academy",
+    receiverName = "Parent/Guardian",
+    fullName = "Student Name",
+    term = "Current Term",
+    principal = "School Principal",
+    contact = "Contact Phone",
+    support = "Support Email",
+    logo,
+  }: Props = $props();
+
+  // Color Constants (from layout.css)
+  const colors = {
+    primary: "#D65D3B",
+    background: "#FDFDFC",
+    foreground: "#524B45",
+    cardBg: "#FFFFFF",
+    muted: "#F7F7F7",
+    border: "#EBEBEB",
+    textLight: "#888888",
+  };
 </script>
 
 <!-- Svelte head content for email compatibility -->
@@ -66,8 +61,11 @@
     <meta name="x-apple-disable-message-reformatting" />
     <meta http-equiv="content-type" content="text/html; charset=utf-8" />
     <meta http-equiv="x-ua-compatible" content="ie=edge" />
-    <meta name="format-detection" content="telephone=no, date=no, address=no, email=no" />
-    <title>Result Notification</title>
+    <meta
+      name="format-detection"
+      content="telephone=no, date=no, address=no, email=no"
+    />
+    <title>Result notification</title>
 
     <style type="text/css">
       /* Client-Specific Resets */
@@ -76,6 +74,7 @@
         padding: 0;
         -webkit-text-size-adjust: 100%;
         -ms-text-size-adjust: 100%;
+        font-family: "Geist", "Helvetica Neue", Helvetica, Arial, sans-serif;
       }
       table,
       td {
@@ -93,223 +92,310 @@
       }
       p {
         display: block;
-        margin: 13px 0;
+        margin: 16px 0;
       }
 
-      /* Theme Colors (Converted from OKLCH for Email Support)
-         Background: #FDFC (oklch 98%)
-         Foreground: #524B45 (oklch 34% warm grey)
-         Primary: #D65D3B (oklch 62% terracotta/orange)
-         Secondary: #EBEB (oklch 92% light grey)
-      */
-
       /* Responsive Styles */
-      @media only screen and (max-width: 600px) {
+      @media only screen and (max-width: 620px) {
         .mobile-wrapper {
-          width: 100% !important;
-          max-width: 100% !important;
+          width: 95% !important;
+          margin: 0 auto !important;
         }
         .mobile-padding {
-          padding-left: 20px !important;
-          padding-right: 20px !important;
+          padding-left: 15px !important;
+          padding-right: 15px !important;
         }
-        .mobile-block {
-          display: block !important;
+        .hero-title {
+          font-size: 24px !important;
+        }
+        .hero-subtitle {
+          font-size: 13px !important;
+        }
+        .support-card {
+          padding: 20px !important;
+        }
+      }
+
+      @media only screen and (max-width: 480px) {
+        .mobile-wrapper {
           width: 100% !important;
+          border-radius: 0 !important;
         }
-        .mobile-center {
-          text-align: center !important;
+        .hero-title {
+          font-size: 22px !important;
         }
-        .img-fluid {
-          width: 10% !important;
-          height: auto !important;
-        }
-        .hide-mobile {
-          display: none !important;
+        .main-text {
+          font-size: 15px !important;
+          line-height: 24px !important;
         }
       }
     </style>
   </head>
-  <body style="margin: 0; padding: 0; background-color: #FDFDFC;">
+  <body style="margin: 0; padding: 0; background-color: {colors.background};">
     <!-- Preheader Text (Hidden) -->
     <div style="display: none; max-height: 0px; overflow: hidden;">
-      The Termly Summary of Progress Reports for your children are now available. &nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;
+      The termly summary of progress report for {fullName} is now available. &nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;
     </div>
 
     <!-- Main Container -->
-    <center style="width: 100%; background-color: #FDFDFC;">
-      <!--[if mso]>
-      <table role="presentation" width="600" cellspacing="0" cellpadding="0" border="0" align="center">
-      <tr>
-      <td width="600">
-      <![endif]-->
-
+    <center
+      style="width: 100%; background-color: {colors.background}; padding: 40px 0;"
+    >
       <table
         class="mobile-wrapper"
         role="presentation"
-        width="10%"
-        style="max-width: 600px; margin: 0 auto; background-color: #ffffff;"
+        width="600"
+        style="width: 600px; max-width: 600px; margin: 0 auto; background-color: {colors.cardBg}; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);"
         cellspacing="0"
         cellpadding="0"
         border="0"
         align="center"
       >
         <tbody>
-          <!-- Header / Logo -->
+          <!-- Decorative Header -->
           <tr>
-            <td style="padding: 30px 40px; text-align: center; border-bottom: 3px solid #FDFDFC;">
-              <a href="https://example.com" style="text-decoration: none;">
-                <!-- Adapted for School Name prop -->
-                <span
-                  style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 20px; font-weight: bold; color: #D65D3B; letter-spacing: 0.5px; text-transform: uppercase;"
-                >
-                  {data.schoolName?.replace("Leading Academy", "")}
-                  <span style="color: #524B45;">Leading Academy</span>
-                </span>
-              </a>
-            </td>
-          </tr>
-
-          <!-- Hero Image -->
-          <tr>
-            <td style="padding: 0;">
-              <a href="https://example.com">
-                <!-- Kept academic/happy image -->
-                <img
-                  src="https://images.unsplash.com/photo-1503676260728-1c00da094a0b?ixlib=rb-4.0.3&auto=format&fit=crop&w=1200&q=80"
-                  alt="Student success"
-                  width="600"
-                  class="img-fluid"
-                  style="display: block; width: 100%; max-width: 600px; height: auto; color: #524B45;"
-                />
-              </a>
-            </td>
-          </tr>
-
-          <!-- Main Content Area -->
-          <tr>
-            <td class="mobile-padding" style="padding: 40px 40px 20px 40px;">
-              <h1
-                style="margin: 0 0 20px 0; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 24px; line-height: 32px; color: #D65D3B; font-weight: bold;"
+            <td
+              style="padding: 0; position: relative; background: linear-gradient(135deg, {colors.primary} 0%, {colors.primary}dd 100%);"
+            >
+              <table
+                role="presentation"
+                width="100%"
+                cellspacing="0"
+                cellpadding="0"
+                border="0"
               >
-                TERMLY SUMMARY OF PROGRESS REPORT
-              </h1>
-
-              <p
-                style="margin: 0 0 16px 0; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 16px; line-height: 26px; color: #524B45;"
-              >
-                <strong>Dear {data.guardianName},</strong>
-              </p>
-
-              <p
-                style="margin: 0 24px 0; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 16px; line-height: 26px; color: #524B45;"
-              >
-                We are pleased to inform you that the <strong>First Term Examination</strong> results for your
-                children have been released and are now available for review.
-              </p>
-              <p
-                style="margin: 0 20px 0; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 16px; line-height: 26px; color: #524B45;"
-              >
-                This report provides a comprehensive summary of academic performance, attendance, and
-                behavioral development for the term.
-              </p>
-
-              <!-- Grid of Student Cards -->
-              <p
-                style="margin: 0 0 20px 0; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 16px; line-height: 26px; color: #524B45; font-weight: bold;"
-              >
-                Reports for your children:
-              </p>
-              
-              <table role="presentation" cellspacing="10" cellpadding="0" border="0" style="width: 100%; margin: 0 30px 0;">
                 <tbody>
-                  {#each Array(Math.ceil(data.students.length / 2)) as _, rowIndex (rowIndex)}
-                    <tr>
-                      {#each data.students.slice(rowIndex * 2, rowIndex * 2 + 2) as student, colIndex (student.studentName || colIndex)}
-                        <td style="background-color: #F7F7F7; border-radius: 8px; padding: 15px; text-align: center; width: 48%; vertical-align: top;" width="48%">
-                          {#if student.avatar}
-                          <img 
-                            src={student.avatar} 
-                            alt={student.studentName}
-                            width="60"
-                            height="60"
-                            style="display: block; width: 60px; height: 60px; border-radius: 50%; object-fit: cover; margin: 0 auto 10px auto;"
-                          />
-                          {/if}
-                          <p style="margin: 0 0 10px 0; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 16px; font-weight: bold; color: #524B45; text-align: center;">
-                            {student.studentName}
-                          </p>
-                          <a 
-                            href={student.reportUrl} 
-                            style="background-color: #D65D3B; border: 1px solid #D65D3B; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 14px; font-weight: bold; line-height: 1.5; text-decoration: none; padding: 8px 16px; color: #ffffff; display: inline-block; border-radius: 4px;"
-                          >
-                            View Report &rarr;
-                          </a>
-                        </td>
-                      {/each}
-                      
-                      <!-- Add empty cell if there's an odd number of students in the last row -->
-                      {#if (rowIndex * 2 + 1) === data.students.length - 1 && data.students.length % 2 !== 0}
-                        <td style="background-color: #F7F7F7; border-radius: 8px; padding: 15px; text-align: center; width: 48%; vertical-align: top;" width="48;">
-                          &nbsp;
-                        </td>
-                      {/if}
-                    </tr>
-                  {/each}
+                  <tr>
+                    <td
+                      style="padding: 40px 40px 30px 40px; text-align: center;"
+                    >
+                      <!-- School Logo -->
+                      <div style="margin-bottom: 20px;">
+                        <img
+                          src="cid:schoolLogo"
+                          alt={schoolName}
+                          width="100"
+                          style="background: white; padding: 10px; border-radius: 50%; box-shadow: 0 2px 8px rgba(0,0,0,0.1);"
+                        />
+                      </div>
+                      <h2
+                        style="margin: 0; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 18px; color: #FFFFFF; font-weight: 500; letter-spacing: 0.5px;"
+                      >
+                        {schoolName}
+                      </h2>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+
+              <!-- Subtle Balloon Decorations (Using table cells for layout spacing) -->
+              <table
+                role="presentation"
+                width="100%"
+                cellspacing="0"
+                cellpadding="0"
+                border="0"
+                style="position: absolute; top: 0; left: 0; pointer-events: none;"
+              >
+                <tbody>
+                  <tr>
+                    <td align="left" valign="top" style="padding: 10px;">
+                      <img
+                        src="https://cdn-icons-png.flaticon.com/512/3256/3256158.png"
+                        width="30"
+                        height="30"
+                        alt=""
+                        style="opacity: 0.2;"
+                      />
+                    </td>
+                    <td align="right" valign="top" style="padding: 10px;">
+                      <img
+                        src="https://cdn-icons-png.flaticon.com/512/3256/3256158.png"
+                        width="30"
+                        height="30"
+                        alt=""
+                        style="opacity: 0.2;"
+                      />
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Hero Content -->
+          <tr>
+            <td
+              class="mobile-padding"
+              style="padding: 40px 40px 10px 40px; text-align: center;"
+            >
+              <p
+                class="hero-subtitle"
+                style="margin: 0; font-size: 14px; font-weight: 600; color: {colors.primary}; text-transform: uppercase; letter-spacing: 1px;"
+              >
+                Announcement
+              </p>
+              <h1
+                class="hero-title"
+                style="margin: 10px 0 20px 0; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 28px; line-height: 1.2; color: {colors.foreground}; font-weight: 700;"
+              >
+                Termly progress report
+              </h1>
+              <div
+                style="height: 2px; width: 60px; background-color: {colors.primary}; margin: 0 auto 30px auto;"
+              ></div>
+            </td>
+          </tr>
+
+          <!-- Main Message -->
+          <tr>
+            <td class="mobile-padding" style="padding: 0 40px 40px 40px;">
+              <p
+                class="main-text"
+                style="margin: 0 0 20px 0; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 16px; line-height: 26px; color: {colors.foreground};"
+              >
+                Dear {receiverName},
+              </p>
+
+              <p
+                class="main-text"
+                style="margin: 0 0 20px 0; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 16px; line-height: 26px; color: {colors.foreground};"
+              >
+                We are pleased to inform you that the <strong>{term}</strong>
+                examination results for <strong>{fullName}</strong> have been released.
+              </p>
+
+              <p
+                class="main-text"
+                style="margin: 0 0 30px 0; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 16px; line-height: 26px; color: {colors.foreground};"
+              >
+                The comprehensive report is attached to this email as a PDF
+                document for your review. This report provides a summary of
+                academic performance, attendance, and behavioral development for
+                the term.
+              </p>
+
+              <!-- Static Confetti / Achievement Decoration -->
+              <table
+                role="presentation"
+                width="100%"
+                cellspacing="0"
+                cellpadding="0"
+                border="0"
+                style="margin-bottom: 30px;"
+              >
+                <tbody>
+                  <tr>
+                    <td
+                      align="center"
+                      style="padding: 20px; background-color: #FFF5F2; border-radius: 8px; border: 1px dashed {colors.primary}44;"
+                    >
+                      <img
+                        src="https://cdn-icons-png.flaticon.com/512/5812/5812975.png"
+                        width="40"
+                        height="40"
+                        alt="Success"
+                        style="margin-bottom: 10px;"
+                      />
+                      <p
+                        style="margin: 0; font-size: 14px; font-weight: 500; color: {colors.primary};"
+                      >
+                        Great progress achieved this term!
+                      </p>
+                    </td>
+                  </tr>
                 </tbody>
               </table>
 
               <!-- Sign off -->
-              <p
-                style="margin: 30px 0 0; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 16px; line-height: 26px; color: #524B45;"
+              <table
+                role="presentation"
+                width="100%"
+                cellspacing="0"
+                cellpadding="0"
+                border="0"
+                style="margin-top: 40px;"
               >
-                Warm regards,<br />
-                <strong>{data.principalName}</strong><br />
-                <span style="font-size: 14px; color: #888888;">Principal, {data.schoolName}</span>
-              </p>
+                <tbody>
+                  <tr>
+                    <td>
+                      <p
+                        style="margin: 0; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 16px; line-height: 26px; color: {colors.foreground};"
+                      >
+                        Warm regards,
+                      </p>
+                      <p
+                        style="margin: 5px 0 0 0; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 18px; font-weight: 700; color: {colors.foreground};"
+                      >
+                        {principal}
+                      </p>
+                      <p
+                        style="margin: 0; font-size: 14px; color: {colors.textLight};"
+                      >
+                        Principal, {schoolName}
+                      </p>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
             </td>
           </tr>
 
-          <!-- Secondary Feature Section (Support) -->
+          <!-- Support Section -->
           <tr>
-            <td class="mobile-padding" style="padding: 20px 40px 40px;">
-              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+            <td class="mobile-padding" style="padding: 0 40px 40px 40px;">
+              <table
+                role="presentation"
+                width="100%"
+                cellspacing="0"
+                cellpadding="0"
+                border="0"
+                style="background-color: {colors.muted}; border-radius: 12px;"
+              >
                 <tbody>
                   <tr>
-                    <td style="background-color: #F7F7F7; border-radius: 8px; padding: 30px;">
-                      <table role="presentation" width="10%" cellspacing="0" cellpadding="0" border="0">
+                    <td class="support-card" style="padding: 30px;">
+                      <table
+                        role="presentation"
+                        width="100%"
+                        cellspacing="0"
+                        cellpadding="0"
+                        border="0"
+                      >
                         <tbody>
                           <tr>
-                            <!-- Icon/Small Image -->
                             <td
-                              width="50"
+                              width="48"
                               valign="top"
                               style="padding-right: 15px;"
-                              class="mobile-block mobile-center"
                             >
                               <img
                                 src="https://cdn-icons-png.flaticon.com/512/1067/1067566.png"
-                                alt="Support Icon"
+                                alt="Support"
                                 width="40"
                                 height="40"
-                                style="display: block; width: 40px; max-width: 40px;"
+                                style="display: block;"
                               />
                             </td>
-                            <!-- Text -->
-                            <td valign="top" class="mobile-block mobile-center" style="padding-top: 5px;">
+                            <td valign="top">
                               <h3
-                                style="margin: 0 0 5px 0; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 16px; color: #D65D3B; font-weight: bold;"
+                                style="margin: 0 0 8px 0; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 16px; color: {colors.foreground}; font-weight: 700;"
                               >
-                                Have questions about the result?
+                                Questions about the result?
                               </h3>
                               <p
-                                style="margin: 0; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 14px; line-height: 22px; color: #524B45;"
+                                class="main-text"
+                                style="margin: 0; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 14px; line-height: 22px; color: {colors.foreground};"
                               >
                                 Contact us at <a
-                                  href={"mailto:" + data.contactEmail}
-                                  style="color: #D65D3B; text-decoration: none;">{data.contactEmail}</a
+                                  href={"mailto:" + support}
+                                  style="color: {colors.primary}; text-decoration: none; font-weight: 500;"
+                                  >{support}</a
                                 >
-                                or call <strong>{data.contactPhone}</strong>.
+                                or call
+                                <strong style="color: {colors.foreground};"
+                                  >{contact}</strong
+                                >.
                               </p>
                             </td>
                           </tr>
@@ -325,30 +411,55 @@
           <!-- Footer -->
           <tr>
             <td
-              style="background-color: #FDFDFC; border-top: 1px solid #EBEBEB; padding: 40px 20px; text-align: center;"
+              style="padding: 40px 20px; text-align: center; background-color: {colors.muted};"
             >
               <p
-                style="margin: 0 10px 0; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 12px; color: #9999; line-height: 18px;"
+                style="margin: 0 0 8px 0; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 12px; font-weight: 700; color: {colors.foreground}; letter-spacing: 0.5px; text-transform: uppercase;"
               >
-                <strong>{data.schoolName}</strong><br />
-                Education for the Future
+                {schoolName}
               </p>
               <p
-                style="margin: 0 0 20px 0; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 12px; color: #9999; line-height: 18px;"
+                style="margin: 0 0 16px 0; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 12px; color: {colors.textLight}; line-height: 1.5;"
               >
-                You are receiving this email as a guardian of a registered student.<br />
-                <a href="https://example.com" style="color: #99999; text-decoration: underline;">View in browser</a>
+                Education for the future
+              </p>
+              <p
+                style="margin: 0; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 11px; color: {colors.textLight};"
+              >
+                You are receiving this email as a guardian of a registered
+                student.<br />
+                Please do not reply directly to this automated notification.
               </p>
             </td>
           </tr>
         </tbody>
       </table>
 
-      <!--[if mso]>
-      </td>
-      </tr>
+      <!-- Gift Decoration (Outside the main card for a floating effect) -->
+      <table
+        class="mobile-wrapper"
+        role="presentation"
+        width="600"
+        style="width: 600px; max-width: 600px; margin-top: 20px;"
+        cellspacing="0"
+        cellpadding="0"
+        border="0"
+        align="center"
+      >
+        <tbody>
+          <tr>
+            <td align="center">
+              <img
+                src="https://cdn-icons-png.flaticon.com/512/714/714035.png"
+                width="24"
+                height="24"
+                alt=""
+                style="opacity: 0.3;"
+              />
+            </td>
+          </tr>
+        </tbody>
       </table>
-      <![endif]-->
     </center>
   </body>
 </html>

@@ -25,6 +25,7 @@ export const emptyTools = (writer: UIMessageStreamWriter, model: LanguageModel) 
 
 export const coordinatorTools = (writer: UIMessageStreamWriter, model: LanguageModel) => {
     return {
+        getClassStudentList,
         upsertStudentResult,
         validateClassResults,
         sendClassResults,

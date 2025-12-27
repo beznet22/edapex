@@ -2,7 +2,7 @@ import { Worker } from "worker_threads";
 import { dirname, join } from "path";
 import { fileURLToPath } from "url";
 
-interface TaskResult {
+export interface JobResult {
   jobId: string;
   status: "success" | "error";
   result?: any;
@@ -15,18 +15,17 @@ const __dirname = dirname(__filename);
 
 const registry = {
   "send-email": join(__dirname, "jobs/email-job.ts"),
-  "generate-pdf": join(__dirname, "jobs/pdf-job.js"),
 } as const;
 
 export type JobType = keyof typeof registry;
 
-export type Payload = {
+export type JobPayload = {
   type: JobType;
   data: any;
 };
 
 export class JobWorker {
-  static async runTask(payload: Payload, callback?: (result: TaskResult) => void): Promise<TaskResult> {
+  static async runTask(payload: JobPayload, callback?: (result: JobResult) => void): Promise<JobResult> {
     const { type, data } = payload;
     return new Promise((resolve, reject) => {
       const jobId = crypto.randomUUID();
