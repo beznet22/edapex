@@ -1,34 +1,34 @@
 import {
+  AttributeRemark,
   type Attendance,
+  type MarkResponse,
   type MarksData,
   type MarksInput,
-  type MarkResponse,
   type ResultInput,
-  type StudentRatings,
-  type TeacherRemark,
-  AttributeRemark,
   type StudentInput,
+  type StudentRatings
 } from "$lib/schema/result-input";
+import { resultOutputSchema, type Category, type MarksRecord, type ResultOutput, type School, type Student } from "$lib/schema/result-output";
+import { repo } from "$lib/server/repository";
+import { studentRepo } from "$lib/server/repository/student.repo";
 import type {
   ClassAverage,
   ExamSetup,
   MarkData,
-  NewSmMarkStore,
   ResultData,
-  ScoreData,
-  StudentRecord,
+  ScoreData
 } from "$lib/types/result-types";
-import { studentRepo } from "$lib/server/repository/student.repo";
-import ResultEmail from "$lib/components/template/result-email.svelte";
-import { base, repo } from "$lib/server/repository";
-import { ensureBase64Image, pageToHtml } from "../helpers";
 import { base64url } from "jose";
-import { timelineRepo } from "../repository/timeline.repo";
-import { SMTPClient, type SMTPMessage } from "../helpers/smtp";
 import { render } from "svelte/server";
+import { ensureBase64Image, pageToHtml } from "../helpers";
+import { generate } from "../helpers/pdf-generator";
 import { resultRepo } from "../repository/result.repo";
-import { id } from "zod/v4/locales";
-import { resultOutputSchema, type Category, type MarksRecord, type ResultOutput, type Student } from "$lib/schema/result-output";
+import { timelineRepo } from "../repository/timeline.repo";
+import ResultTemplate from "$lib/components/template/ResultTemplate.svelte";
+import ResultEmail from "$lib/components/template/result-email.svelte";
+import { JobWorker, type JobPayload, type JobResult } from "../worker";
+import path from "path";
+import fs from "fs";
 
 const GRADE_RANGES = {
   EYFS: [
@@ -51,70 +51,101 @@ export class ResultService {
   /**
    * Publish result to students and parents timeline and send email
    */
-  async publishResult(params: { studentId: number; examId: number }) {
-    const { studentId, examId } = params;
-    const resultData = await result.getStudentResult({ id: studentId, examId, withImages: true });
-    const validatedResult = await resultOutputSchema.safeParseAsync(resultData);
-    if (!validatedResult.success) {
-      return null;
-    }
-    this.sendResultEmail({ examTypeId: examId });
-    const timeline = {
-      staffStudentId: studentId,
-      type: `exam-${examId}`,
-      title: "TERMLY SUMMARY OF PROGRESS REPORT",
-      description: "TERMLY SUMMARY OF PROGRESS REPORT",
-      visibleToStudent: 1,
-      file: `result/${base64url.encode(JSON.stringify({ studentId, examId }))}`,
-      date: new Date().toISOString().slice(0, 10),
-      activeStatus: 1,
-      schoolId: 1,
-      academicId: 1,
+  async publishResult(params: { studentIds: number[]; examId: number }) {
+    const { studentIds, examId } = params;
+    const messages: any[] = [];
+    const CONCURRENCY_LIMIT = 5;
+
+    const processStudent = async (studentId: number) => {
+      try {
+        const resultData = await result.getStudentResult({ id: studentId, examId, withImages: true });
+        const validatedResult = await resultOutputSchema.safeParseAsync(resultData);
+        if (!validatedResult.success || !resultData) {
+          console.warn(`Validation failed for student ${studentId}`);
+          return null;
+        }
+        const { student, school } = validatedResult.data;
+
+        const pdfProps = { data: resultData };
+        let { body, head } = render(ResultTemplate, { props: pdfProps });
+        let html = pageToHtml(body, head);
+        const fileName = `res_${student.fullName}_a${student.adminNo}_e${examId}_${Date.now()}`;
+
+        const pdfResult = await generate({ htmlContent: html, fileName, returnPath: true });
+        if (!pdfResult.success) throw new Error(pdfResult.error || "Failed to generate document");
+        if (!pdfResult.filePath) throw new Error("PDF path is missing");
+
+        const logoPath = school.logo || "/school-logo.png";
+        let absoluteLogoPath = logoPath.startsWith("/")
+          ? path.join(process.cwd(), "static", logoPath.substring(1))
+          : path.join(process.cwd(), logoPath);
+
+        if (!fs.existsSync(absoluteLogoPath)) {
+          absoluteLogoPath = path.join(process.cwd(), "static", "school-logo.png");
+        }
+
+        const emailProps = {
+          term: student.term,
+          fullName: student.fullName,
+          receiverName: student.parentName,
+          schoolName: school.name,
+          principal: "Patience Okwube",
+          contact: school.phone,
+          support: school.email || "support@sms.com",
+        };
+
+        const content = render(ResultEmail as any, { props: emailProps });
+        html = pageToHtml(content.body, content.head);
+
+        return {
+          from: `"${school.name}" <${school.email}>`,
+          to: student.parentEmail,
+          subject: "Result Notification",
+          html,
+          attachments: [
+            { filename: `${student.fullName}_result.pdf`, path: pdfResult.filePath },
+            { filename: "logo.png", path: absoluteLogoPath, cid: "schoolLogo" }
+          ],
+          studentId: student.id,
+        };
+      } catch (error) {
+        console.error(`Error processing student ${studentId}:`, error);
+        return null;
+      }
     };
 
-    await timelineRepo.upsertTimeline(timeline);
-    return true;
-  }
+    // Process students in chunks to respect concurrency limit
+    for (let i = 0; i < studentIds.length; i += CONCURRENCY_LIMIT) {
+      const chunk = studentIds.slice(i, i + CONCURRENCY_LIMIT);
+      const results = await Promise.all(chunk.map(id => processStudent(id)));
+      messages.push(...results.filter((m): m is any => m !== null));
+    }
 
-  /**
-   * Send result email to parent
-   */
-  async sendResultEmail(params: { examTypeId: number }) {
-    const { examTypeId } = params;
-    const siblings = await studentRepo.getStudentBySiblings();
-    const examType = await base.getCurrentTerm(examTypeId);
-    const settings = await base.getGeneralSettingBySchoolId(1);
+    if (messages.length === 0) return false;
 
-    if (!siblings) return false;
-    Promise.all(
-      siblings.map(async (s) => {
-        if (!s.guardiansEmail) return false;
+    const payload: JobPayload = { type: "send-email", data: messages };
+    await JobWorker.runTask(payload, async (job: JobResult) => {
+      const { status, result: jobResult } = job;
+      if (status !== "success") {
+        console.error("Failed to send email: ", job.error);
+        return;
+      }
 
-        const props = {
-          term: examType.title,
-          title: "TERMLY SUMMARY OF PROGRESS REPORT",
-          fullName: s.fullName,
-          receiverName: s.guardiansName,
-          schoolName: settings?.siteTitle || "School Name",
-          logo: ensureBase64Image(settings?.logo || "", "/school-logo.png"),
-          principal: "Principal Name",
-          contact: "1234567890",
-          support: "support@sms.com",
-        };
+      const { studentId, messageId } = jobResult;
+      const timeline = {
+        staffStudentId: studentId,
+        type: `exam-${examId}`,
+        title: "Result Notification",
+        description: "TERMLY SUMMARY OF PROGRESS REPORT",
+        visibleToStudent: 1,
+        file: `result/${base64url.encode(JSON.stringify({ studentId, messageId, examId }))}`,
+        date: new Date().toISOString().slice(0, 10),
+        activeStatus: 1,
+        schoolId: 1,
+      };
+      await timelineRepo.upsertTimelines(timeline);
+    });
 
-        const { body, head } = render(ResultEmail as any, { props });
-        const html = pageToHtml(body, head);
-        const payload: SMTPMessage = {
-          from: "School Management System <no-reply@sms.com>",
-          to: s.guardiansEmail,
-          subject: "Result Notification",
-          text: "Result Notification",
-          html,
-        };
-
-        await new SMTPClient().sendMessage(payload);
-      })
-    );
     return true;
   }
 
@@ -295,6 +326,7 @@ export class ResultService {
 
     const { examType, academic, attendance, marks, ratings, remark, resultRecord } = resultData;
 
+    const photo = withImages ? ensureBase64Image(studentData.studentPhoto || "", "/avatar.jpg") : undefined;
     const student: Student = {
       id: studentData.studentId,
       examId: examType?.id || 0,
@@ -318,11 +350,14 @@ export class ResultService {
 
     const schoolData = (await repo.result.getGeneralSettings())?.[0] || {};
     const address = this.parseAddress(schoolData?.address || "");
-    const school = {
+    const school: School = {
+      id: schoolData?.id || 1,
       name: schoolData?.siteTitle || "School Name",
+      phone: schoolData?.phone || "",
       logo: withImages
         ? ensureBase64Image(schoolData?.favicon || schoolData?.logo || "", "/school-logo.png")
         : undefined,
+      email: schoolData?.email || "",
       city: address.city || "",
       state: address.state || "",
       title: examType?.title || "",

@@ -9,51 +9,21 @@ import { render } from "svelte/server";
 import ResultTemplate from "$lib/components/template/ResultTemplate.svelte";
 import { staffRepo } from "$lib/server/repository/staff.repo";
 
-export const GET: RequestHandler = async ({ locals }) => {
-  const { session, user } = locals;
+export const GET: RequestHandler = async () => {
   try {
     const filePath = `${process.cwd()}/static/extracted/parsed.json`;
     const data = readFileSync(filePath, "utf-8");
     const parsed = JSON.parse(data);
     const validated = await resultInputSchema.parseAsync(parsed)
 
-    // const { studentId, examTypeId, sectionId, classId } = validated.studentData
-    // const staff = await staffRepo.getStaffByClassSection({ classId, sectionId });
-    // if (!staff.teacherId) throw new Error("Class not assigned to any teacher")
-    // const res = await result.upsertStudentResult(validated, staff.teacherId);
-    // if (!studentId || !examTypeId) return error(400, "Invalid student or exam type ID");
-    const resultData = await result.getStudentResult({ id: validated.studentData.studentId!, examId: validated.studentData.examTypeId!, });
-    const validatedResult = await resultOutputSchema.safeParseAsync(resultData);
-    if (!validatedResult.success) {
-      return json(validatedResult.error.issues)
-    }
+    const { studentId, examTypeId } = validated.studentData;
+    if (!studentId || !examTypeId) return error(400, "Invalid student or exam type ID");
 
-    return json({ resultData })
+    // Background the publication process
+    result.publishResult({ studentIds: [studentId], examId: examTypeId })
+      .catch(e => console.error("Background Result Publication Failed:", e));
 
-    // console.log(validatedResult.data.student)
-    // const props = { data: validatedResult.data };
-    // const { body, head } = render(ResultTemplate, { props });
-
-    // const html = pageToHtml(body, head);
-    // const student = validatedResult.data.student;
-    // const fileName = `res_${student.fullName}_a${student.adminNo}_e${examTypeId}_${Date.now()}`;
-
-    // const pdfResult = await generate(html, fileName);
-    // if (!pdfResult.success) throw new Error(pdfResult.error || "Failed to generate document");
-    // if (!pdfResult.pdfBuffer) throw new Error("PDF buffer is missing");
-    // return new Response(new Uint8Array(pdfResult.pdfBuffer), {
-    //   headers: {
-    //     "Content-Type": "application/pdf",
-    //     "Content-Disposition": `inline; filename=${fileName}.pdf`,
-    //   },
-    // });
-
-    // return new Response(html, {
-    //   headers: {
-    //     "Content-Type": "text/html",
-    //     "Content-Disposition": `inline; filename=${fileName}.html`,
-    //   },
-    // });
+    return json({ success: true, message: "Result publication started in the background" });
   } catch (e: any) {
     return error(500, e.message);
   }

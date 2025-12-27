@@ -13,14 +13,17 @@ const TITLES_BY_CATEGORY: Record<Category, readonly string[]> = {
 };
 
 export const schoolSchema = z.object({
+  id: z.number().describe("The ID of the school"),
   name: z.string().describe("The name of the school"),
+  email: z.string().describe("The email of the school"),
+  phone: z.string().describe("The phone of the school"),
   logo: z.string().optional().describe("The base64 encoded logo of the school"),
   city: z.string().describe("The city of the school"),
   state: z.string().describe("The state of the school"),
   title: z.string().describe("The title of the school"),
   vacation_date: z.string().describe("The vacation date of the school"),
 });
-export type SchoolData = z.infer<typeof schoolSchema>;
+export type School = z.infer<typeof schoolSchema>;
 
 export const studentSchema = z.object({
   id: z.number().describe("The ID of the student"),

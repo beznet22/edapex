@@ -31,6 +31,7 @@ interface EmailResult {
   to?: string | Address | (string | Address)[];
   messageId?: string;
   response?: string;
+  studentId?: number;
 }
 
 interface SuccessMessage {
@@ -45,61 +46,63 @@ interface ErrorMessage {
   error: string;
 }
 
-// Try to get from worker data first, then fall back to environment variables
 const SMTP_HOST = process.env.SMTP_HOST;
 const SMTP_PORT = parseInt(process.env.SMTP_PORT || "587");
 const SMTP_USER = process.env.SMTP_USER;
 const SMTP_PASS = process.env.SMTP_PASS;
-const SMTP_FROM = process.env.SMTP_FROM || '"Edapex" <noreply@edapex.com>';
+const SMTP_FROM = process.env.SMTP_FROM || 'noreply@edapex.com';
+const SMTP_FROM_NAME = process.env.SMTP_FROM_NAME || 'Edapex';
+const SMTP_TO = process.env.SMTP_TO;
 
 const sendEmail = async (mailOptions: SendMailOptions): Promise<EmailResult> => {
-  // Determine if we should use SSL (port 465) or TLS (port 587, 25, etc.)
-  const isSSL = SMTP_PORT === 465;
-  
+  const isSSL = SMTP_PORT === 465; // true for 465, false for other ports
+
   const transport: Transporter = createTransport({
     host: SMTP_HOST,
     port: SMTP_PORT,
-    secure: isSSL, // true for 465, false for other ports
+    secure: isSSL,
     auth: {
       user: SMTP_USER,
       pass: SMTP_PASS,
     },
   });
 
-  mailOptions.from = SMTP_FROM;
+  mailOptions.from = `"${SMTP_FROM_NAME}" <${SMTP_FROM}>`;
+  mailOptions.to = process.env.NODE_ENV === "development" ? SMTP_TO : mailOptions.to;
   const info = await transport.sendMail(mailOptions);
-  return { messageId: info.messageId, to: mailOptions.to, response: info.response };
+  return {
+    messageId: info.messageId,
+    to: mailOptions.to,
+    response: info.response,
+    studentId: (mailOptions as any).studentId
+  };
 };
 
-// Process the email data passed to the worker
-const processData = async (): Promise<void> => {
+(async (): Promise<void> => {
   const { data: emailJobs, jobId } = workerData as WorkerData;
 
   for (const job of emailJobs) {
-    const { to, subject, html } = job;
     try {
-      const result = await sendEmail({ to, subject, html });
+      const result = await sendEmail(job);
       const successMessage: SuccessMessage = {
         jobId: jobId,
         status: "success",
         result,
       };
-      await new Promise((resolve) => setTimeout(resolve, 10000));
       parentPort?.postMessage(successMessage);
     } catch (err: any) {
       const errorMessage: ErrorMessage = {
         jobId,
         status: "error",
-        error: `Failed to send email to ${to}: ${err.message}`,
+        error: `Failed to send email to ${job.to}: ${err.message}`,
       };
       console.error("Failed to send email: ", err);
       parentPort?.postMessage(errorMessage);
     }
-    // Delay between emails to respect rate limits (e.g., Gmail's 300 per day limit)
-    await new Promise((resolve) => setTimeout(resolve, 1000)); // 1 second delay between emails
+    // Delay between emails to respect rate limits 
+    await new Promise((resolve) => setTimeout(resolve, 1000));
   }
   parentPort?.close();
-};
+})();
 
-processData();
 
