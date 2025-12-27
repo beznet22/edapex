@@ -125,3 +125,29 @@ export const sendClassResults = tool({
         };
     }
 });
+
+
+export const getStudentList = tool({
+    description: "Retrieves a list of all students assigned to a specific staff member. Returns student IDs, names, and admission numbers. Essential when 'studentId' or 'admissionNo' is unknown.",
+    inputSchema: z.object({
+        classId: z.number().describe("The unique ID of the class."),
+        sectionId: z.number().optional().describe("Optional Section ID."),
+    }),
+    outputSchema: z.object({
+        students: z
+            .array(
+                z.object({
+                    id: z.number(),
+                    name: z.string(),
+                    admissionNo: z.number(),
+                })
+            )
+            .describe("List of students"),
+    }),
+    execute: async (input) => {
+        const students = await studentRepo.getStudentsByClassId(input.classId, input.sectionId);
+        return {
+            students: students || [],
+        };
+    },
+});
