@@ -6,7 +6,7 @@ import type {
   AssignedSubject,
   ClassSection,
   ExamSetup,
-  GetExamSetupParams,
+  GetExamSetup,
   GetMarkGradeParams,
   GetSubjectFullMarkParams,
   MarkData,
@@ -23,7 +23,7 @@ import type {
   Subject,
 } from "$lib/types/result-types";
 import { jsonArrayAgg } from "../helpers";
-import type { Rating, Remark, Student } from "$lib/schema/result-output";
+import type { Rating, Remark, Student, SubjectAssigned } from "$lib/schema/result-output";
 
 export class ResultsRepository extends BaseRepository {
   async assignSubjects(assigned: Partial<AssignedSubject>[]) {
@@ -59,7 +59,7 @@ export class ResultsRepository extends BaseRepository {
     }, "getClassSections");
   }
 
-  async getAssignedSubjects(classId: number, sectionId: number): Promise<AssignedSubject[]> {
+  async getAssignedSubjects(classId: number, sectionId?: number): Promise<SubjectAssigned[]> {
     return this.withErrorHandling(async () => {
       const academicId = await this.getAcademicId();
       const [assigned] = await this.db
@@ -75,8 +75,13 @@ export class ResultsRepository extends BaseRepository {
         .limit(1);
       if (!assigned || !assigned.teacherId) return [];
       return await this.db
-        .select()
+        .select({
+          subjectId: schema.smAssignSubjects.subjectId,
+          subjectCode: schema.smSubjects.subjectCode,
+          teacherId: schema.smAssignSubjects.teacherId,
+        })
         .from(schema.smAssignSubjects)
+        .leftJoin(schema.smSubjects, eq(schema.smAssignSubjects.subjectId, schema.smSubjects.id))
         .where(
           and(
             eq(schema.smAssignSubjects.classId, classId),
@@ -94,8 +99,12 @@ export class ResultsRepository extends BaseRepository {
         .select({
           classId: schema.smAssignSubjects.classId,
           sectionId: schema.smAssignSubjects.sectionId,
+          className: schema.smClasses.className,
+          sectionName: schema.smSections.sectionName,
         })
         .from(schema.smAssignSubjects)
+        .leftJoin(schema.smClasses, eq(schema.smAssignSubjects.classId, schema.smClasses.id))
+        .leftJoin(schema.smSections, eq(schema.smAssignSubjects.sectionId, schema.smSections.id))
         .where(
           and(
             eq(schema.smAssignSubjects.teacherId, staffId),
@@ -421,6 +430,34 @@ export class ResultsRepository extends BaseRepository {
     );
   }
 
+  async updateExamSetup(
+    params: {
+      classId: number,
+      sectionId: number,
+      examTermId: number,
+      schoolId: number,
+      examTitle: string
+    }
+  ): Promise<number> {
+    return this.withErrorHandling(async () => {
+      const academicId = await this.getAcademicId();
+      const { classId, sectionId, examTermId, schoolId, ...data } = params;
+      const result = await this.db
+        .update(schema.smExamSetups)
+        .set({ ...data, updatedAt: new Date() })
+        .where(
+          and(
+            eq(schema.smExamSetups.classId, classId),
+            eq(schema.smExamSetups.sectionId, sectionId),
+            eq(schema.smExamSetups.examTermId, examTermId),
+            eq(schema.smExamSetups.academicId, academicId),
+            eq(schema.smExamSetups.schoolId, schoolId)
+          )
+        )
+      return Number(result[0].affectedRows);
+    }, "updateExamSetupTitle");
+  }
+
   async upsertExamSetup(setup: NewExamSetup): Promise<number> {
     return this.withErrorHandling(async () => {
       const { id, createdAt, updatedAt, ...data } = setup;
@@ -580,7 +617,10 @@ export class ResultsRepository extends BaseRepository {
     }, "getExamSetupsByStaffId");
   }
 
-  async getExamSetup(p: GetExamSetupParams): Promise<ExamSetup[]> {
+  async getExamSetup(p: GetExamSetup): Promise<ExamSetup[]> {
+    const { classId, sectionId, subjectId, examTypeId, schoolId } = p;
+    const condition = subjectId ? eq(schema.smExamSetups.subjectId, subjectId) : undefined;
+    const academicId = await this.getAcademicId();
     return this.withErrorHandling(
       () =>
         this.db
@@ -588,11 +628,12 @@ export class ResultsRepository extends BaseRepository {
           .from(schema.smExamSetups)
           .where(
             and(
-              eq(schema.smExamSetups.classId, p.studentClassId),
-              eq(schema.smExamSetups.sectionId, p.studentSectionId),
-              eq(schema.smExamSetups.examTermId, p.examTypeId),
-              eq(schema.smExamSetups.academicId, p.academicId),
-              eq(schema.smExamSetups.schoolId, p.schoolId)
+              eq(schema.smExamSetups.classId, classId),
+              eq(schema.smExamSetups.sectionId, sectionId),
+              eq(schema.smExamSetups.examTermId, examTypeId),
+              eq(schema.smExamSetups.academicId, academicId),
+              eq(schema.smExamSetups.schoolId, schoolId),
+              condition
             )
           ),
       "getExamSetup"

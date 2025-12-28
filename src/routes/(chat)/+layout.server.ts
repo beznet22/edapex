@@ -12,8 +12,9 @@ import { existsSync, rm, rmdirSync, type Dirent } from "fs";
 import type { ClassSection } from "$lib/types/result-types";
 import { resultRepo } from "$lib/server/repository/result.repo";
 import { DESIGNATIONS, type Designation } from "$lib/types/sms-types";
+import { generateId } from "ai";
 
-export const load: LayoutServerLoad = async ({ cookies, locals }) => {
+export const load: LayoutServerLoad = async ({ cookies, locals, url }) => {
   const { user, session } = locals;
   if ((!user || !session) && !allowAnonymousChats) {
     redirect(302, "/signin");
@@ -25,14 +26,22 @@ export const load: LayoutServerLoad = async ({ cookies, locals }) => {
 
   let students: ClassStudent[] | null = null;
   let classes: ClassSection[] = [];
-  let designation: Designation | undefined = undefined;
   if (user) {
     classes = await resultRepo.getClassSections();
     students = await studentRepo.getStudentsByStaffId(user?.staffId);
   }
 
+  const className = url.searchParams.get("className");
+  const sectionName = url.searchParams.get("sectionName");
+
   let pending: Dirent<string>[] = [];
-  const uploadPath = join(UPLOADS_DIR, `${user?.id}-${user?.fullName}`);
+  let token = `${className}(${sectionName})`.toLowerCase().replaceAll(" ", "_");
+  if (user?.designation === "class_teacher") {
+    const classSection = await resultRepo.getAssignedClassSection(user.staffId || 1);
+    if (!classSection) throw new Error("Class not assigned to any section");
+    token = `${classSection.className}(${classSection.sectionName})`.toLowerCase().replaceAll(" ", "_");
+  }
+  let uploadPath = join(UPLOADS_DIR, token);
   if (existsSync(uploadPath)) {
     try {
       const files = await readdir(uploadPath, { withFileTypes: true });
@@ -54,8 +63,9 @@ export const load: LayoutServerLoad = async ({ cookies, locals }) => {
   }
 
   const uploads: UploadedData[] = pending.map((file, index) => ({
-    id: index.toString(),
+    id: generateId(),
     filename: file.name,
+    token,
     status: "pending",
     success: false,
   }));

@@ -45,6 +45,16 @@ const GRADE_RANGES = {
   ],
 } as const;
 
+type StudentData = {
+  category: Category;
+  studentId: number;
+  recordId: number;
+  classId: number;
+  sectionId: number;
+  schoolId: number;
+  examTypeId: number;
+}
+
 export class ResultService {
   category?: Category
   studentInput?: StudentInput
@@ -151,16 +161,15 @@ export class ResultService {
 
   async assignSubjects(classId: number, sectionId: number, teacherId?: number) {
     // clones existing subjects from other sections of the same class
-    const assignedSubjects = await resultRepo.getAssignedSubjects(classId, classId);
+    const academicId = await repo.result.getAcademicId();
+    const assignedSubjects = await resultRepo.getAssignedSubjects(classId, sectionId);
     const assigned = assignedSubjects.map((s) => ({
       classId,
       sectionId,
+      academicId,
       teacherId: teacherId ?? s.teacherId,
       subjectId: s.subjectId,
-      academicId: s.academicId,
-      schoolId: s.schoolId,
-      activeStatus: s.activeStatus,
-      parentId: s.parentId,
+      activeStatus: 1,
       createdAt: new Date(),
       updatedAt: new Date(),
     }));
@@ -377,9 +386,9 @@ export class ResultService {
       maxScores: records.length * 100,
     };
 
-    const subjects = await resultRepo.getAssignedSubjects(studentData.classId!, studentData.sectionId!)
+    const subjects = await resultRepo.getAssignedSubjects(studentData.classId!!)
     return {
-      subjectlen: subjects.length,
+      subjects,
       school,
       student,
       records,
@@ -471,7 +480,24 @@ export class ResultService {
    */
   private async processMarks(markStore: MarksData, examSetups: ExamSetup[]): Promise<MarksInput[] | null> {
     if (!this.studentInput) return null;
-    const { studentId, recordId, classId, sectionId, schoolId, examTypeId } = this.studentInput;
+    return this.doProcessMarks({
+      category: this.studentInput.studentCategory! as Category,
+      studentId: this.studentInput.studentId!,
+      recordId: this.studentInput.recordId!,
+      classId: this.studentInput.classId!,
+      sectionId: this.studentInput.sectionId!,
+      schoolId: this.studentInput.schoolId!,
+      examTypeId: this.studentInput.examTypeId!,
+    }, markStore, examSetups);
+  }
+
+
+  /**
+   * Process marks and store in database
+   */
+  async doProcessMarks(student: StudentData, markStore: MarksData, examSetups: ExamSetup[]): Promise<MarksInput[] | null> {
+    if (!student) return null;
+    const { studentId, recordId, classId, sectionId, schoolId, examTypeId } = student;
     if (!classId || !sectionId || !schoolId || !studentId) {
       return null;
     }
@@ -497,8 +523,7 @@ export class ResultService {
         schoolId,
       });
 
-      if (this.category !== "DAYCARE") {
-
+      if (student.category !== "DAYCARE") {
         if (!marks || !record.examTitles) continue;
         if (marks.length === 0) continue;
         if (marks.length !== record.examTitles.length) continue;
@@ -623,14 +648,12 @@ export class ResultService {
   /**
    * Get exam setup data for a student and exam
    */
-  private async getExamSetup(examId: number) {
+  async getExamSetup(examId: number) {
     if (!this.studentInput) return null;
-    const academicId = await repo.result.getAcademicId();
     return await repo.result.getExamSetup({
-      studentClassId: this.studentInput.classId,
-      studentSectionId: this.studentInput.sectionId,
+      classId: this.studentInput.classId,
+      sectionId: this.studentInput.sectionId,
       examTypeId: examId,
-      academicId,
       schoolId: 1,
     });
     // ⚠️ Note: `studentId` was in params but unused in repo — removed
@@ -639,7 +662,7 @@ export class ResultService {
   /**
    * Find exam setup ID for subject and exam type
    */
-  private findExamSetupId(examSetups: ExamSetup[], subjectId: number, examType: string): number | null {
+  findExamSetupId(examSetups: ExamSetup[], subjectId: number, examType: string): number | null {
     const subjectSetups = examSetups.filter((setup) => setup.subjectId === subjectId);
 
     if (!examType) {
@@ -653,7 +676,7 @@ export class ResultService {
     return matchedSetup?.id || null;
   }
 
-  private subjectPercentageMark(obtainedMark: number, fullMark: number): number {
+  subjectPercentageMark(obtainedMark: number, fullMark: number): number {
     if (fullMark === 0) return 0;
     return Math.round((obtainedMark / fullMark) * 10000) / 100; // 2 decimal places
   }

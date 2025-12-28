@@ -2,6 +2,7 @@ import { UPLOADS_DIR } from "$lib/constants";
 import { fileSchema } from "$lib/schema/chat-schema";
 import { resultInputSchema } from "$lib/schema/result-input";
 import { generateContent } from "$lib/server/helpers/chat-helper";
+import { resultRepo } from "$lib/server/repository/result.repo";
 import { staffRepo } from "$lib/server/repository/staff.repo";
 import { result } from "$lib/server/service/result.service";
 import { del, get, put } from "$lib/utils/fs-blob";
@@ -21,14 +22,23 @@ export const POST: RequestHandler = async ({ request, locals }) => {
     const filename = formData.get("filename") as string;
     const classId = formData.get("classId") as number | null;
     const sectionId = formData.get("sectionId") as number | null;
+    const className = formData.get("className") as string;
+    const sectionName = formData.get("sectionName") as string;
+
     let staffId: number = user.staffId || 1;
-    if (classId && sectionId) {
+    let token = "";
+    if (classId && sectionId && user.designation === "coordinator") {
       const staff = await staffRepo.getStaffByClassSection({ classId, sectionId });
       if (!staff.teacherId) throw new Error("Class not assigned to any teacher")
       staffId = staff.teacherId;
+      token = `${className}(${sectionName})`.toLowerCase().replaceAll(" ", "_");
+    } else {
+      const { className, sectionName } = await resultRepo.getAssignedClassSection(staffId);
+      if (!className || !sectionName) throw new Error("Class not assigned to any section");
+      token = `${className}(${sectionName})`.toLowerCase().replaceAll(" ", "_");
     }
 
-    let pathname = `${user.id}-${user.fullName}/${filename ?? file.name}`;
+    let pathname = `${token}/${filename ?? file.name}`;
     if (filename) {
       const { buffer } = await get(pathname);
       file = new Blob([new Uint8Array(buffer)], { type: "image/jpeg" }) as File;
@@ -63,7 +73,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
       console.log("Validated data", validated.data);
       const res = await result.upsertStudentResult(validated.data, staffId);
 
-    
+
       if (filename) del(pathname);
       return json({ success: true, status: "done", data: res, filename: filename ?? file.name });
     } catch (e) {
@@ -73,7 +83,6 @@ export const POST: RequestHandler = async ({ request, locals }) => {
       }
 
       try {
-        const token = `${user.id}-${user.fullName}`;
         const buff = await file.arrayBuffer();
         const data = await put(file.name, buff, {
           token,

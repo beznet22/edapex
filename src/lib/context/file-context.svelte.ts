@@ -6,7 +6,8 @@ import UploadWorker from "$lib/chat/upload-worker.ts?worker";
 import type { index } from "drizzle-orm/gel-core";
 import { doExtraction } from "$lib/api/result.remote";
 import type { ClassSection } from "$lib/types/result-types";
-import { localStore } from "$lib/utils";
+import { page } from "$app/state";
+import { goto, replaceState } from "$app/navigation";
 
 const FILES_CONTEXT_KEY = Symbol("attachments-context");
 
@@ -19,14 +20,33 @@ export class FilesContext {
 
   constructor(uploads: UploadedData[], public doUpload?: boolean) {
     this.uploads = uploads;
+    // console.log("Files Context: ", this.uploads);
   }
 
   get selectedClass() {
-    return localStore<ClassSection | null>("selected-class");
+    if (!page.url.searchParams.get("classId") || !page.url.searchParams.get("sectionId")) return this.#selectedClass;
+    return {
+      id: Number(page.url.searchParams.get("id")!),
+      classId: Number(page.url.searchParams.get("classId")!),
+      sectionId: Number(page.url.searchParams.get("sectionId")!),
+      className: page.url.searchParams.get("className")!,
+      sectionName: page.url.searchParams.get("sectionName")!
+    }
   }
 
   set selectedClass(v: ClassSection | null) {
-    this.#selectedClass = localStore<ClassSection | null>("selected-class", v);
+    if (!v) return;
+    replaceState(`?id=${v.id}&classId=${v.classId}&sectionId=${v.sectionId}&className=${v.className}&sectionName=${v.sectionName}`, {
+      settings: {
+        id: v.id,
+        classId: v.classId,
+        sectionId: v.sectionId,
+        className: v.className,
+        sectionName: v.sectionName
+      },
+    });
+    this.#selectedClass = v;
+    window.location.reload();
   }
 
   openFileDialog = () => {
@@ -62,17 +82,16 @@ export class FilesContext {
     if (!files?.length) return;
     this.files = [...this.files, ...files];
     const incoming = Array.from(files);
-    this.#upload({ files: incoming, selectedClass: this.selectedClass });
+    this.#upload(incoming);
   };
 
   add = async (files: File[] | FileList) => {
     const incoming = Array.from(files);
-    if (this.doUpload) this.#upload({ files: incoming });
+    if (this.doUpload) this.#upload(incoming);
     this.files = [...this.files, ...incoming];
   };
 
-  #upload = (params: { files: File[], selectedClass?: ClassSection }) => {
-    const { files, selectedClass } = params;
+  #upload = (files: File[]) => {
     for (const file of files) {
       const fileId = generateId(); // Unique ID per file (not per batch)
       const upload: UploadedData = {
@@ -84,18 +103,27 @@ export class FilesContext {
 
       this.uploads = [...this.uploads, upload];
       const worker = this.#initWoeker(fileId, file.name);
-      const { classId, sectionId } = selectedClass || {};
-      worker.postMessage({ fileId, file, classId, sectionId });
+      const { classId, sectionId, className, sectionName } = this.selectedClass || {};
+      worker.postMessage({ fileId, file, classId, sectionId, className, sectionName });
     }
   };
 
-  retryUpload = (upload: UploadedData) => {
+  retryUpload = (upload: UploadedData, selectedClass?: ClassSection) => {
     upload.status = "retrying";
     upload.success = false;
     this.updateUpload(upload);
     console.log("Retrying upload: ", upload);
     const worker = this.#initWoeker(upload.id, upload.filename);
-    worker.postMessage({ fileId: upload.id, filename: upload.filename });
+
+    const { classId, sectionId, className, sectionName } = selectedClass || {};
+    worker.postMessage({
+      fileId: upload.id,
+      filename: upload.filename,
+      classId,
+      sectionId,
+      className,
+      sectionName
+    });
   };
 
   #initWoeker = (fileId: string, name: string) => {

@@ -215,10 +215,10 @@
     </PromptInputActions>
   </PromptInput>
 
-  {#if isInitial && !userContext.isCoordinator && !userContext.isIt}
-    <div
-      class="absolute top-full left-0 w-full flex flex-col items-center justify-center mt-2 gap-4"
-    >
+  <div
+    class="absolute top-full left-0 w-full flex flex-col items-center justify-center mt-2 gap-4"
+  >
+    {#if !userContext.isCoordinator && !userContext.isIt}
       {#if activeSuggestions.length > 0}
         <div class="flex w-full flex-col items-center justify-center space-y-1">
           {#each activeSuggestions as suggestion}
@@ -261,11 +261,10 @@
           {/each}
         </div>
       {/if}
-      {#if !userContext.isCoordinator && !userContext.isIt}
-        <ChatResource {onFileSelected} />
-      {/if}
-    </div>
-  {/if}
+    {/if}
+
+    <ChatResource {onFileSelected} />
+  </div>
 </div>
 
 <input

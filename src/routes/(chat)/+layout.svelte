@@ -4,12 +4,20 @@
   import * as Sidebar from "$lib/components/ui/sidebar";
   import { UserContext } from "$lib/context/user-context.svelte.js";
   import { ChatHistory } from "$lib/context/chat-history.svelte.js";
-  import { FilesContext } from "$lib/context/file-context.svelte.js";
-  let { data, children } = $props();
+  import { FilesContext, useFileActions } from "$lib/context/file-context.svelte.js";
+  import { onMount, setContext } from "svelte";
+  import type { ActionData } from "./$types.js";
+  import { pushState } from "$app/navigation";
+  import { page } from "$app/state";
+
+  let { data, children, form } = $props<{
+    data: any;
+    children: any;
+    form: ActionData;
+  }>();
 
   // svelte-ignore state_referenced_locally
   let { user, chats, uploads, selectedChatModel, students, classes } = data;
-
   const chatHistory = new ChatHistory(chats);
   chatHistory.setContext();
 

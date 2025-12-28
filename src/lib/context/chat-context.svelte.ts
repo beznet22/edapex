@@ -15,7 +15,7 @@ import { toast } from "svelte-sonner";
 import { ChatHistory } from "./chat-history.svelte";
 import type { ClassSection } from "$lib/types/result-types";
 import type { Student } from "$lib/schema/result-output";
-import { localStore } from "$lib/utils";
+import { page } from "$app/state";
 
 const CHAT_CONTEXT_KEY = Symbol("chat-context");
 
@@ -70,7 +70,14 @@ export class ChatContext {
     this.lastMessage = $derived(this.messages.at(-1));
     this.agents = $state(agents);
     this.activeAgent = agents[0]
-    this.selectedClass = localStore("selected-class", selectedClass) || undefined;
+
+    this.selectedClass = {
+      id: Number(page.url.searchParams.get("id")!),
+      classId: Number(page.url.searchParams.get("classId")!),
+      sectionId: Number(page.url.searchParams.get("sectionId")!),
+      className: page.url.searchParams.get("className")!,
+      sectionName: page.url.searchParams.get("sectionName")!
+    }
   }
 
   get loading() {
