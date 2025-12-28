@@ -1,10 +1,11 @@
-import z from "zod";
-import { tool } from "ai";
+import { marksIputSchema } from "$lib/schema/result-input";
+import { resultOutputSchema, type Category } from "$lib/schema/result-output";
+import { resultRepo } from "$lib/server/repository/result.repo";
 import { studentRepo } from "$lib/server/repository/student.repo";
 import { result } from "$lib/server/service/result.service";
-import { smStudentTimelines } from "$lib/server/db/sms-schema";
-import { repo } from "$lib/server/repository";
-import { resultOutputSchema } from "$lib/schema/result-output";
+import { CATEGORY } from "$lib/types/sms-types";
+import { tool } from "ai";
+import z, { record } from "zod";
 
 export const validateClassResults = tool({
     description: [
@@ -151,3 +152,113 @@ export const getStudentList = tool({
         };
     },
 });
+
+
+export const changeStudentName = tool({
+    description: "Changes the name of a student.",
+    inputSchema: z.object({
+        studentId: z.number().describe("The unique ID of the student."),
+        name: z.string().describe("The new name of the student."),
+    }),
+    outputSchema: z.object({
+        success: z.boolean(),
+        message: z.string(),
+    }),
+    execute: async (input) => {
+        const student = await studentRepo.getStudentById(input.studentId);
+        if (!student) {
+            return { success: false, message: "Student not found." };
+        }
+        student.fullName = input.name;
+        await studentRepo.updateStudent(student);
+        return { success: true, message: "Student name updated successfully." };
+    },
+});
+
+export const updateExamTitle = tool({
+    description: "Updates the exam title for a specific exam type.",
+    inputSchema: z.object({
+        classId: z.number().describe("The unique ID of the class."),
+        sectionId: z.number().describe("The unique ID of the section."),
+        examTypeId: z.number().describe("The unique ID of the exam type."),
+        newExamTitle: z.string().describe("The new exam title to be updated."),
+    }),
+    outputSchema: z.object({
+        success: z.boolean(),
+        message: z.string(),
+    }),
+    execute: async (input) => {
+        const affectedRows = await resultRepo.updateExamSetup({
+            examTitle: input.newExamTitle,
+            classId: input.classId,
+            sectionId: input.sectionId,
+            examTermId: input.examTypeId,
+            schoolId: 1,
+        });
+
+        return { success: true, message: `Exam setup updated successfully. Affected rows: ${affectedRows}` };
+    },
+});
+
+export const upsertMarkStore = tool({
+    description: "Updates the mark store for a specific subject and exam type.",
+    inputSchema: z.object({
+        classId: z.number().describe("The unique ID of the class. required"),
+        sectionId: z.number().describe("The unique ID of the section. required"),
+        studentId: z.number().describe("The unique ID of the student. required"),
+        examTypeId: z.number().describe("The unique ID of the exam type. required"),
+        subjectId: z.number().describe("The unique ID of the subject. required"),
+        subjectCode: z.string().describe("The subject code to be updated. required"),
+        newMarks: z.array(z.number()).describe("The new mark to be updated. required"),
+        titles: z.array(z.string()).describe("The new title to be updated. required"),
+    }),
+    outputSchema: z.object({
+        success: z.boolean().describe("The success status. required"),
+        message: z.string().describe("The message to be returned. required"),
+        data: z.array(marksIputSchema).optional().describe("The process mark to be updated. optional"),
+    }),
+    execute: async (input) => {
+        const examSetups = await resultRepo.getExamSetup({
+            classId: input.classId,
+            sectionId: input.sectionId,
+            examTypeId: input.examTypeId,
+            subjectId: input.subjectId,
+            schoolId: 1,
+        });
+
+        if (!examSetups || examSetups.length === 0) {
+            return { success: false, message: "Exam setup not found." };
+        }
+
+        const studentRecord = await studentRepo.getStudentRecord({
+            classId: input.classId,
+            sectionId: input.sectionId,
+            studentId: input.studentId,
+        });
+        if (!studentRecord) {
+            return { success: false, message: "Student not found." };
+        }
+
+        const processMark = await result.doProcessMarks({
+            category: CATEGORY[studentRecord.categoryId ?? 0] as Category,
+            studentId: input.studentId,
+            recordId: studentRecord.id,
+            classId: input.classId,
+            sectionId: input.sectionId,
+            schoolId: 1,
+            examTypeId: input.examTypeId,
+        }, [{
+            subjectId: input.subjectId,
+            subjectCode: input.subjectCode,
+            marks: input.newMarks,
+            examTitles: input.titles
+        }],
+            examSetups
+        )
+        if (!processMark) {
+            return { success: false, message: "Mark store update failed." };
+        }
+
+        return { success: true, message: `Mark store updated successfully`, data: processMark };
+    },
+}); 

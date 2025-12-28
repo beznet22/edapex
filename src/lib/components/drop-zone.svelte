@@ -1,17 +1,40 @@
 <script lang="ts">
+  import { enhance } from "$app/forms";
   import { Button } from "$lib/components/ui/button";
   import * as Dialog from "$lib/components/ui/dialog/index.js";
   import { useFileActions } from "$lib/context/file-context.svelte";
   import { Check, CircleAlert, TriangleAlert } from "@lucide/svelte";
   import XIcon from "@lucide/svelte/icons/x";
-  import { onDestroy } from "svelte";
+  import { getContext, onDestroy } from "svelte";
   import { toast } from "svelte-sonner";
-  import { displaySize, FileDropZone, KILOBYTE, type FileDropZoneProps } from "./file-drop-zone";
+  import {
+    displaySize,
+    FileDropZone,
+    KILOBYTE,
+    type FileDropZoneProps,
+  } from "./file-drop-zone";
   import { Loader } from "./prompt-kit/loader";
   import { ScrollArea } from "./ui/scroll-area";
+  import type { ActionData } from "../../routes/(chat)/$types";
+  import { page } from "$app/state";
+  import { useChat } from "$lib/context/chat-context.svelte";
 
-  const filesContext = useFileActions();
+  type Upload = {
+    filename: string;
+    status: "pending" | "uploading" | "done" | "error";
+  };
+
+  let filesContext = useFileActions();
+  let chat = useChat();
   let previewUrls = new Map<File, string>();
+  let fileForm: HTMLFormElement;
+  let files = $state<File[]>([]);
+  let uploads = $derived<Upload[]>(
+    files.map((f) => ({
+      filename: page.form?.filenames?.[f.name] || f.name,
+      status: page.form?.status || "uploading",
+    })),
+  );
 
   // Cleanup object URLs on destruction
   onDestroy(() => {
@@ -19,11 +42,15 @@
     previewUrls.clear();
   });
 
-  const onUpload: FileDropZoneProps["onUpload"] = async (files) => {
-    await filesContext.add(files);
+  const onUpload: FileDropZoneProps["onUpload"] = async (fs) => {
+    files = [...files, ...fs];
+    fileForm.requestSubmit();
   };
 
-  const onFileRejected: FileDropZoneProps["onFileRejected"] = ({ reason, file }) => {
+  const onFileRejected: FileDropZoneProps["onFileRejected"] = ({
+    reason,
+    file,
+  }) => {
     toast.error(`${file.name} failed to upload!`, { description: reason });
   };
 
@@ -36,12 +63,12 @@
   };
 
   const removeFile = (index: number) => {
-    const file = filesContext.files[index];
+    const file = files[index];
     if (file && previewUrls.has(file)) {
       URL.revokeObjectURL(previewUrls.get(file)!);
       previewUrls.delete(file);
     }
-    filesContext.remove(index);
+    files.splice(index, 1);
   };
 </script>
 
@@ -62,35 +89,57 @@
       <Dialog.Header>
         <Dialog.Title>Add Recource</Dialog.Title>
         <Dialog.Description>
-          Add image or documents to chat, file content will be extracted and used as chat context.
+          Add image or documents to chat, file content will be extracted and
+          used as chat context.
         </Dialog.Description>
       </Dialog.Header>
 
-      <div class="mt-4">
-        <FileDropZone
-          {onUpload}
-          {onFileRejected}
-          maxFileSize={300 * KILOBYTE}
-          accept="image/*"
-          maxFiles={5}
-          fileCount={filesContext.files.length}
+      <form
+        bind:this={fileForm}
+        method="POST"
+        enctype="multipart/form-data"
+        use:enhance
+      >
+        <div class="mt-4">
+          <FileDropZone
+            name="files"
+            {onUpload}
+            {onFileRejected}
+            maxFileSize={300 * KILOBYTE}
+            accept="image/*"
+            maxFiles={30}
+            fileCount={files.length}
+          />
+        </div>
+        {console.log(chat.selectedClass)}
+        <input hidden name="classId" value={chat.selectedClass?.classId} />
+        <input hidden name="sectionId" value={chat.selectedClass?.sectionId} />
+        <input hidden name="className" value={chat.selectedClass?.className} />
+        <input
+          hidden
+          name="sectionName"
+          value={chat.selectedClass?.sectionName}
         />
-      </div>
+      </form>
     </div>
 
     <ScrollArea class="min-h-0 grow px-6 pb-6 overflow-auto">
       <div class="flex flex-col gap-3">
-        {#each filesContext.files as file, i (file.name + i)}
-          <div class="flex items-center justify-between gap-3 rounded-md p-2 bg-background">
+        {#each files as file, i (file.name + i)}
+          <div
+            class="flex items-center justify-between gap-3 rounded-md p-2 bg-background"
+          >
             <div class="flex items-center gap-3 min-w-0 flex-1">
               {#if file.type.startsWith("image/")}
-                <div class="relative size-10 shrink-0 overflow-hidden rounded-md bg-muted">
+                <div
+                  class="relative size-10 shrink-0 overflow-hidden rounded-md bg-muted"
+                >
                   <img
                     src={generatePreviewUrl(file)}
                     alt={file.name}
                     class="h-full w-full object-cover"
                     loading="lazy"
-                    on:error={() => {
+                    onerror={() => {
                       URL.revokeObjectURL(previewUrls.get(file)!);
                       previewUrls.delete(file);
                     }}
@@ -98,7 +147,10 @@
                 </div>
               {/if}
               <div class="flex flex-col min-w-0 flex-1">
-                <span class="truncate text-sm font-medium leading-none" title={file.name}>
+                <span
+                  class="truncate text-sm font-medium leading-none"
+                  title={file.name}
+                >
                   {file.name}
                 </span>
                 <span class="text-xs text-muted-foreground mt-1">
@@ -109,13 +161,13 @@
 
             <div class="shrink-0">
               <div class="flex items-center gap-1">
-                {#if filesContext.uploads.some((u) => u.filename === file.name && u.status === "done")}
+                {#if uploads.some((u) => u.filename === file.name && u.status === "done")}
                   <Check class="size-4 text-green-500" />
-                {:else if filesContext.uploads.some((u) => u.filename === file.name && u.status === "pending")}
+                {:else if uploads.some((u) => u.filename === file.name && u.status === "pending")}
                   <TriangleAlert class="size-4 text-primary" />
-                {:else if filesContext.uploads.some((u) => u.filename === file.name && u.status === "uploading")}
+                {:else if uploads.some((u) => u.filename === file.name && u.status === "uploading")}
                   <Loader variant="circular" size="sm" />
-                {:else if filesContext.uploads.some((u) => u.filename === file.name && u.status === "error")}
+                {:else if uploads.some((u) => u.filename === file.name && u.status === "error")}
                   <CircleAlert class="size-4 text-destructive" />
                 {/if}
                 <Button
@@ -132,8 +184,10 @@
           </div>
         {/each}
 
-        {#if filesContext.files.length === 0}
-          <div class="text-center text-muted-foreground py-8">No files added yet</div>
+        {#if files.length === 0}
+          <div class="text-center text-muted-foreground py-8">
+            No files added yet
+          </div>
         {/if}
       </div>
     </ScrollArea>

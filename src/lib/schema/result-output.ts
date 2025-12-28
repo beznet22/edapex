@@ -78,8 +78,14 @@ export const recordSchema = z
           code: "custom",
           message: `Number of titles must match number of allowed titles for category ${data.category}`,
           path: ["titles"],
+          meta: {
+            allowedTitles,
+            titles: data.titles,
+            subjectId: data.subjectId,
+            subjectCode: data.subjectCode,
+          },
           continue: true,
-        });
+        })
         // await result.cleanUpResultRecord(data);
       }
       const invalidTitles = data.titles.filter((title) => !allowedTitles.includes(title));
@@ -170,21 +176,33 @@ export const examType = z.object({
 });
 export type ExamType = z.infer<typeof examType>;
 
+export const subjectAssignedSchema = z.object({
+  subjectId: z.number().nullable().describe("The ID of the subject"),
+  subjectCode: z.string().nullable().describe("The code of the subject"),
+  teacherId: z.number().nullable().describe("The ID of the teacher"),
+});
+export type SubjectAssigned = z.infer<typeof subjectAssignedSchema>;
+
 export const resultOutputSchema = z.object({
   school: schoolSchema,
   student: studentSchema,
-  subjectlen: z.number(),
+  subjects: z.array(subjectAssignedSchema).nonempty(),
   records: z.array(recordSchema).nonempty(),
   score: scoreSchema,
   ratings: ratingSchema,
   remark: remarkSchema,
   examType: examType.optional(),
 }).superRefine(async (data, ctx) => {
-  if (data.records.length !== data.subjectlen) {
+  if (data.records.length !== data.subjects.length) {
     ctx.addIssue({
       code: "custom",
-      message: "Subjects records not complete",
+      message: `Subjects records not complete, expected ${data.subjects.length} records, found ${data.records.length}`,
       path: ["records"],
+      meta: {
+        expected: data.subjects,
+        found: data.records.map((record) => record.subjectId),
+        missing: data.records.filter((record) => !data.subjects.find((subject) => subject.subjectId === record.subjectId)).map((record) => record.subjectId),
+      },
       continue: true,
     });
   }

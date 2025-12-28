@@ -38,5 +38,16 @@ export const DESIGNATION_TITLES = [
   "Finance",
 ] as const;
 
+export const CATEGORY =[
+  undefined,
+  "DAYCARE",
+  "NURSERY",
+  'GRADEK',
+  "LOWERBASIC",
+  "MIDDLEBASIC",
+]
+
 export type Designation = Exclude<(typeof DESIGNATIONS)[number], undefined>;
+export type Category = Exclude<(typeof CATEGORY)[number], undefined>;
+
 

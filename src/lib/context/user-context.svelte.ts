@@ -51,3 +51,8 @@ export class UserContext {
     return getContext(USER_CONTEXT_KEY);
   }
 }
+
+export function useUser() {
+  return UserContext.fromContext();
+}
+

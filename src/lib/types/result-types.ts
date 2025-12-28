@@ -77,11 +77,11 @@ export interface GetMarkGradeParams {
   schoolId: number;
 }
 
-export interface GetExamSetupParams {
-  studentClassId: number;
-  studentSectionId: number;
+export interface GetExamSetup {
+  classId: number;
+  sectionId: number;
+  subjectId?: number;
   examTypeId: number;
-  academicId: number;
   schoolId: number;
 }
 

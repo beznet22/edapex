@@ -9,18 +9,22 @@ interface UploadRequest {
   filename?: string;
   classId?: number;
   sectionId?: number;
+  className?: string;
+  sectionName?: string;
 }
 
 // Listen for messages from the main thread
 self.onmessage = async function (e) {
-  const { fileId, file, filename, classId, sectionId }: UploadRequest = e.data;
-  console.log({ fileId, file, filename, classId, sectionId });
+  const { fileId, file, filename, classId, sectionId, className, sectionName }: UploadRequest = e.data;
+  console.log({ fileId, file, filename, classId, sectionId, className, sectionName });
   try {
-    const formData = new FormData();
+    const formData = new FormData();  
     if (filename) formData.append("filename", filename);
     if (file) formData.append("file", file);
     if (classId) formData.append("classId", classId.toString());
     if (sectionId) formData.append("sectionId", sectionId.toString());
+    if (className) formData.append("className", className);
+    if (sectionName) formData.append("sectionName", sectionName);
 
     const response = await fetch("/api/uploads", {
       method: "POST",

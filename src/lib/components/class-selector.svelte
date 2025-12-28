@@ -13,6 +13,7 @@
   import { CircleCheck, ChevronDown } from "@lucide/svelte";
   import type { ClassSection } from "$lib/types/result-types";
   import type { ClassValue } from "svelte/elements";
+  import { replaceState } from "$app/navigation";
 
   let {
     class: c,

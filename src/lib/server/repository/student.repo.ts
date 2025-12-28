@@ -174,6 +174,31 @@ export class StudentRepository extends BaseRepository {
     return inserted.insertId;
   }
 
+  async getStudentRecord(params: { classId: number, sectionId: number, studentId: number }) {
+    const { classId, sectionId, studentId } = params;
+    if (!classId || !sectionId || !studentId) return null;
+    const academicId = await this.getAcademicId();
+    const [record] = await this.db
+      .select({
+        id: studentRecords.id,
+        categoryId: smStudents.studentCategoryId,
+      })
+      .from(studentRecords)
+      .leftJoin(smStudents, eq(studentRecords.studentId, smStudents.id))
+      .where(
+        and(
+          eq(studentRecords.studentId, studentId),
+          eq(studentRecords.classId, classId),
+          eq(studentRecords.sectionId, sectionId),
+          eq(studentRecords.isDefault, 1),
+          eq(studentRecords.academicId, academicId),
+          eq(studentRecords.activeStatus, 1)
+        )
+      )
+      .limit(1);
+    return record || null;
+  }
+
   async getStudentRecordByAdmissionNo(admissionNo: number): Promise<StudentRecord | null> {
     const academicId = await this.getAcademicId();
     const [record] = await this.db
@@ -202,6 +227,15 @@ export class StudentRepository extends BaseRepository {
       )
       .limit(1);
     return record || null;
+  }
+
+  async updateStudent(student: StudentDetails) {
+    const [updated] = await this.db
+      .update(smStudents)
+      .set({ fullName: student.fullName })
+      .where(eq(smStudents.id, student.studentId));
+    if (updated.affectedRows === 0) return null;
+    return updated;
   }
 
   async getStudentById(id?: number, isAdminNo = false): Promise<StudentDetails | null> {

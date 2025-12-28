@@ -3,19 +3,20 @@ import type { RequestHandler } from "@sveltejs/kit";
 import { error, json } from "@sveltejs/kit";
 import { base64url } from "jose";
 
-export const GET: RequestHandler = async ({ params, locals }) => {
+export const GET: RequestHandler = async ({ params, locals, url }) => {
   const { session, user } = locals;
   if (!user || !session) error(401, "Unauthorized");
 
   let { fileId } = params;
-  if (!fileId) return error(400, "No file id provided");
+  let token = url.searchParams.get("token");
+  if (!fileId || !token) return error(400, "No file id or token provided");
   const ext = fileId.split(".").pop();
-  let pathname = `${user.id}-${user.fullName}/${fileId}`;
+  let pathname = `${token}/${fileId}`;
   if (!ext) fileId = new TextDecoder().decode(base64url.decode(fileId));
 
   try {
     const file = await get(pathname);
-    return new Response(file.buffer, {
+    return new Response(new Uint8Array(file.buffer), {
       headers: {
         "Content-Type": file.contentType,
         "Content-Length": file.size.toString(),

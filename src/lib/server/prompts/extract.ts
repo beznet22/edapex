@@ -36,7 +36,7 @@ export const extractPrompt = [
   '      "subjectCode": <string> (mapped from subjects.subjectCode matches table leaning areas/subjects column),',
   '      "subjectId": <int>, (mapped from subjects.id)',
   '      "learningOutcome": <string>, (ONLY if studentCategory is "DAYCARE")',
-  '      "examTitles": [<string>, ...],',
+  '      "examTitles": [<string>, ...], (WITHOUT the dots e.g C.A becomes CA)',
   '      "marks": [<number>, ...]',
   '      "total": <number>,',
   '      "grade": "<span class=\\"{COLOR} text-violet-600 py-1 px-3 rounded-full text-xs\\">{GRADE}</span>"',
