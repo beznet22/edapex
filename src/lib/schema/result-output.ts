@@ -10,7 +10,7 @@ const TITLES_BY_CATEGORY: Record<Category, readonly string[]> = {
   GRADEK: ["CA1", "CA2", "HW", "REPORT", "PSYCHO", "EXAM"],
   LOWERBASIC: ["MTA", "CA", "REPORT", "EXAM"],
   MIDDLEBASIC: ["MTA", "CA", "REPORT", "EXAM"],
-  NURSERY: ["HW", "CA", "PSYCHO", "ORAL", "EXAM"],
+  NURSERY: ["CA", "ORAL", "PSYCHO", "HW", "EXAM"],
 };
 
 export const schoolSchema = z.object({
