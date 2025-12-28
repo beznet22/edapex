@@ -11,10 +11,10 @@ import { staffRepo } from "$lib/server/repository/staff.repo";
 
 export const GET: RequestHandler = async () => {
   try {
-    const filePath = `${process.cwd()}/static/extracted/parsed.json`;
-    const data = readFileSync(filePath, "utf-8");
-    const parsed = JSON.parse(data);
-    const validated = await resultInputSchema.parseAsync(parsed)
+    // const filePath = `${process.cwd()}/static/extracted/parsed.json`;
+    // const data = readFileSync(filePath, "utf-8");
+    // const parsed = JSON.parse(data);
+    // const validated = await resultInputSchema.parseAsync(parsed)
 
     const resultData = await result.getStudentResult({ id: 144, examId: 5, withImages: true });
     const validatedResult = await resultOutputSchema.safeParseAsync(resultData);
