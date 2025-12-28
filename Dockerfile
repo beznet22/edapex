@@ -16,34 +16,39 @@ COPY . .
 # Build the SvelteKit application
 RUN bun run build
 
-# Production stage - Use alpine for minimal size
-FROM oven/bun:alpine AS production
+# Production stage - Use slim (Debian) for glibc compatibility and smaller size
+FROM oven/bun:slim AS production
 
-# Set working directory
+# Set working directory and environment
 WORKDIR /app
+ENV NODE_ENV=production
 
-# Copy built application from builder stage
-COPY --from=builder /app/build ./build
-COPY --from=builder /app/bin ./bin
-COPY --from=builder /app/package.json ./package.json
-COPY --from=builder /app/bun.lock* ./bun.lock*
+# Install necessary libraries for html2pdf and rendering in one layer
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    fontconfig \
+    fonts-liberation \
+    libglib2.0-0 \
+    && rm -rf /var/lib/apt/lists/* \
+    && mkdir -p /app/temp
 
-# Install only production dependencies with offline mode for speed
+# Create non-root user first
+RUN groupadd -g 1001 nodejs && \
+    useradd -m -u 1001 -g nodejs nodejs
+
+# Copy files using --chown to prevent layer doubling
+COPY --from=builder --chown=nodejs:nodejs /app/build ./build
+COPY --from=builder --chown=nodejs:nodejs /app/bin ./bin
+COPY --from=builder --chown=nodejs:nodejs /app/package.json ./package.json
+COPY --from=builder --chown=nodejs:nodejs /app/bun.lock* ./bun.lock*
+COPY --from=builder --chown=nodejs:nodejs /app/static ./static
+COPY --from=builder --chown=nodejs:nodejs /app/storage ./storage
+
+# Install only production dependencies and clean cache in one layer
 RUN bun install --frozen-lockfile --production --prefer-offline && \
-    # Clean up bun cache to reduce image size
-    bun pm cache clean --force
-
-# Copy static assets and other necessary files
-COPY --from=builder /app/static ./static
-COPY --from=builder /app/storage ./storage
-
-
-# Create non-root user for security
-RUN addgroup -g 1001 -S nodejs && \
-    adduser -S nodejs -u 1001 -G nodejs
-
-# Change ownership of the app directory
-RUN chown -R nodejs:nodejs /app
+    bun pm cache clean --force && \
+    chmod +x /app/bin/html2pdf && \
+    chown -R nodejs:nodejs /app/temp
 
 # Switch to non-root user
 USER nodejs
@@ -51,5 +56,5 @@ USER nodejs
 # Expose port
 EXPOSE 3000
 
-# Start the application using the start script
+# Start the application
 CMD ["bun", "run", "start"]

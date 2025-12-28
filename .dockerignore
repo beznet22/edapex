@@ -64,6 +64,10 @@ temp
 *.tmp
 *.temp
 
+# Large directories that should be volumes
+static/public/uploads
+storage/
+
 # Bun specific
 .bun
 !.bun/install/cache
