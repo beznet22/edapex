@@ -1,3 +1,4 @@
+import { resultRepo } from "$lib/server/repository/result.repo";
 import { result } from "$lib/server/service/result.service";
 import { z } from "zod";
 
@@ -6,10 +7,10 @@ export type Category = z.infer<typeof categoryEnum>;
 
 const TITLES_BY_CATEGORY: Record<Category, readonly string[]> = {
   DAYCARE: [],
-  GRADEK: ["MTA", "CA", "REPORT", "EXAM"],
+  GRADEK: ["CA1", "CA2", "HW", "REPORT", "PSYCHO", "EXAM"],
   LOWERBASIC: ["MTA", "CA", "REPORT", "EXAM"],
   MIDDLEBASIC: ["MTA", "CA", "REPORT", "EXAM"],
-  NURSERY: ["MTA", "CA", "REPORT", "PSYCHO", "ORAL", "EXAM"],
+  NURSERY: ["HW", "CA", "PSYCHO", "ORAL", "EXAM"],
 };
 
 export const schoolSchema = z.object({
@@ -56,6 +57,9 @@ export type Student = z.infer<typeof studentSchema>;
 export const recordSchema = z
   .object({
     resultId: z.number().describe("The ID of the result"),
+    classId: z.number().describe("The ID of the class"),
+    sectionId: z.number().describe("The ID of the section"),
+    examTypeId: z.number().describe("The ID of the exam type"),
     subjectId: z.number().describe("The ID of the subject"),
     subject: z.string().describe("The name of the subject"),
     subjectCode: z.string().describe("The code of the subject"),
@@ -86,16 +90,6 @@ export const recordSchema = z
           },
           continue: true,
         })
-        // await result.cleanUpResultRecord(data);
-      }
-      const invalidTitles = data.titles.filter((title) => !allowedTitles.includes(title));
-      if (invalidTitles.length > 0) {
-        ctx.addIssue({
-          code: "custom",
-          message: `Invalid titles for category ${data.category}: ${invalidTitles.join(", ")}`,
-          path: ["titles"],
-          continue: true,
-        });
         // await result.cleanUpResultRecord(data);
       }
       if (data.marks.length !== data.titles.length) {

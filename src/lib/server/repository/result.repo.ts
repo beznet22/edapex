@@ -436,7 +436,7 @@ export class ResultsRepository extends BaseRepository {
       sectionId: number,
       examTermId: number,
       schoolId: number,
-      examTitle: string
+      examTitles: string[]
     }
   ): Promise<number> {
     return this.withErrorHandling(async () => {

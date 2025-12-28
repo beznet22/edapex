@@ -181,7 +181,7 @@ export const updateExamTitle = tool({
         classId: z.number().describe("The unique ID of the class."),
         sectionId: z.number().describe("The unique ID of the section."),
         examTypeId: z.number().describe("The unique ID of the exam type."),
-        newExamTitle: z.string().describe("The new exam title to be updated."),
+        newExamTitles: z.array(z.string()).describe("The new exam title to be updated."),
     }),
     outputSchema: z.object({
         success: z.boolean(),
@@ -189,7 +189,7 @@ export const updateExamTitle = tool({
     }),
     execute: async (input) => {
         const affectedRows = await resultRepo.updateExamSetup({
-            examTitle: input.newExamTitle,
+            examTitles: input.newExamTitles,
             classId: input.classId,
             sectionId: input.sectionId,
             examTermId: input.examTypeId,
