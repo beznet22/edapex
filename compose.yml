@@ -19,5 +19,5 @@ services:
       - MAIL_ENCRYPTION=${MAIL_ENCRYPTION}
     volumes:
       - ${STORAGE_DIR}/storage:/app/storage/
-      - ${STORAGE_DIR}/static:/app/storage/
+      - ${STORAGE_DIR}/static:/app/static/
     restart: unless-stopped
