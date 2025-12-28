@@ -108,7 +108,11 @@ export const DELETE: RequestHandler = async ({ url, locals }) => {
   if (!user || !session) error(401, "Unauthorized");
   const clearAll = url.searchParams.get("clear") === "all";
   if (clearAll) {
-    const uploadPath = join(UPLOADS_DIR, `${user.id}-${user.fullName}`);
+    const { className, sectionName } = await resultRepo.getAssignedClassSection(user.id);
+    if (!className || !sectionName) throw new Error("Class not assigned to any section");
+    const token = `${className}(${sectionName})`.toLowerCase().replaceAll(" ", "_");
+    
+    const uploadPath = join(UPLOADS_DIR, `${token}`);
     rmdirSync(uploadPath, { recursive: true });
   }
   return json({ success: true });
