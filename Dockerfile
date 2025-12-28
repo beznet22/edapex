@@ -29,12 +29,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     fontconfig \
     fonts-liberation \
     libglib2.0-0 \
-    && rm -rf /var/lib/apt/lists/* \
-    && mkdir -p /app/temp
+    && rm -rf /var/lib/apt/lists/*
 
 # Create non-root user first
 RUN groupadd -g 1001 nodejs && \
     useradd -m -u 1001 -g nodejs nodejs
+
+# Create necessary directories first
+RUN mkdir -p /app/storage/uploads /app/storage/cache /app/storage/private /app/temp && \
+    chown -R nodejs:nodejs /app/storage /app/temp
 
 # Copy files using --chown to prevent layer doubling
 COPY --from=builder --chown=nodejs:nodejs /app/build ./build
@@ -42,7 +45,6 @@ COPY --from=builder --chown=nodejs:nodejs /app/bin ./bin
 COPY --from=builder --chown=nodejs:nodejs /app/package.json ./package.json
 COPY --from=builder --chown=nodejs:nodejs /app/bun.lock* ./bun.lock*
 COPY --from=builder --chown=nodejs:nodejs /app/static ./static
-COPY --from=builder --chown=nodejs:nodejs /app/storage ./storage
 
 # Install only production dependencies and clean cache in one layer
 RUN bun install --frozen-lockfile --production --prefer-offline && \
