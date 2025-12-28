@@ -77,10 +77,10 @@ export const recordSchema = z
   .superRefine(async (data, ctx) => {
     if (data.category !== "DAYCARE") {
       const allowedTitles = TITLES_BY_CATEGORY[data.category];
-      if (data.titles.length !== allowedTitles.length) {
+      if (data.titles.length > allowedTitles.length) {
         ctx.addIssue({
           code: "custom",
-          message: `Number of titles must match number of allowed titles for category ${data.category}`,
+          message: `Number of titles is greater than allowed titles for category ${data.category}`,
           path: ["titles"],
           meta: {
             allowedTitles,
@@ -90,7 +90,7 @@ export const recordSchema = z
           },
           continue: true,
         })
-        // await result.cleanUpResultRecord(data);
+        await result.cleanUpResultRecord(data);
       }
       if (data.marks.length !== data.titles.length) {
         ctx.addIssue({
@@ -99,7 +99,7 @@ export const recordSchema = z
           path: ["marks"],
           continue: true,
         });
-        // await result.cleanUpResultRecord(data);
+        await result.cleanUpResultRecord(data);
       }
     }
     if (data.category === "DAYCARE") {
@@ -110,7 +110,7 @@ export const recordSchema = z
           path: ["titles"],
           continue: true,
         });
-        // await result.cleanUpResultRecord(data);
+        await result.cleanUpResultRecord(data);
       }
       if (!data.learningOutcome) {
         ctx.addIssue({
@@ -119,7 +119,6 @@ export const recordSchema = z
           path: ["learningOutcome"],
           continue: true,
         });
-        // await result.cleanUpResultRecord(data);
       }
     }
   });
