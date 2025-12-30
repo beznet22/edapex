@@ -56,7 +56,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
       if (mappingData.subjects.length === 0) throw new Error("You are not assigned to any subjects");
       const mapString = JSON.stringify(mappingData);
       const { success, content, message } = await generateContent(validatedFile.data, mapString);
-      if (!content || !success) throw new Error(message);
+      if (!content || !success) return json({ success: false, status: "error", error: message });
 
       const parsedResult = JSON.parse(content.trim());
       // console.log("Parsed result", parsedResult);

@@ -105,7 +105,7 @@ export class ChatContext {
   #onData = (part: any) => {
     if (part.type === "data-chat") {
       this.chatData = part.data;
-      if (!this.chatData) return;
+      if (!this.chatData || !this.chatData.id) return;
       this.chatHistory.addChat(this.chatData);
       replaceState(`/chat/${this.chatData.id}`, {
         settings: { chatId: this.chatData?.id },

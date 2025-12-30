@@ -5,6 +5,7 @@ import { studentRepo } from "$lib/server/repository/student.repo";
 import { result } from "$lib/server/service/result.service";
 import { CATEGORY } from "$lib/types/sms-types";
 import { tool } from "ai";
+import { base64url } from "jose";
 import z, { record } from "zod";
 
 export const validateClassResults = tool({
@@ -29,6 +30,7 @@ export const validateClassResults = tool({
             admissionNo: z.number(),
             issues: z.array(z.string()),
             valid: z.boolean(),
+            token: z.string().optional(),
         })).describe("List of students with invalid or missing results."),
         message: z.string(),
     }),
@@ -47,7 +49,7 @@ export const validateClassResults = tool({
 
         let validCount = 0;
         let invalidCount = 0;
-        const resultStatus: { studentId: number; name: string; admissionNo: number; issues: string[]; valid: boolean }[] = [];
+        const resultStatus: { studentId: number; name: string; admissionNo: number; issues: string[]; valid: boolean; token?: string }[] = [];
 
         for (const student of students) {
             const resultData = await result.getStudentResult({
@@ -82,6 +84,7 @@ export const validateClassResults = tool({
                     admissionNo: student.admissionNo || 0,
                     issues: [],
                     valid: true,
+                    token: base64url.encode(JSON.stringify({ studentId: student.id, examId: examTypeId })),
                 });
             }
         }

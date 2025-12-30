@@ -15,8 +15,9 @@ declare global {
       settings?: any;
       showModal?: boolean;
       showPreview?: boolean;
+      previewToken?: string;
     }
   }
 }
 
-export {};
+export { };

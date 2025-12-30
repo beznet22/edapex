@@ -1,6 +1,6 @@
 // src/agents/assessment.ts
 
-import { coordinatorTools, tools } from "$lib/chat/tools";
+import { coordinatorTools, teacherTools } from "$lib/chat/tools";
 import type { AgentWorkflow } from "$lib/types/chat-types";
 
 export const assessmentWorkflow: AgentWorkflow = {
@@ -48,7 +48,7 @@ export const assessmentWorkflow: AgentWorkflow = {
       workflowId: "assessment",
       designation: "class_teacher",
       highlight: "Compile & Validate Results",
-      tools: tools,
+      tools: teacherTools,
       suggestions: [
         "Generate raw assessment report data",
         "Update assessment report cards",
@@ -144,7 +144,16 @@ export const assessmentWorkflow: AgentWorkflow = {
         "2. **Validation (Mandatory Step)**:",
         "   - When asked to 'validate', 'check', or 'review' results, call `validateClassResults`.",
         "   - Report a summary: Total students, Valid count, Invalid count.",
+        "   - **Result Preview**: For students with NO validation issues, ALWAYS display their info in a compact markdown table.",
+        "     - **Table Columns**: | ID | Admission Number | Name |",
+        "     - **Link Format**: The 'Name' column must be a clickable Link component: `<Link href='#{TOKEN}'>{STUDENT_NAME}</Link>`",
+        "     - **Example Table**:",
+        "       | ID | Admission Number | Name |",
+        "       | :--- | :--- | :--- |",
+        "       | 56 | 1234 | <Link href='#eyJzdHVkZW5...'>John Doe</Link> |",
+        "     - IMPORTANT: Only valid students should have a link in the Name column.",
         "   - List students with issues and explain the errors in layman's terms.",
+
 
         "3. **Data Correction**:",
         "   - If validation fails: Guide the user to upload missing/corrected result sheets (images).",

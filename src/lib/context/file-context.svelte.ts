@@ -130,7 +130,10 @@ export class FilesContext {
     const worker = new UploadWorker({ name: `upload-worker-${generateId()}` });
     worker.onmessage = ({ data }: MessageEvent<UploadedData>) => {
       if (!data.success) {
-        this.uploads = this.uploads.filter((u) => u.id !== fileId);
+        const existing = this.uploads.find((u) => u.id === fileId);
+        if (existing) {
+          this.updateUpload({ ...existing, status: "error", success: false, error: data.error });
+        }
         this.files = this.files.filter((u) => u.name !== name);
         console.log(`Upload failed: `, data.error);
         toast.error(data.error!);
@@ -155,7 +158,10 @@ export class FilesContext {
 
     worker.onerror = (error) => {
       console.error(`Upload error for ${name}:`, error);
-      this.uploads = this.uploads.filter((u) => u.id !== fileId);
+      const existing = this.uploads.find((u) => u.id === fileId);
+      if (existing) {
+        this.updateUpload({ ...existing, status: "error", success: false });
+      }
       toast.error(`Failed to upload ${name}`);
     };
 
@@ -175,7 +181,10 @@ export class FilesContext {
   };
 
   updateUpload = (upload: UploadedData) => {
-    this.uploads = [...this.uploads.filter((u) => u.id !== upload.id), upload];
+    const index = this.uploads.findIndex((u) => u.id === upload.id);
+    if (index !== -1) {
+      this.uploads[index] = upload;
+    }
   };
 
   clear = () => {

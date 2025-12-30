@@ -4,7 +4,7 @@
 
 import { getRequestEvent } from "$app/server";
 import { chatModels, DEFAULT_CHAT_MODEL } from "$lib/chat/models.js";
-import { coordinatorTools, emptyTools, tools } from "$lib/chat/tools/index.js";
+import { coordinatorTools, teacherTools, defaultTools } from "$lib/chat/tools/index.js";
 import { CredentialType, type OAuth2Client } from "$lib/schema/chat-schema.js";
 import type { AuthUser } from "$lib/types/auth-types.js";
 import type { AgentWorkflow, Assistant } from "$lib/types/chat-types.js";
@@ -63,10 +63,10 @@ export class AgentService {
     return systemPrompt;
   }
 
-  static getTools(user: AuthUser | null, agentId?: string): typeof tools | typeof coordinatorTools | typeof emptyTools {
-    if (!agentId || !user?.designation) return emptyTools;
+  static getTools(user: AuthUser | null, agentId?: string): typeof teacherTools | typeof coordinatorTools | typeof defaultTools {
+    if (!agentId || !user?.designation) return defaultTools;
     const designation = user.designation;
-    return agentWorkflows.find((work) => work.id === agentId)?.assistants.find((assistant: Assistant) => assistant.designation === designation)?.tools || emptyTools;
+    return agentWorkflows.find((work) => work.id === agentId)?.assistants.find((assistant: Assistant) => assistant.designation === designation)?.tools || defaultTools;
   }
 
   static getAgentWorkflows(user: AuthUser | null): AgentWorkflow[] {

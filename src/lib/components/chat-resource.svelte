@@ -116,7 +116,7 @@
                     onclick={() => openPreview(upload)}
                   >
                     <img
-                      src={`api/uploads/${upload.filename}?token=${upload.token}`}
+                      src={`/api/uploads/${upload.filename}?token=${upload.token}`}
                       alt={upload.filename}
                       class="h-full w-full object-cover rounded-lg"
                     />
@@ -159,7 +159,7 @@
     {#if selectedUpload}
       <div class="relative w-full h-full flex items-center justify-center">
         <img
-          src={`api/uploads/${selectedUpload.filename}?token=${selectedUpload.token}`}
+          src={`/api/uploads/${selectedUpload.filename}?token=${selectedUpload.token}`}
           alt={selectedUpload.filename}
           class="max-w-full max-h-[85vh] object-contain rounded-lg shadow-2xl"
         />
