@@ -8,9 +8,8 @@ import {
 } from "./result.tool";
 import { getStudentList, sendClassResults, updateExamTitle, upsertMarkStore, validateClassResults } from "./coordinator.tool";
 
-export const tools = (writer: UIMessageStreamWriter, model: LanguageModel) => {
+export const teacherTools = (writer: UIMessageStreamWriter, model: LanguageModel) => {
     return {
-        // createDocument: createdDocumentTool(writer, model),
         upsertStudentResult,
         getClassStudentList,
         upsertAttendance,
@@ -19,14 +18,13 @@ export const tools = (writer: UIMessageStreamWriter, model: LanguageModel) => {
     };
 };
 
-export const emptyTools = (writer: UIMessageStreamWriter, model: LanguageModel) => {
+export const defaultTools = (writer: UIMessageStreamWriter, model: LanguageModel) => {
     return {};
 };
 
 export const coordinatorTools = (writer: UIMessageStreamWriter, model: LanguageModel) => {
     return {
         getStudentList,
-        upsertStudentResult,
         validateClassResults,
         sendClassResults,
         upsertMarkStore,
