@@ -1,25 +1,29 @@
 <script lang="ts">
   import { page } from "$app/state";
+  import { mode } from "mode-watcher";
+  import { onMount } from "svelte";
   import { Streamdown } from "svelte-streamdown";
 
   let content = `
 # Using MDX Components
+
 <Card title="Hello" count={42}>
 This is **markdown content** inside a component!
 </Card>
-<Link href="#eyJzdHVkZW5...">John Doe</Link>
+
+[John Doe](#eyJzdHVkZW5...>)
 `;
 
+  onMount(() => {
+    container
+      .querySelectorAll("a")
+      .forEach((link) => link.removeAttribute("target"));
+  });
+
   const defaultOrigin = page.url.href;
+  let container: HTMLDivElement;
 </script>
 
-<Streamdown {defaultOrigin} {content}>
-  {#snippet mdx({ token, props, children })}
-    {#if token.tagName === "Link"}
-      {@const { active, ...attr } = props}
-      <a {...attr}>{@render children()} </a>
-    {:else}
-      {@render children()}
-    {/if}
-  {/snippet}
-</Streamdown>
+<div bind:this={container}>
+  <Streamdown {defaultOrigin} {content} />
+</div>

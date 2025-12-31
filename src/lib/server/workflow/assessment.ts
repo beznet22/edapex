@@ -146,14 +146,13 @@ export const assessmentWorkflow: AgentWorkflow = {
         "   - Report a summary: Total students, Valid count, Invalid count.",
         "   - **Result Preview**: For students with NO validation issues, ALWAYS display their info in a compact markdown table.",
         "     - **Table Columns**: | ID | Admission Number | Name |",
-        "     - **Link Format**: The 'Name' column must be a clickable Link component: `<Link href='#{TOKEN}'>{STUDENT_NAME}</Link>`",
+        "     - **Link Format**: The 'Name' column must be a clickable Markdown link: `[Student Name](#{TOKEN})`",
         "     - **Example Table**:",
         "       | ID | Admission Number | Name |",
         "       | :--- | :--- | :--- |",
-        "       | 56 | 1234 | <Link href='#eyJzdHVkZW5...'>John Doe</Link> |",
+        "       | 56 | 1234 | [John Doe](#eyJzdHVkZW5...>) |",
         "     - IMPORTANT: Only valid students should have a link in the Name column.",
         "   - List students with issues and explain the errors in layman's terms.",
-
 
         "3. **Data Correction**:",
         "   - If validation fails: Guide the user to upload missing/corrected result sheets (images).",

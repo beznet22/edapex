@@ -6,13 +6,12 @@
   let { data } = $props();
 
   // svelte-ignore state_referenced_locally
-  let { chat, messages, agents, user, selectedClass } = data;
+  let { chat, messages, agents, user } = data;
 
   const chatContext = new ChatContext({
     initialMessages: messages,
     chatData: chat ?? undefined,
     agents: agents,
-    selectedClass,
   });
 
   chatContext.setContext();

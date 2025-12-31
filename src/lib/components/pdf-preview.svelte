@@ -20,12 +20,10 @@
     open = $bindable(false),
     token,
     title = "Document Preview",
-    onOpenChange: onOpenChangeProp,
   }: {
     open: boolean;
     token: string;
     title?: string;
-    onOpenChange?: (val: boolean) => void;
   } = $props();
 
   let ctx = $derived(usePreview(`/api/results/${token}?preview=1`));
@@ -58,10 +56,11 @@
   });
 
   function onOpenChange(val: boolean) {
+    console.log("Closing preview", val);
     open = val;
-    if (onOpenChangeProp) onOpenChangeProp(val);
     if (!val) {
       ctx.clear();
+      history.back();
     }
   }
 
@@ -118,8 +117,8 @@
             in:scale={{ duration: 300, start: 0.95 }}
           >
             {#key ctx.currentIndex}
-            <!-- svelte-ignore a11y_click_events_have_key_events -->
-            <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+              <!-- svelte-ignore a11y_click_events_have_key_events -->
+              <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
               <img
                 src={ctx.preview.images[ctx.currentIndex]}
                 alt="Page {ctx.currentIndex + 1}"
