@@ -69,7 +69,7 @@ export type UploadedData = {
 
 // Tool set type - using any to avoid circular dependency with tools function
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export type xToolUIPart = InferUITools<ReturnType<typeof teacherTools>> | InferUITools<ReturnType<typeof coordinatorTools>>;
+export type xToolUIPart = InferUITools<ReturnType<typeof teacherTools>>;
 export type xUIMessage = UIMessage<xMetadata, xDataPart, xToolUIPart>;
 export type xUIMessagePart = UIMessagePart<xDataPart, xToolUIPart>;
 export type xProviderMetadata = Record<string, Record<string, JSONValue>>;

@@ -23,10 +23,9 @@
   import NavSecondary from "./nav-secondary.svelte";
   import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
   import { SidebarHistory } from "./sidebar-history";
-  import { SettingsIcon, SearchIcon, CircleQuestionMark, CommandIcon, Plus } from "@lucide/svelte";
+  import { SettingsIcon, CircleQuestionMark, CommandIcon, Plus } from "@lucide/svelte";
   import { Button } from "./ui/button";
   import { goto } from "$app/navigation";
-  import ScrollArea from "./ui/scroll-area/scroll-area.svelte";
   let {
     user,
     ref = $bindable(null),
@@ -42,7 +41,7 @@
       <div class="flex h-10 flex-row items-center justify-between md:h-[34px]">
         <Sidebar.MenuButton class="data-[slot=sidebar-menu-button]:py-6!">
           {#snippet child({ props })}
-            <a href="##" {...props}>
+            <a href="/" {...props}>
               <div
                 class="bg-sidebar-primary text-sidebar-primary-foreground flex aspect-square size-8 items-center justify-center rounded-lg"
               >
