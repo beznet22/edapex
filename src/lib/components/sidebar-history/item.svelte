@@ -9,11 +9,21 @@
     DropdownMenuSubTrigger,
     DropdownMenuTrigger,
   } from "../ui/dropdown-menu";
-  import { useSidebar, SidebarMenuAction, SidebarMenuButton, SidebarMenuItem } from "../ui/sidebar";
-  import { Trash2, Globe, CircleCheck, Lock, Share2, MoreHorizontal } from "@lucide/svelte";
-  import { goto } from "$app/navigation";
+  import {
+    useSidebar,
+    SidebarMenuAction,
+    SidebarMenuButton,
+    SidebarMenuItem,
+  } from "../ui/sidebar";
+  import {
+    Trash2,
+    Globe,
+    CircleCheck,
+    Lock,
+    Share2,
+    MoreHorizontal,
+  } from "@lucide/svelte";
   import { ChatHistory } from "$lib/context/chat-history.svelte";
-  import { onMount } from "svelte";
 
   let {
     chat,
@@ -34,7 +44,7 @@
 <SidebarMenuItem>
   <SidebarMenuButton>
     {#snippet child({ props })}
-      <a href={chat.id} {...props}>
+      <a href={`/chat/${chat.id}`} {...props}>
         <span>{chat.title}</span>
       </a>
     {/snippet}

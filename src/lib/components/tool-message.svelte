@@ -1,22 +1,15 @@
 <script lang="ts">
   import type { xUIMessagePart } from "$lib/types/chat-types";
-  import { Tool, ToolContent, ToolHeader, ToolInput, ToolOutput } from "./ai-elements/tool";
-  import PreviewModal from "./pdf-preview.svelte";
-  import type { ResultOutput } from "$lib/schema/result-input";
+  import {
+    Tool,
+    ToolContent,
+    ToolHeader,
+    ToolInput,
+    ToolOutput,
+  } from "./ai-elements/tool";
   import { isToolUIPart } from "ai";
 
-  type ToolPartOutput = {
-    status: "approved" | "denied";
-    message: string;
-    data?: ResultOutput;
-  };
-
-  let { part, showModal = $bindable(false) }: { part: xUIMessagePart; showModal: boolean } = $props();
-  let token = $derived(part.type === "tool-upsertStudentResult" ? part.output?.data?.student.token : "");
-
-  $effect(() => {
-    console.log("URL: ", token);
-  });
+  let { part }: { part: xUIMessagePart } = $props();
 
   function getToolType(): string {
     const toolName = part.type.replace("tool-", "");
@@ -24,26 +17,8 @@
     return operation.charAt(0).toUpperCase() + operation.slice(1);
   }
 
-  function formatOutput(part: xUIMessagePart): string {
-    if (isToolUIPart(part)) {
-      switch (part.type) {
-        case "tool-upsertStudentResult":
-          if (part.state !== "output-available") return "";
-          return `Status: ${part.output.status}\nMessage: ${part.output.message}`;
-        case "tool-upsertAttendance":
-          if (part.state !== "output-available") return "";
-          return `Status: ${part.output.status}\nMessage: ${part.output.message}`;
-        case "tool-upsertTeacherRemark":
-          if (part.state !== "output-available") return "";
-          return `Status: ${part.output.status}\nMessage: ${part.output.message}`;
-        case "tool-upsertStudentRatings":
-          if (part.state !== "output-available") return "";
-          return `Status: ${part.output.status}\nMessage: ${part.output.message}`;
-        default:
-          return JSON.stringify(part.output);
-      }
-    }
-    return "";
+  function formatOutput(status: string, message?: string): string {
+    return `Status: ${status}\nMessage: ${message}`;
   }
 </script>
 
@@ -55,10 +30,30 @@
         {#if part.state === "input-available"}
           <ToolInput input={part.input} />
         {/if}
-        <ToolOutput output={formatOutput(part)} errorText={part.errorText} />
+        {#if part.state === "output-available"}
+          {#if part.type === "tool-upsertStudentResult"}
+            <ToolOutput
+              output={formatOutput(part.output.status, part.output.message)}
+              errorText={part.errorText}
+            />
+          {:else if part.type === "tool-upsertAttendance"}
+            <ToolOutput
+              output={formatOutput(part.output.status, part.output.message)}
+              errorText={part.errorText}
+            />
+          {:else if part.type === "tool-upsertTeacherRemark"}
+            <ToolOutput
+              output={formatOutput(part.output.status, part.output.message)}
+              errorText={part.errorText}
+            />
+          {:else if part.type === "tool-upsertStudentRatings"}
+            <ToolOutput
+              output={formatOutput(part.output.status, part.output.message)}
+              errorText={part.errorText}
+            />
+          {/if}
+        {/if}
       </ToolContent>
     </Tool>
   {/if}
 </div>
-
-<PreviewModal bind:open={showModal} token={token || ""} />

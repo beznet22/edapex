@@ -30,7 +30,6 @@
   // State
   let isAssistantCopied = $state(false);
   let isUserCopied = $state(false);
-  let showModal = $state(false);
 
   // Context
   const chat = $derived(useChat());
@@ -89,7 +88,7 @@
                     <!-- Then render tool parts -->
                     {#if isToolUIPart(part)}
                       <div class="flex">
-                        <ToolMessage {part} bind:showModal />
+                        <ToolMessage {part} />
                       </div>
                     {/if}
                     <!-- Rrender text parts -->

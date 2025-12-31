@@ -15,6 +15,7 @@
   } from "@lucide/svelte";
   import { fade, fly, scale } from "svelte/transition";
   import { cn } from "$lib/utils/shadcn";
+  import { page } from "$app/state";
 
   let {
     open = $bindable(false),
@@ -37,8 +38,7 @@
   });
 
   function handleClose() {
-    ctx.clear();
-    open = false;
+    onOpenChange(false);
   }
 
   function handleKeydown(event: KeyboardEvent) {
@@ -56,11 +56,13 @@
   });
 
   function onOpenChange(val: boolean) {
-    console.log("Closing preview", val);
+    if (val === open) return;
     open = val;
     if (!val) {
       ctx.clear();
-      history.back();
+      if (page.url.hash.includes(token) && token) {
+        history.back();
+      }
     }
   }
 
