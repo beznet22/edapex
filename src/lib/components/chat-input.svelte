@@ -155,7 +155,7 @@
     {#if chat.activeAgent}
       {@const Icon = iconRegistry[chat.activeAgent.iconName]}
       <div
-        class="flex sm:hidden flex-wrap items-center gap-2 px-3 pb-2 -mt-1 transition-all duration-300"
+        class="flex sm:hidden flex-wrap items-center gap-2 px-3 pb-2 transition-all duration-300"
       >
         <Button
           variant="outline"
