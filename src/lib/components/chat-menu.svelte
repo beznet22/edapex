@@ -20,8 +20,13 @@
 <DropdownMenu.Root {open} onOpenChange={(val: boolean) => (open = val)}>
   <DropdownMenu.Trigger>
     {#snippet child({ props }: { props: any })}
-      <Button {...props} variant="outline" size="icon" class="size-9 rounded-full cursor-pointer">
-        <Plus class="size-4" />
+      <Button
+        {...props}
+        variant="outline"
+        size="icon"
+        class="size-9 sm:size-10 rounded-full cursor-pointer transition-colors hover:bg-accent/50"
+      >
+        <Plus class="size-4 sm:size-4.5" />
       </Button>
     {/snippet}
   </DropdownMenu.Trigger>

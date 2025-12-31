@@ -24,6 +24,7 @@
   import { onMount } from "svelte";
   import { Loader } from "./prompt-kit/loader";
   import { Check, CircleAlert, TriangleAlert } from "@lucide/svelte";
+  import { cn } from "$lib/utils/shadcn";
 
   let {
     user,
@@ -112,22 +113,22 @@
   }
 </script>
 
-<div class="relative">
+<div class="relative transition-all duration-300">
   <PromptInput
-    class="border-input bg-popover relative z-10 w-full rounded-3xl border p-0 pt-1 shadow-xs"
+    class="border-input bg-popover/95 backdrop-blur-md relative z-10 w-full rounded-[26px] sm:rounded-3xl border p-0 pt-1 shadow-sm transition-all duration-200 focus-within:shadow-md focus-within:border-primary/30"
     value={input}
     {onValueChange}
     {onSubmit}
   >
     {#if file.files.length > 0}
       <div
-        class="flex flex-wrap gap-2 px-3 pb-2 transition-all duration-300 ease-in-out"
+        class="flex flex-wrap gap-1.5 sm:gap-2 px-3 pb-2 transition-all duration-300 ease-in-out"
       >
         {#each file.files as f, i (f.name + i)}
           <div
-            class="flex items-center gap-2 rounded-full border bg-muted px-2 py-1 text-xs"
+            class="flex items-center gap-1.5 sm:gap-2 rounded-full border bg-muted/50 px-2 sm:px-2.5 py-1 text-[11px] sm:text-xs transition-all hover:bg-muted"
           >
-            <span class="max-w-[100px] truncate">{f.name}</span>
+            <span class="max-w-[80px] sm:max-w-[120px] truncate">{f.name}</span>
             {#if file.uploads.some((u) => u.filename === f.name && u.status === "done")}
               <Check class="size-3 text-green-500" />
             {:else if file.uploads.some((u) => u.filename === f.name && u.status === "pending")}
@@ -140,13 +141,31 @@
             <Button
               variant="ghost"
               size="icon"
-              class="size-3 rounded-full cursor-pointer"
+              class="size-3.5 rounded-full cursor-pointer hover:bg-destructive/10 hover:text-destructive transition-colors"
               onclick={() => file.remove(i)}
             >
               <X class="size-3" />
             </Button>
           </div>
         {/each}
+      </div>
+    {/if}
+
+    <!-- Mobile Context Toolbar: Row for Agent Selector -->
+    {#if chat.activeAgent}
+      {@const Icon = iconRegistry[chat.activeAgent.iconName]}
+      <div
+        class="flex sm:hidden flex-wrap items-center gap-2 px-3 pb-2 -mt-1 transition-all duration-300"
+      >
+        <Button
+          variant="outline"
+          class="h-8 rounded-full border-primary/20 bg-primary/5 px-2.5 text-[11px] font-medium gap-1.5 transition-all active:scale-95"
+          onclick={() => ((chat.activeAgent = null), (activeSuggestions = []))}
+        >
+          <Icon class="size-3.5 text-primary" />
+          <span class="max-w-[100px] truncate">{chat.activeAgent.label}</span>
+          <X class="size-3 opacity-50" />
+        </Button>
       </div>
     {/if}
 
@@ -157,58 +176,64 @@
     />
 
     <PromptInputActions
-      class="mt-5 flex w-full items-end justify-between gap-2 px-3 pb-3"
+      class="mt-2 sm:mt-5 flex w-full items-end justify-between gap-2 px-2.5 sm:px-3 pb-2.5 sm:pb-3"
     >
-      <div class="flex gap-2">
+      <div class="flex gap-1.5 sm:gap-2 items-center">
         <ChatMenu {input} />
         {#if chat.activeAgent}
-          <PromptInputAction>
-            {#snippet tooltip()}
-              <p>{chat.activeAgent?.label || "Active Agent"}</p>
-            {/snippet}
-            {@const Icon = iconRegistry[chat.activeAgent.iconName]}
-            <Button
-              variant="outline"
-              class="rounded-full cursor-pointer"
-              onclick={() => (
-                (chat.activeAgent = null), (activeSuggestions = [])
-              )}
-            >
-              <Icon class="size-4" />
-              {chat.activeAgent.label}
-            </Button>
-          </PromptInputAction>
+          {@const Icon = iconRegistry[chat.activeAgent.iconName]}
+          <div class="hidden sm:block">
+            <PromptInputAction>
+              {#snippet tooltip()}
+                <p>{chat.activeAgent?.label || "Active Agent"}</p>
+              {/snippet}
+              <Button
+                variant="outline"
+                class="h-9 sm:h-10 rounded-full cursor-pointer gap-1.5 sm:gap-2 px-3 sm:px-4 text-xs sm:text-sm"
+                onclick={() => (
+                  (chat.activeAgent = null), (activeSuggestions = [])
+                )}
+              >
+                <Icon class="size-3.5 sm:size-4" />
+                <span class="max-w-[80px] sm:max-w-none truncate"
+                  >{chat.activeAgent.label}</span
+                >
+              </Button>
+            </PromptInputAction>
+          </div>
         {/if}
       </div>
-      <div class="flex gap-2">
+      <div class="flex gap-1.5 sm:gap-2 items-center">
         {#if userContext.isCoordinator || userContext.isIt}
           <ClassSelector />
         {:else}
-          <PromptInputAction>
-            {#snippet tooltip()}
-              Add Resource
-            {/snippet}
-            <Button
-              variant="ghost"
-              size="icon"
-              class="size-9 rounded-full cursor-pointer"
-              onclick={() => file.oprnFileDropZone()}
-            >
-              <Package class="size-5" />
-            </Button>
-          </PromptInputAction>
+          <div class="hidden sm:block">
+            <PromptInputAction>
+              {#snippet tooltip()}
+                Add Resource
+              {/snippet}
+              <Button
+                variant="ghost"
+                size="icon"
+                class="size-9 sm:size-10 rounded-full cursor-pointer hover:bg-accent/50 transition-colors"
+                onclick={() => file.oprnFileDropZone()}
+              >
+                <Package class="size-4.5 sm:size-5" />
+              </Button>
+            </PromptInputAction>
+          </div>
         {/if}
 
         <Button
           size="sm"
-          class="h-9 w-9 rounded-full cursor-pointer"
+          class="h-9 w-9 sm:h-10 sm:w-10 rounded-full cursor-pointer shadow-sm hover:shadow-md transition-all active:scale-95"
           onclick={onSubmit}
           disabled={!input.trim()}
         >
           {#if chat.loading}
-            <Square class="size-4 fill-current" />
+            <Square class="size-3.5 sm:size-4 fill-current" />
           {:else}
-            <ArrowUp class="size-5" />
+            <ArrowUp class="size-4.5 sm:size-5" />
           {/if}
         </Button>
       </div>
@@ -216,54 +241,65 @@
   </PromptInput>
 
   <div
-    class="absolute top-full left-0 w-full flex flex-col items-center justify-center mt-2 gap-4"
+    class={cn(
+      "absolute left-0 w-full flex flex-col items-center justify-center gap-4 transition-all duration-300 pointer-events-none",
+      isInitial ? "top-full mt-4 sm:mt-8" : "bottom-full mb-4 sm:mb-8",
+    )}
   >
-    {#if !userContext.isCoordinator && !userContext.isIt}
-      {#if activeSuggestions.length > 0}
-        <div class="flex w-full flex-col items-center justify-center space-y-1">
-          {#each activeSuggestions as suggestion}
-            <PromptSuggestion
-              highlight={activeHighlight}
-              onclick={() => handleSuggestionClick(suggestion)}
-              class="transition-all hover:scale-[1.02] hover:shadow-sm"
-            >
-              {suggestion}
-            </PromptSuggestion>
-            <Separator class="me-2" />
-          {/each}
-        </div>
-      {:else if input.trim() && found.length > 0}
-        <div class="flex w-full flex-col items-center justify-center space-y-1">
-          {#each found as student}
-            <PromptSuggestion
-              highlight={input}
-              onclick={() => handleStudentClick(student)}
-              class="transition-all hover:scale-[1.02] hover:shadow-sm"
-            >
-              {student.name}
-            </PromptSuggestion>
-            <Separator class="me-2" />
-          {/each}
-        </div>
-      {:else}
-        <div
-          class="relative flex w-full flex-wrap items-center justify-center gap-2"
-        >
-          {#each chat.agents as agent}
-            <PromptSuggestion
-              onclick={() => handleAgentClick(agent.id)}
-              class="capitalize transition-all hover:scale-105 hover:shadow-md"
-            >
-              {@const Icon = iconRegistry[agent.iconName]}
-              <Icon class="mr-2 h-4 w-4" />
-              {agent.label}
-            </PromptSuggestion>
-          {/each}
-        </div>
+    <div
+      class="w-full flex flex-col items-center justify-center gap-2 pointer-events-auto"
+    >
+      {#if !userContext.isCoordinator && !userContext.isIt}
+        {#if activeSuggestions.length > 0}
+          <div
+            class="flex w-full flex-col items-center justify-center space-y-1"
+          >
+            {#each activeSuggestions as suggestion}
+              <PromptSuggestion
+                highlight={activeHighlight}
+                onclick={() => handleSuggestionClick(suggestion)}
+                class="transition-all hover:scale-[1.02] hover:shadow-sm"
+              >
+                {suggestion}
+              </PromptSuggestion>
+              <Separator class="me-2" />
+            {/each}
+          </div>
+        {:else if input.trim() && found.length > 0}
+          <div
+            class="flex w-full flex-col items-center justify-center space-y-1"
+          >
+            {#each found as student}
+              <PromptSuggestion
+                highlight={input}
+                onclick={() => handleStudentClick(student)}
+                class="transition-all hover:scale-[1.02] hover:shadow-sm"
+              >
+                {student.name}
+              </PromptSuggestion>
+              <Separator class="me-2" />
+            {/each}
+          </div>
+        {:else}
+          <div
+            class="relative flex w-full flex-wrap items-center justify-center gap-2"
+          >
+            {#each chat.agents as agent}
+              <PromptSuggestion
+                onclick={() => handleAgentClick(agent.id)}
+                class="capitalize transition-all hover:scale-105 hover:shadow-md"
+              >
+                {@const Icon = iconRegistry[agent.iconName]}
+                <Icon class="mr-2 h-4 w-4" />
+                {agent.label}
+              </PromptSuggestion>
+            {/each}
+          </div>
+        {/if}
       {/if}
-    {/if}
 
-    <ChatResource {onFileSelected} />
+      <ChatResource {onFileSelected} />
+    </div>
   </div>
 </div>
 

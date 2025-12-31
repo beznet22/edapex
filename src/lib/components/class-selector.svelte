@@ -44,20 +44,23 @@
         {...props}
         variant="outline"
         class={cn(
-          "data-[state=open]:bg-accent data-[state=open]:text-accent-foreground w-fit md:h-[34px] md:px-2",
+          "h-9 sm:h-10 rounded-full px-3 sm:px-4 w-fit text-xs sm:text-sm gap-1.5 sm:gap-2 transition-all duration-200",
+          "data-[state=open]:bg-accent data-[state=open]:text-accent-foreground",
           c,
         )}
       >
-        {#if !chat.selectedClass?.id}
-          Select a Class
-        {:else}
-          {`${chat.selectedClass?.className} (${chat.selectedClass?.sectionName})`}
-        {/if}
-        <ChevronDown />
+        <div class="max-w-[100px] sm:max-w-[120px] truncate">
+          {#if !chat.selectedClass?.id}
+            Select a Class
+          {:else}
+            {`${chat.selectedClass?.className} (${chat.selectedClass?.sectionName})`}
+          {/if}
+        </div>
+        <ChevronDown class="size-3.5 sm:size-4 opacity-50" />
       </Button>
     {/snippet}
   </DropdownMenuTrigger>
-  <DropdownMenuContent align="center" class="max-h-96 overflow-y-auto">
+  <DropdownMenuContent align="end" class="max-h-96">
     {#each userContext.classes as cls (cls.id)}
       <DropdownMenuItem
         onSelect={() => onSelect(cls)}
