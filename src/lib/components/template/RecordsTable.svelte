@@ -48,7 +48,7 @@
         <th class="py-1 px-6 text-center">Score</th>
         <th class="py-1 px-6 text-center">Grade</th>
       </tr>
-    </thead>  
+    </thead>
   {:else if category == "DAYCARE"}
     <thead>
       <tr
@@ -103,7 +103,7 @@
           </td>
           <td class="py-3 px-6 text-center">
             <span class="text-violet-600 py-1 px-3 rounded-full text-xs">
-              {record.grade || "-"}
+              {@html record.grade}
             </span>
           </td>
         {:else if category == "DAYCARE"}

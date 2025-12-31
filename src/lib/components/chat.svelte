@@ -53,10 +53,16 @@
     }, 2000);
   };
 
-  let previewOpen = $derived(!!page.url.hash);
-  let previewToken = $derived(
-    page.url.hash.startsWith("#") ? page.url.hash.slice(1) : page.url.hash,
+  let previewOpen = $derived(!!page.state.previewToken);
+  let previewToken = $state(
+    page.url.hash.startsWith("#") ? page.url.hash.slice(1) : null,
   );
+
+  $effect(() => {
+    if (!previewToken || previewToken === "settings") return;
+    pushState("", { previewToken: previewToken || "" });
+    previewToken = "";
+  });
 </script>
 
 <main class="bg-background relative flex h-[calc(100vh-5rem)] flex-col">
