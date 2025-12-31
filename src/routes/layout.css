@@ -161,3 +161,10 @@
     @apply bg-background text-foreground;
   }
 }
+
+a[target="_blank"].disabled-link {
+    pointer-events: none;
+    cursor: default;
+    text-decoration: none;
+    color: inherit;
+}

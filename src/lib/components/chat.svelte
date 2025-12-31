@@ -54,42 +54,12 @@
     }, 2000);
   };
 
-  function handleLinkClick(e: MouseEvent) {
-    const target = e.target as HTMLElement;
-    const anchor = target.closest("a");
-    if (anchor) {
-      let previewToken = null;
-      console.log(anchor.hash);
-      if (anchor.hash) {
-        // Remove the leading '#' from the hash
-        const hash = anchor.hash.startsWith("#")
-          ? anchor.hash.slice(1)
-          : anchor.hash;
-
-        // 1. Check if the hash itself is the token (e.g. #eyJ...)
-        // This is the primary format for the assessment workflow.
-        if (hash.startsWith("eyJ")) {
-          previewToken = hash;
-        } else {
-          // 2. Fallback: Try to parse as conventional URL parameters (e.g. #preview=TOKEN)
-          const params = new URLSearchParams(hash);
-          previewToken = params.get("preview");
-        }
-      }
-
-      if (previewToken) {
-        e.preventDefault();
-        pushState("", { previewToken });
-      }
-    }
-  }
-
-  let previewOpen = $derived(!!page.state.previewToken);
-  let previewToken = $derived(page.state.previewToken as string);
+  let previewOpen = $derived(!!page.url.hash);
+  let previewToken = $derived(
+    page.url.hash.startsWith("#") ? page.url.hash.slice(1) : page.url.hash,
+  );
 </script>
 
-<!-- svelte-ignore a11y_click_events_have_key_events -->
-<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 <main class="bg-background relative flex h-[calc(100vh-5rem)] flex-col">
   {#if chat.messages.length === 0}
     <!-- Empty State with Centered Input -->
@@ -174,12 +144,4 @@
   {/if}
 </main>
 
-<PreviewModal
-  open={previewOpen}
-  token={previewToken || ""}
-  onOpenChange={(val) => {
-    if (!val) {
-      history.back();
-    }
-  }}
-/>
+<PreviewModal open={previewOpen} token={previewToken || ""} />
