@@ -57,10 +57,12 @@
 
   function onOpenChange(val: boolean) {
     if (val === open) return;
+    console.log("onOpenChange", val);
     open = val;
     if (!val) {
       ctx.clear();
       if (page.url.hash.includes(token) && token) {
+        console.log("history.back()")
         history.back();
       }
     }

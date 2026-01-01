@@ -18,23 +18,23 @@ export function getDevice(): DeviceInfo {
   const browser = ua.includes("Edg/")
     ? "Edge"
     : ua.includes("Chrome")
-    ? "Chrome"
-    : ua.includes("Firefox")
-    ? "Firefox"
-    : ua.includes("Safari")
-    ? "Safari"
-    : "Other";
+      ? "Chrome"
+      : ua.includes("Firefox")
+        ? "Firefox"
+        : ua.includes("Safari")
+          ? "Safari"
+          : "Other";
   const os = ua.includes("Windows")
     ? "Windows"
     : ua.includes("Mac")
-    ? "macOS"
-    : ua.includes("Linux")
-    ? "Linux"
-    : ua.includes("Android")
-    ? "Android"
-    : /iPhone|iPad/.test(ua)
-    ? "iOS"
-    : "Other";
+      ? "macOS"
+      : ua.includes("Linux")
+        ? "Linux"
+        : ua.includes("Android")
+          ? "Android"
+          : /iPhone|iPad/.test(ua)
+            ? "iOS"
+            : "Other";
   return { browser, os, ip };
 }
 
@@ -90,27 +90,32 @@ import { join } from "path";
  */
 export function imageToBase64(imagePath: string, fallbackPath?: string): string {
   try {
-    let fullPath = imagePath;
+    // --- Path Resolution Strategy ---
+    const resolvePath = (p: string) => {
+      // 1. Try as-is (absolute or already correct relative)
+      if (existsSync(p)) return p;
 
-    // If path starts with '/', treat it as relative to static directory
-    if (imagePath.startsWith("/")) {
-      fullPath = join(process.cwd(), "static", imagePath.substring(1));
-    } else if (!imagePath.startsWith("/") && !imagePath.includes(":")) {
-      // Relative path - resolve from project root
-      fullPath = join(process.cwd(), imagePath);
-    }
+      // 2. Try relative to project root (process.cwd())
+      const projectPath = join(process.cwd(), p.startsWith("/") ? p.substring(1) : p);
+      if (existsSync(projectPath)) return projectPath;
 
-    // Check if file exists, try fallback if provided
-    if (!existsSync(fullPath) && fallbackPath) {
-      if (fallbackPath.startsWith("/")) {
-        fullPath = join(process.cwd(), "static", fallbackPath.substring(1));
-      } else {
-        fullPath = join(process.cwd(), fallbackPath);
-      }
+      // 3. Try relative to static directory
+      const staticPath = join(process.cwd(), "static", p.startsWith("/") ? p.substring(1) : p);
+      if (existsSync(staticPath)) return staticPath;
+
+      return null;
+    };
+
+    let fullPath = resolvePath(imagePath);
+
+    // If initial path fails, try fallback if provided
+    if (!fullPath && fallbackPath) {
+      console.log("Image not found, trying fallback:", fallbackPath);
+      fullPath = resolvePath(fallbackPath);
     }
 
     // If still doesn't exist, return empty string
-    if (!existsSync(fullPath)) {
+    if (!fullPath) {
       console.warn(`Image not found: ${imagePath}`);
       return "";
     }
@@ -173,7 +178,6 @@ export function ensureBase64Image(imageSource: string, fallbackPath?: string): s
   if (imageSource.startsWith("data:image/")) {
     return imageSource;
   }
-
   // If it's a URL (http/https), return as is (can't convert server-side)
   if (imageSource.startsWith("http://") || imageSource.startsWith("https://")) {
     console.warn(`Cannot convert remote URL to base64: ${imageSource}`);

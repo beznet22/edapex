@@ -71,6 +71,10 @@ html {
   background-color: rgb(147 51 234);
 }
 
+.bg-red-200 {
+  background-color: rgb(254 202 202);
+}
+
 .progress-bar-secondary,
 .progress-bar-fill.progress-bar-secondary {
   background-color: rgb(107 114 128);

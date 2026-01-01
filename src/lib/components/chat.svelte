@@ -56,7 +56,7 @@
 
   let previewOpen = $derived(!!page.state.previewToken);
   let previewToken = $derived(
-    page.url.hash.startsWith("#") ? page.url.hash.slice(1) : null,
+    page.url.hash.startsWith("#") ? page.url.hash.slice(1) : "",
   );
 
   $effect(() => {
@@ -149,5 +149,5 @@
   {/if}
 </main>
 
-<PreviewModal open={previewOpen} token={previewToken || ""} />
+<PreviewModal open={previewOpen} token={page.state.previewToken || ""} />
 <ChatResource onFileSelected={() => {}} />

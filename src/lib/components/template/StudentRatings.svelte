@@ -1,5 +1,6 @@
 <script lang="ts">
-  import type { ResultOutput } from "$lib/schema/result-input";
+    import type { ResultOutput } from "$lib/schema/result-output";
+
 
   const badgeColors = [
     "bg-green-200 text-green-600",
@@ -10,7 +11,15 @@
     "bg-gray-200 text-gray-600",
     "bg-pink-200 text-pink-600",
   ];
-  const progress = ["success", "info", "warning", "error", "primary", "secondary", "accent"];
+  const progress = [
+    "success",
+    "info",
+    "warning",
+    "error",
+    "primary",
+    "secondary",
+    "accent",
+  ];
 
   interface Props {
     ratings: ResultOutput["ratings"];
@@ -38,8 +47,11 @@
 </script>
 
 {#if ratings.length > 0}
+  <div class="page-break"></div>
   <section class="mb-4">
-    <h2 class="text-sm font-bold mr-1 text-slate-700 opacity-75">Student Ratings</h2>
+    <h2 class="text-sm font-bold mr-1 text-slate-700 opacity-75">
+      Student Ratings
+    </h2>
     <div class="text-sm opacity-50 flex items-center">
       <svg
         class="text-xl mr-1"
@@ -61,7 +73,9 @@
     {#each ratings as rating}
       <div class="border-b grid grid-cols-6 py-1">
         <div class="col-span-2">
-          <span class="py-2 pl-2 text-xs print:text-slate-500 uppercase"> {rating.attribute}</span>
+          <span class="py-2 pl-2 text-xs print:text-slate-500 uppercase">
+            {rating.attribute}</span
+          >
         </div>
 
         <div class="col-span-3 flex items-center gap-2">
@@ -69,16 +83,24 @@
           <div class="progress-bar-container">
             <div class="progress-bar-track">
               <div
-                class="progress-bar-fill progress-bar-{progress[rating.rate! - 1] || 'info'}"
+                class="progress-bar-fill progress-bar-{progress[
+                  rating.rate! - 1
+                ] || 'info'}"
                 style="width: {getRangeValue(rating.rate)}%"
               ></div>
             </div>
           </div>
-          <span class="progress-percentage print:text-slate-500!">{getRangeValue(rating.rate)}%</span>
+          <span class="progress-percentage print:text-slate-500!"
+            >{getRangeValue(rating.rate)}%</span
+          >
         </div>
 
         <span class="col-span-1 text-xs text-center text-slate-500">
-          <span class="{getBadgeColorClass(rating.rate || 0)} py-1 px-3 rounded-full text-xs uppercase">
+          <span
+            class="{getBadgeColorClass(
+              rating.rate || 0,
+            )} py-1 px-3 rounded-full text-xs uppercase"
+          >
             {rating.remark}
           </span>
         </span>

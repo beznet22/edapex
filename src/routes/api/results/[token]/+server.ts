@@ -16,7 +16,7 @@ export const GET: RequestHandler = async ({ url, params }) => {
     const jsonString = new TextDecoder().decode(decoded);
     const { studentId, examId } = JSON.parse(jsonString);
 
-    const resultData = await result.getStudentResult({ id: studentId, examId });
+    const resultData = await result.getStudentResult({ id: studentId, examId, withImages: true });
     if (!resultData) throw new Error("Result not found");
     const props = { data: resultData };
     const { body, head } = render(ResultTemplate, { props });
@@ -24,7 +24,6 @@ export const GET: RequestHandler = async ({ url, params }) => {
     const html = pageToHtml(body, head);
     const student = resultData.student;
     const fileName = `res_${student.fullName}_a${student.adminNo}_e${examId}_${Date.now()}`;
-
     const pdfResult = await generate(html, fileName, preview);
     if (!pdfResult.success) throw new Error(pdfResult.error || "Failed to generate document");
 
@@ -32,7 +31,7 @@ export const GET: RequestHandler = async ({ url, params }) => {
       // Return ZIP file containing both images and PDF
       if (!pdfResult.zipBuffer) throw new Error("ZIP buffer not found in preview mode");
 
-      return new Response(pdfResult.zipBuffer, {
+      return new Response(new Uint8Array(pdfResult.zipBuffer), {
         headers: {
           "Content-Type": "application/zip",
           "Content-Disposition": `attachment; filename=${fileName}_files.zip`,
@@ -42,7 +41,7 @@ export const GET: RequestHandler = async ({ url, params }) => {
       // Return PDF file
       if (!pdfResult.pdfBuffer) throw new Error("PDF buffer not found in PDF mode");
 
-      return new Response(pdfResult.pdfBuffer, {
+      return new Response(new Uint8Array(pdfResult.pdfBuffer), {
         headers: {
           "Content-Type": "application/pdf",
           "Content-Disposition": `inline; filename=${fileName}.pdf`,
