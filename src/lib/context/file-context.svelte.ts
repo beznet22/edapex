@@ -16,6 +16,7 @@ export class FilesContext {
   uploads = $state<UploadedData[]>([]);
   fileInputRef = $state<HTMLInputElement | null>(null);
   openModal = $state(false);
+  openResourceModal = $state(false);
   #selectedClass = $state<ClassSection | null>(null);
 
   constructor(uploads: UploadedData[], public doUpload?: boolean) {
@@ -46,7 +47,6 @@ export class FilesContext {
       },
     });
     this.#selectedClass = v;
-    window.location.reload();
   }
 
   openFileDialog = () => {

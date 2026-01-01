@@ -1,7 +1,7 @@
 <script lang="ts">
   import * as DropdownMenu from "$lib/components/ui/dropdown-menu/index.js";
   import { FilesContext } from "$lib/context/file-context.svelte";
-  import { Check, Paperclip, Plus } from "@lucide/svelte";
+  import { Check, Paperclip, Plus, Package } from "@lucide/svelte";
   import { Button } from "./ui/button";
   import { useChat } from "$lib/context/chat-context.svelte";
   import { iconRegistry } from "$lib/utils/icons";
@@ -15,6 +15,12 @@
   let open = $state(false);
   const filesContext = FilesContext.fromContext();
   const chat = useChat();
+  
+  // Function to open the resource modal
+  function openResourceModal() {
+    filesContext.openResourceModal = true;
+    open = false;
+  }
 </script>
 
 <DropdownMenu.Root {open} onOpenChange={(val: boolean) => (open = val)}>
@@ -42,6 +48,17 @@
         <div class="flex items-center gap-5">
           <Paperclip class="size-4" />
           <div>Add Photos & Files</div>
+        </div>
+      </DropdownMenu.Item>
+      <DropdownMenu.Item
+        onSelect={() => {
+          openResourceModal();
+        }}
+        class="group/item flex flex-row items-center justify-between gap-4"
+      >
+        <div class="flex items-center gap-5">
+          <Package class="size-4" />
+          <div>View Resources</div>
         </div>
       </DropdownMenu.Item>
     </DropdownMenu.Group>
