@@ -2,7 +2,14 @@
   import { Action, Actions } from "$lib/components/ai-elements/action";
   import type { xUIMessage, xUIMessagePart } from "$lib/types/chat-types";
   import { useChat } from "$lib/context/chat-context.svelte";
-  import { Check, Copy, PlayIcon, RefreshCcw, ThumbsDown, ThumbsUp } from "@lucide/svelte";
+  import {
+    Check,
+    Copy,
+    PlayIcon,
+    RefreshCcw,
+    ThumbsDown,
+    ThumbsUp,
+  } from "@lucide/svelte";
   import PreviewModal from "./pdf-preview.svelte";
 
   let {
@@ -23,12 +30,15 @@
   let doPreview = $derived(
     message.parts.some(
       (part) =>
-        part.type === "tool-upsertStudentResult" && part.output?.status === "approved" && part.output?.data
-    )
+        part.type === "tool-upsertStudentResult" &&
+        part.output?.status === "approved" &&
+        part.output?.data,
+    ),
   );
 
   let token = $derived(
-    message.parts.find((part) => part.type === "tool-upsertStudentResult")?.output?.data?.student.token
+    message.parts.find((part) => part.type === "tool-upsertStudentResult")
+      ?.output?.data?.student.token,
   );
 </script>
 
@@ -50,8 +60,10 @@
       tooltip="Copy"
       onclick={() =>
         copyMessage(
-          message.parts.map((p: xUIMessagePart) => (p.type === "text" ? p.text : "")).join(""),
-          message.role
+          message.parts
+            .map((p: xUIMessagePart) => (p.type === "text" ? p.text : ""))
+            .join(""),
+          message.role,
         )}
     >
       {#if isAssistantCopied}
@@ -76,8 +88,10 @@
       tooltip="Copy"
       onclick={() =>
         copyMessage(
-          message.parts.map((p: xUIMessagePart) => (p.type === "text" ? p.text : "")).join(""),
-          message.role
+          message.parts
+            .map((p: xUIMessagePart) => (p.type === "text" ? p.text : ""))
+            .join(""),
+          message.role,
         )}
     >
       {#if isUserCopied}

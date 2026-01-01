@@ -86,18 +86,18 @@
 {#if uploads.length > 0}
   <Carousel.Root class="relative w-full pt-12">
     {#if !userContext.isCoordinator}
-    <Tooltip.Provider delayDuration={0}>
-      <Tooltip.Root>
-        <Tooltip.Trigger
-          class={buttonVariants({ variant: "ghost" }) +
-            "m-4 absolute left-0 top-0 z-10 cursor-pointer"}
-          onclick={clearResource}
-        >
-          <BrushCleaning class="size-5" />
-        </Tooltip.Trigger>
-        <Tooltip.Content>Clear Resources</Tooltip.Content>
-      </Tooltip.Root>
-    </Tooltip.Provider>
+      <Tooltip.Provider delayDuration={0}>
+        <Tooltip.Root>
+          <Tooltip.Trigger
+            class={buttonVariants({ variant: "ghost" }) +
+              "m-4 absolute left-0 top-0 z-10 cursor-pointer"}
+            onclick={clearResource}
+          >
+            <BrushCleaning class="size-5" />
+          </Tooltip.Trigger>
+          <Tooltip.Content>Clear Resources</Tooltip.Content>
+        </Tooltip.Root>
+      </Tooltip.Provider>
     {/if}
     <div class="flex min-h-full items-center text-sm mx-4">
       <Separator />
