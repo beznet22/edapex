@@ -12,7 +12,6 @@
   import { iconRegistry } from "$lib/utils/icons";
   import { searchFilter } from "$lib/utils/search";
   import ChatMenu from "./chat-menu.svelte";
-  import ChatResource from "./chat-resource.svelte";
   import DropZone from "./drop-zone.svelte";
   import {
     PromptInput,
@@ -298,7 +297,6 @@
         {/if}
       {/if}
 
-      <ChatResource {onFileSelected} />
     </div>
   </div>
 </div>

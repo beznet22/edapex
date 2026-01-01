@@ -18,6 +18,7 @@
   import { pushState } from "$app/navigation";
   import { page } from "$app/state";
   import PreviewModal from "./pdf-preview.svelte";
+  import ChatResource from "./chat-resource.svelte";
 
   let {
     user,
@@ -149,3 +150,4 @@
 </main>
 
 <PreviewModal open={previewOpen} token={previewToken || ""} />
+<ChatResource onFileSelected={() => {}} />
