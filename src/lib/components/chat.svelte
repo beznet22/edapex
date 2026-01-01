@@ -54,14 +54,13 @@
   };
 
   let previewOpen = $derived(!!page.state.previewToken);
-  let previewToken = $state(
+  let previewToken = $derived(
     page.url.hash.startsWith("#") ? page.url.hash.slice(1) : null,
   );
 
   $effect(() => {
     if (!previewToken || previewToken === "settings") return;
     pushState("", { previewToken: previewToken || "" });
-    previewToken = "";
   });
 </script>
 
