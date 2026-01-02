@@ -1,10 +1,12 @@
 <script lang="ts">
+  import { goto } from "$app/navigation";
   import { signout } from "$lib/api/auth.remote";
   import * as DropdownMenu from "$lib/components/ui/dropdown-menu/index.js";
   import * as Sidebar from "$lib/components/ui/sidebar/index.js";
 
   import { useSidebar } from "$lib/components/ui/sidebar/index.js";
   import type { AuthUser } from "$lib/types/auth-types";
+    import { clearLocalStore } from "$lib/utils";
   import BadgeCheckIcon from "@lucide/svelte/icons/badge-check";
   import BellIcon from "@lucide/svelte/icons/bell";
   import ChevronsUpDownIcon from "@lucide/svelte/icons/chevrons-up-down";
@@ -34,8 +36,12 @@
               class="rounded-full"
             />
             <div class="grid flex-1 text-start text-sm leading-tight">
-              <span class="truncate font-medium">{user?.fullName || "Guest"}</span>
-              <span class="text-muted-foreground truncate text-xs"> {user?.email || "m@example.com"}</span>
+              <span class="truncate font-medium"
+                >{user?.fullName || "Guest"}</span
+              >
+              <span class="text-muted-foreground truncate text-xs">
+                {user?.email || "m@example.com"}</span
+              >
             </div>
 
             <ChevronsUpDownIcon class="ms-auto size-4" />
@@ -58,7 +64,9 @@
               class="rounded-full"
             />
             <div class="grid flex-1 text-start text-sm leading-tight">
-              <span class="truncate font-medium">{user?.fullName || "Guest"}</span>
+              <span class="truncate font-medium"
+                >{user?.fullName || "Guest"}</span
+              >
               <span class="truncate text-xs">{user?.email || "Guest"}</span>
             </div>
           </div>
@@ -90,7 +98,8 @@
           onSelect={async () => {
             const result = await signout();
             if (result) {
-              window.location.href = "/signin";
+              clearLocalStore("selected-class");
+              goto("/signin");
             }
           }}
         >

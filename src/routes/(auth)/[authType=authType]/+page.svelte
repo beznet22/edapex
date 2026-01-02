@@ -1,18 +1,28 @@
 <script lang="ts">
   import SubmitButton from "$lib/components/submit-button.svelte";
-  import { enhance } from "$app/forms";
   import { page } from "$app/state";
   import AuthForm, { type FormData } from "$lib/components/auth-form.svelte";
+  import { onMount } from "svelte";
+  import { clearLocalStore } from "$lib/utils";
 
   let { form }: { form?: FormData } = $props();
 
-  const signInSignUp = $derived(page.params.authType === "signup" ? "Sign up" : "Sign in");
+  const signInSignUp = $derived(
+    page.params.authType === "signup" ? "Sign up" : "Sign in",
+  );
+
+  onMount(() => {
+    clearLocalStore("selected-class");
+  });
 </script>
 
-
-<div class="bg-background flex h-dvh w-screen items-start justify-center pt-12 md:items-center md:pt-0">
+<div
+  class="bg-background flex h-dvh w-screen items-start justify-center pt-12 md:items-center md:pt-0"
+>
   <div class="flex w-full max-w-md flex-col gap-12 overflow-hidden rounded-2xl">
-    <div class="flex flex-col items-center justify-center gap-2 px-4 text-center sm:px-16">
+    <div
+      class="flex flex-col items-center justify-center gap-2 px-4 text-center sm:px-16"
+    >
       <h3 class="text-xl font-semibold dark:text-zinc-50">{signInSignUp}</h3>
       <p class="text-sm text-gray-500 dark:text-zinc-400">
         Use your email and password to {signInSignUp.toLowerCase()}
@@ -57,7 +67,10 @@
 })}
   <p class="mt-4 text-center text-sm text-gray-600 dark:text-zinc-400">
     {question}
-    <a {href} class="font-semibold text-gray-800 hover:underline dark:text-zinc-200">
+    <a
+      {href}
+      class="font-semibold text-gray-800 hover:underline dark:text-zinc-200"
+    >
       {cta}
     </a>
     {postscript}

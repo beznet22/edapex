@@ -8,6 +8,7 @@ import { doExtraction } from "$lib/api/result.remote";
 import type { ClassSection } from "$lib/types/result-types";
 import { page } from "$app/state";
 import { goto, replaceState } from "$app/navigation";
+import { localStore } from "$lib/utils";
 
 const FILES_CONTEXT_KEY = Symbol("attachments-context");
 
@@ -21,31 +22,16 @@ export class FilesContext {
 
   constructor(uploads: UploadedData[], public doUpload?: boolean) {
     this.uploads = uploads;
-    // console.log("Files Context: ", this.uploads);
+    this.selectedClass = localStore("selected-class");
   }
 
   get selectedClass() {
-    if (!page.url.searchParams.get("classId") || !page.url.searchParams.get("sectionId")) return this.#selectedClass;
-    return {
-      id: Number(page.url.searchParams.get("id")!),
-      classId: Number(page.url.searchParams.get("classId")!),
-      sectionId: Number(page.url.searchParams.get("sectionId")!),
-      className: page.url.searchParams.get("className")!,
-      sectionName: page.url.searchParams.get("sectionName")!
-    }
+    return this.#selectedClass ?? localStore("selected-class");
   }
 
   set selectedClass(v: ClassSection | null) {
     if (!v) return;
-    replaceState(`?id=${v.id}&classId=${v.classId}&sectionId=${v.sectionId}&className=${v.className}&sectionName=${v.sectionName}`, {
-      settings: {
-        id: v.id,
-        classId: v.classId,
-        sectionId: v.sectionId,
-        className: v.className,
-        sectionName: v.sectionName
-      },
-    });
+    localStore("selected-class", v);
     this.#selectedClass = v;
   }
 
