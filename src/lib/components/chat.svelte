@@ -1,24 +1,22 @@
 <script lang="ts">
   import {
-    Conversation,
-    ConversationContent,
-    ConversationScrollButton,
+      Conversation,
+      ConversationContent,
+      ConversationScrollButton,
   } from "$lib/components/ai-elements/conversation";
   import { useChat } from "$lib/context/chat-context.svelte";
+  import { UserContext } from "$lib/context/user-context.svelte";
   import type { AuthUser } from "$lib/types/auth-types";
   import { isToolUIPart } from "ai";
   import { toast } from "svelte-sonner";
   import { Message, MessageContent } from "./ai-elements/message";
+  import Shimmer from "./ai-elements/shimmer/Shimmer.svelte";
   import ChatInput from "./chat-input.svelte";
+  import ChatResource from "./chat-resource.svelte";
   import MessageAction from "./message-action.svelte";
+  import PreviewModal from "./pdf-preview.svelte";
   import { Markdown } from "./prompt-kit/markdown";
   import ToolMessage from "./tool-message.svelte";
-  import Shimmer from "./ai-elements/shimmer/Shimmer.svelte";
-  import { UserContext } from "$lib/context/user-context.svelte";
-  import { pushState, replaceState } from "$app/navigation";
-  import { page } from "$app/state";
-  import PreviewModal from "./pdf-preview.svelte";
-  import ChatResource from "./chat-resource.svelte";
 
   let {
     user,
