@@ -11,6 +11,7 @@
     ThumbsUp,
   } from "@lucide/svelte";
   import PreviewModal from "./pdf-preview.svelte";
+    import { goto } from "$app/navigation";
 
   let {
     message,
@@ -44,18 +45,16 @@
 
 {#if message.role === "assistant"}
   <Actions>
-    <!-- {#if doPreview}
+    {#if doPreview}
       <Action
         variant="outline"
         tooltip="Preview"
         class="rounded-full text-primary bg-primary/10! border-primary! cursor-pointer"
-        onclick={() => {
-          showModal = true;
-        }}
+        onclick={() => goto(`#${token}`)}
       >
         <PlayIcon class="size-4" />
       </Action>
-    {/if} -->
+    {/if}
     <Action
       tooltip="Copy"
       onclick={() =>
@@ -103,4 +102,4 @@
   </Actions>
 {/if}
 
-<PreviewModal bind:open={showModal} token={token || ""} />
+<PreviewModal />
