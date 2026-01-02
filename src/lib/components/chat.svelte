@@ -15,7 +15,7 @@
   import ToolMessage from "./tool-message.svelte";
   import Shimmer from "./ai-elements/shimmer/Shimmer.svelte";
   import { UserContext } from "$lib/context/user-context.svelte";
-  import { pushState } from "$app/navigation";
+  import { pushState, replaceState } from "$app/navigation";
   import { page } from "$app/state";
   import PreviewModal from "./pdf-preview.svelte";
   import ChatResource from "./chat-resource.svelte";
@@ -53,16 +53,6 @@
       }
     }, 2000);
   };
-
-  let previewOpen = $derived(!!page.state.previewToken);
-  let previewToken = $derived(
-    page.url.hash.startsWith("#") ? page.url.hash.slice(1) : "",
-  );
-
-  $effect(() => {
-    if (!previewToken || previewToken === "settings") return;
-    pushState("", { previewToken: previewToken || "" });
-  });
 </script>
 
 <main class="bg-background relative flex h-[calc(100vh-5rem)] flex-col">
@@ -149,5 +139,5 @@
   {/if}
 </main>
 
-<PreviewModal open={previewOpen} token={page.state.previewToken || ""} />
+<PreviewModal />
 <ChatResource onFileSelected={() => {}} />

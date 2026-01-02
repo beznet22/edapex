@@ -16,24 +16,41 @@
   import { fade, fly, scale } from "svelte/transition";
   import { cn } from "$lib/utils/shadcn";
   import { page } from "$app/state";
+  import { goto, replaceState } from "$app/navigation";
 
   let {
-    open = $bindable(false),
-    token,
     title = "Document Preview",
   }: {
-    open: boolean;
-    token: string;
     title?: string;
   } = $props();
 
-  let ctx = $derived(usePreview(`/api/results/${token}?preview=1`));
+  let token = $derived(
+    page.url.hash.startsWith("#")
+      ? page.url.hash.slice(1)
+      : (page.state.previewToken as string | null),
+  );
+
+  let ctx = usePreview("");
+  let open = $state(false);
   let isZoomed = $state(false);
+
+  let processedToken = $state<string | null>(null);
+
+  // Sync from URL to open state (one-way sync down, carefully)
+  $effect(() => {
+    if (token !== processedToken) {
+      processedToken = token;
+      open = !!token && token !== "settings";
+    }
+  });
 
   // Fetch preview when token or open status changes
   $effect(() => {
     if (open && token) {
+      ctx.url = `/api/results/${token}?preview=1`;
       ctx.fetch();
+    } else if (!open) {
+      ctx.clear();
     }
   });
 
@@ -56,15 +73,21 @@
   });
 
   function onOpenChange(val: boolean) {
-    if (val === open) return;
-    console.log("onOpenChange", val);
     open = val;
     if (!val) {
       ctx.clear();
-      if (page.url.hash.includes(token) && token) {
-        console.log("history.back()")
-        history.back();
+      if (token) {
+        // Use goto to clear both hash and state cleanly
+        // Using replaceState: true ensures we don't add to window history
+        goto(`${page.url.pathname}${page.url.search}`, {
+          replaceState: true,
+          noScroll: true,
+          keepFocus: true,
+          state: {},
+        });
       }
+    } else {
+      processedToken = token;
     }
   }
 
@@ -73,7 +96,7 @@
   }
 </script>
 
-<Dialog.Root bind:open {onOpenChange}>
+<Dialog.Root {open} {onOpenChange}>
   <Dialog.Content
     class="max-w-[95vw] lg:max-w-[85vw] h-[92vh] p-0 overflow-hidden border-none bg-background/80 backdrop-blur-xl shadow-2xl transition-all duration-300 sm:rounded-2xl"
     onkeydown={handleKeydown}
