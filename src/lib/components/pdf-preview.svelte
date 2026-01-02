@@ -16,7 +16,7 @@
   import { fade, fly, scale } from "svelte/transition";
   import { cn } from "$lib/utils/shadcn";
   import { page } from "$app/state";
-  import { goto, replaceState } from "$app/navigation";
+  import { goto } from "$app/navigation";
 
   let {
     title = "Document Preview",
@@ -54,23 +54,15 @@
     }
   });
 
-  function handleClose() {
-    onOpenChange(false);
-  }
-
   function handleKeydown(event: KeyboardEvent) {
     if (event.key === "ArrowRight") {
       ctx.next();
     } else if (event.key === "ArrowLeft") {
       ctx.prev();
     } else if (event.key === "Escape") {
-      handleClose();
+      onOpenChange(false);
     }
   }
-
-  onDestroy(() => {
-    ctx.clear();
-  });
 
   function onOpenChange(val: boolean) {
     open = val;
@@ -91,9 +83,8 @@
     }
   }
 
-  function toggleZoom() {
-    isZoomed = !isZoomed;
-  }
+  const toggleZoom = () => (isZoomed = !isZoomed);
+  onDestroy(() => ctx.clear());
 </script>
 
 <Dialog.Root {open} {onOpenChange}>
@@ -113,13 +104,6 @@
             {title}
           </h2>
         </div>
-
-        <button
-          onclick={handleClose}
-          class="p-2 rounded-full bg-background/20 backdrop-blur-md border border-white/10 hover:bg-background/40 transition-all pointer-events-auto"
-        >
-          <X class="h-4 w-4" />
-        </button>
       </div>
 
       <!-- Main Preview Area -->
