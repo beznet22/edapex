@@ -7,12 +7,16 @@ export type Preview = {
 };
 
 const cache = new Map<string, Preview>();
+const pendingRequests = new Map<string, Promise<Preview | null>>();
 
 class PreviewContext {
+  url = $state("");
   preview: Preview | null = $state(null);
   currentIndex = $state(0);
 
-  constructor(private url: string) {}
+  constructor(url: string) {
+    this.url = url;
+  }
 
   next = () => {
     if (!this.preview) return;
@@ -28,32 +32,81 @@ class PreviewContext {
     }
   };
 
+  #isFetching = false;
+  #lastFetchedUrl = "";
+
   fetch = async () => {
+    if (!this.url || this.#isFetching) return;
+
+    // 1. Check completed cache
+    const cached = cache.get(this.url);
+    if (cached) {
+      this.preview = cached;
+      this.currentIndex = 0;
+      return;
+    }
+
+    // 2. Check pending requests
+    const pending = pendingRequests.get(this.url);
+    if (pending) {
+      try {
+        const preview = await pending;
+        if (preview) {
+          this.preview = preview;
+          this.currentIndex = 0;
+        }
+      } catch (err) {
+        console.error("Error awaiting pending preview: ", err);
+      }
+      return;
+    }
+
+    // 3. Start new fetch
+    this.#isFetching = true;
+    const fetchPromise = (async () => {
+      try {
+        const preview = await this.#fetchPreview();
+        if (preview) {
+          cache.set(this.url, preview);
+        }
+        return preview;
+      } finally {
+        pendingRequests.delete(this.url);
+      }
+    })();
+
+    pendingRequests.set(this.url, fetchPromise);
+
     try {
-      const preview = await this.#fetchPreview();
-      if (!preview) return;
-      this.#setPreview(preview);
+      const preview = await fetchPromise;
+      if (preview) {
+        this.preview = preview;
+        this.currentIndex = 0;
+      }
     } catch (err) {
       console.error("Error fetching preview: ", err);
+    } finally {
+      this.#isFetching = false;
     }
   };
 
   clear = () => {
-    if (this.preview) {
-      this.#revoke(this.preview);
-    }
+    // We don't revoke here because we use a global cache now
+    // revoking would break other components using the same cached preview
     this.preview = null;
+    this.#lastFetchedUrl = "";
   };
 
-   #setPreview = (preview: Preview) => {
+  #setPreview = (preview: Preview) => {
     this.preview = preview;
     this.currentIndex = 0;
-    if (preview.pdfName) {
-      cache.set(preview.pdfName, preview);
+    if (this.url) {
+      cache.set(this.url, preview);
     }
   };
 
   #revoke = (preview: Preview) => {
+    // Only revoke if we really want to purge the cache
     preview.images.forEach((url) => URL.revokeObjectURL(url));
     if (preview.pdfUrl) {
       URL.revokeObjectURL(preview.pdfUrl);
@@ -71,7 +124,6 @@ class PreviewContext {
 
       const zipBlob = await response.blob();
       if (!zipBlob) throw new Error("Failed to fetch ZIP");
-      console.log("ZIP Blob: ", zipBlob);
       const zip = new JSZip();
       const zipContent = await zip.loadAsync(zipBlob);
 
