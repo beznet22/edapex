@@ -16,6 +16,7 @@ import { ChatHistory } from "./chat-history.svelte";
 import type { ClassSection } from "$lib/types/result-types";
 import type { Student } from "$lib/schema/result-output";
 import { page } from "$app/state";
+import { localStore } from "$lib/utils";
 
 const CHAT_CONTEXT_KEY = Symbol("chat-context");
 
@@ -32,7 +33,7 @@ export class ChatContext {
   user = $state<AuthUser | undefined>(undefined);
   activeAgent = $state<AgentWorkflow | null>(null);
   studentData = $state<Student | undefined>(undefined);
-  selectedClass = $state<ClassSection | undefined>(undefined);
+  selectedClass = $state<ClassSection | null>(null);
   openedDocumentId = $state<string | undefined>(undefined);
   openPanel = $state<boolean>(false);
   docPart = $state<CreateDocumentPart | undefined>(undefined);
@@ -69,15 +70,8 @@ export class ChatContext {
     this.messages = $derived(this.client?.messages ?? []);
     this.lastMessage = $derived(this.messages.at(-1));
     this.agents = $state(agents);
-    this.activeAgent = agents[0]
-
-    this.selectedClass = {
-      id: Number(page.url.searchParams.get("id")!),
-      classId: Number(page.url.searchParams.get("classId")!),
-      sectionId: Number(page.url.searchParams.get("sectionId")!),
-      className: page.url.searchParams.get("className")!,
-      sectionName: page.url.searchParams.get("sectionName")!
-    }
+    this.activeAgent = agents[0];
+    this.selectedClass = localStore<ClassSection>("selected-class");
   }
 
   get loading() {

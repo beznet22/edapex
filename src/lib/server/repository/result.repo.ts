@@ -88,7 +88,7 @@ export class ResultsRepository extends BaseRepository {
             eq(schema.smAssignSubjects.teacherId, assigned.teacherId),
             eq(schema.smAssignSubjects.academicId, academicId)
           )
-        );
+        ).groupBy(schema.smAssignSubjects.subjectId);
     }, "getAssignedSubjects");
   }
 

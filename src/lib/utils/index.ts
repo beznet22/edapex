@@ -26,7 +26,7 @@ export function localStore<T>(
       return JSON.parse(raw) as T;
     } catch {
       localStorage.removeItem(key);
-      return null;  
+      return null;
     }
   }
 
@@ -37,4 +37,8 @@ export function localStore<T>(
 
   localStorage.setItem(key, JSON.stringify(value));
   return value;
+}
+
+export function clearLocalStore(key: string) {
+  localStorage.removeItem(key);
 }

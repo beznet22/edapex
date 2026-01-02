@@ -387,6 +387,7 @@ export class ResultService {
     };
 
     const subjects = await resultRepo.getAssignedSubjects(studentData.classId!!)
+    console.log({classId: studentData.classId, subjects})
     return {
       subjects,
       school,
