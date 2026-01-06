@@ -248,7 +248,7 @@
     <div
       class="w-full flex flex-col items-center justify-center gap-2 pointer-events-auto"
     >
-      {#if !userContext.isCoordinator && !userContext.isIt}
+      {#if !userContext.isCoordinator && !userContext.isIt && isInitial}
         {#if activeSuggestions.length > 0}
           <div
             class="flex w-full flex-col items-center justify-center space-y-1"
