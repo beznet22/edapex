@@ -4,6 +4,7 @@ import { and, count, eq, isNotNull, ne, sql } from "drizzle-orm";
 import {
   classAttendances,
   smAssignSubjects,
+  smBaseGroups,
   smBaseSetups,
   smClasses,
   smMarkStores,
@@ -13,6 +14,7 @@ import {
   smStudentCategories,
   smStudents,
   studentRecords,
+  users,
 } from "$lib/server/db/sms-schema";
 import { BaseRepository } from "./base.repo";
 import type { Attendance } from "$lib/schema/result-input";
@@ -48,7 +50,177 @@ export type ClassStudent = {
   admissionNo: number | null;
 };
 
+/** Guardian relation type */
+export type GuardianRelation = "father" | "mother" | "other";
+
+/** Minimal required input for creating a new student */
+export type CreateStudentInput = {
+  // Student info
+  admissionNo?: number; // optional - only checks for existing student if provided
+  firstName: string;
+  lastName: string;
+  email?: string;
+  mobile?: string;
+  dateOfBirth?: string;
+  // Required references
+  classId: number;
+  sectionId: number;
+  genderId: number;
+  studentCategoryId: number;
+  roleId?: number; // defaults to student role (2)
+  schoolId?: number; // defaults to 1
+  academicId?: number; // fetched from session if not provided
+  // Parent/guardian info (required)
+  guardianRelation: GuardianRelation; // father, mother, or other
+  guardiansName: string;
+  guardiansMobile: string;
+  guardiansEmail: string;
+};
+
 export class StudentRepository extends BaseRepository {
+  /**
+   * Creates a new student with all required related records (user, parent, student, student record)
+   * if a student with the given admission number does not already exist.
+   * @param input - Minimal required data for creating a student
+   * @returns The existing or newly created student record
+   */
+  async creatStudentIfNotExists(input: CreateStudentInput) {
+    const {
+      admissionNo,
+      firstName,
+      lastName,
+      email,
+      mobile,
+      dateOfBirth,
+      classId,
+      sectionId,
+      genderId,
+      studentCategoryId,
+      roleId = 2, // default student role
+      schoolId = 1,
+      guardianRelation,
+      guardiansName,
+      guardiansMobile,
+      guardiansEmail,
+    } = input;
+
+    // Construct full name from first and last name
+    const fullName = `${firstName} ${lastName}`.trim();
+
+    // Step 1: Check if student already exists by admission number (only if provided)
+    if (admissionNo) {
+      const [existingStudent] = await this.db
+        .select()
+        .from(smStudents)
+        .where(eq(smStudents.admissionNo, admissionNo))
+        .limit(1);
+      if (existingStudent) return existingStudent;
+    }
+
+    // Get academic year ID
+    const academicId = input.academicId ?? (await this.getAcademicId());
+
+    // Step 2: Create a User for the student
+    const [user] = await this.db
+      .insert(users)
+      .values({
+        fullName,
+        email,
+        phoneNumber: mobile,
+        usertype: "student",
+        roleId,
+        schoolId,
+        walletBalance: 0,
+        activeStatus: 1,
+      })
+      .$returningId();
+
+    // Step 3: Create a User for the parent/guardian
+    const [parentUser] = await this.db
+      .insert(users)
+      .values({
+        fullName: guardiansName,
+        email: guardiansEmail,
+        phoneNumber: guardiansMobile,
+        usertype: "parent",
+        roleId: 3, // parent role
+        schoolId,
+        walletBalance: 0,
+        activeStatus: 1,
+      })
+      .$returningId();
+
+    // Step 4: Create a Parent record with father/mother/guardian info based on relation
+    const parentData: Record<string, unknown> = {
+      guardiansName,
+      guardiansMobile,
+      guardiansEmail,
+      guardiansRelation: guardianRelation,
+      userId: parentUser.id,
+      schoolId,
+      academicId,
+      activeStatus: 1,
+    };
+
+    // Set father or mother fields based on guardian relation
+    if (guardianRelation === "father") {
+      parentData.fathersName = guardiansName;
+      parentData.fathersMobile = guardiansMobile;
+    } else if (guardianRelation === "mother") {
+      parentData.mothersName = guardiansName;
+      parentData.mothersMobile = guardiansMobile;
+    }
+
+    const [parent] = await this.db.insert(smParents).values(parentData).$returningId();
+
+    // Step 5: Create the Student record
+    const [newStudent] = await this.db
+      .insert(smStudents)
+      .values({
+        admissionNo,
+        fullName,
+        firstName,
+        lastName,
+        email,
+        mobile,
+        dateOfBirth,
+        parentId: parent.id,
+        userId: user.id,
+        roleId,
+        genderId,
+        studentCategoryId,
+        classId,
+        sectionId,
+        sessionId: academicId,
+        academicId,
+        schoolId,
+        activeStatus: 1,
+      })
+      .$returningId();
+
+    // Step 6: Create the Student Record (class enrollment)
+    await this.db.insert(studentRecords).values({
+      studentId: newStudent.id,
+      classId,
+      sectionId,
+      sessionId: academicId,
+      academicId,
+      schoolId,
+      isDefault: 1,
+      isPromote: 0,
+      activeStatus: 1,
+    });
+
+    // Return the full student record
+    const [createdStudent] = await this.db
+      .select()
+      .from(smStudents)
+      .where(eq(smStudents.id, newStudent.id))
+      .limit(1);
+
+    return createdStudent;
+  }
+
   async getStudentBySiblings() {
     const student = await this.db
       .select({
@@ -67,9 +239,7 @@ export class StudentRepository extends BaseRepository {
     return student || null;
   }
 
-
-
-  async getStudentsByClassId(params: { classId: number, sectionId: number }) {
+  async getStudentsByClassId(params: { classId: number; sectionId: number }) {
     const { classId, sectionId } = params;
     const academicId = await this.getAcademicId();
     const students = await this.db
@@ -80,19 +250,21 @@ export class StudentRepository extends BaseRepository {
       })
       .from(smStudents)
       .innerJoin(studentRecords, eq(smStudents.id, studentRecords.studentId))
-      .where(and(
-        eq(studentRecords.classId, classId),
-        eq(studentRecords.sectionId, sectionId),
-        eq(studentRecords.academicId, academicId),
-        eq(smStudents.activeStatus, 1),
-        eq(studentRecords.activeStatus, 1),
-        eq(studentRecords.isDefault, 1)
-      ));
+      .where(
+        and(
+          eq(studentRecords.classId, classId),
+          eq(studentRecords.sectionId, sectionId),
+          eq(studentRecords.academicId, academicId),
+          eq(smStudents.activeStatus, 1),
+          eq(studentRecords.activeStatus, 1),
+          eq(studentRecords.isDefault, 1)
+        )
+      );
 
     return students;
   }
 
-  async getStudentsByClassSection(params: { classId: number, sectionId: number }) {
+  async getStudentsByClassSection(params: { classId: number; sectionId: number }) {
     const { classId, sectionId } = params;
     if (!classId || !sectionId) return null;
     const academicId = await this.getAcademicId();
@@ -104,11 +276,14 @@ export class StudentRepository extends BaseRepository {
       })
       .from(smStudents)
       .innerJoin(studentRecords, eq(smStudents.id, studentRecords.studentId))
-      .where(and(
-        eq(studentRecords.classId, classId),
-        eq(studentRecords.sectionId, sectionId),
-        eq(studentRecords.academicId, academicId),
-        eq(smStudents.activeStatus, 1)));
+      .where(
+        and(
+          eq(studentRecords.classId, classId),
+          eq(studentRecords.sectionId, sectionId),
+          eq(studentRecords.academicId, academicId),
+          eq(smStudents.activeStatus, 1)
+        )
+      );
     return students;
   }
 
@@ -149,16 +324,23 @@ export class StudentRepository extends BaseRepository {
       //   )
       // )
       .innerJoin(studentRecords, eq(smStudents.id, studentRecords.studentId))
-      .where(and(
-        eq(studentRecords.classId, classSection.classId || 0),
-        eq(studentRecords.sectionId, classSection.sectionId || 0),
-        eq(studentRecords.academicId, academicId),
-        eq(smStudents.activeStatus, 1)))
+      .where(
+        and(
+          eq(studentRecords.classId, classSection.classId || 0),
+          eq(studentRecords.sectionId, classSection.sectionId || 0),
+          eq(studentRecords.academicId, academicId),
+          eq(smStudents.activeStatus, 1)
+        )
+      )
       .groupBy(smStudents.id);
     return students;
   }
 
-  async createIfNotExistsStudentRecord(params: { studentId?: number | null, classId?: number | null, sectionId?: number | null }) {
+  async createIfNotExistsStudentRecord(params: {
+    studentId?: number | null;
+    classId?: number | null;
+    sectionId?: number | null;
+  }) {
     const { studentId, classId, sectionId } = params;
     if (!studentId || !classId || !sectionId) return null;
     const academicId = await this.getAcademicId();
@@ -191,7 +373,7 @@ export class StudentRepository extends BaseRepository {
     return inserted.insertId;
   }
 
-  async getStudentRecord(params: { classId: number, sectionId: number, studentId: number }) {
+  async getStudentRecord(params: { classId: number; sectionId: number; studentId: number }) {
     const { classId, sectionId, studentId } = params;
     if (!classId || !sectionId || !studentId) return null;
     const academicId = await this.getAcademicId();
@@ -232,16 +414,16 @@ export class StudentRepository extends BaseRepository {
         schoolId: smStudents.schoolId,
       })
       .from(smStudents)
-      .leftJoin(studentRecords, and(eq(smStudents.id, studentRecords.studentId),
-        eq(studentRecords.academicId, academicId),
-        eq(studentRecords.isDefault, 1),
-        eq(studentRecords.activeStatus, 1)))
-      .where(
+      .leftJoin(
+        studentRecords,
         and(
-          eq(smStudents.admissionNo, admissionNo),
-          eq(smStudents.activeStatus, 1),
+          eq(smStudents.id, studentRecords.studentId),
+          eq(studentRecords.academicId, academicId),
+          eq(studentRecords.isDefault, 1),
+          eq(studentRecords.activeStatus, 1)
         )
       )
+      .where(and(eq(smStudents.admissionNo, admissionNo), eq(smStudents.activeStatus, 1)))
       .limit(1);
     return record || null;
   }
@@ -310,6 +492,57 @@ export class StudentRepository extends BaseRepository {
       .select()
       .from(smStudents)
       .where(and(eq(smStudents.parentId, parentId), eq(smStudents.activeStatus, 1)));
+  }
+
+  /**
+   * Get all options needed for student registration form
+   * @returns Object with classes, sections, categories, genders, and guardian relations
+   */
+  async getStudentRegistrationOptions() {
+    const academicId = await this.getAcademicId();
+
+    // Fetch all data in parallel
+    const [classes, sections, categories, genders] = await Promise.all([
+      // Classes
+      this.db
+        .select({ id: smClasses.id, name: smClasses.className })
+        .from(smClasses)
+        .where(and(eq(smClasses.activeStatus, 1), eq(smClasses.academicId, academicId))),
+
+      // Sections
+      this.db
+        .select({ id: smSections.id, name: smSections.sectionName })
+        .from(smSections)
+        .where(and(eq(smSections.activeStatus, 1), eq(smSections.academicId, academicId))),
+
+      // Student categories (not filtered by academicId as categories are typically global)
+      this.db
+        .select({ id: smStudentCategories.id, name: smStudentCategories.categoryName })
+        .from(smStudentCategories),
+
+      // Genders (baseGroupId 1 is typically for genders, fetching by joining with base groups)
+      this.db
+        .select({
+          id: smBaseSetups.id,
+          name: smBaseSetups.baseSetupName,
+          groupName: smBaseGroups.name,
+        })
+        .from(smBaseSetups)
+        .innerJoin(smBaseGroups, eq(smBaseSetups.baseGroupId, smBaseGroups.id))
+        .where(and(eq(smBaseSetups.activeStatus, 1), eq(smBaseGroups.name, "Gender"))),
+    ]);
+
+    return {
+      classes,
+      sections,
+      categories,
+      genders: genders.map((g) => ({ id: g.id, name: g.name })),
+      guardianRelations: [
+        { value: "father", label: "Father" },
+        { value: "mother", label: "Mother" },
+        { value: "other", label: "Other" },
+      ],
+    };
   }
 }
 
