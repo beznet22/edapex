@@ -6,7 +6,7 @@ import path from "path";
 import type { Address } from "nodemailer/lib/mailer";
 
 // Load environment variables in the worker context
-dotenv.config({ path: path.resolve(process.cwd(), '.env') });
+dotenv.config({ path: path.resolve(process.cwd(), ".env") });
 
 interface EmailData {
   to: string;
@@ -50,8 +50,8 @@ const SMTP_HOST = process.env.SMTP_HOST;
 const SMTP_PORT = parseInt(process.env.SMTP_PORT || "587");
 const SMTP_USER = process.env.SMTP_USER;
 const SMTP_PASS = process.env.SMTP_PASS;
-const SMTP_FROM = process.env.SMTP_FROM || 'noreply@edapex.com';
-const SMTP_FROM_NAME = process.env.SMTP_FROM_NAME || 'Edapex';
+const SMTP_FROM = process.env.SMTP_FROM || "noreply@edapex.com";
+const SMTP_FROM_NAME = process.env.SMTP_FROM_NAME || "Edapex";
 const SMTP_TO = process.env.SMTP_TO;
 
 const sendEmail = async (mailOptions: SendMailOptions): Promise<EmailResult> => {
@@ -74,7 +74,7 @@ const sendEmail = async (mailOptions: SendMailOptions): Promise<EmailResult> => 
     messageId: info.messageId,
     to: mailOptions.to,
     response: info.response,
-    studentId: (mailOptions as any).studentId
+    studentId: (mailOptions as any).studentId,
   };
 };
 
@@ -99,10 +99,8 @@ const sendEmail = async (mailOptions: SendMailOptions): Promise<EmailResult> => 
       console.error("Failed to send email: ", err);
       parentPort?.postMessage(errorMessage);
     }
-    // Delay between emails to respect rate limits 
+    // Delay between emails to respect rate limits
     await new Promise((resolve) => setTimeout(resolve, 1000));
   }
   parentPort?.close();
 })();
-
-

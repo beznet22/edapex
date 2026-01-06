@@ -104,12 +104,6 @@ export const recordSchema = z
     }
     if (data.category === "DAYCARE") {
       if (data.titles.length > 0 || data.marks.length > 0) {
-        ctx.addIssue({
-          code: "custom",
-          message: "Titles and marks are not allowed for DAYCARE, must be empty",
-          path: ["titles"],
-          continue: true,
-        });
         await result.cleanUpResultRecord(data);
       }
       if (!data.learningOutcome) {

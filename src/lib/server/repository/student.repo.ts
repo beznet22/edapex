@@ -69,22 +69,9 @@ export class StudentRepository extends BaseRepository {
 
 
 
-  async getStudentsByClassId(classId: number, sectionId?: number) {
+  async getStudentsByClassId(params: { classId: number, sectionId: number }) {
+    const { classId, sectionId } = params;
     const academicId = await this.getAcademicId();
-
-    // Build conditions array
-    const conditions = [
-      eq(studentRecords.classId, classId),
-      eq(studentRecords.academicId, academicId),
-      eq(smStudents.activeStatus, 1),
-      eq(studentRecords.activeStatus, 1),
-      eq(studentRecords.isDefault, 1)
-    ];
-
-    if (sectionId) {
-      conditions.push(eq(studentRecords.sectionId, sectionId));
-    }
-
     const students = await this.db
       .select({
         id: smStudents.id,
@@ -93,7 +80,14 @@ export class StudentRepository extends BaseRepository {
       })
       .from(smStudents)
       .innerJoin(studentRecords, eq(smStudents.id, studentRecords.studentId))
-      .where(and(...conditions));
+      .where(and(
+        eq(studentRecords.classId, classId),
+        eq(studentRecords.sectionId, sectionId),
+        eq(studentRecords.academicId, academicId),
+        eq(smStudents.activeStatus, 1),
+        eq(studentRecords.activeStatus, 1),
+        eq(studentRecords.isDefault, 1)
+      ));
 
     return students;
   }

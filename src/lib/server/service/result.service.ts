@@ -58,10 +58,11 @@ type StudentData = {
 export class ResultService {
   category?: Category
   studentInput?: StudentInput
+  
   /**
    * Publish result to students and parents timeline and send email
    */
-  async publishResult(params: { studentIds: number[]; examId: number }) {
+  async publishResults(params: { studentIds: number[]; examId: number }) {
     const { studentIds, examId } = params;
     const messages: any[] = [];
     const CONCURRENCY_LIMIT = 5;
@@ -101,7 +102,7 @@ export class ResultService {
           schoolName: school.name,
           principal: "Patience Okwube",
           contact: school.phone,
-          support: school.email || "support@sms.com",
+          support: "admin@llacademy.ng",
         };
 
         const content = render(ResultEmail as any, { props: emailProps });
@@ -132,13 +133,12 @@ export class ResultService {
     }
 
     if (messages.length === 0) return false;
-
     const payload: JobPayload = { type: "send-email", data: messages };
     await JobWorker.runTask(payload, async (job: JobResult) => {
       const { status, result: jobResult } = job;
       if (status !== "success") {
         console.error("Failed to send email: ", job.error);
-        return;
+        return false;
       }
 
       const { studentId, messageId } = jobResult;
@@ -332,12 +332,12 @@ export class ResultService {
     const resultData = await repo.result.queryResultData(studentData, examId);
     if (!resultData?.classResults?.length) return null;
 
-    const { examType, academic, attendance, marks, ratings, remark, resultRecord } = resultData;
+    const { examType, academic, attendance, marks, ratings, remark, resultRecords } = resultData;
 
     const photo = withImages ? ensureBase64Image(studentData.studentPhoto || "", "/avatar.jpg") : undefined;
     const student: Student = {
       id: studentData.studentId,
-      examId: examType?.id || 0,
+      examId: examType?.id || 0,  
       fullName: studentData.fullName || "",
       gender: studentData.genderName || "",
       parentEmail: studentData.email || "",
@@ -377,7 +377,7 @@ export class ResultService {
     };
 
     const objectives = await this.getObjectives(student);
-    const { records, overAll } = this.buildMarksRecords(marks, objectives, student.category, resultRecord);
+    const { records, overAll } = this.buildMarksRecords(marks, objectives, student.category, resultRecords);
     const score: ScoreData = {
       total: overAll,
       average: records.length ? Math.floor(overAll / records.length) : 0,

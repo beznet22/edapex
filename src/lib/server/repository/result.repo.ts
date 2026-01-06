@@ -264,6 +264,7 @@ export class ResultsRepository extends BaseRepository {
               eq(schema.smMarkStores.activeStatus, 1)
             )
           ),
+        // Query 3: Fetch attendance from classAttendances
         this.db
           .select()
           .from(schema.classAttendances)
@@ -293,7 +294,7 @@ export class ResultsRepository extends BaseRepository {
         academic,
         classResults,
         marks,
-        resultRecord: resultRecords,
+        resultRecords,
         ratings,
         remark,
         attendance

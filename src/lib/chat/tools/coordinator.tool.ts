@@ -17,8 +17,8 @@ export const validateClassResults = tool({
     ].join("\n"),
     inputSchema: z.object({
         classId: z.number().describe("The Class ID to validate results for."),
+        sectionId: z.number().describe("Section ID to filter students."),
         examTypeId: z.number().describe("The Exam Type ID to validate results for."),
-        sectionId: z.number().optional().describe("Optional Section ID to filter students."),
     }),
     outputSchema: z.object({
         totalStudents: z.number(),
@@ -34,8 +34,8 @@ export const validateClassResults = tool({
         })).describe("List of students with invalid or missing results."),
         message: z.string(),
     }),
-    execute: async ({ classId, examTypeId, sectionId }) => {
-        const students = await studentRepo.getStudentsByClassId(classId, sectionId);
+    execute: async ({ classId, sectionId, examTypeId }) => {
+        const students = await studentRepo.getStudentsByClassId({ classId, sectionId });
 
         if (!students || students.length === 0) {
             return {
@@ -43,7 +43,7 @@ export const validateClassResults = tool({
                 validCount: 0,
                 invalidCount: 0,
                 resultStatus: [],
-                message: "No students found in this class.",
+                message: "No students found in this class/section.",
             };
         }
 
@@ -98,6 +98,33 @@ export const validateClassResults = tool({
     },
 });
 
+export const sendStudentResult = tool({
+    description: [
+        "Sends/Publishes a single student result.",
+        "Marks the result as published in the student timeline.",
+        "Should be called only after validation is successful or deemed acceptable."
+    ].join("\n"),
+    inputSchema: z.object({
+        studentId: z.number().describe("The Student ID."),
+        examTypeId: z.number().describe("The Exam Type ID."),
+    }),
+    outputSchema: z.object({
+        success: z.boolean(),
+        message: z.string(),
+    }),
+    execute: async ({ studentId, examTypeId }) => {
+        const response = await result.publishResults({ studentIds: [studentId], examId: examTypeId })
+        if (!response) {
+            return { success: false, message: `Failed to publish result for ${studentId}.` };
+        }
+
+        return {
+            success: true,
+            message: `Result queued for publication for ${studentId}.`
+        };
+    }
+});
+
 
 export const sendClassResults = tool({
     description: [
@@ -107,7 +134,7 @@ export const sendClassResults = tool({
     ].join("\n"),
     inputSchema: z.object({
         classId: z.number().describe("The Class ID."),
-        sectionId: z.number().optional().describe("Optional Section ID."),
+        sectionId: z.number().describe("Optional Section ID."),
         examTypeId: z.number().describe("The Exam Type ID."),
     }),
     outputSchema: z.object({
@@ -115,12 +142,12 @@ export const sendClassResults = tool({
         message: z.string(),
     }),
     execute: async ({ classId, examTypeId, sectionId }) => {
-        const students = await studentRepo.getStudentsByClassId(classId, sectionId);
+        const students = await studentRepo.getStudentsByClassId({ classId, sectionId });
         if (!students || students.length === 0) {
             return { success: false, message: "No students found." };
         }
 
-        await result.publishResult({ studentIds: students.map((s) => s.id), examId: examTypeId })
+        result.publishResults({ studentIds: students.map((s) => s.id), examId: examTypeId })
             .catch(e => console.error("Background Result Publication Failed:", e));
 
         return {
@@ -135,7 +162,7 @@ export const getStudentList = tool({
     description: "Retrieves a list of all students assigned to a specific staff member. Returns student IDs, names, and admission numbers. Essential when 'studentId' or 'admissionNo' is unknown.",
     inputSchema: z.object({
         classId: z.number().describe("The unique ID of the class."),
-        sectionId: z.number().optional().describe("Optional Section ID."),
+        sectionId: z.number().describe("Section ID."),
     }),
     outputSchema: z.object({
         students: z
@@ -148,8 +175,8 @@ export const getStudentList = tool({
             )
             .describe("List of students"),
     }),
-    execute: async (input) => {
-        const students = await studentRepo.getStudentsByClassId(input.classId, input.sectionId);
+    execute: async ({ classId, sectionId }) => {
+        const students = await studentRepo.getStudentsByClassId({ classId, sectionId });
         return {
             students: students || [],
         };
@@ -167,12 +194,12 @@ export const changeStudentName = tool({
         success: z.boolean(),
         message: z.string(),
     }),
-    execute: async (input) => {
-        const student = await studentRepo.getStudentById(input.studentId);
+    execute: async ({ studentId, name }) => {
+        const student = await studentRepo.getStudentById(studentId);
         if (!student) {
             return { success: false, message: "Student not found." };
         }
-        student.fullName = input.name;
+        student.fullName = name;
         await studentRepo.updateStudent(student);
         return { success: true, message: "Student name updated successfully." };
     },
@@ -190,12 +217,12 @@ export const updateExamTitle = tool({
         success: z.boolean(),
         message: z.string(),
     }),
-    execute: async (input) => {
+    execute: async ({ classId, sectionId, examTypeId, newExamTitles }) => {
         const affectedRows = await resultRepo.updateExamSetup({
-            examTitles: input.newExamTitles,
-            classId: input.classId,
-            sectionId: input.sectionId,
-            examTermId: input.examTypeId,
+            examTitles: newExamTitles,
+            classId,
+            sectionId,
+            examTermId: examTypeId,
             schoolId: 1,
         });
 
@@ -220,12 +247,12 @@ export const upsertMarkStore = tool({
         message: z.string().describe("The message to be returned. required"),
         data: z.array(marksIputSchema).optional().describe("The process mark to be updated. optional"),
     }),
-    execute: async (input) => {
+    execute: async ({ classId, sectionId, studentId, examTypeId, subjectId, subjectCode, newMarks, titles }) => {
         const examSetups = await resultRepo.getExamSetup({
-            classId: input.classId,
-            sectionId: input.sectionId,
-            examTypeId: input.examTypeId,
-            subjectId: input.subjectId,
+            classId,
+            sectionId,
+            examTypeId,
+            subjectId,
             schoolId: 1,
         });
 
@@ -234,9 +261,9 @@ export const upsertMarkStore = tool({
         }
 
         const studentRecord = await studentRepo.getStudentRecord({
-            classId: input.classId,
-            sectionId: input.sectionId,
-            studentId: input.studentId,
+            classId,
+            sectionId,
+            studentId,
         });
         if (!studentRecord) {
             return { success: false, message: "Student not found." };
@@ -244,17 +271,17 @@ export const upsertMarkStore = tool({
 
         const processMark = await result.doProcessMarks({
             category: CATEGORY[studentRecord.categoryId ?? 0] as Category,
-            studentId: input.studentId,
+            studentId,
             recordId: studentRecord.id,
-            classId: input.classId,
-            sectionId: input.sectionId,
+            classId,
+            sectionId,
             schoolId: 1,
-            examTypeId: input.examTypeId,
+            examTypeId,
         }, [{
-            subjectId: input.subjectId,
-            subjectCode: input.subjectCode,
-            marks: input.newMarks,
-            examTitles: input.titles
+            subjectId,
+            subjectCode,
+            marks: newMarks,
+            examTitles: titles
         }],
             examSetups
         )
