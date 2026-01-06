@@ -101,5 +101,3 @@
     </Action>
   </Actions>
 {/if}
-
-<PreviewModal />

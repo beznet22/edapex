@@ -15,6 +15,7 @@ export const GET: RequestHandler = async ({ url, params }) => {
     const decoded = base64url.decode(token.split(".")[0]);
     const jsonString = new TextDecoder().decode(decoded);
     const { studentId, examId } = JSON.parse(jsonString);
+    console.log({studentId, examId});
 
     const resultData = await result.getStudentResult({ id: studentId, examId, withImages: true });
     if (!resultData) throw new Error("Result not found");
