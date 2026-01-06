@@ -121,7 +121,6 @@ export class StudentRepository extends BaseRepository {
   async getStudentsByStaffId(staffId?: number) {
     if (!staffId) return null;
     const academicId = await this.getAcademicId();
-    const examType = await this.getCurrentTerm();
     const [classSection] = await this.db
       .select()
       .from(smAssignSubjects)
