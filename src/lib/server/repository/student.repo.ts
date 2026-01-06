@@ -162,7 +162,6 @@ export class StudentRepository extends BaseRepository {
         eq(studentRecords.academicId, academicId),
         eq(smStudents.activeStatus, 1)))
       .groupBy(smStudents.id);
-
     return students;
   }
 
