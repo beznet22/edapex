@@ -39,6 +39,19 @@
     })),
   );
 
+  $effect(() => {
+    if (!page.form) return;
+    if (page.form?.status === "error") {
+      toast.error(page.form.message);
+    }
+    if (page.form?.status === "done") {
+      toast.success(page.form.message);
+    }
+    if (page.form?.status === "pending") {
+      toast.info(page.form.message);
+    }
+  });
+
   let value = $state<string>();
   const student = $derived(
     userCtx.students.find((p) => p.id === Number(value)),

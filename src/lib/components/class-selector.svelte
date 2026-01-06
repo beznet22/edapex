@@ -39,7 +39,7 @@
 
     if (!result.success || (!result.data && result.message)) {
       loading = false;
-      toast(result.message);
+      toast.error(result.message);
     }
 
     userContext.students = result.data!;

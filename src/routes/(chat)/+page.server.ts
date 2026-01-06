@@ -1,18 +1,13 @@
-import { redirect, type Actions } from "@sveltejs/kit";
-import type { PageServerLoad } from "./$types";
-import { staffRepo } from "$lib/server/repository/staff.repo";
-import { put } from "$lib/utils/fs-blob";
-import { resultRepo } from "$lib/server/repository/result.repo";
-import { readdir, stat } from "fs/promises";
-import { join } from "path";
-import type { UploadedData } from "$lib/types/chat-types";
-import { existsSync, rmdirSync, writeFileSync, type Dirent } from "fs";
-import { DESIGNATIONS, type Designation } from "$lib/types/sms-types";
-import { UPLOADS_DIR } from "$lib/constants";
 import { fileSchema } from "$lib/schema/chat-schema";
-import { result } from "$lib/server/service/result.service";
-import { generateContent } from "$lib/server/helpers/chat-helper";
 import { resultInputSchema } from "$lib/schema/result-input";
+import { generateContent } from "$lib/server/helpers/chat-helper";
+import { resultRepo } from "$lib/server/repository/result.repo";
+import { staffRepo } from "$lib/server/repository/staff.repo";
+import { result } from "$lib/server/service/result.service";
+import { put } from "$lib/utils/fs-blob";
+import { redirect, type Actions } from "@sveltejs/kit";
+import { writeFileSync } from "fs";
+import type { PageServerLoad } from "./$types";
 
 export const load: PageServerLoad = async ({ url, locals }) => {
     const { user, session } = locals;
@@ -37,27 +32,25 @@ export const actions: Actions = {
         const sectionId = Number(formData.get("sectionId"))
         const studentId = Number(formData.get("studentId"))
         const admissionNo = Number(formData.get("admissionNo"))
-        const studentName = Number(formData.get("studentName"))
+        const studentName = formData.get("studentName") as string
 
         let staffId: number = user.staffId || 1;
         let token = "";
         if (classId && sectionId && user.designation === "coordinator") {
             const staff = await staffRepo.getStaffByClassSection({ classId, sectionId });
-            if (!staff.teacherId) throw new Error("Class not assigned to any teacher")
+            if (!staff.teacherId) return { success: false, status: "error", message: "Class not assigned to any teacher" }
             staffId = staff.teacherId;
             token = `${className}(${sectionName})`.toLowerCase().replaceAll(" ", "_");
         } else {
             const { className, sectionName } = await resultRepo.getAssignedClassSection(staffId);
-            if (!className || !sectionName) throw new Error("Class not assigned to any section");
-            token = `${className}(${sectionName})`.toLowerCase().replaceAll(" ", "_");
+            if (!className || !sectionName) return { success: false, status: "error", message: "You have not been assigned a class" }
         }
 
         const file = files[0]
-        let pathname = `${token}/${file.name}`;
         const validatedFile = fileSchema.safeParse(file);
         if (!validatedFile.success) {
             const errorMessage = validatedFile.error.issues.map((issue) => issue.message).join(", ");
-            throw new Error(errorMessage);
+            return { success: false, status: "error", message: errorMessage }
         }
 
         // try {
@@ -83,13 +76,15 @@ export const actions: Actions = {
             if (mappingData.subjects.length === 0) throw new Error("You are not assigned to any subjects");
             const mapString = JSON.stringify(mappingData);
             const { success, content, message } = await generateContent(validatedFile.data, mapString);
-            if (!content || !success) return { success: false, status: "error", error: message }
+            if (!content || !success) return { success: false, status: "error", message }
 
             const parsedResult = JSON.parse(content.trim());
             parsedResult.studentId = studentId
             parsedResult.admissionNo = admissionNo
             parsedResult.fullName = studentName
-            
+
+            console.log(parsedResult)
+
             // console.log("Parsed result", parsedResult);
             const validated = await resultInputSchema.safeParseAsync(parsedResult);
             if (!validated.success) {
@@ -98,13 +93,13 @@ export const actions: Actions = {
                 );
                 writeFileSync(process.cwd() + "/static/extracted/parsed.json", JSON.stringify(parsedResult));
                 console.log("Failed to upload file", validated.error.issues);
-                return { success: false, status: "error", error: error.map(issue => issue.message).join("\n") }
+                return { success: false, status: "error", message: error.map(issue => issue.message).join("\n") }
             }
 
             console.log("Validated data", validated.data);
             const res = await result.upsertStudentResult(validated.data, staffId);
 
-            return { success: true, status: "done", data: res, filenames: [file.name] };
+            return { success: true, status: "done", data: res, filenames: [file.name], message: "File uploaded successfully" };
         } catch (e) {
             console.error("Main processing error:", e);
             try {
@@ -116,10 +111,10 @@ export const actions: Actions = {
                 });
 
                 const filename = data.pathname.split("/").pop();
-                return { success: true, status: "pending", data, filename }
+                return { success: true, status: "pending", data, filename, message: "File saved but pending extraction" }
             } catch (e) {
                 console.error("Failed to save file:", e);
-                return { success: false, status: "error", error: e instanceof Error ? e.message : "Failed to upload file, try again" }
+                return { success: false, status: "error", message: e instanceof Error ? e.message : "Failed to upload file, try again" }
             }
         }
     }
