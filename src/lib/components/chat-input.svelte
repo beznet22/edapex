@@ -52,7 +52,6 @@
 
   // svelte-ignore state_referenced_locally
   if (!userContext.user) chat.activeAgent = null;
-
   // Handlers
   function onSubmit() {
     if (chat.loading) {
@@ -204,7 +203,7 @@
         {/if}
       </div>
       <div class="flex gap-1.5 sm:gap-2 items-center">
-        {#if userContext.isCoordinator && userContext.isIt}
+        {#if userContext.isCoordinator || userContext.isIt}
           <ClassSelector />
         {/if}
         <div class="hidden sm:block">
