@@ -1,4 +1,3 @@
-import { tools } from "$lib/chat/tools";
 import { allowAnonymousChats } from "$lib/constants";
 import { CredentialType } from "$lib/schema/chat-schema";
 import { repo } from "$lib/server/repository";

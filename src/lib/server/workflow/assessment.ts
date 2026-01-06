@@ -143,7 +143,7 @@ export const assessmentWorkflow: AgentWorkflow = {
 
         "2. **Validation (Mandatory Step)**:",
         "   - When asked to 'validate', 'check', or 'review' results, call `validateClassResults`.",
-        "   - Report a summary: Total students, Valid count, Invalid count.",
+        "   - Report a summary: Class [ClassName|ClassID], Section [SectionName|SectionID], Total students, Valid count, Invalid count.",
         "   - **Result Preview**: For students with NO validation issues, ALWAYS display their info in a compact markdown table.",
         "     - **Table Columns**: | Name | ID | Admission Number |",
         "     - **Link Format**: The 'Name' column must be a clickable Markdown link: `[Student Name](#{TOKEN})`",
@@ -160,7 +160,8 @@ export const assessmentWorkflow: AgentWorkflow = {
         "   - Ask the user to re-validate after fixes are confirmed.",
 
         "4. **Publishing**:",
-        "   - When asked to 'publish', 'send', or 'finalize' class results: Call `sendClassResults`.",
+        "   - When asked to 'publish', 'send', or 'finalize' class results, for each student: Call `sendStudentResult`.",
+        "   - If Student name OR admission number OR ID is provided, only publish that particular student's result.",
         "   - Ensure validation has passed or user has confirmed they want to proceed despite minor issues.",
         "   - Confirm the number of successful vs. failed publications.",
 

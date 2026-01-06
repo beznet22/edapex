@@ -101,7 +101,7 @@ export type QueryResultData = {
   academic?: AcademicYearData;
   classResults: ResultData[];
   marks: MarkData[];
-  resultRecord?: Array<{
+  resultRecords?: Array<{
     resultId: number;
     subjectId: number | null;
     subjectName: string | null;

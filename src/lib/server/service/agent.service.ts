@@ -58,6 +58,8 @@ export class AgentService {
     if (selectedClass) {
       systemPrompt += `\n\nCLASS ID: ${selectedClass.classId}`;
       systemPrompt += `\n\nSECTION ID: ${selectedClass.sectionId}`;
+      systemPrompt += `\n\nCLASS NAME: ${selectedClass.className}`;
+      systemPrompt += `\n\nSECTION NAME: ${selectedClass.sectionName}`;
     }
 
     return systemPrompt;

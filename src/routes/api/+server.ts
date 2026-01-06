@@ -16,7 +16,7 @@ export const GET: RequestHandler = async () => {
     // const parsed = JSON.parse(data);
     // const validated = await resultInputSchema.parseAsync(parsed)
 
-    result.publishResult({ studentIds: [144], examId: 5 }).catch((e) => {
+    result.publishResults({ studentIds: [144], examId: 5 }).catch((e) => {
       console.error(`Failed to publish result: ${e}`);
     });
 
