@@ -18,6 +18,8 @@
   import type { ActionData } from "../../routes/(chat)/$types";
   import { page } from "$app/state";
   import { useChat } from "$lib/context/chat-context.svelte";
+  import { useUser } from "$lib/context/user-context.svelte";
+  import * as Select from "$lib/components/ui/select/index.js";
 
   type Upload = {
     filename: string;
@@ -26,6 +28,7 @@
 
   let filesContext = useFileActions();
   let chat = useChat();
+  let userCtx = useUser();
   let previewUrls = new Map<File, string>();
   let fileForm: HTMLFormElement;
   let files = $state<File[]>([]);
@@ -34,6 +37,11 @@
       filename: page.form?.filenames?.[f.name] || f.name,
       status: page.form?.status || "uploading",
     })),
+  );
+
+  let value = $state<string>();
+  const student = $derived(
+    userCtx.students.find((p) => p.id === Number(value)),
   );
 
   // Cleanup object URLs on destruction
@@ -87,7 +95,10 @@
   >
     <div class="p-6 pb-2">
       <Dialog.Header>
-        <Dialog.Title>Add Recource</Dialog.Title>
+        <Dialog.Title>
+          Add Recource for {filesContext.selectedClass?.className}
+          {filesContext.selectedClass?.sectionName}
+        </Dialog.Title>
         <Dialog.Description>
           Add image or documents to chat, file content will be extracted and
           used as chat context.
@@ -100,6 +111,29 @@
         enctype="multipart/form-data"
         use:enhance
       >
+        {#if userCtx.students.length > 0}
+          <div class="grid gap-4 py-4">
+            <Select.Root required type="single" name="provider" bind:value>
+              <Select.Trigger class="w-full">
+                {student?.name || "Select a student"}
+              </Select.Trigger>
+              <Select.Content>
+                <Select.Group>
+                  <Select.Label>Students</Select.Label>
+                  {#each userCtx.students as student (student.id)}
+                    <Select.Item
+                      value={student.id.toString()}
+                      label={student.name || ""}
+                    >
+                      {student.name}
+                    </Select.Item>
+                  {/each}
+                </Select.Group>
+              </Select.Content>
+            </Select.Root>
+          </div>
+        {/if}
+
         <div class="mt-4">
           <FileDropZone
             name="files"
@@ -107,7 +141,8 @@
             {onFileRejected}
             maxFileSize={300 * KILOBYTE}
             accept="image/*"
-            maxFiles={30}
+            maxFiles={1}
+            disabled={!value}
             fileCount={files.length}
           />
         </div>
@@ -120,6 +155,9 @@
           name="sectionName"
           value={chat.selectedClass?.sectionName}
         />
+        <input hidden name="studentId" bind:value />
+        <input hidden name="studentName" value={student?.name} />
+        <input hidden name="admissionNo" value={student?.admissionNo} />
       </form>
     </div>
 

@@ -24,6 +24,7 @@
   import { Loader } from "./prompt-kit/loader";
   import { Check, CircleAlert, TriangleAlert } from "@lucide/svelte";
   import { cn } from "$lib/utils/shadcn";
+  import { toast } from "svelte-sonner";
 
   let {
     user,
@@ -203,25 +204,28 @@
         {/if}
       </div>
       <div class="flex gap-1.5 sm:gap-2 items-center">
-        {#if userContext.isCoordinator || userContext.isIt}
-          <ClassSelector />
-        {:else}
-          <div class="hidden sm:block">
-            <PromptInputAction>
-              {#snippet tooltip()}
-                Add Resource
-              {/snippet}
-              <Button
-                variant="ghost"
-                size="icon"
-                class="size-9 sm:size-10 rounded-full cursor-pointer hover:bg-accent/50 transition-colors"
-                onclick={() => file.oprnFileDropZone()}
-              >
-                <Package class="size-4.5 sm:size-5" />
-              </Button>
-            </PromptInputAction>
-          </div>
-        {/if}
+        <ClassSelector />
+        <div class="hidden sm:block">
+          <PromptInputAction>
+            {#snippet tooltip()}
+              Add Resource
+            {/snippet}
+            <Button
+              variant="ghost"
+              size="icon"
+              class="size-9 sm:size-10 rounded-full cursor-pointer hover:bg-accent/50 transition-colors"
+              onclick={() => {
+                if (userContext.students.length === 0) {
+                  toast("Please Select a class");
+                  return;
+                }
+                file.openFileDropZone();
+              }}
+            >
+              <Package class="size-4.5 sm:size-5" />
+            </Button>
+          </PromptInputAction>
+        </div>
 
         <Button
           size="sm"
@@ -296,7 +300,6 @@
           </div>
         {/if}
       {/if}
-
     </div>
   </div>
 </div>

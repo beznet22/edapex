@@ -15,6 +15,7 @@ import { existsSync, rmdirSync } from "fs";
 import { generateId } from "ai";
 import type { Dirent } from "fs";
 import { resultRepo } from "$lib/server/repository/result.repo";
+import { studentRepo } from "$lib/server/repository/student.repo";
 
 export const updateHistory = command(
   z.object({
@@ -252,3 +253,23 @@ export const getResources = query(
     }
   }
 );
+
+export const getStudents = query(
+  z.object({
+    classId: z.number().optional(),
+    sectionId: z.number().optional(),
+  }),
+  async ({ classId, sectionId }) => {
+    const { user } = getRequestEvent().locals;
+    if (!user) return { success: true, message: "Not Authorized" }
+
+    try {
+      if (!classId || !sectionId) throw new Error("Class not selected")
+      const staff = await staffRepo.getStaffByClassSection({ classId, sectionId });
+      if (!staff.teacherId) throw new Error("Class not assigned to any teacher")
+      const students = await studentRepo.getStudentsByStaffId(staff.teacherId);
+      return { success: true, data: students }
+    } catch (e: any) {
+      return { success: false, message: e.message }
+    }
+  })

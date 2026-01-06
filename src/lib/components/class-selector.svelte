@@ -14,6 +14,9 @@
   import type { ClassSection } from "$lib/types/result-types";
   import type { ClassValue } from "svelte/elements";
   import { replaceState } from "$app/navigation";
+  import { getStudents } from "$lib/api/chat.remote";
+  import { toast } from "svelte-sonner";
+    import { localStore } from "$lib/utils";
 
   let {
     class: c,
@@ -25,11 +28,30 @@
   const userContext = UserContext.fromContext();
   const chat = $derived(useChat());
   const file = $derived(useFileActions());
+  let loading = $state(true);
+
+  const loadStudents = async () => {
+    loading = true;
+    const result = await getStudents({
+      classId: chat.selectedClass?.classId || undefined,
+      sectionId: chat.selectedClass?.sectionId || undefined,
+    });
+
+    if (!result.success || (!result.data && result.message)) {
+      loading = false;
+      toast(result.message);
+    }
+
+    userContext.students = result.data!;
+    localStore("students", result.data)
+    loading = false;
+  };
 
   const onSelect = (cls: ClassSection) => {
     open = false;
     chat.selectedClass = cls;
     file.selectedClass = cls;
+    loadStudents();
   };
 
   const onOpenChange = (val: boolean) => {
