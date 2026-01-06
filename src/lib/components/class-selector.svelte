@@ -16,7 +16,7 @@
   import { replaceState } from "$app/navigation";
   import { getStudents } from "$lib/api/chat.remote";
   import { toast } from "svelte-sonner";
-    import { localStore } from "$lib/utils";
+  import { localStore } from "$lib/utils";
 
   let {
     class: c,
@@ -43,7 +43,7 @@
     }
 
     userContext.students = result.data!;
-    localStore("students", result.data)
+    localStore("students", result.data);
     loading = false;
   };
 
@@ -53,6 +53,10 @@
     file.selectedClass = cls;
     loadStudents();
   };
+
+  // $effect(() => {
+  //   console.log(userContext.students);
+  // });
 
   const onOpenChange = (val: boolean) => {
     open = val;
