@@ -23,9 +23,8 @@ export class UserContext {
   constructor(user: AuthUser | undefined, classes: ClassSection[], students?: ClassStudent[]) {
     this.user = user;
     this.classes = classes;
-    this.students = students || [];
+    this.students = localStore("students", students) || [];
     this.designation = user?.designation;
-    this.students = localStore<ClassStudent[]>("students") || []
   }
 
   greeting = () => {

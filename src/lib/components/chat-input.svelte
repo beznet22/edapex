@@ -204,7 +204,9 @@
         {/if}
       </div>
       <div class="flex gap-1.5 sm:gap-2 items-center">
-        <ClassSelector />
+        {#if userContext.isCoordinator && userContext.isIt}
+          <ClassSelector />
+        {/if}
         <div class="hidden sm:block">
           <PromptInputAction>
             {#snippet tooltip()}
