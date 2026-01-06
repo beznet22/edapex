@@ -43,7 +43,7 @@ export class FilesContext {
     this.fileInputRef?.click();
   };
 
-  oprnFileDropZone = () => {
+  openFileDropZone = () => {
     this.openModal = true;
   };
 

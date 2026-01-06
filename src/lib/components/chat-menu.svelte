@@ -38,7 +38,7 @@
   </DropdownMenu.Trigger>
   <DropdownMenu.Content side="top" align="start" class="min-w-[150px]">
     <DropdownMenu.Group>
-      <DropdownMenu.Item
+      <!-- <DropdownMenu.Item
         onSelect={() => {
           filesContext.openFileDialog();
           open = false;
@@ -49,7 +49,7 @@
           <Paperclip class="size-4" />
           <div>Add Photos & Files</div>
         </div>
-      </DropdownMenu.Item>
+      </DropdownMenu.Item> -->
       <DropdownMenu.Item
         onSelect={() => {
           openResourceModal();

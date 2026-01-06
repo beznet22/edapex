@@ -111,7 +111,7 @@ export const DELETE: RequestHandler = async ({ url, locals }) => {
     const { className, sectionName } = await resultRepo.getAssignedClassSection(user.id);
     if (!className || !sectionName) throw new Error("Class not assigned to any section");
     const token = `${className}(${sectionName})`.toLowerCase().replaceAll(" ", "_");
-    
+
     const uploadPath = join(UPLOADS_DIR, `${token}`);
     rmdirSync(uploadPath, { recursive: true });
   }

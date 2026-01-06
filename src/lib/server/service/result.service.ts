@@ -240,7 +240,6 @@ export class ResultService {
     const { studentId, classId, sectionId, recordId, examTypeId } = studentData;
 
     try {
-
       if (!studentId || !classId || !sectionId || !recordId || !examTypeId) {
         throw new Error(
           `Student record not found for admission number ${studentData.admissionNo}`

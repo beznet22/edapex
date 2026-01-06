@@ -3,6 +3,7 @@ import type { ClassStudent } from "$lib/server/repository/student.repo";
 import type { AuthUser } from "$lib/types/auth-types";
 import type { AssignedSubject, ClassSection } from "$lib/types/result-types";
 import { DESIGNATION_TITLES, DESIGNATIONS, type Designation } from "$lib/types/sms-types";
+import { localStore } from "$lib/utils";
 import { getContext, setContext } from "svelte";
 
 const USER_CONTEXT_KEY = Symbol("user-context");
@@ -21,9 +22,10 @@ export class UserContext {
 
   constructor(user: AuthUser | undefined, classes: ClassSection[], students?: ClassStudent[]) {
     this.user = user;
-    this.classes = classes; 
+    this.classes = classes;
     this.students = students || [];
     this.designation = user?.designation;
+    this.students = localStore<ClassStudent[]>("students") || []
   }
 
   greeting = () => {
