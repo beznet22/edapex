@@ -13,6 +13,7 @@
 
   onMount(() => {
     clearLocalStore("selected-class");
+    clearLocalStore("students");
   });
 </script>
 
