@@ -57,6 +57,8 @@ USER nodejs
 
 # Expose port
 EXPOSE 3000
+EXPOSE 587
+EXPOSE 465
 
 # Start the application
 CMD ["bun", "run", "start"]

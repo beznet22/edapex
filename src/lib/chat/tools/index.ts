@@ -1,33 +1,44 @@
 import { type LanguageModel, type UIMessageStreamWriter } from "ai";
 import {
-    getClassStudentList,
-    upsertAttendance,
-    upsertStudentRatings,
-    upsertStudentResult,
-    upsertTeacherRemark,
+  getClassStudentList,
+  upsertAttendance,
+  upsertStudentRatings,
+  upsertStudentResult,
+  upsertTeacherRemark,
 } from "./result.tool";
-import { getStudentList, sendClassResults, sendStudentResult, updateExamTitle, upsertMarkStore, validateClassResults } from "./coordinator.tool";
+import {
+  createStudent,
+  getStudentList,
+  getStudentRegistrationOptions,
+  sendClassResults,
+  sendStudentResult,
+  updateExamTitle,
+  upsertMarkStore,
+  validateClassResults,
+} from "./coordinator.tool";
 
 export const teacherTools = (writer: UIMessageStreamWriter, model: LanguageModel) => {
-    return {
-        upsertStudentResult,
-        getClassStudentList,
-        upsertAttendance,
-        upsertTeacherRemark,
-        upsertStudentRatings,
-    };
+  return {
+    upsertStudentResult,
+    getClassStudentList,
+    upsertAttendance,
+    upsertTeacherRemark,
+    upsertStudentRatings,
+  };
 };
 
 export const defaultTools = (writer: UIMessageStreamWriter, model: LanguageModel) => {
-    return {};
+  return {};
 };
 
 export const coordinatorTools = (writer: UIMessageStreamWriter, model: LanguageModel) => {
-    return {
-        getStudentList,
-        validateClassResults,
-        sendStudentResult,
-        upsertMarkStore,
-        updateExamTitle,
-    };
+  return {
+    getStudentList,
+    getStudentRegistrationOptions,
+    validateClassResults,
+    sendStudentResult,
+    upsertMarkStore,
+    updateExamTitle,
+    createStudent,
+  };
 };

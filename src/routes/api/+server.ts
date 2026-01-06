@@ -8,19 +8,13 @@ import { readFileSync } from "fs";
 import { render } from "svelte/server";
 import ResultTemplate from "$lib/components/template/ResultTemplate.svelte";
 import { staffRepo } from "$lib/server/repository/staff.repo";
+import { studentRepo } from "$lib/server/repository/student.repo";
 
 export const GET: RequestHandler = async () => {
   try {
-    // const filePath = `${process.cwd()}/static/extracted/parsed.json`;
-    // const data = readFileSync(filePath, "utf-8");
-    // const parsed = JSON.parse(data);
-    // const validated = await resultInputSchema.parseAsync(parsed)
+    const result = await studentRepo.getStudentsByClassId({ classId: 21, sectionId: 5 })
 
-    result.publishResults({ studentIds: [144], examId: 5 }).catch((e) => {
-      console.error(`Failed to publish result: ${e}`);
-    });
-
-    return json({ success: true });
+    return json({ success: true, result });
   } catch (e: any) {
     console.error(`Failed to publish result: ${e}`);
     return error(500, e.message);
