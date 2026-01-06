@@ -98,6 +98,26 @@ export class StudentRepository extends BaseRepository {
     return students;
   }
 
+  async getStudentsByClassSection(params: { classId: number, sectionId: number }) {
+    const { classId, sectionId } = params;
+    if (!classId || !sectionId) return null;
+    const academicId = await this.getAcademicId();
+    const students = await this.db
+      .select({
+        id: smStudents.id,
+        name: smStudents.fullName,
+        admissionNo: smStudents.admissionNo,
+      })
+      .from(smStudents)
+      .innerJoin(studentRecords, eq(smStudents.id, studentRecords.studentId))
+      .where(and(
+        eq(studentRecords.classId, classId),
+        eq(studentRecords.sectionId, sectionId),
+        eq(studentRecords.academicId, academicId),
+        eq(smStudents.activeStatus, 1)));
+    return students;
+  }
+
   async getStudentsByStaffId(staffId?: number) {
     if (!staffId) return null;
     const academicId = await this.getAcademicId();
@@ -123,19 +143,24 @@ export class StudentRepository extends BaseRepository {
         // categoryId: smStudents.studentCategoryId,
       })
       .from(smStudents)
-      .innerJoin(
-        smMarkStores,
-        and(
-          eq(smMarkStores.studentId, smStudents.id),
-          eq(smMarkStores.examTermId, examType.id),
-          eq(smMarkStores.activeStatus, 1),
-          eq(smMarkStores.academicId, academicId),
-          eq(smMarkStores.classId, classSection.classId || 0),
-          eq(smMarkStores.sectionId, classSection.sectionId || 0),
-          eq(smMarkStores.activeStatus, smStudents.activeStatus)
-        )
-      )
-      .where(and(eq(smStudents.activeStatus, 1)))
+      // .innerJoin(
+      //   smMarkStores,
+      //   and(
+      //     eq(smMarkStores.studentId, smStudents.id),
+      //     eq(smMarkStores.examTermId, examType.id),
+      //     eq(smMarkStores.activeStatus, 1),
+      //     eq(smMarkStores.academicId, academicId),
+      //     eq(smMarkStores.classId, classSection.classId || 0),
+      //     eq(smMarkStores.sectionId, classSection.sectionId || 0),
+      //     eq(smMarkStores.activeStatus, smStudents.activeStatus)
+      //   )
+      // )
+      .innerJoin(studentRecords, eq(smStudents.id, studentRecords.studentId))
+      .where(and(
+        eq(studentRecords.classId, classSection.classId || 0),
+        eq(studentRecords.sectionId, classSection.sectionId || 0),
+        eq(studentRecords.academicId, academicId),
+        eq(smStudents.activeStatus, 1)))
       .groupBy(smStudents.id);
 
     return students;
