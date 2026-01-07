@@ -139,7 +139,7 @@ export class ResultService {
 
         return {
           from: `"${school.name}" <${school.email}>`,
-          to: "bono247@gmail.com",
+          to: student.parentEmail,
           subject: "Result Notification",
           html,
           attachments: [
