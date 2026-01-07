@@ -7,6 +7,7 @@
         "@shikijs/langs": "^3.19.0",
         "@shikijs/themes": "^3.19.0",
         "isomorphic-dompurify": "^2.34.0",
+        "nodemailer": "^7.0.12",
         "shiki": "^3.19.0",
         "svelte-toolbelt": "^0.10.6",
       },
@@ -42,7 +43,6 @@
         "jszip": "^3.10.1",
         "mode-watcher": "^1.1.0",
         "mysql2": "^3.15.3",
-        "nodemailer": "^7.0.11",
         "runed": "^0.37.0",
         "svelte": "^5.39.5",
         "svelte-check": "^4.3.4",
@@ -1126,7 +1126,7 @@
 
     "node-fetch": ["node-fetch@3.3.2", "", { "dependencies": { "data-uri-to-buffer": "^4.0.0", "fetch-blob": "^3.1.4", "formdata-polyfill": "^4.0.10" } }, "sha512-dRB78srN/l6gqWulah9SrxeYnxeddIG30+GOqK/9OlLVyLg3HPnr6SqOWTWOXKRwC2eGYCkZ59NNuSgvSrpgOA=="],
 
-    "nodemailer": ["nodemailer@7.0.11", "", {}, "sha512-gnXhNRE0FNhD7wPSCGhdNh46Hs6nm+uTyg+Kq0cZukNQiYdnCsoQjodNP9BQVG9XrcK/v6/MgpAPBUFyzh9pvw=="],
+    "nodemailer": ["nodemailer@7.0.12", "", {}, "sha512-H+rnK5bX2Pi/6ms3sN4/jRQvYSMltV6vqup/0SFOrxYYY/qoNvhXPlYq3e+Pm9RFJRwrMGbMIwi81M4dxpomhA=="],
 
     "nopt": ["nopt@7.2.1", "", { "dependencies": { "abbrev": "^2.0.0" }, "bin": { "nopt": "bin/nopt.js" } }, "sha512-taM24ViiimT/XntxbPyJQzCG+p4EKOpgD3mxFwW38mGjVUrfERQOeY4EDHjdnptttfHuHQXFx+lTP08Q+mLa/w=="],
 
