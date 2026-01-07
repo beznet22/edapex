@@ -6,18 +6,19 @@ import {
   type MarksInput,
   type ResultInput,
   type StudentInput,
-  type StudentRatings
+  type StudentRatings,
 } from "$lib/schema/result-input";
-import { resultOutputSchema, type Category, type MarksRecord, type ResultOutput, type School, type Student } from "$lib/schema/result-output";
+import {
+  resultOutputSchema,
+  type Category,
+  type MarksRecord,
+  type ResultOutput,
+  type School,
+  type Student,
+} from "$lib/schema/result-output";
 import { repo } from "$lib/server/repository";
 import { studentRepo } from "$lib/server/repository/student.repo";
-import type {
-  ClassAverage,
-  ExamSetup,
-  MarkData,
-  ResultData,
-  ScoreData
-} from "$lib/types/result-types";
+import type { ClassAverage, ExamSetup, MarkData, ResultData, ScoreData } from "$lib/types/result-types";
 import { base64url } from "jose";
 import { render } from "svelte/server";
 import { ensureBase64Image, pageToHtml } from "../helpers";
@@ -53,12 +54,12 @@ type StudentData = {
   sectionId: number;
   schoolId: number;
   examTypeId: number;
-}
+};
 
 export class ResultService {
-  category?: Category
-  studentInput?: StudentInput
-  
+  category?: Category;
+  studentInput?: StudentInput;
+
   /**
    * Publish result to students and parents timeline and send email
    */
@@ -115,7 +116,7 @@ export class ResultService {
           html,
           attachments: [
             { filename: `${student.fullName}_result.pdf`, path: pdfResult.filePath },
-            { filename: "logo.png", path: absoluteLogoPath, cid: "schoolLogo" }
+            { filename: "logo.png", path: absoluteLogoPath, cid: "schoolLogo" },
           ],
           studentId: student.id,
         };
@@ -128,7 +129,7 @@ export class ResultService {
     // Process students in chunks to respect concurrency limit
     for (let i = 0; i < studentIds.length; i += CONCURRENCY_LIMIT) {
       const chunk = studentIds.slice(i, i + CONCURRENCY_LIMIT);
-      const results = await Promise.all(chunk.map(id => processStudent(id)));
+      const results = await Promise.all(chunk.map((id) => processStudent(id)));
       messages.push(...results.filter((m): m is any => m !== null));
     }
 
@@ -241,9 +242,7 @@ export class ResultService {
 
     try {
       if (!studentId || !classId || !sectionId || !recordId || !examTypeId) {
-        throw new Error(
-          `Student record not found for admission number ${studentData.admissionNo}`
-        );
+        throw new Error(`Student record not found for admission number ${studentData.admissionNo}`);
       }
       this.category = studentData.studentCategory as Category;
       this.studentInput = studentData;
@@ -337,7 +336,7 @@ export class ResultService {
     const photo = withImages ? ensureBase64Image(studentData.studentPhoto || "", "/avatar.jpg") : undefined;
     const student: Student = {
       id: studentData.studentId,
-      examId: examType?.id || 0,  
+      examId: examType?.id || 0,
       fullName: studentData.fullName || "",
       gender: studentData.genderName || "",
       parentEmail: studentData.email || "",
@@ -385,7 +384,7 @@ export class ResultService {
       maxScores: records.length * 100,
     };
 
-    const subjects = await resultRepo.getAssignedSubjects(studentData.classId!!)
+    const subjects = await resultRepo.getAssignedSubjects(studentData.classId!!);
     return {
       subjects,
       school,
@@ -407,7 +406,7 @@ export class ResultService {
       subjectId: number | null;
       subjectName: string | null;
       subjectCode: string | null;
-      teacherRemarks: string | null
+      teacherRemarks: string | null;
     }>
   ): { records: MarksRecord[]; overAll: number } {
     // Special handling for DAYCARE when marks is empty
@@ -441,7 +440,7 @@ export class ResultService {
       for (const m of sMarks) marksObj[m.examTitle || "Unknown"] = m.totalMarks;
       const first = sMarks[0];
       const obj = objectives?.find((o: any) => o.subjectCode === first?.subjectCode);
-      const matchingResult = resultRecords?.find(r => r.subjectId === first?.subjectId);
+      const matchingResult = resultRecords?.find((r) => r.subjectId === first?.subjectId);
       const grade = this.getGrade(totalScore, category, matchingResult?.teacherRemarks ?? null);
       overAll += totalScore;
       return {
@@ -479,22 +478,37 @@ export class ResultService {
    */
   private async processMarks(markStore: MarksData, examSetups: ExamSetup[]): Promise<MarksInput[] | null> {
     if (!this.studentInput) return null;
-    return this.doProcessMarks({
-      category: this.studentInput.studentCategory! as Category,
+    await resultRepo.cleanMarks({
+      studentRecordId: this.studentInput.recordId!,
       studentId: this.studentInput.studentId!,
-      recordId: this.studentInput.recordId!,
       classId: this.studentInput.classId!,
       sectionId: this.studentInput.sectionId!,
+      examTermId: this.studentInput.examTypeId!,
       schoolId: this.studentInput.schoolId!,
-      examTypeId: this.studentInput.examTypeId!,
-    }, markStore, examSetups);
+    });
+    return this.doProcessMarks(
+      {
+        category: this.studentInput.studentCategory! as Category,
+        studentId: this.studentInput.studentId!,
+        recordId: this.studentInput.recordId!,
+        classId: this.studentInput.classId!,
+        sectionId: this.studentInput.sectionId!,
+        schoolId: this.studentInput.schoolId!,
+        examTypeId: this.studentInput.examTypeId!,
+      },
+      markStore,
+      examSetups
+    );
   }
-
 
   /**
    * Process marks and store in database
    */
-  async doProcessMarks(student: StudentData, markStore: MarksData, examSetups: ExamSetup[]): Promise<MarksInput[] | null> {
+  async doProcessMarks(
+    student: StudentData,
+    markStore: MarksData,
+    examSetups: ExamSetup[]
+  ): Promise<MarksInput[] | null> {
     if (!student) return null;
     const { studentId, recordId, classId, sectionId, schoolId, examTypeId } = student;
     if (!classId || !sectionId || !schoolId || !studentId) {
