@@ -113,9 +113,10 @@ export const validateClassResults = tool({
 
 export const sendStudentResult = tool({
   description: [
-    "Sends/Publishes a single student result.",
+    "Sends/Publishes a single student result via email.",
     "Marks the result as published in the student timeline.",
     "Should be called only after validation is successful or deemed acceptable.",
+    "Returns detailed error information if sending fails - explain errors to user in simple terms.",
   ].join("\n"),
   inputSchema: z.object({
     studentId: z.number().describe("The Student ID."),
@@ -124,25 +125,33 @@ export const sendStudentResult = tool({
   outputSchema: z.object({
     success: z.boolean(),
     message: z.string(),
+    errors: z.array(z.string()).optional().describe("Detailed error messages if any"),
   }),
   execute: async ({ studentId, examTypeId }) => {
     const response = await result.publishResults({ studentIds: [studentId], examId: examTypeId });
-    if (!response) {
-      return { success: false, message: `Failed to publish result for ${studentId}.` };
+
+    if (!response.success) {
+      return {
+        success: false,
+        message: `Failed to send result for student ${studentId}. ${response.failed} failed.`,
+        errors: response.errors,
+      };
     }
 
     return {
       success: true,
-      message: `Result queued for publication for ${studentId}.`,
+      message: `Result sent successfully for student ${studentId}.`,
+      errors: response.errors.length > 0 ? response.errors : undefined,
     };
   },
 });
 
 export const sendClassResults = tool({
   description: [
-    "Sends/Publishes results for a class.",
+    "Sends/Publishes results for a class via email.",
     "Marks the result as published in the student timeline.",
     "Should be called only after validation is successful or deemed acceptable.",
+    "Returns detailed error information if sending fails - explain errors to user in simple terms.",
   ].join("\n"),
   inputSchema: z.object({
     classId: z.number().describe("The Class ID."),
@@ -152,6 +161,9 @@ export const sendClassResults = tool({
   outputSchema: z.object({
     success: z.boolean(),
     message: z.string(),
+    sent: z.number().optional().describe("Number of results successfully sent"),
+    failed: z.number().optional().describe("Number of results that failed to send"),
+    errors: z.array(z.string()).optional().describe("Detailed error messages if any"),
   }),
   execute: async ({ classId, examTypeId, sectionId }) => {
     const students = await studentRepo.getStudentsByClassId({ classId, sectionId });
@@ -159,13 +171,27 @@ export const sendClassResults = tool({
       return { success: false, message: "No students found." };
     }
 
-    result
-      .publishResults({ studentIds: students.map((s) => s.id), examId: examTypeId })
-      .catch((e) => console.error("Background Result Publication Failed:", e));
+    const response = await result.publishResults({
+      studentIds: students.map((s) => s.id),
+      examId: examTypeId,
+    });
+
+    if (!response.success) {
+      return {
+        success: false,
+        message: `Failed to send results. ${response.sent} sent, ${response.failed} failed.`,
+        sent: response.sent,
+        failed: response.failed,
+        errors: response.errors,
+      };
+    }
 
     return {
       success: true,
-      message: `Results queued for publication.`,
+      message: `Results sent successfully. ${response.sent} sent, ${response.failed} failed.`,
+      sent: response.sent,
+      failed: response.failed,
+      errors: response.errors.length > 0 ? response.errors : undefined,
     };
   },
 });
