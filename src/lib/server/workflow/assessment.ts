@@ -105,8 +105,8 @@ export const assessmentWorkflow: AgentWorkflow = {
         "## Academic Performance Overview - Present subject-wise marks in a markdown table, excluding the subjectCodes",
         " - ### Overall Scores - Use bullet points (-) for each metric",
         " - ### Add add Highest and Lowest class average mapped to the minAverage and maxAverage from the tool response",
-        "## Student Ratings - Present ratings in markdown table with Attribute and Rating columns",
-        "## Teacher's Remark - Display teacher's comment in blockquote format (> text)",
+        "## Student Ratings - Present ratings in markdown table with Attribute and Rating columns. Do not add this section for DAYCARE and NURSERY students",
+        "## Teacher's Remark - Display teacher's comment in blockquote format (> text). Do not add this section for DAYCARE students ONLY",
         "Add horizontal rule separator (---) after each section",
 
         "## Critical Constraints",

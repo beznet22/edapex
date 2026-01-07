@@ -14,7 +14,7 @@ import { id } from "zod/v4/locales";
 
 export const GET: RequestHandler = async () => {
   try {
-    const resultData = await result.getStudentResult({ id: 989, examId: 5, isAdminNo: true })
+    const resultData = await result.getStudentResult({ id: 984, examId: 5, isAdminNo: true })
     const validated = await resultOutputSchema.safeParseAsync(resultData)
     if (!validated.success) {
       return json({ success: false, error: validated.error.issues })
