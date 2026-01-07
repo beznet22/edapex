@@ -1,6 +1,6 @@
 // /src/lib/server/repository/student.repo.ts
 
-import { and, count, eq, isNotNull, ne, sql } from "drizzle-orm";
+import { and, count, eq, isNotNull, ne, sql, like, or } from "drizzle-orm";
 import {
   classAttendances,
   smAssignSubjects,
@@ -10,6 +10,7 @@ import {
   smMarkStores,
   smParents,
   smSections,
+  smClassSections,
   smStaffs,
   smStudentCategories,
   smStudents,
@@ -437,6 +438,14 @@ export class StudentRepository extends BaseRepository {
     return updated;
   }
 
+  async updateStudentPhoto(studentId: number, photoPath: string) {
+    const [updated] = await this.db
+      .update(smStudents)
+      .set({ studentPhoto: photoPath })
+      .where(eq(smStudents.id, studentId));
+    return updated.affectedRows > 0;
+  }
+
   async updateStudentCategoryId(studentId: number, studentCategoryId: number) {
     const [updated] = await this.db
       .update(smStudents)
@@ -551,6 +560,126 @@ export class StudentRepository extends BaseRepository {
         { value: "other", label: "Other" },
       ],
     };
+  }
+
+  /**
+   * Resolves class and section names to their corresponding IDs.
+   * @param className - The name of the class
+   * @param sectionName - The name of the section
+   * @returns The resolved IDs or null if not found
+   */
+  async getClassAndSectionByName(className: string, sectionName: string) {
+    const academicId = await this.getAcademicId();
+
+    const [data] = await this.db
+      .select({
+        classId: smClasses.id,
+        sectionId: smSections.id,
+      })
+      .from(smClassSections)
+      .innerJoin(smClasses, eq(smClassSections.classId, smClasses.id))
+      .innerJoin(smSections, eq(smClassSections.sectionId, smSections.id))
+      .where(
+        and(
+          eq(smClasses.className, className.toUpperCase()),
+          eq(smSections.sectionName, sectionName.toUpperCase()),
+          eq(smClasses.activeStatus, 1),
+          eq(smSections.activeStatus, 1),
+          eq(smClassSections.activeStatus, 1),
+          eq(smClasses.academicId, academicId)
+        )
+      )
+      .limit(1);
+
+    return data || null;
+  }
+
+  /**
+   * Searches for available class and section combinations.
+   * @param query - Optional search string to filter by class or section name
+   * @returns Array of matching class/section combinations with their IDs
+   */
+  async searchClassSection(query?: string) {
+    const academicId = await this.getAcademicId();
+
+    const filters = [
+      eq(smClasses.activeStatus, 1),
+      eq(smSections.activeStatus, 1),
+      eq(smClassSections.activeStatus, 1),
+      eq(smClasses.academicId, academicId),
+    ];
+
+    if (query) {
+      const searchPattern = `%${query.toUpperCase()}%`;
+      filters.push(
+        or(
+          like(smClasses.className, searchPattern),
+          like(smSections.sectionName, searchPattern),
+          like(sql`CONCAT(${smClasses.className}, ' ', ${smSections.sectionName})`, searchPattern),
+          like(sql`CONCAT(${smClasses.className}, ${smSections.sectionName})`, searchPattern)
+        ) as any
+      );
+    }
+
+    return await this.db
+      .select({
+        classId: smClasses.id,
+        className: smClasses.className,
+        sectionId: smSections.id,
+        sectionName: smSections.sectionName,
+      })
+      .from(smClassSections)
+      .innerJoin(smClasses, eq(smClassSections.classId, smClasses.id))
+      .innerJoin(smSections, eq(smClassSections.sectionId, smSections.id))
+      .where(and(...filters))
+      .limit(20);
+  }
+
+  /**
+   * Assigns a student to a new class/section.
+   * - Performs a direct upsert (create or update) on the student_records table.
+   */
+  async assignClassSection(params: {
+    studentId: number;
+    classId: number;
+    sectionId: number;
+  }) {
+    return this.withErrorHandling(async () => {
+      const { studentId, classId, sectionId } = params;
+      const academicId = await this.getAcademicId();
+
+      // Upsert destination record
+      const [existingDest] = await this.db
+        .select({ id: studentRecords.id })
+        .from(studentRecords)
+        .where(
+          and(
+            eq(studentRecords.studentId, studentId),
+            eq(studentRecords.academicId, academicId)
+          )
+        )
+        .limit(1);
+
+      if (existingDest) {
+        await this.db
+          .update(studentRecords)
+          .set({ activeStatus: 1, isDefault: 1, classId, sectionId })
+          .where(eq(studentRecords.id, existingDest.id));
+      } else {
+        await this.db.insert(studentRecords).values({
+          studentId,
+          classId,
+          sectionId,
+          academicId,
+          sessionId: academicId,
+          schoolId: 1,
+          isDefault: 1,
+          activeStatus: 1,
+        });
+      }
+
+      return true;
+    }, "assignClassSection");
   }
 }
 

@@ -6,18 +6,28 @@
   import XIcon from "@lucide/svelte/icons/x";
   import { onDestroy } from "svelte";
   import { toast } from "svelte-sonner";
-  import { displaySize, FileDropZone, KILOBYTE, type FileDropZoneProps } from "./file-drop-zone";
+  import {
+    displaySize,
+    FileDropZone,
+    KILOBYTE,
+    type FileDropZoneProps,
+  } from "./file-drop-zone";
   import { Loader } from "./prompt-kit/loader";
   import { ScrollArea } from "./ui/scroll-area";
   import { useUser } from "$lib/context/user-context.svelte";
   import * as Select from "$lib/components/ui/select/index.js";
+  import { Switch } from "$lib/components/ui/switch";
+  import { Label } from "$lib/components/ui/label";
 
   let filesContext = useFileActions();
   let userCtx = useUser();
   let previewUrls = new Map<File, string>();
 
   let value = $state<string>();
-  const student = $derived(userCtx.students.find((p) => p.id === Number(value)));
+  const student = $derived(
+    userCtx.students.find((p) => p.id === Number(value)),
+  );
+  let isStudentPhoto = $state(false);
 
   // Use files and uploads from the shared context
   const files = $derived(filesContext.files);
@@ -34,10 +44,14 @@
       studentId: student?.id,
       studentName: student?.name ?? undefined,
       admissionNo: student?.admissionNo ?? undefined,
+      isStudentPhoto,
     });
   };
 
-  const onFileRejected: FileDropZoneProps["onFileRejected"] = ({ reason, file }) => {
+  const onFileRejected: FileDropZoneProps["onFileRejected"] = ({
+    reason,
+    file,
+  }) => {
     toast.error(`${file.name} failed to upload!`, { description: reason });
   };
 
@@ -79,7 +93,8 @@
           {filesContext.selectedClass?.sectionName}
         </Dialog.Title>
         <Dialog.Description>
-          Add image or documents to chat, file content will be extracted and used as chat context.
+          Add image or documents to chat, file content will be extracted and
+          used as chat context.
         </Dialog.Description>
       </Dialog.Header>
 
@@ -93,7 +108,10 @@
               <Select.Group>
                 <Select.Label>Students</Select.Label>
                 {#each userCtx.students as student (student.id)}
-                  <Select.Item value={student.id.toString()} label={student.name || ""}>
+                  <Select.Item
+                    value={student.id.toString()}
+                    label={student.name || ""}
+                  >
                     {student.name}
                   </Select.Item>
                 {/each}
@@ -103,7 +121,19 @@
         </div>
       {/if}
 
-      <div class="mt-4">
+      <div class="mb-4 flex flex-col gap-4">
+        {#if student}
+          <div class="flex items-center space-x-2 px-1">
+            <Switch id="student-photo" bind:checked={isStudentPhoto} />
+            <Label
+              for="student-photo"
+              class="text-sm font-medium cursor-pointer"
+            >
+              Upload as Student Photo
+            </Label>
+          </div>
+        {/if}
+
         <FileDropZone
           name="files"
           {onUpload}
@@ -120,10 +150,14 @@
     <ScrollArea class="min-h-0 grow px-6 pb-6 overflow-auto">
       <div class="flex flex-col gap-3">
         {#each files as file, i (file.name + i)}
-          <div class="flex items-center justify-between gap-3 rounded-md p-2 bg-background">
+          <div
+            class="flex items-center justify-between gap-3 rounded-md p-2 bg-background"
+          >
             <div class="flex items-center gap-3 min-w-0 flex-1">
               {#if file.type.startsWith("image/")}
-                <div class="relative size-10 shrink-0 overflow-hidden rounded-md bg-muted">
+                <div
+                  class="relative size-10 shrink-0 overflow-hidden rounded-md bg-muted"
+                >
                   <img
                     src={generatePreviewUrl(file)}
                     alt={file.name}
@@ -137,7 +171,10 @@
                 </div>
               {/if}
               <div class="flex flex-col min-w-0 flex-1">
-                <span class="truncate text-sm font-medium leading-none" title={file.name}>
+                <span
+                  class="truncate text-sm font-medium leading-none"
+                  title={file.name}
+                >
                   {file.name}
                 </span>
                 <span class="text-xs text-muted-foreground mt-1">
@@ -172,7 +209,9 @@
         {/each}
 
         {#if files.length === 0}
-          <div class="text-center text-muted-foreground py-8">No files added yet</div>
+          <div class="text-center text-muted-foreground py-8">
+            No files added yet
+          </div>
         {/if}
       </div>
     </ScrollArea>
