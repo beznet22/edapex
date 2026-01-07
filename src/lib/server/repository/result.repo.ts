@@ -88,7 +88,8 @@ export class ResultsRepository extends BaseRepository {
             eq(schema.smAssignSubjects.teacherId, assigned.teacherId),
             eq(schema.smAssignSubjects.academicId, academicId)
           )
-        ).groupBy(schema.smAssignSubjects.subjectId);
+        )
+        .groupBy(schema.smAssignSubjects.subjectId);
     }, "getAssignedSubjects");
   }
 
@@ -210,6 +211,49 @@ export class ResultsRepository extends BaseRepository {
     }, "deleteMarkStore");
   }
 
+  async cleanMarks(params: {
+    studentRecordId: number;
+    studentId: number;
+    classId: number;
+    sectionId: number;
+    examTermId: number;
+    schoolId: number;
+  }) {
+    return this.withErrorHandling(async () => {
+      const academicId = await this.getAcademicId();
+
+      // Delete marks from smMarkStores
+      await this.db
+        .delete(schema.smMarkStores)
+        .where(
+          and(
+            eq(schema.smMarkStores.studentRecordId, params.studentRecordId),
+            eq(schema.smMarkStores.studentId, params.studentId),
+            eq(schema.smMarkStores.classId, params.classId),
+            eq(schema.smMarkStores.sectionId, params.sectionId),
+            eq(schema.smMarkStores.examTermId, params.examTermId),
+            eq(schema.smMarkStores.schoolId, params.schoolId),
+            eq(schema.smMarkStores.academicId, academicId)
+          )
+        );
+
+      // Delete result records from smResultStores
+      await this.db
+        .delete(schema.smResultStores)
+        .where(
+          and(
+            eq(schema.smResultStores.studentRecordId, params.studentRecordId),
+            eq(schema.smResultStores.studentId, params.studentId),
+            eq(schema.smResultStores.classId, params.classId),
+            eq(schema.smResultStores.sectionId, params.sectionId),
+            eq(schema.smResultStores.examTypeId, params.examTermId),
+            eq(schema.smResultStores.schoolId, params.schoolId),
+            eq(schema.smResultStores.academicId, academicId)
+          )
+        );
+    }, "cleanMarks");
+  }
+
   async deleteExamSetup(titleIds: number[]) {
     return this.withErrorHandling(async () => {
       await this.db.delete(schema.smExamSetups).where(inArray(schema.smExamSetups.id, titleIds));
@@ -277,16 +321,16 @@ export class ResultsRepository extends BaseRepository {
       const classResults =
         classId && sectionId
           ? await this.db
-            .select()
-            .from(schema.smResultStores)
-            .where(
-              and(
-                eq(schema.smResultStores.examTypeId, examId),
-                eq(schema.smResultStores.classId, classId),
-                eq(schema.smResultStores.sectionId, sectionId),
-                eq(schema.smResultStores.activeStatus, 1)
+              .select()
+              .from(schema.smResultStores)
+              .where(
+                and(
+                  eq(schema.smResultStores.examTypeId, examId),
+                  eq(schema.smResultStores.classId, classId),
+                  eq(schema.smResultStores.sectionId, sectionId),
+                  eq(schema.smResultStores.activeStatus, 1)
+                )
               )
-            )
           : [];
 
       return {
@@ -297,7 +341,7 @@ export class ResultsRepository extends BaseRepository {
         resultRecords,
         ratings,
         remark,
-        attendance
+        attendance,
       };
     }, "queryResultData");
   }
@@ -426,20 +470,18 @@ export class ResultsRepository extends BaseRepository {
           .insert(schema.teacherRemarks)
           .values(remark)
           .onDuplicateKeyUpdate({ set: { remark: remark.remark, updatedAt: new Date() } })
-          .then(() => { }),
+          .then(() => {}),
       "upsertTeacherRemark"
     );
   }
 
-  async updateExamSetup(
-    params: {
-      classId: number,
-      sectionId: number,
-      examTermId: number,
-      schoolId: number,
-      examTitles: string[]
-    }
-  ): Promise<number> {
+  async updateExamSetup(params: {
+    classId: number;
+    sectionId: number;
+    examTermId: number;
+    schoolId: number;
+    examTitles: string[];
+  }): Promise<number> {
     return this.withErrorHandling(async () => {
       const academicId = await this.getAcademicId();
       const { classId, sectionId, examTermId, schoolId, ...data } = params;
@@ -454,7 +496,7 @@ export class ResultsRepository extends BaseRepository {
             eq(schema.smExamSetups.academicId, academicId),
             eq(schema.smExamSetups.schoolId, schoolId)
           )
-        )
+        );
       return Number(result[0].affectedRows);
     }, "updateExamSetupTitle");
   }
@@ -501,14 +543,17 @@ export class ResultsRepository extends BaseRepository {
         )
         .limit(1);
       if (existing) {
-        await this.db.update(schema.smMarkStores).set(data).where(
-          and(
-            eq(schema.smMarkStores.id, existing.id),
-            eq(schema.smMarkStores.examTermId, data.examTermId!),
-            eq(schema.smMarkStores.examSetupId, data.examSetupId!),
-            eq(schema.smMarkStores.studentId, data.studentId!),
-          )
-        );
+        await this.db
+          .update(schema.smMarkStores)
+          .set(data)
+          .where(
+            and(
+              eq(schema.smMarkStores.id, existing.id),
+              eq(schema.smMarkStores.examTermId, data.examTermId!),
+              eq(schema.smMarkStores.examSetupId, data.examSetupId!),
+              eq(schema.smMarkStores.studentId, data.studentId!)
+            )
+          );
         return existing.id;
       }
       return (await this.db.insert(schema.smMarkStores).values(data).$returningId())[0].id;
