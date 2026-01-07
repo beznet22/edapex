@@ -8,19 +8,33 @@ import { readFileSync } from "fs";
 import { render } from "svelte/server";
 import ResultTemplate from "$lib/components/template/ResultTemplate.svelte";
 import { staffRepo } from "$lib/server/repository/staff.repo";
+import { studentRepo } from "$lib/server/repository/student.repo";
+import { resultRepo } from "$lib/server/repository/result.repo";
+import { id } from "zod/v4/locales";
 
 export const GET: RequestHandler = async () => {
   try {
-    // const filePath = `${process.cwd()}/static/extracted/parsed.json`;
-    // const data = readFileSync(filePath, "utf-8");
-    // const parsed = JSON.parse(data);
-    // const validated = await resultInputSchema.parseAsync(parsed)
+    // const resultData = await result.getStudentResult({ id: 984, examId: 5, isAdminNo: true })
+    // const validated = await resultOutputSchema.safeParseAsync(resultData)
+    // if (!validated.success) {
+    //   return json({ success: false, error: validated.error.issues })
+    // }
 
-    result.publishResults({ studentIds: [144], examId: 5 }).catch((e) => {
-      console.error(`Failed to publish result: ${e}`);
-    });
 
-    return json({ success: true });
+    const response = await result.publishResults({ studentIds: [144], examId: 5 });
+    if (!response.success) {
+      return json({
+        success: false,
+        message: `Failed to send result for student ${144}. ${response.failed} failed.`,
+        errors: response.errors,
+      })
+    }
+
+    return json({
+      success: true,
+      message: `Result sent successfully for student ${144}.`,
+      result: response.results[0],
+    })
   } catch (e: any) {
     console.error(`Failed to publish result: ${e}`);
     return error(500, e.message);

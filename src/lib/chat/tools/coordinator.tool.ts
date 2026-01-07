@@ -111,12 +111,20 @@ export const validateClassResults = tool({
   },
 });
 
+// EmailResult schema matching email-job.ts interface
+const emailResultSchema = z.object({
+  to: z.string().optional().describe("Recipient email address"),
+  messageId: z.string().optional().describe("Unique message ID from SMTP server"),
+  response: z.string().optional().describe("SMTP server response (e.g., '250 OK')"),
+  studentId: z.number().optional().describe("Student ID this email was sent for"),
+});
+
 export const sendStudentResult = tool({
   description: [
     "Sends/Publishes a single student result via email.",
     "Marks the result as published in the student timeline.",
     "Should be called only after validation is successful or deemed acceptable.",
-    "Returns detailed error information if sending fails - explain errors to user in simple terms.",
+    "Returns full SMTP result on success, or detailed error information on failure.",
   ].join("\n"),
   inputSchema: z.object({
     studentId: z.number().describe("The Student ID."),
@@ -125,7 +133,8 @@ export const sendStudentResult = tool({
   outputSchema: z.object({
     success: z.boolean(),
     message: z.string(),
-    errors: z.array(z.string()).optional().describe("Detailed error messages if any"),
+    result: emailResultSchema.optional().describe("SMTP result details on successful send"),
+    errors: z.array(z.string()).optional().describe("Detailed error messages if sending failed"),
   }),
   execute: async ({ studentId, examTypeId }) => {
     const response = await result.publishResults({ studentIds: [studentId], examId: examTypeId });
@@ -133,7 +142,7 @@ export const sendStudentResult = tool({
     if (!response.success) {
       return {
         success: false,
-        message: `Failed to send result for student ${studentId}. ${response.failed} failed.`,
+        message: `Failed to send result for student ${studentId}.`,
         errors: response.errors,
       };
     }
@@ -141,7 +150,7 @@ export const sendStudentResult = tool({
     return {
       success: true,
       message: `Result sent successfully for student ${studentId}.`,
-      errors: response.errors.length > 0 ? response.errors : undefined,
+      result: response.results[0],
     };
   },
 });
@@ -151,7 +160,7 @@ export const sendClassResults = tool({
     "Sends/Publishes results for a class via email.",
     "Marks the result as published in the student timeline.",
     "Should be called only after validation is successful or deemed acceptable.",
-    "Returns detailed error information if sending fails - explain errors to user in simple terms.",
+    "Returns full SMTP results on success, or detailed error information on failure.",
   ].join("\n"),
   inputSchema: z.object({
     classId: z.number().describe("The Class ID."),
@@ -163,7 +172,8 @@ export const sendClassResults = tool({
     message: z.string(),
     sent: z.number().optional().describe("Number of results successfully sent"),
     failed: z.number().optional().describe("Number of results that failed to send"),
-    errors: z.array(z.string()).optional().describe("Detailed error messages if any"),
+    results: z.array(emailResultSchema).optional().describe("SMTP result details for each successful send"),
+    errors: z.array(z.string()).optional().describe("Detailed error messages if sending failed"),
   }),
   execute: async ({ classId, examTypeId, sectionId }) => {
     const students = await studentRepo.getStudentsByClassId({ classId, sectionId });
@@ -191,6 +201,7 @@ export const sendClassResults = tool({
       message: `Results sent successfully. ${response.sent} sent, ${response.failed} failed.`,
       sent: response.sent,
       failed: response.failed,
+      results: response.results.length > 0 ? response.results : undefined,
       errors: response.errors.length > 0 ? response.errors : undefined,
     };
   },
