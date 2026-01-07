@@ -127,7 +127,7 @@
           <div
             class="flex items-center gap-1.5 sm:gap-2 rounded-full border bg-muted/50 px-2 sm:px-2.5 py-1 text-[11px] sm:text-xs transition-all hover:bg-muted"
           >
-            <span class="max-w-[80px] sm:max-w-[120px] truncate">{f.name}</span>
+            <span class="max-w-20 sm:max-w-[120px] truncate">{f.name}</span>
             {#if file.uploads.some((u) => u.filename === f.name && u.status === "done")}
               <Check class="size-3 text-green-500" />
             {:else if file.uploads.some((u) => u.filename === f.name && u.status === "pending")}

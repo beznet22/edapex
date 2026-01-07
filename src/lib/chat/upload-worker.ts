@@ -2,7 +2,7 @@
 // This will be used to perform fetch requests for file uploads without blocking the UI
 
 import type { UploadedData } from "$lib/types/chat-types";
-import type { ClassSection } from "$lib/types/result-types";
+
 interface UploadRequest {
   fileId: string;
   file?: File;
@@ -11,20 +11,48 @@ interface UploadRequest {
   sectionId?: number;
   className?: string;
   sectionName?: string;
+  studentId?: number;
+  studentName?: string;
+  admissionNo?: number;
 }
 
 // Listen for messages from the main thread
 self.onmessage = async function (e) {
-  const { fileId, file, filename, classId, sectionId, className, sectionName }: UploadRequest = e.data;
-  console.log({ fileId, file, filename, classId, sectionId, className, sectionName });
+  const {
+    fileId,
+    file,
+    filename,
+    classId,
+    sectionId,
+    className,
+    sectionName,
+    studentId,
+    studentName,
+    admissionNo,
+  }: UploadRequest = e.data;
+  console.log({
+    fileId,
+    file,
+    filename,
+    classId,
+    sectionId,
+    className,
+    sectionName,
+    studentId,
+    studentName,
+    admissionNo,
+  });
   try {
-    const formData = new FormData();  
+    const formData = new FormData();
     if (filename) formData.append("filename", filename);
     if (file) formData.append("file", file);
     if (classId) formData.append("classId", classId.toString());
     if (sectionId) formData.append("sectionId", sectionId.toString());
     if (className) formData.append("className", className);
     if (sectionName) formData.append("sectionName", sectionName);
+    if (studentId) formData.append("studentId", studentId.toString());
+    if (studentName) formData.append("studentName", studentName);
+    if (admissionNo) formData.append("admissionNo", admissionNo.toString());
 
     const response = await fetch("/api/uploads", {
       method: "POST",
