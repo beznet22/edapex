@@ -24,12 +24,15 @@ export const POST: RequestHandler = async ({ request, locals }) => {
     const sectionId = formData.get("sectionId") as number | null;
     const className = formData.get("className") as string;
     const sectionName = formData.get("sectionName") as string;
+    const studentId = formData.get("studentId") ? Number(formData.get("studentId")) : null;
+    const studentName = formData.get("studentName") as string | null;
+    const admissionNo = formData.get("admissionNo") ? Number(formData.get("admissionNo")) : null;
 
     let staffId: number = user.staffId || 1;
     let token = "";
     if (classId && sectionId && user.designation === "coordinator") {
       const staff = await staffRepo.getStaffByClassSection({ classId, sectionId });
-      if (!staff.teacherId) throw new Error("Class not assigned to any teacher")
+      if (!staff.teacherId) throw new Error("Class not assigned to any teacher");
       staffId = staff.teacherId;
       token = `${className}(${sectionName})`.toLowerCase().replaceAll(" ", "_");
     } else {
@@ -59,20 +62,25 @@ export const POST: RequestHandler = async ({ request, locals }) => {
       if (!content || !success) return json({ success: false, status: "error", error: message });
 
       const parsedResult = JSON.parse(content.trim());
+      // Add student data if provided (from drop-zone upload)
+      if (studentId) parsedResult.studentData.studentId = studentId;
+      if (admissionNo) parsedResult.studentData.admissionNo = admissionNo;
+      if (studentName) parsedResult.studentData.fullName = studentName;
       // console.log("Parsed result", parsedResult);
       const validated = await resultInputSchema.safeParseAsync(parsedResult);
       if (!validated.success) {
-        const error = validated.error.issues.filter(
-          issue => issue.code === "custom"
-        );
+        const error = validated.error.issues.filter((issue) => issue.code === "custom");
         writeFileSync(process.cwd() + "/static/extracted/parsed.json", JSON.stringify(parsedResult));
         console.log("Failed to upload file", validated.error.issues);
-        return json({ success: false, status: "error", error: error.map(issue => issue.message).join("\n") });
+        return json({
+          success: false,
+          status: "error",
+          error: error.map((issue) => issue.message).join("\n"),
+        });
       }
 
       console.log("Validated data", validated.data);
       const res = await result.upsertStudentResult(validated.data, staffId);
-
 
       if (filename) del(pathname);
       return json({ success: true, status: "done", data: res, filename: filename ?? file.name });
@@ -94,12 +102,20 @@ export const POST: RequestHandler = async ({ request, locals }) => {
         return json({ success: true, status: "pending", data, filename });
       } catch (e) {
         console.error("Failed to save file:", e);
-        return json({ success: false, status: "error", error: e instanceof Error ? e.message : "Failed to upload file, try again" });
+        return json({
+          success: false,
+          status: "error",
+          error: e instanceof Error ? e.message : "Failed to upload file, try again",
+        });
       }
     }
   } catch (e) {
     console.error(e);
-    return json({ success: false, status: "error", error: e instanceof Error ? e.message : "Failed to upload file, try again" });
+    return json({
+      success: false,
+      status: "error",
+      error: e instanceof Error ? e.message : "Failed to upload file, try again",
+    });
   }
 };
 

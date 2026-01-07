@@ -1,61 +1,27 @@
 <script lang="ts">
-  import { enhance } from "$app/forms";
   import { Button } from "$lib/components/ui/button";
   import * as Dialog from "$lib/components/ui/dialog/index.js";
   import { useFileActions } from "$lib/context/file-context.svelte";
   import { Check, CircleAlert, TriangleAlert } from "@lucide/svelte";
   import XIcon from "@lucide/svelte/icons/x";
-  import { getContext, onDestroy } from "svelte";
+  import { onDestroy } from "svelte";
   import { toast } from "svelte-sonner";
-  import {
-    displaySize,
-    FileDropZone,
-    KILOBYTE,
-    type FileDropZoneProps,
-  } from "./file-drop-zone";
+  import { displaySize, FileDropZone, KILOBYTE, type FileDropZoneProps } from "./file-drop-zone";
   import { Loader } from "./prompt-kit/loader";
   import { ScrollArea } from "./ui/scroll-area";
-  import type { ActionData } from "../../routes/(chat)/$types";
-  import { page } from "$app/state";
-  import { useChat } from "$lib/context/chat-context.svelte";
   import { useUser } from "$lib/context/user-context.svelte";
   import * as Select from "$lib/components/ui/select/index.js";
 
-  type Upload = {
-    filename: string;
-    status: "pending" | "uploading" | "done" | "error";
-  };
-
   let filesContext = useFileActions();
-  let chat = useChat();
   let userCtx = useUser();
   let previewUrls = new Map<File, string>();
-  let fileForm: HTMLFormElement;
-  let files = $state<File[]>([]);
-  let uploads = $derived<Upload[]>(
-    files.map((f) => ({
-      filename: page.form?.filenames?.[f.name] || f.name,
-      status: page.form?.status || "uploading",
-    })),
-  );
-
-  $effect(() => {
-    if (!page.form) return;
-    if (page.form?.status === "error") {
-      toast.error(page.form.message);
-    }
-    if (page.form?.status === "done") {
-      toast.success(page.form.message);
-    }
-    if (page.form?.status === "pending") {
-      toast.info(page.form.message);
-    }
-  });
 
   let value = $state<string>();
-  const student = $derived(
-    userCtx.students.find((p) => p.id === Number(value)),
-  );
+  const student = $derived(userCtx.students.find((p) => p.id === Number(value)));
+
+  // Use files and uploads from the shared context
+  const files = $derived(filesContext.files);
+  const uploads = $derived(filesContext.uploads);
 
   // Cleanup object URLs on destruction
   onDestroy(() => {
@@ -64,14 +30,14 @@
   });
 
   const onUpload: FileDropZoneProps["onUpload"] = async (fs) => {
-    files = [...files, ...fs];
-    fileForm.requestSubmit();
+    filesContext.uploadWithStudentData(fs, {
+      studentId: student?.id,
+      studentName: student?.name ?? undefined,
+      admissionNo: student?.admissionNo ?? undefined,
+    });
   };
 
-  const onFileRejected: FileDropZoneProps["onFileRejected"] = ({
-    reason,
-    file,
-  }) => {
+  const onFileRejected: FileDropZoneProps["onFileRejected"] = ({ reason, file }) => {
     toast.error(`${file.name} failed to upload!`, { description: reason });
   };
 
@@ -89,7 +55,7 @@
       URL.revokeObjectURL(previewUrls.get(file)!);
       previewUrls.delete(file);
     }
-    files.splice(index, 1);
+    filesContext.remove(index);
   };
 </script>
 
@@ -113,78 +79,51 @@
           {filesContext.selectedClass?.sectionName}
         </Dialog.Title>
         <Dialog.Description>
-          Add image or documents to chat, file content will be extracted and
-          used as chat context.
+          Add image or documents to chat, file content will be extracted and used as chat context.
         </Dialog.Description>
       </Dialog.Header>
 
-      <form
-        bind:this={fileForm}
-        method="POST"
-        enctype="multipart/form-data"
-        use:enhance
-      >
-        {#if userCtx.students.length > 0}
-          <div class="grid gap-4 py-4">
-            <Select.Root required type="single" name="provider" bind:value>
-              <Select.Trigger class="w-full">
-                {student?.name || "Select a student"}
-              </Select.Trigger>
-              <Select.Content>
-                <Select.Group>
-                  <Select.Label>Students</Select.Label>
-                  {#each userCtx.students as student (student.id)}
-                    <Select.Item
-                      value={student.id.toString()}
-                      label={student.name || ""}
-                    >
-                      {student.name}
-                    </Select.Item>
-                  {/each}
-                </Select.Group>
-              </Select.Content>
-            </Select.Root>
-          </div>
-        {/if}
-
-        <div class="mt-4">
-          <FileDropZone
-            name="files"
-            {onUpload}
-            {onFileRejected}
-            maxFileSize={300 * KILOBYTE}
-            accept="image/*"
-            maxFiles={1}
-            disabled={!value}
-            fileCount={files.length}
-          />
+      {#if userCtx.students.length > 0}
+        <div class="grid gap-4 py-4">
+          <Select.Root required type="single" name="provider" bind:value>
+            <Select.Trigger class="w-full">
+              {student?.name || "Select a student"}
+            </Select.Trigger>
+            <Select.Content>
+              <Select.Group>
+                <Select.Label>Students</Select.Label>
+                {#each userCtx.students as student (student.id)}
+                  <Select.Item value={student.id.toString()} label={student.name || ""}>
+                    {student.name}
+                  </Select.Item>
+                {/each}
+              </Select.Group>
+            </Select.Content>
+          </Select.Root>
         </div>
-        {console.log(chat.selectedClass)}
-        <input hidden name="classId" value={chat.selectedClass?.classId} />
-        <input hidden name="sectionId" value={chat.selectedClass?.sectionId} />
-        <input hidden name="className" value={chat.selectedClass?.className} />
-        <input
-          hidden
-          name="sectionName"
-          value={chat.selectedClass?.sectionName}
+      {/if}
+
+      <div class="mt-4">
+        <FileDropZone
+          name="files"
+          {onUpload}
+          {onFileRejected}
+          maxFileSize={300 * KILOBYTE}
+          accept="image/*"
+          maxFiles={4}
+          disabled={!value}
+          fileCount={files.length}
         />
-        <input hidden name="studentId" bind:value />
-        <input hidden name="studentName" value={student?.name} />
-        <input hidden name="admissionNo" value={student?.admissionNo} />
-      </form>
+      </div>
     </div>
 
     <ScrollArea class="min-h-0 grow px-6 pb-6 overflow-auto">
       <div class="flex flex-col gap-3">
         {#each files as file, i (file.name + i)}
-          <div
-            class="flex items-center justify-between gap-3 rounded-md p-2 bg-background"
-          >
+          <div class="flex items-center justify-between gap-3 rounded-md p-2 bg-background">
             <div class="flex items-center gap-3 min-w-0 flex-1">
               {#if file.type.startsWith("image/")}
-                <div
-                  class="relative size-10 shrink-0 overflow-hidden rounded-md bg-muted"
-                >
+                <div class="relative size-10 shrink-0 overflow-hidden rounded-md bg-muted">
                   <img
                     src={generatePreviewUrl(file)}
                     alt={file.name}
@@ -198,10 +137,7 @@
                 </div>
               {/if}
               <div class="flex flex-col min-w-0 flex-1">
-                <span
-                  class="truncate text-sm font-medium leading-none"
-                  title={file.name}
-                >
+                <span class="truncate text-sm font-medium leading-none" title={file.name}>
                   {file.name}
                 </span>
                 <span class="text-xs text-muted-foreground mt-1">
@@ -236,9 +172,7 @@
         {/each}
 
         {#if files.length === 0}
-          <div class="text-center text-muted-foreground py-8">
-            No files added yet
-          </div>
+          <div class="text-center text-muted-foreground py-8">No files added yet</div>
         {/if}
       </div>
     </ScrollArea>

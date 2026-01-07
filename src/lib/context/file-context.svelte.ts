@@ -77,7 +77,19 @@ export class FilesContext {
     this.files = [...this.files, ...incoming];
   };
 
-  #upload = (files: File[]) => {
+  // Upload files with optional student data (used by drop-zone)
+  uploadWithStudentData = (
+    files: File[],
+    studentData?: { studentId?: number; studentName?: string; admissionNo?: number }
+  ) => {
+    this.files = [...this.files, ...files];
+    this.#upload(files, studentData);
+  };
+
+  #upload = (
+    files: File[],
+    studentData?: { studentId?: number; studentName?: string; admissionNo?: number }
+  ) => {
     for (const file of files) {
       const fileId = generateId(); // Unique ID per file (not per batch)
       const upload: UploadedData = {
@@ -90,7 +102,17 @@ export class FilesContext {
       this.uploads = [...this.uploads, upload];
       const worker = this.#initWoeker(fileId, file.name);
       const { classId, sectionId, className, sectionName } = this.selectedClass || {};
-      worker.postMessage({ fileId, file, classId, sectionId, className, sectionName });
+      worker.postMessage({
+        fileId,
+        file,
+        classId,
+        sectionId,
+        className,
+        sectionName,
+        studentId: studentData?.studentId,
+        studentName: studentData?.studentName,
+        admissionNo: studentData?.admissionNo,
+      });
     }
   };
 
@@ -108,7 +130,7 @@ export class FilesContext {
       classId,
       sectionId,
       className,
-      sectionName
+      sectionName,
     });
   };
 
