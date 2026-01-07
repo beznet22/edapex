@@ -66,7 +66,7 @@ export const POST: RequestHandler = async ({ request, locals: { user, session },
         system: systemPrompt,
         messages: convertToModelMessages(messages),
         abortSignal: userStopSignal.signal,
-        stopWhen: stepCountIs(5),
+        stopWhen: stepCountIs(30),
         tools: tools(writer, model),
         experimental_transform: smoothStream({
           delayInMs: 20,

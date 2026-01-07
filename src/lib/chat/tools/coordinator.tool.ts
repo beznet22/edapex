@@ -129,6 +129,7 @@ export const sendStudentResult = tool({
   inputSchema: z.object({
     studentId: z.number().describe("The Student ID."),
     examTypeId: z.number().describe("The Exam Type ID."),
+    resend: z.boolean().optional().describe("If true, resends the email even if it was previously sent. Default is false."),
   }),
   outputSchema: z.object({
     success: z.boolean(),
@@ -136,8 +137,8 @@ export const sendStudentResult = tool({
     result: emailResultSchema.optional().describe("SMTP result details on successful send"),
     errors: z.array(z.string()).optional().describe("Detailed error messages if sending failed"),
   }),
-  execute: async ({ studentId, examTypeId }) => {
-    const response = await result.publishResults({ studentIds: [studentId], examId: examTypeId });
+  execute: async ({ studentId, examTypeId, resend }) => {
+    const response = await result.publishResults({ studentIds: [studentId], examId: examTypeId, resend });
 
     if (!response.success) {
       return {
@@ -166,6 +167,7 @@ export const sendClassResults = tool({
     classId: z.number().describe("The Class ID."),
     sectionId: z.number().describe("Optional Section ID."),
     examTypeId: z.number().describe("The Exam Type ID."),
+    resend: z.boolean().optional().describe("If true, resends emails for students who already received them. Default is false."),
   }),
   outputSchema: z.object({
     success: z.boolean(),
@@ -175,7 +177,7 @@ export const sendClassResults = tool({
     results: z.array(emailResultSchema).optional().describe("SMTP result details for each successful send"),
     errors: z.array(z.string()).optional().describe("Detailed error messages if sending failed"),
   }),
-  execute: async ({ classId, examTypeId, sectionId }) => {
+  execute: async ({ classId, examTypeId, sectionId, resend }) => {
     const students = await studentRepo.getStudentsByClassId({ classId, sectionId });
     if (!students || students.length === 0) {
       return { success: false, message: "No students found." };
@@ -184,6 +186,7 @@ export const sendClassResults = tool({
     const response = await result.publishResults({
       studentIds: students.map((s) => s.id),
       examId: examTypeId,
+      resend,
     });
 
     if (!response.success) {
@@ -509,6 +512,100 @@ export const createStudent = tool({
         success: false,
         message: `Failed to create student: ${errorMessage}`,
         isExisting: false,
+      };
+    }
+  },
+});
+
+export const assignClassSection = tool({
+  description: [
+    "Assigns a student to a new class and section using their unique IDs.",
+    "This tool should be used after confirming the correct class and section IDs, usually via the `searchClassSection` tool.",
+    "It performs a direct assignment on the student's records.",
+  ].join("\n"),
+  inputSchema: z.object({
+    studentId: z.number().describe("The unique ID of the student."),
+    classId: z.number().describe("The unique ID of the destination class."),
+    sectionId: z.number().describe("The unique ID of the destination section."),
+    className: z.string().optional().describe("The name of the class (for confirmation message)."),
+    sectionName: z.string().optional().describe("The name of the section (for confirmation message)."),
+  }),
+  outputSchema: z.object({
+    success: z.boolean(),
+    message: z.string(),
+  }),
+  execute: async ({ studentId, classId, sectionId, className, sectionName }) => {
+    try {
+      const result = await studentRepo.assignClassSection({
+        studentId,
+        classId,
+        sectionId,
+      });
+
+      if (!result) {
+        return {
+          success: false,
+          message: "Failed to update student records.",
+        };
+      }
+
+      const location = className && sectionName ? ` to ${className} (${sectionName})` : "";
+      return {
+        success: true,
+        message: `Student successfully moved${location}.`,
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+      return {
+        success: false,
+        message: `Error assigning student: ${errorMessage}`,
+      };
+    }
+  },
+});
+
+export const searchClassSection = tool({
+  description: [
+    "Searches for available classes and sections matching a query string.",
+    "Use this tool when a user provides a class or section name that might be misspelled, or to find IDs before assignment.",
+    "If no query is provided, it returns all active class/section combinations.",
+  ].join("\n"),
+  inputSchema: z.object({
+    query: z.string().optional().describe("The name or partial name of the class or section to search for."),
+  }),
+  outputSchema: z.object({
+    success: z.boolean(),
+    results: z.array(
+      z.object({
+        classId: z.number(),
+        className: z.string(),
+        sectionId: z.number(),
+        sectionName: z.string(),
+      })
+    ),
+    message: z.string(),
+  }),
+  execute: async ({ query }) => {
+    try {
+      const results = await studentRepo.searchClassSection(query);
+      if (results.length === 0) {
+        return {
+          success: true,
+          results: [],
+          message: `No classes or sections found matching "${query}".`,
+        };
+      }
+      return {
+        success: true,
+        results,
+        message: `Found ${results.length} matching class/section combinations.`,
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+      return {
+        success: false,
+        results: [],
+        message: `Error searching classes: ${errorMessage}`,
       };
     }
   },

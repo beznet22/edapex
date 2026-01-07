@@ -73,7 +73,7 @@ export class ResultService {
   /**
    * Publish result to students and parents timeline and send email
    */
-  async publishResults(params: { studentIds: number[]; examId: number }): Promise<{
+  async publishResults(params: { studentIds: number[]; examId: number; resend?: boolean }): Promise<{
     success: boolean;
     sent: number;
     failed: number;
@@ -85,13 +85,21 @@ export class ResultService {
       studentId?: number;
     }>;
   }> {
-    const { studentIds, examId } = params;
+    const { studentIds, examId, resend = false } = params;
     const messages: any[] = [];
     const CONCURRENCY_LIMIT = 5;
     const processingErrors: string[] = [];
 
     const processStudent = async (studentId: number) => {
       try {
+        if (!resend) {
+          const alreadySent = await this.isEmailAlreadySent(studentId, examId);
+          if (alreadySent) {
+            processingErrors.push(`Student ${studentId}: Email already sent`);
+            return null;
+          }
+        }
+
         const resultData = await result.getStudentResult({ id: studentId, examId, withImages: true });
         const validatedResult = await resultOutputSchema.safeParseAsync(resultData);
         if (!validatedResult.success || !resultData) {
@@ -202,7 +210,7 @@ export class ResultService {
 
       const timeline = {
         staffStudentId: studentId,
-        type: `exam-${examId}`,
+        type: `exam-${examId}-${messageId}`,
         title: "Result Notification",
         description: "TERMLY SUMMARY OF PROGRESS REPORT",
         visibleToStudent: 1,
@@ -222,6 +230,14 @@ export class ResultService {
       errors: allErrors,
       results: emailResults,
     };
+  }
+
+  /**
+   * Check if result notification already exists for student and exam
+   */
+  async isEmailAlreadySent(studentId: number, examId: number): Promise<boolean> {
+    const timelines = await timelineRepo.getTimelinesByStudentId(studentId);
+    return timelines.some((t) => t.type?.startsWith(`exam-${examId}`));
   }
 
   async assignSubjects(classId: number, sectionId: number, teacherId?: number) {

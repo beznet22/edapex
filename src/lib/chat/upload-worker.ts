@@ -14,6 +14,7 @@ interface UploadRequest {
   studentId?: number;
   studentName?: string;
   admissionNo?: number;
+  isStudentPhoto?: boolean;
 }
 
 // Listen for messages from the main thread
@@ -29,6 +30,7 @@ self.onmessage = async function (e) {
     studentId,
     studentName,
     admissionNo,
+    isStudentPhoto,
   }: UploadRequest = e.data;
   console.log({
     fileId,
@@ -53,6 +55,7 @@ self.onmessage = async function (e) {
     if (studentId) formData.append("studentId", studentId.toString());
     if (studentName) formData.append("studentName", studentName);
     if (admissionNo) formData.append("admissionNo", admissionNo.toString());
+    if (isStudentPhoto) formData.append("isStudentPhoto", isStudentPhoto.toString());
 
     const response = await fetch("/api/uploads", {
       method: "POST",

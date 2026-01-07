@@ -1,14 +1,16 @@
-import { UPLOADS_DIR } from "$lib/constants";
+import { STATIC_DIR, UPLOADS_DIR } from "$lib/constants";
 import { fileSchema } from "$lib/schema/chat-schema";
 import { resultInputSchema } from "$lib/schema/result-input";
 import { generateContent } from "$lib/server/helpers/chat-helper";
 import { resultRepo } from "$lib/server/repository/result.repo";
 import { staffRepo } from "$lib/server/repository/staff.repo";
+import { studentRepo } from "$lib/server/repository/student.repo";
 import { result } from "$lib/server/service/result.service";
 import { del, get, put } from "$lib/utils/fs-blob";
 import type { RequestHandler } from "@sveltejs/kit";
 import { error, json } from "@sveltejs/kit";
-import { rmdirSync, writeFileSync } from "fs";
+import { mkdirSync, rmdirSync, writeFileSync } from "fs";
+import { createHash } from "crypto";
 import { join } from "path";
 
 export const POST: RequestHandler = async ({ request, locals }) => {
@@ -27,6 +29,25 @@ export const POST: RequestHandler = async ({ request, locals }) => {
     const studentId = formData.get("studentId") ? Number(formData.get("studentId")) : null;
     const studentName = formData.get("studentName") as string | null;
     const admissionNo = formData.get("admissionNo") ? Number(formData.get("admissionNo")) : null;
+    const isStudentPhoto = formData.get("isStudentPhoto") === "true";
+
+    if (isStudentPhoto) {
+      if (!studentId) throw new Error("Student ID is required for photo upload");
+      const buff = await file.arrayBuffer();
+      const buffer = Buffer.from(buff);
+      const hash = createHash("md5").update(buffer).digest("hex");
+      const ext = file.name.split(".").pop();
+      const filename = `${hash}.${ext}`;
+      const relativePath = `public/uploads/student/${filename}`;
+      const fullPath = join(STATIC_DIR, relativePath);
+
+      const dir = join(STATIC_DIR, "public/uploads/student");
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(fullPath, buffer);
+
+      await studentRepo.updateStudentPhoto(studentId, relativePath);
+      return json({ success: true, status: "done", filename });
+    }
 
     let staffId: number = user.staffId || 1;
     let token = "";

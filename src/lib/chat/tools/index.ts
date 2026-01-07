@@ -15,6 +15,8 @@ import {
   updateExamTitle,
   upsertMarkStore,
   validateClassResults,
+  assignClassSection,
+  searchClassSection,
 } from "./coordinator.tool";
 
 export const teacherTools = (writer: UIMessageStreamWriter, model: LanguageModel) => {
@@ -40,5 +42,7 @@ export const coordinatorTools = (writer: UIMessageStreamWriter, model: LanguageM
     upsertMarkStore,
     updateExamTitle,
     createStudent,
+    assignClassSection,
+    searchClassSection,
   };
 };
