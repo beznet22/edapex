@@ -9,14 +9,12 @@ services:
       - DATABASE_URL=${DATABASE_URL}
       - JWT_SIGN_SECRET=${JWT_SIGN_SECRET}
       - JWE_ENC_SECRET=${JWE_ENC_SECRET}
-      - MAIL_DRIVER=${MAIL_DRIVER}
-      - MAIL_HOST=${MAIL_HOST}
-      - MAIL_PORT=${MAIL_PORT}
-      - MAIL_USERNAME=${MAIL_USERNAME}
-      - MAIL_PASSWORD=${MAIL_PASSWORD}
-      - MAIL_FROM_ADDRESS=${MAIL_FROM_ADDRESS}
-      - MAIL_FROM_NAME=${MAIL_FROM_NAME}
-      - MAIL_ENCRYPTION=${MAIL_ENCRYPTION}
+      - SMTP_HOST=${SMTP_HOST}
+      - SMTP_PORT=${SMTP_PORT}
+      - SMTP_USER=${SMTP_USER}
+      - SMTP_PASS=${SMTP_PASS}
+      - SMTP_FROM=${SMTP_FROM}
+      - SMTP_FROM_NAME=${SMTP_FROM_NAME}
     volumes:
       - ${STORAGE_DIR}/storage:/app/storage/
       - ${STORAGE_DIR}/static:/app/static/
