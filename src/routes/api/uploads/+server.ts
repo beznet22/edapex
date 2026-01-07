@@ -79,7 +79,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
         });
       }
 
-      console.log("Validated data", validated.data);
+      // console.log("Validated data", validated.data);
       const res = await result.upsertStudentResult(validated.data, staffId);
 
       if (filename) del(pathname);
@@ -89,7 +89,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
       if (filename) {
         throw new Error("Failed to save file");
       }
-      
+
       try {
         const buff = await file.arrayBuffer();
         const data = await put(file.name, buff, {

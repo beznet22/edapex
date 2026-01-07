@@ -437,6 +437,14 @@ export class StudentRepository extends BaseRepository {
     return updated;
   }
 
+  async updateStudentCategoryId(studentId: number, studentCategoryId: number) {
+    const [updated] = await this.db
+      .update(smStudents)
+      .set({ studentCategoryId })
+      .where(eq(smStudents.id, studentId));
+    return updated.affectedRows > 0;
+  }
+
   async getStudentById(id?: number, isAdminNo = false): Promise<StudentDetails | null> {
     if (!id) return null;
     const academicId = await this.getAcademicId();
