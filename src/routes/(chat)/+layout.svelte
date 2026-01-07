@@ -2,28 +2,26 @@
   import favicon from "$lib/assets/favicon.svg";
   import AppSidebar from "$lib/components/app-sidebar.svelte";
   import * as Sidebar from "$lib/components/ui/sidebar";
-  import { UserContext } from "$lib/context/user-context.svelte.js";
   import { ChatHistory } from "$lib/context/chat-history.svelte.js";
-  import { FilesContext, useFileActions } from "$lib/context/file-context.svelte.js";
-  import { onMount, setContext } from "svelte";
-  import type { ActionData } from "./$types.js";
-  import { pushState } from "$app/navigation";
-  import { page } from "$app/state";
+  import { FilesContext } from "$lib/context/file-context.svelte.js";
+  import { UserContext } from "$lib/context/user-context.svelte.js";
+  import type { PageData } from "./$types.js";
 
-  let { data, children, form } = $props<{
-    data: any;
+  let { data, children } = $props<{
+    data: PageData;
     children: any;
-    form: ActionData;
   }>();
 
   // svelte-ignore state_referenced_locally
-  let { user, chats, uploads, selectedChatModel, students, classes } = data;
+  let { user, chats, uploads, selectedChatModel, students, classes } =
+    data as PageData;
+
   const chatHistory = new ChatHistory(chats);
   chatHistory.setContext();
 
   selectedChatModel.setContext();
 
-  const appContext = new UserContext(user, classes, students || []);
+  const appContext = new UserContext(user, classes, students ?? undefined);
   appContext.setContext();
 
   const filesContext = new FilesContext(uploads, true);
