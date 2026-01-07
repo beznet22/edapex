@@ -61,6 +61,16 @@ export class ResultService {
   studentInput?: StudentInput;
 
   /**
+   * SMTP Email Result matching email-job.ts EmailResult interface
+   */
+  static EmailResultSchema = {
+    to: "" as string | undefined,
+    messageId: "" as string | undefined,
+    response: "" as string | undefined,
+    studentId: 0 as number | undefined,
+  };
+
+  /**
    * Publish result to students and parents timeline and send email
    */
   async publishResults(params: { studentIds: number[]; examId: number }): Promise<{
@@ -68,6 +78,12 @@ export class ResultService {
     sent: number;
     failed: number;
     errors: string[];
+    results: Array<{
+      to?: string;
+      messageId?: string;
+      response?: string;
+      studentId?: number;
+    }>;
   }> {
     const { studentIds, examId } = params;
     const messages: any[] = [];
@@ -152,10 +168,17 @@ export class ResultService {
         sent: 0,
         failed: studentIds.length,
         errors: processingErrors.length > 0 ? processingErrors : ["No valid results to send"],
+        results: [],
       };
     }
 
     const emailErrors: string[] = [];
+    const emailResults: Array<{
+      to?: string;
+      messageId?: string;
+      response?: string;
+      studentId?: number;
+    }> = [];
     let sentCount = 0;
 
     const payload: JobPayload = { type: "send-email", data: messages };
@@ -167,7 +190,16 @@ export class ResultService {
       }
 
       sentCount++;
-      const { studentId, messageId } = jobResult;
+      const { studentId, messageId, response, to } = jobResult;
+
+      // Capture full SMTP result
+      emailResults.push({
+        to: typeof to === "string" ? to : Array.isArray(to) ? String(to[0]) : undefined,
+        messageId,
+        response,
+        studentId,
+      });
+
       const timeline = {
         staffStudentId: studentId,
         type: `exam-${examId}`,
@@ -188,6 +220,7 @@ export class ResultService {
       sent: sentCount,
       failed: studentIds.length - sentCount,
       errors: allErrors,
+      results: emailResults,
     };
   }
 

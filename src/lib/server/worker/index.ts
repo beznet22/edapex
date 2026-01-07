@@ -1,6 +1,7 @@
 import { Worker } from "worker_threads";
 import { dirname, join } from "path";
 import { fileURLToPath } from "url";
+import { dev } from "$app/environment";
 
 export interface JobResult {
   jobId: string;
@@ -13,8 +14,18 @@ export interface JobResult {
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
+// In dev: use __dirname relative path with .ts extension
+// In prod: use absolute path from cwd to build/lib/server/worker/jobs with .js extension
+const getWorkerPath = (jobName: string) => {
+  if (dev) {
+    return join(__dirname, `jobs/${jobName}.ts`);
+  }
+  // Production: workers are compiled to build/lib/server/worker/jobs/
+  return join(process.cwd(), `build/lib/server/worker/jobs/${jobName}.js`);
+};
+
 const registry = {
-  "send-email": join(__dirname, "jobs/email-job.ts"),
+  "send-email": getWorkerPath("email-job"),
 } as const;
 
 export type JobType = keyof typeof registry;
@@ -30,9 +41,12 @@ export class JobWorker {
     return new Promise((resolve, reject) => {
       const jobId = crypto.randomUUID();
 
+      // In dev, use --experimental-transform-types to run .ts directly
+      const execArgv = dev ? ["--experimental-transform-types"] : [];
+
       const worker = new Worker(registry[type], {
         workerData: { data, jobId },
-        execArgv: ["--experimental-transform-types"],
+        execArgv,
       });
 
       worker.on("message", (msg) => {
