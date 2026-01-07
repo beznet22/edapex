@@ -48,7 +48,6 @@ const GRADE_RANGES = {
 
 type StudentData = {
   category: Category;
-  studentCategoryId: number;
   studentId: number;
   recordId: number;
   classId: number;
@@ -64,17 +63,23 @@ export class ResultService {
   /**
    * Publish result to students and parents timeline and send email
    */
-  async publishResults(params: { studentIds: number[]; examId: number }) {
+  async publishResults(params: { studentIds: number[]; examId: number }): Promise<{
+    success: boolean;
+    sent: number;
+    failed: number;
+    errors: string[];
+  }> {
     const { studentIds, examId } = params;
     const messages: any[] = [];
     const CONCURRENCY_LIMIT = 5;
+    const processingErrors: string[] = [];
 
     const processStudent = async (studentId: number) => {
       try {
         const resultData = await result.getStudentResult({ id: studentId, examId, withImages: true });
         const validatedResult = await resultOutputSchema.safeParseAsync(resultData);
         if (!validatedResult.success || !resultData) {
-          console.warn(`Validation failed for student ${studentId}`);
+          processingErrors.push(`Student ${studentId}: Result validation failed`);
           return null;
         }
         const { student, school } = validatedResult.data;
@@ -85,8 +90,14 @@ export class ResultService {
         const fileName = `res_${student.fullName}_a${student.adminNo}_e${examId}_${Date.now()}`;
 
         const pdfResult = await generate({ htmlContent: html, fileName, returnPath: true });
-        if (!pdfResult.success) throw new Error(pdfResult.error || "Failed to generate document");
-        if (!pdfResult.filePath) throw new Error("PDF path is missing");
+        if (!pdfResult.success) {
+          processingErrors.push(`Student ${studentId}: ${pdfResult.error || "Failed to generate PDF"}`);
+          return null;
+        }
+        if (!pdfResult.filePath) {
+          processingErrors.push(`Student ${studentId}: PDF path is missing`);
+          return null;
+        }
 
         const logoPath = school.logo || "/school-logo.png";
         let absoluteLogoPath = logoPath.startsWith("/")
@@ -112,7 +123,7 @@ export class ResultService {
 
         return {
           from: `"${school.name}" <${school.email}>`,
-          to: student.parentEmail,
+          to: "bono247@gmail.com",
           subject: "Result Notification",
           html,
           attachments: [
@@ -120,9 +131,10 @@ export class ResultService {
             { filename: "logo.png", path: absoluteLogoPath, cid: "schoolLogo" },
           ],
           studentId: student.id,
+          studentName: student.fullName,
         };
-      } catch (error) {
-        console.error(`Error processing student ${studentId}:`, error);
+      } catch (error: any) {
+        processingErrors.push(`Student ${studentId}: ${error.message || "Unknown error"}`);
         return null;
       }
     };
@@ -134,15 +146,27 @@ export class ResultService {
       messages.push(...results.filter((m): m is any => m !== null));
     }
 
-    if (messages.length === 0) return false;
+    if (messages.length === 0) {
+      return {
+        success: false,
+        sent: 0,
+        failed: studentIds.length,
+        errors: processingErrors.length > 0 ? processingErrors : ["No valid results to send"],
+      };
+    }
+
+    const emailErrors: string[] = [];
+    let sentCount = 0;
+
     const payload: JobPayload = { type: "send-email", data: messages };
     await JobWorker.runTask(payload, async (job: JobResult) => {
-      const { status, result: jobResult } = job;
+      const { status, result: jobResult, error } = job;
       if (status !== "success") {
-        console.error("Failed to send email: ", job.error);
-        return false;
+        emailErrors.push(error || "Email sending failed");
+        return;
       }
 
+      sentCount++;
       const { studentId, messageId } = jobResult;
       const timeline = {
         staffStudentId: studentId,
@@ -158,7 +182,13 @@ export class ResultService {
       await timelineRepo.upsertTimelines(timeline);
     });
 
-    return true;
+    const allErrors = [...processingErrors, ...emailErrors];
+    return {
+      success: sentCount > 0,
+      sent: sentCount,
+      failed: studentIds.length - sentCount,
+      errors: allErrors,
+    };
   }
 
   async assignSubjects(classId: number, sectionId: number, teacherId?: number) {
@@ -479,6 +509,13 @@ export class ResultService {
    */
   private async processMarks(markStore: MarksData, examSetups: ExamSetup[]): Promise<MarksInput[] | null> {
     if (!this.studentInput) return null;
+
+    // Update student category before processing marks
+    await studentRepo.updateStudentCategoryId(
+      this.studentInput.studentId!,
+      this.studentInput.studentCategoryId!
+    );
+
     await resultRepo.cleanMarks({
       studentRecordId: this.studentInput.recordId!,
       studentId: this.studentInput.studentId!,
@@ -491,7 +528,6 @@ export class ResultService {
     return this.doProcessMarks(
       {
         category: this.studentInput.studentCategory! as Category,
-        studentCategoryId: this.studentInput.studentCategoryId!,
         studentId: this.studentInput.studentId!,
         recordId: this.studentInput.recordId!,
         classId: this.studentInput.classId!,
@@ -513,14 +549,11 @@ export class ResultService {
     examSetups: ExamSetup[]
   ): Promise<MarksInput[] | null> {
     if (!student) return null;
-    const { studentId, studentCategoryId, recordId, classId, sectionId, schoolId, examTypeId } = student;
+    const { studentId, recordId, classId, sectionId, schoolId, examTypeId } = student;
     if (!classId || !sectionId || !schoolId || !studentId) {
       return null;
     }
     const studentRecordId = recordId;
-
-    // Update student category before processing marks
-    await studentRepo.updateStudentCategoryId(studentId, studentCategoryId);
 
     const academicId = await repo.result.getAcademicId();
     const results: MarksInput[] = [];

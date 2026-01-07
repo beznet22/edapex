@@ -78,6 +78,33 @@ const sendEmail = async (mailOptions: SendMailOptions): Promise<EmailResult> => 
   };
 };
 
+/**
+ * Format SMTP error into a user-friendly message with technical details
+ */
+function formatSmtpError(err: any, recipient: string | undefined): string {
+  const to = recipient || "unknown";
+  const parts: string[] = [`Failed to send email to ${to}`];
+
+  // SMTP response code (e.g., 550, 553, 421)
+  if (err.responseCode) {
+    parts.push(`SMTP code ${err.responseCode}`);
+  }
+
+  // Error code (e.g., ECONNREFUSED, ETIMEDOUT, EAUTH)
+  if (err.code) {
+    parts.push(`(${err.code})`);
+  }
+
+  // SMTP server response message
+  if (err.response) {
+    parts.push(`- Server response: "${err.response}"`);
+  } else if (err.message) {
+    parts.push(`- ${err.message}`);
+  }
+
+  return parts.join(" ");
+}
+
 (async (): Promise<void> => {
   const { data: emailJobs, jobId } = workerData as WorkerData;
 
@@ -94,7 +121,7 @@ const sendEmail = async (mailOptions: SendMailOptions): Promise<EmailResult> => 
       const errorMessage: ErrorMessage = {
         jobId,
         status: "error",
-        error: `Failed to send email to ${job.to}: ${err.message}`,
+        error: formatSmtpError(err, job.to as string),
       };
       console.error("Failed to send email: ", err);
       parentPort?.postMessage(errorMessage);
