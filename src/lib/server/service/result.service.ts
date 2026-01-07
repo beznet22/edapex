@@ -100,7 +100,7 @@ export class ResultService {
         const emailProps = {
           term: student.term,
           fullName: student.fullName,
-          receiverName: "bono247@gmail.com",
+          receiverName: student.parentName,
           schoolName: school.name,
           principal: "Patience Okwube",
           contact: school.phone,
