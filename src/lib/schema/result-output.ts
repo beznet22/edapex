@@ -89,7 +89,7 @@ export const recordSchema = z
             subjectCode: data.subjectCode,
           },
           continue: true,
-        })
+        });
         await result.cleanUpResultRecord(data);
       }
       if (data.marks.length !== data.titles.length) {
@@ -110,6 +110,14 @@ export const recordSchema = z
         ctx.addIssue({
           code: "custom",
           message: "Learning outcome is required for DAYCARE",
+          path: ["learningOutcome"],
+          continue: true,
+        });
+      } else if (/<[^>]+>/.test(data.learningOutcome)) {
+        // Check if learningOutcome contains HTML tags (including unicode-escaped ones)
+        ctx.addIssue({
+          code: "custom",
+          message: "Learning outcome is not in the correct format, must not contain HTML tags",
           path: ["learningOutcome"],
           continue: true,
         });
@@ -148,9 +156,11 @@ export const ratingSchema = z.array(
 );
 export type Rating = z.infer<typeof ratingSchema>;
 
-export const remarkSchema = z.object({
-  remark: z.string().nullable().describe("The teacher's remark"),
-}).optional();
+export const remarkSchema = z
+  .object({
+    remark: z.string().nullable().describe("The teacher's remark"),
+  })
+  .optional();
 export type Remark = z.infer<typeof remarkSchema>;
 
 export const examType = z.object({
@@ -170,29 +180,34 @@ export const subjectAssignedSchema = z.object({
 });
 export type SubjectAssigned = z.infer<typeof subjectAssignedSchema>;
 
-export const resultOutputSchema = z.object({
-  school: schoolSchema,
-  student: studentSchema,
-  subjects: z.array(subjectAssignedSchema).nonempty(),
-  records: z.array(recordSchema).nonempty(),
-  score: scoreSchema,
-  ratings: ratingSchema,
-  remark: remarkSchema,
-  examType: examType.optional(),
-}).superRefine(async (data, ctx) => {
-  if (data.records.length !== data.subjects.length) {
-    ctx.addIssue({
-      code: "custom",
-      message: `Subjects records not complete, expected ${data.subjects.length} records, found ${data.records.length}`,
-      path: ["records"],
-      meta: {
-        expected: data.subjects,
-        found: data.records.map((record) => record.subjectId),
-        missing: data.records.filter((record) => !data.subjects.find((subject) => subject.subjectId === record.subjectId)).map((record) => record.subjectId),
-      },
-      continue: true,
-    });
-  }
-});
+export const resultOutputSchema = z
+  .object({
+    school: schoolSchema,
+    student: studentSchema,
+    subjects: z.array(subjectAssignedSchema).nonempty(),
+    records: z.array(recordSchema).nonempty(),
+    score: scoreSchema,
+    ratings: ratingSchema,
+    remark: remarkSchema,
+    examType: examType.optional(),
+  })
+  .superRefine(async (data, ctx) => {
+    if (data.student.category === "DAYCARE") return;
+    if (data.records.length !== data.subjects.length) {
+      ctx.addIssue({
+        code: "custom",
+        message: `Subjects records not complete, expected ${data.subjects.length} records, found ${data.records.length}`,
+        path: ["records"],
+        meta: {
+          expected: data.subjects,
+          found: data.records.map((record) => record.subjectId),
+          missing: data.records
+            .filter((record) => !data.subjects.find((subject) => subject.subjectId === record.subjectId))
+            .map((record) => record.subjectId),
+        },
+        continue: true,
+      });
+    }
+  });
 
 export type ResultOutput = z.infer<typeof resultOutputSchema> & { extra?: any };

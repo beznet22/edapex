@@ -48,6 +48,7 @@ const GRADE_RANGES = {
 
 type StudentData = {
   category: Category;
+  studentCategoryId: number;
   studentId: number;
   recordId: number;
   classId: number;
@@ -486,9 +487,11 @@ export class ResultService {
       examTermId: this.studentInput.examTypeId!,
       schoolId: this.studentInput.schoolId!,
     });
+
     return this.doProcessMarks(
       {
         category: this.studentInput.studentCategory! as Category,
+        studentCategoryId: this.studentInput.studentCategoryId!,
         studentId: this.studentInput.studentId!,
         recordId: this.studentInput.recordId!,
         classId: this.studentInput.classId!,
@@ -510,11 +513,14 @@ export class ResultService {
     examSetups: ExamSetup[]
   ): Promise<MarksInput[] | null> {
     if (!student) return null;
-    const { studentId, recordId, classId, sectionId, schoolId, examTypeId } = student;
+    const { studentId, studentCategoryId, recordId, classId, sectionId, schoolId, examTypeId } = student;
     if (!classId || !sectionId || !schoolId || !studentId) {
       return null;
     }
     const studentRecordId = recordId;
+
+    // Update student category before processing marks
+    await studentRepo.updateStudentCategoryId(studentId, studentCategoryId);
 
     const academicId = await repo.result.getAcademicId();
     const results: MarksInput[] = [];
