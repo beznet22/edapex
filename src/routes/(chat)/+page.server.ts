@@ -79,9 +79,9 @@ export const actions: Actions = {
             if (!content || !success) return { success: false, status: "error", message }
 
             const parsedResult = JSON.parse(content.trim());
-            parsedResult.studentId = studentId
-            parsedResult.admissionNo = admissionNo
-            parsedResult.fullName = studentName
+            parsedResult.studentData.studentId = studentId
+            parsedResult.studentData.admissionNo = admissionNo
+            parsedResult.studentData.fullName = studentName
 
             console.log(parsedResult)
 
