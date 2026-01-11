@@ -14,11 +14,13 @@ import { id } from "zod/v4/locales";
 
 export const GET: RequestHandler = async () => {
   try {
-    // const resultData = await result.getStudentResult({ id: 984, examId: 5, isAdminNo: true })
-    // const validated = await resultOutputSchema.safeParseAsync(resultData)
-    // if (!validated.success) {
-    //   return json({ success: false, error: validated.error.issues })
-    // }
+    const resultData = await result.getStudentResult({ id: 496, examId: 5 })
+    const validated = await resultOutputSchema.safeParseAsync(resultData)
+    if (!validated.success) {
+      return json({ success: false, error: validated.error.issues })
+    }
+
+    return json(validated)
 
 
     const response = await result.publishResults({ studentIds: [144], examId: 5 });

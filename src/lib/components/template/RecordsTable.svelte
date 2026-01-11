@@ -99,7 +99,11 @@
             {record.totalScore}
           </td>
           <td class="py-3 px-6 text-center">
-            {@html record.grade}
+            <span
+              class="text-violet-600 py-1 px-3 rounded-full text-xs {record.color}"
+            >
+              {record.grade}
+            </span>
           </td>
         {:else if category == "NURSERY" || category == "GRADEK"}
           <td class="py-3 px-6 text-center whitespace-nowrap">
@@ -112,9 +116,11 @@
             {record.totalScore}
           </td>
           <td class="py-3 px-6 text-center">
-            <!-- <span class="text-violet-600 py-1 px-3 rounded-full text-xs"> -->
-            {@html record.grade}
-            <!-- </span> -->
+            <span
+              class="text-violet-600 py-1 px-3 rounded-full text-xs {record.color}"
+            >
+              {record.grade}
+            </span>
           </td>
         {:else if category == "DAYCARE"}
           <td class="py-3 px-6 max-w-10">

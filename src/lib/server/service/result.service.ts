@@ -434,7 +434,6 @@ export class ResultService {
       studentPhoto: withImages ? ensureBase64Image(studentData.studentPhoto || "", "/avatar.jpg") : undefined,
       token: base64url.encode(JSON.stringify({ studentId: id, examId })),
     };
-
     const schoolData = (await repo.result.getGeneralSettings())?.[0] || {};
     const address = this.parseAddress(schoolData?.address || "");
     const school: School = {
@@ -783,8 +782,7 @@ export class ResultService {
   }
 
   getGrade(score: number, category: Category, remark: string | null): { grade: string; color?: string } {
-    if (remark) return { grade: remark };
-    const ranges = category === "LOWERBASIC" || "MIDDLEBASIC" ? GRADE_RANGES.GRADERS : GRADE_RANGES.EYFS;
+    const ranges = category === "LOWERBASIC" || category === "MIDDLEBASIC" ? GRADE_RANGES.GRADERS : GRADE_RANGES.EYFS;
     const match = ranges.find((r) => score >= r.min && score <= r.max);
     return match ? { grade: match.grade, color: match.color } : { grade: "N/A", color: "bg-gray-200" };
   }
