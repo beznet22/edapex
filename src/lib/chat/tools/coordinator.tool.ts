@@ -237,7 +237,7 @@ export const getStudentList = tool({
 });
 
 export const changeStudentName = tool({
-  description: "Changes the name of a student.",
+  description: "Changes the name of a student. Use this tool when a student's name is misspelled or needs to be updated.",
   inputSchema: z.object({
     studentId: z.number().describe("The unique ID of the student."),
     name: z.string().describe("The new name of the student."),
