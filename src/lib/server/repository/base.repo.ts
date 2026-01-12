@@ -2,8 +2,8 @@ import { getDatabase } from "../db";
 import type { MySql2Database } from "drizzle-orm/mysql2/driver";
 import { smAcademicYears, smExamTypes, smGeneralSettings } from "../db/sms-schema";
 import { eq, and, desc, type SQL } from "drizzle-orm";
-import type { ExamType } from "$lib/schema/result-input";
-import { DbInternalError } from "$lib/server/helpers/errors";
+import type { ExamType } from "$lib/schema/result-output";
+import { DbInternalError } from "../helpers/errors";
 
 export type MySQLDrizzleClient = MySql2Database<any>;
 

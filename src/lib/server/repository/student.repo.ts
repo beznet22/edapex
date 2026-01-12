@@ -1,6 +1,6 @@
 // /src/lib/server/repository/student.repo.ts
 
-import { and, count, eq, isNotNull, ne, sql, like, or } from "drizzle-orm";
+import { and, count, eq, isNotNull, ne, sql, like, or, desc } from "drizzle-orm";
 import {
   classAttendances,
   smAssignSubjects,
@@ -107,18 +107,7 @@ export class StudentRepository extends BaseRepository {
 
     // Construct full name from first and last name
     const fullName = `${firstName} ${lastName}`.trim();
-
-    // Step 1: Check if student already exists by admission number (only if provided)
-    if (admissionNo) {
-      const [existingStudent] = await this.db
-        .select()
-        .from(smStudents)
-        .where(eq(smStudents.admissionNo, admissionNo))
-        .limit(1);
-      if (existingStudent) return existingStudent;
-    }
-
-    // Get academic year ID
+    const finalAdmissionNo = admissionNo ?? ((await this.getLastAdmissionNo()) + 1);
     const academicId = input.academicId ?? (await this.getAcademicId());
 
     // Step 2: Create a User for the student
@@ -178,7 +167,7 @@ export class StudentRepository extends BaseRepository {
     const [newStudent] = await this.db
       .insert(smStudents)
       .values({
-        admissionNo,
+        admissionNo: finalAdmissionNo,
         fullName,
         firstName,
         lastName,
@@ -680,6 +669,20 @@ export class StudentRepository extends BaseRepository {
 
       return true;
     }, "assignClassSection");
+  }
+
+  /**
+   * Finds the last admission number and increments it by one.
+   * @returns The last admission number found, or 0 if none exist.
+   */
+  private async getLastAdmissionNo(): Promise<number> {
+    const [lastAdmission] = await this.db
+      .select({ admissionNo: smStudents.admissionNo })
+      .from(smStudents)
+      .orderBy(desc(smStudents.admissionNo))
+      .limit(1);
+
+    return lastAdmission?.admissionNo ?? 0;
   }
 }
 
