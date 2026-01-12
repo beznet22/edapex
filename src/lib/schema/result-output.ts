@@ -65,7 +65,7 @@ export const recordSchema = z
     titles: z.array(z.string()).default([]).describe("The titles of the marks"),
     markIds: z.array(z.number()).default([]).describe("The IDs of the marks"),
     marks: z
-      .array(z.number().refine((val) => val !== 0, "Mark must not be zero"))
+      .array(z.number())
       .default([])
       .describe("The marks for the subject"),
     totalScore: z.number().describe("The total score for the subject"),
