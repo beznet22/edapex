@@ -411,26 +411,6 @@ export const createStudent = tool({
     "Creates a new student record with all required related data (user account, parent/guardian, student record, class enrollment).",
     "IMPORTANT: Before calling this tool, you MUST first call 'getStudentRegistrationOptions' to get available classes, sections, categories, genders, and guardian relations.",
     "If admissionNo is provided and a student with that admission number already exists, returns the existing student.",
-    "",
-    "## Required Fields:",
-    "- **firstName** (string): The student's first name",
-    "- **lastName** (string): The student's last name",
-    "- **classId** (number): The ID of the class to enroll the student in",
-    "- **sectionId** (number): The ID of the section within the class",
-    "- **genderId** (number): Gender ID from the options (call getStudentRegistrationOptions first)",
-    "- **studentCategoryId** (number): Student category ID (call getStudentRegistrationOptions first)",
-    "- **guardianRelation** (string): 'father', 'mother', or 'other' - determines which parent field is populated",
-    "- **guardiansName** (string): Name of the parent/guardian (if father, also sets fathersName; if mother, also sets mothersName)",
-    "- **guardiansMobile** (string): Guardian's phone number - REQUIRED for communication",
-    "- **guardiansEmail** (string): Guardian's email address - REQUIRED for communication",
-    "",
-    "## Optional Fields:",
-    "- **admissionNo** (number): Unique admission number - if provided, checks for existing student first",
-    "- **email** (string): Student's email address",
-    "- **mobile** (string): Student's mobile/phone number",
-    "- **dateOfBirth** (string): Date of birth in 'YYYY-MM-DD' format",
-    "- **schoolId** (number): School ID (defaults to 1)",
-    "- **academicId** (number): Academic year ID (auto-fetched if not provided)",
   ].join("\n"),
   inputSchema: z.object({
     // Required fields
@@ -447,15 +427,12 @@ export const createStudent = tool({
     guardiansMobile: z.string().describe("Guardian's phone number. REQUIRED for communication."),
     guardiansEmail: z.string().describe("Guardian's email address. REQUIRED for communication."),
     // Optional fields
-    admissionNo: z
-      .number()
-      .optional()
-      .describe("Unique admission number. If provided, checks for existing student first."),
-    email: z.string().optional().describe("Student's email address."),
-    mobile: z.string().optional().describe("Student's mobile/phone number."),
-    dateOfBirth: z.string().optional().describe("Date of birth in 'YYYY-MM-DD' format."),
-    schoolId: z.number().optional().describe("School ID. Defaults to 1."),
-    academicId: z.number().optional().describe("Academic year ID. Auto-fetched if not provided."),
+    email: z.string().optional().describe("Optional Student's email address."),
+    mobile: z.string().optional().describe("Optional Student's mobile/phone number."),
+    dateOfBirth: z.string().optional().describe("Optional Date of birth in 'YYYY-MM-DD' format."),
+    schoolId: z.number().optional().describe("Optional School ID. Defaults to 1."),
+    academicId: z.number().optional().describe("Optional Academic year ID. Auto-fetched if not provided."),
+    admissionNo: z.number().optional().describe("Optional Admission number. Auto-incremented if not provided."),
   }),
   outputSchema: z.object({
     success: z.boolean().describe("Whether the operation was successful."),
@@ -486,18 +463,10 @@ export const createStudent = tool({
 
       const fullName = `${input.firstName} ${input.lastName}`.trim();
 
-      // Check if this was an existing student (only possible if admissionNo was provided)
-      const isExisting =
-        input.admissionNo !== undefined &&
-        student.admissionNo === input.admissionNo &&
-        student.fullName !== fullName;
-
       return {
         success: true,
-        message: isExisting
-          ? `Student with admission number ${input.admissionNo} already exists.`
-          : `Student "${fullName}" created successfully with ID ${student.id}.`,
-        isExisting,
+        message: `Student "${fullName}" created successfully with ID ${student.id}.`,
+        isExisting: false,
         student: {
           id: student.id,
           admissionNo: student.admissionNo,
