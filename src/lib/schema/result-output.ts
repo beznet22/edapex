@@ -68,7 +68,7 @@ export const recordSchema = z
       .array(z.number())
       .default([])
       .describe("The marks for the subject"),
-    totalScore: z.number().describe("The total score for the subject"),
+    totalScore: z.number().max(100.0).describe("The total score for the subject"),
     grade: z.string().describe("The grade for the subject"),
     color: z.string().optional().describe("The color for the grade"),
     category: categoryEnum.describe("The category of the student"),
@@ -100,6 +100,14 @@ export const recordSchema = z
           continue: true,
         });
         await result.cleanUpResultRecord(data);
+      }
+      if (data.totalScore > 100.0) {
+        ctx.addIssue({
+          code: "custom",
+          message: `Total score for subject ${data.subject} is greater than 100.0 due to possible duplicate marks. Please re-upload the result image to fix this.`,
+          path: ["totalScore"],
+          continue: true,
+        });
       }
     }
     if (data.category === "DAYCARE") {
