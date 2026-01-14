@@ -735,8 +735,8 @@ export class ResultService {
     const maxStudent = studentAverages.find((s) => s.average === maxAvg) || studentAverages[0];
 
     return {
-      min: { studentId: minStudent.studentId, value: minAvg.toFixed(2) },
-      max: { studentId: maxStudent.studentId, value: maxAvg.toFixed(2) },
+      min: { studentId: minStudent.studentId, value: minAvg.toFixed(0) },
+      max: { studentId: maxStudent.studentId, value: maxAvg.toFixed(0) },
     };
   }
 
