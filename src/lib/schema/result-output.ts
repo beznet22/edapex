@@ -108,6 +108,7 @@ export const recordSchema = z
           path: ["totalScore"],
           continue: true,
         });
+        await result.cleanUpResultRecord(data);
       }
     }
     if (data.category === "DAYCARE") {

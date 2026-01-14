@@ -212,7 +212,7 @@ export class ResultsRepository extends BaseRepository {
   }
 
   async cleanMarks(params: {
-    studentRecordId: number;
+    recordId: number;
     studentId: number;
     classId: number;
     sectionId: number;
@@ -220,6 +220,7 @@ export class ResultsRepository extends BaseRepository {
     schoolId: number;
   }) {
     return this.withErrorHandling(async () => {
+      const { recordId, studentId, classId, sectionId, examTermId, schoolId } = params;
       const academicId = await this.getAcademicId();
 
       // Delete marks from smMarkStores
@@ -227,12 +228,12 @@ export class ResultsRepository extends BaseRepository {
         .delete(schema.smMarkStores)
         .where(
           and(
-            eq(schema.smMarkStores.studentRecordId, params.studentRecordId),
-            eq(schema.smMarkStores.studentId, params.studentId),
-            eq(schema.smMarkStores.classId, params.classId),
-            eq(schema.smMarkStores.sectionId, params.sectionId),
-            eq(schema.smMarkStores.examTermId, params.examTermId),
-            eq(schema.smMarkStores.schoolId, params.schoolId),
+            eq(schema.smMarkStores.studentRecordId, recordId),
+            eq(schema.smMarkStores.studentId, studentId),
+            eq(schema.smMarkStores.classId, classId),
+            eq(schema.smMarkStores.sectionId, sectionId),
+            eq(schema.smMarkStores.examTermId, examTermId),
+            eq(schema.smMarkStores.schoolId, schoolId),
             eq(schema.smMarkStores.academicId, academicId)
           )
         );
@@ -242,12 +243,12 @@ export class ResultsRepository extends BaseRepository {
         .delete(schema.smResultStores)
         .where(
           and(
-            eq(schema.smResultStores.studentRecordId, params.studentRecordId),
-            eq(schema.smResultStores.studentId, params.studentId),
-            eq(schema.smResultStores.classId, params.classId),
-            eq(schema.smResultStores.sectionId, params.sectionId),
-            eq(schema.smResultStores.examTypeId, params.examTermId),
-            eq(schema.smResultStores.schoolId, params.schoolId),
+            eq(schema.smResultStores.studentRecordId, recordId),
+            eq(schema.smResultStores.studentId, studentId),
+            eq(schema.smResultStores.classId, classId),
+            eq(schema.smResultStores.sectionId, sectionId),
+            eq(schema.smResultStores.examTypeId, examTermId),
+            eq(schema.smResultStores.schoolId, schoolId),
             eq(schema.smResultStores.academicId, academicId)
           )
         );

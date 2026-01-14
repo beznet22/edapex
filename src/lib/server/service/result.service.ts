@@ -407,6 +407,8 @@ export class ResultService {
       ? await studentRepo.getStudentById(id, isAdminNo)
       : await studentRepo.getStudentById(id);
 
+    console.log(studentData);
+
     if (!studentData) return null;
     const resultData = await repo.result.queryResultData(studentData, examId);
     if (!resultData?.classResults?.length) return null;
@@ -565,7 +567,7 @@ export class ResultService {
     );
 
     await resultRepo.cleanMarks({
-      studentRecordId: this.studentInput.recordId!,
+      recordId: this.studentInput.recordId!,
       studentId: this.studentInput.studentId!,
       classId: this.studentInput.classId!,
       sectionId: this.studentInput.sectionId!,
