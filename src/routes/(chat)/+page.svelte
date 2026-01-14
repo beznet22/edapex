@@ -15,6 +15,7 @@
   let open = $state(false);
   let value = $state<string | undefined>();
   let userContext = $derived(UserContext.fromContext());
+
   const chatContext = new ChatContext({
     initialMessages: [],
     chatData: undefined,
@@ -66,13 +67,13 @@
             {`${chat.selectedClass?.className} (${chat.selectedClass?.sectionName})`}
           {/if}
         </Select.Trigger>
-        <Select.Content>  
+        <Select.Content>
           <Select.Group>
             <Select.Label>Classes and Sections</Select.Label>
             {#each userContext.classes as cls (cls.id)}
-            <Select.Item value={`${cls.id}`} label={cls.className || ""}>
-              {`${cls.className} (${cls.sectionName})`}
-            </Select.Item>
+              <Select.Item value={`${cls.id}`} label={cls.className || ""}>
+                {`${cls.className} (${cls.sectionName})`}
+              </Select.Item>
             {/each}
           </Select.Group>
         </Select.Content>
