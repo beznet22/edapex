@@ -89,7 +89,8 @@ export const studentDataSchema = z.object({
     if (!student || !student.classId || !student.sectionId || !student.fullName) {
       ctx.addIssue({
         code: "custom",
-        message: `Student not found for admission number ${data.admissionNo}`,
+        message: `Student not found for admission number ${data.admissionNo} or disabled, 
+        please register student first or ask admin to enable student`,
         path: ["admissionNo"],
       });
     }
@@ -164,8 +165,8 @@ export type MarksData = z.infer<typeof marksDataSchema>;
 
 export const teacherRemarkSchema = z
   .object({
-    comment: z.string().nullable().describe("Teacher's remark/comment, or null if none"),
-    note: z.string().nullable().describe("Optional note about the remark presence/absence"),
+    comment: z.string().optional().nullable().describe("Teacher's remark/comment, or null if none"),
+    note: z.string().optional().nullable().describe("Optional note about the remark presence/absence"),
   })
   .describe("Teacher's remark section");
 export type TeacherRemark = z.infer<typeof teacherRemarkSchema>;

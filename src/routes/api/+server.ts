@@ -15,13 +15,14 @@ import { id } from "zod/v4/locales";
 export const GET: RequestHandler = async () => {
   try {
     const students = await studentRepo.getStudentsByClassSection({ classId: 20, sectionId: 5 })
-    const resultData = await result.getStudentResult({ id: 167, examId: 5 })
-    const validated = await resultOutputSchema.safeParseAsync(resultData)
-    if (!validated.success) {
-      return json({ success: false, error: validated.error.issues })
-    }
+    const studentRecord = await studentRepo.getStudentRecordByAdmissionNo(961)
+    // const resultData = await result.getStudentResult({ id: 167, examId: 5 })
+    // const validated = await resultOutputSchema.safeParseAsync(resultData)
+    // if (!validated.success) {
+    //   return json({ success: false, error: validated.error.issues })
+    // }
 
-    return json(students)
+    return json({studentRecord})
 
     const response = await result.publishResults({ studentIds: [144], examId: 5 });
     if (!response.success) {
