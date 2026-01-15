@@ -78,6 +78,13 @@ export const POST: RequestHandler = async ({ request, locals }) => {
       const mappingData = await result.getMappingData(staffId);
       // console.log(mappingData)
       if (mappingData.subjects.length === 0) throw new Error("You are not assigned to any subjects");
+      mappingData.studentData = {
+        studentId,
+        admissionNo,
+        fullName: studentName,
+        classId,
+        sectionId,
+      }
       const mapString = JSON.stringify(mappingData);
       const { success, content, message } = await generateContent(validatedFile.data, mapString);
       if (!content || !success) return json({ success: false, status: "error", error: message });
@@ -87,7 +94,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
       if (studentId) parsedResult.studentData.studentId = studentId;
       if (admissionNo) parsedResult.studentData.admissionNo = admissionNo;
       if (studentName) parsedResult.studentData.fullName = studentName;
-      // console.log("Parsed result", parsedResult);
+      console.log("Parsed result", parsedResult);
       const validated = await resultInputSchema.safeParseAsync(parsedResult);
       if (!validated.success) {
         const error = validated.error.issues.filter((issue) => issue.code === "custom");
