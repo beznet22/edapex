@@ -45,6 +45,7 @@ export const coordinatorTools = (writer: UIMessageStreamWriter, model: LanguageM
     createStudent,
     assignClassSection,
     searchClassSection,
-    changeStudentName
+    changeStudentName,
+    upsertTeacherRemark,
   };
 };
