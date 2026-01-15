@@ -27,7 +27,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
     const className = formData.get("className") as string;
     const sectionName = formData.get("sectionName") as string;
     const studentId = formData.get("studentId") ? Number(formData.get("studentId")) : null;
-    const studentName = formData.get("studentName") as string | null;
+    const fullName = formData.get("studentName") as string | null;
     const admissionNo = formData.get("admissionNo") ? Number(formData.get("admissionNo")) : null;
     const isStudentPhoto = formData.get("isStudentPhoto") === "true";
 
@@ -81,9 +81,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
       mappingData.studentData = {
         studentId,
         admissionNo,
-        fullName: studentName,
-        classId,
-        sectionId,
+        fullName,
       }
       const mapString = JSON.stringify(mappingData);
       const { success, content, message } = await generateContent(validatedFile.data, mapString);
@@ -91,10 +89,10 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 
       const parsedResult = JSON.parse(content.trim());
       // Add student data if provided (from drop-zone upload)
-      if (studentId) parsedResult.studentData.studentId = studentId;
-      if (admissionNo) parsedResult.studentData.admissionNo = admissionNo;
-      if (studentName) parsedResult.studentData.fullName = studentName;
-      console.log("Parsed result", parsedResult);
+      // if (studentId) parsedResult.studentData.studentId = studentId;
+      // if (admissionNo) parsedResult.studentData.admissionNo = admissionNo;
+      // if (fullName) parsedResult.studentData.fullName = fullName;
+      // console.log("Parsed result", parsedResult);
       const validated = await resultInputSchema.safeParseAsync(parsedResult);
       if (!validated.success) {
         const error = validated.error.issues.filter((issue) => issue.code === "custom");

@@ -52,7 +52,7 @@ export const extractPrompt = [
   '    "overall_progress": <1-5|null>, (e.g OP)',
   '    "self_control_and_interaction": <1-5|null> (e.g SCI)',
   "  },",
-  '  "teachersRemark": {"comment": <string|null> (sentence case) student name must start with a capital letter using actual student first or last name mapped from studentData.fullName, "note"?: <string>}',
+  '  "teachersRemark": { "comment": <string|null> (Sentence case. If the remark mentions the student, always use the corresponding first or last name from studentData.fullName choose based on the mentioned name from the remark, do not use the mentioned name, ensuring the first letter is capitalized), "note": <string|null> }',
   "}",
   "",
   "## Grade Logic",
