@@ -1,1 +1,134 @@
-{"studentData":{"studentId":52,"recordId":null,"schoolId":null,"admissionNo":76,"fullName":"DIVINE UPELLE","class":"MIDDLE BASIC 4A","classId":20,"sectionId":5,"studentCategory":"GRADEK","studentCategoryId":3,"term":"FIRST TERM EXAMINATION - DEC/2025","examTypeId":5,"attendance":{"daysOpened":134,"daysPresent":112,"daysAbsent":12}},"marksData":[{"subjectCode":"BDL","subjectId":42,"examTitles":["CA1","CA2","HLW","REPORT","PSYCHO EXAM"],"marks":[19,20,1,2,34],"total":76,"grade":"<span class=\"bg-orange-200 text-violet-600 py-1 px-3 rounded-full text-xs\">D</span>"},{"subjectCode":"BST","subjectId":43,"examTitles":["CA1","CA2","HLW","REPORT","PSYCHO EXAM"],"marks":[17,12,1,2,36],"total":68,"grade":"<span class=\"bg-red-200 text-violet-600 py-1 px-3 rounded-full text-xs\">E</span>"},{"subjectCode":"CRS","subjectId":44,"examTitles":["CA1","CA2","HLW","REPORT","PSYCHO EXAM"],"marks":[17,20,1,2,40],"total":80,"grade":"<span class=\"bg-yellow-200 text-violet-600 py-1 px-3 rounded-full text-xs\">C</span>"},{"subjectCode":"CIVIC","subjectId":28,"examTitles":["CA1","CA2","HLW","REPORT","PSYCHO EXAM"],"marks":[20,18,2,2,50],"total":92,"grade":"<span class=\"bg-blue-200 text-violet-600 py-1 px-3 rounded-full text-xs\">B</span>"},{"subjectCode":"CCA","subjectId":23,"examTitles":["CA1","CA2","HLW","REPORT","PSYCHO EXAM"],"marks":[20,20,2,2,50],"total":94,"grade":"<span class=\"bg-purple-200 text-violet-600 py-1 px-3 rounded-full text-xs\">A</span>"},{"subjectCode":"ENG","subjectId":22,"examTitles":["CA1","CA2","HLW","REPORT","PSYCHO EXAM"],"marks":[20,15,2,2,48],"total":87,"grade":"<span class=\"bg-blue-200 text-violet-600 py-1 px-3 rounded-full text-xs\">B</span>"}],"studentRatings":{"adherent_and_independent":null,"flexibility_and_creativity":null,"meticulous":null,"neatness":null,"overall_progress":null,"self_control_and_interaction":null},"teachersRemark":{"comment":"gideon has being working hard and showing improvement in his school work.","note":null}}
+{
+    "studentData": {
+        "studentId": 695,
+        "recordId": null,
+        "schoolId": null,
+        "admissionNo": 818,
+        "fullName": "JOANNA ROYALTY AKOR",
+        "class": "NURSERY 1C",
+        "classId": 13,
+        "sectionId": 7,
+        "studentCategory": "NURSERY",
+        "studentCategoryId": 2,
+        "term": "FIRST TERM EXAMINATION - DEC/2025",
+        "examTypeId": 5,
+        "attendance": {
+            "daysOpened": 134,
+            "daysPresent": 124,
+            "daysAbsent": 10
+        }
+    },
+    "marksData": [
+        {
+            "subjectCode": "BIBLE",
+            "subjectId": 24,
+            "examTitles": [
+                "HW",
+                "CA",
+                "PSYCHO",
+                "ORAL",
+                "EXAM"
+            ],
+            "marks": [
+                10,
+                30,
+                5,
+                5,
+                50
+            ],
+            "total": 100,
+            "grade": "<span class=\"bg-red-200 text-violet-600 py-1 px-3 rounded-full text-xs\">EMERGING</span>"
+        },
+        {
+            "subjectCode": "CLL/JP",
+            "subjectId": 34,
+            "examTitles": [
+                "HW",
+                "CA",
+                "PSYCHO",
+                "ORAL",
+                "EXAM"
+            ],
+            "marks": [
+                10,
+                30,
+                5,
+                5,
+                32
+            ],
+            "total": 82,
+            "grade": "<span class=\"bg-blue-200 text-violet-600 py-1 px-3 rounded-full text-xs\">EXPECTED</span>"
+        },
+        {
+            "subjectCode": "KUW/EAD",
+            "subjectId": 31,
+            "examTitles": [
+                "HW",
+                "CA",
+                "PSYCHO",
+                "ORAL",
+                "EXAM"
+            ],
+            "marks": [
+                10,
+                20,
+                5,
+                5,
+                50
+            ],
+            "total": 90,
+            "grade": "<span class=\"bg-blue-200 text-violet-600 py-1 px-3 rounded-full text-xs\">EXPECTED</span>"
+        },
+        {
+            "subjectCode": "PSED/PD",
+            "subjectId": 36,
+            "examTitles": [
+                "HW",
+                "CA",
+                "PSYCHO",
+                "ORAL",
+                "EXAM"
+            ],
+            "marks": [
+                10,
+                30,
+                5,
+                5,
+                43
+            ],
+            "total": 93,
+            "grade": "<span class=\"bg-red-200 text-violet-600 py-1 px-3 rounded-full text-xs\">EXCEEDING</span>"
+        },
+        {
+            "subjectCode": "PSRN",
+            "subjectId": 30,
+            "examTitles": [
+                "HW",
+                "CA",
+                "PSYCHO",
+                "ORAL",
+                "EXAM"
+            ],
+            "marks": [
+                10,
+                30,
+                5,
+                5,
+                37
+            ],
+            "total": 87,
+            "grade": "<span class=\"bg-red-200 text-violet-600 py-1 px-3 rounded-full text-xs\">EXCEEDING</span>"
+        }
+    ],
+    "studentRatings": {
+        "adherent_and_independent": null,
+        "flexibility_and_creativity": null,
+        "meticulous": null,
+        "neatness": null,
+        "overall_progress": null,
+        "self_control_and_interaction": null
+    },
+    "teachersRemark": {
+        "comment": "a nice result, but you can do better next term"
+    }
+}
