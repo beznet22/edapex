@@ -549,7 +549,7 @@ export class ResultService {
       repo.result.getSubjectsAssignedToStaff(staffId),
       repo.result.getAssignedClassSection(staffId),
     ]);
-    return { examSetups, examTypes, studentCategories, subjects, classSection };
+    return { examSetups, examTypes, studentCategories, subjects, classSection, studentData: {} };
   }
 
   /**
