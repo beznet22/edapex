@@ -14,15 +14,17 @@ import { id } from "zod/v4/locales";
 
 export const GET: RequestHandler = async () => {
   try {
-    const students = await studentRepo.getStudentsByClassSection({ classId: 20, sectionId: 5 })
-    const studentRecord = await studentRepo.getStudentRecordByAdmissionNo(961)
+    const students = await studentRepo.getStudentsByClassSection({ classId: 15, sectionId: 5 })
+    const studentRecord = await studentRepo.getStudentRecordByAdmissionNo(765)
+    const staff = await staffRepo.getStaffByClassSection({ classId: 17, sectionId: 7 })
+    const mappingData = await result.getMappingData(staff?.teacherId ?? 0)
     // const resultData = await result.getStudentResult({ id: 167, examId: 5 })
     // const validated = await resultOutputSchema.safeParseAsync(resultData)
     // if (!validated.success) {
     //   return json({ success: false, error: validated.error.issues })
     // }
 
-    return json({studentRecord})
+    return json({ students })
 
     const response = await result.publishResults({ studentIds: [144], examId: 5 });
     if (!response.success) {
