@@ -89,9 +89,9 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 
       const parsedResult = JSON.parse(content.trim());
       // Add student data if provided (from drop-zone upload)
-      // if (studentId) parsedResult.studentData.studentId = studentId;
-      // if (admissionNo) parsedResult.studentData.admissionNo = admissionNo;
-      // if (fullName) parsedResult.studentData.fullName = fullName;
+      if (studentId) parsedResult.studentData.studentId = studentId;
+      if (admissionNo) parsedResult.studentData.admissionNo = admissionNo;
+      if (fullName) parsedResult.studentData.fullName = fullName;
       // console.log("Parsed result", parsedResult);
       const validated = await resultInputSchema.safeParseAsync(parsedResult);
       if (!validated.success) {

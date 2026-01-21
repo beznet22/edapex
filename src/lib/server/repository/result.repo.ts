@@ -222,10 +222,11 @@ export class ResultsRepository extends BaseRepository {
     return this.withErrorHandling(async () => {
       const { recordId, studentId, classId, sectionId, examTermId, schoolId } = params;
       const academicId = await this.getAcademicId();
-
+      
       // Delete result records from smResultStores
-      await this.db
-        .delete(schema.smResultStores)
+      const resultStores = await this.db
+        .select({ id: schema.smResultStores.id })
+        .from(schema.smResultStores)
         .where(
           and(
             eq(schema.smResultStores.studentRecordId, recordId),
@@ -236,7 +237,12 @@ export class ResultsRepository extends BaseRepository {
             eq(schema.smResultStores.schoolId, schoolId),
             eq(schema.smResultStores.academicId, academicId)
           )
-        );
+        )
+      if (resultStores.length > 0) {
+        await this.db
+          .delete(schema.smResultStores)
+          .where(inArray(schema.smResultStores.id, resultStores.map((rs) => rs.id)));
+      }
 
       // Select marks from smMarkStores
       const marks = await this.db
@@ -256,6 +262,8 @@ export class ResultsRepository extends BaseRepository {
             eq(schema.smMarkStores.academicId, academicId)
           )
         );
+
+      if (marks.length === 0) return;
 
       // Delete marks from smMarkStores
       await this.db
