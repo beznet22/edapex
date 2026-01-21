@@ -18,13 +18,13 @@ export const GET: RequestHandler = async () => {
     const studentRecord = await studentRepo.getStudentRecordByAdmissionNo(765)
     const staff = await staffRepo.getStaffByClassSection({ classId: 17, sectionId: 7 })
     const mappingData = await result.getMappingData(staff?.teacherId ?? 0)
-    // const resultData = await result.getStudentResult({ id: 167, examId: 5 })
-    // const validated = await resultOutputSchema.safeParseAsync(resultData)
-    // if (!validated.success) {
-    //   return json({ success: false, error: validated.error.issues })
-    // }
+    const resultData = await result.getStudentResult({ id: 580, examId: 5 })
+    const validated = await resultOutputSchema.safeParseAsync(resultData)
+    if (!validated.success) {
+      return json({ success: false, error: validated.error.issues })
+    }
 
-    return json({ students })
+    return json({ resultData })
 
     const response = await result.publishResults({ studentIds: [144], examId: 5 });
     if (!response.success) {
