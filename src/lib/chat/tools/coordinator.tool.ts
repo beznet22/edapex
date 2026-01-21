@@ -39,7 +39,7 @@ export const validateClassResults = tool({
     message: z.string(),
   }),
   execute: async ({ classId, sectionId, examTypeId }) => {
-    const students = await studentRepo.getStudentsByClassId({ classId, sectionId });
+    const students = await studentRepo.getStudentsByClassSection({ classId, sectionId });
 
     if (!students || students.length === 0) {
       return {
@@ -178,7 +178,7 @@ export const sendClassResults = tool({
     errors: z.array(z.string()).optional().describe("Detailed error messages if sending failed"),
   }),
   execute: async ({ classId, examTypeId, sectionId, resend }) => {
-    const students = await studentRepo.getStudentsByClassId({ classId, sectionId });
+    const students = await studentRepo.getStudentsByClassSection({ classId, sectionId });
     if (!students || students.length === 0) {
       return { success: false, message: "No students found." };
     }
@@ -229,7 +229,7 @@ export const getStudentList = tool({
       .describe("List of students"),
   }),
   execute: async ({ classId, sectionId }) => {
-    const students = await studentRepo.getStudentsByClassId({ classId, sectionId });
+    const students = await studentRepo.getStudentsByClassSection({ classId, sectionId });
     return {
       students: students || [],
     };

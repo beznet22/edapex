@@ -1,6 +1,6 @@
 // /src/lib/server/repository/student.repo.ts
 
-import { and, count, eq, isNotNull, ne, sql, like, or, desc } from "drizzle-orm";
+import { and, count, eq, isNotNull, ne, sql, like, or, desc, asc } from "drizzle-orm";
 import {
   classAttendances,
   smAssignSubjects,
@@ -229,31 +229,6 @@ export class StudentRepository extends BaseRepository {
     return student || null;
   }
 
-  async getStudentsByClassId(params: { classId: number; sectionId: number }) {
-    const { classId, sectionId } = params;
-    const academicId = await this.getAcademicId();
-    const students = await this.db
-      .select({
-        id: smStudents.id,
-        name: smStudents.fullName,
-        admissionNo: smStudents.admissionNo,
-      })
-      .from(smStudents)
-      .innerJoin(studentRecords, eq(smStudents.id, studentRecords.studentId))
-      .where(
-        and(
-          eq(studentRecords.classId, classId),
-          eq(studentRecords.sectionId, sectionId),
-          eq(studentRecords.academicId, academicId),
-          eq(smStudents.activeStatus, 1),
-          eq(studentRecords.activeStatus, 1),
-          eq(studentRecords.isDefault, 1)
-        )
-      );
-
-    return students;
-  }
-
   async getStudentsByClassSection(params: { classId: number; sectionId: number }) {
     const { classId, sectionId } = params;
     if (!classId || !sectionId) return null;
@@ -271,9 +246,11 @@ export class StudentRepository extends BaseRepository {
           eq(studentRecords.classId, classId),
           eq(studentRecords.sectionId, sectionId),
           eq(studentRecords.academicId, academicId),
-          eq(smStudents.activeStatus, 1)
+          eq(studentRecords.activeStatus, 1),
+          eq(smStudents.activeStatus, 1),
+          eq(studentRecords.isDefault, 1)
         )
-      );
+      ).orderBy(asc(smStudents.id));
     return students;
   }
 

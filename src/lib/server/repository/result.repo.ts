@@ -223,21 +223,6 @@ export class ResultsRepository extends BaseRepository {
       const { recordId, studentId, classId, sectionId, examTermId, schoolId } = params;
       const academicId = await this.getAcademicId();
 
-      // Delete marks from smMarkStores
-      await this.db
-        .delete(schema.smMarkStores)
-        .where(
-          and(
-            eq(schema.smMarkStores.studentRecordId, recordId),
-            eq(schema.smMarkStores.studentId, studentId),
-            eq(schema.smMarkStores.classId, classId),
-            eq(schema.smMarkStores.sectionId, sectionId),
-            eq(schema.smMarkStores.examTermId, examTermId),
-            eq(schema.smMarkStores.schoolId, schoolId),
-            eq(schema.smMarkStores.academicId, academicId)
-          )
-        );
-
       // Delete result records from smResultStores
       await this.db
         .delete(schema.smResultStores)
@@ -252,6 +237,35 @@ export class ResultsRepository extends BaseRepository {
             eq(schema.smResultStores.academicId, academicId)
           )
         );
+
+      // Select marks from smMarkStores
+      const marks = await this.db
+        .select({
+          id: schema.smMarkStores.id,
+          setupId: schema.smMarkStores.examSetupId,
+        })
+        .from(schema.smMarkStores)
+        .where(
+          and(
+            eq(schema.smMarkStores.studentRecordId, recordId),
+            eq(schema.smMarkStores.studentId, studentId),
+            eq(schema.smMarkStores.classId, classId),
+            eq(schema.smMarkStores.sectionId, sectionId),
+            eq(schema.smMarkStores.examTermId, examTermId),
+            eq(schema.smMarkStores.schoolId, schoolId),
+            eq(schema.smMarkStores.academicId, academicId)
+          )
+        );
+
+      // Delete marks from smMarkStores
+      await this.db
+        .delete(schema.smMarkStores)
+        .where(inArray(schema.smMarkStores.id, marks.map((m) => m.id)));
+
+      // Delete exam setups from smExamSetups
+      await this.db
+        .delete(schema.smExamSetups)
+        .where(inArray(schema.smExamSetups.id, marks.map((m) => m.setupId!)));
     }, "cleanMarks");
   }
 
@@ -322,16 +336,16 @@ export class ResultsRepository extends BaseRepository {
       const classResults =
         classId && sectionId
           ? await this.db
-              .select()
-              .from(schema.smResultStores)
-              .where(
-                and(
-                  eq(schema.smResultStores.examTypeId, examId),
-                  eq(schema.smResultStores.classId, classId),
-                  eq(schema.smResultStores.sectionId, sectionId),
-                  eq(schema.smResultStores.activeStatus, 1)
-                )
+            .select()
+            .from(schema.smResultStores)
+            .where(
+              and(
+                eq(schema.smResultStores.examTypeId, examId),
+                eq(schema.smResultStores.classId, classId),
+                eq(schema.smResultStores.sectionId, sectionId),
+                eq(schema.smResultStores.activeStatus, 1)
               )
+            )
           : [];
 
       return {
@@ -471,7 +485,7 @@ export class ResultsRepository extends BaseRepository {
           .insert(schema.teacherRemarks)
           .values(remark)
           .onDuplicateKeyUpdate({ set: { remark: remark.remark, updatedAt: new Date() } })
-          .then(() => {}),
+          .then(() => { }),
       "upsertTeacherRemark"
     );
   }
