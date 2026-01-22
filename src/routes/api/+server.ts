@@ -24,7 +24,7 @@ export const GET: RequestHandler = async () => {
       return json({ success: false, error: validated.error.issues })
     }
 
-    return json({ resultData })
+    return json({ validated })
 
     const response = await result.publishResults({ studentIds: [144], examId: 5 });
     if (!response.success) {

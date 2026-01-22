@@ -3,6 +3,7 @@ export * from "./base.repo";
 import { resultRepo } from "./result.repo";
 import { chat } from "./chat.repo";
 import { base } from "./base.repo";
+import { staffRepo } from "./staff.repo";
 export * from "./job.repo";
 
-export const repo = { result: resultRepo, chat, base };
+export const repo = { result: resultRepo, chat, base, staff: staffRepo };
