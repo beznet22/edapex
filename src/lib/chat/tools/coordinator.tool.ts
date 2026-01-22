@@ -2,7 +2,9 @@ import { marksIputSchema } from "$lib/schema/result-input";
 import { resultOutputSchema, type Category } from "$lib/schema/result-output";
 import { resultRepo } from "$lib/server/repository/result.repo";
 import { studentRepo } from "$lib/server/repository/student.repo";
+import { staffRepo } from "$lib/server/repository/staff.repo";
 import { result } from "$lib/server/service/result.service";
+
 import { CATEGORY } from "$lib/types/sms-types";
 import { tool } from "ai";
 import { base64url } from "jose";
@@ -316,7 +318,9 @@ export const upsertMarkStore = tool({
       subjectId,
       schoolId: 1,
     });
-
+    console.log("New marks", newMarks);
+    console.log("Titles", titles);
+    console.log("Exam setup", examSetups);
     if (!examSetups || examSetups.length === 0) {
       return { success: false, message: "Exam setup not found." };
     }
@@ -579,3 +583,35 @@ export const searchClassSection = tool({
     }
   },
 });
+
+export const getAssessmentMapping = tool({
+  description:
+    "Retrieves mapping data for assessments, including exam setups, exam types, student categories, assigned subjects, and class/section assignments for a specific class and section.",
+  inputSchema: z.object({
+    classId: z.number().describe("The unique ID of the class. required"),
+    sectionId: z.number().describe("The unique ID of the section. required"),
+    staffId: z.number().optional().describe("The unique ID of the staff member (optional)."),
+  }),
+  outputSchema: z.object({
+    success: z.boolean(),
+    data: z.any().optional(),
+    message: z.string().optional(),
+  }),
+  execute: async ({ classId, sectionId, staffId }) => {
+    try {
+      let finalStaffId = staffId;
+      if (!finalStaffId) {
+        const staff = await staffRepo.getStaffByClassSection({ classId, sectionId });
+        if (!staff || !staff.teacherId) {
+          return { success: false, message: "No staff assigned to this class and section." };
+        }
+        finalStaffId = staff.teacherId;
+      }
+      const data = await result.getMappingData(finalStaffId!);
+      return { success: true, data };
+    } catch (error) {
+      return { success: false, message: "Failed to fetch mapping data" };
+    }
+  },
+});
+

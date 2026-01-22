@@ -222,7 +222,7 @@ export class ResultsRepository extends BaseRepository {
     return this.withErrorHandling(async () => {
       const { recordId, studentId, classId, sectionId, examTermId, schoolId } = params;
       const academicId = await this.getAcademicId();
-      
+
       // Delete result records from smResultStores
       const resultStores = await this.db
         .select({ id: schema.smResultStores.id })
@@ -669,7 +669,6 @@ export class ResultsRepository extends BaseRepository {
         .select({
           id: schema.smExamSetups.id,
           examTitle: schema.smExamSetups.examTitle,
-          exam_mark: schema.smExamSetups.examMark,
           classId: schema.smExamSetups.classId,
           sectionId: schema.smExamSetups.sectionId,
         })
@@ -760,7 +759,7 @@ export class ResultsRepository extends BaseRepository {
     return this.withErrorHandling(async () => {
       const academicId = await this.getAcademicId();
       const subjects = await this.db
-        .select({ id: schema.smSubjects.id, subjectCode: schema.smSubjects.subjectCode })
+        .select({ id: schema.smSubjects.id, subjectCode: schema.smSubjects.subjectCode, subjectName: schema.smSubjects.subjectName })
         .from(schema.smSubjects)
         .leftJoin(schema.smAssignSubjects, eq(schema.smSubjects.id, schema.smAssignSubjects.subjectId))
         .where(

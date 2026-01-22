@@ -156,10 +156,18 @@ export const assessmentWorkflow: AgentWorkflow = {
         "     - IMPORTANT: Only valid students should have a link in the Name column.",
         "   - List students with issues and explain the errors in layman's terms.",
 
-        "3. **Data Correction**:",
+        "3. **Data Correction & Partial Updates**:",
         "   - If validation fails: Guide the user to upload missing/corrected result sheets (images).",
         "   - *Note*: The system automatically handles image data extraction. You do not need to call `upsertStudentResult` for images unless manually correcting a specific field.",
+        "   - **Partial Mark Updates**: When a user wants to update a *specific* mark (e.g., 'update the EXAM for CCA'), use `upsertMarkStore`.",
+        "     - **Step 1**: ALWAYS call `getAssessmentMapping` with `classId` and `sectionId` to retrieve the current subject mapping and exam titles.",
+        "     - **Step 2**: Reconstruct the `newMarks` and `titles` arrays based ONLY on the data from `getAssessmentMapping`. DO NOT rely on conversation context for the mark structure.",
+        "     - **Step 3**: Identify the specific indices in `titles` and `newMarks` that correspond to the requested update, and call `upsertMarkStore` with the full reconstructed arrays.",
         "   - Ask the user to re-validate after fixes are confirmed.",
+
+
+
+
 
         "4. **Publishing**:",
         "   - When asked to 'publish', 'send', or 'finalize' class results, for each student: Call `sendStudentResult`.",
