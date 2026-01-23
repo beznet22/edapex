@@ -86,6 +86,7 @@ export interface GetExamSetup {
 }
 
 export type MarkData = {
+  studentId: number | null;
   markId: number | null;
   titleId?: number | null;
   subjectId: number | null;
@@ -102,6 +103,7 @@ export type QueryResultData = {
   classResults: ResultData[];
   marks: MarkData[];
   resultRecords?: Array<{
+    studentId: number | null;
     resultId: number;
     subjectId: number | null;
     subjectName: string | null;

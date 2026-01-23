@@ -56,6 +56,7 @@ export type Student = z.infer<typeof studentSchema>;
 
 export const recordSchema = z
   .object({
+    studentId: z.number().describe("The ID of the student"),
     resultId: z.number().describe("The ID of the result"),
     subjectId: z.number().describe("The ID of the subject"),
     subject: z.string().describe("The name of the subject"),

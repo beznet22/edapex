@@ -199,15 +199,23 @@ export class ResultsRepository extends BaseRepository {
     );
   }
 
-  async deleteResultStore(resultId: number) {
+  async deleteResultStore(resultId: number, studentId: number) {
     return this.withErrorHandling(async () => {
-      await this.db.delete(schema.smResultStores).where(eq(schema.smResultStores.id, resultId));
+      await this.db.delete(schema.smResultStores).where(
+        and(
+          eq(schema.smResultStores.id, resultId),
+          eq(schema.smResultStores.studentId, studentId))
+      );
     }, "deleteResultStore");
   }
 
-  async deleteMarkStore(markIds: number[]) {
+  async deleteMarkStore(markIds: number[], studentId: number) {
     return this.withErrorHandling(async () => {
-      await this.db.delete(schema.smMarkStores).where(inArray(schema.smMarkStores.id, markIds));
+      await this.db.delete(schema.smMarkStores).where(
+        and(
+          inArray(schema.smMarkStores.id, markIds),
+          eq(schema.smMarkStores.studentId, studentId))
+      );
     }, "deleteMarkStore");
   }
 
@@ -269,11 +277,6 @@ export class ResultsRepository extends BaseRepository {
       await this.db
         .delete(schema.smMarkStores)
         .where(inArray(schema.smMarkStores.id, marks.map((m) => m.id)));
-
-      // Delete exam setups from smExamSetups
-      await this.db
-        .delete(schema.smExamSetups)
-        .where(inArray(schema.smExamSetups.id, marks.map((m) => m.setupId!)));
     }, "cleanMarks");
   }
 
@@ -295,6 +298,7 @@ export class ResultsRepository extends BaseRepository {
         // Query 1: Fetch all result records from smResultStores (one per subject)
         this.db
           .select({
+            studentId: schema.smResultStores.studentId,
             resultId: schema.smResultStores.id,
             subjectId: schema.smResultStores.subjectId,
             subjectName: schema.smSubjects.subjectName,
@@ -313,6 +317,7 @@ export class ResultsRepository extends BaseRepository {
         // Query 2: Fetch marks from smMarkStores
         this.db
           .select({
+            studentId: schema.smMarkStores.studentId,
             markId: schema.smMarkStores.id,
             subjectId: schema.smSubjects.id,
             totalMarks: schema.smMarkStores.totalMarks,
