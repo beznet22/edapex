@@ -308,9 +308,9 @@ export class ResultService {
   }
 
   async cleanUpResultRecord(record: MarksRecord) {
-    await repo.result.deleteResultStore(record.resultId);
-    await repo.result.deleteMarkStore(record.markIds);
-    await repo.result.deleteExamSetup(record.titleIds);
+    await repo.result.deleteResultStore(record.resultId, record.studentId);
+    await repo.result.deleteMarkStore(record.markIds, record.studentId);
+    // await repo.result.deleteExamSetup(record.titleIds);
   }
 
   /**
@@ -481,6 +481,7 @@ export class ResultService {
     objectives: any[],
     category: Category,
     resultRecords?: Array<{
+      studentId: number | null;
       resultId: number;
       subjectId: number | null;
       subjectName: string | null;
@@ -491,6 +492,7 @@ export class ResultService {
     // Special handling for DAYCARE when marks is empty
     if (category === "DAYCARE" && resultRecords && resultRecords.length > 0) {
       const records = resultRecords.map((result) => ({
+        studentId: result.studentId || 0,
         subject: result.subjectName || "Learning Outcome",
         totalScore: 0,
         category,
@@ -523,6 +525,7 @@ export class ResultService {
       const grade = this.getGrade(totalScore, category, matchingResult?.teacherRemarks ?? null);
       overAll += totalScore;
       return {
+        studentId: first?.studentId || 0,
         subject,
         totalScore,
         category,
