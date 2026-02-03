@@ -1,6 +1,5 @@
 <script lang="ts">
-  import type { ResultOutput } from "$lib/schema/result-input";
-
+  import type { ResultOutput } from "$lib/schema/result-output";
 
   interface Props {
     school: ResultOutput["school"];

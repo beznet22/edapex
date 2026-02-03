@@ -74,6 +74,7 @@ export const credentialSchema = z.object({
   token_type: z.string(),
   resource_url: z.string().optional(),
   scope: z.string().optional(),
+  project_id: z.string().optional(),
   obtained_at: z.number().optional(),
 });
 
@@ -96,9 +97,60 @@ export interface OAuth2Client {
   readonly config: ProviderConfig;
 
   on(event: ClientEvent, callback: (tokens: Credential) => void): void;
-  getAccessToken(): Promise<{ accessToken: string; endpoint: string } | null>;
+  getAccessToken(): Promise<{ accessToken: string; endpoint?: string } | null>;
   getToken(code: string, verifier: string): Promise<Credential | { status: string; slowDown?: boolean }>;
-  geModelProvider(): Promise<Provider | null>;
+  getModelProvider(): Promise<Provider | null>;
   getTokenInfo(credential: string): Promise<any>;
   generateAuthUrl(): Promise<DeviceAuth | null>;
 }
+
+export type OpenAICompatibleCompletionModelId = string;
+
+export const openaiCompatibleCompletionProviderOptions = z.object({
+  /**
+   * Echo back the prompt in addition to the completion.
+   */
+  echo: z.boolean().optional(),
+
+  /**
+   * Modify the likelihood of specified tokens appearing in the completion.
+   *
+   * Accepts a JSON object that maps tokens (specified by their token ID in
+   * the GPT tokenizer) to an associated bias value from -100 to 100.
+   */
+  logitBias: z.record(z.string(), z.number()).optional(),
+
+  /**
+   * The suffix that comes after a completion of inserted text.
+   */
+  suffix: z.string().optional(),
+
+  /**
+   * A unique identifier representing your end-user, which can help providers to
+   * monitor and detect abuse.
+   */
+  user: z.string().optional(),
+});
+
+export type OpenAICompatibleCompletionProviderOptions = z.infer<
+  typeof openaiCompatibleCompletionProviderOptions
+>;
+
+const usageSchema = z.object({
+  prompt_tokens: z.number(),
+  completion_tokens: z.number(),
+  total_tokens: z.number(),
+});
+
+const openaiCompatibleCompletionResponseSchema = z.object({
+  id: z.string().nullish(),
+  created: z.number().nullish(),
+  model: z.string().nullish(),
+  choices: z.array(
+    z.object({
+      text: z.string(),
+      finish_reason: z.string(),
+    }),
+  ),
+  usage: usageSchema.nullish(),
+});

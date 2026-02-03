@@ -2,16 +2,14 @@
   import { Action, Actions } from "$lib/components/ai-elements/action";
   import type { xUIMessage, xUIMessagePart } from "$lib/types/chat-types";
   import { useChat } from "$lib/context/chat-context.svelte";
-  import {
-    Check,
-    Copy,
-    PlayIcon,
-    RefreshCcw,
-    ThumbsDown,
-    ThumbsUp,
-  } from "@lucide/svelte";
+  import CheckIcon from "@lucide/svelte/icons/check";
+  import CopyIcon from "@lucide/svelte/icons/copy";
+  import PlayIcon from "@lucide/svelte/icons/play";
+  import RefreshCcwIcon from "@lucide/svelte/icons/refresh-ccw";
+  import ThumbsDownIcon from "@lucide/svelte/icons/thumbs-down";
+  import ThumbsUpIcon from "@lucide/svelte/icons/thumbs-up";
   import PreviewModal from "./pdf-preview.svelte";
-    import { goto } from "$app/navigation";
+  import { goto } from "$app/navigation";
 
   let {
     message,
@@ -32,14 +30,17 @@
     message.parts.some(
       (part) =>
         part.type === "tool-upsertStudentResult" &&
-        part.output?.status === "approved" &&
-        part.output?.data,
+        (part as any).output?.status === "approved" &&
+        (part as any).output?.data,
     ),
   );
 
   let token = $derived(
-    message.parts.find((part) => part.type === "tool-upsertStudentResult")
-      ?.output?.data?.student.token,
+    (
+      message.parts.find(
+        (part) => part.type === "tool-upsertStudentResult",
+      ) as any
+    )?.output?.data?.student.token,
   );
 </script>
 
@@ -66,19 +67,19 @@
         )}
     >
       {#if isAssistantCopied}
-        <Check class="size-4" />
+        <CheckIcon class="size-4" />
       {:else}
-        <Copy class="size-4" />
+        <CopyIcon class="size-4" />
       {/if}
     </Action>
     <Action tooltip="Retry" onclick={() => chat.client.regenerate()}>
-      <RefreshCcw class="size-4" />
+      <RefreshCcwIcon class="size-4" />
     </Action>
     <Action tooltip="Like">
-      <ThumbsUp class="size-4" />
+      <ThumbsUpIcon class="size-4" />
     </Action>
     <Action tooltip="Dislike">
-      <ThumbsDown class="size-4" />
+      <ThumbsDownIcon class="size-4" />
     </Action>
   </Actions>
 {:else}
@@ -94,9 +95,9 @@
         )}
     >
       {#if isUserCopied}
-        <Check class="size-4" />
+        <CheckIcon class="size-4" />
       {:else}
-        <Copy class="size-4" />
+        <CopyIcon class="size-4" />
       {/if}
     </Action>
   </Actions>

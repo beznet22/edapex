@@ -4,6 +4,16 @@ import { toast } from "svelte-sonner";
 
 let popup: Window | null = null;
 
+function isPopupClosed(p: Window | null): boolean {
+  if (!p) return true;
+  try {
+    return p.closed;
+  } catch (e) {
+    // Access might be blocked by COOP/Cross-Origin policy
+    return false;
+  }
+}
+
 async function poll_device_code(
   { device_code, provider, interval, expires_in }: DeviceAuth & { provider: CredentialType },
   controller: AbortController
@@ -19,9 +29,12 @@ async function poll_device_code(
       console.log("Polling for token...");
       const data = await addToken({ device_code, provider });
       if (data.success) {
-        console.log("✅ Credentials added successfully");
-        if (popup) popup.close();
-        toast.success("Provider added successfully");
+        console.log(`✅ ${provider} credentials added successfully`);
+        if (popup) {
+          popup.close();
+          popup = null;
+        }
+        toast.success(`${provider.replace("_", " ")} added successfully`);
         break;
       }
 
@@ -30,8 +43,12 @@ async function poll_device_code(
         continue;
       }
 
-      console.warn("❌ Authorization failed:", data);
-      if (popup) popup.close();
+      console.warn(`❌ ${provider} authorization failed:`, data);
+      if (popup) {
+        popup.close();
+        popup = null;
+      }
+      toast.error(`Authorization failed for ${provider}`);
       break;
     }
   } catch (err: any) {
@@ -60,7 +77,7 @@ export function saveTokenData(data: DeviceAuth & { provider: CredentialType }) {
     "popup=true",
   ].join(",");
 
-  if (popup && !popup.closed) {
+  if (popup && !isPopupClosed(popup)) {
     popup.focus();
     popup.location.href = data.authUrl;
   } else {
@@ -69,15 +86,19 @@ export function saveTokenData(data: DeviceAuth & { provider: CredentialType }) {
 
   const controller = new AbortController();
   const checkPopup = setInterval(() => {
-    if (popup && popup.closed) {
+    if (isPopupClosed(popup)) {
       controller.abort();
       clearInterval(checkPopup);
     }
   }, 1000);
 
   window.addEventListener("focus", function () {
-    if (popup && !popup.closed) {
-      popup.focus();
+    if (popup && !isPopupClosed(popup)) {
+      try {
+        popup.focus();
+      } catch (e) {
+        // Ignore cross-origin focus errors
+      }
     }
   });
 

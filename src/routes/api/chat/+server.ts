@@ -22,14 +22,16 @@ export const POST: RequestHandler = async ({ request, locals: { user, session },
   const selectedChatModel = cookies.get("selected-model");
   if (messages.length === 0) error(400, "No user message found");
   if (!selectedChatModel) error(400, "No chat model selected");
+  console.log("[api/chat] Cookies:", cookies.getAll().map(c => c.name));
 
   const agentService = useAgent();
-  const provider = await agentService.use(CredentialType.QWEN_CODE).geModelProvider();
+  const provider = await agentService.getProviderForAgent(agentId).getModelProvider();
   if (!provider) error(400, "No provider found");
 
   let message = messages[messages.length - 1];
-  if (user && messages.length === 1) {
-    if (!chatId) {
+  if (user) {
+    // Create chat if it doesn't exist
+    if (!chatId && messages.length === 1) {
       chatId = await repo.chat.createChat({
         userId: user.id,
         title: "New Chat",
@@ -41,7 +43,7 @@ export const POST: RequestHandler = async ({ request, locals: { user, session },
   }
 
   const tools = AgentService.getTools(user, agentId);
-  const systemPrompt = await AgentService.getSystemPrompt(user, agentId, selectedClass);
+  const instructions = await AgentService.getInstructions(user, agentId, selectedClass);
   const userStopSignal = new AbortController();
   const stream = createUIMessageStream<xUIMessage>({
     execute: async ({ writer }) => {
@@ -63,11 +65,11 @@ export const POST: RequestHandler = async ({ request, locals: { user, session },
       const model = provider.languageModel(selectedChatModel);
       const result = streamText({
         model,
-        system: systemPrompt,
-        messages: convertToModelMessages(messages),
+        system: instructions,
+        messages: await convertToModelMessages(messages),
         abortSignal: userStopSignal.signal,
         stopWhen: stepCountIs(30),
-        tools: tools(writer, model),
+        tools: tools,
         experimental_transform: smoothStream({
           delayInMs: 20,
           chunking: "line",

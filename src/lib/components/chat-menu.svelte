@@ -1,7 +1,10 @@
 <script lang="ts">
   import * as DropdownMenu from "$lib/components/ui/dropdown-menu/index.js";
   import { FilesContext } from "$lib/context/file-context.svelte";
-  import { Check, Paperclip, Plus, Package } from "@lucide/svelte";
+  import CheckIcon from "@lucide/svelte/icons/check";
+  import PaperclipIcon from "@lucide/svelte/icons/paperclip";
+  import PlusIcon from "@lucide/svelte/icons/plus";
+  import PackageIcon from "@lucide/svelte/icons/package";
   import { Button } from "./ui/button";
   import { useChat } from "$lib/context/chat-context.svelte";
   import { iconRegistry } from "$lib/utils/icons";
@@ -32,7 +35,7 @@
         size="icon"
         class="size-9 sm:size-10 rounded-full cursor-pointer transition-colors hover:bg-accent/50"
       >
-        <Plus class="size-4 sm:size-4.5" />
+        <PlusIcon class="size-4 sm:size-4.5" />
       </Button>
     {/snippet}
   </DropdownMenu.Trigger>
@@ -57,7 +60,7 @@
         class="group/item flex flex-row items-center justify-between gap-4"
       >
         <div class="flex items-center gap-5">
-          <Package class="size-4" />
+          <PackageIcon class="size-4" />
           <div>View Resources</div>
         </div>
       </DropdownMenu.Item>
@@ -82,7 +85,7 @@
           <div
             class="text-foreground dark:text-foreground opacity-0 group-data-[active=true]/item:opacity-100"
           >
-            <Check class="size-4" />
+            <CheckIcon class="size-4" />
           </div>
         </DropdownMenu.Item>
       {/each}

@@ -41,13 +41,17 @@ export class QwenProvider implements OAuth2Client {
 
   constructor() {
     const { cookies } = getRequestEvent();
-    const token = cookies.get(CredentialType.QWEN_CODE);
+    const token = cookies.get(this.type);
+    console.log(`[QwenProvider] Cookie '${this.type}' present:`, !!token);
     this.credentials = token ? (jwt.verify(token) as Promise<Credential>) : null;
   }
 
   async getAccessToken(): Promise<{ accessToken: string; endpoint: string } | null> {
     const credentials = await this.credentials;
-    if (!credentials) return null;
+    if (!credentials) {
+      console.log("❌ [QwenProvider] No credentials found in constructor");
+      return null;
+    }
 
     const { refresh_token, access_token: accessToken } = credentials;
     const endpoint = this.getCurrentEndpoint(credentials);
@@ -100,7 +104,7 @@ export class QwenProvider implements OAuth2Client {
   private setDeviceCode(verifier: any): void {
     const { cookies } = getRequestEvent();
     const expiresMs = Date.now() + verifier.expires_in * 1000;
-    cookies.set(this.type, JSON.stringify(verifier), {
+    cookies.set(`v_${this.type}`, JSON.stringify(verifier), {
       expires: new Date(expiresMs),
       httpOnly: true,
       sameSite: "lax",
@@ -127,7 +131,7 @@ export class QwenProvider implements OAuth2Client {
     throw new Error("Not implemented");
   }
 
-  async geModelProvider(): Promise<Provider | null> {
+  async getModelProvider(): Promise<Provider | null> {
     const token = await this.getAccessToken();
     if (!token) return null;
     const { accessToken, endpoint } = token;

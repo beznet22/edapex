@@ -6,7 +6,7 @@ import { staffRepo } from "$lib/server/repository/staff.repo";
 import { result } from "$lib/server/service/result.service";
 
 import { CATEGORY } from "$lib/types/sms-types";
-import { tool } from "ai";
+import { tool, type InferToolInput, type InferToolOutput } from "ai";
 import { base64url } from "jose";
 import z, { record } from "zod";
 
@@ -113,6 +113,9 @@ export const validateClassResults = tool({
   },
 });
 
+export type ValidateClassResultsInput = InferToolInput<typeof validateClassResults>;
+export type ValidateClassResultsOutput = InferToolOutput<typeof validateClassResults>;
+
 // EmailResult schema matching email-job.ts interface
 const emailResultSchema = z.object({
   to: z.string().optional().describe("Recipient email address"),
@@ -157,6 +160,9 @@ export const sendStudentResult = tool({
     };
   },
 });
+
+export type SendStudentResultInput = InferToolInput<typeof sendStudentResult>;
+export type SendStudentResultOutput = InferToolOutput<typeof sendStudentResult>;
 
 export const sendClassResults = tool({
   description: [
@@ -212,6 +218,9 @@ export const sendClassResults = tool({
   },
 });
 
+export type SendClassResultsInput = InferToolInput<typeof sendClassResults>;
+export type SendClassResultsOutput = InferToolOutput<typeof sendClassResults>;
+
 export const getStudentList = tool({
   description:
     "Retrieves a list of all students assigned to a specific staff member. Returns student IDs, names, and admission numbers. Essential when 'studentId' or 'admissionNo' is unknown.",
@@ -238,6 +247,9 @@ export const getStudentList = tool({
   },
 });
 
+export type GetStudentListInput = InferToolInput<typeof getStudentList>;
+export type GetStudentListOutput = InferToolOutput<typeof getStudentList>;
+
 export const changeStudentName = tool({
   description: "Changes the name of a student. Use this tool when a student's name is misspelled or needs to be updated.",
   inputSchema: z.object({
@@ -258,6 +270,9 @@ export const changeStudentName = tool({
     return { success: true, message: "Student name updated successfully." };
   },
 });
+
+export type ChangeStudentNameInput = InferToolInput<typeof changeStudentName>;
+export type ChangeStudentNameOutput = InferToolOutput<typeof changeStudentName>;
 
 export const updateExamTitle = tool({
   description: "Updates the exam title for a specific exam type.",
@@ -283,6 +298,9 @@ export const updateExamTitle = tool({
     return { success: true, message: `Exam setup updated successfully. Affected rows: ${affectedRows}` };
   },
 });
+
+export type UpdateExamTitleInput = InferToolInput<typeof updateExamTitle>;
+export type UpdateExamTitleOutput = InferToolOutput<typeof updateExamTitle>;
 
 export const upsertMarkStore = tool({
   description: "Updates the mark store for a specific subject and exam type.",
@@ -362,6 +380,9 @@ export const upsertMarkStore = tool({
   },
 });
 
+export type UpsertMarkStoreInput = InferToolInput<typeof upsertMarkStore>;
+export type UpsertMarkStoreOutput = InferToolOutput<typeof upsertMarkStore>;
+
 export const getStudentRegistrationOptions = tool({
   description: [
     "Retrieves all available options for student registration.",
@@ -409,6 +430,9 @@ export const getStudentRegistrationOptions = tool({
     }
   },
 });
+
+export type GetStudentRegistrationOptionsInput = InferToolInput<typeof getStudentRegistrationOptions>;
+export type GetStudentRegistrationOptionsOutput = InferToolOutput<typeof getStudentRegistrationOptions>;
 
 export const createStudent = tool({
   description: [
@@ -490,6 +514,9 @@ export const createStudent = tool({
   },
 });
 
+export type CreateStudentInput = InferToolInput<typeof createStudent>;
+export type CreateStudentOutput = InferToolOutput<typeof createStudent>;
+
 export const assignClassSection = tool({
   description: [
     "Assigns a student to a new class and section using their unique IDs.",
@@ -536,6 +563,9 @@ export const assignClassSection = tool({
     }
   },
 });
+
+export type AssignClassSectionInput = InferToolInput<typeof assignClassSection>;
+export type AssignClassSectionOutput = InferToolOutput<typeof assignClassSection>;
 
 export const searchClassSection = tool({
   description: [
@@ -584,6 +614,9 @@ export const searchClassSection = tool({
   },
 });
 
+export type SearchClassSectionInput = InferToolInput<typeof searchClassSection>;
+export type SearchClassSectionOutput = InferToolOutput<typeof searchClassSection>;
+
 export const getAssessmentMapping = tool({
   description:
     "Retrieves mapping data for assessments, including exam setups, exam types, student categories, assigned subjects, and class/section assignments for a specific class and section.",
@@ -614,4 +647,7 @@ export const getAssessmentMapping = tool({
     }
   },
 });
+
+export type GetAssessmentMappingInput = InferToolInput<typeof getAssessmentMapping>;
+export type GetAssessmentMappingOutput = InferToolOutput<typeof getAssessmentMapping>;
 

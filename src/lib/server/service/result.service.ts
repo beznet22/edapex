@@ -310,7 +310,7 @@ export class ResultService {
   async cleanUpResultRecord(record: MarksRecord) {
     await repo.result.deleteResultStore(record.resultId, record.studentId);
     await repo.result.deleteMarkStore(record.markIds, record.studentId);
-    // await repo.result.deleteExamSetup(record.titleIds);
+    await repo.result.deleteExamSetup(record.titleIds);
   }
 
   /**

@@ -1,7 +1,9 @@
 <script lang="ts">
   import * as Card from "$lib/components/ui/card/index.js";
   import * as Carousel from "$lib/components/ui/carousel/index.js";
-  import { BrushCleaning, RotateCcw, Upload } from "@lucide/svelte";
+  import BrushCleaningIcon from "@lucide/svelte/icons/brush";
+  import RotateCcwIcon from "@lucide/svelte/icons/rotate-ccw";
+  import UploadIcon from "@lucide/svelte/icons/upload";
   import { Separator } from "./ui/separator";
   import { useFileActions } from "$lib/context/file-context.svelte";
   import Button, { buttonVariants } from "./ui/button/button.svelte";
@@ -73,7 +75,9 @@
 
   const retryUpload = (upload: UploadedData) => {
     if (userContext.isCoordinator) {
-      const selectedClass = userContext.classes.find((c) => c.id === chat.selectedClass?.id);
+      const selectedClass = userContext.classes.find(
+        (c) => c.id === chat.selectedClass?.id,
+      );
       if (!selectedClass) {
         toast("Failed to retry upload");
         return;
@@ -121,7 +125,9 @@
       <div class="p-6 pb-2">
         <Dialog.Header>
           <Dialog.Title>Resources</Dialog.Title>
-          <Dialog.Description>View and manage your uploaded resources.</Dialog.Description>
+          <Dialog.Description
+            >View and manage your uploaded resources.</Dialog.Description
+          >
         </Dialog.Header>
       </div>
 
@@ -140,7 +146,7 @@
                       "m-4 absolute left-0 top-0 z-10 cursor-pointer"}
                     onclick={clearResource}
                   >
-                    <BrushCleaning class="size-5" />
+                    <BrushCleaningIcon class="size-5" />
                   </Tooltip.Trigger>
                   <Tooltip.Content>Clear Resources</Tooltip.Content>
                 </Tooltip.Root>
@@ -178,7 +184,7 @@
                             {#if uploads.some((u) => u.id === upload.id && u.status === "retrying")}
                               <Loader variant="circular" size="sm" />
                             {:else}
-                              <RotateCcw class="size-4" />
+                              <RotateCcwIcon class="size-4" />
                             {/if}
                           </Button>
                         </Card.Content>
@@ -194,7 +200,9 @@
             </div>
           </Carousel.Root>
         {:else}
-          <div class="text-center text-muted-foreground py-8">No resources uploaded yet</div>
+          <div class="text-center text-muted-foreground py-8">
+            No resources uploaded yet
+          </div>
         {/if}
       </div>
     </Dialog.Content>

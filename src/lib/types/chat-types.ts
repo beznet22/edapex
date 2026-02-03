@@ -10,8 +10,9 @@ export interface Assistant {
   designation: Designation;
   suggestions: readonly string[];
   highlight: string;
-  systemPrompt?: string;
+  instructions?: string;
   tools?: typeof teacherTools | typeof coordinatorTools;
+  maxSteps?: number;
 }
 
 export interface TaskData {
@@ -67,9 +68,8 @@ export type UploadedData = {
   data?: any;
 };
 
-// Tool set type - using any to avoid circular dependency with tools function
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export type xToolUIPart = InferUITools<ReturnType<typeof teacherTools>>;
+// Combine all possible tools for type inference in the UI
+export type xToolUIPart = InferUITools<typeof teacherTools & typeof coordinatorTools>;
 export type xUIMessage = UIMessage<xMetadata, xDataPart, xToolUIPart>;
 export type xUIMessagePart = UIMessagePart<xDataPart, xToolUIPart>;
 export type xProviderMetadata = Record<string, Record<string, JSONValue>>;

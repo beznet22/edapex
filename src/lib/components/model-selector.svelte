@@ -9,7 +9,8 @@
     DropdownMenuItem,
     DropdownMenuTrigger,
   } from "./ui/dropdown-menu";
-  import { CircleCheck, ChevronDown } from "@lucide/svelte";
+  import CircleCheckIcon from "@lucide/svelte/icons/circle-check";
+  import ChevronDownIcon from "@lucide/svelte/icons/chevron-down";
   import type { ClassValue } from "svelte/elements";
 
   let {
@@ -20,7 +21,9 @@
 
   let open = $state(false);
   const selectedChatModel = SelectedModel.fromContext();
-  const selectedChatModelDetails = $derived(chatModels.find((model) => model.id === selectedChatModel.value));
+  const selectedChatModelDetails = $derived(
+    chatModels.find((model) => model.id === selectedChatModel.value),
+  );
 </script>
 
 <DropdownMenu {open} onOpenChange={(val) => (open = val)}>
@@ -31,11 +34,11 @@
         variant="outline"
         class={cn(
           "data-[state=open]:bg-accent data-[state=open]:text-accent-foreground w-fit md:h-[34px] md:px-2",
-          c
+          c,
         )}
       >
         {selectedChatModelDetails?.name}
-        <ChevronDown />
+        <ChevronDownIcon />
       </Button>
     {/snippet}
   </DropdownMenuTrigger>
@@ -56,8 +59,10 @@
           </div>
         </div>
 
-        <div class="text-foreground dark:text-foreground opacity-0 group-data-[active=true]/item:opacity-100">
-          <CircleCheck />
+        <div
+          class="text-foreground dark:text-foreground opacity-0 group-data-[active=true]/item:opacity-100"
+        >
+          <CircleCheckIcon />
         </div>
       </DropdownMenuItem>
     {/each}

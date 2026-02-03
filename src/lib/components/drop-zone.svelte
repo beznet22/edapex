@@ -2,7 +2,9 @@
   import { Button } from "$lib/components/ui/button";
   import * as Dialog from "$lib/components/ui/dialog/index.js";
   import { useFileActions } from "$lib/context/file-context.svelte";
-  import { Check, CircleAlert, TriangleAlert } from "@lucide/svelte";
+  import CheckIcon from "@lucide/svelte/icons/check";
+  import CircleAlertIcon from "@lucide/svelte/icons/circle-alert";
+  import TriangleAlertIcon from "@lucide/svelte/icons/triangle-alert";
   import XIcon from "@lucide/svelte/icons/x";
   import { onDestroy } from "svelte";
   import { toast } from "svelte-sonner";
@@ -89,7 +91,7 @@
     <div class="p-6 pb-2">
       <Dialog.Header>
         <Dialog.Title>
-          Add Recource for {filesContext.selectedClass?.className}
+          Add Resource for {filesContext.selectedClass?.className}
           {filesContext.selectedClass?.sectionName}
         </Dialog.Title>
         <Dialog.Description>
@@ -186,13 +188,13 @@
             <div class="shrink-0">
               <div class="flex items-center gap-1">
                 {#if uploads.some((u) => u.filename === file.name && u.status === "done")}
-                  <Check class="size-4 text-green-500" />
+                  <CheckIcon class="size-4 text-green-500" />
                 {:else if uploads.some((u) => u.filename === file.name && u.status === "pending")}
-                  <TriangleAlert class="size-4 text-primary" />
+                  <TriangleAlertIcon class="size-4 text-primary" />
                 {:else if uploads.some((u) => u.filename === file.name && u.status === "uploading")}
                   <Loader variant="circular" size="sm" />
                 {:else if uploads.some((u) => u.filename === file.name && u.status === "error")}
-                  <CircleAlert class="size-4 text-destructive" />
+                  <CircleAlertIcon class="size-4 text-destructive" />
                 {/if}
                 <Button
                   variant="ghost"

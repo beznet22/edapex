@@ -15,14 +15,12 @@
     SidebarMenuButton,
     SidebarMenuItem,
   } from "../ui/sidebar";
-  import {
-    Trash2,
-    Globe,
-    CircleCheck,
-    Lock,
-    Share2,
-    MoreHorizontal,
-  } from "@lucide/svelte";
+  import CircleCheckIcon from "@lucide/svelte/icons/circle-check";
+  import GlobeIcon from "@lucide/svelte/icons/globe";
+  import LockIcon from "@lucide/svelte/icons/lock";
+  import MoreHorizontalIcon from "@lucide/svelte/icons/more-horizontal";
+  import Share2Icon from "@lucide/svelte/icons/share-2";
+  import Trash2Icon from "@lucide/svelte/icons/trash-2";
   import { ChatHistory } from "$lib/context/chat-history.svelte";
 
   let {
@@ -58,7 +56,7 @@
           class="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground mr-0.5"
           showOnHover={!active}
         >
-          <MoreHorizontal />
+          <MoreHorizontalIcon />
           <span class="sr-only">More</span>
         </SidebarMenuAction>
       {/snippet}
@@ -67,7 +65,7 @@
     <DropdownMenuContent side="bottom" align="end">
       <DropdownMenuSub>
         <DropdownMenuSubTrigger class="cursor-pointer">
-          <Share2 />
+          <Share2Icon />
           <span>Share</span>
         </DropdownMenuSubTrigger>
         <DropdownMenuSubContent align="start">
@@ -78,11 +76,11 @@
             }}
           >
             <div class="flex flex-row items-center gap-2">
-              <Lock size={12} />
+              <LockIcon size={12} />
               <span>Private</span>
             </div>
             {#if chatFromHistory?.visibility === "private"}
-              <CircleCheck />
+              <CircleCheckIcon />
             {/if}
           </DropdownMenuItem>
           <DropdownMenuItem
@@ -92,11 +90,11 @@
             }}
           >
             <div class="flex flex-row items-center gap-2">
-              <Globe />
+              <GlobeIcon />
               <span>Public</span>
             </div>
             {#if chatFromHistory?.visibility === "public"}
-              <CircleCheck />
+              <CircleCheckIcon />
             {/if}
           </DropdownMenuItem>
         </DropdownMenuSubContent>
@@ -106,7 +104,7 @@
         class="text-destructive focus:bg-destructive/15 focus:text-destructive cursor-pointer dark:text-red-500"
         onclick={() => ondelete(chat.id)}
       >
-        <Trash2 />
+        <Trash2Icon />
         <span>Delete</span>
       </DropdownMenuItem>
     </DropdownMenuContent>

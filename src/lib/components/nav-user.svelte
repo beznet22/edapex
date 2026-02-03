@@ -6,13 +6,15 @@
 
   import { useSidebar } from "$lib/components/ui/sidebar/index.js";
   import type { AuthUser } from "$lib/types/auth-types";
-    import { clearLocalStore } from "$lib/utils";
+  import { clearLocalStore } from "$lib/utils";
   import BadgeCheckIcon from "@lucide/svelte/icons/badge-check";
   import BellIcon from "@lucide/svelte/icons/bell";
   import ChevronsUpDownIcon from "@lucide/svelte/icons/chevrons-up-down";
   import CreditCardIcon from "@lucide/svelte/icons/credit-card";
   import LogOutIcon from "@lucide/svelte/icons/log-out";
   import SparklesIcon from "@lucide/svelte/icons/sparkles";
+  import CircleHelpIcon from "@lucide/svelte/icons/circle-help";
+
   let { user }: { user?: AuthUser } = $props();
 
   const sidebar = useSidebar();
@@ -91,6 +93,10 @@
           <DropdownMenu.Item>
             <BellIcon />
             Notifications
+          </DropdownMenu.Item>
+          <DropdownMenu.Item>
+            <CircleHelpIcon />
+            Get Help
           </DropdownMenu.Item>
         </DropdownMenu.Group>
         <DropdownMenu.Separator />

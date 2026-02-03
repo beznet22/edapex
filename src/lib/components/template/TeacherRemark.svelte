@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { ResultOutput } from "$lib/schema/result-input";
+	import type { ResultOutput } from "$lib/schema/result-output";
 
 	interface Props {
 		remark: ResultOutput["remark"];
@@ -8,7 +8,7 @@
 	let { remark }: Props = $props();
 
 	// Get remark text or default message
-	const remarkText = $derived(remark?.remark || 'No comment');
+	const remarkText = $derived(remark?.remark || "No comment");
 </script>
 
 <div class="border-b grid grid-cols-5 px-1 py-1">
@@ -23,4 +23,3 @@
 		{remarkText}
 	</span>
 </div>
-

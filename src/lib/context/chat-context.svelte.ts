@@ -6,7 +6,7 @@ import type {
   AgentWorkflow,
   CreateDocumentPart,
   xUIMessage,
-  xUIMessagePart
+  xUIMessagePart,
 } from "$lib/types/chat-types";
 import { Chat } from "@ai-sdk/svelte";
 import { DefaultChatTransport, type ChatStatus } from "ai";
@@ -75,7 +75,7 @@ export class ChatContext {
   }
 
   get loading() {
-    return this.status === "submitted" || this.status === "streaming";
+    return this.status === "ready" ? false : true;
   }
 
   #prepareSendMessagesRequest = ({ messages }: { messages: xUIMessage[] }) => {
@@ -146,6 +146,17 @@ export class ChatContext {
         .findLast((p) => p.type === "data-createDocument")?.data;
       this.openedDocumentId = id;
     };
+  };
+
+  scrollToBottom = () => {
+    // implement smooth scroll to bottom
+    const container = document.querySelector(".conversation-container");
+    if (container) {
+      container.scrollTo({
+        top: container.scrollHeight,
+        behavior: "smooth",
+      });
+    }
   };
 
   setContext = () => {

@@ -1,0 +1,43 @@
+{
+  "config": {
+    "url": "https://cloudcode-pa.googleapis.com/v1internal:generateContent?alt=json",
+    "method": "POST",
+    "params": {
+      "alt": "json"
+    },
+    "headers": {},
+    "body": "{\"model\":\"gemini-1.5-pro\",\"project\":\"praxis-synthesizer-539xn\",\"request\":{\"systemInstruction\":{\"role\":\"user\",\"parts\":[{\"text\":\"\\n\\n            - you will generate a short title based on the first message a user begins a conversation with\\n            - ensure it is not more than 20 characters long\\n            - the title should be a summary of the user's message\\n            - do not use quotes or colons\"}]},\"contents\":[{\"role\":\"user\",\"parts\":[{\"text\":\"{\\\"parts\\\":[{\\\"type\\\":\\\"text\\\",\\\"text\\\":\\\"hello\\\"}],\\\"id\\\":\\\"BoPSVn9cq1WZKcCw\\\",\\\"role\\\":\\\"user\\\"}\"}]}],\"generationConfig\":{\"temperature\":0.7,\"maxOutputTokens\":8192}}}",
+    "responseType": "unknown",
+    "duplex": "half"
+  },
+  "response": {
+    "size": 0,
+    "data": {
+      "error": {
+        "code": 404,
+        "message": "Requested entity was not found.",
+        "errors": [
+          {
+            "message": "Requested entity was not found.",
+            "domain": "global",
+            "reason": "notFound"
+          }
+        ],
+        "status": "NOT_FOUND"
+      }
+    },
+    "config": {
+      "url": "https://cloudcode-pa.googleapis.com/v1internal:generateContent?alt=json",
+      "method": "POST",
+      "params": {
+        "alt": "json"
+      },
+      "headers": {},
+      "body": "{\"model\":\"gemini-1.5-pro\",\"project\":\"praxis-synthesizer-539xn\",\"request\":{\"systemInstruction\":{\"role\":\"user\",\"parts\":[{\"text\":\"\\n\\n            - you will generate a short title based on the first message a user begins a conversation with\\n            - ensure it is not more than 20 characters long\\n            - the title should be a summary of the user's message\\n            - do not use quotes or colons\"}]},\"contents\":[{\"role\":\"user\",\"parts\":[{\"text\":\"{\\\"parts\\\":[{\\\"type\\\":\\\"text\\\",\\\"text\\\":\\\"hello\\\"}],\\\"id\\\":\\\"BoPSVn9cq1WZKcCw\\\",\\\"role\\\":\\\"user\\\"}\"}]}],\"generationConfig\":{\"temperature\":0.7,\"maxOutputTokens\":8192}}}",
+      "responseType": "unknown",
+      "duplex": "half"
+    }
+  },
+  "code": 404,
+  "status": 404
+}
