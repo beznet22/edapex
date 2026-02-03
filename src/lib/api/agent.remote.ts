@@ -40,7 +40,7 @@ export const addToken = command(
       return { success: false, message: "User not authenticated or provider not specified" };
     }
 
-    const device_verifier = cookies.get(provider);
+    const device_verifier = cookies.get(`v_${provider}`);
     if (!device_verifier) {
       console.log("❌ No device verifier cookie found (expired)");
       return { success: false, message: "Device code expired" };
@@ -62,9 +62,11 @@ export const addToken = command(
 
     const result = await useAgent().use(provider).getToken(code, verifier);
     if ("status" in result && result.status === "pending") {
+      console.log(`[addToken] Token still pending for ${provider}`);
       return { ...result };
     }
 
+    console.log(`[addToken] Successfully added token for ${provider}`);
     return { success: true, status: "complete" };
   }
 );

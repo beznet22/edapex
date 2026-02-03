@@ -1,6 +1,5 @@
 <script lang="ts">
-  import type { ResultOutput } from "$lib/schema/result-input";
-
+  import type { ResultOutput } from "$lib/schema/result-output";
 
   interface Props {
     score: ResultOutput["score"];
@@ -10,13 +9,15 @@
   let { score, student }: Props = $props();
 
   // Check if student type is GRADERS
-  const isBasic = $derived(student.category === "MIDDLEBASIC" || student.category === "LOWERBASIC");
+  const isBasic = $derived(
+    student.category === "MIDDLEBASIC" || student.category === "LOWERBASIC",
+  );
 
   // Grading system text based on student type
   const gradingSystemText = $derived(
     isBasic
       ? "A(94-100) B(86-93) C(77-85) D(70-76) E(0-69)"
-      : "Emerging(0-80) Expected(81-90) Exceeding(91-100)"
+      : "Emerging(0-80) Expected(81-90) Exceeding(91-100)",
   );
 </script>
 

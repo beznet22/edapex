@@ -4,15 +4,13 @@
   import { Button } from "$lib/components/ui/button";
   import { Spinner } from "$lib/components/ui/spinner/index.js";
   import { usePreview } from "$lib/context/fetch-preview.svelte";
-  import {
-    ChevronLeft,
-    ChevronRight,
-    Download,
-    X,
-    Maximize2,
-    ZoomIn,
-    ZoomOut,
-  } from "@lucide/svelte";
+  import ChevronLeftIcon from "@lucide/svelte/icons/chevron-left";
+  import ChevronRightIcon from "@lucide/svelte/icons/chevron-right";
+  import DownloadIcon from "@lucide/svelte/icons/download";
+  import XIcon from "@lucide/svelte/icons/x";
+  import Maximize2Icon from "@lucide/svelte/icons/maximize-2";
+  import ZoomInIcon from "@lucide/svelte/icons/zoom-in";
+  import ZoomOutIcon from "@lucide/svelte/icons/zoom-out";
   import { fade, fly, scale } from "svelte/transition";
   import { cn } from "$lib/utils/shadcn";
   import { page } from "$app/state";
@@ -147,7 +145,7 @@
         {:else}
           <div class="text-center p-12" in:fade>
             <div class="mb-4 inline-flex p-4 rounded-full bg-muted">
-              <Maximize2 class="h-8 w-8 text-muted-foreground opacity-50" />
+              <Maximize2Icon class="h-8 w-8 text-muted-foreground opacity-50" />
             </div>
             <p class="text-base font-medium text-muted-foreground">
               No preview available for this document
@@ -173,7 +171,7 @@
                 onclick={() => ctx.prev()}
                 class="rounded-xl h-10 w-10 hover:bg-white/10 disabled:opacity-30"
               >
-                <ChevronLeft class="h-5 w-5" />
+                <ChevronLeftIcon class="h-5 w-5" />
               </Button>
 
               <div class="flex items-center justify-center min-w-16 px-2">
@@ -191,7 +189,7 @@
                 onclick={() => ctx.next()}
                 class="rounded-xl h-10 w-10 hover:bg-white/10 disabled:opacity-30"
               >
-                <ChevronRight class="h-5 w-5" />
+                <ChevronRightIcon class="h-5 w-5" />
               </Button>
             </div>
 
@@ -207,9 +205,9 @@
                 title={isZoomed ? "Zoom Out" : "Zoom In"}
               >
                 {#if isZoomed}
-                  <ZoomOut class="h-5 w-5" />
+                  <ZoomOutIcon class="h-5 w-5" />
                 {:else}
-                  <ZoomIn class="h-5 w-5" />
+                  <ZoomInIcon class="h-5 w-5" />
                 {/if}
               </Button>
 
@@ -224,7 +222,7 @@
                     size="sm"
                     class="rounded-xl gap-2 font-medium bg-primary hover:scale-[1.02] transition-transform active:scale-[0.98]"
                   >
-                    <Download class="h-4 w-4" />
+                    <DownloadIcon class="h-4 w-4" />
                     <span class="hidden sm:inline">Download</span>
                   </Button>
                 </a>

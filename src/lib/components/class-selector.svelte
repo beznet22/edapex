@@ -10,7 +10,8 @@
     DropdownMenuItem,
     DropdownMenuTrigger,
   } from "./ui/dropdown-menu";
-  import { CircleCheck, ChevronDown } from "@lucide/svelte";
+  import CircleCheckIcon from "@lucide/svelte/icons/circle-check";
+  import ChevronDownIcon from "@lucide/svelte/icons/chevron-down";
   import type { ClassSection } from "$lib/types/result-types";
   import type { ClassValue } from "svelte/elements";
   import { replaceState } from "$app/navigation";
@@ -82,7 +83,7 @@
             {`${chat.selectedClass?.className} (${chat.selectedClass?.sectionName})`}
           {/if}
         </div>
-        <ChevronDown class="size-3.5 sm:size-4 opacity-50" />
+        <ChevronDownIcon class="size-3.5 sm:size-4 opacity-50" />
       </Button>
     {/snippet}
   </DropdownMenuTrigger>
@@ -100,7 +101,7 @@
         <div
           class="text-foreground dark:text-foreground opacity-0 group-data-[active=true]/item:opacity-100"
         >
-          <CircleCheck />
+          <CircleCheckIcon />
         </div>
       </DropdownMenuItem>
     {/each}

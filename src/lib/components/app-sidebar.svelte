@@ -2,14 +2,9 @@
   // sample data
   const data = [
     {
-      title: "AI Providers",
+      title: "Integrations",
       url: "#settings",
       icon: SettingsIcon,
-    },
-    {
-      title: "Get Help",
-      url: "#",
-      icon: CircleQuestionMark,
     },
   ];
 </script>
@@ -23,7 +18,10 @@
   import NavSecondary from "./nav-secondary.svelte";
   import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
   import { SidebarHistory } from "./sidebar-history";
-  import { SettingsIcon, CircleQuestionMark, CommandIcon, Plus } from "@lucide/svelte";
+  import SettingsIcon from "@lucide/svelte/icons/settings";
+  import CircleQuestionMark from "@lucide/svelte/icons/circle-help";
+  import CommandIcon from "@lucide/svelte/icons/command";
+  import PlusIcon from "@lucide/svelte/icons/plus";
   import { Button } from "./ui/button";
   import { goto } from "$app/navigation";
   let {
@@ -67,7 +65,7 @@
                   goto("/", { invalidateAll: true });
                 }}
               >
-                <Plus />
+                <PlusIcon />
               </Button>
             {/snippet}
           </TooltipTrigger>
@@ -83,6 +81,5 @@
     <NavSecondary items={data} class="mt-auto" />
     <NavUser {user} />
   </Sidebar.Footer>
-  <Sidebar.Rail />
   <Sidebar.Rail />
 </Sidebar.Root>

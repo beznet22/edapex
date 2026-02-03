@@ -21,7 +21,6 @@ export const createdDocumentTool = (
     throw new Error("Writer and model are required");
   }
   return tool({
-    name: "createDocument",
     description: [
       "Create or draft a well-structured long-form document in Markdown, returning a concise title and the full content.",
       "Use this tool whenever the user asks to write, draft, create, generate, outline, expand, or turn content into a document or artifact (e.g. report cards, notes, briefs, PRDs, specs, proposals, plans, emails, blog posts, articles, summaries).",
@@ -29,7 +28,7 @@ export const createdDocumentTool = (
     ].join(" "),
     inputSchema: z.object({ title: z.string() }),
     outputSchema: z.string(),
-    execute: async (input, { messages }) => {
+    execute: async (input: { title: string }, { messages }) => {
       const documentId = generateId();
       const { textStream } = streamText({
         model,

@@ -2,7 +2,8 @@
   import { Button } from "$lib/components/ui/button/index.js";
   import { Separator } from "$lib/components/ui/separator/index.js";
   import * as Sidebar from "$lib/components/ui/sidebar/index.js";
-  import { ExternalLink, PanelLeft, Plus } from "@lucide/svelte";
+  import PanelLeftIcon from "@lucide/svelte/icons/panel-left";
+  import PlusIcon from "@lucide/svelte/icons/plus";
   import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
   import { innerWidth } from "svelte/reactivity/window";
   import { useSidebar } from "$lib/components/ui/sidebar/index.js";
@@ -12,7 +13,11 @@
   import type { DBChat } from "$lib/server/db/schema";
   import * as Breadcrumb from "$lib/components/ui/breadcrumb/index.js";
 
-  let { user, chat, readonly = false }: { user?: AuthUser; chat?: DBChat; readonly?: boolean } = $props();
+  let {
+    user,
+    chat,
+    readonly = false,
+  }: { user?: AuthUser; chat?: DBChat; readonly?: boolean } = $props();
 
   const sidebar = useSidebar();
 </script>
@@ -30,7 +35,7 @@
             variant="outline"
             class="md:h-fit md:px-2"
           >
-            <PanelLeft />
+            <PanelLeftIcon />
           </Button>
         {/snippet}
       </TooltipTrigger>
@@ -48,7 +53,7 @@
                 goto("/", { invalidateAll: true });
               }}
             >
-              <Plus />
+              <PlusIcon />
               <span class="md:sr-only">New Chat</span>
             </Button>
           {/snippet}

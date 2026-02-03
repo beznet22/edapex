@@ -12,7 +12,8 @@ import type { ClassSection } from "$lib/types/result-types.js";
 import { defaultPrompt } from "../prompts/default.js";
 import { GoogleProvider, QwenProvider } from "../provider/index.js";
 import { resultRepo } from "../repository/result.repo.js";
-import { agentWorkflows } from "../workflow/index.js";
+import { agentWorkflows } from "../agents/index.js";
+import { getProviderType } from "../provider/router.js";
 
 export class AgentService {
   private providers: Map<CredentialType, OAuth2Client> = new Map();
@@ -29,6 +30,26 @@ export class AgentService {
     return this.providers.get(type)!;
   }
 
+  getProviderForAgent(agentId?: string): OAuth2Client {
+    const { cookies } = getRequestEvent();
+    const preferredType = getProviderType(agentId);
+
+    // If preferred is connected, use it
+    if (cookies.get(preferredType)) {
+      return this.use(preferredType);
+    }
+
+    // Try others
+    for (const type of Object.values(CredentialType)) {
+      if (cookies.get(type)) {
+        return this.use(type);
+      }
+    }
+
+    // Fallback to preferred (will likely throw error downstream but that's expected if nothing is connected)
+    return this.use(preferredType);
+  }
+
   static initChatModels(): string {
     const { cookies } = getRequestEvent();
     let modelId = cookies.get("selected-model");
@@ -43,26 +64,26 @@ export class AgentService {
     return modelId;
   }
 
-  static async getSystemPrompt(user: AuthUser | null, agentId?: string, selectedClass?: ClassSection): Promise<string> {
+  static async getInstructions(user: AuthUser | null, agentId?: string, selectedClass?: ClassSection): Promise<string> {
     if (!agentId || !user?.designation) return defaultPrompt();
     const designation = user.designation;
-    let systemPrompt = agentWorkflows.find((work) => work.id === agentId)?.assistants.find((assistant: Assistant) => assistant.designation === designation)?.systemPrompt;
+    let instructions = agentWorkflows.find((work) => work.id === agentId)?.assistants.find((assistant: Assistant) => assistant.designation === designation)?.instructions;
 
-    if (!systemPrompt) return defaultPrompt();
+    if (!instructions) return defaultPrompt();
     const examTypes = await resultRepo.getExamTypes();
-    systemPrompt += `\n\nEXAM TYPES: ${examTypes
+    instructions += `\n\nEXAM TYPES: ${examTypes
       .map((e) => `- ${e.title} (Exam Type ID: ${e.id})`)
       .join("\n")}`;
-    systemPrompt += `\n\nUSER ID: ${user.id}`;
-    systemPrompt += `\n\nSTAFF ID: ${user.staffId}`;
+    instructions += `\n\nUSER ID: ${user.id}`;
+    instructions += `\n\nSTAFF ID: ${user.staffId}`;
     if (selectedClass) {
-      systemPrompt += `\n\nCLASS ID: ${selectedClass.classId}`;
-      systemPrompt += `\n\nSECTION ID: ${selectedClass.sectionId}`;
-      systemPrompt += `\n\nCLASS NAME: ${selectedClass.className}`;
-      systemPrompt += `\n\nSECTION NAME: ${selectedClass.sectionName}`;
+      instructions += `\n\nCLASS ID: ${selectedClass.classId}`;
+      instructions += `\n\nSECTION ID: ${selectedClass.sectionId}`;
+      instructions += `\n\nCLASS NAME: ${selectedClass.className}`;
+      instructions += `\n\nSECTION NAME: ${selectedClass.sectionName}`;
     }
 
-    return systemPrompt;
+    return instructions;
   }
 
   static getTools(user: AuthUser | null, agentId?: string): typeof teacherTools | typeof coordinatorTools | typeof defaultTools {
@@ -78,7 +99,7 @@ export class AgentService {
       // Filter and strip systemPromptto prevent leaking to browser
       const assistants = work.assistants
         .filter((assistant): assistant is Assistant => assistant.designation === designation)
-        .map(({ systemPrompt, tools, ...safeTask }) => safeTask);
+        .map(({ instructions, tools, ...safeTask }) => safeTask);
 
       return {
         ...work,

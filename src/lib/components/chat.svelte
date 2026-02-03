@@ -1,8 +1,8 @@
 <script lang="ts">
   import {
-      Conversation,
-      ConversationContent,
-      ConversationScrollButton,
+    Conversation,
+    ConversationContent,
+    ConversationScrollButton,
   } from "$lib/components/ai-elements/conversation";
   import { useChat } from "$lib/context/chat-context.svelte";
   import { UserContext } from "$lib/context/user-context.svelte";
@@ -85,7 +85,7 @@
                         <ToolMessage {part} />
                       </div>
                     {/if}
-                    <!-- Rrender text parts -->
+                    <!-- Render text parts -->
                     {#if part.type === "text"}
                       {#if message.role === "assistant"}
                         <Markdown

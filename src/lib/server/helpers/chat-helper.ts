@@ -5,6 +5,7 @@ import { CredentialType } from "$lib/schema/chat-schema";
 import { resultInputSchema } from "$lib/schema/result-input";
 import { extractPrompt } from "../prompts/extract";
 import { useAgent } from "../service/agent.service";
+import { writeFileSync } from "fs";
 
 export function convertToUIMessages(messages: Array<DBMessage>): Array<xUIMessage> {
   return messages.map((message) => ({
@@ -36,7 +37,7 @@ export async function generateTitle({
 
     return result.text;
   } catch (error) {
-    // console.error(error);
+    writeFileSync("error.json", JSON.stringify(error, null, 2));
     console.warn("error generating title from user message, using default title");
     return "New Chat";
   }
@@ -65,7 +66,7 @@ export const generateContent = async (file: Blob, mapString?: string) => {
       ],
     });
 
-    const provider = await useAgent().use(CredentialType.QWEN_CODE).geModelProvider();
+    const provider = await useAgent().use(CredentialType.QWEN_CODE).getModelProvider();
     if (!provider) return { success: false, message: "No provider found" };
 
     const result = await generateText({

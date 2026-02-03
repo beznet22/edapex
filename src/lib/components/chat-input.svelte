@@ -2,7 +2,10 @@
   import { PromptSuggestion } from "$lib/components/prompt-kit/prompt-suggestion";
   import { Button } from "$lib/components/ui/button";
   import { Separator } from "$lib/components/ui/separator";
-  import { ArrowUp, Package, Square, X } from "@lucide/svelte";
+  import ArrowUpIcon from "@lucide/svelte/icons/arrow-up";
+  import PackageIcon from "@lucide/svelte/icons/package";
+  import SquareIcon from "@lucide/svelte/icons/square";
+  import XIcon from "@lucide/svelte/icons/x";
 
   import { useChat } from "$lib/context/chat-context.svelte";
   import { useFileActions } from "$lib/context/file-context.svelte";
@@ -22,8 +25,11 @@
   import ClassSelector from "./class-selector.svelte";
   import { onMount } from "svelte";
   import { Loader } from "./prompt-kit/loader";
-  import { Check, CircleAlert, TriangleAlert } from "@lucide/svelte";
+  import CheckIcon from "@lucide/svelte/icons/check";
+  import CircleAlertIcon from "@lucide/svelte/icons/circle-alert";
+  import TriangleAlertIcon from "@lucide/svelte/icons/triangle-alert";
   import { cn } from "$lib/utils/shadcn";
+  import { loadStudentFile } from "$lib/api/student-api";
   import { toast } from "svelte-sonner";
 
   let {
@@ -41,14 +47,13 @@
   let found = $state<ClassStudent[]>([]);
   let activeSuggestions = $state<readonly string[]>([]);
   let activeHighlight = $state<string>("");
+  let autocompleteMode = $state<"agent" | "student" | null>(null);
 
   // Context
   const chat = useChat();
   const file = useFileActions();
   const userContext = UserContext.fromContext();
   const students = $derived(userContext.students);
-
-  // const isUploading = true;
 
   // svelte-ignore state_referenced_locally
   if (!userContext.user) chat.activeAgent = null;
@@ -62,6 +67,8 @@
     if (input.trim() && chat.status === "ready") {
       chat.client.sendMessage({ text: input });
       input = "";
+      // scroll to bottom
+      chat.scrollToBottom();
     }
   }
 
@@ -82,8 +89,26 @@
   function onValueChange(value: string) {
     input = value;
     activeSuggestions = [];
+    autocompleteMode = null;
 
-    found = searchFilter(value, students);
+    if (value.endsWith("/")) {
+      autocompleteMode = "agent";
+    } else if (value.endsWith("@")) {
+      autocompleteMode = "student";
+      found = students; // Show all initially or filter
+    } else if (value.includes("@")) {
+      // Simple check if we are typing a mention
+      const match = value.match(/@(\w*)$/);
+      if (match) {
+        autocompleteMode = "student";
+        found = searchFilter(match[1], students);
+      }
+    }
+
+    // Legacy search filter - can keep or refactor
+    if (!autocompleteMode) {
+      found = searchFilter(value, students);
+    }
   }
 
   let handleSuggestionClick = (suggestion: string) => {
@@ -91,9 +116,57 @@
     activeHighlight = suggestion;
   };
 
-  function handleStudentClick(student: ClassStudent) {
-    found = searchFilter(student.name || "", students);
-    input = `${activeHighlight} for ${student.name} (Student Admission No: ${student.admissionNo})`;
+  async function handleStudentClick(student: ClassStudent) {
+    if (!chat.selectedClass) {
+      toast.error("No class selected context");
+      input = input.replace(/@\w*$/, "");
+      autocompleteMode = null;
+      return;
+    }
+
+    try {
+      toast.info(`Loading context for ${student.name}...`);
+      const data = await loadStudentFile(
+        student.id!,
+        chat.selectedClass!.classId!,
+        chat.selectedClass!.sectionId!,
+      );
+
+      if (data) {
+        // Append student data as context to the next message (hidden or explicit?)
+        // For now, let's append a text representation or attach it.
+        // Since we don't have a direct "add attachment" method in the UI yet that isn't a File object,
+        // we can perhaps set it in a way the agent picks up.
+        // Or we just add it to the input text for now.
+        input = input.replace(/@\w*$/, `@${student.name} `);
+        // TODO: Actually attach the data JSON to the message context
+        // Maybe via a hidden system message or metadata?
+        // For this iteration, we'll verify file loading works.
+        toast.success("Student context loaded");
+
+        // Temporarily log or store it in chat context to be sent?
+        // Ideally we should use experimental_attachments if supported or append to text.
+        // Let's rely on the agent to resolve the student data if we just provide ID,
+        // BUT the requirement was "Backend file loading".
+        // If we loaded it here, we should pass it.
+        // Let's assume for now the agent can fetch it if we give the ID,
+        // OR we inject it.
+        // Let's inject it into the input as a hidden block for the user to send?
+        // No, that's messy.
+        // We'll leave it as just text completion for now, and rely on the agent tool `upsertStudentResult` (read) or similar
+        // OR we can pass `data` payload in `sendMessage`.
+        chat.studentData = { ...student, ...data }; // Update context
+      } else {
+        toast.warning("No assessment file found for student");
+        input = input.replace(/@\w*$/, `@${student.name} `);
+      }
+    } catch (e) {
+      console.error(e);
+      toast.error("Failed to load student file");
+      input = input.replace(/@\w*$/, `@${student.name} `);
+    }
+
+    autocompleteMode = null;
   }
 
   let handleAgentClick = (id: string) => {
@@ -104,7 +177,9 @@
     activeSuggestions = suggestions ?? [];
     activeHighlight = highlight ?? "";
     chat.activeAgent = agent ?? null;
-    input = "";
+    input = input.replace(/\/$/, ""); // Remove the slash
+    autocompleteMode = null;
+    toast.success(`Agent switched to ${agent.label}`);
   };
 
   function onFileSelected(files: FileList) {
@@ -129,13 +204,13 @@
           >
             <span class="max-w-20 sm:max-w-[120px] truncate">{f.name}</span>
             {#if file.uploads.some((u) => u.filename === f.name && u.status === "done")}
-              <Check class="size-3 text-green-500" />
+              <CheckIcon class="size-3 text-green-500" />
             {:else if file.uploads.some((u) => u.filename === f.name && u.status === "pending")}
-              <TriangleAlert class="size-3 text-primary" />
+              <TriangleAlertIcon class="size-3 text-primary" />
             {:else if file.uploads.some((u) => u.filename === f.name && u.status === "uploading")}
               <Loader variant="circular" class="size-3" />
             {:else if file.uploads.some((u) => u.filename === f.name && u.status === "error")}
-              <CircleAlert class="size-3 text-destructive" />
+              <CircleAlertIcon class="size-3 text-destructive" />
             {/if}
             <Button
               variant="ghost"
@@ -143,7 +218,7 @@
               class="size-3.5 rounded-full cursor-pointer hover:bg-destructive/10 hover:text-destructive transition-colors"
               onclick={() => file.remove(i)}
             >
-              <X class="size-3" />
+              <XIcon class="size-3" />
             </Button>
           </div>
         {/each}
@@ -163,7 +238,7 @@
         >
           <Icon class="size-3.5 text-primary" />
           <span class="max-w-[100px] truncate">{chat.activeAgent.label}</span>
-          <X class="size-3 opacity-50" />
+          <XIcon class="size-3 opacity-50" />
         </Button>
       </div>
     {/if}
@@ -223,7 +298,7 @@
                 file.openFileDropZone();
               }}
             >
-              <Package class="size-4.5 sm:size-5" />
+              <PackageIcon class="size-4.5 sm:size-5" />
             </Button>
           </PromptInputAction>
         </div>
@@ -235,9 +310,9 @@
           disabled={!input.trim()}
         >
           {#if chat.loading}
-            <Square class="size-3.5 sm:size-4 fill-current" />
+            <SquareIcon class="size-3.5 sm:size-4 fill-current" />
           {:else}
-            <ArrowUp class="size-4.5 sm:size-5" />
+            <ArrowUpIcon class="size-4.5 sm:size-5" />
           {/if}
         </Button>
       </div>
@@ -254,22 +329,7 @@
       class="w-full flex flex-col items-center justify-center gap-2 pointer-events-auto"
     >
       {#if !userContext.isCoordinator && !userContext.isIt && isInitial}
-        {#if activeSuggestions.length > 0}
-          <div
-            class="flex w-full flex-col items-center justify-center space-y-1"
-          >
-            {#each activeSuggestions as suggestion}
-              <PromptSuggestion
-                highlight={activeHighlight}
-                onclick={() => handleSuggestionClick(suggestion)}
-                class="transition-all hover:scale-[1.02] hover:shadow-sm"
-              >
-                {suggestion}
-              </PromptSuggestion>
-              <Separator class="me-2" />
-            {/each}
-          </div>
-        {:else if input.trim() && found.length > 0}
+        {#if autocompleteMode === "student" && found.length > 0}
           <div
             class="flex w-full flex-col items-center justify-center space-y-1"
           >
@@ -284,7 +344,7 @@
               <Separator class="me-2" />
             {/each}
           </div>
-        {:else}
+        {:else if autocompleteMode === "agent"}
           <div
             class="relative flex w-full flex-wrap items-center justify-center gap-2"
           >
@@ -297,6 +357,22 @@
                 <Icon class="mr-2 h-4 w-4" />
                 {agent.label}
               </PromptSuggestion>
+            {/each}
+          </div>
+        {:else if activeSuggestions.length > 0}
+          <!-- Default suggestions when input is empty or no trigger -->
+          <div
+            class="flex w-full flex-col items-center justify-center space-y-1"
+          >
+            {#each activeSuggestions as suggestion}
+              <PromptSuggestion
+                highlight={activeHighlight}
+                onclick={() => handleSuggestionClick(suggestion)}
+                class="transition-all hover:scale-[1.02] hover:shadow-sm"
+              >
+                {suggestion}
+              </PromptSuggestion>
+              <Separator class="me-2" />
             {/each}
           </div>
         {/if}

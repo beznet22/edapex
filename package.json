@@ -19,8 +19,7 @@
 		"db:studio": "drizzle-kit studio"
 	},
 	"devDependencies": {
-		"@ai-sdk/openai-compatible": "^1.0.28",
-		"@ai-sdk/svelte": "^3.0.106",
+		"@ai-sdk/provider-utils": "^4.0.9",
 		"@internationalized/date": "^3.10.0",
 		"@lucia-auth/adapter-drizzle": "^1.1.0",
 		"@lucide/svelte": "^0.561.0",
@@ -35,7 +34,6 @@
 		"@tailwindcss/vite": "^4.1.17",
 		"@types/node": "^22",
 		"@types/nodemailer": "^7.0.4",
-		"ai": "^5.0.106",
 		"bcrypt-ts": "^7.1.0",
 		"bits-ui": "^2.14.4",
 		"clsx": "^2.1.1",
@@ -64,8 +62,12 @@
 		"zod": "^4.1.13"
 	},
 	"dependencies": {
+		"@ai-sdk/openai-compatible": "^2.0.19",
+		"@ai-sdk/provider": "3.0.5",
+		"@ai-sdk/svelte": "^4.0.50",
 		"@shikijs/langs": "^3.19.0",
 		"@shikijs/themes": "^3.19.0",
+		"ai": "^6.0.50",
 		"dotenv": "^17.2.3",
 		"isomorphic-dompurify": "^2.34.0",
 		"nodemailer": "^7.0.12",

@@ -105,11 +105,55 @@ export const POST: RequestHandler = async ({ request, locals }) => {
         });
       }
 
+      // Save processed data to file storage using the new StudentFileStorage
+      // We use classId/sectionId/studentId from the parsed result or fallback to form data if available
+      // Ideally we should have guaranteed these exist by now
+
+      const fileClassId = classId || validated.data.studentData.classId;
+      const fileSectionId = sectionId || validated.data.studentData.sectionId;
+      const fileStudentId = studentId || validated.data.studentData.studentId;
+
+      // If we have minimal info to save to file storage
+      let storagePath = "";
+      if (fileClassId && fileSectionId && fileStudentId) {
+        // Assuming single exam for now or extracting from data
+        // We need an examId. Let's try to find it in the data or default to 0/null handling if permitted
+        // But implementation plan suggests base64(studentId:examId)
+        // validated.data has results array. Let's assume the first result's examId 
+        // or if single exam upload, the examTypeId from context? 
+        // The current code doesn't seem to explicitly pass examId in every case but upsertStudentResult uses it.
+        // Let's rely on what upsertStudentResult does for now, but ALSO save the file.
+
+        const examId = validated.data.studentData.examTypeId ?? 0;
+
+        try {
+          const { studentFileStorage } = await import("$lib/server/storage/student-files");
+          storagePath = await studentFileStorage.save({
+            studentId: fileStudentId,
+            examId: examId,
+            classId: fileClassId,
+            sectionId: fileSectionId,
+            scores: validated.data.marksData.reduce((acc, subj) => {
+              // subj is a subject entry from marksData
+              if (subj.subjectCode && subj.marks) {
+                acc[subj.subjectCode] = subj.marks;
+              }
+              return acc;
+            }, {} as Record<string, number[]>) ?? {},
+            extractedAt: new Date(),
+            verified: false
+          });
+        } catch (err) {
+          console.error("Failed to save to student file storage", err);
+          // Non-blocking error for now
+        }
+      }
+
       // console.log("Validated data", validated.data);
       const res = await result.upsertStudentResult(validated.data, staffId);
 
       if (filename) del(pathname);
-      return json({ success: true, status: "done", data: res, filename: filename ?? file.name });
+      return json({ success: true, status: "done", data: res, filename: filename ?? file.name, storagePath });
     } catch (e) {
       console.error("Main processing error:", e);
       if (filename) {

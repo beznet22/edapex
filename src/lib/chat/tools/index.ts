@@ -1,54 +1,42 @@
-import { type LanguageModel, type UIMessageStreamWriter } from "ai";
-import {
+import { upsertStudentResult,
   getClassStudentList,
   upsertAttendance,
-  upsertStudentRatings,
-  upsertStudentResult,
   upsertTeacherRemark,
-} from "./result.tool";
-import {
+  upsertStudentRatings } from "./result.tool";
+
+import { getStudentList,
+  getStudentRegistrationOptions,
+  validateClassResults,
+  sendStudentResult,
+  upsertMarkStore,
+  updateExamTitle,
   createStudent,
+  assignClassSection,
+  searchClassSection,
+  changeStudentName,
+  getAssessmentMapping } from "./coordinator.tool";
+
+export const teacherTools = {
+  upsertStudentResult,
+  getClassStudentList,
+  upsertAttendance,
+  upsertTeacherRemark,
+  upsertStudentRatings,
+};
+
+export const defaultTools = {};
+
+export const coordinatorTools = {
   getStudentList,
   getStudentRegistrationOptions,
-  sendClassResults,
-  sendStudentResult,
-  updateExamTitle,
-  upsertMarkStore,
   validateClassResults,
+  sendStudentResult,
+  upsertMarkStore,
+  updateExamTitle,
+  createStudent,
   assignClassSection,
   searchClassSection,
   changeStudentName,
   getAssessmentMapping,
-} from "./coordinator.tool";
-
-export const teacherTools = (writer: UIMessageStreamWriter, model: LanguageModel) => {
-  return {
-    upsertStudentResult,
-    getClassStudentList,
-    upsertAttendance,
-    upsertTeacherRemark,
-    upsertStudentRatings,
-  };
-};
-
-export const defaultTools = (writer: UIMessageStreamWriter, model: LanguageModel) => {
-  return {};
-};
-
-export const coordinatorTools = (writer: UIMessageStreamWriter, model: LanguageModel) => {
-  return {
-    getStudentList,
-    getStudentRegistrationOptions,
-    validateClassResults,
-    sendStudentResult,
-    upsertMarkStore,
-    updateExamTitle,
-    createStudent,
-    assignClassSection,
-    searchClassSection,
-    changeStudentName,
-    getAssessmentMapping,
-    upsertTeacherRemark,
-
-  };
+  upsertTeacherRemark,
 };
