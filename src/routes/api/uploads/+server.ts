@@ -1,15 +1,13 @@
-import { STATIC_DIR, UPLOADS_DIR } from "$lib/constants";
+import { STATIC_DIR, EXTRACTED_DIR } from "$lib/constants";
 import { fileSchema } from "$lib/schema/chat-schema";
-import { resultInputSchema } from "$lib/schema/result-input";
-import { generateContent } from "$lib/server/helpers/chat-helper";
 import { resultRepo } from "$lib/server/repository/result.repo";
 import { staffRepo } from "$lib/server/repository/staff.repo";
 import { studentRepo } from "$lib/server/repository/student.repo";
-import { result } from "$lib/server/service/result.service";
-import { del, get, put } from "$lib/utils/fs-blob";
+import { assessment } from "$lib/server/service/assessment.service";
+import { studentFileStorage } from "$lib/server/storage/student-files";
 import type { RequestHandler } from "@sveltejs/kit";
 import { error, json } from "@sveltejs/kit";
-import { mkdirSync, rmdirSync, writeFileSync } from "fs";
+import { existsSync, mkdirSync, rmdirSync, writeFileSync, unlinkSync } from "fs";
 import { createHash } from "crypto";
 import { join } from "path";
 
@@ -18,18 +16,28 @@ export const POST: RequestHandler = async ({ request, locals }) => {
   if (!user || !session) error(401, "Unauthorized");
   if (request.body === null) error(400, "Empty file received");
 
+  let file: any = null;
+  let filename: string | null = null;
+  let token = "";
+  let className = "";
+  let sectionName = "";
+  let fullName: string | null = null;
+
   try {
     const formData = await request.formData();
-    let file = formData.get("file") as File;
-    const filename = formData.get("filename") as string;
-    const classId = formData.get("classId") as number | null;
-    const sectionId = formData.get("sectionId") as number | null;
-    const className = formData.get("className") as string;
-    const sectionName = formData.get("sectionName") as string;
+    file = formData.get("file") as File;
+    filename = formData.get("filename") as string;
+    const classId = formData.get("classId") ? Number(formData.get("classId")) : null;
+    const sectionId = formData.get("sectionId") ? Number(formData.get("sectionId")) : null;
+    className = formData.get("className") as string;
+    sectionName = formData.get("sectionName") as string;
     const studentId = formData.get("studentId") ? Number(formData.get("studentId")) : null;
-    const fullName = formData.get("studentName") as string | null;
+    fullName = formData.get("studentName") as string | null;
     const admissionNo = formData.get("admissionNo") ? Number(formData.get("admissionNo")) : null;
     const isStudentPhoto = formData.get("isStudentPhoto") === "true";
+    const fileId = formData.get("fileId") as string | null;
+
+    if (!file && !filename) throw new Error("No file or filename provided");
 
     if (isStudentPhoto) {
       if (!studentId) throw new Error("Student ID is required for photo upload");
@@ -37,8 +45,8 @@ export const POST: RequestHandler = async ({ request, locals }) => {
       const buffer = Buffer.from(buff);
       const hash = createHash("md5").update(buffer).digest("hex");
       const ext = file.name.split(".").pop();
-      const filename = `${hash}.${ext}`;
-      const relativePath = `public/uploads/student/${filename}`;
+      const photoFilename = `${hash}.${ext}`;
+      const relativePath = `public/uploads/student/${photoFilename}`;
       const fullPath = join(STATIC_DIR, relativePath);
 
       const dir = join(STATIC_DIR, "public/uploads/student");
@@ -46,26 +54,32 @@ export const POST: RequestHandler = async ({ request, locals }) => {
       writeFileSync(fullPath, buffer);
 
       await studentRepo.updateStudentPhoto(studentId, relativePath);
-      return json({ success: true, status: "done", filename });
+      return json({ success: true, status: "done", filename: photoFilename });
     }
 
     let staffId: number = user.staffId || 1;
-    let token = "";
     if (classId && sectionId && user.designation === "coordinator") {
       const staff = await staffRepo.getStaffByClassSection({ classId, sectionId });
       if (!staff.teacherId) throw new Error("Class not assigned to any teacher");
       staffId = staff.teacherId;
       token = `${className}(${sectionName})`.toLowerCase().replaceAll(" ", "_");
     } else {
-      const { className, sectionName } = await resultRepo.getAssignedClassSection(staffId);
-      if (!className || !sectionName) throw new Error("Class not assigned to any section");
-      token = `${className}(${sectionName})`.toLowerCase().replaceAll(" ", "_");
+      const classSection = await resultRepo.getAssignedClassSection(staffId);
+      if (!classSection?.className || !classSection?.sectionName) throw new Error("Class not assigned to any section");
+      token = `${classSection.className}(${classSection.sectionName})`.toLowerCase().replaceAll(" ", "_");
     }
 
-    let pathname = `${token}/${filename ?? file.name}`;
     if (filename) {
-      const { buffer } = await get(pathname);
-      file = new Blob([new Uint8Array(buffer)], { type: "image/jpeg" }) as File;
+      try {
+        const buffer = await studentFileStorage.getImage(fileId || filename);
+        if (buffer) {
+          file = new Blob([new Uint8Array(buffer)], { type: "image/jpeg" });
+        } else {
+          throw new Error("File not found in storage");
+        }
+      } catch (err) {
+        throw err;
+      }
     }
 
     const validatedFile = fileSchema.safeParse(file);
@@ -74,113 +88,55 @@ export const POST: RequestHandler = async ({ request, locals }) => {
       throw new Error(errorMessage);
     }
 
-    try {
-      const mappingData = await result.getMappingData(staffId);
-      // console.log(mappingData)
-      if (mappingData.subjects.length === 0) throw new Error("You are not assigned to any subjects");
-      mappingData.studentData = {
-        studentId,
-        admissionNo,
-        fullName,
-      }
-      const mapString = JSON.stringify(mappingData);
-      const { success, content, message } = await generateContent(validatedFile.data, mapString);
-      if (!content || !success) return json({ success: false, status: "error", error: message });
+    if (!classId || !sectionId) throw new Error("Missing class or section information");
 
-      const parsedResult = JSON.parse(content.trim());
-      // Add student data if provided (from drop-zone upload)
-      if (studentId) parsedResult.studentData.studentId = studentId;
-      if (admissionNo) parsedResult.studentData.admissionNo = admissionNo;
-      if (fullName) parsedResult.studentData.fullName = fullName;
-      // console.log("Parsed result", parsedResult);
-      const validated = await resultInputSchema.safeParseAsync(parsedResult);
-      if (!validated.success) {
-        const error = validated.error.issues.filter((issue) => issue.code === "custom");
-        writeFileSync(process.cwd() + "/static/extracted/parsed.json", JSON.stringify(parsedResult));
-        console.log("Failed to upload file", validated.error.issues);
-        return json({
-          success: false,
-          status: "error",
-          error: error.map((issue) => issue.message).join("\n"),
-        });
-      }
+    const extractionResult = await assessment.runExtraction({
+      file,
+      classId,
+      sectionId,
+      studentId: studentId ?? undefined,
+      fullName: fullName || undefined,
+      admissionNo: admissionNo ?? undefined,
+      originalName: file.name
+    });
 
-      // Save processed data to file storage using the new StudentFileStorage
-      // We use classId/sectionId/studentId from the parsed result or fallback to form data if available
-      // Ideally we should have guaranteed these exist by now
+    return json({
+      ...extractionResult,
+      id: extractionResult.storagePath,
+      url: `/api/uploads/${extractionResult.storagePath}/image.jpg?token=${token}`,
+      status: "done",
+      filename: filename ?? file.name
+    });
 
-      const fileClassId = classId || validated.data.studentData.classId;
-      const fileSectionId = sectionId || validated.data.studentData.sectionId;
-      const fileStudentId = studentId || validated.data.studentData.studentId;
+  } catch (e) {
+    console.error("Upload/Extraction error:", e);
 
-      // If we have minimal info to save to file storage
-      let storagePath = "";
-      if (fileClassId && fileSectionId && fileStudentId) {
-        // Assuming single exam for now or extracting from data
-        // We need an examId. Let's try to find it in the data or default to 0/null handling if permitted
-        // But implementation plan suggests base64(studentId:examId)
-        // validated.data has results array. Let's assume the first result's examId 
-        // or if single exam upload, the examTypeId from context? 
-        // The current code doesn't seem to explicitly pass examId in every case but upsertStudentResult uses it.
-        // Let's rely on what upsertStudentResult does for now, but ALSO save the file.
-
-        const examId = validated.data.studentData.examTypeId ?? 0;
-
-        try {
-          const { studentFileStorage } = await import("$lib/server/storage/student-files");
-          storagePath = await studentFileStorage.save({
-            studentId: fileStudentId,
-            examId: examId,
-            classId: fileClassId,
-            sectionId: fileSectionId,
-            scores: validated.data.marksData.reduce((acc, subj) => {
-              // subj is a subject entry from marksData
-              if (subj.subjectCode && subj.marks) {
-                acc[subj.subjectCode] = subj.marks;
-              }
-              return acc;
-            }, {} as Record<string, number[]>) ?? {},
-            extractedAt: new Date(),
-            verified: false
-          });
-        } catch (err) {
-          console.error("Failed to save to student file storage", err);
-          // Non-blocking error for now
-        }
-      }
-
-      // console.log("Validated data", validated.data);
-      const res = await result.upsertStudentResult(validated.data, staffId);
-
-      if (filename) del(pathname);
-      return json({ success: true, status: "done", data: res, filename: filename ?? file.name, storagePath });
-    } catch (e) {
-      console.error("Main processing error:", e);
-      if (filename) {
-        throw new Error("Failed to save file");
-      }
-
+    // If extraction fails but we have a new file, save it as pending in unified storage
+    if (!filename && file && className && sectionName) {
       try {
-        const buff = await file.arrayBuffer();
-        const data = await put(file.name, buff, {
-          token,
-          access: "private",
-          contentType: file.type,
+        const storagePath = await studentFileStorage.savePending({
+          file,
+          className,
+          sectionName,
+          fileName: file.name,
+          fullName: fullName ?? undefined,
+          status: "error",
+          error: e instanceof Error ? e.message : "Extraction failed"
         });
 
-        const filename = data.pathname.split("/").pop();
-        return json({ success: true, status: "pending", data, filename });
-      } catch (e) {
-        console.error("Failed to save file:", e);
         return json({
-          success: false,
-          status: "error",
-          error: e instanceof Error ? e.message : "Failed to upload file, try again",
+          success: true,
+          status: "pending",
+          storagePath,
+          filename: file.name,
+          id: storagePath,
+          url: `/api/uploads/${storagePath}/image.jpg?token=${token}`
         });
+      } catch (err) {
+        console.error("Failed to save pending file:", err);
       }
     }
-  } catch (e) {
-    console.error(e);
+
     return json({
       success: false,
       status: "error",
@@ -192,14 +148,40 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 export const DELETE: RequestHandler = async ({ url, locals }) => {
   const { session, user } = locals;
   if (!user || !session) error(401, "Unauthorized");
-  const clearAll = url.searchParams.get("clear") === "all";
-  if (clearAll) {
-    const { className, sectionName } = await resultRepo.getAssignedClassSection(user.id);
-    if (!className || !sectionName) throw new Error("Class not assigned to any section");
-    const token = `${className}(${sectionName})`.toLowerCase().replaceAll(" ", "_");
 
-    const uploadPath = join(UPLOADS_DIR, `${token}`);
-    rmdirSync(uploadPath, { recursive: true });
+  const clearAll = url.searchParams.get("clear") === "all";
+  const filename = url.searchParams.get("filename");
+
+  let staffId: number = user.staffId || 1;
+  const classSection = await resultRepo.getAssignedClassSection(staffId);
+  if (!classSection?.className || !classSection?.sectionName) throw new Error("Class not assigned to any section");
+  const token = `${classSection.className}(${classSection.sectionName})`.toLowerCase().replaceAll(" ", "_");
+
+  if (clearAll) {
+    const uploadPath = join(EXTRACTED_DIR, `${token}`);
+    if (existsSync(uploadPath)) {
+      rmdirSync(uploadPath, { recursive: true });
+    }
+    return json({ success: true });
   }
-  return json({ success: true });
+
+  if (filename) {
+    const { EXTRACTED_DIR } = await import("$lib/constants");
+    const filePath = join(EXTRACTED_DIR, filename);
+    if (existsSync(filePath)) {
+      // In unified storage, 'filename' is a folder path
+      rmdirSync(filePath, { recursive: true });
+    }
+    return json({ success: true });
+  }
+
+  return json({ success: false, message: "No filename provided" });
 };
+
+function unlink_internal(path: string) {
+  try {
+    unlinkSync(path);
+  } catch (e) {
+    console.error("Failed to unlink", path, e);
+  }
+}

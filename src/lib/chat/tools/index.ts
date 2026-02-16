@@ -1,10 +1,13 @@
-import { upsertStudentResult,
+import {
+  upsertStudentResult,
   getClassStudentList,
   upsertAttendance,
   upsertTeacherRemark,
-  upsertStudentRatings } from "./result.tool";
+  upsertStudentRatings
+} from "./result.tool";
 
-import { getStudentList,
+import {
+  getStudentList,
   getStudentRegistrationOptions,
   validateClassResults,
   sendStudentResult,
@@ -14,7 +17,8 @@ import { getStudentList,
   assignClassSection,
   searchClassSection,
   changeStudentName,
-  getAssessmentMapping } from "./coordinator.tool";
+  getAssessmentMapping
+} from "./coordinator.tool";
 
 export const teacherTools = {
   upsertStudentResult,
@@ -39,4 +43,5 @@ export const coordinatorTools = {
   changeStudentName,
   getAssessmentMapping,
   upsertTeacherRemark,
+  upsertStudentResult,
 };

@@ -17,44 +17,15 @@ import { googleConfig } from "$lib/server/config";
 import { cookies, jwt } from "$lib/server/helpers";
 import { getRequestEvent } from "$app/server";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
-import { customProvider, wrapLanguageModel, extractReasoningMiddleware, type Provider } from "ai";
-import { z } from "zod";
-import { parseJsonEventStream, type ParseResult } from "@ai-sdk/provider-utils";
-import { Readable } from "node:stream";
-import type {
-  LanguageModelV3,
-  LanguageModelV3CallOptions,
-  LanguageModelV3GenerateResult,
-  LanguageModelV3Middleware,
-  LanguageModelV3StreamPart,
-  LanguageModelV3StreamResult,
-  LanguageModelV3Prompt,
-  LanguageModelV3Content
+import { customProvider, wrapLanguageModel, type Provider } from "ai";
+import {
+  type LanguageModelV3Content
 } from "@ai-sdk/provider";
+import { createGoogleMiddleware } from "./google-middleware";
 
 const COOKIE_GRACE_SEC = 60; // 1 minute buffer: Grace period
 const CODE_ASSIST_ENDPOINT = "https://cloudcode-pa.googleapis.com"
 const CODE_ASSIST_API_VERSION = "v1internal"
-
-const geminiResponseSchema = z.object({
-  candidates: z.array(z.object({
-    content: z.object({
-      parts: z.array(z.object({
-        text: z.string().optional(),
-      })),
-    }).optional(),
-    finishReason: z.string().optional(),
-  })).optional(),
-  usageMetadata: z.object({
-    promptTokenCount: z.number().optional(),
-    candidatesTokenCount: z.number().optional(),
-    totalTokenCount: z.number().optional(),
-  }).optional(),
-});
-
-const chunkSchema = z.object({
-  response: geminiResponseSchema.optional(),
-});
 
 export class GoogleProvider implements OAuth2Client {
   readonly type = CredentialType.GOOGLE_OAUTH;
@@ -209,20 +180,22 @@ export class GoogleProvider implements OAuth2Client {
       baseURL: "https://generativelanguage.googleapis.com/v1beta/openai",
     });
 
-    // Eagerly discover/cache project ID while we are still in a valid cookie-setting context
-    await this.discoverProjectId();
+    // Discovery/cache project ID
+    const projectId = await this.discoverProjectId();
+
+    const middleware = createGoogleMiddleware(this.client!, projectId);
 
     const wrapModel = (model: any) =>
       wrapLanguageModel({
         model: model,
-        middleware: this.completionMiddleware() as any,
+        middleware,
       });
 
     return customProvider({
       languageModels: {
         "coder-model": wrapModel(gemini("gemini-3-pro-preview")),
-        "vision-model": wrapModel(gemini("gemini-3-flash-preview")),
-        "chat-model": wrapModel(gemini("gemini-3-flash-preview")),
+        "vision-model": wrapModel(gemini("gemini-3-pro-preview")),
+        "chat-model": wrapModel(gemini("gemini-3-pro-preview")),
         "chat-model-reasoning": wrapModel(gemini("gemini-3-pro-preview")),
         "title-model": wrapModel(gemini("gemini-1.5-pro")),
         "artifact-model": wrapModel(gemini("gemini-1.5-pro")),
@@ -362,321 +335,5 @@ export class GoogleProvider implements OAuth2Client {
     return response.data as any;
   }
 
-  private convertPromptToGemini(prompt: LanguageModelV3Prompt): any[] {
-    const contents: any[] = [];
-
-    for (const message of prompt) {
-      if (message.role === "system") continue;
-
-      const role = message.role === "assistant" ? "model" : "user";
-      const parts: any[] = [];
-
-      if (typeof message.content === "string") {
-        parts.push({ text: message.content });
-      } else {
-        for (const part of message.content) {
-          switch (part.type) {
-            case "text":
-              parts.push({ text: part.text });
-              break;
-            case "file":
-              if (role === "model") continue;
-              const mimeType = part.mediaType || "application/octet-stream";
-              let base64Data: string;
-              if (typeof part.data === "string") {
-                base64Data = part.data;
-              } else if (part.data instanceof Uint8Array) {
-                base64Data = Buffer.from(part.data).toString("base64");
-              } else if (part.data instanceof ArrayBuffer) {
-                base64Data = Buffer.from(part.data).toString("base64");
-              } else {
-                continue;
-              }
-              parts.push({
-                inlineData: { mimeType, data: base64Data },
-              });
-              break;
-            case "tool-call":
-              parts.push({
-                functionCall: {
-                  name: part.toolName,
-                  args: (part.input || {}) as Record<string, unknown>,
-                },
-              });
-              break;
-            case "tool-result":
-              let resultValue: Record<string, unknown>;
-              const output = part.output;
-              if (output.type === "text" || output.type === "error-text") {
-                resultValue = { result: output.value };
-              } else if (output.type === "json" || output.type === "error-json") {
-                const jsonValue = output.value;
-                if (jsonValue !== null && typeof jsonValue === "object" && !Array.isArray(jsonValue)) {
-                  resultValue = jsonValue as Record<string, unknown>;
-                } else {
-                  resultValue = { result: jsonValue };
-                }
-              } else if (output.type === "execution-denied") {
-                resultValue = { result: `[Execution denied${output.reason ? `: ${output.reason}` : ""}]` };
-              } else if (output.type === "content") {
-                resultValue = {
-                  result: output.value
-                    .filter((p: any) => p.type === "text")
-                    .map((p: any) => p.text)
-                    .join("\n"),
-                };
-              } else {
-                resultValue = { result: "[Unknown output type]" };
-              }
-
-              parts.push({
-                functionResponse: {
-                  name: part.toolName,
-                  response: resultValue,
-                },
-              });
-              break;
-          }
-        }
-      }
-
-      contents.push({ role, parts });
-    }
-
-    return contents;
-  }
-
-  private completionMiddleware(): LanguageModelV3Middleware {
-    return {
-      specificationVersion: 'v3',
-      wrapGenerate: async ({ model, params }) => {
-        return this.doGenerate(model, params);
-      },
-      wrapStream: async ({ model, params }) => {
-        return this.doStream(model, params);
-      },
-    };
-  }
-
-  private async prepareRequestBody(
-    modelId: string,
-    options: LanguageModelV3CallOptions
-  ) {
-    const projectId = await this.discoverProjectId();
-
-    // Map system instruction if present
-    const systemPrompt = options.prompt.find((m) => m.role === "system");
-    let systemInstruction: any = undefined;
-
-    if (systemPrompt) {
-      const parts: any[] = [];
-      if (typeof systemPrompt.content === "string") {
-        parts.push({ text: systemPrompt.content });
-      } else {
-        for (const part of systemPrompt.content as LanguageModelV3Content[]) {
-          if (part.type === "text") {
-            parts.push({ text: part.text });
-          }
-        }
-      }
-      if (parts.length > 0) {
-        systemInstruction = { role: "user", parts };
-      }
-    }
-
-    const contents = this.convertPromptToGemini(options.prompt);
-
-    const generationConfig: any = {
-      temperature: options.temperature ?? 0.7,
-      maxOutputTokens: options.maxOutputTokens || 8192,
-    };
-
-    if (options.topP != null) generationConfig.topP = options.topP;
-    if (options.topK != null) generationConfig.topK = options.topK;
-    if (options.stopSequences != null && options.stopSequences.length > 0) {
-      generationConfig.stopSequences = options.stopSequences;
-    }
-    if (options.presencePenalty != null) {
-      generationConfig.presencePenalty = options.presencePenalty;
-    }
-    if (options.frequencyPenalty != null) {
-      generationConfig.frequencyPenalty = options.frequencyPenalty;
-    }
-    if (options.seed != null) {
-      generationConfig.seed = options.seed;
-    }
-
-    if (options.responseFormat?.type === "json") {
-      generationConfig.responseMimeType = "application/json";
-      if (options.responseFormat.schema) {
-        generationConfig.responseSchema = options.responseFormat.schema;
-      }
-    }
-
-    return {
-      model: modelId,
-      project: projectId,
-      request: {
-        systemInstruction,
-        contents,
-        generationConfig,
-      },
-    };
-  }
-
-  private async doGenerate(
-    model: LanguageModelV3,
-    options: LanguageModelV3CallOptions
-  ): Promise<LanguageModelV3GenerateResult> {
-    const requestBody = await this.prepareRequestBody(model.modelId, options);
-
-    const response = await this.client!.request({
-      url: `${CODE_ASSIST_ENDPOINT}/${CODE_ASSIST_API_VERSION}:generateContent`,
-      method: "POST",
-      params: { alt: "json" },
-      headers: {
-        "Content-Type": "application/json",
-        "x-goog-api-client": `edapex-ai/v0.0.1`,
-      },
-      body: JSON.stringify(requestBody),
-    });
-
-    const data = response.data as any;
-    const candidates = data?.candidates || [];
-    const firstCandidate = candidates[0];
-    const text = firstCandidate?.content?.parts?.[0]?.text ?? "";
-    const usageMetadata = data?.usageMetadata || {};
-
-    return {
-      content: [{ type: 'text', text }],
-      usage: {
-        inputTokens: {
-          total: usageMetadata.promptTokenCount ?? 0,
-          noCache: undefined,
-          cacheRead: undefined,
-          cacheWrite: undefined
-        },
-        outputTokens: {
-          total: usageMetadata.candidatesTokenCount ?? 0,
-          text: undefined,
-          reasoning: undefined
-        },
-      },
-      finishReason: (firstCandidate?.finishReason?.toLowerCase() as any) || "unknown",
-      request: { body: JSON.stringify(requestBody) },
-      response: {
-        id: "gen-" + Date.now(),
-        modelId: model.modelId,
-        headers: Object.fromEntries(response.headers as any),
-        body: JSON.stringify(data),
-      },
-      warnings: [],
-    };
-  }
-
-  private async doStream(
-    model: LanguageModelV3,
-    options: LanguageModelV3CallOptions
-  ): Promise<LanguageModelV3StreamResult> {
-    const requestBody = await this.prepareRequestBody(model.modelId, options);
-
-    const response = await this.client!.request({
-      url: `${CODE_ASSIST_ENDPOINT}/${CODE_ASSIST_API_VERSION}:streamGenerateContent`,
-      method: "POST",
-      params: { alt: "sse" },
-      headers: {
-        "Content-Type": "application/json",
-        "x-goog-api-client": `edapex-ai/v0.0.1`,
-      },
-      responseType: "stream",
-      body: JSON.stringify(requestBody),
-    });
-
-    const nodeStream = response.data as Readable;
-    const webStream = Readable.toWeb(nodeStream);
-    const parsedStream = parseJsonEventStream({
-      stream: webStream as ReadableStream<Uint8Array>,
-      schema: chunkSchema,
-    });
-
-    let isFirstChunk = true;
-    let finishReason: string = "unknown";
-    let usage = {
-      inputTokens: { total: 0, noCache: undefined, cacheRead: undefined, cacheWrite: undefined },
-      outputTokens: { total: 0, text: undefined, reasoning: undefined }
-    };
-
-    const transformer = new TransformStream<ParseResult<z.infer<typeof chunkSchema>>, LanguageModelV3StreamPart>({
-      start(controller) {
-        controller.enqueue({ type: 'stream-start', warnings: [] });
-      },
-      transform(chunk, controller) {
-        if (!chunk.success) {
-          controller.enqueue({ type: 'error', error: chunk.error });
-          return;
-        }
-
-        const data = chunk.value.response;
-        if (!data) return;
-
-        if (isFirstChunk) {
-          isFirstChunk = false;
-          controller.enqueue({
-            type: 'response-metadata',
-            id: "gen-" + Date.now(),
-            modelId: model.modelId,
-          });
-          controller.enqueue({ type: 'text-start', id: '0' });
-        }
-
-        const candidate = data.candidates?.[0];
-        if (candidate?.content?.parts?.[0]?.text) {
-          controller.enqueue({
-            type: 'text-delta',
-            id: '0',
-            delta: candidate.content.parts[0].text,
-          });
-        }
-
-        if (candidate?.finishReason) {
-          finishReason = candidate.finishReason.toLowerCase();
-        }
-
-        if (data.usageMetadata) {
-          usage = {
-            inputTokens: {
-              total: data.usageMetadata.promptTokenCount ?? usage.inputTokens.total,
-              noCache: undefined,
-              cacheRead: undefined,
-              cacheWrite: undefined
-            },
-            outputTokens: {
-              total: data.usageMetadata.candidatesTokenCount ?? usage.outputTokens.total,
-              text: undefined,
-              reasoning: undefined
-            },
-          };
-        }
-      },
-      flush(controller) {
-        if (!isFirstChunk) {
-          controller.enqueue({ type: 'text-end', id: '0' });
-        }
-        controller.enqueue({
-          type: 'finish',
-          finishReason: finishReason as any,
-          usage,
-        });
-      },
-    });
-
-    return {
-      stream: parsedStream.pipeThrough(transformer),
-      request: { body: JSON.stringify(requestBody) },
-      response: {
-        headers: Object.fromEntries(response.headers as any),
-      },
-    };
-  }
 
 }

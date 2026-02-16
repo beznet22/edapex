@@ -15,6 +15,7 @@ interface UploadRequest {
   studentName?: string;
   admissionNo?: number;
   isStudentPhoto?: boolean;
+  originalName?: string;
 }
 
 // Listen for messages from the main thread
@@ -31,6 +32,7 @@ self.onmessage = async function (e) {
     studentName,
     admissionNo,
     isStudentPhoto,
+    originalName,
   }: UploadRequest = e.data;
   console.log({
     fileId,
@@ -56,6 +58,7 @@ self.onmessage = async function (e) {
     if (studentName) formData.append("studentName", studentName);
     if (admissionNo) formData.append("admissionNo", admissionNo.toString());
     if (isStudentPhoto) formData.append("isStudentPhoto", isStudentPhoto.toString());
+    if (fileId) formData.append("fileId", fileId);
 
     const response = await fetch("/api/uploads", {
       method: "POST",
@@ -77,6 +80,7 @@ self.onmessage = async function (e) {
       success,
       status,
       data,
+      originalName,
     };
 
     self.postMessage(result);
@@ -86,6 +90,7 @@ self.onmessage = async function (e) {
       filename: filename || "",
       success: false,
       status: "error",
+      originalName,
       error: error instanceof Error ? error.message : "Unknown error occurred during upload",
     };
     // Post the error back to the main thread

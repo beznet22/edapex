@@ -4,11 +4,12 @@ import { getContext, setContext } from "svelte";
 import { toast } from "svelte-sonner";
 import UploadWorker from "$lib/chat/upload-worker.ts?worker";
 import type { index } from "drizzle-orm/gel-core";
-import { doExtraction } from "$lib/api/result.remote";
+import { doExtraction } from "$lib/api/assessment.remote";
 import type { ClassSection } from "$lib/types/result-types";
 import { page } from "$app/state";
 import { goto, replaceState } from "$app/navigation";
 import { localStore } from "$lib/utils";
+import { getResources } from "$lib/api/chat.remote";
 
 const FILES_CONTEXT_KEY = Symbol("attachments-context");
 
@@ -18,6 +19,7 @@ export class FilesContext {
   fileInputRef = $state<HTMLInputElement | null>(null);
   openModal = $state(false);
   openResourceModal = $state(false);
+  openFileStoreModal = $state(false);
   #selectedClass = $state<ClassSection | null>(null);
 
   constructor(uploads: UploadedData[], public doUpload?: boolean) {
@@ -104,13 +106,14 @@ export class FilesContext {
       const fileId = generateId(); // Unique ID per file (not per batch)
       const upload: UploadedData = {
         id: fileId,
-        filename: file.name,
+        filename: studentData?.studentName ? `${studentData.studentName}.jpg` : file.name,
+        originalName: file.name,
         status: "uploading",
         success: false,
       };
 
       this.uploads = [...this.uploads, upload];
-      const worker = this.#initWoeker(fileId, file.name);
+      const worker = this.#initWoeker(fileId, upload.filename);
       const { classId, sectionId, className, sectionName } = this.selectedClass || {};
       worker.postMessage({
         fileId,
@@ -123,6 +126,7 @@ export class FilesContext {
         studentName: studentData?.studentName,
         admissionNo: studentData?.admissionNo,
         isStudentPhoto: studentData?.isStudentPhoto,
+        originalName: file.name,
       });
     }
   };
@@ -131,10 +135,15 @@ export class FilesContext {
     upload.status = "retrying";
     upload.success = false;
     this.updateUpload(upload);
+    toast.info(`Retrying extraction for ${upload.filename}...`);
     console.log("Retrying upload: ", upload);
-    const worker = this.#initWoeker(upload.id, upload.filename);
 
-    const { classId, sectionId, className, sectionName } = selectedClass || {};
+    // If it's a permanent file, we might not have the original File object
+    // but the backend handles "retry by filename" if it exists in UPLOADS_DIR.
+    // However, if it was already "done", we might not need to retry unless we want to re-extract.
+
+    const worker = this.#initWoeker(upload.id, upload.filename);
+    const { classId, sectionId, className, sectionName } = selectedClass || this.selectedClass || {};
     worker.postMessage({
       fileId: upload.id,
       filename: upload.filename,
@@ -142,7 +151,51 @@ export class FilesContext {
       sectionId,
       className,
       sectionName,
+      originalName: upload.originalName,
     });
+  };
+
+  loadResources = async () => {
+    const { className, sectionName } = this.selectedClass || {};
+
+    try {
+      let result;
+      if (className && sectionName) {
+        result = await getResources({ className, sectionName });
+      } else {
+        result = await getResources({});
+      }
+      if (result.success) {
+        this.uploads = result.resources;
+      }
+    } catch (error) {
+      console.error("Failed to load resources:", error);
+    }
+  };
+
+  deleteFile = async (upload: UploadedData) => {
+    const params = new URLSearchParams();
+    if (upload.status === "pending" || upload.status === "error") {
+      params.append("filename", upload.filename);
+    } else if (upload.status === "done") {
+      params.append("fileId", upload.id);
+    }
+
+    try {
+      const resp = await fetch(`/api/uploads?${params.toString()}`, {
+        method: "DELETE",
+      });
+
+      if (resp.ok) {
+        this.uploads = this.uploads.filter((u) => u.id !== upload.id);
+        toast.success("File deleted");
+      } else {
+        toast.error("Failed to delete file");
+      }
+    } catch (error) {
+      console.error("Delete error:", error);
+      toast.error("An error occurred while deleting the file");
+    }
   };
 
   #initWoeker = (fileId: string, name: string) => {
@@ -153,7 +206,7 @@ export class FilesContext {
         if (existing) {
           this.updateUpload({ ...existing, status: "error", success: false, error: data.error });
         }
-        this.files = this.files.filter((u) => u.name !== name);
+        // Don't remove from this.files, just show error in UI
         console.log(`Upload failed: `, data.error);
         toast.error(data.error!);
         return;

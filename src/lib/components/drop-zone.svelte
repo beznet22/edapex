@@ -121,6 +121,12 @@
             </Select.Content>
           </Select.Root>
         </div>
+      {:else if filesContext.selectedClass}
+        <div
+          class="grid gap-4 py-4 text-sm text-muted-foreground text-center bg-muted/30 rounded-lg border border-dashed"
+        >
+          No students found in {filesContext.selectedClass.className}
+        </div>
       {/if}
 
       <div class="mb-4 flex flex-col gap-4">
@@ -140,7 +146,7 @@
           name="files"
           {onUpload}
           {onFileRejected}
-          maxFileSize={300 * KILOBYTE}
+          maxFileSize={600 * KILOBYTE}
           accept="image/*"
           maxFiles={4}
           disabled={!value}
@@ -187,13 +193,13 @@
 
             <div class="shrink-0">
               <div class="flex items-center gap-1">
-                {#if uploads.some((u) => u.filename === file.name && u.status === "done")}
+                {#if uploads.some((u) => u.originalName === file.name && u.status === "done")}
                   <CheckIcon class="size-4 text-green-500" />
-                {:else if uploads.some((u) => u.filename === file.name && u.status === "pending")}
+                {:else if uploads.some((u) => u.originalName === file.name && u.status === "pending")}
                   <TriangleAlertIcon class="size-4 text-primary" />
-                {:else if uploads.some((u) => u.filename === file.name && u.status === "uploading")}
+                {:else if uploads.some((u) => u.originalName === file.name && u.status === "uploading")}
                   <Loader variant="circular" size="sm" />
-                {:else if uploads.some((u) => u.filename === file.name && u.status === "error")}
+                {:else if uploads.some((u) => u.originalName === file.name && u.status === "error")}
                   <CircleAlertIcon class="size-4 text-destructive" />
                 {/if}
                 <Button

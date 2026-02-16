@@ -17,6 +17,7 @@ import type { ClassSection } from "$lib/types/result-types";
 import type { Student } from "$lib/schema/result-output";
 import { page } from "$app/state";
 import { localStore } from "$lib/utils";
+import type { ClassStudent } from "$lib/server/repository/student.repo";
 
 const CHAT_CONTEXT_KEY = Symbol("chat-context");
 
@@ -32,7 +33,7 @@ export class ChatContext {
   // Reactive state using Svelte 5 runes
   user = $state<AuthUser | undefined>(undefined);
   activeAgent = $state<AgentWorkflow | null>(null);
-  studentData = $state<Student | undefined>(undefined);
+  studentData = $state<ClassStudent | undefined>(undefined);
   selectedClass = $state<ClassSection | null>(null);
   openedDocumentId = $state<string | undefined>(undefined);
   openPanel = $state<boolean>(false);
@@ -84,7 +85,7 @@ export class ChatContext {
         messages: this.user ? [messages.at(-1)] : messages,
         chatId: this.chatData?.id,
         agentId: this.activeAgent?.id,
-        data: this.studentData,
+        data: this.studentData as any,
         selectedClass: this.selectedClass,
       },
     };

@@ -1,11 +1,11 @@
 <script lang="ts">
-  import { PromptSuggestion } from "$lib/components/prompt-kit/prompt-suggestion";
   import { Button } from "$lib/components/ui/button";
-  import { Separator } from "$lib/components/ui/separator";
   import ArrowUpIcon from "@lucide/svelte/icons/arrow-up";
   import PackageIcon from "@lucide/svelte/icons/package";
   import SquareIcon from "@lucide/svelte/icons/square";
   import XIcon from "@lucide/svelte/icons/x";
+  import SearchIcon from "@lucide/svelte/icons/search";
+  import GraduationCapIcon from "@lucide/svelte/icons/graduation-cap";
 
   import { useChat } from "$lib/context/chat-context.svelte";
   import { useFileActions } from "$lib/context/file-context.svelte";
@@ -91,23 +91,30 @@
     activeSuggestions = [];
     autocompleteMode = null;
 
-    if (value.endsWith("/")) {
+    // Agent Autocomplete (/)
+    const agentMatch = value.match(/\/(\w*)$/);
+    if (agentMatch) {
       autocompleteMode = "agent";
-    } else if (value.endsWith("@")) {
-      autocompleteMode = "student";
-      found = students; // Show all initially or filter
-    } else if (value.includes("@")) {
-      // Simple check if we are typing a mention
-      const match = value.match(/@(\w*)$/);
-      if (match) {
-        autocompleteMode = "student";
-        found = searchFilter(match[1], students);
-      }
+      // Optional: filter agents based on query if needed,
+      // e.g., chat.agents.filter(a => a.label.toLowerCase().includes(agentMatch[1].toLowerCase()))
+      // For now, we show all, or let the user pick.
     }
 
-    // Legacy search filter - can keep or refactor
-    if (!autocompleteMode) {
-      found = searchFilter(value, students);
+    // Student Autocomplete (@)
+    else {
+      const studentMatch = value.match(/@([^@]*)$/);
+      if (studentMatch) {
+        autocompleteMode = "student";
+        const query = studentMatch[1];
+        if (!query.trim()) {
+          found = students;
+        } else {
+          found = searchFilter(query, students);
+        }
+      } else {
+        // Legacy search filter - can keep or refactor
+        found = searchFilter(value, students);
+      }
     }
   }
 
@@ -125,45 +132,41 @@
     }
 
     try {
-      toast.info(`Loading context for ${student.name}...`);
+      toast.info(`Loading context for ${student.name || "Student"}...`);
+      // Optimistic update
+      chat.studentData = student;
+
       const data = await loadStudentFile(
         student.id!,
         chat.selectedClass!.classId!,
         chat.selectedClass!.sectionId!,
       );
 
-      if (data) {
-        // Append student data as context to the next message (hidden or explicit?)
-        // For now, let's append a text representation or attach it.
-        // Since we don't have a direct "add attachment" method in the UI yet that isn't a File object,
-        // we can perhaps set it in a way the agent picks up.
-        // Or we just add it to the input text for now.
-        input = input.replace(/@\w*$/, `@${student.name} `);
-        // TODO: Actually attach the data JSON to the message context
-        // Maybe via a hidden system message or metadata?
-        // For this iteration, we'll verify file loading works.
-        toast.success("Student context loaded");
+      // Remove the @mention query from input
+      const replaceQuery = (val: string) => {
+        const match = val.match(/@([^@]*)$/);
+        if (match) {
+          const query = match[1];
+          const lastIndex = val.lastIndexOf("@" + query);
+          if (lastIndex !== -1) {
+            return val.substring(0, lastIndex).trimEnd();
+          }
+        }
+        return val.replace(/@\w*$/, "").trimEnd();
+      };
 
-        // Temporarily log or store it in chat context to be sent?
-        // Ideally we should use experimental_attachments if supported or append to text.
-        // Let's rely on the agent to resolve the student data if we just provide ID,
-        // BUT the requirement was "Backend file loading".
-        // If we loaded it here, we should pass it.
-        // Let's assume for now the agent can fetch it if we give the ID,
-        // OR we inject it.
-        // Let's inject it into the input as a hidden block for the user to send?
-        // No, that's messy.
-        // We'll leave it as just text completion for now, and rely on the agent tool `upsertStudentResult` (read) or similar
-        // OR we can pass `data` payload in `sendMessage`.
+      input = replaceQuery(input);
+
+      if (data) {
+        toast.success("Student context loaded");
         chat.studentData = { ...student, ...data }; // Update context
       } else {
         toast.warning("No assessment file found for student");
-        input = input.replace(/@\w*$/, `@${student.name} `);
       }
     } catch (e) {
       console.error(e);
       toast.error("Failed to load student file");
-      input = input.replace(/@\w*$/, `@${student.name} `);
+      // Even if failed, we should probably clear the query or let user retry
     }
 
     autocompleteMode = null;
@@ -194,10 +197,31 @@
     {onValueChange}
     {onSubmit}
   >
-    {#if file.files.length > 0}
+    {#if file.files.length > 0 || chat.studentData}
       <div
         class="flex flex-wrap gap-1.5 sm:gap-2 px-3 pb-2 transition-all duration-300 ease-in-out"
       >
+        {#if chat.studentData}
+          <div
+            class="flex items-center gap-1.5 sm:gap-2 rounded-full border bg-primary/10 px-2 sm:px-2.5 py-1 text-[11px] sm:text-xs transition-all hover:bg-primary/20"
+          >
+            <GraduationCapIcon class="size-3.5 text-primary" />
+            <span
+              class="max-w-20 sm:max-w-[120px] truncate font-medium text-primary"
+            >
+              @{chat.studentData.name}
+            </span>
+            <Button
+              variant="ghost"
+              size="icon"
+              class="size-3.5 rounded-full cursor-pointer hover:bg-primary/20 hover:text-primary transition-colors"
+              onclick={() => (chat.studentData = undefined)}
+            >
+              <XIcon class="size-3" />
+            </Button>
+          </div>
+        {/if}
+
         {#each file.files as f, i (f.name + i)}
           <div
             class="flex items-center gap-1.5 sm:gap-2 rounded-full border bg-muted/50 px-2 sm:px-2.5 py-1 text-[11px] sm:text-xs transition-all hover:bg-muted"
@@ -278,9 +302,6 @@
         {/if}
       </div>
       <div class="flex gap-1.5 sm:gap-2 items-center">
-        {#if userContext.isCoordinator || userContext.isIt}
-          <ClassSelector />
-        {/if}
         <div class="hidden sm:block">
           <PromptInputAction>
             {#snippet tooltip()}
@@ -321,58 +342,94 @@
 
   <div
     class={cn(
-      "absolute left-0 w-full flex flex-col items-center justify-center gap-4 transition-all duration-300 pointer-events-none",
-      isInitial ? "top-full mt-4 sm:mt-8" : "bottom-full mb-4 sm:mb-8",
+      "absolute left-0 w-full flex flex-col items-start justify-end gap-2 transition-all duration-300 pointer-events-none px-4",
+      "bottom-full mb-2",
     )}
   >
     <div
-      class="w-full flex flex-col items-center justify-center gap-2 pointer-events-auto"
+      class="w-full flex flex-col items-start justify-end gap-2 pointer-events-auto"
     >
-      {#if !userContext.isCoordinator && !userContext.isIt && isInitial}
+      {#if autocompleteMode || (!userContext.isCoordinator && !userContext.isIt && isInitial)}
         {#if autocompleteMode === "student" && found.length > 0}
           <div
-            class="flex w-full flex-col items-center justify-center space-y-1"
+            class="flex min-w-[300px] flex-col overflow-x-hidden overflow-y-auto max-h-[300px] rounded-xl border bg-popover p-1 shadow-md"
           >
+            <div
+              class="px-2 py-1.5 text-xs font-medium text-muted-foreground/70"
+            >
+              Select Student
+            </div>
             {#each found as student}
-              <PromptSuggestion
-                highlight={input}
+              <button
+                class="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground cursor-pointer text-left"
                 onclick={() => handleStudentClick(student)}
-                class="transition-all hover:scale-[1.02] hover:shadow-sm"
               >
-                {student.name}
-              </PromptSuggestion>
-              <Separator class="me-2" />
+                <div
+                  class="flex size-8 items-center justify-center rounded-lg border bg-background"
+                >
+                  <GraduationCapIcon class="size-4 text-muted-foreground" />
+                </div>
+                <div class="flex flex-col gap-0.5">
+                  <span class="font-medium text-foreground">{student.name}</span
+                  >
+                  <span class="text-[10px] text-muted-foreground">
+                    {student.admissionNo}
+                  </span>
+                </div>
+              </button>
             {/each}
           </div>
         {:else if autocompleteMode === "agent"}
           <div
-            class="relative flex w-full flex-wrap items-center justify-center gap-2"
+            class="flex min-w-[300px] flex-col overflow-x-hidden overflow-y-auto max-h-[300px] rounded-xl border bg-popover p-1 shadow-md"
           >
+            <div
+              class="px-2 py-1.5 text-xs font-medium text-muted-foreground/70"
+            >
+              Select Agent
+            </div>
             {#each chat.agents as agent}
-              <PromptSuggestion
+              {@const Icon = iconRegistry[agent.iconName]}
+              <button
+                class="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground cursor-pointer text-left"
                 onclick={() => handleAgentClick(agent.id)}
-                class="capitalize transition-all hover:scale-105 hover:shadow-md"
               >
-                {@const Icon = iconRegistry[agent.iconName]}
-                <Icon class="mr-2 h-4 w-4" />
-                {agent.label}
-              </PromptSuggestion>
+                <div
+                  class="flex size-8 items-center justify-center rounded-lg border bg-background"
+                >
+                  <Icon class="size-4 text-muted-foreground" />
+                </div>
+                <div class="flex flex-col gap-0.5">
+                  <span class="font-medium text-foreground">{agent.label}</span>
+                  <span class="text-[10px] text-muted-foreground capitalize">
+                    AI Agent
+                  </span>
+                </div>
+              </button>
             {/each}
           </div>
         {:else if activeSuggestions.length > 0}
           <!-- Default suggestions when input is empty or no trigger -->
           <div
-            class="flex w-full flex-col items-center justify-center space-y-1"
+            class="flex min-w-[300px] flex-col overflow-x-hidden overflow-y-auto max-h-[300px] rounded-xl border bg-popover p-1 shadow-md"
           >
+            <div
+              class="px-2 py-1.5 text-xs font-medium text-muted-foreground/70"
+            >
+              Suggestions
+            </div>
             {#each activeSuggestions as suggestion}
-              <PromptSuggestion
-                highlight={activeHighlight}
+              <button
+                class="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground cursor-pointer text-left"
                 onclick={() => handleSuggestionClick(suggestion)}
-                class="transition-all hover:scale-[1.02] hover:shadow-sm"
               >
-                {suggestion}
-              </PromptSuggestion>
-              <Separator class="me-2" />
+                <div
+                  class="flex size-8 items-center justify-center rounded-lg border bg-background"
+                >
+                  <SearchIcon class="size-4 text-muted-foreground" />
+                </div>
+                <span class="text-foreground">{suggestion}</span>
+              </button>
             {/each}
           </div>
         {/if}

@@ -66,7 +66,7 @@ export const generateContent = async (file: Blob, mapString?: string) => {
       ],
     });
 
-    const provider = await useAgent().use(CredentialType.QWEN_CODE).getModelProvider();
+    const provider = await useAgent().use(CredentialType.GOOGLE_OAUTH).getModelProvider();
     if (!provider) return { success: false, message: "No provider found" };
 
     const result = await generateText({
@@ -74,6 +74,7 @@ export const generateContent = async (file: Blob, mapString?: string) => {
       system: extractPrompt,
       messages,
     });
+    console.log(result);
     return { success: true, content: result.text };
   } catch (e) {
     console.error("Failed to extract content", e);

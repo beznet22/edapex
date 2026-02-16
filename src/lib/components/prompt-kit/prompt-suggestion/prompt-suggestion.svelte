@@ -1,5 +1,8 @@
 <script lang="ts" module>
-  import type { ButtonVariant, ButtonSize } from "$lib/components/ui/button/index.js";
+  import type {
+    ButtonVariant,
+    ButtonSize,
+  } from "$lib/components/ui/button/index.js";
   import { cn } from "$lib/utils/shadcn.js";
   import type { Snippet } from "svelte";
 
@@ -31,8 +34,12 @@
     type = "button",
   }: PromptSuggestionProps = $props();
 
-  const isHighlightMode = $derived(highlight !== undefined && highlight.trim() !== "");
-  const content = $derived(typeof children === "string" ? (children as string) : "");
+  const isHighlightMode = $derived(
+    highlight !== undefined && highlight.trim() !== "",
+  );
+  const content = $derived(
+    typeof children === "string" ? (children as string) : "",
+  );
 
   const highlightedContent = $derived.by(() => {
     if (!isHighlightMode || !content) {
@@ -65,7 +72,10 @@
       };
     }
 
-    const actualHighlightedText = content.substring(index, index + highlightLower.length);
+    const actualHighlightedText = content.substring(
+      index,
+      index + highlightLower.length,
+    );
     const before = content.substring(0, index);
     const after = content.substring(index + actualHighlightedText.length);
 
@@ -96,7 +106,11 @@
     bind:ref
     variant={variant || "ghost"}
     size={size || "sm"}
-    class={cn("w-full cursor-pointer justify-start rounded-xl py-2", "hover:bg-accent", className)}
+    class={cn(
+      "w-full cursor-pointer justify-start rounded-xl py-2",
+      "hover:bg-accent",
+      className,
+    )}
     {onclick}
     {disabled}
     {type}
@@ -108,7 +122,11 @@
     bind:ref
     variant={variant || "ghost"}
     size={size || "sm"}
-    class={cn("w-full cursor-pointer justify-start gap-0 rounded-xl py-2", "hover:bg-accent", className)}
+    class={cn(
+      "w-full cursor-pointer justify-start gap-0 rounded-xl py-2",
+      "hover:bg-accent",
+      className,
+    )}
     {onclick}
     {disabled}
     {type}

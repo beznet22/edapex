@@ -2,7 +2,7 @@ import { resultInputSchema } from "$lib/schema/result-input";
 import { resultOutputSchema } from "$lib/schema/result-output";
 import { pageToHtml } from "$lib/server/helpers";
 import { generate } from "$lib/server/helpers/pdf-generator";
-import { result } from "$lib/server/service/result.service";
+import { assessment } from "$lib/server/service/assessment.service";
 import { error, json, type RequestHandler } from "@sveltejs/kit";
 import { readFileSync } from "fs";
 import { render } from "svelte/server";
@@ -17,8 +17,8 @@ export const GET: RequestHandler = async () => {
     const students = await studentRepo.getStudentsByClassSection({ classId: 15, sectionId: 5 })
     const studentRecord = await studentRepo.getStudentRecordByAdmissionNo(765)
     const staff = await staffRepo.getStaffByClassSection({ classId: 17, sectionId: 7 })
-    const mappingData = await result.getMappingData(staff?.teacherId ?? 0)
-    const resultData = await result.getStudentResult({ id: 580, examId: 5 })
+    const mappingData = await assessment.getMappingData(staff?.teacherId ?? 0)
+    const resultData = await assessment.getStudentResult({ id: 580, examId: 5 })
     const validated = await resultOutputSchema.safeParseAsync(resultData)
     if (!validated.success) {
       return json({ success: false, error: validated.error.issues })
@@ -26,7 +26,7 @@ export const GET: RequestHandler = async () => {
 
     return json({ validated })
 
-    const response = await result.publishResults({ studentIds: [144], examId: 5 });
+    const response = await assessment.publishResults({ studentIds: [144], examId: 5 });
     if (!response.success) {
       return json({
         success: false,

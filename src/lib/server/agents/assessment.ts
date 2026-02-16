@@ -90,9 +90,11 @@ export const assessmentWorkflow: AgentWorkflow = {
         "     - IMPORTANT: Only valid students should have a link in the Name column.",
         "   - List students with issues and explain the errors in layman's terms.",
 
-        "3. **Data Correction & Partial Updates**:",
+        "3. **Data Correction & Approval**:",
         "   - If validation fails: Guide the user to upload missing/corrected result sheets (images).",
-        "   - *Note*: The system automatically handles image data extraction. You do not need to call `upsertStudentResult` for images unless manually correcting a specific field.",
+        "   - **Manual Correction**: When correcting a specific field or mark, you can use `upsertMarkStore`.",
+        "   - **Approving Extraction**: When a user wants to 'approve', 'persist', or 'save' an extracted assessment (usually after an upload), call `upsertStudentResult`.",
+        "     - If `studentId` and `examTypeId` are provided, the system will automatically pull the extracted data from the filesystem for persistence.",
         "   - **Partial Mark Updates**: When a user wants to update a *specific* mark (e.g., 'update the EXAM for CCA'), use `upsertMarkStore`.",
         "     - **Step 1**: ALWAYS call `getAssessmentMapping` with `classId` and `sectionId` to retrieve the current subject mapping and exam titles.",
         "     - **Step 2**: Reconstruct the `newMarks` and `titles` arrays based ONLY on the data from `getAssessmentMapping`. DO NOT rely on conversation context for the mark structure.",

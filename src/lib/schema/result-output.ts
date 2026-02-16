@@ -1,5 +1,5 @@
 import { resultRepo } from "$lib/server/repository/result.repo";
-import { result } from "$lib/server/service/result.service";
+import { assessment } from "$lib/server/service/assessment.service";
 import { z } from "zod";
 
 export const categoryEnum = z.enum(["DAYCARE", "NURSERY", "GRADEK", "LOWERBASIC", "MIDDLEBASIC"]);
@@ -91,7 +91,7 @@ export const recordSchema = z
           },
           continue: true,
         });
-        await result.cleanUpResultRecord(data);
+        await assessment.cleanUpResultRecord(data);
       }
       if (data.marks.length !== data.titles.length) {
         ctx.addIssue({
@@ -100,7 +100,7 @@ export const recordSchema = z
           path: ["marks"],
           continue: true,
         });
-        await result.cleanUpResultRecord(data);
+        await assessment.cleanUpResultRecord(data);
       }
       if (data.totalScore > 100.0) {
         ctx.addIssue({
@@ -109,12 +109,12 @@ export const recordSchema = z
           path: ["totalScore"],
           continue: true,
         });
-        await result.cleanUpResultRecord(data);
+        await assessment.cleanUpResultRecord(data);
       }
     }
     if (data.category === "DAYCARE") {
       if (data.titles.length > 0 || data.marks.length > 0) {
-        await result.cleanUpResultRecord(data);
+        await assessment.cleanUpResultRecord(data);
       }
       if (!data.learningOutcome) {
         ctx.addIssue({

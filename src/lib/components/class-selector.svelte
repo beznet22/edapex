@@ -27,20 +27,21 @@
 
   let open = $state(false);
   const userContext = UserContext.fromContext();
-  const chat = $derived(useChat());
-  const file = $derived(useFileActions());
+  const chat = useChat();
+  const file = useFileActions();
   let loading = $state(true);
 
   const loadStudents = async () => {
     loading = true;
     const result = await getStudents({
-      classId: chat.selectedClass?.classId || undefined,
-      sectionId: chat.selectedClass?.sectionId || undefined,
+      classId: file.selectedClass?.classId || undefined,
+      sectionId: file.selectedClass?.sectionId || undefined,
     });
 
     if (!result.success || (!result.data && result.message)) {
       loading = false;
       toast.error(result.message);
+      return;
     }
 
     userContext.students = result.data!;
@@ -50,14 +51,10 @@
 
   const onSelect = (cls: ClassSection) => {
     open = false;
-    chat.selectedClass = cls;
     file.selectedClass = cls;
+    if (chat) chat.selectedClass = cls;
     loadStudents();
   };
-
-  // $effect(() => {
-  //   console.log(userContext.students);
-  // });
 
   const onOpenChange = (val: boolean) => {
     open = val;
@@ -71,28 +68,27 @@
         {...props}
         variant="outline"
         class={cn(
-          "h-9 sm:h-10 rounded-full px-3 sm:px-4 w-fit text-xs sm:text-sm gap-1.5 sm:gap-2 transition-all duration-200",
-          "data-[state=open]:bg-accent data-[state=open]:text-accent-foreground",
+          "data-[state=open]:bg-accent data-[state=open]:text-accent-foreground w-fit md:h-[34px] md:px-2",
           c,
         )}
       >
         <div class="max-w-[100px] sm:max-w-[120px] truncate">
-          {#if !chat.selectedClass?.id}
+          {#if !file.selectedClass?.id}
             Select a Class
           {:else}
-            {`${chat.selectedClass?.className} (${chat.selectedClass?.sectionName})`}
+            {`${file.selectedClass?.className} (${file.selectedClass?.sectionName})`}
           {/if}
         </div>
-        <ChevronDownIcon class="size-3.5 sm:size-4 opacity-50" />
+        <ChevronDownIcon class="opacity-50" />
       </Button>
     {/snippet}
   </DropdownMenuTrigger>
-  <DropdownMenuContent align="end" class="max-h-96">
+  <DropdownMenuContent align="start" class="max-h-96 min-w-[300px]">
     {#each userContext.classes as cls (cls.id)}
       <DropdownMenuItem
         onSelect={() => onSelect(cls)}
         class="group/item flex flex-row items-center justify-between gap-4"
-        data-active={cls.id === chat.selectedClass?.id}
+        data-active={cls.id === file.selectedClass?.id}
       >
         <div class="flex flex-col items-start gap-1">
           <div>{`${cls.className} (${cls.sectionName})`}</div>
