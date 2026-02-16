@@ -1,21 +1,7 @@
 import { studentRepo } from "$lib/server/repository/student.repo";
 import { z } from "zod";
 
-export enum AttributeEnum {
-  Poor = 1,
-  Fair,
-  Good,
-  VeryGood,
-  Excellent,
-}
-
-export const AttributeRemark = {
-  1: "Poor",
-  2: "Fair",
-  3: "Good",
-  4: "Very Good",
-  5: "Excellent",
-};
+import { AttributeEnum, AttributeRemark } from "$lib/constants/assessment";
 
 // Helper function to match names
 const matchName = (fullName: string, targetName?: string): boolean => {
@@ -71,7 +57,9 @@ export const studentDataSchema = z.object({
   fullName: z.string().min(1, "Student full name required").describe("Full name of the student"),
   class: z.string().describe("Assigned class (e.g. GRADE KA)"),
   classId: z.number().int().positive().describe("Mapped class ID from classes mapping"),
+  className: z.string().describe("Class Name"),
   sectionId: z.number().int().positive().describe("Mapped section ID from sections mapping"),
+  sectionName: z.string().describe("Section Name"),
   studentCategory: z
     .string()
     .describe("Category of the student mapped from the class category (e.g., GRADE K)"),
@@ -142,6 +130,7 @@ export const marksDataSchema = z
   .array(
     z.object({
       subjectCode: z.string().min(1, "Subject code required").describe("Subject code (e.g., PSRN/QR)"),
+      subjectName: z.string().optional().describe("Full subject name"),
       subjectId: z.number().int().positive().describe("Mapped subject ID from subjects mapping"),
       learningOutcome: z.string().nullable().optional().describe("Learning outcome (ONLY for DAYCARE)"),
       examTitles: z

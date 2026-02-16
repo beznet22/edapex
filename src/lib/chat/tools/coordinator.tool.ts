@@ -3,7 +3,7 @@ import { resultOutputSchema, type Category } from "$lib/schema/result-output";
 import { resultRepo } from "$lib/server/repository/result.repo";
 import { studentRepo } from "$lib/server/repository/student.repo";
 import { staffRepo } from "$lib/server/repository/staff.repo";
-import { result } from "$lib/server/service/result.service";
+import { assessment } from "$lib/server/service/assessment.service";
 
 import { CATEGORY } from "$lib/types/sms-types";
 import { tool, type InferToolInput, type InferToolOutput } from "ai";
@@ -65,7 +65,7 @@ export const validateClassResults = tool({
     }[] = [];
 
     for (const student of students) {
-      const resultData = await result.getStudentResult({
+      const resultData = await assessment.getStudentResult({
         id: student.id,
         examId: examTypeId,
       });
@@ -143,7 +143,7 @@ export const sendStudentResult = tool({
     errors: z.array(z.string()).optional().describe("Detailed error messages if sending failed"),
   }),
   execute: async ({ studentId, examTypeId, resend }) => {
-    const response = await result.publishResults({ studentIds: [studentId], examId: examTypeId, resend });
+    const response = await assessment.publishResults({ studentIds: [studentId], examId: examTypeId, resend });
 
     if (!response.success) {
       return {
@@ -191,7 +191,7 @@ export const sendClassResults = tool({
       return { success: false, message: "No students found." };
     }
 
-    const response = await result.publishResults({
+    const response = await assessment.publishResults({
       studentIds: students.map((s) => s.id),
       examId: examTypeId,
       resend,
@@ -352,7 +352,7 @@ export const upsertMarkStore = tool({
       return { success: false, message: "Student not found." };
     }
 
-    const processMark = await result.doProcessMarks(
+    const processMark = await assessment.doProcessMarks(
       {
         category: CATEGORY[studentRecord.categoryId ?? 0] as Category,
         studentId,
@@ -640,7 +640,7 @@ export const getAssessmentMapping = tool({
         }
         finalStaffId = staff.teacherId;
       }
-      const data = await result.getMappingData(finalStaffId!);
+      const data = await assessment.getMappingData(finalStaffId!);
       return { success: true, data };
     } catch (error) {
       return { success: false, message: "Failed to fetch mapping data" };

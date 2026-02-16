@@ -59,6 +59,33 @@ export class ResultsRepository extends BaseRepository {
     }, "getClassSections");
   }
 
+  async getClassSectionById(classId: number, sectionId: number): Promise<ClassSection | null> {
+    return this.withErrorHandling(async () => {
+      const academicId = await this.getAcademicId();
+      const [classSection] = await this.db
+        .select({
+          id: schema.smClassSections.id,
+          classId: schema.smClassSections.classId,
+          className: schema.smClasses.className,
+          sectionId: schema.smClassSections.sectionId,
+          sectionName: schema.smSections.sectionName,
+        })
+        .from(schema.smClassSections)
+        .leftJoin(schema.smClasses, eq(schema.smClassSections.classId, schema.smClasses.id))
+        .leftJoin(schema.smSections, eq(schema.smClassSections.sectionId, schema.smSections.id))
+        .where(
+          and(
+            eq(schema.smClassSections.classId, classId),
+            eq(schema.smClassSections.sectionId, sectionId),
+            eq(schema.smClassSections.activeStatus, 1),
+            eq(schema.smClassSections.academicId, academicId)
+          )
+        )
+        .limit(1);
+      return classSection || null;
+    }, "getClassSectionById");
+  }
+
   async getAssignedSubjects(classId: number, sectionId?: number): Promise<SubjectAssigned[]> {
     return this.withErrorHandling(async () => {
       const academicId = await this.getAcademicId();

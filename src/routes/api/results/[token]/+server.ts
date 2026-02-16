@@ -1,5 +1,5 @@
 import { generate } from "$lib/server/helpers/pdf-generator";
-import { result } from "$lib/server/service/result.service";
+import { assessment } from "$lib/server/service/assessment.service";
 import ResultTemplate from "$lib/components/template/ResultTemplate.svelte";
 import type { RequestHandler } from "@sveltejs/kit";
 import { base64url } from "jose";
@@ -15,9 +15,9 @@ export const GET: RequestHandler = async ({ url, params }) => {
     const decoded = base64url.decode(token.split(".")[0]);
     const jsonString = new TextDecoder().decode(decoded);
     const { studentId, examId } = JSON.parse(jsonString);
-    console.log({studentId, examId});
+    console.log({ studentId, examId });
 
-    const resultData = await result.getStudentResult({ id: studentId, examId, withImages: true });
+    const resultData = await assessment.getStudentResult({ id: studentId, examId, withImages: true });
     if (!resultData) throw new Error("Result not found");
     const props = { data: resultData };
     const { body, head } = render(ResultTemplate, { props });

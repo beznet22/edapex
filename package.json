@@ -67,6 +67,7 @@
 		"@ai-sdk/svelte": "^4.0.50",
 		"@shikijs/langs": "^3.19.0",
 		"@shikijs/themes": "^3.19.0",
+		"@types/glob": "^9.0.0",
 		"ai": "^6.0.50",
 		"dotenv": "^17.2.3",
 		"isomorphic-dompurify": "^2.34.0",

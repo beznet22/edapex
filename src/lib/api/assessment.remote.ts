@@ -7,7 +7,8 @@ import { generateContent } from "$lib/server/helpers/chat-helper";
 import { generate } from "$lib/server/helpers/pdf-generator";
 import { staffRepo } from "$lib/server/repository/staff.repo";
 import { studentRepo } from "$lib/server/repository/student.repo";
-import { result } from "$lib/server/service/result.service";
+import { resultRepo } from "$lib/server/repository/result.repo";
+import { assessment } from "$lib/server/service/assessment.service";
 import { render } from "svelte/server";
 import z from "zod";
 
@@ -18,7 +19,7 @@ export const generateResultPdf = command(
   }),
   async ({ studentId, examId }) => {
     try {
-      const resultData = await result.getStudentResult({ id: studentId, examId });
+      const resultData = await assessment.getStudentResult({ id: studentId, examId });
       if (!resultData) throw new Error("Result not found");
 
       const props = { data: resultData };
@@ -80,7 +81,7 @@ export const assignSubjects = command(
 
       let staffId: number = 0;
       if (designation === "class_teacher") {
-        const assigned = await result.assignSubjects(classId, sectionId, user.staffId);
+        const assigned = await assessment.assignSubjects(classId, sectionId, user.staffId);
         if (!assigned || !user.staffId) return { success: false, message: "Failed to assign subjects" };
         staffId = user.staffId;
       }
@@ -113,36 +114,8 @@ export const doExtraction = command(
     if (!user) {
       return { success: false, status: "error", error: "Unauthorized" };
     }
-    console.log(classId, sectionId);
     try {
-      const staff = await staffRepo.getStaffByClassSection({ classId, sectionId });
-      if (!staff.teacherId) throw new Error("Class not assigned to any teacher");
-
-      const mappingData = await result.getMappingData(staff.teacherId);
-      const mapString = JSON.stringify(mappingData);
-      const { success, content, message } = await generateContent(file, mapString);
-      if (!success || !content) {
-        throw new Error(message);
-      }
-      const parsedResult = JSON.parse(content.trim());
-      console.log(parsedResult);
-      const marks = resultInputSchema.parse(parsedResult);
-      const res = await result.upsertStudentResult(marks, staff.teacherId);
-      if (!res.success) {
-        throw new Error(res.message);
-      }
-
-      const validated = resultInputSchema.safeParse(parsedResult);
-      if (!validated.success) {
-        const error = validated.error.issues.filter(
-          issue => issue.code === "custom"
-        );
-        console.log("Failed to upload file", error);
-        throw new Error(error.map(issue => issue.message).join("\n"));
-      }
-
-      validated.data.studentData.studentId = res.data?.studentId || null;
-      return { success: true, status: "done", studentData: validated.data.studentData, marks: validated.data };
+      return await assessment.runExtraction({ file, classId, sectionId });
     } catch (error: any) {
       console.error("Failed to upload file", error);
       return { success: false, status: "error", error: error.message };

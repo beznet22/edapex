@@ -1,134 +1,231 @@
 import { promises as fs } from "fs";
+import { join } from "path";
+import type { ResultInput } from "$lib/schema/result-input";
+import { EXTRACTED_DIR } from "$lib/constants";
 
-interface ExtractedAssessment {
-    studentId: number;
-    examId: number;
-    classId: number;
-    sectionId: number;
-    scores: Record<string, number[]>;
+export interface ExtractedAssessment {
+    data?: ResultInput;
     extractedAt: Date;
     verified: boolean;
+    status: "pending" | "done" | "error";
+    error?: string;
+    originalName?: string;
 }
 
 export class StudentFileStorage {
-    private basePath = "storage/students";
+    public basePath = EXTRACTED_DIR;
 
     constructor(basePath?: string) {
         if (basePath) this.basePath = basePath;
     }
 
-    encodeFolder(classId: number, sectionId: number): string {
-        return Buffer.from(`${classId}:${sectionId}`).toString("base64url");
+    public formatName(name: string): string {
+        return name.trim().replaceAll(" ", "_");
     }
 
-    encodeFile(studentId: number, examId: number): string {
-        return Buffer.from(`${studentId}:${examId}`).toString("base64url");
+    public getFolderPath(className: string, sectionName: string): string {
+        return `${className}(${sectionName})`.toLowerCase().replaceAll(" ", "_");
     }
 
-    decode(encoded: string): { id1: number; id2: number } {
-        const decoded = Buffer.from(encoded, "base64url").toString();
-        const [id1, id2] = decoded.split(":");
-        return { id1: Number(id1), id2: Number(id2) };
+    async loadByStudent(classId: number, sectionId: number, studentId: number, examId: number): Promise<ExtractedAssessment | null> {
+        // Since we now store by name, we need to find the student first to get their name
+        // This is a bit backwards but keeps the human-readable FS structure
+        const { studentRepo } = await import("$lib/server/repository/student.repo");
+        const { resultRepo } = await import("$lib/server/repository/result.repo");
+
+        const student = await studentRepo.getStudentById(studentId);
+        if (!student) return null;
+
+        const classSection = await resultRepo.getClassSectionById(classId, sectionId);
+        if (!classSection) return null;
+
+        const folder = this.getFolderPath(classSection.className || "Unknown", classSection.sectionName || "Unknown");
+        const studentFolder = this.formatName(student.fullName || "Unknown");
+        return this.load(join(folder, studentFolder));
     }
 
-    async save(data: ExtractedAssessment): Promise<string> {
-        const folder = this.encodeFolder(data.classId, data.sectionId);
-        const filename = this.encodeFile(data.studentId, data.examId);
-        const dir = `${this.basePath}/${folder}`;
+    async findLatestByStudent(classId: number, sectionId: number, studentId: number): Promise<ExtractedAssessment | null> {
+        // Similar to loadByStudent but for latest
+        const { studentRepo } = await import("$lib/server/repository/student.repo");
+        const { resultRepo } = await import("$lib/server/repository/result.repo");
+
+        const student = await studentRepo.getStudentById(studentId);
+        if (!student) return null;
+
+        const classSection = await resultRepo.getClassSectionById(classId, sectionId);
+        if (!classSection) return null;
+
+        const folder = this.getFolderPath(classSection.className || "Unknown", classSection.sectionName || "Unknown");
+        const studentFolder = this.formatName(student.fullName || "Unknown");
+        return this.load(join(folder, studentFolder));
+    }
+
+    async save(data: ExtractedAssessment, imageBuffer?: Buffer): Promise<string> {
+        // Use class/section/name from the ResultInput data
+        const { className, sectionName, fullName } = data.data?.studentData || { fullName: "Unknown" };
+
+        const folder = this.getFolderPath(className || "Unknown", sectionName || "Unknown");
+        const studentFolder = this.formatName(fullName);
+        const dir = join(this.basePath, folder, studentFolder);
 
         await fs.mkdir(dir, { recursive: true });
-        await fs.writeFile(`${dir}/${filename}.json`, JSON.stringify(data, null, 2));
 
-        return `${folder}/${filename}`;
+        // Ensure status is done if not otherwise specified
+        if (!data.status) data.status = "done";
+
+        // Save the JSON data
+        await fs.writeFile(join(dir, "data.json"), JSON.stringify(data, null, 2));
+
+        // Save the image if provided
+        if (imageBuffer) {
+            const imageFilename = `${this.formatName(fullName)}.jpg`;
+            await fs.writeFile(join(dir, imageFilename), imageBuffer);
+        }
+
+        return join(folder, studentFolder);
     }
 
-    async loadByStudent(
-        classId: number,
-        sectionId: number,
-        studentId: number,
-        examId: number
-    ): Promise<ExtractedAssessment | null> {
-        const folder = this.encodeFolder(classId, sectionId);
-        const filename = this.encodeFile(studentId, examId);
-        return this.load(`${folder}/${filename}`);
+    async savePending(params: {
+        file: Blob;
+        className: string;
+        sectionName: string;
+        fileName: string;
+        fullName?: string;
+        status?: "pending" | "error";
+        error?: string;
+    }): Promise<string> {
+        const folder = this.getFolderPath(params.className, params.sectionName);
+
+        // Strictly use fullName or Unknown_Student as a fallback
+        // We use Unknown_Student_${Date.now()} to avoid collisions if multiple unknown students are uploaded
+        const nameToUse = params.fullName || `Unknown_Student_${Date.now()}`;
+        const folderName = this.formatName(nameToUse);
+        const dir = join(this.basePath, folder, folderName);
+
+        await fs.mkdir(dir, { recursive: true });
+
+        const assessment: ExtractedAssessment = {
+            extractedAt: new Date(),
+            verified: false,
+            status: params.status || "pending",
+            error: params.error,
+            originalName: params.fileName,
+            data: {
+                studentData: {
+                    fullName: params.fullName || "Unknown Student",
+                    className: params.className,
+                    sectionName: params.sectionName
+                }
+            } as any
+        };
+
+        await fs.writeFile(join(dir, "data.json"), JSON.stringify(assessment, null, 2));
+
+        const imageBuffer = Buffer.from(await params.file.arrayBuffer());
+        // Use formatted folderName.jpg
+        const imageFilename = `${folderName}.jpg`;
+        await fs.writeFile(join(dir, imageFilename), imageBuffer);
+
+        return join(folder, folderName);
     }
 
-    async load(path: string): Promise<ExtractedAssessment | null> {
-        const fullPath = `${this.basePath}/${path}`;
+    async load(folderPath: string): Promise<ExtractedAssessment | null> {
+        const fullPath = join(this.basePath, folderPath, "data.json");
         try {
-            const data = await fs.readFile(fullPath.endsWith(".json") ? fullPath : `${fullPath}.json`, "utf-8");
+            const data = await fs.readFile(fullPath, "utf-8");
             const parsed = JSON.parse(data);
-            // Ensure extractedAt is a Date object
             if (parsed.extractedAt) {
                 parsed.extractedAt = new Date(parsed.extractedAt);
             }
+            if (!parsed.status) {
+                parsed.status = "done";
+            }
             return parsed as ExtractedAssessment;
-        } catch (error) {
-            if ((error as any).code === "ENOENT") {
-                return null; // File not found
-            }
-            throw error;
-        }
-    }
-
-    async listByClass(classId: number, sectionId: number): Promise<string[]> {
-        const folder = this.encodeFolder(classId, sectionId);
-        const dir = `${this.basePath}/${folder}`;
-        try {
-            const files = await fs.readdir(dir);
-            return files.filter(f => f.endsWith(".json"));
-        } catch (error) {
-            if ((error as any).code === "ENOENT") {
-                return []; // Directory not found
-            }
-            throw error;
-        }
-    }
-
-    async findLatestByStudent(
-        classId: number,
-        sectionId: number,
-        studentId: number
-    ): Promise<ExtractedAssessment | null> {
-        const folder = this.encodeFolder(classId, sectionId);
-        const dir = `${this.basePath}/${folder}`;
-        try {
-            const files = await fs.readdir(dir);
-            // filter files that match studentId regardless of examId
-            // Filename is base64(studentId:examId)
-            const matchedFiles = [];
-            for (const file of files) {
-                if (!file.endsWith(".json")) continue;
-                const encoded = file.replace(".json", "");
-                try {
-                    const { id1 } = this.decode(encoded);
-                    if (id1 === studentId) {
-                        matchedFiles.push(file);
-                    }
-                } catch (e) {
-                    continue;
-                }
-            }
-
-            if (matchedFiles.length === 0) return null;
-
-            // Sort by modification time to get latest
-            const validFilesWithStat = await Promise.all(
-                matchedFiles.map(async (f) => {
-                    const stat = await fs.stat(`${dir}/${f}`);
-                    return { file: f, mtime: stat.mtime };
-                })
-            );
-
-            validFilesWithStat.sort((a, b) => b.mtime.getTime() - a.mtime.getTime());
-            return this.load(`${folder}/${validFilesWithStat[0].file}`);
-
         } catch (error) {
             if ((error as any).code === "ENOENT") {
                 return null;
             }
             throw error;
         }
+    }
+
+    async getImage(folderPath: string): Promise<Buffer | null> {
+        // Since folderPath is usually className(sectionName)/student_name
+        // the filename should be student_name.jpg
+        const parts = folderPath.split("/");
+        const studentName = parts[parts.length - 1];
+        const imageFilename = `${studentName}.jpg`;
+        const fullPath = join(this.basePath, folderPath, imageFilename);
+
+        try {
+            return await fs.readFile(fullPath);
+        } catch (error) {
+            // Fallback to legacy 'image.jpg' if needed
+            try {
+                return await fs.readFile(join(this.basePath, folderPath, "image.jpg"));
+            } catch (innerError) {
+                if ((error as any).code === "ENOENT") {
+                    return null;
+                }
+                throw error;
+            }
+        }
+    }
+
+    async listByClass(className: string, sectionName: string): Promise<string[]> {
+        const folder = this.getFolderPath(className, sectionName);
+        const dir = join(this.basePath, folder);
+        try {
+            const entries = await fs.readdir(dir, { withFileTypes: true });
+            return entries
+                .filter(e => e.isDirectory())
+                .map(e => join(folder, e.name));
+        } catch (error) {
+            if ((error as any).code === "ENOENT") {
+                return [];
+            }
+            throw error;
+        }
+    }
+
+    async findFilePath(filename: string): Promise<string | null> {
+        const folders = await fs.readdir(this.basePath, { withFileTypes: true });
+        for (const folder of folders) {
+            if (!folder.isDirectory()) continue;
+
+            const folderPath = join(this.basePath, folder.name);
+            const subfolders = await fs.readdir(folderPath, { withFileTypes: true });
+
+            for (const sub of subfolders) {
+                if (!sub.isDirectory()) continue;
+
+                const studentPath = join(folderPath, sub.name);
+                const files = await fs.readdir(studentPath);
+
+                if (files.includes(filename)) {
+                    return join(this.basePath, folder.name, sub.name, filename);
+                }
+            }
+        }
+        return null;
+    }
+
+    // Legacy support or helper
+    decode(encoded: string): { id1: number; id2: number } {
+        // This was previously used for base64(studentId:examId)
+        // We might not need this anymore if we use the new path structure,
+        // but keeping it for compatibility if other parts of the system still use it.
+        try {
+            const decoded = Buffer.from(encoded, "base64url").toString();
+            const [id1, id2] = decoded.split(":");
+            return { id1: Number(id1), id2: Number(id2) };
+        } catch (e) {
+            return { id1: 0, id2: 0 };
+        }
+    }
+
+    encodeFolder(classId: number, sectionId: number): string {
+        return Buffer.from(`${classId}:${sectionId}`).toString("base64url");
     }
 }
 

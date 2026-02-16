@@ -20,7 +20,9 @@
   }: FileDropZoneProps = $props();
 
   if (maxFiles !== undefined && fileCount === undefined) {
-    console.warn("Make sure to provide FileDropZone with `fileCount` when using the `maxFiles` prompt");
+    console.warn(
+      "Make sure to provide FileDropZone with `fileCount` when using the `maxFiles` prompt",
+    );
   }
 
   let uploading = $state(false);
@@ -28,7 +30,7 @@
   const drop = async (
     e: DragEvent & {
       currentTarget: EventTarget & HTMLLabelElement;
-    }
+    },
   ) => {
     if (disabled || !canUploadFiles) return;
 
@@ -42,7 +44,7 @@
   const change = async (
     e: Event & {
       currentTarget: EventTarget & HTMLInputElement;
-    }
+    },
   ) => {
     if (disabled) return;
 
@@ -56,10 +58,15 @@
     (e.target as HTMLInputElement).value = "";
   };
 
-  const shouldAcceptFile = (file: File, fileNumber: number): FileRejectedReason | undefined => {
-    if (maxFileSize !== undefined && file.size > maxFileSize) return "Maximum file size exceeded";
+  const shouldAcceptFile = (
+    file: File,
+    fileNumber: number,
+  ): FileRejectedReason | undefined => {
+    if (maxFileSize !== undefined && file.size > maxFileSize)
+      return "Maximum file size exceeded";
 
-    if (maxFiles !== undefined && fileNumber > maxFiles) return "Maximum files uploaded";
+    if (maxFiles !== undefined && fileNumber > maxFiles)
+      return "Maximum files uploaded";
 
     if (!accept) return undefined;
 
@@ -112,7 +119,13 @@
   };
 
   const canUploadFiles = $derived(
-    !disabled && !uploading && !(maxFiles !== undefined && fileCount !== undefined && fileCount >= maxFiles)
+    !disabled &&
+      !uploading &&
+      !(
+        maxFiles !== undefined &&
+        fileCount !== undefined &&
+        fileCount >= maxFiles
+      ),
   );
 </script>
 
@@ -123,7 +136,7 @@
   aria-disabled={!canUploadFiles}
   class={cn(
     "border-border hover:bg-accent/25 flex h-48 w-full place-items-center justify-center rounded-lg border-2 border-dashed p-6 transition-all hover:cursor-pointer aria-disabled:opacity-50 aria-disabled:hover:cursor-not-allowed",
-    className
+    className,
   )}
 >
   {#if children}

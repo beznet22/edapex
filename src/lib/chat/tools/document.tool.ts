@@ -11,7 +11,7 @@ import {
   type UIMessageStreamWriter,
 } from "ai";
 import type { xDataPart } from "$lib/types/chat-types";
-import { result } from "$lib/server/service/result.service";
+import { assessment } from "$lib/server/service/assessment.service";
 
 export const createdDocumentTool = (
   writer?: UIMessageStreamWriter<UIMessage<never, xDataPart>>,
@@ -89,7 +89,7 @@ export const createdDocumentTool = (
 };
 
 const addResultDataToMessage = async (messages: ModelMessage[]): Promise<ModelMessage[]> => {
-  const resultData = await result.getStudentResult({ id: 20, examId: 5 });
+  const resultData = await assessment.getStudentResult({ id: 20, examId: 5 });
   if (!resultData) return messages;
   resultData.student.studentPhoto = "";
   resultData.school.logo = "";

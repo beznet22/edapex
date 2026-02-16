@@ -3,60 +3,33 @@
   import * as Carousel from "$lib/components/ui/carousel/index.js";
   import BrushCleaningIcon from "@lucide/svelte/icons/brush";
   import RotateCcwIcon from "@lucide/svelte/icons/rotate-ccw";
-  import UploadIcon from "@lucide/svelte/icons/upload";
+  import FolderIcon from "@lucide/svelte/icons/folder";
   import { Separator } from "./ui/separator";
   import { useFileActions } from "$lib/context/file-context.svelte";
   import Button, { buttonVariants } from "./ui/button/button.svelte";
   import * as Tooltip from "$lib/components/ui/tooltip/index.js";
-  import type { CarouselAPI } from "$lib/components/ui/carousel/context.js";
-  import { onMount } from "svelte";
   import Loader from "./prompt-kit/loader/loader.svelte";
   import { toast } from "svelte-sonner";
   import type { UploadedData } from "$lib/types/chat-types";
   import { useUser } from "$lib/context/user-context.svelte";
   import { useChat } from "$lib/context/chat-context.svelte";
   import * as Dialog from "$lib/components/ui/dialog/index.js";
-  import { getResources } from "$lib/api/chat.remote";
 
-  interface ChatResourceProps {
-    onFileSelected?: (files: FileList) => void;
-  }
-
-  let { onFileSelected = () => {} }: ChatResourceProps = $props();
-
+  let { onFileSelected }: { onFileSelected?: (file: UploadedData) => void } =
+    $props();
   let fileCtx = $derived(useFileActions());
   let userContext = $derived(useUser());
   let chat = $derived(useChat());
 
-  let uploads = $state<UploadedData[]>([]);
-  let loading = $state(true);
-
-  const loadResources = async () => {
-    loading = true;
-    try {
-      const result = await getResources({
-        className: chat.selectedClass?.className || undefined,
-        sectionName: chat.selectedClass?.sectionName || undefined,
-      });
-
-      if (result.success) {
-        uploads = result.resources;
-      } else {
-        console.error("Failed to load resources:", result.message);
-        uploads = [];
-      }
-    } catch (error) {
-      console.error("Error loading resources:", error);
-      uploads = [];
-    } finally {
-      loading = false;
-    }
-  };
+  let loading = $state(false);
 
   // Load resources when modal opens
   $effect(() => {
     if (fileCtx.openResourceModal) {
-      loadResources();
+      loading = true;
+      fileCtx.loadResources().finally(() => {
+        loading = false;
+      });
     }
   });
 
@@ -70,7 +43,7 @@
       return;
     }
     toast("Resources cleared");
-    uploads = [];
+    fileCtx.uploads = [];
   };
 
   const retryUpload = (upload: UploadedData) => {
@@ -110,8 +83,8 @@
     }
   };
 
-  // Close the resource modal
-  const closeResourceModal = () => {
+  const openManageFiles = () => {
+    fileCtx.openFileStoreModal = true;
     fileCtx.openResourceModal = false;
   };
 </script>
@@ -124,10 +97,23 @@
     >
       <div class="p-6 pb-2">
         <Dialog.Header>
-          <Dialog.Title>Resources</Dialog.Title>
-          <Dialog.Description
-            >View and manage your uploaded resources.</Dialog.Description
-          >
+          <div class="flex items-center justify-between">
+            <div>
+              <Dialog.Title>Resources</Dialog.Title>
+              <Dialog.Description
+                >View and manage your uploaded resources.</Dialog.Description
+              >
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onclick={openManageFiles}
+              class="gap-2"
+            >
+              <FolderIcon class="size-4" />
+              Manage Files
+            </Button>
+          </div>
         </Dialog.Header>
       </div>
 
@@ -136,7 +122,7 @@
           <div class="flex items-center justify-center h-40">
             <Loader variant="circular" />
           </div>
-        {:else if uploads.length > 0}
+        {:else if fileCtx.uploads.length > 0}
           <Carousel.Root class="relative w-full pt-10">
             {#if !userContext.isCoordinator}
               <Tooltip.Provider delayDuration={0}>
@@ -157,7 +143,7 @@
             {/if}
             <div class="flex justify-center">
               <Carousel.Content class="flex-1 my-4 justify-center items-center">
-                {#each uploads as upload, i (i)}
+                {#each fileCtx.uploads as upload, i (i)}
                   <Carousel.Item class="md:basis-1/2 lg:basis-1/3 h-full -ms-1">
                     <div class="h-full">
                       <Card.Root class="h-full rounded-2xl">
@@ -168,11 +154,20 @@
                             class="h-full w-full cursor-pointer outline-none border-none p-0 bg-transparent"
                             onclick={() => openPreview(upload)}
                           >
-                            <img
-                              src={`/api/uploads/${upload.filename}?token=${upload.token}`}
-                              alt={upload.filename}
-                              class="h-full w-full object-cover rounded-lg"
-                            />
+                            {#if upload.status === "done" && upload.token}
+                              <img
+                                src={`/api/uploads/${upload.filename}?token=${upload.token}`}
+                                alt={upload.filename}
+                                class="h-full w-full object-cover rounded-lg"
+                              />
+                            {:else}
+                              <div
+                                class="flex flex-col items-center justify-center gap-2 text-muted-foreground"
+                              >
+                                <RotateCcwIcon class="size-12 opacity-20" />
+                                <span class="text-xs">{upload.status}</span>
+                              </div>
+                            {/if}
                           </button>
 
                           <Button
@@ -181,7 +176,7 @@
                             class="absolute bottom-2 right-2 bg-black/70 text-white text-2xl font-semibold px-2 py-1 rounded-md cursor-pointer"
                             onclick={() => retryUpload(upload)}
                           >
-                            {#if uploads.some((u) => u.id === upload.id && u.status === "retrying")}
+                            {#if upload.status === "retrying"}
                               <Loader variant="circular" size="sm" />
                             {:else}
                               <RotateCcwIcon class="size-4" />
@@ -218,11 +213,17 @@
           <Dialog.Title>{selectedUpload?.filename || "Preview"}</Dialog.Title>
         </Dialog.Header>
         <div class="relative w-full h-full flex items-center justify-center">
-          <img
-            src={`/api/uploads/${selectedUpload.filename}?token=${selectedUpload.token}`}
-            alt={selectedUpload.filename}
-            class="max-w-full max-h-[85vh] object-contain rounded-lg shadow-2xl"
-          />
+          {#if selectedUpload.status === "done" && selectedUpload.token}
+            <img
+              src={`/api/uploads/${selectedUpload.id}.pdf?token=${selectedUpload.token}`}
+              alt={selectedUpload.filename}
+              class="max-w-full max-h-[85vh] object-contain rounded-lg shadow-2xl"
+            />
+          {:else}
+            <div class="bg-card p-10 rounded-lg">
+              Preview not available for {selectedUpload.status} items.
+            </div>
+          {/if}
         </div>
       </Dialog.Content>
     </Dialog.Root>

@@ -650,6 +650,67 @@ class AuthService {
     });
     return { success: true };
   }
+  async logoutMobile(sessionId?: string) {
+    if (sessionId) {
+      await authRepo.revokeRefreshToken(sessionId);
+    }
+    return { success: true };
+  }
+
+  async refreshMobile(token: string) {
+    // Similar to standard refresh but returns the tokens in response body instead of only cookies
+    const payload = await jwt.verify(token);
+    if (!payload?.sub || !payload.jti) {
+      throw new Error("Invalid refresh token");
+    }
+
+    const isValid = await authRepo.validateRefreshToken(payload.jti as string, payload.jti as string);
+    if (!isValid) {
+      throw new Error("Session expired");
+    }
+
+    const userId = parseInt(payload.sub);
+    const currentFingerprint = payload.fp as string || "mobile-client"; // Fallback for mobile
+    const isPWAToken = payload.pwa === true;
+
+    const newAccessToken = await jwt.sign(
+      {
+        sub: userId.toString(),
+        fp: currentFingerprint,
+        pwa: isPWAToken,
+        installed: isPWAToken,
+      },
+      ACCESS_TTL
+    );
+
+    const newRefreshToken = await jwt.signRT(
+      {
+        sub: userId.toString(),
+        fp: currentFingerprint,
+        sid: payload.jti,
+        pwa: isPWAToken,
+        installed: isPWAToken,
+      },
+      isPWAToken ? PWA_REFRESH_TTL : BROWSER_REFRESH_TTL
+    );
+
+    // Revoke old
+    await authRepo.revokeRefreshToken(payload.jti as string);
+
+    // Store new
+    await authRepo.createRefreshToken(
+      newRefreshToken.jti,
+      userId,
+      currentFingerprint,
+      new Date(newRefreshToken.exp * 1000).toISOString().slice(0, 19).replace("T", " ")
+    );
+
+    return {
+      accessToken: newAccessToken.token,
+      refreshToken: newRefreshToken.token,
+      expiresAt: newAccessToken.exp,
+    };
+  }
 }
 
 export const auth = new AuthService();

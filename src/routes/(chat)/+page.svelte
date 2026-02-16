@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { assignSubjects } from "$lib/api/result.remote.js";
+  import { assignSubjects } from "$lib/api/assessment.remote.js";
   import ChatHeader from "$lib/components/chat-header.svelte";
   import Chat from "$lib/components/chat.svelte";
   import * as AlertDialog from "$lib/components/ui/alert-dialog";

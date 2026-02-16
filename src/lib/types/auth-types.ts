@@ -24,11 +24,12 @@ export interface AuthUser {
 }
 
 export interface DeviceInfo {
+  browser?: string;
   os?: string;
   ip?: string;
-  fingerprint: string;
-  userAgent: string;
-  isPWA: boolean;
+  fingerprint?: string;
+  userAgent?: string;
+  isPWA?: boolean;
   displayMode?: string;
   viewportWidth?: string;
 }

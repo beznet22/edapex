@@ -1,7 +1,7 @@
 import { json, type RequestHandler } from "@sveltejs/kit";
 import { jobRepo } from "$lib/server/repository";
 import { studentRepo } from "$lib/server/repository/student.repo";
-import { result } from "$lib/server/service/result.service";
+import { assessment } from "$lib/server/service/assessment.service";
 import { generateContent } from "$lib/server/helpers/chat-helper";
 import { resultInputSchema } from "$lib/schema/result-input";
 import { readFileSync } from "fs";
@@ -53,8 +53,8 @@ export const GET: RequestHandler = async ({ request, url }) => {
     const filePath = join(__dirname, "..", "..", "..", "static/extracted", "6a.json");
     const parsedResult = JSON.parse(readFileSync(filePath, "utf-8"));
     const marks = await resultInputSchema.parseAsync(parsedResult);
-    const res = await result.upsertStudentResult(marks, 1);
-    const resultData = await result.getStudentResult({ id: 20, examId: 5 });
+    const res = await assessment.upsertStudentResult(marks, 1);
+    const resultData = await assessment.getStudentResult({ id: 20, examId: 5 });
 
     const props = { data: resultData };
     const { body, head } = render(ResultTemplate, { props });

@@ -1,5 +1,5 @@
 import {
-  AttributeRemark,
+  resultInputSchema,
   type Attendance,
   type MarkResponse,
   type MarksData,
@@ -8,6 +8,7 @@ import {
   type StudentInput,
   type StudentRatings,
 } from "$lib/schema/result-input";
+import { AttributeRemark } from "$lib/constants/assessment";
 import {
   resultOutputSchema,
   type Category,
@@ -28,6 +29,9 @@ import { timelineRepo } from "../repository/timeline.repo";
 import ResultTemplate from "$lib/components/template/ResultTemplate.svelte";
 import ResultEmail from "$lib/components/template/result-email.svelte";
 import { JobWorker, type JobPayload, type JobResult } from "../worker";
+import { staffRepo } from "../repository/staff.repo";
+import { generateContent } from "../helpers/chat-helper";
+import { studentFileStorage } from "../storage/student-files";
 import path from "path";
 import fs from "fs";
 
@@ -56,7 +60,7 @@ type StudentData = {
   examTypeId: number;
 };
 
-export class ResultService {
+export class AssessmentService {
   category?: Category;
   studentInput?: StudentInput;
 
@@ -100,7 +104,7 @@ export class ResultService {
           }
         }
 
-        const resultData = await result.getStudentResult({ id: studentId, examId, withImages: true });
+        const resultData = await this.getStudentResult({ id: studentId, examId, withImages: true });
         const validatedResult = await resultOutputSchema.safeParseAsync(resultData);
         if (!validatedResult.success || !resultData) {
           processingErrors.push(`Student ${studentId}: Result validation failed`);
@@ -319,11 +323,10 @@ export class ResultService {
   async upsertStudentResult(validatedResult: ResultInput, teacherId: number): Promise<MarkResponse> {
     const { studentData, marksData, teachersRemark, studentRatings } = validatedResult;
     const { studentId, classId, sectionId, recordId, examTypeId } = studentData;
+    if (!studentId || !examTypeId) throw new Error("");
+
 
     try {
-      if (!studentId || !classId || !sectionId || !recordId || !examTypeId) {
-        throw new Error(`Student record not found for admission number ${studentData.admissionNo}`);
-      }
       this.category = studentData.studentCategory as Category;
       this.studentInput = studentData;
 
@@ -790,6 +793,29 @@ export class ResultService {
     return match ? { grade: match.grade, color: match.color } : { grade: "N/A", color: "bg-gray-200" };
   }
 
+  private matchName(fullName: string, targetName?: string): boolean {
+    if (!fullName || !targetName) return false;
+    const normalize = (name: string) =>
+      name
+        .toLowerCase()
+        .replace(/[^\w\s]/g, "")
+        .split(/\s+/)
+        .filter(Boolean);
+
+    const fullSet = new Set(normalize(fullName));
+    const targetSet = new Set(normalize(targetName));
+
+    let matches = 0;
+    for (const part of fullSet) {
+      if (targetSet.has(part)) {
+        matches++;
+        if (matches >= 2) return true;
+      }
+    }
+
+    return false;
+  }
+
   private parseAddress(address: string) {
     const parts = address.split(",").map((p) => p.trim());
     const state = parts.pop() || null,
@@ -798,6 +824,123 @@ export class ResultService {
     const m = /No\.\s*(\d+)\s*(.+)/i.exec(street);
     return { street_number: m?.[1] || null, street_name: m?.[2] || street || null, city, state };
   }
+  /**
+   * Unifies extraction logic for UI and API entry points.
+   * Handles mapping fetching, AI extraction, validation, and storage.
+   */
+  async runExtraction(params: {
+    file: Blob;
+    classId: number;
+    sectionId: number;
+    studentId?: number;
+    fullName?: string;
+    admissionNo?: number;
+    originalName?: string;
+  }) {
+    const { file, classId, sectionId, studentId, fullName, admissionNo } = params;
+
+    const staff = await staffRepo.getStaffByClassSection({ classId, sectionId });
+    if (!staff.teacherId) throw new Error("Class not assigned to any teacher");
+
+    const mappingData = await this.getMappingData(staff.teacherId);
+    if (studentId) {
+      mappingData.studentData = { studentId, admissionNo, fullName };
+    }
+
+    const mapString = JSON.stringify(mappingData);
+    const { success, content, message } = await generateContent(file, mapString);
+    if (!success || !content) {
+      throw new Error(message || "AI extraction failed");
+    }
+
+    const parsedResult = JSON.parse(content.trim());
+
+    // Fetch class/section names for storage folder naming and validation
+    const classSection = await resultRepo.getClassSectionById(classId, sectionId);
+    const finalClassName = classSection?.className || (parsedResult.studentData as any).className || "Unknown";
+    const finalSectionName = classSection?.sectionName || (parsedResult.studentData as any).sectionName || "Unknown";
+
+    // Inject missing fields before validation to satisfy studentDataSchema
+    if (!parsedResult.studentData.className) parsedResult.studentData.className = finalClassName;
+    if (!parsedResult.studentData.sectionName) parsedResult.studentData.sectionName = finalSectionName;
+    if (!parsedResult.studentData.class) {
+      parsedResult.studentData.class = `${finalClassName} ${finalSectionName}`.trim();
+    }
+
+    // Merge manual overrides if provided
+    if (studentId) parsedResult.studentData.studentId = studentId;
+    if (admissionNo) parsedResult.studentData.admissionNo = admissionNo;
+    if (fullName) parsedResult.studentData.fullName = fullName;
+
+    const validated = await resultInputSchema.safeParseAsync(parsedResult);
+    if (!validated.success) {
+      console.log("Extraction validation failed", validated.error.issues);
+      const errors = validated.error.issues.map((issue) => {
+        const path = issue.path.join(".");
+        return `${path}: ${issue.message}`;
+      });
+      throw new Error(`Validation failed:\n${errors.join("\n")}`);
+    }
+
+    // Ensure names are in the data object for storage path generation
+    validated.data.studentData.className = finalClassName;
+    validated.data.studentData.sectionName = finalSectionName;
+
+    const storagePath = await studentFileStorage.save(
+      {
+        data: validated.data,
+        extractedAt: new Date(),
+        verified: false,
+        status: "done",
+        originalName: params.originalName,
+      },
+      Buffer.from(await file.arrayBuffer())
+    );
+
+    return {
+      success: true,
+      studentData: validated.data.studentData,
+      marks: validated.data,
+      storagePath,
+    };
+  }
+
+  /**
+   * Retrieves extracted assessment data from persistent filesystem storage.
+   * Handles path derivation and mapping back to usable marks data.
+   */
+  async getExtractedAssessment(studentId: number, examId: number) {
+    const student = await studentRepo.getStudentById(studentId);
+    if (!student || !student.classId || !student.sectionId) return null;
+
+    const classSection = await resultRepo.getClassSectionById(student.classId, student.sectionId);
+    if (!classSection) return null;
+
+    const folderPath = `${classSection.className}(${classSection.sectionName})/${student.fullName}`
+      .toLowerCase()
+      .replaceAll(" ", "_");
+
+    const extracted = await studentFileStorage.load(folderPath);
+    if (!extracted || !extracted.verified) return null;
+
+    // Map extracted data to ResultInput format
+    return {
+      studentId: extracted.data?.studentData?.studentId,
+      examTypeId: extracted.data?.studentData?.examTypeId,
+      marksData: extracted.data?.marksData?.map((m) => ({
+        subjectCode: m.subjectCode,
+        marks: m.marks,
+        subjectName: m.subjectName,
+        subjectId: m.subjectId,
+        examTitles: m.examTitles,
+      })),
+      studentData: {
+        ...extracted.data?.studentData
+      },
+      teachersRemark: extracted.data?.teachersRemark,
+      studentRatings: extracted.data?.studentRatings,
+    } as any;
+  }
 }
 
-export const result = new ResultService();
+export const assessment = new AssessmentService();

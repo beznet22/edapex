@@ -20,6 +20,8 @@ export const extractPrompt = [
   '    "admissionNo": <number>, (mapped from studentData.admissionNo)',
   '    "fullName": <string>, (mapped from studentData.fullName)',
   '    "class": <string> (e.g., "LOWER BASIC 2A"),',
+  '    "className": <string>, (mapped from classSection.className)',
+  '    "sectionName": <string>, (mapped from classSection.sectionName)',
   '    "classId": <int>, (mapped from classSection.classId)',
   '    "sectionId": <int>, (mapped from classSection.sectionId)',
   '    "studentCategory": <string> ("DAYCARE", "GRADEK", NURSERY, "LOWERBASIC", "MIDDLEBASIC" without space),',

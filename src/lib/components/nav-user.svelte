@@ -5,6 +5,7 @@
   import * as Sidebar from "$lib/components/ui/sidebar/index.js";
 
   import { useSidebar } from "$lib/components/ui/sidebar/index.js";
+  import { useFileActions } from "$lib/context/file-context.svelte";
   import type { AuthUser } from "$lib/types/auth-types";
   import { clearLocalStore } from "$lib/utils";
   import BadgeCheckIcon from "@lucide/svelte/icons/badge-check";
@@ -14,10 +15,12 @@
   import LogOutIcon from "@lucide/svelte/icons/log-out";
   import SparklesIcon from "@lucide/svelte/icons/sparkles";
   import CircleHelpIcon from "@lucide/svelte/icons/circle-help";
+  import FolderIcon from "@lucide/svelte/icons/folder";
 
   let { user }: { user?: AuthUser } = $props();
 
   const sidebar = useSidebar();
+  let fileCtx = $derived(useFileActions());
 </script>
 
 <Sidebar.Menu>
@@ -27,7 +30,7 @@
         {#snippet child({ props })}
           <Sidebar.MenuButton
             size="lg"
-            class="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+            class="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0!"
             {...props}
           >
             <img
@@ -37,7 +40,9 @@
               height={24}
               class="rounded-full"
             />
-            <div class="grid flex-1 text-start text-sm leading-tight">
+            <div
+              class="grid flex-1 text-start text-sm leading-tight group-data-[collapsible=icon]:hidden"
+            >
               <span class="truncate font-medium"
                 >{user?.fullName || "Guest"}</span
               >
@@ -46,7 +51,9 @@
               >
             </div>
 
-            <ChevronsUpDownIcon class="ms-auto size-4" />
+            <ChevronsUpDownIcon
+              class="ms-auto size-4 group-data-[collapsible=icon]:hidden"
+            />
           </Sidebar.MenuButton>
         {/snippet}
       </DropdownMenu.Trigger>
@@ -86,9 +93,9 @@
             <BadgeCheckIcon />
             Account
           </DropdownMenu.Item>
-          <DropdownMenu.Item>
-            <CreditCardIcon />
-            Billing
+          <DropdownMenu.Item onSelect={() => goto("/filestore")}>
+            <FolderIcon />
+            Filestore
           </DropdownMenu.Item>
           <DropdownMenu.Item>
             <BellIcon />

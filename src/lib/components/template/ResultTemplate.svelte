@@ -21,7 +21,6 @@
   <!-- Header Section -->
   <ResultHeader school={data.school} />
 
-
   <!-- Student Info Section -->
   <StudentInfo student={data.student} />
 

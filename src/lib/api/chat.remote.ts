@@ -1,21 +1,19 @@
 import { command, getRequestEvent, query } from "$app/server";
 import { chatModels } from "$lib/chat/models";
-import { allowAnonymousChats, UPLOADS_DIR } from "$lib/constants";
+import { allowAnonymousChats, EXTRACTED_DIR } from "$lib/constants";
 import { chatVisibilitySchema, fileSchema } from "$lib/schema/chat-schema";
 import { resultInputSchema } from "$lib/schema/result-input";
 import { repo } from "$lib/server/repository";
-import { result } from "$lib/server/service/result.service";
 import { generateContent } from "$lib/server/helpers/chat-helper";
 import z from "zod";
 import { staffRepo } from "$lib/server/repository/staff.repo";
+import { resultRepo } from "$lib/server/repository/result.repo";
+import { studentRepo } from "$lib/server/repository/student.repo";
+import { studentFileStorage } from "$lib/server/storage/student-files";
 import { readdir, stat } from "fs/promises";
 import { join } from "path";
 import type { UploadedData } from "$lib/types/chat-types";
 import { existsSync, rmdirSync } from "fs";
-import { generateId } from "ai";
-import type { Dirent } from "fs";
-import { resultRepo } from "$lib/server/repository/result.repo";
-import { studentRepo } from "$lib/server/repository/student.repo";
 
 export const updateHistory = command(
   z.object({
@@ -199,58 +197,75 @@ export const getResources = query(
   async ({ className, sectionName }) => {
     const { user } = getRequestEvent().locals;
 
-    let token = `${className}(${sectionName})`.toLowerCase().replaceAll(" ", "_");
-    if (user?.designation === "class_teacher") {
+    const allTokens = new Set<string>();
+    const extractedBase = EXTRACTED_DIR;
+
+    // Determine which tokens to search for
+    if (className && sectionName) {
+      allTokens.add(`${className}(${sectionName})`.toLowerCase().replaceAll(" ", "_"));
+    } else if (user?.designation === "class_teacher") {
       const classSection = await resultRepo.getAssignedClassSection(user.staffId || 1);
-      if (!classSection) {
-        return { success: false, message: "Class not assigned to any section", resources: [] };
+      if (classSection) {
+        allTokens.add(`${classSection.className}(${classSection.sectionName})`.toLowerCase().replaceAll(" ", "_"));
       }
-      token = `${classSection.className}(${classSection.sectionName})`.toLowerCase().replaceAll(" ", "_");
+    } else {
+      // Admin or no specific filter - find all available tokens in storage/extracted
+      if (existsSync(extractedBase)) {
+        const dirs = await readdir(extractedBase, { withFileTypes: true });
+        dirs.filter(d => d.isDirectory()).forEach(d => allTokens.add(d.name));
+      }
     }
 
-    if (!token && className && sectionName) {
-      token = `${className}(${sectionName})`.toLowerCase().replaceAll(" ", "_");
-    }
-
-    if (!token) {
-      return { success: false, message: "No class or section specified", resources: [] };
-    }
-
-    const uploadPath = join(UPLOADS_DIR, token);
-
-    if (!existsSync(uploadPath)) {
+    const tokens = Array.from(allTokens);
+    if (tokens.length === 0) {
       return { success: true, resources: [] };
     }
 
-    try {
-      const files = await readdir(uploadPath, { withFileTypes: true });
-      if (files.length === 0) {
-        rmdirSync(uploadPath, { recursive: true });
-        return { success: true, resources: [] };
+    const resources: UploadedData[] = [];
+
+    for (const token of tokens) {
+      // Get Extracted Files from Permanent Storage
+      try {
+        // We need to parse common token format: class(section)
+        const match = token.match(/^(.+)\((.+)\)$/);
+        if (match) {
+          const [, cName, sName] = match;
+          const studentFolders = await studentFileStorage.listByClass(cName, sName);
+
+          for (const folderPath of studentFolders) {
+            try {
+              const assessmentData = await studentFileStorage.load(folderPath);
+              if (!assessmentData) continue;
+
+              const resourceId = folderPath;
+              resources.push({
+                id: resourceId,
+                filename: assessmentData.data?.studentData?.fullName || folderPath.split("/").pop() || "Unknown",
+                originalName: assessmentData.originalName || folderPath.split("/").pop(),
+                token,
+                status: assessmentData.status,
+                success: assessmentData.status === "done",
+                type: "image/jpeg",
+                url: `/api/uploads/${resourceId}/image.jpg?token=${token}`,
+                data: {
+                  studentId: assessmentData.data?.studentData?.studentId,
+                  examId: assessmentData.data?.studentData?.examTypeId,
+                  classId: assessmentData.data?.studentData?.classId,
+                  sectionId: assessmentData.data?.studentData?.sectionId,
+                  fullName: assessmentData.data?.studentData?.fullName
+                }
+              });
+            } catch (e) {
+              console.error("Failed to load assessment data for folder:", folderPath, e);
+            }
+          }
+        }
+      } catch (error) {
+        console.error("Error reading student file storage:", error);
       }
-
-      const isFiles = await Promise.all(
-        files.map(async (file) => {
-          const filePath = join(uploadPath, file.name);
-          const fileStat = await stat(filePath);
-          return fileStat.isFile();
-        })
-      );
-
-      const pending = files.filter((_, index) => isFiles[index]);
-      const resources: UploadedData[] = pending.map((file) => ({
-        id: generateId(),
-        filename: file.name,
-        token,
-        status: "pending",
-        success: false,
-      }));
-
-      return { success: true, resources };
-    } catch (error) {
-      console.error("Error reading upload directory:", error);
-      return { success: false, message: "Error reading upload directory", resources: [] };
     }
+
+    return { success: true, resources };
   }
 );
 

@@ -6,9 +6,10 @@ import {
   studentRatingsSchema,
   teacherRemarkSchema,
 } from "$lib/schema/result-input";
-import { result } from "$lib/server/service/result.service";
+import { assessment } from "$lib/server/service/assessment.service";
 import { studentRepo } from "$lib/server/repository/student.repo";
 import { resultOutputSchema } from "$lib/schema/result-output";
+import { studentFileStorage } from "$lib/server/storage/student-files";
 
 export const upsertStudentResult = tool({
   description: "Comprehensive tool for managing student academic results. Use 'read' to fetch existing scores and report data, 'create' to add new marks, and 'update' to modify existing marks. Requires 'studentId' and 'examTypeId'.",
@@ -36,23 +37,70 @@ export const upsertStudentResult = tool({
   }),
   execute: async (input) => {
     const { studentId, examTypeId, operation, marksData, adminNo } = input;
+
     if (operation === "create" || operation === "update") {
-      if (!marksData) {
-        return { status: "denied", message: "Marks data is required for create or update operation" };
-      }
       try {
-        const res = await result.upsertStudentResult(marksData, 1);
+        let finalMarksData = marksData;
+
+        if (!finalMarksData) {
+          finalMarksData = await assessment.getExtractedAssessment(studentId, examTypeId);
+        }
+
+        if (!finalMarksData) {
+          return { status: "denied", message: "Marks data not found in either input or filesystem" };
+        }
+
+        // Map ExtractedAssessment to ResultInput
+        const extraction = finalMarksData as any;
+        const marksDataMapped = extraction.marksData ? extraction.marksData.map((m: any) => ({
+          subjectCode: m.subjectCode,
+          subjectId: m.subjectId,
+          marks: m.marks || [],
+          examTitles: m.examTitles,
+          subjectName: m.subjectName,
+        })) : Object.entries(extraction.scores || {}).map(([code, marks]) => ({
+          subjectCode: code,
+          marks: marks as number[],
+        }));
+
+        const resultInput = {
+          studentId: extraction.studentId,
+          examTypeId: extraction.examId,
+          marksData: marksDataMapped,
+          studentData: {
+            fullName: extraction.fullName,
+            classId: extraction.classId,
+            sectionId: extraction.sectionId,
+            examTypeId: extraction.examId,
+            studentId: extraction.studentId,
+            admissionNo: extraction.admissionNo,
+            recordId: extraction.recordId,
+            schoolId: extraction.schoolId || 1,
+            studentCategory: extraction.studentCategory,
+            className: extraction.className,
+            sectionName: extraction.sectionName,
+          },
+          teachersRemark: { comment: "" },
+        };
+
+        const res = await assessment.upsertStudentResult(resultInput as any, 1);
         if (!res) {
           return { status: "denied", message: "Failed to upsert student result" };
         }
+
+        // Also save to permanent storage to mark as verified/synced
+        extraction.verified = true;
+        extraction.extractedAt = new Date();
+        await studentFileStorage.save(extraction);
       } catch (error) {
+        console.error("Upsert tool error:", error);
         return { status: "denied", message: "Failed to upsert student result" };
       }
     }
 
     const resultData = adminNo
-      ? await result.getStudentResult({ isAdminNo: true, examId: examTypeId, id: adminNo })
-      : await result.getStudentResult({ id: studentId, examId: examTypeId });
+      ? await assessment.getStudentResult({ isAdminNo: true, examId: examTypeId, id: adminNo })
+      : await assessment.getStudentResult({ id: studentId, examId: examTypeId });
 
     if (!resultData) {
       return {
@@ -63,7 +111,7 @@ export const upsertStudentResult = tool({
 
     return {
       status: "approved",
-      message: "Assessment data retrieved",
+      message: "Assessment data retrieved/processed",
       data: resultData,
     };
   },
@@ -124,7 +172,9 @@ export const upsertAttendance = tool({
           message: "Attendance data is required for create or update operation",
         };
       }
-      await result.upsertAttendance({ attendance: attendanceData, studentId, examTypeId });
+      await assessment.upsertAttendance({
+        attendance: attendanceData, studentId, examTypeId
+      });
     }
     return {
       status: "approved",
@@ -164,7 +214,7 @@ export const upsertTeacherRemark = tool({
           message: "Remark data is required for create or update operation",
         };
       }
-      await result.upsertTeacherRemark({
+      await assessment.upsertTeacherRemark({
         studentId,
         examTypeId,
         remark: remarkData.comment!,
@@ -208,7 +258,7 @@ export const upsertStudentRatings = tool({
           message: "Ratings data is required for create or update operation",
         };
       }
-      await result.upsertStudentRatings({
+      await assessment.upsertStudentRatings({
         studentId,
         examTypeId,
         ratings: ratingsData,

@@ -24,20 +24,35 @@
   import PlusIcon from "@lucide/svelte/icons/plus";
   import { Button } from "./ui/button";
   import { goto } from "$app/navigation";
+  import { useFileActions } from "$lib/context/file-context.svelte";
+
+  type SidebarProps = {
+    user?: AuthUser;
+    ref?: HTMLElement | null;
+    items?: unknown[]; // Assuming items is part of SidebarProps
+    version?: string; // Assuming version is part of SidebarProps
+  } & ComponentProps<typeof Sidebar.Root>;
+
   let {
     user,
     ref = $bindable(null),
+    items, // Added items
+    version, // Added version
     ...restProps
-  }: { user?: AuthUser } & ComponentProps<typeof Sidebar.Root> = $props();
+  }: SidebarProps = $props();
 
   const context = useSidebar();
+  let fileCtx = $derived(useFileActions());
 </script>
 
-<Sidebar.Root {...restProps} bind:ref>
+<Sidebar.Root collapsible="icon" {...restProps} bind:ref>
   <Sidebar.Header>
     <Sidebar.Menu>
-      <div class="flex h-10 flex-row items-center justify-between md:h-[34px]">
-        <Sidebar.MenuButton class="data-[slot=sidebar-menu-button]:py-6!">
+      <Sidebar.MenuItem>
+        <Sidebar.MenuButton
+          size="lg"
+          class="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+        >
           {#snippet child({ props })}
             <a href="/" {...props}>
               <div
@@ -45,33 +60,39 @@
               >
                 <CommandIcon class="size-4" />
               </div>
-              <div class="grid flex-1 text-start text-sm leading-tight">
+              <div
+                class="grid flex-1 text-start text-sm leading-tight group-data-[collapsible=icon]:hidden"
+              >
                 <span class="truncate font-medium">Edapex AI</span>
                 <span class="truncate text-xs">Enterprise</span>
               </div>
             </a>
           {/snippet}
         </Sidebar.MenuButton>
-        <Tooltip>
-          <TooltipTrigger>
-            {#snippet child({ props })}
-              <Button
-                {...props}
-                variant="ghost"
-                type="button"
-                class="h-fit p-2"
-                onclick={() => {
-                  context.setOpenMobile(false);
-                  goto("/", { invalidateAll: true });
-                }}
-              >
-                <PlusIcon />
-              </Button>
-            {/snippet}
-          </TooltipTrigger>
-          <TooltipContent align="end">New Chat</TooltipContent>
-        </Tooltip>
-      </div>
+        <Sidebar.MenuAction
+          class="group-data-[collapsible=icon]:hidden top-1/2 -translate-y-1/2"
+        >
+          <Tooltip>
+            <TooltipTrigger>
+              {#snippet child({ props })}
+                <Button
+                  {...props}
+                  variant="ghost"
+                  type="button"
+                  class="h-fit p-1"
+                  onclick={() => {
+                    context.setOpenMobile(false);
+                    goto("/", { invalidateAll: true });
+                  }}
+                >
+                  <PlusIcon class="size-4" />
+                </Button>
+              {/snippet}
+            </TooltipTrigger>
+            <TooltipContent align="end">New Chat</TooltipContent>
+          </Tooltip>
+        </Sidebar.MenuAction>
+      </Sidebar.MenuItem>
     </Sidebar.Menu>
   </Sidebar.Header>
   <Sidebar.Content>

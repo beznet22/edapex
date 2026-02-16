@@ -2,12 +2,11 @@
   import * as Sidebar from "$lib/components/ui/sidebar/index.js";
   import type { WithoutChildren } from "$lib/utils/shadcn.js";
   import { type Icon } from "@lucide/svelte";
-  import EclipseIcon from "@lucide/svelte/icons/eclipse";
+  import Sun from "@lucide/svelte/icons/sun";
+  import Moon from "@lucide/svelte/icons/moon";
   import type { Component } from "svelte";
   import type { ComponentProps } from "svelte";
   import { getTheme } from "@sejohnson/svelte-themes";
-  import Switch from "./ui/switch/switch.svelte";
-  import { Label } from "./ui/label";
   import { page } from "$app/state";
   import { pushState } from "$app/navigation";
   import IntegrationsModal from "$lib/components/integrations-modal.svelte";
@@ -41,37 +40,61 @@
 
 <Sidebar.Group {...restProps}>
   <Sidebar.GroupContent>
-    <Sidebar.Menu>
+    <Sidebar.Menu class="gap-4">
       {#each items as item (item.title)}
         {@const Icon = item.icon}
         <Sidebar.MenuItem>
-          <Sidebar.MenuButton onclick={() => onclick(item.url)}>
+          <Sidebar.MenuButton
+            onclick={() => onclick(item.url)}
+            class="group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0! cursor-pointer"
+          >
             {#snippet child({ props })}
-              <a href={item.url} {...props}>
-                <Icon />
-                <span>{item.title}</span>
+              <a
+                href={item.url}
+                {...props}
+                class="flex w-full items-center gap-2 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0"
+              >
+                <div
+                  class="flex size-4 shrink-0 items-center justify-center group-data-[collapsible=icon]:mx-auto"
+                >
+                  <Icon />
+                </div>
+                <span class="group-data-[collapsible=icon]:hidden">
+                  {item.title}
+                </span>
               </a>
             {/snippet}
           </Sidebar.MenuButton>
         </Sidebar.MenuItem>
       {/each}
       <Sidebar.MenuItem>
-        <div class="flex w-full justify-between items-center space-x-2 p-2">
-          <Label for="theme-switch" class="cursor-pointer">
-            <EclipseIcon class="size-4" />
-            <span
-              >{theme.resolvedTheme === "light" ? "Dark" : "Light"} Mode</span
+        <Sidebar.MenuButton
+          onclick={() =>
+            (theme.selectedTheme =
+              theme.resolvedTheme === "light" ? "dark" : "light")}
+          class="w-full group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0!"
+        >
+          {#snippet child({ props })}
+            <button
+              {...props}
+              class="flex w-full items-center gap-2 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 cursor-pointer"
             >
-          </Label>
-          <Switch
-            class="cursor-pointer"
-            checked={theme.resolvedTheme === "dark"}
-            id="theme-switch"
-            onCheckedChange={() =>
-              (theme.selectedTheme =
-                theme.resolvedTheme === "light" ? "dark" : "light")}
-          />
-        </div>
+              <div
+                class="relative size-4 flex items-center justify-center shrink-0 group-data-[collapsible=icon]:mx-auto"
+              >
+                <Sun
+                  class="size-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0"
+                />
+                <Moon
+                  class="absolute size-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100"
+                />
+              </div>
+              <span class="group-data-[collapsible=icon]:hidden"
+                >{theme.resolvedTheme === "light" ? "Dark" : "Light"} Mode</span
+              >
+            </button>
+          {/snippet}
+        </Sidebar.MenuButton>
       </Sidebar.MenuItem>
     </Sidebar.Menu>
   </Sidebar.GroupContent>

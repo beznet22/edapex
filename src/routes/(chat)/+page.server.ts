@@ -3,7 +3,7 @@ import { resultInputSchema } from "$lib/schema/result-input";
 import { generateContent } from "$lib/server/helpers/chat-helper";
 import { resultRepo } from "$lib/server/repository/result.repo";
 import { staffRepo } from "$lib/server/repository/staff.repo";
-import { result } from "$lib/server/service/result.service";
+import { assessment } from "$lib/server/service/assessment.service";
 import { put } from "$lib/utils/fs-blob";
 import { redirect, type Actions } from "@sveltejs/kit";
 import { writeFileSync } from "fs";
@@ -73,7 +73,7 @@ export const actions: Actions = {
     // }
 
     try {
-      const mappingData = await result.getMappingData(staffId);
+      const mappingData = await assessment.getMappingData(staffId);
       // console.log(mappingData)
       if (mappingData.subjects.length === 0) throw new Error("You are not assigned to any subjects");
       const mapString = JSON.stringify(mappingData);
@@ -97,7 +97,7 @@ export const actions: Actions = {
       }
 
       console.log("Validated data", validated.data);
-      const res = await result.upsertStudentResult(validated.data, staffId);
+      const res = await assessment.upsertStudentResult(validated.data, staffId);
 
       return {
         success: true,

@@ -169,7 +169,7 @@ export async function get(pathname: string): Promise<{
       uploadedAt: fileStats.mtime,
     };
   } catch (error) {
-    console.error("Failed to get file:", error);
-    throw new Error("Failed to get file");
+    // console.error("Failed to get file:", error); // Silenced to avoid noise on 404s
+    throw error;
   }
 }

@@ -12,6 +12,8 @@
   import ModelSelector from "./model-selector.svelte";
   import type { DBChat } from "$lib/server/db/schema";
   import * as Breadcrumb from "$lib/components/ui/breadcrumb/index.js";
+  import ClassSelector from "./class-selector.svelte";
+  import { UserContext } from "$lib/context/user-context.svelte";
 
   let {
     user,
@@ -20,27 +22,11 @@
   }: { user?: AuthUser; chat?: DBChat; readonly?: boolean } = $props();
 
   const sidebar = useSidebar();
+  const userContext = UserContext.fromContext();
 </script>
 
 <header class="bg-background sticky top-0 flex items-center gap-2 p-2">
-  <div class="flex flex-1 items-center gap-2 px-3">
-    <Tooltip>
-      <TooltipTrigger>
-        {#snippet child({ props })}
-          <Button
-            {...props}
-            onclick={() => {
-              sidebar.toggle();
-            }}
-            variant="outline"
-            class="md:h-fit md:px-2"
-          >
-            <PanelLeftIcon />
-          </Button>
-        {/snippet}
-      </TooltipTrigger>
-      <TooltipContent align="start">Toggle Sidebar</TooltipContent>
-    </Tooltip>
+  <div class="flex flex-1 items-center gap-2 px-3 pl-12">
     {#if !sidebar.open || (innerWidth.current ?? 768) < 768}
       <Tooltip>
         <TooltipTrigger>
@@ -66,7 +52,13 @@
     {/if} -->
     {/if}
     {#if !readonly}
-      <ModelSelector class="" />
+      <div class="flex items-center gap-2">
+        <ModelSelector class="" />
+        {#if userContext.isCoordinator || userContext.isIt}
+          <Separator orientation="vertical" class="h-4" />
+          <ClassSelector />
+        {/if}
+      </div>
     {/if}
   </div>
   <div class="flex justify-end gap-2 px-3">
