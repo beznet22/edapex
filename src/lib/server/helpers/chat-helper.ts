@@ -37,7 +37,7 @@ export async function generateTitle({
 
     return result.text;
   } catch (error) {
-    writeFileSync("error.json", JSON.stringify(error, null, 2));
+    // writeFileSync("error.json", JSON.stringify(error, null, 2));
     console.warn("error generating title from user message, using default title");
     return "New Chat";
   }
@@ -66,7 +66,7 @@ export const generateContent = async (file: Blob, mapString?: string) => {
       ],
     });
 
-    const provider = await useAgent().use(CredentialType.GOOGLE_OAUTH).getModelProvider();
+    const provider = await useAgent().use(CredentialType.QWEN_CODE).getModelProvider();
     if (!provider) return { success: false, message: "No provider found" };
 
     const result = await generateText({
@@ -74,7 +74,7 @@ export const generateContent = async (file: Blob, mapString?: string) => {
       system: extractPrompt,
       messages,
     });
-    console.log(result);
+
     return { success: true, content: result.text };
   } catch (e) {
     console.error("Failed to extract content", e);

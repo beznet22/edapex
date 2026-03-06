@@ -68,8 +68,8 @@ export class FilesContext {
 
     let files = (event.target as HTMLInputElement).files;
     if (!files?.length) return;
-    this.files = [...this.files, ...files];
     const incoming = Array.from(files);
+    this.files = [...this.files, ...incoming];
     this.#upload(incoming);
   };
 

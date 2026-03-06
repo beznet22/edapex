@@ -12,7 +12,7 @@ export const assessmentWorkflow: AgentWorkflow = {
     // —— Principal Assistant ——
     {
       workflowId: "assessment",
-      designation: "principal",
+      designation: ["principal"],
       highlight: "Review & Approve",
       suggestions: [
         "Review and approve exam questions",
@@ -28,7 +28,7 @@ export const assessmentWorkflow: AgentWorkflow = {
     // —— Teacher Assistant ——
     {
       workflowId: "assessment",
-      designation: "class_teacher",
+      designation: ["coding_&_robotics"],
       highlight: "Compile & Validate Results",
       tools: teacherTools,
       suggestions: [
@@ -53,7 +53,7 @@ export const assessmentWorkflow: AgentWorkflow = {
     // —— Coordinator Assistant ——
     {
       workflowId: "assessment",
-      designation: "coordinator",
+      designation: ["coordinator", "it_support", "it", "class_teacher"],
       highlight: "Class Results & Publishing",
       tools: coordinatorTools,
       suggestions: [

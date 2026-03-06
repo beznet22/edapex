@@ -1,4 +1,4 @@
-import { marksIputSchema } from "$lib/schema/result-input";
+import { marksInputSchema } from "$lib/schema/result-input";
 import { resultOutputSchema, type Category } from "$lib/schema/result-output";
 import { resultRepo } from "$lib/server/repository/result.repo";
 import { studentRepo } from "$lib/server/repository/student.repo";
@@ -317,7 +317,7 @@ export const upsertMarkStore = tool({
   outputSchema: z.object({
     success: z.boolean().describe("The success status. required"),
     message: z.string().describe("The message to be returned. required"),
-    data: z.array(marksIputSchema).optional().describe("The process mark to be updated. optional"),
+    data: z.array(marksInputSchema).optional().describe("The process mark to be updated. optional"),
   }),
   execute: async ({
     classId,
@@ -354,13 +354,21 @@ export const upsertMarkStore = tool({
 
     const processMark = await assessment.doProcessMarks(
       {
-        category: CATEGORY[studentRecord.categoryId ?? 0] as Category,
         studentId,
         recordId: studentRecord.id,
         classId,
         sectionId,
         schoolId: 1,
         examTypeId,
+        studentCategory: CATEGORY[studentRecord.categoryId ?? 0] as Category,
+        admissionNo: studentRecord.admissionNo || 0,
+        fullName: studentRecord.fullName || "",
+        class: "",
+        className: "",
+        sectionName: "",
+        studentCategoryId: studentRecord.categoryId || 0,
+        term: "",
+        attendance: { daysOpened: 0, daysAbsent: 0, daysPresent: 0 }
       },
       [
         {
@@ -376,7 +384,7 @@ export const upsertMarkStore = tool({
       return { success: false, message: "Mark store update failed." };
     }
 
-    return { success: true, message: `Mark store updated successfully`, data: processMark };
+    return { success: true, message: "Mark store updated successfully", data: processMark.marksInput };
   },
 });
 
@@ -640,8 +648,8 @@ export const getAssessmentMapping = tool({
         }
         finalStaffId = staff.teacherId;
       }
-      const data = await assessment.getMappingData(finalStaffId!);
-      return { success: true, data };
+      const data = await assessment.getMappingData(finalStaffId!, classId, sectionId);
+      return { success: true, message: "Mapping data fetched successfully", data };
     } catch (error) {
       return { success: false, message: "Failed to fetch mapping data" };
     }

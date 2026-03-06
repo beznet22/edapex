@@ -25,7 +25,7 @@
   const chat = $derived(ChatContext.fromContext());
 
   onMount(() => {
-    if (userContext.isTeacher && !userContext.students.length) open = true;
+    if (userContext.isTeacher && !userContext.assignedSection) open = true;
   });
 
   const doAssign = async () => {
@@ -39,6 +39,7 @@
     }
 
     userContext.students = res.assigned;
+    userContext.assignedSection = chat.selectedClass;
     open = false;
   };
 </script>

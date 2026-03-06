@@ -56,13 +56,24 @@
     loadStudents();
   };
 
+  $effect(() => {
+    if (userContext.isTeacher && userContext.assignedSection) {
+      if (file.selectedClass?.id !== userContext.assignedSection.id) {
+        onSelect(userContext.assignedSection);
+      }
+    }
+  });
+
   const onOpenChange = (val: boolean) => {
+    if (userContext.isTeacher && userContext.assignedSection) return;
     open = val;
   };
 </script>
 
 <DropdownMenu {open} {onOpenChange}>
-  <DropdownMenuTrigger>
+  <DropdownMenuTrigger
+    disabled={userContext.isTeacher && !!userContext.assignedSection}
+  >
     {#snippet child({ props })}
       <Button
         {...props}

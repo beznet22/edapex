@@ -3,6 +3,7 @@ import { studentFileStorage } from "$lib/server/storage/student-files";
 import { assessment } from "$lib/server/service/assessment.service";
 import { join } from "path";
 import type { RequestHandler } from "./$types";
+import type { ResultInput } from "$lib/schema/result-input";
 
 export const POST: RequestHandler = async ({ params, request, locals }) => {
     const { fileId } = params;
@@ -23,52 +24,15 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
         data.extractedAt = new Date();
 
         // 2. Map ExtractedAssessment data to ResultInput format for DB persistence
-        let resultInput: any;
-
-        if (data.data && typeof data.data === 'object' && 'studentData' in data.data) {
-            // Use the nested ResultInput structure directly
-            resultInput = data.data;
-        } else {
-            // FALLBACK: Legacy mapping logic
-            // We now use the enriched marksData if available
-            const marksData = data.marksData ? data.marksData.map((m: any) => ({
-                subjectCode: m.subjectCode,
-                subjectId: m.subjectId,
-                marks: m.marks || [],
-                examTitles: m.examTitles,
-                subjectName: m.subjectName,
-            })) : Object.entries(data.scores).map(([code, marks]) => ({
-                subjectCode: code,
-                marks: marks as number[],
-                // Fallback: we might miss subjectId here if using old data
-            }));
-
-            resultInput = {
-                studentId: data.studentId,
-                examTypeId: data.examId,
-                marksData,
-                studentData: {
-                    fullName: data.fullName,
-                    classId: data.classId,
-                    sectionId: data.sectionId,
-                    examTypeId: data.examId,
-                    studentId: data.studentId,
-                    admissionNo: data.admissionNo,
-                    recordId: data.recordId,
-                    schoolId: data.schoolId || 1,
-                    studentCategory: data.studentCategory,
-                    className: data.className,
-                    sectionName: data.sectionName,
-                },
-                teachersRemark: data.teachersRemark || { comment: "" },
-                studentRatings: data.studentRatings || null,
-            };
+        if (!data.data) {
+            return json({ success: false, message: "No data to approve" }, { status: 400 });
         }
+        const resultInput = data.data as ResultInput;
 
         // 3. Save to Database
         const teacherId = user.staffId || 1;
         // Upsert returns the MarkResponse, we just need to ensure it doesn't throw
-        const dbResult = await assessment.upsertStudentResult(resultInput as any, teacherId);
+        const dbResult = await assessment.upsertStudentResult(resultInput, teacherId);
 
         // 4. Save back to filesystem (permanent storage)
         const storagePath = await studentFileStorage.save(data);

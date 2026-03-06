@@ -67,13 +67,11 @@ export class AgentService {
   static async getInstructions(user: AuthUser | null, agentId?: string, selectedClass?: ClassSection): Promise<string> {
     if (!agentId || !user?.designation) return defaultPrompt();
     const designation = user.designation;
-    let instructions = agentWorkflows.find((work) => work.id === agentId)?.assistants.find((assistant: Assistant) => assistant.designation === designation)?.instructions;
+    let instructions = agentWorkflows.find((work) => work.id === agentId)?.assistants.find((assistant: Assistant) => assistant.designation.includes(designation))?.instructions;
 
     if (!instructions) return defaultPrompt();
-    const examTypes = await resultRepo.getExamTypes();
-    instructions += `\n\nEXAM TYPES: ${examTypes
-      .map((e) => `- ${e.title} (Exam Type ID: ${e.id})`)
-      .join("\n")}`;
+    const examTypes = await resultRepo.getCurrentTerm();
+    instructions += `\n\nCURRENT TERM: ${examTypes?.title} (Exam Type ID: ${examTypes?.id})`;
     instructions += `\n\nUSER ID: ${user.id}`;
     instructions += `\n\nSTAFF ID: ${user.staffId}`;
     if (selectedClass) {
@@ -89,7 +87,7 @@ export class AgentService {
   static getTools(user: AuthUser | null, agentId?: string): typeof teacherTools | typeof coordinatorTools | typeof defaultTools {
     if (!agentId || !user?.designation) return defaultTools;
     const designation = user.designation;
-    return agentWorkflows.find((work) => work.id === agentId)?.assistants.find((assistant: Assistant) => assistant.designation === designation)?.tools || defaultTools;
+    return agentWorkflows.find((work) => work.id === agentId)?.assistants.find((assistant: Assistant) => assistant.designation.includes(designation))?.tools || defaultTools;
   }
 
   static getAgentWorkflows(user: AuthUser | null): AgentWorkflow[] {
@@ -98,7 +96,7 @@ export class AgentService {
     return agentWorkflows.map((work) => {
       // Filter and strip systemPromptto prevent leaking to browser
       const assistants = work.assistants
-        .filter((assistant): assistant is Assistant => assistant.designation === designation)
+        .filter((assistant): assistant is Assistant => assistant.designation.includes(designation))
         .map(({ instructions, tools, ...safeTask }) => safeTask);
 
       return {

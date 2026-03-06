@@ -5,7 +5,8 @@ import { eq, and, desc, type SQL } from "drizzle-orm";
 import type { ExamType } from "$lib/schema/result-output";
 import { DbInternalError } from "../helpers/errors";
 
-export type MySQLDrizzleClient = MySql2Database<any>;
+import { type MySQLDrizzleClient } from "../db";
+export type { MySQLDrizzleClient };
 
 export type AcademicYearData = typeof smAcademicYears.$inferSelect;
 export type ExamTypeData = typeof smExamTypes.$inferSelect;
@@ -25,7 +26,7 @@ let configCache: ConfigurationCache | null = null;
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes cache TTL
 
 export class BaseRepository {
-  protected db!: MySQLDrizzleClient;
+  public db!: MySQLDrizzleClient;
 
   constructor() { }
 

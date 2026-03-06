@@ -1,6 +1,6 @@
 import { SelectedModel } from "$lib/context/sync.svelte";
 import { base } from "$lib/server/repository";
-import { redirect } from "@sveltejs/kit";
+import { error, redirect } from "@sveltejs/kit";
 import type { LayoutServerLoad } from "./$types";
 import { allowAnonymousChats, STORAGE_DIR, UPLOADS_DIR } from "$lib/constants";
 import { AgentService } from "$lib/server/service/agent.service";
@@ -36,10 +36,14 @@ export const load: LayoutServerLoad = async ({ cookies, locals, url }) => {
 
   let pending: Dirent<string>[] = [];
   let token = `${className}(${sectionName})`.toLowerCase().replaceAll(" ", "_");
+  let assignedSection: ClassSection | null = null;
   if (user?.designation === "class_teacher") {
-    const classSection = await resultRepo.getAssignedClassSection(user.staffId || 1);
-    if (!classSection) throw new Error("Class not assigned to any section");
-    token = `${classSection.className}(${classSection.sectionName})`.toLowerCase().replaceAll(" ", "_");
+    assignedSection = (await resultRepo.getAssignedClassSection(user.staffId || 1)) as ClassSection | null;
+    if (assignedSection) {
+      token = `${assignedSection.className}(${assignedSection.sectionName})`
+        .toLowerCase()
+        .replaceAll(" ", "_");
+    }
   }
   let uploadPath = join(UPLOADS_DIR, token);
   if (existsSync(uploadPath)) {
@@ -78,5 +82,6 @@ export const load: LayoutServerLoad = async ({ cookies, locals, url }) => {
     sidebarCollapsed,
     selectedChatModel: new SelectedModel(modelId),
     uploads,
+    assignedSection,
   };
 };

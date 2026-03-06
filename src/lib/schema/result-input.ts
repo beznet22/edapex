@@ -172,21 +172,24 @@ export type ResultInput = z.infer<typeof resultInputSchema>;
 
 
 
-export const marksIputSchema = z.object({
+export const marksInputSchema = z.object({
   subjectId: z.number(),
   examTypeId: z.number(),
+  marks: z.number().optional(),
+  fullMarks: z.number().optional(),
   totalMarks: z.number(),
+  percentage: z.number().optional(),
   grade: z.string().nullable(),
-  gpa: z.number().nullable(),
+  gpa: z.number().nullable().optional(),
   isAbsent: z.boolean(),
   teacherRemarks: z.string().optional(),
 });
-export type MarksInput = z.infer<typeof marksIputSchema>;
+export type MarksInput = z.infer<typeof marksInputSchema>;
 
 export const markResponseSchema = z.object({
   studentId: z.number(),
   examTypeId: z.number(),
-  results: z.array(marksIputSchema),
+  results: z.array(marksInputSchema),
 });
 
 export type MarkResponse = z.infer<typeof markResponseSchema> & { extra?: any };
