@@ -51,6 +51,7 @@
           return await imageContext.compress(file, {
             quality: 0.8,
             convertPngThreshold: 2 * 1024 * 1024,
+            maxSizeKB: 100,
           });
         }
         return file;
@@ -161,7 +162,7 @@
           name="files"
           {onUpload}
           {onFileRejected}
-          maxFileSize={600 * KILOBYTE}
+          maxFileSize={2000 * KILOBYTE}
           accept="image/*"
           maxFiles={4}
           disabled={!value}
