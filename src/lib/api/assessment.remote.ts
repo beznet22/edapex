@@ -45,18 +45,37 @@ export const generateResultPdf = command(
 
 export const publishResult = command(
   z.object({
-    provider: z.string(),
-    model: z.string(),
+    studentId: z.number(),
+    examTypeId: z.number(),
+    resend: z.boolean().optional(),
   }),
-  async ({ provider, model }) => {
+  async ({ studentId, examTypeId, resend }) => {
     const { locals } = getRequestEvent();
     if (!locals.user) {
       return { success: false, message: "User not authenticated" };
     }
     try {
-      // await auth.publishResult(provider, model);
-      return { success: true, message: "Result published" };
+      const response = await assessment.publishResults({
+        studentIds: [studentId],
+        examId: examTypeId,
+        resend,
+      });
+
+      if (!response.success) {
+        return {
+          success: false,
+          message: `Failed to publish result for student ${studentId}.`,
+          errors: response.errors,
+        };
+      }
+
+      return {
+        success: true,
+        message: `Result published successfully for student ${studentId}.`,
+        result: response.results[0],
+      };
     } catch (error) {
+      console.error("Publish result error:", error);
       return { success: false, message: "Failed to publish result" };
     }
   }
