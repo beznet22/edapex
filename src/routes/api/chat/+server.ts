@@ -19,10 +19,24 @@ import type { ClassSection } from "$lib/types/result-types";
 export const POST: RequestHandler = async ({ request, locals: { user, session }, cookies }) => {
   let { chatId, messages, agentId, selectedClass }: ChatResponse & { selectedClass?: ClassSection } = await request.json();
   if ((!user || !session) && !allowAnonymousChats) error(401, "Unauthorized");
+
   const selectedChatModel = cookies.get("selected-model");
-  if (messages.length === 0) error(400, "No user message found");
   if (!selectedChatModel) error(400, "No chat model selected");
-  console.log("[api/chat] Cookies:", cookies.getAll().map(c => c.name));
+
+  // Fallback to cookies if not provided in request body
+  if (!agentId) {
+    agentId = cookies.get("selected-agent") || "";
+  }
+
+  if (!selectedClass && cookies.get("selected-class")) {
+    try {
+      selectedClass = JSON.parse(cookies.get("selected-class")!);
+    } catch (e) {
+      console.error("Error parsing selected-class cookie in chat API:", e);
+    }
+  }
+
+  console.log(`[api/chat] Agent: ${agentId}, Class: ${selectedClass?.className}(${selectedClass?.sectionName})`);
 
   const agentService = useAgent();
   const provider = await agentService.getProviderForAgent(agentId).getModelProvider();

@@ -19,6 +19,8 @@ import { page } from "$app/state";
 import { localStore } from "$lib/utils";
 import type { ClassStudent } from "$lib/server/repository/student.repo";
 
+import { SelectedClass, SelectedAgent } from "./sync.svelte";
+
 const CHAT_CONTEXT_KEY = Symbol("chat-context");
 
 export type InitChat = {
@@ -32,9 +34,7 @@ export type InitChat = {
 export class ChatContext {
   // Reactive state using Svelte 5 runes
   user = $state<AuthUser | undefined>(undefined);
-  activeAgent = $state<AgentWorkflow | null>(null);
   studentData = $state<ClassStudent | undefined>(undefined);
-  selectedClass = $state<ClassSection | null>(null);
   openedDocumentId = $state<string | undefined>(undefined);
   openPanel = $state<boolean>(false);
   docPart = $state<CreateDocumentPart | undefined>(undefined);
@@ -71,8 +71,23 @@ export class ChatContext {
     this.messages = $derived(this.client?.messages ?? []);
     this.lastMessage = $derived(this.messages.at(-1));
     this.agents = $state(agents);
-    this.activeAgent = agents[0];
-    this.selectedClass = localStore<ClassSection>("selected-class");
+  }
+
+  get activeAgent() {
+    const id = SelectedAgent.fromContext().value;
+    return this.agents.find((a) => a.id === id) || this.agents[0];
+  }
+
+  set activeAgent(v: AgentWorkflow | null) {
+    SelectedAgent.fromContext().value = v?.id || "";
+  }
+
+  get selectedClass() {
+    return SelectedClass.fromContext().data;
+  }
+
+  set selectedClass(v: ClassSection | null) {
+    SelectedClass.fromContext().data = v;
   }
 
   get loading() {

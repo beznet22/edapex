@@ -27,9 +27,17 @@ export class UserContext {
     students?: ClassStudent[],
     assignedSection?: ClassSection | null
   ) {
+    this.rehydrate(user, classes, assignedSection);
+    this.students = localStore("students", students) || [];
+  }
+
+  rehydrate(
+    user: AuthUser | undefined,
+    classes: ClassSection[],
+    assignedSection?: ClassSection | null
+  ) {
     this.user = user;
     this.classes = classes;
-    this.students = localStore("students", students) || [];
     this.designation = user?.designation;
     this.assignedSection = assignedSection ?? null;
   }

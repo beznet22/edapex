@@ -11,6 +11,7 @@ import { goto, replaceState } from "$app/navigation";
 import { localStore } from "$lib/utils";
 import { getResources } from "$lib/api/chat.remote";
 
+import { SelectedClass } from "./sync.svelte";
 const FILES_CONTEXT_KEY = Symbol("attachments-context");
 
 export class FilesContext {
@@ -20,21 +21,21 @@ export class FilesContext {
   openModal = $state(false);
   openResourceModal = $state(false);
   openFileStoreModal = $state(false);
-  #selectedClass = $state<ClassSection | null>(null);
 
   constructor(uploads: UploadedData[], public doUpload?: boolean) {
+    this.rehydrate(uploads);
+  }
+
+  rehydrate(uploads: UploadedData[]) {
     this.uploads = uploads;
-    this.selectedClass = localStore("selected-class");
   }
 
   get selectedClass() {
-    return this.#selectedClass ?? localStore("selected-class");
+    return SelectedClass.fromContext().data;
   }
 
   set selectedClass(v: ClassSection | null) {
-    if (!v) return;
-    localStore("selected-class", v);
-    this.#selectedClass = v;
+    SelectedClass.fromContext().data = v;
   }
 
   openFileDialog = () => {

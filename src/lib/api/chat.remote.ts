@@ -81,6 +81,7 @@ export const syncCookie = command(
         if (!chatModels.find((model) => model.id === value)) return null;
         break;
       case "selected-class":
+      case "selected-agent":
         if (!value) return null;
         break;
       default:

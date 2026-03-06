@@ -43,8 +43,8 @@ export const actions: Actions = {
       staffId = staff.teacherId;
       token = `${className}(${sectionName})`.toLowerCase().replaceAll(" ", "_");
     } else {
-      const { className, sectionName } = await resultRepo.getAssignedClassSection(staffId);
-      if (!className || !sectionName)
+      const assigned = await resultRepo.getAssignedClassSection(staffId);
+      if (!assigned || !assigned.className || !assigned.sectionName)
         return { success: false, status: "error", message: "You have not been assigned a class" };
     }
 

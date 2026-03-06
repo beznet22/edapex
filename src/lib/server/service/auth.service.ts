@@ -546,6 +546,10 @@ class AuthService {
 
       cookies.del(ACCESS_COOKIE);
       cookies.del(REFRESH_COOKIE);
+      cookies.del("selected-class");
+      cookies.del("selected-agent");
+      cookies.del("selected-model");
+      cookies.del("selected-category");
       return { success: true };
     } catch (error) {
       console.error("Failed to delete cookies:", error);

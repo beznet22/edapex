@@ -1,4 +1,4 @@
-import { SelectedModel } from "$lib/context/sync.svelte";
+import { SelectedModel, SelectedClass, SelectedAgent } from "$lib/context/sync.svelte";
 import { base } from "$lib/server/repository";
 import { error, redirect } from "@sveltejs/kit";
 import type { LayoutServerLoad } from "./$types";
@@ -24,6 +24,9 @@ export const load: LayoutServerLoad = async ({ cookies, locals, url }) => {
   let modelId = AgentService.initChatModels();
   let agents = AgentService.getAgentWorkflows(user);
 
+  const selectedClassRaw = cookies.get("selected-class");
+  const selectedAgentId = cookies.get("selected-agent") || "";
+
   let students: ClassStudent[] | null = null;
   let classes: ClassSection[] = [];
   if (user) {
@@ -35,11 +38,29 @@ export const load: LayoutServerLoad = async ({ cookies, locals, url }) => {
   const sectionName = url.searchParams.get("sectionName");
 
   let pending: Dirent<string>[] = [];
-  let token = `${className}(${sectionName})`.toLowerCase().replaceAll(" ", "_");
+  let token = "";
+
+  // Priority for token generation:
+  // 1. URL search params (explicit navigation)
+  // 2. Cookie (persisted session)
+  // 3. Assigned Section (for teachers)
+  if (className && sectionName) {
+    token = `${className}(${sectionName})`.toLowerCase().replaceAll(" ", "_");
+  } else if (selectedClassRaw) {
+    try {
+      const cls = JSON.parse(selectedClassRaw) as ClassSection;
+      if (cls.className && cls.sectionName) {
+        token = `${cls.className}(${cls.sectionName})`.toLowerCase().replaceAll(" ", "_");
+      }
+    } catch (e) {
+      console.error("Error parsing selected-class cookie:", e);
+    }
+  }
+
   let assignedSection: ClassSection | null = null;
   if (user?.designation === "class_teacher") {
     assignedSection = (await resultRepo.getAssignedClassSection(user.staffId || 1)) as ClassSection | null;
-    if (assignedSection) {
+    if (assignedSection && !token) {
       token = `${assignedSection.className}(${assignedSection.sectionName})`
         .toLowerCase()
         .replaceAll(" ", "_");
@@ -80,7 +101,9 @@ export const load: LayoutServerLoad = async ({ cookies, locals, url }) => {
     students,
     classes,
     sidebarCollapsed,
-    selectedChatModel: new SelectedModel(modelId),
+    modelId,
+    selectedClassRaw,
+    selectedAgentId,
     uploads,
     assignedSection,
   };
