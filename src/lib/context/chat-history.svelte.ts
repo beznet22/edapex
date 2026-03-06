@@ -32,6 +32,10 @@ export class ChatHistory {
   }
 
   constructor(chatsPromise: Promise<DBChat[]>) {
+    this.rehydrate(chatsPromise);
+  }
+
+  rehydrate(chatsPromise: Promise<DBChat[]>) {
     this.#loading = true;
     this.#revalidating = true;
     chatsPromise

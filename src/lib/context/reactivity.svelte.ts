@@ -38,6 +38,10 @@ export class SynchronizedCookie {
     this.#value = v;
   }
 
+  rehydrate(v: string) {
+    this.#value = v;
+  }
+
   setContext() {
     setContext(this.#contextKey, this);
   }

@@ -5,6 +5,11 @@
   import { ChatHistory } from "$lib/context/chat-history.svelte.js";
   import { FilesContext } from "$lib/context/file-context.svelte.js";
   import { UserContext } from "$lib/context/user-context.svelte.js";
+  import {
+    SelectedModel,
+    SelectedClass,
+    SelectedAgent,
+  } from "$lib/context/sync.svelte";
   import type { PageData } from "./$types.js";
 
   let { data, children } = $props<{
@@ -12,25 +17,60 @@
     children: any;
   }>();
 
-  // svelte-ignore state_referenced_locally
-  let { user, chats, uploads, selectedChatModel, students, classes } =
-    data as PageData;
+  let {
+    user,
+    classes,
+    students,
+    assignedSection,
+    chats,
+    modelId,
+    selectedClassRaw,
+    selectedAgentId,
+    uploads,
+    sidebarCollapsed,
+  } = data;
 
   const chatHistory = new ChatHistory(chats);
   chatHistory.setContext();
 
+  const selectedChatModel = new SelectedModel(modelId!);
   selectedChatModel.setContext();
 
-  const appContext = new UserContext(
-    user,
-    classes,
-    students ?? undefined,
-    data.assignedSection,
-  );
+  const selectedClass = new SelectedClass(selectedClassRaw || "");
+  selectedClass.setContext();
+
+  const selectedAgent = new SelectedAgent(selectedAgentId || "");
+  selectedAgent.setContext();
+
+  $effect(() => {
+    chatHistory.rehydrate(chats);
+  });
+
+  $effect(() => {
+    selectedChatModel.rehydrate(modelId!);
+  });
+
+  $effect(() => {
+    selectedClass.rehydrate(selectedClassRaw || "");
+  });
+
+  $effect(() => {
+    selectedAgent.rehydrate(selectedAgentId || "");
+  });
+
+  const appContext = new UserContext(user, classes, students ?? undefined, assignedSection);
   appContext.setContext();
 
   const filesContext = new FilesContext(uploads, true);
   filesContext.setContext();
+
+  $effect(() => {
+    appContext.rehydrate(data.user, data.classes, data.assignedSection);
+  });
+
+  $effect(() => {
+    filesContext.rehydrate(data.uploads);
+  });
 </script>
 
 <svelte:head>
@@ -42,7 +82,7 @@
   <link rel="icon" href={favicon} />
 </svelte:head>
 
-<Sidebar.Provider open={!data.sidebarCollapsed}>
+<Sidebar.Provider open={!sidebarCollapsed}>
   <AppSidebar user={user ?? undefined} />
   <Sidebar.Inset>
     <Sidebar.Trigger
