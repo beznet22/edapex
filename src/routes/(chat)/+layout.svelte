@@ -10,6 +10,7 @@
     SelectedClass,
     SelectedAgent,
   } from "$lib/context/sync.svelte";
+  import { ImageContext } from "$lib/context/image.context.svelte";
   import type { PageData } from "./$types.js";
 
   let { data, children } = $props<{
@@ -69,6 +70,9 @@
 
   const filesContext = new FilesContext(data.uploads, selectedClass, true);
   filesContext.setContext();
+
+  const imageContext = new ImageContext();
+  imageContext.setContext();
 
   $effect(() => {
     appContext.rehydrate(data.user, data.classes, data.assignedSection);

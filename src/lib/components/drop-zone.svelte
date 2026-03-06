@@ -2,6 +2,7 @@
   import { Button } from "$lib/components/ui/button";
   import * as Dialog from "$lib/components/ui/dialog/index.js";
   import { useFileActions } from "$lib/context/file-context.svelte";
+  import { useImageCompression } from "$lib/context/image.context.svelte";
   import CheckIcon from "@lucide/svelte/icons/check";
   import CircleAlertIcon from "@lucide/svelte/icons/circle-alert";
   import TriangleAlertIcon from "@lucide/svelte/icons/triangle-alert";
@@ -22,6 +23,7 @@
   import { Label } from "$lib/components/ui/label";
 
   let filesContext = useFileActions();
+  let imageContext = useImageCompression();
   let userCtx = useUser();
   let previewUrls = new Map<File, string>();
 
@@ -42,7 +44,20 @@
   });
 
   const onUpload: FileDropZoneProps["onUpload"] = async (fs) => {
-    filesContext.uploadWithStudentData(fs, {
+    const compressedFiles = await Promise.all(
+      fs.map(async (file) => {
+        if (file.type.startsWith("image/")) {
+          toast.info(`Compressing ${file.name}...`);
+          return await imageContext.compress(file, {
+            quality: 0.8,
+            convertPngThreshold: 2 * 1024 * 1024,
+          });
+        }
+        return file;
+      }),
+    );
+
+    filesContext.uploadWithStudentData(compressedFiles, {
       studentId: student?.id,
       studentName: student?.name ?? undefined,
       admissionNo: student?.admissionNo ?? undefined,
@@ -187,6 +202,14 @@
                 </span>
                 <span class="text-xs text-muted-foreground mt-1">
                   {displaySize(file.size)}
+                  {#if imageContext.lastStats && imageContext.lastStats.originalSize > file.size}
+                    <span class="text-green-500 ml-1">
+                      (-{Math.round(
+                        (1 - file.size / imageContext.lastStats.originalSize) *
+                          100,
+                      )}%)
+                    </span>
+                  {/if}
                 </span>
               </div>
             </div>
