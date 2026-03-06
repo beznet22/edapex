@@ -22,8 +22,11 @@ export class FilesContext {
   openResourceModal = $state(false);
   openFileStoreModal = $state(false);
 
-  constructor(uploads: UploadedData[], public doUpload?: boolean) {
+  #selectedContext: SelectedClass;
+
+  constructor(uploads: UploadedData[], selectedClass: SelectedClass, public doUpload?: boolean) {
     this.rehydrate(uploads);
+    this.#selectedContext = selectedClass;
   }
 
   rehydrate(uploads: UploadedData[]) {
@@ -31,11 +34,11 @@ export class FilesContext {
   }
 
   get selectedClass() {
-    return SelectedClass.fromContext().data;
+    return this.#selectedContext.data;
   }
 
   set selectedClass(v: ClassSection | null) {
-    SelectedClass.fromContext().data = v;
+    this.#selectedContext.data = v;
   }
 
   openFileDialog = () => {

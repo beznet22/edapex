@@ -9,17 +9,23 @@
   import { onMount } from "svelte";
   import { toast } from "svelte-sonner";
 
+  import { SelectedClass, SelectedAgent } from "$lib/context/sync.svelte";
+
   let { data } = $props();
   // svelte-ignore state_referenced_locally
   const { user, agents } = data;
   let open = $state(false);
   let value = $state<string | undefined>();
   let userContext = $derived(UserContext.fromContext());
+  const selectedClass = SelectedClass.fromContext();
+  const selectedAgent = SelectedAgent.fromContext();
 
   const chatContext = new ChatContext({
     initialMessages: [],
     chatData: undefined,
     agents,
+    selectedClass,
+    selectedAgent,
   });
   chatContext.setContext();
   const chat = $derived(ChatContext.fromContext());
