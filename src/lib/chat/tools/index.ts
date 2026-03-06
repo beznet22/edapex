@@ -17,7 +17,8 @@ import {
   assignClassSection,
   searchClassSection,
   changeStudentName,
-  getAssessmentMapping
+  getAssessmentMapping,
+  changeParentEmail
 } from "./coordinator.tool";
 
 export const teacherTools = {
@@ -42,6 +43,7 @@ export const coordinatorTools = {
   searchClassSection,
   changeStudentName,
   getAssessmentMapping,
+  changeParentEmail,
   upsertTeacherRemark,
   upsertStudentResult,
 };
