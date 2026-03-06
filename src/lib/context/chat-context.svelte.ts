@@ -28,7 +28,8 @@ export type InitChat = {
   api?: string;
   chatData?: DBChat;
   agents: AgentWorkflow[];
-  selectedClass?: ClassSection;
+  selectedClass: SelectedClass;
+  selectedAgent: SelectedAgent;
 };
 
 export class ChatContext {
@@ -51,7 +52,17 @@ export class ChatContext {
   chatData?: DBChat;
   chatHistory = ChatHistory.fromContext();
 
-  constructor({ initialMessages, api, chatData, agents, selectedClass }: InitChat) {
+  #selectedClass: SelectedClass;
+  #selectedAgent: SelectedAgent;
+
+  constructor({
+    initialMessages,
+    api,
+    chatData,
+    agents,
+    selectedClass,
+    selectedAgent,
+  }: InitChat) {
     this.client = $derived(
       new Chat<xUIMessage>({
         id: chatData?.id,
@@ -71,23 +82,25 @@ export class ChatContext {
     this.messages = $derived(this.client?.messages ?? []);
     this.lastMessage = $derived(this.messages.at(-1));
     this.agents = $state(agents);
+    this.#selectedClass = selectedClass;
+    this.#selectedAgent = selectedAgent;
   }
 
   get activeAgent() {
-    const id = SelectedAgent.fromContext().value;
+    const id = this.#selectedAgent.value;
     return this.agents.find((a) => a.id === id) || this.agents[0];
   }
 
   set activeAgent(v: AgentWorkflow | null) {
-    SelectedAgent.fromContext().value = v?.id || "";
+    this.#selectedAgent.value = v?.id || "";
   }
 
   get selectedClass() {
-    return SelectedClass.fromContext().data;
+    return this.#selectedClass.data;
   }
 
   set selectedClass(v: ClassSection | null) {
-    SelectedClass.fromContext().data = v;
+    this.#selectedClass.data = v;
   }
 
   get loading() {

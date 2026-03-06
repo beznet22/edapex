@@ -28,6 +28,7 @@
     selectedAgentId,
     uploads,
     sidebarCollapsed,
+    // svelte-ignore state_referenced_locally
   } = data;
 
   const chatHistory = new ChatHistory(chats);
@@ -43,25 +44,30 @@
   selectedAgent.setContext();
 
   $effect(() => {
-    chatHistory.rehydrate(chats);
+    chatHistory.rehydrate(data.chats);
   });
 
   $effect(() => {
-    selectedChatModel.rehydrate(modelId!);
+    selectedChatModel.rehydrate(data.modelId!);
   });
 
   $effect(() => {
-    selectedClass.rehydrate(selectedClassRaw || "");
+    selectedClass.rehydrate(data.selectedClassRaw || "");
   });
 
   $effect(() => {
-    selectedAgent.rehydrate(selectedAgentId || "");
+    selectedAgent.rehydrate(data.selectedAgentId || "");
   });
 
-  const appContext = new UserContext(user, classes, students ?? undefined, assignedSection);
+  const appContext = new UserContext(
+    user,
+    classes,
+    students ?? undefined,
+    assignedSection,
+  );
   appContext.setContext();
 
-  const filesContext = new FilesContext(uploads, true);
+  const filesContext = new FilesContext(data.uploads, selectedClass, true);
   filesContext.setContext();
 
   $effect(() => {
@@ -82,8 +88,8 @@
   <link rel="icon" href={favicon} />
 </svelte:head>
 
-<Sidebar.Provider open={!sidebarCollapsed}>
-  <AppSidebar user={user ?? undefined} />
+<Sidebar.Provider open={!data.sidebarCollapsed}>
+  <AppSidebar user={data.user ?? undefined} />
   <Sidebar.Inset>
     <Sidebar.Trigger
       variant="outline"
