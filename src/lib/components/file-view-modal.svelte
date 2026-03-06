@@ -16,6 +16,8 @@
     import ChevronLeft from "@lucide/svelte/icons/chevron-left";
     import ChevronRight from "@lucide/svelte/icons/chevron-right";
     import Check from "@lucide/svelte/icons/check";
+    import Send from "@lucide/svelte/icons/send";
+    import LoaderCircle from "@lucide/svelte/icons/loader-circle";
     import Grid3X3 from "@lucide/svelte/icons/grid-3x3";
     import Languages from "@lucide/svelte/icons/languages";
     import Search from "@lucide/svelte/icons/search";
@@ -307,6 +309,25 @@
                                         (store.rotation + 90) % 360)}
                             >
                                 <RotateCw class="h-4 w-4" />
+                            </Button>
+                            <div class="w-px h-3 bg-white/20 mx-1.5"></div>
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                class="h-8 w-8 text-white hover:bg-white/10 disabled:opacity-30"
+                                onclick={() => store.handlePublish()}
+                                disabled={store.isPublishing ||
+                                    !store.extractedData?.data?.studentData
+                                        ?.studentId}
+                                title="Publish result via email"
+                            >
+                                {#if store.isPublishing}
+                                    <LoaderCircle
+                                        class="h-4 w-4 animate-spin"
+                                    />
+                                {:else}
+                                    <Send class="h-4 w-4" />
+                                {/if}
                             </Button>
                         </div>
 

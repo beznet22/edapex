@@ -3,6 +3,7 @@ import type { UploadedData } from "$lib/types/chat-types";
 import type { ExtractedAssessment } from "$lib/server/storage/student-files";
 import { toast } from "svelte-sonner";
 import { useFileActions } from "./file-context.svelte";
+import { publishResult } from "$lib/api/assessment.remote";
 
 const FILESTORE_CONTEXT_KEY = Symbol("filestore-context");
 
@@ -21,6 +22,7 @@ export class FilestoreContext {
     showTranslation = $state(false);
     extractedData = $state<ExtractedAssessment | null>(null);
     isModalLoading = $state(false);
+    isPublishing = $state(false);
     activeTab = $state("results");
 
     // Drawer State (Mobile selection)
@@ -173,6 +175,32 @@ export class FilestoreContext {
 
         if (legacy.scores && legacy.scores[subject]) {
             legacy.scores[subject][index] = num;
+        }
+    };
+
+    handlePublish = async () => {
+        const data = this.extractedData?.data;
+        const studentId = data?.studentData?.studentId;
+        const examTypeId = data?.studentData?.examTypeId;
+
+        if (!studentId || !examTypeId) {
+            toast.error("Missing student or exam data for publishing");
+            return;
+        }
+
+        this.isPublishing = true;
+        try {
+            const result = await publishResult({ studentId, examTypeId });
+            if (result.success) {
+                toast.success(result.message || "Result published successfully");
+            } else {
+                toast.error(result.message || "Failed to publish result");
+            }
+        } catch (e) {
+            console.error(e);
+            toast.error("Error publishing result");
+        } finally {
+            this.isPublishing = false;
         }
     };
 
