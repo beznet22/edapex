@@ -15,16 +15,23 @@ export class UserContext {
   designation = $state<Designation | undefined>(undefined);
   subjects = $state<AssignedSubject[]>([]);
   staff = $state<Staff | undefined>(undefined);
+  assignedSection = $state<ClassSection | null>(null);
 
   isIt = $derived(this.designation === "it");
   isTeacher = $derived(this.designation === "class_teacher");
   isCoordinator = $derived(this.designation === "coordinator");
 
-  constructor(user: AuthUser | undefined, classes: ClassSection[], students?: ClassStudent[]) {
+  constructor(
+    user: AuthUser | undefined,
+    classes: ClassSection[],
+    students?: ClassStudent[],
+    assignedSection?: ClassSection | null
+  ) {
     this.user = user;
     this.classes = classes;
     this.students = localStore("students", students) || [];
     this.designation = user?.designation;
+    this.assignedSection = assignedSection ?? null;
   }
 
   greeting = () => {

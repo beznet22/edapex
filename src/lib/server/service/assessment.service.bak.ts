@@ -25,7 +25,6 @@ import { render } from "svelte/server";
 import { ensureBase64Image, pageToHtml } from "../helpers";
 import { generate } from "../helpers/pdf-generator";
 import { resultRepo } from "../repository/result.repo";
-import type { NewExamSetup } from "$lib/types/result-types";
 import { timelineRepo } from "../repository/timeline.repo";
 import ResultTemplate from "$lib/components/template/ResultTemplate.svelte";
 import ResultEmail from "$lib/components/template/result-email.svelte";
@@ -35,7 +34,6 @@ import { generateContent } from "../helpers/chat-helper";
 import { studentFileStorage } from "../storage/student-files";
 import path from "path";
 import fs from "fs";
-import type { MySQLDrizzleClient } from "../db";
 
 const GRADE_RANGES = {
   EYFS: [
@@ -60,14 +58,6 @@ type StudentData = {
   sectionId: number;
   schoolId: number;
   examTypeId: number;
-};
-
-// Local type for mark processing (now distinct from result summary ScoreData)
-type MarkScoreData = {
-  score: number;
-  fullMarks: number;
-  originalName?: string;
-  isAbsent?: boolean;
 };
 
 export class AssessmentService {
@@ -251,7 +241,7 @@ export class AssessmentService {
    */
   async isEmailAlreadySent(studentId: number, examId: number): Promise<boolean> {
     const timelines = await timelineRepo.getTimelinesByStudentId(studentId);
-    return timelines.some((t: any) => t.type?.startsWith(`exam-${examId}`));
+    return timelines.some((t) => t.type?.startsWith(`exam-${examId}`));
   }
 
   async assignSubjects(classId: number, sectionId: number, teacherId?: number) {
@@ -274,20 +264,20 @@ export class AssessmentService {
   /**
    * Store student attendance for an exam
    */
-  async upsertAttendance(params: { attendance: Attendance; studentId: number; examTypeId: number }, tx?: MySQLDrizzleClient) {
+  async upsertAttendance(params: { attendance: Attendance; studentId: number; examTypeId: number }) {
     const { attendance, studentId, examTypeId } = params;
     const data = {
       ...attendance,
       studentId,
       examTypeId,
     };
-    await resultRepo.upsertClassAttendance(data, tx);
+    await resultRepo.upsertClassAttendance(data);
   }
 
   /**
    * Store teacher's remark for a student
    */
-  async upsertTeacherRemark(params: { studentId: number; examTypeId: number; remark: string }, tx?: MySQLDrizzleClient) {
+  async upsertTeacherRemark(params: { studentId: number; examTypeId: number; remark: string }) {
     const { studentId, examTypeId, remark } = params;
     const academicId = await repo.result.getAcademicId();
     await resultRepo.upsertTeacherRemark({
@@ -295,13 +285,13 @@ export class AssessmentService {
       examTypeId,
       remark,
       academicId,
-    }, tx);
+    });
   }
 
   /**
    * Store student ratings for a student
    */
-  async upsertStudentRatings(params: { studentId: number; examTypeId: number; ratings: StudentRatings }, tx?: MySQLDrizzleClient) {
+  async upsertStudentRatings(params: { studentId: number; examTypeId: number; ratings: StudentRatings }) {
     const { studentId, examTypeId, ratings } = params;
     const academicId = await repo.result.getAcademicId();
     await resultRepo.upsertStudentRatings(
@@ -317,8 +307,7 @@ export class AssessmentService {
             academicId,
           };
         })
-        .filter((r) => r !== null) as any[],
-      tx
+        .filter((r) => r !== null) as any[]
     );
   }
 
@@ -331,122 +320,76 @@ export class AssessmentService {
   /**
    * Store exam marks for a student from validated report data
    */
-  async upsertStudentResult(validatedResult: ResultInput, staffId: number): Promise<MarkResponse> {
+  async upsertStudentResult(validatedResult: ResultInput, teacherId: number): Promise<MarkResponse> {
     const { studentData, marksData, teachersRemark, studentRatings } = validatedResult;
-    const { studentId, classId, sectionId, recordId, examTypeId, studentCategoryId } = studentData;
-    if (!studentId || !examTypeId) throw new Error("Student ID and Exam Type ID are required");
+    const { studentId, classId, sectionId, recordId, examTypeId } = studentData;
+    if (!studentId || !examTypeId) throw new Error("");
 
-    return await repo.result.db.transaction(async (tx: any) => {
+
+    try {
       this.category = studentData.studentCategory as Category;
       this.studentInput = studentData;
 
-      const academicId = await repo.result.getAcademicId();
-      const schoolId = studentData.schoolId || 1;
-      const sId = studentId!;
-      const eTId = examTypeId!;
-
-      // 1. Resolve approving staff member
-      const approvingStaffId = staffId || 1;
-
-      // 2. Resolve teacher to attribute the marks to (if Admin is approving)
-      const assignedSubjects = await repo.result.getAssignedSubjects(classId, sectionId);
-      const subjectTeacherMap = new Map<number, number>();
-      assignedSubjects.forEach((s) => {
-        if (s.subjectId && s.teacherId) subjectTeacherMap.set(s.subjectId, s.teacherId);
-      });
-
-      // 3. Update student category if it changed
-      if (studentCategoryId) {
-        await studentRepo.updateStudentCategoryId(studentId, studentCategoryId, tx);
+      const examSetup = await this.getExamSetup(examTypeId);
+      if (!examSetup) {
+        throw new Error("Failed to fetch exam setup");
       }
-
-      // 4. Fetch Exam Setups
-      const examSetups = await repo.result.getExamSetupsByClassSection(classId, sectionId);
-
-      // 5. Clean existing marks for this term
-      await repo.result.cleanMarks(
-        {
-          recordId: recordId!,
-          studentId: sId,
-          classId: classId!,
-          sectionId: sectionId!,
-          examTermId: eTId,
-          schoolId,
-        },
-        tx
-      );
-
-      // 6. Process marks (collect data for batching)
-      const batchData = await this.doProcessMarks(studentData, marksData, examSetups as ExamSetup[], tx);
-
-      if (!batchData) {
-        throw new Error("Failed to process marks.");
-      }
-
-      if (!batchData.marks.length && !batchData.results.length) {
-        throw new Error("No marks or results were processed.");
-      }
-
-      // 7. Batch Upsert
-      await Promise.all([
-        repo.result.batchUpsertMarkRecords(batchData.marks, tx),
-        repo.result.batchUpsertResultRecords(batchData.results, tx),
-      ]);
-
-      if (studentRatings) {
-        const ratingsToInsert = Object.entries(studentRatings)
-          .filter(([_, value]) => value !== null)
-          .map(([key, value]) => ({
-            studentId: sId,
-            examTypeId: eTId,
-            attribute: key,
-            rate: value as number,
-            schoolId,
-            academicId,
-            activeStatus: 1,
-          }));
-
-        if (ratingsToInsert.length > 0) {
-          await repo.result.upsertStudentRatings(ratingsToInsert, tx);
-        }
-      }
-
-      // 9. Save teacher remark
-      if (teachersRemark.comment) {
-        // Fallback: use first available teacher ID if approving staff is not found (shouldn't happen for teachers)
-        const remarkTeacherId = approvingStaffId || subjectTeacherMap.values().next().value || 0;
-        await repo.result.upsertTeacherRemark(
-          {
-            teacherId: remarkTeacherId,
-            studentId,
-            examTypeId,
-            remark: teachersRemark.comment,
-            academicId,
-          },
-          tx
+      const results = await this.processMarks(marksData, examSetup);
+      if (!results?.length) {
+        throw new Error(
+          "Failed to process marks. Ensure you have uploaded the marks data for the student before proceeding."
         );
       }
 
-      // 10. Upsert attendance
+      // Update student ratings if present
+      if (studentRatings) {
+        const academicId = await repo.result.getAcademicId();
+        await repo.result.upsertStudentRatings(
+          Object.entries(studentRatings)
+            .map(([attribute, rating]) => {
+              if (!rating) return null;
+              return {
+                studentId,
+                examTypeId,
+                attribute,
+                rate: rating,
+                remark: AttributeRemark[rating as keyof typeof AttributeRemark],
+                academicId,
+              };
+            })
+            .filter((r) => r !== null) as any[]
+        );
+      }
+
+      // Save teacher remark if present
+      if (teachersRemark.comment) {
+        const academicId = await repo.result.getAcademicId(); // Reuse repo’s helper
+        await repo.result.upsertTeacherRemark({
+          teacherId,
+          studentId,
+          examTypeId,
+          remark: teachersRemark.comment,
+          academicId,
+        });
+      }
+
+      // upsert attendance
       if (studentData.attendance) {
         await this.upsertAttendance({
           attendance: studentData.attendance,
           studentId,
           examTypeId,
-        }, tx);
+        });
       }
 
-      return { studentId, examTypeId, results: batchData.marksInput };
-    });
-  }
-
-  async processMarks(
-    markStore: MarksData,
-    examSetups: ExamSetup[],
-    tx?: MySQLDrizzleClient
-  ) {
-    const batchData = await this.doProcessMarks(this.studentInput!, markStore, examSetups, tx);
-    return batchData?.marksInput;
+      return { studentId, examTypeId, results };
+    } catch (error) {
+      console.error("MarksService::store - Operation failed", {
+        error: error instanceof Error ? error.message : "Unknown error",
+        stack: error instanceof Error ? error.stack : undefined,
+      });
+      throw error;
+    }
   }
 
   /**
@@ -491,7 +434,7 @@ export class AssessmentService {
       daysOpened: attendance?.daysOpened || 0,
       daysAbsent: attendance?.daysAbsent || 0,
       daysPresent: attendance?.daysPresent || 0,
-      studentPhoto: photo,
+      studentPhoto: withImages ? ensureBase64Image(studentData.studentPhoto || "", "/avatar.jpg") : undefined,
       token: base64url.encode(JSON.stringify({ studentId: id, examId })),
     };
     const schoolData = (await repo.result.getGeneralSettings())?.[0] || {};
@@ -523,7 +466,7 @@ export class AssessmentService {
       maxScores: records.length * 100,
     };
 
-    const subjects = await resultRepo.getAssignedSubjects(studentData.classId!!, studentData.sectionId!!);
+    const subjects = await resultRepo.getAssignedSubjects(studentData.classId!, studentData.sectionId!);
     return {
       subjects,
       school,
@@ -604,200 +547,177 @@ export class AssessmentService {
     return { records, overAll };
   }
 
-  async getMappingData(staffId: number, classId?: number, sectionId?: number) {
-    const academicId = await repo.result.getAcademicId();
-    const [examTypes, studentCategories, subjects, classSection] = await Promise.all([
+  async getMappingData(staffId: number) {
+    const [examSetups, examTypes, studentCategories, subjects, classSection] = await Promise.all([
+      repo.result.getExamSetupsByStaffId(staffId),
       repo.result.getCurrentTerm(),
       repo.result.getStudentCategories(),
       repo.result.getSubjectsAssignedToStaff(staffId),
       repo.result.getAssignedClassSection(staffId),
     ]);
-
-    // If classId/sectionId provided (Admin view), use those, else use teacher's assigned ones
-    const activeClassId = classId || classSection?.classId;
-    const activeSectionId = sectionId || classSection?.sectionId;
-
-    let examSetups: Partial<ExamSetup>[] = [];
-    if (activeClassId && activeSectionId) {
-      examSetups = await repo.result.getExamSetupsByClassSection(activeClassId, activeSectionId);
-    } else {
-      examSetups = await repo.result.getExamSetupsByStaffId(staffId);
-    }
-
-    return {
-      examSetups,
-      examTypes,
-      studentCategories,
-      subjects,
-      classSection: classSection || { classId: activeClassId, sectionId: activeSectionId },
-      studentData: {},
-    };
+    return { examSetups, examTypes, studentCategories, subjects, classSection, studentData: {} };
   }
 
-  async doProcessMarks(
-    student: StudentInput,
-    markStore: MarksData,
-    examSetups: ExamSetup[],
-    tx?: MySQLDrizzleClient
-  ): Promise<{
-    marks: any[];
-    results: any[];
-    marksInput: MarksInput[];
-  } | null> {
-    const academicId = await repo.result.getAcademicId();
-    const schoolId = student.schoolId || 1;
-    const { classId, sectionId, studentId, recordId, examTypeId } = student;
-    if (!classId || !sectionId || !studentId || !examTypeId) return null;
+  /**
+   * Process marks and store in database
+   */
+  private async processMarks(markStore: MarksData, examSetups: ExamSetup[]): Promise<MarksInput[] | null> {
+    if (!this.studentInput) return null;
 
-    const marksToInsert: any[] = [];
-    const resultsToInsert: any[] = [];
-    const marksInput: MarksInput[] = [];
+    // Update student category before processing marks
+    await studentRepo.updateStudentCategoryId(
+      this.studentInput.studentId!,
+      this.studentInput.studentCategoryId!
+    );
 
-    const assignedSubjects = await repo.result.getAssignedSubjects(classId, sectionId);
-    const subjectTeacherMap = new Map<number, number>();
-    assignedSubjects.forEach((s) => {
-      if (s.subjectId && s.teacherId) subjectTeacherMap.set(s.subjectId, s.teacherId);
+    await resultRepo.cleanMarks({
+      recordId: this.studentInput.recordId!,
+      studentId: this.studentInput.studentId!,
+      classId: this.studentInput.classId!,
+      sectionId: this.studentInput.sectionId!,
+      examTermId: this.studentInput.examTypeId!,
+      schoolId: this.studentInput.schoolId!,
     });
 
-    for (const store of markStore) {
-      const subjectId = store.subjectId;
-      const teacherId = subjectTeacherMap.get(subjectId) || 0;
+    return this.doProcessMarks(
+      {
+        category: this.studentInput.studentCategory! as Category,
+        studentId: this.studentInput.studentId!,
+        recordId: this.studentInput.recordId!,
+        classId: this.studentInput.classId!,
+        sectionId: this.studentInput.sectionId!,
+        schoolId: this.studentInput.schoolId!,
+        examTypeId: this.studentInput.examTypeId!,
+      },
+      markStore,
+      examSetups
+    );
+  }
 
-      // Ensure Exam exists
-      const examId = await repo.result.createExamIfNotExist(
-        {
-          classId,
-          sectionId,
-          subjectId,
-          examTypeId,
-          academicId,
-          schoolId,
-          activeStatus: 1,
-        },
-        tx
-      );
+  /**
+   * Process marks and store in database
+   */
+  async doProcessMarks(
+    student: StudentData,
+    markStore: MarksData,
+    examSetups: ExamSetup[]
+  ): Promise<MarksInput[] | null> {
+    if (!student) return null;
+    const { studentId, recordId, classId, sectionId, schoolId, examTypeId } = student;
+    if (!classId || !sectionId || !schoolId || !studentId) {
+      return null;
+    }
+    const studentRecordId = recordId;
 
-      if (!examId) continue;
+    const academicId = await repo.result.getAcademicId();
+    const results: MarksInput[] = [];
 
-      let totalSubjectMarks = 0;
-      let totalSubjectFullMarks = 0;
+    for (const record of markStore) {
+      const subjectId = record.subjectId;
+      const marks = record.marks;
+      const totalMarksPerSubject = record.total || 0; // already summed in input
+      let isAbsent = false;
 
-      // DAYCARE Handling
-      if (this.category === "DAYCARE") {
-        resultsToInsert.push({
-          studentRecordId: recordId,
-          studentId,
-          classId,
-          sectionId,
-          subjectId,
-          examId,
-          examTypeId,
-          totalMarks: 0,
-          teacherRemarks: store.learningOutcome || null,
-          academicId,
-          schoolId,
-          activeStatus: 1,
-        });
-
-        marksInput.push({
-          subjectId,
-          examTypeId,
-          marks: 0,
-          fullMarks: 0,
-          totalMarks: 0,
-          percentage: 0,
-          grade: "",
-          gpa: 0,
-          isAbsent: false,
-          teacherRemarks: store.learningOutcome || undefined
-        });
-
-        continue;
-      }
-
-      // Graded Assessment Handling
-      if (store.examTitles && store.marks) {
-        for (let i = 0; i < store.examTitles.length; i++) {
-          const title = store.examTitles[i];
-          const score = store.marks[i] || 0;
-          const fullMarks = 100; // Default or resolve from setup if needed
-
-          const examSetupId = this.findExamSetupId(examSetups, subjectId, title, examId);
-
-          let finalSetupId = examSetupId;
-          if (!finalSetupId) {
-            finalSetupId = await repo.result.upsertExamSetup(
-              {
-                examTitle: title,
-                examId,
-                examTermId: examTypeId,
-                subjectId,
-                classId,
-                sectionId,
-                examMark: fullMarks,
-                academicId,
-                schoolId,
-                activeStatus: 1,
-              },
-              tx
-            );
-          }
-
-          marksToInsert.push({
-            studentRecordId: recordId,
-            studentId,
-            classId,
-            sectionId,
-            subjectId,
-            examTermId: examTypeId,
-            examSetupId: finalSetupId,
-            totalMarks: score,
-            isAbsent: 0,
-            academicId,
-            schoolId,
-            teacherId,
-            activeStatus: 1,
-          });
-
-          totalSubjectMarks += score;
-          totalSubjectFullMarks += fullMarks;
-        }
-      }
-
-      resultsToInsert.push({
-        studentRecordId: recordId,
-        studentId,
+      const examId = await repo.result.createExamIfNotExist({
+        examMark: 100,
+        passMark: 70,
         classId,
         sectionId,
         subjectId,
-        examId,
         examTypeId,
-        totalMarks: totalSubjectMarks,
         academicId,
         schoolId,
-        activeStatus: 1,
       });
 
-      marksInput.push({
+      if (student.category !== "DAYCARE") {
+        if (!marks || !record.examTitles) continue;
+        if (marks.length === 0) continue;
+        if (marks.length !== record.examTitles.length) continue;
+        // Process each mark part (e.g., FA1, FA2, SA)
+        let markIds: number[] = [];
+        for (let i = 0; i < marks.length; i++) {
+          const partMark = marks[i] ?? 0;
+          const examTitle = record.examTitles[i] || "";
+          let examSetupId = this.findExamSetupId(examSetups, subjectId, examTitle);
+          isAbsent = isAbsent || partMark === 0;
+
+          examSetupId = await repo.result.upsertExamSetup({
+            id: examSetupId || undefined,
+            examTitle,
+            examMark: partMark,
+            subjectId,
+            examId,
+            examTermId: examTypeId,
+            classId,
+            sectionId,
+            academicId,
+            schoolId,
+          });
+
+          if (!examSetupId) {
+            continue;
+          }
+
+          await repo.result.upsertMarkRecord({
+            examTermId: examTypeId,
+            classId,
+            sectionId,
+            subjectId,
+            studentId,
+            studentRecordId,
+            totalMarks: partMark,
+            examSetupId,
+            isAbsent: isAbsent ? 1 : 0,
+            teacherRemarks: record.grade,
+            schoolId,
+            academicId,
+          });
+        }
+      }
+      // Compute subject-level result
+      const subjectFullMark = await repo.result.getSubjectFullMark({
+        examTypeId,
+        subjectId,
+        classId,
+        sectionId,
+        academicId,
+        schoolId,
+      });
+
+      const percentage = this.subjectPercentageMark(totalMarksPerSubject, subjectFullMark);
+      const [grade] = await repo.result.getMarkGrade({ percentage, academicId, schoolId });
+      await repo.result.upsertResultRecord({
+        classId,
+        sectionId,
         subjectId,
         examTypeId,
-        marks: totalSubjectMarks,
-        fullMarks: totalSubjectFullMarks,
-        totalMarks: totalSubjectMarks,
-        percentage: this.subjectPercentageMark(totalSubjectMarks, totalSubjectFullMarks),
-        grade: this.getGrade(
-          this.subjectPercentageMark(totalSubjectMarks, totalSubjectFullMarks),
-          this.category!
-        ).grade,
-        gpa: 0,
-        isAbsent: false
+        studentId,
+        studentRecordId,
+        isAbsent: isAbsent ? 1 : 0,
+        totalMarks: totalMarksPerSubject || 0,
+        totalGpaPoint: grade?.gpa ?? null,
+        totalGpaGrade: grade?.gradeName ?? null,
+        teacherRemarks: record.grade ?? record.learningOutcome,
+        schoolId,
+        academicId,
+      });
+
+      results.push({
+        subjectId,
+        examTypeId,
+        totalMarks: totalMarksPerSubject,
+        grade: grade?.gradeName ?? null,
+        gpa: grade?.gpa ?? null,
+        isAbsent,
+        teacherRemarks: record.grade ?? record.learningOutcome ?? undefined,
       });
     }
 
-    return { marks: marksToInsert, results: resultsToInsert, marksInput };
+    return results;
   }
 
   async getClassAverages(classResults: ResultData[]): Promise<ClassAverage> {
+    // Group by studentId
     const resultByStudent = classResults.reduce((acc: Record<string, ResultData[]>, result: ResultData) => {
       const studentId = String(result.studentId || "0");
       (acc[studentId] = acc[studentId] || []).push(result);
@@ -831,6 +751,9 @@ export class AssessmentService {
     return await repo.result.getObjectives(student);
   }
 
+  /**
+   * Get exam setup data for a student and exam
+   */
   async getExamSetup(examId: number) {
     if (!this.studentInput) return null;
     return await repo.result.getExamSetup({
@@ -839,46 +762,32 @@ export class AssessmentService {
       examTypeId: examId,
       schoolId: 1,
     });
+    // ⚠️ Note: `studentId` was in params but unused in repo — removed
   }
 
-  findExamSetupId(
-    examSetups: ExamSetup[],
-    subjectId: number,
-    examTitle: string,
-    examId?: number
-  ): number | null {
-    const subjectSetups = examSetups.filter(
-      (setup) =>
-        setup.subjectId === subjectId &&
-        (examId === undefined || setup.examId === examId)
-    );
+  /**
+   * Find exam setup ID for subject and exam type
+   */
+  findExamSetupId(examSetups: ExamSetup[], subjectId: number, examType: string): number | null {
+    const subjectSetups = examSetups.filter((setup) => setup.subjectId === subjectId);
 
-    if (subjectSetups.length === 0) return null;
-    if (!examTitle) return subjectSetups[0].id;
-
-    const normalizedTitle = examTitle.trim().toLowerCase();
-
-    // 1. Exact match
-    let match = subjectSetups.find(
-      (s) => s.examTitle?.trim().toLowerCase() === normalizedTitle
-    );
-
-    // 2. Fallback to includes
-    if (!match) {
-      match = subjectSetups.find(
-        (s) => s.examTitle?.trim().toLowerCase().includes(normalizedTitle)
-      );
+    if (!examType) {
+      return subjectSetups[0].id;
     }
 
-    return match?.id || null;
+    const matchedSetup = subjectSetups.find(
+      (setup) => setup.examTitle && setup.examTitle.toLowerCase().includes(examType.toLowerCase())
+    );
+
+    return matchedSetup?.id || null;
   }
 
   subjectPercentageMark(obtainedMark: number, fullMark: number): number {
     if (fullMark === 0) return 0;
-    return Math.round((obtainedMark / fullMark) * 10000) / 100;
+    return Math.round((obtainedMark / fullMark) * 10000) / 100; // 2 decimal places
   }
 
-  getGrade(score: number, category: Category, remark: string | null = null): { grade: string; color?: string } {
+  getGrade(score: number, category: Category, remark: string | null): { grade: string; color?: string } {
     const ranges = category === "LOWERBASIC" || category === "MIDDLEBASIC" ? GRADE_RANGES.GRADERS : GRADE_RANGES.EYFS;
     const match = ranges.find((r) => score >= r.min && score <= r.max);
     return match ? { grade: match.grade, color: match.color } : { grade: "N/A", color: "bg-gray-200" };
@@ -903,6 +812,7 @@ export class AssessmentService {
         if (matches >= 2) return true;
       }
     }
+
     return false;
   }
 
@@ -914,7 +824,10 @@ export class AssessmentService {
     const m = /No\.\s*(\d+)\s*(.+)/i.exec(street);
     return { street_number: m?.[1] || null, street_name: m?.[2] || street || null, city, state };
   }
-
+  /**
+   * Unifies extraction logic for UI and API entry points.
+   * Handles mapping fetching, AI extraction, validation, and storage.
+   */
   async runExtraction(params: {
     file: Blob;
     classId: number;
@@ -929,7 +842,7 @@ export class AssessmentService {
     const staff = await staffRepo.getStaffByClassSection({ classId, sectionId });
     if (!staff.teacherId) throw new Error("Class not assigned to any teacher");
 
-    const mappingData = await this.getMappingData(staff.teacherId, classId, sectionId);
+    const mappingData = await this.getMappingData(staff.teacherId);
     if (studentId) {
       mappingData.studentData = { studentId, admissionNo, fullName };
     }
@@ -942,16 +855,19 @@ export class AssessmentService {
 
     const parsedResult = JSON.parse(content.trim());
 
+    // Fetch class/section names for storage folder naming and validation
     const classSection = await resultRepo.getClassSectionById(classId, sectionId);
     const finalClassName = classSection?.className || (parsedResult.studentData as any).className || "Unknown";
     const finalSectionName = classSection?.sectionName || (parsedResult.studentData as any).sectionName || "Unknown";
 
+    // Inject missing fields before validation to satisfy studentDataSchema
     if (!parsedResult.studentData.className) parsedResult.studentData.className = finalClassName;
     if (!parsedResult.studentData.sectionName) parsedResult.studentData.sectionName = finalSectionName;
     if (!parsedResult.studentData.class) {
       parsedResult.studentData.class = `${finalClassName} ${finalSectionName}`.trim();
     }
 
+    // Merge manual overrides if provided
     if (studentId) parsedResult.studentData.studentId = studentId;
     if (admissionNo) parsedResult.studentData.admissionNo = admissionNo;
     if (fullName) parsedResult.studentData.fullName = fullName;
@@ -966,6 +882,7 @@ export class AssessmentService {
       throw new Error(`Validation failed:\n${errors.join("\n")}`);
     }
 
+    // Ensure names are in the data object for storage path generation
     validated.data.studentData.className = finalClassName;
     validated.data.studentData.sectionName = finalSectionName;
 
@@ -988,6 +905,10 @@ export class AssessmentService {
     };
   }
 
+  /**
+   * Retrieves extracted assessment data from persistent filesystem storage.
+   * Handles path derivation and mapping back to usable marks data.
+   */
   async getExtractedAssessment(studentId: number, examId: number) {
     const student = await studentRepo.getStudentById(studentId);
     if (!student || !student.classId || !student.sectionId) return null;
@@ -1002,10 +923,11 @@ export class AssessmentService {
     const extracted = await studentFileStorage.load(folderPath);
     if (!extracted || !extracted.verified) return null;
 
+    // Map extracted data to ResultInput format
     return {
       studentId: extracted.data?.studentData?.studentId,
       examTypeId: extracted.data?.studentData?.examTypeId,
-      marksData: extracted.data?.marksData?.map((m: any) => ({
+      marksData: extracted.data?.marksData?.map((m) => ({
         subjectCode: m.subjectCode,
         marks: m.marks,
         subjectName: m.subjectName,

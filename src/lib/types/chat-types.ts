@@ -7,7 +7,7 @@ import type { Designation } from "./sms-types";
 
 export interface Assistant {
   workflowId: string;
-  designation: Designation;
+  designation: Designation[];
   suggestions: readonly string[];
   highlight: string;
   instructions?: string;

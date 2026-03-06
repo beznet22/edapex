@@ -58,14 +58,14 @@ export const POST: RequestHandler = async ({ request, locals }) => {
     }
 
     let staffId: number = user.staffId || 1;
-    if (classId && sectionId && user.designation === "coordinator") {
+    if (classId && sectionId) {
       const staff = await staffRepo.getStaffByClassSection({ classId, sectionId });
       if (!staff.teacherId) throw new Error("Class not assigned to any teacher");
       staffId = staff.teacherId;
       token = `${className}(${sectionName})`.toLowerCase().replaceAll(" ", "_");
     } else {
       const classSection = await resultRepo.getAssignedClassSection(staffId);
-      if (!classSection?.className || !classSection?.sectionName) throw new Error("Class not assigned to any section");
+      if (!classSection?.className || !classSection?.sectionName) throw new Error("Class not assigned");
       token = `${classSection.className}(${classSection.sectionName})`.toLowerCase().replaceAll(" ", "_");
     }
 
@@ -154,7 +154,7 @@ export const DELETE: RequestHandler = async ({ url, locals }) => {
 
   let staffId: number = user.staffId || 1;
   const classSection = await resultRepo.getAssignedClassSection(staffId);
-  if (!classSection?.className || !classSection?.sectionName) throw new Error("Class not assigned to any section");
+  if (!classSection?.className || !classSection?.sectionName) throw new Error("Class not assigned");
   const token = `${classSection.className}(${classSection.sectionName})`.toLowerCase().replaceAll(" ", "_");
 
   if (clearAll) {

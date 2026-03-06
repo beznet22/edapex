@@ -1,6 +1,7 @@
 // /src/lib/server/repository/student.repo.ts
 
 import { and, count, eq, isNotNull, ne, sql, like, or, desc, asc } from "drizzle-orm";
+import { type MySQLDrizzleClient } from "./base.repo";
 import {
   classAttendances,
   smAssignSubjects,
@@ -340,7 +341,12 @@ export class StudentRepository extends BaseRepository {
     return inserted.insertId;
   }
 
-  async getStudentRecord(params: { classId: number; sectionId: number; studentId: number }) {
+  async getStudentRecord(params: { classId: number; sectionId: number; studentId: number }): Promise<{
+    id: number;
+    categoryId: number | null;
+    fullName: string | null;
+    admissionNo: number | null;
+  } | null> {
     const { classId, sectionId, studentId } = params;
     if (!classId || !sectionId || !studentId) return null;
     const academicId = await this.getAcademicId();
@@ -348,6 +354,8 @@ export class StudentRepository extends BaseRepository {
       .select({
         id: studentRecords.id,
         categoryId: smStudents.studentCategoryId,
+        fullName: smStudents.fullName,
+        admissionNo: smStudents.admissionNo,
       })
       .from(studentRecords)
       .leftJoin(smStudents, eq(studentRecords.studentId, smStudents.id))
@@ -412,8 +420,9 @@ export class StudentRepository extends BaseRepository {
     return updated.affectedRows > 0;
   }
 
-  async updateStudentCategoryId(studentId: number, studentCategoryId: number) {
-    const [updated] = await this.db
+  async updateStudentCategoryId(studentId: number, studentCategoryId: number, tx?: MySQLDrizzleClient) {
+    const db = tx || this.db;
+    const [updated] = await db
       .update(smStudents)
       .set({ studentCategoryId })
       .where(eq(smStudents.id, studentId));
@@ -609,13 +618,14 @@ export class StudentRepository extends BaseRepository {
     studentId: number;
     classId: number;
     sectionId: number;
-  }) {
+  }, tx?: MySQLDrizzleClient) {
     return this.withErrorHandling(async () => {
+      const db = tx || this.db;
       const { studentId, classId, sectionId } = params;
       const academicId = await this.getAcademicId();
 
       // Upsert destination record
-      const [existingDest] = await this.db
+      const [existingDest] = await db
         .select({ id: studentRecords.id })
         .from(studentRecords)
         .where(
@@ -627,12 +637,12 @@ export class StudentRepository extends BaseRepository {
         .limit(1);
 
       if (existingDest) {
-        await this.db
+        await db
           .update(studentRecords)
           .set({ activeStatus: 1, isDefault: 1, classId, sectionId })
           .where(eq(studentRecords.id, existingDest.id));
       } else {
-        await this.db.insert(studentRecords).values({
+        await db.insert(studentRecords).values({
           studentId,
           classId,
           sectionId,

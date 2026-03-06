@@ -54,10 +54,7 @@
     {#if !readonly}
       <div class="flex items-center gap-2">
         <ModelSelector class="" />
-        {#if userContext.isCoordinator || userContext.isIt}
-          <Separator orientation="vertical" class="h-4" />
-          <ClassSelector />
-        {/if}
+        <ClassSelector />
       </div>
     {/if}
   </div>

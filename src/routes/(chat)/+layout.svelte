@@ -21,7 +21,12 @@
 
   selectedChatModel.setContext();
 
-  const appContext = new UserContext(user, classes, students ?? undefined);
+  const appContext = new UserContext(
+    user,
+    classes,
+    students ?? undefined,
+    data.assignedSection,
+  );
   appContext.setContext();
 
   const filesContext = new FilesContext(uploads, true);
