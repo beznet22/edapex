@@ -49,6 +49,7 @@
   let activeSuggestions = $state<readonly string[]>([]);
   let activeHighlight = $state<string>("");
   let autocompleteMode = $state<"agent" | "student" | null>(null);
+  let agentWidth = $state(80); // Sensible default to prevent large layout shifts
 
   // Context
   const chat = useChat();
@@ -196,7 +197,7 @@
 
 <div class="relative transition-all duration-300">
   <PromptInput
-    class="border-input bg-popover/95 backdrop-blur-md relative z-10 w-full rounded-[26px] sm:rounded-3xl border p-0 pt-1 shadow-sm transition-all duration-200 focus-within:shadow-md focus-within:border-primary/30"
+    class="border-input bg-popover/95 backdrop-blur-md relative z-10 w-full rounded-[20px] sm:rounded-3xl border p-0 pt-1 shadow-sm transition-all duration-200 focus-within:shadow-md focus-within:border-primary/30"
     value={input}
     {onValueChange}
     {onSubmit}
@@ -253,30 +254,37 @@
       </div>
     {/if}
 
-    <!-- Context Toolbar: Agent Selector (Universal) -->
+    <!-- Inlined Agent UI -->
     {#if chat.activeAgent}
       {@const Icon = iconRegistry[chat.activeAgent.iconName]}
       <div
-        class="flex flex-wrap items-center gap-2 px-3 pb-2 transition-all duration-300"
+        bind:clientWidth={agentWidth}
+        class="absolute top-[8px] left-2.5 z-20 pointer-events-auto"
       >
-        <Button
-          variant="outline"
-          class="h-8 rounded-full border-primary/20 bg-primary/5 px-2.5 text-[11px] font-medium gap-1.5 transition-all active:scale-95"
-          onclick={() => {
-            chat.activeAgent = null;
-            activeSuggestions = [];
-          }}
+        <div
+          class="flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary/20 pl-2 pr-1 h-[28px] text-[11px] font-semibold backdrop-blur-md shadow-sm text-primary animate-in fade-in zoom-in duration-200"
         >
-          <Icon class="size-3.5 text-primary" />
-          <span class="max-w-[100px] truncate">{chat.activeAgent.label}</span>
-          <XIcon class="size-3 opacity-50" />
-        </Button>
+          <Icon class="size-3.5" />
+          <span class="max-w-[50px] truncate">{chat.activeAgent.label}</span>
+          <Button
+            variant="ghost"
+            size="icon"
+            class="size-5 rounded-full hover:bg-primary/20 transition-colors cursor-pointer"
+            onclick={() => {
+              chat.activeAgent = null;
+              activeSuggestions = [];
+            }}
+          >
+            <XIcon class="size-3.5" />
+          </Button>
+        </div>
       </div>
     {/if}
 
     <PromptInputTextarea
       placeholder="Ask anything..."
-      class="min-h-11 pt-3 pl-4 text-base leading-[1.3] sm:text-base md:text-base"
+      class="min-h-[44px] pt-[11px] text-base leading-tight sm:text-base md:text-base selection:bg-primary/30 placeholder:transition-all"
+      style="text-indent: {chat.activeAgent ? agentWidth + 8 : 0}px; padding-left: 12px;"
       {onkeydown}
     />
 
