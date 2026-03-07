@@ -253,11 +253,11 @@
       </div>
     {/if}
 
-    <!-- Mobile Context Toolbar: Row for Agent Selector -->
+    <!-- Context Toolbar: Agent Selector (Universal) -->
     {#if chat.activeAgent}
       {@const Icon = iconRegistry[chat.activeAgent.iconName]}
       <div
-        class="flex sm:hidden flex-wrap items-center gap-2 px-3 pb-2 transition-all duration-300"
+        class="flex flex-wrap items-center gap-2 px-3 pb-2 transition-all duration-300"
       >
         <Button
           variant="outline"
@@ -280,30 +280,8 @@
     <PromptInputActions
       class="mt-2 sm:mt-5 flex w-full items-end justify-between gap-2 px-2.5 sm:px-3 pb-2.5 sm:pb-3"
     >
-      <div class="flex gap-1.5 sm:gap-2 items-center">
+      <div class="flex gap-1 sm:gap-1.5 items-center">
         <ChatMenu {input} />
-        {#if chat.activeAgent}
-          {@const Icon = iconRegistry[chat.activeAgent.iconName]}
-          <div class="hidden sm:block">
-            <PromptInputAction>
-              {#snippet tooltip()}
-                <p>{chat.activeAgent?.label || "Active Agent"}</p>
-              {/snippet}
-              <Button
-                variant="outline"
-                class="h-9 sm:h-10 rounded-full cursor-pointer gap-1.5 sm:gap-2 px-3 sm:px-4 text-xs sm:text-sm"
-                onclick={() => (
-                  (chat.activeAgent = null), (activeSuggestions = [])
-                )}
-              >
-                <Icon class="size-3.5 sm:size-4" />
-                <span class="max-w-[80px] sm:max-w-none truncate"
-                  >{chat.activeAgent.label}</span
-                >
-              </Button>
-            </PromptInputAction>
-          </div>
-        {/if}
       </div>
       <div class="flex gap-1.5 sm:gap-2 items-center">
         <div>

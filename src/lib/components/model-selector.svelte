@@ -16,7 +16,7 @@
   let {
     class: c,
   }: {
-    class: ClassValue;
+    class?: ClassValue;
   } = $props();
 
   let open = $state(false);
