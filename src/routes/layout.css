@@ -158,11 +158,15 @@
     @apply border-border outline-ring/50;
   }
   html, body {
-    @apply h-dvh overflow-hidden max-w-[100vw] overflow-x-hidden;
+    @apply fixed inset-0 w-full overflow-hidden;
+    height: 100dvh;
   }
   body {
     @apply bg-background text-foreground;
     overscroll-behavior: none;
+  }
+  [data-slot="sidebar-wrapper"] {
+    @apply h-dvh overflow-hidden;
   }
   button, [role="button"], a {
     -webkit-user-select: none;

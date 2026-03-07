@@ -53,7 +53,7 @@
   };
 </script>
 
-<main class="bg-background relative flex h-[calc(100dvh-3.5rem)] sm:h-[calc(100dvh-5rem)] flex-col">
+<main class="bg-background relative flex flex-1 min-h-0 w-full flex-col">
   {#if chat.messages.length === 0}
     <!-- Empty State with Centered Input -->
     <div class="relative h-full">
@@ -69,7 +69,7 @@
   {:else}
     <!-- Chat Messages -->
     <Conversation>
-      <ConversationContent class="w-full">
+      <ConversationContent class="w-full overscroll-contain touch-pan-y scrollbar-hide">
         <div class="space-y-6 py-4 mx-auto max-w-3xl px-4">
           {#each chat.messages as message}
             <div class="group relative">
