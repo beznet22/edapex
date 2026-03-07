@@ -179,9 +179,9 @@ export class FilesContext {
 
   deleteFile = async (upload: UploadedData) => {
     const params = new URLSearchParams();
-    if (upload.status === "pending" || upload.status === "error") {
+    if (upload.status === "uploaded" || upload.status === "error") {
       params.append("filename", upload.filename);
-    } else if (upload.status === "done") {
+    } else if (["extracted", "approved", "published"].includes(upload.status)) {
       params.append("fileId", upload.id);
     }
 
@@ -221,11 +221,11 @@ export class FilesContext {
         u.id === fileId ? { ...u, ...data, success: true, status: data.status } : u
       );
 
-      if (data.status === "pending") {
+      if (data.status === "uploaded") {
         toast.error("File saved retry extraction");
       }
 
-      if (data.status === "done") {
+      if (["extracted", "approved", "published"].includes(data.status)) {
         toast.success("File uploaded successfully");
         // this.openModal = false;
         console.log(`Upload success for ${name}:`, data);

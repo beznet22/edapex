@@ -13,6 +13,8 @@ node_modules
 /temp
 /cache
 
+# System
+.system
 
 # OS
 .DS_Store

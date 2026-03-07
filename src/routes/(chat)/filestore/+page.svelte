@@ -20,7 +20,8 @@
     import * as DropdownMenu from "$lib/components/ui/dropdown-menu/index";
     import { Loader } from "$lib/components/prompt-kit/loader";
     import { toast } from "svelte-sonner";
-    import type { UploadedData } from "$lib/types/chat-types";
+    import { type UploadedData, getAssessmentStatusDescription } from "$lib/types/chat-types";
+    import * as Tooltip from "$lib/components/ui/tooltip/index.js";
 
     const store = new FilestoreContext();
     store.setContext();
@@ -224,31 +225,40 @@
                                     <div
                                         class="absolute top-1.5 left-1.5 sm:top-2 sm:left-2"
                                     >
-                                        {#if file.status === "done"}
-                                            <div
-                                                class="px-3 py-1 rounded-full bg-emerald-500 text-white text-[10px] sm:text-xs font-black uppercase tracking-widest shadow-lg shadow-emerald-500/20"
-                                            >
-                                                Done
-                                            </div>
-                                        {:else if file.status === "error"}
-                                            <div
-                                                class="px-3 py-1 rounded-full bg-destructive text-destructive-foreground text-[10px] sm:text-xs font-black uppercase tracking-widest shadow-lg shadow-destructive/20"
-                                            >
-                                                Error
-                                            </div>
-                                        {:else if file.status === "pending"}
-                                            <div
-                                                class="px-3 py-1 rounded-full bg-amber-500 text-white text-[10px] sm:text-xs font-black uppercase tracking-widest shadow-lg shadow-amber-500/20"
-                                            >
-                                                Pending
-                                            </div>
-                                        {:else}
-                                            <div
-                                                class="px-3 py-1 rounded-full bg-blue-500 text-white text-[10px] sm:text-xs font-black uppercase tracking-widest shadow-lg shadow-blue-500/20 animate-pulse"
-                                            >
-                                                {file.status || "..."}
-                                            </div>
-                                        {/if}
+                                        <Tooltip.Provider delayDuration={0}>
+                                            <Tooltip.Root>
+                                                <Tooltip.Trigger>
+                                                    {#if ["extracted", "approved", "published"].includes(file.status)}
+                                                        <div
+                                                            class="px-3 py-1 rounded-full bg-emerald-500 text-white text-[10px] sm:text-xs font-black uppercase tracking-widest shadow-lg shadow-emerald-500/20"
+                                                        >
+                                                            {file.status}
+                                                        </div>
+                                                    {:else if file.status === "error"}
+                                                        <div
+                                                            class="px-3 py-1 rounded-full bg-destructive text-destructive-foreground text-[10px] sm:text-xs font-black uppercase tracking-widest shadow-lg shadow-destructive/20"
+                                                        >
+                                                            Error
+                                                        </div>
+                                                    {:else if file.status === "uploaded"}
+                                                        <div
+                                                            class="px-3 py-1 rounded-full bg-amber-500 text-white text-[10px] sm:text-xs font-black uppercase tracking-widest shadow-lg shadow-amber-500/20"
+                                                        >
+                                                            Uploaded
+                                                        </div>
+                                                    {:else}
+                                                        <div
+                                                            class="px-3 py-1 rounded-full bg-blue-500 text-white text-[10px] sm:text-xs font-black uppercase tracking-widest shadow-lg shadow-blue-500/20 animate-pulse"
+                                                        >
+                                                            {file.status || "..."}
+                                                        </div>
+                                                    {/if}
+                                                </Tooltip.Trigger>
+                                                <Tooltip.Content side="bottom" sideOffset={5}>
+                                                    <p class="text-xs max-w-[200px] text-wrap text-center">{getAssessmentStatusDescription(file.status, file.error)}</p>
+                                                </Tooltip.Content>
+                                            </Tooltip.Root>
+                                        </Tooltip.Provider>
                                     </div>
 
                                     <!-- Status Overlay/Spinner -->

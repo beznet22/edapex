@@ -15,6 +15,10 @@
   import { cn } from "$lib/utils/shadcn";
   import { page } from "$app/state";
   import { goto } from "$app/navigation";
+  import SendIcon from "@lucide/svelte/icons/send";
+  import LoaderCircleIcon from "@lucide/svelte/icons/loader-circle";
+  import { publishResult } from "$lib/api/assessment.remote";
+  import { toast } from "svelte-sonner";
 
   let {
     title = "Document Preview",
@@ -31,8 +35,35 @@
   let ctx = usePreview("");
   let open = $state(false);
   let isZoomed = $state(false);
+  let isPublishing = $state(false);
 
   let processedToken = $state<string | null>(null);
+
+  async function handlePublish() {
+    if (!token) return;
+    try {
+      isPublishing = true;
+      const payloadStr = atob(token.replace(/-/g, "+").replace(/_/g, "/"));
+      const { studentId, examId } = JSON.parse(payloadStr);
+
+      if (!studentId || !examId) {
+        toast.error("Invalid token format");
+        return;
+      }
+
+      const res = await publishResult({ studentId, examTypeId: examId });
+      if (res?.success) {
+        toast.success(res.message || "Results published successfully");
+      } else {
+        toast.error(res?.message || "Failed to publish results");
+      }
+    } catch (e) {
+      console.error(e);
+      toast.error("Failed to publish results");
+    } finally {
+      isPublishing = false;
+    }
+  }
 
   // Sync from URL to open state (one-way sync down, carefully)
   $effect(() => {
@@ -197,6 +228,21 @@
 
             <!-- Action Controls -->
             <div class="flex items-center gap-1">
+              <Button
+                variant="ghost"
+                size="icon"
+                onclick={handlePublish}
+                disabled={isPublishing}
+                class="rounded-xl h-10 w-10 hover:bg-white/10"
+                title="Publish result via email"
+              >
+                {#if isPublishing}
+                  <LoaderCircleIcon class="h-5 w-5 animate-spin" />
+                {:else}
+                  <SendIcon class="h-5 w-5" />
+                {/if}
+              </Button>
+
               <Button
                 variant="ghost"
                 size="icon"

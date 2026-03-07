@@ -154,7 +154,7 @@
                             class="h-full w-full cursor-pointer outline-none border-none p-0 bg-transparent"
                             onclick={() => openPreview(upload)}
                           >
-                            {#if upload.status === "done" && upload.token}
+                            {#if ["uploaded", "extracted", "approved", "published"].includes(upload.status) && upload.token}
                               <img
                                 src={`/api/uploads/${upload.filename}?token=${upload.token}`}
                                 alt={upload.filename}
@@ -213,7 +213,7 @@
           <Dialog.Title>{selectedUpload?.filename || "Preview"}</Dialog.Title>
         </Dialog.Header>
         <div class="relative w-full h-full flex items-center justify-center">
-          {#if selectedUpload.status === "done" && selectedUpload.token}
+          {#if ["uploaded", "extracted", "approved", "published"].includes(selectedUpload.status) && selectedUpload.token}
             <img
               src={`/api/uploads/${selectedUpload.id}.pdf?token=${selectedUpload.token}`}
               alt={selectedUpload.filename}

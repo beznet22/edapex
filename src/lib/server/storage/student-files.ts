@@ -2,12 +2,13 @@ import { promises as fs } from "fs";
 import { join } from "path";
 import type { ResultInput } from "$lib/schema/result-input";
 import { EXTRACTED_DIR } from "$lib/constants";
+import type { AssessmentStatus } from "$lib/types/chat-types";
 
 export interface ExtractedAssessment {
     data?: ResultInput;
     extractedAt: Date;
     verified: boolean;
-    status: "pending" | "done" | "error";
+    status: AssessmentStatus;
     error?: string;
     originalName?: string;
 }
@@ -70,8 +71,8 @@ export class StudentFileStorage {
 
         await fs.mkdir(dir, { recursive: true });
 
-        // Ensure status is done if not otherwise specified
-        if (!data.status) data.status = "done";
+        // Ensure status is extracted if not otherwise specified for saved files
+        if (!data.status) data.status = "extracted";
 
         // Save the JSON data
         await fs.writeFile(join(dir, "data.json"), JSON.stringify(data, null, 2));
@@ -91,7 +92,7 @@ export class StudentFileStorage {
         sectionName: string;
         fileName: string;
         fullName?: string;
-        status?: "pending" | "error";
+        status?: AssessmentStatus;
         error?: string;
     }): Promise<string> {
         const folder = this.getFolderPath(params.className, params.sectionName);
@@ -107,7 +108,7 @@ export class StudentFileStorage {
         const assessment: ExtractedAssessment = {
             extractedAt: new Date(),
             verified: false,
-            status: params.status || "pending",
+            status: params.status || "uploaded",
             error: params.error,
             originalName: params.fileName,
             data: {
@@ -137,8 +138,8 @@ export class StudentFileStorage {
             if (parsed.extractedAt) {
                 parsed.extractedAt = new Date(parsed.extractedAt);
             }
-            if (!parsed.status) {
-                parsed.status = "done";
+            if (!parsed.status || (parsed.status as string) === "pending" || (parsed.status as string) === "done") {
+                parsed.status = "extracted";
             }
             return parsed as ExtractedAssessment;
         } catch (error) {
