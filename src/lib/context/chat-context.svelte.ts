@@ -88,11 +88,12 @@ export class ChatContext {
 
   get activeAgent() {
     const id = this.#selectedAgent.value;
+    if (id === "none") return null;
     return this.agents.find((a) => a.id === id) || this.agents[0];
   }
 
   set activeAgent(v: AgentWorkflow | null) {
-    this.#selectedAgent.value = v?.id || "";
+    this.#selectedAgent.value = v?.id || "none";
   }
 
   get selectedClass() {
