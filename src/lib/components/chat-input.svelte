@@ -262,7 +262,10 @@
         <Button
           variant="outline"
           class="h-8 rounded-full border-primary/20 bg-primary/5 px-2.5 text-[11px] font-medium gap-1.5 transition-all active:scale-95"
-          onclick={() => ((chat.activeAgent = null), (activeSuggestions = []))}
+          onclick={() => {
+            chat.activeAgent = null;
+            activeSuggestions = [];
+          }}
         >
           <Icon class="size-3.5 text-primary" />
           <span class="max-w-[100px] truncate">{chat.activeAgent.label}</span>
