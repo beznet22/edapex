@@ -10,7 +10,6 @@
   import { page } from "$app/state";
   import { pushState } from "$app/navigation";
   import { useSidebar } from "$lib/components/ui/sidebar/index.js";
-  import IntegrationsModal from "$lib/components/integrations-modal.svelte";
   
   let {
     items,
@@ -21,17 +20,6 @@
 
   const sidebar = useSidebar();
   const theme = getTheme();
-  let open = $state(false);
-
-  $effect(() => {
-    open = !!page.state.showModal;
-  });
-
-  function onOpenChange(isOpen: boolean) {
-    if (!isOpen && page.state.showModal) {
-      history.back();
-    }
-  }
 
   const onclick = async (url: string) => {
     if (sidebar.isMobile) {
@@ -107,4 +95,3 @@
   </Sidebar.GroupContent>
 </Sidebar.Group>
 
-<IntegrationsModal bind:open {onOpenChange} />

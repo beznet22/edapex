@@ -1,0 +1,222 @@
+Loading svelte-check in workspace: /home/beznet/Workspace/edapex
+Getting Svelte diagnostics...
+
+/home/beznet/Workspace/edapex/src/lib/components/template/RecordsTable.svelte:10:34
+Warn: This reference only captures the initial value of `student`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+  let { records, student }: Props = $props();
+  const { category, fullName } = student;
+
+/home/beznet/Workspace/edapex/src/lib/components/template/ResultTemplate.svelte:15:24
+Warn: This reference only captures the initial value of `data`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+  let { data }: Props = $props();
+  const { category } = data.student;
+
+/home/beznet/Workspace/edapex/src/lib/server/agents/communicate.ts:14:7
+Error: Type 'string' is not assignable to type 'Designation[]'. 
+      workflowId: "communication",
+      designation: "principal",
+      highlight: "Official Messaging",
+
+/home/beznet/Workspace/edapex/src/lib/server/agents/communicate.ts:31:7
+Error: Type 'string' is not assignable to type 'Designation[]'. 
+      workflowId: "communication",
+      designation: "class_teacher",
+      highlight: "Parent & Student Engagement",
+
+/home/beznet/Workspace/edapex/src/lib/server/agents/communicate.ts:45:7
+Error: Type 'string' is not assignable to type 'Designation[]'. 
+      workflowId: "communication",
+      designation: "coordinator",
+      highlight: "Staff & Parent Engagement",
+
+/home/beznet/Workspace/edapex/src/lib/server/agents/document.ts:14:7
+Error: Type 'string' is not assignable to type 'Designation[]'. 
+      workflowId: "documentation",
+      designation: "principal",
+      highlight: "Governance & Oversight",
+
+/home/beznet/Workspace/edapex/src/lib/server/agents/document.ts:34:7
+Error: Type 'string' is not assignable to type 'Designation[]'. 
+      workflowId: "documentation",
+      designation: "class_teacher",
+      highlight: "Curriculum & Classroom Resources",
+
+/home/beznet/Workspace/edapex/src/lib/server/agents/document.ts:53:7
+Error: Type 'string' is not assignable to type 'Designation[]'. 
+      workflowId: "documentation",
+      designation: "coordinator",
+      highlight: "Records & Certificates",
+
+/home/beznet/Workspace/edapex/src/lib/server/agents/report.ts:14:7
+Error: Type 'string' is not assignable to type 'Designation[]'. 
+      workflowId: "reporting",
+      designation: "principal",
+      highlight: "Strategic Insights",
+
+/home/beznet/Workspace/edapex/src/lib/server/agents/report.ts:33:7
+Error: Type 'string' is not assignable to type 'Designation[]'. 
+      workflowId: "reporting",
+      designation: "class_teacher",
+      highlight: "Classroom Diagnostics",
+
+/home/beznet/Workspace/edapex/src/lib/server/agents/report.ts:51:7
+Error: Type 'string' is not assignable to type 'Designation[]'. 
+      workflowId: "reporting",
+      designation: "coordinator",
+      highlight: "Analytics & Trends",
+
+/home/beznet/Workspace/edapex/src/lib/components/ai-elements/code/Code.svelte:36:2
+Warn: Unknown at rule @reference (css)
+<style>
+	@reference '../../../../routes/layout.css';
+
+/home/beznet/Workspace/edapex/src/lib/components/ai-elements/code/Code.svelte:58:3
+Warn: Unknown at rule @apply (css)
+	.ai-code-wrapper :global(pre.shiki) {
+		@apply overflow-x-auto rounded-lg bg-inherit py-4 text-sm;
+	}
+
+/home/beznet/Workspace/edapex/src/lib/components/ai-elements/code/Code.svelte:62:3
+Warn: Unknown at rule @apply (css)
+	.ai-code-wrapper :global(pre.shiki:not([data-code-overflow] *):not([data-code-overflow])) {
+		@apply overflow-y-auto;
+		max-height: min(100%, 650px);
+
+/home/beznet/Workspace/edapex/src/lib/components/ai-elements/code/Code.svelte:67:3
+Warn: Unknown at rule @apply (css)
+	.ai-code-wrapper :global(pre.shiki code) {
+		@apply grid min-w-full rounded-none border-0 bg-transparent p-0 break-words;
+		counter-reset: line;
+
+/home/beznet/Workspace/edapex/src/lib/components/ai-elements/code/Code.svelte:87:3
+Warn: Unknown at rule @apply (css)
+	.ai-code-wrapper :global(pre.line-numbers .line::before) {
+		@apply text-muted-foreground;
+	}
+
+/home/beznet/Workspace/edapex/src/lib/components/ai-elements/code/Code.svelte:91:3
+Warn: Unknown at rule @apply (css)
+	.ai-code-wrapper :global(pre .line.line--highlighted) {
+		@apply bg-secondary;
+		/* border-l-2 border-primary/40 if needed */
+
+/home/beznet/Workspace/edapex/src/lib/components/ai-elements/code/Code.svelte:96:3
+Warn: Unknown at rule @apply (css)
+	.ai-code-wrapper :global(pre .line.line--highlighted span) {
+		@apply relative;
+	}
+
+/home/beznet/Workspace/edapex/src/lib/components/ai-elements/code/Code.svelte:100:3
+Warn: Unknown at rule @apply (css)
+	.ai-code-wrapper :global(pre .line) {
+		@apply inline-block min-h-4 w-full px-4 py-0.5;
+	}
+
+/home/beznet/Workspace/edapex/src/lib/components/ai-elements/code/Code.svelte:104:3
+Warn: Unknown at rule @apply (css)
+	.ai-code-wrapper :global(pre.line-numbers .line) {
+		@apply px-2;
+	}
+
+/home/beznet/Workspace/edapex/src/lib/components/ai-elements/copy-button/CopyButton.svelte:26:6
+Warn: This reference only captures the initial value of `size`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+	// this way if the user passes text then the button will be the default size
+	if (size === "icon" && children) {
+		size = "default";
+
+/home/beznet/Workspace/edapex/src/lib/components/ai-elements/copy-button/CopyButton.svelte:26:25
+Warn: This reference only captures the initial value of `children`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+	// this way if the user passes text then the button will be the default size
+	if (size === "icon" && children) {
+		size = "default";
+
+/home/beznet/Workspace/edapex/src/lib/components/file-drop-zone/file-drop-zone.svelte:22:7
+Warn: This reference only captures the initial value of `maxFiles`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+
+  if (maxFiles !== undefined && fileCount === undefined) {
+    console.warn(
+
+/home/beznet/Workspace/edapex/src/lib/components/file-drop-zone/file-drop-zone.svelte:22:33
+Warn: This reference only captures the initial value of `fileCount`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+
+  if (maxFiles !== undefined && fileCount === undefined) {
+    console.warn(
+
+/home/beznet/Workspace/edapex/src/lib/components/prompt-kit/prompt-input/PromptInput.svelte:24:5
+Warn: This reference only captures the initial value of `isLoading`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+  const contextInstance = new PromptInputClass({
+    isLoading,
+    value,
+
+/home/beznet/Workspace/edapex/src/lib/components/prompt-kit/prompt-input/PromptInput.svelte:25:5
+Warn: This reference only captures the initial value of `value`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+    isLoading,
+    value,
+    onValueChange,
+
+/home/beznet/Workspace/edapex/src/lib/components/prompt-kit/prompt-input/PromptInput.svelte:26:5
+Warn: This reference only captures the initial value of `onValueChange`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+    value,
+    onValueChange,
+    maxHeight,
+
+/home/beznet/Workspace/edapex/src/lib/components/prompt-kit/prompt-input/PromptInput.svelte:27:5
+Warn: This reference only captures the initial value of `maxHeight`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+    onValueChange,
+    maxHeight,
+    onSubmit,
+
+/home/beznet/Workspace/edapex/src/lib/components/prompt-kit/prompt-input/PromptInput.svelte:28:5
+Warn: This reference only captures the initial value of `onSubmit`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+    maxHeight,
+    onSubmit,
+    disabled: isLoading,
+
+/home/beznet/Workspace/edapex/src/lib/components/prompt-kit/prompt-input/PromptInput.svelte:29:15
+Warn: This reference only captures the initial value of `isLoading`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+    onSubmit,
+    disabled: isLoading,
+  });
+
+/home/beznet/Workspace/edapex/src/lib/components/ui/carousel/carousel.svelte:25:3
+Warn: This reference only captures the initial value of `orientation`. Did you mean to reference it inside a derived instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+		scrollNext,
+		orientation,
+		canScrollNext: false,
+
+/home/beznet/Workspace/edapex/src/lib/components/ui/carousel/carousel.svelte:29:12
+Warn: This reference only captures the initial value of `opts`. Did you mean to reference it inside a derived instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+		handleKeyDown,
+		options: opts,
+		plugins,
+
+/home/beznet/Workspace/edapex/src/lib/components/ui/carousel/carousel.svelte:30:3
+Warn: This reference only captures the initial value of `plugins`. Did you mean to reference it inside a derived instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+		options: opts,
+		plugins,
+		onInit,
+
+/home/beznet/Workspace/edapex/src/routes/(chat)/+layout.svelte:71:41
+Warn: This reference only captures the initial value of `data`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+
+  const filesContext = new FilesContext(data.uploads, selectedClass, true);
+  filesContext.setContext();
+
+====================================
+svelte-check found 9 errors and 25 warnings in 11 files
