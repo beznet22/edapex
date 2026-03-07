@@ -91,7 +91,7 @@ export const load: LayoutServerLoad = async ({ cookies, locals, url }) => {
     id: generateId(),
     filename: file.name,
     token,
-    status: "pending",
+    status: "uploaded",
     success: false,
   }));
 

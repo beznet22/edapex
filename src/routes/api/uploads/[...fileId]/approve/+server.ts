@@ -22,6 +22,7 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
         // 1. Mark as verified in the data object
         data.verified = true;
         data.extractedAt = new Date();
+        data.status = "approved";
 
         // 2. Map ExtractedAssessment data to ResultInput format for DB persistence
         if (!data.data) {

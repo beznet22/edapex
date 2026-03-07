@@ -9,6 +9,7 @@ import { staffRepo } from "$lib/server/repository/staff.repo";
 import { studentRepo } from "$lib/server/repository/student.repo";
 import { resultRepo } from "$lib/server/repository/result.repo";
 import { assessment } from "$lib/server/service/assessment.service";
+import { studentFileStorage } from "$lib/server/storage/student-files";
 import { render } from "svelte/server";
 import z from "zod";
 
@@ -67,6 +68,16 @@ export const publishResult = command(
           message: `Failed to publish result for student ${studentId}.`,
           errors: response.errors,
         };
+      }
+
+      // Update extracted assessment status to "published"
+      const student = await studentRepo.getStudentById(studentId);
+      if (student && student.classId && student.sectionId) {
+        const extracted = await studentFileStorage.loadByStudent(student.classId, student.sectionId, studentId, examTypeId);
+        if (extracted) {
+          extracted.status = "published";
+          await studentFileStorage.save(extracted);
+        }
       }
 
       return {

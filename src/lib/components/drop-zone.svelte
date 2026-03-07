@@ -217,9 +217,9 @@
 
             <div class="shrink-0">
               <div class="flex items-center gap-1">
-                {#if uploads.some((u) => u.originalName === file.name && u.status === "done")}
+                {#if uploads.some((u) => u.originalName === file.name && ["extracted", "approved", "published"].includes(u.status))}
                   <CheckIcon class="size-4 text-green-500" />
-                {:else if uploads.some((u) => u.originalName === file.name && u.status === "pending")}
+                {:else if uploads.some((u) => u.originalName === file.name && u.status === "uploaded")}
                   <TriangleAlertIcon class="size-4 text-primary" />
                 {:else if uploads.some((u) => u.originalName === file.name && u.status === "uploading")}
                   <Loader variant="circular" size="sm" />

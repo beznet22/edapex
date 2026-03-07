@@ -245,7 +245,7 @@ export const getResources = query(
                 originalName: assessmentData.originalName || folderPath.split("/").pop(),
                 token,
                 status: assessmentData.status,
-                success: assessmentData.status === "done",
+                success: ["extracted", "approved", "published"].includes(assessmentData.status),
                 type: "image/jpeg",
                 url: `/api/uploads/${resourceId}/image.jpg?token=${token}`,
                 data: {

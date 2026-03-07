@@ -23,8 +23,9 @@
     import Search from "@lucide/svelte/icons/search";
     import LayoutGrid from "@lucide/svelte/icons/layout-grid";
     import { useFilestore } from "$lib/context/filestore.svelte";
-    import type { UploadedData } from "$lib/types/chat-types";
+    import { type UploadedData, getAssessmentStatusDescription } from "$lib/types/chat-types";
     import { AttributeRemark } from "$lib/constants/assessment";
+    import * as Tooltip from "$lib/components/ui/tooltip/index.js";
 
     let { open = $bindable(false), file = null } = $props();
 
@@ -227,7 +228,7 @@
                                         alt={img.filename}
                                         class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                                     />
-                                    {#if img.status === "done"}
+                                    {#if ["extracted", "approved", "published"].includes(img.status)}
                                         <div class="absolute top-2 right-2">
                                             <div
                                                 class="bg-emerald-500 rounded-full p-1 shadow-lg border-2 border-white dark:border-black"
@@ -309,25 +310,6 @@
                                         (store.rotation + 90) % 360)}
                             >
                                 <RotateCw class="h-4 w-4" />
-                            </Button>
-                            <div class="w-px h-3 bg-white/20 mx-1.5"></div>
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                class="h-8 w-8 text-white hover:bg-white/10 disabled:opacity-30"
-                                onclick={() => store.handlePublish()}
-                                disabled={store.isPublishing ||
-                                    !store.extractedData?.data?.studentData
-                                        ?.studentId}
-                                title="Publish result via email"
-                            >
-                                {#if store.isPublishing}
-                                    <LoaderCircle
-                                        class="h-4 w-4 animate-spin"
-                                    />
-                                {:else}
-                                    <Send class="h-4 w-4" />
-                                {/if}
                             </Button>
                         </div>
 
@@ -612,24 +594,20 @@
                                                                 class="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1"
                                                                 >Status</Label
                                                             >
-                                                            <div
-                                                                class="h-11 flex items-center bg-background border-none shadow-sm font-black text-xs rounded-2xl px-4 uppercase {store
-                                                                    .extractedData
-                                                                    .status ===
-                                                                'done'
-                                                                    ? 'text-emerald-500'
-                                                                    : store
-                                                                            .extractedData
-                                                                            .status ===
-                                                                        'error'
-                                                                      ? 'text-destructive'
-                                                                      : 'text-amber-500'}"
-                                                            >
-                                                                {store
-                                                                    .extractedData
-                                                                    .status ||
-                                                                    "PENDING"}
-                                                            </div>
+                                                            <Tooltip.Provider delayDuration={0}>
+                                                                <Tooltip.Root>
+                                                                    <Tooltip.Trigger class="w-full">
+                                                                        <div
+                                                                            class="h-11 flex items-center bg-background border-none shadow-sm font-black text-xs rounded-2xl px-4 uppercase {store.extractedData.status === 'published' ? 'text-blue-500' : store.extractedData.status === 'approved' ? 'text-emerald-500' : store.extractedData.status === 'extracted' ? 'text-amber-500' : store.extractedData.status === 'error' ? 'text-destructive' : 'text-muted-foreground'}"
+                                                                        >
+                                                                            {store.extractedData.status || "UPLOADED"}
+                                                                        </div>
+                                                                    </Tooltip.Trigger>
+                                                                    <Tooltip.Content>
+                                                                        <p class="text-sm">{getAssessmentStatusDescription(store.extractedData.status, store.extractedData.error)}</p>
+                                                                    </Tooltip.Content>
+                                                                </Tooltip.Root>
+                                                            </Tooltip.Provider>
                                                         </div>
                                                     </div>
                                                     {#if store.extractedData.error}
@@ -1102,7 +1080,7 @@
                                 alt={img.filename}
                                 class="w-full h-full object-cover"
                             />
-                            {#if img.status === "done"}
+                            {#if ["extracted", "approved", "published"].includes(img.status)}
                                 <div class="absolute top-2 right-2">
                                     <div
                                         class="bg-emerald-500 rounded-full p-1 shadow-lg border-2 border-white"

@@ -974,7 +974,7 @@ export class AssessmentService {
         data: validated.data,
         extractedAt: new Date(),
         verified: false,
-        status: "done",
+        status: "extracted",
         originalName: params.originalName,
       },
       Buffer.from(await file.arrayBuffer())

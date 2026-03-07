@@ -113,7 +113,7 @@ The workflows in `src/lib/server/agents/` reference prompt files that don't exis
 
 ```typescript
 export function loadPrompt(moduleName: string, designation: string): string {
-  const path = join(process.cwd(), ".agent/prompts", moduleName, `${designation}.md`);
+  const path = join(process.cwd(), ".system/prompts", moduleName, `${designation}.md`);
 
   if (!existsSync(path)) {
     console.warn(`Prompt file not found: ${path}`);

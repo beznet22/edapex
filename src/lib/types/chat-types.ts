@@ -68,11 +68,26 @@ export type UploadedData = {
   size?: number;
   createdAt?: Date | string;
   success: boolean;
-  status: "pending" | "uploading" | "retrying" | "done" | "error";
+  status: AssessmentStatus;
   error?: string;
   data?: any;
 };
 
+export type AssessmentStatus = "uploading" | "retrying" | "error" | "uploaded" | "extracted" | "approved" | "published";
+
+export function getAssessmentStatusDescription(status?: AssessmentStatus | string, errorMessage?: string): string {
+  if (status === "error" && errorMessage) return errorMessage;
+  switch (status) {
+      case "uploading": return "Image is currently being uploaded.";
+      case "retrying": return "Retry attempt is in progress.";
+      case "uploaded": return "Image uploaded and waiting for AI extraction.";
+      case "extracted": return "Data extracted successfully, pending teacher approval.";
+      case "approved": return "Data verified and saved, ready to publish.";
+      case "published": return "Results have been published and emailed to parents.";
+      case "error": return errorMessage || "An error occurred during processing.";
+      default: return status || "Unknown status";
+  }
+}
 // Combine all possible tools for type inference in the UI
 export type xToolUIPart = InferUITools<typeof teacherTools & typeof coordinatorTools>;
 export type xUIMessage = UIMessage<xMetadata, xDataPart, xToolUIPart>;

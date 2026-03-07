@@ -54,7 +54,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
       writeFileSync(fullPath, buffer);
 
       await studentRepo.updateStudentPhoto(studentId, relativePath);
-      return json({ success: true, status: "done", filename: photoFilename });
+      return json({ success: true, status: "uploaded", filename: photoFilename });
     }
 
     let staffId: number = user.staffId || 1;
@@ -104,7 +104,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
       ...extractionResult,
       id: extractionResult.storagePath,
       url: `/api/uploads/${extractionResult.storagePath}/image.jpg?token=${token}`,
-      status: "done",
+      status: "extracted",
       filename: filename ?? file.name
     });
 
@@ -126,7 +126,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 
         return json({
           success: true,
-          status: "pending",
+          status: "uploaded",
           storagePath,
           filename: file.name,
           id: storagePath,
