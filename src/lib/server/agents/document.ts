@@ -11,7 +11,7 @@ export const documentationWorkflow: AgentWorkflow = {
     // —— Principal Assistant ——
     {
       workflowId: "documentation",
-      designation: "principal",
+      designation: ["principal"],
       highlight: "Governance & Oversight",
       suggestions: [
         "Approve lesson notes and schemes of work",
@@ -31,7 +31,7 @@ export const documentationWorkflow: AgentWorkflow = {
     // —— Teacher Assistant ——
     {
       workflowId: "documentation",
-      designation: "class_teacher",
+      designation: ["class_teacher"],
       highlight: "Curriculum & Classroom Resources",
       suggestions: [
         "Generate lesson notes per class and week",
@@ -50,7 +50,7 @@ export const documentationWorkflow: AgentWorkflow = {
     // —— Coordinator Assistant ——
     {
       workflowId: "documentation",
-      designation: "coordinator",
+      designation: ["coordinator"],
       highlight: "Records & Certificates",
       suggestions: [
         "Draft certificates (transfer, testimonial, completion)",

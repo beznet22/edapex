@@ -11,7 +11,7 @@ export const reportingWorkflow: AgentWorkflow = {
     // —— Principal Assistant ——
     {
       workflowId: "reporting",
-      designation: "principal",
+      designation: ["principal"],
       highlight: "Strategic Insights",
       suggestions: [
         "Generate weekly academic performance summaries",
@@ -30,7 +30,7 @@ export const reportingWorkflow: AgentWorkflow = {
     // —— Teacher Assistant ——
     {
       workflowId: "reporting",
-      designation: "class_teacher",
+      designation: ["class_teacher"],
       highlight: "Classroom Diagnostics",
       suggestions: [
         "Generate weekly class performance summaries",
@@ -48,7 +48,7 @@ export const reportingWorkflow: AgentWorkflow = {
     // —— Coordinator Assistant ——
     {
       workflowId: "reporting",
-      designation: "coordinator",
+      designation: ["coordinator"],
       highlight: "Analytics & Trends",
       suggestions: [
         "Generate broadsheets and class ranking summaries",

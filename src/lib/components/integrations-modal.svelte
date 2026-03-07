@@ -1,27 +1,33 @@
 <script lang="ts">
-    import * as Dialog from "$lib/components/ui/dialog/index.js";
-    import { Button } from "$lib/components/ui/button";
+    import { Button } from "$lib/components/ui/button/index.js";
     import {
         Card,
-        CardContent,
         CardHeader,
         CardTitle,
         CardDescription,
         CardFooter,
-    } from "$lib/components/ui/card";
-    import { Badge } from "$lib/components/ui/badge";
-    import { Spinner } from "$lib/components/ui/spinner";
-    import { chatProviders, type ChatProviders } from "$lib/chat/models";
-    import { addProvder } from "$lib/api/agent.remote";
+    } from "$lib/components/ui/card/index.js";
+    import { Spinner } from "$lib/components/ui/spinner/index.js";
+    import { chatProviders } from "$lib/chat/models.js";
+    import { addProvder } from "$lib/api/agent.remote.js";
     import { toast } from "svelte-sonner";
-    import { saveTokenData } from "$lib/context/oauth.svelte";
-    import type { CredentialType } from "$lib/schema/chat-schema";
+    import { saveTokenData } from "$lib/context/oauth.svelte.js";
+    import type { CredentialType } from "$lib/schema/chat-schema.js";
     import Plug from "@lucide/svelte/icons/plug";
+    import { page } from "$app/state";
+    import ResponsiveSheet from "$lib/components/shared/responsive-sheet.svelte";
 
-    let {
-        open = $bindable(false),
-        onOpenChange,
-    }: { open: boolean; onOpenChange?: (open: boolean) => void } = $props();
+    let open = $state(false);
+
+    $effect(() => {
+        open = !!page.state.showModal;
+    });
+
+    function onOpenChange(isOpen: boolean) {
+        if (!isOpen && page.state.showModal) {
+            history.back();
+        }
+    }
 
     let connectingProviderId = $state<CredentialType | null>(null);
 
@@ -35,8 +41,6 @@
                 return;
             }
 
-            // In a real app we might redirect or show a code here.
-            // For Google OAuth device flow:
             toast.info(
                 `Authorizing ${name}... Please complete the process in the popup.`,
             );
@@ -51,54 +55,45 @@
     }
 </script>
 
-<Dialog.Root bind:open {onOpenChange}>
-    <Dialog.Content class="sm:max-w-[700px]">
-        <Dialog.Header>
-            <Dialog.Title>Integrations</Dialog.Title>
-            <Dialog.Description>
-                Connect external AI providers to enhance your chat experience.
-            </Dialog.Description>
-        </Dialog.Header>
-
-        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 py-4">
-            {#each chatProviders as provider}
-                <Card>
-                    <CardHeader class="pb-3">
-                        <div class="flex items-center justify-between">
-                            <div class="flex items-center gap-2">
-                                <!-- We could add provider icons here if we had them mapped -->
-                                <Plug class="h-5 w-5 text-muted-foreground" />
-                                <CardTitle class="text-base"
-                                    >{provider.name}</CardTitle
-                                >
-                            </div>
-                            <!-- 
-                           We would ideally check connection status here.
-                           For now, we assume disconnected or handle state elsewhere.
-                          -->
+<ResponsiveSheet
+    bind:open
+    {onOpenChange}
+    title="Integrations"
+    description="Connect external AI providers to enhance your chat experience."
+>
+    <div class="grid grid-cols-1 gap-4 py-4">
+        {#each chatProviders as provider}
+            <Card class="bg-muted/5 border-border/50">
+                <CardHeader class="pb-3">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-2">
+                            <Plug class="h-5 w-5 text-muted-foreground" />
+                            <CardTitle class="text-base"
+                                >{provider.name}</CardTitle
+                            >
                         </div>
-                        <CardDescription
-                            >{provider.description ||
-                                "Connect to this provider"}</CardDescription
-                        >
-                    </CardHeader>
-                    <CardFooter>
-                        <Button
-                            variant="outline"
-                            class="w-full gap-2"
-                            onclick={() =>
-                                handleConnect(provider.id, provider.name || "")}
-                            disabled={!!connectingProviderId}
-                        >
-                            {#if connectingProviderId === provider.id}
-                                <Spinner class="h-4 w-4" /> Connecting...
-                            {:else}
-                                Connect
-                            {/if}
-                        </Button>
-                    </CardFooter>
-                </Card>
-            {/each}
-        </div>
-    </Dialog.Content>
-</Dialog.Root>
+                    </div>
+                    <CardDescription
+                        >{provider.description ||
+                            "Connect to this provider"}</CardDescription
+                    >
+                </CardHeader>
+                <CardFooter>
+                    <Button
+                        variant="outline"
+                        class="w-full gap-2 rounded-xl"
+                        onclick={() =>
+                            handleConnect(provider.id, provider.name || "")}
+                        disabled={!!connectingProviderId}
+                    >
+                        {#if connectingProviderId === provider.id}
+                            <Spinner class="h-4 w-4" /> Connecting...
+                        {:else}
+                            Connect
+                        {/if}
+                    </Button>
+                </CardFooter>
+            </Card>
+        {/each}
+    </div>
+</ResponsiveSheet>

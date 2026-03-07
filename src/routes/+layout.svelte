@@ -2,6 +2,7 @@
   import "./layout.css";
   import { ThemeProvider } from "@sejohnson/svelte-themes";
   import { Toaster } from "$lib/components/ui/sonner";
+  import IntegrationsModal from "$lib/components/integrations-modal.svelte";
   import { onMount } from "svelte";
   import { toast } from "svelte-sonner";
 
@@ -37,6 +38,7 @@
 
 <ThemeProvider attribute="class" disableTransitionOnChange>
   <Toaster position="bottom-center" />
+  <IntegrationsModal />
   {@render children()}
 </ThemeProvider>
 

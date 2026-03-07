@@ -11,7 +11,7 @@ export const communicationWorkflow: AgentWorkflow = {
     // —— Principal Assistant ——
     {
       workflowId: "communication",
-      designation: "principal",
+      designation: ["principal"],
       highlight: "Official Messaging",
       suggestions: [
         "Send bulk SMS to all parents",
@@ -28,7 +28,7 @@ export const communicationWorkflow: AgentWorkflow = {
     // —— Teacher Assistant ——
     {
       workflowId: "communication",
-      designation: "class_teacher",
+      designation: ["class_teacher"],
       highlight: "Parent & Student Engagement",
       suggestions: [
         "Send messages to parents: homework reminders, behaviour alerts, praise notes, academic concerns",
@@ -42,7 +42,7 @@ export const communicationWorkflow: AgentWorkflow = {
     // —— Coordinator Assistant ——
     {
       workflowId: "communication",
-      designation: "coordinator",
+      designation: ["coordinator"],
       highlight: "Staff & Parent Engagement",
       suggestions: [
         "## Audience Awareness",
