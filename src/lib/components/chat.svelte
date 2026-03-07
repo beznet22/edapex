@@ -53,14 +53,14 @@
   };
 </script>
 
-<main class="bg-background relative flex h-[calc(100vh-5rem)] flex-col">
+<main class="bg-background relative flex h-[calc(100dvh-3.5rem)] sm:h-[calc(100dvh-5rem)] flex-col">
   {#if chat.messages.length === 0}
     <!-- Empty State with Centered Input -->
     <div class="relative h-full">
       <div
         class="absolute inset-x-0 top-1/2 mx-auto flex max-w-3xl -translate-y-1/2 flex-col gap-4 px-3 pb-3"
       >
-        <h1 class="flex justify-center text-4xl font-bold mb-10">
+        <h1 class="flex justify-center text-2xl sm:text-4xl font-bold mb-6 sm:mb-10 px-2 text-center">
           {`Good ${userContext.greeting()}, ${userContext.getName(user?.firstName) || "Guest"}!`}
         </h1>
         <ChatInput {user} {readonly} />
@@ -128,7 +128,7 @@
     </Conversation>
 
     <!-- Input at bottom -->
-    <div class="px-4 py-4">
+    <div class="px-4 py-4 safe-area-bottom">
       <div class="mx-auto max-w-3xl">
         <!-- Help me write an essay about silicon valley -->
         <ChatInput {user} {readonly} isInitial={false} />

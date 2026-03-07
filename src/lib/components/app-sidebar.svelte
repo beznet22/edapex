@@ -54,7 +54,15 @@
           class="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
         >
           {#snippet child({ props })}
-            <a href="/" {...props}>
+            <a
+              href="/"
+              {...props}
+              onclick={() => {
+                if (context.isMobile) {
+                  context.setOpenMobile(false);
+                }
+              }}
+            >
               <div
                 class="bg-sidebar-primary text-sidebar-primary-foreground flex aspect-square size-8 items-center justify-center rounded-lg"
               >

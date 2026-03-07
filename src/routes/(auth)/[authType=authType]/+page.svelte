@@ -18,7 +18,7 @@
 </script>
 
 <div
-  class="bg-background flex h-dvh w-screen items-start justify-center pt-12 md:items-center md:pt-0"
+  class="bg-background flex min-h-dvh w-full items-start justify-center pt-12 md:items-center md:pt-0"
 >
   <div class="flex w-full max-w-md flex-col gap-12 overflow-hidden rounded-2xl">
     <div

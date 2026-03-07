@@ -189,8 +189,8 @@
                 {/each}
               </Carousel.Content>
               <div class="absolute right-0 top-0 z-10 flex gap-2">
-                <Carousel.Previous class="static translate-y-0 h-9 w-9" />
-                <Carousel.Next class="static translate-y-0 h-9 w-9" />
+                <Carousel.Previous class="static translate-y-0 h-11 w-11 sm:h-9 sm:w-9" />
+                <Carousel.Next class="static translate-y-0 h-11 w-11 sm:h-9 sm:w-9" />
               </div>
             </div>
           </Carousel.Root>

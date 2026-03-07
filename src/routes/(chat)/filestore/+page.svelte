@@ -45,7 +45,7 @@
     <div class="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
         <!-- Sticky Header & Filters -->
         <div
-            class="sticky top-0 z-30 bg-background/80 backdrop-blur-xl -mx-4 px-4 sm:mx-0 sm:px-0 pb-2"
+            class="sticky top-0 z-30 bg-background/80 backdrop-blur-xl -mx-4 px-4 sm:mx-0 sm:px-0 pb-2 safe-area-top"
         >
             <!-- Header -->
             <div
@@ -110,20 +110,20 @@
                     class="flex items-center gap-2 overflow-x-auto pb-4 scrollbar-hide"
                 >
                     <button
-                        class="px-5 py-2 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap {store.selectedFolder ===
+                        class="px-5 py-2.5 min-h-[44px] flex items-center rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap cursor-pointer focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:outline-none {store.selectedFolder ===
                         null
                             ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/20 scale-105'
-                            : 'bg-muted/30 text-muted-foreground hover:bg-muted/50 hover:scale-105'}"
+                            : 'bg-muted/30 text-muted-foreground hover:bg-muted/50 active:scale-95'}"
                         onclick={() => (store.selectedFolder = null)}
                     >
                         All Collections
                     </button>
                     {#each store.folders as folder}
                         <button
-                            class="px-5 py-2 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap {store.selectedFolder ===
+                            class="px-5 py-2.5 min-h-[44px] flex items-center rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap cursor-pointer focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:outline-none {store.selectedFolder ===
                             folder
                                 ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/20 scale-105'
-                                : 'bg-muted/30 text-muted-foreground hover:bg-muted/50 hover:scale-105'}"
+                                : 'bg-muted/30 text-muted-foreground hover:bg-muted/50 active:scale-95'}"
                             onclick={() => (store.selectedFolder = folder)}
                         >
                             {folder}
@@ -176,7 +176,7 @@
                 </h2>
 
                 <div
-                    class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4 lg:gap-6"
+                    class="grid grid-cols-1 min-[400px]:grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4 lg:gap-6"
                 >
                     {#if store.filteredFiles.length === 0}
                         <div
@@ -193,11 +193,18 @@
                         </div>
                     {:else}
                         {#each store.filteredFiles as file (file.id)}
-                            <!-- svelte-ignore a11y_click_events_have_key_events -->
-                            <!-- svelte-ignore a11y_no_static_element_interactions -->
-                            <div
-                                class="group relative bg-card rounded-xl sm:rounded-2xl p-1.5 sm:p-2 lg:p-3 hover:shadow-lg hover:scale-[1.02] transition-all duration-300 ease-out cursor-pointer border border-border/50 overflow-hidden active:scale-[0.98]"
+                        <!-- svelte-ignore a11y_no_noninteractive_element_to_interactive_role -->
+                        <div
+                                role="button"
+                                tabindex="0"
+                                class="group relative bg-card rounded-xl sm:rounded-2xl p-1.5 sm:p-2 lg:p-3 hover:shadow-lg hover:scale-[1.02] transition-all duration-300 ease-out cursor-pointer border border-border/50 overflow-hidden active:scale-[0.98] text-left w-full focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:outline-none"
                                 onclick={() => handleView(file)}
+                                onkeydown={(e) => {
+                                    if (e.key === "Enter" || e.key === " ") {
+                                        e.preventDefault();
+                                        handleView(file);
+                                    }
+                                }}
                             >
                                 <div
                                     class="aspect-square sm:aspect-3/4 rounded-lg sm:rounded-xl bg-muted/40 overflow-hidden mb-1.5 sm:mb-2 relative"
@@ -207,6 +214,8 @@
                                             src={file.url}
                                             alt={file.filename}
                                             class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                                            loading="lazy"
+                                            decoding="async"
                                         />
                                     {:else}
                                         <div
@@ -282,14 +291,14 @@
                                         {file.filename}
                                     </h3>
                                     <div
-                                        class="flex items-center justify-between text-[8px] sm:text-[9px] text-muted-foreground/60 font-medium"
+                                        class="flex items-center justify-between text-[11px] sm:text-xs text-muted-foreground/60 font-medium"
                                     >
                                         <span class="truncate opacity-70">
                                             {file.originalName || file.filename}
                                         </span>
                                     </div>
                                     <div
-                                        class="flex items-center justify-between text-[7px] sm:text-[8px] text-muted-foreground/40"
+                                        class="flex items-center justify-between text-[11px] sm:text-xs text-muted-foreground/40"
                                     >
                                         {#if file.createdAt}
                                             <span class="truncate">
@@ -314,8 +323,9 @@
                                 >
                                     <DropdownMenu.Root>
                                         <DropdownMenu.Trigger
-                                            class="flex items-center justify-center p-1.5 rounded-full bg-background/80 backdrop-blur-sm border border-border opacity-0 group-hover:opacity-100 transition-all duration-300 hover:bg-muted hover:scale-110"
+                                            class="flex items-center justify-center p-2 min-w-[44px] min-h-[44px] rounded-full bg-background/80 backdrop-blur-sm border border-border opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-all duration-300 hover:bg-muted active:scale-95"
                                             onclick={(e) => e.stopPropagation()}
+                                            aria-label="File actions"
                                         >
                                             <EllipsisVertical
                                                 class="w-3.5 h-3.5"
@@ -356,7 +366,7 @@
                                         </DropdownMenu.Content>
                                     </DropdownMenu.Root>
                                 </div>
-                            </div>
+                        </div>
                         {/each}
                         <!-- Add New Card -->
                         <button

@@ -102,7 +102,7 @@
 >
   <Dialog.Content
     preventScroll={false}
-    class="w-[95%] rounded-lg sm:max-w-[425px] max-h-[85vh] flex flex-col p-0 gap-0"
+    class="w-[calc(100vw-1.5rem)] sm:max-w-[425px] max-h-[85vh] flex flex-col p-0 gap-0 overflow-hidden"
   >
     <div class="p-6 pb-2">
       <Dialog.Header>

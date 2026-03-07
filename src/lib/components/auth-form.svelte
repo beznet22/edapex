@@ -25,7 +25,7 @@
   let { form, submitButton, children }: AuthFormProps = $props();
 </script>
 
-<form {...login} class="flex flex-col gap-4 px-4 sm:px-16">
+<form {...login} class="flex flex-col gap-4 px-6 sm:px-10">
   <div class="flex flex-col gap-2">
     <Label for="email" class=" text-zinc-600 dark:text-zinc-400">Email Address</Label>
 
