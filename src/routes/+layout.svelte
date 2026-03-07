@@ -3,6 +3,7 @@
   import { ThemeProvider } from "@sejohnson/svelte-themes";
   import { Toaster } from "$lib/components/ui/sonner";
   import { onMount } from "svelte";
+  import { toast } from "svelte-sonner";
 
   let { children } = $props();
 
@@ -14,10 +15,16 @@
       const sw = registration.installing;
       sw?.addEventListener("statechange", () => {
         if (sw.state === "installed") {
-          if (confirm("A new version is available. Reload to update?")) {
-            sw.postMessage({ type: "SKIP_WAITING" });
-            window.location.reload();
-          }
+          toast("A new version is available", {
+            action: {
+              label: "Update",
+              onClick: () => {
+                sw.postMessage({ type: "SKIP_WAITING" });
+                window.location.reload();
+              },
+            },
+            duration: Infinity,
+          });
         }
       });
     });
@@ -29,6 +36,7 @@
 </script>
 
 <ThemeProvider attribute="class" disableTransitionOnChange>
-  <Toaster position="top-center" />
+  <Toaster position="bottom-center" />
   {@render children()}
 </ThemeProvider>
+

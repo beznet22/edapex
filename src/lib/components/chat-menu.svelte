@@ -34,6 +34,7 @@
         variant="outline"
         size="icon"
         class="size-9 sm:size-10 rounded-full cursor-pointer transition-colors hover:bg-accent/50"
+        aria-label="More actions"
       >
         <PlusIcon class="size-4 sm:size-4.5" />
       </Button>

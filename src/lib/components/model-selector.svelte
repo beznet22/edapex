@@ -33,11 +33,13 @@
         {...props}
         variant="outline"
         class={cn(
-          "data-[state=open]:bg-accent data-[state=open]:text-accent-foreground w-fit md:h-[34px] md:px-2",
+          "data-[state=open]:bg-accent data-[state=open]:text-accent-foreground w-fit px-1.5 sm:px-2 md:h-[34px]",
           c,
         )}
       >
-        {selectedChatModelDetails?.name}
+        <div class="max-w-[70px] sm:max-w-none truncate">
+          {selectedChatModelDetails?.name}
+        </div>
         <ChevronDownIcon />
       </Button>
     {/snippet}

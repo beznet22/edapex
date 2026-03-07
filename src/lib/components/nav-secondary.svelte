@@ -9,8 +9,9 @@
   import { getTheme } from "@sejohnson/svelte-themes";
   import { page } from "$app/state";
   import { pushState } from "$app/navigation";
+  import { useSidebar } from "$lib/components/ui/sidebar/index.js";
   import IntegrationsModal from "$lib/components/integrations-modal.svelte";
-
+  
   let {
     items,
     ...restProps
@@ -18,6 +19,7 @@
     items: { title: string; url: string; icon: Component<Icon> }[];
   } & WithoutChildren<ComponentProps<typeof Sidebar.Group>> = $props();
 
+  const sidebar = useSidebar();
   const theme = getTheme();
   let open = $state(false);
 
@@ -32,6 +34,9 @@
   }
 
   const onclick = async (url: string) => {
+    if (sidebar.isMobile) {
+      sidebar.setOpenMobile(false);
+    }
     if (url === "#settings") {
       pushState(url, { showModal: true });
     }
@@ -69,9 +74,11 @@
       {/each}
       <Sidebar.MenuItem>
         <Sidebar.MenuButton
-          onclick={() =>
-            (theme.selectedTheme =
-              theme.resolvedTheme === "light" ? "dark" : "light")}
+          onclick={() => {
+            if (sidebar.isMobile) sidebar.setOpenMobile(false);
+            theme.selectedTheme =
+              theme.resolvedTheme === "light" ? "dark" : "light";
+          }}
           class="w-full group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0!"
         >
           {#snippet child({ props })}

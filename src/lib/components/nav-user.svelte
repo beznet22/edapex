@@ -93,7 +93,10 @@
             <BadgeCheckIcon />
             Account
           </DropdownMenu.Item>
-          <DropdownMenu.Item onSelect={() => goto("/filestore")}>
+          <DropdownMenu.Item onSelect={() => {
+            if (sidebar.isMobile) sidebar.setOpenMobile(false);
+            goto("/filestore");
+          }}>
             <FolderIcon />
             Filestore
           </DropdownMenu.Item>
@@ -109,6 +112,7 @@
         <DropdownMenu.Separator />
         <DropdownMenu.Item
           onSelect={async () => {
+            if (sidebar.isMobile) sidebar.setOpenMobile(false);
             const result = await signout();
             if (result) {
               clearLocalStore("selected-class");

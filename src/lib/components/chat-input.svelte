@@ -6,6 +6,7 @@
   import XIcon from "@lucide/svelte/icons/x";
   import SearchIcon from "@lucide/svelte/icons/search";
   import GraduationCapIcon from "@lucide/svelte/icons/graduation-cap";
+  import { innerWidth } from "svelte/reactivity/window";
 
   import { useChat } from "$lib/context/chat-context.svelte";
   import { useFileActions } from "$lib/context/file-context.svelte";
@@ -73,6 +74,9 @@
   }
 
   function onkeydown(e: KeyboardEvent) {
+    // On mobile-width screens, Enter just inserts newline; send button is used instead
+    if ((innerWidth.current ?? 768) < 640) return;
+
     if (e.key === "Enter" && e.shiftKey) {
       input += "\n";
       e.preventDefault();
@@ -302,7 +306,7 @@
         {/if}
       </div>
       <div class="flex gap-1.5 sm:gap-2 items-center">
-        <div class="hidden sm:block">
+        <div>
           <PromptInputAction>
             {#snippet tooltip()}
               Add Resource
@@ -311,6 +315,7 @@
               variant="ghost"
               size="icon"
               class="size-9 sm:size-10 rounded-full cursor-pointer hover:bg-accent/50 transition-colors"
+              aria-label="Add Resource"
               onclick={() => {
                 if (userContext.students.length === 0) {
                   toast("Please Select a class");
@@ -329,6 +334,7 @@
           class="h-9 w-9 sm:h-10 sm:w-10 rounded-full cursor-pointer shadow-sm hover:shadow-md transition-all active:scale-95"
           onclick={onSubmit}
           disabled={!input.trim()}
+          aria-label={chat.loading ? "Stop generation" : "Send message"}
         >
           {#if chat.loading}
             <SquareIcon class="size-3.5 sm:size-4 fill-current" />

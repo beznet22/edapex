@@ -188,7 +188,7 @@
       <!-- Floating Controls Area -->
       {#if ctx.preview && ctx.preview.images.length > 0}
         <div
-          class="absolute bottom-6 left-1/2 -translate-x-1/2 z-50 w-full max-w-sm sm:max-w-md px-4"
+          class="absolute bottom-6 left-1/2 -translate-x-1/2 z-50 w-full max-w-sm sm:max-w-md px-4 safe-area-bottom"
         >
           <div
             class="bg-background/40 backdrop-blur-xl border border-white/10 p-2 sm:p-3 rounded-2xl shadow-2xl flex items-center justify-between gap-2 overflow-hidden"

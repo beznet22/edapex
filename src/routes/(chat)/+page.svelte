@@ -62,7 +62,7 @@
         {`${userContext.getDesignationTitle(userContext.designation)} Onboarding`}
       </AlertDialog.Title>
       <AlertDialog.Description>
-        You are not assined to any class, Please select a class to work on.
+        You are not assigned to any class. Please select a class to work on.
       </AlertDialog.Description>
     </AlertDialog.Header>
     <div class="grid gap-4">
@@ -86,6 +86,7 @@
         </Select.Content>
       </Select.Root>
       <AlertDialog.Footer>
+        <AlertDialog.Cancel>Later</AlertDialog.Cancel>
         <AlertDialog.Action onclick={doAssign}>Continue</AlertDialog.Action>
       </AlertDialog.Footer>
     </div>

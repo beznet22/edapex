@@ -157,8 +157,26 @@
   * {
     @apply border-border outline-ring/50;
   }
+  html, body {
+    @apply h-dvh overflow-hidden max-w-[100vw] overflow-x-hidden;
+  }
   body {
     @apply bg-background text-foreground;
+    overscroll-behavior: none;
+  }
+  button, [role="button"], a {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }
 

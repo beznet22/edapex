@@ -25,8 +25,8 @@
   const userContext = UserContext.fromContext();
 </script>
 
-<header class="bg-background sticky top-0 flex items-center gap-2 p-2">
-  <div class="flex flex-1 items-center gap-2 px-3 pl-12">
+<header class="bg-background sticky top-0 flex items-center justify-between gap-1 p-1 sm:p-2 safe-area-top min-w-0 overflow-hidden">
+  <div class="flex flex-1 items-center gap-1 px-1 pl-[48px] sm:pl-12 min-w-0">
     {#if !sidebar.open || (innerWidth.current ?? 768) < 768}
       <Tooltip>
         <TooltipTrigger>
@@ -34,7 +34,8 @@
             <Button
               {...props}
               variant="outline"
-              class="ml-auto px-2 md:ml-0 md:h-fit md:px-2"
+              class="ml-auto p-2.5 min-w-[44px] min-h-[44px] md:ml-0 md:h-fit md:px-2"
+              aria-label="New Chat"
               onclick={() => {
                 goto("/", { invalidateAll: true });
               }}

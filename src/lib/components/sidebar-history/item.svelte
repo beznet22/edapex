@@ -42,7 +42,15 @@
 <SidebarMenuItem>
   <SidebarMenuButton>
     {#snippet child({ props })}
-      <a href={`/chat/${chat.id}`} {...props}>
+      <a
+        href={`/chat/${chat.id}`}
+        {...props}
+        onclick={() => {
+          if (context.isMobile) {
+            context.setOpenMobile(false);
+          }
+        }}
+      >
         <span>{chat.title}</span>
       </a>
     {/snippet}
@@ -54,7 +62,7 @@
         <SidebarMenuAction
           {...props}
           class="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground mr-0.5"
-          showOnHover={!active}
+          showOnHover={false}
         >
           <MoreHorizontalIcon />
           <span class="sr-only">More</span>

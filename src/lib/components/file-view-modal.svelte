@@ -112,7 +112,7 @@
 
 <Dialog.Root bind:open={store.viewModalOpen}>
     <Dialog.Content
-        class="max-w-full sm:max-w-[95vw] lg:max-w-[90vw] h-dvh sm:h-[95vh] p-0 overflow-hidden border-none bg-background/95 backdrop-blur-3xl shadow-2xl flex flex-col gap-0 select-none animate-in fade-in zoom-in-95 duration-300 sm:rounded-[2.5rem] overscroll-contain"
+        class="w-screen sm:max-w-[95vw] lg:max-w-[90vw] h-dvh sm:h-[95vh] p-0 overflow-hidden border-none bg-background/95 backdrop-blur-3xl shadow-2xl flex flex-col gap-0 select-none animate-in fade-in zoom-in-95 duration-300 sm:rounded-[2.5rem] overscroll-contain"
     >
         <!-- Mobile Header -->
         <div
@@ -124,6 +124,7 @@
                     size="icon"
                     class="h-10 w-10 rounded-2xl"
                     onclick={() => (store.drawerOpen = true)}
+                    aria-label="Select assessment"
                 >
                     <LayoutGrid class="h-5 w-5" />
                 </Button>
@@ -145,6 +146,7 @@
                 size="icon"
                 class="h-10 w-10 rounded-2xl"
                 onclick={() => (store.viewModalOpen = false)}
+                aria-label="Close"
             >
                 <X class="h-5 w-5" />
             </Button>
@@ -274,7 +276,8 @@
                             <Button
                                 variant="ghost"
                                 size="icon"
-                                class="h-8 w-8 text-white hover:bg-white/10"
+                                class="h-11 w-11 sm:h-8 sm:w-8 text-white hover:bg-white/10 active:bg-white/20"
+                                aria-label="Zoom out"
                                 onclick={() =>
                                     (store.zoom = Math.max(
                                         store.zoom - 0.2,
@@ -284,14 +287,15 @@
                                 <ZoomOut class="h-4 w-4" />
                             </Button>
                             <span
-                                class="text-[9px] text-white font-black w-10 text-center tabular-nums"
+                                class="text-[11px] text-white font-black w-10 text-center tabular-nums"
                             >
                                 {Math.round(store.zoom * 100)}%
                             </span>
                             <Button
                                 variant="ghost"
                                 size="icon"
-                                class="h-8 w-8 text-white hover:bg-white/10"
+                                class="h-11 w-11 sm:h-8 sm:w-8 text-white hover:bg-white/10 active:bg-white/20"
+                                aria-label="Zoom in"
                                 onclick={() =>
                                     (store.zoom = Math.min(
                                         store.zoom + 0.2,
@@ -304,7 +308,8 @@
                             <Button
                                 variant="ghost"
                                 size="icon"
-                                class="h-8 w-8 text-white hover:bg-white/10"
+                                class="h-11 w-11 sm:h-8 sm:w-8 text-white hover:bg-white/10 active:bg-white/20"
+                                aria-label="Rotate"
                                 onclick={() =>
                                     (store.rotation =
                                         (store.rotation + 90) % 360)}
@@ -494,7 +499,7 @@
                                                         {/if}
                                                     </div>
                                                     <div
-                                                        class="grid grid-cols-2 gap-4"
+                                                        class="grid grid-cols-1 sm:grid-cols-2 gap-4"
                                                     >
                                                         <div class="space-y-2">
                                                             <Label
@@ -531,7 +536,7 @@
                                                         </div>
                                                     </div>
                                                     <div
-                                                        class="grid grid-cols-2 gap-4"
+                                                        class="grid grid-cols-1 sm:grid-cols-2 gap-4"
                                                     >
                                                         <div class="space-y-2">
                                                             <Label
@@ -568,7 +573,7 @@
                                                         </div>
                                                     </div>
                                                     <div
-                                                        class="grid grid-cols-2 gap-4"
+                                                        class="grid grid-cols-1 sm:grid-cols-2 gap-4"
                                                     >
                                                         <div class="space-y-2">
                                                             <Label
@@ -642,7 +647,7 @@
                                                         </h3>
                                                     </div>
                                                     <div
-                                                        class="grid grid-cols-3 gap-4 bg-muted/20 p-5 rounded-3xl border border-border/50"
+                                                        class="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-muted/20 p-5 rounded-3xl border border-border/50"
                                                     >
                                                         <div class="space-y-2">
                                                             <Label
@@ -826,7 +831,7 @@
                                                                                                     .currentTarget
                                                                                                     .value,
                                                                                             )}
-                                                                                        class="w-11 h-9 text-center bg-muted/40 border-none rounded-xl text-sm font-black focus:bg-background focus:ring-4 focus:ring-primary/10 transition-all outline-none"
+                                                                                        class="w-14 h-11 sm:w-11 sm:h-9 text-center bg-muted/40 border-none rounded-xl text-sm font-black focus:bg-background focus:ring-4 focus:ring-primary/10 transition-all outline-none"
                                                                                     />
                                                                                 {/each}
                                                                             </div>
@@ -861,7 +866,7 @@
                                                                 class="space-y-2 bg-muted/20 p-4 rounded-3xl border border-border/50"
                                                             >
                                                                 <Label
-                                                                    class="text-[9px] font-black uppercase tracking-widest text-muted-foreground ml-1"
+                                                                    class="text-[11px] font-black uppercase tracking-widest text-muted-foreground ml-1"
                                                                 >
                                                                     {key.replace(
                                                                         /_/g,
