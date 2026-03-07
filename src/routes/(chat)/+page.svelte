@@ -50,7 +50,7 @@
   };
 </script>
 
-<div class="">
+<div class="flex-1 flex flex-col min-h-0 w-full">
   <ChatHeader {user} />
   <Chat readonly={false} {user} />
 </div>

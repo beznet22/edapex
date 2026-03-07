@@ -25,7 +25,7 @@
   const userContext = UserContext.fromContext();
 </script>
 
-<header class="bg-background sticky top-0 flex items-center justify-between gap-1 p-1 sm:p-2 safe-area-top min-w-0 overflow-hidden mt-2">
+<header class="bg-background shrink-0 relative z-10 flex items-center justify-between gap-1 p-1 sm:p-2 safe-area-top min-w-0 overflow-hidden mt-2">
   <div class="flex flex-1 items-center gap-1 px-1 pl-[52px] sm:pl-12 min-w-0">
     {#if !readonly}
       <div class="flex items-center gap-1">
