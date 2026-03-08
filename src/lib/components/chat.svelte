@@ -68,9 +68,10 @@
     </div>
   {:else}
     <!-- Chat Messages -->
-    <Conversation>
+    <Conversation class="flex-1 min-h-0 h-auto w-full">
       <ConversationContent class="w-full overscroll-contain touch-pan-y scrollbar-hide">
-        <div class="space-y-6 py-4 mx-auto max-w-3xl px-4">
+        <!-- Add padding bottom so messages don't hide behind floating input -->
+        <div class="space-y-6 py-4 mx-auto max-w-3xl px-4 pb-32 sm:pb-36">
           {#each chat.messages as message}
             <div class="group relative">
               <Message from={message.role} class="py-0">
@@ -124,12 +125,12 @@
           {/each}
         </div>
       </ConversationContent>
-      <ConversationScrollButton />
+      <ConversationScrollButton class="bottom-36 sm:bottom-40 z-20" />
     </Conversation>
 
-    <!-- Input at bottom -->
-    <div class="px-4 py-4 safe-area-bottom">
-      <div class="mx-auto max-w-3xl">
+    <!-- Floating Input at bottom -->
+    <div class="absolute bottom-0 left-0 w-full bg-linear-to-t from-background via-background/90 to-transparent pt-10 pb-4 px-4 safe-area-bottom pointer-events-none z-10">
+      <div class="mx-auto max-w-3xl pointer-events-auto shadow-2xl rounded-3xl sm:rounded-4xl">
         <!-- Help me write an essay about silicon valley -->
         <ChatInput {user} {readonly} isInitial={false} />
       </div>

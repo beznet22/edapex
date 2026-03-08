@@ -212,54 +212,8 @@
   onDestroy(() => ctx.clear());
 </script>
 
-{#snippet header()}
-  <div class="flex items-center justify-between w-full py-2">
-    <div class="px-4 py-2 rounded-full bg-primary/10 border border-primary/20 backdrop-blur-md">
-      <h2 class="text-sm font-black text-primary tracking-tighest uppercase">
-        {title}
-      </h2>
-    </div>
-  </div>
-{/snippet}
-
-{#snippet footer()}
-  {#if ctx.preview && ctx.preview.images.length > 0}
-    <div class="flex items-center justify-between gap-2 overflow-hidden w-full">
-      <!-- Pagination Controls -->
-      <div class="flex items-center gap-1">
-        <Button
-          variant="ghost"
-          size="icon"
-          disabled={ctx.currentIndex === 0}
-          onclick={() => { ctx.prev(); resetGestures(); }}
-          class="rounded-xl h-10 w-10 hover:bg-white/10 disabled:opacity-30"
-        >
-          <ChevronLeftIcon class="h-5 w-5" />
-        </Button>
-
-        <div class="flex items-center justify-center min-w-16 px-2">
-          <span class="text-xs font-bold tabular-nums">
-            {ctx.currentIndex + 1}
-            <span class="text-muted-foreground/50 mx-0.5">/</span>
-            {ctx.preview.images.length}
-          </span>
-        </div>
-
-        <Button
-          variant="ghost"
-          size="icon"
-          disabled={ctx.currentIndex === ctx.preview.images.length - 1}
-          onclick={() => { ctx.next(); resetGestures(); }}
-          class="rounded-xl h-10 w-10 hover:bg-white/10 disabled:opacity-30"
-        >
-          <ChevronRightIcon class="h-5 w-5" />
-        </Button>
-      </div>
-
-      <div class="h-6 w-px bg-border/50 mx-1"></div>
-
-      <!-- Action Controls -->
-      <div class="flex items-center gap-1">
+{#snippet extra()}
+    <div class="flex items-center gap-1.5">
         <Button
           variant="ghost"
           size="icon"
@@ -276,35 +230,61 @@
         </Button>
 
         <Button
-          variant="ghost"
-          size="icon"
-          onclick={toggleZoom}
-          class="rounded-xl h-10 w-10 hover:bg-primary/10"
-          title={isZoomed ? "Zoom Out" : "Zoom In"}
+            variant="ghost"
+            size="icon"
+            onclick={toggleZoom}
+            class="rounded-xl h-10 w-10 hover:bg-primary/10"
+            title={isZoomed ? "Zoom Out" : "Zoom In"}
         >
-          {#if isZoomed}
-            <ZoomOutIcon class="h-5 w-5" />
-          {:else}
-            <ZoomInIcon class="h-5 w-5" />
-          {/if}
+            {#if isZoomed}
+                <ZoomOutIcon class="h-5 w-5" />
+            {:else}
+                <ZoomInIcon class="h-5 w-5" />
+            {/if}
         </Button>
 
-        {#if ctx.preview.pdfUrl}
-          <a
-            href={ctx.preview.pdfUrl}
-            download={ctx.preview.pdfName || "document.pdf"}
-            class="inline-flex"
-          >
-            <Button
-              variant="default"
-              size="sm"
-              class="rounded-xl gap-2 font-black uppercase tracking-widest text-[10px] bg-primary hover:scale-[1.02] transition-transform active:scale-[0.98]"
-            >
-              <DownloadIcon class="h-4 w-4" />
-              <span class="hidden sm:inline">Download</span>
-            </Button>
-          </a>
+        {#if ctx.preview?.pdfUrl}
+            <a href={ctx.preview.pdfUrl} download={ctx.preview.pdfName || "document.pdf"}>
+                <Button variant="ghost" size="icon" class="h-10 w-10 rounded-xl hover:bg-primary/10">
+                    <DownloadIcon class="h-5 w-5" />
+                </Button>
+            </a>
         {/if}
+    </div>
+{/snippet}
+
+{#snippet footer()}
+  {#if ctx.preview && ctx.preview.images.length > 0}
+    <div class="flex items-center justify-between w-full">
+      <!-- Pagination Controls (Bottom Left) -->
+      <div class="flex items-center gap-2">
+        <Button
+          variant="ghost"
+          size="icon"
+          disabled={ctx.currentIndex === 0}
+          onclick={() => { ctx.prev(); resetGestures(); }}
+          class="rounded-xl h-9 w-9 hover:bg-white/10 disabled:opacity-30"
+        >
+          <ChevronLeftIcon class="h-5 w-5" />
+        </Button>
+
+        <div class="flex items-center justify-center min-w-16">
+          <span class="text-[11px] font-black tabular-nums tracking-widest text-muted-foreground">
+            {ctx.currentIndex + 1}
+            <span class="text-muted-foreground/30 mx-1">/</span>
+            {ctx.preview.images.length}
+          </span>
+        </div>
+
+        <Button
+          variant="ghost"
+          size="icon"
+          disabled={ctx.currentIndex === ctx.preview.images.length - 1}
+          onclick={() => { ctx.next(); resetGestures(); }}
+          class="rounded-xl h-9 w-9 hover:bg-white/10 disabled:opacity-30"
+        >
+          <ChevronRightIcon class="h-5 w-5" />
+        </Button>
       </div>
     </div>
   {/if}
@@ -313,9 +293,11 @@
 <ResponsiveSheet
   {open}
   {onOpenChange}
-  class="max-w-full lg:max-w-[85vw]"
+  class="sm:max-w-fit"
   contentClass="p-0 bg-[#111]"
-  {header}
+  title={title || "Document"}
+  description={ctx.preview?.pdfName ?? undefined}
+  {extra}
   {footer}
 >
   <div
@@ -330,7 +312,7 @@
   >
     <!-- Main Preview Area -->
     <div
-      class="flex-1 overflow-hidden flex items-center justify-center custom-scrollbar"
+      class="flex-1 overflow-auto flex items-center justify-center custom-scrollbar p-4 sm:p-6"
     >
       {#if !ctx.preview}
         <div class="flex flex-col items-center gap-6 py-20">
@@ -354,7 +336,7 @@
             <img
               src={ctx.preview.images[ctx.currentIndex]}
               alt="Page {ctx.currentIndex + 1}"
-              class="shadow-[0_30px_60px_-15px_rgba(0,0,0,0.8)] rounded-sm select-none bg-white ring-1 ring-white/20 border-t border-white max-w-full md:max-w-[85vw] lg:max-w-[70vw] max-h-[85vh] object-contain"
+              class="shadow-[0_30px_60px_-15px_rgba(0,0,0,0.8)] rounded-sm select-none bg-white ring-1 ring-white/20 border-t border-white max-w-full max-h-[80vh] object-contain"
               draggable="false"
             />
           {/key}

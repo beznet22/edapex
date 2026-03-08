@@ -169,9 +169,13 @@
     @apply h-dvh overflow-hidden;
   }
   button, [role="button"], a {
+    @apply cursor-pointer;
     -webkit-user-select: none;
     user-select: none;
     -webkit-tap-highlight-color: transparent;
+  }
+  button:disabled, [aria-disabled="true"] {
+    @apply cursor-default;
   }
 }
 

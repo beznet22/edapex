@@ -39,9 +39,10 @@
     });
 </script>
 
-<ChatHeader />
+<div class="flex-1 flex flex-col min-h-0 w-full h-full overflow-hidden">
+  <ChatHeader />
 
-<div class="h-full overflow-auto bg-background/50 scrollbar-hide">
+  <div class="flex-1 min-h-0 overflow-auto bg-background/50 scrollbar-hide">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
         <!-- Sticky Header & Filters -->
         <div
@@ -49,9 +50,9 @@
         >
             <!-- Header -->
             <div
-                class="flex flex-col sm:flex-row sm:items-center justify-between gap-6 py-6 sm:py-8"
+                class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 py-4 sm:py-8"
             >
-                <div class="space-y-1">
+                <div class="space-y-1 hidden sm:block">
                     <h1
                         class="text-2xl sm:text-3xl font-black text-foreground tracking-tight uppercase"
                     >
@@ -65,25 +66,25 @@
                 </div>
 
                 <div
-                    class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3"
+                    class="flex flex-row items-center gap-3 w-full sm:w-auto"
                 >
-                    <div class="relative group">
+                    <div class="relative group flex-1 sm:flex-none">
                         <Search
                             class="absolute left-3.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/50 group-focus-within:text-primary transition-colors"
                         />
                         <Input
                             type="search"
-                            placeholder="Search assessments..."
+                            placeholder="Search..."
                             class="pl-10 h-11 w-full sm:w-72 bg-muted/30 border-none rounded-2xl focus-visible:ring-2 focus-visible:ring-primary/20 font-medium transition-all"
                             bind:value={store.searchQuery}
                         />
                     </div>
 
-                    <div class="flex items-center gap-2">
+                    <div class="flex items-center gap-2 shrink-0">
                         <Button
                             variant="secondary"
                             size="icon"
-                            class="h-11 w-11 rounded-2xl bg-muted/30 border-none hover:bg-muted/50 transition-all shrink-0"
+                            class="h-11 w-11 rounded-2xl bg-muted/30 border-none hover:bg-muted/50 transition-all"
                             onclick={() => store.loadResources()}
                         >
                             <RefreshCw
@@ -94,11 +95,11 @@
                         </Button>
 
                         <Button
-                            class="h-11 px-6 rounded-2xl bg-primary hover:bg-primary/90 text-primary-foreground font-black uppercase tracking-[0.2em] text-[10px] shadow-lg shadow-primary/20 transition-all flex-1 sm:flex-none"
+                            class="h-11 px-6 rounded-2xl bg-primary hover:bg-primary/90 text-primary-foreground font-black uppercase tracking-[0.2em] text-[10px] shadow-lg shadow-primary/20 transition-all"
                             onclick={handleAddNew}
                         >
-                            <Plus class="h-4 w-4 mr-2" />
-                            Upload
+                            <Plus class="h-4 w-4 sm:mr-2" />
+                            <span class="hidden sm:inline">Upload</span>
                         </Button>
                     </div>
                 </div>
@@ -400,3 +401,4 @@
 
 <FileViewModal bind:open={store.viewModalOpen} file={store.selectedFile} />
 <DropZone />
+</div>
