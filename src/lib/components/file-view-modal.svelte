@@ -390,7 +390,7 @@
                                                                         {store.extractedData.status || "UPLOADED"}
                                                                     </div>
                                                                 </Tooltip.Trigger>
-                                                                <Tooltip.Content>
+                                                                <Tooltip.Content portalProps={{ disabled: true }}>
                                                                     <p class="text-sm">{getAssessmentStatusDescription(store.extractedData.status, store.extractedData.error)}</p>
                                                                 </Tooltip.Content>
                                                             </Tooltip.Root>
@@ -530,7 +530,7 @@
                                                                 <Select.Trigger class="h-10 border-none bg-background rounded-2xl shadow-sm text-xs font-black px-4">
                                                                     {AttributeRemark[value as any as keyof typeof AttributeRemark] || "Select rating"}
                                                                 </Select.Trigger>
-                                                                <Select.Content>
+                                                                <Select.Content portalProps={{ disabled: true }}>
                                                                     {#each Object.entries(AttributeRemark) as [rKey, rLabel]}
                                                                         <Select.Item value={String(rKey)} label={rLabel} class="text-xs font-medium">{rLabel}</Select.Item>
                                                                     {/each}
