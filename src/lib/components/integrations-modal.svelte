@@ -20,6 +20,13 @@
     import FolderIcon from "@lucide/svelte/icons/folder";
 
     let open = $state(false);
+    
+    // Sync with page state for sidebar/navigation triggers
+    $effect(() => {
+        if (page.state.showModal !== undefined) {
+            open = page.state.showModal;
+        }
+    });
 
 
     function onOpenChange(isOpen: boolean) {
