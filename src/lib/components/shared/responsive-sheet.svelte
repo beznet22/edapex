@@ -65,13 +65,13 @@
 
                 <div class="flex flex-col flex-1 overflow-hidden">
                     <div
-                        class="shrink-0 px-6 pt-4 pb-4 border-b border-border/5 text-left flex items-center justify-between"
+                        class="shrink-0 px-4 pt-4 pb-4 border-b border-border/5 text-left flex items-center justify-between"
                     >
                         <div class="flex-1 flex flex-col min-w-0">
                             {#if header}
                                 {@render header()}
                             {:else}
-                                <div class="flex items-center gap-3">
+                                <div class="flex items-center gap-2.5">
                                     {#if prefix}
                                         <div class="shrink-0">
                                             {@render prefix()}
@@ -79,7 +79,7 @@
                                     {/if}
                                     <div class="flex flex-col min-w-0">
                                         {#if title}
-                                            <div class="inline-flex self-start px-3 py-1 rounded-full bg-primary/10 border border-primary/20 backdrop-blur-md mb-1">
+                                            <div class="inline-flex self-start px-2 py-1 rounded-full bg-primary/10 border border-primary/20 backdrop-blur-md mb-0.5 max-w-full">
                                                 <h2 class="text-[10px] font-black text-primary tracking-[0.2em] uppercase truncate">
                                                     {#if typeof title === "string"}
                                                         {title}
@@ -102,7 +102,7 @@
                                 </div>
                             {/if}
                         </div>
-                        <div class="flex items-center gap-2 shrink-0 ml-4">
+                        <div class="flex items-center gap-1 shrink-0 ml-2">
                             {#if extra}
                                 {@render extra()}
                             {/if}

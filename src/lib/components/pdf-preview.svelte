@@ -213,7 +213,7 @@
 </script>
 
 {#snippet extra()}
-    <div class="flex items-center gap-1.5">
+    <div class="flex items-center gap-1">
         <Button
           variant="ghost"
           size="icon"
