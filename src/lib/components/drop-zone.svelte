@@ -169,6 +169,7 @@
                      align="start"
                      trapFocus={false}
                      onOpenAutoFocus={(e) => e.preventDefault()}
+                     portalProps={{ disabled: true }}
                    >
                      <Command.Root class="w-full">
                        <Command.Input placeholder="Search student..." class="h-9" />
