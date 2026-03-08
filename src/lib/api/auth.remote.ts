@@ -25,3 +25,8 @@ export const getUser = query(async () => {
   }
   return locals.user;
 });
+
+import { z } from "zod";
+export const requestReset = form(z.object({ email: z.string().email() }), async ({ email }) => {
+  return await auth.requestReset(email);
+});
