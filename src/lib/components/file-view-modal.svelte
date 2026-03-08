@@ -196,7 +196,7 @@
 
 <ResponsiveSheet
     bind:open={store.viewModalOpen}
-    class={store.activeTab === "viewer" ? "sm:max-w-[85vw]" : "sm:max-w-[30vw]"}
+    class="sm:max-w-[30vw]"
     contentClass="p-0"
     title="Assessment"
     description={store.selectedFile?.filename}
