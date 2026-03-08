@@ -12,7 +12,7 @@ import { join } from "path";
 export const POST: RequestHandler = async ({ request, locals }) => {
   const { session, user } = locals;
   if (!user || !session) error(401, "Unauthorized");
-  if (request.body === null) error(400, "Empty file received");
+  if (request.body === null) error(400, "Empty request received");
 
   let file: any = null;
   let filename: string | null = null;
@@ -103,7 +103,8 @@ export const POST: RequestHandler = async ({ request, locals }) => {
       id: extractionResult.storagePath,
       url: `/api/uploads/${extractionResult.storagePath}/image.jpg?token=${token}`,
       status: "extracted",
-      filename: filename ?? file.name
+      filename: fullName || (filename ?? file.name),
+      token
     });
 
   } catch (e) {
@@ -124,11 +125,13 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 
         return json({
           success: true,
-          status: "uploaded",
+          status: "error",
+          error: e instanceof Error ? e.message : "Extraction failed",
           storagePath,
-          filename: file.name,
+          filename: fullName || filename || file.name,
           id: storagePath,
-          url: `/api/uploads/${storagePath}/image.jpg?token=${token}`
+          url: `/api/uploads/${storagePath}/image.jpg?token=${token}`,
+          token
         });
       } catch (err) {
         console.error("Failed to save pending file:", err);
@@ -149,6 +152,10 @@ export const DELETE: RequestHandler = async ({ url, locals, cookies }) => {
 
   const clearAll = url.searchParams.get("clear") === "all";
   const filename = url.searchParams.get("filename");
+  const fileId = url.searchParams.get("fileId");
+
+  const targetPath = fileId || filename;
+  if (!targetPath) return json({ success: false, message: "No filename or fileId provided" });
 
   let staffId: number = user.staffId || 1;
   let token = "";
@@ -167,29 +174,51 @@ export const DELETE: RequestHandler = async ({ url, locals, cookies }) => {
 
   if (!token) {
     const classSection = await resultRepo.getAssignedClassSection(staffId);
-    if (!classSection?.className || !classSection?.sectionName) throw new Error("Class not assigned");
-    token = `${classSection.className}(${classSection.sectionName})`.toLowerCase().replaceAll(" ", "_");
+    if (classSection?.className && classSection?.sectionName) {
+      token = `${classSection.className}(${classSection.sectionName})`.toLowerCase().replaceAll(" ", "_");
+    }
   }
 
-  if (clearAll) {
-    const uploadPath = join(EXTRACTED_DIR, `${token}`);
+  if (clearAll && token) {
+    const uploadPath = join(EXTRACTED_DIR, token);
     if (existsSync(uploadPath)) {
       rmdirSync(uploadPath, { recursive: true });
     }
     return json({ success: true });
   }
 
-  if (filename) {
-    const { EXTRACTED_DIR } = await import("$lib/constants");
-    const filePath = join(EXTRACTED_DIR, filename);
-    if (existsSync(filePath)) {
-      // In unified storage, 'filename' is a folder path
-      rmdirSync(filePath, { recursive: true });
+  const fullPath = join(EXTRACTED_DIR, targetPath);
+  if (existsSync(fullPath)) {
+    try {
+        // 1. Load assessment data to check for DB record linkages
+        const assessmentData = await studentFileStorage.load(targetPath);
+        
+        // 2. If it has DB records (marks/results), clean them up
+        if (assessmentData?.data?.studentData) {
+            const { studentId, classId, sectionId, recordId, examTypeId } = assessmentData.data.studentData;
+            if (studentId && classId && sectionId && recordId && examTypeId) {
+                const schoolId = assessmentData.data.studentData.schoolId || 1;
+                await resultRepo.cleanMarks({
+                    recordId,
+                    studentId,
+                    classId,
+                    sectionId,
+                    examTermId: examTypeId,
+                    schoolId
+                });
+            }
+        }
+
+        // 3. Delete the directory/file from the filesystem
+        rmdirSync(fullPath, { recursive: true });
+        return json({ success: true });
+    } catch (e) {
+        console.error("Deletion error:", e);
+        return json({ success: false, message: e instanceof Error ? e.message : "Internal deletion error" });
     }
-    return json({ success: true });
   }
 
-  return json({ success: false, message: "No filename provided" });
+  return json({ success: true, message: "Resource already removed or not found" });
 };
 
 function unlink_internal(path: string) {

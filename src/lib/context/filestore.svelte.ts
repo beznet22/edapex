@@ -123,6 +123,8 @@ export class FilestoreContext {
                 
                 // Optimistically update the UI status instantly to preserve reactivity
                 this.selectedFile.status = "approved";
+                this.extractedData.status = "approved";
+                this.extractedData.verified = true;
                 this.fileCtx.updateUpload({ ...this.selectedFile });
 
                 this.handleNext();

@@ -245,57 +245,49 @@
                                     {/if}
                                 </div>
 
-                                <!-- Status indicator - Moved out of scaling container and switched to Popover -->
+                                <!-- Improved Status indicator with Hover & Focus behavior -->
                                 <div
-                                    class="absolute top-3 left-3 sm:top-4 sm:left-4 z-20 pointer-events-auto"
-                                    role="presentation"
+                                    class="absolute top-3 left-3 sm:top-4 sm:left-4 z-20 pointer-events-auto group/status outline-none cursor-pointer"
+                                    role="button"
+                                    tabindex="0"
+                                    onclick={(e) => { e.stopPropagation(); e.currentTarget.focus(); }}
+                                    onkeydown={(e) => e.stopPropagation()}
                                 >
-                                    <Popover.Root>
-                                        <Popover.Trigger 
-                                            onclick={(e) => e.stopPropagation()}
-                                            onkeydown={(e) => e.stopPropagation()}
+                                    {#if ["extracted", "approved", "published"].includes(file.status)}
+                                        <div
+                                            class="px-3 py-1 rounded-full bg-emerald-500 text-white text-[10px] sm:text-xs font-black uppercase tracking-widest shadow-lg shadow-emerald-500/20"
                                         >
-                                            {#if ["extracted", "approved", "published"].includes(file.status)}
-                                                <div
-                                                    class="px-3 py-1 rounded-full bg-emerald-500 text-white text-[10px] sm:text-xs font-black uppercase tracking-widest shadow-lg shadow-emerald-500/20"
-                                                >
-                                                    {file.status}
-                                                </div>
-                                            {:else if file.status === "error"}
-                                                <div
-                                                    class="px-3 py-1 rounded-full bg-destructive text-destructive-foreground text-[10px] sm:text-xs font-black uppercase tracking-widest shadow-lg shadow-destructive/20"
-                                                >
-                                                    Error
-                                                </div>
-                                            {:else if file.status === "uploaded"}
-                                                <div
-                                                    class="px-3 py-1 rounded-full bg-amber-500 text-white text-[10px] sm:text-xs font-black uppercase tracking-widest shadow-lg shadow-amber-500/20"
-                                                >
-                                                    Uploaded
-                                                </div>
-                                            {:else}
-                                                <div
-                                                    class="px-3 py-1 rounded-full bg-blue-500 text-white text-[10px] sm:text-xs font-black uppercase tracking-widest shadow-lg shadow-blue-500/20 animate-pulse"
-                                                >
-                                                    {file.status || "..."}
-                                                </div>
-                                            {/if}
-                                        </Popover.Trigger>
-                                        <Popover.Content side="bottom" sideOffset={5} portalProps={{ disabled: true }} class="z-100 w-fit p-0 border-none bg-transparent shadow-none group/popover">
-                                            <div class="relative bg-primary text-primary-foreground rounded-md px-3 py-1.5 shadow-md animate-in fade-in-0 zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95">
-                                                <p class="text-[10px] font-bold uppercase tracking-widest max-w-[200px] text-wrap text-center leading-tight">
-                                                    {getAssessmentStatusDescription(file.status, file.error)}
-                                                </p>
-                                                <!-- Reactive Arrow implementation -->
-                                                <div class="absolute w-2 h-2 bg-primary rotate-45 rounded-[1px]
-                                                    group-data-[side=top]/popover:-bottom-1 group-data-[side=top]/popover:left-1/2 group-data-[side=top]/popover:-translate-x-1/2
-                                                    group-data-[side=bottom]/popover:-top-1 group-data-[side=bottom]/popover:left-1/2 group-data-[side=bottom]/popover:-translate-x-1/2
-                                                    group-data-[side=left]/popover:-right-1 group-data-[side=left]/popover:top-1/2 group-data-[side=left]/popover:-translate-y-1/2
-                                                    group-data-[side=right]/popover:-left-1 group-data-[side=right]/popover:top-1/2 group-data-[side=right]/popover:-translate-y-1/2
-                                                "></div>
-                                            </div>
-                                        </Popover.Content>
-                                    </Popover.Root>
+                                            {file.status}
+                                        </div>
+                                    {:else if file.status === "error"}
+                                        <div
+                                            class="px-3 py-1 rounded-full bg-destructive text-destructive-foreground text-[10px] sm:text-xs font-black uppercase tracking-widest shadow-lg shadow-destructive/20"
+                                        >
+                                            Error
+                                        </div>
+                                    {:else if file.status === "uploaded"}
+                                        <div
+                                            class="px-3 py-1 rounded-full bg-amber-500 text-white text-[10px] sm:text-xs font-black uppercase tracking-widest shadow-lg shadow-amber-500/20"
+                                        >
+                                            Uploaded
+                                        </div>
+                                    {:else}
+                                        <div
+                                            class="px-3 py-1 rounded-full bg-blue-500 text-white text-[10px] sm:text-xs font-black uppercase tracking-widest shadow-lg shadow-blue-500/20 animate-pulse pointer-events-none"
+                                        >
+                                            {file.status || "..."}
+                                        </div>
+                                    {/if}
+
+                                    <!-- Hover/Focus Tooltip -->
+                                    <div class="absolute top-full auto-cols-auto left-1/2 -translate-x-1/2 pt-2 opacity-0 invisible group-hover/status:opacity-100 group-hover/status:visible group-focus/status:opacity-100 group-focus/status:visible transition-all duration-200 z-50 pointer-events-none">
+                                        <div class="relative bg-primary text-primary-foreground rounded-md px-3 py-1.5 shadow-md border border-primary-foreground/10">
+                                            <p class="text-[10px] font-bold uppercase tracking-widest min-w-max max-w-[200px] text-wrap text-center leading-tight">
+                                                {getAssessmentStatusDescription(file.status, file.error)}
+                                            </p>
+                                            <div class="absolute w-2 h-2 bg-primary rotate-45 rounded-[1px] -top-1 left-1/2 -translate-x-1/2 border-l border-t border-primary-foreground/10"></div>
+                                        </div>
+                                    </div>
                                 </div>
 
                                 <div class="space-y-0.5 px-0.5">

@@ -20,9 +20,10 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 
     try {
         // 1. Mark as verified in the data object
+        // studentFileStorage.save() expects this to be on the top level of data
         data.verified = true;
-        data.extractedAt = new Date();
         data.status = "approved";
+        data.extractedAt = new Date();
 
         // 2. Map ExtractedAssessment data to ResultInput format for DB persistence
         if (!data.data) {

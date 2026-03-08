@@ -252,7 +252,8 @@ export const getResources = query(
                   classId: assessmentData.data?.studentData?.classId,
                   sectionId: assessmentData.data?.studentData?.sectionId,
                   fullName: assessmentData.data?.studentData?.fullName
-                }
+                },
+                error: assessmentData.error
               });
             } catch (e) {
               console.error("Failed to load assessment data for folder:", folderPath, e);
