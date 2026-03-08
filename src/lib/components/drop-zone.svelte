@@ -17,9 +17,13 @@
   import { Loader } from "./prompt-kit/loader";
   import { ScrollArea } from "$lib/components/ui/scroll-area/index.js";
   import { useUser } from "$lib/context/user-context.svelte";
-  import * as Select from "$lib/components/ui/select/index.js";
-  import { Switch } from "$lib/components/ui/switch/index.js";
-  import { Label } from "$lib/components/ui/label/index.js";
+  import * as Popover from "$lib/components/ui/popover/index.js";
+  import * as Command from "$lib/components/ui/command/index.js";
+  import ChevronsUpDownIcon from "@lucide/svelte/icons/chevrons-up-down";
+  import { cn } from "$lib/utils/shadcn.js";
+  import { tick } from "svelte";
+  import { Switch } from "$lib/components/ui/switch";
+  import { Label } from "$lib/components/ui/label";
   import ResponsiveSheet from "./shared/responsive-sheet.svelte";
 
   let filesContext = useFileActions();
@@ -27,11 +31,21 @@
   let userCtx = useUser();
   let previewUrls = new Map<File, string>();
 
-  let value = $state<string>();
+  let open = $state(false);
+  let value = $state<string>("");
+  let triggerRef = $state<HTMLButtonElement>(null!);
+
   const student = $derived(
     userCtx.students.find((p) => p.id === Number(value)),
   );
   let isStudentPhoto = $state(false);
+
+  function closeAndFocusTrigger() {
+    open = false;
+    tick().then(() => {
+      triggerRef.focus();
+    });
+  }
 
   // Use files and uploads from the shared context
   const files = $derived(filesContext.files);
@@ -91,48 +105,6 @@
   };
 </script>
 
-{#snippet header()}
-  <div class="flex flex-col gap-4 w-full">
-    <div class="flex items-center justify-between">
-      <div class="space-y-1">
-        <h2 class="text-sm font-black uppercase tracking-widest text-primary">
-          Add Resource
-        </h2>
-        <p class="text-[10px] font-medium text-muted-foreground/60">
-          For {filesContext.selectedClass?.className} {filesContext.selectedClass?.sectionName}
-        </p>
-      </div>
-    </div>
-
-    {#if userCtx.students.length > 0}
-      <div class="w-full">
-        <Select.Root required type="single" name="provider" bind:value>
-          <Select.Trigger class="w-full h-11 bg-muted/20 border-border/50 rounded-2xl text-xs font-bold px-4">
-            {student?.name || "Select a student"}
-          </Select.Trigger>
-          <Select.Content portalProps={{ disabled: true }} class="rounded-2xl shadow-2xl border-border/50">
-            <Select.Group>
-              <Select.Label class="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60 px-4 py-2">Students</Select.Label>
-              {#each userCtx.students as student (student.id)}
-                <Select.Item
-                  value={student.id.toString()}
-                  label={student.name || ""}
-                  class="rounded-xl mx-1"
-                >
-                  {student.name}
-                </Select.Item>
-              {/each}
-            </Select.Group>
-          </Select.Content>
-        </Select.Root>
-      </div>
-    {:else if filesContext.selectedClass}
-      <div class="p-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground/40 text-center bg-muted/10 rounded-3xl border border-dashed border-muted/30">
-        No students found in {filesContext.selectedClass.className}
-      </div>
-    {/if}
-  </div>
-{/snippet}
 
 {#snippet extra()}
   {#if files.length > 0}
@@ -164,19 +136,93 @@
   <div class="flex flex-col h-full overflow-hidden">
     <ScrollArea class="flex-1 px-6 py-6">
       <div class="space-y-8">
-        <!-- Options & Dropzone -->
+        <!-- Student Selection & Configuration -->
         <div class="space-y-6">
+          <div class="space-y-3">
+             <div class="flex items-center gap-3">
+                <div class="w-1 h-4 bg-primary rounded-full"></div>
+                <h3 class="text-[10px] font-black uppercase tracking-[0.2em] text-foreground/60">
+                   Target Assessment
+                </h3>
+             </div>
+
+             {#if userCtx.students.length > 0}
+               <div class="w-full">
+                 <Popover.Root bind:open>
+                   <Popover.Trigger bind:ref={triggerRef}>
+                     {#snippet child({ props })}
+                       <Button
+                         {...props}
+                         variant="outline"
+                         class="w-full h-12 bg-muted/10 border-none rounded-2xl text-xs font-black px-5 shadow-inner transition-all hover:bg-muted/15 justify-between"
+                         role="combobox"
+                         aria-expanded={open}
+                       >
+                         <span class="truncate">{student?.name || "Select a student..."}</span>
+                         <ChevronsUpDownIcon class="size-4 shrink-0 opacity-50" />
+                       </Button>
+                     {/snippet}
+                   </Popover.Trigger>
+                   <Popover.Content 
+                     class="p-0 w-(--bits-popover-anchor-width)" 
+                     side="bottom" 
+                     align="start"
+                     trapFocus={false}
+                     onOpenAutoFocus={(e) => e.preventDefault()}
+                   >
+                     <Command.Root class="w-full">
+                       <Command.Input placeholder="Search student..." class="h-9" />
+                       <Command.List class="max-h-[300px]">
+                         <Command.Empty>No student found.</Command.Empty>
+                         <Command.Group>
+                           {#each userCtx.students as s (s.id)}
+                             <Command.Item
+                               value={s.name || ""}
+                               onSelect={() => {
+                                 value = s.id.toString();
+                                 closeAndFocusTrigger();
+                               }}
+                               class="rounded-xl mx-1"
+                             >
+                               <CheckIcon
+                                 class={cn("size-4", value !== s.id.toString() && "text-transparent")}
+                               />
+                               <span class="truncate">{s.name}</span>
+                             </Command.Item>
+                           {/each}
+                         </Command.Group>
+                       </Command.List>
+                     </Command.Root>
+                   </Popover.Content>
+                 </Popover.Root>
+               </div>
+             {:else if filesContext.selectedClass}
+               <div class="p-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground/40 text-center bg-muted/10 rounded-3xl border border-dashed border-muted/30">
+                 No students found in {filesContext.selectedClass.className}
+               </div>
+             {/if}
+          </div>
+
           {#if student}
-            <div class="flex items-center space-x-3 px-1">
+            <div class="flex items-center space-x-4 p-4 rounded-2xl bg-primary/5 border border-primary/10 transition-all animate-in fade-in slide-in-from-top-2">
               <Switch id="student-photo" bind:checked={isStudentPhoto} class="data-[state=checked]:bg-primary" />
-              <Label
-                for="student-photo"
-                class="text-[10px] font-black uppercase tracking-widest text-foreground/80 cursor-pointer"
-              >
-                Upload as Student Photo
-              </Label>
+              <div class="flex flex-col">
+                <Label
+                  for="student-photo"
+                  class="text-[10px] font-black uppercase tracking-widest text-foreground/80 cursor-pointer"
+                >
+                  Upload as Student Photo
+                </Label>
+                <span class="text-[8px] font-bold text-muted-foreground/60 uppercase tracking-tight mt-0.5">
+                  Save this image as the official profile picture for {student.name}
+                </span>
+              </div>
             </div>
           {/if}
+        </div>
+
+        <!-- Options & Dropzone -->
+        <div class="space-y-6">
 
           <div class="rounded-[2.5rem] overflow-hidden border border-border/50 bg-muted/5 p-1 shadow-inner">
             <FileDropZone
