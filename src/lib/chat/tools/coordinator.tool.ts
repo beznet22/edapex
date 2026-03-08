@@ -1,9 +1,10 @@
 import { marksInputSchema } from "$lib/schema/result-input";
 import { resultOutputSchema, type Category } from "$lib/schema/result-output";
-import { resultRepo, studentRepo, staffRepo, parentRepo } from "$lib/server/repository";
+import { resultRepo, studentRepo, staffRepo, parentRepo, authRepo } from "$lib/server/repository";
 import { assessment } from "$lib/server/service/assessment.service";
 
 import { CATEGORY } from "$lib/types/sms-types";
+import { hashPwd } from "$lib/server/helpers/utils";
 import { tool, zodSchema, type InferToolInput, type InferToolOutput } from "ai";
 import { base64url } from "jose";
 
@@ -509,16 +510,17 @@ export const createStudent = tool({
   ),
   outputSchema: zodSchema(
     z.object({
-      success: z.boolean().describe("Whether the operation was successful."),
       message: z.string().describe("A message describing the result."),
+      errorType: z.enum(["USER_EXISTS", "UNKNOWN"]).optional().describe("Type of error if success is false"),
       isExisting: z.boolean().describe("True if the student already existed, false if newly created."),
       student: z
         .object({
           id: z.number().describe("The student's unique ID."),
           admissionNo: z.number().nullable().describe("The student's admission number."),
           fullName: z.string().nullable().describe("The student's full name."),
-          classId: z.number().nullable().describe("The class ID."),
           sectionId: z.number().nullable().describe("The section ID."),
+          temporaryPassword: z.string().optional().describe("Auto-generated temporary password for the student."),
+          temporaryParentPassword: z.string().optional().describe("Auto-generated temporary password for the parent/guardian."),
         })
         .optional()
         .describe("The created or existing student record."),
@@ -548,12 +550,24 @@ export const createStudent = tool({
           fullName: student.fullName,
           classId: student.classId,
           sectionId: student.sectionId,
+          temporaryPassword: student.studentPassword,
+          temporaryParentPassword: student.parentPassword,
         },
       };
     } catch (error) {
+      if (error instanceof Error && error.message === "USER_EXISTS") {
+        return {
+          success: false,
+          errorType: "USER_EXISTS",
+          message: `A user with the provided student or guardian email already exists.`,
+          isExisting: false,
+        };
+      }
+      
       const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
       return {
         success: false,
+        errorType: "UNKNOWN",
         message: `Failed to create student: ${errorMessage}`,
         isExisting: false,
       };
@@ -617,6 +631,146 @@ export const assignClassSection = tool({
 
 export type AssignClassSectionInput = InferToolInput<typeof assignClassSection>;
 export type AssignClassSectionOutput = InferToolOutput<typeof assignClassSection>;
+
+export const searchStudent = tool({
+  description: [
+    "Searches for a student by matching a part of their name.",
+    "This must be used before updating or deleting a student to find their exact studentId.",
+  ].join("\n"),
+  inputSchema: zodSchema(
+    z.object({
+      query: z.string().describe("The name or part of the name to search for."),
+    })
+  ),
+  outputSchema: zodSchema(
+    z.object({
+      success: z.boolean(),
+      message: z.string(),
+      data: z.array(
+        z.object({
+          studentId: z.number(),
+          fullName: z.string().nullable(),
+          admissionNo: z.number().nullable(),
+          className: z.string().nullable(),
+          sectionName: z.string().nullable(),
+          activeStatus: z.number().nullable(),
+        })
+      ),
+    })
+  ),
+  execute: async ({ query }) => {
+    try {
+      const students = await studentRepo.searchStudent(query);
+      return {
+        success: true,
+        message: `Found ${students.length} student(s) matching "${query}".`,
+        data: students,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: "Failed to search for students.",
+        data: [],
+      };
+    }
+  },
+});
+
+export type SearchStudentInput = InferToolInput<typeof searchStudent>;
+export type SearchStudentOutput = InferToolOutput<typeof searchStudent>;
+
+export const updateStudentStatus = tool({
+  description: [
+    "Updates the active status of a student's account, allowing you to either enable or disable them.",
+    "Use this to deactivate, suspend, or re-enable a student.",
+  ].join("\n"),
+  inputSchema: zodSchema(
+    z.object({
+      studentId: z.number().describe("The unique student ID."),
+      active: z.boolean().describe("True to enable the student, false to disable them."),
+    })
+  ),
+  outputSchema: zodSchema(
+    z.object({
+      success: z.boolean(),
+      message: z.string(),
+      errorType: z.enum(["USER_NOT_FOUND", "UNKNOWN"]).optional(),
+    })
+  ),
+  execute: async ({ studentId, active }) => {
+    try {
+      const result = await studentRepo.updateStudentStatus({ studentId, active });
+      const actionStr = active ? "enabled" : "disabled";
+      return {
+        success: true,
+        message: `Successfully ${actionStr} the student ${result.fullName} (ID: ${result.studentId}).`,
+      };
+    } catch (error) {
+      if (error instanceof Error && error.message === "USER_NOT_FOUND") {
+        return {
+          success: false,
+          errorType: "USER_NOT_FOUND",
+          message: `No student found with the provided ID.`,
+        };
+      }
+      const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+      return {
+        success: false,
+        errorType: "UNKNOWN",
+        message: `Failed to update student status: ${errorMessage}`,
+      };
+    }
+  },
+});
+
+export type UpdateStudentStatusInput = InferToolInput<typeof updateStudentStatus>;
+export type UpdateStudentStatusOutput = InferToolOutput<typeof updateStudentStatus>;
+
+export const deleteStudent = tool({
+  description: [
+    "Permanently deletes a student's record and their associated login account.",
+    "The parent/guardian account is NOT deleted to preserve siblings.",
+    "WARNING: Requires explicit user consent before calling.",
+  ].join("\n"),
+  inputSchema: zodSchema(
+    z.object({
+      studentId: z.number().describe("The unique student ID to delete."),
+    })
+  ),
+  outputSchema: zodSchema(
+    z.object({
+      success: z.boolean(),
+      message: z.string(),
+      errorType: z.enum(["USER_NOT_FOUND", "UNKNOWN"]).optional(),
+    })
+  ),
+  execute: async ({ studentId }) => {
+    try {
+      const result = await studentRepo.deleteStudent({ studentId });
+      return {
+        success: true,
+        message: `Successfully deleted student ${result.fullName}.`,
+      };
+    } catch (error) {
+      if (error instanceof Error && error.message === "USER_NOT_FOUND") {
+        return {
+          success: false,
+          errorType: "USER_NOT_FOUND",
+          message: `No student found with the provided ID.`,
+        };
+      }
+      const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+      return {
+        success: false,
+        errorType: "UNKNOWN",
+        message: `Failed to delete student: ${errorMessage}`,
+      };
+    }
+  },
+});
+
+export type DeleteStudentInput = InferToolInput<typeof deleteStudent>;
+export type DeleteStudentOutput = InferToolOutput<typeof deleteStudent>;
 
 export const searchClassSection = tool({
   description: [
@@ -885,3 +1039,329 @@ export const changeParentEmail = tool({
 export type ChangeParentEmailInput = InferToolInput<typeof changeParentEmail>;
 export type ChangeParentEmailOutput = InferToolOutput<typeof changeParentEmail>;
 
+export const getStaffRegistrationOptions = tool({
+  description: [
+    "Retrieves all available options for staff registration.",
+    "ALWAYS call this tool FIRST when a coordinator wants to register a new staff member.",
+    "Returns lists of departments, designations, roles, and genders.",
+    "Use these options to present choices to the coordinator for selection.",
+  ].join("\n"),
+  inputSchema: zodSchema(z.object({})),
+  outputSchema: zodSchema(
+    z.object({
+      success: z.boolean(),
+      designations: z.array(z.object({ id: z.number(), name: z.string().nullable() })),
+      departments: z.array(z.object({ id: z.number(), name: z.string().nullable() })),
+      roles: z.array(z.object({ id: z.number(), name: z.string().nullable() })),
+      genders: z.array(z.object({ id: z.number(), name: z.string().nullable() })),
+      message: z.string().optional(),
+    })
+  ),
+  execute: async () => {
+    try {
+      const options = await staffRepo.getStaffRegistrationOptions();
+      return {
+        success: true,
+        ...options,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        designations: [],
+        departments: [],
+        roles: [],
+        genders: [],
+        message: "Failed to fetch staff registration options.",
+      };
+    }
+  },
+});
+
+export type GetStaffRegistrationOptionsInput = InferToolInput<typeof getStaffRegistrationOptions>;
+export type GetStaffRegistrationOptionsOutput = InferToolOutput<typeof getStaffRegistrationOptions>;
+
+export const registerStaff = tool({
+  description: [
+    "Registers a new staff member and creates their user account.",
+    "IMPORTANT: Before calling this tool, you MUST first call 'getStaffRegistrationOptions' to get available administrative options.",
+    "Collect basic info (first name, last name, email, mobile) first, then present administrative options for confirmation.",
+    "If the email already exists, this tool will return a message indicating so.",
+  ].join("\n"),
+  inputSchema: zodSchema(
+    z.object({
+      firstName: z.string().describe("Staff first name. REQUIRED."),
+      lastName: z.string().describe("Staff last name. REQUIRED."),
+      email: z.string().email().describe("Staff email. REQUIRED."),
+      mobile: z.string().describe("Staff phone number. REQUIRED."),
+      designationId: z.number().describe("Designation ID from options. REQUIRED."),
+      departmentId: z.number().describe("Department ID from options. REQUIRED."),
+      roleId: z.number().describe("Role ID from options. REQUIRED."),
+      genderId: z.number().describe("Gender ID from options. REQUIRED."),
+      qualification: z.string().optional().describe("Staff qualification."),
+      experience: z.string().optional().describe("Staff experience."),
+    })
+  ),
+  outputSchema: zodSchema(
+    z.object({
+      success: z.boolean(),
+      message: z.string(),
+      errorType: z.enum(["USER_EXISTS", "UNKNOWN"]).optional(),
+      staff: z
+        .object({
+          id: z.number(),
+          userId: z.number(),
+          fullName: z.string(),
+          email: z.string(),
+          password: z.string(),
+        })
+        .optional(),
+    })
+  ),
+  execute: async (input) => {
+    try {
+      const result = await staffRepo.createStaff(input);
+      return {
+        success: true,
+        message: `Staff member "${result.fullName}" registered successfully. Temporary password: ${result.password}`,
+        staff: result,
+      };
+    } catch (error) {
+      if (error instanceof Error && error.message === "USER_EXISTS") {
+        return {
+          success: false,
+          errorType: "USER_EXISTS",
+          message: `The email "${input.email}" is already registered. Staff members with existing accounts should login with their current credentials. If they forgot their password, use the 'updateUserPassword' tool.`,
+        };
+      }
+      const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+      return {
+        success: false,
+        errorType: "UNKNOWN",
+        message: `Failed to register staff: ${errorMessage}`,
+      };
+    }
+  },
+});
+
+export type RegisterStaffInput = InferToolInput<typeof registerStaff>;
+export type RegisterStaffOutput = InferToolOutput<typeof registerStaff>;
+
+export const updateUserPassword = tool({
+  description: [
+    "Updates or resets a user's password.",
+    "Can be used by coordinators to reset someone's password, or by anyone to change their own.",
+  ].join("\n"),
+  inputSchema: zodSchema(
+    z.object({
+      email: z.string().email().optional().describe("The email of the user to update."),
+      userId: z.number().optional().describe("The ID of the user to update."),
+      newPassword: z.string().describe("The new password to set."),
+    })
+  ),
+  outputSchema: zodSchema(
+    z.object({
+      success: z.boolean(),
+      message: z.string(),
+    })
+  ),
+  execute: async ({ email, userId, newPassword }) => {
+    try {
+      let targetUserId: number | undefined = userId;
+
+      if (!targetUserId && email) {
+        const user = await authRepo.findUser("email", email);
+        if (!user) {
+          return { success: false, message: `User with email "${email}" not found.` };
+        }
+        targetUserId = user.id;
+      }
+
+      if (!targetUserId) {
+        return { success: false, message: "Either userId or email must be provided." };
+      }
+
+      await authRepo.updateUserPassword(targetUserId, hashPwd(newPassword));
+
+      return {
+        success: true,
+        message: "Password updated successfully.",
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+      return {
+        success: false,
+        message: `Failed to update password: ${errorMessage}`,
+      };
+    }
+  },
+});
+
+export type UpdateUserPasswordInput = InferToolInput<typeof updateUserPassword>;
+export type UpdateUserPasswordOutput = InferToolOutput<typeof updateUserPassword>;
+
+export const searchStaff = tool({
+  description: [
+    "Searches for staff members by department, or designation.",
+    "Use this when a coordinator wants to find a non-teaching staff member but doesn't know their email.",
+  ].join("\n"),
+  inputSchema: zodSchema(
+    z.object({
+      departmentId: z.number().optional().describe("The ID of the department the staff member belongs to."),
+      designationId: z.number().optional().describe("The ID of the designation of the staff member."),
+    })
+  ),
+  outputSchema: zodSchema(
+    z.object({
+      success: z.boolean(),
+      message: z.string(),
+      data: z.array(z.object({
+        teacherId: z.number(),
+        fullName: z.string().nullable(),
+        email: z.string().nullable(),
+        designation: z.string().nullable(),
+        department: z.string().nullable(),
+      })).optional(),
+    })
+  ),
+  execute: async ({ departmentId, designationId }) => {
+    try {
+      const staffList = await staffRepo.searchStaff({ departmentId, designationId });
+      return {
+        success: true,
+        message: `Found ${staffList.length} staff member(s) matching the criteria.`,
+        data: staffList,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: "Failed to search for staff members.",
+        data: [],
+      };
+    }
+  },
+});
+
+export type SearchStaffInput = InferToolInput<typeof searchStaff>;
+export type SearchStaffOutput = InferToolOutput<typeof searchStaff>;
+
+export const updateStaffStatus = tool({
+  description: [
+    "Updates the active status of a staff member's account, allowing you to either enable or disable their access.",
+    "Use this when a coordinator requests to deactivate, suspend, or re-enable a staff member.",
+  ].join("\n"),
+  inputSchema: zodSchema(
+    z.object({
+      email: z.string().email().optional().describe("The email address of the staff member to update."),
+      teacherId: z.number().optional().describe("The teacher ID (staff ID) of the staff member to update."),
+      classId: z.number().optional().describe("The class ID, used to auto-resolve a teacher if email and teacherId are omitted."),
+      sectionId: z.number().optional().describe("The section ID, used to auto-resolve a teacher if email and teacherId are omitted."),
+      active: z.boolean().describe("True to enable the staff account, false to disable it."),
+    }).refine(data => data.email || data.teacherId || (data.classId && data.sectionId), {
+      message: "Either email, teacherId, or classId+sectionId must be provided.",
+    })
+  ),
+  outputSchema: zodSchema(
+    z.object({
+      success: z.boolean(),
+      message: z.string(),
+      errorType: z.enum(["USER_NOT_FOUND", "UNKNOWN"]).optional(),
+    })
+  ),
+  execute: async ({ email, teacherId, classId, sectionId, active }) => {
+    try {
+      let resolvedTeacherId = teacherId;
+      if (!email && !resolvedTeacherId && classId && sectionId) {
+        const staff = await staffRepo.getStaffByClassSection({ classId, sectionId });
+        if (staff && staff.teacherId) {
+          resolvedTeacherId = staff.teacherId;
+        } else {
+          return { success: false, errorType: "USER_NOT_FOUND", message: "No staff assigned to the specified class and section." };
+        }
+      }
+
+      const result = await staffRepo.updateStaffStatus({ email, teacherId: resolvedTeacherId, active });
+      const actionStr = active ? "enabled" : "disabled";
+      return {
+        success: true,
+        message: `Successfully ${actionStr} the account for ${result.fullName} (${result.email}).`,
+      };
+    } catch (error) {
+      if (error instanceof Error && error.message === "USER_NOT_FOUND") {
+        return {
+          success: false,
+          errorType: "USER_NOT_FOUND",
+          message: `No active staff member found with the provided details.`,
+        };
+      }
+      const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+      return {
+        success: false,
+        errorType: "UNKNOWN",
+        message: `Failed to update staff account status: ${errorMessage}`,
+      };
+    }
+  },
+});
+
+export type UpdateStaffStatusInput = InferToolInput<typeof updateStaffStatus>;
+export type UpdateStaffStatusOutput = InferToolOutput<typeof updateStaffStatus>;
+
+export const deleteStaff = tool({
+  description: [
+    "Permanently deletes a staff member's account.",
+    "CRITICAL: This action is irreversible. Ensure you have obtained explicit user confirmation before calling this tool.",
+  ].join("\n"),
+  inputSchema: zodSchema(
+    z.object({
+      email: z.string().email().optional().describe("The email address of the staff member to permanently delete."),
+      teacherId: z.number().optional().describe("The teacher ID (staff ID) of the staff member to permanently delete."),
+      classId: z.number().optional().describe("The class ID, used to auto-resolve a teacher if email and teacherId are omitted."),
+      sectionId: z.number().optional().describe("The section ID, used to auto-resolve a teacher if email and teacherId are omitted."),
+    }).refine(data => data.email || data.teacherId || (data.classId && data.sectionId), {
+      message: "Either email, teacherId, or classId+sectionId must be provided.",
+    })
+  ),
+  outputSchema: zodSchema(
+    z.object({
+      success: z.boolean(),
+      message: z.string(),
+      errorType: z.enum(["USER_NOT_FOUND", "UNKNOWN"]).optional(),
+    })
+  ),
+  execute: async ({ email, teacherId, classId, sectionId }) => {
+    try {
+      let resolvedTeacherId = teacherId;
+      if (!email && !resolvedTeacherId && classId && sectionId) {
+        const staff = await staffRepo.getStaffByClassSection({ classId, sectionId });
+        if (staff && staff.teacherId) {
+          resolvedTeacherId = staff.teacherId;
+        } else {
+          return { success: false, errorType: "USER_NOT_FOUND", message: "No staff assigned to the specified class and section." };
+        }
+      }
+
+      const result = await staffRepo.deleteStaff({ email, teacherId: resolvedTeacherId });
+      return {
+        success: true,
+        message: `Successfully and permanently deleted the account for ${result.fullName} (${result.email}).`,
+      };
+    } catch (error) {
+      if (error instanceof Error && error.message === "USER_NOT_FOUND") {
+        return {
+          success: false,
+          errorType: "USER_NOT_FOUND",
+          message: `No active staff member found with the provided details.`,
+        };
+      }
+      const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+      return {
+        success: false,
+        errorType: "UNKNOWN",
+        message: `Failed to delete staff account: ${errorMessage}`,
+      };
+    }
+  },
+});
+
+export type DeleteStaffInput = InferToolInput<typeof deleteStaff>;
+export type DeleteStaffOutput = InferToolOutput<typeof deleteStaff>;

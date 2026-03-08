@@ -18,7 +18,13 @@ import {
   searchClassSection,
   changeStudentName,
   getAssessmentMapping,
-  changeParentEmail
+  changeParentEmail,
+  getStaffRegistrationOptions,
+  registerStaff,
+  updateUserPassword,
+  updateStaffStatus,
+  deleteStaff,
+  searchStaff
 } from "./coordinator.tool";
 
 export const teacherTools = {
@@ -46,4 +52,10 @@ export const coordinatorTools = {
   changeParentEmail,
   upsertTeacherRemark,
   upsertStudentResult,
+  getStaffRegistrationOptions,
+  registerStaff,
+  updateUserPassword,
+  updateStaffStatus,
+  deleteStaff,
+  searchStaff,
 };

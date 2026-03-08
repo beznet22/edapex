@@ -1,9 +1,12 @@
 <script lang="ts">
   import { assignSubjects } from "$lib/api/assessment.remote.js";
+  import { signout, updatePassword } from "$lib/api/auth.remote.js";
   import ChatHeader from "$lib/components/chat-header.svelte";
   import Chat from "$lib/components/chat.svelte";
   import * as AlertDialog from "$lib/components/ui/alert-dialog";
   import * as Select from "$lib/components/ui/select";
+  import { Input } from "$lib/components/ui/input";
+  import { Button } from "$lib/components/ui/button";
   import { ChatContext } from "$lib/context/chat-context.svelte.js";
   import { UserContext } from "$lib/context/user-context.svelte.js";
   import { onMount } from "svelte";
@@ -16,6 +19,8 @@
   const { user, agents } = data;
   let open = $state(false);
   let value = $state<string | undefined>();
+  let newPassword = $state("");
+  let isUpdating = $state(false);
   let userContext = $derived(UserContext.fromContext());
   const selectedClass = SelectedClass.fromContext();
   const selectedAgent = SelectedAgent.fromContext();
@@ -34,19 +39,52 @@
     if (userContext.isTeacher && !userContext.assignedSection) open = true;
   });
 
+  const handleLogout = async () => {
+    isUpdating = true;
+    try {
+      await signout();
+      window.location.href = "/signin";
+    } finally {
+      isUpdating = false;
+    }
+  };
+
   const doAssign = async () => {
-    if (!chat.selectedClass) return;
-    const { classId, sectionId } = chat.selectedClass;
-    if (!classId || !sectionId || !user || !user.staffId) return;
-    const res = await assignSubjects({ classId, sectionId });
-    if ((!res.success && res.message) || !res.assigned) {
-      toast.error(res.message);
+    if (!chat.selectedClass) {
+      toast.error("Please select a class");
       return;
     }
 
-    userContext.students = res.assigned;
-    userContext.assignedSection = chat.selectedClass;
-    open = false;
+    isUpdating = true;
+    try {
+      if (newPassword) {
+        if (newPassword.length < 6) {
+          toast.error("Password must be at least 6 characters.");
+          return;
+        }
+        
+        const pwdRes = await updatePassword({ password: newPassword });
+        if (!pwdRes.success) {
+          toast.error(pwdRes.message);
+          return; // Stop if password update failed
+        }
+        toast.success("Password updated successfully.");
+      }
+
+      const { classId, sectionId } = chat.selectedClass;
+      if (!classId || !sectionId || !user || !user.staffId) return;
+      const res = await assignSubjects({ classId, sectionId });
+      if ((!res.success && res.message) || !res.assigned) {
+        toast.error(res.message);
+        return;
+      }
+
+      userContext.students = res.assigned;
+      userContext.assignedSection = chat.selectedClass;
+      open = false;
+    } finally {
+      isUpdating = false;
+    }
   };
 </script>
 
@@ -85,9 +123,25 @@
           </Select.Group>
         </Select.Content>
       </Select.Root>
-      <AlertDialog.Footer>
-        <AlertDialog.Cancel>Later</AlertDialog.Cancel>
-        <AlertDialog.Action onclick={doAssign}>Continue</AlertDialog.Action>
+      <div class="space-y-2 mt-4">
+        <label for="newPassword" class="text-sm font-medium">New Password (Optional)</label>
+        <Input 
+          id="newPassword" 
+          type="password" 
+          bind:value={newPassword} 
+          placeholder="Enter a new password" 
+          class="w-full"
+        />
+        {#if newPassword && newPassword.length < 6}
+          <p class="text-xs text-destructive">Password must be at least 6 characters</p>
+        {/if}
+      </div>
+
+      <AlertDialog.Footer class="mt-6 flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2 gap-2">
+        <Button variant="outline" onclick={handleLogout} disabled={isUpdating}>Log Out</Button>
+        <Button onclick={doAssign} disabled={isUpdating || (newPassword.length > 0 && newPassword.length < 6)}>
+          {isUpdating ? "Saving..." : "Continue"}
+        </Button>
       </AlertDialog.Footer>
     </div>
   </AlertDialog.Content>
