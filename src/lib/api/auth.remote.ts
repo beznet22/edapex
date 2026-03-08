@@ -1,6 +1,8 @@
 import { command, form, getRequestEvent, query } from "$app/server";
 import { authUserSchema, signupSchema } from "$lib/schema/auth";
 import { auth } from "$lib/server/service/auth.service";
+import { authRepo } from "$lib/server/repository";
+import { hashPwd } from "$lib/server/helpers/utils";
 import { redirect } from "@sveltejs/kit";
 
 export const signup = form(signupSchema, async (user) => {
@@ -17,6 +19,24 @@ export const signout = command(async () => {
   await auth.logout();
   return true;
 });
+
+export const updatePassword = command(
+  z.object({
+    password: z.string().min(6),
+  }),
+  async ({ password }) => {
+    const { locals } = getRequestEvent();
+    if (!locals.user) {
+      return { success: false, message: "User not authenticated" };
+    }
+    try {
+      await authRepo.updateUserPassword(locals.user.id, hashPwd(password));
+      return { success: true, message: "Password updated successfully" };
+    } catch (error) {
+      return { success: false, message: "Failed to update password" };
+    }
+  }
+);
 
 export const getUser = query(async () => {
   const { locals } = getRequestEvent();

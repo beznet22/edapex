@@ -21,6 +21,7 @@ import {
 import { BaseRepository } from "./base.repo";
 import type { Attendance } from "$lib/schema/result-input";
 import type { NewAttendance, StudentRecord } from "$lib/types/result-types";
+import { hashPwd } from "$lib/server/helpers/utils";
 
 export type StudentDetails = {
   studentId: number;
@@ -111,6 +112,25 @@ export class StudentRepository extends BaseRepository {
     const finalAdmissionNo = admissionNo ?? ((await this.getLastAdmissionNo()) + 1);
     const academicId = input.academicId ?? (await this.getAcademicId());
 
+    // Step 1: Check for email conflicts
+    if (email) {
+      const [existingStudentUser] = await this.db.select().from(users).where(eq(users.email, email)).limit(1);
+      if (existingStudentUser) {
+        throw new Error("USER_EXISTS");
+      }
+    }
+
+    if (guardiansEmail) {
+      const [existingParentUser] = await this.db.select().from(users).where(eq(users.email, guardiansEmail)).limit(1);
+      if (existingParentUser) {
+        throw new Error("USER_EXISTS");
+      }
+    }
+
+    // Generate temporary passwords
+    const studentPassword = Math.random().toString(36).slice(-8);
+    const parentPassword = Math.random().toString(36).slice(-8);
+
     // Step 2: Create a User for the student
     const [user] = await this.db
       .insert(users)
@@ -118,6 +138,7 @@ export class StudentRepository extends BaseRepository {
         fullName,
         email,
         phoneNumber: mobile,
+        password: hashPwd(studentPassword),
         usertype: "student",
         roleId,
         schoolId,
@@ -133,6 +154,7 @@ export class StudentRepository extends BaseRepository {
         fullName: guardiansName,
         email: guardiansEmail,
         phoneNumber: guardiansMobile,
+        password: hashPwd(parentPassword),
         usertype: "parent",
         roleId: 3, // parent role
         schoolId,
@@ -209,7 +231,11 @@ export class StudentRepository extends BaseRepository {
       .where(eq(smStudents.id, newStudent.id))
       .limit(1);
 
-    return createdStudent;
+    return {
+      ...createdStudent,
+      studentPassword,
+      parentPassword,
+    };
   }
 
   async getStudentBySiblings() {
@@ -670,6 +696,95 @@ export class StudentRepository extends BaseRepository {
       .limit(1);
 
     return lastAdmission?.admissionNo ?? 0;
+  }
+
+  async searchStudent(query: string) {
+    return this.withErrorHandling(async () => {
+      const searchPattern = `%${query}%`;
+      const students = await this.db
+        .select({
+          studentId: smStudents.id,
+          fullName: smStudents.fullName,
+          admissionNo: smStudents.admissionNo,
+          className: smClasses.className,
+          sectionName: smSections.sectionName,
+          activeStatus: smStudents.activeStatus,
+        })
+        .from(smStudents)
+        .leftJoin(studentRecords, eq(smStudents.id, studentRecords.studentId))
+        .leftJoin(smClasses, eq(studentRecords.classId, smClasses.id))
+        .leftJoin(smSections, eq(studentRecords.sectionId, smSections.id))
+        .where(
+          and(
+            like(smStudents.fullName, searchPattern),
+            eq(studentRecords.isDefault, 1) // Only show their active/default class
+          )
+        )
+        .limit(20);
+
+      return students;
+    }, "searchStudent");
+  }
+
+  async updateStudentStatus(params: { studentId: number; active: boolean }) {
+    return this.withErrorHandling(async () => {
+      const { studentId, active } = params;
+      const [student] = await this.db.select().from(smStudents).where(eq(smStudents.id, studentId)).limit(1);
+
+      if (!student) {
+        throw new Error("USER_NOT_FOUND");
+      }
+
+      const activeStatus = active ? 1 : 0;
+
+      // Update student table
+      await this.db.update(smStudents).set({ activeStatus }).where(eq(smStudents.id, studentId));
+      
+      // Update student_records table
+      await this.db.update(studentRecords).set({ activeStatus }).where(eq(studentRecords.studentId, studentId));
+
+      // Update user table only if userId exists
+      if (student.userId) {
+        await this.db.update(users).set({ activeStatus }).where(eq(users.id, student.userId));
+      }
+
+      return {
+        success: true,
+        studentId,
+        fullName: student.fullName,
+        active,
+      };
+    }, "updateStudentStatus");
+  }
+
+  async deleteStudent(params: { studentId: number }) {
+    return this.withErrorHandling(async () => {
+      const { studentId } = params;
+      const [student] = await this.db.select().from(smStudents).where(eq(smStudents.id, studentId)).limit(1);
+
+      if (!student) {
+        throw new Error("USER_NOT_FOUND");
+      }
+
+      // 1. Delete Student Records
+      await this.db.delete(studentRecords).where(eq(studentRecords.studentId, studentId));
+
+      // 2. Delete Student
+      await this.db.delete(smStudents).where(eq(smStudents.id, studentId));
+
+      // 3. Delete associated User account
+      if (student.userId) {
+        await this.db.delete(users).where(eq(users.id, student.userId));
+      }
+
+      // Note: We leave the smParents record intact, as they may have other children enrolled.
+      
+      return {
+        success: true,
+        studentId,
+        fullName: student.fullName,
+      };
+    }, "deleteStudent");
   }
 }
 

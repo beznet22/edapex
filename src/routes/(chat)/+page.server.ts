@@ -11,7 +11,7 @@ import type { PageServerLoad } from "./$types";
 export const load: PageServerLoad = async ({ url, locals }) => {
   const { user, session } = locals;
   if (!user || !session) {
-    return redirect(302, "/login");
+    return redirect(302, "/signin");
   }
 
   return {};
@@ -21,7 +21,7 @@ export const actions: Actions = {
   default: async ({ request, locals }) => {
     const { user, session } = locals;
     if (!user || !session) {
-      return redirect(302, "/login");
+      return redirect(302, "/signin");
     }
     const formData = await request.formData();
     const files = formData.getAll("files") as File[];
