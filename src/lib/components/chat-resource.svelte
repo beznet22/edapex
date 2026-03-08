@@ -141,7 +141,7 @@
                 >
                   <BrushCleaningIcon class="size-5" />
                 </Tooltip.Trigger>
-                <Tooltip.Content>Clear Resources</Tooltip.Content>
+                <Tooltip.Content portalProps={{ disabled: true }}>Clear Resources</Tooltip.Content>
               </Tooltip.Root>
             </Tooltip.Provider>
           {/if}
