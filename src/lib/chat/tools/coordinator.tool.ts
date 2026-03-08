@@ -1,14 +1,12 @@
 import { marksInputSchema } from "$lib/schema/result-input";
 import { resultOutputSchema, type Category } from "$lib/schema/result-output";
-import { resultRepo } from "$lib/server/repository/result.repo";
-import { studentRepo } from "$lib/server/repository/student.repo";
-import { staffRepo } from "$lib/server/repository/staff.repo";
+import { resultRepo, studentRepo, staffRepo, parentRepo } from "$lib/server/repository";
 import { assessment } from "$lib/server/service/assessment.service";
 
 import { CATEGORY } from "$lib/types/sms-types";
 import { tool, zodSchema, type InferToolInput, type InferToolOutput } from "ai";
 import { base64url } from "jose";
-import { parentRepo } from "$lib/server/repository/parent.repo";
+
 import { z } from "zod";
 
 export const validateClassResults = tool({

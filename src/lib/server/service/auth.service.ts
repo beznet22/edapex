@@ -1,5 +1,5 @@
 import crypto from "crypto";
-import { authRepo } from "$lib/server/repository/auth.repo";
+import { authRepo } from "$lib/server/repository";
 import { hashPwd, checkPwd } from "$lib/server/helpers/utils";
 import { cookies } from "$lib/server/helpers/cookie";
 import { jwt } from "$lib/server/helpers/jwt";

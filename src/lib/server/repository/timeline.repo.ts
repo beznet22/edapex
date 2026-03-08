@@ -7,7 +7,7 @@ import { BaseRepository } from "./base.repo";
 export type TimelineRow = typeof smStaffs.$inferSelect;
 export type TimelinePayload = typeof smStudentTimelines.$inferInsert;
 
-class TimelineRepository extends BaseRepository {
+export class TimelineRepository extends BaseRepository {
   // CRUD
   async createTimeline(payload: TimelinePayload) {
     return this.withErrorHandling(async () => {
@@ -107,4 +107,4 @@ class TimelineRepository extends BaseRepository {
 }
 
 // ✅ Singleton export — the only one you need
-export const timelineRepo = await TimelineRepository.build();
+// export const timelineRepo = await TimelineRepository.build();

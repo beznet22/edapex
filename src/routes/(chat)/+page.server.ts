@@ -1,8 +1,7 @@
 import { fileSchema } from "$lib/schema/chat-schema";
 import { resultInputSchema } from "$lib/schema/result-input";
 import { generateContent } from "$lib/server/helpers/chat-helper";
-import { resultRepo } from "$lib/server/repository/result.repo";
-import { staffRepo } from "$lib/server/repository/staff.repo";
+import { resultRepo, staffRepo } from "$lib/server/repository";
 import { assessment } from "$lib/server/service/assessment.service";
 import { put } from "$lib/utils/fs-blob";
 import { redirect, type Actions } from "@sveltejs/kit";

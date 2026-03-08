@@ -674,4 +674,4 @@ export class StudentRepository extends BaseRepository {
 }
 
 // ✅ Singleton export — the only one you need
-export const studentRepo = await StudentRepository.build();
+// export const studentRepo = await StudentRepository.build();

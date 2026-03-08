@@ -75,7 +75,7 @@ export const studentDataSchema = z.object({
   if (data.admissionNo) {
     let studentRepo;
     if (typeof window === "undefined") {
-      const mod = await import("$lib/server/repository/student.repo");
+      const mod = await import("$lib/server/repository");
       studentRepo = mod.studentRepo;
     } else {
       // Running on the client: bypass server-side repo check

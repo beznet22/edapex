@@ -273,4 +273,4 @@ export class ChatRepository extends BaseRepository {
   }
 }
 
-export const chat = await ChatRepository.build();
+// export const chat = await ChatRepository.build();

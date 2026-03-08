@@ -7,7 +7,7 @@ import {
   teacherRemarkSchema,
 } from "$lib/schema/result-input";
 import { assessment } from "$lib/server/service/assessment.service";
-import { studentRepo } from "$lib/server/repository/student.repo";
+import { studentRepo } from "$lib/server/repository";
 import { resultOutputSchema } from "$lib/schema/result-output";
 import { studentFileStorage } from "$lib/server/storage/student-files";
 

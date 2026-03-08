@@ -157,4 +157,4 @@ export class ParentRepository extends BaseRepository {
 }
 
 // ✅ Singleton export — the only one you need
-export const parentRepo = await ParentRepository.build();
+// export const parentRepo = await ParentRepository.build();

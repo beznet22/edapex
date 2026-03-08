@@ -17,20 +17,19 @@ import {
   type School,
   type Student,
 } from "$lib/schema/result-output";
-import { repo } from "$lib/server/repository";
-import { studentRepo } from "$lib/server/repository/student.repo";
+import { repo, studentRepo, resultRepo, timelineRepo, staffRepo } from "$lib/server/repository";
 import type { ClassAverage, ExamSetup, MarkData, ResultData, ScoreData } from "$lib/types/result-types";
 import { base64url } from "jose";
 import { render } from "svelte/server";
 import { ensureBase64Image, pageToHtml } from "../helpers";
 import { generate } from "../helpers/pdf-generator";
-import { resultRepo } from "../repository/result.repo";
+
 import type { NewExamSetup } from "$lib/types/result-types";
-import { timelineRepo } from "../repository/timeline.repo";
+
 import ResultTemplate from "$lib/components/template/ResultTemplate.svelte";
 import ResultEmail from "$lib/components/template/result-email.svelte";
 import { JobWorker, type JobPayload, type JobResult } from "../worker";
-import { staffRepo } from "../repository/staff.repo";
+
 import { generateContent } from "../helpers/chat-helper";
 import { studentFileStorage } from "../storage/student-files";
 import path from "path";
