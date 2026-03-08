@@ -7,14 +7,15 @@
   let {
     pending,
     success,
+    class: className,
     children,
-  }: { pending: boolean; success: boolean; children: Snippet } = $props();
+  }: { pending: boolean; success: boolean; class?: string; children: Snippet } = $props();
 </script>
 
 <Button
   type={pending ? "button" : "submit"}
   disabled={pending || success}
-  class="relative w-full overflow-hidden transition-all duration-300"
+  class={cn("relative w-full overflow-hidden transition-all duration-300", className)}
 >
   <div class={cn(
     "flex items-center justify-center gap-2 transition-all duration-300",
