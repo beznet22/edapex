@@ -155,4 +155,4 @@ export class AuthRepository extends BaseRepository {
   }
 }
 
-export const authRepo = await AuthRepository.build();
+// export const authRepo = await AuthRepository.build();

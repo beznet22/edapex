@@ -1,8 +1,6 @@
 import { STATIC_DIR, EXTRACTED_DIR } from "$lib/constants";
 import { fileSchema } from "$lib/schema/chat-schema";
-import { resultRepo } from "$lib/server/repository/result.repo";
-import { staffRepo } from "$lib/server/repository/staff.repo";
-import { studentRepo } from "$lib/server/repository/student.repo";
+import { resultRepo, staffRepo, studentRepo } from "$lib/server/repository";
 import { assessment } from "$lib/server/service/assessment.service";
 import { studentFileStorage } from "$lib/server/storage/student-files";
 import type { RequestHandler } from "@sveltejs/kit";

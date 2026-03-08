@@ -1,6 +1,5 @@
 import { json, type RequestHandler } from "@sveltejs/kit";
-import { jobRepo } from "$lib/server/repository";
-import { studentRepo } from "$lib/server/repository/student.repo";
+import { resultRepo, studentRepo } from "$lib/server/repository";
 import { assessment } from "$lib/server/service/assessment.service";
 import { generateContent } from "$lib/server/helpers/chat-helper";
 import { resultInputSchema } from "$lib/schema/result-input";

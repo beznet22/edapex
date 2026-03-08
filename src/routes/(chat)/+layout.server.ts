@@ -4,13 +4,14 @@ import { error, redirect } from "@sveltejs/kit";
 import type { LayoutServerLoad } from "./$types";
 import { allowAnonymousChats, STORAGE_DIR, UPLOADS_DIR } from "$lib/constants";
 import { AgentService } from "$lib/server/service/agent.service";
-import { studentRepo, type ClassStudent } from "$lib/server/repository/student.repo";
+import { studentRepo } from "$lib/server/repository";
+import type { ClassStudent } from "$lib/server/repository/student.repo";
 import { readdir, stat } from "fs/promises";
 import { join } from "path";
 import type { UploadedData } from "$lib/types/chat-types";
 import { existsSync, rm, rmdirSync, type Dirent } from "fs";
 import type { ClassSection } from "$lib/types/result-types";
-import { resultRepo } from "$lib/server/repository/result.repo";
+import { resultRepo } from "$lib/server/repository";
 import { DESIGNATIONS, type Designation } from "$lib/types/sms-types";
 import { generateId } from "ai";
 

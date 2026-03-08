@@ -31,8 +31,7 @@ export class StudentFileStorage {
     async loadByStudent(classId: number, sectionId: number, studentId: number, examId: number): Promise<ExtractedAssessment | null> {
         // Since we now store by name, we need to find the student first to get their name
         // This is a bit backwards but keeps the human-readable FS structure
-        const { studentRepo } = await import("$lib/server/repository/student.repo");
-        const { resultRepo } = await import("$lib/server/repository/result.repo");
+        const { studentRepo, resultRepo } = await import("$lib/server/repository");
 
         const student = await studentRepo.getStudentById(studentId);
         if (!student) return null;
@@ -47,8 +46,7 @@ export class StudentFileStorage {
 
     async findLatestByStudent(classId: number, sectionId: number, studentId: number): Promise<ExtractedAssessment | null> {
         // Similar to loadByStudent but for latest
-        const { studentRepo } = await import("$lib/server/repository/student.repo");
-        const { resultRepo } = await import("$lib/server/repository/result.repo");
+        const { studentRepo, resultRepo } = await import("$lib/server/repository");
 
         const student = await studentRepo.getStudentById(studentId);
         if (!student) return null;

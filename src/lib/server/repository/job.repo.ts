@@ -13,7 +13,7 @@ export type ClaimedJob = {
   createdAt: number;
 };
 
-class JobRepository extends BaseRepository {
+export class JobRepository extends BaseRepository {
   async enqueueJob(queue: string, payloadObj: unknown, delaySeconds = 0) {
     // Enqueue a new job with optional delay (seconds)
     const payload = typeof payloadObj === "string" ? payloadObj : JSON.stringify(payloadObj);
@@ -158,4 +158,4 @@ class JobRepository extends BaseRepository {
     return row || null;
   }
 }
-export const jobRepo = await JobRepository.build();
+// export const jobRepo = await JobRepository.build();

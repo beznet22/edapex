@@ -220,4 +220,4 @@ export class BaseRepository {
   }
 }
 
-export const base = await BaseRepository.build();
+// export const base = await BaseRepository.build();

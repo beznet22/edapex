@@ -7,10 +7,8 @@ import { error, json, type RequestHandler } from "@sveltejs/kit";
 import { readFileSync } from "fs";
 import { render } from "svelte/server";
 import ResultTemplate from "$lib/components/template/ResultTemplate.svelte";
-import { staffRepo } from "$lib/server/repository/staff.repo";
-import { studentRepo } from "$lib/server/repository/student.repo";
-import { resultRepo } from "$lib/server/repository/result.repo";
-import { id } from "zod/v4/locales";
+import { staffRepo, studentRepo, resultRepo } from "$lib/server/repository";
+
 
 export const GET: RequestHandler = async () => {
   try {
