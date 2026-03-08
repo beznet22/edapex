@@ -20,6 +20,8 @@
     import Search from "@lucide/svelte/icons/search";
     import LayoutGrid from "@lucide/svelte/icons/layout-grid";
     import * as Sheet from "$lib/components/ui/sheet";
+    import { Drawer } from "vaul-svelte";
+    import { IsMobile } from "$lib/hooks/is-mobile.svelte.js";
     import { useFilestore } from "$lib/context/filestore.svelte";
     import { type UploadedData, getAssessmentStatusDescription } from "$lib/types/chat-types";
     import { AttributeRemark } from "$lib/constants/assessment";
@@ -29,6 +31,7 @@
     let { open = $bindable(false), file = null } = $props();
 
     const store = useFilestore();
+    const isMobile = new IsMobile();
 
     // Sync prop with store
     $effect(() => {
@@ -109,62 +112,41 @@
     };
 </script>
 
-{#snippet header()}
-    <!-- Mobile Header -->
-    <div class="sm:hidden flex items-center justify-between py-2 w-full">
-        <div class="flex items-center gap-3">
-            <Button
-                variant="ghost"
-                size="icon"
-                class="h-10 w-10 rounded-2xl"
-                onclick={() => (store.drawerOpen = true)}
-                aria-label="Select assessment"
-            >
-                <LayoutGrid class="h-5 w-5" />
-            </Button>
-            <div class="min-w-0">
-                <h3 class="text-[10px] font-black uppercase tracking-widest text-foreground/80">
-                    Assessment
-                </h3>
-                <p class="text-[9px] font-bold text-muted-foreground uppercase opacity-60 truncate max-w-[120px]">
-                    {store.selectedFile?.filename}
-                </p>
-            </div>
-        </div>
-    </div>
+{#snippet prefix()}
+    <Button
+        variant="ghost"
+        size="icon"
+        class="h-10 w-10 rounded-2xl hover:bg-primary/10"
+        onclick={() => (store.drawerOpen = true)}
+        aria-label="Select assessment"
+    >
+        <LayoutGrid class="h-5 w-5" />
+    </Button>
+{/snippet}
 
-    <!-- Desktop Header -->
-    <div class="hidden sm:flex items-center justify-between py-2 grow shrink-0">
-        <div class="flex items-center gap-6">
-            <div class="flex items-center gap-2">
-                <div class="w-2 h-2 bg-primary rounded-full shadow-[0_0_10px_rgba(var(--primary),0.5)]"></div>
-                <span class="text-[10px] font-black uppercase tracking-[0.2em]">
-                    {store.selectedFile?.filename}
-                </span>
-            </div>
-            <div class="h-4 w-px bg-border/50"></div>
-            <span class="text-[10px] bg-primary/10 text-primary px-3 py-1 rounded-full font-black tabular-nums">
-                {store.currentIndex + 1} / {store.images.length}
-            </span>
-        </div>
-        <div class="flex items-center gap-2">
+{#snippet extra()}
+    <div class="flex items-center gap-4">
+        <span class="text-[9px] bg-primary/10 text-primary px-3 py-1.5 rounded-full font-black tabular-nums tracking-widest">
+            {store.currentIndex + 1} / {store.images.length}
+        </span>
+        <div class="hidden sm:flex items-center gap-1">
             <Button
                 variant="ghost"
                 size="icon"
-                class="h-10 w-10 rounded-2xl hover:bg-primary/10"
+                class="h-9 w-9 rounded-xl hover:bg-primary/10"
                 onclick={store.handlePrev}
                 disabled={store.currentIndex === 0}
             >
-                <ChevronLeft class="h-5 w-5" />
+                <ChevronLeft class="h-4 w-4" />
             </Button>
             <Button
                 variant="ghost"
                 size="icon"
-                class="h-10 w-10 rounded-2xl hover:bg-primary/10"
+                class="h-9 w-9 rounded-xl hover:bg-primary/10"
                 onclick={store.handleNext}
                 disabled={store.currentIndex === store.images.length - 1}
             >
-                <ChevronRight class="h-5 w-5" />
+                <ChevronRight class="h-4 w-4" />
             </Button>
         </div>
     </div>
@@ -214,58 +196,19 @@
 
 <ResponsiveSheet
     bind:open={store.viewModalOpen}
-    class="sm:max-w-[95vw] lg:max-w-[90vw]"
+    class={store.activeTab === "viewer" ? "sm:max-w-[85vw]" : "sm:max-w-[30vw]"}
     contentClass="p-0"
-    {header}
+    title="Assessment"
+    description={store.selectedFile?.filename}
+    {prefix}
+    {extra}
     {footer}
 >
-    <!-- Main Content Area -->
-    <div class="flex-1 flex flex-col sm:flex-row overflow-hidden h-full">
-        <!-- LEFT PANE: Desktop Thumbnails -->
-        <div class="hidden sm:flex w-20 lg:w-60 border-r bg-muted/5 flex-col h-full overflow-hidden shrink-0 transition-all duration-300">
-            <ScrollArea class="flex-1 p-2 lg:p-3">
-                <div class="space-y-3 lg:space-y-4">
-                    {#each store.images as img}
-                        <div
-                            class="group relative rounded-2xl overflow-hidden cursor-pointer transition-all border-2
-                                   {img.id === store.selectedFile?.id
-                                ? 'border-primary shadow-[0_0_20px_rgba(var(--primary),0.2)] scale-[1.02]'
-                                : 'border-transparent hover:border-primary/30'}"
-                            onclick={() => store.handleView(img)}
-                            onkeydown={(e) => e.key === "Enter" && store.handleView(img)}
-                            role="button"
-                            tabindex="0"
-                        >
-                            <div class="aspect-4/5 bg-muted relative">
-                                <img
-                                    src={img.url}
-                                    alt={img.filename}
-                                    class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                                />
-                                {#if ["extracted", "approved", "published"].includes(img.status)}
-                                    <div class="absolute top-2 right-2">
-                                        <div class="bg-emerald-500 rounded-full p-1 shadow-lg border-2 border-white dark:border-black">
-                                            <Check class="w-2.5 h-2.5 text-white" />
-                                        </div>
-                                    </div>
-                                {/if}
-                            </div>
-                            <div class="p-3 bg-background/50 backdrop-blur-md hidden lg:block">
-                                <p class="text-[9px] font-black truncate uppercase tracking-tight">
-                                    {img.filename}
-                                </p>
-                            </div>
-                        </div>
-                    {/each}
-                </div>
-            </ScrollArea>
-        </div>
-
-        <!-- CENTER AREA: Tab-based Viewer & Data Panes -->
-        <div class="flex-1 flex flex-col overflow-hidden min-w-0">
+    <!-- Main Content Area: Simplified Single Column Layout -->
+    <div class="flex-1 flex flex-col min-w-0">
             <!-- Viewer Pane -->
-            <div class="flex-1 relative overflow-hidden flex-col {store.activeTab === 'viewer' ? 'flex' : 'hidden'}">
-                <div class="flex-1 relative flex flex-col bg-neutral-950 sm:bg-transparent overflow-hidden">
+            <div class="flex-1 relative sm:overflow-hidden flex-col {store.activeTab === 'viewer' ? 'flex' : 'hidden'}">
+                <div class="flex-1 relative flex flex-col bg-neutral-950 sm:bg-transparent sm:overflow-hidden">
                     <!-- Viewer Toolbar -->
                     <div class="absolute top-6 left-1/2 -translate-x-1/2 flex items-center gap-1.5 px-4 py-2 bg-background/20 backdrop-blur-2xl rounded-2xl border border-white/10 z-20 shadow-2xl">
                         <Button
@@ -317,13 +260,13 @@
                     >
                         {#if store.selectedFile?.url}
                             <div
-                                class="relative transition-transform duration-75 ease-out shadow-[0_0_100px_rgba(0,0,0,0.3)] origin-center"
+                                class="relative transition-transform duration-75 ease-out shadow-[0_0_100px_rgba(0,0,0,0.3)] origin-center cursor-grab active:cursor-grabbing"
                                 style="transform: translate({panX}px, {panY}px) scale({store.zoom}) rotate({store.rotation}deg);"
                             >
                                 <img
                                     src={store.selectedFile.url}
                                     alt={store.selectedFile.filename}
-                                    class="max-w-[85vw] max-h-[70vh] sm:max-w-[40vw] lg:max-w-[50vw] sm:max-h-[80vh] object-contain bg-white rounded-xl shadow-2xl"
+                                    class="max-w-[85vw] max-h-[70vh] sm:max-w-full sm:max-h-[60vh] object-contain bg-white rounded-2xl shadow-2xl transition-all duration-300"
                                     draggable="false"
                                 />
                                 {#if store.showGrids}
@@ -368,7 +311,7 @@
 
             <!-- Data Panes -->
             <div class="flex-1 min-h-0 w-full bg-background flex-col {['results', 'json'].includes(store.activeTab) ? 'flex' : 'hidden'}">
-                <div class="flex-1 overflow-y-auto overscroll-contain touch-pan-y scrollbar-hide">
+                <div data-vaul-no-drag class="flex-1">
                     {#if store.activeTab === "json"}
                         <div class="p-8 font-mono text-[10px] whitespace-pre-wrap break-all text-muted-foreground/80 leading-relaxed">
                             {JSON.stringify(store.extractedData, null, 2)}
@@ -632,51 +575,105 @@
                 </div>
             </div>
         </div>
-    </div>
-</ResponsiveSheet>
 
-<!-- Mobile Selection Drawer (Moved from old logic, simplified) -->
-<Sheet.Root bind:open={store.drawerOpen}>
-    <Sheet.Content side="bottom" class="h-[80vh] rounded-t-[2.5rem] p-0 overflow-hidden border-none bg-background/95 backdrop-blur-3xl">
-        <div class="px-8 py-6 border-b flex items-center justify-between bg-muted/10">
-            <h3 class="text-xs font-black uppercase tracking-[0.3em] text-foreground/60">Select Assessment</h3>
-            <Sheet.Title class="hidden">Assessments</Sheet.Title>
-            <Button variant="ghost" size="icon" class="h-10 w-10 rounded-2xl" onclick={() => (store.drawerOpen = false)}>
-                <X class="h-5 w-5" />
-            </Button>
-        </div>
-        <ScrollArea class="h-full p-6 pb-20">
-            <div class="grid grid-cols-2 gap-4 pb-20">
-                {#each store.images as img}
-                    <div
-                        class="group relative rounded-2xl overflow-hidden cursor-pointer transition-all border-2
-                               {img.id === store.selectedFile?.id
-                            ? 'border-primary shadow-lg scale-95'
-                            : 'border-transparent active:scale-95'}"
-                        onclick={() => { store.handleView(img); store.drawerOpen = false; }}
-                        onkeydown={(e) => e.key === "Enter" && (store.handleView(img), (store.drawerOpen = false))}
-                        role="button"
-                        tabindex="0"
-                    >
-                        <div class="aspect-4/5 bg-muted relative">
-                            <img src={img.url} alt={img.filename} class="w-full h-full object-cover" />
-                            {#if ["extracted", "approved", "published"].includes(img.status)}
-                                <div class="absolute top-2 right-2">
-                                    <div class="bg-emerald-500 rounded-full p-1 shadow-lg border-2 border-white">
-                                        <Check class="w-2.5 h-2.5 text-white" />
+    <!-- Mobile Selection Drawer (Nested inside ResponsiveSheet to share context/portal) -->
+    {#if isMobile.current}
+        <Drawer.NestedRoot bind:open={store.drawerOpen}>
+            <Drawer.Portal>
+                <Drawer.Overlay class="fixed inset-0 z-50 bg-black/50 backdrop-blur-md" />
+                <Drawer.Content class="fixed bottom-0 left-0 right-0 z-50 h-[80vh] rounded-t-[2.5rem] p-0 overflow-hidden border-none bg-background/95 backdrop-blur-3xl focus:outline-none">
+                    <div class="mx-auto mt-4 h-1.5 w-12 shrink-0 rounded-full bg-muted/40"></div>
+                    <div class="px-8 py-6 border-b flex items-center justify-between bg-muted/10">
+                        <h3 class="text-xs font-black uppercase tracking-[0.3em] text-foreground/60">Select Assessment</h3>
+                        <div class="hidden">Assessments</div>
+                        <Button variant="ghost" size="icon" class="h-10 w-10 rounded-2xl" onclick={() => (store.drawerOpen = false)}>
+                            <X class="h-5 w-5" />
+                        </Button>
+                    </div>
+                    <ScrollArea data-vaul-no-drag class="h-full p-6 pb-20">
+                        <div class="grid grid-cols-2 gap-4 pb-20">
+                            {#each store.images as img}
+                                <div
+                                    class="group relative rounded-2xl overflow-hidden cursor-pointer transition-all border-2
+                                           {img.id === store.selectedFile?.id
+                                        ? 'border-primary shadow-lg scale-95'
+                                        : 'border-transparent active:scale-95'}"
+                                    onclick={(e) => { e.stopPropagation(); store.handleView(img); store.drawerOpen = false; }}
+                                    onkeydown={(e) => e.key === "Enter" && (e.stopPropagation(), store.handleView(img), (store.drawerOpen = false))}
+                                    role="button"
+                                    tabindex="0"
+                                >
+                                    <div class="aspect-4/5 bg-muted relative">
+                                        <img src={img.url} alt={img.filename} class="w-full h-full object-cover" />
+                                        {#if ["extracted", "approved", "published"].includes(img.status)}
+                                            <div class="absolute top-2 right-2">
+                                                <div class="bg-emerald-500 rounded-full p-1 shadow-lg border-2 border-white">
+                                                    <Check class="w-2.5 h-2.5 text-white" />
+                                                </div>
+                                            </div>
+                                        {/if}
+                                    </div>
+                                    <div class="p-3 bg-secondary/50 backdrop-blur-sm">
+                                        <p class="text-[9px] font-black truncate uppercase tracking-tight">{img.filename}</p>
                                     </div>
                                 </div>
-                            {/if}
+                            {/each}
                         </div>
-                        <div class="p-3 bg-secondary/50 backdrop-blur-sm">
-                            <p class="text-[9px] font-black truncate uppercase tracking-tight">{img.filename}</p>
-                        </div>
+                    </ScrollArea>
+                </Drawer.Content>
+            </Drawer.Portal>
+        </Drawer.NestedRoot>
+    {:else}
+        <Sheet.Root bind:open={store.drawerOpen}>
+            <Sheet.Content
+                side="right"
+                class="flex h-full flex-col bg-background/95 p-0 backdrop-blur-3xl border-l border-white/5 sm:max-w-[25vw] z-100"
+            >
+                <div class="px-8 py-6 border-b flex items-center justify-between bg-muted/10">
+                    <h3 class="text-xs font-black uppercase tracking-[0.3em] text-foreground/60">Select Assessment</h3>
+                    <Sheet.Title class="hidden">Assessments</Sheet.Title>
+                    <Button variant="ghost" size="icon" class="h-10 w-10 rounded-2xl" onclick={() => (store.drawerOpen = false)}>
+                        <X class="h-5 w-5" />
+                    </Button>
+                </div>
+                <ScrollArea data-vaul-no-drag class="h-full p-6 pb-20 custom-scrollbar">
+                    <div class="grid grid-cols-1 gap-4 pb-20">
+                        {#each store.images as img}
+                            <div
+                                class="group relative rounded-2xl overflow-hidden cursor-pointer transition-all border-2
+                                       {img.id === store.selectedFile?.id
+                                    ? 'border-primary shadow-[0_0_20px_rgba(var(--primary),0.2)] scale-[1.02]'
+                                    : 'border-transparent hover:border-primary/30'}"
+                                onclick={(e) => {
+                                    e.stopPropagation();
+                                    store.handleView(img);
+                                    store.drawerOpen = false;
+                                }}
+                                onkeydown={(e) => e.key === "Enter" && (e.stopPropagation(), store.handleView(img), (store.drawerOpen = false))}
+                                role="button"
+                                tabindex="0"
+                            >
+                                <div class="aspect-4/5 bg-muted relative">
+                                    <img src={img.url} alt={img.filename} class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+                                    {#if ["extracted", "approved", "published"].includes(img.status)}
+                                        <div class="absolute top-2 right-2">
+                                            <div class="bg-emerald-500 rounded-full p-1 shadow-lg border-2 border-white dark:border-black">
+                                                <Check class="w-2.5 h-2.5 text-white" />
+                                            </div>
+                                        </div>
+                                    {/if}
+                                </div>
+                                <div class="p-3 bg-background/50 backdrop-blur-md">
+                                    <p class="text-[9px] font-black truncate uppercase tracking-tight">{img.filename}</p>
+                                </div>
+                            </div>
+                        {/each}
                     </div>
-                {/each}
-            </div>
-        </ScrollArea>
-    </Sheet.Content>
-</Sheet.Root>
+                </ScrollArea>
+            </Sheet.Content>
+        </Sheet.Root>
+    {/if}
+</ResponsiveSheet>
 
 <style>
     :global(.scrollbar-hide::-webkit-scrollbar) {

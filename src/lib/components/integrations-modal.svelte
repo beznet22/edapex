@@ -16,12 +16,11 @@
     import Plug from "@lucide/svelte/icons/plug";
     import { page } from "$app/state";
     import ResponsiveSheet from "$lib/components/shared/responsive-sheet.svelte";
+    import Settings from "@lucide/svelte/icons/settings";
+    import FolderIcon from "@lucide/svelte/icons/folder";
 
     let open = $state(false);
 
-    $effect(() => {
-        open = !!page.state.showModal;
-    });
 
     function onOpenChange(isOpen: boolean) {
         if (!isOpen && page.state.showModal) {
@@ -55,11 +54,18 @@
     }
 </script>
 
+{#snippet prefix()}
+    <div class="p-2.5 rounded-2xl bg-primary/10 border border-primary/20">
+        <Plug class="size-4 text-primary" />
+    </div>
+{/snippet}
+
 <ResponsiveSheet
     bind:open
     {onOpenChange}
     title="Integrations"
     description="Connect external AI providers to enhance your chat experience."
+    {prefix}
 >
     <div class="grid grid-cols-1 gap-4 py-4">
         {#each chatProviders as provider}

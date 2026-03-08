@@ -89,46 +89,31 @@
   };
 </script>
 
-{#snippet resourceHeader()}
-  <div class="flex items-center justify-between w-full">
-    <div class="space-y-1">
-      <h2 class="text-sm font-black uppercase tracking-widest text-primary">
-        Resources
-      </h2>
-      <p class="text-[10px] font-medium text-muted-foreground/60">
-        View and manage your uploaded resources.
-      </p>
+{#snippet prefix()}
+    <div class="p-2.5 rounded-2xl bg-primary/10 border border-primary/20">
+        <FolderIcon class="size-4 text-primary" />
     </div>
-    <div class="flex items-center gap-2">
-      <Button
+{/snippet}
+
+{#snippet extra()}
+    <Button
         variant="outline"
         size="sm"
         onclick={openManageFiles}
         class="gap-2 rounded-xl text-[10px] font-black uppercase tracking-widest bg-background/50 border-border/50"
-      >
+    >
         <FolderIcon class="size-3.5" />
         Manage Files
-      </Button>
-    </div>
-  </div>
-{/snippet}
-
-{#snippet previewHeader()}
-  <div class="flex items-center justify-between w-full py-2">
-    <div class="px-4 py-2 rounded-full bg-primary/10 border border-primary/20">
-      <h2
-        class="text-[10px] font-black text-primary tracking-widest uppercase truncate max-w-[200px]"
-      >
-        {selectedUpload?.filename || "Preview"}
-      </h2>
-    </div>
-  </div>
+    </Button>
 {/snippet}
 
 <ResponsiveSheet
   bind:open={fileCtx.openResourceModal}
-  class="sm:max-w-4xl"
-  header={resourceHeader}
+  class="sm:max-w-[30vw]"
+  title="Resources"
+  description="View and manage your uploaded resources."
+  {prefix}
+  {extra}
   contentClass="p-0"
 >
   <div class="flex-1 overflow-auto px-6 pb-6 pt-2 h-full">
@@ -244,8 +229,9 @@
 {#if selectedUpload}
   <ResponsiveSheet
     bind:open={previewOpen}
-    class="sm:max-w-2xl"
-    header={previewHeader}
+    class="sm:max-w-[85vw]"
+    title="Document Preview"
+    description={selectedUpload?.filename}
     contentClass="p-0 bg-neutral-950/20"
     onOpenChange={onPreviewOpenChange}
   >

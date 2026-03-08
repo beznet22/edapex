@@ -110,7 +110,7 @@
           <Select.Trigger class="w-full h-11 bg-muted/20 border-border/50 rounded-2xl text-xs font-bold px-4">
             {student?.name || "Select a student"}
           </Select.Trigger>
-          <Select.Content class="rounded-2xl shadow-2xl border-border/50">
+          <Select.Content portalProps={{ disabled: true }} class="rounded-2xl shadow-2xl border-border/50">
             <Select.Group>
               <Select.Label class="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60 px-4 py-2">Students</Select.Label>
               {#each userCtx.students as student (student.id)}
@@ -134,16 +134,31 @@
   </div>
 {/snippet}
 
+{#snippet extra()}
+  {#if files.length > 0}
+    <Button
+      variant="ghost"
+      size="sm"
+      onclick={() => filesContext.clear()}
+      class="h-8 px-3 rounded-xl text-[10px] font-black uppercase tracking-widest text-destructive hover:text-destructive hover:bg-destructive/10"
+    >
+      Clear All
+    </Button>
+  {/if}
+{/snippet}
+
 <ResponsiveSheet
   bind:open={filesContext.openModal}
-  onOpenChange={(open) => {
-    if (!open) {
+  onOpenChange={(isOpen: boolean) => {
+    if (!isOpen) {
       previewUrls.forEach((url) => URL.revokeObjectURL(url));
       previewUrls.clear();
     }
   }}
-  header={header}
-  class="sm:max-w-md"
+  title="Add Resource"
+  description="Upload files to your current context."
+  {extra}
+  class="sm:max-w-[30vw]"
   contentClass="p-0 border-t sm:border-t-0"
 >
   <div class="flex flex-col h-full overflow-hidden">
