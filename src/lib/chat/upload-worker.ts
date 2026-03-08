@@ -66,12 +66,18 @@ self.onmessage = async function (e) {
     });
 
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      let errMsg = `HTTP error! status: ${response.status}`;
+      try {
+        const errData = await response.json();
+        if (errData.message) errMsg = errData.message;
+        else if (errData.error) errMsg = errData.error;
+      } catch (e) {}
+      throw new Error(errMsg);
     }
 
-    const { data, status, filename: name, success, error } = await response.json();
+    const { data, status, filename: name, success, error, url, token } = await response.json();
     if (!success) {
-      throw new Error(`Upload failed: ${error}`);
+      throw new Error(error || "Upload failed");
     }
 
     const result: UploadedData = {
@@ -81,6 +87,9 @@ self.onmessage = async function (e) {
       status,
       data,
       originalName,
+      error,
+      url,
+      token,
     };
 
     self.postMessage(result);

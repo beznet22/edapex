@@ -108,7 +108,7 @@ export class FilesContext {
   ) => {
     for (const file of files) {
       const fileId = generateId(); // Unique ID per file (not per batch)
-      const filename = studentData?.studentName ? `${studentData.studentName}.jpg` : file.name;
+      const filename = studentData?.studentName || file.name;
       
       const upload: UploadedData = {
         id: fileId,
@@ -116,20 +116,35 @@ export class FilesContext {
         originalName: file.name,
         status: "uploading",
         success: false,
+        url: URL.createObjectURL(file), // Generate local preview URL
+        type: file.type, // Pass type so UI correctly renders the thumbnail
+        data: studentData?.studentName ? { fullName: studentData.studentName } : undefined
       };
 
-      // If a file with this name already exists and it's not currently uploading, replace it
-      const existingIdx = this.uploads.findIndex(u => u.filename === filename);
+      // Find an existing UI element using a reliable identifier (evaluate student.name or filename)
+      const existingIdx = this.uploads.findIndex(u => {
+        if (studentData?.studentName) {
+           return u.filename === `${studentData.studentName}.jpg` || 
+                  u.filename === studentData.studentName || 
+                  (u.data && (u.data as any).fullName === studentData.studentName);
+        }
+        return u.filename === filename || u.originalName === file.name;
+      });
+
       if (existingIdx !== -1) {
+         // Preserve existing ID to maintain UI reactivity and prevent orphaned components
+         upload.id = this.uploads[existingIdx].id;
          this.uploads[existingIdx] = upload;
       } else {
          this.uploads = [...this.uploads, upload];
       }
 
-      const worker = this.#initWoeker(fileId, upload.filename);
+      // Important: Use upload.id here as it might have been reassigned to the existing ID
+      const activeId = upload.id;
+      const worker = this.#initWoeker(activeId, upload.filename);
       const { classId, sectionId, className, sectionName } = this.selectedClass || {};
       worker.postMessage({
-        fileId,
+        fileId: activeId,
         file,
         classId,
         sectionId,
@@ -214,29 +229,35 @@ export class FilesContext {
   #initWoeker = (fileId: string, name: string) => {
     const worker = new UploadWorker({ name: `upload-worker-${generateId()}` });
     worker.onmessage = ({ data }: MessageEvent<UploadedData>) => {
+      // Always update the upload state to ensure UI stops the loading spinner
+      // We explicitly map only the new fields so that we don't destructively overwrite
+      // optimistic properties like filename, data, and url if the worker returns an error or empty
+      this.uploads = this.uploads.map((u) =>
+        u.id === fileId ? { 
+          ...u, 
+          status: data.status,
+          success: data.success,
+          error: data.error,
+          filename: data.filename || u.filename,
+          url: data.url || u.url,
+          data: data.data || u.data,
+          originalName: data.originalName || u.originalName,
+          token: data.token || u.token
+        } : u
+      );
+
       if (!data.success) {
-        const existing = this.uploads.find((u) => u.id === fileId);
-        if (existing) {
-          this.updateUpload({ ...existing, status: "error", success: false, error: data.error });
-        }
-        // Don't remove from this.files, just show error in UI
-        console.log(`Upload failed: `, data.error);
-        toast.error(data.error!);
+        // If HTTP request failed or pure error from worker
+        toast.error(data.error || "Upload failed");
         return;
       }
 
-      // Update only this specific file's status
-      this.uploads = this.uploads.map((u) =>
-        u.id === fileId ? { ...u, ...data, success: true, status: data.status } : u
-      );
-
-      if (data.status === "uploaded") {
-        toast.error("File saved retry extraction");
-      }
-
-      if (["extracted", "approved", "published"].includes(data.status)) {
+      if (data.status === "error") {
+        toast.error(data.error || "Failed to extract file. File saved, pending extraction.");
+      } else if (data.status === "uploaded") {
+        toast.info("File saved, pending extraction");
+      } else if (["extracted", "approved", "published"].includes(data.status)) {
         toast.success("File uploaded successfully");
-        // this.openModal = false;
         console.log(`Upload success for ${name}:`, data);
       }
     };
