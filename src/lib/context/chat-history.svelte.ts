@@ -81,21 +81,29 @@ export class ChatHistory {
 
   async deleteChat(chatId?: string) {
     if (!chatId) return;
+
+    // Optimistic UI update for immediate reactivity
+    const previousChats = this.chats;
+    this.chats = this.chats.filter((chat) => chat.id !== chatId);
+    this.alertDialogOpen = false;
+
+    if (chatId === page.params.chatId) {
+      goto("/");
+    }
+
     const deletePromise = deleteChat({ chatId });
     toast.promise(deletePromise, {
       loading: "Deleting chat...",
       success: () => {
-        this.chats = this.chats.filter((chat) => chat.id !== chatId);
         this.refetch();
         return "Chat deleted successfully";
       },
-      error: "Failed to delete chat",
+      error: () => {
+        // Revert optimistic update on error
+        this.chats = previousChats;
+        return "Failed to delete chat";
+      },
     });
-
-    this.alertDialogOpen = false;
-    if (chatId === page.params.chatId) {
-      await goto("/");
-    }
   }
 
   getChatDetails = (chatId: string) => {

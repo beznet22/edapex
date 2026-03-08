@@ -143,7 +143,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
   }
 };
 
-export const DELETE: RequestHandler = async ({ url, locals }) => {
+export const DELETE: RequestHandler = async ({ url, locals, cookies }) => {
   const { session, user } = locals;
   if (!user || !session) error(401, "Unauthorized");
 
@@ -151,9 +151,25 @@ export const DELETE: RequestHandler = async ({ url, locals }) => {
   const filename = url.searchParams.get("filename");
 
   let staffId: number = user.staffId || 1;
-  const classSection = await resultRepo.getAssignedClassSection(staffId);
-  if (!classSection?.className || !classSection?.sectionName) throw new Error("Class not assigned");
-  const token = `${classSection.className}(${classSection.sectionName})`.toLowerCase().replaceAll(" ", "_");
+  let token = "";
+
+  const selectedClassRaw = cookies.get("selected-class");
+  if (selectedClassRaw) {
+    try {
+      const cls = JSON.parse(selectedClassRaw);
+      if (cls.className && cls.sectionName) {
+        token = `${cls.className}(${cls.sectionName})`.toLowerCase().replaceAll(" ", "_");
+      }
+    } catch (e) {
+      console.error("Error parsing selected-class cookie:", e);
+    }
+  }
+
+  if (!token) {
+    const classSection = await resultRepo.getAssignedClassSection(staffId);
+    if (!classSection?.className || !classSection?.sectionName) throw new Error("Class not assigned");
+    token = `${classSection.className}(${classSection.sectionName})`.toLowerCase().replaceAll(" ", "_");
+  }
 
   if (clearAll) {
     const uploadPath = join(EXTRACTED_DIR, `${token}`);
