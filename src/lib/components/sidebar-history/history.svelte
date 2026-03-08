@@ -92,7 +92,7 @@
       </SidebarGroupContent>
     </SidebarGroup>
     <AlertDialog.Root bind:open={chatHistory.alertDialogOpen}>
-      <AlertDialog.Content>
+      <AlertDialog.Content class="bg-background/95 backdrop-blur-3xl border border-white/10 rounded-[2.5rem] p-8 shadow-2xl max-w-[calc(100%-1.5rem)] sm:max-w-md">
         <AlertDialog.Header>
           <AlertDialog.Title>Are you absolutely sure?</AlertDialog.Title>
           <AlertDialog.Description>

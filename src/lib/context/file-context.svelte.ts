@@ -108,15 +108,24 @@ export class FilesContext {
   ) => {
     for (const file of files) {
       const fileId = generateId(); // Unique ID per file (not per batch)
+      const filename = studentData?.studentName ? `${studentData.studentName}.jpg` : file.name;
+      
       const upload: UploadedData = {
         id: fileId,
-        filename: studentData?.studentName ? `${studentData.studentName}.jpg` : file.name,
+        filename,
         originalName: file.name,
         status: "uploading",
         success: false,
       };
 
-      this.uploads = [...this.uploads, upload];
+      // If a file with this name already exists and it's not currently uploading, replace it
+      const existingIdx = this.uploads.findIndex(u => u.filename === filename);
+      if (existingIdx !== -1) {
+         this.uploads[existingIdx] = upload;
+      } else {
+         this.uploads = [...this.uploads, upload];
+      }
+
       const worker = this.#initWoeker(fileId, upload.filename);
       const { classId, sectionId, className, sectionName } = this.selectedClass || {};
       worker.postMessage({

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { goto } from "$app/navigation";
   import type { DBChat } from "$lib/server/db/schema";
   import {
     DropdownMenu,
@@ -45,10 +46,12 @@
       <a
         href={`/chat/${chat.id}`}
         {...props}
-        onclick={() => {
+        onclick={(e) => {
+          e.preventDefault();
           if (context.isMobile) {
             context.setOpenMobile(false);
           }
+          goto(`/chat/${chat.id}`);
         }}
       >
         <span>{chat.title}</span>

@@ -120,6 +120,11 @@ export class FilestoreContext {
 
             if (resp.ok) {
                 toast.success("Assessment approved and saved");
+                
+                // Optimistically update the UI status instantly to preserve reactivity
+                this.selectedFile.status = "approved";
+                this.fileCtx.updateUpload({ ...this.selectedFile });
+
                 this.handleNext();
             } else {
                 toast.error("Failed to approve assessment");

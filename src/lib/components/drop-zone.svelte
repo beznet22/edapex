@@ -146,7 +146,7 @@
                 </h3>
              </div>
 
-             {#if userCtx.students.length > 0}
+             {#if (userCtx.students && userCtx.students.length > 0) || filesContext.selectedClass}
                <div class="w-full">
                  <Popover.Root bind:open>
                    <Popover.Trigger bind:ref={triggerRef}>
@@ -197,7 +197,7 @@
                    </Popover.Content>
                  </Popover.Root>
                </div>
-             {:else if filesContext.selectedClass}
+             {:else if filesContext.selectedClass?.className}
                <div class="p-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground/40 text-center bg-muted/10 rounded-3xl border border-dashed border-muted/30">
                  No students found in {filesContext.selectedClass.className}
                </div>
