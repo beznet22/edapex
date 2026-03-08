@@ -17,20 +17,24 @@
 </script>
 
 <script lang="ts">
-  import { login } from "$lib/api/auth.remote";
+  import { login, signup } from "$lib/api/auth.remote";
   import { Input } from "$lib/components/ui/input";
   import { Label } from "$lib/components/ui/label";
+  import { page } from "$app/state";
   import type { Snippet } from "svelte";
 
   let { form, submitButton, children }: AuthFormProps = $props();
+
+  const isSignup = $derived(page.params.authType === "signup");
+  const auth = $derived(isSignup ? signup : login);
 </script>
 
-<form {...login} class="flex flex-col gap-4 px-6 sm:px-10">
+<form {...auth} class="flex flex-col gap-4 px-6 sm:px-10">
   <div class="flex flex-col gap-2">
     <Label for="email" class=" text-zinc-600 dark:text-zinc-400">Email Address</Label>
 
-    <Input {...login.fields.email.as("email")} />
-    {#each login.fields.email.issues() ?? [] as issue}
+    <Input {...auth.fields.email.as("email")} />
+    {#each auth.fields.email.issues() ?? [] as issue}
       <p class="issue">{issue.message}</p>
     {/each}
   </div>
@@ -38,12 +42,12 @@
   <div class="flex flex-col gap-2">
     <Label for="password" class="text-zinc-600 dark:text-zinc-400">Password</Label>
 
-    <Input {...login.fields.password.as("password")} />
-    {#each login.fields.password.issues() ?? [] as issue}
+    <Input {...auth.fields.password.as("password")} type="password" />
+    {#each auth.fields.password.issues() ?? [] as issue}
       <p class="issue">{issue.message}</p>
     {/each}
   </div>
 
-  {@render submitButton({ pending: !!login.pending, success: !!form?.success })}
+  {@render submitButton({ pending: !!auth.pending, success: !!form?.success })}
   {@render children()}
 </form>
