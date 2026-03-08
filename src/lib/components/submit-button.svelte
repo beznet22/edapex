@@ -2,6 +2,7 @@
   import type { Snippet } from "svelte";
   import { Button } from "./ui/button";
   import { Loader } from "./prompt-kit/loader";
+  import { cn } from "$lib/utils/shadcn.js";
 
   let {
     pending,
@@ -13,14 +14,19 @@
 <Button
   type={pending ? "button" : "submit"}
   disabled={pending || success}
-  class="relative"
+  class="relative w-full overflow-hidden transition-all duration-300"
 >
-  {@render children()}
+  <div class={cn(
+    "flex items-center justify-center gap-2 transition-all duration-300",
+    (pending || success) ? "opacity-0 scale-95" : "opacity-100 scale-100"
+  )}>
+    {@render children()}
+  </div>
 
   {#if pending || success}
-    <span class="absolute right-4 animate-spin">
-      <Loader />
-    </span>
+    <div class="absolute inset-0 flex items-center justify-center">
+      <Loader variant="circular" size="sm" class="text-current" />
+    </div>
   {/if}
 
   <output aria-live="polite" class="sr-only">
