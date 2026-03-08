@@ -196,19 +196,19 @@
                         {#each store.filteredFiles as file (file.id)}
                         <!-- svelte-ignore a11y_no_noninteractive_element_to_interactive_role -->
                         <div
-                                role="button"
-                                tabindex="0"
-                                class="group relative bg-card rounded-xl sm:rounded-2xl p-1.5 sm:p-2 lg:p-3 hover:shadow-lg hover:scale-[1.02] transition-all duration-300 ease-out cursor-pointer border border-border/50 overflow-hidden active:scale-[0.98] text-left w-full focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:outline-none"
-                                onclick={() => handleView(file)}
-                                onkeydown={(e) => {
-                                    if (e.key === "Enter" || e.key === " ") {
-                                        e.preventDefault();
-                                        handleView(file);
-                                    }
-                                }}
+                                class="group relative bg-card rounded-xl sm:rounded-2xl p-1.5 sm:p-2 lg:p-3 hover:shadow-lg transition-all duration-300 ease-out border border-border/50 text-left w-full focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:outline-none"
                             >
                                 <div
-                                    class="aspect-square sm:aspect-3/4 rounded-lg sm:rounded-xl bg-muted/40 overflow-hidden mb-1.5 sm:mb-2 relative"
+                                    class="aspect-square sm:aspect-3/4 rounded-lg sm:rounded-xl bg-muted/40 overflow-hidden mb-1.5 sm:mb-2 relative cursor-pointer hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 ease-out"
+                                    role="button"
+                                    tabindex="0"
+                                    onclick={() => handleView(file)}
+                                    onkeydown={(e) => {
+                                        if (e.key === "Enter" || e.key === " ") {
+                                            e.preventDefault();
+                                            handleView(file);
+                                        }
+                                    }}
                                 >
                                     {#if file.type?.startsWith("image/")}
                                         <img
@@ -231,46 +231,6 @@
                                         class="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors duration-300"
                                     ></div>
 
-                                    <!-- Status indicator -->
-                                    <div
-                                        class="absolute top-1.5 left-1.5 sm:top-2 sm:left-2"
-                                    >
-                                        <Tooltip.Provider delayDuration={0}>
-                                            <Tooltip.Root>
-                                                <Tooltip.Trigger>
-                                                    {#if ["extracted", "approved", "published"].includes(file.status)}
-                                                        <div
-                                                            class="px-3 py-1 rounded-full bg-emerald-500 text-white text-[10px] sm:text-xs font-black uppercase tracking-widest shadow-lg shadow-emerald-500/20"
-                                                        >
-                                                            {file.status}
-                                                        </div>
-                                                    {:else if file.status === "error"}
-                                                        <div
-                                                            class="px-3 py-1 rounded-full bg-destructive text-destructive-foreground text-[10px] sm:text-xs font-black uppercase tracking-widest shadow-lg shadow-destructive/20"
-                                                        >
-                                                            Error
-                                                        </div>
-                                                    {:else if file.status === "uploaded"}
-                                                        <div
-                                                            class="px-3 py-1 rounded-full bg-amber-500 text-white text-[10px] sm:text-xs font-black uppercase tracking-widest shadow-lg shadow-amber-500/20"
-                                                        >
-                                                            Uploaded
-                                                        </div>
-                                                    {:else}
-                                                        <div
-                                                            class="px-3 py-1 rounded-full bg-blue-500 text-white text-[10px] sm:text-xs font-black uppercase tracking-widest shadow-lg shadow-blue-500/20 animate-pulse"
-                                                        >
-                                                            {file.status || "..."}
-                                                        </div>
-                                                    {/if}
-                                                </Tooltip.Trigger>
-                                                <Tooltip.Content side="bottom" sideOffset={5}>
-                                                    <p class="text-xs max-w-[200px] text-wrap text-center">{getAssessmentStatusDescription(file.status, file.error)}</p>
-                                                </Tooltip.Content>
-                                            </Tooltip.Root>
-                                        </Tooltip.Provider>
-                                    </div>
-
                                     <!-- Status Overlay/Spinner -->
                                     {#if file.status === "uploading" || file.status === "retrying"}
                                         <div
@@ -282,6 +242,50 @@
                                             />
                                         </div>
                                     {/if}
+                                </div>
+
+                                <!-- Status indicator - Moved out of scaling container -->
+                                <div
+                                    class="absolute top-3 left-3 sm:top-4 sm:left-4 z-20 pointer-events-auto"
+                                    role="presentation"
+                                >
+                                    <Tooltip.Provider delayDuration={0}>
+                                        <Tooltip.Root>
+                                            <Tooltip.Trigger 
+                                                onclick={(e) => e.stopPropagation()}
+                                                onkeydown={(e) => e.stopPropagation()}
+                                            >
+                                                {#if ["extracted", "approved", "published"].includes(file.status)}
+                                                    <div
+                                                        class="px-3 py-1 rounded-full bg-emerald-500 text-white text-[10px] sm:text-xs font-black uppercase tracking-widest shadow-lg shadow-emerald-500/20"
+                                                    >
+                                                        {file.status}
+                                                    </div>
+                                                {:else if file.status === "error"}
+                                                    <div
+                                                        class="px-3 py-1 rounded-full bg-destructive text-destructive-foreground text-[10px] sm:text-xs font-black uppercase tracking-widest shadow-lg shadow-destructive/20"
+                                                    >
+                                                        Error
+                                                    </div>
+                                                {:else if file.status === "uploaded"}
+                                                    <div
+                                                        class="px-3 py-1 rounded-full bg-amber-500 text-white text-[10px] sm:text-xs font-black uppercase tracking-widest shadow-lg shadow-amber-500/20"
+                                                    >
+                                                        Uploaded
+                                                    </div>
+                                                {:else}
+                                                    <div
+                                                        class="px-3 py-1 rounded-full bg-blue-500 text-white text-[10px] sm:text-xs font-black uppercase tracking-widest shadow-lg shadow-blue-500/20 animate-pulse"
+                                                    >
+                                                        {file.status || "..."}
+                                                    </div>
+                                                {/if}
+                                            </Tooltip.Trigger>
+                                            <Tooltip.Content side="bottom" sideOffset={5} portalProps={{ disabled: true }} class="z-100">
+                                                <p class="text-[10px] font-bold uppercase tracking-widest max-w-[200px] text-wrap text-center px-3 py-1.5">{getAssessmentStatusDescription(file.status, file.error)}</p>
+                                            </Tooltip.Content>
+                                        </Tooltip.Root>
+                                    </Tooltip.Provider>
                                 </div>
 
                                 <div class="space-y-0.5 px-0.5">
