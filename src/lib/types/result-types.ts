@@ -147,6 +147,7 @@ export interface ScoreData {
 
 export type StudentRecord = {
   id: number;
+  userId: number | null;
   recordId: number | null;
   classId: number | null;
   sectionId: number | null;
