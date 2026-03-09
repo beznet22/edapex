@@ -146,61 +146,63 @@
                 </h3>
              </div>
 
-             {#if (userCtx.students && userCtx.students.length > 0) || filesContext.selectedClass}
-               <div class="w-full">
-                 <Popover.Root bind:open>
-                   <Popover.Trigger bind:ref={triggerRef}>
-                     {#snippet child({ props })}
-                       <Button
-                         {...props}
-                         variant="outline"
-                         class="w-full h-12 bg-muted/10 border-none rounded-2xl text-xs font-black px-5 shadow-inner transition-all hover:bg-muted/15 justify-between"
-                         role="combobox"
-                         aria-expanded={open}
-                       >
-                         <span class="truncate">{student?.name || "Select a student..."}</span>
-                         <ChevronsUpDownIcon class="size-4 shrink-0 opacity-50" />
-                       </Button>
-                     {/snippet}
-                   </Popover.Trigger>
-                   <Popover.Content 
-                     class="p-0 w-(--bits-popover-anchor-width)" 
-                     side="bottom" 
-                     align="start"
-                     trapFocus={false}
-                     onOpenAutoFocus={(e) => e.preventDefault()}
-                     portalProps={{ disabled: true }}
-                   >
-                     <Command.Root class="w-full">
-                       <Command.Input placeholder="Search student..." class="h-9" />
-                       <Command.List class="max-h-[300px]">
-                         <Command.Empty>No student found.</Command.Empty>
-                         <Command.Group>
-                           {#each userCtx.students as s (s.id)}
-                             <Command.Item
-                               value={s.name || ""}
-                               onSelect={() => {
-                                 value = s.id.toString();
-                                 closeAndFocusTrigger();
-                               }}
-                               class="rounded-xl mx-1"
-                             >
-                               <CheckIcon
-                                 class={cn("size-4", value !== s.id.toString() && "text-transparent")}
-                               />
-                               <span class="truncate">{s.name}</span>
-                             </Command.Item>
-                           {/each}
-                         </Command.Group>
-                       </Command.List>
-                     </Command.Root>
-                   </Popover.Content>
-                 </Popover.Root>
-               </div>
-             {:else if filesContext.selectedClass?.className}
-               <div class="p-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground/40 text-center bg-muted/10 rounded-3xl border border-dashed border-muted/30">
-                 No students found in {filesContext.selectedClass.className}
-               </div>
+             {#if filesContext.selectedClass}
+               {#if userCtx.students && userCtx.students.length > 0}
+                <div class="w-full">
+                  <Popover.Root bind:open>
+                    <Popover.Trigger bind:ref={triggerRef}>
+                      {#snippet child({ props })}
+                        <Button
+                          {...props}
+                          variant="outline"
+                          class="w-full h-12 bg-muted/10 border-none rounded-2xl text-xs font-black px-5 shadow-inner transition-all hover:bg-muted/15 justify-between"
+                          role="combobox"
+                          aria-expanded={open}
+                        >
+                          <span class="truncate">{student?.name || "Select a student..."}</span>
+                          <ChevronsUpDownIcon class="size-4 shrink-0 opacity-50" />
+                        </Button>
+                      {/snippet}
+                    </Popover.Trigger>
+                    <Popover.Content 
+                      class="p-0 w-(--bits-popover-anchor-width)" 
+                      side="bottom" 
+                      align="start"
+                      trapFocus={false}
+                      onOpenAutoFocus={(e) => e.preventDefault()}
+                      portalProps={{ disabled: true }}
+                    >
+                      <Command.Root class="w-full">
+                        <Command.Input placeholder="Search student..." class="h-9" />
+                        <Command.List class="max-h-[300px]">
+                          <Command.Empty>No student found.</Command.Empty>
+                          <Command.Group>
+                            {#each userCtx.students as s (s.id)}
+                              <Command.Item
+                                value={s.name || ""}
+                                onSelect={() => {
+                                  value = s.id.toString();
+                                  closeAndFocusTrigger();
+                                }}
+                                class="rounded-xl mx-1"
+                              >
+                                <CheckIcon
+                                  class={cn("size-4", value !== s.id.toString() && "text-transparent")}
+                                />
+                                <span class="truncate">{s.name}</span>
+                              </Command.Item>
+                            {/each}
+                          </Command.Group>
+                        </Command.List>
+                      </Command.Root>
+                    </Popover.Content>
+                  </Popover.Root>
+                </div>
+               {:else}
+                <div class="p-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground/40 text-center bg-muted/10 rounded-3xl border border-dashed border-muted/30">
+                  No students found in {filesContext.selectedClass.className}
+                </div>
+               {/if}
              {/if}
           </div>
 

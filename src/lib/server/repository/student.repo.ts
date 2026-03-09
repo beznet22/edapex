@@ -1,6 +1,6 @@
 // /src/lib/server/repository/student.repo.ts
 
-import { and, count, eq, isNotNull, ne, sql, like, or, desc, asc } from "drizzle-orm";
+import { and, count, eq, isNotNull, ne, sql, like, or, desc, asc, inArray } from "drizzle-orm";
 import { type MySQLDrizzleClient } from "./base.repo";
 import {
   classAttendances,
@@ -17,6 +17,12 @@ import {
   smStudents,
   studentRecords,
   users,
+  smStudentPromotions,
+  smFeesMasters,
+  smFeesAssigns,
+  chatGroups,
+  chatGroupUsers,
+  smAcademicYears,
 } from "$lib/server/db/sms-schema";
 import { BaseRepository } from "./base.repo";
 import type { Attendance } from "$lib/schema/result-input";
@@ -34,7 +40,9 @@ export type StudentDetails = {
   studentPhoto: string | null;
   dateOfBirth: string | null; // Adjust based on actual type
   genderName: string | null;
+  genderId: number | null;
   categoryName: string | null;
+  studentCategoryId: number | null;
   parentId: number | null;
   guardiansName: string | null;
   guardiansMobile: string | null;
@@ -45,6 +53,8 @@ export type StudentDetails = {
   sectionName: string | null;
   studentRecordId: number | null;
   schoolId: number | null;
+  academicId: number | null;
+  rollNo: number | null;
 };
 
 export type ClassStudent = {
@@ -73,11 +83,13 @@ export type CreateStudentInput = {
   roleId?: number; // defaults to student role (2)
   schoolId?: number; // defaults to 1
   academicId?: number; // fetched from session if not provided
-  // Parent/guardian info (required)
+  // Parent/guardian info
   guardianRelation: GuardianRelation; // father, mother, or other
   guardiansName: string;
   guardiansMobile: string;
   guardiansEmail: string;
+  // Optional sibling linkage
+  siblingAdmissionNo?: number;
 };
 
 export class StudentRepository extends BaseRepository {
@@ -105,6 +117,7 @@ export class StudentRepository extends BaseRepository {
       guardiansName,
       guardiansMobile,
       guardiansEmail,
+      siblingAdmissionNo,
     } = input;
 
     // Construct full name from first and last name
@@ -112,7 +125,7 @@ export class StudentRepository extends BaseRepository {
     const finalAdmissionNo = admissionNo ?? ((await this.getLastAdmissionNo()) + 1);
     const academicId = input.academicId ?? (await this.getAcademicId());
 
-    // Step 1: Check for email conflicts
+    // Step 1: Check for existing student email conflicts
     if (email) {
       const [existingStudentUser] = await this.db.select().from(users).where(eq(users.email, email)).limit(1);
       if (existingStudentUser) {
@@ -120,18 +133,132 @@ export class StudentRepository extends BaseRepository {
       }
     }
 
-    if (guardiansEmail) {
-      const [existingParentUser] = await this.db.select().from(users).where(eq(users.email, guardiansEmail)).limit(1);
-      if (existingParentUser) {
-        throw new Error("USER_EXISTS");
+    let parentId: number | null = null;
+    let parentPassword: string | undefined = undefined;
+    let parentUserId: number | null = null;
+
+    // Step 2: Try to find existing parent via sibling or email
+    let existingParentRecord: (typeof smParents.$inferSelect) | null = null;
+
+    if (siblingAdmissionNo) {
+      const results = await this.db
+        .select({ 
+          parent: smParents
+        })
+        .from(smStudents)
+        .innerJoin(smParents, eq(smStudents.parentId, smParents.id))
+        .where(eq(smStudents.admissionNo, siblingAdmissionNo))
+        .limit(1);
+      if (results.length > 0) {
+        existingParentRecord = results[0].parent;
       }
     }
 
-    // Generate temporary passwords
-    const studentPassword = Math.random().toString(36).slice(-8);
-    const parentPassword = Math.random().toString(36).slice(-8);
+    if (!existingParentRecord && guardiansEmail) {
+      const [parent] = await this.db
+        .select()
+        .from(smParents)
+        .where(eq(smParents.guardiansEmail, guardiansEmail))
+        .limit(1);
+      if (parent) {
+        existingParentRecord = parent;
+      }
+    }
 
-    // Step 2: Create a User for the student
+    if (existingParentRecord) {
+      parentId = existingParentRecord.id;
+      parentUserId = existingParentRecord.userId;
+
+      // Verify if the linked user account actually exists
+      let userExists = false;
+      if (parentUserId) {
+        const [u] = await this.db.select({ id: users.id }).from(users).where(eq(users.id, parentUserId)).limit(1);
+        userExists = !!u;
+      }
+
+      // If no userId or user record is gone, RECOVER/CREATE it
+      if (!userExists) {
+        parentPassword = Math.random().toString(36).slice(-8);
+        const [recoveredUser] = await this.db
+          .insert(users)
+          .values({
+            fullName: existingParentRecord.guardiansName || guardiansName,
+            email: existingParentRecord.guardiansEmail || guardiansEmail,
+            phoneNumber: existingParentRecord.guardiansMobile || guardiansMobile,
+            password: hashPwd(parentPassword),
+            usertype: "parent",
+            roleId: 3,
+            schoolId,
+            walletBalance: 0,
+            activeStatus: 1,
+          })
+          .$returningId();
+        
+        parentUserId = recoveredUser.id;
+        // Update the existing parent record with the new userId
+        await this.db.update(smParents).set({ userId: parentUserId }).where(eq(smParents.id, parentId!));
+      }
+    } else if (guardiansEmail) {
+      // No smParents record, check if a USER with this email already exists (orphaned user)
+      const [orphanedUser] = await this.db
+        .select({ id: users.id })
+        .from(users)
+        .where(and(eq(users.email, guardiansEmail), eq(users.roleId, 3)))
+        .limit(1);
+      
+      if (orphanedUser) {
+        parentUserId = orphanedUser.id;
+      }
+    }
+
+    // Step 3: Create parent record if not found (or link it to orphaned user)
+    if (!parentId) {
+      if (!parentUserId) {
+        parentPassword = Math.random().toString(36).slice(-8);
+        const [newUser] = await this.db
+          .insert(users)
+          .values({
+            fullName: guardiansName,
+            email: guardiansEmail,
+            phoneNumber: guardiansMobile,
+            password: hashPwd(parentPassword),
+            usertype: "parent",
+            roleId: 3,
+            schoolId,
+            walletBalance: 0,
+            activeStatus: 1,
+          })
+          .$returningId();
+        parentUserId = newUser.id;
+      }
+
+      const parentData: Record<string, any> = {
+        guardiansName,
+        guardiansMobile,
+        guardiansEmail,
+        guardiansRelation: guardianRelation,
+        userId: parentUserId,
+        schoolId,
+        academicId,
+        activeStatus: 1,
+      };
+
+      if (guardianRelation === "father") {
+        parentData.fathersName = guardiansName;
+        parentData.fathersMobile = guardiansMobile;
+      } else if (guardianRelation === "mother") {
+        parentData.mothersName = guardiansName;
+        parentData.mothersMobile = guardiansMobile;
+      }
+
+      const [newParent] = await this.db.insert(smParents).values(parentData).$returningId();
+      parentId = newParent.id;
+    }
+
+    // Generate temporary student password
+    const studentPassword = Math.random().toString(36).slice(-8);
+
+    // Step 4: Create a User for the student
     const [user] = await this.db
       .insert(users)
       .values({
@@ -147,45 +274,6 @@ export class StudentRepository extends BaseRepository {
       })
       .$returningId();
 
-    // Step 3: Create a User for the parent/guardian
-    const [parentUser] = await this.db
-      .insert(users)
-      .values({
-        fullName: guardiansName,
-        email: guardiansEmail,
-        phoneNumber: guardiansMobile,
-        password: hashPwd(parentPassword),
-        usertype: "parent",
-        roleId: 3, // parent role
-        schoolId,
-        walletBalance: 0,
-        activeStatus: 1,
-      })
-      .$returningId();
-
-    // Step 4: Create a Parent record with father/mother/guardian info based on relation
-    const parentData: Record<string, unknown> = {
-      guardiansName,
-      guardiansMobile,
-      guardiansEmail,
-      guardiansRelation: guardianRelation,
-      userId: parentUser.id,
-      schoolId,
-      academicId,
-      activeStatus: 1,
-    };
-
-    // Set father or mother fields based on guardian relation
-    if (guardianRelation === "father") {
-      parentData.fathersName = guardiansName;
-      parentData.fathersMobile = guardiansMobile;
-    } else if (guardianRelation === "mother") {
-      parentData.mothersName = guardiansName;
-      parentData.mothersMobile = guardiansMobile;
-    }
-
-    const [parent] = await this.db.insert(smParents).values(parentData).$returningId();
-
     // Step 5: Create the Student record
     const [newStudent] = await this.db
       .insert(smStudents)
@@ -197,7 +285,7 @@ export class StudentRepository extends BaseRepository {
         email,
         mobile,
         dateOfBirth,
-        parentId: parent.id,
+        parentId: parentId,
         userId: user.id,
         roleId,
         genderId,
@@ -429,11 +517,25 @@ export class StudentRepository extends BaseRepository {
     return record || null;
   }
 
-  async updateStudent(student: StudentDetails) {
+  async updateStudent(student: Partial<StudentDetails> & { studentId: number }) {
+    const updateData: Record<string, any> = {};
+    if (student.fullName !== undefined) updateData.fullName = student.fullName;
+    if (student.firstName !== undefined) updateData.firstName = student.firstName;
+    if (student.lastName !== undefined) updateData.lastName = student.lastName;
+    if (student.dateOfBirth !== undefined) updateData.dateOfBirth = student.dateOfBirth;
+    if (student.genderId !== undefined) updateData.genderId = student.genderId;
+    if (student.studentCategoryId !== undefined) updateData.studentCategoryId = student.studentCategoryId;
+    if (student.classId !== undefined) updateData.classId = student.classId;
+    if (student.sectionId !== undefined) updateData.sectionId = student.sectionId;
+    if (student.rollNo !== undefined) updateData.rollNo = student.rollNo;
+
+    if (Object.keys(updateData).length === 0) return null;
+
     const [updated] = await this.db
       .update(smStudents)
-      .set({ fullName: student.fullName })
+      .set(updateData)
       .where(eq(smStudents.id, student.studentId));
+    
     if (updated.affectedRows === 0) return null;
     return updated;
   }
@@ -483,6 +585,10 @@ export class StudentRepository extends BaseRepository {
         sectionName: smSections.sectionName,
         studentRecordId: studentRecords.id,
         schoolId: studentRecords.schoolId,
+        academicId: studentRecords.academicId,
+        genderId: smStudents.genderId,
+        studentCategoryId: smStudents.studentCategoryId,
+        rollNo: smStudents.rollNo,
       })
       .from(smStudents)
       .leftJoin(smBaseSetups, eq(smStudents.genderId, smBaseSetups.id))
@@ -680,8 +786,164 @@ export class StudentRepository extends BaseRepository {
         });
       }
 
+      // Sync sm_students as well for consistency in denormalized fields
+      await db.update(smStudents)
+        .set({ classId, sectionId })
+        .where(eq(smStudents.id, studentId));
+
       return true;
     }, "assignClassSection");
+  }
+
+  /**
+   * Promotes a student to a new class/session while preserving history, assigning fees, and updating chat groups.
+   */
+  async promoteStudent(params: {
+    studentId: number;
+    classId: number;
+    sectionId: number;
+    sessionId?: number;
+    rollNo?: number;
+    resultStatus?: string;
+  }) {
+    return this.withErrorHandling(async () => {
+      const currentAcademicId = await this.getAcademicId();
+      const targetAcademicId = params.sessionId || currentAcademicId;
+      const { studentId, classId, sectionId, rollNo, resultStatus = "PASSED" } = params;
+
+      return await this.db.transaction(async (tx) => {
+        // 1. Fetch current student state for audit log
+        const [student] = await tx.select().from(smStudents).where(eq(smStudents.id, studentId)).limit(1);
+        if (!student) throw new Error("STUDENT_NOT_FOUND");
+
+        const [currentRecord] = await tx
+          .select()
+          .from(studentRecords)
+          .where(and(eq(studentRecords.studentId, studentId), eq(studentRecords.isDefault, 1), eq(studentRecords.academicId, currentAcademicId)))
+          .limit(1);
+
+        // 2. Create Audit Record in sm_student_promotions
+        await tx.insert(smStudentPromotions).values({
+          studentId,
+          previousClassId: student.classId,
+          previousSectionId: student.sectionId,
+          previousSessionId: currentAcademicId,
+          currentClassId: classId,
+          currentSectionId: sectionId,
+          currentSessionId: targetAcademicId,
+          previousRollNumber: student.rollNo,
+          currentRollNumber: rollNo || student.rollNo,
+          resultStatus,
+          studentInfo: JSON.stringify(student),
+          admissionNumber: student.admissionNo,
+          schoolId: student.schoolId,
+          createdAt: new Date(),
+        });
+
+        // 3. Complete Roll Number logic
+        const finalRollNo = rollNo ?? (await this.getNextRollNo(classId, sectionId, targetAcademicId, tx));
+
+        // 4. Update existing current record
+        if (currentRecord) {
+          await tx.update(studentRecords)
+            .set({ isDefault: 0, isPromote: 1 })
+            .where(eq(studentRecords.id, currentRecord.id));
+        }
+
+        // 5. Insert new record for target session
+        const [newRecord] = await tx.insert(studentRecords).values({
+          studentId,
+          classId,
+          sectionId,
+          academicId: targetAcademicId,
+          sessionId: targetAcademicId,
+          schoolId: student.schoolId || 1,
+          isDefault: 1,
+          isPromote: 0,
+          activeStatus: 1,
+        }).$returningId();
+
+        // 6. Update main student table
+        await tx.update(smStudents)
+          .set({ classId, sectionId, sessionId: targetAcademicId, academicId: targetAcademicId, rollNo: finalRollNo })
+          .where(eq(smStudents.id, studentId));
+
+        // 7. Auto-Assign Fees (assignDirectFees)
+        const classMasters = await tx.select()
+          .from(smFeesMasters)
+          .where(and(
+            eq(smFeesMasters.classId, classId),
+            eq(smFeesMasters.academicId, targetAcademicId),
+            eq(smFeesMasters.activeStatus, 1)
+          ));
+
+        for (const master of classMasters) {
+          await tx.insert(smFeesAssigns).values({
+            studentId,
+            recordId: newRecord.id,
+            feesMasterId: master.id,
+            feesAmount: master.amount,
+            academicId: targetAcademicId,
+            schoolId: student.schoolId || 1,
+            activeStatus: 1,
+          });
+        }
+
+        // 8. Chat Group Migration
+        if (student.userId) {
+          const oldGroups = await tx.select({ id: chatGroups.id })
+            .from(chatGroups)
+            .where(and(
+              eq(chatGroups.classId, student.classId || 0),
+              eq(chatGroups.sectionId, student.sectionId || 0),
+              eq(chatGroups.academicId, currentAcademicId)
+            ));
+          
+          if (oldGroups.length > 0) {
+            await tx.delete(chatGroupUsers)
+              .where(and(
+                inArray(chatGroupUsers.groupId, oldGroups.map(g => g.id)),
+                eq(chatGroupUsers.userId, student.userId)
+              ));
+          }
+
+          const newGroups = await tx.select({ id: chatGroups.id })
+            .from(chatGroups)
+            .where(and(
+              eq(chatGroups.classId, classId),
+              eq(chatGroups.sectionId, sectionId),
+              eq(chatGroups.academicId, targetAcademicId)
+            ));
+          
+          for (const g of newGroups) {
+            await tx.insert(chatGroupUsers).values({
+              groupId: g.id,
+              userId: student.userId,
+              role: 1,
+              addedBy: 1,
+              createdAt: new Date(),
+            });
+          }
+        }
+
+        return true;
+      });
+    }, "promoteStudent");
+  }
+
+  private async getNextRollNo(classId: number, sectionId: number, academicId: number, tx: MySQLDrizzleClient): Promise<number> {
+    const [lastRoll] = await tx
+      .select({ rollNo: smStudents.rollNo })
+      .from(smStudents)
+      .where(and(
+        eq(smStudents.classId, classId),
+        eq(smStudents.sectionId, sectionId),
+        eq(smStudents.academicId, academicId)
+      ))
+      .orderBy(desc(smStudents.rollNo))
+      .limit(1);
+
+    return (lastRoll?.rollNo ?? 0) + 1;
   }
 
   /**
@@ -739,7 +1001,7 @@ export class StudentRepository extends BaseRepository {
 
       // Update student table
       await this.db.update(smStudents).set({ activeStatus }).where(eq(smStudents.id, studentId));
-      
+
       // Update student_records table
       await this.db.update(studentRecords).set({ activeStatus }).where(eq(studentRecords.studentId, studentId));
 
@@ -778,7 +1040,7 @@ export class StudentRepository extends BaseRepository {
       }
 
       // Note: We leave the smParents record intact, as they may have other children enrolled.
-      
+
       return {
         success: true,
         studentId,

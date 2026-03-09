@@ -506,6 +506,7 @@ export const createStudent = tool({
       schoolId: z.number().optional().describe("Optional School ID. Defaults to 1."),
       academicId: z.number().optional().describe("Optional Academic year ID. Auto-fetched if not provided."),
       admissionNo: z.number().optional().describe("Optional Admission number. Auto-incremented if not provided."),
+      siblingAdmissionNo: z.number().optional().describe("Optional admission number of a sibling to link the same parent."),
     })
   ),
   outputSchema: zodSchema(
@@ -563,7 +564,7 @@ export const createStudent = tool({
           isExisting: false,
         };
       }
-      
+
       const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
       return {
         success: false,
@@ -771,6 +772,95 @@ export const deleteStudent = tool({
 
 export type DeleteStudentInput = InferToolInput<typeof deleteStudent>;
 export type DeleteStudentOutput = InferToolOutput<typeof deleteStudent>;
+
+export const promoteStudent = tool({
+  description: [
+    "Promotes a student to a new class and section for a new academic session.",
+    "This tool preserves historical records, assigns new fees, and migrates the student to appropriate chat groups.",
+    "Use this ONLY for academic advancement. For fixing mistakes, use `assignClassSection` (Transfer).",
+  ].join("\n"),
+  inputSchema: zodSchema(
+    z.object({
+      studentId: z.number().describe("The unique ID of the student to promote."),
+      classId: z.number().describe("The ID of the target class."),
+      sectionId: z.number().describe("The ID of the target section."),
+      sessionId: z.number().optional().describe("The ID of the new academic session. Defaults to current."),
+      rollNo: z.number().optional().describe("Optional custom roll number. Auto-calculated if omitted."),
+      resultStatus: z.string().optional().describe("Outcome of the previous session (e.g., 'PASSED'). Defaults to 'PASSED'."),
+    })
+  ),
+  outputSchema: zodSchema(
+    z.object({
+      success: z.boolean(),
+      message: z.string(),
+    })
+  ),
+  execute: async (params) => {
+    try {
+      const result = await studentRepo.promoteStudent(params);
+      return {
+        success: true,
+        message: `Student successfully promoted to the new class and session. Fees assigned and chat groups updated.`,
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+      return {
+        success: false,
+        message: `Promotion failed: ${errorMessage}`,
+      };
+    }
+  },
+});
+
+export type PromoteStudentInput = InferToolInput<typeof promoteStudent>;
+export type PromoteStudentOutput = InferToolOutput<typeof promoteStudent>;
+
+export const updateStudentDetails = tool({
+  description: [
+    "Updates multiple demographic and profile details for a student.",
+    "Supports updating name, DOB, gender, category, and roll number.",
+    "Use this to fix errors in the student's profile.",
+  ].join("\n"),
+  inputSchema: zodSchema(
+    z.object({
+      studentId: z.number().describe("The unique ID of the student."),
+      firstName: z.string().optional().describe("The student's first name."),
+      lastName: z.string().optional().describe("The student's last name."),
+      fullName: z.string().optional().describe("The student's full name (usually auto-generated)."),
+      dateOfBirth: z.string().optional().describe("Date of birth in 'YYYY-MM-DD' format."),
+      genderId: z.number().optional().describe("The ID of the gender (e.g., from registration options)."),
+      studentCategoryId: z.number().optional().describe("The ID of the student category."),
+      rollNo: z.number().optional().describe("The student's roll number."),
+    })
+  ),
+  outputSchema: zodSchema(
+    z.object({
+      success: z.boolean(),
+      message: z.string(),
+    })
+  ),
+  execute: async (params) => {
+    try {
+      const result = await studentRepo.updateStudent(params);
+      if (!result) {
+        return { success: false, message: "No updates were made or student not found." };
+      }
+      return {
+        success: true,
+        message: `Student profile updated successfully.`,
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+      return {
+        success: false,
+        message: `Update failed: ${errorMessage}`,
+      };
+    }
+  },
+});
+
+export type UpdateStudentDetailsInput = InferToolInput<typeof updateStudentDetails>;
+export type UpdateStudentDetailsOutput = InferToolOutput<typeof updateStudentDetails>;
 
 export const searchClassSection = tool({
   description: [
