@@ -172,7 +172,6 @@ export const assessmentWorkflow: AgentWorkflow = {
         "     ",
         "     **OPTIONAL**",
         "     * Sibling Admission No: ",
-        "     * Admission No: ",
         "     * Date of Birth: ",
         "     * Student Email: ",
         "     * Student Phone: ",
