@@ -441,7 +441,7 @@
                                                     Extracted Marks
                                                 </h3>
                                             </div>
-                                            <div class="rounded-4xl overflow-hidden border border-border/50 bg-background shadow-xl">
+                                            <div class="rounded-4xl border border-border/50 bg-background shadow-xl overflow-x-auto">
                                                 <table class="w-full text-left">
                                                     <thead>
                                                         <tr class="bg-muted/30 border-b border-border/50">

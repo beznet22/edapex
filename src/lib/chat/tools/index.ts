@@ -24,7 +24,9 @@ import {
   updateUserPassword,
   updateStaffStatus,
   deleteStaff,
-  searchStaff
+  searchStaff,
+  updateStudentDetails,
+  promoteStudent,
 } from "./coordinator.tool";
 
 export const teacherTools = {
@@ -58,4 +60,6 @@ export const coordinatorTools = {
   updateStaffStatus,
   deleteStaff,
   searchStaff,
+  updateStudentDetails,
+  promoteStudent,
 };
