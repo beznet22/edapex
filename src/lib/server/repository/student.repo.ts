@@ -492,6 +492,7 @@ export class StudentRepository extends BaseRepository {
     const [record] = await this.db
       .select({
         id: smStudents.id,
+        userId: smStudents.userId,
         recordId: studentRecords.id,
         classId: studentRecords.classId,
         sectionId: studentRecords.sectionId,

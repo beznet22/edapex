@@ -1220,7 +1220,7 @@ export const registerStaff = tool({
         return {
           success: false,
           errorType: "USER_EXISTS",
-          message: `The email "${input.email}" is already registered. Staff members with existing accounts should login with their current credentials. If they forgot their password, use the 'updateUserPassword' tool.`,
+          message: `The email "${input.email}" is already registered. Staff members with existing accounts should login with their current credentials. If they forgot their password, use the 'resetPassword' tool.`,
         };
       }
       const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
@@ -1236,28 +1236,42 @@ export const registerStaff = tool({
 export type RegisterStaffInput = InferToolInput<typeof registerStaff>;
 export type RegisterStaffOutput = InferToolOutput<typeof registerStaff>;
 
-export const updateUserPassword = tool({
+export const resetPassword = tool({
   description: [
     "Updates or resets a user's password.",
     "Can be used by coordinators to reset someone's password, or by anyone to change their own.",
+    "If 'newPassword' is not provided, a random one will be generated and returned.",
+    "For students, you can identify them using 'admissionNo' instead of email or userId.",
   ].join("\n"),
   inputSchema: zodSchema(
     z.object({
       email: z.string().email().optional().describe("The email of the user to update."),
       userId: z.number().optional().describe("The ID of the user to update."),
-      newPassword: z.string().describe("The new password to set."),
+      admissionNo: z.number().optional().describe("Optional Admission number (for students)."),
+      newPassword: z.string().optional().describe("The new password to set. If omitted, one will be generated."),
     })
   ),
   outputSchema: zodSchema(
     z.object({
       success: z.boolean(),
       message: z.string(),
+      password: z.string().optional().describe("The new password (especially if auto-generated)."),
     })
   ),
-  execute: async ({ email, userId, newPassword }) => {
+  execute: async ({ email, userId, admissionNo, newPassword }) => {
     try {
-      let targetUserId: number | undefined = userId;
+      let targetUserId: number | null = userId!;
 
+      // 1. Resolve via admissionNo (Student lookup)
+      if (!targetUserId && admissionNo) {
+        const student = await studentRepo.getStudentRecordByAdmissionNo(admissionNo);
+        if (!student) {
+          return { success: false, message: `Student with admission number "${admissionNo}" not found.` };
+        }
+        targetUserId = student.userId;
+      }
+
+      // 2. Resolve via email
       if (!targetUserId && email) {
         const user = await authRepo.findUser("email", email);
         if (!user) {
@@ -1267,14 +1281,16 @@ export const updateUserPassword = tool({
       }
 
       if (!targetUserId) {
-        return { success: false, message: "Either userId or email must be provided." };
+        return { success: false, message: "Either userId, email, or admissionNo must be provided." };
       }
 
-      await authRepo.updateUserPassword(targetUserId, hashPwd(newPassword));
+      const finalPassword = newPassword || Math.random().toString(36).slice(-8);
+      await authRepo.updateUserPassword(targetUserId, hashPwd(finalPassword));
 
       return {
         success: true,
-        message: "Password updated successfully.",
+        message: `Password updated successfully. ${newPassword ? "" : "Generated password: " + finalPassword}`,
+        password: finalPassword,
       };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
@@ -1286,8 +1302,8 @@ export const updateUserPassword = tool({
   },
 });
 
-export type UpdateUserPasswordInput = InferToolInput<typeof updateUserPassword>;
-export type UpdateUserPasswordOutput = InferToolOutput<typeof updateUserPassword>;
+export type ResetPasswordInput = InferToolInput<typeof resetPassword>;
+export type ResetPasswordOutput = InferToolOutput<typeof resetPassword>;
 
 export const searchStaff = tool({
   description: [
