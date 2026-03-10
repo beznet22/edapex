@@ -6,7 +6,7 @@
     "display": "standalone",
     "orientation": "portrait",
     "theme_color": "#d95a00",
-    "background_color": "#fcfcf7",
+    "background_color": "#fcfcf9",
     "description": "Your AI Assistant for Education",
     "icons": [
         {
