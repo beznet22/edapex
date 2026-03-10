@@ -1,6 +1,7 @@
 <script lang="ts">
   import "./layout.css";
   import { ThemeProvider } from "@sejohnson/svelte-themes";
+  import ThemeHead from "$lib/components/ThemeHead.svelte";
   import { Toaster } from "$lib/components/ui/sonner";
   import IntegrationsModal from "$lib/components/integrations-modal.svelte";
   import { onMount } from "svelte";
@@ -37,6 +38,7 @@
 </script>
 
 <ThemeProvider attribute="class" disableTransitionOnChange>
+  <ThemeHead />
   <Toaster position="bottom-center" />
   <IntegrationsModal />
   {@render children()}
