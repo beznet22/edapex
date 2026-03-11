@@ -5,6 +5,7 @@ const PWA_CONTEXT_KEY = Symbol("pwa-context");
 export class PWAContext {
     deferredPrompt = $state<any>(null);
     isStandalone = $state(false);
+    isFullscreen = $state(false);
     showInstallPrompt = $state(false);
     userDismissed = $state(false);
 
@@ -35,8 +36,48 @@ export class PWAContext {
                 this.deferredPrompt = null;
                 console.log("PWA was installed");
             });
+
+            // Track fullscreen state
+            window.addEventListener("fullscreenchange", () => {
+                this.isFullscreen = !!document.fullscreenElement;
+            });
+
+            // Smart switching for orientation
+            window.addEventListener("orientationchange", () => {
+                // When rotating to landscape on a standalone PWA, auto-request fullscreen to maximize space
+                if (this.isStandalone && window.orientation === 90 || window.orientation === -90) {
+                    // Small delay to allow the orientation change to "settle"
+                    setTimeout(() => {
+                        this.requestFullscreen();
+                    }, 500);
+                }
+            });
         }
     }
+
+    requestFullscreen = async () => {
+        if (!document.fullscreenElement) {
+            try {
+                await document.documentElement.requestFullscreen();
+            } catch (err) {
+                console.error(`Error attempting to enable fullscreen: ${err}`);
+            }
+        }
+    };
+
+    exitFullscreen = async () => {
+        if (document.fullscreenElement) {
+            await document.exitFullscreen();
+        }
+    };
+
+    toggleFullscreen = () => {
+        if (this.isFullscreen) {
+            this.exitFullscreen();
+        } else {
+            this.requestFullscreen();
+        }
+    };
 
     install = async () => {
         if (!this.deferredPrompt) return;

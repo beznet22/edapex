@@ -227,3 +227,20 @@ a[target="_blank"].disabled-link {
     padding-left: env(safe-area-inset-left);
   }
 }
+
+/* Landscape Mobile Optimizations */
+@media (max-height: 500px) and (orientation: landscape) {
+  :root {
+    --sidebar-width: 0px !important;
+  }
+  
+  /* Hide sidebar entirely in extreme landscape to save vertical space */
+  [data-slot="sidebar-wrapper"] {
+    display: none !important;
+  }
+
+  /* Reduce chat input padding in landscape */
+  .safe-area-bottom {
+    padding-bottom: max(12px, env(safe-area-inset-bottom)) !important;
+  }
+}
