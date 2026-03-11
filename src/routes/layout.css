@@ -144,12 +144,13 @@
     @apply border-border outline-ring/50;
   }
   html, body {
-    @apply fixed inset-0 w-full overflow-hidden;
+    @apply w-full overflow-x-hidden;
     height: 100dvh;
   }
   body {
     @apply bg-background text-foreground;
-    overscroll-behavior: none;
+    overscroll-behavior-x: none;
+    overscroll-behavior-y: auto;
   }
   [data-slot="sidebar-wrapper"] {
     @apply h-dvh overflow-hidden;
