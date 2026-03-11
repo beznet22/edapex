@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { EXAM_MARK_MAXIMUMS } from "$lib/constants/assessment";
 
 export const categoryEnum = z.enum(["DAYCARE", "NURSERY", "GRADEK", "LOWERBASIC", "MIDDLEBASIC"]);
 export type Category = z.infer<typeof categoryEnum>;
@@ -67,6 +68,10 @@ export const recordSchema = z
       .array(z.number())
       .default([])
       .describe("The marks for the subject"),
+    fullMarks: z
+      .array(z.number())
+      .default([])
+      .describe("The maximum marks per exam title"),
     totalScore: z.number().max(100.0).describe("The total score for the subject"),
     grade: z.string().describe("The grade for the subject"),
     color: z.string().optional().describe("The color for the grade"),
@@ -104,6 +109,21 @@ export const recordSchema = z
           message: `Total score for subject ${data.subject} is greater than 100.0 due to possible duplicate marks. Please re-upload the result image to fix this.`,
           path: ["totalScore"],
           continue: true,
+        });
+      }
+      // Validate each mark against the per-title maximum
+      const maxMarks = EXAM_MARK_MAXIMUMS[data.category];
+      if (maxMarks) {
+        data.titles.forEach((title, i) => {
+          const max = maxMarks[title.toUpperCase()];
+          if (max !== undefined && data.marks[i] !== undefined && data.marks[i] > max) {
+            ctx.addIssue({
+              code: "custom",
+              message: `Mark for ${title} in ${data.subject} (${data.marks[i]}) exceeds the maximum allowed (${max})`,
+              path: ["marks", i],
+              continue: true,
+            });
+          }
         });
       }
     }

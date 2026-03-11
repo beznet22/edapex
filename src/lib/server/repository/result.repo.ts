@@ -362,6 +362,7 @@ export class ResultsRepository extends BaseRepository {
             subjectId: schema.smSubjects.id,
             totalMarks: schema.smMarkStores.totalMarks,
             examTitle: schema.smExamSetups.examTitle,
+            examMark: schema.smExamSetups.examMark,
             subjectCode: schema.smSubjects.subjectCode,
             isAbsent: schema.smMarkStores.isAbsent,
             subjectName: schema.smSubjects.subjectName,
