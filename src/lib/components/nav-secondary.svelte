@@ -10,6 +10,9 @@
   import { page } from "$app/state";
   import { pushState } from "$app/navigation";
   import { useSidebar } from "$lib/components/ui/sidebar/index.js";
+  import { usePWA } from "$lib/context/pwa.svelte";
+  import Maximize from "@lucide/svelte/icons/maximize";
+  import Minimize from "@lucide/svelte/icons/minimize";
   
   let {
     items,
@@ -20,6 +23,7 @@
 
   const sidebar = useSidebar();
   const theme = getTheme();
+  const pwa = usePWA();
 
   const onclick = async (url: string) => {
     if (sidebar.isMobile) {
@@ -60,6 +64,36 @@
           </Sidebar.MenuButton>
         </Sidebar.MenuItem>
       {/each}
+      <Sidebar.MenuItem>
+        <Sidebar.MenuButton
+          onclick={() => {
+            if (sidebar.isMobile) sidebar.setOpenMobile(false);
+            pwa.toggleFullscreen();
+          }}
+          class="w-full group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0!"
+        >
+          {#snippet child({ props })}
+            <button
+              {...props}
+              class="flex w-full items-center gap-2 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 cursor-pointer"
+            >
+              <div
+                class="relative size-4 flex items-center justify-center shrink-0 group-data-[collapsible=icon]:mx-auto"
+              >
+                {#if pwa.isFullscreen}
+                  <Minimize class="size-4" />
+                {:else}
+                  <Maximize class="size-4" />
+                {/if}
+              </div>
+              <span class="group-data-[collapsible=icon]:hidden">
+                {pwa.isFullscreen ? "Exit Focus" : "Focus Mode"}
+              </span>
+            </button>
+          {/snippet}
+        </Sidebar.MenuButton>
+      </Sidebar.MenuItem>
+
       <Sidebar.MenuItem>
         <Sidebar.MenuButton
           onclick={() => {
