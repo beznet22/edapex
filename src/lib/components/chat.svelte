@@ -69,7 +69,7 @@
   {:else}
     <!-- Chat Messages -->
     <Conversation class="flex-1 min-h-0 h-auto w-full">
-      <ConversationContent class="w-full overscroll-contain touch-pan-y scrollbar-hide">
+    <ConversationContent class="w-full overscroll-contain touch-pan-y">
         <!-- Add padding bottom so messages don't hide behind floating input -->
         <div class="space-y-6 py-4 mx-auto max-w-3xl px-4 pb-32 sm:pb-36">
           {#each chat.messages as message}
