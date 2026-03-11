@@ -187,11 +187,13 @@ export const DELETE: RequestHandler = async ({ url, locals, cookies }) => {
     return json({ success: true });
   }
 
-  const fullPath = join(EXTRACTED_DIR, targetPath);
+  const actualPath = targetPath.includes('/') ? targetPath : (token ? join(token, studentFileStorage.formatName(targetPath.split('.')[0] || targetPath)) : targetPath);
+  const fullPath = join(EXTRACTED_DIR, actualPath);
+  
   if (existsSync(fullPath)) {
     try {
         // 1. Load assessment data to check for DB record linkages
-        const assessmentData = await studentFileStorage.load(targetPath);
+        const assessmentData = await studentFileStorage.load(actualPath);
         
         // 2. If it has DB records (marks/results), clean them up
         if (assessmentData?.data?.studentData) {

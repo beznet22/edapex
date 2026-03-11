@@ -75,13 +75,13 @@ self.onmessage = async function (e) {
       throw new Error(errMsg);
     }
 
-    const { data, status, filename: name, success, error, url, token } = await response.json();
+    const { data, status, filename: name, success, error, url, token, id: responseId } = await response.json();
     if (!success) {
       throw new Error(error || "Upload failed");
     }
 
     const result: UploadedData = {
-      id: fileId,
+      id: responseId || fileId,
       filename: name || filename || "",
       success,
       status,
