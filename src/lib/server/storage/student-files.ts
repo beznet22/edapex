@@ -11,6 +11,8 @@ export interface ExtractedAssessment {
     status: AssessmentStatus;
     error?: string;
     originalName?: string;
+    fileId?: string;
+    storagePath?: string;
 }
 
 export class StudentFileStorage {
@@ -71,6 +73,9 @@ export class StudentFileStorage {
 
         // Ensure status is extracted if not otherwise specified for saved files
         if (!data.status) data.status = "extracted";
+        
+        const storagePath = join(folder, studentFolder);
+        data.storagePath = storagePath;
 
         // Save the JSON data
         await fs.writeFile(join(dir, "data.json"), JSON.stringify(data, null, 2));
@@ -81,7 +86,7 @@ export class StudentFileStorage {
             await fs.writeFile(join(dir, imageFilename), imageBuffer);
         }
 
-        return join(folder, studentFolder);
+        return storagePath;
     }
 
     async savePending(params: {
@@ -100,6 +105,7 @@ export class StudentFileStorage {
         const nameToUse = params.fullName || `Unknown_Student_${Date.now()}`;
         const folderName = this.formatName(nameToUse);
         const dir = join(this.basePath, folder, folderName);
+        const storagePath = join(folder, folderName);
 
         await fs.mkdir(dir, { recursive: true });
 
@@ -109,6 +115,7 @@ export class StudentFileStorage {
             status: params.status || "uploaded",
             error: params.error,
             originalName: params.fileName,
+            storagePath,
             data: {
                 studentData: {
                     fullName: params.fullName || "Unknown Student",
@@ -125,7 +132,7 @@ export class StudentFileStorage {
         const imageFilename = `${folderName}.jpg`;
         await fs.writeFile(join(dir, imageFilename), imageBuffer);
 
-        return join(folder, folderName);
+        return storagePath;
     }
 
     async load(folderPath: string): Promise<ExtractedAssessment | null> {

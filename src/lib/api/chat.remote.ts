@@ -236,10 +236,10 @@ export const getResources = query(
               const assessmentData = await studentFileStorage.load(folderPath);
               if (!assessmentData) continue;
 
-              const resourceId = folderPath;
+              const resourceId = assessmentData.storagePath || folderPath;
               resources.push({
                 id: resourceId,
-                filename: assessmentData.data?.studentData?.fullName || folderPath.split("/").pop() || "Unknown",
+                filename: assessmentData.data?.studentData?.fullName || assessmentData.originalName || folderPath.split("/").pop() || "Unknown",
                 originalName: assessmentData.originalName || folderPath.split("/").pop(),
                 token,
                 status: assessmentData.status,

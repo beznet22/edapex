@@ -203,11 +203,7 @@ export class FilesContext {
 
   deleteFile = async (upload: UploadedData) => {
     const params = new URLSearchParams();
-    if (upload.status === "uploaded" || upload.status === "error") {
-      params.append("filename", upload.filename);
-    } else if (["extracted", "approved", "published"].includes(upload.status)) {
-      params.append("fileId", upload.id);
-    }
+    params.append("fileId", upload.id);
 
     try {
       const resp = await fetch(`/api/uploads?${params.toString()}`, {
@@ -235,6 +231,7 @@ export class FilesContext {
       this.uploads = this.uploads.map((u) =>
         u.id === fileId ? { 
           ...u, 
+          id: data.id || u.id, 
           status: data.status,
           success: data.success,
           error: data.error,
