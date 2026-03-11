@@ -145,7 +145,7 @@
                    Target Assessment
                 </h3>
              </div>
-
+             
              {#if filesContext.selectedClass}
                {#if userCtx.students && userCtx.students.length > 0}
                 <div class="w-full">
@@ -169,11 +169,32 @@
                       side="bottom" 
                       align="start"
                       trapFocus={false}
-                      onOpenAutoFocus={(e) => e.preventDefault()}
                       portalProps={{ disabled: true }}
                     >
                       <Command.Root class="w-full">
-                        <Command.Input placeholder="Search student..." class="h-9" autofocus />
+                        <Command.Input
+                          placeholder="Search student..."
+                          class="h-9"
+                          autofocus
+                          onfocus={(e) => {
+                            // Prevent the browser's native scroll-to-focus from pushing the
+                            // entire page above the keyboard. The drawer is position:fixed,
+                            // so we only need to reset the document scroll.
+                            const resetScroll = () => {
+                              if (document.scrollingElement) document.scrollingElement.scrollTop = 0;
+                              window.scrollTo(0, 0);
+                            };
+                            // Reset multiple times during keyboard animation
+                            const t1 = setTimeout(resetScroll, 50);
+                            const t2 = setTimeout(resetScroll, 150);
+                            const t3 = setTimeout(resetScroll, 300);
+                            const t4 = setTimeout(resetScroll, 500);
+                            e.currentTarget.addEventListener('blur', () => {
+                              clearTimeout(t1); clearTimeout(t2);
+                              clearTimeout(t3); clearTimeout(t4);
+                            }, { once: true });
+                          }}
+                        />
                         <Command.List class="max-h-[300px]">
                           <Command.Empty>No student found.</Command.Empty>
                           <Command.Group>

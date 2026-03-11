@@ -35,10 +35,47 @@
 
     const isMobile = new IsMobile();
 
+    let drawerContentRef = $state<HTMLElement>(null!);
+
     function handleClose() {
         open = false;
         onOpenChange?.(false);
     }
+
+    // Adjust drawer position when virtual keyboard opens on mobile
+    $effect(() => {
+        if (!isMobile.current || !open) return;
+
+        const vv = window.visualViewport;
+        if (!vv) return;
+
+        const onViewportChange = () => {
+            if (!drawerContentRef) return;
+            // Calculate how much the visual viewport has shrunk (keyboard height)
+            const keyboardHeight = window.innerHeight - vv.height - vv.offsetTop;
+            if (keyboardHeight > 50) {
+                // Keyboard is open — lift the drawer above it
+                drawerContentRef.style.bottom = `${keyboardHeight}px`;
+                drawerContentRef.style.maxHeight = `${vv.height * 0.85}px`;
+            } else {
+                // Keyboard is closed — reset
+                drawerContentRef.style.bottom = '';
+                drawerContentRef.style.maxHeight = '';
+            }
+        };
+
+        vv.addEventListener('resize', onViewportChange);
+        vv.addEventListener('scroll', onViewportChange);
+
+        return () => {
+            vv.removeEventListener('resize', onViewportChange);
+            vv.removeEventListener('scroll', onViewportChange);
+            if (drawerContentRef) {
+                drawerContentRef.style.bottom = '';
+                drawerContentRef.style.maxHeight = '';
+            }
+        };
+    });
 </script>
 
 {#if isMobile.current}
@@ -54,8 +91,9 @@
                 class="fixed inset-0 z-50 bg-black/50 backdrop-blur-md"
             />
             <Drawer.Content
+                bind:ref={drawerContentRef}
                 class={cn(
-                    "fixed bottom-0 left-0 right-0 z-50 mt-24 flex max-h-[85vh] flex-col rounded-t-[2.5rem] bg-background/95 backdrop-blur-xl border-t border-white/10 outline-none",
+                    "fixed bottom-0 left-0 right-0 z-50 mt-24 flex max-h-[85vh] flex-col rounded-t-[2.5rem] bg-background/95 backdrop-blur-xl border-t border-white/10 outline-none transition-[bottom,max-height] duration-200",
                     className,
                 )}
             >
