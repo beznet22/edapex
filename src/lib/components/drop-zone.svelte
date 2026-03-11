@@ -165,25 +165,15 @@
                       {/snippet}
                     </Popover.Trigger>
                     <Popover.Content 
-                      class="p-0 w-[calc(100vw-2rem)] sm:w-(--bits-popover-anchor-width) z-[100] max-h-[50vh] flex flex-col" 
+                      class="p-0 w-(--bits-popover-anchor-width)" 
                       side="bottom" 
                       align="start"
-                      sideOffset={8}
-                      avoidCollisions={true}
                       trapFocus={false}
                       onOpenAutoFocus={(e) => e.preventDefault()}
-                      portalProps={{ disabled: false }}
+                      portalProps={{ disabled: true }}
                     >
                       <Command.Root class="w-full">
-                        <Command.Input 
-                          placeholder="Search student..." 
-                          class="h-9" 
-                          onMount={(el) => {
-                            if (el) {
-                                tick().then(() => el.focus());
-                            }
-                          }}
-                        />
+                        <Command.Input placeholder="Search student..." class="h-9" autofocus />
                         <Command.List class="max-h-[300px]">
                           <Command.Empty>No student found.</Command.Empty>
                           <Command.Group>
