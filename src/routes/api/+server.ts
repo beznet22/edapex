@@ -22,7 +22,7 @@ export const GET: RequestHandler = async () => {
       return json({ success: false, error: validated.error.issues })
     }
 
-    return json({ validated })
+    return json({ mappingData })
 
     const response = await assessment.publishResults({ studentIds: [144], examId: 5 });
     if (!response.success) {

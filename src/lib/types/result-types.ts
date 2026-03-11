@@ -92,6 +92,7 @@ export type MarkData = {
   subjectId: number | null;
   totalMarks: number;
   examTitle: string | null;
+  examMark: number | null;
   subjectCode: string | null;
   isAbsent: number;
   subjectName: string | null;

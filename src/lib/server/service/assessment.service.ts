@@ -8,7 +8,7 @@ import {
   type StudentInput,
   type StudentRatings,
 } from "$lib/schema/result-input";
-import { AttributeRemark } from "$lib/constants/assessment";
+import { AttributeRemark, EXAM_MARK_MAXIMUMS } from "$lib/constants/assessment";
 import {
   resultOutputSchema,
   type Category,
@@ -559,6 +559,7 @@ export class AssessmentService {
         subjectId: result.subjectId || 0,
         markIds: [],
         titleIds: [],
+        fullMarks: [],
         subjectCode: result.subjectCode || "",
         objectives: [],
         titles: [],
@@ -592,6 +593,7 @@ export class AssessmentService {
         subjectId: first?.subjectId || 0,
         markIds: sMarks.map((m: MarkData) => m.markId || 0),
         titleIds: sMarks.map((m: MarkData) => m.titleId || 0),
+        fullMarks: sMarks.map((m: MarkData) => m.examMark || 0),
         subjectCode: first?.subjectCode || "",
         objectives: obj?.text?.split("|").map((s: string) => s.trim()) || ([] as string[]),
         titles: Object.keys(marksObj),
@@ -719,7 +721,8 @@ export class AssessmentService {
         for (let i = 0; i < store.examTitles.length; i++) {
           const title = store.examTitles[i];
           const score = store.marks[i] || 0;
-          const fullMarks = 100; // Default or resolve from setup if needed
+          const maxMarks = EXAM_MARK_MAXIMUMS[this.category!];
+          const fullMarks = maxMarks?.[title.toUpperCase()] ?? 100;
 
           const examSetupId = this.findExamSetupId(examSetups, subjectId, title, examId);
 
@@ -941,6 +944,7 @@ export class AssessmentService {
 
     const parsedResult = JSON.parse(content.trim());
 
+    // Patch class section data
     const classSection = await resultRepo.getClassSectionById(classId, sectionId);
     const finalClassName = classSection?.className || (parsedResult.studentData as any).className || "Unknown";
     const finalSectionName = classSection?.sectionName || (parsedResult.studentData as any).sectionName || "Unknown";
@@ -951,6 +955,7 @@ export class AssessmentService {
       parsedResult.studentData.class = `${finalClassName} ${finalSectionName}`.trim();
     }
 
+    // Patch student data
     if (studentId) parsedResult.studentData.studentId = studentId;
     if (admissionNo) parsedResult.studentData.admissionNo = admissionNo;
     if (fullName) parsedResult.studentData.fullName = fullName;

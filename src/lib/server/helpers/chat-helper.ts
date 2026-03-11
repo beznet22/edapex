@@ -1,11 +1,10 @@
 import type { xUIMessage } from "$lib/types/chat-types";
-import { generateText, type LanguageModel, type ModelMessage, type Provider } from "ai";
-import type { DBMessage } from "../db/schema";
-import { CredentialType } from "$lib/schema/chat-schema";
-import { resultInputSchema } from "$lib/schema/result-input";
 import { extractPrompt } from "../prompts/extract";
 import { useAgent } from "../service/agent.service";
+import { generateText, type LanguageModel, type ModelMessage, type Provider } from "ai";
 import { writeFileSync } from "fs";
+import { CredentialType } from "$lib/schema/chat-schema";
+import type { DBMessage } from "../db/schema";
 
 export function convertToUIMessages(messages: Array<DBMessage>): Array<xUIMessage> {
   return messages.map((message) => ({
@@ -75,7 +74,10 @@ export const generateContent = async (file: Blob, mapString?: string) => {
       messages,
     });
 
-    return { success: true, content: result.text };
+    // Strip markdown code fences (e.g. ```json ... ```) if present
+    const raw = result.text.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
+
+    return { success: true, content: raw };
   } catch (e) {
     console.error("Failed to extract content", e);
     return { success: false, message: "Failed to extract content" };
