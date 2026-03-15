@@ -13,6 +13,7 @@ The project involves migrating a legacy MariaDB database (`devdb`) to a moderniz
 - [ ] **Unified Financials**: Review `domain-finance.ts`. Check if the `edx_ledger_entries` table correctly consolidates legacy fee payments, wallet top-ups, and expenses using the `transaction_type` and `reference_type` polymorphic pointers.
 - [ ] **Domain Separation**: Verify that the 14 domains satisfy the "Strangler Fig" pattern requirements.
 - [ ] **Naming Conventions**: Ensure all V2 tables follow the `edx_*` prefixing and snake_case column naming.
+- [ ] **Legacy Deadwood Audit**: Identify columns carried over from `devdb` that are no longer strictly required or have been subsumed by new structures (e.g. redundant flat strings that now exist in `metadata`, legacy status flags replaced by new polymorphic enums, or redundant `school_id` columns that should consistently be `tenant_id`).
 
 ### 2. Schema Verification
 - [ ] **Foreign Key Enforcement**: Audit the `REFERENCES` constraints added to all `domain-*.ts` files. Specifically, check cross-database references to `devdb.users` for identity integrity.
