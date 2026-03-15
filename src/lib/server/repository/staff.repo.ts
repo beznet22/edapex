@@ -142,24 +142,28 @@ export class StaffRepository extends BaseRepository {
         activeStatus: 1,
       });
 
-      // Dual-write: Create staff in new edx_accounts table
-      await this.db.insert(accounts).values({
-        tenantId: schoolId,
-        userId: userId,
-        accountType: "staff",
-        firstName: input.firstName,
-        lastName: input.lastName,
-        email: input.email,
-        mobile: input.mobile,
-        genderId: input.genderId,
-        metadata: {
-          designationId: input.designationId,
-          departmentId: input.departmentId,
-          qualification: input.qualification,
-          experience: input.experience
-        },
-        activeStatus: 1,
-      });
+      // Dual-write: Create staff in new edx_accounts table (V2 DB)
+      try {
+        await this.dbV2.insert(accounts).values({
+          tenantId: schoolId,
+          userId: userId,
+          accountType: "staff",
+          firstName: input.firstName,
+          lastName: input.lastName,
+          email: input.email,
+          mobile: input.mobile,
+          genderId: input.genderId,
+          metadata: {
+            designationId: input.designationId,
+            departmentId: input.departmentId,
+            qualification: input.qualification,
+            experience: input.experience
+          },
+          activeStatus: 1,
+        });
+      } catch (v2Error) {
+        console.error("V2 Shadow Write (Staff) Failed:", v2Error);
+      }
 
       return {
         id: staff.insertId,
@@ -234,7 +238,7 @@ export class StaffRepository extends BaseRepository {
       await this.db.update(smStaffs).set({ activeStatus }).where(eq(smStaffs.userId, user.id));
 
       // Dual-write: Update edx_accounts table
-      await this.db.update(accounts)
+      await this.dbV2.update(accounts)
         .set({ activeStatus })
         .where(and(eq(accounts.userId, user.id), eq(accounts.accountType, "staff")));
 
@@ -270,7 +274,7 @@ export class StaffRepository extends BaseRepository {
       await this.db.delete(smStaffs).where(eq(smStaffs.userId, user.id));
 
       // Dual-write: Delete from edx_accounts
-      await this.db.delete(accounts).where(and(eq(accounts.userId, user.id), eq(accounts.accountType, "staff")));
+      await this.dbV2.delete(accounts).where(and(eq(accounts.userId, user.id), eq(accounts.accountType, "staff")));
 
       // Delete from users table
       await this.db.delete(users).where(eq(users.id, user.id));

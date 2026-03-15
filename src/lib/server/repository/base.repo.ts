@@ -28,6 +28,7 @@ const CACHE_TTL = 5 * 60 * 1000; // 5 minutes cache TTL
 
 export class BaseRepository {
   public db!: MySQLDrizzleClient;
+  public dbV2!: MySQLDrizzleClient;
   protected tenant!: TenantContext;
 
   constructor() { }
@@ -37,7 +38,9 @@ export class BaseRepository {
     tenant?: TenantContext
   ): Promise<T> {
     const inst = new this();
+    const { getDatabase, getDatabaseV2 } = await import("../db");
     inst.db = await getDatabase();
+    inst.dbV2 = await getDatabaseV2();
     if (tenant) {
       inst.tenant = tenant;
     } else {
@@ -47,20 +50,35 @@ export class BaseRepository {
         tenantId: config.generalSettings[0]?.schoolId ?? 1,
         academicId: config.activeAcademicYear?.id ?? 1,
         userId: 0,
-       };
+      };
     }
     return inst;
   }
 
   /**
    * Generic create method to insert records into any table
+   * Mirrored to V2 if shadow mapping is enabled
    */
   async create<T extends { [key: string]: any }>(params: {
     table: any;
     values: T;
+    shadowTable?: any;
+    shadowValues?: any;
   }) {
     return this.withErrorHandling(async () => {
-      return await this.db.insert(params.table).values(params.values);
+      const result = await this.db.insert(params.table).values(params.values);
+      
+      // Shadow Write if configured
+      if (params.shadowTable && params.shadowValues) {
+        try {
+          await this.dbV2.insert(params.shadowTable).values(params.shadowValues);
+        } catch (v2Error) {
+          console.error("V2 Shadow Write Failed:", v2Error);
+          // Don't fail the primary write if shadow write fails
+        }
+      }
+      
+      return result;
     }, "create");
   }
 

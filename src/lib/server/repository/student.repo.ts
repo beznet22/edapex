@@ -25,6 +25,7 @@ import {
   smAcademicYears,
 } from "$lib/server/db/sms-schema";
 import { accounts } from "$lib/server/db/domain-core";
+import { enrollments } from "$lib/server/db/domain-academic";
 import { BaseRepository } from "./base.repo";
 import type { Attendance } from "$lib/schema/result-input";
 import type { NewAttendance, StudentRecord } from "$lib/types/result-types";
@@ -255,17 +256,21 @@ export class StudentRepository extends BaseRepository {
       const [newParent] = await this.db.insert(smParents).values(parentData).$returningId();
       parentId = newParent.id;
 
-      // Dual-write: Create parent in new edx_accounts table
-      await this.db.insert(accounts).values({
-        tenantId: schoolId,
-        userId: parentUserId,
-        accountType: "parent",
-        firstName: guardiansName.split(' ')[0] || guardiansName,
-        lastName: guardiansName.split(' ').slice(1).join(' ') || 'Parent',
-        email: guardiansEmail,
-        mobile: guardiansMobile,
-        activeStatus: 1,
-      });
+      // Dual-write: Create parent in new edx_accounts table (V2 DB)
+      try {
+        await this.dbV2.insert(accounts).values({
+          tenantId: schoolId,
+          userId: parentUserId,
+          accountType: "parent",
+          firstName: guardiansName.split(' ')[0] || guardiansName,
+          lastName: guardiansName.split(' ').slice(1).join(' ') || 'Parent',
+          email: guardiansEmail,
+          mobile: guardiansMobile,
+          activeStatus: 1,
+        });
+      } catch (v2Error) {
+        console.error("V2 Shadow Write (Parent) Failed:", v2Error);
+      }
     }
 
     // Generate temporary student password
@@ -313,7 +318,7 @@ export class StudentRepository extends BaseRepository {
       .$returningId();
 
     // Step 6: Create the Student Record (class enrollment)
-    await this.db.insert(studentRecords).values({
+    const [studentRecord] = await this.db.insert(studentRecords).values({
       studentId: newStudent.id,
       classId,
       sectionId,
@@ -323,22 +328,36 @@ export class StudentRepository extends BaseRepository {
       isDefault: 1,
       isPromote: 0,
       activeStatus: 1,
-    });
+    }).$returningId();
 
-    // Dual-write: Create student in new edx_accounts table
-    await this.db.insert(accounts).values({
-      tenantId: schoolId,
-      userId: user.id,
-      accountType: "student",
-      firstName,
-      lastName,
-      email,
-      mobile,
-      dateOfBirth,
-      genderId,
-      metadata: { admissionNo: finalAdmissionNo, studentCategoryId },
-      activeStatus: 1,
-    });
+    // Dual-write: Create student in new edx_accounts table (V2 DB)
+    try {
+      const [v2Student] = await this.dbV2.insert(accounts).values({
+        tenantId: schoolId,
+        userId: user.id,
+        accountType: "student",
+        firstName,
+        lastName,
+        email,
+        mobile,
+        dateOfBirth,
+        genderId,
+        metadata: { admissionNo: finalAdmissionNo, studentCategoryId },
+        activeStatus: 1,
+      }).$returningId();
+
+      // Dual-write: Create enrollment in V2
+      await this.dbV2.insert(enrollments).values({
+        tenantId: schoolId,
+        accountId: v2Student.id,
+        classId,
+        sectionId,
+        academicId,
+        status: "active",
+      });
+    } catch (v2Error) {
+      console.error("V2 Shadow Write (Student/Enrollment) Failed:", v2Error);
+    }
 
     // Return the full student record
     const [createdStudent] = await this.db
@@ -577,7 +596,7 @@ export class StudentRepository extends BaseRepository {
        // retrieve userId to target the exact account
        const [s] = await this.db.select({ userId: smStudents.userId }).from(smStudents).where(eq(smStudents.id, student.studentId)).limit(1);
         if (s?.userId) {
-           await this.db.update(accounts)
+           await this.dbV2.update(accounts)
              .set(accountUpdateData)
              .where(and(eq(accounts.userId, s.userId), eq(accounts.accountType, "student")));
         }
@@ -596,7 +615,7 @@ export class StudentRepository extends BaseRepository {
     // Dual-write: Update edx_accounts photo
     const [s] = await this.db.select({ userId: smStudents.userId }).from(smStudents).where(eq(smStudents.id, studentId)).limit(1);
      if (s?.userId) {
-        await this.db.update(accounts)
+        await this.dbV2.update(accounts)
           .set({ photo: photoPath })
           .where(and(eq(accounts.userId, s.userId), eq(accounts.accountType, "student")));
      }
@@ -1078,7 +1097,7 @@ export class StudentRepository extends BaseRepository {
         await this.db.update(users).set({ activeStatus }).where(eq(users.id, student.userId));
         
         // Dual-write: update edx_accounts
-        await this.db.update(accounts)
+        await this.dbV2.update(accounts)
           .set({ activeStatus })
           .where(and(eq(accounts.userId, student.userId), eq(accounts.accountType, "student")));
       }
@@ -1112,7 +1131,7 @@ export class StudentRepository extends BaseRepository {
         await this.db.delete(users).where(eq(users.id, student.userId));
         
         // Dual-write: delete from edx_accounts
-        await this.db.delete(accounts)
+        await this.dbV2.delete(accounts)
           .where(and(eq(accounts.userId, student.userId), eq(accounts.accountType, "student")));
       }
 
