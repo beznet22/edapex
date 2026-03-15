@@ -6,11 +6,15 @@ import * as schema from "./schema";
 import * as relations from "./relations";
 
 export type MySQLDrizzleClient = MySql2Database<typeof schema & typeof relations>;
+// For now, V2 uses the same generated types as they are consolidated in schema.ts
+export type MySQLDrizzleClientV2 = MySql2Database<typeof schema & typeof relations>;
 
 let pool: mysql.Pool | null = null;
+let poolV2: mysql.Pool | null = null;
 
 /** Cached promise so getDatabase() always returns a Promise. */
 let dbInstancePromise: Promise<MySQLDrizzleClient> | null = null;
+let dbInstancePromiseV2: Promise<MySQLDrizzleClientV2> | null = null;
 
 /**
  * Return a Promise that resolves to a cached drizzle client.
@@ -47,6 +51,41 @@ export function connectMySQL(): MySQLDrizzleClient {
 }
 
 /**
+ * Return a Promise that resolves to a cached drizzle client for the V2 Database.
+ */
+export async function getDatabaseV2(): Promise<MySQLDrizzleClientV2> {
+  if (!dbInstancePromiseV2) {
+    dbInstancePromiseV2 = Promise.resolve(connectMySQLV2());
+  }
+  return dbInstancePromiseV2;
+}
+
+/**
+ * Synchronously create mysql2 pool and drizzle client for V2.
+ */
+export function connectMySQLV2(): MySQLDrizzleClientV2 {
+  if (!poolV2) {
+    if (!env.DATABASE_V2_URL) {
+      throw new Error("DATABASE_V2_URL is not configured in the environment.");
+    }
+    poolV2 = mysql.createPool({
+      uri: env.DATABASE_V2_URL,
+      waitForConnections: true,
+      connectionLimit: 10,
+      queueLimit: 0,
+    });
+  }
+
+  const client = drizzleMySQL(poolV2, {
+    schema: { ...schema, ...relations },
+    mode: "default",
+  });
+
+  return client;
+}
+
+
+/**
  * Gracefully close the MySQL pool (useful for tests, CLI, or HMR).
  */
 export async function closeDatabase(): Promise<void> {
@@ -59,12 +98,20 @@ export async function closeDatabase(): Promise<void> {
     }
     pool = null;
   }
+  if (poolV2) {
+    try {
+      await poolV2.end();
+    } catch (err) {}
+    poolV2 = null;
+  }
   dbInstancePromise = null;
+  dbInstancePromiseV2 = null;
 }
 
 /** Clear cache without closing pool (rarely used). */
 export function clearDatabaseCache(): void {
   dbInstancePromise = null;
+  dbInstancePromiseV2 = null;
 }
 
 /**

@@ -6146,7 +6146,6 @@ export const smModulePermissionAssigns = mysqlTable(
       foreignColumns: [smSchools.id],
     })
       .onDelete("cascade")
-      .onUpdate("restrict"),
   })
 );
 
@@ -7707,7 +7706,12 @@ export const smStudents = mysqlTable("sm_students", {
       onDelete: "cascade",
       onUpdate: "restrict",
     }),
-});
+}, (table) => ({
+    parentIdx: index("sm_students_parent_idx").on(table.parentId),
+    userIdx: index("sm_students_user_idx").on(table.userId),
+    schoolAcademicIdx: index("sm_students_school_academic_idx").on(table.schoolId, table.academicId),
+    schoolIdx: index("sm_students_school_idx").on(table.schoolId),
+}));
 
 export const smStudentAttendances = mysqlTable("sm_student_attendances", {
   id: int().autoincrement().primaryKey().notNull(),
@@ -7794,6 +7798,8 @@ export const smStudentAttendanceImports = mysqlTable(
     })
       .onDelete("cascade")
       .onUpdate("restrict"),
+    studentDateIdx: index("sm_student_attendances_student_date_idx").on(table.studentId, table.attendanceDate),
+    schoolAcademicIdx: index("sm_student_attendances_school_academic_idx").on(table.schoolId, table.academicId),
   })
 );
 
@@ -9248,7 +9254,10 @@ export const users = mysqlTable("users", {
   verified: varchar({ length: 191 }).default(sql`NULL`),
   trialEndsAt: timestamp("trial_ends_at", { mode: "string" }).default(sql`NULL`),
   walletBalance: double("wallet_balance", { precision: 8, scale: 2 }).notNull(),
-});
+}, (table) => ({
+    emailSchoolIdx: index("users_email_school_idx").on(table.email, table.schoolId),
+    schoolIdx: index("users_school_idx").on(table.schoolId),
+}));
 
 export const userOtpCodes = mysqlTable("user_otp_codes", {
   id: bigint({ mode: "number" }).autoincrement().primaryKey().notNull(),

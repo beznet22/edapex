@@ -4,6 +4,7 @@ import {
   smStudents,
   users,
 } from "$lib/server/db/sms-schema";
+import { accounts } from "$lib/server/db/domain-core";
 import { BaseRepository } from "./base.repo";
 
 export type ParentRow = typeof smParents.$inferSelect;
@@ -138,11 +139,16 @@ export class ParentRepository extends BaseRepository {
           .set({ userId: newUser.id })
           .where(eq(smParents.id, parentId));
       } else {
-        // Update existing user
         await tx
           .update(users)
           .set({ email: newEmail, username: newEmail })
           .where(eq(users.id, userId));
+          
+        // Dual-write: update edx_accounts
+        await tx
+          .update(accounts)
+          .set({ email: newEmail })
+          .where(and(eq(accounts.userId, userId), eq(accounts.accountType, "parent")));
       }
 
       // Always update sm_parents email

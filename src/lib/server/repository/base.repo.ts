@@ -2,6 +2,7 @@ import { getDatabase } from "../db";
 import type { MySql2Database } from "drizzle-orm/mysql2/driver";
 import { smAcademicYears, smExamTypes, smGeneralSettings } from "../db/sms-schema";
 import { eq, and, desc, type SQL } from "drizzle-orm";
+import type { TenantContext } from "../db/domain-core";
 import type { ExamType } from "$lib/schema/result-output";
 import { DbInternalError } from "../helpers/errors";
 
@@ -27,12 +28,27 @@ const CACHE_TTL = 5 * 60 * 1000; // 5 minutes cache TTL
 
 export class BaseRepository {
   public db!: MySQLDrizzleClient;
+  protected tenant!: TenantContext;
 
   constructor() { }
 
-  static async build<T extends BaseRepository>(this: new () => T): Promise<T> {
+  static async build<T extends BaseRepository>(
+    this: new () => T,
+    tenant?: TenantContext
+  ): Promise<T> {
     const inst = new this();
     inst.db = await getDatabase();
+    if (tenant) {
+      inst.tenant = tenant;
+    } else {
+      // Backward compatibility: auto-detect from config cache
+      const config = await inst.loadConfigurations();
+      inst.tenant = {
+        tenantId: config.generalSettings[0]?.schoolId ?? 1,
+        academicId: config.activeAcademicYear?.id ?? 1,
+        userId: 0,
+       };
+    }
     return inst;
   }
 

@@ -16,6 +16,7 @@ import {
   studentRecords,
   users,
 } from "$lib/server/db/sms-schema";
+import { accounts } from "$lib/server/db/domain-core";
 import { BaseRepository } from "./base.repo";
 import { hashPwd } from "$lib/server/helpers/utils";
 
@@ -141,6 +142,25 @@ export class StaffRepository extends BaseRepository {
         activeStatus: 1,
       });
 
+      // Dual-write: Create staff in new edx_accounts table
+      await this.db.insert(accounts).values({
+        tenantId: schoolId,
+        userId: userId,
+        accountType: "staff",
+        firstName: input.firstName,
+        lastName: input.lastName,
+        email: input.email,
+        mobile: input.mobile,
+        genderId: input.genderId,
+        metadata: {
+          designationId: input.designationId,
+          departmentId: input.departmentId,
+          qualification: input.qualification,
+          experience: input.experience
+        },
+        activeStatus: 1,
+      });
+
       return {
         id: staff.insertId,
         userId,
@@ -213,6 +233,11 @@ export class StaffRepository extends BaseRepository {
       // Update sm_staffs table
       await this.db.update(smStaffs).set({ activeStatus }).where(eq(smStaffs.userId, user.id));
 
+      // Dual-write: Update edx_accounts table
+      await this.db.update(accounts)
+        .set({ activeStatus })
+        .where(and(eq(accounts.userId, user.id), eq(accounts.accountType, "staff")));
+
       return {
         success: true,
         email: user.email,
@@ -243,6 +268,9 @@ export class StaffRepository extends BaseRepository {
 
       // Delete from sm_staffs table first (foreign key dependency usually dictates this order)
       await this.db.delete(smStaffs).where(eq(smStaffs.userId, user.id));
+
+      // Dual-write: Delete from edx_accounts
+      await this.db.delete(accounts).where(and(eq(accounts.userId, user.id), eq(accounts.accountType, "staff")));
 
       // Delete from users table
       await this.db.delete(users).where(eq(users.id, user.id));

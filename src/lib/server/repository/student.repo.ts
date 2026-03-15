@@ -24,6 +24,7 @@ import {
   chatGroupUsers,
   smAcademicYears,
 } from "$lib/server/db/sms-schema";
+import { accounts } from "$lib/server/db/domain-core";
 import { BaseRepository } from "./base.repo";
 import type { Attendance } from "$lib/schema/result-input";
 import type { NewAttendance, StudentRecord } from "$lib/types/result-types";
@@ -253,6 +254,18 @@ export class StudentRepository extends BaseRepository {
 
       const [newParent] = await this.db.insert(smParents).values(parentData).$returningId();
       parentId = newParent.id;
+
+      // Dual-write: Create parent in new edx_accounts table
+      await this.db.insert(accounts).values({
+        tenantId: schoolId,
+        userId: parentUserId,
+        accountType: "parent",
+        firstName: guardiansName.split(' ')[0] || guardiansName,
+        lastName: guardiansName.split(' ').slice(1).join(' ') || 'Parent',
+        email: guardiansEmail,
+        mobile: guardiansMobile,
+        activeStatus: 1,
+      });
     }
 
     // Generate temporary student password
@@ -309,6 +322,21 @@ export class StudentRepository extends BaseRepository {
       schoolId,
       isDefault: 1,
       isPromote: 0,
+      activeStatus: 1,
+    });
+
+    // Dual-write: Create student in new edx_accounts table
+    await this.db.insert(accounts).values({
+      tenantId: schoolId,
+      userId: user.id,
+      accountType: "student",
+      firstName,
+      lastName,
+      email,
+      mobile,
+      dateOfBirth,
+      genderId,
+      metadata: { admissionNo: finalAdmissionNo, studentCategoryId },
       activeStatus: 1,
     });
 
@@ -537,6 +565,24 @@ export class StudentRepository extends BaseRepository {
       .set(updateData)
       .where(eq(smStudents.id, student.studentId));
     
+    // Dual-write: Update edx_accounts
+    // We update based on userId or metadata->admissionNo since we don't store smStudents.id directly
+    const accountUpdateData: Record<string, any> = {};
+    if (student.firstName !== undefined) accountUpdateData.firstName = student.firstName;
+    if (student.lastName !== undefined) accountUpdateData.lastName = student.lastName;
+    if (student.dateOfBirth !== undefined) accountUpdateData.dateOfBirth = student.dateOfBirth;
+    if (student.genderId !== undefined) accountUpdateData.genderId = student.genderId;
+    
+    if (Object.keys(accountUpdateData).length > 0) {
+       // retrieve userId to target the exact account
+       const [s] = await this.db.select({ userId: smStudents.userId }).from(smStudents).where(eq(smStudents.id, student.studentId)).limit(1);
+        if (s?.userId) {
+           await this.db.update(accounts)
+             .set(accountUpdateData)
+             .where(and(eq(accounts.userId, s.userId), eq(accounts.accountType, "student")));
+        }
+    }
+
     if (updated.affectedRows === 0) return null;
     return updated;
   }
@@ -546,6 +592,15 @@ export class StudentRepository extends BaseRepository {
       .update(smStudents)
       .set({ studentPhoto: photoPath })
       .where(eq(smStudents.id, studentId));
+
+    // Dual-write: Update edx_accounts photo
+    const [s] = await this.db.select({ userId: smStudents.userId }).from(smStudents).where(eq(smStudents.id, studentId)).limit(1);
+     if (s?.userId) {
+        await this.db.update(accounts)
+          .set({ photo: photoPath })
+          .where(and(eq(accounts.userId, s.userId), eq(accounts.accountType, "student")));
+     }
+
     return updated.affectedRows > 0;
   }
 
@@ -555,6 +610,18 @@ export class StudentRepository extends BaseRepository {
       .update(smStudents)
       .set({ studentCategoryId })
       .where(eq(smStudents.id, studentId));
+    
+    // Dual-write: Update edx_accounts metadata.studentCategoryId
+    // JSON update in MySQL Drizzle is complex, so we'll fetch, merge, and save
+    const [s] = await db.select({ userId: smStudents.userId }).from(smStudents).where(eq(smStudents.id, studentId)).limit(1);
+    if (s?.userId) {
+       const [acc] = await db.select({ metadata: accounts.metadata }).from(accounts).where(and(eq(accounts.userId, s.userId), eq(accounts.accountType, "student"))).limit(1);
+       if (acc) {
+          const newMeta = { ...(acc.metadata as object || {}), studentCategoryId };
+          await db.update(accounts).set({ metadata: newMeta }).where(and(eq(accounts.userId, s.userId), eq(accounts.accountType, "student")));
+       }
+    }
+
     return updated.affectedRows > 0;
   }
 
@@ -1009,6 +1076,11 @@ export class StudentRepository extends BaseRepository {
       // Update user table only if userId exists
       if (student.userId) {
         await this.db.update(users).set({ activeStatus }).where(eq(users.id, student.userId));
+        
+        // Dual-write: update edx_accounts
+        await this.db.update(accounts)
+          .set({ activeStatus })
+          .where(and(eq(accounts.userId, student.userId), eq(accounts.accountType, "student")));
       }
 
       return {
@@ -1038,6 +1110,10 @@ export class StudentRepository extends BaseRepository {
       // 3. Delete associated User account
       if (student.userId) {
         await this.db.delete(users).where(eq(users.id, student.userId));
+        
+        // Dual-write: delete from edx_accounts
+        await this.db.delete(accounts)
+          .where(and(eq(accounts.userId, student.userId), eq(accounts.accountType, "student")));
       }
 
       // Note: We leave the smParents record intact, as they may have other children enrolled.
