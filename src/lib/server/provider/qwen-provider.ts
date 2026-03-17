@@ -82,7 +82,9 @@ export class QwenProvider implements OAuth2Client {
   async generateAuthUrl(): Promise<DeviceAuth | null> {
     const { codeChallenge, codeVerifier } = await this.generateCodeVerifierAsync();
     try {
+      console.log("[QwenProvider] Requesting device authorization with codeChallenge:", codeChallenge);
       const deviceAuth = await this.requestDeviceAuthorization(codeChallenge);
+      console.log("[QwenProvider] Device authorization received:", deviceAuth);
       const verifier = {
         code: deviceAuth.device_code,
         verifier: codeVerifier,
@@ -96,7 +98,7 @@ export class QwenProvider implements OAuth2Client {
         expires_in: deviceAuth.expires_in,
       };
     } catch (error) {
-      console.error("QwenCode user code authentication failed:", error);
+      console.error("❌ [QwenProvider] user code authentication failed:", error);
       return null;
     }
   }
@@ -205,6 +207,9 @@ export class QwenProvider implements OAuth2Client {
       code_challenge_method: "S256",
     };
 
+    console.log(`[QwenProvider] POST ${this.config.deviceCodeUrl}`);
+    console.log("[QwenProvider] Request body:", bodyData);
+
     const response = await fetch(this.config.deviceCodeUrl!, {
       method: "POST",
       headers: {
@@ -215,7 +220,11 @@ export class QwenProvider implements OAuth2Client {
       body: this.objectToUrlEncoded(bodyData),
     });
 
+    console.log(`[QwenProvider] Response status: ${response.status} ${response.statusText}`);
+
     if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`❌ [QwenProvider] Device authorization failed: ${response.status} ${errorText}`);
       throw new Error(`Device authorization failed: ${response.status} ${response.statusText}`);
     }
 
@@ -233,6 +242,9 @@ export class QwenProvider implements OAuth2Client {
       code_verifier,
     };
 
+    console.log(`[QwenProvider] POST ${this.config.tokenUrl}`);
+    console.log("[QwenProvider] Poll body:", bodyData);
+
     const response = await fetch(this.config.tokenUrl, {
       method: "POST",
       headers: {
@@ -243,8 +255,11 @@ export class QwenProvider implements OAuth2Client {
       body: this.objectToUrlEncoded(bodyData),
     });
 
+    console.log(`[QwenProvider] Poll response status: ${response.status}`);
+
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
+      console.warn("[QwenProvider] Poll error data:", errorData);
 
       if (response.status === 400 && errorData.error === "authorization_pending") {
         return { status: "pending" };
@@ -254,6 +269,7 @@ export class QwenProvider implements OAuth2Client {
         return { status: "pending", slowDown: true };
       }
 
+      console.error(`❌ [QwenProvider] Credential poll failed: ${errorData.error || "Unknown error"}`);
       throw new Error(`Credential poll failed: ${errorData.error || "Unknown error"}`);
     }
 
