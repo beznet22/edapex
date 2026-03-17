@@ -26,6 +26,8 @@ import {
   deleteStaff,
   searchStaff,
   updateStudentDetails,
+  updateStudentStatus,
+  searchStudent,
   promoteStudent,
 } from "./coordinator.tool";
 
@@ -61,5 +63,7 @@ export const coordinatorTools = {
   deleteStaff,
   searchStaff,
   updateStudentDetails,
+  updateStudentStatus,
+  searchStudent,
   promoteStudent,
 };

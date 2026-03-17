@@ -190,16 +190,17 @@ export class QwenProvider implements OAuth2Client {
   }
 
   private getBaseHeaders(): Record<string, string> {
-    const version = "0.0.5"; // Real QwenCode CLI version
-    const platform = process.platform;
-    const arch = process.arch;
-
+    const version = "0.0.5";
+    const userAgent = `QwenCode/${version} (${process.platform}; ${process.arch})`;
     return {
-      "User-Agent": `QwenCode/${version} (${platform}; ${arch})`,
+      "User-Agent": userAgent,
       Accept: "application/json",
-      "Accept-Encoding": "gzip, deflate, br",
+      "X-DashScope-UserAgent": userAgent,
+      "X-DashScope-CacheControl": "enable",
+      "X-DashScope-AuthType": "qwen_oauth",
       Connection: "keep-alive",
       "Cache-Control": "no-cache",
+      "Accept-Encoding": "gzip, deflate, br",
     };
   }
 
@@ -223,7 +224,7 @@ export class QwenProvider implements OAuth2Client {
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
         Accept: "application/json",
-        ...this.getBaseHeaders(),
+        "x-request-id": crypto.randomUUID(),
       },
       body: this.objectToUrlEncoded(bodyData),
     });
@@ -265,7 +266,6 @@ export class QwenProvider implements OAuth2Client {
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
         Accept: "application/json",
-        ...this.getBaseHeaders(),
       },
       body: this.objectToUrlEncoded(bodyData),
     });
@@ -318,7 +318,6 @@ export class QwenProvider implements OAuth2Client {
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
         Accept: "application/json",
-        ...this.getBaseHeaders(),
       },
       body: this.objectToUrlEncoded(bodyData),
     });
