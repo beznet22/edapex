@@ -1,22 +1,22 @@
 import type { Category, ExamType, Rating, Remark } from "$lib/schema/result-output";
 import * as schema from "$lib/server/db/schema";
 
-export type ResultData = typeof schema.smResultStores.$inferSelect;
+export type ResultData = typeof schema.computedResults.$inferSelect;
 export type RemarkData = typeof schema.teacherRemarks.$inferSelect;
 export type RatingData = typeof schema.studentRatings.$inferSelect;
-export type MarkStoreRecord = typeof schema.smMarkStores.$inferSelect;
-export type ResultStoreRecord = typeof schema.smResultStores.$inferSelect;
-export type ExamSetup = typeof schema.smExamSetups.$inferSelect;
-export type NewSmMarkStore = typeof schema.smMarkStores.$inferInsert;
-export type NewSmResultStore = typeof schema.smResultStores.$inferInsert;
+export type MarkStoreRecord = typeof schema.examMarks.$inferSelect;
+export type ResultStoreRecord = typeof schema.computedResults.$inferSelect;
+export type ExamSetup = typeof schema.examSetups.$inferSelect;
+export type NewSmMarkStore = typeof schema.examMarks.$inferInsert;
+export type NewSmResultStore = typeof schema.computedResults.$inferInsert;
 export type NewTeacherRemark = typeof schema.teacherRemarks.$inferInsert;
 export type NewStudentRating = typeof schema.studentRatings.$inferInsert;
-export type NewLearningOutcome = typeof schema.smMarkStores.$inferInsert;
-export type NewExamSetup = typeof schema.smExamSetups.$inferInsert;
+export type NewLearningOutcome = typeof schema.examMarks.$inferInsert;
+export type NewExamSetup = typeof schema.examSetups.$inferInsert;
 export type StudentCategory = typeof schema.teacherRemarks.$inferInsert;
-export type Subject = typeof schema.smSubjects.$inferSelect;
-export type AssignedSubject = typeof schema.smAssignSubjects.$inferSelect;
-export type NewExam = typeof schema.smExams.$inferInsert;
+export type Subject = typeof schema.subjects.$inferSelect;
+export type AssignedSubject = typeof schema.subjectAssignments.$inferSelect;
+export type NewExam = typeof schema.exams.$inferInsert;
 export type NewAttendance = typeof schema.classAttendances.$inferInsert;
 
 export type ClassSection = {
@@ -27,12 +27,12 @@ export type ClassSection = {
   sectionName: string | null;
 };
 
-export type MarkStoreResult = typeof schema.smMarkStores.$inferSelect & {
+export type MarkStoreResult = typeof schema.examMarks.$inferSelect & {
   exam_title: string;
   subject_code: string;
 };
-export type AcademicYearData = typeof schema.smAcademicYears.$inferSelect;
-export type ExamTypeData = typeof schema.smExamTypes.$inferSelect;
+export type AcademicYearData = typeof schema.academicYears.$inferSelect;
+export type ExamTypeData = typeof schema.exams.$inferSelect;
 export type ClassAttendanceData = {
   days_opened: number;
   days_absent: number;

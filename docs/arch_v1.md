@@ -1,4 +1,4 @@
-Below is a **complete, scalable architecture for EdApex** that supports:
+Below is a **Scalable architecture for EdApex** that supports:
 
 * **Multi-tenant schools**
 * **AI-agent driven ERP**

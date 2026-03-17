@@ -6,15 +6,12 @@ import * as schema from "./schema";
 import * as relations from "./relations";
 
 export type MySQLDrizzleClient = MySql2Database<typeof schema & typeof relations>;
-// For now, V2 uses the same generated types as they are consolidated in schema.ts
-export type MySQLDrizzleClientV2 = MySql2Database<typeof schema & typeof relations>;
 
 let pool: mysql.Pool | null = null;
 let poolV2: mysql.Pool | null = null;
 
 /** Cached promise so getDatabase() always returns a Promise. */
 let dbInstancePromise: Promise<MySQLDrizzleClient> | null = null;
-let dbInstancePromiseV2: Promise<MySQLDrizzleClientV2> | null = null;
 
 /**
  * Return a Promise that resolves to a cached drizzle client.
@@ -32,10 +29,14 @@ export async function getDatabase(): Promise<MySQLDrizzleClient> {
  * Kept synchronous because it only constructs objects.
  */
 export function connectMySQL(): MySQLDrizzleClient {
-  // If a pool already exists (rare), reuse it.
   if (!pool) {
+    const dbUrl = env.DATABASE_V2_URL || env.DATABASE_URL;
+    if (!dbUrl) {
+      throw new Error("Missing database connection URL.");
+    }
+
     pool = mysql.createPool({
-      uri: env.DATABASE_URL,
+      uri: dbUrl,
       waitForConnections: true,
       connectionLimit: 10,
       queueLimit: 0,
@@ -51,37 +52,11 @@ export function connectMySQL(): MySQLDrizzleClient {
 }
 
 /**
- * Return a Promise that resolves to a cached drizzle client for the V2 Database.
+ * Fallback helper for V2 naming (Authoritative transition)
+ * @deprecated Use getDatabase() directly.
  */
-export async function getDatabaseV2(): Promise<MySQLDrizzleClientV2> {
-  if (!dbInstancePromiseV2) {
-    dbInstancePromiseV2 = Promise.resolve(connectMySQLV2());
-  }
-  return dbInstancePromiseV2;
-}
-
-/**
- * Synchronously create mysql2 pool and drizzle client for V2.
- */
-export function connectMySQLV2(): MySQLDrizzleClientV2 {
-  if (!poolV2) {
-    if (!env.DATABASE_V2_URL) {
-      throw new Error("DATABASE_V2_URL is not configured in the environment.");
-    }
-    poolV2 = mysql.createPool({
-      uri: env.DATABASE_V2_URL,
-      waitForConnections: true,
-      connectionLimit: 10,
-      queueLimit: 0,
-    });
-  }
-
-  const client = drizzleMySQL(poolV2, {
-    schema: { ...schema, ...relations },
-    mode: "default",
-  });
-
-  return client;
+export async function getDatabaseV2(): Promise<MySQLDrizzleClient> {
+  return getDatabase();
 }
 
 
@@ -101,17 +76,15 @@ export async function closeDatabase(): Promise<void> {
   if (poolV2) {
     try {
       await poolV2.end();
-    } catch (err) {}
+    } catch (err) { }
     poolV2 = null;
   }
   dbInstancePromise = null;
-  dbInstancePromiseV2 = null;
 }
 
 /** Clear cache without closing pool (rarely used). */
 export function clearDatabaseCache(): void {
   dbInstancePromise = null;
-  dbInstancePromiseV2 = null;
 }
 
 /**
@@ -127,6 +100,6 @@ if (import.meta?.hot) {
 
   // On dispose, close the pool (fire-and-forget)
   import.meta.hot.dispose?.(() => {
-    closeDatabase().catch(() => {});
+    closeDatabase().catch(() => { });
   });
 }

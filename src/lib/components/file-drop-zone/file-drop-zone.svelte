@@ -19,7 +19,9 @@
     ...rest
   }: FileDropZoneProps = $props();
 
-  if (maxFiles !== undefined && fileCount === undefined) {
+  import { untrack } from "svelte";
+
+  if (untrack(() => maxFiles !== undefined && fileCount === undefined)) {
     console.warn(
       "Make sure to provide FileDropZone with `fileCount` when using the `maxFiles` prompt",
     );

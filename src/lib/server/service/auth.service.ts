@@ -230,8 +230,8 @@ class AuthService {
     if (!sessionObj) return null;
 
     const [user, staff] = await Promise.all([
-      authRepo.findUser("id", sessionObj.userId),
-      authRepo.findStaff(sessionObj.userId),
+      authRepo.findUser("id", parseInt(sessionObj.userId)),
+      authRepo.findStaff(parseInt(sessionObj.userId)),
     ]);
 
     if (!user?.activeStatus) {
@@ -301,7 +301,7 @@ class AuthService {
 
     const sessionObj: Session = {
       id: (payload.jti as string) || "unknown",
-      userId,
+      userId: String(userId),
       deviceInfo: {
         fingerprint: currentFingerprint,
         userAgent: request.headers.get("user-agent") || "",

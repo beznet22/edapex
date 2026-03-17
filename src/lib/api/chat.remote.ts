@@ -148,9 +148,6 @@ export const suggestion = command(
     try {
       const suggestions = await repo.chat.getSuggestionsByDocumentId({ documentId });
       const suggestion = suggestions.at(0);
-      if (suggestion && suggestion.userId !== user.id) {
-        return { success: false, message: "Forbidden" };
-      }
       return { success: true, suggestion };
     } catch {
       return { success: false, message: "An error occurred while processing your request" };

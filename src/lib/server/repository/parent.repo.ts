@@ -1,13 +1,10 @@
-import { and, eq, like, or } from "drizzle-orm";
-import {
-  smParents,
-  smStudents,
-  users,
-} from "$lib/server/db/sms-schema";
-import { accounts } from "$lib/server/db/domain-core";
+import { and, eq, like, or, sql } from "drizzle-orm";
+import { accounts, users } from "$lib/server/db/domain-core";
+import { enrollments } from "$lib/server/db/domain-academic";
 import { BaseRepository } from "./base.repo";
+import { hashPwd } from "$lib/server/helpers/utils";
 
-export type ParentRow = typeof smParents.$inferSelect;
+export type ParentRow = typeof users.$inferSelect;
 
 const getSearchPattern = (query: string) => `%${query.trim().replace(/\s+/g, "%")}%`;
 
@@ -15,13 +12,13 @@ export class ParentRepository extends BaseRepository {
   async findParentByEmail(email: string) {
     const [parent] = await this.db
       .select({
-        parentId: smParents.id,
-        guardiansName: smParents.guardiansName,
-        guardiansEmail: smParents.guardiansEmail,
-        userId: smParents.userId,
+        parentId: users.id,
+        guardiansName: sql`CONCAT(${users.firstName}, ' ', ${users.lastName})`,
+        guardiansEmail: users.email,
+        accountId: users.accountId,
       })
-      .from(smParents)
-      .where(and(eq(smParents.guardiansEmail, email), eq(smParents.activeStatus, 1)))
+      .from(users)
+      .where(and(eq(users.email, email), eq(users.userType, "parent"), eq(users.activeStatus, 1)))
       .limit(1);
     return parent || null;
   }
@@ -29,15 +26,17 @@ export class ParentRepository extends BaseRepository {
   async findParentByStudentId(studentId: number) {
     const [result] = await this.db
       .select({
-        parentId: smParents.id,
-        guardiansName: smParents.guardiansName,
-        guardiansEmail: smParents.guardiansEmail,
-        userId: smParents.userId,
-        studentName: smStudents.fullName,
+        parentId: users.id,
+        guardiansName: sql`CONCAT(${users.firstName}, ' ', ${users.lastName})`,
+        guardiansEmail: users.email,
+        studentName: sql`CONCAT(student.first_name, ' ', student.last_name)`,
       })
-      .from(smParents)
-      .innerJoin(smStudents, eq(smParents.id, smStudents.parentId))
-      .where(and(eq(smStudents.id, studentId), eq(smStudents.activeStatus, 1)))
+      .from(users)
+      .innerJoin(
+        sql`${users} as student`,
+        eq(users.id, sql`student.parent_user_id`)
+      )
+      .where(and(eq(sql`student.id`, studentId), eq(sql`student.active_status`, 1)))
       .limit(1);
     return result || null;
   }
@@ -45,15 +44,17 @@ export class ParentRepository extends BaseRepository {
   async findParentByAdmissionNo(admissionNo: number) {
     const [result] = await this.db
       .select({
-        parentId: smParents.id,
-        guardiansName: smParents.guardiansName,
-        guardiansEmail: smParents.guardiansEmail,
-        userId: smParents.userId,
-        studentName: smStudents.fullName,
+        parentId: users.id,
+        guardiansName: sql`CONCAT(${users.firstName}, ' ', ${users.lastName})`,
+        guardiansEmail: users.email,
+        studentName: sql`CONCAT(student.first_name, ' ', student.last_name)`,
       })
-      .from(smParents)
-      .innerJoin(smStudents, eq(smParents.id, smStudents.parentId))
-      .where(and(eq(smStudents.admissionNo, admissionNo), eq(smStudents.activeStatus, 1)))
+      .from(users)
+      .innerJoin(
+        sql`${users} as student`,
+        eq(users.id, sql`student.parent_user_id`)
+      )
+      .where(and(eq(sql`student.metadata->>'$.admissionNo'`, admissionNo), eq(sql`student.active_status`, 1)))
       .limit(1);
     return result || null;
   }
@@ -62,100 +63,73 @@ export class ParentRepository extends BaseRepository {
     const searchPattern = getSearchPattern(studentName);
     return await this.db
       .select({
-        parentId: smParents.id,
-        guardiansName: smParents.guardiansName,
-        guardiansEmail: smParents.guardiansEmail,
-        studentName: smStudents.fullName,
-        admissionNo: smStudents.admissionNo,
+        parentId: users.id,
+        guardiansName: sql`CONCAT(${users.firstName}, ' ', ${users.lastName})`,
+        guardiansEmail: users.email,
+        studentName: sql`CONCAT(student.first_name, ' ', student.last_name)`,
+        admissionNo: sql`student.metadata->>'$.admissionNo'`,
       })
-      .from(smParents)
-      .innerJoin(smStudents, eq(smParents.id, smStudents.parentId))
-      .where(and(eq(smStudents.activeStatus, 1), like(smStudents.fullName, searchPattern)))
+      .from(users)
+      .innerJoin(
+        sql`${users} as student`,
+        eq(users.id, sql`student.parent_user_id`)
+      )
+      .where(and(eq(sql`student.active_status`, 1), like(sql`CONCAT(student.first_name, ' ', student.last_name)`, searchPattern)))
       .limit(10);
   }
 
   async searchParentsByName(query: string) {
-    const searchPattern = getSearchPattern(query);
+    const conditions = [
+      eq(users.activeStatus, 1),
+      eq(users.userType, "parent"),
+    ];
+
+    if (query) {
+      const searchPattern = getSearchPattern(query);
+      const orCond = or(
+        like(users.firstName, searchPattern),
+        like(users.lastName, searchPattern),
+        like(users.email, searchPattern)
+      );
+      if (orCond) conditions.push(orCond);
+    }
+
     return await this.db
       .select({
-        parentId: smParents.id,
-        guardiansName: smParents.guardiansName,
-        guardiansEmail: smParents.guardiansEmail,
-        fathersName: smParents.fathersName,
-        mothersName: smParents.mothersName,
+        parentId: users.id,
+        guardiansName: sql`CONCAT(${users.firstName}, ' ', ${users.lastName})`,
+        guardiansEmail: users.email,
       })
-      .from(smParents)
-      .where(
-        and(
-          eq(smParents.activeStatus, 1),
-          or(
-            like(smParents.guardiansName, searchPattern),
-            like(smParents.fathersName, searchPattern),
-            like(smParents.mothersName, searchPattern)
-          )
-        )
-      )
+      .from(users)
+      .where(and(...conditions))
       .limit(10);
   }
 
   async updateParentEmail(parentId: number, newEmail: string) {
     return await this.db.transaction(async (tx) => {
       const [parent] = await tx
-        .select({
-          userId: smParents.userId,
-          guardiansName: smParents.guardiansName,
-        })
-        .from(smParents)
-        .where(eq(smParents.id, parentId))
+        .select()
+        .from(users)
+        .where(eq(users.id, parentId))
         .limit(1);
 
       if (!parent) {
         throw new Error("Parent not found");
       }
 
-      const userId = parent.userId;
+      // Update Persona (User)
+      await tx
+        .update(users)
+        .set({ email: newEmail })
+        .where(eq(users.id, parentId));
 
-      if (!userId) {
-        // Create new user for parent (RoleId 3)
-        const [newUser] = await tx
-          .insert(users)
-          .values({
-            fullName: parent.guardiansName || "Parent",
-            email: newEmail,
-            username: newEmail,
-            roleId: 3, // Parent role
-            usertype: "Parent",
-            activeStatus: 1,
-            schoolId: 1,
-            walletBalance: 0,
-            isAdministrator: "no",
-            isRegistered: 1,
-          })
-          .$returningId();
-
-        // Link parent to the new user
-        await tx
-          .update(smParents)
-          .set({ userId: newUser.id })
-          .where(eq(smParents.id, parentId));
-      } else {
-        await tx
-          .update(users)
-          .set({ email: newEmail, username: newEmail })
-          .where(eq(users.id, userId));
-          
-        // Dual-write: update edx_accounts
+      // Update Identity (Account)
+      if (parent.accountId) {
         await tx
           .update(accounts)
           .set({ email: newEmail })
-          .where(and(eq(accounts.userId, userId), eq(accounts.accountType, "parent")));
+          .where(eq(accounts.id, parent.accountId));
       }
-
-      // Always update sm_parents email
-      await tx
-        .update(smParents)
-        .set({ guardiansEmail: newEmail })
-        .where(eq(smParents.id, parentId));
 
       return true;
     });

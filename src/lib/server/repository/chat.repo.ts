@@ -1,17 +1,15 @@
-import { and, asc, desc, eq, gt, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, gt, inArray, sql } from "drizzle-orm";
 import { BaseRepository } from "./base.repo";
 import { DbInternalError, DbEntityNotFoundError, unwrapSingleQueryResult } from "$lib/server/helpers/errors";
 import {
   chats,
-  documents,
   messages,
-  suggestions,
   votes,
-  type DBChat,
-  type DBMessage,
-  type Document,
-  type Vote,
-} from "../db/schema";
+  aiDocuments,
+  aiSuggestions,
+  type MessagePart,
+} from "$lib/server/db/domain-ai";
+import { users, accounts } from "$lib/server/db/domain-core";
 import type { xUIMessage } from "$lib/types/chat-types";
 import { convertToUIMessages } from "$lib/utils";
 
@@ -35,7 +33,11 @@ export interface AuthUser {
   academicId?: number;
 }
 
-type Suggestion = typeof suggestions.$inferSelect;
+
+type DBChat = typeof chats.$inferSelect;
+type Vote = typeof votes.$inferSelect;
+type Document = typeof aiDocuments.$inferSelect;
+type Suggestion = typeof aiSuggestions.$inferSelect;
 
 export class ChatRepository extends BaseRepository {
   constructor() {
@@ -47,15 +49,14 @@ export class ChatRepository extends BaseRepository {
       const result = await this.db
         .insert(chats)
         .values({
-          id,
-          createdAt: new Date(),
-          userId,
+          id: id!,
+          tenantId: this.tenant.tenantId,
+          userId: userId!,
           title: title || "New Chat",
           model: model || "chat-model",
-        })
-        .$returningId();
+        });
 
-      return result[0].id;
+      return id!;
     } catch (error) {
       console.error("Failed to create chat", error);
       throw new DbInternalError({ cause: error });
@@ -67,7 +68,7 @@ export class ChatRepository extends BaseRepository {
     try {
       await this.db.update(chats).set({ title }).where(eq(chats.id, id));
       const rows = await this.db.select().from(chats).where(eq(chats.id, id));
-      return unwrapSingleQueryResult(rows, id, "DBChat");
+      return (rows[0] as DBChat) || null;
     } catch (error) {
       console.error("Failed to update chat", error);
       throw new DbInternalError({ cause: error });
@@ -78,17 +79,17 @@ export class ChatRepository extends BaseRepository {
     const { role, parts, id } = message;
     await this.db
       .insert(messages)
-      .values({ 
-        id, 
-        chatId, 
-        role, 
-        parts: parts ?? [], 
-        metadata: message.metadata, 
+      .values({
+        id,
+        chatId,
+        role: (role as any) ?? "user",
+        parts: parts ?? [],
+        metadata: message.metadata as any,
       })
-      .onDuplicateKeyUpdate({ set: { role, parts: parts ?? [], metadata: null } });
+      .onDuplicateKeyUpdate({ set: { role: (role as any) ?? "user", parts: parts ?? [] } });
   }
 
-  async loadMessages(chatId: string): Promise<xUIMessage[]> {
+  async loadMessages(chatId: string): Promise<any[]> {
     try {
       const msgRows = await this.db
         .select()
@@ -106,11 +107,8 @@ export class ChatRepository extends BaseRepository {
   async getChatById(chatId: string): Promise<DBChat | null> {
     try {
       const rows = await this.db.select().from(chats).where(eq(chats.id, chatId));
-      return unwrapSingleQueryResult(rows, chatId, "DBChat");
+      return (rows[0] as DBChat) || null;
     } catch (error) {
-      if (error instanceof DbEntityNotFoundError) {
-        return null;
-      }
       console.error("Failed to get chat by id", error);
       throw new DbInternalError({ cause: error });
     }
@@ -123,7 +121,7 @@ export class ChatRepository extends BaseRepository {
         .from(chats)
         .where(eq(chats.userId, id))
         .orderBy(desc(chats.createdAt));
-      return rows;
+      return rows as DBChat[];
     } catch (error) {
       console.error("Failed to get chats by user id", error);
       throw new DbInternalError({ cause: error });
@@ -132,7 +130,7 @@ export class ChatRepository extends BaseRepository {
 
   async getChats(): Promise<DBChat[]> {
     try {
-      return await this.db.select().from(chats);
+      return await this.db.select().from(chats) as DBChat[];
     } catch (error) {
       console.error("Failed to get chats", error);
       throw new DbInternalError({ cause: error });
@@ -151,13 +149,12 @@ export class ChatRepository extends BaseRepository {
   async deleteMessage(messageId: string): Promise<void> {
     try {
       await this.db.transaction(async (tx) => {
-        const target = await tx.select().from(messages).where(eq(messages.id, messageId)).limit(1);
-
-        const msg = unwrapSingleQueryResult(target, messageId, "Message");
+        const [msg] = await tx.select().from(messages).where(eq(messages.id, messageId)).limit(1);
+        if (!msg) return;
 
         await tx
           .delete(messages)
-          .where(and(eq(messages.chatId, msg.chatId), gt(messages.createdAt, msg.createdAt)));
+          .where(and(eq(messages.chatId, msg.chatId), gt(messages.createdAt, msg.createdAt!)));
 
         await tx.delete(messages).where(eq(messages.id, messageId));
       });
@@ -182,9 +179,9 @@ export class ChatRepository extends BaseRepository {
         .values({
           chatId,
           messageId,
-          isUpvoted: type === "up",
+          isUpvoted: type === "up" ? 1 : 0,
         })
-        .onDuplicateKeyUpdate({ set: { isUpvoted: type === "up" } });
+        .onDuplicateKeyUpdate({ set: { isUpvoted: type === "up" ? 1 : 0 } });
     } catch (error) {
       console.error("Failed to vote message", error);
       throw new DbInternalError({ cause: error });
@@ -192,7 +189,7 @@ export class ChatRepository extends BaseRepository {
   }
 
   async getVotesByChatId({ id }: { id: string }): Promise<Vote[]> {
-    return await this.db.select().from(votes).where(eq(votes.chatId, id));
+    return await this.db.select().from(votes).where(eq(votes.chatId, id)) as Vote[];
   }
 
   async updateChatVisibilityById({
@@ -222,7 +219,7 @@ export class ChatRepository extends BaseRepository {
     content: string;
   }): Promise<void> {
     try {
-      await this.db.insert(documents).values({
+      await this.db.insert(aiDocuments).values({
         id,
         title,
         kind,
@@ -236,36 +233,33 @@ export class ChatRepository extends BaseRepository {
   }
 
   async getSuggestionsByDocumentId({ documentId }: { documentId: string }): Promise<Suggestion[]> {
-    return await this.db.select().from(suggestions).where(eq(suggestions.documentId, documentId));
+    return await this.db.select().from(aiSuggestions).where(eq(aiSuggestions.documentId, documentId)) as any[];
   }
 
   async getDocumentsById({ id }: { id: string }): Promise<Document[]> {
     return await this.db
       .select()
-      .from(documents)
-      .where(eq(documents.id, id))
-      .orderBy(asc(documents.createdAt));
+      .from(aiDocuments)
+      .where(eq(aiDocuments.id, id))
+      .orderBy(asc(aiDocuments.createdAt)) as Document[];
   }
 
   async getDocumentById({ id }: { id: string }): Promise<Document | null> {
     const [doc] = await this.db
       .select()
-      .from(documents)
-      .where(eq(documents.id, id))
-      .orderBy(desc(documents.createdAt));
+      .from(aiDocuments)
+      .where(eq(aiDocuments.id, id))
+      .orderBy(desc(aiDocuments.createdAt));
     if (!doc) return null;
 
-    return doc;
+    return doc as Document;
   }
 
   async deleteDocumentsByIdAfterTimestamp({ id, timestamp }: { id: string; timestamp: Date }): Promise<void> {
     try {
       await this.db
-        .delete(suggestions)
-        .where(and(eq(suggestions.documentId, id), gt(suggestions.documentCreatedAt, timestamp)));
-      await this.db
-        .delete(suggestions)
-        .where(and(eq(suggestions.id, id), gt(suggestions.createdAt, timestamp)));
+        .delete(aiSuggestions)
+        .where(and(eq(aiSuggestions.documentId, id), gt(aiSuggestions.createdAt, timestamp)));
     } catch (error) {
       console.error("Failed to delete documents", error);
       throw new DbInternalError({ cause: error });

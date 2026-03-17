@@ -4,9 +4,13 @@ import type { xUIMessage } from "$lib/types/chat-types";
 export function convertToUIMessages(messages: Array<DBMessage>): Array<xUIMessage> {
   return messages.map((message) => ({
     id: message.id,
-    parts: JSON.parse(message.parts as string),
+    parts: message.parts as any,
     role: message.role,
-    metadata: message.metadata,
+    metadata: {
+      ...message.metadata,
+      documentId: "",
+      createdAt: message.createdAt?.toISOString() || new Date().toISOString(),
+    } as any,
     content: "",
     createdAt: message.createdAt,
   } as xUIMessage));

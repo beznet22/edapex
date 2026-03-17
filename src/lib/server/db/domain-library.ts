@@ -4,45 +4,67 @@ import {
   int,
   timestamp,
   mysqlEnum,
-  date,
+  decimal,
   index,
+  json,
 } from "drizzle-orm/mysql-core";
 
-import { accounts } from "./domain-core";
+import { users, tenants, academicYears, accounts } from "./domain-core";
 
-// Consolidates sm_books, sm_book_issues, sm_book_categories. Uses edx_accounts FK instead of student_staff_id.
+// Rewritten Library Domain - drops edx_ prefix and adds improvements
 
-export const bookCategories = mysqlTable("edx_book_categories", {
+export const bookCategories = mysqlTable("book_categories", {
   id: int("id").autoincrement().primaryKey(),
-  tenantId: int("tenant_id").notNull(),
-  categoryName: varchar("category_name", { length: 255 }).notNull(),
+  tenantId: int("tenant_id").notNull().references(() => tenants.id),
+  name: varchar("name", { length: 200 }).notNull(),
+  description: varchar("description", { length: 500 }),
   createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow(),
 });
 
-export const books = mysqlTable("edx_books", {
+// Library Metadata Types
+export type BookMetadata = {
+  edition?: string;
+  language?: string;
+  pages?: number;
+  tags?: string[];
+};
+
+export const books = mysqlTable("books", {
   id: int("id").autoincrement().primaryKey(),
-  tenantId: int("tenant_id").notNull(),
-  categoryId: int("category_id").references(() => bookCategories.id),
+  tenantId: int("tenant_id").notNull().references(() => tenants.id),
   title: varchar("title", { length: 255 }).notNull(),
+  isbn: varchar("isbn", { length: 50 }),
   author: varchar("author", { length: 255 }),
-  isbn: varchar("isbn", { length: 100 }),
-  quantity: int("quantity").notNull().default(1),
-  available: int("available").notNull().default(1),
+  publisher: varchar("publisher", { length: 255 }),
+  categoryId: int("category_id").references(() => bookCategories.id),
+  quantity: int("quantity").notNull().default(0),
+  price: decimal("price", { precision: 12, scale: 2 }),
+  rackNo: varchar("rack_no", { length: 100 }),
+  metadata: json("metadata").$type<BookMetadata>(),
   createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow(),
 }, (table) => ({
-  tenantCategoryIdx: index("book_tenant_cat_idx").on(table.tenantId, table.categoryId),
+  tenantIdx: index("book_tenant_idx").on(table.tenantId),
+  categoryIdx: index("book_category_idx").on(table.categoryId),
 }));
 
-export const bookIssues = mysqlTable("edx_book_issues", {
+export const bookIssues = mysqlTable("book_issues", {
   id: int("id").autoincrement().primaryKey(),
-  tenantId: int("tenant_id").notNull(),
+  tenantId: int("tenant_id").notNull().references(() => tenants.id),
   bookId: int("book_id").notNull().references(() => books.id),
-  accountId: int("account_id").notNull().references(() => accounts.id), // Borrower
-  issueDate: date("issue_date", { mode: "string" }).notNull(),
-  dueDate: date("due_date", { mode: "string" }).notNull(),
-  returnDate: date("return_date", { mode: "string" }),
-  status: mysqlEnum("status", ["issued", "returned", "overdue"]).notNull(),
+  userId: int("user_id").notNull().references(() => users.id), // Borrower persona
+  issueDate: timestamp("issue_date").defaultNow().notNull(),
+  dueDate: timestamp("due_date").notNull(),
+  returnDate: timestamp("return_date"),
+  status: mysqlEnum("status", ["issued", "returned", "lost", "damaged"]).notNull().default("issued"),
+  fineAmount: decimal("fine_amount", { precision: 12, scale: 2 }).default("0.00"),
+  isFinePaid: int("is_fine_paid").default(0),
+  academicId: int("academic_id").references(() => academicYears.id),
   createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow(),
 }, (table) => ({
-  bookAccountIdx: index("bissue_book_acct_idx").on(table.bookId, table.accountId),
+  userIdx: index("bi_user_idx").on(table.userId),
+  bookIdx: index("bi_book_idx").on(table.bookId),
+  tenantIdx: index("bi_tenant_idx").on(table.tenantId),
 }));

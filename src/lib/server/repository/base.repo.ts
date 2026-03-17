@@ -1,23 +1,21 @@
 import { getDatabase } from "../db";
 import type { MySql2Database } from "drizzle-orm/mysql2/driver";
-import { smAcademicYears, smExamTypes, smGeneralSettings } from "../db/sms-schema";
 import { eq, and, desc, type SQL } from "drizzle-orm";
 import type { TenantContext } from "../db/domain-core";
-import type { ExamType } from "$lib/schema/result-output";
+import { tenants, academicYears } from "../db/domain-core";
+import { settings } from "../db/domain-settings";
 import { DbInternalError } from "../helpers/errors";
 
 import { type MySQLDrizzleClient } from "../db";
 export type { MySQLDrizzleClient };
 
-export type AcademicYearData = typeof smAcademicYears.$inferSelect;
-export type ExamTypeData = typeof smExamTypes.$inferSelect;
-export type GeneralSetting = typeof smGeneralSettings.$inferSelect;
+export type AcademicYearData = typeof academicYears.$inferSelect;
+export type GeneralSetting = typeof settings.$inferSelect;
 
 // Configuration cache interface
 interface ConfigurationCache {
-  generalSettings: GeneralSetting[];
+  settings: GeneralSetting[];
   academicYears: AcademicYearData[];
-  examTypes: ExamTypeData[];
   activeAcademicYear: AcademicYearData | null;
   lastUpdated: number;
 }
@@ -28,7 +26,6 @@ const CACHE_TTL = 5 * 60 * 1000; // 5 minutes cache TTL
 
 export class BaseRepository {
   public db!: MySQLDrizzleClient;
-  public dbV2!: MySQLDrizzleClient;
   protected tenant!: TenantContext;
 
   constructor() { }
@@ -38,16 +35,14 @@ export class BaseRepository {
     tenant?: TenantContext
   ): Promise<T> {
     const inst = new this();
-    const { getDatabase, getDatabaseV2 } = await import("../db");
+    const { getDatabase } = await import("../db");
     inst.db = await getDatabase();
-    inst.dbV2 = await getDatabaseV2();
     if (tenant) {
       inst.tenant = tenant;
     } else {
-      // Backward compatibility: auto-detect from config cache
       const config = await inst.loadConfigurations();
       inst.tenant = {
-        tenantId: config.generalSettings[0]?.schoolId ?? 1,
+        tenantId: config.settings[0]?.id ?? 1,
         academicId: config.activeAcademicYear?.id ?? 1,
         userId: 0,
       };
@@ -62,22 +57,9 @@ export class BaseRepository {
   async create<T extends { [key: string]: any }>(params: {
     table: any;
     values: T;
-    shadowTable?: any;
-    shadowValues?: any;
   }) {
     return this.withErrorHandling(async () => {
       const result = await this.db.insert(params.table).values(params.values);
-      
-      // Shadow Write if configured
-      if (params.shadowTable && params.shadowValues) {
-        try {
-          await this.dbV2.insert(params.shadowTable).values(params.shadowValues);
-        } catch (v2Error) {
-          console.error("V2 Shadow Write Failed:", v2Error);
-          // Don't fail the primary write if shadow write fails
-        }
-      }
-      
       return result;
     }, "create");
   }
@@ -117,26 +99,20 @@ export class BaseRepository {
   async loadConfigurations(forceRefresh: boolean = false): Promise<ConfigurationCache> {
     const now = Date.now();
 
-    // Return cached data if valid and not forcing refresh
     if (!forceRefresh && configCache && now - configCache.lastUpdated < CACHE_TTL) {
       return configCache;
     }
 
-    // Load all configurations in parallel
-    const [generalSettings, academicYears, examTypes] = await Promise.all([
-      this.db.select().from(smGeneralSettings),
-      this.db.select().from(smAcademicYears).orderBy(smAcademicYears.id),
-      this.db.select().from(smExamTypes).orderBy(smExamTypes.id),
+    const [settingsData, academicYearsData] = await Promise.all([
+      this.db.select().from(settings),
+      this.db.select().from(academicYears).orderBy(academicYears.id),
     ]);
 
-    // Find active academic year based on current date
-    const activeAcademicYear = this.findActiveAcademicYear(academicYears);
+    const activeAcademicYear = this.findActiveAcademicYear(academicYearsData);
 
-    // Update cache
     configCache = {
-      generalSettings,
-      academicYears,
-      examTypes,
+      settings: settingsData,
+      academicYears: academicYearsData,
       activeAcademicYear,
       lastUpdated: now,
     };
@@ -149,15 +125,15 @@ export class BaseRepository {
    */
   async getGeneralSettings(forceRefresh: boolean = false): Promise<GeneralSetting[]> {
     const config = await this.loadConfigurations(forceRefresh);
-    return config.generalSettings;
+    return config.settings;
   }
 
   /**
    * Get a specific general setting by school ID
    */
-  async getGeneralSettingBySchoolId(schoolId: number = 1): Promise<GeneralSetting | null> {
-    const settings = await this.getGeneralSettings();
-    return settings.find((s) => s.schoolId === schoolId) || settings[0] || null;
+  async getSettingsById(id: number = 1): Promise<GeneralSetting | null> {
+    const settingsList = await this.getGeneralSettings();
+    return settingsList.find((s) => s.id === id) || settingsList[0] || null;
   }
 
   /**
@@ -195,36 +171,19 @@ export class BaseRepository {
     return year.id;
   }
 
+  async getTenantId() {
+    return this.tenant.tenantId;
+  }
+
+  async getUserId() {
+    return this.tenant.userId;
+  }
+
   /**
-   * Get ExamTypes (Terms)
+   * Term management is now part of domain-assessment. 
+   * Local aliases kept for backward repository patterns if needed.
+   * TODO: Migrate to AssessmentRepository
    */
-  async getExamTypes(): Promise<ExamType[]> {
-    const academicId = await this.getAcademicId();
-    return await this.db
-      .select({
-        id: smExamTypes.id,
-        activeStatus: smExamTypes.activeStatus,
-        title: smExamTypes.title,
-        isAverage: smExamTypes.isAverage,
-        percentage: smExamTypes.percentage,
-        averageMark: smExamTypes.averageMark,
-      })
-      .from(smExamTypes)
-      .where(and(eq(smExamTypes.activeStatus, 1), eq(smExamTypes.academicId, academicId)));
-  }
-
-  async getCurrentTerm(examId?: number): Promise<ExamType> {
-    const field = examId ? eq(smExamTypes.id, examId) : undefined;
-    const academicId = await this.getAcademicId();
-    const [examType] = await this.db
-      .select({ id: smExamTypes.id, title: smExamTypes.title })
-      .from(smExamTypes)
-      .where(and(eq(smExamTypes.activeStatus, 1), eq(smExamTypes.academicId, academicId), field))
-      .orderBy(desc(smExamTypes.createdAt)) // Or desc(smExamTypes.id)
-      .limit(1);
-
-    return examType;
-  }
 
   /**
    * Clear configuration cache (useful after updates)

@@ -4,23 +4,43 @@ import {
   int,
   timestamp,
   json,
+  index,
   unique,
 } from "drizzle-orm/mysql-core";
 
-// JSONB Settings Store — replaces sm_general_settings (100+ cols), sm_sms_gateways, admit_card_settings, etc.
+import { tenants } from "./domain-core";
 
-export type SettingsConfig = Record<string, unknown>;
+// Settings Domain - dropped edx_ prefix
 
-export const settings = mysqlTable("edx_settings", {
+// --- SETTINGS METADATA TYPES ---
+
+export type GeneralConfig = {
+  schoolName: string;
+  address?: string;
+  phone?: string;
+  email?: string;
+  session?: number;
+  schoolCode?: string;
+  logo?: string;
+};
+
+export type FinanceConfig = {
+  currency: string;
+  currencySymbol?: string;
+  feeReceiptPrefix?: string;
+  invoicePrefix?: string;
+  academicYearId?: number;
+};
+
+export type SettingConfig = GeneralConfig | FinanceConfig | Record<string, any>;
+
+export const settings = mysqlTable("settings", {
   id: int("id").autoincrement().primaryKey(),
-  tenantId: int("tenant_id").notNull(),
-  domain: varchar("domain", { length: 50 }).notNull(),
-  // 'school_profile', 'branding', 'email', 'sms', 'attendance',
-  // 'exam', 'result_display', 'admit_card', 'features'
-  config: json("config").$type<SettingsConfig>().notNull(),
-  schemaVersion: int("schema_version").default(1),
-  updatedBy: int("updated_by"),
+  tenantId: int("tenant_id").notNull().references(() => tenants.id),
+  domain: varchar("domain", { length: 50 }).notNull(), // 'general', 'finance', 'attendance', 'ai'
+  config: json("config").$type<SettingConfig>().notNull(), // Domain-specific JSON configuration
+  createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow(),
 }, (table) => ({
-  tenantDomainUnique: unique("settings_unique").on(table.tenantId, table.domain),
+  tenantDomainIdx: unique("setting_tenant_domain_unique").on(table.tenantId, table.domain),
 }));

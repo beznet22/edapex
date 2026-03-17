@@ -110,26 +110,26 @@ export const studentDataSchema = z.object({
     }
 
     const studentId = student?.id || student?.studentId;
-    if (!student?.recordId) {
-      const recordId = await studentRepo.createIfNotExistsStudentRecord({
-        studentId,
+    if (!student?.enrollmentId) {
+      const enrollmentId = await studentRepo.createIfNotExistsEnrollment({
+        studentId: studentId as number,
         classId: data.classId,
         sectionId: data.sectionId,
       });
-      if (!recordId) {
+      if (!enrollmentId) {
         ctx.addIssue({
           code: "custom",
           message: `Student record not found for admission number ${data.admissionNo}, please ask the admin to assign a class to the student`,
           path: ["admissionNo"],
         });
       } else {
-        data.recordId = recordId;
+        data.recordId = enrollmentId;
       }
     } else {
-      data.recordId = student.recordId;
+      data.recordId = student.enrollmentId;
     }
 
-    data.schoolId = student?.schoolId || 1;
+    data.schoolId = student?.tenantId || 1;
     data.studentId = studentId || null;
   }
 })

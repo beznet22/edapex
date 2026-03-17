@@ -7,7 +7,8 @@
   }
 
   let { records, student }: Props = $props();
-  const { category, fullName } = student;
+  const category = $derived(student.category);
+  const fullName = $derived(student.fullName);
 
   function getMarkByTitle(
     record: ResultOutput["records"][0],

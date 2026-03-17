@@ -12,7 +12,7 @@
   }
 
   let { data }: Props = $props();
-  const { category } = data.student;
+  const category = $derived(data.student.category);
 
   // Check if student type is GRADERS to conditionally show ratings
 </script>

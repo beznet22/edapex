@@ -67,7 +67,7 @@ export class AgentService {
   static async getInstructions(user: AuthUser | null, agentId?: string, selectedClass?: ClassSection): Promise<string> {
     if (!agentId || !user?.designation) return defaultPrompt();
     const designation = user.designation;
-    let instructions = agentWorkflows.find((work) => work.id === agentId)?.assistants.find((assistant: Assistant) => assistant.designation.includes(designation))?.instructions;
+    let instructions = agentWorkflows.find((work) => work.id === agentId)?.assistants.find((assistant: Assistant) => assistant.designation.includes(designation as any))?.instructions;
 
     if (!instructions) return defaultPrompt();
     const examTypes = await resultRepo.getCurrentTerm();
@@ -87,7 +87,7 @@ export class AgentService {
   static getTools(user: AuthUser | null, agentId?: string): typeof teacherTools | typeof coordinatorTools | typeof defaultTools {
     if (!agentId || !user?.designation) return defaultTools;
     const designation = user.designation;
-    return agentWorkflows.find((work) => work.id === agentId)?.assistants.find((assistant: Assistant) => assistant.designation.includes(designation))?.tools || defaultTools;
+    return agentWorkflows.find((work) => work.id === agentId)?.assistants.find((assistant: Assistant) => assistant.designation.includes(designation as any))?.tools || defaultTools;
   }
 
   static getAgentWorkflows(user: AuthUser | null): AgentWorkflow[] {
@@ -96,7 +96,7 @@ export class AgentService {
     return agentWorkflows.map((work) => {
       // Filter and strip systemPromptto prevent leaking to browser
       const assistants = work.assistants
-        .filter((assistant): assistant is Assistant => assistant.designation.includes(designation))
+        .filter((assistant): assistant is Assistant => assistant.designation.includes(designation as any))
         .map(({ instructions, tools, ...safeTask }) => safeTask);
 
       return {

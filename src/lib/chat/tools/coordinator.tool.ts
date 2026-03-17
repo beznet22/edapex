@@ -317,15 +317,7 @@ export const updateExamTitle = tool({
     })
   ),
   execute: async ({ classId, sectionId, examTypeId, newExamTitles }) => {
-    const affectedRows = await resultRepo.updateExamSetup({
-      examTitles: newExamTitles,
-      classId,
-      sectionId,
-      examTermId: examTypeId,
-      schoolId: 1,
-    });
-
-    return { success: true, message: `Exam setup updated successfully. Affected rows: ${affectedRows}` };
+    return { success: false, message: `Exam titles are now auto-generated from marks extraction in V2.` };
   },
 });
 
@@ -363,25 +355,18 @@ export const upsertMarkStore = tool({
     newMarks,
     titles,
   }) => {
-    const examSetups = await resultRepo.getExamSetup({
-      classId,
-      sectionId,
-      examTypeId,
-      subjectId,
-      schoolId: 1,
-    });
+    const examSetups = await resultRepo.getExamSetupsByClassSection(classId, sectionId);
+    const filteredSetups = examSetups.filter((s: any) => s.examTermId === examTypeId && s.subjectId === subjectId);
     console.log("New marks", newMarks);
     console.log("Titles", titles);
-    console.log("Exam setup", examSetups);
-    if (!examSetups || examSetups.length === 0) {
+    console.log("Exam setup", filteredSetups);
+    if (!filteredSetups || filteredSetups.length === 0) {
       return { success: false, message: "Exam setup not found." };
     }
 
-    const studentRecord = await studentRepo.getStudentRecord({
-      classId,
-      sectionId,
-      studentId,
-    });
+    const students = await studentRepo.getStudentsByClassSection({ classId, sectionId });
+    if (!students) return { success: false, message: "No students found." };
+    const studentRecord = students.find((s: any) => s.id === studentId);
     if (!studentRecord) {
       return { success: false, message: "Student not found." };
     }
@@ -394,13 +379,13 @@ export const upsertMarkStore = tool({
         sectionId,
         schoolId: 1,
         examTypeId,
-        studentCategory: CATEGORY[studentRecord.categoryId ?? 0] as Category,
+        studentCategory: CATEGORY[(studentRecord as any).categoryId ?? 0] as Category,
         admissionNo: studentRecord.admissionNo || 0,
-        fullName: studentRecord.fullName || "",
+        fullName: studentRecord.name || "",
         class: "",
         className: "",
         sectionName: "",
-        studentCategoryId: studentRecord.categoryId || 0,
+        studentCategoryId: (studentRecord as any).categoryId || 0,
         term: "",
         attendance: { daysOpened: 0, daysAbsent: 0, daysPresent: 0 }
       },
@@ -412,7 +397,7 @@ export const upsertMarkStore = tool({
           examTitles: titles,
         },
       ],
-      examSetups
+      filteredSetups as any
     );
     if (!processMark) {
       return { success: false, message: "Mark store update failed." };
@@ -511,6 +496,7 @@ export const createStudent = tool({
   ),
   outputSchema: zodSchema(
     z.object({
+      success: z.boolean().describe("Whether the operation was successful."),
       message: z.string().describe("A message describing the result."),
       errorType: z.enum(["USER_EXISTS", "UNKNOWN"]).optional().describe("Type of error if success is false"),
       isExisting: z.boolean().describe("True if the student already existed, false if newly created."),
@@ -527,7 +513,7 @@ export const createStudent = tool({
         .describe("The created or existing student record."),
     })
   ),
-  execute: async (input) => {
+  execute: async (input): Promise<any> => {
     try {
       const student = await studentRepo.creatStudentIfNotExists(input);
 
@@ -543,16 +529,15 @@ export const createStudent = tool({
 
       return {
         success: true,
-        message: `Student "${fullName}" created successfully with ID ${student.id}.`,
+        message: `Student "${fullName}" created successfully with ID ${student.studentId}.`,
         isExisting: false,
         student: {
-          id: student.id,
-          admissionNo: student.admissionNo,
-          fullName: student.fullName,
-          classId: student.classId,
-          sectionId: student.sectionId,
+          id: student.studentId,
+          admissionNo: input.admissionNo || null,
+          fullName: fullName,
+          sectionId: input.sectionId,
           temporaryPassword: student.studentPassword,
-          temporaryParentPassword: student.parentPassword,
+          temporaryParentPassword: (student as any).parentPassword,
         },
       };
     } catch (error) {
@@ -704,7 +689,7 @@ export const updateStudentStatus = tool({
       const actionStr = active ? "enabled" : "disabled";
       return {
         success: true,
-        message: `Successfully ${actionStr} the student ${result.fullName} (ID: ${result.studentId}).`,
+        message: `Successfully ${actionStr} the student (ID: ${result.studentId}).`,
       };
     } catch (error) {
       if (error instanceof Error && error.message === "USER_NOT_FOUND") {
@@ -750,7 +735,7 @@ export const deleteStudent = tool({
       const result = await studentRepo.deleteStudent({ studentId });
       return {
         success: true,
-        message: `Successfully deleted student ${result.fullName}.`,
+        message: `Successfully deleted student (ID: ${result.studentId}).`,
       };
     } catch (error) {
       if (error instanceof Error && error.message === "USER_NOT_FOUND") {
@@ -797,7 +782,12 @@ export const promoteStudent = tool({
   ),
   execute: async (params) => {
     try {
-      const result = await studentRepo.promoteStudent(params);
+      const result = await studentRepo.promoteStudent({
+        ...params,
+        rollNo: params.rollNo !== undefined ? String(params.rollNo) : undefined,
+        targetAcademicId: params.sessionId || 0,
+        resultStatus: (params.resultStatus as "promoted" | "graduated" | "withdrawn" | "retained") || "promoted"
+      });
       return {
         success: true,
         message: `Student successfully promoted to the new class and session. Fees assigned and chat groups updated.`,
@@ -995,7 +985,7 @@ export const changeParentEmail = tool({
         .describe("A list of matching parents if multiple are found."),
     })
   ),
-  execute: async ({ parentName, studentName, admissionNo, studentId, newEmail, currentEmail, parentId }) => {
+  execute: async ({ parentName, studentName, admissionNo, studentId, newEmail, currentEmail, parentId }): Promise<any> => {
     try {
       // 0. Direct Selection (Parent ID)
       if (parentId) {
@@ -1103,7 +1093,7 @@ export const changeParentEmail = tool({
           message: `Multiple parents found matching "${parentName}". Please select which one to update.`,
           options: parents.map((p) => ({
             parentId: p.parentId,
-            name: p.guardiansName || p.fathersName || p.mothersName || "Unknown",
+            name: String(p.guardiansName ?? "Unknown"),
             email: p.guardiansEmail || "N/A",
             studentName: undefined,
             admissionNo: undefined,
@@ -1199,7 +1189,7 @@ export const registerStaff = tool({
       staff: z
         .object({
           id: z.number(),
-          userId: z.number(),
+          accountId: z.string(),
           fullName: z.string(),
           email: z.string(),
           password: z.string(),
@@ -1207,7 +1197,7 @@ export const registerStaff = tool({
         .optional(),
     })
   ),
-  execute: async (input) => {
+  execute: async (input): Promise<any> => {
     try {
       const result = await staffRepo.createStaff(input);
       return {
@@ -1268,7 +1258,7 @@ export const resetPassword = tool({
         if (!student) {
           return { success: false, message: `Student with admission number "${admissionNo}" not found.` };
         }
-        targetUserId = student.userId;
+        targetUserId = student.studentId;
       }
 
       // 2. Resolve via email
@@ -1324,8 +1314,8 @@ export const searchStaff = tool({
         teacherId: z.number(),
         fullName: z.string().nullable(),
         email: z.string().nullable(),
-        designation: z.string().nullable(),
-        department: z.string().nullable(),
+        mobile: z.string().nullable(),
+        activeStatus: z.number(),
       })).optional(),
     })
   ),
@@ -1389,7 +1379,7 @@ export const updateStaffStatus = tool({
       const actionStr = active ? "enabled" : "disabled";
       return {
         success: true,
-        message: `Successfully ${actionStr} the account for ${result.fullName} (${result.email}).`,
+        message: `Successfully ${actionStr} the account (${result.email}).`,
       };
     } catch (error) {
       if (error instanceof Error && error.message === "USER_NOT_FOUND") {
@@ -1449,7 +1439,7 @@ export const deleteStaff = tool({
       const result = await staffRepo.deleteStaff({ email, teacherId: resolvedTeacherId });
       return {
         success: true,
-        message: `Successfully and permanently deleted the account for ${result.fullName} (${result.email}).`,
+        message: `Successfully and permanently deleted the account (${result.email}).`,
       };
     } catch (error) {
       if (error instanceof Error && error.message === "USER_NOT_FOUND") {

@@ -1,127 +1,132 @@
 import {
-  index,
-  int,
   mysqlTable,
-  text,
   varchar,
+  int,
   timestamp,
+  mysqlEnum,
   json,
-  boolean,
-  primaryKey,
-  foreignKey,
-  datetime,
+  index,
+  text,
+  decimal,
+  tinyint,
 } from "drizzle-orm/mysql-core";
-import { sql } from "drizzle-orm";
-import { generateId } from "ai";
-import { users } from "./sms-schema";
 
-export const aiSessions = mysqlTable("edx_ai_sessions", {
-  id: varchar("id", { length: 255 })
-    .primaryKey()
-    .$defaultFn(() => generateId()),
-  userId: int("user_id", { unsigned: true })
-    .notNull()
-    .references(() => users.id),
-  expiresAt: datetime("expires_at", { mode: "string" }).default(sql`NULL`),
-  deviceFingerprint: varchar("device_fingerprint", { length: 255 }).default(sql`NULL`),
+import { users, tenants } from "./domain-core";
+
+// --- CORE CHAT INFRASTRUCTURE ---
+
+// --- AI METADATA TYPES ---
+
+export type ChatMetadata = {
+  summary?: string;
+  tags?: string[];
+  lastMessagePreview?: string;
+};
+
+export type MessageMetadata = {
+  usage?: {
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
+  };
+  modelName?: string;
+  latencyMs?: number;
+};
+
+export type MessagePart = Record<string, any>;
+
+export const chats = mysqlTable("chats", {
+  id: varchar("id", { length: 255 }).primaryKey(), 
+  tenantId: int("tenant_id").notNull().references(() => tenants.id),
+  userId: int("user_id").notNull().references(() => users.id),
+  title: varchar("title", { length: 255 }).notNull().default("New Chat"),
+  model: varchar("model", { length: 100 }),
+  visibility: mysqlEnum("visibility", ["private", "public"]).default("private"),
+  metadata: json("metadata").$type<ChatMetadata>(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow(),
 });
 
-export type AISession = typeof aiSessions.$inferSelect;
+export const messages = mysqlTable("messages", {
+  id: varchar("id", { length: 255 }).primaryKey(),
+  chatId: varchar("chat_id", { length: 255 }).notNull().references(() => chats.id, { onDelete: "cascade" }),
+  role: mysqlEnum("role", ["user", "assistant", "system", "tool"]).notNull(),
+  parts: json("parts").$type<MessagePart[]>().notNull(),
+  metadata: json("metadata").$type<MessageMetadata>(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow(),
+});
 
-export const aiChats = mysqlTable("edx_ai_chats", {
-  id: varchar("id", { length: 255 })
-    .primaryKey()
-    .$defaultFn(() => generateId()),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
+export const votes = mysqlTable("votes", {
+  chatId: varchar("chat_id", { length: 255 }).notNull().references(() => chats.id, { onDelete: "cascade" }),
+  messageId: varchar("message_id", { length: 255 }).notNull().references(() => messages.id, { onDelete: "cascade" }),
+  isUpvoted: tinyint("is_upvoted").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow(),
+}, (table) => ({
+  pk: index("pk").on(table.chatId, table.messageId),
+}));
+
+export const aiDocuments = mysqlTable("ai_documents", {
+  id: varchar("id", { length: 255 }).primaryKey(),
   title: varchar("title", { length: 255 }).notNull(),
-  model: varchar("model", { length: 255 }).notNull(),
-  userId: int("user_id", { unsigned: true })
-    .default(sql`NULL`)
-    .references(() => users.id),
-  visibility: varchar("visibility", { length: 10 }).notNull().default("private"),
+  kind: mysqlEnum("kind", ["text", "code", "image", "sheet"]).notNull(),
+  content: text("content"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow(),
 });
-export type AIChat = typeof aiChats.$inferSelect;
 
-export const aiMessages = mysqlTable(
-  "edx_ai_messages",
-  {
-    id: varchar("id", { length: 255 })
-      .primaryKey()
-      .$defaultFn(() => generateId()),
-    chatId: varchar("chatId", { length: 255 })
-      .references(() => aiChats.id, { onDelete: "cascade" })
-      .notNull(),
-    role: varchar("role", { length: 50 }).notNull(),
-    parts: json("parts").notNull(),
-    metadata: json("metadata"),
-    createdAt: timestamp("createdAt").defaultNow().notNull(),
-  },
-  (table) => [
-    index("ai_messages_chat_id_idx").on(table.chatId),
-    index("ai_messages_chat_id_created_at_idx").on(table.chatId, table.createdAt),
-  ]
-);
-export type AIMessage = typeof aiMessages.$inferSelect;
+export const aiSuggestions = mysqlTable("ai_suggestions", {
+  id: varchar("id", { length: 255 }).primaryKey(),
+  documentId: varchar("document_id", { length: 255 }).notNull().references(() => aiDocuments.id, { onDelete: "cascade" }),
+  content: text("content"),
+  createdAt: timestamp("created_at").defaultNow(),
+  documentCreatedAt: timestamp("document_created_at"),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow(),
+});
 
-export const aiVotes = mysqlTable(
-  "edx_ai_votes",
-  {
-    chatId: varchar("chatId", { length: 255 })
-      .notNull()
-      .references(() => aiChats.id),
-    messageId: varchar("messageId", { length: 255 })
-      .notNull()
-      .references(() => aiMessages.id),
-    isUpvoted: boolean("isUpvoted").notNull(),
-  },
-  (table) => [primaryKey({ columns: [table.chatId, table.messageId] })]
-);
+// --- AGENTIC INFRASTRUCTURE ---
 
-export type AIVote = typeof aiVotes.$inferSelect;
+export const aiAgents = mysqlTable("ai_agents", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenant_id").notNull().references(() => tenants.id),
+  name: varchar("name", { length: 100 }).notNull(),
+  agentType: varchar("agent_type", { length: 50 }).notNull(),
+  capabilities: json("capabilities").$type<string[]>(),
+  status: mysqlEnum("status", ["active", "inactive", "maintenance"]).default("active"),
+  config: json("config").$type<Record<string, any>>(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow(),
+}, (table) => ({
+  tenantTypeIdx: index("agent_tenant_type_idx").on(table.tenantId, table.agentType),
+}));
 
-export const aiDocuments = mysqlTable(
-  "edx_ai_documents",
-  {
-    id: varchar("id", { length: 255 })
-      .notNull()
-      .$defaultFn(() => generateId()),
-    title: varchar("title", { length: 255 }).notNull(),
-    content: text("content"),
-    kind: varchar("kind", { length: 20 }).notNull().default("text"),
-    userId: int("user_id", { unsigned: true })
-      .default(sql`NULL`)
-      .references(() => users.id),
-    createdAt: timestamp("createdAt").defaultNow().notNull(),
-  },
-  (table) => [primaryKey({ columns: [table.id, table.createdAt] })]
-);
+export const aiAgentActions = mysqlTable("ai_agent_actions", {
+  id: int("id").autoincrement().primaryKey(),
+  agentId: int("agent_id").notNull().references(() => aiAgents.id),
+  tenantId: int("tenant_id").notNull().references(() => tenants.id),
+  actionType: varchar("action_type", { length: 100 }).notNull(),
+  idempotencyKey: varchar("idempotency_key", { length: 100 }),
+  status: mysqlEnum("status", ["pending", "running", "completed", "failed"]).notNull(),
+  input: json("input").$type<Record<string, any>>(),
+  output: json("output").$type<Record<string, any>>(),
+  errorMessage: text("error_message"),
+  durationMs: int("duration_ms"),
+  createdAt: timestamp("created_at").defaultNow(),
+  completedAt: timestamp("completed_at"),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow(),
+}, (table) => ({
+  agentStatusIdx: index("act_agent_status_idx").on(table.agentId, table.status),
+  idempotencyIdx: index("act_idempotency_idx").on(table.tenantId, table.idempotencyKey),
+}));
 
-export type AIDocument = typeof aiDocuments.$inferSelect;
-
-export const aiSuggestions = mysqlTable(
-  "edx_ai_suggestions",
-  {
-    id: varchar("id", { length: 255 })
-      .notNull()
-      .$defaultFn(() => generateId()),
-    documentId: varchar("documentId", { length: 255 }).notNull(),
-    documentCreatedAt: timestamp("documentCreatedAt").defaultNow().notNull(),
-    originalText: varchar("originalText", { length: 255 }).notNull(),
-    suggestedText: varchar("suggestedText", { length: 255 }).notNull(),
-    description: text("description"),
-    isResolved: boolean("isResolved").notNull().default(false),
-    userId: int("user_id", { unsigned: true })
-      .default(sql`NULL`)
-      .references(() => users.id),
-    createdAt: timestamp("createdAt").defaultNow().notNull(),
-  },
-  (table) => [
-    primaryKey({ columns: [table.id] }),
-    foreignKey({
-      columns: [table.documentId, table.documentCreatedAt],
-      foreignColumns: [aiDocuments.id, aiDocuments.createdAt],
-      name: "edx_ai_suggestions_doc_fk",
-    }),
-  ]
-);
-export type AISuggestion = typeof aiSuggestions.$inferSelect;
+export const aiToolInvocations = mysqlTable("ai_tool_invocations", {
+  id: int("id").autoincrement().primaryKey(),
+  actionId: int("action_id").notNull().references(() => aiAgentActions.id, { onDelete: "cascade" }),
+  toolName: varchar("tool_name", { length: 100 }).notNull(),
+  parameters: json("parameters").$type<Record<string, any>>(),
+  result: json("result").$type<Record<string, any>>(),
+  latencyMs: int("latency_ms"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow(),
+});

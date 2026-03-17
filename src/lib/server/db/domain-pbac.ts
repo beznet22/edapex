@@ -3,39 +3,57 @@ import {
   varchar,
   int,
   timestamp,
-  mysqlEnum,
   json,
   index,
+  unique,
 } from "drizzle-orm/mysql-core";
 
-import { accounts } from "./domain-core";
+import { users, tenants, accounts } from "./domain-core";
 
-// Replaces the 5-way permission system (permissions, assign_permissions, infix_permission_assigns, sm_role_permissions, sm_module_permission_assigns)
+// Policy-Based Access Control (PBAC) schema - dropped edx_ prefix
 
-export const policyDefinitions = mysqlTable("edx_policy_definitions", {
+export type PolicyCondition = {
+  field: string;
+  operator: "eq" | "neq" | "gt" | "gte" | "lt" | "lte" | "in" | "contains";
+  value: any;
+};
+
+export type PolicyDefinition = {
+  effect: "allow" | "deny";
+  actions: string[]; // e.g. ["read", "write", "delete"]
+  resources: string[]; // e.g. ["student:*", "finance:invoice"]
+  conditions?: PolicyCondition[];
+};
+
+export const policyDefinitions = mysqlTable("policy_definitions", {
   id: int("id").autoincrement().primaryKey(),
-  tenantId: int("tenant_id"),  // NULL = global/system policy
-  policyName: varchar("policy_name", { length: 100 }).notNull(),
-  resource: varchar("resource", { length: 100 }).notNull(),  // 'student', 'exam', 'fee', etc.
-  action: varchar("action", { length: 50 }).notNull(),      // 'read', 'write', 'delete', 'approve'
-  conditions: json("conditions").notNull(),        // PBAC condition expressions
-  effect: mysqlEnum("effect", ["allow", "deny"]).notNull().default("allow"),
-  priority: int("priority").default(0),
+  tenantId: int("tenant_id").references(() => tenants.id), // NULL = system-wide policy
+  name: varchar("name", { length: 191 }).notNull(),
+  description: varchar("description", { length: 500 }),
+  definition: json("definition").$type<PolicyDefinition>().notNull(),
+  activeStatus: int("active_status").default(1),
   createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow(),
 }, (table) => ({
-  tenantResourceIdx: index("policy_tenant_resource_idx").on(table.tenantId, table.resource),
+  tenantIdx: index("pol_tenant_idx").on(table.tenantId),
 }));
 
-export const roleAssignments = mysqlTable("edx_role_assignments", {
+// Role Assignment Metadata
+export type RoleAssignmentMetadata = {
+  isPrimary?: boolean;
+  grantedBy?: number; // userId
+  expiresAt?: string;
+};
+
+export const roleAssignments = mysqlTable("role_assignments", {
   id: int("id").autoincrement().primaryKey(),
-  tenantId: int("tenant_id").notNull(),
-  accountId: int("account_id").notNull().references(() => accounts.id),
-  roleName: varchar("role_name", { length: 50 }).notNull(),
-  scope: json("scope"),  // { classIds: [...], sectionIds: [...], subjectIds: [...] }
-  validFrom: timestamp("valid_from").defaultNow(),
-  validTo: timestamp("valid_to"),
+  tenantId: int("tenant_id").notNull().references(() => tenants.id),
+  userId: int("user_id").notNull().references(() => users.id), // Persona
+  roleName: varchar("role_name", { length: 100 }).notNull(), // e.g. 'admin', 'teacher', 'student'
+  metadata: json("metadata").$type<RoleAssignmentMetadata>(),
   createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow(),
 }, (table) => ({
-  accountIdx: index("role_account_idx").on(table.accountId),
-  tenantRoleIdx: index("role_tenant_idx").on(table.tenantId, table.roleName),
+  userRoleIdx: unique("role_assignment_unique").on(table.userId, table.roleName),
+  userIdx: index("ra_user_idx").on(table.userId),
 }));

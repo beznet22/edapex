@@ -38,7 +38,7 @@ export class UserContext {
   ) {
     this.user = user;
     this.classes = classes;
-    this.designation = user?.designation;
+    this.designation = user?.designation as Designation | undefined;
     this.assignedSection = assignedSection ?? null;
   }
 

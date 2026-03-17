@@ -1,24 +1,26 @@
-// /src/lib/server/repository/student.repo.ts
+// /src/lib/server/repository/staff.repo.ts
 
-import { and, eq } from "drizzle-orm";
 import {
-  infixRoles,
-  smAssignSubjects,
-  smBaseSetups,
-  smClasses,
-  smDesignations,
-  smHumanDepartments,
-  smParents,
-  smSections,
-  smStaffs,
-  smStudentCategories,
-  smStudents,
-  studentRecords,
+  tenants,
+  academicYears,
+  accounts,
   users,
-} from "$lib/server/db/sms-schema";
-import { accounts } from "$lib/server/db/domain-core";
+  enumerations,
+} from "$lib/server/db/domain-core";
+import {
+  classes,
+  sections,
+  enrollments,
+  classSections,
+  promotions,
+  classTeachers,
+  subjectAssignments,
+} from "$lib/server/db/domain-academic";
+import { hrDepartments, hrDesignations } from "$lib/server/db/domain-hr";
 import { BaseRepository } from "./base.repo";
 import { hashPwd } from "$lib/server/helpers/utils";
+import { type MySQLDrizzleClient } from "./base.repo";
+import { and, eq, like, or, sql, asc, desc } from "drizzle-orm";
 
 export type StaffDetails = {
   studentId: number;
@@ -54,30 +56,28 @@ export type StaffDepartment = {
   title: string | null;
 };
 
-export type StaffRow = typeof smStaffs.$inferSelect;
+export type StaffRow = typeof users.$inferSelect;
 
 export class StaffRepository extends BaseRepository {
   async getStaffRegistrationOptions() {
     return this.withErrorHandling(async () => {
       const designations = await this.db
-        .select({ id: smDesignations.id, name: smDesignations.title })
-        .from(smDesignations)
-        .where(eq(smDesignations.activeStatus, 1));
+        .select({ id: hrDesignations.id, name: hrDesignations.designationName })
+        .from(hrDesignations);
 
       const departments = await this.db
-        .select({ id: smHumanDepartments.id, name: smHumanDepartments.name })
-        .from(smHumanDepartments)
-        .where(eq(smHumanDepartments.activeStatus, 1));
+        .select({ id: hrDepartments.id, name: hrDepartments.departmentName })
+        .from(hrDepartments);
 
       const roles = await this.db
-        .select({ id: infixRoles.id, name: infixRoles.name })
-        .from(infixRoles)
-        .where(eq(infixRoles.activeStatus, 1));
+        .select({ id: enumerations.id, name: enumerations.label })
+        .from(enumerations)
+        .where(eq(enumerations.domain, "staff_role"));
 
       const genders = await this.db
-        .select({ id: smBaseSetups.id, name: smBaseSetups.baseSetupName })
-        .from(smBaseSetups)
-        .where(and(eq(smBaseSetups.activeStatus, 1), eq(smBaseSetups.baseGroupId, 1))); // Assuming baseGroupId 1 is for gender
+        .select({ id: enumerations.id, name: enumerations.label })
+        .from(enumerations)
+        .where(eq(enumerations.domain, "gender"));
 
       return {
         designations,
@@ -101,151 +101,127 @@ export class StaffRepository extends BaseRepository {
     experience?: string;
     schoolId?: number;
   }) {
-    // Check if user already exists outside withErrorHandling to avoid generic DB error wrapping
-    const [existingUser] = await this.db.select().from(users).where(eq(users.email, input.email)).limit(1);
-    if (existingUser) {
+    // Check if identity already exists
+    const [existingAccount] = await this.db.select().from(accounts).where(eq(accounts.email, input.email)).limit(1);
+    if (existingAccount) {
       throw new Error("USER_EXISTS");
     }
 
     return this.withErrorHandling(async () => {
       const schoolId = input.schoolId || 1;
-      const fullName = `${input.firstName} ${input.lastName}`.trim();
       const password = Math.random().toString(36).slice(-8); // Temporary password
 
-      const [user] = await this.db.insert(users).values({
-        fullName,
-        email: input.email,
-        phoneNumber: input.mobile,
-        roleId: input.roleId,
-        password: hashPwd(password),
-        activeStatus: 1,
-        schoolId,
-        walletBalance: 0,
-      });
-
-      const userId = user.insertId;
-
-      const [staff] = await this.db.insert(smStaffs).values({
-        firstName: input.firstName,
-        lastName: input.lastName,
-        fullName,
-        email: input.email,
-        mobile: input.mobile,
-        qualification: input.qualification,
-        experience: input.experience,
-        designationId: input.designationId,
-        departmentId: input.departmentId,
-        roleId: input.roleId,
-        genderId: input.genderId,
-        userId: userId,
-        schoolId,
-        activeStatus: 1,
-      });
-
-      // Dual-write: Create staff in new edx_accounts table (V2 DB)
-      try {
-        await this.dbV2.insert(accounts).values({
+      return await this.db.transaction(async (tx) => {
+        // 1. Create Identity (Account)
+        const accountId = crypto.randomUUID();
+        await tx.insert(accounts).values({
+          id: accountId,
           tenantId: schoolId,
-          userId: userId,
-          accountType: "staff",
+          email: input.email,
+          phoneNumber: input.mobile,
+          password: hashPwd(password),
+          activeStatus: 1,
+        });
+
+        // 2. Create Persona (User)
+        const [staff] = await tx.insert(users).values({
+          tenantId: schoolId,
+          accountId: accountId,
+          userType: "staff",
           firstName: input.firstName,
           lastName: input.lastName,
           email: input.email,
           mobile: input.mobile,
           genderId: input.genderId,
+          activeStatus: 1,
           metadata: {
+            staffNumber: `${Date.now()}`,
+            joiningDate: new Date().toISOString().split('T')[0],
             designationId: input.designationId,
             departmentId: input.departmentId,
+            roleId: input.roleId,
             qualification: input.qualification,
-            experience: input.experience
-          },
-          activeStatus: 1,
+            experience: input.experience,
+          }
         });
-      } catch (v2Error) {
-        console.error("V2 Shadow Write (Staff) Failed:", v2Error);
-      }
+        const staffId = (staff as any).insertId;
 
-      return {
-        id: staff.insertId,
-        userId,
-        fullName,
-        email: input.email,
-        password, // Return plain password for the UI to show once
-      };
+        return {
+          id: staffId,
+          accountId,
+          fullName: `${input.firstName} ${input.lastName}`,
+          email: input.email,
+          password,
+        };
+      });
     }, "createStaff");
   }
 
-  async searchStaff(filters: { departmentId?: number; designationId?: number }) {
+  async searchStaff(filters: { departmentId?: number; designationId?: number; query?: string }) {
     return this.withErrorHandling(async () => {
-      const { departmentId, designationId } = filters;
+      const { departmentId, designationId, query } = filters;
 
-      if (departmentId || designationId) {
-        // Search by department or designation
-        const conditions = [eq(smStaffs.activeStatus, 1)];
-        if (departmentId) conditions.push(eq(smStaffs.departmentId, departmentId));
-        if (designationId) conditions.push(eq(smStaffs.designationId, designationId));
+      const conditions = [
+        eq(users.userType, "staff"),
+        eq(users.activeStatus, 1)
+      ];
 
-        const staffList = await this.db
-          .select({
-            teacherId: smStaffs.id,
-            fullName: smStaffs.fullName,
-            email: smStaffs.email,
-            designation: smDesignations.title,
-            department: smHumanDepartments.name,
-          })
-          .from(smStaffs)
-          .leftJoin(smDesignations, eq(smStaffs.designationId, smDesignations.id))
-          .leftJoin(smHumanDepartments, eq(smStaffs.departmentId, smHumanDepartments.id))
-          .where(and(...conditions));
-
-        return staffList.map(a => ({
-          teacherId: a.teacherId,
-          fullName: a.fullName,
-          email: a.email,
-          designation: a.designation,
-          department: a.department,
-        }));
+      if (departmentId) conditions.push(sql`${users.metadata}->>'$.departmentId' = ${departmentId}`);
+      if (designationId) conditions.push(sql`${users.metadata}->>'$.designationId' = ${designationId}`);
+      if (query) {
+        const searchCond = or(
+          like(users.firstName, `%${query}%`),
+          like(users.lastName, `%${query}%`),
+          like(users.email, `%${query}%`)
+        );
+        if (searchCond) conditions.push(searchCond);
       }
-      return [];
+
+      const staffList = await this.db
+        .select({
+          teacherId: users.id,
+          fullName: sql<string>`CONCAT(${users.firstName}, ' ', ${users.lastName})`,
+          email: users.email,
+          mobile: users.mobile,
+          activeStatus: users.activeStatus,
+        })
+        .from(users)
+        .where(and(...(conditions as any[])))
+        .orderBy(asc(users.id))
+        .limit(100);
+
+      return staffList;
     }, "searchStaff");
   }
 
   async updateStaffStatus(params: { email?: string; teacherId?: number; active: boolean }) {
     return this.withErrorHandling(async () => {
       const { email, teacherId, active } = params;
-      let user;
+      let staff;
 
-      // Find user by either email or teacherId (staff id)
       if (email) {
-        [user] = await this.db.select().from(users).where(eq(users.email, email)).limit(1);
+        [staff] = await this.db.select().from(users).where(and(eq(users.email, email), eq(users.userType, "staff"))).limit(1);
       } else if (teacherId) {
-        const [staff] = await this.db.select().from(smStaffs).where(eq(smStaffs.id, teacherId)).limit(1);
-        if (staff && staff.userId) {
-          [user] = await this.db.select().from(users).where(eq(users.id, staff.userId)).limit(1);
-        }
+        [staff] = await this.db.select().from(users).where(eq(users.id, teacherId)).limit(1);
       }
       
-      if (!user) {
-        throw new Error("USER_NOT_FOUND");
-      }
+      if (!staff) throw new Error("USER_NOT_FOUND");
 
       const activeStatus = active ? 1 : 0;
 
-      // Update users table
-      await this.db.update(users).set({ activeStatus }).where(eq(users.id, user.id));
+      await this.db.transaction(async (tx) => {
+        // 1. Update Persona (User)
+        await tx.update(users).set({ activeStatus }).where(eq(users.id, staff.id));
 
-      // Update sm_staffs table
-      await this.db.update(smStaffs).set({ activeStatus }).where(eq(smStaffs.userId, user.id));
-
-      // Dual-write: Update edx_accounts table
-      await this.dbV2.update(accounts)
-        .set({ activeStatus })
-        .where(and(eq(accounts.userId, user.id), eq(accounts.accountType, "staff")));
+        // 2. Update Account (Identity)
+        if (staff.accountId) {
+          await tx.update(accounts).set({ activeStatus }).where(eq(accounts.id, staff.accountId));
+        }
+      });
 
       return {
         success: true,
-        email: user.email,
-        fullName: user.fullName,
+        email: staff.email,
         active,
       };
     }, "updateStaffStatus");
@@ -254,35 +230,29 @@ export class StaffRepository extends BaseRepository {
   async deleteStaff(params: { email?: string; teacherId?: number }) {
     return this.withErrorHandling(async () => {
       const { email, teacherId } = params;
-      let user;
+      let staff;
 
-      // Find user by either email or teacherId (staff id)
       if (email) {
-        [user] = await this.db.select().from(users).where(eq(users.email, email)).limit(1);
+        [staff] = await this.db.select().from(users).where(and(eq(users.email, email), eq(users.userType, "staff"))).limit(1);
       } else if (teacherId) {
-        const [staff] = await this.db.select().from(smStaffs).where(eq(smStaffs.id, teacherId)).limit(1);
-        if (staff && staff.userId) {
-          [user] = await this.db.select().from(users).where(eq(users.id, staff.userId)).limit(1);
-        }
+        [staff] = await this.db.select().from(users).where(eq(users.id, teacherId)).limit(1);
       }
       
-      if (!user) {
-        throw new Error("USER_NOT_FOUND");
-      }
+      if (!staff) throw new Error("USER_NOT_FOUND");
 
-      // Delete from sm_staffs table first (foreign key dependency usually dictates this order)
-      await this.db.delete(smStaffs).where(eq(smStaffs.userId, user.id));
+      await this.db.transaction(async (tx) => {
+        // 1. Delete Persona (User)
+        await tx.delete(users).where(eq(users.id, staff.id));
 
-      // Dual-write: Delete from edx_accounts
-      await this.dbV2.delete(accounts).where(and(eq(accounts.userId, user.id), eq(accounts.accountType, "staff")));
-
-      // Delete from users table
-      await this.db.delete(users).where(eq(users.id, user.id));
+        // 2. Delete Account (Identity)
+        if (staff.accountId) {
+          await tx.delete(accounts).where(eq(accounts.id, staff.accountId));
+        }
+      });
 
       return {
         success: true,
-        email: user.email,
-        fullName: user.fullName,
+        email: staff.email,
       };
     }, "deleteStaff");
   }
@@ -291,24 +261,25 @@ export class StaffRepository extends BaseRepository {
     const { classId, sectionId } = params;
     return this.withErrorHandling(async () => {
       const academicId = await this.getAcademicId();
-      const [classSection] = await this.db
+      const [assignment] = await this.db
         .select({
-          teacherId: smAssignSubjects.teacherId,
-          classId: smAssignSubjects.classId,
-          sectionId: smAssignSubjects.sectionId,
-          subjectId: smAssignSubjects.subjectId,
+          id: classTeachers.id,
+          teacherId: classTeachers.staffId,
+          classId: classTeachers.classId,
+          sectionId: classTeachers.sectionId,
+          academicId: classTeachers.academicId,
+          createdAt: classTeachers.createdAt
         })
-        .from(smAssignSubjects)
+        .from(classTeachers)
         .where(
           and(
-            eq(smAssignSubjects.classId, classId),
-            eq(smAssignSubjects.sectionId, sectionId),
-            eq(smAssignSubjects.activeStatus, 1),
-            eq(smAssignSubjects.academicId, academicId)
+            eq(classTeachers.classId, classId),
+            eq(classTeachers.sectionId, sectionId),
+            eq(classTeachers.academicId, academicId)
           )
         )
         .limit(1);
-      return classSection;
+      return assignment;
     }, "getStaffClassSection");
   }
 }

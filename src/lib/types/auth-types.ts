@@ -1,12 +1,11 @@
-import type { smStaffs, users } from "$lib/server/db/sms-schema";
+import type { users } from "$lib/server/db/schema";
 import type { JWTPayload } from "jose";
-import type { Designation } from "./sms-types";
 
 export interface AuthUser {
   id: number;
   roleId?: number;
   staffId?: number;
-  designation?: Designation;
+  designation?: string;
   departmentId?: number;
   activeStatus?: number;
   firstName?: string;
@@ -36,7 +35,7 @@ export interface DeviceInfo {
 
 export interface Session {
   id: string;
-  userId: number;
+  userId: string;
   expiresAt?: Date;
   deviceInfo?: DeviceInfo;
   fresh?: boolean;

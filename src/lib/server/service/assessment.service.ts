@@ -202,6 +202,7 @@ export class AssessmentService {
     }> = [];
     let sentCount = 0;
 
+    const academicId = await repo.result.getAcademicId();
     const payload: JobPayload = { type: "send-email", data: messages };
     await JobWorker.runTask(payload, async (job: JobResult) => {
       const { status, result: jobResult, error } = job;
@@ -222,7 +223,7 @@ export class AssessmentService {
       });
 
       const timeline = {
-        staffStudentId: studentId,
+        userId: studentId,
         type: `exam-${examId}-${messageId}`,
         title: "Result Notification",
         description: "TERMLY SUMMARY OF PROGRESS REPORT",
@@ -230,9 +231,9 @@ export class AssessmentService {
         file: `result/${base64url.encode(JSON.stringify({ studentId, messageId, examId }))}`,
         date: new Date().toISOString().slice(0, 10),
         activeStatus: 1,
-        schoolId: 1,
+        academicId,
       };
-      await timelineRepo.upsertTimelines(timeline);
+      await timelineRepo.upsertTimelines(timeline as any);
     });
 
     const allErrors = [...processingErrors, ...emailErrors];
@@ -494,15 +495,16 @@ export class AssessmentService {
       token: base64url.encode(JSON.stringify({ studentId: id, examId })),
     };
     const schoolData = (await repo.result.getGeneralSettings())?.[0] || {};
-    const address = this.parseAddress(schoolData?.address || "");
+    const config = (schoolData.config as any) || {};
+    const address = this.parseAddress(config.address || "");
     const school: School = {
-      id: schoolData?.id || 1,
-      name: schoolData?.siteTitle || "School Name",
-      phone: schoolData?.phone || "",
+      id: schoolData.id || 1,
+      name: config.schoolName || "School Name",
+      phone: config.phone || "",
       logo: withImages
-        ? ensureBase64Image(schoolData?.favicon || schoolData?.logo || "", "/school-logo.png")
+        ? ensureBase64Image(config.favicon || config.logo || "", "/school-logo.png")
         : undefined,
-      email: schoolData?.email || "",
+      email: config.email || "",
       city: address.city || "",
       state: address.state || "",
       title: examType?.title || "",
@@ -513,7 +515,7 @@ export class AssessmentService {
       }),
     };
 
-    const objectives = await this.getObjectives(student);
+    const objectives = await this.getObjectives(student, examType?.id, 0);
     const { records, overAll } = this.buildMarksRecords(marks, objectives, student.category, resultRecords);
     const score: ScoreData = {
       total: overAll,
@@ -724,6 +726,11 @@ export class AssessmentService {
           const maxMarks = EXAM_MARK_MAXIMUMS[this.category!];
           const fullMarks = maxMarks?.[title.toUpperCase()] ?? 100;
 
+          const examDetails: any = await this.getExamSetup(examTypeId, classId, sectionId, subjectId);
+          if (!examDetails) continue;
+
+    const examTitle = examDetails?.examTitle || "Term Assessment";
+
           const examSetupId = this.findExamSetupId(examSetups, subjectId, title, examId);
 
           let finalSetupId = examSetupId;
@@ -800,47 +807,46 @@ export class AssessmentService {
   }
 
   async getClassAverages(classResults: ResultData[]): Promise<ClassAverage> {
-    const resultByStudent = classResults.reduce((acc: Record<string, ResultData[]>, result: ResultData) => {
-      const studentId = String(result.studentId || "0");
-      (acc[studentId] = acc[studentId] || []).push(result);
+    const studentAverages = classResults.reduce((acc: any, r: any) => {
+      const sid = r.userId;
+      if (!acc[sid]) acc[sid] = [];
+      acc[sid].push(Number(r.totalMarks || 0));
       return acc;
-    }, {} as Record<string, ResultData[]>);
+    }, {});
 
-    const studentAverages = Object.entries(resultByStudent).map(([studentId, results]) => {
-      const totalMarks = results.reduce((sum: number, r: ResultData) => sum + (r.totalMarks || 0), 0);
-      const avg = results.length ? Math.fround(totalMarks / results.length) : 0;
-      return { studentId: parseInt(studentId), average: avg };
-    });
+    const studentTotal = Object.entries(studentAverages).map(([sid, marks]: [string, any]) => ({
+      userId: Number(sid),
+      total: marks.reduce((sum: number, m: number) => sum + m, 0),
+    }));
 
-    if (studentAverages.length === 0) {
+    const studentAvg = studentTotal.map((s: any) => ({
+      studentId: s.userId,
+      average: s.total / studentAverages[s.userId].length,
+    }));
+
+    if (studentAvg.length === 0) {
       return { min: { studentId: 0, value: "0.00" }, max: { studentId: 0, value: "0.00" } };
     }
 
-    const minAvg = Math.min(...studentAverages.map((s) => s.average));
-    const maxAvg = Math.max(...studentAverages.map((s) => s.average));
+    const minAvg = Math.min(...studentAvg.map((s: any) => s.average));
+    const maxAvg = Math.max(...studentAvg.map((s: any) => s.average));
 
-    const minStudent = studentAverages.find((s) => s.average === minAvg) || studentAverages[0];
-    const maxStudent = studentAverages.find((s) => s.average === maxAvg) || studentAverages[0];
+    const minStudent = studentAvg.find((s: any) => s.average === minAvg) || studentAvg[0];
+    const maxStudent = studentAvg.find((s: any) => s.average === maxAvg) || studentAvg[0];
 
     return {
-      min: { studentId: minStudent.studentId, value: minAvg.toFixed(0) },
-      max: { studentId: maxStudent.studentId, value: maxAvg.toFixed(0) },
+      min: { studentId: minStudent.studentId, value: minAvg.toFixed(2) },
+      max: { studentId: maxStudent.studentId, value: maxAvg.toFixed(2) },
     };
   }
 
-  async getObjectives(student: Student) {
-    if (student.category !== "NURSERY") return [];
-    return await repo.result.getObjectives(student);
+  async getObjectives(student: any, examId?: number, subjectId?: number) {
+    if (student.categoryName !== "NURSERY") return [];
+    return await repo.result.getObjectives(student.classId, student.sectionId, examId || 0, subjectId || 0);
   }
 
-  async getExamSetup(examId: number) {
-    if (!this.studentInput) return null;
-    return await repo.result.getExamSetup({
-      classId: this.studentInput.classId,
-      sectionId: this.studentInput.sectionId,
-      examTypeId: examId,
-      schoolId: 1,
-    });
+  async getExamSetup(examId: number, classId: number, sectionId: number, subjectId: number) {
+    return await repo.result.getExamSetup(examId, classId, sectionId, subjectId);
   }
 
   findExamSetupId(
@@ -862,13 +868,13 @@ export class AssessmentService {
 
     // 1. Exact match
     let match = subjectSetups.find(
-      (s) => s.examTitle?.trim().toLowerCase() === normalizedTitle
+      (s: any) => s.examTitle?.trim().toLowerCase() === normalizedTitle
     );
 
     // 2. Fallback to includes
     if (!match) {
       match = subjectSetups.find(
-        (s) => s.examTitle?.trim().toLowerCase().includes(normalizedTitle)
+        (s: any) => s.examTitle?.trim().toLowerCase().includes(normalizedTitle)
       );
     }
 

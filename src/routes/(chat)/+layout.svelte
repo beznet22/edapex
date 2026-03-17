@@ -11,6 +11,7 @@
     SelectedAgent,
   } from "$lib/context/sync.svelte";
   import { ImageContext } from "$lib/context/image.context.svelte";
+  import { untrack } from "svelte";
   import type { PageData } from "./$types.js";
 
   let { data, children } = $props<{
@@ -32,16 +33,16 @@
     // svelte-ignore state_referenced_locally
   } = data;
 
-  const chatHistory = new ChatHistory(chats);
+  const chatHistory = new ChatHistory(untrack(() => data.chats));
   chatHistory.setContext();
 
-  const selectedChatModel = new SelectedModel(modelId!);
+  const selectedChatModel = new SelectedModel(untrack(() => data.modelId || ""));
   selectedChatModel.setContext();
 
-  const selectedClass = new SelectedClass(selectedClassRaw || "");
+  const selectedClass = new SelectedClass(untrack(() => data.selectedClassRaw || ""));
   selectedClass.setContext();
 
-  const selectedAgent = new SelectedAgent(selectedAgentId || "");
+  const selectedAgent = new SelectedAgent(untrack(() => data.selectedAgentId || ""));
   selectedAgent.setContext();
 
   $effect(() => {
@@ -61,14 +62,14 @@
   });
 
   const appContext = new UserContext(
-    user,
-    classes,
-    students ?? undefined,
-    assignedSection,
+    untrack(() => data.user),
+    untrack(() => data.classes),
+    untrack(() => data.students ?? undefined),
+    untrack(() => data.assignedSection),
   );
   appContext.setContext();
 
-  const filesContext = new FilesContext(data.uploads, selectedClass, true);
+  const filesContext = new FilesContext(untrack(() => data.uploads), selectedClass, true);
   filesContext.setContext();
 
   const imageContext = new ImageContext();

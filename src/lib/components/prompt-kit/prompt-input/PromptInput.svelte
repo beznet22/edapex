@@ -7,6 +7,7 @@
     type PromptInputSchema,
   } from "./prompt-input-context.svelte.js";
 
+  import { untrack } from "svelte";
   let {
     class: className,
     isLoading = false,
@@ -21,12 +22,12 @@
   } = $props();
 
   const contextInstance = new PromptInputClass({
-    isLoading,
-    value,
-    onValueChange,
-    maxHeight,
-    onSubmit,
-    disabled: isLoading,
+    isLoading: untrack(() => isLoading),
+    value: untrack(() => value),
+    onValueChange: untrack(() => onValueChange),
+    maxHeight: untrack(() => maxHeight),
+    onSubmit: untrack(() => onSubmit),
+    disabled: untrack(() => isLoading),
   });
 
   setPromptInputContext(contextInstance);

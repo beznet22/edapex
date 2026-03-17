@@ -9,46 +9,63 @@ import {
   text,
   tinyint,
   index,
+  json,
 } from "drizzle-orm/mysql-core";
 
-import { accounts } from "./domain-core";
+import { users, tenants, academicYears, accounts } from "./domain-core";
 
 // Extracts HR-specific data from sm_staffs
 
-export const hrDepartments = mysqlTable("edx_departments", {
+export const hrDepartments = mysqlTable("departments", {
   id: int("id").autoincrement().primaryKey(),
-  tenantId: int("tenant_id").notNull(),
+  tenantId: int("tenant_id").notNull().references(() => tenants.id),
   departmentName: varchar("department_name", { length: 191 }).notNull(),
   createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow(),
 });
 
-export const hrDesignations = mysqlTable("edx_designations", {
+export const hrDesignations = mysqlTable("designations", {
   id: int("id").autoincrement().primaryKey(),
-  tenantId: int("tenant_id").notNull(),
+  tenantId: int("tenant_id").notNull().references(() => tenants.id),
   designationName: varchar("designation_name", { length: 191 }).notNull(),
   createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow(),
 });
 
-export const hrLeaveRequests = mysqlTable("edx_leave_requests", {
+// Leave Types — configurable leave categories (replaces smLeaveTypes)
+export const leaveTypes = mysqlTable("leave_types", {
   id: int("id").autoincrement().primaryKey(),
-  tenantId: int("tenant_id").notNull(),
-  accountId: int("account_id").notNull().references(() => accounts.id), // Staff
-  leaveType: varchar("leave_type", { length: 100 }).notNull(), // medical, casual, maternity
+  tenantId: int("tenant_id").notNull().references(() => tenants.id),
+  name: varchar("name", { length: 100 }).notNull(), // medical, casual, maternity, etc.
+  totalDays: int("total_days"),  // annual allowance
+  activeStatus: tinyint("active_status").default(1).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow(),
+});
+
+export const hrLeaveRequests = mysqlTable("leave_requests", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenant_id").notNull().references(() => tenants.id),
+  userId: int("user_id").notNull().references(() => users.id), // Staff persona
+  leaveTypeId: int("leave_type_id").references(() => leaveTypes.id),
+  leaveType: varchar("leave_type", { length: 100 }).notNull(), // kept for flexibility
   applyDate: date("apply_date", { mode: "string" }).notNull(),
   fromDate: date("from_date", { mode: "string" }).notNull(),
   toDate: date("to_date", { mode: "string" }).notNull(),
   reason: text("reason"),
   status: mysqlEnum("status", ["pending", "approved", "rejected"]).notNull().default("pending"),
-  approvedBy: int("approved_by").references(() => accounts.id),
+  approvedBy: int("approved_by").references(() => users.id), // Staff persona
   createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow(),
 }, (table) => ({
-  accountIdx: index("leave_account_idx").on(table.accountId),
+  userIdx: index("leave_user_idx").on(table.userId),
+  tenantStatusIdx: index("leave_tenant_status_idx").on(table.tenantId, table.status),
 }));
 
-export const payrollRuns = mysqlTable("edx_payroll_runs", {
+export const payrollRuns = mysqlTable("payroll_runs", {
   id: int("id").autoincrement().primaryKey(),
-  tenantId: int("tenant_id").notNull(),
-  accountId: int("account_id").notNull().references(() => accounts.id), // Staff
+  tenantId: int("tenant_id").notNull().references(() => tenants.id),
+  userId: int("user_id").notNull().references(() => users.id), // Staff persona
   payrollMonth: varchar("payroll_month", { length: 20 }).notNull(),
   payrollYear: varchar("payroll_year", { length: 20 }).notNull(),
   basicSalary: decimal("basic_salary", { precision: 12, scale: 2 }).notNull(),
@@ -57,6 +74,32 @@ export const payrollRuns = mysqlTable("edx_payroll_runs", {
   netSalary: decimal("net_salary", { precision: 12, scale: 2 }).notNull(),
   paymentGenerated: tinyint("payment_generated").default(0),
   createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow(),
 }, (table) => ({
-  payrollAccountIdx: index("pr_acct_period_idx").on(table.accountId, table.payrollMonth, table.payrollYear),
+  payrollUserIdx: index("pr_user_period_idx").on(table.userId, table.payrollMonth, table.payrollYear),
+}));
+
+// --- NEW TABLE ---
+
+// Staff Evaluations — teacher performance evaluations (replaces teacherEvaluations)
+export type EvaluationMetadata = {
+  criteria?: { name: string; score: number; maxScore: number }[];
+  observerNotes?: string;
+};
+
+export const staffEvaluations = mysqlTable("staff_evaluations", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenant_id").notNull().references(() => tenants.id),
+  userId: int("user_id").notNull().references(() => users.id), // Staff being evaluated
+  evaluatorId: int("evaluator_id").notNull().references(() => users.id), // Staff persona
+  evaluationDate: date("evaluation_date", { mode: "string" }).notNull(),
+  overallScore: decimal("overall_score", { precision: 5, scale: 2 }),
+  remarks: text("remarks"),
+  metadata: json("metadata").$type<EvaluationMetadata>(),
+  academicId: int("academic_id").references(() => academicYears.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow(),
+}, (table) => ({
+  userIdx: index("eval_user_idx").on(table.userId),
+  tenantAcademicIdx: index("eval_tenant_academic_idx").on(table.tenantId, table.academicId),
 }));

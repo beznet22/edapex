@@ -1,21 +1,6 @@
-import {
-  index,
-  int,
-  mysqlTable,
-  text,
-  varchar,
-  timestamp,
-  json,
-  boolean,
-  primaryKey,
-  foreignKey,
-  datetime,
-} from "drizzle-orm/mysql-core";
-import { sql } from "drizzle-orm";
-import { generateId } from "ai";
-export * from "./sms-schema";
 export * from "./domain-core";
 export * from "./domain-academic";
+export * from "./domain-ai";
 export * from "./domain-assessment";
 export * from "./domain-attendance";
 export * from "./domain-cms";
@@ -28,29 +13,21 @@ export * from "./domain-hr";
 export * from "./domain-library";
 export * from "./domain-pbac";
 export * from "./domain-settings";
-import { users, smStaffs, smStudents, smParents } from "./sms-schema";
+export * from "./domain-lms";
 
+import { users, accounts, sessions } from "./domain-core";
+import { chats, messages } from "./domain-ai";
+
+// Authoritative Types
 export type User = typeof users.$inferSelect;
-export type Staff = typeof smStaffs.$inferSelect;
-export type Student = typeof smStudents.$inferSelect;
-export type Parent = typeof smParents.$inferSelect;
+export type Staff = typeof users.$inferSelect;
+export type Student = typeof users.$inferSelect;
+export type Parent = typeof users.$inferSelect;
+export type DBChat = typeof chats.$inferSelect;
+export type DBMessage = typeof messages.$inferSelect;
 
-export * from "./domain-ai";
+// Lucia Auth re-exports
+export { sessions, accounts } from "./domain-core";
 
-export {
-  aiSessions as sessions,
-  aiChats as chats,
-  aiMessages as messages,
-  aiVotes as votes,
-  aiDocuments as documents,
-  aiSuggestions as suggestions,
-} from "./domain-ai";
-
-export type {
-  AISession as Session,
-  AIChat as DBChat,
-  AIMessage as DBMessage,
-  AIVote as Vote,
-  AIDocument as Document,
-  AISuggestion as Suggestion,
-} from "./domain-ai";
+// Re-export specific metadata unions for convenience if needed, 
+// though 'export *' already handles individual type exports.

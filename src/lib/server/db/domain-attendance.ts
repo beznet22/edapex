@@ -6,9 +6,13 @@ import {
   date,
   json,
   index,
+  varchar,
+  text,
+  tinyint,
 } from "drizzle-orm/mysql-core";
 
-import { accounts } from "./domain-core";
+import { users, tenants, academicYears, accounts } from "./domain-core";
+import { classes, enrollments, sections } from "./domain-academic";
 
 export type AttendanceMetadata = {
   daysOpened?: number;
@@ -19,22 +23,44 @@ export type AttendanceMetadata = {
 };
 
 // Universal Attendance — replaces 4 parallel tables
-export const attendances = mysqlTable("edx_attendances", {
+export const attendances = mysqlTable("attendances", {
   id: int("id").autoincrement().primaryKey(),
-  tenantId: int("tenant_id").notNull(),
-  accountId: int("account_id").notNull().references(() => accounts.id),
+  tenantId: int("tenant_id").notNull().references(() => tenants.id),
+  userId: int("user_id").notNull().references(() => users.id), // Participant (Student/Staff)
   actorType: mysqlEnum("actor_type", ["student", "staff"]).notNull(),
   scopeType: mysqlEnum("scope_type", ["daily", "subject", "term_summary"]).notNull(),
   scopeRefId: int("scope_ref_id"),  // subject_id or exam_type_id
   attendanceDate: date("attendance_date", { mode: "string" }),
+  enrollmentId: int("enrollment_id").references(() => enrollments.id),
+  classId: int("class_id").references(() => classes.id),
+  sectionId: int("section_id").references(() => sections.id),
   status: mysqlEnum("status", ["present", "absent", "late", "half_day", "excused"]).notNull(),
-  metadata: json("metadata").$type<AttendanceMetadata>(),  // { days_opened, days_absent, days_present, notes }
-  recordedBy: int("recorded_by"),
-  academicId: int("academic_id").notNull(),
+  metadata: json("metadata").$type<AttendanceMetadata>(),
+  recordedBy: int("recorded_by").references(() => users.id), // Staff persona
+  academicId: int("academic_id").notNull().references(() => academicYears.id),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow(),
 }, (table) => ({
-  personDateIdx: index("att_person_date_idx").on(table.accountId, table.attendanceDate),
+  personDateIdx: index("att_user_date_idx").on(table.userId, table.attendanceDate),
   tenantDateIdx: index("att_tenant_date_idx").on(table.tenantId, table.attendanceDate),
   tenantAcademicIdx: index("att_tenant_academic_idx").on(table.tenantId, table.academicId),
+}));
+
+// --- NEW TABLE ---
+
+// Holidays — replaces smHolidays, smWeekends
+export const holidays = mysqlTable("holidays", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenant_id").notNull().references(() => tenants.id),
+  title: varchar("title", { length: 200 }).notNull(),
+  description: text("description"),
+  holidayType: mysqlEnum("holiday_type", ["holiday", "weekend", "half_day", "event"]).notNull(),
+  fromDate: date("from_date", { mode: "string" }).notNull(),
+  toDate: date("to_date", { mode: "string" }).notNull(),
+  isRecurring: tinyint("is_recurring").default(0),  // for weekends
+  academicId: int("academic_id").references(() => academicYears.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow(),
+}, (table) => ({
+  tenantDateIdx: index("hol_tenant_date_idx").on(table.tenantId, table.fromDate),
 }));

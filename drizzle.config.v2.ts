@@ -9,7 +9,7 @@ if (!process.env.DATABASE_V2_URL) throw new Error("DATABASE_V2_URL is not set in
 
 export default defineConfig({
   out: "./drizzle-v2",
-  schema: "./src/lib/server/db/schema-v2.ts",
+  schema: "./src/lib/server/db/schema.ts",
   dialect: "mysql",
   dbCredentials: {
     url: process.env.DATABASE_V2_URL!,
