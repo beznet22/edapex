@@ -222,13 +222,20 @@ export class QwenProvider implements OAuth2Client {
 
     console.log(`[QwenProvider] Response status: ${response.status} ${response.statusText}`);
 
+    const responseText = await response.text();
+    console.log("[QwenProvider] Raw response body:", responseText);
+
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`❌ [QwenProvider] Device authorization failed: ${response.status} ${errorText}`);
+      console.error(`❌ [QwenProvider] Device authorization failed: ${response.status} ${responseText}`);
       throw new Error(`Device authorization failed: ${response.status} ${response.statusText}`);
     }
 
-    return await response.json();
+    try {
+      return JSON.parse(responseText);
+    } catch (e) {
+      console.error("❌ [QwenProvider] Failed to parse device authorization response as JSON:", e);
+      throw new Error("Failed to parse device authorization response as JSON");
+    }
   }
 
   private async pollDevicToken(
@@ -257,8 +264,16 @@ export class QwenProvider implements OAuth2Client {
 
     console.log(`[QwenProvider] Poll response status: ${response.status}`);
 
+    const responseText = await response.text();
+    console.log("[QwenProvider] Poll raw response body:", responseText);
+
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
+      let errorData: any = {};
+      try {
+        errorData = JSON.parse(responseText);
+      } catch (e) {
+        console.warn("[QwenProvider] Could not parse error response as JSON");
+      }
       console.warn("[QwenProvider] Poll error data:", errorData);
 
       if (response.status === 400 && errorData.error === "authorization_pending") {
@@ -273,10 +288,14 @@ export class QwenProvider implements OAuth2Client {
       throw new Error(`Credential poll failed: ${errorData.error || "Unknown error"}`);
     }
 
-    const credentialData = await response.json();
-    credentialData.obtained_at = Date.now();
-
-    return credentialData;
+    try {
+      const credentialData = JSON.parse(responseText);
+      credentialData.obtained_at = Date.now();
+      return credentialData;
+    } catch (e) {
+      console.error("❌ [QwenProvider] Failed to parse poll response as JSON:", e);
+      throw new Error("Failed to parse poll response as JSON");
+    }
   }
 
   private async doRefresh(refresh_credential: string): Promise<Credential> {
