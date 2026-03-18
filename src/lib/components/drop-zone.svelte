@@ -255,7 +255,7 @@
               {onFileRejected}
               maxFileSize={2000 * KILOBYTE}
               accept="image/*"
-              maxFiles={4}
+              maxFiles={25}
               disabled={!value}
               fileCount={files.length}
             />
