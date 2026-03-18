@@ -190,7 +190,7 @@ export class QwenProvider implements OAuth2Client {
   }
 
   private getBaseHeaders(): Record<string, string> {
-    const version = "0.0.5";
+    const version = "1.0.0";
     const userAgent = `QwenCode/${version} (${process.platform}; ${process.arch})`;
     return {
       "User-Agent": userAgent,
