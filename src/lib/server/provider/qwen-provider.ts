@@ -190,7 +190,7 @@ export class QwenProvider implements OAuth2Client {
   }
 
   private getBaseHeaders(): Record<string, string> {
-    const version = "1.0.0";
+    const version = "0.12.6";
     const userAgent = `QwenCode/${version} (${process.platform}; ${process.arch})`;
     return {
       "User-Agent": userAgent,
@@ -201,6 +201,15 @@ export class QwenProvider implements OAuth2Client {
       Connection: "keep-alive",
       "Cache-Control": "no-cache",
       "Accept-Encoding": "gzip, deflate, br",
+    };
+  }
+
+  private getOAuthHeaders(): Record<string, string> {
+    const baseHeaders = this.getBaseHeaders();
+    return {
+      ...baseHeaders,
+      "Content-Type": "application/x-www-form-urlencoded",
+      "x-request-id": crypto.randomUUID(),
     };
   }
 
@@ -221,11 +230,7 @@ export class QwenProvider implements OAuth2Client {
 
     const response = await fetch(this.config.deviceCodeUrl!, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-        Accept: "application/json",
-        "x-request-id": crypto.randomUUID(),
-      },
+      headers: this.getOAuthHeaders(),
       body: this.objectToUrlEncoded(bodyData),
     });
 
@@ -263,10 +268,7 @@ export class QwenProvider implements OAuth2Client {
 
     const response = await fetch(this.config.tokenUrl, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-        Accept: "application/json",
-      },
+      headers: this.getOAuthHeaders(),
       body: this.objectToUrlEncoded(bodyData),
     });
 
@@ -315,10 +317,7 @@ export class QwenProvider implements OAuth2Client {
 
     const response = await fetch(this.config.tokenUrl, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-        Accept: "application/json",
-      },
+      headers: this.getOAuthHeaders(),
       body: this.objectToUrlEncoded(bodyData),
     });
 
