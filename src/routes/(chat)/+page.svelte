@@ -13,6 +13,8 @@
   import { toast } from "svelte-sonner";
 
   import { SelectedClass, SelectedAgent } from "$lib/context/sync.svelte";
+  import EyeIcon from "@lucide/svelte/icons/eye";
+  import EyeOffIcon from "@lucide/svelte/icons/eye-off";
 
   let { data } = $props();
   // svelte-ignore state_referenced_locally
@@ -20,6 +22,7 @@
   let open = $state(false);
   let value = $state<string | undefined>();
   let newPassword = $state("");
+  let showPassword = $state(false);
   let isUpdating = $state(false);
   let userContext = $derived(UserContext.fromContext());
   const selectedClass = SelectedClass.fromContext();
@@ -104,7 +107,17 @@
       </AlertDialog.Description>
     </AlertDialog.Header>
     <div class="grid gap-4">
-      <Select.Root type="single" name="classes" bind:value>
+      <Select.Root 
+        type="single" 
+        name="classes" 
+        bind:value 
+        onValueChange={(val) => {
+          const selected = userContext.classes.find((c) => `${c.id}` === val);
+          if (selected) {
+            chat.selectedClass = selected;
+          }
+        }}
+      >
         <Select.Trigger class="w-full">
           {#if !chat.selectedClass}
             Select a class
@@ -125,13 +138,29 @@
       </Select.Root>
       <div class="space-y-2 mt-4">
         <label for="newPassword" class="text-sm font-medium">New Password (Optional)</label>
-        <Input 
-          id="newPassword" 
-          type="password" 
-          bind:value={newPassword} 
-          placeholder="Enter a new password" 
-          class="w-full"
-        />
+        <div class="relative">
+          <Input 
+            id="newPassword" 
+            type={showPassword ? "text" : "password"} 
+            bind:value={newPassword} 
+            placeholder="Enter a new password" 
+            class="w-full pr-10"
+          />
+          <button
+            type="button"
+            class="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+            onpointerdown={(e) => { e.preventDefault(); showPassword = true; }}
+            onpointerup={() => showPassword = false}
+            onpointerleave={() => showPassword = false}
+            aria-label={showPassword ? "Hide password" : "Show password"}
+          >
+            {#if showPassword}
+              <EyeOffIcon class="h-4 w-4" />
+            {:else}
+              <EyeIcon class="h-4 w-4" />
+            {/if}
+          </button>
+        </div>
         {#if newPassword && newPassword.length < 6}
           <p class="text-xs text-destructive">Password must be at least 6 characters</p>
         {/if}

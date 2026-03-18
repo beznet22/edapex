@@ -254,19 +254,47 @@ export class AssessmentService {
   }
 
   async assignSubjects(classId: number, sectionId: number, teacherId?: number) {
-    // clones existing subjects from other sections of the same class
     const academicId = await repo.result.getAcademicId();
-    const assignedSubjects = await resultRepo.getAssignedSubjects(classId, sectionId);
-    const assigned = assignedSubjects.map((s) => ({
-      classId,
-      sectionId,
-      academicId,
-      teacherId: teacherId ?? s.teacherId,
-      subjectId: s.subjectId,
-      activeStatus: 1,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    }));
+    
+    // 1. Try to get subjects for this specific section first
+    let assignedSubjects = await resultRepo.getAssignedSubjects(classId, sectionId);
+    
+    // 2. If empty, try to get subjects from any other section in the same class
+    if (assignedSubjects.length === 0) {
+      const allClassSections = await resultRepo.getClassSections();
+      const parentSections = allClassSections.filter(s => s.classId === classId && s.sectionId !== sectionId);
+      
+      for (const section of parentSections) {
+        if (section.sectionId) {
+          const proxySubjects = await resultRepo.getAssignedSubjects(classId, section.sectionId);
+          if (proxySubjects.length > 0) {
+            assignedSubjects = proxySubjects;
+            break;
+          }
+        }
+      }
+    }
+
+    if (assignedSubjects.length === 0) return null;
+
+    // 3. Prepare unique assignments to avoid duplicates
+    const subjectMap = new Map<number, any>();
+    assignedSubjects.forEach(s => {
+      if (s.subjectId && !subjectMap.has(s.subjectId)) {
+        subjectMap.set(s.subjectId, {
+          classId,
+          sectionId,
+          academicId,
+          teacherId: teacherId ?? s.teacherId,
+          subjectId: s.subjectId,
+          activeStatus: 1,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
+      }
+    });
+
+    const assigned = Array.from(subjectMap.values());
     return await resultRepo.assignSubjects(assigned);
   }
 
