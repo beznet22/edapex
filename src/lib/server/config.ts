@@ -26,3 +26,12 @@ export const googleConfig: ProviderConfig = {
   successUrl: "https://developers.google.com/gemini-code-assist/auth_success_gemini",
   failureUrl: "https://developers.google.com/gemini-code-assist/auth_failure_gemini",
 };
+
+// OpenRouter OAuth configuration
+export const openRouterConfig: ProviderConfig = {
+  clientId: "openrouter", // Placeholder as OpenRouter uses callback_url as identifier
+  scopes: [],
+  tokenUrl: "https://openrouter.ai/api/v1/auth/keys",
+  authUrl: "https://openrouter.ai/auth",
+  baseUrl: "https://openrouter.ai/api/v1",
+};

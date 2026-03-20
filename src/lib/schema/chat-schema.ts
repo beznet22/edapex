@@ -56,7 +56,7 @@ export const providerConfigSchema = z.object({
   scopes: z.array(z.string()),
   tokenUrl: z.string(),
   deviceCodeUrl: z.string().optional(),
-  authUrl: z.string().optional(),
+  authUrl: z.string(),
   redirectUri: z.string().optional(),
   userInfoUrl: z.string().optional(),
   successUrl: z.string().optional(),

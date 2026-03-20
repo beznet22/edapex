@@ -10,7 +10,7 @@ import type { AuthUser } from "$lib/types/auth-types.js";
 import type { AgentWorkflow, Assistant } from "$lib/types/chat-types.js";
 import type { ClassSection } from "$lib/types/result-types.js";
 import { defaultPrompt } from "../prompts/default.js";
-import { GoogleProvider, QwenProvider } from "../provider/index.js";
+import { GoogleProvider, QwenProvider, OpenRouterProvider } from "../provider/index.js";
 import { resultRepo } from "../repository";
 import { agentWorkflows } from "../agents/index.js";
 import { getProviderType } from "../provider/router.js";
@@ -21,6 +21,7 @@ export class AgentService {
   constructor() {
     this.providers.set(CredentialType.QWEN_CODE, new QwenProvider());
     this.providers.set(CredentialType.GOOGLE_OAUTH, new GoogleProvider());
+    this.providers.set(CredentialType.OPENROUTER, new OpenRouterProvider());
   }
 
   use(type: CredentialType): OAuth2Client {
