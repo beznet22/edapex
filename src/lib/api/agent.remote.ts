@@ -33,8 +33,9 @@ export const addToken = command(
   z.object({
     device_code: z.string(),
     provider: z.enum(CredentialType),
+    manual_code: z.string().optional(),
   }),
-  async ({ device_code, provider }) => {
+  async ({ device_code, provider, manual_code }) => {
     const { cookies, locals } = getRequestEvent();
     if ((!locals.user || !provider) && !allowAnonymousChats) {
       return { success: false, message: "User not authenticated or provider not specified" };
@@ -55,15 +56,21 @@ export const addToken = command(
       return { success: false, message: "Device code expired" };
     }
 
-    if (code !== device_code || !verifier) {
+    if (code !== device_code) {
       console.log(`❌ Invalid or mismatched device code: ${device_code}`);
       return { success: false, message: "Invalid device code" };
     }
 
-    const result = await useAgent().use(provider).getToken(code, verifier);
+    // For Gemini (Google OAuth), we need the manual_code if it's not polling
+    const result = await useAgent().use(provider).getToken(manual_code || device_code, code);
+    
     if ("status" in result && result.status === "pending") {
       console.log(`[addToken] Token still pending for ${provider}`);
       return { ...result };
+    }
+
+    if ("status" in result && result.status === "error") {
+      return { success: false, message: "Authorization failed" };
     }
 
     console.log(`[addToken] Successfully added token for ${provider}`);

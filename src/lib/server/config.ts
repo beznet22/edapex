@@ -15,16 +15,15 @@ export const qwenConfig: ProviderConfig = {
 export const googleConfig: ProviderConfig = {
   clientId: "681255809395-oo8ft2oprdrnp9e3aqf6av3hmdib135j.apps.googleusercontent.com",
   clientSecret: "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",
+  redirectUri: "https://codeassist.google.com/authcode",
+  authUrl: "https://accounts.google.com/o/oauth2/v2/auth",
+  tokenUrl: "https://oauth2.googleapis.com/token",
+  userInfoUrl: "https://www.googleapis.com/oauth2/v2/userinfo",
   scopes: [
     "https://www.googleapis.com/auth/cloud-platform",
     "https://www.googleapis.com/auth/userinfo.email",
-    "https://www.googleapis.com/auth/userinfo.profile"
+    "https://www.googleapis.com/auth/userinfo.profile",
   ],
-  tokenUrl: "https://oauth2.googleapis.com/token",
-  authUrl: "https://accounts.google.com/o/oauth2/v2/auth",
-  userInfoUrl: "https://www.googleapis.com/oauth2/v2/userinfo",
-  successUrl: "https://developers.google.com/gemini-code-assist/auth_success_gemini",
-  failureUrl: "https://developers.google.com/gemini-code-assist/auth_failure_gemini",
 };
 
 // OpenRouter OAuth configuration
@@ -34,4 +33,6 @@ export const openRouterConfig: ProviderConfig = {
   tokenUrl: "https://openrouter.ai/api/v1/auth/keys",
   authUrl: "https://openrouter.ai/auth",
   baseUrl: "https://openrouter.ai/api/v1",
+  redirectUri: undefined,
 };
+
