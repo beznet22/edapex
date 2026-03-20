@@ -77,3 +77,24 @@ export const addToken = command(
     return { success: true, status: "complete" };
   }
 );
+
+export const setDefaultProvider = command(
+  z.object({
+    provider: z.enum(CredentialType),
+  }),
+  async ({ provider }) => {
+    const { cookies, locals } = getRequestEvent();
+    if (!locals.user && !allowAnonymousChats) {
+      return { success: false, message: "Unauthorized" };
+    }
+
+    cookies.set("default-provider", provider, {
+      path: "/",
+      httpOnly: true,
+      sameSite: "lax",
+      maxAge: 60 * 60 * 24 * 30, // 30 days
+    });
+
+    return { success: true, message: `Default provider set to ${provider}` };
+  }
+);

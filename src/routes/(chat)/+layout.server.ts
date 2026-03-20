@@ -96,6 +96,8 @@ export const load: LayoutServerLoad = async ({ cookies, locals, url }) => {
     success: false,
   }));
 
+  const defaultProvider = cookies.get("default-provider");
+
   return {
     agents,
     user: user || undefined,
@@ -107,5 +109,6 @@ export const load: LayoutServerLoad = async ({ cookies, locals, url }) => {
     selectedAgentId,
     uploads,
     assignedSection,
+    defaultProvider,
   };
 };

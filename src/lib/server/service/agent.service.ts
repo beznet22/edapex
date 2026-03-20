@@ -33,21 +33,27 @@ export class AgentService {
 
   getProviderForAgent(agentId?: string): OAuth2Client {
     const { cookies } = getRequestEvent();
-    const preferredType = getProviderType(agentId);
+    
+    // 1. Check for user-selected default provider
+    const defaultType = cookies.get("default-provider") as CredentialType;
+    if (defaultType && cookies.get(defaultType)) {
+      return this.use(defaultType);
+    }
 
-    // If preferred is connected, use it
+    // 2. Check for agent-preferred provider
+    const preferredType = getProviderType(agentId);
     if (cookies.get(preferredType)) {
       return this.use(preferredType);
     }
 
-    // Try others
+    // 3. Fallback to any connected provider
     for (const type of Object.values(CredentialType)) {
       if (cookies.get(type)) {
         return this.use(type);
       }
     }
 
-    // Fallback to preferred (will likely throw error downstream but that's expected if nothing is connected)
+    // 4. Ultimate fallback to preferred (defaulting to QWEN if nothing else works)
     return this.use(preferredType);
   }
 

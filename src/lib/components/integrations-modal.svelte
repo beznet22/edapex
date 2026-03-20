@@ -1,24 +1,24 @@
 <script lang="ts">
+    import { page } from "$app/state";
+    import { addProvder, addToken, setDefaultProvider } from "$lib/api/agent.remote.js";
+    import { chatProviders } from "$lib/chat/models.js";
+    import ResponsiveSheet from "$lib/components/shared/responsive-sheet.svelte";
     import { Button } from "$lib/components/ui/button/index.js";
     import {
         Card,
-        CardHeader,
-        CardTitle,
         CardDescription,
         CardFooter,
+        CardHeader,
+        CardTitle,
     } from "$lib/components/ui/card/index.js";
-    import { Spinner } from "$lib/components/ui/spinner/index.js";
     import { Input } from "$lib/components/ui/input/index.js";
-    import { chatProviders } from "$lib/chat/models.js";
-    import { addProvder, addToken } from "$lib/api/agent.remote.js";
-    import { toast } from "svelte-sonner";
+    import { Spinner } from "$lib/components/ui/spinner/index.js";
     import { saveTokenData } from "$lib/context/oauth.svelte.js";
     import type { CredentialType } from "$lib/schema/chat-schema.js";
+    import CheckCircleIcon from "@lucide/svelte/icons/check-circle";
+    import CircleIcon from "@lucide/svelte/icons/circle";
     import Plug from "@lucide/svelte/icons/plug";
-    import { page } from "$app/state";
-    import ResponsiveSheet from "$lib/components/shared/responsive-sheet.svelte";
-    import Settings from "@lucide/svelte/icons/settings";
-    import FolderIcon from "@lucide/svelte/icons/folder";
+    import { toast } from "svelte-sonner";
 
     let open = $state(false);
     
@@ -39,6 +39,8 @@
     let connectingProviderId = $state<CredentialType | null>(null);
     let manualCode = $state("");
     let currentDeviceCode = $state("");
+    let optimisticDefaultProvider = $state<string | null>(null);
+    let displayDefaultProvider = $derived(optimisticDefaultProvider ?? page.data.defaultProvider);
 
     async function handleConnect(providerId: CredentialType, name: string) {
         if (connectingProviderId) return;
@@ -96,6 +98,23 @@
             toast.error("An error occurred during verification");
         }
     }
+
+    async function handleSetDefault(providerId: CredentialType) {
+        optimisticDefaultProvider = providerId;
+        try {
+            const result = await setDefaultProvider({ provider: providerId });
+            if (result.success) {
+                toast.success(result.message);
+            } else {
+                toast.error(result.message);
+                optimisticDefaultProvider = null;
+            }
+        } catch (err) {
+            console.error(err);
+            toast.error("Failed to set default provider");
+            optimisticDefaultProvider = null;
+        }
+    }
 </script>
 
 {#snippet prefix()}
@@ -108,12 +127,17 @@
     bind:open
     {onOpenChange}
     title="Integrations"
-    description="Connect external AI providers to enhance your chat experience."
+    description="Connect external AI providers and select your default for automated tasks."
     {prefix}
 >
     <div class="grid grid-cols-1 gap-4 py-4">
         {#each chatProviders as provider}
-            <Card class="bg-muted/5 border-border/50">
+            <Card class="bg-muted/5 border-border/50 relative overflow-hidden">
+                {#if displayDefaultProvider === provider.id}
+                    <div class="absolute top-0 right-0 p-1 bg-primary/10 rounded-bl-xl border-l border-b border-primary/20">
+                        <CheckCircleIcon class="size-3 text-primary" />
+                    </div>
+                {/if}
                 <CardHeader class="pb-3">
                     <div class="flex items-center justify-between">
                         <div class="flex items-center gap-2">
@@ -122,6 +146,17 @@
                                 >{provider.name}</CardTitle
                             >
                         </div>
+                        <button 
+                            class="p-1 hover:bg-primary/10 rounded-full transition-colors group"
+                            onclick={() => handleSetDefault(provider.id)}
+                            title="Set as default provider"
+                        >
+                            {#if displayDefaultProvider === provider.id}
+                                <CheckCircleIcon class="size-5 text-primary" />
+                            {:else}
+                                <CircleIcon class="size-5 text-muted-foreground group-hover:text-primary transition-colors" />
+                            {/if}
+                        </button>
                     </div>
                     <CardDescription
                         >{provider.description ||
