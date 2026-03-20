@@ -65,7 +65,7 @@ export const generateContent = async (file: Blob, mapString?: string) => {
       ],
     });
 
-    const provider = await useAgent().use(CredentialType.GOOGLE_OAUTH).getModelProvider();
+    const provider = await useAgent().getProviderForAgent().getModelProvider();
     if (!provider) return { success: false, message: "No provider found" };
 
     const result = await generateText({
