@@ -58,6 +58,27 @@ async function poll_device_code(
   }
 }
 
+export function closePopup() {
+  if (popup) {
+    try {
+      popup.close();
+    } catch (e) {
+      console.error("Could not close popup window automatically", e);
+    }
+    popup = null;
+  }
+
+  // Fallback: if state was lost (e.g. HMR or reload), attempt to grab the window by name
+  try {
+    const fallbackPopup = window.open("", "oauth2_popup");
+    if (fallbackPopup) {
+      fallbackPopup.close();
+    }
+  } catch (e) {
+    // ignore
+  }
+}
+
 export function saveTokenData(data: DeviceAuth & { provider: CredentialType }) {
   if (!data.authUrl || !data.device_code) {
     console.error("Invalid OAuth2 response", data);
