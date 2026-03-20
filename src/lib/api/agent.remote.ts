@@ -62,7 +62,7 @@ export const addToken = command(
     }
 
     // For Gemini (Google OAuth), we need the manual_code if it's not polling
-    const result = await useAgent().use(provider).getToken(manual_code || device_code, code);
+    const result = await useAgent().use(provider).getToken(manual_code || device_code, verifier);
     
     if ("status" in result && result.status === "pending") {
       console.log(`[addToken] Token still pending for ${provider}`);

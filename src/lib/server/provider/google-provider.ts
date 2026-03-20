@@ -76,7 +76,7 @@ export class GoogleProvider implements OAuth2Client {
 
   async getToken(
     code: string,
-    state: string
+    verifier: string
   ): Promise<Credential | { status: string; slowDown?: boolean }> {
     const { cookies } = getRequestEvent();
     const verifierData = cookies.get(`v_${this.type}`);
@@ -86,17 +86,10 @@ export class GoogleProvider implements OAuth2Client {
       return { status: "error" };
     }
 
-    const { code: savedState, verifier } = JSON.parse(verifierData);
-    if (savedState !== state) {
-      console.error("❌ [GoogleProvider] State mismatch", {
-        savedState,
-        passedState: state,
-      });
-      return { status: "error" };
-    }
+    const { code: savedState } = JSON.parse(verifierData);
 
-    // If the code is the same as the state, it means the user hasn't entered the manual code yet (polling)
-    if (code === state) {
+    // If the code is the same as the saved state, the user hasn't entered the manual code yet (polling)
+    if (code === savedState) {
       return { status: "pending" };
     }
 

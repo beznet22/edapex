@@ -1,6 +1,10 @@
 <script lang="ts">
     import { page } from "$app/state";
-    import { addProvder, addToken, setDefaultProvider } from "$lib/api/agent.remote.js";
+    import {
+        addProvder,
+        addToken,
+        setDefaultProvider,
+    } from "$lib/api/agent.remote.js";
     import { chatProviders } from "$lib/chat/models.js";
     import ResponsiveSheet from "$lib/components/shared/responsive-sheet.svelte";
     import { Button } from "$lib/components/ui/button/index.js";
@@ -13,7 +17,7 @@
     } from "$lib/components/ui/card/index.js";
     import { Input } from "$lib/components/ui/input/index.js";
     import { Spinner } from "$lib/components/ui/spinner/index.js";
-    import { saveTokenData } from "$lib/context/oauth.svelte.js";
+    import { saveTokenData, closePopup } from "$lib/context/oauth.svelte.js";
     import type { CredentialType } from "$lib/schema/chat-schema.js";
     import CheckCircleIcon from "@lucide/svelte/icons/check-circle";
     import CircleIcon from "@lucide/svelte/icons/circle";
@@ -21,14 +25,13 @@
     import { toast } from "svelte-sonner";
 
     let open = $state(false);
-    
+
     // Sync with page state for sidebar/navigation triggers
     $effect(() => {
         if (page.state.showModal !== undefined) {
             open = page.state.showModal;
         }
     });
-
 
     function onOpenChange(isOpen: boolean) {
         if (!isOpen && page.state.showModal) {
@@ -40,7 +43,9 @@
     let manualCode = $state("");
     let currentDeviceCode = $state("");
     let optimisticDefaultProvider = $state<string | null>(null);
-    let displayDefaultProvider = $derived(optimisticDefaultProvider ?? page.data.defaultProvider);
+    let displayDefaultProvider = $derived(
+        optimisticDefaultProvider ?? page.data.defaultProvider,
+    );
 
     async function handleConnect(providerId: CredentialType, name: string) {
         if (connectingProviderId) return;
@@ -59,7 +64,7 @@
                 `Authorizing ${name}... Please complete the process in the popup.`,
             );
             saveTokenData({ ...result.deviceAuth, provider: providerId });
-            
+
             // For most providers, we can close and let polling happen
             // For Google, we stay open to allow manual code entry
             if (providerId !== "google_oauth") {
@@ -83,11 +88,14 @@
             const result = await addToken({
                 device_code: currentDeviceCode,
                 provider: providerId,
-                manual_code: manualCode
+                manual_code: manualCode,
             });
 
             if (result.success) {
-                toast.success("Connection successful!");
+                toast.success(
+                    `${(connectingProviderId || providerId).replace("_", " ")} added safely`,
+                );
+                closePopup();
                 open = false;
                 connectingProviderId = null;
             } else {
@@ -134,7 +142,9 @@
         {#each chatProviders as provider}
             <Card class="bg-muted/5 border-border/50 relative overflow-hidden">
                 {#if displayDefaultProvider === provider.id}
-                    <div class="absolute top-0 right-0 p-1 bg-primary/10 rounded-bl-xl border-l border-b border-primary/20">
+                    <div
+                        class="absolute top-0 right-0 p-1 bg-primary/10 rounded-bl-xl border-l border-b border-primary/20"
+                    >
                         <CheckCircleIcon class="size-3 text-primary" />
                     </div>
                 {/if}
@@ -146,7 +156,7 @@
                                 >{provider.name}</CardTitle
                             >
                         </div>
-                        <button 
+                        <button
                             class="p-1 hover:bg-primary/10 rounded-full transition-colors group"
                             onclick={() => handleSetDefault(provider.id)}
                             title="Set as default provider"
@@ -154,7 +164,9 @@
                             {#if displayDefaultProvider === provider.id}
                                 <CheckCircleIcon class="size-5 text-primary" />
                             {:else}
-                                <CircleIcon class="size-5 text-muted-foreground group-hover:text-primary transition-colors" />
+                                <CircleIcon
+                                    class="size-5 text-muted-foreground group-hover:text-primary transition-colors"
+                                />
                             {/if}
                         </button>
                     </div>
@@ -165,7 +177,9 @@
                 </CardHeader>
                 <CardFooter>
                     {#if connectingProviderId === provider.id && provider.id === "google_oauth"}
-                        <div class="flex flex-col w-full gap-2 transition-all duration-300">
+                        <div
+                            class="flex flex-col w-full gap-2 transition-all duration-300"
+                        >
                             <Input
                                 type="text"
                                 bind:value={manualCode}
@@ -176,23 +190,27 @@
                                 <Button
                                     variant="default"
                                     class="flex-1 rounded-xl"
-                                    onclick={() => verifyManualCode(provider.id)}
+                                    onclick={() =>
+                                        verifyManualCode(provider.id)}
                                 >
                                     Verify Code
                                 </Button>
                                 <Button
                                     variant="ghost"
                                     class="rounded-xl"
-                                    onclick={() => { 
-                                        connectingProviderId = null; 
-                                        manualCode = ""; 
+                                    onclick={() => {
+                                        connectingProviderId = null;
+                                        manualCode = "";
                                     }}
                                 >
                                     Cancel
                                 </Button>
                             </div>
-                            <p class="text-[10px] text-muted-foreground text-center">
-                                Tip: The code is displayed in the popup after authorization.
+                            <p
+                                class="text-[10px] text-muted-foreground text-center"
+                            >
+                                Tip: The code is displayed in the popup after
+                                authorization.
                             </p>
                         </div>
                     {:else}
