@@ -14,31 +14,26 @@ import {
   type ProviderConfig,
 } from "$lib/schema/chat-schema";
 import { googleConfig } from "$lib/server/config";
-import { cookies, jwt } from "$lib/server/helpers";
+import { jwt } from "$lib/server/helpers";
 import { getRequestEvent } from "$app/server";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { customProvider, wrapLanguageModel, type Provider } from "ai";
-import {
-  type LanguageModelV3Content
-} from "@ai-sdk/provider";
 import { createGoogleMiddleware } from "./google-middleware";
 
-const COOKIE_GRACE_SEC = 60; // 1 minute buffer: Grace period
-const CODE_ASSIST_ENDPOINT = "https://cloudcode-pa.googleapis.com"
-const CODE_ASSIST_API_VERSION = "v1internal"
+const CODE_ASSIST_ENDPOINT = "https://cloudcode-pa.googleapis.com";
+const CODE_ASSIST_API_VERSION = "v1internal";
 
 export class GoogleProvider implements OAuth2Client {
   readonly type = CredentialType.GOOGLE_OAUTH;
   readonly config: ProviderConfig;
   readonly credentials: Promise<Credential> | null;
-  private client: Client | null = null;
+  private client: Client;
   private projectId: string | null = null;
-  private authInitialized: boolean = false;
 
   constructor() {
     this.config = googleConfig;
 
-    const { cookies, url } = getRequestEvent();
+    const { cookies } = getRequestEvent();
     const token = cookies.get(this.type);
     console.log(`[GoogleProvider] Cookie '${this.type}' present:`, !!token);
     this.credentials = token ? (jwt.verify(token) as Promise<Credential>) : null;
@@ -46,7 +41,6 @@ export class GoogleProvider implements OAuth2Client {
     this.client = new Client({
       clientId: this.config.clientId,
       clientSecret: this.config.clientSecret,
-      redirectUri: `${url.origin}/api/auth/callback/google_oauth`,
     });
   }
 
@@ -68,50 +62,68 @@ export class GoogleProvider implements OAuth2Client {
       }
     }
 
-    // Ensure the client state is synchronized
-    this.client!.setCredentials({
+    if (!this.client) {
+        throw new Error("Client not initialized");
+    }
+    this.client.setCredentials({
       access_token: currentCredentials.access_token,
       refresh_token: currentCredentials.refresh_token,
-      expiry_date: currentCredentials.obtained_at! + currentCredentials.expires_in! * 1000,
+      expiry_date: (currentCredentials.obtained_at ?? 0) + (currentCredentials.expires_in ?? 0) * 1000,
     });
 
     return { accessToken: currentCredentials.access_token };
   }
 
   async getToken(
-    state: string,
-    codeVerifier: string
+    code: string,
+    state: string
   ): Promise<Credential | { status: string; slowDown?: boolean }> {
-    if (!this.client) return { status: "error" };
-
     const { cookies } = getRequestEvent();
-    const authCode = cookies.get(`auth_code_${state}`);
+    const verifierData = cookies.get(`v_${this.type}`);
+    
+    if (!verifierData) {
+      console.error("❌ [GoogleProvider] No verifier found in cookies");
+      return { status: "error" };
+    }
 
-    if (!authCode) {
+    const { code: savedState, verifier } = JSON.parse(verifierData);
+    if (savedState !== state) {
+      console.error("❌ [GoogleProvider] State mismatch", {
+        savedState,
+        passedState: state,
+      });
+      return { status: "error" };
+    }
+
+    // If the code is the same as the state, it means the user hasn't entered the manual code yet (polling)
+    if (code === state) {
       return { status: "pending" };
     }
 
     try {
-      // Exchange code for Credentials using google-auth-library
       const { tokens } = await this.client.getToken({
-        code: authCode,
-        codeVerifier,
+        code,
+        codeVerifier: verifier,
+        redirect_uri: this.config.redirectUri,
       });
 
-      this.client.setCredentials(tokens);
-      const credential = {
-        access_token: tokens.access_token!,
+      if (!tokens.access_token) {
+        throw new Error("No access token returned from Google");
+      }
+
+      const credential: Credential = {
+        access_token: tokens.access_token,
         refresh_token: tokens.refresh_token || "",
         expires_in: tokens.expiry_date ? Math.floor((tokens.expiry_date - Date.now()) / 1000) : 3600,
         token_type: "Bearer",
         obtained_at: Date.now(),
       };
+
       await this.setCredentials(credential);
-      // Clean up temporary code cookie
-      cookies.delete(`auth_code_${state}`, { path: "/" });
+      cookies.delete(`v_${this.type}`, { path: "/" });
       return credential;
     } catch (error) {
-      console.error("Failed to authenticate with authorization code:", error);
+      console.error("❌ [GoogleProvider] Token exchange failed:", error);
       return { status: "error" };
     }
   }
@@ -136,34 +148,46 @@ export class GoogleProvider implements OAuth2Client {
   }
 
   async generateAuthUrl(): Promise<DeviceAuth | null> {
-    if (!this.client) return null;
-    const event = getRequestEvent();
     try {
-      const redirectUri = `${event.url.origin}/api/auth/callback/google_oauth`;
-      const codeVerifier = await this.client.generateCodeVerifierAsync();
+      console.log("[GoogleProvider] Generating PKCE auth URL...");
+      
+      const verifier = crypto.randomBytes(32).toString('hex');
+      const challenge = crypto.createHash('sha256').update(verifier).digest('base64url');
       const state = crypto.randomBytes(32).toString("hex");
 
-      // Generate auth URL using google-auth-library
+      this.setVerifier(state, verifier);
+
       const authUrl = this.client.generateAuthUrl({
-        redirect_uri: redirectUri,
         access_type: "offline",
         scope: this.config.scopes,
         code_challenge_method: CodeChallengeMethod.S256,
-        code_challenge: codeVerifier.codeChallenge,
+        code_challenge: challenge,
         state,
+        redirect_uri: this.config.redirectUri,
       });
 
-      cookies.set(
-        `v_${this.type}`,
-        JSON.stringify({ code: state, verifier: codeVerifier.codeVerifier }),
-        Math.floor(Date.now() / 1000) + 3600
-      );
-      return { authUrl, device_code: state, interval: 2, expires_in: 3600 };
+      return {
+        authUrl,
+        device_code: state,
+        interval: 5, // Poll every 5 seconds
+        expires_in: 3600,
+      };
     } catch (error) {
-      console.error("Google user code authentication failed:", error);
+      console.error("❌ [GoogleProvider] Auth URL generation failed:", error);
       return null;
     }
   }
+
+  private setVerifier(state: string, verifier: string): void {
+    const { cookies } = getRequestEvent();
+    cookies.set(`v_${this.type}`, JSON.stringify({ code: state, verifier }), {
+      expires: new Date(Date.now() + 3600 * 1000),
+      httpOnly: true,
+      sameSite: "lax",
+      path: "/",
+    });
+  }
+
 
   async getModelProvider(): Promise<Provider | null> {
     const tokenData = await this.getAccessToken();
@@ -183,9 +207,9 @@ export class GoogleProvider implements OAuth2Client {
     // Discovery/cache project ID
     const projectId = await this.discoverProjectId();
 
-    const middleware = createGoogleMiddleware(this.client!, projectId);
+    const middleware = createGoogleMiddleware(this.client, projectId);
 
-    const wrapModel = (model: any) =>
+    const wrapModel = (model: Parameters<typeof wrapLanguageModel>[0]["model"]) =>
       wrapLanguageModel({
         model: model,
         middleware,
@@ -204,10 +228,10 @@ export class GoogleProvider implements OAuth2Client {
     });
   }
 
-  async fetchUserInfo(client: Client): Promise<{ email: string;[key: string]: any } | null> {
+  async fetchUserInfo(client: Client): Promise<{ email: string; [key: string]: unknown } | null> {
     try {
-      const response = await client.request({
-        url: this.config.userInfoUrl!,
+      const response = await client.request<{ email: string; [key: string]: unknown }>({
+        url: this.config.userInfoUrl || "",
         method: "GET",
       });
 
@@ -216,7 +240,7 @@ export class GoogleProvider implements OAuth2Client {
         return null;
       }
 
-      return response.data as any;
+      return response.data;
     } catch (error) {
       console.log("Error retrieving user info:", error);
       return null;
@@ -225,13 +249,12 @@ export class GoogleProvider implements OAuth2Client {
 
   async refreshToken(credential: Credential): Promise<Credential> {
     try {
-      // Set refresh Credential and get new Credential using existing client
-      this.client!.setCredentials({
+      this.client.setCredentials({
         access_token: credential.access_token,
         refresh_token: credential.refresh_token,
       });
 
-      const { credentials } = await this.client!.refreshAccessToken();
+      const { credentials } = await this.client.refreshAccessToken();
 
       return {
         access_token: credentials.access_token!,
@@ -303,15 +326,15 @@ export class GoogleProvider implements OAuth2Client {
         await this.setCredentials({ ...credentials, project_id: this.projectId });
       }
 
-      return this.projectId!;
+      return this.projectId || initialProjectId;
     } catch (error) {
       console.error("Failed to discover project ID:", error);
       throw error;
     }
   }
 
-  private async loadCodeAssist(projectId: string, metadata: any) {
-    const response = await this.client!.request({
+  private async loadCodeAssist(projectId: string, metadata: Record<string, unknown>) {
+    const response = await this.client.request<{ cloudaicompanionProject?: string; allowedTiers?: { id: string; isDefault: boolean }[] }>({
       url: `${CODE_ASSIST_ENDPOINT}/${CODE_ASSIST_API_VERSION}:loadCodeAssist`,
       method: "POST",
       body: JSON.stringify({
@@ -319,11 +342,11 @@ export class GoogleProvider implements OAuth2Client {
         metadata,
       }),
     });
-    return response.data as any;
+    return response.data;
   }
 
-  private async onboardUser(tierId: string, projectId: string, metadata: any) {
-    const response = await this.client!.request({
+  private async onboardUser(tierId: string, projectId: string, metadata: Record<string, unknown>) {
+    const response = await this.client.request<{ done?: boolean; response?: { cloudaicompanionProject?: { id: string } } }>({
       url: `${CODE_ASSIST_ENDPOINT}/${CODE_ASSIST_API_VERSION}:onboardUser`,
       method: "POST",
       body: JSON.stringify({
@@ -332,7 +355,7 @@ export class GoogleProvider implements OAuth2Client {
         metadata,
       }),
     });
-    return response.data as any;
+    return response.data;
   }
 
 
