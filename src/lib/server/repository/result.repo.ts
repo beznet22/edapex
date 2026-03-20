@@ -1,7 +1,8 @@
+/** biome-ignore-all lint/style/noNonNullAssertion: <explanation> */
 import * as schema from "$lib/server/db/schema";
 import { and, avg, eq, asc, sql, inArray } from "drizzle-orm";
 import { BaseRepository, type MySQLDrizzleClient } from "./base.repo";
-import { type StudentDetails } from "./student.repo";
+import type { StudentDetails } from "./student.repo";
 import type {
   AssignedSubject,
   ClassSection,
@@ -9,7 +10,6 @@ import type {
   GetExamSetup,
   GetMarkGradeParams,
   GetSubjectFullMarkParams,
-  MarkData,
   NewAttendance,
   NewExam,
   NewExamSetup,
@@ -87,6 +87,7 @@ export class ResultsRepository extends BaseRepository {
   }
 
   async getAssignedSubjects(classId: number, sectionId: number): Promise<SubjectAssigned[]> {
+    if (!classId || !sectionId) return [];
     return this.withErrorHandling(async () => {
       const academicId = await this.getAcademicId();
       const [assigned] = await this.db
@@ -152,7 +153,7 @@ export class ResultsRepository extends BaseRepository {
           )
         )
         .limit(1);
-      return classSection as any as ClassSection | null;
+      return classSection as ClassSection | null;
     }, "getAssignedClassSection");
   }
 
@@ -160,6 +161,9 @@ export class ResultsRepository extends BaseRepository {
     return this.withErrorHandling(async () => {
       const db = tx || this.db;
       const { id, createdAt, updatedAt, ...data } = attendance;
+      if(!data.studentId || !data.examTypeId){
+        return null;
+      }
       const academicId = await this.getAcademicId();
       // Update data to include academicId from the current context
       const updatedData = {
@@ -173,8 +177,8 @@ export class ResultsRepository extends BaseRepository {
         .from(schema.classAttendances)
         .where(
           and(
-            eq(schema.classAttendances.studentId, data.studentId!),
-            eq(schema.classAttendances.examTypeId, data.examTypeId!)
+            eq(schema.classAttendances.studentId, data.studentId),
+            eq(schema.classAttendances.examTypeId, data.examTypeId)
           )
         )
         .limit(1);
@@ -266,6 +270,9 @@ export class ResultsRepository extends BaseRepository {
     examTermId: number;
     schoolId: number;
   }, tx?: MySQLDrizzleClient) {
+    if(params.recordId === 0){
+      return;
+    }
     return this.withErrorHandling(async () => {
       const db = tx || this.db;
       const { recordId, studentId, classId, sectionId, examTermId, schoolId } = params;
@@ -285,7 +292,8 @@ export class ResultsRepository extends BaseRepository {
             eq(schema.smResultStores.schoolId, schoolId),
             eq(schema.smResultStores.academicId, academicId)
           )
-        )
+        );
+
       if (resultStores.length > 0) {
         await db
           .delete(schema.smResultStores)
@@ -311,12 +319,36 @@ export class ResultsRepository extends BaseRepository {
           )
         );
 
-      if (marks.length === 0) return;
+      if (marks.length > 0) {
+        await db
+          .delete(schema.smMarkStores)
+          .where(inArray(schema.smMarkStores.id, marks.map((m: { id: number }) => m.id)));
+      }
 
-      // Delete marks from smMarkStores
-      await db
-        .delete(schema.smMarkStores)
-        .where(inArray(schema.smMarkStores.id, marks.map((m: { id: number }) => m.id)));
+      // Fresh Assessment: Clear Remarks, Ratings, and Attendance for this term
+      await Promise.all([
+        db.delete(schema.teacherRemarks).where(
+          and(
+            eq(schema.teacherRemarks.studentId, studentId),
+            eq(schema.teacherRemarks.examTypeId, examTermId),
+            eq(schema.teacherRemarks.academicId, academicId)
+          )
+        ),
+        db.delete(schema.studentRatings).where(
+          and(
+            eq(schema.studentRatings.studentId, studentId),
+            eq(schema.studentRatings.examTypeId, examTermId),
+            eq(schema.studentRatings.academicId, academicId)
+          )
+        ),
+        db.delete(schema.classAttendances).where(
+          and(
+            eq(schema.classAttendances.studentId, studentId),
+            eq(schema.classAttendances.examTypeId, examTermId),
+            eq(schema.classAttendances.academicId, academicId)
+          )
+        ),
+      ]);
     }, "cleanMarks");
   }
 
@@ -475,7 +507,7 @@ export class ResultsRepository extends BaseRepository {
     );
   }
 
-  async getObjectives(_student: Student): Promise<any[]> {
+  async getObjectives(_student: Student) {
     // Placeholder - requires objectives table schema
     return [];
   }
@@ -777,7 +809,7 @@ export class ResultsRepository extends BaseRepository {
           )
         );
       return results.filter(
-        (r: any): r is { gradeName: string; gpa: number } => r.gradeName != null && r.gpa != null
+        (r): r is { gradeName: string; gpa: number } => r.gradeName != null && r.gpa != null
       );
     }, "getMarkGrade");
   }
