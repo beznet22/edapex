@@ -11,14 +11,15 @@ import {
 import { AttributeRemark, EXAM_MARK_MAXIMUMS } from "$lib/constants/assessment";
 import {
   resultOutputSchema,
+  categoryEnum,
   type Category,
   type MarksRecord,
   type ResultOutput,
   type School,
   type Student,
 } from "$lib/schema/result-output";
-import { repo, studentRepo, resultRepo, timelineRepo, staffRepo } from "$lib/server/repository";
-import type { ClassAverage, ExamSetup, MarkData, ResultData, ScoreData } from "$lib/types/result-types";
+import { studentRepo, resultRepo, timelineRepo, staffRepo } from "$lib/server/repository";
+import type { ClassAverage, ExamSetup, MarkData, NewSmMarkStore, NewSmResultStore, ResultData, ScoreData } from "$lib/types/result-types";
 import { base64url } from "jose";
 import { render } from "svelte/server";
 import { ensureBase64Image, pageToHtml } from "../helpers";
@@ -70,8 +71,6 @@ type MarkScoreData = {
 };
 
 export class AssessmentService {
-  category?: Category;
-  studentInput?: StudentInput;
 
   /**
    * SMTP Email Result matching email-job.ts EmailResult interface
@@ -254,7 +253,7 @@ export class AssessmentService {
   }
 
   async assignSubjects(classId: number, sectionId: number, teacherId?: number) {
-    const academicId = await repo.result.getAcademicId();
+    const academicId = await resultRepo.getAcademicId();
     
     // 1. Try to get subjects for this specific section first
     let assignedSubjects = await resultRepo.getAssignedSubjects(classId, sectionId);
@@ -285,7 +284,7 @@ export class AssessmentService {
           classId,
           sectionId,
           academicId,
-          teacherId: teacherId ?? s.teacherId,
+          teacherId: teacherId || s.teacherId,
           subjectId: s.subjectId,
           activeStatus: 1,
           createdAt: new Date(),
@@ -316,7 +315,7 @@ export class AssessmentService {
    */
   async upsertTeacherRemark(params: { studentId: number; examTypeId: number; remark: string }, tx?: MySQLDrizzleClient) {
     const { studentId, examTypeId, remark } = params;
-    const academicId = await repo.result.getAcademicId();
+    const academicId = await resultRepo.getAcademicId();
     await resultRepo.upsertTeacherRemark({
       studentId,
       examTypeId,
@@ -330,7 +329,7 @@ export class AssessmentService {
    */
   async upsertStudentRatings(params: { studentId: number; examTypeId: number; ratings: StudentRatings }, tx?: MySQLDrizzleClient) {
     const { studentId, examTypeId, ratings } = params;
-    const academicId = await repo.result.getAcademicId();
+    const academicId = await resultRepo.getAcademicId();
     await resultRepo.upsertStudentRatings(
       Object.entries(ratings)
         .map(([attribute, rating]) => {
@@ -349,12 +348,6 @@ export class AssessmentService {
     );
   }
 
-  async cleanUpResultRecord(record: MarksRecord) {
-    await repo.result.deleteResultStore(record.resultId, record.studentId);
-    await repo.result.deleteMarkStore(record.markIds, record.studentId);
-    await repo.result.deleteExamSetup(record.titleIds);
-  }
-
   /**
    * Store exam marks for a student from validated report data
    */
@@ -363,48 +356,41 @@ export class AssessmentService {
     const { studentId, classId, sectionId, recordId, examTypeId, studentCategoryId } = studentData;
     if (!studentId || !examTypeId) throw new Error("Student ID and Exam Type ID are required");
 
-    return await repo.result.db.transaction(async (tx: any) => {
-      this.category = studentData.studentCategory as Category;
-      this.studentInput = studentData;
-
-      const academicId = await repo.result.getAcademicId();
+    return await resultRepo.db.transaction(async (tx: MySQLDrizzleClient) => {
+      const category = categoryEnum.parse(studentData.studentCategory);
+      
+      const academicId = await resultRepo.getAcademicId();
       const schoolId = studentData.schoolId || 1;
-      const sId = studentId!;
-      const eTId = examTypeId!;
+      const sId = studentId || 0;
+      const eTId = examTypeId || 0;
 
-      // 1. Resolve approving staff member
       const approvingStaffId = staffId || 1;
 
-      // 2. Resolve teacher to attribute the marks to (if Admin is approving)
-      const assignedSubjects = await repo.result.getAssignedSubjects(classId, sectionId);
+      const assignedSubjects = await resultRepo.getAssignedSubjects(classId, sectionId);
       const subjectTeacherMap = new Map<number, number>();
       assignedSubjects.forEach((s) => {
         if (s.subjectId && s.teacherId) subjectTeacherMap.set(s.subjectId, s.teacherId);
       });
 
-      // 3. Update student category if it changed
       if (studentCategoryId) {
         await studentRepo.updateStudentCategoryId(studentId, studentCategoryId, tx);
       }
 
-      // 4. Fetch Exam Setups
-      const examSetups = await repo.result.getExamSetupsByClassSection(classId, sectionId);
+      const examSetups = await resultRepo.getExamSetupsByClassSection(classId, sectionId);
 
-      // 5. Clean existing marks for this term
-      await repo.result.cleanMarks(
+      await resultRepo.cleanMarks(
         {
-          recordId: recordId!,
+          recordId: recordId || 0,
           studentId: sId,
-          classId: classId!,
-          sectionId: sectionId!,
+          classId: classId,
+          sectionId: sectionId,
           examTermId: eTId,
           schoolId,
         },
         tx
       );
 
-      // 6. Process marks (collect data for batching)
-      const batchData = await this.doProcessMarks(studentData, marksData, examSetups as ExamSetup[], tx);
+      const batchData = await this.doProcessMarks(studentData, category, marksData, examSetups as ExamSetup[], tx);
 
       if (!batchData) {
         throw new Error("Failed to process marks.");
@@ -414,10 +400,9 @@ export class AssessmentService {
         throw new Error("No marks or results were processed.");
       }
 
-      // 7. Batch Upsert
       await Promise.all([
-        repo.result.batchUpsertMarkRecords(batchData.marks, tx),
-        repo.result.batchUpsertResultRecords(batchData.results, tx),
+        resultRepo.batchUpsertMarkRecords(batchData.marks, tx),
+        resultRepo.batchUpsertResultRecords(batchData.results, tx),
       ]);
 
       if (studentRatings) {
@@ -434,15 +419,13 @@ export class AssessmentService {
           }));
 
         if (ratingsToInsert.length > 0) {
-          await repo.result.upsertStudentRatings(ratingsToInsert, tx);
+          await resultRepo.upsertStudentRatings(ratingsToInsert, tx);
         }
       }
 
-      // 9. Save teacher remark
       if (teachersRemark.comment) {
-        // Fallback: use first available teacher ID if approving staff is not found (shouldn't happen for teachers)
         const remarkTeacherId = approvingStaffId || subjectTeacherMap.values().next().value || 0;
-        await repo.result.upsertTeacherRemark(
+        await resultRepo.upsertTeacherRemark(
           {
             teacherId: remarkTeacherId,
             studentId,
@@ -454,7 +437,6 @@ export class AssessmentService {
         );
       }
 
-      // 10. Upsert attendance
       if (studentData.attendance) {
         await this.upsertAttendance({
           attendance: studentData.attendance,
@@ -465,15 +447,6 @@ export class AssessmentService {
 
       return { studentId, examTypeId, results: batchData.marksInput };
     });
-  }
-
-  async processMarks(
-    markStore: MarksData,
-    examSetups: ExamSetup[],
-    tx?: MySQLDrizzleClient
-  ) {
-    const batchData = await this.doProcessMarks(this.studentInput!, markStore, examSetups, tx);
-    return batchData?.marksInput;
   }
 
   /**
@@ -489,13 +462,13 @@ export class AssessmentService {
     isAdminNo?: boolean;
     withImages?: boolean;
   }): Promise<ResultOutput | null> {
-    let { id, examId, isAdminNo, withImages } = params;
+    const { id, examId, isAdminNo, withImages } = params;
     const studentData = isAdminNo
       ? await studentRepo.getStudentById(id, isAdminNo)
       : await studentRepo.getStudentById(id);
 
     if (!studentData) return null;
-    const resultData = await repo.result.queryResultData(studentData, examId);
+    const resultData = await resultRepo.queryResultData(studentData, examId);
     if (!resultData?.classResults?.length) return null;
 
     const { examType, academic, attendance, marks, ratings, remark, resultRecords } = resultData;
@@ -510,7 +483,7 @@ export class AssessmentService {
       parentName: studentData.guardiansName || "Unknown Parent",
       term: examType?.title || "",
       title: "TERMLY SUMMARY OF PROGRESS REPORT",
-      category: (studentData.categoryName as any) || "MIDDLEBASIC",
+      category: (studentData.categoryName as Category) || "MIDDLEBASIC",
       className: studentData.className || "",
       sectionName: studentData.sectionName || "",
       adminNo: studentData.admissionNo || 0,
@@ -521,7 +494,7 @@ export class AssessmentService {
       studentPhoto: photo,
       token: base64url.encode(JSON.stringify({ studentId: id, examId })),
     };
-    const schoolData = (await repo.result.getGeneralSettings())?.[0] || {};
+    const schoolData = (await resultRepo.getGeneralSettings())?.[0] || {};
     const address = this.parseAddress(schoolData?.address || "");
     const school: School = {
       id: schoolData?.id || 1,
@@ -550,7 +523,7 @@ export class AssessmentService {
       maxScores: records.length * 100,
     };
 
-    const subjects = await resultRepo.getAssignedSubjects(studentData.classId!!, studentData.sectionId!!);
+    const subjects = await resultRepo.getAssignedSubjects(studentData.classId || 0, studentData.sectionId || 0);
     return {
       subjects,
       school,
@@ -600,17 +573,21 @@ export class AssessmentService {
     }
 
     const bySubject: Record<string, MarkData[]> = {};
-    for (const m of marks) (bySubject[m.subjectName || "Unknown"] ??= []).push(m);
+    for (const m of marks) {
+      const key = m.subjectName || "Unknown";
+      if (!bySubject[key]) bySubject[key] = [];
+      bySubject[key].push(m);
+    }
 
     let overAll = 0;
     const records = Object.entries(bySubject).map(([subject, sMarks]) => {
-      const totalScore = Math.ceil(sMarks.reduce((s: number, m: any) => s + (m.totalMarks || 0), 0));
+      const totalScore = Math.ceil(sMarks.reduce((s: number, m: MarkData) => s + (m.totalMarks || 0), 0));
       const marksObj: Record<string, number> = {};
       for (const m of sMarks) marksObj[m.examTitle || "Unknown"] = m.totalMarks;
       const first = sMarks[0];
-      const obj = objectives?.find((o: any) => o.subjectCode === first?.subjectCode);
+      const obj = objectives?.find((o) => o.subjectCode === first?.subjectCode);
       const matchingResult = resultRecords?.find((r) => r.subjectId === first?.subjectId);
-      const grade = this.getGrade(totalScore, category, matchingResult?.teacherRemarks ?? null);
+      const grade = this.getGrade(totalScore, category);
       overAll += totalScore;
       return {
         studentId: first?.studentId || 0,
@@ -634,12 +611,11 @@ export class AssessmentService {
   }
 
   async getMappingData(staffId: number, classId?: number, sectionId?: number) {
-    const academicId = await repo.result.getAcademicId();
     const [examTypes, studentCategories, subjects, classSection] = await Promise.all([
-      repo.result.getCurrentTerm(),
-      repo.result.getStudentCategories(),
-      repo.result.getSubjectsAssignedToStaff(staffId),
-      repo.result.getAssignedClassSection(staffId),
+      resultRepo.getCurrentTerm(),
+      resultRepo.getStudentCategories(),
+      resultRepo.getSubjectsAssignedToStaff(staffId),
+      resultRepo.getAssignedClassSection(staffId),
     ]);
 
     // If classId/sectionId provided (Admin view), use those, else use teacher's assigned ones
@@ -648,9 +624,9 @@ export class AssessmentService {
 
     let examSetups: Partial<ExamSetup>[] = [];
     if (activeClassId && activeSectionId) {
-      examSetups = await repo.result.getExamSetupsByClassSection(activeClassId, activeSectionId);
+      examSetups = await resultRepo.getExamSetupsByClassSection(activeClassId, activeSectionId);
     } else {
-      examSetups = await repo.result.getExamSetupsByStaffId(staffId);
+      examSetups = await resultRepo.getExamSetupsByStaffId(staffId);
     }
 
     return {
@@ -665,24 +641,25 @@ export class AssessmentService {
 
   async doProcessMarks(
     student: StudentInput,
+    category: Category,
     markStore: MarksData,
     examSetups: ExamSetup[],
     tx?: MySQLDrizzleClient
   ): Promise<{
-    marks: any[];
-    results: any[];
+    marks: NewSmMarkStore[];
+    results: NewSmResultStore[];
     marksInput: MarksInput[];
   } | null> {
-    const academicId = await repo.result.getAcademicId();
+    const academicId = await resultRepo.getAcademicId();
     const schoolId = student.schoolId || 1;
     const { classId, sectionId, studentId, recordId, examTypeId } = student;
     if (!classId || !sectionId || !studentId || !examTypeId) return null;
 
-    const marksToInsert: any[] = [];
-    const resultsToInsert: any[] = [];
+    const marksToInsert = [];
+    const resultsToInsert = [];
     const marksInput: MarksInput[] = [];
 
-    const assignedSubjects = await repo.result.getAssignedSubjects(classId, sectionId);
+    const assignedSubjects = await resultRepo.getAssignedSubjects(classId, sectionId);
     const subjectTeacherMap = new Map<number, number>();
     assignedSubjects.forEach((s) => {
       if (s.subjectId && s.teacherId) subjectTeacherMap.set(s.subjectId, s.teacherId);
@@ -693,7 +670,7 @@ export class AssessmentService {
       const teacherId = subjectTeacherMap.get(subjectId) || 0;
 
       // Ensure Exam exists
-      const examId = await repo.result.createExamIfNotExist(
+      const examId = await resultRepo.createExamIfNotExist(
         {
           classId,
           sectionId,
@@ -712,7 +689,7 @@ export class AssessmentService {
       let totalSubjectFullMarks = 0;
 
       // DAYCARE Handling
-      if (this.category === "DAYCARE") {
+      if (category === "DAYCARE") {
         resultsToInsert.push({
           studentRecordId: recordId,
           studentId,
@@ -749,14 +726,14 @@ export class AssessmentService {
         for (let i = 0; i < store.examTitles.length; i++) {
           const title = store.examTitles[i];
           const score = store.marks[i] || 0;
-          const maxMarks = EXAM_MARK_MAXIMUMS[this.category!];
+          const maxMarks = EXAM_MARK_MAXIMUMS[category];
           const fullMarks = maxMarks?.[title.toUpperCase()] ?? 100;
 
           const examSetupId = this.findExamSetupId(examSetups, subjectId, title, examId);
 
           let finalSetupId = examSetupId;
           if (!finalSetupId) {
-            finalSetupId = await repo.result.upsertExamSetup(
+            finalSetupId = await resultRepo.upsertExamSetup(
               {
                 examTitle: title,
                 examId,
@@ -817,7 +794,7 @@ export class AssessmentService {
         percentage: this.subjectPercentageMark(totalSubjectMarks, totalSubjectFullMarks),
         grade: this.getGrade(
           this.subjectPercentageMark(totalSubjectMarks, totalSubjectFullMarks),
-          this.category!
+          category
         ).grade,
         gpa: 0,
         isAbsent: false
@@ -830,7 +807,10 @@ export class AssessmentService {
   async getClassAverages(classResults: ResultData[]): Promise<ClassAverage> {
     const resultByStudent = classResults.reduce((acc: Record<string, ResultData[]>, result: ResultData) => {
       const studentId = String(result.studentId || "0");
-      (acc[studentId] = acc[studentId] || []).push(result);
+      if (!acc[studentId]) {
+        acc[studentId] = [];
+      }
+      acc[studentId].push(result);
       return acc;
     }, {} as Record<string, ResultData[]>);
 
@@ -858,17 +838,7 @@ export class AssessmentService {
 
   async getObjectives(student: Student) {
     if (student.category !== "NURSERY") return [];
-    return await repo.result.getObjectives(student);
-  }
-
-  async getExamSetup(examId: number) {
-    if (!this.studentInput) return null;
-    return await repo.result.getExamSetup({
-      classId: this.studentInput.classId,
-      sectionId: this.studentInput.sectionId,
-      examTypeId: examId,
-      schoolId: 1,
-    });
+    return await resultRepo.getObjectives(student);
   }
 
   findExamSetupId(
@@ -908,39 +878,17 @@ export class AssessmentService {
     return Math.round((obtainedMark / fullMark) * 10000) / 100;
   }
 
-  getGrade(score: number, category: Category, remark: string | null = null): { grade: string; color?: string } {
-    const ranges = category === "LOWERBASIC" || category === "MIDDLEBASIC" ? GRADE_RANGES.GRADERS : GRADE_RANGES.EYFS;
-    const match = ranges.find((r) => score >= r.min && score <= r.max);
+  getGrade(score: number, category: Category): { grade: string; color?: string } {
+    const ranges = (category === "LOWERBASIC" || category === "MIDDLEBASIC" ? GRADE_RANGES.GRADERS : GRADE_RANGES.EYFS) as any;
+    const match = ranges.find((r: any) => score >= r.min && score <= r.max);
     return match ? { grade: match.grade, color: match.color } : { grade: "N/A", color: "bg-gray-200" };
-  }
-
-  private matchName(fullName: string, targetName?: string): boolean {
-    if (!fullName || !targetName) return false;
-    const normalize = (name: string) =>
-      name
-        .toLowerCase()
-        .replace(/[^\w\s]/g, "")
-        .split(/\s+/)
-        .filter(Boolean);
-
-    const fullSet = new Set(normalize(fullName));
-    const targetSet = new Set(normalize(targetName));
-
-    let matches = 0;
-    for (const part of fullSet) {
-      if (targetSet.has(part)) {
-        matches++;
-        if (matches >= 2) return true;
-      }
-    }
-    return false;
   }
 
   private parseAddress(address: string) {
     const parts = address.split(",").map((p) => p.trim());
-    const state = parts.pop() || null,
-      city = parts.pop() || null,
-      street = parts.join(", ");
+    const state = parts.pop() || null;
+    const city = parts.pop() || null;
+    const street = parts.join(", ");
     const m = /No\.\s*(\d+)\s*(.+)/i.exec(street);
     return { street_number: m?.[1] || null, street_name: m?.[2] || street || null, city, state };
   }

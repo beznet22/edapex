@@ -1,14 +1,13 @@
-import { marksInputSchema } from "$lib/schema/result-input";
-import { resultOutputSchema, type Category } from "$lib/schema/result-output";
-import { resultRepo, studentRepo, staffRepo, parentRepo, authRepo } from "$lib/server/repository";
-import { assessment } from "$lib/server/service/assessment.service";
-
-import { CATEGORY } from "$lib/types/sms-types";
-import { hashPwd } from "$lib/server/helpers/utils";
 import { tool, zodSchema, type InferToolInput, type InferToolOutput } from "ai";
 import { base64url } from "jose";
-
 import { z } from "zod";
+
+import { marksInputSchema } from "$lib/schema/result-input";
+import { resultOutputSchema, type Category } from "$lib/schema/result-output";
+import { authRepo, parentRepo, resultRepo, staffRepo, studentRepo } from "$lib/server/repository";
+import { hashPwd } from "$lib/server/helpers/utils";
+import { assessment } from "$lib/server/service/assessment.service";
+import { CATEGORY } from "$lib/types/sms-types";
 
 export const validateClassResults = tool({
   description: [
@@ -386,6 +385,7 @@ export const upsertMarkStore = tool({
       return { success: false, message: "Student not found." };
     }
 
+    const category = CATEGORY[studentRecord.categoryId ?? 0] as Category;
     const processMark = await assessment.doProcessMarks(
       {
         studentId,
@@ -394,7 +394,7 @@ export const upsertMarkStore = tool({
         sectionId,
         schoolId: 1,
         examTypeId,
-        studentCategory: CATEGORY[studentRecord.categoryId ?? 0] as Category,
+        studentCategory: category,
         admissionNo: studentRecord.admissionNo || 0,
         fullName: studentRecord.fullName || "",
         class: "",
@@ -402,8 +402,9 @@ export const upsertMarkStore = tool({
         sectionName: "",
         studentCategoryId: studentRecord.categoryId || 0,
         term: "",
-        attendance: { daysOpened: 0, daysAbsent: 0, daysPresent: 0 }
+        attendance: { daysOpened: 0, daysAbsent: 0, daysPresent: 0 },
       },
+      category,
       [
         {
           subjectId,
@@ -667,7 +668,7 @@ export const searchStudent = tool({
         message: `Found ${students.length} student(s) matching "${query}".`,
         data: students,
       };
-    } catch (error) {
+    } catch {
       return {
         success: false,
         message: "Failed to search for students.",
@@ -797,7 +798,7 @@ export const promoteStudent = tool({
   ),
   execute: async (params) => {
     try {
-      const result = await studentRepo.promoteStudent(params);
+      await studentRepo.promoteStudent(params);
       return {
         success: true,
         message: `Student successfully promoted to the new class and session. Fees assigned and chat groups updated.`,
@@ -943,10 +944,10 @@ export const getAssessmentMapping = tool({
         }
         finalStaffId = staff.teacherId;
       }
-      const data = await assessment.getMappingData(finalStaffId!, classId, sectionId);
+      const data = await assessment.getMappingData(finalStaffId, classId, sectionId);
       return { success: true, message: "Mapping data fetched successfully", data };
     } catch (error) {
-      return { success: false, message: "Failed to fetch mapping data" };
+      return { success: false, message: "Failed to fetch mapping data", error };
     }
   },
 });
@@ -1154,7 +1155,7 @@ export const getStaffRegistrationOptions = tool({
         success: true,
         ...options,
       };
-    } catch (error) {
+    } catch {
       return {
         success: false,
         designations: [],
@@ -1260,7 +1261,7 @@ export const resetPassword = tool({
   ),
   execute: async ({ email, userId, admissionNo, newPassword }) => {
     try {
-      let targetUserId: number | null = userId!;
+      let targetUserId: number | null = userId || null;
 
       // 1. Resolve via admissionNo (Student lookup)
       if (!targetUserId && admissionNo) {
@@ -1337,7 +1338,7 @@ export const searchStaff = tool({
         message: `Found ${staffList.length} staff member(s) matching the criteria.`,
         data: staffList,
       };
-    } catch (error) {
+    } catch {
       return {
         success: false,
         message: "Failed to search for staff members.",
@@ -1378,7 +1379,7 @@ export const updateStaffStatus = tool({
       let resolvedTeacherId = teacherId;
       if (!email && !resolvedTeacherId && classId && sectionId) {
         const staff = await staffRepo.getStaffByClassSection({ classId, sectionId });
-        if (staff && staff.teacherId) {
+        if (staff?.teacherId) {
           resolvedTeacherId = staff.teacherId;
         } else {
           return { success: false, errorType: "USER_NOT_FOUND", message: "No staff assigned to the specified class and section." };
@@ -1439,7 +1440,7 @@ export const deleteStaff = tool({
       let resolvedTeacherId = teacherId;
       if (!email && !resolvedTeacherId && classId && sectionId) {
         const staff = await staffRepo.getStaffByClassSection({ classId, sectionId });
-        if (staff && staff.teacherId) {
+        if (staff?.teacherId) {
           resolvedTeacherId = staff.teacherId;
         } else {
           return { success: false, errorType: "USER_NOT_FOUND", message: "No staff assigned to the specified class and section." };
