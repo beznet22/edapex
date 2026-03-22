@@ -159,7 +159,7 @@ export class AssessmentService {
 
         return {
           from: `"${school.name}" <${school.email}>`,
-          to: "onosbrown.saved@gmail.com",
+          to: student.parentEmail,
           subject: "Result Notification",
           html,
           attachments: [
