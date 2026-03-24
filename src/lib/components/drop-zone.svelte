@@ -253,7 +253,7 @@
               name="files"
               {onUpload}
               {onFileRejected}
-              maxFileSize={2500 * KILOBYTE}
+              maxFileSize={3000 * KILOBYTE}
               accept="image/*"
               maxFiles={1}
               disabled={!value}

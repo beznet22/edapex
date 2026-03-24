@@ -935,7 +935,7 @@ export class AssessmentService {
     if (studentId) parsedResult.studentData.studentId = studentId;
     if (admissionNo) parsedResult.studentData.admissionNo = admissionNo;
     if (fullName) parsedResult.studentData.fullName = fullName;
-
+    // console.log("Parsed result", parsedResult.StudentData);
     const validated = await resultInputSchema.safeParseAsync(parsedResult);
     if (!validated.success) {
       console.log("Extraction validation failed", validated.error.issues);
