@@ -210,12 +210,12 @@ export class GoogleProvider implements OAuth2Client {
 
     return customProvider({
       languageModels: {
-        "coder-model": wrapModel(gemini("gemini-3-pro-preview")),
-        "vision-model": wrapModel(gemini("gemini-3-pro-preview")),
-        "chat-model": wrapModel(gemini("gemini-3-pro-preview")),
-        "chat-model-reasoning": wrapModel(gemini("gemini-3-pro-preview")),
-        "title-model": wrapModel(gemini("gemini-1.5-pro")),
-        "artifact-model": wrapModel(gemini("gemini-1.5-pro")),
+        "coder-model": wrapModel(gemini("gemini-3-flash-preview")),
+        "vision-model": wrapModel(gemini("gemini-3-flash-preview")),
+        "chat-model": wrapModel(gemini("gemini-3-flash-preview")),
+        "chat-model-reasoning": wrapModel(gemini("gemini-3-flash-preview")),
+        "title-model": wrapModel(gemini("gemini-3-flash-preview")),
+        "artifact-model": wrapModel(gemini("gemini-3-flash-preview")),
         "image-model": wrapModel(gemini("gemini-3-pro-image-preview")),
       },
     });

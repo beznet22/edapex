@@ -227,7 +227,7 @@
              {/if}
           </div>
 
-          {#if student}
+          {#if student && userCtx.designation !== "class_teacher"}
             <div class="flex items-center space-x-4 p-4 rounded-2xl bg-primary/5 border border-primary/10 transition-all animate-in fade-in slide-in-from-top-2">
               <Switch id="student-photo" bind:checked={isStudentPhoto} class="data-[state=checked]:bg-primary" />
               <div class="flex flex-col">
@@ -253,7 +253,7 @@
               name="files"
               {onUpload}
               {onFileRejected}
-              maxFileSize={3000 * KILOBYTE}
+              maxFileSize={7000 * KILOBYTE}
               accept="image/*"
               maxFiles={1}
               disabled={!value}

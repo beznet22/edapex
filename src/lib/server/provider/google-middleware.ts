@@ -330,7 +330,7 @@ async function doStream(
 
         const webStream = Readable.toWeb(nodeStream);
         const parsedStream = parseJsonEventStream({
-            stream: webStream as ReadableStream<Uint8Array>,
+            stream: webStream as unknown as ReadableStream<Uint8Array>,
             schema: chunkSchema,
         });
 
