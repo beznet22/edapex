@@ -32,7 +32,6 @@ import {
 } from "./coordinator.tool";
 
 export const teacherTools = {
-  upsertStudentResult,
   getClassStudentList,
   upsertAttendance,
   upsertTeacherRemark,
@@ -46,7 +45,6 @@ export const coordinatorTools = {
   getStudentRegistrationOptions,
   validateClassResults,
   sendStudentResult,
-  upsertMarkStore,
   updateExamTitle,
   createStudent,
   assignClassSection,
@@ -55,7 +53,6 @@ export const coordinatorTools = {
   getAssessmentMapping,
   changeParentEmail,
   upsertTeacherRemark,
-  upsertStudentResult,
   getStaffRegistrationOptions,
   registerStaff,
   resetPassword,
