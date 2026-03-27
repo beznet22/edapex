@@ -137,7 +137,7 @@
         return;
       }
 
-      const res = await publishResult({ studentId, examTypeId: examId });
+      const res = await publishResult({ studentId, examTypeId: examId, resend: true });
       if (res?.success) {
         toast.success(res.message || "Results published successfully");
       } else {
