@@ -141,7 +141,7 @@
       if (res?.success) {
         toast.success(res.message || "Results published successfully");
       } else {
-        toast.error(res?.message || "Failed to publish results");
+        toast.error(res?.errors?.join("\n") || "Failed to publish results");
       }
     } catch (e) {
       console.error(e);
