@@ -1,4 +1,20 @@
+/**
+ * ARCHITECTURE OVERVIEW: Content Management System (CMS) Domain
+ * 
+ * Purpose:
+ * Manages a tenant-isolated content delivery model for public facades. Employs 
+ * Drizzle JSON/Text columns to store rich text blocks and media references, streamlining 
+ * what used to be scattered legacy page tables into a flexible `edx_content_nodes` model.
+ * 
+ * Replaces Legacy Tables:
+ * - sm_front_cms_pages
+ * - sm_news
+ * - sm_events
+ * - sm_pages / sm_about_pages / sm_contact_pages / sm_course_pages
+ * - home_sliders
+ */
 import {
+
   mysqlTable,
   varchar,
   int,

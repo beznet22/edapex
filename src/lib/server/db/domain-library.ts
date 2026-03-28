@@ -1,4 +1,18 @@
+/**
+ * ARCHITECTURE OVERVIEW: Library Domain
+ * 
+ * Purpose:
+ * Manages non-consumable tracking within physical/digital libraries. Employs 
+ * transaction logging limits on `edx_book_issues` securely tied to `account_id` 
+ * and homogeneously enforced via physical `tenant_id` logic.
+ * 
+ * Replaces Legacy Tables:
+ * - sm_books
+ * - sm_book_categories
+ * - sm_book_issues / library_subjects
+ */
 import {
+
   mysqlTable,
   varchar,
   int,

@@ -1,4 +1,21 @@
+/**
+ * ARCHITECTURE OVERVIEW: Core Domain
+ * 
+ * Purpose:
+ * Establishes global platform multi-tenancy utilizing a native `tenant_id` foreign key. 
+ * Centralizes identities into a polymorphic-ready `edx_accounts` table, reducing table 
+ * bloat and eliminating dual-writes across disparate user tables. Extends type safety 
+ * with `metadata` JSON blobs for role-specific attributes, and utilizes `edx_enumerations`
+ * for centralized taxonomy mapping.
+ * 
+ * Replaces Legacy Tables:
+ * - sm_schools -> edx_tenants
+ * - sm_academic_years -> edx_academic_years
+ * - sm_base_setups / sm_base_groups -> edx_enumerations
+ * - users / sm_students / sm_staffs / sm_parents -> edx_accounts
+ */
 import {
+
   mysqlTable,
   varchar,
   int,

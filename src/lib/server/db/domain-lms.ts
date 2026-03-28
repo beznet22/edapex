@@ -1,4 +1,18 @@
+/**
+ * ARCHITECTURE OVERVIEW: Learning Management System (LMS) Domain
+ * 
+ * Purpose:
+ * Enables scalable tracking of assignments and digital coursework, replacing convoluted 
+ * relational maps with Drizzle JSON structures for adaptive lesson delivery. Enforces
+ * strict foreign keys across `tenant_id`, `academic_id`, and `account_id` for isolated tracking.
+ * 
+ * Replaces Legacy Tables:
+ * - sm_homeworks / sm_homework_students / sm_upload_homework_contents / sm_student_homeworks
+ * - sm_lessons / sm_lesson_details / sm_lesson_topics / sm_lesson_topic_details / lesson_planners
+ * - sm_online_classes / sm_courses / sm_course_categories
+ */
 import {
+
   mysqlTable,
   varchar,
   int,

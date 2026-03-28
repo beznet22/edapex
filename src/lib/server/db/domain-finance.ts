@@ -1,4 +1,19 @@
+/**
+ * ARCHITECTURE OVERVIEW: Finance & Accounting Domain
+ * 
+ * Purpose:
+ * Overhauls the cashflow architecture employing a robust `edx_ledger_entries` model enforcing 
+ * transactional duality (credits/debits). Consolidates disparate fee and expense tables onto a 
+ * unified chart of accounts linked tightly across the multi-tenant `account_id` space.
+ * 
+ * Replaces Legacy Tables:
+ * - sm_fees_masters / sm_fees_groups / sm_fees_types / fm_fees_groups / fm_fees_types
+ * - sm_fees_assigns / sm_fees_payments / sm_bank_payment_slips
+ * - sm_add_incomes / sm_add_expenses / sm_expense_heads / sm_income_heads
+ * - sm_chart_of_accounts / transcations / wallet_transactions
+ */
 import {
+
   mysqlTable,
   varchar,
   int,

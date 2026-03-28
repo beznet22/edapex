@@ -1,4 +1,22 @@
+/**
+ * ARCHITECTURE OVERVIEW: Academic Domain
+ * 
+ * Purpose:
+ * Models the hierarchical academic structure utilizing strict composite foreign keys 
+ * and tenant isolation. Manages cross-entity associations like `sm_class_sections` via 
+ * enforced relational mapping and strict enum typing, preparing a robust foundational
+ * schema for student enrollments, attendance, and routines.
+ * 
+ * Replaces Legacy Tables:
+ * - sm_classes
+ * - sm_sections
+ * - sm_class_sections
+ * - sm_subjects
+ * - sm_assign_subjects
+ * - sm_class_routines / sm_class_times
+ */
 import {
+
   mysqlTable,
   varchar,
   int,

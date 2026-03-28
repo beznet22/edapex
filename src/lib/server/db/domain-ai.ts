@@ -1,4 +1,16 @@
+/**
+ * ARCHITECTURE OVERVIEW: AI Integration Domain
+ * 
+ * Purpose:
+ * Manages the context windows, token billing, and historical conversational trees of AI 
+ * assistant integrations directly on the relational plane for tight data security, tying 
+ * `chat_id` and `message_id` sequentially, enforcing tenant and user isolation implicitly.
+ * 
+ * Replaces Legacy Tables:
+ * - Unifies external disparate ML scripts and custom scripts (No legacy table equivalents).
+ */
 import {
+
   mysqlTable,
   varchar,
   int,

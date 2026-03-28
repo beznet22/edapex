@@ -1,4 +1,21 @@
+/**
+ * ARCHITECTURE OVERVIEW: Assessment Domain
+ * 
+ * Purpose:
+ * Unifies physical exam tabulation and online digital assessments. Replaces fragile 
+ * legacy JSON parsing and redundant grade stores with strictly typed `edx_exam_setups`, 
+ * `edx_exam_marks`, and dynamic constraints driven by Drizzle ORM schemas. Implements 
+ * high-fidelity relational maps for grade compilation.
+ * 
+ * Replaces Legacy Tables:
+ * - sm_exams / sm_exam_types / sm_exam_setups
+ * - sm_marks_registers / sm_mark_stores / sm_exam_marks_registers
+ * - sm_results / sm_student_promotions / all_exam_wise_positions
+ * - sm_online_exams / sm_question_banks / sm_question_groups
+ * - sm_exam_schedules / sm_exam_attendances
+ */
 import {
+
   mysqlTable,
   varchar,
   int,

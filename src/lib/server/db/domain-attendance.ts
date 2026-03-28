@@ -1,4 +1,20 @@
+/**
+ * ARCHITECTURE OVERVIEW: Attendance Domain
+ * 
+ * Purpose:
+ * Consolidates discrete legacy attendance tables into a single high-performance 
+ * `edx_attendances` model. Utilizes heavily optimized indexing strategies on 
+ * `attendance_date`, `account_id`, and `tenant_id` to compute absenteeism metrics 
+ * at scale and natively map absent events.
+ * 
+ * Replaces Legacy Tables:
+ * - sm_student_attendances
+ * - sm_staff_attendences
+ * - sm_subject_attendances
+ * - student_attendance_bulks
+ */
 import {
+
   mysqlTable,
   int,
   timestamp,

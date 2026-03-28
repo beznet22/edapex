@@ -1,4 +1,18 @@
+/**
+ * ARCHITECTURE OVERVIEW: Documents Domain
+ * 
+ * Purpose:
+ * Provides a highly scalable, polymorphic storage system for digital assets via `edx_documents`. 
+ * Utilizes `owner_type` and `owner_id` polymorphic linkage to seamlessly attach files to any 
+ * entity (profiles, homework, facilities) without altering their core tables.
+ * 
+ * Replaces Legacy Tables:
+ * - sm_student_documents
+ * - sm_staff_documents
+ * - sm_upload_contents / sm_teacher_upload_contents
+ */
 import {
+
   mysqlTable,
   varchar,
   int,

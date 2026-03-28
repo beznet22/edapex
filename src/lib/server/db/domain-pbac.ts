@@ -1,4 +1,18 @@
+/**
+ * ARCHITECTURE OVERVIEW: Policy-Based Access Control (PBAC) Domain
+ * 
+ * Purpose:
+ * Instantiates an attribute-based & policy-based access control standard (`edx_policy_definitions`). 
+ * Discards legacy hard-coded boolean permission assignments in favor of dynamic JSON rule sets 
+ * mapped per `tenant_id`, dynamically evaluating access without schema alterations per module.
+ * 
+ * Replaces Legacy Tables:
+ * - infix_roles / roles / sm_role_permissions
+ * - infix_module_infos / infix_module_managers / sm_modules / sm_module_permissions
+ * - infix_permission_assigns / permissions / permission_sections / assign_permissions
+ */
 import {
+
   mysqlTable,
   varchar,
   int,

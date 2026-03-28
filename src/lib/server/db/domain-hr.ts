@@ -1,4 +1,19 @@
+/**
+ * ARCHITECTURE OVERVIEW: Human Resources & Payroll Domain
+ * 
+ * Purpose:
+ * Decouples employee payroll and leave metadata from the core `edx_accounts` table. 
+ * Utilizes native relational constraints connecting `department_id` and `designation_id` 
+ * directly to the identity layer, handling automated payroll generation securely.
+ * 
+ * Replaces Legacy Tables:
+ * - sm_leave_requests / sm_leave_types / sm_leave_defines / sm_leave_deduction_infos
+ * - sm_hr_payroll_generates / sm_hr_salary_templates
+ * - sm_human_departments
+ * - sm_designations
+ */
 import {
+
   mysqlTable,
   varchar,
   int,

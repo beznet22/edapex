@@ -1,4 +1,19 @@
+/**
+ * ARCHITECTURE OVERVIEW: Communication Domain
+ * 
+ * Purpose:
+ * Re-architects message dispatching via `edx_communication_events`. Supports polymorphic 
+ * `target_ref_id` strings mapping to accounts or roles, handling auditing, and delivery 
+ * status of multi-channel logs (SMS, Email, Push) structurally across tenants.
+ * 
+ * Replaces Legacy Tables:
+ * - sm_notice_boards
+ * - sm_email_sms_logs
+ * - sm_communications / sm_send_messages
+ * - chat_conversations / chat_groups / chat_group_message_recipients
+ */
 import {
+
   mysqlTable,
   varchar,
   int,

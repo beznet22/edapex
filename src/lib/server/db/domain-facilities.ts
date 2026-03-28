@@ -1,4 +1,19 @@
+/**
+ * ARCHITECTURE OVERVIEW: Facilities & Logistics Domain
+ * 
+ * Purpose:
+ * Manages physical school assets and infrastructure. This includes transportation (vehicles, routes),
+ * residential structures (hostels, dormitories, rooms), and their allocations. Connects finite 
+ * resource allocations strictly to `account_id` replacing loose legacy foreign ID tracking, 
+ * ensuring data integrity regardless of the user's role.
+ * 
+ * Replaces Legacy Tables:
+ * - sm_vehicles / sm_routes / sm_assign_vehicles
+ * - sm_dormitory_lists / sm_room_lists / sm_room_types
+ * - sm_seat_plans / sm_seat_plan_children
+ */
 import {
+
   mysqlTable,
   varchar,
   int,

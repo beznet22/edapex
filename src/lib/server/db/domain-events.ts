@@ -1,4 +1,17 @@
+/**
+ * ARCHITECTURE OVERVIEW: System Events & Audit Domain
+ * 
+ * Purpose:
+ * Implements an event-sourcing architectural pattern via `edx_domain_events` and 
+ * `edx_audit_log`. Stores heavily indexed immutable payloads detailing systemic 
+ * state mutations for security forensics and webhook syndication.
+ * 
+ * Replaces Legacy Tables:
+ * - sm_system_logs
+ * - sm_user_logs
+ */
 import {
+
   mysqlTable,
   varchar,
   int,

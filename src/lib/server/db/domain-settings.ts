@@ -1,4 +1,18 @@
+/**
+ * ARCHITECTURE OVERVIEW: System Settings Domain
+ * 
+ * Purpose:
+ * Decouples system toggles from hardcoded config files into database-driven `edx_settings`. 
+ * Enforces isolated tenant configurations via `tenant_id` ensuring multi-tenant customization 
+ * safety for webhooks, gateways, and layout preferences.
+ * 
+ * Replaces Legacy Tables:
+ * - sm_general_settings / infixedu__settings / sm_base_setups (partial config extraction)
+ * - sm_email_settings / sm_payment_gateway_settings / sm_sms_gateways
+ * - sm_dashboard_settings / sm_home_page_settings / invoice_settings / maintenance_settings
+ */
 import {
+
   mysqlTable,
   varchar,
   int,
