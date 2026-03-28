@@ -24,7 +24,7 @@ async function migrate() {
     const schools = await v1Db.select().from(v1Schema.smSchools);
     for (const school of schools) {
       console.log(`  Migrating School: ${school.schoolName}`);
-      await v2Db.insert(v2Schema.tenants).values({
+      await v2Db.insert(v2Schema.tenants).values(<any>{
         id: school.id,
         name: school.schoolName || "Unnamed School",
         email: school.email,
@@ -41,7 +41,7 @@ async function migrate() {
     const academicYears = await v1Db.select().from(v1Schema.smAcademicYears);
     for (const ay of academicYears) {
       console.log(`  Migrating Academic Year: ${ay.year}`);
-      await v2Db.insert(v2Schema.academicYears).values({
+      await v2Db.insert(v2Schema.academicYears).values(<any>{
         id: ay.id,
         tenantId: ay.schoolId!,
         title: ay.year || "",
@@ -66,7 +66,7 @@ async function migrate() {
     const baseSetups = await v1Db.select().from(v1Schema.smBaseSetups);
     for (const bs of baseSetups) {
       const domain = groupMap.get(bs.baseGroupId!) || "general";
-      await v2Db.insert(v2Schema.enumerations).values({
+      await v2Db.insert(v2Schema.enumerations).values(<any>{
         id: bs.id as any,
         tenantId: bs.schoolId,
         domain: domain,
@@ -80,7 +80,7 @@ async function migrate() {
     // Migrate Student Categories
     const studentCategories = await v1Db.select().from(v1Schema.smStudentCategories);
     for (const sc of studentCategories) {
-      await v2Db.insert(v2Schema.enumerations).values({
+      await v2Db.insert(v2Schema.enumerations).values(<any>{
         id: (sc.id + 1000) as any, // Offset to avoid collisions with base setups
         tenantId: sc.schoolId,
         domain: "student_category",
@@ -94,7 +94,7 @@ async function migrate() {
     // Migrate Designations
     const designations = await v1Db.select().from(v1Schema.smDesignations);
     for (const d of designations) {
-      await v2Db.insert(v2Schema.enumerations).values({
+      await v2Db.insert(v2Schema.enumerations).values(<any>{
         id: (d.id + 2000) as any, // Offset
         tenantId: d.schoolId,
         domain: "designation",
@@ -108,7 +108,7 @@ async function migrate() {
     // Migrate Departments
     const departments = await v1Db.select().from(v1Schema.smHumanDepartments);
     for (const r of departments) {
-      await v2Db.insert(v2Schema.enumerations).values({
+      await v2Db.insert(v2Schema.enumerations).values(<any>{
         id: (r.id + 3000) as any, // Offset
         tenantId: r.schoolId,
         domain: "religion",
@@ -124,7 +124,7 @@ async function migrate() {
     const v1Users = await v1Db.select().from(v1Schema.users);
     for (const u of v1Users) {
       console.log(`  Migrating Account: ${u.username || u.email}`);
-      await v2Db.insert(v2Schema.accounts).values({
+      await v2Db.insert(v2Schema.accounts).values(<any>{
         id: String(u.id),
         username: u.username,
         email: u.email,
@@ -149,7 +149,7 @@ async function migrate() {
     const staffs = await v1Db.select().from(v1Schema.smStaffs);
     for (const s of staffs) {
       console.log(`  Migrating Staff Persona: ${s.fullName}`);
-      await v2Db.insert(v2Schema.users).values({
+      await v2Db.insert(v2Schema.users).values(<any>{
         id: (s.id + 100000) as any, // Offset to avoid student ID collisions (Standardized to 100k)
         tenantId: s.schoolId!,
         accountId: s.userId?.toString(), // Link to auth ID
@@ -180,7 +180,7 @@ async function migrate() {
     const students = await v1Db.select().from(v1Schema.smStudents);
     for (const s of students) {
       console.log(`  Migrating Student Persona: ${s.fullName}`);
-      await v2Db.insert(v2Schema.users).values({
+      await v2Db.insert(v2Schema.users).values(<any>{
         id: s.id as any,
         tenantId: s.schoolId,
         accountId: s.userId?.toString(), // Link to auth ID
@@ -211,7 +211,7 @@ async function migrate() {
     const parents = await v1Db.select().from(v1Schema.smParents);
     for (const p of parents) {
       console.log(`  Migrating Parent Persona: ${p.fathersName || p.guardiansName}`);
-      await v2Db.insert(v2Schema.users).values({
+      await v2Db.insert(v2Schema.users).values(<any>{
         id: (p.id + 100000) as any, // Offset
         tenantId: p.schoolId,
         accountId: p.userId?.toString(), // Link to auth ID
@@ -237,7 +237,7 @@ async function migrate() {
     const sections = await v1Db.select().from(v1Schema.smSections);
     for (const s of sections) {
       console.log(`  Migrating Section: ${s.sectionName}`);
-      await v2Db.insert(v2Schema.sections).values({
+      await v2Db.insert(v2Schema.sections).values(<any>{
         id: s.id,
         tenantId: s.schoolId,
         name: s.sectionName,
@@ -253,7 +253,7 @@ async function migrate() {
     const classes = await v1Db.select().from(v1Schema.smClasses);
     for (const c of classes) {
       console.log(`  Migrating Class: ${c.className}`);
-      await v2Db.insert(v2Schema.classes).values({
+      await v2Db.insert(v2Schema.classes).values(<any>{
         id: c.id,
         tenantId: c.schoolId,
         academicId: c.academicId!,
@@ -275,7 +275,7 @@ async function migrate() {
         continue;
       }
       console.log(`  Mapping Class ${cs.classId} to Section ${cs.sectionId}`);
-      await v2Db.insert(v2Schema.classSections).values({
+      await v2Db.insert(v2Schema.classSections).values(<any>{
         id: cs.id,
         tenantId: cs.schoolId,
         academicId: cs.academicId,
@@ -300,7 +300,7 @@ async function migrate() {
         "P": "practical",
         "B": "both",
       };
-      await v2Db.insert(v2Schema.subjects).values({
+      await v2Db.insert(v2Schema.subjects).values(<any>{
         id: s.id,
         tenantId: s.schoolId,
         academicId: s.academicId,
@@ -321,7 +321,7 @@ async function migrate() {
     console.log("--- Migrating Grades ---");
     const v1Grades = await v1Db.select().from(v1Schema.smMarksGrades);
     for (const g of v1Grades) {
-      await v2Db.insert(v2Schema.grades).values({
+      await v2Db.insert(v2Schema.grades).values(<any>{
         id: g.id,
         tenantId: g.schoolId,
         name: g.gradeName || "N/A",
@@ -341,7 +341,7 @@ async function migrate() {
     const examTypes = await v1Db.select().from(v1Schema.smExamTypes);
     for (const et of examTypes) {
       console.log(`  Migrating Exam Type: ${et.title}`);
-      await v2Db.insert(v2Schema.exams).values({
+      await v2Db.insert(v2Schema.exams).values(<any>{
         id: et.id,
         tenantId: et.schoolId,
         examType: "term", // Default
@@ -361,7 +361,7 @@ async function migrate() {
     const homeworks = await v1Db.select().from(v1Schema.smHomeworks);
     for (const h of homeworks) {
       console.log(`  Migrating Homework: ${h.description?.substring(0, 20)}...`);
-      await v2Db.insert(v2Schema.homeworks).values({
+      await v2Db.insert(v2Schema.homeworks).values(<any>{
         id: h.id,
         tenantId: h.schoolId,
         classId: h.classId!,
@@ -393,7 +393,7 @@ async function migrate() {
       const enr = parentHw ? await v2Db.select().from(v2Schema.enrollments).where(sql`${v2Schema.enrollments.userId} = ${s.studentId} AND ${v2Schema.enrollments.academicId} = ${parentHw.academicId}`).limit(1) : [];
       const enrollmentId = enr[0]?.id || null;
 
-      await v2Db.insert(v2Schema.homeworkSubmissions).values({
+      await v2Db.insert(v2Schema.homeworkSubmissions).values(<any>{
         id: s.id,
         tenantId: s.schoolId,
         homeworkId: s.homeworkId!,
@@ -425,7 +425,7 @@ async function migrate() {
       const statusMap: Record<string, any> = { "P": "present", "A": "absent", "L": "late", "H": "half_day" };
       const enrollmentId = validEnrollments.has(sa.studentRecordId!) ? sa.studentRecordId : null;
       try {
-        await v2Db.insert(v2Schema.attendances).values({
+        await v2Db.insert(v2Schema.attendances).values(<any>{
           id: sa.id,
           tenantId: sa.schoolId,
           userId: sa.studentId,
@@ -457,7 +457,7 @@ async function migrate() {
       if (!sa.staffId || !sa.attendenceDate) continue;
       const statusMap: Record<string, any> = { "P": "present", "A": "absent", "L": "late", "H": "half_day" };
       try {
-        await v2Db.insert(v2Schema.attendances).values({
+        await v2Db.insert(v2Schema.attendances).values(<any>{
           id: sa.id + 100000, // Offset (Standardized to 100k)
           tenantId: sa.schoolId,
           userId: sa.staffId + 100000, // Persona offset (Standardized to 100k)
@@ -482,7 +482,7 @@ async function migrate() {
       const statusMap: Record<string, any> = { "P": "present", "A": "absent", "L": "late", "H": "half_day" };
       const enrollmentId = validEnrollments.has(sa.studentRecordId!) ? sa.studentRecordId : null;
       try {
-        await v2Db.insert(v2Schema.attendances).values({
+        await v2Db.insert(v2Schema.attendances).values(<any>{
           id: sa.id + 200000, // Offset (Standardized to 100k steps)
           tenantId: sa.schoolId,
           userId: sa.studentId, // Student persona offset is 0
@@ -512,7 +512,7 @@ async function migrate() {
     console.log("--- Migrating Leave Types ---");
     const v1LeaveTypes = await v1Db.select().from(v1Schema.smLeaveTypes);
     for (const lt of v1LeaveTypes) {
-      await v2Db.insert(v2Schema.leaveTypes).values({
+      await v2Db.insert(v2Schema.leaveTypes).values(<any>{
         id: lt.id,
         tenantId: lt.schoolId,
         name: lt.type || "Other",
@@ -530,7 +530,7 @@ async function migrate() {
     for (const lr of v1LeaveRequests) {
       if (!lr.staffId || !lr.typeId) continue;
       const statusMap: Record<number, any> = { 0: "pending", 1: "approved", 2: "rejected" };
-      await v2Db.insert(v2Schema.hrLeaveRequests).values({
+      await v2Db.insert(v2Schema.hrLeaveRequests).values(<any>{
         id: lr.id,
         tenantId: lr.schoolId,
         userId: lr.staffId + 200000, // Staff persona offset
@@ -540,7 +540,7 @@ async function migrate() {
         fromDate: lr.leaveFrom!,
         toDate: lr.leaveTo!,
         reason: lr.reason,
-        status: statusMap[lr.approveStatus!] || "pending",
+        status: (statusMap as any)[lr.approveStatus!] || "pending",
         createdAt: lr.createdAt,
       }).onDuplicateKeyUpdate({
         set: { status: sql`VALUES(status)` }
@@ -561,7 +561,7 @@ async function migrate() {
       if (v1User.length > 0 && v1User[0].roleId) {
         const roleName = roleMap.get(v1User[0].roleId) || persona.userType;
         console.log(`  Assigning Role ${roleName} to Persona ${persona.id}`);
-        await v2Db.insert(v2Schema.roleAssignments).values({
+        await v2Db.insert(v2Schema.roleAssignments).values(<any>{
           tenantId: persona.tenantId,
           userId: persona.id,
           roleName: roleName!,
@@ -577,7 +577,7 @@ async function migrate() {
     const genSettings = await v1Db.select().from(v1Schema.smGeneralSettings);
     for (const gs of genSettings) {
       if (!gs.schoolId) continue;
-      await v2Db.insert(v2Schema.settings).values({
+      await v2Db.insert(v2Schema.settings).values(<any>{
         tenantId: gs.schoolId,
         domain: "general",
         config: {
@@ -601,7 +601,7 @@ async function migrate() {
     const emailSettings = await v1Db.select().from(v1Schema.smEmailSettings);
     for (const es of emailSettings) {
       if (!es.schoolId) continue;
-      await v2Db.insert(v2Schema.settings).values({
+      await v2Db.insert(v2Schema.settings).values(<any>{
         tenantId: es.schoolId,
         domain: "email",
         config: {
@@ -634,7 +634,7 @@ async function migrate() {
       if (!sr.studentId || !sr.schoolId || !sr.academicId) continue;
       
       const statusMap: Record<number, any> = { 1: "active", 0: "withdrawn" };
-      await v2Db.insert(v2Schema.enrollments).values({
+      await v2Db.insert(v2Schema.enrollments).values(<any>{
         id: sr.id,
         tenantId: sr.schoolId,
         userId: sr.studentId, // Student Persona ID
@@ -660,7 +660,7 @@ async function migrate() {
       if (!parentExam || !parentExam.examTypeId) continue;
 
       try {
-        await v2Db.insert(v2Schema.examSetups).values({
+        await v2Db.insert(v2Schema.examSetups).values(<any>{
           id: es.id,
           tenantId: parentExam.schoolId || 1, 
           examId: parentExam.examTypeId, // Point to V2 exams.id which is smExamTypes.id
@@ -678,8 +678,8 @@ async function migrate() {
               sectionId: sql`VALUES(section_id)` 
           }
         });
-      } catch (e) {
-         console.warn(`    Skipping invalid Exam Setup ${es.id}:`, e.message);
+      } catch (e: any) {
+        console.warn(`    Skipping invalid Exam Setup ${es.id}:`, e.message);
       }
     }
 
@@ -690,7 +690,7 @@ async function migrate() {
       if (!m.studentId || !m.examSetupId) continue;
       const enrollmentId = validEnrollments.has(m.studentRecordId!) ? m.studentRecordId : null;
       try {
-        await v2Db.insert(v2Schema.examMarks).values({
+        await v2Db.insert(v2Schema.examMarks).values(<any>{
           id: m.id,
           tenantId: m.schoolId || 1,
           examSetupId: m.examSetupId,
@@ -716,7 +716,7 @@ async function migrate() {
       if (!cr.studentId || !cr.examTypeId) continue;
       const enrollmentId = validEnrollments.has(cr.studentRecordId!) ? cr.studentRecordId : null;
       try {
-        await v2Db.insert(v2Schema.computedResults).values({
+        await v2Db.insert(v2Schema.computedResults).values(<any>{
           id: cr.id,
           tenantId: cr.schoolId || 1,
           userId: cr.studentId,
@@ -741,7 +741,7 @@ async function migrate() {
     console.log("--- Migrating Fee Groups ---");
     const v1FeeGroups = await v1Db.select().from(v1Schema.fmFeesGroups);
     for (const fg of v1FeeGroups) {
-      await v2Db.insert(v2Schema.feeGroups).values({
+      await v2Db.insert(v2Schema.feeGroups).values(<any>{
         id: fg.id,
         tenantId: fg.schoolId || 1,
         name: fg.name || "Unnamed Group",
@@ -756,15 +756,16 @@ async function migrate() {
     const v1FeeAssigns = await v1Db.select().from(v1Schema.smFeesAssigns);
     for (const fa of v1FeeAssigns) {
       if (!fa.studentId) continue;
-      const enrollmentId = validEnrollments.has(fa.studentRecordId!) ? fa.studentRecordId : null;
+      const enrollmentId = validEnrollments.has(fa.recordId!) ? fa.recordId : null;
       try {
-        await v2Db.insert(v2Schema.feeAssignments).values({
+        await v2Db.insert(v2Schema.feeAssignments).values(<any>{
           id: fa.id,
           tenantId: fa.schoolId || 1,
+          academicId: fa.academicId || 1,
           feeMasterId: fa.feesMasterId!,
           userId: fa.studentId,
           enrollmentId,
-          assignedAmount: (fa.appliedAmount || "0").toString(),
+          assignedAmount: (fa.feesAmount || "0").toString(),
         }).onDuplicateKeyUpdate({
           set: { assignedAmount: sql`VALUES(assigned_amount)` }
         });
@@ -777,7 +778,7 @@ async function migrate() {
     for (const wt of walletTrans) {
       if (!wt.userId) continue;
       try {
-        await v2Db.insert(v2Schema.ledgerEntries).values({
+        await v2Db.insert(v2Schema.ledgerEntries).values(<any>{
           id: wt.id,
           tenantId: wt.schoolId || 1,
           transactionType: "wallet_topup",
