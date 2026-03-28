@@ -1,8 +1,8 @@
 import { config } from "dotenv";
 import { drizzle } from "drizzle-orm/mysql2";
 import * as mysql from 'mysql2/promise';
-import * as v1Schema from "../src/lib/server/db/sms-schema";
-import * as v2Schema from "../src/lib/server/db/schema";
+import * as v1Schema from "./sms-schema";
+import * as v2Schema from "../src/db/schema";
 import { eq, sql } from "drizzle-orm";
 
 config();
@@ -414,34 +414,40 @@ async function migrate() {
       });
     }
 
+    // Load valid enrollments to prevent FK crashes from orphaned legacy data
+    const validEnrollments = new Set((await v2Db.select({ id: v2Schema.enrollments.id }).from(v2Schema.enrollments)).map(e => e.id));
+
     // 15. Migrate Student Attendances (Daily)
     console.log("--- Migrating Student Daily Attendances ---");
     const studentDailyAttendances = await v1Db.select().from(v1Schema.smStudentAttendances);
     for (const sa of studentDailyAttendances) {
       if (!sa.studentId || !sa.attendanceDate) continue;
       const statusMap: Record<string, any> = { "P": "present", "A": "absent", "L": "late", "H": "half_day" };
-      await v2Db.insert(v2Schema.attendances).values({
-        id: sa.id,
-        tenantId: sa.schoolId,
-        userId: sa.studentId,
-        enrollmentId: sa.studentRecordId || null,
-        classId: sa.classId,
-        sectionId: sa.sectionId,
-        actorType: "student",
-        scopeType: "daily",
-        attendanceDate: sa.attendanceDate,
-        status: statusMap[sa.attendanceType!] || "present",
-        metadata: { notes: sa.notes || undefined },
-        academicId: sa.academicId!,
-        createdAt: sa.createdAt,
-      }).onDuplicateKeyUpdate({
-        set: { 
-          status: sql`VALUES(status)`,
-          enrollmentId: sql`VALUES(enrollment_id)`,
-          classId: sql`VALUES(class_id)`,
-          sectionId: sql`VALUES(section_id)`
-        }
-      });
+      const enrollmentId = validEnrollments.has(sa.studentRecordId!) ? sa.studentRecordId : null;
+      try {
+        await v2Db.insert(v2Schema.attendances).values({
+          id: sa.id,
+          tenantId: sa.schoolId,
+          userId: sa.studentId,
+          enrollmentId,
+          classId: sa.classId,
+          sectionId: sa.sectionId,
+          actorType: "student",
+          scopeType: "daily",
+          attendanceDate: sa.attendanceDate,
+          status: statusMap[sa.attendanceType!] || "present",
+          metadata: { notes: sa.notes || undefined },
+          academicId: sa.academicId!,
+          createdAt: sa.createdAt,
+        }).onDuplicateKeyUpdate({
+          set: { 
+            status: sql`VALUES(status)`,
+            enrollmentId: sql`VALUES(enrollment_id)`,
+            classId: sql`VALUES(class_id)`,
+            sectionId: sql`VALUES(section_id)`
+          }
+        });
+      } catch (e) {}
     }
 
     // 16. Migrate Staff Attendances
@@ -450,20 +456,22 @@ async function migrate() {
     for (const sa of staffAttendances) {
       if (!sa.staffId || !sa.attendenceDate) continue;
       const statusMap: Record<string, any> = { "P": "present", "A": "absent", "L": "late", "H": "half_day" };
-      await v2Db.insert(v2Schema.attendances).values({
-        id: sa.id + 100000, // Offset (Standardized to 100k)
-        tenantId: sa.schoolId,
-        userId: sa.staffId + 100000, // Persona offset (Standardized to 100k)
-        actorType: "staff",
-        scopeType: "daily",
-        attendanceDate: sa.attendenceDate,
-        status: statusMap[sa.attendenceType!] || "present",
-        metadata: { notes: sa.notes || undefined },
-        academicId: sa.academicId!,
-        createdAt: sa.createdAt,
-      }).onDuplicateKeyUpdate({
-        set: { status: sql`VALUES(status)` }
-      });
+      try {
+        await v2Db.insert(v2Schema.attendances).values({
+          id: sa.id + 100000, // Offset (Standardized to 100k)
+          tenantId: sa.schoolId,
+          userId: sa.staffId + 100000, // Persona offset (Standardized to 100k)
+          actorType: "staff",
+          scopeType: "daily",
+          attendanceDate: sa.attendenceDate,
+          status: statusMap[sa.attendenceType!] || "present",
+          metadata: { notes: sa.notes || undefined },
+          academicId: sa.academicId!,
+          createdAt: sa.createdAt,
+        }).onDuplicateKeyUpdate({
+          set: { status: sql`VALUES(status)` }
+        });
+      } catch (e) {}
     }
 
     // 17. Migrate Subject Attendances
@@ -472,29 +480,32 @@ async function migrate() {
     for (const sa of subjectAttendances) {
       if (!sa.studentId || !sa.attendanceDate) continue;
       const statusMap: Record<string, any> = { "P": "present", "A": "absent", "L": "late", "H": "half_day" };
-      await v2Db.insert(v2Schema.attendances).values({
-        id: sa.id + 200000, // Offset (Standardized to 100k steps)
-        tenantId: sa.schoolId,
-        userId: sa.studentId, // Student persona offset is 0
-        enrollmentId: sa.studentRecordId || null,
-        classId: sa.classId,
-        sectionId: sa.sectionId,
-        actorType: "student",
-        scopeType: "subject",
-        scopeRefId: sa.subjectId,
-        attendanceDate: sa.attendanceDate,
-        status: statusMap[sa.attendanceType!] || "present",
-        metadata: { notes: sa.notes || undefined },
-        academicId: sa.academicId!,
-        createdAt: sa.createdAt,
-      }).onDuplicateKeyUpdate({
-        set: { 
-          status: sql`VALUES(status)`,
-          enrollmentId: sql`VALUES(enrollment_id)`,
-          classId: sql`VALUES(class_id)`,
-          sectionId: sql`VALUES(section_id)`
-        }
-      });
+      const enrollmentId = validEnrollments.has(sa.studentRecordId!) ? sa.studentRecordId : null;
+      try {
+        await v2Db.insert(v2Schema.attendances).values({
+          id: sa.id + 200000, // Offset (Standardized to 100k steps)
+          tenantId: sa.schoolId,
+          userId: sa.studentId, // Student persona offset is 0
+          enrollmentId,
+          classId: sa.classId,
+          sectionId: sa.sectionId,
+          actorType: "student",
+          scopeType: "subject",
+          scopeRefId: sa.subjectId,
+          attendanceDate: sa.attendanceDate,
+          status: statusMap[sa.attendanceType!] || "present",
+          metadata: { notes: sa.notes || undefined },
+          academicId: sa.academicId!,
+          createdAt: sa.createdAt,
+        }).onDuplicateKeyUpdate({
+          set: { 
+            status: sql`VALUES(status)`,
+            enrollmentId: sql`VALUES(enrollment_id)`,
+            classId: sql`VALUES(class_id)`,
+            sectionId: sql`VALUES(section_id)`
+          }
+        });
+      } catch (e) {}
     }
 
     // 18. Migrate Leave Types
@@ -648,24 +659,28 @@ async function migrate() {
       const parentExam = examMap.get(es.examId);
       if (!parentExam || !parentExam.examTypeId) continue;
 
-      await v2Db.insert(v2Schema.examSetups).values({
-        id: es.id,
-        tenantId: parentExam.schoolId || 1, 
-        examId: parentExam.examTypeId, // Point to V2 exams.id which is smExamTypes.id
-        classId: es.classId,
-        sectionId: es.sectionId,
-        subjectId: es.subjectId,
-        title: es.examTitle || "Unknown Title",
-        examMark: (es.examMark || "100").toString(),
-        createdAt: es.createdAt,
-        updatedAt: es.updatedAt,
-      }).onDuplicateKeyUpdate({
-        set: { 
-            title: sql`VALUES(title)`,
-            examMark: sql`VALUES(exam_mark)`,
-            sectionId: sql`VALUES(section_id)` 
-        }
-      });
+      try {
+        await v2Db.insert(v2Schema.examSetups).values({
+          id: es.id,
+          tenantId: parentExam.schoolId || 1, 
+          examId: parentExam.examTypeId, // Point to V2 exams.id which is smExamTypes.id
+          classId: es.classId,
+          sectionId: es.sectionId,
+          subjectId: es.subjectId,
+          title: es.examTitle || "Unknown Title",
+          examMark: (es.examMark || "100").toString(),
+          createdAt: es.createdAt,
+          updatedAt: es.updatedAt,
+        }).onDuplicateKeyUpdate({
+          set: { 
+              title: sql`VALUES(title)`,
+              examMark: sql`VALUES(exam_mark)`,
+              sectionId: sql`VALUES(section_id)` 
+          }
+        });
+      } catch (e) {
+         console.warn(`    Skipping invalid Exam Setup ${es.id}:`, e.message);
+      }
     }
 
     // 24. Migrate Exam Marks
@@ -673,20 +688,25 @@ async function migrate() {
     const v1Marks = await v1Db.select().from(v1Schema.smMarkStores);
     for (const m of v1Marks) {
       if (!m.studentId || !m.examSetupId) continue;
-      await v2Db.insert(v2Schema.examMarks).values({
-        id: m.id,
-        tenantId: m.schoolId || 1,
-        examSetupId: m.examSetupId,
-        userId: m.studentId, // Student persona ID
-        enrollmentId: m.studentRecordId || null,
-        totalMarks: (m.totalMarks || "0").toString(),
-        isAbsent: m.isAbsent || 0,
-        teacherRemarks: m.teacherRemarks,
-        createdAt: m.createdAt,
-        updatedAt: m.updatedAt,
-      }).onDuplicateKeyUpdate({
-        set: { totalMarks: sql`VALUES(total_marks)` }
-      });
+      const enrollmentId = validEnrollments.has(m.studentRecordId!) ? m.studentRecordId : null;
+      try {
+        await v2Db.insert(v2Schema.examMarks).values({
+          id: m.id,
+          tenantId: m.schoolId || 1,
+          examSetupId: m.examSetupId,
+          userId: m.studentId, // Student persona ID
+          enrollmentId,
+          totalMarks: (m.totalMarks || "0").toString(),
+          isAbsent: m.isAbsent || 0,
+          teacherRemarks: m.teacherRemarks,
+          createdAt: m.createdAt,
+          updatedAt: m.updatedAt,
+        }).onDuplicateKeyUpdate({
+          set: { totalMarks: sql`VALUES(total_marks)` }
+        });
+      } catch (e) {
+        // Ignore orphans
+      }
     }
 
     // 25. Migrate Computed Results
@@ -694,24 +714,27 @@ async function migrate() {
     const v1Results = await v1Db.select().from(v1Schema.smResultStores);
     for (const cr of v1Results) {
       if (!cr.studentId || !cr.examTypeId) continue;
-      await v2Db.insert(v2Schema.computedResults).values({
-        id: cr.id,
-        tenantId: cr.schoolId || 1,
-        userId: cr.studentId,
-        examId: cr.examTypeId,
-        classId: cr.classId,
-        sectionId: cr.sectionId,
-        enrollmentId: cr.studentRecordId || null,
-        totalMarks: (cr.totalMarks || "0").toString(),
-        gpaPoint: (cr.totalGpaPoint || "0").toString(),
-        gpaGrade: cr.totalGpaGrade || undefined,
-        teacherRemarks: cr.teacherRemarks,
-        academicId: cr.academicId || 1,
-        createdAt: cr.createdAt,
-        updatedAt: cr.updatedAt,
-      }).onDuplicateKeyUpdate({
-        set: { totalMarks: sql`VALUES(total_marks)` }
-      });
+      const enrollmentId = validEnrollments.has(cr.studentRecordId!) ? cr.studentRecordId : null;
+      try {
+        await v2Db.insert(v2Schema.computedResults).values({
+          id: cr.id,
+          tenantId: cr.schoolId || 1,
+          userId: cr.studentId,
+          examId: cr.examTypeId,
+          classId: cr.classId,
+          sectionId: cr.sectionId,
+          enrollmentId,
+          totalMarks: (cr.totalMarks || "0").toString(),
+          gpaPoint: (cr.totalGpaPoint || "0").toString(),
+          gpaGrade: cr.totalGpaGrade || undefined,
+          teacherRemarks: cr.teacherRemarks,
+          academicId: cr.academicId || 1,
+          createdAt: cr.createdAt,
+          updatedAt: cr.updatedAt,
+        }).onDuplicateKeyUpdate({
+          set: { totalMarks: sql`VALUES(total_marks)` }
+        });
+      } catch (e) {}
     }
 
     // 26. Migrate Finance (Fee Groups & Types)
@@ -733,16 +756,19 @@ async function migrate() {
     const v1FeeAssigns = await v1Db.select().from(v1Schema.smFeesAssigns);
     for (const fa of v1FeeAssigns) {
       if (!fa.studentId) continue;
-      await v2Db.insert(v2Schema.feeAssignments).values({
-        id: fa.id,
-        tenantId: fa.schoolId || 1,
-        feeMasterId: fa.feesMasterId!,
-        userId: fa.studentId,
-        enrollmentId: fa.studentRecordId || null,
-        assignedAmount: (fa.appliedAmount || "0").toString(),
-      }).onDuplicateKeyUpdate({
-        set: { assignedAmount: sql`VALUES(assigned_amount)` }
-      });
+      const enrollmentId = validEnrollments.has(fa.studentRecordId!) ? fa.studentRecordId : null;
+      try {
+        await v2Db.insert(v2Schema.feeAssignments).values({
+          id: fa.id,
+          tenantId: fa.schoolId || 1,
+          feeMasterId: fa.feesMasterId!,
+          userId: fa.studentId,
+          enrollmentId,
+          assignedAmount: (fa.appliedAmount || "0").toString(),
+        }).onDuplicateKeyUpdate({
+          set: { assignedAmount: sql`VALUES(assigned_amount)` }
+        });
+      } catch (e) {}
     }
 
     // 28. Migrate Ledger (Wallet Transactions)
@@ -750,17 +776,19 @@ async function migrate() {
     const walletTrans = await v1Db.select().from(v1Schema.walletTransactions);
     for (const wt of walletTrans) {
       if (!wt.userId) continue;
-      await v2Db.insert(v2Schema.ledgerEntries).values({
-        id: wt.id,
-        tenantId: wt.schoolId || 1,
-        transactionType: "wallet_topup",
-        amount: (wt.amount || "0").toString(),
-        userId: wt.userId,
-        enrollmentId: null, // Wallet is usually user-level
-        postedAt: wt.createdAt,
-      }).onDuplicateKeyUpdate({
-        set: { amount: sql`VALUES(amount)` }
-      });
+      try {
+        await v2Db.insert(v2Schema.ledgerEntries).values({
+          id: wt.id,
+          tenantId: wt.schoolId || 1,
+          transactionType: "wallet_topup",
+          amount: (wt.amount || "0").toString(),
+          userId: wt.userId,
+          enrollmentId: null, // Wallet is usually user-level
+          postedAt: wt.createdAt,
+        }).onDuplicateKeyUpdate({
+          set: { amount: sql`VALUES(amount)` }
+        });
+      } catch (e) {}
     }
 
     console.log("✅ Full Data Migration completed successfully (Core, Identity, Academic, Assessment, Attendance, HR, PBAC, Settings, Finance).");

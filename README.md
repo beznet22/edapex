@@ -1,38 +1,47 @@
-# sv
+# EdApex Platform Backend
 
-Everything you need to build a Svelte project, powered by [`sv`](https://github.com/sveltejs/cli).
+Welcome to the EdApex backend foundation repository. EdApex is an advanced, scalable educational management platform designed to orchestrate academic, financial, attendance, and AI-assisted workflows for modern schools.
 
-## Creating a project
+## 🏛 Architectural Vision
 
-If you're seeing this, you've probably already done this step. Congrats!
+The `feature/databas-migration-v2` branch represents a radical architectural shift toward a dedicated microservice/Backend API architecture. 
 
-```sh
-# create a new project in the current directory
-npx sv create
+This repository has been definitively stripped of all its former frontend (SvelteKit UI) monolith code. It now serves exclusively as the foundational **Database Layer Codebase**. It encapsulates the primary source of truth for the entire EdApex ecosystem, managing complex relational domain schemas strictly via native physical constraints.
 
-# create a new project in my-app
-npx sv create my-app
-```
+## 📦 Current State: The Database Layer
 
-## Developing
+Currently, the repository strictly encapsulates the database definitions using **Drizzle ORM** mapped to a **MySQL/MariaDB** engine.
 
-Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
+It isolates business logic into 16 distinct domain schemas:
+- **Core Multi-tenancy** (`domain-core.ts`)
+- **Education & Routines** (`domain-academic.ts`, `domain-assessment.ts`, `domain-lms.ts`)
+- **Infrastructure & Assets** (`domain-facilities.ts`, `domain-library.ts`, `domain-documents.ts`)
+- **Administration** (`domain-hr.ts`, `domain-finance.ts`, `domain-attendance.ts`)
+- **Access Control & Integration** (`domain-pbac.ts`, `domain-ai.ts`, `domain-settings.ts`)
+- **Content & Audit** (`domain-cms.ts`, `domain-communication.ts`, `domain-events.ts`)
 
-```sh
-npm run dev
+Every domain schema utilizes strong typings, native `tenant_id` isolation loops, robust JSON metadata blobs, and strict polymorphic `owner_type/owner_id` constraints instead of legacy dual-write patterns.
 
-# or start the server and open the app in a new browser tab
-npm run dev -- --open
-```
+## 🚀 Getting Started
 
-## Building
+To utilize this database layer locally:
 
-To create a production version of your app:
+1. **Install Dependencies**:
+   ```bash
+   pnpm install
+   ```
 
-```sh
-npm run build
-```
+2. **Environment Variables**:
+   Copy `.env.example` to `.env` and fill in your local `DATABASE_V2_URL` to point to a target EdApex V2 instance.
 
-You can preview the production build with `npm run preview`.
+3. **Schema Management**:
+   The `drizzle-kit` utility is used for schema synchronizations:
+   
+   *Push schema to the local database immediately without intermediate SQL migrations:*
+   ```bash
+   pnpm run db:push
+   ```
 
-> To deploy your app, you may need to install an [adapter](https://svelte.dev/docs/kit/adapters) for your target environment.
+## 🛠 Future Backend Expansion
+
+As moving forward, this database foundation acts as the dependency and building block. Future iterations of this robust architecture will introduce lightweight REST/GraphQL microservices, message queue event sourcing using `edx_domain_events`, and dedicated API endpoints that purely rely on this isolated DB schema, completely disassociated from the web presentation layer.
