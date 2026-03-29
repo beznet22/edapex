@@ -45,11 +45,14 @@ export const policyDefinitions = mysqlTable("policy_definitions", {
   name: varchar("name", { length: 191 }).notNull(),
   description: varchar("description", { length: 500 }),
   definition: json("definition").$type<PolicyDefinition>().notNull(),
+  // Conflict resolution: higher priority wins when multiple policies match
+  priority: int("priority").default(0).notNull(),
   activeStatus: int("active_status").default(1),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow(),
 }, (table) => ({
   tenantIdx: index("pol_tenant_idx").on(table.tenantId),
+  priorityIdx: index("pol_priority_idx").on(table.tenantId, table.priority),
 }));
 
 // Role Assignment Metadata
@@ -63,6 +66,7 @@ export const roleAssignments = mysqlTable("role_assignments", {
   id: int("id").autoincrement().primaryKey(),
   tenantId: int("tenant_id").notNull().references(() => tenants.id),
   userId: int("user_id").notNull().references(() => users.id), // Persona
+  accountId: int("account_id").references(() => accounts.id), // Platform identity for account-level auth
   roleName: varchar("role_name", { length: 100 }).notNull(), // e.g. 'admin', 'teacher', 'student'
   metadata: json("metadata").$type<RoleAssignmentMetadata>(),
   createdAt: timestamp("created_at").defaultNow(),
@@ -70,4 +74,19 @@ export const roleAssignments = mysqlTable("role_assignments", {
 }, (table) => ({
   userRoleIdx: unique("role_assignment_unique").on(table.userId, table.roleName),
   userIdx: index("ra_user_idx").on(table.userId),
+  accountIdx: index("ra_account_idx").on(table.accountId),
+}));
+
+// M:N binding between policies and role assignments
+// Enables dynamic PBAC: "role X gets policy Y in tenant Z"
+export const policyBindings = mysqlTable("policy_bindings", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenant_id").notNull().references(() => tenants.id),
+  policyId: int("policy_id").notNull().references(() => policyDefinitions.id),
+  roleAssignmentId: int("role_assignment_id").notNull().references(() => roleAssignments.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow(),
+}, (table) => ({
+  policyRoleIdx: unique("pb_policy_role_unique").on(table.policyId, table.roleAssignmentId),
+  tenantIdx: index("pb_tenant_idx").on(table.tenantId),
 }));

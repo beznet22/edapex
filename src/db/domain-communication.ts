@@ -49,6 +49,10 @@ export const communicationEvents = mysqlTable("communication_events", {
   targetRefId: int("target_ref_id"),
   subject: varchar("subject", { length: 500 }),
   body: text("body"),
+  // Scheduling and priority for delivery routing
+  priority: mysqlEnum("priority", ["low", "normal", "high", "urgent"]).default("normal").notNull(),
+  scheduledAt: timestamp("scheduled_at"),  // NULL = send immediately
+  sentAt: timestamp("sent_at"),  // when actually dispatched
   metadata: json("metadata").$type<CommunicationMetadata>(),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow(),
@@ -56,6 +60,7 @@ export const communicationEvents = mysqlTable("communication_events", {
   targetIdx: index("comm_target_idx").on(table.targetType, table.targetRefId),
   tenantIdx: index("comm_tenant_idx").on(table.tenantId),
   channelIdx: index("comm_channel_idx").on(table.tenantId, table.channel),
+  scheduledIdx: index("comm_scheduled_idx").on(table.scheduledAt),
 }));
 
 // --- NEW TABLE ---

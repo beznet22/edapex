@@ -51,6 +51,8 @@ export const attendances = mysqlTable("attendances", {
   classId: int("class_id").references(() => classes.id),
   sectionId: int("section_id").references(() => sections.id),
   status: mysqlEnum("status", ["present", "absent", "late", "half_day", "excused"]).notNull(),
+  // How attendance was captured — enables anomaly detection
+  sourceType: mysqlEnum("source_type", ["manual", "biometric", "qr", "auto_reconciled"]).default("manual").notNull(),
   metadata: json("metadata").$type<AttendanceMetadata>(),
   recordedBy: int("recorded_by").references(() => users.id), // Staff persona
   academicId: int("academic_id").notNull().references(() => academicYears.id),

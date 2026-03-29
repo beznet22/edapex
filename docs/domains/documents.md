@@ -50,3 +50,39 @@ Unlike legacy `available_for_role` logic, V2 leverages **PBAC**:
 ## 6. Implementation Notes
 - **MIME Type Validation**: V2 enforces strict MIME checks in the `StorageService` layer, preventing execution of malicious files (replaces legacy `mimes:...` validation).
 - **Tenant Isolation**: All file paths are prefixed with `tenant_id` at the storage provider level for physical data isolation.
+
+---
+
+## Hono API Routes
+
+```
+Routes → DocumentsController → DocumentsService → DocumentsRepository
+```
+
+| Method | Route | Description | Auth |
+|:---|:---|:---|:---|
+| `GET` | `/api/v1/documents` | List documents (filtered by owner_type) | Authenticated |
+| `POST` | `/api/v1/documents/presign` | Get presigned upload URL | Authenticated |
+| `POST` | `/api/v1/documents` | Create document metadata record | Authenticated |
+| `GET` | `/api/v1/documents/:id` | Get document with signed download URL | Owner + Admin |
+| `DELETE` | `/api/v1/documents/:id` | Delete document | Owner + Admin |
+| `POST` | `/api/v1/documents/:id/verify` | Verify document (admin) | `TenantAdmin` |
+
+---
+
+## HMAS Agent Registry
+
+| Agent | Type | Capabilities |
+|:---|:---|:---|
+| `document_classifier` | Task | Auto-categorize uploaded documents |
+| `document_verifier` | Task | Validate document authenticity and expiry |
+
+---
+
+## Domain Events
+
+| Event | Payload | Consumers |
+|:---|:---|:---|
+| `docs.uploaded` | `{ documentId, ownerType, ownerId }` | Events (audit), AI (auto-classify) |
+| `docs.verified` | `{ documentId, verifiedBy }` | Events (audit), Communication (notify owner) |
+| `docs.expired` | `{ documentId, expiryDate }` | Communication (renewal reminder) |

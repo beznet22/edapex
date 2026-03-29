@@ -15,8 +15,8 @@ The Core domain is the foundation of the EdApex Planet-Scale Architecture. It ma
 | Legacy Table (`schoolify`) | V2 Entity (`src/db/domain-core.ts`) | Notes |
 | :--- | :--- | :--- |
 | `sm_schools` | `tenants` | Centrally managed school entities. |
-| `users` | `accounts` | Authentication identity layer. |
-| `users` (Roles/Personas) | `users` | Domain-specific personas (Student, Staff, Parent). |
+| `users` | `accounts` / `auth_accounts` | Better-Auth identity layer and OAuth linkages. |
+| `users` (Roles/Personas)| `users` | Domain-specific personas (Student, Staff, Parent). |
 | `sm_academic_years` | `academicYears` | Temporal session control. |
 | `sm_base_setups` | `enumerations` | Centralized taxonomy mapping (Gender, Blood Group, etc.). |
 
@@ -71,3 +71,48 @@ graph TD
     E -->|Role: Teacher| G[Staff Dashboard]
     E -->|Role: Admin| H[Management Console]
 ```
+
+---
+
+## Hono API Routes
+
+```
+Routes → CoreController → CoreService → CoreRepository → tenants/accounts/users
+```
+
+| Method | Route | Description | Auth |
+|:---|:---|:---|:---|
+| `GET/POST` | `/api/auth/*` | Better-Auth framework endpoints (login, register, session) | Public |
+| `GET` | `/api/v1/tenants` | List tenants (system admin only) | `SystemAdmin` |
+| `POST` | `/api/v1/tenants` | Create tenant | `SystemAdmin` |
+| `GET` | `/api/v1/tenants/:id` | Get tenant details | `TenantAdmin` |
+| `PATCH` | `/api/v1/tenants/:id` | Update tenant metadata | `TenantAdmin` |
+| `GET` | `/api/v1/users` | List users (filtered by persona type) | `TenantAdmin` |
+| `POST` | `/api/v1/users` | Create user persona | `TenantAdmin` |
+| `GET` | `/api/v1/users/:id` | Get user details | Self + `TenantAdmin` |
+| `PATCH` | `/api/v1/users/:id` | Update user metadata | Self + `TenantAdmin` |
+| `GET` | `/api/v1/academic-years` | List academic years | Authenticated |
+| `POST` | `/api/v1/academic-years` | Create academic year | `TenantAdmin` |
+| `GET` | `/api/v1/enumerations` | List enums by domain | Authenticated |
+
+---
+
+## HMAS Agent Registry
+
+| Agent | Type | Capabilities |
+|:---|:---|:---|
+| `identity_provisioner` | Task | Account creation, persona linking, onboarding |
+| `tenant_architect` | Task | Tenant initialization, branding, module enablement |
+| `context_resolver` | Task | Injects tenantId + academicId into request |
+
+---
+
+## Domain Events
+
+| Event | Payload | Consumers |
+|:---|:---|:---|
+| `core.tenant_provisioned` | `{ tenantId, name, tier }` | Settings (default config), PBAC (default policies) |
+| `core.user_created` | `{ userId, tenantId, userType }` | Communication (welcome message), PBAC (default role) |
+| `core.account_linked` | `{ accountId, userId, tenantId }` | Events (audit) |
+| `core.academic_year_activated` | `{ academicId, tenantId }` | All domains (context switch) |
+

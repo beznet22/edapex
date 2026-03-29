@@ -15,19 +15,25 @@ export * from "./domain-pbac";
 export * from "./domain-settings";
 export * from "./domain-lms";
 
-import { users, accounts, sessions } from "./domain-core";
-import { chats, messages } from "./domain-ai";
+import { users, accounts, sessions, authAccounts, authVerifications } from "./domain-core";
+import { aiChats, aiMessages } from "./domain-ai";
 
 // Authoritative Types
 export type User = typeof users.$inferSelect;
 export type Staff = typeof users.$inferSelect;
 export type Student = typeof users.$inferSelect;
 export type Parent = typeof users.$inferSelect;
-export type DBChat = typeof chats.$inferSelect;
-export type DBMessage = typeof messages.$inferSelect;
+export type AIChat = typeof aiChats.$inferSelect;
+export type AIMessage = typeof aiMessages.$inferSelect;
 
-// Lucia Auth re-exports
-export { sessions, accounts } from "./domain-core";
+// Better-Auth Core exports & Database Types
+export { sessions, accounts, authAccounts, authVerifications } from "./domain-core";
+
+// Auth Types (Better-Auth canonical models)
+export type AuthUser = typeof accounts.$inferSelect;
+export type AuthSession = typeof sessions.$inferSelect;
+export type AuthAccount = typeof authAccounts.$inferSelect;
+export type AuthVerification = typeof authVerifications.$inferSelect;
 
 // Re-export specific metadata unions for convenience if needed, 
 // though 'export *' already handles individual type exports.

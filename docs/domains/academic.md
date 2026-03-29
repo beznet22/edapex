@@ -92,3 +92,44 @@ This allows for "Shift-based" routines or varying times per day (e.g., Short Per
 
 ### 2. Academic Calendar Integration
 Replace the `dayOfWeek` enum with a reference to an `academic_calendar_days` table to support holiday-aware scheduling and custom weekend configurations (e.g., specific Saturdays being working days).
+
+---
+
+## Hono API Routes
+
+```
+Routes → AcademicController → AcademicService → AcademicRepository
+```
+
+| Method | Route | Description | Auth |
+|:---|:---|:---|:---|
+| `GET` | `/api/v1/classes` | List classes for academic year | Authenticated |
+| `POST` | `/api/v1/classes` | Create class | `TenantAdmin` |
+| `GET` | `/api/v1/sections` | List sections | Authenticated |
+| `GET` | `/api/v1/class-sections` | List class-section junctions | Authenticated |
+| `GET` | `/api/v1/subjects` | List subjects | Authenticated |
+| `POST` | `/api/v1/subject-assignments` | Assign teacher to subject | `TenantAdmin` |
+| `GET` | `/api/v1/routines` | Get class routines | Authenticated |
+| `POST` | `/api/v1/routines` | Create routine entry | `TenantAdmin` |
+| `GET` | `/api/v1/enrollments` | List enrollments | `TenantAdmin` |
+| `POST` | `/api/v1/enrollments` | Enroll student | `TenantAdmin` |
+
+---
+
+## HMAS Agent Registry
+
+| Agent | Type | Capabilities |
+|:---|:---|:---|
+| `academic_architect` | Task | Class/section setup, subject mapping |
+| `schedule_coordinator` | Task | Routine generation, collision detection |
+| `enrollment_manager` | Task | Bulk enrollment, promotion processing |
+
+---
+
+## Domain Events
+
+| Event | Payload | Consumers |
+|:---|:---|:---|
+| `academic.student_enrolled` | `{ userId, classId, sectionId, academicId }` | Attendance (init records), Finance (assign fees) |
+| `academic.routine_updated` | `{ classId, sectionId, academicId }` | Communication (notify teachers) |
+| `academic.student_promoted` | `{ userId, fromClassId, toClassId }` | Events (audit), Finance (adjust fees) |

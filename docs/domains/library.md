@@ -79,3 +79,44 @@ Access to library records is strictly governed by **Policy-Based Access Control 
 ### 5.3 Digital Resource Metadata
 **Proposal**: Expand `BookMetadata` to include `digital_asset_url` and `is_digital`.
 - **Justification**: Prepares the Library domain for Hybrid libraries (Physical + PDF/E-book) where "issuing" for a digital asset simply involves unlocking access for a period.
+
+---
+
+## Hono API Routes
+
+```
+Routes → LibraryController → LibraryService → LibraryRepository
+```
+
+| Method | Route | Description | Auth |
+|:---|:---|:---|:---|
+| `GET` | `/api/v1/library/books` | List books (search, filter by category) | Authenticated |
+| `POST` | `/api/v1/library/books` | Add book | Librarian |
+| `GET` | `/api/v1/library/categories` | List book categories | Authenticated |
+| `POST` | `/api/v1/library/issues` | Issue book to user | Librarian |
+| `PATCH` | `/api/v1/library/issues/:id/return` | Return book | Librarian |
+| `GET` | `/api/v1/library/issues/my` | Get own issued books | Authenticated |
+| `GET` | `/api/v1/library/issues/overdue` | List overdue books | Librarian |
+| `GET` | `/api/v1/library/profiles/:userId` | Get library profile (limits, fines) | Librarian + Self |
+
+---
+
+## HMAS Agent Registry
+
+| Agent | Type | Capabilities |
+|:---|:---|:---|
+| `library_supervisor` | Supervisor | Routes library tasks, enforces borrowing policies |
+| `book_recommendation_agent` | Task | Personalized suggestions from borrowing history |
+| `library_audit_agent` | Task | Stock reconciliation, discrepancy detection |
+| `overdue_notifier` | Task | Automated fine calculation and reminders |
+
+---
+
+## Domain Events
+
+| Event | Payload | Consumers |
+|:---|:---|:---|
+| `library.book_issued` | `{ issueId, userId, bookId }` | Events (audit) |
+| `library.book_returned` | `{ issueId, condition }` | Events (audit) |
+| `library.book_overdue` | `{ issueId, userId, daysOverdue, fineAmount }` | Finance (ledger fine entry), Communication (reminder) |
+| `library.stock_low` | `{ bookId, currentQuantity }` | Communication (alert librarian) |

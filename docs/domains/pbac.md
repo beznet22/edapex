@@ -71,3 +71,41 @@ To ensure consistency across the HMAS (Hierarchical Multi-Agent System), all aut
 - **Tenant Isolation**: Policies with `tenant_id = NULL` act as global system defaults, while tenant-specific policies override or append to the global set.
 - **Conflicts**: If multiple policies apply, `deny` overrides `allow` by default (Safety-first approach).
 - **Attribute Provisioning**: The evaluator requires a robust "Attribute Retriever" to fetch user/resource metadata (e.g., `assignedClasses`) before evaluation.
+
+---
+
+## Hono API Routes
+
+```
+Routes → PbacController → PbacService → PbacRepository → policyDefinitions/roleAssignments/policyBindings
+```
+
+| Method | Route | Description | Auth |
+|:---|:---|:---|:---|
+| `GET` | `/api/v1/policies` | List policy definitions | `TenantAdmin` |
+| `POST` | `/api/v1/policies` | Create policy | `TenantAdmin` |
+| `PATCH` | `/api/v1/policies/:id` | Update policy definition/priority | `TenantAdmin` |
+| `DELETE` | `/api/v1/policies/:id` | Deactivate policy | `TenantAdmin` |
+| `GET` | `/api/v1/roles` | List role assignments | `TenantAdmin` |
+| `POST` | `/api/v1/roles` | Assign role to user | `TenantAdmin` |
+| `POST` | `/api/v1/roles/:id/bind` | Bind policy to role assignment | `TenantAdmin` |
+| `POST` | `/api/v1/evaluate` | Evaluate access (internal middleware) | Internal |
+
+---
+
+## HMAS Agent Registry
+
+| Agent | Type | Capabilities |
+|:---|:---|:---|
+| `policy_evaluator` | Task | Evaluates context against policy tree |
+| `role_provisioner` | Task | Auto-assigns default roles on user creation |
+
+---
+
+## Domain Events
+
+| Event | Payload | Consumers |
+|:---|:---|:---|
+| `pbac.policy_created` | `{ policyId, tenantId, name }` | Events (audit) |
+| `pbac.role_assigned` | `{ userId, roleName, tenantId }` | Events (audit), Core (user profile) |
+| `pbac.access_denied` | `{ userId, resource, action }` | Events (security audit), Communication (alert admin) |

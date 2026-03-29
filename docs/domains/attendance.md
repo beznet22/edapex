@@ -37,3 +37,41 @@ All attendance mutations emit `attendance.marked` or `attendance.updated` events
   - `att_user_date_idx`: Optimized for individual "My Attendance" reports.
   - `att_tenant_date_idx`: Optimized for daily dashboard summaries and administrative oversight.
 - **Data Locality**: `tenant_id` mandatory for all queries to ensure strict multi-tenant isolation.
+
+---
+
+## Hono API Routes
+
+```
+Routes → AttendanceController → AttendanceService → AttendanceRepository
+```
+
+| Method | Route | Description | Auth |
+|:---|:---|:---|:---|
+| `POST` | `/api/v1/attendance` | Mark attendance (single) | Teacher |
+| `POST` | `/api/v1/attendance/bulk` | Bulk mark attendance | Teacher |
+| `GET` | `/api/v1/attendance/daily` | Daily attendance summary | Teacher+ |
+| `GET` | `/api/v1/attendance/user/:id` | Individual attendance report | Self + Teacher |
+| `GET` | `/api/v1/attendance/analytics` | Tenant-wide analytics | `TenantAdmin` |
+| `GET` | `/api/v1/holidays` | List holidays | Authenticated |
+| `POST` | `/api/v1/holidays` | Create holiday | `TenantAdmin` |
+
+---
+
+## HMAS Agent Registry
+
+| Agent | Type | Capabilities |
+|:---|:---|:---|
+| `attendance_monitor` | Task | Anomaly detection, chronic absenteeism alerts |
+| `auto_reconciler` | Task | Cross-references leave requests to mark excused |
+| `biometric_validator` | Task | Validates biometric/QR attendance data |
+
+---
+
+## Domain Events
+
+| Event | Payload | Consumers |
+|:---|:---|:---|
+| `attendance.marked` | `{ userId, classId, status, date }` | AI (anomaly detection), Events (audit) |
+| `attendance.anomaly_detected` | `{ classId, absentRate, threshold }` | Communication (alert admin), Events (audit) |
+| `attendance.reconciled` | `{ userId, date, oldStatus, newStatus }` | Events (audit) |

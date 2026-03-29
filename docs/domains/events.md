@@ -49,3 +49,43 @@ Task Agents are the primary consumers of domain events.
 - **Status Column for Events**: Add a `delivery_status` column (`pending`, `delivered`, `failed`) to the `events` table to explicitly track the outbox state.
 - **Payload Indexing**: Implement `json_extract` generated columns for frequently-queried event fields (e.g., `action_result` within the payload) to optimize agent dashboards.
 - **Audit Data Retention**: Implement a partitioning scheme for `audit_log` based on `changed_at` (monthly) to ensure high-performance queries as the history grows.
+
+---
+
+## Hono API Routes
+
+```
+Routes → EventsController → EventsService → EventsRepository → events/auditLog
+```
+
+| Method | Route | Description | Auth |
+|:---|:---|:---|:---|
+| `GET` | `/api/v1/events` | List events (filtered by type, aggregate) | `TenantAdmin` |
+| `GET` | `/api/v1/events/:id` | Get event detail | `TenantAdmin` |
+| `GET` | `/api/v1/events/pending` | List pending outbox events | `SystemAdmin` |
+| `POST` | `/api/v1/events/:id/dispatch` | Manually dispatch event | `SystemAdmin` |
+| `GET` | `/api/v1/audit-log` | Query audit trail | `TenantAdmin` |
+| `GET` | `/api/v1/audit-log/:aggregateType/:id` | Audit history for entity | `TenantAdmin` |
+
+---
+
+## HMAS Agent Registry
+
+| Agent | Type | Capabilities |
+|:---|:---|:---|
+| `event_relay` | Background | Polls pending events, dispatches to bus |
+| `audit_analyzer` | Task | Detects anomalous patterns in audit trail |
+
+---
+
+## Outbox Lifecycle
+
+```mermaid
+graph LR
+    A[Domain Service] -->|INSERT event| B["events (pending)"]
+    B -->|Relay polls| C{event_relay agent}
+    C -->|Publish| D[Event Bus]
+    D -->|Consume| E[Task Agents]
+    C -->|Update| F["events (dispatched)"]
+    C -->|Retry exceeded| G["events (failed)"]
+```

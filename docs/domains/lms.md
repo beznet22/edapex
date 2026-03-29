@@ -57,3 +57,37 @@ Security is enforced via **Policy-Based Access Control**, ensuring data privacy 
 ### C. Multimedia Interaction Metadata
 **Proposal**: Expand `LMSLessonMetadata` to include interactive hotspots or timestamps.
 - **Justification**: Allows agents to guide students to specific moments in a video or specific paragraphs in a long text.
+
+---
+
+## Hono API Routes
+
+```
+Routes → LmsController → LmsService → LmsRepository
+```
+
+| Method | Route | Description | Auth |
+|:---|:---|:---|:---|
+| `GET` | `/api/v1/lms/courses` | List courses | Authenticated |
+| `POST` | `/api/v1/lms/courses` | Create course | Teacher+ |
+| `POST` | `/api/v1/lms/courses/:id/publish` | Publish course (triggers RAG indexing) | Teacher+ |
+| `GET` | `/api/v1/lms/courses/:id/modules` | List course modules/lessons | Enrolled |
+| `POST` | `/api/v1/lms/enrollments` | Enroll student | `TenantAdmin` |
+| `GET` | `/api/v1/lms/progress/:userId` | Get learning path progress | Self + Teacher |
+| `POST` | `/api/v1/lms/submissions` | Submit assignment | Student |
+| `POST` | `/api/v1/lms/submissions/:id/grade` | Grade submission (AI or manual) | Teacher |
+| `GET` | `/api/v1/lms/tutoring/:sessionId` | Get tutoring session | Student |
+| `POST` | `/api/v1/lms/tutoring` | Start tutoring session | Student |
+| `GET` | `/api/v1/lms/competencies/:userId` | Get competency records | Self + Teacher |
+
+---
+
+## Domain Events
+
+| Event | Payload | Consumers |
+|:---|:---|:---|
+| `lms.course_published` | `{ courseId, tenantId }` | AI (RAG indexing), Events (audit) |
+| `lms.student_enrolled` | `{ enrollmentId, courseId, userId }` | Communication (welcome), Events (audit) |
+| `lms.submission_graded` | `{ submissionId, score, gradedBy }` | Communication (notify student), Assessment (sync) |
+| `lms.path_rerouted` | `{ userId, oldPath, newPath, reason }` | Events (audit), Communication (notify student) |
+| `lms.tutoring_completed` | `{ sessionId, tokenUsage }` | Finance (token billing), Events (audit) |

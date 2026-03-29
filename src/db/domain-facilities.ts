@@ -106,12 +106,14 @@ export const facilityAllocations = mysqlTable("facility_allocations", {
   userId: int("user_id").notNull().references(() => users.id), // Participant persona
   facilityType: mysqlEnum("facility_type", ["transport", "dormitory"]).notNull(),
   facilityRefId: int("facility_ref_id").notNull(), // vehicle.id or room.id
+  status: mysqlEnum("status", ["active", "released", "transferred"]).notNull().default("active"),
   academicId: int("academic_id").notNull().references(() => academicYears.id),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow(),
 }, (table) => ({
   allocationIdx: index("fac_alloc_idx").on(table.facilityType, table.facilityRefId),
   userIdx: index("fac_user_idx").on(table.userId),
+  statusIdx: index("fac_status_idx").on(table.tenantId, table.status),
 }));
 
 // --- NEW TABLES ---
@@ -151,4 +153,28 @@ export const visitors = mysqlTable("visitors", {
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow(),
 }, (table) => ({
   tenantDateIdx: index("vis_tenant_date_idx").on(table.tenantId, table.checkInAt),
+}));
+
+// Inventory Items — consumable tracking with reorder levels
+export type InventoryMetadata = {
+  supplier?: string;
+  location?: string;
+  expiryDate?: string;
+};
+
+export const inventoryItems = mysqlTable("inventory_items", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenant_id").notNull().references(() => tenants.id),
+  name: varchar("name", { length: 255 }).notNull(),
+  category: varchar("category", { length: 100 }),
+  quantity: int("quantity").notNull().default(0),
+  unitCost: decimal("unit_cost", { precision: 12, scale: 2 }),
+  reorderLevel: int("reorder_level").default(0),
+  status: mysqlEnum("status", ["in_stock", "low_stock", "out_of_stock"]).notNull().default("in_stock"),
+  metadata: json("metadata").$type<InventoryMetadata>(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow(),
+}, (table) => ({
+  tenantCategoryIdx: index("inv_tenant_cat_idx").on(table.tenantId, table.category),
+  statusIdx: index("inv_status_idx").on(table.tenantId, table.status),
 }));

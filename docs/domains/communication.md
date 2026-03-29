@@ -60,3 +60,41 @@ The Communication domain provides a unified, omni-channel infrastructure for int
 1.  **Phase 1**: Migrate `sm_notice_boards` and `sm_events` into `communicationEvents`.
 2.  **Phase 2**: Replace legacy traits like `NotificationSend` with a unified `CommunicationService`.
 3.  **Phase 3**: Implement the Moderated Chat infrastructure in a dedicated module.
+
+---
+
+## Hono API Routes
+
+```
+Routes → CommunicationController → CommunicationService → CommunicationRepository
+```
+
+| Method | Route | Description | Auth |
+|:---|:---|:---|:---|
+| `GET` | `/api/v1/communications` | List communication events | Authenticated |
+| `POST` | `/api/v1/communications` | Create communication event | Teacher+ |
+| `POST` | `/api/v1/communications/broadcast` | Broadcast to role/class | `TenantAdmin` |
+| `GET` | `/api/v1/communications/:id/recipients` | Get recipient delivery status | Teacher+ |
+| `GET` | `/api/v1/notifications` | Get user's notifications | Authenticated |
+| `PATCH` | `/api/v1/notifications/:id/read` | Mark notification as read | Authenticated |
+
+---
+
+## HMAS Agent Registry
+
+| Agent | Type | Capabilities |
+|:---|:---|:---|
+| `communication_supervisor` | Supervisor | Routes messages, manages delivery dispatch |
+| `moderation_agent` | Task | Scans content for toxicity/PII |
+| `dispatch_agent` | Task | Optimizes delivery timing and channel |
+| `summary_agent` | Task | Generates daily digests of unread notices |
+
+---
+
+## Domain Events
+
+| Event | Payload | Consumers |
+|:---|:---|:---|
+| `comm.event_dispatched` | `{ eventId, channel, recipientCount }` | Events (audit) |
+| `comm.delivery_failed` | `{ recipientId, reason }` | Events (alert), Communication (retry) |
+| `comm.content_moderated` | `{ eventId, approved, flags }` | Events (audit) |

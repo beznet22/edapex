@@ -116,7 +116,10 @@ export const classRoutines = mysqlTable("class_routines", {
   academicId: int("academic_id").notNull().references(() => academicYears.id),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow(),
-});
+}, (table) => ({
+  tenantAcademicIdx: index("cr_tenant_academic_idx").on(table.tenantId, table.academicId),
+  classScheduleIdx: index("cr_class_schedule_idx").on(table.classId, table.sectionId, table.dayOfWeek),
+}));
 
 export const homeworks = mysqlTable("homeworks", {
   id: int("id").autoincrement().primaryKey(),
@@ -132,7 +135,10 @@ export const homeworks = mysqlTable("homeworks", {
   academicId: int("academic_id").notNull().references(() => academicYears.id),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow(),
-});
+}, (table) => ({
+  tenantAcademicIdx: index("hw_tenant_academic_idx").on(table.tenantId, table.academicId),
+  classSubjectIdx: index("hw_class_subject_idx").on(table.classId, table.subjectId),
+}));
 
 export const lessons = mysqlTable("lessons", {
   id: int("id").autoincrement().primaryKey(),

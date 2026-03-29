@@ -15,6 +15,15 @@ export const accountsRelations = relations(schema.accounts, ({ one, many }) => (
     references: [schema.tenants.id],
   }),
   users: many(schema.users), // Multiple personas (student, staff) per login
+  sessions: many(schema.sessions),
+  authAccounts: many(schema.authAccounts),
+}));
+
+export const authAccountsRelations = relations(schema.authAccounts, ({ one }) => ({
+  account: one(schema.accounts, {
+    fields: [schema.authAccounts.accountId],
+    references: [schema.accounts.id],
+  }),
 }));
 
 export const usersRelations = relations(schema.users, ({ one, many }) => ({
@@ -104,31 +113,31 @@ export const attendancesRelations = relations(schema.attendances, ({ one }) => (
 }));
 
 // AI Relations
-export const chatsRelations = relations(schema.chats, ({ one, many }) => ({
+export const aiChatsRelations = relations(schema.aiChats, ({ one, many }) => ({
   user: one(schema.users, {
-    fields: [schema.chats.userId],
+    fields: [schema.aiChats.userId],
     references: [schema.users.id],
   }),
-  messages: many(schema.messages),
-  votes: many(schema.votes),
+  messages: many(schema.aiMessages),
+  votes: many(schema.aiVotes),
 }));
 
-export const messagesRelations = relations(schema.messages, ({ one, many }) => ({
-  chat: one(schema.chats, {
-    fields: [schema.messages.chatId],
-    references: [schema.chats.id],
+export const aiMessagesRelations = relations(schema.aiMessages, ({ one, many }) => ({
+  chat: one(schema.aiChats, {
+    fields: [schema.aiMessages.chatId],
+    references: [schema.aiChats.id],
   }),
-  votes: many(schema.votes),
+  votes: many(schema.aiVotes),
 }));
 
-export const votesRelations = relations(schema.votes, ({ one }) => ({
-  chat: one(schema.chats, {
-    fields: [schema.votes.chatId],
-    references: [schema.chats.id],
+export const aiVotesRelations = relations(schema.aiVotes, ({ one }) => ({
+  chat: one(schema.aiChats, {
+    fields: [schema.aiVotes.chatId],
+    references: [schema.aiChats.id],
   }),
-  message: one(schema.messages, {
-    fields: [schema.votes.messageId],
-    references: [schema.messages.id],
+  message: one(schema.aiMessages, {
+    fields: [schema.aiVotes.messageId],
+    references: [schema.aiMessages.id],
   }),
 }));
 

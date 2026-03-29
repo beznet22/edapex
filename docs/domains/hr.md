@@ -77,3 +77,46 @@ HR data contains sensitive PII (Bank info, Salary, Home address).
 - **Access Control**: Only `SchoolAdmin` and specific `HRAgent` personas can view salary/bank metadata.
 - **Self-Service**: Users (Staff) can read their own `payrollRuns` and `hrLeaveRequests` but cannot modify them once submitted.
 - **Audit**: Every change to `basicSalary` or `netSalary` is logged with an `updatedBy` reference to ensure accountability.
+
+---
+
+## Hono API Routes
+
+```
+Routes → HrController → HrService → HrRepository
+```
+
+| Method | Route | Description | Auth |
+|:---|:---|:---|:---|
+| `GET` | `/api/v1/hr/departments` | List departments | Authenticated |
+| `POST` | `/api/v1/hr/departments` | Create department | `TenantAdmin` |
+| `GET` | `/api/v1/hr/designations` | List designations | Authenticated |
+| `GET` | `/api/v1/hr/leave-types` | List leave types | Authenticated |
+| `POST` | `/api/v1/hr/leave-requests` | Submit leave request | Staff |
+| `PATCH` | `/api/v1/hr/leave-requests/:id` | Approve/reject leave | `TenantAdmin` |
+| `POST` | `/api/v1/hr/payroll/generate` | Generate payroll run | `TenantAdmin` |
+| `GET` | `/api/v1/hr/payroll` | List payroll runs | `TenantAdmin` |
+| `GET` | `/api/v1/hr/payroll/my` | Get own payroll history | Staff |
+| `PATCH` | `/api/v1/hr/payroll/:id/approve` | Approve payroll for payment | `TenantAdmin` |
+
+---
+
+## HMAS Agent Registry
+
+| Agent | Type | Capabilities |
+|:---|:---|:---|
+| `hr_supervisor` | Supervisor | Routes HR tasks, policy enforcement |
+| `payroll_generator` | Task | Auto-calculates salary, deductions, allowances |
+| `leave_processor` | Task | Validates leave balance, auto-flag excess |
+| `attendance_reconciler` | Task | Cross-references attendance for payroll |
+
+---
+
+## Domain Events
+
+| Event | Payload | Consumers |
+|:---|:---|:---|
+| `hr.leave_approved` | `{ requestId, userId, leaveType, days }` | Attendance (mark excused), Events (audit) |
+| `hr.payroll_approved` | `{ runId, tenantId, totalAmount }` | Finance (ledger salary entries) |
+| `hr.payroll_disbursed` | `{ runId, disbursedAt }` | Communication (payslip notification), Events (audit) |
+| `hr.staff_onboarded` | `{ userId, departmentId, designationId }` | PBAC (assign default role), Communication (welcome) |

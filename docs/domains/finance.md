@@ -82,3 +82,45 @@ While currently handled via `transaction_type`, consider a dedicated `chart_of_a
 
 ### 2. Digital Wallet Support
 Extend the ledger to support a `wallet_balance` per user (Student/Staff) to allow for internal pre-payments (canteen, bookstore) without direct bank interaction for every micro-transaction.
+
+---
+
+## Hono API Routes
+
+```
+Routes → FinanceController → FinanceService → FinanceRepository
+```
+
+| Method | Route | Description | Auth |
+|:---|:---|:---|:---|
+| `GET` | `/api/v1/finance/ledger` | List ledger entries (paginated, filtered) | `TenantAdmin` |
+| `POST` | `/api/v1/finance/ledger` | Create ledger entry | `TenantAdmin` |
+| `GET` | `/api/v1/finance/fee-groups` | List fee groups | Authenticated |
+| `POST` | `/api/v1/finance/fee-assignments` | Assign fees to students | `TenantAdmin` |
+| `GET` | `/api/v1/finance/fee-assignments/:userId` | Get student fee status | Self + Admin |
+| `POST` | `/api/v1/finance/payments` | Record fee payment | `TenantAdmin` |
+| `GET` | `/api/v1/finance/bank-accounts` | List bank accounts | `TenantAdmin` |
+| `GET` | `/api/v1/finance/installments/:assignmentId` | Get installment plan | Self + Admin |
+| `GET` | `/api/v1/finance/reports/balance-sheet` | Balance sheet report | `TenantAdmin` |
+
+---
+
+## HMAS Agent Registry
+
+| Agent | Type | Capabilities |
+|:---|:---|:---|
+| `finance_supervisor` | Supervisor | Routes financial tasks, enforces ledger immutability |
+| `fee_calculator` | Task | Fee computation, installment generation |
+| `fee_recovery_agent` | Task | Overdue reminders, payment pattern analysis |
+| `ledger_agent` | Task | Auto-creates ledger entries from domain events |
+
+---
+
+## Domain Events
+
+| Event | Payload | Consumers |
+|:---|:---|:---|
+| `finance.payment_received` | `{ assignmentId, amount, method }` | Events (audit), Communication (receipt) |
+| `finance.fee_overdue` | `{ assignmentId, userId, daysOverdue }` | Communication (reminder), AI (recovery agent) |
+| `finance.ledger_posted` | `{ entryId, type, amount, direction }` | Events (audit) |
+| `finance.installment_due` | `{ installmentId, dueDate, amount }` | Communication (reminder) |

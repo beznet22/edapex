@@ -44,11 +44,12 @@ export const documents = mysqlTable("documents", {
   mimeType: varchar("mime_type", { length: 100 }),
   status: mysqlEnum("status", ["draft", "pending_review", "approved", "rejected"]).default("approved"),
   metadata: json("metadata").$type<DocumentMetadata>(),
-  createdBy: int("created_by").references(() => users.id), // Staff persona
+  expiresAt: timestamp("expires_at"),
+  createdBy: int("created_by").references(() => users.id),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow(),
 }, (table) => ({
-  ownerIdx: index("doc_owner_idx").on(table.ownerType, table.ownerId),
+  ownerIdx: index("doc_owner_idx").on(table.tenantId, table.ownerType, table.ownerId),
   tenantIdx: index("doc_tenant_idx").on(table.tenantId),
   statusIdx: index("doc_status_idx").on(table.tenantId, table.status),
 }));

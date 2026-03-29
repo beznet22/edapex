@@ -160,7 +160,11 @@ export const studentRatings = mysqlTable("student_ratings", {
 }));
 
 // Teacher Remarks
-// TODO: Use computedResults.teacherRemarks field instead, and remove this table.
+/**
+ * @deprecated Use `computedResults.teacherRemarks` field instead.
+ * This table is scheduled for removal in the next schema migration.
+ * All data should be migrated to the `teacher_remarks` field on `computed_results`.
+ */
 export const teacherRemarks = mysqlTable("teacher_remarks", {
   id: int("id").autoincrement().primaryKey(),
   tenantId: int("tenant_id").notNull().references(() => tenants.id),
@@ -175,7 +179,11 @@ export const teacherRemarks = mysqlTable("teacher_remarks", {
   studentExamIdx: index("rem_stu_ex_idx").on(table.userId, table.examId),
 }));
 
-// Class Attendances Summary
+/**
+ * NOTE: Export name `classAttendances` does NOT match DB table `class_attendance_summaries`.
+ * This is intentional for brevity but may cause confusion. Consider renaming the export
+ * to `classAttendanceSummaries` in a future refactor.
+ */
 export const classAttendances = mysqlTable("class_attendance_summaries", {
   id: int("id").autoincrement().primaryKey(),
   tenantId: int("tenant_id").notNull().references(() => tenants.id),

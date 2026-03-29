@@ -88,3 +88,46 @@ EdApex V2 integrates AI to solve the **Vehicle Routing Problem (VRP)** for schoo
     - `STORE_MANAGER` can only view/edit `inventory` tables.
     - `TRANSPORT_DIRECTOR` manages `routes` and `vehicles`.
     - `Warden` manages `dormitories` and `complaints`.
+
+---
+
+## Hono API Routes
+
+```
+Routes → FacilitiesController → FacilitiesService → FacilitiesRepository
+```
+
+| Method | Route | Description | Auth |
+|:---|:---|:---|:---|
+| `GET` | `/api/v1/facilities/dormitories` | List dormitories | Authenticated |
+| `POST` | `/api/v1/facilities/dormitories` | Create dormitory | `TenantAdmin` |
+| `GET` | `/api/v1/facilities/rooms` | List rooms (filterable by dormitory) | Authenticated |
+| `GET` | `/api/v1/facilities/routes` | List transport routes | Authenticated |
+| `POST` | `/api/v1/facilities/routes` | Create route | `TransportDirector` |
+| `GET` | `/api/v1/facilities/vehicles` | List vehicles | `TransportDirector` |
+| `POST` | `/api/v1/facilities/allocations` | Create facility allocation | `TenantAdmin` |
+| `GET` | `/api/v1/facilities/inventory` | List inventory items | `StoreManager` |
+| `POST` | `/api/v1/facilities/inventory/transactions` | Create inventory transaction | `StoreManager` |
+| `GET` | `/api/v1/facilities/visitors` | List visitor log | `TenantAdmin` |
+
+---
+
+## HMAS Agent Registry
+
+| Agent | Type | Capabilities |
+|:---|:---|:---|
+| `facilities_supervisor` | Supervisor | Routes facility tasks, manages allocations |
+| `route_optimizer` | Task | AI-driven vehicle routing (VRP solver) |
+| `inventory_agent` | Task | Stock prediction, reorder triggers |
+| `maintenance_agent` | Task | Predictive vehicle/building maintenance |
+
+---
+
+## Domain Events
+
+| Event | Payload | Consumers |
+|:---|:---|:---|
+| `facilities.allocation_created` | `{ userId, facilityType, facilityRefId }` | Finance (assign transport/dorm fees) |
+| `facilities.inventory_received` | `{ itemId, quantity, amount }` | Finance (ledger expense entry) |
+| `facilities.inventory_sold` | `{ itemId, quantity, amount }` | Finance (ledger income entry) |
+| `facilities.maintenance_due` | `{ vehicleId, type, dueDate }` | Communication (notify driver), Events (audit) |

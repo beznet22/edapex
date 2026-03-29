@@ -98,7 +98,7 @@ EdApex V2 decomposes the monolith into 14 distinct functional domains, each enca
 
 | Domain | Key Entities | Core Modern Logic |
 | :--- | :--- | :--- |
-| **Core & Identity** | `tenants`, `users`, `academic_years` | Decouples "Platform Identity" from "School Accounts" for multi-role flexibility. |
+| **Core & Identity** | `tenants`, `accounts`, `auth_accounts`, `users`, `academic_years` | Better-Auth identity provider; decouples platform ID from school personas. |
 | **PBAC & Security**| `policy_definitions`, `role_assignments` | Replaces static RBAC with dynamic, attribute-based policy evaluation. |
 | **Settings** | `settings` | A polymorphic, ledger-based config system with hierarchical overrides. |
 | **Documents** | `documents` | Unified polymorphic storage replacing 6+ fragmented legacy upload tables. |

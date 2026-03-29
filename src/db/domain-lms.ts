@@ -116,6 +116,7 @@ export const lmsLearningObjectives = mysqlTable("lms_learning_objectives", {
 
 export const lmsAssignments = mysqlTable("lms_assignments", {
   id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenant_id").notNull().references(() => tenants.id),
   lessonId: int("lesson_id").references(() => lmsLessons.id),
   moduleId: int("module_id").references(() => lmsModules.id),
   courseId: int("course_id").notNull().references(() => lmsCourses.id),
@@ -129,6 +130,7 @@ export const lmsAssignments = mysqlTable("lms_assignments", {
 
 export const lmsSubmissions = mysqlTable("lms_submissions", {
   id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenant_id").notNull().references(() => tenants.id),
   assignmentId: int("assignment_id").notNull().references(() => lmsAssignments.id),
   userId: int("user_id").notNull().references(() => users.id), // Student persona
   content: text("content"),
@@ -143,8 +145,10 @@ export const lmsSubmissions = mysqlTable("lms_submissions", {
 
 export const lmsEnrollments = mysqlTable("lms_enrollments", {
   id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenant_id").notNull().references(() => tenants.id),
   courseId: int("course_id").notNull().references(() => lmsCourses.id),
-  userId: int("user_id").notNull().references(() => users.id), // Student persona
+  userId: int("user_id").notNull().references(() => users.id),
+  academicId: int("academic_id").references(() => academicYears.id),
   enrollmentDate: timestamp("enrollment_date").defaultNow(),
   status: mysqlEnum("status", ["active", "completed", "suspended", "expired"]).default("active"),
   progressPercent: int("progress_percent").default(0),
@@ -187,7 +191,8 @@ export const lmsCompetencyRecords = mysqlTable("lms_competency_records", {
 
 export const lmsTutoringSessions = mysqlTable("lms_tutoring_sessions", {
   id: int("id").autoincrement().primaryKey(),
-  userId: int("user_id").notNull().references(() => users.id), // Student persona
+  tenantId: int("tenant_id").notNull().references(() => tenants.id),
+  userId: int("user_id").notNull().references(() => users.id),
   lessonId: int("lesson_id").references(() => lmsLessons.id),
   topic: varchar("topic", { length: 500 }),
   messages: json("messages").$type<TutoringMessage[]>(), // Full chat history for this tutoring interaction
@@ -198,7 +203,8 @@ export const lmsTutoringSessions = mysqlTable("lms_tutoring_sessions", {
 
 export const lmsLearningPaths = mysqlTable("lms_learning_paths", {
   id: int("id").autoincrement().primaryKey(),
-  userId: int("user_id").notNull().references(() => users.id), // Student persona
+  tenantId: int("tenant_id").notNull().references(() => tenants.id),
+  userId: int("user_id").notNull().references(() => users.id),
   goalDescription: text("goal_description"),
   status: mysqlEnum("status", ["active", "completed", "cancelled"]).default("active"),
   createdAt: timestamp("created_at").defaultNow(),

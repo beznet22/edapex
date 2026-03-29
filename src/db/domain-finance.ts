@@ -45,6 +45,8 @@ export const ledgerEntries = mysqlTable("ledger_entries", {
   transactionType: mysqlEnum("transaction_type", [
     "fee_payment", "fee_waiver", "salary", "expense", "income", "refund", "wallet_topup"
   ]).notNull(),
+  // Double-entry accounting: every transaction has a direction
+  direction: mysqlEnum("direction", ["credit", "debit"]).notNull(),
   amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
   userId: int("user_id").references(() => users.id), // Participant Persona
   enrollmentId: int("enrollment_id"), // Student record ID if applicable
@@ -59,6 +61,7 @@ export const ledgerEntries = mysqlTable("ledger_entries", {
   tenantIdx: index("ledger_tenant_idx").on(table.tenantId),
   userIdx: index("ledger_user_idx").on(table.userId),
   typeIdx: index("ledger_type_idx").on(table.tenantId, table.transactionType),
+  postedAtIdx: index("ledger_posted_idx").on(table.tenantId, table.postedAt),
 }));
 
 export const feeGroups = mysqlTable("fee_groups", {

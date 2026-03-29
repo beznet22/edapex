@@ -70,10 +70,21 @@ export const tenants = mysqlTable("tenants", {
 });
 
 // Accounts Table — Authentication Identity (Identity Layer)
+/**
+ * @legacy The following fields are remnants of the V1 schema and should be migrated:
+ * - `styleId`, `rtlLtl` → Move to `settings` domain (UI preferences)
+ * - `stripeId`, `cardBrand`, `cardLastFour`, `trialEndsAt` → Move to a `billing` domain
+ * - `walletBalance` → Move to `finance` domain (ledger-backed balance)
+ * - `selectedSession` → Derive from `academicYears.isCurrent`
+ * - `randomCode`, `notificationToken`, `deviceToken` → Move to `sessions` or `communication` domain
+ */
 export const accounts = mysqlTable("accounts", {
   id: varchar("id", { length: 255 }).primaryKey(),
+  name: varchar("name", { length: 192 }).notNull(), // better-auth display name
   email: varchar("email", { length: 192 }),
-  password: varchar("password", { length: 100 }),
+  emailVerified: tinyint("email_verified").default(0).notNull(), // better-auth requirement
+  image: varchar("image", { length: 500 }), // better-auth requirement
+  password: varchar("password", { length: 100 }), // legacy/local password tracking
   username: varchar("username", { length: 192 }),
   phoneNumber: varchar("phone_number", { length: 191 }),
   activeStatus: tinyint("active_status").default(1).notNull(),
@@ -104,11 +115,44 @@ export const accounts = mysqlTable("accounts", {
   tenantIdx: index("acct_tenant_idx").on(table.tenantId),
 }));
 
-// Sessions Table — Lucia Auth Session Store
+// Sessions Table — Better-Auth Session Store
 export const sessions = mysqlTable("sessions", {
   id: varchar("id", { length: 255 }).primaryKey(),
   userId: varchar("user_id", { length: 255 }).notNull().references(() => accounts.id, { onDelete: "cascade" }),
+  token: varchar("token", { length: 255 }).notNull(),
   expiresAt: timestamp("expires_at").notNull(),
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow(),
+});
+
+// Auth Accounts Table — Better-Auth OAuth link & Credential Store
+export const authAccounts = mysqlTable("auth_accounts", {
+  id: varchar("id", { length: 255 }).primaryKey(),
+  accountId: varchar("account_id", { length: 255 }).notNull().references(() => accounts.id, { onDelete: "cascade" }), // maps to user_id
+  providerId: varchar("provider_id", { length: 192 }).notNull(), // 'github', 'credential'
+  accountIdProvider: varchar("account_id_provider", { length: 192 }).notNull(), // 'github-user-id'
+  userId: varchar("user_id", { length: 255 }).notNull().references(() => accounts.id, { onDelete: "cascade" }),
+  accessToken: text("access_token"),
+  refreshToken: text("refresh_token"),
+  idToken: text("id_token"),
+  accessTokenExpiresAt: timestamp("access_token_expires_at"),
+  refreshTokenExpiresAt: timestamp("refresh_token_expires_at"),
+  scope: text("scope"),
+  password: text("password"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow(),
+});
+
+// Verification Table — Better-Auth Magic Links / OTP
+export const authVerifications = mysqlTable("auth_verifications", {
+  id: varchar("id", { length: 255 }).primaryKey(),
+  identifier: varchar("identifier", { length: 192 }).notNull(),
+  value: varchar("value", { length: 192 }).notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow(),
 });
 
 // --- PERSONA METADATA TYPES ---

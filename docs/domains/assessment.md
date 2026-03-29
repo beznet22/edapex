@@ -67,3 +67,42 @@ erDiagram
 - **Tenant Isolation**: All assessment data is scoped via `tenantId`.
 - **PBAC**: Grading is restricted to assigned subject teachers or HODs via specific permission checks.
 - **Academic Year Scoping**: Data is strictly partitioned by `academicId` to prevent historical data leakage into current terms.
+
+---
+
+## Hono API Routes
+
+```
+Routes → AssessmentController → AssessmentService → AssessmentRepository
+```
+
+| Method | Route | Description | Auth |
+|:---|:---|:---|:---|
+| `GET` | `/api/v1/exams` | List exams for academic year | Authenticated |
+| `POST` | `/api/v1/exams` | Create exam definition | `TenantAdmin` |
+| `GET` | `/api/v1/exam-setups` | List exam setups for class/subject | Teacher+ |
+| `POST` | `/api/v1/exam-marks` | Submit marks for exam setup | Teacher |
+| `GET` | `/api/v1/results` | Get computed results | Authenticated |
+| `POST` | `/api/v1/results/compute` | Trigger result computation | `TenantAdmin` |
+| `GET` | `/api/v1/question-banks` | List question bank | Teacher+ |
+| `POST` | `/api/v1/online-exams` | Create online exam | Teacher+ |
+
+---
+
+## HMAS Agent Registry
+
+| Agent | Type | Capabilities |
+|:---|:---|:---|
+| `result_engine` | Task | Bulk GPA/grade computation, ranking |
+| `assessment_coordinator` | Task | Auto-generate exam setups from policy |
+| `grading_agent` | Task | AI-powered submission evaluation |
+
+---
+
+## Domain Events
+
+| Event | Payload | Consumers |
+|:---|:---|:---|
+| `assessment.marks_uploaded` | `{ examSetupId, classId, tenantId }` | AI (result_engine trigger) |
+| `assessment.result_calculated` | `{ examId, classId, studentCount }` | Communication (report cards), Events (audit) |
+| `assessment.online_exam_submitted` | `{ attemptId, userId, onlineExamId }` | AI (auto-grading) |

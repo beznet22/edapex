@@ -87,3 +87,39 @@ Access to the Settings domain is strictly controlled to prevent unauthorized con
   }
 }
 ```
+
+---
+
+## Hono API Routes
+
+```
+Routes → SettingsController → SettingsService → SettingsRepository → settings/featureFlags
+```
+
+| Method | Route | Description | Auth |
+|:---|:---|:---|:---|
+| `GET` | `/api/v1/settings` | List settings by domain | `TenantAdmin` |
+| `GET` | `/api/v1/settings/:domain` | Get specific domain config | Authenticated |
+| `PUT` | `/api/v1/settings/:domain` | Upsert domain config | `TenantAdmin` |
+| `GET` | `/api/v1/feature-flags` | List feature flags | `TenantAdmin` |
+| `POST` | `/api/v1/feature-flags` | Create feature flag | `TenantAdmin` |
+| `PATCH` | `/api/v1/feature-flags/:id` | Toggle flag / update rollout | `TenantAdmin` |
+| `GET` | `/api/v1/feature-flags/evaluate/:key` | Evaluate flag for current user | Authenticated |
+
+---
+
+## HMAS Agent Registry
+
+| Agent | Type | Capabilities |
+|:---|:---|:---|
+| `config_provisioner` | Task | Seeds default settings on tenant creation |
+| `feature_evaluator` | Task | Evaluates feature flag with rollout % and user targeting |
+
+---
+
+## Domain Events
+
+| Event | Payload | Consumers |
+|:---|:---|:---|
+| `settings.config_updated` | `{ tenantId, domain, changedKeys[] }` | Events (audit), affected domains (cache invalidation) |
+| `settings.feature_toggled` | `{ tenantId, featureKey, isEnabled }` | Events (audit), All domains (module enablement) |

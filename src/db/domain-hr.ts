@@ -77,21 +77,43 @@ export const hrLeaveRequests = mysqlTable("leave_requests", {
   tenantStatusIdx: index("leave_tenant_status_idx").on(table.tenantId, table.status),
 }));
 
+// Salary Templates — configurable payroll components (replaces smHrSalaryTemplates)
+export type SalaryComponent = {
+  name: string;
+  type: "earning" | "deduction";
+  amount: number;
+  isPercentage?: boolean;  // if true, amount is % of basic
+};
+
+export const salaryTemplates = mysqlTable("salary_templates", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenant_id").notNull().references(() => tenants.id),
+  name: varchar("name", { length: 200 }).notNull(),
+  components: json("components").$type<SalaryComponent[]>().notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow(),
+}, (table) => ({
+  tenantIdx: index("st_tenant_idx").on(table.tenantId),
+}));
+
 export const payrollRuns = mysqlTable("payroll_runs", {
   id: int("id").autoincrement().primaryKey(),
   tenantId: int("tenant_id").notNull().references(() => tenants.id),
   userId: int("user_id").notNull().references(() => users.id), // Staff persona
+  salaryTemplateId: int("salary_template_id").references(() => salaryTemplates.id),
   payrollMonth: varchar("payroll_month", { length: 20 }).notNull(),
   payrollYear: varchar("payroll_year", { length: 20 }).notNull(),
   basicSalary: decimal("basic_salary", { precision: 12, scale: 2 }).notNull(),
   totalEarnings: decimal("total_earnings", { precision: 12, scale: 2 }).notNull(),
   totalDeductions: decimal("total_deductions", { precision: 12, scale: 2 }).notNull(),
   netSalary: decimal("net_salary", { precision: 12, scale: 2 }).notNull(),
+  status: mysqlEnum("status", ["draft", "approved", "disbursed", "cancelled"]).notNull().default("draft"),
   paymentGenerated: tinyint("payment_generated").default(0),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow(),
 }, (table) => ({
   payrollUserIdx: index("pr_user_period_idx").on(table.userId, table.payrollMonth, table.payrollYear),
+  tenantStatusIdx: index("pr_tenant_status_idx").on(table.tenantId, table.status),
 }));
 
 // --- NEW TABLE ---

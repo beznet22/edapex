@@ -27,7 +27,6 @@ export type EventMetadata = {
   userAgent?: string;
   sourceSystem?: string;
   agentId?: string;  // links to ai_agents for agent-triggered events
-  correlationId?: string;  // traces agent workflow chains
 };
 
 export type AuditLogValues = Record<string, unknown>;
@@ -41,13 +40,20 @@ export const events = mysqlTable("events", {
   actorId: int("actor_id").references(() => users.id),  // persona who triggered the event
   payload: json("payload").$type<Record<string, any>>().notNull(),
   metadata: json("metadata").$type<EventMetadata>(),
+  // Transactional Outbox: tracks event dispatch lifecycle
+  deliveryStatus: mysqlEnum("delivery_status", ["pending", "dispatched", "failed"]).default("pending").notNull(),
+  // Optimistic concurrency control for event versioning
+  version: int("version").default(1).notNull(),
+  // Top-level for indexing — traces agent workflow chains across domains
+  correlationId: varchar("correlation_id", { length: 100 }),
   occurredAt: timestamp("occurred_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow(),
 }, (table) => ({
   aggregateIdx: index("evt_aggregate_idx").on(table.aggregateType, table.aggregateId),
   tenantEventIdx: index("evt_tenant_event_idx").on(table.tenantId, table.eventType),
   timeIdx: index("evt_time_idx").on(table.occurredAt),
-  correlationIdx: index("evt_correlation_idx").on(table.tenantId),
+  correlationIdx: index("evt_correlation_idx").on(table.tenantId, table.correlationId),
+  deliveryIdx: index("evt_delivery_idx").on(table.deliveryStatus, table.occurredAt),
 }));
 
 export const auditLog = mysqlTable("audit_log", {

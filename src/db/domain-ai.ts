@@ -47,7 +47,7 @@ export type MessageMetadata = {
 
 export type MessagePart = Record<string, any>;
 
-export const chats = mysqlTable("chats", {
+export const aiChats = mysqlTable("ai_chats", {
   id: varchar("id", { length: 255 }).primaryKey(), 
   tenantId: int("tenant_id").notNull().references(() => tenants.id),
   userId: int("user_id").notNull().references(() => users.id),
@@ -59,9 +59,9 @@ export const chats = mysqlTable("chats", {
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow(),
 });
 
-export const messages = mysqlTable("messages", {
+export const aiMessages = mysqlTable("ai_messages", {
   id: varchar("id", { length: 255 }).primaryKey(),
-  chatId: varchar("chat_id", { length: 255 }).notNull().references(() => chats.id, { onDelete: "cascade" }),
+  chatId: varchar("chat_id", { length: 255 }).notNull().references(() => aiChats.id, { onDelete: "cascade" }),
   role: mysqlEnum("role", ["user", "assistant", "system", "tool"]).notNull(),
   parts: json("parts").$type<MessagePart[]>().notNull(),
   metadata: json("metadata").$type<MessageMetadata>(),
@@ -69,9 +69,9 @@ export const messages = mysqlTable("messages", {
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow(),
 });
 
-export const votes = mysqlTable("votes", {
-  chatId: varchar("chat_id", { length: 255 }).notNull().references(() => chats.id, { onDelete: "cascade" }),
-  messageId: varchar("message_id", { length: 255 }).notNull().references(() => messages.id, { onDelete: "cascade" }),
+export const aiVotes = mysqlTable("ai_votes", {
+  chatId: varchar("chat_id", { length: 255 }).notNull().references(() => aiChats.id, { onDelete: "cascade" }),
+  messageId: varchar("message_id", { length: 255 }).notNull().references(() => aiMessages.id, { onDelete: "cascade" }),
   isUpvoted: tinyint("is_upvoted").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow(),

@@ -58,3 +58,23 @@ export const settings = mysqlTable("settings", {
 }, (table) => ({
   tenantDomainIdx: unique("setting_tenant_domain_unique").on(table.tenantId, table.domain),
 }));
+
+// Feature Flags — tenant-scoped dark launches, A/B testing, module enablement
+export type FeatureFlagMetadata = {
+  description?: string;
+  enabledForUserIds?: number[];  // targeted rollout
+  variant?: string;  // A/B test variant
+};
+
+export const featureFlags = mysqlTable("feature_flags", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenant_id").notNull().references(() => tenants.id),
+  featureKey: varchar("feature_key", { length: 100 }).notNull(), // e.g. 'lms.ai_tutoring', 'finance.digital_wallet'
+  isEnabled: int("is_enabled").notNull().default(0),
+  rolloutPercentage: int("rollout_percentage").default(0), // 0-100 for gradual rollouts
+  metadata: json("metadata").$type<FeatureFlagMetadata>(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow(),
+}, (table) => ({
+  tenantFeatureIdx: unique("ff_tenant_feature_unique").on(table.tenantId, table.featureKey),
+}));

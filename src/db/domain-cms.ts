@@ -26,7 +26,7 @@ import {
   index,
 } from "drizzle-orm/mysql-core";
 
-import { users, tenants, accounts } from "./domain-core";
+import { users, tenants, accounts, enumerations } from "./domain-core";
 
 // Consolidates sm_news, sm_pages, sm_testimonials, etc., into a polymorphic content management schema.
 
@@ -57,7 +57,10 @@ export const contentNodes = mysqlTable("content_nodes", {
   body: text("body"),
   image: varchar("image", { length: 500 }),
   publishedStatus: tinyint("published_status").notNull().default(1),
-  authorId: int("author_id").references(() => users.id), // Staff persona
+  publishedAt: timestamp("published_at"),
+  expiresAt: timestamp("expires_at"),
+  authorId: int("author_id").references(() => users.id),
+  categoryId: int("category_id").references(() => enumerations.id),
   parentId: int("parent_id"),  // self-ref for menu hierarchy / gallery items
   sortOrder: int("sort_order").default(0),
   metadata: json("metadata").$type<ContentNodeMetadata>(),

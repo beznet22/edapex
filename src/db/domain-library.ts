@@ -21,6 +21,7 @@ import {
   decimal,
   index,
   json,
+  unique,
 } from "drizzle-orm/mysql-core";
 
 import { users, tenants, academicYears, accounts } from "./domain-core";
@@ -81,4 +82,26 @@ export const bookIssues = mysqlTable("book_issues", {
   userIdx: index("bi_user_idx").on(table.userId),
   bookIdx: index("bi_book_idx").on(table.bookId),
   tenantIdx: index("bi_tenant_idx").on(table.tenantId),
+}));
+
+// Borrower profiles — per-user library membership and limits
+export type LibraryProfileMetadata = {
+  membershipType?: string;  // e.g. 'standard', 'premium', 'staff'
+  notes?: string;
+};
+
+export const libraryProfiles = mysqlTable("library_profiles", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenant_id").notNull().references(() => tenants.id),
+  userId: int("user_id").notNull().references(() => users.id),
+  maxBooksAllowed: int("max_books_allowed").notNull().default(3),
+  currentBorrowed: int("current_borrowed").notNull().default(0),
+  totalFinesAccrued: decimal("total_fines_accrued", { precision: 12, scale: 2 }).default("0.00"),
+  membershipStatus: mysqlEnum("membership_status", ["active", "suspended", "expired"]).notNull().default("active"),
+  metadata: json("metadata").$type<LibraryProfileMetadata>(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow(),
+}, (table) => ({
+  userIdx: unique("lp_user_unique").on(table.tenantId, table.userId),
+  statusIdx: index("lp_status_idx").on(table.tenantId, table.membershipStatus),
 }));
