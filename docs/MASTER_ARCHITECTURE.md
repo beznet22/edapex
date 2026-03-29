@@ -92,23 +92,41 @@ FMSIA enables cross-tenant intelligence without compromising data privacy.
 
 ## 5. Domain Module Architecture (V2 Schema)
 
-Each domain is encapsulated in `src/db/domain-*.ts`.
+EdApex V2 decomposes the monolith into 14 distinct functional domains, each encapsulated in `src/db/domain-*.ts`. This modularity ensures that specialized AI agents can operate within bounded contexts while maintaining strict multi-tenant isolation.
 
-### 5.1 Core & Identity
-- **Tables**: `tenants`, `users`, `user_accounts`, `academic_years`.
-- **Logic**: Decouples "Platform Identity" (User) from "School Account" (Student/Staff persona).
+### 5.1 Platform Foundations
 
-### 5.2 Finance & Ledger
-- **Tables**: `fees_groups`, `fees_types`, `fees_masters`, `fee_assignments`, `ledger_entries`.
-- **Logic**: Every fee payment automatically generates a double-entry ledger record.
+| Domain | Key Entities | Core Modern Logic |
+| :--- | :--- | :--- |
+| **Core & Identity** | `tenants`, `users`, `academic_years` | Decouples "Platform Identity" from "School Accounts" for multi-role flexibility. |
+| **PBAC & Security**| `policy_definitions`, `role_assignments` | Replaces static RBAC with dynamic, attribute-based policy evaluation. |
+| **Settings** | `settings` | A polymorphic, ledger-based config system with hierarchical overrides. |
+| **Documents** | `documents` | Unified polymorphic storage replacing 6+ fragmented legacy upload tables. |
+| **Domain Events** | `domain_events` | An immutable audit log of all system state changes for event-driven reliability. |
 
-### 5.3 Assessment & Exams
-- **Tables**: `exams`, `exam_setups`, `exam_marks`, `computed_results`.
-- **Logic**: Decouples the "Exam Definition" from the "Mark Setup" to allow multiple grading variations for the same exam.
+### 5.2 Academic & Assessment
 
-### 5.4 LMS (AI-First)
-- **Tables**: `courses`, `lessons`, `progress_tracking`, `ai_interactions`.
-- **Logic**: Built to support RAG (Retrieval Augmented Generation) by storing document embeddings alongside course content.
+| Domain | Key Entities | Core Modern Logic |
+| :--- | :--- | :--- |
+| **Academic** | `classes`, `sections`, `subjects`, `routines`| Uses M:N junction mapping for classes/sections and time-slot normalization. |
+| **Assessment** | `exams`, `exam_marks`, `computed_results` | Decouples exam definitions from mark setups; event-driven result engine. |
+| **Attendance** | `attendances` | Unified student/staff/subject tracking with anomaly detection triggers. |
+| **LMS (AI-First)** | `courses`, `lessons`, `progress`, `tutoring_sessions` | Built for RAG; dynamic learning paths based on analytics and AI feedback. |
+
+### 5.3 Human Resources & Finance
+
+| Domain | Key Entities | Core Modern Logic |
+| :--- | :--- | :--- |
+| **Finance** | `fees_masters`, `fee_assignments`, `ledger_entries` | Every transaction automatically generates a double-entry ledger record. |
+| **HR & Payroll** | `hr_metadata`, `payroll_runs`, `leave_requests` | "User-Persona" model; automated payroll triggers based on attendance events. |
+
+### 5.4 Logistics & Life
+
+| Domain | Key Entities | Core Modern Logic |
+| :--- | :--- | :--- |
+| **Facilities** | `dormitories`, `rooms`, `routes`, `vehicles`, `allocations`, `inventory` | Physical assets with AI-driven route optimization and smart stocking. |
+| **Library** | `books`, `book_categories`, `book_issues` | ISBN-first cataloging; event-driven library fines linked to student ledgers. |
+| **Communication** | `communication_events`, `recipients` | Omni-channel dispatch (SMS, Push, Email) with toxicity moderation agents. |
 
 ---
 
