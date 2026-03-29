@@ -1,66 +1,38 @@
-import mysql from "mysql2/promise";
 import { drizzle as drizzleMySQL } from "drizzle-orm/mysql2";
-import type { MySql2Database } from "drizzle-orm/mysql2/driver";
-import * as schema from "./schema";
-import * as relations from "./relations";
+import { drizzle as drizzlePG } from "drizzle-orm/node-postgres";
+import { drizzle as drizzleSQLite } from "drizzle-orm/better-sqlite3";
+import mysql from "mysql2/promise";
+import { Pool as PgPool } from "pg";
+import Database from "better-sqlite3";
 
-export type MySQLDrizzleClient = MySql2Database<typeof schema & typeof relations>;
+import * as mysqlSchema from "./mysql/schema";
+import * as postgresSchema from "./postgres/schema";
+import * as sqliteSchema from "./sqlite/schema";
 
-let pool: mysql.Pool | null = null;
-let poolV2: mysql.Pool | null = null;
+export type DrizzleDB = any; // Generic fallback to allow multiple dialects in the same codebase
 
-let dbInstancePromise: Promise<MySQLDrizzleClient> | null = null;
+let dbInstance: any = null;
 
-export async function getDatabase(): Promise<MySQLDrizzleClient> {
-  if (!dbInstancePromise) {
-    dbInstancePromise = Promise.resolve(connectMySQL());
+export function getDatabaseV2(): DrizzleDB {
+  if (dbInstance) return dbInstance;
+
+  const dialect = process.env.DATABASE_DIALECT || "mysql";
+  const url = process.env.DATABASE_URL || "";
+
+  if (dialect === "postgres") {
+    const pool = new PgPool({ connectionString: url });
+    dbInstance = drizzlePG(pool, { schema: postgresSchema });
+  } else if (dialect === "sqlite") {
+    const sqlite = new Database(url);
+    dbInstance = drizzleSQLite(sqlite, { schema: sqliteSchema });
+  } else {
+    // Default: MySQL
+    const pool = mysql.createPool({ uri: url });
+    dbInstance = drizzleMySQL(pool, { schema: mysqlSchema, mode: "default" });
   }
-  return dbInstancePromise;
+
+  return dbInstance;
 }
 
-export function connectMySQL(): MySQLDrizzleClient {
-  if (!pool) {
-    const dbUrl = process.env.DATABASE_V2_URL || process.env.DATABASE_URL;
-    if (!dbUrl) {
-      throw new Error("Missing database connection URL.");
-    }
+export const db = getDatabaseV2();
 
-    pool = mysql.createPool({
-      uri: dbUrl,
-      waitForConnections: true,
-      connectionLimit: 10,
-      queueLimit: 0,
-    });
-  }
-
-  const client = drizzleMySQL(pool, {
-    schema: { ...schema, ...relations },
-    mode: "default",
-  });
-
-  return client;
-}
-
-export async function getDatabaseV2(): Promise<MySQLDrizzleClient> {
-  return getDatabase();
-}
-
-export async function closeDatabase(): Promise<void> {
-  if (pool) {
-    try {
-      await pool.end();
-    } catch (err) { }
-    pool = null;
-  }
-  if (poolV2) {
-    try {
-      await poolV2.end();
-    } catch (err) { }
-    poolV2 = null;
-  }
-  dbInstancePromise = null;
-}
-
-export function clearDatabaseCache(): void {
-  dbInstancePromise = null;
-}

@@ -116,19 +116,20 @@ export const lmsSupervisor = new Agent({
 });
 ```
 
-### MySQL Storage Adapter
+### Extensible Storage Adapters
 
 > [!CAUTION]
-> **Mastra has no MySQL storage adapter.** EdApex requires a custom `MysqlStore` implementation.
+> **Mastra existing adapters do not map perfectly to our isolated schema.** EdApex requires custom `[DB]Store` implementation based on the active database in use.
 
-Mastra supports: libSQL, PostgreSQL, MongoDB, Upstash, D1, DynamoDB, MSSQL — but **not MySQL**.
+Mastra officially supports: libSQL, PostgreSQL, MongoDB, Upstash, D1, DynamoDB, MSSQL — but **not MySQL**. Even for supported databases like Postgres, we want our specific schema conventions.
 
-**Recommendation**: Build a custom `MysqlStore` implementing the `MastraStorage` interface:
+**Recommendation**: Build custom `[DB]Store` adapters (e.g., `MysqlStore`, `PostgresStore`) implementing the `MastraStorage` interface:
 
 ```typescript
 import { MastraStorage } from '@mastra/core';
-import { drizzle } from 'drizzle-orm/mysql2';
+import { drizzle } from 'drizzle-orm';
 
+// Example MySQL adapter. Similarly for Postgres/SQLite.
 export class MysqlStore extends MastraStorage {
   constructor(private db: ReturnType<typeof drizzle>) {
     super({ id: 'edapex-mysql-store' });
@@ -180,7 +181,7 @@ graph TD
         M4["Working Memory"]
     end
     
-    TA1 -.->|aiAgentActions| DB[(MySQL via MysqlStore)]
+    TA1 -.->|aiAgentActions| DB[(EdApex Database via [DB]Store)]
     CS -.->|Memory| M1
     M1 --> M2
     M2 --> DB
@@ -236,9 +237,9 @@ graph TD
 
 ## 6. Recommendations & Justifications
 
-### A. Build Custom `MysqlStore` (CRITICAL)
-**Proposal**: Implement `MastraStorage` interface for MySQL using Drizzle ORM.
-- **Justification**: No MySQL adapter exists in Mastra. Without it, EdApex cannot persist Mastra memory, threads, or agent state to its primary database.
+### A. Build Custom `[DB]Store` Adapters (CRITICAL)
+**Proposal**: Implement `MastraStorage` interface using Drizzle ORM based on the active database.
+- **Justification**: Custom adapters (like `MysqlStore` or `PostgresStore`) ensure Mastra memory, threads, and agent state save cleanly into our multi-tenant database using our exact table parameters.
 
 ### B. Add `tenantId` to `aiDocuments`
 **Proposal**: Add `tenantId: int("tenant_id").references(() => tenants.id)` to `aiDocuments`.
@@ -250,7 +251,21 @@ graph TD
 
 ### D. Vector Store for Semantic Recall
 **Proposal**: Integrate a vector database (e.g., pgvector, Qdrant, or Pinecone) for semantic recall.
-- **Justification**: Required by `@mastra/memory` for embedding-based retrieval. Without it, agents can only recall via exact message history, limiting tutoring and long-term learning effectiveness.
+- **Justification**: Enhances AI capability to retrieve historical interactions that standard keyword DB searches miss.
+
+### E. TODO: Implement Stateless AI Execution (Future Architecture)
+**Proposal**: Eventually decouple `aiChats` and `aiMessages` from Mastra entirely using a Stateless Agent Invocation pattern.
+- **Status**: Deferred. Currently, the custom `[DB]Store` wrapper handles mapping our DB to Mastra. In the future, eliminating the `MastraStorage` layer protects against vendor lock-in with the AI SDK.
+- **Future Design Strategy**:
+  1. `aiChats` and `aiMessages` remain strictly Drizzle-native and independent of `MastraStorage`.
+  2. The `AiService` loads the DB history, maps it to generic LLM payloads, and invokes the Mastra agent statelessly.
+  ```typescript
+  // Future Stateless Invocation
+  const dbMessages = await aiRepository.getMessages(chatId);
+  const standardMessages = dbMessages.map(m => m.parts); 
+  const response = await agent.generate([ ...standardMessages, { role: 'user', content: req.text }]);
+  await aiRepository.saveMessage(chatId, 'assistant', response.text);
+  ```
 
 ### E. Hono API Routes
 

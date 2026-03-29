@@ -1,0 +1,46 @@
+import { db } from "../../../db/index.js";
+import { contentNodes } from "../../../db/mysql/domain-cms.js";
+import { ICmsRepository, IContentNode } from "../../interfaces/cms.interface.js";
+import { eq, and } from "drizzle-orm";
+
+export class MySqlCmsRepository implements ICmsRepository {
+  private mapNode(row: any): IContentNode {
+    return {
+      ...row,
+      publishedAt: row.publishedAt ? new Date(row.publishedAt) : null,
+      expiresAt: row.expiresAt ? new Date(row.expiresAt) : null,
+    };
+  }
+
+  async getContentNodes(tenantId: number, filter?: { type?: string; publishedOnly?: boolean }): Promise<IContentNode[]> {
+    let whereClause = eq(contentNodes.tenantId, tenantId);
+    if (filter?.publishedOnly) {
+      whereClause = and(whereClause, eq(contentNodes.publishedStatus, 1)) as any;
+    }
+    const results = await db.select().from(contentNodes).where(whereClause);
+    return results.map((row: any) => this.mapNode(row));
+  }
+
+  async getNodeBySlug(tenantId: number, slug: string): Promise<IContentNode | null> {
+    const [result] = await db
+      .select()
+      .from(contentNodes)
+      .where(and(eq(contentNodes.tenantId, tenantId), eq(contentNodes.slug, slug)));
+    return result ? this.mapNode(result) : null;
+  }
+
+  async createContentNode(data: Partial<IContentNode>): Promise<IContentNode> {
+    const [result] = await db.insert(contentNodes).values(data as any);
+    const [row] = await db.select().from(contentNodes).where(eq(contentNodes.id, result.insertId));
+    if (!row) throw new Error("Failed to create content node");
+    return this.mapNode(row);
+  }
+
+  async updateContentNode(id: number, data: Partial<IContentNode>): Promise<void> {
+    await db.update(contentNodes).set(data as any).where(eq(contentNodes.id, id));
+  }
+
+  async deleteContentNode(id: number): Promise<void> {
+    await db.delete(contentNodes).where(eq(contentNodes.id, id));
+  }
+}

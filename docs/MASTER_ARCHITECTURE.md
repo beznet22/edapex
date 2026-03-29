@@ -4,6 +4,66 @@ EdApex is a next-generation, AI-native School Management Platform built for mass
 
 ---
 
+## 0. Architectural Flow (Visual)
+
+### 0.1 High-Level Request Lifecycle (Mermaid)
+```mermaid
+graph TD
+    A[Client Request] -->|URL/Auth| B(Edge Gateway)
+    B -->|Resolve| C{Tenant Context}
+    C -->|Initialized| D[PBAC Policy Engine]
+    D -->|Evaluate Action| E{HMAS Orchestrator}
+    
+    subgraph "Core Execution Layer"
+    E -->|Plan| F[Domain Services]
+    F -->|Business Logic| G[Repository Pattern]
+    end
+    
+    subgraph "Data Persistence Layer"
+    G -->|Dialect: MySQL| H[(MySQL DB)]
+    G -->|Dialect: Postgres| I[(Postgres DB)]
+    G -->|Dialect: SQLite| J[(SQLite File)]
+    end
+    
+    H -.->|Domain Schema| K[domain_academic]
+    I -.->|Native Schema| L[domain_finance]
+    J -.->|Single File| M[domain_core]
+```
+
+### 0.2 System Hierarchy (ASCII)
+```text
+[ REQUEST ]
+    |
+    v
++---------------------------------------+
+|        1. INFRASTRUCTURE LAYER        |
+|  (Tenant Resolution, Auth, Context)   |
++---------------------------------------+
+    |
+    v
++---------------------------------------+
+|          2. SECURITY (PBAC)           |
+|  (Subject + Action + Resource + Env)  |
++---------------------------------------+
+    |
+    v
++---------------------------------------+
+|       3. INTELLIGENCE (HMAS)          |
+|  (Orchestrator -> Supervisor -> Agent)|
++---------------------------------------+
+    |
+    v
++---------------------------------------+
+|         4. DOMAIN REPOSITORIES        |
+|  (MySQL | PostgreSQL | SQLite/LibSQL) |
++---------------------------------------+
+    |
+    v
+[ PERSISTENCE ]
+```
+
+---
+
 ## 1. Multi-Tenant Infrastructure Layer
 
 ### 1.1 Tenant Resolution
@@ -24,8 +84,14 @@ The context is initialized for every request and persistent through the executio
 }
 ```
 
-### 1.3 Data Isolation
-Strict logical isolation is enforced:
+### 1.3 Data Persistence & Multi-Database Support
+To support diverse deployment environments (MySQL, PostgreSQL, SQLite, LibSQL), EdApex strictly employs the **Repository Pattern**:
+- **Schema Separation**: Drizzle ORM definitions are siloed by dialect (e.g., `src/db/mysql/`, `src/db/sqlite/`). *For PostgreSQL, native Database Schemas (`CREATE SCHEMA domain_academic;`) are heavily utilized to strictly isolate domains from one another at the RDBMS level.*
+- **Domain Interfaces**: Business logic depends strictly on `IRepository<T>` contracts (e.g., `ITenantRepository`).
+- **Dependency Injection**: The server dynamically injects the `MysqlRepository` or `SqliteRepository` implementations based on the `DATABASE_DIALECT` environment variable, ensuring 0% business logic rewrite when switching databases.
+
+### 1.4 Data Isolation
+Strict logical isolation is enforced across the active database:
 - **Schema**: Shared database with `tenant_id` partitioning.
 - **Query Control**: All database queries MUST include a `WHERE tenant_id = ?` filter.
 - **Indexing**: Composite indexes prioritize `(tenant_id, id)` and `(tenant_id, created_at)`.
@@ -166,7 +232,17 @@ Mastra's `Memory` system is used to handle cross-interaction coherence:
 
 ### 8.3 Storage Adapters
 Mastra requires a `Storage` adapter to persist memory and logs. 
-- **MySQL Adapter**: Since EdApex uses MySQL, a custom or Drizzle-based Mastra storage adapter MUST be used to persist threads, messages, and workflow snapshots to the `edapex_v2` database.
-- **Schema Management**: Mastra's internal memory tables (e.g., `mastra_messages`, `mastra_threads`) should be integrated into the V2 migration lifecycle.
+- **`[DB]Store` Adapter**: A custom or Drizzle-based `[DB]Store` (e.g., `MysqlStore`, `PostgresStore`) MUST be used to persist threads, messages, and workflow snapshots to the `edapex_v2` database based on the active environment dialect.
+- **Schema Management**: Mastra's internal memory tables (e.g., `mastra_messages`, `mastra_threads`) are currently integrated into the V2 migration lifecycle.
 
----
+### 8.4 TODO: Decoupled Persistence & Stateless Execution
+*Note: This architecture is currently deferred for future implementation.*
+To prevent **Vendor Lock-in** with Mastra's proprietary interfaces, the platform should eventually migrate to a **Stateless Agent Execution Model**:
+- Treat `ai_chats` and `ai_messages` natively via Drizzle ORM repositories, wholly agnostic of the AI SDK.
+- The `AiService` loads conversation history and invokes the Mastra agent statelessly:
+  ```typescript
+  // Load agnostic history -> Map to generic LLM array -> Invoke -> Save back natively
+  const history = await repository.getChats(id);
+  const response = await agent.generate(history.map(m => m.parts));
+  ```
+- This ensures that migrating to a different AI SDK in the future requires zero database schema restructuring.
