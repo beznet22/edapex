@@ -1,22 +1,3 @@
-/**
- * ARCHITECTURE OVERVIEW: Legacy EdApex V1 Schema (SMS)
- * 
- * Technical Context:
- * This schema represents the original data layer of the EdApex Educational Platform. 
- * It was characterized by a monolithic, "flat" table design (95+ tables) that evolved 
- * organically over time. 
- * 
- * Key Characteristics:
- * - Direct mapping of school management features (Fees, Exams, Attendance) into rigid tables.
- * - Heavy reliance on `school_id` and `academic_id` for multi-tenancy and temporal partitioning.
- * - Inconsistent naming conventions (mixture of prefixes like `sm_`, `fm_`, and `st_`).
- * - High density of nullable fields and loose foreign key enforcement at the database level.
- * 
- * Role in Modern Architecture:
- * This file is now DEPRECATED and resides in `scripts/` solely to support the 
- * V1 -> V2 data migration process. It should NOT be used for new feature development.
- * All new domain logic must target the decentralized domain schemas in `src/db/domain-*.ts`.
- */
 import {
   mysqlTable,
   varchar,
