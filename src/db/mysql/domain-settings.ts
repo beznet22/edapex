@@ -46,7 +46,13 @@ export type FinanceConfig = {
   academicYearId?: number;
 };
 
-export type SettingConfig = GeneralConfig | FinanceConfig | Record<string, any>;
+export type LmsConfig = {
+  isStandalone: boolean;
+  allowGuestCheckout: boolean;
+  instructorRevenueShare?: number;
+};
+
+export type SettingConfig = GeneralConfig | FinanceConfig | LmsConfig | Record<string, any>;
 
 export const settings = mysqlTable("settings", {
   id: int("id").autoincrement().primaryKey(),

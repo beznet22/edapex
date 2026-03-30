@@ -5,8 +5,9 @@ The Finance & Accounting domain in EdApex V2 is built around a centralized, immu
 
 ### Key Business Logic
 - **Transactional Duality**: Every financial movement (fee payment, salary disbursement, expense) is recorded as a standard ledger entry with specific `transaction_type`.
-- **Fee Lifecycle**: Fees are categorized into Groups and Types, assigned to students via `fee_assignments`, and potentially split into `fee_installments`.
-- **Linked Ledger Reference**: Each ledger entry points back to its source (e.g., a fee assignment or an expense record) via `reference_type` and `reference_id`.
+- **B2B Bulk Invoicing (Fee Lifecycle)**: Fees are categorized into Groups and Types, assigned to students via `fee_assignments`, and potentially split into `fee_installments`.
+- **B2C Standalone Monetization**: Enables direct-to-consumer purchases (like Homeschool Subscriptions or single LMS Courses) via polymorphic `invoices` and an async `online_payments` gateway hub tracking Stripe/Paystack webhook intents.
+- **Linked Ledger Reference**: Each ledger entry points back to its source (e.g., a fee assignment, standalone invoice, or an expense) via `reference_type` and `reference_id`.
 - **Auto-Reconciliation**: Inventory sells/purchases and Payroll runs emit domain events that the Finance domain consumes to generate corresponding ledger entries automatically.
 
 ---
@@ -52,6 +53,9 @@ Manages institutional funds. Linked to `ledger_entries` via metadata for trackin
 
 #### [Fee Installments](file:///home/beznet/Workspace/edapex/src/db/domain-finance.ts#L146)
 Enables complex payment plans. A student can pay a single `fee_assignment` across multiple installments.
+
+#### Online Payments & Gateways (B2C Engine)
+Dedicated tables (`online_payments` and `payment_gateways`) securely handle immediate digital checkouts. They capture webhook intents from providers (Stripe/Flutterwave) and once verified, resolve transactions directly onto the `ledger_entries` log. `invoices` utilize polymorphic `reference_type` and `reference_id` fields to instantly un-gate the purchased product (LMS Course, Subscriptions).
 
 ---
 

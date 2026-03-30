@@ -8,8 +8,10 @@ export interface ILmsCourse {
   description: string | null;
   thumbnail: string | null;
   instructorId: number | null;
+  feeMasterId: number | null;
+  isFree: boolean | number;
   status: CourseStatus;
-  academicId: number;
+  academicId?: number | null;
   createdAt: Date | null;
   updatedAt: Date | null;
 }
@@ -51,6 +53,7 @@ export interface ILmsCourseEnrollment {
   courseId: number;
   userId: number;
   tenantId: number;
+  academicId?: number | null;
   enrolledAt: Date;
   completedAt: Date | null;
   progress: number; // 0-100
@@ -73,7 +76,7 @@ export interface ILmsAssignment {
 export interface ILmsRepository {
   // Courses
   getCourseById(id: number): Promise<ILmsCourse | null>;
-  getCoursesByTenant(tenantId: number, academicId: number): Promise<ILmsCourse[]>;
+  getCoursesByTenant(tenantId: number, academicId?: number | null): Promise<ILmsCourse[]>;
   createCourse(data: Partial<ILmsCourse>): Promise<ILmsCourse>;
   
   // Modules & Content

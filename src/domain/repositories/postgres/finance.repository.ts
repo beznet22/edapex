@@ -4,7 +4,9 @@ import {
   feeMasters, 
   feeTypes, 
   feeAssignments, 
-  invoices 
+  invoices,
+  paymentGateways,
+  onlinePayments
 } from "../../../db/postgres/domain-finance.js";
 import { 
   IFinanceRepository, 
@@ -12,7 +14,9 @@ import {
   IFeeMaster, 
   IFeeType, 
   IFeeAssignment, 
-  IInvoice 
+  IInvoice,
+  IPaymentGateway,
+  IOnlinePayment
 } from "../../interfaces/finance.interface.js";
 import { eq, and } from "drizzle-orm";
 
@@ -127,4 +131,33 @@ export class PostgresFinanceRepository implements IFinanceRepository {
       issuedAt: result.issuedAt ? new Date(result.issuedAt) : null,
     };
   }
+
+  // --- B2C Payments & Gateways ---
+  async getPaymentGateways(tenantId: number): Promise<IPaymentGateway[]> {
+    const results = await db.select().from(paymentGateways).where(eq(paymentGateways.tenantId, tenantId));
+    return results.map((row: any) => ({
+      ...row,
+      createdAt: row.createdAt ? new Date(row.createdAt) : null,
+      updatedAt: row.updatedAt ? new Date(row.updatedAt) : null,
+    }));
+  }
+
+  async createOnlinePayment(data: Partial<IOnlinePayment>): Promise<IOnlinePayment> {
+    const [result] = await db.insert(onlinePayments).values(data as any).returning();
+    if (!result) throw new Error("Failed to create online payment intent");
+    return {
+      ...result,
+      amount: result.amount.toString(),
+      providerFee: result.providerFee ? result.providerFee.toString() : "0.00",
+      createdAt: result.createdAt ? new Date(result.createdAt) : null,
+      updatedAt: result.updatedAt ? new Date(result.updatedAt) : null,
+    };
+  }
+
+  async updateOnlinePaymentStatus(transactionRef: string, status: string, ledgerEntryId?: number): Promise<void> {
+    const updateData: any = { status };
+    if (ledgerEntryId) updateData.ledgerEntryId = ledgerEntryId;
+    await db.update(onlinePayments).set(updateData).where(eq(onlinePayments.transactionRef, transactionRef));
+  }
 }
+

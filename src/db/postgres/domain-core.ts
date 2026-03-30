@@ -47,6 +47,7 @@ export const coreSchema = pgSchema("domain_core");
 
 export const tenants = coreSchema.table("tenants", {
   id: serial("id").primaryKey(),
+  tenantType: varchar("tenant_type", { length: 150 }).default("conventional").notNull(),
   name: varchar("name", { length: 200 }).notNull(),
   code: varchar("code", { length: 50 }),
   email: varchar("email", { length: 191 }),
@@ -188,14 +189,24 @@ export type DriverMetadata = {
   vehicleType?: string;
 };
 
-export type UserMetadata = StudentMetadata | StaffMetadata | ParentMetadata | DriverMetadata;
+export type FacilitatorMetadata = {
+  trcnCertification?: string;
+  subjectSpecializations?: string[];
+  hourlyRate?: number;
+  rating?: number;
+  employmentType?: "salaried" | "contractor" | "hybrid";
+  departmentId?: number; // Links to HR
+  designationId?: number; // Links to HR
+};
+
+export type UserMetadata = StudentMetadata | StaffMetadata | ParentMetadata | DriverMetadata | FacilitatorMetadata;
 
 // Users Table — Domain Personas (Student, Staff, Parent)
 export const users = coreSchema.table("users", {
   id: serial("id").primaryKey(),
   tenantId: integer("tenant_id").notNull().references(() => tenants.id),
   accountId: varchar("account_id", { length: 255 }).references(() => accounts.id),
-  userType: varchar("user_type", { length: 150 }).notNull(),
+  userType: varchar("user_type", { length: 50 }).notNull(), // student, staff, parent, driver, facilitator
   firstName: varchar("first_name", { length: 100 }).notNull(),
   lastName: varchar("last_name", { length: 100 }).notNull(),
   email: varchar("email", { length: 191 }),

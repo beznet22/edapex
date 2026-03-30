@@ -159,6 +159,8 @@ export type InvoiceMetadata = {
 export const invoices = sqliteTable("domain_finance_invoices", {
   id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
   tenantId: integer("tenant_id").notNull().references(() => tenants.id),
+  referenceType: text("reference_type", { enum: ["school_fee", "lms_course", "homeschool_subscription", "other"] }).default("school_fee").notNull(),
+  referenceId: integer("reference_id"),
   invoiceNumber: text("invoice_number", { length: 50 }).notNull(),
   userId: integer("user_id").notNull().references(() => users.id), // Student Persona
   totalAmount: real("total_amount").notNull(),
@@ -176,3 +178,32 @@ export const invoices = sqliteTable("domain_finance_invoices", {
   tenantStatusIdx: index("inv_tenant_status_idx").on(table.tenantId, table.status),
   invoiceNoIdx: index("inv_number_idx").on(table.tenantId, table.invoiceNumber),
 }));
+
+export const paymentGateways = sqliteTable("domain_finance_payment_gateways", {
+  id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
+  tenantId: integer("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+  provider: text("provider", { enum: ["stripe", "paystack", "flutterwave", "paypal"] }).notNull(),
+  publicKey: text("public_key", { length: 255 }),
+  secretKey: text("secret_key"),
+  webhookSecret: text("webhook_secret", { length: 255 }),
+  isActive: integer("is_active", { mode: "boolean" }).default(true).notNull(),
+  createdAt: integer("created_at", { mode: "timestamp" }).defaultNow(),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).defaultNow(),
+});
+
+export const onlinePayments = sqliteTable("domain_finance_online_payments", {
+  id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
+  tenantId: integer("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+  userId: integer("user_id").notNull().references(() => users.id),
+  gatewayId: integer("gateway_id").notNull().references(() => paymentGateways.id),
+  invoiceId: integer("invoice_id").references(() => invoices.id),
+  amount: real("amount").notNull(),
+  currency: text("currency", { length: 10 }).default("NGN").notNull(),
+  providerFee: real("provider_fee").default(0),
+  status: text("status", { enum: ["intent_created", "processing", "succeeded", "failed", "refunded"] }).notNull(),
+  transactionRef: text("transaction_ref", { length: 255 }).unique().notNull(),
+  ledgerEntryId: integer("ledger_entry_id").references(() => ledgerEntries.id),
+  metadata: text("metadata", { mode: "json" }),
+  createdAt: integer("created_at", { mode: "timestamp" }).defaultNow(),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).defaultNow(),
+});

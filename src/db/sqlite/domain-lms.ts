@@ -15,6 +15,7 @@ import { unique,  sqliteTable, text, integer, real, index } from "drizzle-orm/sq
 
 import { users, tenants, academicYears, accounts } from "./domain-core";
 import { subjects } from "./domain-academic";
+import { feeMasters } from "./domain-finance";
 
 // --- LMS METADATA TYPES ---
 
@@ -60,6 +61,8 @@ export const lmsCourses = sqliteTable("domain_lms_lms_courses", {
   gradeLevel: text("grade_level", { length: 50 }), // e.g. 'grade_10', 'year_1'
   subjectId: integer("subject_id").references(() => subjects.id), // Optional link to SMS
   creditHours: real("credit_hours"), // For tertiary
+  feeMasterId: integer("fee_master_id").references(() => feeMasters.id),
+  isFree: integer("is_free", { mode: "boolean" }).default(true).notNull(),
   thumbnail: text("thumbnail", { length: 500 }),
   metadata: text("metadata", { mode: "json" }).$type<LMSCourseMetadata>(),
   activeStatus: integer("active_status").default(1),
@@ -122,6 +125,7 @@ export const lmsSubmissions = sqliteTable("domain_lms_lms_submissions", {
   tenantId: integer("tenant_id").notNull().references(() => tenants.id),
   assignmentId: integer("assignment_id").notNull().references(() => lmsAssignments.id),
   userId: integer("user_id").notNull().references(() => users.id), // Student persona
+  academicId: integer("academic_id").references(() => academicYears.id),
   content: text("content"),
   attachments: text("attachments", { mode: "json" }).$type<LMSAttachment[]>(),
   grade: real("grade"),
@@ -170,7 +174,9 @@ export const lmsCompetencies = sqliteTable("domain_lms_lms_competencies", {
 
 export const lmsCompetencyRecords = sqliteTable("domain_lms_lms_competency_records", {
   id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
+  tenantId: integer("tenant_id").notNull().references(() => tenants.id),
   userId: integer("user_id").notNull().references(() => users.id), // Participant persona
+  academicId: integer("academic_id").references(() => academicYears.id),
   competencyId: integer("competency_id").notNull().references(() => lmsCompetencies.id),
   attainmentLevel: text("attainment_level", { enum: ["learning", "proficient", "mastery"] }).notNull(),
   evidence: text("evidence", { mode: "json" }).$type<{ type: string; id: number | string; url?: string }[]>(), // links to submissions or assessment results
@@ -182,6 +188,7 @@ export const lmsTutoringSessions = sqliteTable("domain_lms_lms_tutoring_sessions
   id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
   tenantId: integer("tenant_id").notNull().references(() => tenants.id),
   userId: integer("user_id").notNull().references(() => users.id),
+  academicId: integer("academic_id").references(() => academicYears.id),
   lessonId: integer("lesson_id").references(() => lmsLessons.id),
   topic: text("topic", { length: 500 }),
   messages: text("messages", { mode: "json" }).$type<TutoringMessage[]>(), // Full chat history for this tutoring interaction
@@ -194,6 +201,7 @@ export const lmsLearningPaths = sqliteTable("domain_lms_lms_learning_paths", {
   id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
   tenantId: integer("tenant_id").notNull().references(() => tenants.id),
   userId: integer("user_id").notNull().references(() => users.id),
+  academicId: integer("academic_id").references(() => academicYears.id),
   goalDescription: text("goal_description"),
   status: text("status", { enum: ["active", "completed", "cancelled"] }).default("active"),
   createdAt: integer("created_at", { mode: "timestamp" }).defaultNow(),

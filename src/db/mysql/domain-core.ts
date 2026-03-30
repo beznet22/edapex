@@ -59,6 +59,7 @@ export type TenantMetadata = {
 
 export const tenants = mysqlTable("tenants", {
   id: int("id").autoincrement().primaryKey(),
+  tenantType: mysqlEnum("tenant_type", ["conventional", "homeschool_family", "homeschool_coop"]).default("conventional").notNull(),
   name: varchar("name", { length: 200 }).notNull(),
   code: varchar("code", { length: 50 }),
   email: varchar("email", { length: 191 }),
@@ -200,14 +201,24 @@ export type DriverMetadata = {
   vehicleType?: string;
 };
 
-export type UserMetadata = StudentMetadata | StaffMetadata | ParentMetadata | DriverMetadata;
+export type FacilitatorMetadata = {
+  trcnCertification?: string;
+  subjectSpecializations?: string[];
+  hourlyRate?: number;
+  rating?: number;
+  employmentType?: "salaried" | "contractor" | "hybrid";
+  departmentId?: number; // Links to HR
+  designationId?: number; // Links to HR
+};
+
+export type UserMetadata = StudentMetadata | StaffMetadata | ParentMetadata | DriverMetadata | FacilitatorMetadata;
 
 // Users Table — Domain Personas (Student, Staff, Parent)
 export const users = mysqlTable("users", {
   id: int("id").autoincrement().primaryKey(),
   tenantId: int("tenant_id").notNull().references(() => tenants.id),
   accountId: varchar("account_id", { length: 255 }).references(() => accounts.id),
-  userType: mysqlEnum("user_type", ["student", "staff", "parent", "driver"]).notNull(),
+  userType: mysqlEnum("user_type", ["student", "staff", "parent", "driver", "facilitator"]).notNull(),
   firstName: varchar("first_name", { length: 100 }).notNull(),
   lastName: varchar("last_name", { length: 100 }).notNull(),
   email: varchar("email", { length: 191 }),

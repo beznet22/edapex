@@ -158,7 +158,9 @@ FMSIA enables cross-tenant intelligence without compromising data privacy.
 
 ## 5. Domain Module Architecture (V2 Schema)
 
-EdApex V2 decomposes the monolith into 14 distinct functional domains, each encapsulated in `src/db/domain-*.ts`. This modularity ensures that specialized AI agents can operate within bounded contexts while maintaining strict multi-tenant isolation.
+EdApex V2 decomposes the monolith into 15 distinct functional domains, each encapsulated in `src/db/domain-*.ts`. This modularity ensures that specialized AI agents can operate within bounded contexts while maintaining strict multi-tenant isolation.
+> [!NOTE] 
+> For detailed low-level documentation spanning entity mappings and PBAC rules per domain, view the architecture specifications in the `docs/domains/` directory.
 
 ### 5.1 Platform Foundations
 
@@ -193,6 +195,12 @@ EdApex V2 decomposes the monolith into 14 distinct functional domains, each enca
 | **Facilities** | `dormitories`, `rooms`, `routes`, `vehicles`, `allocations`, `inventory` | Physical assets with AI-driven route optimization and smart stocking. |
 | **Library** | `books`, `book_categories`, `book_issues` | ISBN-first cataloging; event-driven library fines linked to student ledgers. |
 | **Communication** | `communication_events`, `recipients` | Omni-channel dispatch (SMS, Push, Email) with toxicity moderation agents. |
+
+### 5.5 Homeschooling & Micro-learning
+
+| Domain | Key Entities | Core Modern Logic |
+| :--- | :--- | :--- |
+| **Homeschooling** | `homeschool_subscriptions`, `homeschool_portfolios`, `homeschool_schedules`, `revenue_shares`, `facilitators` | Wraps the LMS & Academic engines to provide personalized, TRCN-facilitator mentored homeschooling paths with Coding & Robotics focuses. |
 
 ---
 
@@ -279,9 +287,12 @@ src/
 
 | Layer | Primary Responsibility | Guideline Alignment |
 | :--- | :--- | :--- |
+| **db/** | Drizzle ORM schema definitions and migrations. | `@database-architect` |
 | **config/** | Unified configuration management; no raw `process.env` calls. | `@backend-dev-guidelines` |
 | **controllers/** | Request orchestration & standardized API error envelopes. | `@api-design-principles` |
 | **services/** | Domain complexity, HMAS orchestration, and business rules. | `@backend-architect` |
 | **domain/** | Masks the database from the service layer via interfaces. | `@database-architect` |
 | **middleware/** | Secure entry points (Auth/PBAC/Rate Limiting). | `@backend-security-coder` |
 | **validators/** | Structural guarantee for all external payloads via Zod. | `@backend-security-coder` |
+| **events/** | Event Bus definitions and domain-specific event handlers. | `@backend-architect` |
+

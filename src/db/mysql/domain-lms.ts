@@ -22,10 +22,12 @@ import {
   json,
   index,
   decimal,
+  boolean
 } from "drizzle-orm/mysql-core";
 
 import { users, tenants, academicYears, accounts } from "./domain-core";
 import { subjects } from "./domain-academic";
+import { feeMasters } from "./domain-finance";
 
 // --- LMS METADATA TYPES ---
 
@@ -71,6 +73,8 @@ export const lmsCourses = mysqlTable("lms_courses", {
   gradeLevel: varchar("grade_level", { length: 50 }), // e.g. 'grade_10', 'year_1'
   subjectId: int("subject_id").references(() => subjects.id), // Optional link to SMS
   creditHours: decimal("credit_hours", { precision: 5, scale: 2 }), // For tertiary
+  feeMasterId: int("fee_master_id").references(() => feeMasters.id),
+  isFree: boolean("is_free").default(true).notNull(),
   thumbnail: varchar("thumbnail", { length: 500 }),
   metadata: json("metadata").$type<LMSCourseMetadata>(),
   activeStatus: int("active_status").default(1),
@@ -133,6 +137,7 @@ export const lmsSubmissions = mysqlTable("lms_submissions", {
   tenantId: int("tenant_id").notNull().references(() => tenants.id),
   assignmentId: int("assignment_id").notNull().references(() => lmsAssignments.id),
   userId: int("user_id").notNull().references(() => users.id), // Student persona
+  academicId: int("academic_id").references(() => academicYears.id),
   content: text("content"),
   attachments: json("attachments").$type<LMSAttachment[]>(),
   grade: decimal("grade", { precision: 5, scale: 2 }),
@@ -181,7 +186,9 @@ export const lmsCompetencies = mysqlTable("lms_competencies", {
 
 export const lmsCompetencyRecords = mysqlTable("lms_competency_records", {
   id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenant_id").notNull().references(() => tenants.id),
   userId: int("user_id").notNull().references(() => users.id), // Participant persona
+  academicId: int("academic_id").references(() => academicYears.id),
   competencyId: int("competency_id").notNull().references(() => lmsCompetencies.id),
   attainmentLevel: mysqlEnum("attainment_level", ["learning", "proficient", "mastery"]).notNull(),
   evidence: json("evidence").$type<{ type: string; id: number | string; url?: string }[]>(), // links to submissions or assessment results
@@ -193,6 +200,7 @@ export const lmsTutoringSessions = mysqlTable("lms_tutoring_sessions", {
   id: int("id").autoincrement().primaryKey(),
   tenantId: int("tenant_id").notNull().references(() => tenants.id),
   userId: int("user_id").notNull().references(() => users.id),
+  academicId: int("academic_id").references(() => academicYears.id),
   lessonId: int("lesson_id").references(() => lmsLessons.id),
   topic: varchar("topic", { length: 500 }),
   messages: json("messages").$type<TutoringMessage[]>(), // Full chat history for this tutoring interaction
@@ -205,6 +213,7 @@ export const lmsLearningPaths = mysqlTable("lms_learning_paths", {
   id: int("id").autoincrement().primaryKey(),
   tenantId: int("tenant_id").notNull().references(() => tenants.id),
   userId: int("user_id").notNull().references(() => users.id),
+  academicId: int("academic_id").references(() => academicYears.id),
   goalDescription: text("goal_description"),
   status: mysqlEnum("status", ["active", "completed", "cancelled"]).default("active"),
   createdAt: timestamp("created_at").defaultNow(),

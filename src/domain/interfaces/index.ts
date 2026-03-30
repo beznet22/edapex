@@ -33,3 +33,4 @@ export * from './documents.interface.js';
 export * from './finance.interface.js';
 export * from './facilities.interface.js';
 export * from './library.interface.js';
+export * from './homeschool.interface.js';

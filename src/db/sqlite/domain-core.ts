@@ -45,6 +45,7 @@ export type TenantMetadata = {
 
 export const tenants = sqliteTable("domain_core_tenants", {
   id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
+  tenantType: text("tenant_type", { enum: ["conventional", "homeschool_family", "homeschool_coop"] }).default("conventional").notNull(),
   name: text("name", { length: 200 }).notNull(),
   code: text("code", { length: 50 }),
   email: text("email", { length: 191 }),
@@ -186,14 +187,24 @@ export type DriverMetadata = {
   vehicleType?: string;
 };
 
-export type UserMetadata = StudentMetadata | StaffMetadata | ParentMetadata | DriverMetadata;
+export type FacilitatorMetadata = {
+  trcnCertification?: string;
+  subjectSpecializations?: string[];
+  hourlyRate?: number;
+  rating?: number;
+  employmentType?: "salaried" | "contractor" | "hybrid";
+  departmentId?: number; // Links to HR
+  designationId?: number; // Links to HR
+};
+
+export type UserMetadata = StudentMetadata | StaffMetadata | ParentMetadata | DriverMetadata | FacilitatorMetadata;
 
 // Users Table — Domain Personas (Student, Staff, Parent)
 export const users = sqliteTable("domain_core_users", {
   id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
   tenantId: integer("tenant_id").notNull().references(() => tenants.id),
   accountId: text("account_id", { length: 255 }).references(() => accounts.id),
-  userType: text("user_type", { enum: ["student", "staff", "parent", "driver"] }).notNull(),
+  userType: text("user_type", { enum: ["student", "staff", "parent", "driver", "facilitator"] }).notNull(),
   firstName: text("first_name", { length: 100 }).notNull(),
   lastName: text("last_name", { length: 100 }).notNull(),
   email: text("email", { length: 191 }),

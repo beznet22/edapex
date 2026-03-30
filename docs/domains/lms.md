@@ -14,13 +14,16 @@ The V2 schema (`src/db/domain-lms.ts`) is designed for **Planet-Scale** educatio
 ### A. Course Management (`lms_courses`, `lms_modules`, `lms_lessons`)
 - **JSON Metadata**: Stores rich syllabus and prerequisites without schema bloat.
 - **Lesson Types**: Native support for `ai_tutoring` lessons that trigger specialized agent interfaces.
+- **B2C Monetization & Standalone Mode**: `lms_courses` natively pairs with the Finance domain via `fee_master_id` and an `is_free` flag. Controlled by `LmsConfig` in the Settings domain, the LMS can operate entirely decoupled from the SMS (like Udemy). This enables courses to be sold for lifetime access (`academic_id` is null) rather than being rigidly chained to school semesters.
 
 ### B. Adaptive Learning (`lms_learning_paths`, `lms_progress`)
+- **Academic Bound**: Strict foreign keys linking to `academic_id` inherently structure progress to the conventional school year to satisfy legal reports. 
 - **Pathing Steps**: Supports `locked`/`available` states based on prerequisite fulfillment tracked by the `lms_supervisor`.
 - **Analytics Loop**: `lms_analytics_events` provides the "Observed Reality" to the AI agent loop (ReAct), allowing for real-time course corrections.
 
 ### C. Competency Engine (`lms_competencies`, `lms_competency_records`)
 - **Evidence-Based Mastery**: Links actual submissions and teacher/AI feedback to specific pedagogical goals, enabling "Mastery Learning" paradigms.
+- **Multi-Tenant Isolation**: Fully constrained by `tenant_id` allowing individual B2B micro-schools to configure unique competency requirements securely.
 
 ## 3. Agent & Tool Integration
 The LMS domain integrates deeply with the **Mastra SDK** to manage agent state and tool execution.

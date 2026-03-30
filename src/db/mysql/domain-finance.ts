@@ -172,6 +172,8 @@ export type InvoiceMetadata = {
 export const invoices = mysqlTable("invoices", {
   id: int("id").autoincrement().primaryKey(),
   tenantId: int("tenant_id").notNull().references(() => tenants.id),
+  referenceType: mysqlEnum("reference_type", ["school_fee", "lms_course", "homeschool_subscription", "other"]).default("school_fee").notNull(),
+  referenceId: int("reference_id"),
   invoiceNumber: varchar("invoice_number", { length: 50 }).notNull(),
   userId: int("user_id").notNull().references(() => users.id), // Student Persona
   totalAmount: decimal("total_amount", { precision: 12, scale: 2 }).notNull(),
@@ -189,3 +191,32 @@ export const invoices = mysqlTable("invoices", {
   tenantStatusIdx: index("inv_tenant_status_idx").on(table.tenantId, table.status),
   invoiceNoIdx: index("inv_number_idx").on(table.tenantId, table.invoiceNumber),
 }));
+
+export const paymentGateways = mysqlTable("payment_gateways", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+  provider: mysqlEnum("provider", ["stripe", "paystack", "flutterwave", "paypal"]).notNull(),
+  publicKey: varchar("public_key", { length: 255 }),
+  secretKey: text("secret_key"),
+  webhookSecret: varchar("webhook_secret", { length: 255 }),
+  isActive: tinyint("is_active").default(1).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow(),
+});
+
+export const onlinePayments = mysqlTable("online_payments", {
+  id: int("id").autoincrement().primaryKey(),
+  tenantId: int("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+  userId: int("user_id").notNull().references(() => users.id),
+  gatewayId: int("gateway_id").notNull().references(() => paymentGateways.id),
+  invoiceId: int("invoice_id").references(() => invoices.id),
+  amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
+  currency: varchar("currency", { length: 10 }).default("NGN").notNull(),
+  providerFee: decimal("provider_fee", { precision: 12, scale: 2 }).default("0.00"),
+  status: mysqlEnum("status", ["intent_created", "processing", "succeeded", "failed", "refunded"]).notNull(),
+  transactionRef: varchar("transaction_ref", { length: 255 }).unique().notNull(),
+  ledgerEntryId: int("ledger_entry_id").references(() => ledgerEntries.id),
+  metadata: json("metadata"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow(),
+});

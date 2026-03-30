@@ -15,6 +15,7 @@ import { pgSchema, text, doublePrecision, integer, serial, numeric, smallint, ti
 
 import { users, tenants, academicYears, accounts } from "./domain-core";
 import { subjects } from "./domain-academic";
+import { feeMasters } from "./domain-finance";
 
 // --- LMS METADATA TYPES ---
 
@@ -62,6 +63,8 @@ export const lmsCourses = lmsSchema.table("lms_courses", {
   gradeLevel: varchar("grade_level", { length: 50 }), // e.g. 'grade_10', 'year_1'
   subjectId: integer("subject_id").references(() => subjects.id), // Optional link to SMS
   creditHours: numeric("credit_hours", { precision: 5, scale: 2 }), // For tertiary
+  feeMasterId: integer("fee_master_id").references(() => feeMasters.id),
+  isFree: boolean("is_free").default(true).notNull(),
   thumbnail: varchar("thumbnail", { length: 500 }),
   metadata: jsonb("metadata").$type<LMSCourseMetadata>(),
   activeStatus: integer("active_status").default(1),
@@ -124,6 +127,7 @@ export const lmsSubmissions = lmsSchema.table("lms_submissions", {
   tenantId: integer("tenant_id").notNull().references(() => tenants.id),
   assignmentId: integer("assignment_id").notNull().references(() => lmsAssignments.id),
   userId: integer("user_id").notNull().references(() => users.id), // Student persona
+  academicId: integer("academic_id").references(() => academicYears.id),
   content: text("content"),
   attachments: jsonb("attachments").$type<LMSAttachment[]>(),
   grade: numeric("grade", { precision: 5, scale: 2 }),
@@ -172,7 +176,9 @@ export const lmsCompetencies = lmsSchema.table("lms_competencies", {
 
 export const lmsCompetencyRecords = lmsSchema.table("lms_competency_records", {
   id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").notNull().references(() => tenants.id),
   userId: integer("user_id").notNull().references(() => users.id), // Participant persona
+  academicId: integer("academic_id").references(() => academicYears.id),
   competencyId: integer("competency_id").notNull().references(() => lmsCompetencies.id),
   attainmentLevel: varchar("attainment_level", { length: 150 }).notNull(),
   evidence: jsonb("evidence").$type<{ type: string; id: number | string; url?: string }[]>(), // links to submissions or assessment results
@@ -184,6 +190,7 @@ export const lmsTutoringSessions = lmsSchema.table("lms_tutoring_sessions", {
   id: serial("id").primaryKey(),
   tenantId: integer("tenant_id").notNull().references(() => tenants.id),
   userId: integer("user_id").notNull().references(() => users.id),
+  academicId: integer("academic_id").references(() => academicYears.id),
   lessonId: integer("lesson_id").references(() => lmsLessons.id),
   topic: varchar("topic", { length: 500 }),
   messages: jsonb("messages").$type<TutoringMessage[]>(), // Full chat history for this tutoring interaction
@@ -196,6 +203,7 @@ export const lmsLearningPaths = lmsSchema.table("lms_learning_paths", {
   id: serial("id").primaryKey(),
   tenantId: integer("tenant_id").notNull().references(() => tenants.id),
   userId: integer("user_id").notNull().references(() => users.id),
+  academicId: integer("academic_id").references(() => academicYears.id),
   goalDescription: text("goal_description"),
   status: varchar("status", { length: 150 }).default("active"),
   createdAt: timestamp("created_at").defaultNow(),

@@ -16,6 +16,11 @@ export interface IFinanceRepository {
   // --- Invoices ---
   getInvoices(tenantId: number, userId?: number): Promise<IInvoice[]>;
   createInvoice(data: Partial<IInvoice>): Promise<IInvoice>;
+  
+  // --- B2C Payments & Gateways ---
+  getPaymentGateways(tenantId: number): Promise<IPaymentGateway[]>;
+  createOnlinePayment(data: Partial<IOnlinePayment>): Promise<IOnlinePayment>;
+  updateOnlinePaymentStatus(transactionRef: string, status: string, ledgerEntryId?: number): Promise<void>;
 }
 
 export interface ILedgerEntry {
@@ -70,6 +75,8 @@ export interface IInvoice {
   id: number;
   tenantId: number;
   invoiceNumber: string;
+  referenceType?: string;
+  referenceId?: number | null;
   userId: number;
   totalAmount: string | number;
   paidAmount: string | number;
@@ -77,4 +84,32 @@ export interface IInvoice {
   issuedAt?: Date | null;
   dueDate?: string | null;
   metadata?: any;
+}
+
+export interface IPaymentGateway {
+  id: number;
+  tenantId: number;
+  provider: "stripe" | "paystack" | "flutterwave" | "paypal";
+  publicKey?: string | null;
+  isActive: boolean | number;
+  createdAt?: Date | null;
+  updatedAt?: Date | null;
+  // Intentionally omitting secret keys from standard interface to prevent exposure
+}
+
+export interface IOnlinePayment {
+  id: number;
+  tenantId: number;
+  userId: number;
+  gatewayId: number;
+  invoiceId?: number | null;
+  amount: string | number;
+  currency: string;
+  providerFee?: string | number;
+  status: "intent_created" | "processing" | "succeeded" | "failed" | "refunded";
+  transactionRef: string;
+  ledgerEntryId?: number | null;
+  metadata?: any;
+  createdAt?: Date | null;
+  updatedAt?: Date | null;
 }

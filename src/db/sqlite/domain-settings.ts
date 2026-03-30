@@ -37,7 +37,13 @@ export type FinanceConfig = {
   academicYearId?: number;
 };
 
-export type SettingConfig = GeneralConfig | FinanceConfig | Record<string, any>;
+export type LmsConfig = {
+  isStandalone: boolean;
+  allowGuestCheckout: boolean;
+  instructorRevenueShare?: number;
+};
+
+export type SettingConfig = GeneralConfig | FinanceConfig | LmsConfig | Record<string, any>;
 
 export const settings = sqliteTable("domain_settings_settings", {
   id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),

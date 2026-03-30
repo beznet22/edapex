@@ -159,6 +159,8 @@ export type InvoiceMetadata = {
 export const invoices = financeSchema.table("invoices", {
   id: serial("id").primaryKey(),
   tenantId: integer("tenant_id").notNull().references(() => tenants.id),
+  referenceType: varchar("reference_type", { length: 150 }).default("school_fee").notNull(),
+  referenceId: integer("reference_id"),
   invoiceNumber: varchar("invoice_number", { length: 50 }).notNull(),
   userId: integer("user_id").notNull().references(() => users.id), // Student Persona
   totalAmount: numeric("total_amount", { precision: 12, scale: 2 }).notNull(),
@@ -176,3 +178,32 @@ export const invoices = financeSchema.table("invoices", {
   tenantStatusIdx: index("inv_tenant_status_idx").on(table.tenantId, table.status),
   invoiceNoIdx: index("inv_number_idx").on(table.tenantId, table.invoiceNumber),
 }));
+
+export const paymentGateways = financeSchema.table("payment_gateways", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+  provider: varchar("provider", { length: 150 }).notNull(),
+  publicKey: varchar("public_key", { length: 255 }),
+  secretKey: text("secret_key"),
+  webhookSecret: varchar("webhook_secret", { length: 255 }),
+  isActive: smallint("is_active").default(1).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const onlinePayments = financeSchema.table("online_payments", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+  userId: integer("user_id").notNull().references(() => users.id),
+  gatewayId: integer("gateway_id").notNull().references(() => paymentGateways.id),
+  invoiceId: integer("invoice_id").references(() => invoices.id),
+  amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
+  currency: varchar("currency", { length: 10 }).default("NGN").notNull(),
+  providerFee: numeric("provider_fee", { precision: 12, scale: 2 }).default("0.00"),
+  status: varchar("status", { length: 150 }).notNull(),
+  transactionRef: varchar("transaction_ref", { length: 255 }).unique().notNull(),
+  ledgerEntryId: integer("ledger_entry_id").references(() => ledgerEntries.id),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});

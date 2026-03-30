@@ -25,6 +25,7 @@ Successfully implemented the entire Data Persistence and Anti-Corruption Layer (
 
 - [ ] **Domain Services**: Implement state-machine logic for Registration, Finance, and Grading workflows.
 - [ ] **HMAS Orchestrator**: Build the Executive Orchestrator to decompose natural language intent into domain-specific tasks.
+- [ ] **Homeschooling AI**: Develop the HomeschoolSupervisor, StemTutoringAgent, and EarlyYearsAgent prioritizing Coding & Robotics.
 - [ ] **Service-Repo Injection**: Connect the 100% completed Repositories to the Service Layer using Dependency Injection.
 - [ ] **Transactional Outbox**: Finalize the event-driven reliability layer for cross-domain state synchronization.
 
