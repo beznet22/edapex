@@ -246,3 +246,42 @@ To prevent **Vendor Lock-in** with Mastra's proprietary interfaces, the platform
   const response = await agent.generate(history.map(m => m.parts));
   ```
 - This ensures that migrating to a different AI SDK in the future requires zero database schema restructuring.
+
+---
+
+## 9. Canonical Directory Structure
+
+To ensure 100% logic parity and strict adherence to the **Backend Feasibility & Risk Index (BFRI)**, EdApex V2 employs a standardized layered architecture.
+
+### 9.1 Directory Hierarchy
+```bash
+src/
+├── config/              # Centralized environment & unifiedConfig
+├── controllers/         # Hono route handlers (req/res) via BaseController
+├── services/            # Framework-agnostic business logic & AI orchestration
+├── domain/              # Anti-Corruption Layer (Interfaces & Repositories)
+│   ├── interfaces/      # e.g., core.interface.ts, ai.interface.ts
+│   └── repositories/    # Drizzle ORM concrete implementations (mysql, postgres, sqlite)
+├── db/                  # Drizzle schemas, relations, and migrations
+├── routes/              # Hono route definitions
+├── middleware/          # Auth, PBAC, Sentry, Rate Limiting
+├── validators/          # Zod schemas for input validation
+├── events/              # Event Bus & EDA definitions
+├── types/               # Shared TypeScript types & Enums
+├── utils/               # Helpers, loggers, formatting
+├── tests/               # Unit, Integration, and E2E specs
+├── instrument.ts        # Observability & Tracing setup
+├── app.ts               # Hono App instance configuration
+└── server.ts            # Bootstrapper & Dependency Injection
+```
+
+### 9.2 Layer Responsibilities
+
+| Layer | Primary Responsibility | Guideline Alignment |
+| :--- | :--- | :--- |
+| **config/** | Unified configuration management; no raw `process.env` calls. | `@backend-dev-guidelines` |
+| **controllers/** | Request orchestration & standardized API error envelopes. | `@api-design-principles` |
+| **services/** | Domain complexity, HMAS orchestration, and business rules. | `@backend-architect` |
+| **domain/** | Masks the database from the service layer via interfaces. | `@database-architect` |
+| **middleware/** | Secure entry points (Auth/PBAC/Rate Limiting). | `@backend-security-coder` |
+| **validators/** | Structural guarantee for all external payloads via Zod. | `@backend-security-coder` |

@@ -1,27 +1,31 @@
 # EdApex V2 Project Roadmap
 
-This document outlines the strategic progression of the EdApex V2 platform, tracking completed milestones and defining future development phases.
+This document outlines the strategic progression of the EdApex V2 platform, tracking completed milestones and defining future development phases with 100% fidelity to the current codebase status.
 
 ## 🏁 Completed Milestones
 
-### Phase 1-5: Planet-Scale Domain Repository Overhaul
-Successfully refactored the legacy monolith into a strict 4-layer architecture with 100% type safety and multi-dialect support (MySQL, PostgreSQL, SQLite).
+### Phase 0: Project Restructuring & Layer Provisioning
+Established the canonical 4-layer directory structure and protocol documentation.
+- [x] **Canonical Structure**: Provisioned `routes/`, `controllers/`, `services/`, `middleware/`, `validators/`, and `config/`.
+- [x] **Protocol Documentation**: Added `@backend-dev-guidelines` headers to all layer indices.
+- [x] **Core Bootstrap**: Initialized `app.ts`, `server.ts`, and `instrument.ts` (Hono / Sentry shells).
 
-- **Phase 1: Foundation**: Established Core Identity, PBAC Security, and Global Settings.
-- **Phase 2: Intelligence & Academics**: Integrated Mastra-native AI repositories and established hierarchical academic/HR structures.
-- **Phase 3: Educational Operations**: Implemented LMS (AI-First), Attendance (Unified), and Assessment Engines.
-- **Phase 4: Administrative & Fiscal**: Built double-entry Finance ledgers and Facilities logistics.
-- **Phase 5: Engagement & Auxiliary**: Completed Communication dispatch, CMS, Events Audit, and Polymorphic Document storage.
+### Phase 1-5: Planet-Scale Domain & Repository Engine
+Successfully implemented the entire Data Persistence and Anti-Corruption Layer (ACL).
+- [x] **Schema Definitions**: 100% coverage for 17 domains in `src/db/`.
+- [x] **Domain Interfaces**: 100% coverage for 17 functional domain contracts.
+- [x] **Multi-Dialect Repositories**: 100% implemented for **MySQL**, **PostgreSQL** (Schema-aware), and **SQLite** across all domains.
+- [x] **Verification**: 100% Type-Safe verified via `tsc`.
 
 ---
 
 ## 🚀 Current Objective: Phase 6 - Service Layer & Agent Orchestration
 
-**Goal**: Migrate business logic from legacy controllers into pure domain services and implement the HMAS Orchestrator.
+**Goal**: Migrate business logic from legacy monolith into pure domain services and implement the HMAS Orchestrator.
 
-- [ ] **Domain Services**: Implement state-machine based business logic for complex workflows (e.g., Enrollment, Fee Collection).
-- [ ] **AI Orchestrator**: Build the Executive Orchestrator to decompose natural language intent into domain-specific tasks.
-- [ ] **Tool Gatekeeping**: Implement PBAC-enforced tool execution for all AI agents.
+- [ ] **Domain Services**: Implement state-machine logic for Registration, Finance, and Grading workflows.
+- [ ] **HMAS Orchestrator**: Build the Executive Orchestrator to decompose natural language intent into domain-specific tasks.
+- [ ] **Service-Repo Injection**: Connect the 100% completed Repositories to the Service Layer using Dependency Injection.
 - [ ] **Transactional Outbox**: Finalize the event-driven reliability layer for cross-domain state synchronization.
 
 ---
@@ -37,21 +41,16 @@ Successfully refactored the legacy monolith into a strict 4-layer architecture w
 
 ---
 
-## 🌐 Vision: Phase 8 - Federated Intelligence (FMSIA)
+## 📈 Status Dashboard (Layer-by-Layer)
 
-**Goal**: Enable cross-school pattern detection and planet-scale benchmarking without compromising data privacy.
-
-- [ ] **Anonymization Engine**: Built-in pipelines for anonymizing tenant data for federated training.
-- [ ] **Benchmarking AI**: Global curriculum intelligence and cross-school performance analytics.
-- [ ] **Autonomous Ecosystem**: Proactive AI agents that manage school logistics without human intervention.
-
----
-
-## 📈 Status Dashboard
-| Layer | Progress | Status |
-| :--- | :--- | :--- |
-| **Database Schema (V2)** | 100% | ✅ COMPLETED |
-| **Domain Repository Layer** | 100% | ✅ COMPLETED |
-| **Domain Service Layer** | 5% | 🏗️ IN PROGRESS |
-| **AI Agent Orchestration** | 10% | 🏗️ IN PROGRESS |
-| **Frontend UI/UX (Svelte 5)** | 0% | 📅 PLANNED |
+| Layer | Responsibility | Progress | Status |
+| :--- | :--- | :--- | :--- |
+| **API & Routes** | Hono endpoints & path mapping. | 5% | 🏗️ PROVISIONED |
+| **Controllers** | Request parsing & error handling. | 5% | 🏗️ PROVISIONED |
+| **Services** | Domain logic & AI orchestration. | 5% | 🏗️ PROVISIONED |
+| **Domain Repositories** | Multi-dialect DB Adapters (MySQL, PG, SQLite). | 100% | ✅ COMPLETED |
+| **Domain Interfaces** | Abstract business logic contracts. | 100% | ✅ COMPLETED |
+| **Database Schema** | Drizzle ORM definitions (17 Domains). | 100% | ✅ COMPLETED |
+| **Security (PBAC)** | Middleware & Policy evaluation logic. | 15% | 🏗️ IN PROGRESS |
+| **Infrastructure** | Config, Events & Observability. | 10% | 🏗️ PROVISIONED |
+| **Frontend UI** | Svelte 5 & AI-Elements. | 0% | 📅 PLANNED |
