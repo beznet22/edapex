@@ -1,57 +1,77 @@
-# EdApex Platform Backend
+# EdApex: Planet-Scale AI-Native School Management Platform
 
-Welcome to the EdApex backend foundation repository. EdApex is an advanced, scalable educational management platform designed to orchestrate academic, financial, attendance, and AI-assisted workflows for modern schools.
+EdApex is a next-generation school management ecosystem built for massive scale and deep AI autonomy. It leverages a hierarchical multi-agent system (HMAS) and policy-based access control (PBAC) to provide a secure, intelligent, and highly scalable foundation for both institutional and retail education.
 
-## 🏛 Architectural Vision
+## 🏛 Technical Vision
 
-The `feature/databas-migration-v2` branch represents a radical architectural shift toward a dedicated microservice/Backend API architecture. 
+EdApex V2 moves beyond the monolithic past into a modern, layered architecture designed for AI-native execution:
+- **HMAS Core**: Powered by **Mastra AI SDK** for sophisticated reasoning and task automation.
+- **PBAC Security**: Dynamic attribute-based access control replacing static roles.
+- **Multi-Tenant Foundation**: Strict logical isolation for thousands of schools/campuses.
+- **Multi-Dialect Persistence**: Repository-pattern based support for MySQL, PostgreSQL, and SQLite/LibSQL.
 
-This repository has been definitively stripped of all its former frontend (SvelteKit UI) monolith code. It now serves exclusively as the foundational **Database Layer Codebase**. It encapsulates the primary source of truth for the entire EdApex ecosystem, managing complex relational domain schemas strictly via native physical constraints.
+## 🛠 Tech Stack
 
-## 📦 Current State: The Database Layer
+- **Runtime**: Node.js / Bun
+- **Framework**: [Hono](https://hono.dev/) (Edge-ready web framework)
+- **Database ORM**: [Drizzle ORM](https://orm.drizzle.team/)
+- **AI Engine**: [Mastra AI SDK](https://mastra.ai/)
+- **Authentication**: [Better-Auth](https://better-auth.com/)
+- **Validation**: [Zod](https://zod.dev/)
+- **Package Manager**: `pnpm`
 
-Currently, the repository strictly encapsulates the database definitions using **Drizzle ORM** mapped to a **MySQL/MariaDB** engine.
+## 📂 Directory Structure
 
-It isolates business logic into 16 distinct domain schemas:
-- **Core Multi-tenancy** (`domain-core.ts`)
-- **Education & Routines** (`domain-academic.ts`, `domain-assessment.ts`, `domain-lms.ts`)
-- **Infrastructure & Assets** (`domain-facilities.ts`, `domain-library.ts`, `domain-documents.ts`)
-- **Administration** (`domain-hr.ts`, `domain-finance.ts`, `domain-attendance.ts`)
-- **Access Control & Integration** (`domain-pbac.ts`, `domain-ai.ts`, `domain-settings.ts`)
-- **Content & Audit** (`domain-cms.ts`, `domain-communication.ts`, `domain-events.ts`)
-
-Every domain schema utilizes strong typings, native `tenant_id` isolation loops, robust JSON metadata blobs, and strict polymorphic `owner_type/owner_id` constraints instead of legacy dual-write patterns.
+```bash
+src/
+├── config/              # Centralized environment & unifiedConfig
+├── controllers/         # Hono route handlers (req/res) via BaseController
+├── services/            # Framework-agnostic business logic & AI orchestration
+├── domain/              # Anti-Corruption Layer (Interfaces & Repositories)
+│   ├── interfaces/      # e.g., core.interface.ts, ai.interface.ts
+│   └── repositories/    # Drizzle ORM concrete implementations (mysql, postgres, sqlite)
+├── db/                  # Drizzle schemas, relations, and migrations
+├── routes/              # Hono route definitions
+├── middleware/          # Auth, PBAC, Sentry, Rate Limiting
+├── validators/          # Zod schemas for input validation
+├── events/              # Event Bus & EDA definitions
+├── types/               # Shared TypeScript types & Enums
+├── utils/               # Helpers, loggers, formatting
+├── tests/               # Unit, Integration, and E2E specs
+├── instrument.ts        # Observability & Tracing setup
+├── app.ts               # Hono App instance configuration
+└── server.ts            # Bootstrapper & Dependency Injection
+```
 
 ## 🚀 Getting Started
 
-To utilize this database layer locally:
+### 1. Prerequisites
+- Node.js 20+ or Bun
+- `pnpm` installed globally
 
-1. **Install Dependencies**:
-   ```bash
-   pnpm install
-   ```
+### 2. Installation
+```bash
+pnpm install
+```
 
-2. **Environment Variables**:
-   Copy `.env.example` to `.env` and fill in your local `DATABASE_V2_URL` to point to a target EdApex V2 instance.
+### 3. Environment Setup
+Copy the example environment file and configure your database and AI keys:
+```bash
+cp .env.example .env
+```
 
-3. **Schema Management**:
-   The `drizzle-kit` utility is used for schema synchronizations:
-   
-   *Push schema to the local database immediately without intermediate SQL migrations:*
-   ```bash
-   pnpm run db:push
-   ```
-
-## 🛠 Future Backend Expansion
-
-As moving forward, this database foundation acts as the dependency and building block. Future iterations of this robust architecture will introduce lightweight REST/GraphQL microservices, message queue event sourcing using `edx_domain_events`, and dedicated API endpoints that purely rely on this isolated DB schema, completely disassociated from the web presentation layer.
+### 4. Database Setup
+Push the schema to your target database:
+```bash
+pnpm run db:push
+```
 
 ## 📖 Documentation
 
-The EdApex documentation is now modular and AI-agent driven:
+- **[Master Architecture](docs/MASTER_ARCHITECTURE.md)**: Detailed technical specification.
+- **[Domain Specifications](docs/domains/)**: Deep dive into per-module schemas and logic.
+- **[PBAC Security Model](docs/domains/pbac.md)**: Details on the policy-based security engine.
 
-- **[Master Architecture](file:///home/beznet/Workspace/edapex/docs/MASTER_ARCHITECTURE.md)**: The definitive Planet-Scale blueprint (PBAC, HMAS, Federated Intelligence).
-- **[Agent Prompts](file:///home/beznet/Workspace/edapex/docs/prompts/)**: Standardized instructions for AI agents to document legacy logic and modern schemas.
-- **[Domain Documentation](file:///home/beznet/Workspace/edapex/docs/domains/)**: Detailed technical specs per domain (Generated by agents).
+## 🤝 Contributing
 
-<!-- /home/beznet/Workspace/schoolify (also known as InfixEdu) is School managent system writen using laravel framework. scripts/sms-schema.ts is the database sms schema of schoolify. While src/db are a redesign of the database layer into a modern AI compatible architecure -->
+When contributing to EdApex, follow the patterns established in `src/` and ensure all business logic is encapsulated in **Services** and **Repositories**. AI commits must follow the attribution format specified in `AGENTS.md`.

@@ -8,7 +8,12 @@ Whenever a new schema, API route, or AI agent is deployed, you must update the m
 - Ensure the documentation lists the ReAct tools mapped to the new Agents.
 - Ensure the new PBAC (Policy-Based Access Control) rules are clearly defined.
 
-## 2. Master Architecture Tracking
+## 2. Project Roadmap Synchronization
+Whenever a feature moves from "Planned" to "Completed" or a new Phase is initialized:
+- You MUST update `docs/PROJECT_ROADMAP.md` to reflect the percentage of layer completion and check off the relevant milestones.
+- Ensure the "Status Dashboard" remains 100% synchronized with the actual codebase implementation.
+
+## 3. Master Architecture Tracking
 If a completely new layer concept or global feature is introduced:
 - You must append to `docs/MASTER_ARCHITECTURE.md` to ensure the blueprint map remains entirely accurate.
 

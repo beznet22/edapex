@@ -1,5 +1,8 @@
 # EdApex: Comprehensive Business Model
 
+> [!NOTE]
+> For the low-level technical mapping of these pillars into the service and database layers, see the **[Master Architecture Specification](file:///home/beznet/Workspace/edapex/docs/MASTER_ARCHITECTURE.md)**.
+
 ## 1. Executive Summary
 EdApex is a next-generation, AI-native education management platform designed for massive scale. The business model spans two major pillars:
 1. **Conventional School Management (B2B SaaS):** Empowering K-12 and tertiary institutions to automate operations, reduce administrative overhead, and leverage AI for grading, attendance, HR, and finance.

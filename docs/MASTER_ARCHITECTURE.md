@@ -4,6 +4,17 @@ EdApex is a next-generation, AI-native School Management Platform built for mass
 
 ---
 
+## 🧭 Project Navigation Map
+
+| Document | Purpose |
+| :--- | :--- |
+| **[Business Model](docs/BUSINESS_MODEL.md)** | Strategic pillars (B2B Institutional vs B2C Retail). |
+| **[Project Roadmap](docs/PROJECT_ROADMAP.md)** | Real-time tracking of development phases and layer status. |
+| **[Domain Specs](docs/domains/)** | Comprehensive directory of per-module technical specifications. |
+| **[Todo: Stateless AI](docs/TODO_STATELESS_AI.md)** | Research notes on decoupling from LLM-vendor lock-in. |
+
+---
+
 ## 0. Architectural Flow (Visual)
 
 ### 0.1 High-Level Request Lifecycle (Mermaid)
@@ -160,7 +171,7 @@ FMSIA enables cross-tenant intelligence without compromising data privacy.
 
 EdApex V2 decomposes the monolith into 15 distinct functional domains, each encapsulated in `src/db/domain-*.ts`. This modularity ensures that specialized AI agents can operate within bounded contexts while maintaining strict multi-tenant isolation.
 > [!NOTE] 
-> For detailed low-level documentation spanning entity mappings and PBAC rules per domain, view the architecture specifications in the `docs/domains/` directory.
+> For detailed low-level documentation spanning entity mappings and PBAC rules per domain, see the **[Domain Specification Index](#56-domain-specification-index)** below.
 
 ### 5.1 Platform Foundations
 
@@ -196,11 +207,18 @@ EdApex V2 decomposes the monolith into 15 distinct functional domains, each enca
 | **Library** | `books`, `book_categories`, `book_issues` | ISBN-first cataloging; event-driven library fines linked to student ledgers. |
 | **Communication** | `communication_events`, `recipients` | Omni-channel dispatch (SMS, Push, Email) with toxicity moderation agents. |
 
-### 5.5 Homeschooling & Micro-learning
-
-| Domain | Key Entities | Core Modern Logic |
-| :--- | :--- | :--- |
 | **Homeschooling** | `homeschool_subscriptions`, `homeschool_portfolios`, `homeschool_schedules`, `revenue_shares`, `facilitators` | Wraps the LMS & Academic engines to provide personalized, TRCN-facilitator mentored homeschooling paths with Coding & Robotics focuses. |
+
+### 5.6 Domain Specification Index
+
+Every domain is governed by a dedicated specification file in `docs/domains/` that details the schema, repositories, and specific AI toolsets.
+
+| Category | Specifications |
+| :--- | :--- |
+| **Foundations** | [Core & Identity](docs/domains/core.md) • [PBAC & Security](docs/domains/pbac.md) • [Settings](docs/domains/settings.md) • [Documents](docs/domains/documents.md) • [Events](docs/domains/events.md) |
+| **Academic** | [Academic](docs/domains/academic.md) • [Assessment](docs/domains/assessment.md) • [Attendance](docs/domains/attendance.md) • [LMS](docs/domains/lms.md) • [Homeschooling](docs/domains/homeschooling.md) |
+| **Operations** | [Finance](docs/domains/finance.md) • [HR & Payroll](docs/domains/hr.md) • [Library](docs/domains/library.md) • [Facilities](docs/domains/facilities.md) |
+| **Support** | [AI Engine](docs/domains/ai.md) • [Communication](docs/domains/communication.md) • [CMS](docs/domains/cms.md) |
 
 ---
 
