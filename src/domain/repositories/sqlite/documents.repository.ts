@@ -28,11 +28,20 @@ export class SqliteDocumentsRepository implements IDocumentsRepository {
     };
   }
 
-  async updateDocumentStatus(id: number, status: string): Promise<void> {
-    await db.update(documents).set({ status: status as any }).where(eq(documents.id, id));
+  async updateDocumentStatus(tenantId: number, id: number, status: string): Promise<void> {
+    await db.update(documents)
+      .set({ status: status as any })
+      .where(and(
+        eq(documents.id, id),
+        eq(documents.tenantId, tenantId)
+      ));
   }
 
-  async deleteDocument(id: number): Promise<void> {
-    await db.delete(documents).where(eq(documents.id, id));
+  async deleteDocument(tenantId: number, id: number): Promise<void> {
+    await db.delete(documents)
+      .where(and(
+        eq(documents.id, id),
+        eq(documents.tenantId, tenantId)
+      ));
   }
 }

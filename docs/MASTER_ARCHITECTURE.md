@@ -20,7 +20,7 @@ EdApex is a next-generation, AI-native School Management Platform built for mass
 ### 0.1 High-Level Request Lifecycle (Mermaid)
 ```mermaid
 graph TD
-    A[Client Request] -->|URL/Auth| B(Edge Gateway)
+    A[Client Request] -->|TanStack DB Sync| B(Edge Gateway)
     B -->|Resolve| C{Tenant Context}
     C -->|Initialized| D[PBAC Policy Engine]
     D -->|Evaluate Action| E{HMAS Orchestrator}
@@ -30,15 +30,14 @@ graph TD
     F -->|Business Logic| G[Repository Pattern]
     end
     
-    subgraph "Data Persistence Layer"
-    G -->|Dialect: MySQL| H[(MySQL DB)]
-    G -->|Dialect: Postgres| I[(Postgres DB)]
+    subgraph "Edge Data Persistence Layer"
+    G -->|Dialect: D1| H[(Cloudflare D1)]
     G -->|Dialect: SQLite| J[(SQLite File)]
+    G -->|Dialect: MySQL| I[(External MySQL)]
     end
     
-    H -.->|Domain Schema| K[domain_academic]
-    I -.->|Native Schema| L[domain_finance]
-    J -.->|Single File| M[domain_core]
+    A -.->|Optimistic UI| K[Local-First IndexedDB]
+    K <==>|Sync Engine| B
 ```
 
 ### 0.2 System Hierarchy (ASCII)
@@ -261,17 +260,11 @@ Mastra requires a `Storage` adapter to persist memory and logs.
 - **`[DB]Store` Adapter**: A custom or Drizzle-based `[DB]Store` (e.g., `MysqlStore`, `PostgresStore`) MUST be used to persist threads, messages, and workflow snapshots to the `edapex_v2` database based on the active environment dialect.
 - **Schema Management**: Mastra's internal memory tables (e.g., `mastra_messages`, `mastra_threads`) are currently integrated into the V2 migration lifecycle.
 
-### 8.4 TODO: Decoupled Persistence & Stateless Execution
-*Note: This architecture is currently deferred for future implementation.*
-To prevent **Vendor Lock-in** with Mastra's proprietary interfaces, the platform should eventually migrate to a **Stateless Agent Execution Model**:
+### 8.4 Stateless AI Execution Model
+To meet the **Cloudflare 10ms CPU limit** and ensure **Edge-Native performance**, EdApex uses a **Stateless Agent Execution Model**:
 - Treat `ai_chats` and `ai_messages` natively via Drizzle ORM repositories, wholly agnostic of the AI SDK.
-- The `AiService` loads conversation history and invokes the Mastra agent statelessly:
-  ```typescript
-  // Load agnostic history -> Map to generic LLM array -> Invoke -> Save back natively
-  const history = await repository.getChats(id);
-  const response = await agent.generate(history.map(m => m.parts));
-  ```
-- This ensures that migrating to a different AI SDK in the future requires zero database schema restructuring.
+- The `AiService` loads conversation history and invokes the Mastra agent statelessly.
+- This ensures minimal холодный start (cold start) overhead and zero vendor lock-in.
 
 ---
 
@@ -314,3 +307,21 @@ src/
 | **validators/** | Structural guarantee for all external payloads via Zod. | `@backend-security-coder` |
 | **events/** | Event Bus definitions and domain-specific event handlers. | `@backend-architect` |
 
+---
+
+## 10. Edge-Native Optimization (Cloudflare Free Tier)
+
+EdApex is optimized for the constraints of Cloudflare's edge network:
+
+### 10.1 Constraint-First Design
+- **3MB Bundle Size**: Aggressive code splitting via `wrangler` and dynamic imports for heavy AI providers.
+- **10ms CPU Time**: Stateless execution, offloading heavy processing to the client or background tasks.
+- **10k AI Neurons/Day**: Runtime model tiering (Small/Medium/Large) and token usage tracking.
+
+### 10.2 Local-First Synchronization
+- **TanStack DB**: Acts as the primary state manager on the client (IndexedDB).
+- **Background Sync**: Uses a conflict-resolution engine to synchronize local state with Cloudflare D1.
+
+### 10.3 AI Orchestration (Provider-Agnostic)
+- **Mastra Core**: Lightweight orchestration without heavy stateful storage adapters.
+- **Runtime Provider Selection**: Agents are defined by capability and use the cheapest/fastest available provider at runtime.

@@ -22,19 +22,26 @@ You must execute your work by sequentially satisfying the constraints of these 5
    Read and execute the constrained multi-agent setup:  
    👉 [Multi-Agent Review](references/multi-agent-review.md)
 
-2. **Data & Domain Layer Constraints**  
-   Strict Drizzle ORM compliance, cross-dialect safety (MySQL/Postgres/SQLite), and Repository interfaces:  
+2. **Data & Domain Layer (Edge-Native)**  
+   Strict Drizzle ORM compliance, Cloudflare D1 optimization, and SQLite repository interfaces:  
    👉 [Database & Domain Layer](references/database-domain-layer.md)
 
-3. **Service & Event Layer Constraints**  
-   Business orchestrations, the Event Bus decoupling, and ReAct AI patterns:  
+3. **Service & Event Layer (Provider-Agnostic)**  
+   Business orchestrations, the Event Bus, and stateless ReAct AI agents:  
    👉 [Service & Event Layer](references/service-event-layer.md)
 
 4. **API, Validation, & PBAC Constraints**  
    Zod schema validations, Standard Error Envelopes, and Auth middleware:  
    👉 [API & Validation Layer](references/api-validation-layer.md)
 
-5. **Mandatory Documentation Requirements**  
+5. **Frontend, Local-First, & UI Aesthetics**  
+   TanStack Start (SPA), TanStack DB synchronization, and mandatory **Shadcn UI** / **AI Elements** integration:  
+   👉 [Frontend & Local-First Layer](references/frontend-local-first-layer.md)
+
+6. **UI/UX Pro Max Standards**
+   Strictly follow [UI/UX Pro Max](file:///home/beznet/.gemini/antigravity/skills/ui-ux-pro-max/SKILL.md) for premium "wow" factor. No emojis as icons; use Lucide/Radix.
+
+7. **Mandatory Documentation Requirements**  
    Architectural changes MUST be committed to the `docs/` dir:  
    👉 [Documentation Requirements](references/documentation-requirements.md)
 

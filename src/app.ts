@@ -1,16 +1,22 @@
-/**
- * ==========================================
- * Layer: APP (HONO INSTANCE)
- * Protocol: @backend-dev-guidelines
- * ==========================================
- * Purpose:
- *   Configures the base Hono app instance.
- *   Applies ALL global middleware (CORS, Sentry, Rate Limiting, Parse).
- *   Mounts defined Route blocks to base paths (e.g., `/api/v1/*`).
- * 
- * Constraints:
- *   - NO application port binding or server startup logic (reserved for `server.ts`).
- */
+import { Hono } from 'hono';
+import { cors } from 'hono/cors';
+import { routes } from './routes/index';
 
-// import { Hono } from 'hono';
-// export const app = new Hono();
+type Bindings = {
+  NODE_VERSION: string;
+  D1_DB: any; // Type 'D1Database' from @cloudflare/workers-types if available
+  PREFER_OPENAI?: string;
+}
+
+export const app = new Hono<{ Bindings: Bindings }>();
+
+// Global Middleware
+app.use('*', cors());
+
+// Base API Path
+app.route('/api/v1', routes);
+
+// Health Check
+app.get('/health', (c) => c.json({ status: 'ok', environment: c.env.NODE_VERSION }));
+
+export default app;

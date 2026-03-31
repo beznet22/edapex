@@ -45,14 +45,21 @@ export class SqliteAssessmentRepository implements IAssessmentRepository {
   }
 
   // --- Exams ---
-  async getExams(tenantId: number, academicId: number): Promise<IExam[]> {
+  async getExams(tenantId: number, academicId: number, updatedSince?: Date): Promise<IExam[]> {
+    const conditions = [
+      eq(exams.tenantId, tenantId),
+      eq(exams.academicId, academicId)
+    ];
+
+    if (updatedSince) {
+      conditions.push(gte(exams.updatedAt, updatedSince));
+    }
+
     const results = await db
       .select()
       .from(exams)
-      .where(and(
-        eq(exams.tenantId, tenantId),
-        eq(exams.academicId, academicId)
-      ));
+      .where(and(...conditions));
+      
     return results.map((row: any) => this.mapExam(row));
   }
 
@@ -72,9 +79,9 @@ export class SqliteAssessmentRepository implements IAssessmentRepository {
     const results = await db
       .select({
         id: examMarks.id,
-        examId: examSetups.examId,
+        userId: examMarks.userId,
         enrollmentId: examMarks.enrollmentId,
-        subjectId: examSetups.subjectId,
+        examSetupId: examMarks.examSetupId,
         tenantId: examMarks.tenantId,
         totalMarks: examMarks.totalMarks,
         isAbsent: examMarks.isAbsent,
@@ -92,20 +99,37 @@ export class SqliteAssessmentRepository implements IAssessmentRepository {
     return results.map((row: any) => this.mapMark(row));
   }
 
-  async saveMarks(marks: Partial<IMark>[]): Promise<void> {
-    for (const mark of marks) {
-      if (!mark.id) {
-        // Create
-      } else {
-        await db.update(examMarks)
-          .set({ 
-            totalMarks: mark.marks, 
-            isAbsent: mark.isAbsent as any,
-            teacherRemarks: mark.teacherRemarks 
+  async saveMarks(tenantId: number, marks: Partial<IMark>[]): Promise<void> {
+    if (marks.length === 0) return;
+
+    const batches = marks.map((mark) => {
+      if (mark.id) {
+        return db.update(examMarks)
+          .set({
+            totalMarks: mark.marks ? parseFloat(mark.marks) : null,
+            isAbsent: mark.isAbsent || 0,
+            teacherRemarks: mark.teacherRemarks,
+            updatedAt: new Date(),
           })
-          .where(eq(examMarks.id, mark.id));
+          .where(and(
+            eq(examMarks.id, mark.id),
+            eq(examMarks.tenantId, tenantId)
+          ));
+      } else {
+        return db.insert(examMarks).values({
+          tenantId: tenantId,
+          examSetupId: mark.examSetupId!,
+          enrollmentId: mark.enrollmentId!,
+          userId: mark.userId!,
+          totalMarks: mark.marks ? parseFloat(mark.marks) : null,
+          isAbsent: mark.isAbsent || 0,
+          teacherRemarks: mark.teacherRemarks,
+        });
       }
-    }
+    });
+
+    // @ts-ignore - Drizzle batch expects a tuple but we passed an array, which is fine for runtime
+    await db.batch(batches as any);
   }
 
   // --- Grades ---

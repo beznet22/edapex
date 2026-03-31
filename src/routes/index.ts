@@ -14,4 +14,14 @@
  *   - Filename convention: `camelCaseRoutes.ts`.
  */
 
-// export * from './authRoutes';
+import { Hono } from 'hono';
+import { syncRoutes } from './syncRoutes';
+
+const routes = new Hono();
+
+/**
+ * Mount all domain routes
+ */
+routes.route('/sync', syncRoutes);
+
+export { routes };

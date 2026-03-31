@@ -11,30 +11,29 @@ Established the canonical 4-layer directory structure and protocol documentation
 - [x] **Core Bootstrap**: Initialized `app.ts`, `server.ts`, and `instrument.ts` (Hono / Sentry shells).
 - [x] **Custom AI Skill**: Deployed `edapex-domain-architect` to enforce cross-layer discipline.
 
-### Phase 1-5: Planet-Scale Domain & Repository Engine
-Successfully implemented the entire Data Persistence and Anti-Corruption Layer (ACL).
-- [x] **Schema Definitions**: 100% coverage for 18 domains (including **Homeschooling**) in `src/db/`.
-- [x] **Domain Interfaces**: 100% coverage for 18 functional domain contracts.
-- [x] **Multi-Dialect Repositories**: 100% implemented for **MySQL**, **PostgreSQL**, and **SQLite** across all domains.
-- [x] **LMS Standalone Mode**: Architecture and Schema relaxed for Udemy-style B2C retail access.
 - [x] **Verification**: 100% Type-Safe verified via `tsc`.
 
----
-
-## 🚀 Current Objective: Phase 6 - Service Layer & Agent Orchestration
-
-**Goal**: Migrate business logic from legacy monolith into pure domain services and implement the HMAS Orchestrator.
-
-- [ ] **Service-Repo Injection**: Connected the 100% completed Repositories to the Service Layer using Dependency Injection.
-- [ ] **Domain Services**: Implement state-machine logic for Registration, Finance, and Grading workflows.
-- [ ] **HMAS Orchestrator**: Build the Executive Orchestrator to decompose natural language intent into domain-specific tasks.
-- [ ] **Homeschooling AI**: Develop the `HomeschoolSupervisor` (logic implementation), StemTutoringAgent, and EarlyYearsAgent.
-- [ ] **Transactional Outbox**: Finalize the event-driven reliability layer for cross-domain state synchronization.
-- [ ] **Transactional Outbox**: Finalize the event-driven reliability layer for cross-domain state synchronization.
+### Phase 6: Edge-Native Migration & Local-First Base
+Transitioned to Cloudflare Workers and established the reactive data synchronization layer.
+- [x] **D1 Persistence**: Adapted 18 domain repositories for **Cloudflare D1** (SQLite flavor).
+- [x] **Sync Engine**: Initialized **TanStack DB** collections and established the reconciliation skeleton in `frontend/src/lib/sync.ts`.
+- [x] **Agent Orchestration**: Refactored `AiOrchestrator` for **Provider-Agnostic AI** (capability-based routing).
 
 ---
 
-## 🎨 Upcoming: Phase 7 - Frontend Modernization (Svelte 5)
+## 🚀 Current Objective: Phase 7 - Frontend Modernization & AI-Elements (TanStack SPA)
+
+**Goal**: Build a stunning, local-first, AI-native SPA (No SSR) using TanStack Router, Query, and DB.
+
+- [/] **Local-First Sync**: Complete the reconciliation logic between TanStack DB and Cloudflare D1. [/]
+- [ ] **Design System**: Implement the vanilla CSS design system with glassmorphism and premium aesthetics.
+- [ ] **AI-Elements Integration**: Build interactive chat interfaces for student tutoring and administrative assistants.
+- [ ] **Portal Overhaul**: Modernize Student, Parent, and Teacher portals with sub-1ms reactive dashboards.
+- [ ] **State Management**: Utilize **TanStack Query** and **TanStack DB** for reactive state orchestration.
+
+---
+
+## 🎨 Upcoming: Phase 7 - Frontend Modernization & AI-Elements (tanstack router, react-query, react-db)
 
 **Goal**: Build a stunning, AI-native user experience using Svelte 5 and AI-Elements.
 
@@ -49,12 +48,12 @@ Successfully implemented the entire Data Persistence and Anti-Corruption Layer (
 
 | Layer | Responsibility | Progress | Status |
 | :--- | :--- | :--- | :--- |
-| **API & Routes** | Hono endpoints & path mapping. | 5% | 🏗️ PROVISIONED |
-| **Controllers** | Request parsing & error handling. | 5% | 🏗️ PROVISIONED |
-| **Services** | Domain logic & AI orchestration. | 15% | 🏗️ IN PROGRESS |
-| **Domain Repositories** | Multi-dialect DB Adapters (MySQL, PG, SQLite). | 100% | ✅ COMPLETED |
+| **API & Routes** | Hono endpoints & D1 integration. | 15% | 🏗️ IN PROGRESS |
+| **Controllers** | Request parsing & Sync reconciliation. | 15% | 🏗️ IN PROGRESS |
+| **Services** | Domain logic & AI orchestration. | 25% | 🏗️ IN PROGRESS |
+| **Domain Repositories** | Edge-Native SQLite/D1 Adapters. | 100% | ✅ COMPLETED |
 | **Domain Interfaces** | Abstract business logic contracts. | 100% | ✅ COMPLETED |
 | **Database Schema** | Drizzle ORM definitions (18 Domains). | 100% | ✅ COMPLETED |
 | **Security (PBAC)** | Middleware & Policy evaluation logic. | 15% | 🏗️ IN PROGRESS |
-| **Infrastructure** | Config, Events & Observability. | 15% | 🏗️ IN PROGRESS |
-| **Frontend UI** | Svelte 5 & AI-Elements. | 0% | 📅 PLANNED |
+| **Infrastructure** | D1, KV, R2 & Sync Engine. | 30% | 🏗️ IN PROGRESS |
+| **Frontend UI** | TanStack Start & AI-Elements. | 5% | 🏗️ IN PROGRESS |

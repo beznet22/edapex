@@ -110,7 +110,7 @@ export class SqliteLmsRepository implements ILmsRepository {
     return {
       ...result,
       enrolledAt: result.enrollmentDate ? new Date(result.enrollmentDate) : new Date(),
-      completedAt: null,
+      completedAt: result.completionDate ? new Date(result.completionDate) : null,
       progress: result.progressPercent || 0,
       createdAt: result.createdAt ? new Date(result.createdAt) : null,
       updatedAt: result.updatedAt ? new Date(result.updatedAt) : null,
@@ -122,7 +122,7 @@ export class SqliteLmsRepository implements ILmsRepository {
     return results.map((row: any) => ({
       ...row,
       enrolledAt: row.enrollmentDate ? new Date(row.enrollmentDate) : new Date(),
-      completedAt: null,
+      completedAt: row.completionDate ? new Date(row.completionDate) : null,
       progress: row.progressPercent || 0,
       createdAt: row.createdAt ? new Date(row.createdAt) : null,
       updatedAt: row.updatedAt ? new Date(row.updatedAt) : null,

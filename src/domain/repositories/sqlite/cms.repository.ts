@@ -35,11 +35,20 @@ export class SqliteCmsRepository implements ICmsRepository {
     return this.mapNode(result);
   }
 
-  async updateContentNode(id: number, data: Partial<IContentNode>): Promise<void> {
-    await db.update(contentNodes).set(data as any).where(eq(contentNodes.id, id));
+  async updateContentNode(tenantId: number, id: number, data: Partial<IContentNode>): Promise<void> {
+    await db.update(contentNodes)
+      .set(data as any)
+      .where(and(
+        eq(contentNodes.id, id),
+        eq(contentNodes.tenantId, tenantId)
+      ));
   }
 
-  async deleteContentNode(id: number): Promise<void> {
-    await db.delete(contentNodes).where(eq(contentNodes.id, id));
+  async deleteContentNode(tenantId: number, id: number): Promise<void> {
+    await db.delete(contentNodes)
+      .where(and(
+        eq(contentNodes.id, id),
+        eq(contentNodes.tenantId, tenantId)
+      ));
   }
 }

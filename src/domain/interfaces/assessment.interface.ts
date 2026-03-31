@@ -33,9 +33,9 @@ export interface IExamSetup {
 
 export interface IMark {
   id: number;
-  examId: number;
+  userId: number;
   enrollmentId: number;
-  subjectId: number;
+  examSetupId: number;
   tenantId: number;
   marks: string | null;
   isAbsent: number | null;
@@ -59,12 +59,12 @@ export interface IGrade {
 
 export interface IAssessmentRepository {
   // Exams
-  getExams(tenantId: number, academicId: number): Promise<IExam[]>;
+  getExams(tenantId: number, academicId: number, updatedSince?: Date): Promise<IExam[]>;
   getExamSetup(examId: number, classId: number): Promise<IExamSetup[]>;
   
   // Marks
   getMarksByExam(examId: number, classId: number, sectionId: number): Promise<IMark[]>;
-  saveMarks(marks: Partial<IMark>[]): Promise<void>;
+  saveMarks(tenantId: number, marks: Partial<IMark>[]): Promise<void>;
   
   // Grades
   getGrades(tenantId: number): Promise<IGrade[]>;

@@ -33,8 +33,19 @@ export class SqliteFinanceRepository implements IFinanceRepository {
 
   // --- Ledger ---
   async getLedgerEntries(tenantId: number, filter?: { type?: string; userId?: number; academicId?: number }): Promise<ILedgerEntry[]> {
-    let query = db.select().from(ledgerEntries).where(eq(ledgerEntries.tenantId, tenantId));
-    const results = await query;
+    const conditions = [eq(ledgerEntries.tenantId, tenantId)];
+    
+    if (filter?.type) {
+      conditions.push(eq(ledgerEntries.transactionType, filter.type as any));
+    }
+    if (filter?.userId) {
+      conditions.push(eq(ledgerEntries.userId, filter.userId));
+    }
+    if (filter?.academicId) {
+      conditions.push(eq(ledgerEntries.academicId, filter.academicId));
+    }
+
+    const results = await db.select().from(ledgerEntries).where(and(...conditions));
     return results.map((row: any) => this.mapLedger(row));
   }
 
@@ -102,8 +113,13 @@ export class SqliteFinanceRepository implements IFinanceRepository {
     };
   }
 
-  async updateFeeAssignment(id: number, data: Partial<IFeeAssignment>): Promise<void> {
-    await db.update(feeAssignments).set(data as any).where(eq(feeAssignments.id, id));
+  async updateFeeAssignment(tenantId: number, id: number, data: Partial<IFeeAssignment>): Promise<void> {
+    await db.update(feeAssignments)
+      .set(data as any)
+      .where(and(
+        eq(feeAssignments.id, id),
+        eq(feeAssignments.tenantId, tenantId)
+      ));
   }
 
   // --- Invoices ---

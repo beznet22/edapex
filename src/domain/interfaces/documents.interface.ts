@@ -2,8 +2,8 @@ export interface IDocumentsRepository {
   // --- Document Storage ---
   getDocumentsByOwner(tenantId: number, ownerType: string, ownerId: number): Promise<IDocument[]>;
   createDocument(data: Partial<IDocument>): Promise<IDocument>;
-  updateDocumentStatus(id: number, status: string): Promise<void>;
-  deleteDocument(id: number): Promise<void>;
+  updateDocumentStatus(tenantId: number, id: number, status: string): Promise<void>;
+  deleteDocument(tenantId: number, id: number): Promise<void>;
 }
 
 export interface IDocument {

@@ -1,0 +1,28 @@
+name = "edapex-edge-api"
+main = "src/server.ts"
+compatibility_date = "2024-10-01"
+compatibility_flags = [ "nodejs_compat" ]
+
+[vars]
+DATABASE_DIALECT = "d1"
+NODE_VERSION = "20"
+# AI Provider Keys (Should be set via wrangler secret)
+# OPENAI_API_KEY = ""
+# ANTHROPIC_API_KEY = ""
+
+[[d1_databases]]
+binding = "D1_DB"
+database_name = "edapex_db"
+database_id = "00000000-0000-0000-0000-000000000000" # Placeholder
+
+[[kv_namespaces]]
+binding = "CACHE_KV"
+id = "00000000-0000-0000-0000-000000000000" # Placeholder
+
+[[r2_buckets]]
+binding = "ASSETS_R2"
+bucket_name = "edapex-assets"
+
+[observability]
+enabled = true
+head_sampling_rate = 1

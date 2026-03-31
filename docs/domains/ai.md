@@ -253,19 +253,27 @@ graph TD
 **Proposal**: Integrate a vector database (e.g., pgvector, Qdrant, or Pinecone) for semantic recall.
 - **Justification**: Enhances AI capability to retrieve historical interactions that standard keyword DB searches miss.
 
-### E. TODO: Implement Stateless AI Execution (Future Architecture)
-**Proposal**: Eventually decouple `aiChats` and `aiMessages` from Mastra entirely using a Stateless Agent Invocation pattern.
-- **Status**: Deferred. Currently, the custom `[DB]Store` wrapper handles mapping our DB to Mastra. In the future, eliminating the `MastraStorage` layer protects against vendor lock-in with the AI SDK.
-- **Future Design Strategy**:
-  1. `aiChats` and `aiMessages` remain strictly Drizzle-native and independent of `MastraStorage`.
-  2. The `AiService` loads the DB history, maps it to generic LLM payloads, and invokes the Mastra agent statelessly.
-  ```typescript
-  // Future Stateless Invocation
-  const dbMessages = await aiRepository.getMessages(chatId);
-  const standardMessages = dbMessages.map(m => m.parts); 
-  const response = await agent.generate([ ...standardMessages, { role: 'user', content: req.text }]);
-  await aiRepository.saveMessage(chatId, 'assistant', response.text);
-  ```
+### E. Stateless AI Execution (Edge-Native Standard)
+
+To meet **Cloudflare's 10ms CPU limit** and ensure **Edge-Native performance**, EdApex uses a **Stateless Agent Execution Model** as the primary implementation pattern.
+
+#### Architecture Alignment
+1. `aiChats` and `aiMessages` remain strictly Drizzle-native and independent of `MastraStorage`.
+2. The `AiService` loads the DB history, maps it to generic LLM payloads, and invokes the Mastra agent statelessly.
+3. **Justification**: Stateless execution avoids the initialization overhead of heavy Mastra Memory adapters (e.g., ORM setup, connection pools) during the tight 10ms request window.
+4. **Justification**: Offloading conversation state to **TanStack DB** (client) and **D1** (edge) ensures sub-1ms local responsiveness and efficient remote persistence.
+
+```typescript
+// Standard Stateless Invocation Pattern
+const dbMessages = await aiRepository.getMessages(chatId);
+const standardMessages = dbMessages.map(m => ({
+  role: m.role,
+  content: m.parts[0]?.text || '', // Simplified mapping
+})); 
+
+const response = await agent.generate([ ...standardMessages, { role: 'user', content: req.text }]);
+await aiRepository.saveMessage(chatId, 'assistant', response.text);
+```
 
 ### E. Hono API Routes
 

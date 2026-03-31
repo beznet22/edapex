@@ -11,7 +11,7 @@ export interface IFinanceRepository {
   // --- Assignments & Payments ---
   getStudentFeeAssignments(userId: number): Promise<IFeeAssignment[]>;
   assignFeeToStudent(data: Partial<IFeeAssignment>): Promise<IFeeAssignment>;
-  updateFeeAssignment(id: number, data: Partial<IFeeAssignment>): Promise<void>;
+  updateFeeAssignment(tenantId: number, id: number, data: Partial<IFeeAssignment>): Promise<void>;
   
   // --- Invoices ---
   getInvoices(tenantId: number, userId?: number): Promise<IInvoice[]>;

@@ -70,6 +70,8 @@ export class SqliteAttendanceRepository implements IAttendanceRepository {
   }
 
   async bulkSaveStudentAttendance(data: Partial<IStudentAttendance>[]): Promise<void> {
+    if (data.length === 0) return;
+
     const values = data.map(item => ({
       tenantId: item.tenantId!,
       userId: item.userId!,
@@ -84,14 +86,16 @@ export class SqliteAttendanceRepository implements IAttendanceRepository {
       metadata: item.note ? { notes: item.note } : {}
     }));
     
-    for (const val of values) {
-      await db.insert(attendances)
-        .values(val as any)
-        .onConflictDoUpdate({
-          target: [attendances.userId, attendances.attendanceDate, attendances.academicId],
-          set: { status: val.status, metadata: val.metadata }
-        });
-    }
+    // Use onConflictDoUpdate for atomic bulk upsert
+    await db.insert(attendances)
+      .values(values as any)
+      .onConflictDoUpdate({
+        target: [attendances.userId, attendances.attendanceDate, attendances.academicId],
+        set: { 
+          status: sql`excluded.status`, 
+          metadata: sql`excluded.metadata` 
+        }
+      });
   }
 
   // --- Staff ---

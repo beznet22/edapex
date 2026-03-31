@@ -3,8 +3,8 @@ export interface ICmsRepository {
   getContentNodes(tenantId: number, filter?: { type?: string; publishedOnly?: boolean }): Promise<IContentNode[]>;
   getNodeBySlug(tenantId: number, slug: string): Promise<IContentNode | null>;
   createContentNode(data: Partial<IContentNode>): Promise<IContentNode>;
-  updateContentNode(id: number, data: Partial<IContentNode>): Promise<void>;
-  deleteContentNode(id: number): Promise<void>;
+  updateContentNode(tenantId: number, id: number, data: Partial<IContentNode>): Promise<void>;
+  deleteContentNode(tenantId: number, id: number): Promise<void>;
 }
 
 export interface IContentNode {
