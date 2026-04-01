@@ -4,10 +4,25 @@
 	"version": "0.1.0",
 	"type": "module",
 	"scripts": {
+		"dev": "vite dev",
+		"dev:backend": "wrangler dev src/server.ts",
+		"build": "vite build",
+		"preview": "vite preview",
+		"start": "wrangler deploy",
+		"clean": "rm -rf dist .wrangler .vinxi",
+		"typecheck": "tsc --noEmit",
+		"lint": "eslint src --ext .ts,.tsx",
+		"format": "prettier --write \"src/**/*.{ts,tsx}\"",
+		"test": "vitest run",
 		"db:push": "drizzle-kit push",
 		"db:generate": "drizzle-kit generate",
 		"db:migrate": "drizzle-kit migrate",
-		"db:studio": "drizzle-kit studio"
+		"db:migrate:local": "wrangler d1 migrations apply edapex_db --local",
+		"db:migrate:prod": "wrangler d1 migrations apply edapex_db --remote",
+		"db:studio": "drizzle-kit studio",
+		"docker:build": "docker build -t edapex-v2 .",
+		"docker:up": "docker-compose up -d --build",
+		"docker:down": "docker-compose down"
 	},
 	"dependencies": {
 		"@libsql/client": "^0.17.2",

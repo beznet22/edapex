@@ -149,11 +149,11 @@ The V2 evolution provides a complete control-plane loop for autonomous agents wi
 
 Every domain in the Agentic School follows this standardized, 5-phase execution lifecycle to ensure multi-tenant safety and fiscal accountability:
 
-1.  **Trigger**: A signal is enqueued (Cron/Event). **Middleware** ensures the request is authenticated and tenant-scoped.
-2.  **Validation**: The payload is verified against a **Zod Validator** (Structural Guarantee).
-3.  **Checkout**: Supervisor performs an **Atomic Checkout** (Distributed Lock) and assigns a `run_id`.
-4.  **Execution**: Mastra Agent hydrates context (via `agent_runtime_state`) and invokes tools.
-5.  **Artifact & Emit**: Agent delivers a `WorkProduct`, releases the lock, and emits an **Internal Event** for decoupled subscribers.
+1.  **Trigger**: A signal is enqueued (Cron/Event). **Middleware** ensures the request is authenticated and tenant-scoped while initializing the **8-Layer Trace Log** (`run_id`).
+2.  **Validation**: The payload is verified against a **Zod Validator** (Structural Guarantee). Any failure triggers a **Toast Notification** and logs a `fatal` error at the `validators` layer.
+3.  **Checkout**: Supervisor performs an **Atomic Checkout** (Distributed Lock) and assigns a `run_id`, logging the transition at the `services` layer.
+4.  **Execution**: Mastra Agent hydrates context and invokes tools. Every tool call emits a `debug` log with input/output metadata.
+5.  **Artifact & Emit**: Agent delivers a `WorkProduct`, releases the lock, and emits an **Internal Event**. Success is broadcasted via the **Notification System**.
 
 ## 3. Explicit V2 Technical Decisions
 
@@ -1125,6 +1125,36 @@ src/
 - **Orchestration**: The `MASTRA_ORCHESTRATOR` lives in `services/`, acting as the supervisor of all domain agents.
 - **Data Persistence**: All agentic state changes pass through the `validators/` before hitting the `domain/repositories/`.
 - **Reactive Backbone**: The `events/` directory manages the decoupling of agent actions from high-latency side effects (notifications, audits).
+
+## 41. Logging & Traceability (8-Layer Namespacing)
+
+To achieve granular visibility into the Agentic School's internal operations, EdApex V2 enforces standardized structured logging across the entire stack.
+
+- **Layer-Mandated Namespacing**: Every log entry includes a mandatory `layer` tag, identifying its origin from the 8 canonical layers (`db`, `config`, `controllers`, `services`, `domain`, `middleware`, `validators`, `events`).
+- **Orchestration Trace**: All logs related to a specialized HMAS task share a common `run_id`, allowing developers to filter the entire "Chain of Thought" and execution trace in a single view.
+- **Backend Implementation**: A Cloudflare-optimized structured JSON logger (`src/utils/logger.ts`).
+  - Usage Example: `logger.child({ layer: 'services', domain: 'finance' })`.
+
+## 42. Error Propagation & Resilience Pattern
+
+Every error follows a type-safe resilience chain from the persistent storage to the user-interface:
+
+1.  **Repository/Service**: Throws a specialized `DomainError` or `ValidationError` with a clear machine-readable code.
+2.  **Controller**: Inherits from `BaseController` which catches unhandled exceptions and maps them to standardized Hono JSON envelopes (Hono RPC).
+3.  **Frontend (TanStack Query)**: A global interceptor in the Query Client catches error responses and maps them to the **UI Notification System**.
+
+## 43. Notification System (Toasts & Push)
+
+- **Frontend Toasts (Sonner/Shadcn)**: Immediate, high-visibility feedback for human-triggered actions and critical agentic outcomes.
+- **Agent Pulse Toasts**: Low-priority "Ghost" notifications in the property panel that visualize granular agent heartbeat ticks without cluttering the main thread.
+- **Reactive Push**: The `Internal Event Bus` triggers the `Communication Service` to dispatch WebPush or SMS alerts for high-urgency reactive events (e.g., `ON_PBAC_VIOLATION`).
+
+## 44. Proactive AI Issue Tracking
+
+The Agentic School is self-healing via the **IT Supervisor's Auditor Agents**:
+
+- **Anomaly Detection**: Background agents scan the `cost_events` and `agent_runs` tables for failed tokens or frequent status errors.
+- **Audit Proposals**: When a pattern is detected (e.g., "Recursive tool error in HR Domain"), the AI Auditor creates a `SECURITY_INCIDENT` or `SYSTEM_ISSUE` WorkProduct in the **Board Command Center**.
 
 ## 40. Conclusion: Towards the Autonomous School
 

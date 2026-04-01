@@ -325,3 +325,5 @@ EdApex is optimized for the constraints of Cloudflare's edge network:
 ### 10.3 AI Orchestration (Provider-Agnostic)
 - **Mastra Core**: Lightweight orchestration without heavy stateful storage adapters.
 - **Runtime Provider Selection**: Agents are defined by capability and use the cheapest/fastest available provider at runtime.
+
+
