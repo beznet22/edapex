@@ -5,19 +5,19 @@ export type HomeworkStatus = "pending" | "submitted" | "evaluated" | "returned";
 export type PromotionResult = "promoted" | "retained" | "graduated" | "withdrawn";
 
 export interface IClass {
-  id: number;
-  tenantId: number;
+  id: string;
+  tenantId: string;
   name: string;
   passMark: string | null;
-  academicId: number;
+  academicId: string;
   activeStatus: number;
   createdAt: Date | null;
   updatedAt: Date | null;
 }
 
 export interface ISection {
-  id: number;
-  tenantId: number;
+  id: string;
+  tenantId: string;
   name: string;
   activeStatus: number;
   createdAt: Date | null;
@@ -25,35 +25,35 @@ export interface ISection {
 }
 
 export interface IClassSection {
-  id: number;
-  classId: number;
-  sectionId: number;
-  tenantId: number;
-  academicId: number;
+  id: string;
+  classId: string;
+  sectionId: string;
+  tenantId: string;
+  academicId: string;
   createdAt: Date | null;
   updatedAt: Date | null;
 }
 
 export interface ISubject {
-  id: number;
-  tenantId: number;
+  id: string;
+  tenantId: string;
   name: string;
   code: string | null;
   type: SubjectType;
   passMark: string | null;
-  academicId: number;
+  academicId: string;
   activeStatus: number;
   createdAt: Date | null;
   updatedAt: Date | null;
 }
 
 export interface IEnrollment {
-  id: number;
-  tenantId: number;
-  userId: number;
-  classId: number | null;
-  sectionId: number | null;
-  academicId: number;
+  id: string;
+  tenantId: string;
+  userId: string;
+  classId: string | null;
+  sectionId: string | null;
+  academicId: string;
   rollNo: string | null;
   isDefault: number | null;
   status: EnrollmentStatus;
@@ -62,81 +62,81 @@ export interface IEnrollment {
 }
 
 export interface IClassRoutine {
-  id: number;
-  tenantId: number;
-  classId: number;
-  sectionId: number;
-  subjectId: number;
-  teacherId: number | null;
+  id: string;
+  tenantId: string;
+  classId: string;
+  sectionId: string;
+  subjectId: string;
+  teacherId: string | null;
   dayOfWeek: DayOfWeek;
   startTime: string | null;
   endTime: string | null;
   roomNo: string | null;
-  academicId: number;
+  academicId: string;
   createdAt: Date | null;
   updatedAt: Date | null;
 }
 
 export interface IHomework {
-  id: number;
-  tenantId: number;
-  classId: number;
-  sectionId: number;
-  subjectId: number;
+  id: string;
+  tenantId: string;
+  classId: string;
+  sectionId: string;
+  subjectId: string;
   homeworkDate: string;
   submissionDate: string;
   description: string | null;
   attachment: string | null;
   marks: string | null;
-  academicId: number;
+  academicId: string;
   createdAt: Date | null;
   updatedAt: Date | null;
 }
 
 export interface ILesson {
-  id: number;
-  tenantId: number;
-  classId: number;
-  sectionId: number;
-  subjectId: number;
+  id: string;
+  tenantId: string;
+  classId: string;
+  sectionId: string;
+  subjectId: string;
   title: string;
   description: string | null;
-  academicId: number;
+  academicId: string;
   createdAt: Date | null;
   updatedAt: Date | null;
 }
 
 export interface ISubjectAssignment {
-  id: number;
-  tenantId: number;
-  staffId: number;
-  classId: number;
-  sectionId: number;
-  subjectId: number;
-  academicId: number;
+  id: string;
+  tenantId: string;
+  staffId: string;
+  classId: string;
+  sectionId: string;
+  subjectId: string;
+  academicId: string;
   createdAt: Date | null;
   updatedAt: Date | null;
 }
 
 export interface IClassTeacher {
-  id: number;
-  tenantId: number;
-  classId: number;
-  sectionId: number;
-  staffId: number;
-  academicId: number;
+  id: string;
+  tenantId: string;
+  classId: string;
+  sectionId: string;
+  staffId: string;
+  academicId: string;
   createdAt: Date | null;
   updatedAt: Date | null;
 }
 
 export interface IHomeworkSubmission {
-  id: number;
-  tenantId: number;
-  homeworkId: number;
-  userId: number;
-  enrollmentId: number | null;
-  classId: number | null;
-  sectionId: number | null;
+  id: string;
+  tenantId: string;
+  homeworkId: string;
+  userId: string;
+  enrollmentId: string | null;
+  classId: string | null;
+  sectionId: string | null;
   marks: string | null;
   status: HomeworkStatus;
   metadata: Record<string, any> | null;
@@ -145,50 +145,50 @@ export interface IHomeworkSubmission {
 }
 
 export interface IPromotion {
-  id: number;
-  tenantId: number;
-  userId: number;
-  fromClassId: number;
-  fromSectionId: number;
-  toClassId: number;
-  toSectionId: number;
-  fromAcademicId: number;
-  toAcademicId: number;
+  id: string;
+  tenantId: string;
+  userId: string;
+  fromClassId: string;
+  fromSectionId: string;
+  toClassId: string;
+  toSectionId: string;
+  fromAcademicId: string;
+  toAcademicId: string;
   result: PromotionResult;
-  promotedBy: number | null;
+  promotedBy: string | null;
   notes: string | null;
   promotedAt: Date | null;
   updatedAt: Date | null;
 }
 
 export interface ITimeline {
-  id: number;
-  tenantId: number;
-  userId: number;
+  id: string;
+  tenantId: string;
+  userId: string;
   type: string;
   title: string;
   description: string | null;
-  academicId: number;
+  academicId: string;
   createdAt: Date | null;
   updatedAt: Date | null;
 }
 
 export interface IAcademicRepository {
   // Classes & Sections
-  getClasses(tenantId: number, academicId: number): Promise<IClass[]>;
-  getSectionsByClass(classId: number): Promise<ISection[]>;
+  getClasses(tenantId: string, academicId: string): Promise<IClass[]>;
+  getSectionsByClass(classId: string): Promise<ISection[]>;
   
   // Enrollments
-  getEnrollmentByStudent(userId: number, academicId: number): Promise<IEnrollment | null>;
+  getEnrollmentByStudent(userId: string, academicId: string): Promise<IEnrollment | null>;
   createEnrollment(data: Partial<IEnrollment>): Promise<IEnrollment>;
   
   // Subjects
-  getSubjectsByClass(classId: number, academicId: number): Promise<ISubject[]>;
+  getSubjectsByClass(classId: string, academicId: string): Promise<ISubject[]>;
   
   // Homework
-  getHomeworkByClass(classId: number, sectionId: number, academicId: number): Promise<IHomework[]>;
+  getHomeworkByClass(classId: string, sectionId: string, academicId: string): Promise<IHomework[]>;
   submitHomework(data: Partial<IHomeworkSubmission>): Promise<IHomeworkSubmission>;
   
   // Lessons
-  getLessonsBySubject(subjectId: number, academicId: number): Promise<ILesson[]>;
+  getLessonsBySubject(subjectId: string, academicId: string): Promise<ILesson[]>;
 }

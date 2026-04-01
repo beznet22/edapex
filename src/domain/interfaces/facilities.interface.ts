@@ -1,29 +1,29 @@
 export interface IFacilitiesRepository {
   // --- Dormitories & Rooms ---
-  getDormitories(tenantId: number): Promise<IDormitory[]>;
-  getRoomsByDormitory(dormitoryId: number): Promise<IRoom[]>;
+  getDormitories(tenantId: string): Promise<IDormitory[]>;
+  getRoomsByDormitory(dormitoryId: string): Promise<IRoom[]>;
   createRoom(data: Partial<IRoom>): Promise<IRoom>;
 
   // --- Transport ---
-  getRoutes(tenantId: number): Promise<IRoute[]>;
-  getVehicles(tenantId: number): Promise<IVehicle[]>;
-  assignVehicleToRoute(routeId: number, vehicleId: number, tenantId: number): Promise<void>;
+  getRoutes(tenantId: string): Promise<IRoute[]>;
+  getVehicles(tenantId: string): Promise<IVehicle[]>;
+  assignVehicleToRoute(routeId: string, vehicleId: string, tenantId: string): Promise<void>;
 
   // --- Allocations ---
-  getAllocationsByUser(userId: number): Promise<IFacilityAllocation[]>;
+  getAllocationsByUser(userId: string): Promise<IFacilityAllocation[]>;
   allocateFacility(data: Partial<IFacilityAllocation>): Promise<IFacilityAllocation>;
-  releaseAllocation(id: number): Promise<void>;
+  releaseAllocation(tenantId: string, id: string): Promise<void>;
 
   // --- Operations ---
-  getComplaints(tenantId: number, filter?: { status?: string; userId?: number }): Promise<IComplaint[]>;
+  getComplaints(tenantId: string, filter?: { status?: string; userId?: string }): Promise<IComplaint[]>;
   createComplaint(data: Partial<IComplaint>): Promise<IComplaint>;
-  getVisitors(tenantId: number): Promise<IVisitor[]>;
+  getVisitors(tenantId: string): Promise<IVisitor[]>;
   logVisitor(data: Partial<IVisitor>): Promise<IVisitor>;
 }
 
 export interface IDormitory {
-  id: number;
-  tenantId: number;
+  id: string;
+  tenantId: string;
   name: string;
   type: "boys" | "girls" | "mixed";
   address?: string | null;
@@ -31,9 +31,9 @@ export interface IDormitory {
 }
 
 export interface IRoom {
-  id: number;
-  tenantId: number;
-  dormitoryId: number;
+  id: string;
+  tenantId: string;
+  dormitoryId: string;
   roomNumber: string;
   roomType: "standard" | "deluxe" | "suite";
   capacity: number;
@@ -41,46 +41,46 @@ export interface IRoom {
 }
 
 export interface IRoute {
-  id: number;
-  tenantId: number;
+  id: string;
+  tenantId: string;
   name: string;
   cost?: string | number | null;
 }
 
 export interface IVehicle {
-  id: number;
-  tenantId: number;
+  id: string;
+  tenantId: string;
   vehicleNo: string;
   vehicleModel?: string | null;
-  driverId?: number | null;
+  driverId?: string | null;
   capacity: number;
 }
 
 export interface IFacilityAllocation {
-  id: number;
-  tenantId: number;
-  userId: number;
+  id: string;
+  tenantId: string;
+  userId: string;
   facilityType: "transport" | "dormitory";
-  facilityRefId: number;
+  facilityRefId: string;
   status: "active" | "released" | "transferred";
-  academicId: number;
+  academicId: string;
 }
 
 export interface IComplaint {
-  id: number;
-  tenantId: number;
-  complaintBy: number;
+  id: string;
+  tenantId: string;
+  complaintBy: string;
   complaintType: string;
   complaintSource: "parent" | "student" | "staff" | "external";
   description: string;
   status: "open" | "in_progress" | "resolved" | "closed";
-  assignedTo?: number | null;
+  assignedTo?: string | null;
   complaintDate: string;
 }
 
 export interface IVisitor {
-  id: number;
-  tenantId: number;
+  id: string;
+  tenantId: string;
   name: string;
   phone?: string | null;
   purpose: string;

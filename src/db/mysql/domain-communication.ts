@@ -26,6 +26,7 @@ import {
 } from "drizzle-orm/mysql-core";
 
 import { users, tenants, accounts } from "./domain-core";
+import { generateId } from "../utils/id";
 
 // Universal Communication Events — replaces 6 notification/message tables
 
@@ -37,16 +38,16 @@ export type CommunicationMetadata = {
 };
 
 export const communicationEvents = mysqlTable("communication_events", {
-  id: int("id").autoincrement().primaryKey(),
-  tenantId: int("tenant_id").notNull().references(() => tenants.id),
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => generateId()),
+  tenantId: varchar("tenant_id", { length: 36 }).notNull().references(() => tenants.id),
   channel: mysqlEnum("channel", [
     "notification", "notice", "message", "email", "sms", "chat"
   ]).notNull(),
-  senderId: int("sender_id").references(() => users.id), // Staff persona
+  senderId: varchar("sender_id", { length: 36 }).references(() => users.id), // Staff persona
   targetType: mysqlEnum("target_type", [
     "person", "role", "class", "section", "broadcast"
   ]).notNull(),
-  targetRefId: int("target_ref_id"),
+  targetRefId: varchar("target_ref_id", { length: 36 }),
   subject: varchar("subject", { length: 500 }),
   body: text("body"),
   // Scheduling and priority for delivery routing
@@ -67,9 +68,10 @@ export const communicationEvents = mysqlTable("communication_events", {
 
 // Communication Recipients — per-recipient delivery tracking
 export const communicationRecipients = mysqlTable("communication_recipients", {
-  id: int("id").autoincrement().primaryKey(),
-  eventId: int("event_id").notNull().references(() => communicationEvents.id, { onDelete: "cascade" }),
-  userId: int("user_id").notNull().references(() => users.id), // Recipient persona
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => generateId()),
+  tenantId: varchar("tenant_id", { length: 36 }).notNull().references(() => tenants.id),
+  eventId: varchar("event_id", { length: 36 }).notNull().references(() => communicationEvents.id, { onDelete: "cascade" }),
+  userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id), // Recipient persona
   deliveryStatus: mysqlEnum("delivery_status", ["pending", "sent", "delivered", "failed", "bounced"]).notNull().default("pending"),
   readAt: timestamp("read_at"),
   deliveredAt: timestamp("delivered_at"),
@@ -80,4 +82,5 @@ export const communicationRecipients = mysqlTable("communication_recipients", {
   eventIdx: index("comr_event_idx").on(table.eventId),
   userIdx: index("comr_user_idx").on(table.userId),
   statusIdx: index("comr_status_idx").on(table.deliveryStatus),
+  tenantEventIdx: index("comr_tenant_evt_idx").on(table.tenantId, table.eventId),
 }));

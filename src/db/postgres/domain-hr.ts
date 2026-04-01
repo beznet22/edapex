@@ -12,7 +12,8 @@
  * - sm_human_departments
  * - sm_designations
  */
-import { pgSchema, text, doublePrecision, integer, serial, numeric, smallint, timestamp, jsonb, boolean, date, varchar, index } from "drizzle-orm/pg-core";
+import { pgSchema, text, doublePrecision, integer, uuid, numeric, smallint, timestamp, jsonb, boolean, date, varchar, index } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
 import { users, tenants, academicYears, accounts } from "./domain-core";
 
@@ -21,16 +22,16 @@ export const hrSchema = pgSchema("domain_hr");
 
 
 export const hrDepartments = hrSchema.table("departments", {
-  id: serial("id").primaryKey(),
-  tenantId: integer("tenant_id").notNull().references(() => tenants.id),
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id),
   departmentName: varchar("department_name", { length: 191 }).notNull(),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 export const hrDesignations = hrSchema.table("designations", {
-  id: serial("id").primaryKey(),
-  tenantId: integer("tenant_id").notNull().references(() => tenants.id),
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id),
   designationName: varchar("designation_name", { length: 191 }).notNull(),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -38,8 +39,8 @@ export const hrDesignations = hrSchema.table("designations", {
 
 // Leave Types — configurable leave categories (replaces smLeaveTypes)
 export const leaveTypes = hrSchema.table("leave_types", {
-  id: serial("id").primaryKey(),
-  tenantId: integer("tenant_id").notNull().references(() => tenants.id),
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id),
   name: varchar("name", { length: 100 }).notNull(), // medical, casual, maternity, etc.
   totalDays: integer("total_days"),  // annual allowance
   activeStatus: smallint("active_status").default(1).notNull(),
@@ -48,17 +49,17 @@ export const leaveTypes = hrSchema.table("leave_types", {
 });
 
 export const hrLeaveRequests = hrSchema.table("leave_requests", {
-  id: serial("id").primaryKey(),
-  tenantId: integer("tenant_id").notNull().references(() => tenants.id),
-  userId: integer("user_id").notNull().references(() => users.id), // Staff persona
-  leaveTypeId: integer("leave_type_id").references(() => leaveTypes.id),
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id),
+  userId: uuid("user_id").notNull().references(() => users.id), // Staff persona
+  leaveTypeId: uuid("leave_type_id").references(() => leaveTypes.id),
   leaveType: varchar("leave_type", { length: 100 }).notNull(), // kept for flexibility
   applyDate: date("apply_date", { mode: "string" }).notNull(),
   fromDate: date("from_date", { mode: "string" }).notNull(),
   toDate: date("to_date", { mode: "string" }).notNull(),
   reason: text("reason"),
   status: varchar("status", { length: 150 }).notNull().default("pending"),
-  approvedBy: integer("approved_by").references(() => users.id), // Staff persona
+  approvedBy: uuid("approved_by").references(() => users.id), // Staff persona
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => ({
@@ -75,8 +76,8 @@ export type SalaryComponent = {
 };
 
 export const salaryTemplates = hrSchema.table("salary_templates", {
-  id: serial("id").primaryKey(),
-  tenantId: integer("tenant_id").notNull().references(() => tenants.id),
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id),
   name: varchar("name", { length: 200 }).notNull(),
   components: jsonb("components").$type<SalaryComponent[]>().notNull(),
   createdAt: timestamp("created_at").defaultNow(),
@@ -86,10 +87,10 @@ export const salaryTemplates = hrSchema.table("salary_templates", {
 }));
 
 export const payrollRuns = hrSchema.table("payroll_runs", {
-  id: serial("id").primaryKey(),
-  tenantId: integer("tenant_id").notNull().references(() => tenants.id),
-  userId: integer("user_id").notNull().references(() => users.id), // Staff persona
-  salaryTemplateId: integer("salary_template_id").references(() => salaryTemplates.id),
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id),
+  userId: uuid("user_id").notNull().references(() => users.id), // Staff persona
+  salaryTemplateId: uuid("salary_template_id").references(() => salaryTemplates.id),
   payrollMonth: varchar("payroll_month", { length: 20 }).notNull(),
   payrollYear: varchar("payroll_year", { length: 20 }).notNull(),
   basicSalary: numeric("basic_salary", { precision: 12, scale: 2 }).notNull(),
@@ -114,15 +115,15 @@ export type EvaluationMetadata = {
 };
 
 export const staffEvaluations = hrSchema.table("staff_evaluations", {
-  id: serial("id").primaryKey(),
-  tenantId: integer("tenant_id").notNull().references(() => tenants.id),
-  userId: integer("user_id").notNull().references(() => users.id), // Staff being evaluated
-  evaluatorId: integer("evaluator_id").notNull().references(() => users.id), // Staff persona
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id),
+  userId: uuid("user_id").notNull().references(() => users.id), // Staff being evaluated
+  evaluatorId: uuid("evaluator_id").notNull().references(() => users.id), // Staff persona
   evaluationDate: date("evaluation_date", { mode: "string" }).notNull(),
   overallScore: numeric("overall_score", { precision: 5, scale: 2 }),
   remarks: text("remarks"),
   metadata: jsonb("metadata").$type<EvaluationMetadata>(),
-  academicId: integer("academic_id").references(() => academicYears.id),
+  academicId: uuid("academic_id").references(() => academicYears.id),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => ({

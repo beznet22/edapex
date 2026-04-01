@@ -12,7 +12,7 @@
  * - infix_permission_assigns / permissions / permission_sections / assign_permissions
  */
 import { unique,  sqliteTable, text, integer, real, index } from "drizzle-orm/sqlite-core";
-
+import { generateId } from "../utils/id";
 import { users, tenants, accounts } from "./domain-core";
 
 // Policy-Based Access Control (PBAC) schema - dropped edx_ prefix
@@ -31,8 +31,8 @@ export type PolicyDefinition = {
 };
 
 export const policyDefinitions = sqliteTable("domain_pbac_policy_definitions", {
-  id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
-  tenantId: integer("tenant_id").references(() => tenants.id), // NULL = system-wide policy
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  tenantId: text("tenant_id").references(() => tenants.id), // NULL = system-wide policy
   name: text("name", { length: 191 }).notNull(),
   description: text("description", { length: 500 }),
   definition: text("definition", { mode: "json" }).$type<PolicyDefinition>().notNull(),
@@ -49,15 +49,15 @@ export const policyDefinitions = sqliteTable("domain_pbac_policy_definitions", {
 // Role Assignment Metadata
 export type RoleAssignmentMetadata = {
   isPrimary?: boolean;
-  grantedBy?: number; // userId
+  grantedBy?: string; // userId
   expiresAt?: string;
 };
 
 export const roleAssignments = sqliteTable("domain_pbac_role_assignments", {
-  id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
-  tenantId: integer("tenant_id").notNull().references(() => tenants.id),
-  userId: integer("user_id").notNull().references(() => users.id), // Persona
-  accountId: integer("account_id").references(() => accounts.id), // Platform identity for account-level auth
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id),
+  userId: text("user_id").notNull().references(() => users.id), // Persona
+  accountId: text("account_id").references(() => accounts.id), // Platform identity for account-level auth
   roleName: text("role_name", { length: 100 }).notNull(), // e.g. 'admin', 'teacher', 'student'
   metadata: text("metadata", { mode: "json" }).$type<RoleAssignmentMetadata>(),
   createdAt: integer("created_at", { mode: "timestamp" }).defaultNow(),
@@ -71,10 +71,10 @@ export const roleAssignments = sqliteTable("domain_pbac_role_assignments", {
 // M:N binding between policies and role assignments
 // Enables dynamic PBAC: "role X gets policy Y in tenant Z"
 export const policyBindings = sqliteTable("domain_pbac_policy_bindings", {
-  id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
-  tenantId: integer("tenant_id").notNull().references(() => tenants.id),
-  policyId: integer("policy_id").notNull().references(() => policyDefinitions.id),
-  roleAssignmentId: integer("role_assignment_id").notNull().references(() => roleAssignments.id),
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id),
+  policyId: text("policy_id").notNull().references(() => policyDefinitions.id),
+  roleAssignmentId: text("role_assignment_id").notNull().references(() => roleAssignments.id),
   createdAt: integer("created_at", { mode: "timestamp" }).defaultNow(),
   updatedAt: integer("updated_at", { mode: "timestamp" }).defaultNow(),
 }, (table) => ({

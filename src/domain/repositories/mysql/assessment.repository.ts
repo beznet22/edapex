@@ -45,7 +45,7 @@ export class MySqlAssessmentRepository implements IAssessmentRepository {
   }
 
   // --- Exams ---
-  async getExams(tenantId: number, academicId: number): Promise<IExam[]> {
+  async getExams(tenantId: string, academicId: string): Promise<IExam[]> {
     const results = await db
       .select()
       .from(exams)
@@ -56,19 +56,20 @@ export class MySqlAssessmentRepository implements IAssessmentRepository {
     return results.map((row: any) => this.mapExam(row));
   }
 
-  async getExamSetup(examId: number, classId: number): Promise<IExamSetup[]> {
+  async getExamSetup(tenantId: string, examId: string, classId: string): Promise<IExamSetup[]> {
     const results = await db
       .select()
       .from(examSetups)
       .where(and(
         eq(examSetups.examId, examId),
-        eq(examSetups.classId, classId)
+        eq(examSetups.classId, classId),
+        eq(examSetups.tenantId, tenantId)
       ));
     return results.map((row: any) => this.mapSetup(row));
   }
 
   // --- Marks ---
-  async getMarksByExam(examId: number, classId: number, sectionId: number): Promise<IMark[]> {
+  async getMarksByExam(tenantId: string, examId: string, classId: string, sectionId: string): Promise<IMark[]> {
     const results = await db
       .select({
         id: examMarks.id,
@@ -83,21 +84,23 @@ export class MySqlAssessmentRepository implements IAssessmentRepository {
         updatedAt: examMarks.updatedAt
       })
       .from(examMarks)
-      .innerJoin(examSetups, eq(examMarks.examSetupId, examSetups.id))
+      .innerJoin(examSetups, and(
+        eq(examMarks.examSetupId, examSetups.id),
+        eq(examMarks.tenantId, examSetups.tenantId)
+      ))
       .where(and(
         eq(examSetups.examId, examId),
         eq(examSetups.classId, classId),
-        eq(examSetups.sectionId, sectionId)
+        eq(examSetups.sectionId, sectionId),
+        eq(examMarks.tenantId, tenantId)
       ));
     return results.map((row: any) => this.mapMark(row));
   }
 
-  async saveMarks(marks: Partial<IMark>[]): Promise<void> {
+  async saveMarks(tenantId: string, marks: Partial<IMark>[]): Promise<void> {
     for (const mark of marks) {
-      // In this schema, we need to find the examSetupId first, or assume it's provided in metadata
-      // For simplicity in this interface implementation:
       if (!mark.id) {
-        // Find or create logic would go here
+        // Need tenantId for creation if not provided in mark
       } else {
         await db.update(examMarks)
           .set({ 
@@ -105,13 +108,13 @@ export class MySqlAssessmentRepository implements IAssessmentRepository {
             isAbsent: mark.isAbsent as any,
             teacherRemarks: mark.teacherRemarks 
           })
-          .where(eq(examMarks.id, mark.id));
+          .where(and(eq(examMarks.id, mark.id), eq(examMarks.tenantId, tenantId)));
       }
     }
   }
 
   // --- Grades ---
-  async getGrades(tenantId: number): Promise<IGrade[]> {
+  async getGrades(tenantId: string): Promise<IGrade[]> {
     const results = await db.select().from(grades).where(eq(grades.tenantId, tenantId));
     return results.map((row: any) => ({
       id: row.id,
@@ -126,7 +129,7 @@ export class MySqlAssessmentRepository implements IAssessmentRepository {
     }));
   }
 
-  async getGradeForMark(tenantId: number, mark: number): Promise<IGrade | null> {
+  async getGradeForMark(tenantId: string, mark: number): Promise<IGrade | null> {
     const [result] = await db
       .select()
       .from(grades)

@@ -12,7 +12,7 @@ export class MySqlCmsRepository implements ICmsRepository {
     };
   }
 
-  async getContentNodes(tenantId: number, filter?: { type?: string; publishedOnly?: boolean }): Promise<IContentNode[]> {
+  async getContentNodes(tenantId: string, filter?: { type?: string; publishedOnly?: boolean }): Promise<IContentNode[]> {
     let whereClause = eq(contentNodes.tenantId, tenantId);
     if (filter?.publishedOnly) {
       whereClause = and(whereClause, eq(contentNodes.publishedStatus, 1)) as any;
@@ -21,7 +21,7 @@ export class MySqlCmsRepository implements ICmsRepository {
     return results.map((row: any) => this.mapNode(row));
   }
 
-  async getNodeBySlug(tenantId: number, slug: string): Promise<IContentNode | null> {
+  async getNodeBySlug(tenantId: string, slug: string): Promise<IContentNode | null> {
     const [result] = await db
       .select()
       .from(contentNodes)
@@ -30,17 +30,17 @@ export class MySqlCmsRepository implements ICmsRepository {
   }
 
   async createContentNode(data: Partial<IContentNode>): Promise<IContentNode> {
-    const [result] = await db.insert(contentNodes).values(data as any);
-    const [row] = await db.select().from(contentNodes).where(eq(contentNodes.id, result.insertId));
+    await db.insert(contentNodes).values(data as any);
+    const [row] = await db.select().from(contentNodes).where(eq(contentNodes.id, data.id!));
     if (!row) throw new Error("Failed to create content node");
     return this.mapNode(row);
   }
 
-  async updateContentNode(id: number, data: Partial<IContentNode>): Promise<void> {
-    await db.update(contentNodes).set(data as any).where(eq(contentNodes.id, id));
+  async updateContentNode(tenantId: string, id: string, data: Partial<IContentNode>): Promise<void> {
+    await db.update(contentNodes).set(data as any).where(and(eq(contentNodes.id, id), eq(contentNodes.tenantId, tenantId)));
   }
 
-  async deleteContentNode(id: number): Promise<void> {
-    await db.delete(contentNodes).where(eq(contentNodes.id, id));
+  async deleteContentNode(tenantId: string, id: string): Promise<void> {
+    await db.delete(contentNodes).where(and(eq(contentNodes.id, id), eq(contentNodes.tenantId, tenantId)));
   }
 }

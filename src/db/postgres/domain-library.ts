@@ -11,7 +11,8 @@
  * - sm_book_categories
  * - sm_book_issues / library_subjects
  */
-import { pgSchema, text, doublePrecision, integer, serial, numeric, smallint, timestamp, jsonb, boolean, date, varchar, index, unique } from "drizzle-orm/pg-core";
+import { pgSchema, text, doublePrecision, integer, uuid, numeric, smallint, timestamp, jsonb, boolean, date, varchar, index, unique } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
 import { users, tenants, academicYears, accounts } from "./domain-core";
 
@@ -20,8 +21,8 @@ export const librarySchema = pgSchema("domain_library");
 
 
 export const bookCategories = librarySchema.table("book_categories", {
-  id: serial("id").primaryKey(),
-  tenantId: integer("tenant_id").notNull().references(() => tenants.id),
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id),
   name: varchar("name", { length: 200 }).notNull(),
   description: varchar("description", { length: 500 }),
   createdAt: timestamp("created_at").defaultNow(),
@@ -37,13 +38,13 @@ export type BookMetadata = {
 };
 
 export const books = librarySchema.table("books", {
-  id: serial("id").primaryKey(),
-  tenantId: integer("tenant_id").notNull().references(() => tenants.id),
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id),
   title: varchar("title", { length: 255 }).notNull(),
   isbn: varchar("isbn", { length: 50 }),
   author: varchar("author", { length: 255 }),
   publisher: varchar("publisher", { length: 255 }),
-  categoryId: integer("category_id").references(() => bookCategories.id),
+  categoryId: uuid("category_id").references(() => bookCategories.id),
   quantity: integer("quantity").notNull().default(0),
   price: numeric("price", { precision: 12, scale: 2 }),
   rackNo: varchar("rack_no", { length: 100 }),
@@ -56,17 +57,17 @@ export const books = librarySchema.table("books", {
 }));
 
 export const bookIssues = librarySchema.table("book_issues", {
-  id: serial("id").primaryKey(),
-  tenantId: integer("tenant_id").notNull().references(() => tenants.id),
-  bookId: integer("book_id").notNull().references(() => books.id),
-  userId: integer("user_id").notNull().references(() => users.id), // Borrower persona
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id),
+  bookId: uuid("book_id").notNull().references(() => books.id),
+  userId: uuid("user_id").notNull().references(() => users.id), // Borrower persona
   issueDate: timestamp("issue_date").defaultNow().notNull(),
   dueDate: timestamp("due_date").notNull(),
   returnDate: timestamp("return_date"),
   status: varchar("status", { length: 150 }).notNull().default("issued"),
   fineAmount: numeric("fine_amount", { precision: 12, scale: 2 }).default("0.00"),
   isFinePaid: integer("is_fine_paid").default(0),
-  academicId: integer("academic_id").references(() => academicYears.id),
+  academicId: uuid("academic_id").references(() => academicYears.id),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => ({
@@ -82,9 +83,9 @@ export type LibraryProfileMetadata = {
 };
 
 export const libraryProfiles = librarySchema.table("library_profiles", {
-  id: serial("id").primaryKey(),
-  tenantId: integer("tenant_id").notNull().references(() => tenants.id),
-  userId: integer("user_id").notNull().references(() => users.id),
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id),
+  userId: uuid("user_id").notNull().references(() => users.id),
   maxBooksAllowed: integer("max_books_allowed").notNull().default(3),
   currentBorrowed: integer("current_borrowed").notNull().default(0),
   totalFinesAccrued: numeric("total_fines_accrued", { precision: 12, scale: 2 }).default("0.00"),

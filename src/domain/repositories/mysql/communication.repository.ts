@@ -20,22 +20,22 @@ export class MySqlCommunicationRepository implements ICommunicationRepository {
   }
 
   // --- Events ---
-  async getCommunicationEvents(tenantId: number, filter?: { channel?: string; targetType?: string }): Promise<ICommunicationEvent[]> {
+  async getCommunicationEvents(tenantId: string, filter?: { channel?: string; targetType?: string }): Promise<ICommunicationEvent[]> {
     let query = db.select().from(communicationEvents).where(eq(communicationEvents.tenantId, tenantId));
     const results = await query;
     return results.map((row: any) => this.mapEvent(row));
   }
 
   async createCommunicationEvent(data: Partial<ICommunicationEvent>): Promise<ICommunicationEvent> {
-    const [result] = await db.insert(communicationEvents).values(data as any);
-    const [row] = await db.select().from(communicationEvents).where(eq(communicationEvents.id, result.insertId));
+    await db.insert(communicationEvents).values(data as any);
+    const [row] = await db.select().from(communicationEvents).where(and(eq(communicationEvents.id, data.id!), eq(communicationEvents.tenantId, data.tenantId!)));
     if (!row) throw new Error("Failed to create event");
     return this.mapEvent(row);
   }
 
   // --- Recipients ---
-  async getEventRecipients(eventId: number): Promise<ICommunicationRecipient[]> {
-    const results = await db.select().from(communicationRecipients).where(eq(communicationRecipients.eventId, eventId));
+  async getEventRecipients(tenantId: string, eventId: string): Promise<ICommunicationRecipient[]> {
+    const results = await db.select().from(communicationRecipients).where(and(eq(communicationRecipients.eventId, eventId), eq(communicationRecipients.tenantId, tenantId)));
     return results.map((row: any) => ({
       ...row,
       readAt: row.readAt ? new Date(row.readAt) : null,
@@ -43,22 +43,22 @@ export class MySqlCommunicationRepository implements ICommunicationRepository {
     }));
   }
 
-  async addRecipients(eventId: number, userIds: number[]): Promise<void> {
-    const values = userIds.map(userId => ({ eventId, userId }));
+  async addRecipients(tenantId: string, eventId: string, userIds: string[]): Promise<void> {
+    const values = userIds.map(userId => ({ tenantId, eventId, userId }));
     await db.insert(communicationRecipients).values(values);
   }
 
-  async updateDeliveryStatus(recipientId: number, status: string, failureReason?: string): Promise<void> {
+  async updateDeliveryStatus(tenantId: string, recipientId: string, status: string, failureReason?: string): Promise<void> {
     await db.update(communicationRecipients)
       .set({ 
         deliveryStatus: status as any, 
         failureReason,
         deliveredAt: status === "delivered" ? new Date() : undefined
       })
-      .where(eq(communicationRecipients.id, recipientId));
+      .where(and(eq(communicationRecipients.id, recipientId), eq(communicationRecipients.tenantId, tenantId)));
   }
 
-  async markAsRead(recipientId: number): Promise<void> {
-    await db.update(communicationRecipients).set({ readAt: new Date() }).where(eq(communicationRecipients.id, recipientId));
+  async markAsRead(tenantId: string, recipientId: string): Promise<void> {
+    await db.update(communicationRecipients).set({ readAt: new Date() }).where(and(eq(communicationRecipients.id, recipientId), eq(communicationRecipients.tenantId, tenantId)));
   }
 }

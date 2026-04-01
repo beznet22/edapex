@@ -27,6 +27,7 @@ import {
 } from "drizzle-orm/mysql-core";
 
 import { users, tenants, academicYears, accounts } from "./domain-core";
+import { generateId } from "../utils/id";
 
 // Consolidates transport and dormitory into a unified facilities schema using accounts FKs.
 
@@ -45,8 +46,8 @@ export type VehicleMetadata = {
 };
 
 export const dormitories = mysqlTable("dormitories", {
-  id: int("id").autoincrement().primaryKey(),
-  tenantId: int("tenant_id").notNull().references(() => tenants.id),
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => generateId()),
+  tenantId: varchar("tenant_id", { length: 36 }).notNull().references(() => tenants.id),
   name: varchar("name", { length: 255 }).notNull(),
   type: mysqlEnum("type", ["boys", "girls", "mixed"]).notNull(),
   address: varchar("address", { length: 500 }),
@@ -57,9 +58,9 @@ export const dormitories = mysqlTable("dormitories", {
 });
 
 export const rooms = mysqlTable("rooms", {
-  id: int("id").autoincrement().primaryKey(),
-  tenantId: int("tenant_id").notNull().references(() => tenants.id),
-  dormitoryId: int("dormitory_id").notNull().references(() => dormitories.id),
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => generateId()),
+  tenantId: varchar("tenant_id", { length: 36 }).notNull().references(() => tenants.id),
+  dormitoryId: varchar("dormitory_id", { length: 36 }).notNull().references(() => dormitories.id),
   roomNumber: varchar("room_number", { length: 50 }).notNull(),
   roomType: mysqlEnum("room_type", ["standard", "deluxe", "suite"]).notNull(),
   capacity: int("capacity").notNull(),
@@ -70,8 +71,8 @@ export const rooms = mysqlTable("rooms", {
 });
 
 export const routes = mysqlTable("routes", {
-  id: int("id").autoincrement().primaryKey(),
-  tenantId: int("tenant_id").notNull().references(() => tenants.id),
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => generateId()),
+  tenantId: varchar("tenant_id", { length: 36 }).notNull().references(() => tenants.id),
   name: varchar("name", { length: 255 }).notNull(),
   cost: decimal("cost", { precision: 10, scale: 2 }),
   metadata: json("metadata").$type<FacilityMetadata>(),
@@ -80,11 +81,11 @@ export const routes = mysqlTable("routes", {
 });
 
 export const vehicles = mysqlTable("vehicles", {
-  id: int("id").autoincrement().primaryKey(),
-  tenantId: int("tenant_id").notNull().references(() => tenants.id),
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => generateId()),
+  tenantId: varchar("tenant_id", { length: 36 }).notNull().references(() => tenants.id),
   vehicleNo: varchar("vehicle_no", { length: 100 }).notNull(),
   vehicleModel: varchar("vehicle_model", { length: 100 }),
-  driverId: int("driver_id").references(() => users.id), // Staff persona
+  driverId: varchar("driver_id", { length: 36 }).references(() => users.id), // Staff persona
   capacity: int("capacity").notNull(),
   metadata: json("metadata").$type<VehicleMetadata>(),
   createdAt: timestamp("created_at").defaultNow(),
@@ -92,22 +93,22 @@ export const vehicles = mysqlTable("vehicles", {
 });
 
 export const routeAssignments = mysqlTable("route_assignments", {
-  id: int("id").autoincrement().primaryKey(),
-  tenantId: int("tenant_id").notNull().references(() => tenants.id),
-  routeId: int("route_id").notNull().references(() => routes.id),
-  vehicleId: int("vehicle_id").notNull().references(() => vehicles.id),
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => generateId()),
+  tenantId: varchar("tenant_id", { length: 36 }).notNull().references(() => tenants.id),
+  routeId: varchar("route_id", { length: 36 }).notNull().references(() => routes.id),
+  vehicleId: varchar("vehicle_id", { length: 36 }).notNull().references(() => vehicles.id),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow(),
 });
 
 export const facilityAllocations = mysqlTable("facility_allocations", {
-  id: int("id").autoincrement().primaryKey(),
-  tenantId: int("tenant_id").notNull().references(() => tenants.id),
-  userId: int("user_id").notNull().references(() => users.id), // Participant persona
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => generateId()),
+  tenantId: varchar("tenant_id", { length: 36 }).notNull().references(() => tenants.id),
+  userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id), // Participant persona
   facilityType: mysqlEnum("facility_type", ["transport", "dormitory"]).notNull(),
-  facilityRefId: int("facility_ref_id").notNull(), // vehicle.id or room.id
+  facilityRefId: varchar("facility_ref_id", { length: 36 }).notNull(), // vehicle.id or room.id
   status: mysqlEnum("status", ["active", "released", "transferred"]).notNull().default("active"),
-  academicId: int("academic_id").notNull().references(() => academicYears.id),
+  academicId: varchar("academic_id", { length: 36 }).notNull().references(() => academicYears.id),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow(),
 }, (table) => ({
@@ -120,15 +121,15 @@ export const facilityAllocations = mysqlTable("facility_allocations", {
 
 // Complaints — replaces smComplaints
 export const complaints = mysqlTable("complaints", {
-  id: int("id").autoincrement().primaryKey(),
-  tenantId: int("tenant_id").notNull().references(() => tenants.id),
-  complaintBy: int("complaint_by").notNull().references(() => users.id), // Reporter persona
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => generateId()),
+  tenantId: varchar("tenant_id", { length: 36 }).notNull().references(() => tenants.id),
+  complaintBy: varchar("complaint_by", { length: 36 }).notNull().references(() => users.id), // Reporter persona
   complaintType: varchar("complaint_type", { length: 100 }).notNull(),
   complaintSource: mysqlEnum("complaint_source", ["parent", "student", "staff", "external"]).notNull(),
   description: text("description").notNull(),
   actionTaken: text("action_taken"),
   status: mysqlEnum("status", ["open", "in_progress", "resolved", "closed"]).notNull().default("open"),
-  assignedTo: int("assigned_to").references(() => users.id), // Staff persona
+  assignedTo: varchar("assigned_to", { length: 36 }).references(() => users.id), // Staff persona
   complaintDate: date("complaint_date", { mode: "string" }).notNull(),
   resolvedAt: timestamp("resolved_at"),
   createdAt: timestamp("created_at").defaultNow(),
@@ -139,13 +140,13 @@ export const complaints = mysqlTable("complaints", {
 
 // Visitors — replaces smVisitors
 export const visitors = mysqlTable("visitors", {
-  id: int("id").autoincrement().primaryKey(),
-  tenantId: int("tenant_id").notNull().references(() => tenants.id),
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => generateId()),
+  tenantId: varchar("tenant_id", { length: 36 }).notNull().references(() => tenants.id),
   name: varchar("name", { length: 200 }).notNull(),
   phone: varchar("phone", { length: 100 }),
   idNumber: varchar("id_number", { length: 100 }),
   purpose: varchar("purpose", { length: 500 }).notNull(),
-  personToMeet: int("person_to_meet").references(() => users.id), // Staff persona
+  personToMeet: varchar("person_to_meet", { length: 36 }).references(() => users.id), // Staff persona
   checkInAt: timestamp("check_in_at").defaultNow(),
   checkOutAt: timestamp("check_out_at"),
   noOfPersons: int("no_of_persons").default(1),
@@ -163,8 +164,8 @@ export type InventoryMetadata = {
 };
 
 export const inventoryItems = mysqlTable("inventory_items", {
-  id: int("id").autoincrement().primaryKey(),
-  tenantId: int("tenant_id").notNull().references(() => tenants.id),
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => generateId()),
+  tenantId: varchar("tenant_id", { length: 36 }).notNull().references(() => tenants.id),
   name: varchar("name", { length: 255 }).notNull(),
   category: varchar("category", { length: 100 }),
   quantity: int("quantity").notNull().default(0),

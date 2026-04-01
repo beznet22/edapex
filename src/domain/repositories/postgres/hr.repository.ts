@@ -43,7 +43,7 @@ export class PostgresHrRepository implements IHrRepository {
   }
 
   // --- Structure ---
-  async getDepartments(tenantId: number): Promise<IDepartment[]> {
+  async getDepartments(tenantId: string): Promise<IDepartment[]> {
     const results = await db.select().from(hrDepartments).where(eq(hrDepartments.tenantId, tenantId));
     return results.map((row: any) => ({
       ...row,
@@ -52,7 +52,7 @@ export class PostgresHrRepository implements IHrRepository {
     }));
   }
 
-  async getDesignations(tenantId: number): Promise<IDesignation[]> {
+  async getDesignations(tenantId: string): Promise<IDesignation[]> {
     const results = await db.select().from(hrDesignations).where(eq(hrDesignations.tenantId, tenantId));
     return results.map((row: any) => ({
       ...row,
@@ -62,7 +62,7 @@ export class PostgresHrRepository implements IHrRepository {
   }
 
   // --- Leaves ---
-  async getLeaveRequestsByStaff(userId: number): Promise<ILeaveRequest[]> {
+  async getLeaveRequestsByStaff(userId: string): Promise<ILeaveRequest[]> {
     const results = await db.select().from(hrLeaveRequests).where(eq(hrLeaveRequests.userId, userId));
     return results.map((row: any) => this.mapLeaveRequest(row));
   }
@@ -73,10 +73,10 @@ export class PostgresHrRepository implements IHrRepository {
     return this.mapLeaveRequest(result);
   }
 
-  async updateLeaveStatus(id: number, status: LeaveStatus, approverId: number): Promise<ILeaveRequest> {
+  async updateLeaveStatus(tenantId: string, id: string, status: LeaveStatus, approverId: string): Promise<ILeaveRequest> {
     const [result] = await db.update(hrLeaveRequests)
       .set({ status, approvedBy: approverId })
-      .where(eq(hrLeaveRequests.id, id))
+      .where(and(eq(hrLeaveRequests.id, id), eq(hrLeaveRequests.tenantId, tenantId)))
       .returning();
     
     if (!result) throw new Error("Failed to update leave status");
@@ -84,7 +84,7 @@ export class PostgresHrRepository implements IHrRepository {
   }
 
   // --- Payroll ---
-  async getPayrollByStaff(userId: number, month: string, year: string): Promise<IPayrollRun | null> {
+  async getPayrollByStaff(userId: string, month: string, year: string): Promise<IPayrollRun | null> {
     const [result] = await db
       .select()
       .from(payrollRuns)

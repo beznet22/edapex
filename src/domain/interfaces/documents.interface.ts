@@ -1,16 +1,16 @@
 export interface IDocumentsRepository {
   // --- Document Storage ---
-  getDocumentsByOwner(tenantId: number, ownerType: string, ownerId: number): Promise<IDocument[]>;
+  getDocumentsByOwner(tenantId: string, ownerType: string, ownerId: string): Promise<IDocument[]>;
   createDocument(data: Partial<IDocument>): Promise<IDocument>;
-  updateDocumentStatus(tenantId: number, id: number, status: string): Promise<void>;
-  deleteDocument(tenantId: number, id: number): Promise<void>;
+  updateDocumentStatus(tenantId: string, id: string, status: string): Promise<void>;
+  deleteDocument(tenantId: string, id: string): Promise<void>;
 }
 
 export interface IDocument {
-  id: number;
-  tenantId: number;
+  id: string;
+  tenantId: string;
   ownerType: string;
-  ownerId: number;
+  ownerId: string;
   documentType: string;
   filePath: string;
   fileSize?: number | null;
@@ -18,5 +18,5 @@ export interface IDocument {
   status: "draft" | "pending_review" | "approved" | "rejected";
   metadata?: any;
   expiresAt?: Date | null;
-  createdBy?: number | null;
+  createdBy?: string | null;
 }

@@ -14,14 +14,15 @@
  * - sm_base_setups / sm_base_groups -> edx_enumerations
  * - users / sm_students / sm_staffs / sm_parents -> edx_accounts
  */
-import { pgSchema, text, doublePrecision, integer, serial, numeric, smallint, timestamp, jsonb, boolean, date, varchar, index, unique } from "drizzle-orm/pg-core";
+import { pgSchema, text, doublePrecision, integer, uuid, numeric, smallint, timestamp, jsonb, boolean, date, varchar, index, unique } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
+import { generateId } from "../utils/id";
 
 // Tenant context injected into all repositories
 export interface TenantContext {
-  tenantId: number;    // school_id (stays integer for now, UUID in PG phase)
-  academicId: number;  // academic_year_id
-  userId: number;      // authenticated user
+  tenantId: string;    // UUID
+  academicId: string;  // academic_year_id UUID
+  userId: string;      // authenticated user UUID
 }
 
 // --- CORE TABLES ---
@@ -46,7 +47,7 @@ export const coreSchema = pgSchema("domain_core");
 
 
 export const tenants = coreSchema.table("tenants", {
-  id: serial("id").primaryKey(),
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
   tenantType: varchar("tenant_type", { length: 150 }).default("conventional").notNull(),
   name: varchar("name", { length: 200 }).notNull(),
   code: varchar("code", { length: 50 }),
@@ -84,10 +85,10 @@ export const accounts = coreSchema.table("accounts", {
   language: varchar("language", { length: 191 }).default("en"),
   styleId: integer("style_id").default(1),
   rtlLtl: integer("rtl_ltl").default(2),
-  selectedSession: integer("selected_session").default(1),
-  accessStatus: integer("access_status").default(1),
-  tenantId: integer("tenant_id").references(() => tenants.id, { onDelete: "cascade" }), 
-  roleId: integer("role_id"), 
+  selectedSession: uuid("selected_session"),
+  accessStatus: smallint("access_status").default(1).notNull(),
+  tenantId: uuid("tenant_id").references(() => tenants.id, { onDelete: "cascade" }), 
+  roleId: uuid("role_id"), 
   isAdministrator: varchar("is_administrator", { length: 150 }).default("no").notNull(),
   isRegistered: smallint("is_registered").default(0).notNull(),
   deviceToken: text("device_token"),
@@ -203,8 +204,8 @@ export type UserMetadata = StudentMetadata | StaffMetadata | ParentMetadata | Dr
 
 // Users Table — Domain Personas (Student, Staff, Parent)
 export const users = coreSchema.table("users", {
-  id: serial("id").primaryKey(),
-  tenantId: integer("tenant_id").notNull().references(() => tenants.id),
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id),
   accountId: varchar("account_id", { length: 255 }).references(() => accounts.id),
   userType: varchar("user_type", { length: 50 }).notNull(), // student, staff, parent, driver, facilitator
   firstName: varchar("first_name", { length: 100 }).notNull(),
@@ -215,7 +216,7 @@ export const users = coreSchema.table("users", {
   genderId: integer("gender_id").references(() => enumerations.id),
   photo: varchar("photo", { length: 500 }),
   idNumber: varchar("id_number", { length: 100 }),  // national ID / passport
-  parentUserId: integer("parent_user_id"),  // self-ref FK for parent-child linking
+  parentUserId: uuid("parent_user_id"),  // self-ref FK for parent-child linking
   metadata: jsonb("metadata").$type<UserMetadata>(),  // role-specific fields
   activeStatus: smallint("active_status").default(1).notNull(),
   createdAt: timestamp("created_at").defaultNow(),
@@ -230,8 +231,8 @@ export const users = coreSchema.table("users", {
 
 // Academic Years — replaces sm_academic_years
 export const academicYears = coreSchema.table("academic_years", {
-  id: serial("id").primaryKey(),
-  tenantId: integer("tenant_id").notNull().references(() => tenants.id),
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id),
   title: varchar("title", { length: 200 }).notNull(),
   year: varchar("year", { length: 20 }),
   startingDate: date("starting_date", { mode: "string" }),
@@ -251,8 +252,8 @@ export type EnumerationMetadata = {
 };
 
 export const enumerations = coreSchema.table("enumerations", {
-  id: serial("id").primaryKey(),
-  tenantId: integer("tenant_id").references(() => tenants.id),  // NULL = global
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: uuid("tenant_id").references(() => tenants.id),  // NULL = global
   domain: varchar("domain", { length: 50 }).notNull(),  // 'gender', 'blood_group', 'religion', etc.
   code: varchar("code", { length: 50 }).notNull(),
   label: varchar("label", { length: 191 }).notNull(),
@@ -274,8 +275,8 @@ export type UserDocumentMetadata = {
 };
 
 export const userDocuments = coreSchema.table("user_documents", {
-  id: serial("id").primaryKey(),
-  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   documentType: varchar("document_type", { length: 50 }).notNull(),
   title: varchar("title", { length: 191 }),
   filePath: varchar("file_path", { length: 500 }).notNull(),
@@ -298,8 +299,8 @@ export type AddressData = {
 };
 
 export const userAddresses = coreSchema.table("user_addresses", {
-  id: serial("id").primaryKey(),
-  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   addressType: varchar("address_type", { length: 150 }).notNull(),
   addressData: jsonb("address_data").$type<AddressData>().notNull(),
   createdAt: timestamp("created_at").defaultNow(),
@@ -311,7 +312,7 @@ export const userAddresses = coreSchema.table("user_addresses", {
 // --- SYSTEM JOBS ---
 
 export const jobs = coreSchema.table("jobs", {
-  id: serial("id").primaryKey(),
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
   queue: varchar("queue", { length: 255 }).notNull(),
   payload: text("payload").notNull(),
   attempts: integer("attempts").notNull().default(0),
@@ -321,7 +322,7 @@ export const jobs = coreSchema.table("jobs", {
 });
 
 export const failedJobs = coreSchema.table("failed_jobs", {
-  id: serial("id").primaryKey(),
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
   uuid: varchar("uuid", { length: 255 }),
   connection: text("connection").notNull(),
   queue: text("queue").notNull(),

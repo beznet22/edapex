@@ -13,7 +13,8 @@
  * - sm_pages / sm_about_pages / sm_contact_pages / sm_course_pages
  * - home_sliders
  */
-import { pgSchema, text, doublePrecision, integer, serial, numeric, smallint, timestamp, jsonb, boolean, date, varchar, index } from "drizzle-orm/pg-core";
+import { pgSchema, text, doublePrecision, integer, uuid, numeric, smallint, timestamp, jsonb, boolean, date, varchar, index } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
 import { users, tenants, accounts, enumerations } from "./domain-core";
 
@@ -40,8 +41,8 @@ export const cmsSchema = pgSchema("domain_cms");
 
 
 export const contentNodes = cmsSchema.table("content_nodes", {
-  id: serial("id").primaryKey(),
-  tenantId: integer("tenant_id").notNull().references(() => tenants.id),
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id),
   contentType: varchar("content_type", { length: 150 }).notNull(),
   slug: varchar("slug", { length: 255 }),
   title: varchar("title", { length: 500 }).notNull(),
@@ -50,9 +51,9 @@ export const contentNodes = cmsSchema.table("content_nodes", {
   publishedStatus: smallint("published_status").notNull().default(1),
   publishedAt: timestamp("published_at"),
   expiresAt: timestamp("expires_at"),
-  authorId: integer("author_id").references(() => users.id),
-  categoryId: integer("category_id").references(() => enumerations.id),
-  parentId: integer("parent_id"),  // self-ref for menu hierarchy / gallery items
+  authorId: uuid("author_id").references(() => users.id),
+  categoryId: uuid("category_id").references(() => enumerations.id),
+  parentId: uuid("parent_id"),  // self-ref for menu hierarchy / gallery items
   sortOrder: integer("sort_order").default(0),
   metadata: jsonb("metadata").$type<ContentNodeMetadata>(),
   createdAt: timestamp("created_at").defaultNow(),

@@ -16,7 +16,7 @@ import { eq, and } from "drizzle-orm";
 
 export class MySqlLibraryRepository implements ILibraryRepository {
   // --- Catalog ---
-  async getBooks(tenantId: number): Promise<IBook[]> {
+  async getBooks(tenantId: string): Promise<IBook[]> {
     const results = await db.select().from(books).where(eq(books.tenantId, tenantId));
     return results.map((row: any) => ({
       ...row,
@@ -24,27 +24,30 @@ export class MySqlLibraryRepository implements ILibraryRepository {
     }));
   }
 
-  async getBookById(id: number): Promise<IBook | null> {
-    const [result] = await db.select().from(books).where(eq(books.id, id));
+  async getBookById(tenantId: string, id: string): Promise<IBook | null> {
+    const [result] = await db
+      .select()
+      .from(books)
+      .where(and(eq(books.id, id), eq(books.tenantId, tenantId)));
     return result ? { ...result, price: result.price ? result.price.toString() : null } : null;
   }
 
   async createBook(data: Partial<IBook>): Promise<IBook> {
-    const [result] = await db.insert(books).values(data as any);
-    const book = await this.getBookById(result.insertId);
+    await db.insert(books).values(data as any);
+    const book = await this.getBookById(data.tenantId!, data.id!);
     if (!book) throw new Error("Failed to create book");
     return book;
   }
 
-  async getCategories(tenantId: number): Promise<IBookCategory[]> {
+  async getCategories(tenantId: string): Promise<IBookCategory[]> {
     const results = await db.select().from(bookCategories).where(eq(bookCategories.tenantId, tenantId));
     return results.map((row: any) => ({ ...row }));
   }
 
   // --- Circulation ---
   async issueBook(data: Partial<IBookIssue>): Promise<IBookIssue> {
-    const [result] = await db.insert(bookIssues).values(data as any);
-    const [row] = await db.select().from(bookIssues).where(eq(bookIssues.id, result.insertId));
+    await db.insert(bookIssues).values(data as any);
+    const [row] = await db.select().from(bookIssues).where(eq(bookIssues.id, data.id!));
     if (!row) throw new Error("Failed to issue book");
     return {
       ...row,
@@ -55,18 +58,21 @@ export class MySqlLibraryRepository implements ILibraryRepository {
     };
   }
 
-  async returnBook(issueId: number, returnDate: Date, fineAmount: number = 0): Promise<void> {
+  async returnBook(tenantId: string, issueId: string, returnDate: Date, fineAmount: number = 0): Promise<void> {
     await db.update(bookIssues)
       .set({ 
         status: "returned", 
         returnDate, 
         fineAmount: fineAmount.toString() 
       })
-      .where(eq(bookIssues.id, issueId));
+      .where(and(eq(bookIssues.id, issueId), eq(bookIssues.tenantId, tenantId)));
   }
 
-  async getUserIssues(userId: number): Promise<IBookIssue[]> {
-    const results = await db.select().from(bookIssues).where(eq(bookIssues.userId, userId));
+  async getUserIssues(tenantId: string, userId: string): Promise<IBookIssue[]> {
+    const results = await db
+      .select()
+      .from(bookIssues)
+      .where(and(eq(bookIssues.tenantId, tenantId), eq(bookIssues.userId, userId)));
     return results.map((row: any) => ({
       ...row,
       issueDate: new Date(row.issueDate),
@@ -77,7 +83,7 @@ export class MySqlLibraryRepository implements ILibraryRepository {
   }
 
   // --- Membership ---
-  async getLibraryProfile(userId: number, tenantId: number): Promise<ILibraryProfile | null> {
+  async getLibraryProfile(userId: string, tenantId: string): Promise<ILibraryProfile | null> {
     const [result] = await db
       .select()
       .from(libraryProfiles)
@@ -89,7 +95,7 @@ export class MySqlLibraryRepository implements ILibraryRepository {
   }
 
   async createLibraryProfile(data: Partial<ILibraryProfile>): Promise<ILibraryProfile> {
-    const [result] = await db.insert(libraryProfiles).values(data as any);
+    await db.insert(libraryProfiles).values(data as any);
     const profile = await this.getLibraryProfile(data.userId!, data.tenantId!);
     if (!profile) throw new Error("Failed to create library profile");
     return profile;

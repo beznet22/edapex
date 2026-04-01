@@ -20,7 +20,7 @@ export class PostgresSettingsRepository implements ISettingsRepository {
     };
   }
 
-  async getSettingsByDomain(tenantId: number, domain: string): Promise<ISetting | null> {
+  async getSettingsByDomain(tenantId: string, domain: string): Promise<ISetting | null> {
     const [result] = await db
       .select()
       .from(settings)
@@ -32,7 +32,7 @@ export class PostgresSettingsRepository implements ISettingsRepository {
     return result ? this.mapSettingToDomain(result) : null;
   }
 
-  async updateSettings(tenantId: number, domain: string, config: SettingConfig): Promise<ISetting> {
+  async updateSettings(tenantId: string, domain: string, config: SettingConfig): Promise<ISetting> {
     const [result] = await db.insert(settings)
       .values({
         tenantId,
@@ -49,7 +49,7 @@ export class PostgresSettingsRepository implements ISettingsRepository {
     return this.mapSettingToDomain(result);
   }
 
-  async getFeatureFlag(tenantId: number, featureKey: string): Promise<IFeatureFlag | null> {
+  async getFeatureFlag(tenantId: string, featureKey: string): Promise<IFeatureFlag | null> {
     const [result] = await db
       .select()
       .from(featureFlags)
@@ -61,7 +61,7 @@ export class PostgresSettingsRepository implements ISettingsRepository {
     return result ? this.mapFeatureToDomain(result) : null;
   }
 
-  async getAllFeatureFlags(tenantId: number): Promise<IFeatureFlag[]> {
+  async getAllFeatureFlags(tenantId: string): Promise<IFeatureFlag[]> {
     const results = await db
       .select()
       .from(featureFlags)
@@ -70,7 +70,7 @@ export class PostgresSettingsRepository implements ISettingsRepository {
     return results.map(this.mapFeatureToDomain);
   }
 
-  async updateFeatureFlag(tenantId: number, featureKey: string, data: Partial<Omit<IFeatureFlag, "id" | "tenantId" | "featureKey" | "createdAt" | "updatedAt">>): Promise<IFeatureFlag> {
+  async updateFeatureFlag(tenantId: string, featureKey: string, data: Partial<Omit<IFeatureFlag, "id" | "tenantId" | "featureKey" | "createdAt" | "updatedAt">>): Promise<IFeatureFlag> {
     const updatePayload: any = {};
     if (data.isEnabled !== undefined) updatePayload.isEnabled = data.isEnabled;
     if (data.rolloutPercentage !== undefined) updatePayload.rolloutPercentage = data.rolloutPercentage;

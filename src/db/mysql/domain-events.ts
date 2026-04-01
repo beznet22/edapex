@@ -21,6 +21,7 @@ import {
   index,
 } from "drizzle-orm/mysql-core";
 import { users, tenants, accounts } from "./domain-core";
+import { generateId } from "../utils/id";
 
 export type EventMetadata = {
   ipAddress?: string;
@@ -31,13 +32,13 @@ export type EventMetadata = {
 
 export type AuditLogValues = Record<string, unknown>;
 export const events = mysqlTable("events", {
-  id: int("id").autoincrement().primaryKey(),
-  tenantId: int("tenant_id").notNull().references(() => tenants.id),
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => generateId()),
+  tenantId: varchar("tenant_id", { length: 36 }).notNull().references(() => tenants.id),
   eventType: varchar("event_type", { length: 100 }).notNull(),
   // e.g. 'student.enrolled', 'exam.completed', 'fee.paid', 'attendance.marked', 'agent.action_completed'
   aggregateType: varchar("aggregate_type", { length: 50 }).notNull(),
-  aggregateId: int("aggregate_id").notNull(),
-  actorId: int("actor_id").references(() => users.id),  // persona who triggered the event
+  aggregateId: varchar("aggregate_id", { length: 36 }).notNull(),
+  actorId: varchar("actor_id", { length: 36 }).references(() => users.id),  // persona who triggered the event
   payload: json("payload").$type<Record<string, any>>().notNull(),
   metadata: json("metadata").$type<EventMetadata>(),
   // Transactional Outbox: tracks event dispatch lifecycle
@@ -57,14 +58,14 @@ export const events = mysqlTable("events", {
 }));
 
 export const auditLog = mysqlTable("audit_log", {
-  id: int("id").autoincrement().primaryKey(),
-  tenantId: int("tenant_id").notNull().references(() => tenants.id),
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => generateId()),
+  tenantId: varchar("tenant_id", { length: 36 }).notNull().references(() => tenants.id),
   tableName: varchar("table_name", { length: 100 }).notNull(),
-  recordId: int("record_id").notNull(),
+  recordId: varchar("record_id", { length: 36 }).notNull(),
   action: mysqlEnum("action", ["INSERT", "UPDATE", "DELETE"]).notNull(),
   oldValues: json("old_values").$type<AuditLogValues>(),
   newValues: json("new_values").$type<AuditLogValues>(),
-  changedBy: int("changed_by").notNull().references(() => users.id), // Staff persona
+  changedBy: varchar("changed_by", { length: 36 }).notNull().references(() => users.id), // Staff persona
   changedAt: timestamp("changed_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow(),
 }, (table) => ({

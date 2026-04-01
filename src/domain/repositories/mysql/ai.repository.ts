@@ -45,12 +45,12 @@ export class MySqlAiRepository implements IAiRepository {
   }
 
   // --- Chat ---
-  async getChatById(chatId: string): Promise<IAiChat | null> {
-    const [result] = await db.select().from(aiChats).where(eq(aiChats.id, chatId));
+  async getChatById(tenantId: string, chatId: string): Promise<IAiChat | null> {
+    const [result] = await db.select().from(aiChats).where(and(eq(aiChats.id, chatId), eq(aiChats.tenantId, tenantId)));
     return result ? this.mapChat(result) : null;
   }
 
-  async getChatsByUser(tenantId: number, userId: number): Promise<IAiChat[]> {
+  async getChatsByUser(tenantId: string, userId: string): Promise<IAiChat[]> {
     const results = await db
       .select()
       .from(aiChats)
@@ -63,42 +63,48 @@ export class MySqlAiRepository implements IAiRepository {
 
   async createChat(data: Partial<IAiChat>): Promise<IAiChat> {
     await db.insert(aiChats).values(data as any);
-    const result = await this.getChatById(data.id!);
+    const result = await this.getChatById(data.tenantId!, data.id!);
     if (!result) throw new Error("Failed to create chat");
     return result;
   }
 
-  async updateChat(chatId: string, data: Partial<IAiChat>): Promise<IAiChat> {
-    await db.update(aiChats).set(data as any).where(eq(aiChats.id, chatId));
-    const result = await this.getChatById(chatId);
+  async updateChat(tenantId: string, chatId: string, data: Partial<IAiChat>): Promise<IAiChat> {
+    await db.update(aiChats)
+      .set(data as any)
+      .where(and(eq(aiChats.id, chatId), eq(aiChats.tenantId, tenantId)));
+    const result = await this.getChatById(tenantId, chatId);
     if (!result) throw new Error("Failed to update chat");
     return result;
   }
 
   // --- Messages ---
-  async getMessagesByChat(chatId: string): Promise<IAiMessage[]> {
+  async getMessagesByChat(tenantId: string, chatId: string): Promise<IAiMessage[]> {
     const results = await db
       .select()
       .from(aiMessages)
-      .where(eq(aiMessages.chatId, chatId));
+      .where(and(eq(aiMessages.chatId, chatId), eq(aiMessages.tenantId, tenantId)));
     return results.map((row: any) => this.mapMessage(row));
   }
 
   async createMessage(data: Partial<IAiMessage>): Promise<IAiMessage> {
     await db.insert(aiMessages).values(data as any);
-    const [result] = await db.select().from(aiMessages).where(eq(aiMessages.id, data.id!));
+    const [result] = await db.select().from(aiMessages).where(and(eq(aiMessages.id, data.id!), eq(aiMessages.tenantId, data.tenantId!)));
     if (!result) throw new Error("Failed to create message");
     return this.mapMessage(result);
   }
 
   // --- Voting ---
-  async upsertVote(chatId: string, messageId: string, isUpvoted: boolean): Promise<IAiVote> {
+  async upsertVote(tenantId: string, chatId: string, messageId: string, isUpvoted: boolean): Promise<IAiVote> {
     const voteValue = isUpvoted ? 1 : 0;
     await db.insert(aiVotes)
-      .values({ chatId, messageId, isUpvoted: voteValue })
+      .values({ tenantId, chatId, messageId, isUpvoted: voteValue })
       .onDuplicateKeyUpdate({ set: { isUpvoted: voteValue } });
     
-    const [result] = await db.select().from(aiVotes).where(and(eq(aiVotes.chatId, chatId), eq(aiVotes.messageId, messageId)));
+    const [result] = await db.select().from(aiVotes).where(and(
+      eq(aiVotes.chatId, chatId), 
+      eq(aiVotes.messageId, messageId),
+      eq(aiVotes.tenantId, tenantId)
+    ));
     return {
       ...result,
       createdAt: result.createdAt ? new Date(result.createdAt) : null,
@@ -107,32 +113,34 @@ export class MySqlAiRepository implements IAiRepository {
   }
 
   // --- Agents ---
-  async getAgentById(id: number): Promise<IAiAgent | null> {
-    const [result] = await db.select().from(aiAgents).where(eq(aiAgents.id, id));
+  async getAgentById(tenantId: string, id: string): Promise<IAiAgent | null> {
+    const [result] = await db.select().from(aiAgents).where(and(eq(aiAgents.id, id), eq(aiAgents.tenantId, tenantId)));
     return result ? (result as any) : null;
   }
 
-  async getAgentsByTenant(tenantId: number): Promise<IAiAgent[]> {
+  async getAgentsByTenant(tenantId: string): Promise<IAiAgent[]> {
     const results = await db.select().from(aiAgents).where(eq(aiAgents.tenantId, tenantId));
     return results as any[];
   }
 
   // --- Actions ---
   async createAction(data: Partial<IAiAgentAction>): Promise<IAiAgentAction> {
-    const [result] = await db.insert(aiAgentActions).values(data as any);
-    const [newAction] = await db.select().from(aiAgentActions).where(eq(aiAgentActions.id, result.insertId));
+    await db.insert(aiAgentActions).values(data as any);
+    const [newAction] = await db.select().from(aiAgentActions).where(and(eq(aiAgentActions.id, data.id!), eq(aiAgentActions.tenantId, data.tenantId!)));
     if (!newAction) throw new Error("Failed to create agent action");
     return this.mapAction(newAction);
   }
 
-  async updateAction(id: number, data: Partial<IAiAgentAction>): Promise<IAiAgentAction> {
-    await db.update(aiAgentActions).set(data as any).where(eq(aiAgentActions.id, id));
-    const [updated] = await db.select().from(aiAgentActions).where(eq(aiAgentActions.id, id));
+  async updateAction(tenantId: string, id: string, data: Partial<IAiAgentAction>): Promise<IAiAgentAction> {
+    await db.update(aiAgentActions)
+      .set(data as any)
+      .where(and(eq(aiAgentActions.id, id), eq(aiAgentActions.tenantId, tenantId)));
+    const [updated] = await db.select().from(aiAgentActions).where(and(eq(aiAgentActions.id, id), eq(aiAgentActions.tenantId, tenantId)));
     if (!updated) throw new Error("Failed to update agent action");
     return this.mapAction(updated);
   }
 
-  async getActionByIdempotencyKey(tenantId: number, key: string): Promise<IAiAgentAction | null> {
+  async getActionByIdempotencyKey(tenantId: string, key: string): Promise<IAiAgentAction | null> {
     const [result] = await db
       .select()
       .from(aiAgentActions)
@@ -145,8 +153,8 @@ export class MySqlAiRepository implements IAiRepository {
 
   // --- Tool Invocations ---
   async createToolInvocation(data: Partial<IAiToolInvocation>): Promise<IAiToolInvocation> {
-    const [result] = await db.insert(aiToolInvocations).values(data as any);
-    const [newTool] = await db.select().from(aiToolInvocations).where(eq(aiToolInvocations.id, result.insertId));
+    await db.insert(aiToolInvocations).values(data as any);
+    const [newTool] = await db.select().from(aiToolInvocations).where(and(eq(aiToolInvocations.id, data.id!), eq(aiToolInvocations.tenantId, data.tenantId!)));
     if (!newTool) throw new Error("Failed to create tool invocation");
     return {
       ...newTool,

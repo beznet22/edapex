@@ -26,8 +26,8 @@ export interface IMessagePart {
 
 export interface IAiChat {
   id: string; // Mastra threadId
-  tenantId: number;
-  userId: number;
+  tenantId: string;
+  userId: string;
   title: string;
   model: string | null;
   visibility: ChatVisibility;
@@ -38,6 +38,7 @@ export interface IAiChat {
 
 export interface IAiMessage {
   id: string;
+  tenantId: string;
   chatId: string;
   role: MessageRole;
   parts: IMessagePart[];
@@ -47,6 +48,7 @@ export interface IAiMessage {
 }
 
 export interface IAiVote {
+  tenantId: string;
   chatId: string;
   messageId: string;
   isUpvoted: number;
@@ -56,6 +58,7 @@ export interface IAiVote {
 
 export interface IAiDocument {
   id: string;
+  tenantId: string;
   title: string;
   kind: DocumentKind;
   content: string | null;
@@ -65,6 +68,7 @@ export interface IAiDocument {
 
 export interface IAiSuggestion {
   id: string;
+  tenantId: string;
   documentId: string;
   content: string | null;
   createdAt: Date | null;
@@ -73,8 +77,8 @@ export interface IAiSuggestion {
 }
 
 export interface IAiAgent {
-  id: number;
-  tenantId: number;
+  id: string;
+  tenantId: string;
   name: string;
   agentType: string;
   capabilities: string[] | null;
@@ -85,9 +89,9 @@ export interface IAiAgent {
 }
 
 export interface IAiAgentAction {
-  id: number;
-  agentId: number;
-  tenantId: number;
+  id: string;
+  agentId: string;
+  tenantId: string;
   actionType: string;
   idempotencyKey: string | null;
   status: ActionStatus;
@@ -101,8 +105,9 @@ export interface IAiAgentAction {
 }
 
 export interface IAiToolInvocation {
-  id: number;
-  actionId: number;
+  id: string;
+  tenantId: string;
+  actionId: string;
   toolName: string;
   parameters: Record<string, any> | null;
   result: Record<string, any> | null;
@@ -113,26 +118,26 @@ export interface IAiToolInvocation {
 
 export interface IAiRepository {
   // Chat
-  getChatById(chatId: string): Promise<IAiChat | null>;
-  getChatsByUser(tenantId: number, userId: number): Promise<IAiChat[]>;
+  getChatById(tenantId: string, chatId: string): Promise<IAiChat | null>;
+  getChatsByUser(tenantId: string, userId: string): Promise<IAiChat[]>;
   createChat(data: Partial<IAiChat>): Promise<IAiChat>;
-  updateChat(chatId: string, data: Partial<IAiChat>): Promise<IAiChat>;
+  updateChat(tenantId: string, chatId: string, data: Partial<IAiChat>): Promise<IAiChat>;
   
   // Messages
-  getMessagesByChat(chatId: string): Promise<IAiMessage[]>;
+  getMessagesByChat(tenantId: string, chatId: string): Promise<IAiMessage[]>;
   createMessage(data: Partial<IAiMessage>): Promise<IAiMessage>;
   
   // Voting
-  upsertVote(chatId: string, messageId: string, isUpvoted: boolean): Promise<IAiVote>;
+  upsertVote(tenantId: string, chatId: string, messageId: string, isUpvoted: boolean): Promise<IAiVote>;
   
   // Agents
-  getAgentById(id: number): Promise<IAiAgent | null>;
-  getAgentsByTenant(tenantId: number): Promise<IAiAgent[]>;
+  getAgentById(tenantId: string, id: string): Promise<IAiAgent | null>;
+  getAgentsByTenant(tenantId: string): Promise<IAiAgent[]>;
   
   // Actions
   createAction(data: Partial<IAiAgentAction>): Promise<IAiAgentAction>;
-  updateAction(id: number, data: Partial<IAiAgentAction>): Promise<IAiAgentAction>;
-  getActionByIdempotencyKey(tenantId: number, key: string): Promise<IAiAgentAction | null>;
+  updateAction(tenantId: string, id: string, data: Partial<IAiAgentAction>): Promise<IAiAgentAction>;
+  getActionByIdempotencyKey(tenantId: string, key: string): Promise<IAiAgentAction | null>;
   
   // Tool Invocations
   createToolInvocation(data: Partial<IAiToolInvocation>): Promise<IAiToolInvocation>;

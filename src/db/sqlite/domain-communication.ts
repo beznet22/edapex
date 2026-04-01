@@ -15,6 +15,7 @@
 import { unique,  sqliteTable, text, integer, real, index } from "drizzle-orm/sqlite-core";
 
 import { users, tenants, accounts } from "./domain-core";
+import { generateId } from "../utils/id";
 
 // Universal Communication Events — replaces 6 notification/message tables
 
@@ -26,16 +27,16 @@ export type CommunicationMetadata = {
 };
 
 export const communicationEvents = sqliteTable("domain_communication_communication_events", {
-  id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
-  tenantId: integer("tenant_id").notNull().references(() => tenants.id),
+  id: text("id", { length: 255 }).primaryKey().$defaultFn(() => generateId()),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id),
   channel: text("channel", { enum: [
     "notification", "notice", "message", "email", "sms", "chat"
   ] }).notNull(),
-  senderId: integer("sender_id").references(() => users.id), // Staff persona
+  senderId: text("sender_id").references(() => users.id), // Staff persona
   targetType: text("target_type", { enum: [
     "person", "role", "class", "section", "broadcast"
   ] }).notNull(),
-  targetRefId: integer("target_ref_id"),
+  targetRefId: text("target_ref_id"),
   subject: text("subject", { length: 500 }),
   body: text("body"),
   // Scheduling and priority for delivery routing
@@ -56,9 +57,9 @@ export const communicationEvents = sqliteTable("domain_communication_communicati
 
 // Communication Recipients — per-recipient delivery tracking
 export const communicationRecipients = sqliteTable("domain_communication_communication_recipients", {
-  id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
-  eventId: integer("event_id").notNull().references(() => communicationEvents.id, { onDelete: "cascade" }),
-  userId: integer("user_id").notNull().references(() => users.id), // Recipient persona
+  id: text("id", { length: 255 }).primaryKey().$defaultFn(() => generateId()),
+  eventId: text("event_id").notNull().references(() => communicationEvents.id, { onDelete: "cascade" }),
+  userId: text("user_id").notNull().references(() => users.id), // Recipient persona
   deliveryStatus: text("delivery_status", { enum: ["pending", "sent", "delivered", "failed", "bounced"] }).notNull().default("pending"),
   readAt: integer("read_at", { mode: "timestamp" }),
   deliveredAt: integer("delivered_at", { mode: "timestamp" }),

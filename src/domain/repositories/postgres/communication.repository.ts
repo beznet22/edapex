@@ -20,7 +20,7 @@ export class PostgresCommunicationRepository implements ICommunicationRepository
   }
 
   // --- Events ---
-  async getCommunicationEvents(tenantId: number, filter?: { channel?: string; targetType?: string }): Promise<ICommunicationEvent[]> {
+  async getCommunicationEvents(tenantId: string, filter?: { channel?: string; targetType?: string }): Promise<ICommunicationEvent[]> {
     let query = db.select().from(communicationEvents).where(eq(communicationEvents.tenantId, tenantId));
     const results = await query;
     return results.map((row: any) => this.mapEvent(row));
@@ -33,21 +33,28 @@ export class PostgresCommunicationRepository implements ICommunicationRepository
   }
 
   // --- Recipients ---
-  async getEventRecipients(eventId: number): Promise<ICommunicationRecipient[]> {
-    const results = await db.select().from(communicationRecipients).where(eq(communicationRecipients.eventId, eventId));
+  async getEventRecipients(tenantId: string, eventId: string): Promise<ICommunicationRecipient[]> {
+    const results = await db
+      .select()
+      .from(communicationRecipients)
+      .innerJoin(communicationEvents, eq(communicationRecipients.eventId, communicationEvents.id))
+      .where(and(
+        eq(communicationRecipients.eventId, eventId),
+        eq(communicationEvents.tenantId, tenantId)
+      ));
     return results.map((row: any) => ({
-      ...row,
-      readAt: row.readAt ? new Date(row.readAt) : null,
-      deliveredAt: row.deliveredAt ? new Date(row.deliveredAt) : null,
+      ...row.communicationRecipients,
+      readAt: row.communicationRecipients.readAt ? new Date(row.communicationRecipients.readAt) : null,
+      deliveredAt: row.communicationRecipients.deliveredAt ? new Date(row.communicationRecipients.deliveredAt) : null,
     }));
   }
 
-  async addRecipients(eventId: number, userIds: number[]): Promise<void> {
+  async addRecipients(tenantId: string, eventId: string, userIds: string[]): Promise<void> {
     const values = userIds.map(userId => ({ eventId, userId }));
     await db.insert(communicationRecipients).values(values);
   }
 
-  async updateDeliveryStatus(recipientId: number, status: string, failureReason?: string): Promise<void> {
+  async updateDeliveryStatus(tenantId: string, recipientId: string, status: string, failureReason?: string): Promise<void> {
     await db.update(communicationRecipients)
       .set({ 
         deliveryStatus: status as any, 
@@ -57,7 +64,7 @@ export class PostgresCommunicationRepository implements ICommunicationRepository
       .where(eq(communicationRecipients.id, recipientId));
   }
 
-  async markAsRead(recipientId: number): Promise<void> {
+  async markAsRead(tenantId: string, recipientId: string): Promise<void> {
     await db.update(communicationRecipients).set({ readAt: new Date() }).where(eq(communicationRecipients.id, recipientId));
   }
 }

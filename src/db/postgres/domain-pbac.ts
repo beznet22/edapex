@@ -11,7 +11,8 @@
  * - infix_module_infos / infix_module_managers / sm_modules / sm_module_permissions
  * - infix_permission_assigns / permissions / permission_sections / assign_permissions
  */
-import { pgSchema, text, doublePrecision, integer, serial, numeric, smallint, timestamp, jsonb, boolean, date, varchar, index, unique } from "drizzle-orm/pg-core";
+import { pgSchema, text, doublePrecision, integer, serial, numeric, smallint, timestamp, jsonb, boolean, date, varchar, index, unique, uuid } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
 import { users, tenants, accounts } from "./domain-core";
 
@@ -33,8 +34,8 @@ export const pbacSchema = pgSchema("domain_pbac");
 
 
 export const policyDefinitions = pbacSchema.table("policy_definitions", {
-  id: serial("id").primaryKey(),
-  tenantId: integer("tenant_id").references(() => tenants.id), // NULL = system-wide policy
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: uuid("tenant_id").references(() => tenants.id), // NULL = system-wide policy
   name: varchar("name", { length: 191 }).notNull(),
   description: varchar("description", { length: 500 }),
   definition: jsonb("definition").$type<PolicyDefinition>().notNull(),
@@ -51,15 +52,15 @@ export const policyDefinitions = pbacSchema.table("policy_definitions", {
 // Role Assignment Metadata
 export type RoleAssignmentMetadata = {
   isPrimary?: boolean;
-  grantedBy?: number; // userId
+  grantedBy?: string; // userId
   expiresAt?: string;
 };
 
 export const roleAssignments = pbacSchema.table("role_assignments", {
-  id: serial("id").primaryKey(),
-  tenantId: integer("tenant_id").notNull().references(() => tenants.id),
-  userId: integer("user_id").notNull().references(() => users.id), // Persona
-  accountId: integer("account_id").references(() => accounts.id), // Platform identity for account-level auth
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id),
+  userId: uuid("user_id").notNull().references(() => users.id), // Persona
+  accountId: uuid("account_id").references(() => accounts.id), // Platform identity for account-level auth
   roleName: varchar("role_name", { length: 100 }).notNull(), // e.g. 'admin', 'teacher', 'student'
   metadata: jsonb("metadata").$type<RoleAssignmentMetadata>(),
   createdAt: timestamp("created_at").defaultNow(),
@@ -73,10 +74,10 @@ export const roleAssignments = pbacSchema.table("role_assignments", {
 // M:N binding between policies and role assignments
 // Enables dynamic PBAC: "role X gets policy Y in tenant Z"
 export const policyBindings = pbacSchema.table("policy_bindings", {
-  id: serial("id").primaryKey(),
-  tenantId: integer("tenant_id").notNull().references(() => tenants.id),
-  policyId: integer("policy_id").notNull().references(() => policyDefinitions.id),
-  roleAssignmentId: integer("role_assignment_id").notNull().references(() => roleAssignments.id),
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id),
+  policyId: uuid("policy_id").notNull().references(() => policyDefinitions.id),
+  roleAssignmentId: uuid("role_assignment_id").notNull().references(() => roleAssignments.id),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => ({

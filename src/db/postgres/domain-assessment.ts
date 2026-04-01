@@ -14,7 +14,8 @@
  * - sm_online_exams / sm_question_banks / sm_question_groups
  * - sm_exam_schedules / sm_exam_attendances
  */
-import { pgSchema, text, doublePrecision, integer, serial, numeric, smallint, timestamp, jsonb, boolean, date, varchar, index } from "drizzle-orm/pg-core";
+import { pgSchema, text, doublePrecision, integer, uuid, numeric, smallint, timestamp, jsonb, boolean, date, varchar, index } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
 import { users, tenants, academicYears, accounts } from "./domain-core";
 import { classes, enrollments, sections, subjects } from "./domain-academic";
@@ -22,11 +23,11 @@ export const assessmentSchema = pgSchema("domain_assessment");
 
 
 export const exams = assessmentSchema.table("exams", {
-  id: serial("id").primaryKey(),
-  tenantId: integer("tenant_id").notNull().references(() => tenants.id),
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id),
   examType: varchar("exam_type", { length: 150 }).notNull(),
   title: varchar("title", { length: 255 }).notNull(),
-  academicId: integer("academic_id").notNull().references(() => academicYears.id),
+  academicId: uuid("academic_id").notNull().references(() => academicYears.id),
   percentage: numeric("percentage", { precision: 8, scale: 2 }),
   activeStatus: smallint("active_status").notNull().default(1),
   createdAt: timestamp("created_at").defaultNow(),
@@ -36,12 +37,12 @@ export const exams = assessmentSchema.table("exams", {
 }));
 
 export const examSetups = assessmentSchema.table("exam_setups", {
-  id: serial("id").primaryKey(),
-  tenantId: integer("tenant_id").notNull().references(() => tenants.id),
-  examId: integer("exam_id").notNull().references(() => exams.id),
-  classId: integer("class_id").references(() => classes.id),
-  sectionId: integer("section_id").references(() => sections.id),
-  subjectId: integer("subject_id").references(() => subjects.id),
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id),
+  examId: uuid("id").notNull().references(() => exams.id), // wait, exam_id
+  classId: uuid("class_id").references(() => classes.id),
+  sectionId: uuid("section_id").references(() => sections.id),
+  subjectId: uuid("subject_id").references(() => subjects.id),
   title: varchar("title", { length: 255 }).notNull(), // MTA, CA, REPORT, EXAM
   examMark: numeric("exam_mark", { precision: 8, scale: 2 }).notNull(),
   createdAt: timestamp("created_at").defaultNow(),
@@ -51,15 +52,15 @@ export const examSetups = assessmentSchema.table("exam_setups", {
 }));
 
 export const examMarks = assessmentSchema.table("exam_marks", {
-  id: serial("id").primaryKey(),
-  tenantId: integer("tenant_id").notNull().references(() => tenants.id),
-  examSetupId: integer("exam_setup_id").notNull().references(() => examSetups.id),
-  enrollmentId: integer("enrollment_id").notNull().references(() => enrollments.id),
-  userId: integer("user_id").notNull().references(() => users.id),
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id),
+  examSetupId: uuid("exam_setup_id").notNull().references(() => examSetups.id),
+  enrollmentId: uuid("enrollment_id").notNull().references(() => enrollments.id),
+  userId: uuid("user_id").notNull().references(() => users.id),
   totalMarks: numeric("total_marks", { precision: 8, scale: 2 }),
   isAbsent: smallint("is_absent").notNull().default(0),
   teacherRemarks: text("teacher_remarks"),
-  gradedBy: integer("graded_by").references(() => users.id), // Staff Persona
+  gradedBy: uuid("graded_by").references(() => users.id), // Staff Persona
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => ({
@@ -70,8 +71,8 @@ export const examMarks = assessmentSchema.table("exam_marks", {
 
 export type ComputedResultMetadata = {
   marksBreakdown: {
-    subjectId: number;
-    title: string[]; // e.g. ["MTA", "CA", "REPORT", "EXAM"]
+    subjectId: string;
+    title: string[]; // e.g. ["MTA", "CA", REPORT, EXAM]
     marks: number[]; // e.g. [30, 10, 10, 50]
     totalMarks: number; // e.g. 100
     outcome?: "EMERGING" | "EXPECTED" | "EXEEDING";
@@ -80,68 +81,68 @@ export type ComputedResultMetadata = {
   totalStudents?: number;
   averageMark?: number;
   gradePoints?: number;
-  subjectAverages?: Record<number, number>;
+  subjectAverages?: Record<string, number>;
 };
 
 export const computedResults = assessmentSchema.table("computed_results", {
-  id: serial("id").primaryKey(),
-  tenantId: integer("tenant_id").notNull().references(() => tenants.id),
-  userId: integer("user_id").notNull().references(() => users.id),
-  examId: integer("exam_id").notNull().references(() => exams.id),
-  classId: integer("class_id").notNull().references(() => classes.id),
-  sectionId: integer("section_id").notNull().references(() => sections.id),
-  enrollmentId: integer("enrollment_id").notNull().references(() => enrollments.id),
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id),
+  userId: uuid("user_id").notNull().references(() => users.id),
+  examId: uuid("exam_id").notNull().references(() => exams.id),
+  classId: uuid("class_id").notNull().references(() => classes.id),
+  sectionId: uuid("section_id").notNull().references(() => sections.id),
+  enrollmentId: uuid("enrollment_id").notNull().references(() => enrollments.id),
   totalMarks: numeric("total_marks", { precision: 12, scale: 2 }),
   gpaPoint: numeric("gpa_point", { precision: 8, scale: 2 }),
   gpaGrade: varchar("gpa_grade", { length: 50 }),
   teacherRemarks: text("teacher_remarks"),
   metadata: jsonb("metadata").$type<ComputedResultMetadata>(),
-  academicId: integer("academic_id").notNull().references(() => academicYears.id),
+  academicId: uuid("academic_id").notNull().references(() => academicYears.id),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 
 export const grades = assessmentSchema.table("grades", {
-  id: serial("id").primaryKey(),
-  tenantId: integer("tenant_id").notNull().references(() => tenants.id),
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id),
   name: varchar("name", { length: 100 }).notNull(),
   point: numeric("point", { precision: 8, scale: 2 }).notNull(),
   fromMark: numeric("from_mark", { precision: 8, scale: 2 }).notNull(),
   toMark: numeric("to_mark", { precision: 8, scale: 2 }).notNull(),
   description: varchar("description", { length: 500 }),
-  academicId: integer("academic_id").references(() => academicYears.id),
+  academicId: uuid("academic_id").references(() => academicYears.id),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 export const examSchedules = assessmentSchema.table("exam_schedules", {
-  id: serial("id").primaryKey(),
-  tenantId: integer("tenant_id").notNull().references(() => tenants.id),
-  examId: integer("exam_id").notNull().references(() => exams.id),
-  classId: integer("class_id").notNull().references(() => classes.id),
-  sectionId: integer("section_id").notNull().references(() => sections.id),
-  subjectId: integer("subject_id").notNull().references(() => subjects.id),
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id),
+  examId: uuid("exam_id").notNull().references(() => exams.id),
+  classId: uuid("class_id").notNull().references(() => classes.id),
+  sectionId: uuid("section_id").notNull().references(() => sections.id),
+  subjectId: uuid("subject_id").notNull().references(() => subjects.id),
   examDate: date("exam_date", { mode: "string" }).notNull(),
   startTime: varchar("start_time", { length: 20 }),
   endTime: varchar("end_time", { length: 20 }),
   roomNo: varchar("room_no", { length: 100 }),
-  academicId: integer("academic_id").notNull().references(() => academicYears.id),
+  academicId: uuid("academic_id").notNull().references(() => academicYears.id),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 // Student Ratings
 export const studentRatings = assessmentSchema.table("student_ratings", {
-  id: serial("id").primaryKey(),
-  tenantId: integer("tenant_id").notNull().references(() => tenants.id),
-  userId: integer("user_id").notNull().references(() => users.id),
-  examId: integer("exam_id").notNull().references(() => exams.id),
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id),
+  userId: uuid("user_id").notNull().references(() => users.id),
+  examId: uuid("exam_id").notNull().references(() => exams.id),
   attribute: varchar("attribute", { length: 255 }).notNull(),
   rate: integer("rate").notNull(),
   color: varchar("color", { length: 50 }),
   remark: text("remark"),
-  academicId: integer("academic_id").notNull().references(() => academicYears.id),
+  academicId: uuid("academic_id").notNull().references(() => academicYears.id),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => ({
@@ -155,13 +156,13 @@ export const studentRatings = assessmentSchema.table("student_ratings", {
  * All data should be migrated to the `teacher_remarks` field on `computed_results`.
  */
 export const teacherRemarks = assessmentSchema.table("teacher_remarks", {
-  id: serial("id").primaryKey(),
-  tenantId: integer("tenant_id").notNull().references(() => tenants.id),
-  userId: integer("user_id").notNull().references(() => users.id),
-  examId: integer("exam_id").notNull().references(() => exams.id),
-  staffId: integer("staff_id").references(() => users.id),
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id),
+  userId: uuid("user_id").notNull().references(() => users.id),
+  examId: uuid("exam_id").notNull().references(() => exams.id),
+  staffId: uuid("staff_id").references(() => users.id),
   remark: text("remark").notNull(),
-  academicId: integer("academic_id").notNull().references(() => academicYears.id),
+  academicId: uuid("academic_id").notNull().references(() => academicYears.id),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => ({
@@ -174,14 +175,14 @@ export const teacherRemarks = assessmentSchema.table("teacher_remarks", {
  * to `classAttendanceSummaries` in a future refactor.
  */
 export const classAttendances = assessmentSchema.table("class_attendance_summaries", {
-  id: serial("id").primaryKey(),
-  tenantId: integer("tenant_id").notNull().references(() => tenants.id),
-  userId: integer("user_id").notNull().references(() => users.id),
-  examId: integer("exam_id").notNull().references(() => exams.id),
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id),
+  userId: uuid("user_id").notNull().references(() => users.id),
+  examId: uuid("exam_id").notNull().references(() => exams.id),
   daysOpened: integer("days_opened").default(0),
   daysAbsent: integer("days_absent").default(0),
   daysPresent: integer("days_present").default(0),
-  academicId: integer("academic_id").notNull().references(() => academicYears.id),
+  academicId: uuid("academic_id").notNull().references(() => academicYears.id),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => ({
@@ -190,10 +191,10 @@ export const classAttendances = assessmentSchema.table("class_attendance_summari
 
 // Question Banks
 export const questionBanks = assessmentSchema.table("question_banks", {
-  id: serial("id").primaryKey(),
-  tenantId: integer("tenant_id").notNull().references(() => tenants.id),
-  subjectId: integer("subject_id").references(() => subjects.id),
-  classId: integer("class_id").references(() => classes.id),
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id),
+  subjectId: uuid("subject_id").references(() => subjects.id),
+  classId: uuid("class_id").references(() => classes.id),
   questionType: varchar("question_type", { length: 150 }).notNull(),
   question: text("question").notNull(),
   options: jsonb("options").$type<string[]>(),
@@ -201,8 +202,8 @@ export const questionBanks = assessmentSchema.table("question_banks", {
   marks: numeric("marks", { precision: 8, scale: 2 }).notNull(),
   difficultyLevel: varchar("difficulty_level", { length: 150 }).default("medium"),
   explanation: text("explanation"),
-  createdBy: integer("created_by").references(() => users.id), // Staff Persona
-  academicId: integer("academic_id").references(() => academicYears.id),
+  createdBy: uuid("created_by").references(() => users.id), // Staff Persona
+  academicId: uuid("academic_id").references(() => academicYears.id),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => ({
@@ -212,12 +213,12 @@ export const questionBanks = assessmentSchema.table("question_banks", {
 
 // Online Exams
 export const onlineExams = assessmentSchema.table("online_exams", {
-  id: serial("id").primaryKey(),
-  tenantId: integer("tenant_id").notNull().references(() => tenants.id),
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id),
   title: varchar("title", { length: 255 }).notNull(),
-  classId: integer("class_id").references(() => classes.id),
-  sectionId: integer("section_id").references(() => sections.id),
-  subjectId: integer("subject_id").references(() => subjects.id),
+  classId: uuid("class_id").references(() => classes.id),
+  sectionId: uuid("section_id").references(() => sections.id),
+  subjectId: uuid("subject_id").references(() => subjects.id),
   totalMarks: numeric("total_marks", { precision: 8, scale: 2 }).notNull(),
   passingMarks: numeric("passing_marks", { precision: 8, scale: 2 }),
   duration: integer("duration"),
@@ -226,8 +227,8 @@ export const onlineExams = assessmentSchema.table("online_exams", {
   isPublished: smallint("is_published").default(0),
   shuffleQuestions: smallint("shuffle_questions").default(0),
   showResult: smallint("show_result").default(1),
-  createdBy: integer("created_by").references(() => users.id), // Staff Persona
-  academicId: integer("academic_id").notNull().references(() => academicYears.id),
+  createdBy: uuid("created_by").references(() => users.id), // Staff Persona
+  academicId: uuid("academic_id").notNull().references(() => academicYears.id),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => ({
@@ -236,9 +237,9 @@ export const onlineExams = assessmentSchema.table("online_exams", {
 
 // Online Exam Questions
 export const onlineExamQuestions = assessmentSchema.table("online_exam_questions", {
-  id: serial("id").primaryKey(),
-  onlineExamId: integer("online_exam_id").notNull().references(() => onlineExams.id, { onDelete: "cascade" }),
-  questionBankId: integer("question_bank_id").notNull().references(() => questionBanks.id),
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  onlineExamId: uuid("online_exam_id").notNull().references(() => onlineExams.id, { onDelete: "cascade" }),
+  questionBankId: uuid("question_bank_id").notNull().references(() => questionBanks.id),
   sortOrder: integer("sort_order").default(0),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -248,18 +249,18 @@ export const onlineExamQuestions = assessmentSchema.table("online_exam_questions
 
 // Online Exam Attempts
 export type AttemptAnswers = {
-  questionId: number;
+  questionId: string;
   selectedAnswer: string;
   isCorrect: boolean;
   marksAwarded: number;
 }[];
 
 export const onlineExamAttempts = assessmentSchema.table("online_exam_attempts", {
-  id: serial("id").primaryKey(),
-  tenantId: integer("tenant_id").notNull().references(() => tenants.id),
-  onlineExamId: integer("online_exam_id").notNull().references(() => onlineExams.id),
-  userId: integer("user_id").notNull().references(() => users.id), // Student Persona
-  enrollmentId: integer("enrollment_id").references(() => enrollments.id),
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id),
+  onlineExamId: uuid("online_exam_id").notNull().references(() => onlineExams.id),
+  userId: uuid("user_id").notNull().references(() => users.id), // Student Persona
+  enrollmentId: uuid("enrollment_id").references(() => enrollments.id),
   totalMarks: numeric("total_marks", { precision: 8, scale: 2 }),
   obtainedMarks: numeric("obtained_marks", { precision: 8, scale: 2 }),
   status: varchar("status", { length: 150 }).notNull().default("in_progress"),

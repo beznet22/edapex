@@ -12,7 +12,8 @@
  * - sm_communications / sm_send_messages
  * - chat_conversations / chat_groups / chat_group_message_recipients
  */
-import { pgSchema, text, doublePrecision, integer, serial, numeric, smallint, timestamp, jsonb, boolean, date, varchar, index } from "drizzle-orm/pg-core";
+import { pgSchema, text, doublePrecision, integer, uuid, numeric, smallint, timestamp, jsonb, boolean, date, varchar, index } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
 import { users, tenants, accounts } from "./domain-core";
 
@@ -28,12 +29,12 @@ export const communicationSchema = pgSchema("domain_communication");
 
 
 export const communicationEvents = communicationSchema.table("communication_events", {
-  id: serial("id").primaryKey(),
-  tenantId: integer("tenant_id").notNull().references(() => tenants.id),
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id),
   channel: varchar("channel", { length: 150 }).notNull(),
-  senderId: integer("sender_id").references(() => users.id), // Staff persona
+  senderId: uuid("sender_id").references(() => users.id), // Staff persona
   targetType: varchar("target_type", { length: 150 }).notNull(),
-  targetRefId: integer("target_ref_id"),
+  targetRefId: uuid("target_ref_id"),
   subject: varchar("subject", { length: 500 }),
   body: text("body"),
   // Scheduling and priority for delivery routing
@@ -54,9 +55,9 @@ export const communicationEvents = communicationSchema.table("communication_even
 
 // Communication Recipients — per-recipient delivery tracking
 export const communicationRecipients = communicationSchema.table("communication_recipients", {
-  id: serial("id").primaryKey(),
-  eventId: integer("event_id").notNull().references(() => communicationEvents.id, { onDelete: "cascade" }),
-  userId: integer("user_id").notNull().references(() => users.id), // Recipient persona
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  eventId: uuid("event_id").notNull().references(() => communicationEvents.id, { onDelete: "cascade" }),
+  userId: uuid("user_id").notNull().references(() => users.id), // Recipient persona
   deliveryStatus: varchar("delivery_status", { length: 150 }).notNull().default("pending"),
   readAt: timestamp("read_at"),
   deliveredAt: timestamp("delivered_at"),

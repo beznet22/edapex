@@ -4,7 +4,7 @@ import { IDocumentsRepository, IDocument } from "../../interfaces/documents.inte
 import { eq, and } from "drizzle-orm";
 
 export class SqliteDocumentsRepository implements IDocumentsRepository {
-  async getDocumentsByOwner(tenantId: number, ownerType: string, ownerId: number): Promise<IDocument[]> {
+  async getDocumentsByOwner(tenantId: string, ownerType: string, ownerId: string): Promise<IDocument[]> {
     const results = await db
       .select()
       .from(documents)
@@ -28,7 +28,7 @@ export class SqliteDocumentsRepository implements IDocumentsRepository {
     };
   }
 
-  async updateDocumentStatus(tenantId: number, id: number, status: string): Promise<void> {
+  async updateDocumentStatus(tenantId: string, id: string, status: string): Promise<void> {
     await db.update(documents)
       .set({ status: status as any })
       .where(and(
@@ -37,7 +37,7 @@ export class SqliteDocumentsRepository implements IDocumentsRepository {
       ));
   }
 
-  async deleteDocument(tenantId: number, id: number): Promise<void> {
+  async deleteDocument(tenantId: string, id: string): Promise<void> {
     await db.delete(documents)
       .where(and(
         eq(documents.id, id),

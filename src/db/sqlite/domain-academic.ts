@@ -16,17 +16,18 @@
  * - sm_class_routines / sm_class_times
  */
 import { unique,  sqliteTable, text, integer, real, index } from "drizzle-orm/sqlite-core";
+import { generateId } from "../utils/id";
 
 import { users, tenants, academicYears, accounts } from "./domain-core";
 
 // Unified Classes & Sections — replaces sm_classes, sm_sections, sm_class_sections, sm_subjects
 
 export const classes = sqliteTable("domain_academic_classes", {
-  id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
-  tenantId: integer("tenant_id").notNull().references(() => tenants.id),
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id),
   name: text("name", { length: 200 }).notNull(),
   passMark: real("pass_mark"),
-  academicId: integer("academic_id").notNull().references(() => academicYears.id),
+  academicId: text("academic_id").notNull().references(() => academicYears.id),
   activeStatus: integer("active_status").notNull().default(1),
   createdAt: integer("created_at", { mode: "timestamp" }).defaultNow(),
   updatedAt: integer("updated_at", { mode: "timestamp" }).defaultNow(),
@@ -35,8 +36,8 @@ export const classes = sqliteTable("domain_academic_classes", {
 }));
 
 export const sections = sqliteTable("domain_academic_sections", {
-  id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
-  tenantId: integer("tenant_id").notNull().references(() => tenants.id),
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id),
   name: text("name", { length: 200 }).notNull(),
   activeStatus: integer("active_status").notNull().default(1),
   createdAt: integer("created_at", { mode: "timestamp" }).defaultNow(),
@@ -46,11 +47,11 @@ export const sections = sqliteTable("domain_academic_sections", {
 }));
 
 export const classSections = sqliteTable("domain_academic_class_sections", {
-  id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
-  classId: integer("class_id").notNull().references(() => classes.id),
-  sectionId: integer("section_id").notNull().references(() => sections.id),
-  tenantId: integer("tenant_id").notNull().references(() => tenants.id),
-  academicId: integer("academic_id").notNull().references(() => academicYears.id),
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  classId: text("class_id").notNull().references(() => classes.id),
+  sectionId: text("section_id").notNull().references(() => sections.id),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id),
+  academicId: text("academic_id").notNull().references(() => academicYears.id),
   createdAt: integer("created_at", { mode: "timestamp" }).defaultNow(),
   updatedAt: integer("updated_at", { mode: "timestamp" }).defaultNow(),
 }, (table) => ({
@@ -58,13 +59,13 @@ export const classSections = sqliteTable("domain_academic_class_sections", {
 }));
 
 export const subjects = sqliteTable("domain_academic_subjects", {
-  id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
-  tenantId: integer("tenant_id").notNull().references(() => tenants.id),
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id),
   name: text("name", { length: 255 }).notNull(),
   code: text("code", { length: 100 }),
   type: text("type", { enum: ["theory", "practical"] }).notNull(),
   passMark: real("pass_mark"),
-  academicId: integer("academic_id").notNull().references(() => academicYears.id),
+  academicId: text("academic_id").notNull().references(() => academicYears.id),
   activeStatus: integer("active_status").notNull().default(1),
   createdAt: integer("created_at", { mode: "timestamp" }).defaultNow(),
   updatedAt: integer("updated_at", { mode: "timestamp" }).defaultNow(),
@@ -73,12 +74,12 @@ export const subjects = sqliteTable("domain_academic_subjects", {
 }));
 
 export const enrollments = sqliteTable("domain_academic_enrollments", {
-  id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
-  tenantId: integer("tenant_id").notNull().references(() => tenants.id),
-  userId: integer("user_id").notNull().references(() => users.id), // Student persona
-  classId: integer("class_id").references(() => classes.id),
-  sectionId: integer("section_id").references(() => sections.id),
-  academicId: integer("academic_id").notNull().references(() => academicYears.id),
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id),
+  userId: text("user_id").notNull().references(() => users.id), // Student persona
+  classId: text("class_id").references(() => classes.id),
+  sectionId: text("section_id").references(() => sections.id),
+  academicId: text("academic_id").notNull().references(() => academicYears.id),
   rollNo: text("roll_no", { length: 100 }),
   isDefault: integer("is_default").default(1),
   status: text("status", { enum: ["active", "promoted", "graduated", "withdrawn", "retained"] }).notNull().default("active"),
@@ -90,17 +91,17 @@ export const enrollments = sqliteTable("domain_academic_enrollments", {
 }));
 
 export const classRoutines = sqliteTable("domain_academic_class_routines", {
-  id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
-  tenantId: integer("tenant_id").notNull().references(() => tenants.id),
-  classId: integer("class_id").notNull().references(() => classes.id),
-  sectionId: integer("section_id").notNull().references(() => sections.id),
-  subjectId: integer("subject_id").notNull().references(() => subjects.id),
-  teacherId: integer("teacher_id").references(() => users.id), // Staff persona
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id),
+  classId: text("class_id").notNull().references(() => classes.id),
+  sectionId: text("section_id").notNull().references(() => sections.id),
+  subjectId: text("subject_id").notNull().references(() => subjects.id),
+  teacherId: text("teacher_id").references(() => users.id), // Staff persona
   dayOfWeek: text("day_of_week", { enum: ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"] }).notNull(),
   startTime: text("start_time", { length: 20 }),
   endTime: text("end_time", { length: 20 }),
   roomNo: text("room_no", { length: 100 }),
-  academicId: integer("academic_id").notNull().references(() => academicYears.id),
+  academicId: text("academic_id").notNull().references(() => academicYears.id),
   createdAt: integer("created_at", { mode: "timestamp" }).defaultNow(),
   updatedAt: integer("updated_at", { mode: "timestamp" }).defaultNow(),
 }, (table) => ({
@@ -109,17 +110,17 @@ export const classRoutines = sqliteTable("domain_academic_class_routines", {
 }));
 
 export const homeworks = sqliteTable("domain_academic_homeworks", {
-  id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
-  tenantId: integer("tenant_id").notNull().references(() => tenants.id),
-  classId: integer("class_id").notNull().references(() => classes.id),
-  sectionId: integer("section_id").notNull().references(() => sections.id),
-  subjectId: integer("subject_id").notNull().references(() => subjects.id),
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id),
+  classId: text("class_id").notNull().references(() => classes.id),
+  sectionId: text("section_id").notNull().references(() => sections.id),
+  subjectId: text("subject_id").notNull().references(() => subjects.id),
   homeworkDate: text("homework_date").notNull(),
   submissionDate: text("submission_date").notNull(),
   description: text("description"),
   attachment: text("attachment", { length: 500 }),
   marks: real("marks"),
-  academicId: integer("academic_id").notNull().references(() => academicYears.id),
+  academicId: text("academic_id").notNull().references(() => academicYears.id),
   createdAt: integer("created_at", { mode: "timestamp" }).defaultNow(),
   updatedAt: integer("updated_at", { mode: "timestamp" }).defaultNow(),
 }, (table) => ({
@@ -128,26 +129,26 @@ export const homeworks = sqliteTable("domain_academic_homeworks", {
 }));
 
 export const lessons = sqliteTable("domain_academic_lessons", {
-  id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
-  tenantId: integer("tenant_id").notNull().references(() => tenants.id),
-  classId: integer("class_id").notNull().references(() => classes.id),
-  sectionId: integer("section_id").notNull().references(() => sections.id),
-  subjectId: integer("subject_id").notNull().references(() => subjects.id),
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id),
+  classId: text("class_id").notNull().references(() => classes.id),
+  sectionId: text("section_id").notNull().references(() => sections.id),
+  subjectId: text("subject_id").notNull().references(() => subjects.id),
   title: text("title", { length: 255 }).notNull(),
   description: text("description"),
-  academicId: integer("academic_id").notNull().references(() => academicYears.id),
+  academicId: text("academic_id").notNull().references(() => academicYears.id),
   createdAt: integer("created_at", { mode: "timestamp" }).defaultNow(),
   updatedAt: integer("updated_at", { mode: "timestamp" }).defaultNow(),
 });
 
 export const subjectAssignments = sqliteTable("domain_academic_subject_assignments", {
-  id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
-  tenantId: integer("tenant_id").notNull().references(() => tenants.id),
-  staffId: integer("staff_id").notNull().references(() => users.id), // Teacher persona
-  classId: integer("class_id").notNull().references(() => classes.id),
-  sectionId: integer("section_id").notNull().references(() => sections.id),
-  subjectId: integer("subject_id").notNull().references(() => subjects.id),
-  academicId: integer("academic_id").notNull().references(() => academicYears.id),
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id),
+  staffId: text("staff_id").notNull().references(() => users.id), // Teacher persona
+  classId: text("class_id").notNull().references(() => classes.id),
+  sectionId: text("section_id").notNull().references(() => sections.id),
+  subjectId: text("subject_id").notNull().references(() => subjects.id),
+  academicId: text("academic_id").notNull().references(() => academicYears.id),
   createdAt: integer("created_at", { mode: "timestamp" }).defaultNow(),
   updatedAt: integer("updated_at", { mode: "timestamp" }).defaultNow(),
 }, (table) => ({
@@ -159,12 +160,12 @@ export const subjectAssignments = sqliteTable("domain_academic_subject_assignmen
 
 // Class Teachers — replaces smAssignClassTeachers
 export const classTeachers = sqliteTable("domain_academic_class_teachers", {
-  id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
-  tenantId: integer("tenant_id").notNull().references(() => tenants.id),
-  classId: integer("class_id").notNull().references(() => classes.id),
-  sectionId: integer("section_id").notNull().references(() => sections.id),
-  staffId: integer("staff_id").notNull().references(() => users.id), // Teacher persona
-  academicId: integer("academic_id").notNull().references(() => academicYears.id),
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id),
+  classId: text("class_id").notNull().references(() => classes.id),
+  sectionId: text("section_id").notNull().references(() => sections.id),
+  staffId: text("staff_id").notNull().references(() => users.id), // Teacher persona
+  academicId: text("academic_id").notNull().references(() => academicYears.id),
   createdAt: integer("created_at", { mode: "timestamp" }).defaultNow(),
   updatedAt: integer("updated_at", { mode: "timestamp" }).defaultNow(),
 }, (table) => ({
@@ -180,13 +181,13 @@ export type HomeworkSubmissionMetadata = {
 };
 
 export const homeworkSubmissions = sqliteTable("domain_academic_homework_submissions", {
-  id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
-  tenantId: integer("tenant_id").notNull().references(() => tenants.id),
-  homeworkId: integer("homework_id").notNull().references(() => homeworks.id, { onDelete: "cascade" }),
-  userId: integer("user_id").notNull().references(() => users.id), // Student persona
-  enrollmentId: integer("enrollment_id").references(() => enrollments.id),
-  classId: integer("class_id").references(() => classes.id),
-  sectionId: integer("section_id").references(() => sections.id),
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id),
+  homeworkId: text("homework_id").notNull().references(() => homeworks.id, { onDelete: "cascade" }),
+  userId: text("user_id").notNull().references(() => users.id), // Student persona
+  enrollmentId: text("enrollment_id").references(() => enrollments.id),
+  classId: text("class_id").references(() => classes.id),
+  sectionId: text("section_id").references(() => sections.id),
   marks: real("marks"),
   status: text("status", { enum: ["pending", "submitted", "evaluated", "returned"] }).notNull().default("pending"),
   metadata: text("metadata", { mode: "json" }).$type<HomeworkSubmissionMetadata>(),
@@ -198,17 +199,17 @@ export const homeworkSubmissions = sqliteTable("domain_academic_homework_submiss
 
 // Promotions — replaces smStudentPromotions
 export const promotions = sqliteTable("domain_academic_promotions", {
-  id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
-  tenantId: integer("tenant_id").notNull().references(() => tenants.id),
-  userId: integer("user_id").notNull().references(() => users.id), // Student persona
-  fromClassId: integer("from_class_id").notNull().references(() => classes.id),
-  fromSectionId: integer("from_section_id").notNull().references(() => sections.id),
-  toClassId: integer("to_class_id").notNull().references(() => classes.id),
-  toSectionId: integer("to_section_id").notNull().references(() => sections.id),
-  fromAcademicId: integer("from_academic_id").notNull().references(() => academicYears.id),
-  toAcademicId: integer("to_academic_id").notNull().references(() => academicYears.id),
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id),
+  userId: text("user_id").notNull().references(() => users.id), // Student persona
+  fromClassId: text("from_class_id").notNull().references(() => classes.id),
+  fromSectionId: text("from_section_id").notNull().references(() => sections.id),
+  toClassId: text("to_class_id").notNull().references(() => classes.id),
+  toSectionId: text("to_section_id").notNull().references(() => sections.id),
+  fromAcademicId: text("from_academic_id").notNull().references(() => academicYears.id),
+  toAcademicId: text("to_academic_id").notNull().references(() => academicYears.id),
   result: text("result", { enum: ["promoted", "retained", "graduated", "withdrawn"] }).notNull(),
-  promotedBy: integer("promoted_by").references(() => users.id),
+  promotedBy: text("promoted_by").references(() => users.id),
   notes: text("notes"),
   promotedAt: integer("promoted_at", { mode: "timestamp" }).defaultNow(),
   updatedAt: integer("updated_at", { mode: "timestamp" }).defaultNow(),
@@ -219,13 +220,13 @@ export const promotions = sqliteTable("domain_academic_promotions", {
 
 // Timelines — replaces smStudentTimelines
 export const timelines = sqliteTable("domain_academic_timelines", {
-  id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
-  tenantId: integer("tenant_id").notNull().references(() => tenants.id),
-  userId: integer("user_id").notNull().references(() => users.id),
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id),
+  userId: text("user_id").notNull().references(() => users.id),
   type: text("type", { length: 100 }).notNull(), // e.g., 'admission', 'promotion', 'exam-1'
   title: text("title", { length: 255 }).notNull(),
   description: text("description"),
-  academicId: integer("academic_id").notNull().references(() => academicYears.id),
+  academicId: text("academic_id").notNull().references(() => academicYears.id),
   createdAt: integer("created_at", { mode: "timestamp" }).defaultNow(),
   updatedAt: integer("updated_at", { mode: "timestamp" }).defaultNow(),
 }, (table) => ({

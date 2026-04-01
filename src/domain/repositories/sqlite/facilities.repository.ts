@@ -23,12 +23,12 @@ import { eq, and } from "drizzle-orm";
 
 export class SqliteFacilitiesRepository implements IFacilitiesRepository {
   // --- Dormitories ---
-  async getDormitories(tenantId: number): Promise<IDormitory[]> {
+  async getDormitories(tenantId: string): Promise<IDormitory[]> {
     const results = await db.select().from(dormitories).where(eq(dormitories.tenantId, tenantId));
     return results.map((row: any) => ({ ...row }));
   }
 
-  async getRoomsByDormitory(dormitoryId: number): Promise<IRoom[]> {
+  async getRoomsByDormitory(dormitoryId: string): Promise<IRoom[]> {
     const results = await db.select().from(rooms).where(eq(rooms.dormitoryId, dormitoryId));
     return results.map((row: any) => ({
       ...row,
@@ -46,7 +46,7 @@ export class SqliteFacilitiesRepository implements IFacilitiesRepository {
   }
 
   // --- Transport ---
-  async getRoutes(tenantId: number): Promise<IRoute[]> {
+  async getRoutes(tenantId: string): Promise<IRoute[]> {
     const results = await db.select().from(routes).where(eq(routes.tenantId, tenantId));
     return results.map((row: any) => ({
       ...row,
@@ -54,17 +54,17 @@ export class SqliteFacilitiesRepository implements IFacilitiesRepository {
     }));
   }
 
-  async getVehicles(tenantId: number): Promise<IVehicle[]> {
+  async getVehicles(tenantId: string): Promise<IVehicle[]> {
     const results = await db.select().from(vehicles).where(eq(vehicles.tenantId, tenantId));
     return results.map((row: any) => ({ ...row }));
   }
 
-  async assignVehicleToRoute(routeId: number, vehicleId: number, tenantId: number): Promise<void> {
+  async assignVehicleToRoute(routeId: string, vehicleId: string, tenantId: string): Promise<void> {
     await db.insert(routeAssignments).values({ routeId, vehicleId, tenantId });
   }
 
   // --- Allocations ---
-  async getAllocationsByUser(userId: number): Promise<IFacilityAllocation[]> {
+  async getAllocationsByUser(userId: string): Promise<IFacilityAllocation[]> {
     const results = await db.select().from(facilityAllocations).where(eq(facilityAllocations.userId, userId));
     return results.map((row: any) => ({ ...row }));
   }
@@ -75,12 +75,12 @@ export class SqliteFacilitiesRepository implements IFacilitiesRepository {
     return { ...result };
   }
 
-  async releaseAllocation(id: number): Promise<void> {
-    await db.update(facilityAllocations).set({ status: "released" }).where(eq(facilityAllocations.id, id));
+  async releaseAllocation(tenantId: string, id: string): Promise<void> {
+    await db.update(facilityAllocations).set({ status: "released" }).where(and(eq(facilityAllocations.id, id), eq(facilityAllocations.tenantId, tenantId)));
   }
 
   // --- Operations ---
-  async getComplaints(tenantId: number): Promise<IComplaint[]> {
+  async getComplaints(tenantId: string): Promise<IComplaint[]> {
     const results = await db.select().from(complaints).where(eq(complaints.tenantId, tenantId));
     return results.map((row: any) => ({ ...row }));
   }
@@ -91,7 +91,7 @@ export class SqliteFacilitiesRepository implements IFacilitiesRepository {
     return { ...result } as any;
   }
 
-  async getVisitors(tenantId: number): Promise<IVisitor[]> {
+  async getVisitors(tenantId: string): Promise<IVisitor[]> {
     const results = await db.select().from(visitors).where(eq(visitors.tenantId, tenantId));
     return results.map((row: any) => ({
       ...row,

@@ -13,7 +13,8 @@
  * - sm_subject_attendances
  * - student_attendance_bulks
  */
-import { pgSchema, text, doublePrecision, integer, serial, numeric, smallint, timestamp, jsonb, boolean, date, varchar, index } from "drizzle-orm/pg-core";
+import { pgSchema, text, doublePrecision, integer, uuid, numeric, smallint, timestamp, jsonb, boolean, date, varchar, index } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
 import { users, tenants, academicYears, accounts } from "./domain-core";
 import { classes, enrollments, sections } from "./domain-academic";
@@ -23,29 +24,29 @@ export type AttendanceMetadata = {
   daysAbsent?: number;
   daysPresent?: number;
   notes?: string;
-  leaveRequestId?: number;
+  leaveRequestId?: string;
 };
 
 // Universal Attendance — replaces 4 parallel tables
 export const attendanceSchema = pgSchema("domain_attendance");
 
 export const attendances = attendanceSchema.table("attendances", {
-  id: serial("id").primaryKey(),
-  tenantId: integer("tenant_id").notNull().references(() => tenants.id),
-  userId: integer("user_id").notNull().references(() => users.id), // Participant (Student/Staff)
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id),
+  userId: uuid("user_id").notNull().references(() => users.id), // Participant (Student/Staff)
   actorType: varchar("actor_type", { length: 150 }).notNull(),
   scopeType: varchar("scope_type", { length: 150 }).notNull(),
-  scopeRefId: integer("scope_ref_id"),  // subject_id or exam_type_id
+  scopeRefId: uuid("scope_ref_id"),  // subject_id or exam_type_id
   attendanceDate: date("attendance_date", { mode: "string" }),
-  enrollmentId: integer("enrollment_id").references(() => enrollments.id),
-  classId: integer("class_id").references(() => classes.id),
-  sectionId: integer("section_id").references(() => sections.id),
+  enrollmentId: uuid("enrollment_id").references(() => enrollments.id),
+  classId: uuid("class_id").references(() => classes.id),
+  sectionId: uuid("section_id").references(() => sections.id),
   status: varchar("status", { length: 150 }).notNull(),
   // How attendance was captured — enables anomaly detection
   sourceType: varchar("source_type", { length: 150 }).default("manual").notNull(),
   metadata: jsonb("metadata").$type<AttendanceMetadata>(),
-  recordedBy: integer("recorded_by").references(() => users.id), // Staff persona
-  academicId: integer("academic_id").notNull().references(() => academicYears.id),
+  recordedBy: uuid("recorded_by").references(() => users.id), // Staff persona
+  academicId: uuid("academic_id").notNull().references(() => academicYears.id),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => ({
@@ -58,15 +59,15 @@ export const attendances = attendanceSchema.table("attendances", {
 
 // Holidays — replaces smHolidays, smWeekends
 export const holidays = attendanceSchema.table("holidays", {
-  id: serial("id").primaryKey(),
-  tenantId: integer("tenant_id").notNull().references(() => tenants.id),
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id),
   title: varchar("title", { length: 200 }).notNull(),
   description: text("description"),
   holidayType: varchar("holiday_type", { length: 150 }).notNull(),
   fromDate: date("from_date", { mode: "string" }).notNull(),
-  toDate: date("to_date", { mode: "string" }).notNull(),
+  toBe: date("to_date", { mode: "string" }).notNull(),
   isRecurring: smallint("is_recurring").default(0),  // for weekends
-  academicId: integer("academic_id").references(() => academicYears.id),
+  academicId: uuid("academic_id").references(() => academicYears.id),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => ({

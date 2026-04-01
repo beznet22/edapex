@@ -45,57 +45,62 @@ export class MySqlLmsRepository implements ILmsRepository {
   }
 
   // --- Courses ---
-  async getCourseById(id: number): Promise<ILmsCourse | null> {
-    const [result] = await db.select().from(lmsCourses).where(eq(lmsCourses.id, id));
+  async getCourseById(tenantId: string, id: string): Promise<ILmsCourse | null> {
+    const [result] = await db
+      .select()
+      .from(lmsCourses)
+      .where(and(eq(lmsCourses.id, id), eq(lmsCourses.tenantId, tenantId)));
     return result ? this.mapCourse(result) : null;
   }
 
-  async getCoursesByTenant(tenantId: number, academicId: number): Promise<ILmsCourse[]> {
+  async getCoursesByTenant(tenantId: string, academicId: string): Promise<ILmsCourse[]> {
     const results = await db
       .select()
       .from(lmsCourses)
       .where(and(
         eq(lmsCourses.tenantId, tenantId)
-        // Note: courses might span academic years, but we can filter by academicId if needed
+        // Optional: filter by academicId if schema supports it
       ));
     return results.map((row: any) => this.mapCourse(row));
   }
 
   async createCourse(data: Partial<ILmsCourse>): Promise<ILmsCourse> {
-    const [result] = await db.insert(lmsCourses).values(data as any);
-    const course = await this.getCourseById(result.insertId);
+    await db.insert(lmsCourses).values(data as any);
+    const course = await this.getCourseById(data.tenantId!, data.id!);
     if (!course) throw new Error("Failed to create course");
     return course;
   }
 
   // --- Modules & Content ---
-  async getModulesByCourse(courseId: number): Promise<ILmsModule[]> {
+  async getModulesByCourse(tenantId: string, courseId: string): Promise<ILmsModule[]> {
     const results = await db
       .select()
       .from(lmsModules)
-      .where(eq(lmsModules.courseId, courseId))
+      .where(and(eq(lmsModules.courseId, courseId), eq(lmsModules.tenantId, tenantId)))
       .orderBy(lmsModules.sortOrder);
     return results.map((row: any) => this.mapModule(row));
   }
 
-  async getContentByModule(moduleId: number): Promise<ILmsContent[]> {
+  async getContentByModule(tenantId: string, moduleId: string): Promise<ILmsContent[]> {
     const results = await db
       .select()
       .from(lmsLessons)
-      .where(eq(lmsLessons.moduleId, moduleId))
+      .where(and(eq(lmsLessons.moduleId, moduleId), eq(lmsLessons.tenantId, tenantId)))
       .orderBy(lmsLessons.sortOrder);
     return results.map((row: any) => this.mapContent(row));
   }
 
   async createModule(data: Partial<ILmsModule>): Promise<ILmsModule> {
-    const [result] = await db.insert(lmsModules).values(data as any);
-    const [row] = await db.select().from(lmsModules).where(eq(lmsModules.id, result.insertId));
+    await db.insert(lmsModules).values(data as any);
+    const [row] = await db.select().from(lmsModules).where(and(eq(lmsModules.id, data.id!), eq(lmsModules.tenantId, data.tenantId!)));
     if (!row) throw new Error("Failed to create module");
     return this.mapModule(row);
   }
 
   async createContent(data: Partial<ILmsContent>): Promise<ILmsContent> {
     const lessonData = {
+      id: data.id,
+      tenantId: data.tenantId,
       moduleId: data.moduleId,
       title: data.title,
       content: data.content,
@@ -103,16 +108,16 @@ export class MySqlLmsRepository implements ILmsRepository {
       mediaUrl: data.url,
       sortOrder: data.order
     };
-    const [result] = await db.insert(lmsLessons).values(lessonData as any);
-    const [row] = await db.select().from(lmsLessons).where(eq(lmsLessons.id, result.insertId));
+    await db.insert(lmsLessons).values(lessonData as any);
+    const [row] = await db.select().from(lmsLessons).where(and(eq(lmsLessons.id, data.id!), eq(lmsLessons.tenantId, data.tenantId!)));
     if (!row) throw new Error("Failed to create lesson content");
     return this.mapContent(row);
   }
 
   // --- Enrollments ---
   async enrollUser(data: Partial<ILmsCourseEnrollment>): Promise<ILmsCourseEnrollment> {
-    const [result] = await db.insert(lmsEnrollments).values(data as any);
-    const [row] = await db.select().from(lmsEnrollments).where(eq(lmsEnrollments.id, result.insertId));
+    await db.insert(lmsEnrollments).values(data as any);
+    const [row] = await db.select().from(lmsEnrollments).where(eq(lmsEnrollments.id, data.id!));
     if (!row) throw new Error("Failed to enroll user");
     return {
       ...row,
@@ -124,8 +129,11 @@ export class MySqlLmsRepository implements ILmsRepository {
     };
   }
 
-  async getUserEnrollments(userId: number): Promise<ILmsCourseEnrollment[]> {
-    const results = await db.select().from(lmsEnrollments).where(eq(lmsEnrollments.userId, userId));
+  async getUserEnrollments(tenantId: string, userId: string): Promise<ILmsCourseEnrollment[]> {
+    const results = await db
+      .select()
+      .from(lmsEnrollments)
+      .where(and(eq(lmsEnrollments.userId, userId), eq(lmsEnrollments.tenantId, tenantId)));
     return results.map((row: any) => ({
       ...row,
       enrolledAt: row.enrollmentDate ? new Date(row.enrollmentDate) : new Date(),
@@ -136,13 +144,18 @@ export class MySqlLmsRepository implements ILmsRepository {
     }));
   }
 
-  async updateProgress(enrollmentId: number, progress: number): Promise<void> {
-    await db.update(lmsEnrollments).set({ progressPercent: progress }).where(eq(lmsEnrollments.id, enrollmentId));
+  async updateProgress(tenantId: string, enrollmentId: string, progress: number): Promise<void> {
+    await db.update(lmsEnrollments)
+      .set({ progressPercent: progress })
+      .where(and(eq(lmsEnrollments.id, enrollmentId), eq(lmsEnrollments.tenantId, tenantId)));
   }
 
   // --- Assignments ---
-  async getAssignmentsByCourse(courseId: number): Promise<ILmsAssignment[]> {
-    const results = await db.select().from(lmsAssignments).where(eq(lmsAssignments.courseId, courseId));
+  async getAssignmentsByCourse(tenantId: string, courseId: string): Promise<ILmsAssignment[]> {
+    const results = await db
+      .select()
+      .from(lmsAssignments)
+      .where(and(eq(lmsAssignments.courseId, courseId), eq(lmsAssignments.tenantId, tenantId)));
     return results.map((row: any) => ({
       ...row,
       marks: row.points,

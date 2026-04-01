@@ -15,7 +15,6 @@
  * - users / sm_students / sm_staffs / sm_parents -> edx_accounts
  */
 import {
-
   mysqlTable,
   varchar,
   int,
@@ -30,12 +29,13 @@ import {
   double,
 } from "drizzle-orm/mysql-core";
 import { sql } from "drizzle-orm";
+import { generateId } from "../utils/id";
 
 // Tenant context injected into all repositories
 export interface TenantContext {
-  tenantId: number;    // school_id (stays int for now, UUID in PG phase)
-  academicId: number;  // academic_year_id
-  userId: number;      // authenticated user
+  tenantId: string;    // UUID v7
+  academicId: string;  // academic_year_id UUID
+  userId: string;      // authenticated user UUID
 }
 
 // --- CORE TABLES ---
@@ -58,7 +58,7 @@ export type TenantMetadata = {
 };
 
 export const tenants = mysqlTable("tenants", {
-  id: int("id").autoincrement().primaryKey(),
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => generateId()),
   tenantType: mysqlEnum("tenant_type", ["conventional", "homeschool_family", "homeschool_coop"]).default("conventional").notNull(),
   name: varchar("name", { length: 200 }).notNull(),
   code: varchar("code", { length: 50 }),
@@ -96,10 +96,10 @@ export const accounts = mysqlTable("accounts", {
   language: varchar("language", { length: 191 }).default("en"),
   styleId: int("style_id").default(1),
   rtlLtl: int("rtl_ltl").default(2),
-  selectedSession: int("selected_session").default(1),
+  selectedSession: varchar("selected_session", { length: 36 }),
   accessStatus: int("access_status").default(1),
-  tenantId: int("tenant_id").references(() => tenants.id, { onDelete: "cascade" }), 
-  roleId: int("role_id"), 
+  tenantId: varchar("tenant_id", { length: 36 }).references(() => tenants.id, { onDelete: "cascade" }), 
+  roleId: varchar("role_id", { length: 36 }), 
   isAdministrator: mysqlEnum("is_administrator", ["yes", "no"]).default("no").notNull(),
   isRegistered: tinyint("is_registered").default(0).notNull(),
   deviceToken: text("device_token"),
@@ -215,8 +215,8 @@ export type UserMetadata = StudentMetadata | StaffMetadata | ParentMetadata | Dr
 
 // Users Table — Domain Personas (Student, Staff, Parent)
 export const users = mysqlTable("users", {
-  id: int("id").autoincrement().primaryKey(),
-  tenantId: int("tenant_id").notNull().references(() => tenants.id),
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => generateId()),
+  tenantId: varchar("tenant_id", { length: 36 }).notNull().references(() => tenants.id),
   accountId: varchar("account_id", { length: 255 }).references(() => accounts.id),
   userType: mysqlEnum("user_type", ["student", "staff", "parent", "driver", "facilitator"]).notNull(),
   firstName: varchar("first_name", { length: 100 }).notNull(),
@@ -227,7 +227,7 @@ export const users = mysqlTable("users", {
   genderId: int("gender_id").references(() => enumerations.id),
   photo: varchar("photo", { length: 500 }),
   idNumber: varchar("id_number", { length: 100 }),  // national ID / passport
-  parentUserId: int("parent_user_id"),  // self-ref FK for parent-child linking
+  parentUserId: varchar("parent_user_id", { length: 36 }),  // self-ref FK for parent-child linking
   metadata: json("metadata").$type<UserMetadata>(),  // role-specific fields
   activeStatus: tinyint("active_status").default(1).notNull(),
   createdAt: timestamp("created_at").defaultNow(),
@@ -242,8 +242,8 @@ export const users = mysqlTable("users", {
 
 // Academic Years — replaces sm_academic_years
 export const academicYears = mysqlTable("academic_years", {
-  id: int("id").autoincrement().primaryKey(),
-  tenantId: int("tenant_id").notNull().references(() => tenants.id),
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => generateId()),
+  tenantId: varchar("tenant_id", { length: 36 }).notNull().references(() => tenants.id),
   title: varchar("title", { length: 200 }).notNull(),
   year: varchar("year", { length: 20 }),
   startingDate: date("starting_date", { mode: "string" }),
@@ -263,8 +263,8 @@ export type EnumerationMetadata = {
 };
 
 export const enumerations = mysqlTable("enumerations", {
-  id: int("id").autoincrement().primaryKey(),
-  tenantId: int("tenant_id").references(() => tenants.id),  // NULL = global
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => generateId()),
+  tenantId: varchar("tenant_id", { length: 36 }).references(() => tenants.id),  // NULL = global
   domain: varchar("domain", { length: 50 }).notNull(),  // 'gender', 'blood_group', 'religion', etc.
   code: varchar("code", { length: 50 }).notNull(),
   label: varchar("label", { length: 191 }).notNull(),
@@ -286,8 +286,9 @@ export type UserDocumentMetadata = {
 };
 
 export const userDocuments = mysqlTable("user_documents", {
-  id: int("id").autoincrement().primaryKey(),
-  userId: int("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => generateId()),
+  tenantId: varchar("tenant_id", { length: 36 }).notNull().references(() => tenants.id),
+  userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id, { onDelete: "cascade" }),
   documentType: varchar("document_type", { length: 50 }).notNull(),
   title: varchar("title", { length: 191 }),
   filePath: varchar("file_path", { length: 500 }).notNull(),
@@ -297,6 +298,7 @@ export const userDocuments = mysqlTable("user_documents", {
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow(),
 }, (table) => ({
   userIdx: index("udoc_user_idx").on(table.userId),
+  tenantUserIdx: index("udoc_tenant_user_idx").on(table.tenantId, table.userId),
 }));
 
 // User Addresses
@@ -310,20 +312,22 @@ export type AddressData = {
 };
 
 export const userAddresses = mysqlTable("user_addresses", {
-  id: int("id").autoincrement().primaryKey(),
-  userId: int("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => generateId()),
+  tenantId: varchar("tenant_id", { length: 36 }).notNull().references(() => tenants.id),
+  userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id, { onDelete: "cascade" }),
   addressType: mysqlEnum("address_type", ["current", "permanent", "mailing"]).notNull(),
   addressData: json("address_data").$type<AddressData>().notNull(),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow(),
 }, (table) => ({
   userIdx: index("uaddr_user_idx").on(table.userId),
+  tenantUserIdx: index("uaddr_tenant_user_idx").on(table.tenantId, table.userId),
 }));
 
 // --- SYSTEM JOBS ---
 
 export const jobs = mysqlTable("jobs", {
-  id: int("id").autoincrement().primaryKey(),
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => generateId()),
   queue: varchar("queue", { length: 255 }).notNull(),
   payload: text("payload").notNull(),
   attempts: int("attempts").notNull().default(0),
@@ -333,7 +337,7 @@ export const jobs = mysqlTable("jobs", {
 });
 
 export const failedJobs = mysqlTable("failed_jobs", {
-  id: int("id").autoincrement().primaryKey(),
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => generateId()),
   uuid: varchar("uuid", { length: 255 }),
   connection: text("connection").notNull(),
   queue: text("queue").notNull(),

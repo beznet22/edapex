@@ -2,13 +2,15 @@ import { db } from "../../../db/index.js";
 import { 
   homeschoolSubscriptions, 
   homeschoolSchedules, 
-  homeschoolPortfolios 
+  homeschoolPortfolios,
+  revenueShares
 } from "../../../db/postgres/domain-homeschool.js";
 import { 
   IHomeschoolRepository, 
   IHomeschoolSubscription, 
   IHomeschoolSchedule, 
-  IHomeschoolPortfolio 
+  IHomeschoolPortfolio,
+  IRevenueShare
 } from "../../interfaces/homeschool.interface.js";
 import { eq, and } from "drizzle-orm";
 
@@ -38,7 +40,15 @@ export class PostgresHomeschoolRepository implements IHomeschoolRepository {
     };
   }
 
-  async getSubscription(tenantId: number, academicId: number): Promise<IHomeschoolSubscription[]> {
+  private mapRevenueShare(row: any): IRevenueShare {
+    return {
+      ...row,
+      createdAt: row.createdAt ? new Date(row.createdAt) : null,
+      updatedAt: row.updatedAt ? new Date(row.updatedAt) : null,
+    };
+  }
+
+  async getSubscription(tenantId: string, academicId: string): Promise<IHomeschoolSubscription[]> {
     const results = await db
       .select()
       .from(homeschoolSubscriptions)
@@ -52,11 +62,11 @@ export class PostgresHomeschoolRepository implements IHomeschoolRepository {
     return this.mapSubscription(result);
   }
 
-  async getSchedules(userId: number, academicId: number): Promise<IHomeschoolSchedule[]> {
+  async getSchedules(tenantId: string, userId: string, academicId: string): Promise<IHomeschoolSchedule[]> {
     const results = await db
       .select()
       .from(homeschoolSchedules)
-      .where(and(eq(homeschoolSchedules.userId, userId), eq(homeschoolSchedules.academicId, academicId)));
+      .where(and(eq(homeschoolSchedules.tenantId, tenantId), eq(homeschoolSchedules.userId, userId), eq(homeschoolSchedules.academicId, academicId)));
     return results.map((row: any) => this.mapSchedule(row));
   }
 
@@ -66,11 +76,11 @@ export class PostgresHomeschoolRepository implements IHomeschoolRepository {
     return this.mapSchedule(result);
   }
 
-  async getPortfolios(userId: number, academicId: number): Promise<IHomeschoolPortfolio[]> {
+  async getPortfolios(tenantId: string, userId: string, academicId: string): Promise<IHomeschoolPortfolio[]> {
     const results = await db
       .select()
       .from(homeschoolPortfolios)
-      .where(and(eq(homeschoolPortfolios.userId, userId), eq(homeschoolPortfolios.academicId, academicId)));
+      .where(and(eq(homeschoolPortfolios.tenantId, tenantId), eq(homeschoolPortfolios.userId, userId), eq(homeschoolPortfolios.academicId, academicId)));
     return results.map((row: any) => this.mapPortfolio(row));
   }
 
@@ -78,5 +88,13 @@ export class PostgresHomeschoolRepository implements IHomeschoolRepository {
     const [result] = await db.insert(homeschoolPortfolios).values(data as any).returning();
     if (!result) throw new Error("Failed to create homeschool portfolio");
     return this.mapPortfolio(result);
+  }
+
+  async getRevenueShares(tenantId: string, facilitatorId: string): Promise<IRevenueShare[]> {
+    const results = await db
+      .select()
+      .from(revenueShares)
+      .where(and(eq(revenueShares.tenantId, tenantId), eq(revenueShares.facilitatorId, facilitatorId)));
+    return results.map((row: any) => this.mapRevenueShare(row));
   }
 }

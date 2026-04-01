@@ -12,7 +12,7 @@
  * - sm_dashboard_settings / sm_home_page_settings / invoice_settings / maintenance_settings
  */
 import { unique,  sqliteTable, text, integer, real, index } from "drizzle-orm/sqlite-core";
-
+import { generateId } from "../utils/id";
 import { tenants } from "./domain-core";
 
 // Settings Domain - dropped edx_ prefix
@@ -34,7 +34,7 @@ export type FinanceConfig = {
   currencySymbol?: string;
   feeReceiptPrefix?: string;
   invoicePrefix?: string;
-  academicYearId?: number;
+  academicYearId?: string;
 };
 
 export type LmsConfig = {
@@ -46,8 +46,8 @@ export type LmsConfig = {
 export type SettingConfig = GeneralConfig | FinanceConfig | LmsConfig | Record<string, any>;
 
 export const settings = sqliteTable("domain_settings_settings", {
-  id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
-  tenantId: integer("tenant_id").notNull().references(() => tenants.id),
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id),
   domain: text("domain", { length: 50 }).notNull(), // 'general', 'finance', 'attendance', 'ai'
   config: text("config", { mode: "json" }).$type<SettingConfig>().notNull(), // Domain-specific JSON configuration
   createdAt: integer("created_at", { mode: "timestamp" }).defaultNow(),
@@ -59,13 +59,13 @@ export const settings = sqliteTable("domain_settings_settings", {
 // Feature Flags — tenant-scoped dark launches, A/B testing, module enablement
 export type FeatureFlagMetadata = {
   description?: string;
-  enabledForUserIds?: number[];  // targeted rollout
+  enabledForUserIds?: string[];  // targeted rollout
   variant?: string;  // A/B test variant
 };
 
 export const featureFlags = sqliteTable("domain_settings_feature_flags", {
-  id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
-  tenantId: integer("tenant_id").notNull().references(() => tenants.id),
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id),
   featureKey: text("feature_key", { length: 100 }).notNull(), // e.g. 'lms.ai_tutoring', 'finance.digital_wallet'
   isEnabled: integer("is_enabled").notNull().default(0),
   rolloutPercentage: integer("rollout_percentage").default(0), // 0-100 for gradual rollouts

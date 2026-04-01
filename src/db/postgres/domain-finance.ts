@@ -12,7 +12,8 @@
  * - sm_add_incomes / sm_add_expenses / sm_expense_heads / sm_income_heads
  * - sm_chart_of_accounts / transcations / wallet_transactions
  */
-import { pgSchema, text, doublePrecision, integer, serial, numeric, smallint, timestamp, jsonb, boolean, date, varchar, index } from "drizzle-orm/pg-core";
+import { pgSchema, text, doublePrecision, integer, uuid, numeric, smallint, timestamp, jsonb, boolean, date, varchar, index } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
 import { users, tenants, academicYears, accounts } from "./domain-core";
 import { classes, enrollments, sections } from "./domain-academic";
@@ -23,26 +24,26 @@ export type LedgerMetadata = {
   paymentMethod?: string;
   receiptNo?: string;
   notes?: string;
-  bankId?: number;
+  bankId?: string;
 };
 export const financeSchema = pgSchema("domain_finance");
 
 
 export const ledgerEntries = financeSchema.table("ledger_entries", {
-  id: serial("id").primaryKey(),
-  tenantId: integer("tenant_id").notNull().references(() => tenants.id),
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id),
   transactionType: varchar("transaction_type", { length: 150 }).notNull(),
   // Double-entry accounting: every transaction has a direction
   direction: varchar("direction", { length: 150 }).notNull(),
   amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
-  userId: integer("user_id").references(() => users.id), // Participant Persona
-  enrollmentId: integer("enrollment_id"), // Student record ID if applicable
+  userId: uuid("user_id").references(() => users.id), // Participant Persona
+  enrollmentId: uuid("enrollment_id"), // Student record ID if applicable
   referenceType: varchar("reference_type", { length: 50 }),
-  referenceId: integer("reference_id"),
+  referenceId: uuid("reference_id"),
   metadata: jsonb("metadata").$type<LedgerMetadata>(),
   postedAt: timestamp("posted_at").defaultNow(),
-  createdBy: integer("created_by").references(() => users.id), // Staff Persona
-  academicId: integer("academic_id").references(() => academicYears.id),
+  createdBy: uuid("created_by").references(() => users.id), // Staff Persona
+  academicId: uuid("academic_id").references(() => academicYears.id),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => ({
   tenantIdx: index("ledger_tenant_idx").on(table.tenantId),
@@ -52,8 +53,8 @@ export const ledgerEntries = financeSchema.table("ledger_entries", {
 }));
 
 export const feeGroups = financeSchema.table("fee_groups", {
-  id: serial("id").primaryKey(),
-  tenantId: integer("tenant_id").notNull().references(() => tenants.id),
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id),
   name: varchar("name", { length: 200 }).notNull(),
   description: varchar("description", { length: 500 }),
   createdAt: timestamp("created_at").defaultNow(),
@@ -61,9 +62,9 @@ export const feeGroups = financeSchema.table("fee_groups", {
 });
 
 export const feeTypes = financeSchema.table("fee_types", {
-  id: serial("id").primaryKey(),
-  tenantId: integer("tenant_id").notNull().references(() => tenants.id),
-  feeGroupId: integer("fee_group_id").references(() => feeGroups.id),
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id),
+  feeGroupId: uuid("fee_group_id").references(() => feeGroups.id),
   name: varchar("name", { length: 200 }).notNull(),
   description: varchar("description", { length: 500 }),
   createdAt: timestamp("created_at").defaultNow(),
@@ -71,19 +72,19 @@ export const feeTypes = financeSchema.table("fee_types", {
 });
 
 export const feeMasters = financeSchema.table("fee_masters", {
-  id: serial("id").primaryKey(),
-  tenantId: integer("tenant_id").notNull().references(() => tenants.id),
-  feeTypeId: integer("fee_type_id").notNull().references(() => feeTypes.id),
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id),
+  feeTypeId: uuid("fee_type_id").notNull().references(() => feeTypes.id),
   amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
-  academicId: integer("academic_id").notNull().references(() => academicYears.id),
+  academicId: uuid("academic_id").notNull().references(() => academicYears.id),
   dueDate: timestamp("due_date"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 export const bankAccounts = financeSchema.table("bank_accounts", {
-  id: serial("id").primaryKey(),
-  tenantId: integer("tenant_id").notNull().references(() => tenants.id),
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id),
   bankName: varchar("bank_name", { length: 255 }).notNull(),
   accountName: varchar("account_name", { length: 255 }).notNull(),
   accountNumber: varchar("account_number", { length: 100 }).notNull(),
@@ -100,18 +101,18 @@ export const bankAccounts = financeSchema.table("bank_accounts", {
 
 // Fee Assignments — which fees apply to which students (replaces smFeesAssigns)
 export const feeAssignments = financeSchema.table("fee_assignments", {
-  id: serial("id").primaryKey(),
-  tenantId: integer("tenant_id").notNull().references(() => tenants.id),
-  feeMasterId: integer("fee_master_id").notNull().references(() => feeMasters.id),
-  userId: integer("user_id").notNull().references(() => users.id), // Student Persona
-  enrollmentId: integer("enrollment_id").references(() => enrollments.id),
-  classId: integer("class_id").references(() => classes.id),
-  sectionId: integer("section_id").references(() => sections.id),
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id),
+  feeMasterId: uuid("fee_master_id").notNull().references(() => feeMasters.id),
+  userId: uuid("user_id").notNull().references(() => users.id), // Student Persona
+  enrollmentId: uuid("enrollment_id").references(() => enrollments.id),
+  classId: uuid("class_id").references(() => classes.id),
+  sectionId: uuid("section_id").references(() => sections.id),
   assignedAmount: numeric("assigned_amount", { precision: 12, scale: 2 }).notNull(),
   paidAmount: numeric("paid_amount", { precision: 12, scale: 2 }).default("0.00"),
   waivedAmount: numeric("waived_amount", { precision: 12, scale: 2 }).default("0.00"),
   status: varchar("status", { length: 150 }).notNull().default("pending"),
-  academicId: integer("academic_id").notNull().references(() => academicYears.id),
+  academicId: uuid("academic_id").notNull().references(() => academicYears.id),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => ({
@@ -121,22 +122,22 @@ export const feeAssignments = financeSchema.table("fee_assignments", {
 
 // Fee Discounts — discount definitions (replaces smFeesDiscounts)
 export const feeDiscounts = financeSchema.table("fee_discounts", {
-  id: serial("id").primaryKey(),
-  tenantId: integer("tenant_id").notNull().references(() => tenants.id),
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id),
   name: varchar("name", { length: 200 }).notNull(),
   discountType: varchar("discount_type", { length: 150 }).notNull(),
   amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
   description: varchar("description", { length: 500 }),
-  academicId: integer("academic_id").references(() => academicYears.id),
+  academicId: uuid("academic_id").references(() => academicYears.id),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 // Fee Installments — payment plans (replaces directFeesInstallments)
 export const feeInstallments = financeSchema.table("fee_installments", {
-  id: serial("id").primaryKey(),
-  tenantId: integer("tenant_id").notNull().references(() => tenants.id),
-  feeAssignmentId: integer("fee_assignment_id").notNull().references(() => feeAssignments.id),
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id),
+  feeAssignmentId: uuid("fee_assignment_id").notNull().references(() => feeAssignments.id),
   title: varchar("title", { length: 200 }).notNull(),
   amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
   dueDate: date("due_date", { mode: "string" }).notNull(),
@@ -157,20 +158,20 @@ export type InvoiceMetadata = {
 };
 
 export const invoices = financeSchema.table("invoices", {
-  id: serial("id").primaryKey(),
-  tenantId: integer("tenant_id").notNull().references(() => tenants.id),
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id),
   referenceType: varchar("reference_type", { length: 150 }).default("school_fee").notNull(),
-  referenceId: integer("reference_id"),
+  referenceId: uuid("reference_id"),
   invoiceNumber: varchar("invoice_number", { length: 50 }).notNull(),
-  userId: integer("user_id").notNull().references(() => users.id), // Student Persona
+  userId: uuid("user_id").notNull().references(() => users.id), // Student Persona
   totalAmount: numeric("total_amount", { precision: 12, scale: 2 }).notNull(),
   paidAmount: numeric("paid_amount", { precision: 12, scale: 2 }).default("0.00"),
   status: varchar("status", { length: 150 }).notNull().default("draft"),
   issuedAt: timestamp("issued_at"),
   dueDate: date("due_date", { mode: "string" }),
   metadata: jsonb("metadata").$type<InvoiceMetadata>(),
-  academicId: integer("academic_id").references(() => academicYears.id),
-  createdBy: integer("created_by").references(() => users.id), // Staff Persona
+  academicId: uuid("academic_id").references(() => academicYears.id),
+  createdBy: uuid("created_by").references(() => users.id), // Staff Persona
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => ({
@@ -180,8 +181,8 @@ export const invoices = financeSchema.table("invoices", {
 }));
 
 export const paymentGateways = financeSchema.table("payment_gateways", {
-  id: serial("id").primaryKey(),
-  tenantId: integer("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
   provider: varchar("provider", { length: 150 }).notNull(),
   publicKey: varchar("public_key", { length: 255 }),
   secretKey: text("secret_key"),
@@ -192,17 +193,17 @@ export const paymentGateways = financeSchema.table("payment_gateways", {
 });
 
 export const onlinePayments = financeSchema.table("online_payments", {
-  id: serial("id").primaryKey(),
-  tenantId: integer("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
-  userId: integer("user_id").notNull().references(() => users.id),
-  gatewayId: integer("gateway_id").notNull().references(() => paymentGateways.id),
-  invoiceId: integer("invoice_id").references(() => invoices.id),
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+  userId: uuid("user_id").notNull().references(() => users.id),
+  gatewayId: uuid("gateway_id").notNull().references(() => paymentGateways.id),
+  invoiceId: uuid("invoice_id").references(() => invoices.id),
   amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
   currency: varchar("currency", { length: 10 }).default("NGN").notNull(),
   providerFee: numeric("provider_fee", { precision: 12, scale: 2 }).default("0.00"),
   status: varchar("status", { length: 150 }).notNull(),
   transactionRef: varchar("transaction_ref", { length: 255 }).unique().notNull(),
-  ledgerEntryId: integer("ledger_entry_id").references(() => ledgerEntries.id),
+  ledgerEntryId: uuid("ledger_entry_id").references(() => ledgerEntries.id),
   metadata: jsonb("metadata"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),

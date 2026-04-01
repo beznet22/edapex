@@ -5,13 +5,13 @@
 This document is the **definitive technical specification** for transforming EdApex V2 into an autonomous "Agentic School." It serves as the concrete, build-ready contract for the V2 evolution, synthesizing Paperclip's orchestration engine, governance models, and financial ledgers into EdApex's multi-tenant, multi-dialect, Hono-driven architecture.
 
 ### 1.1 Source Inputs
-- `docs/MASTER_ARCHITECTURE.md`: Core system philosophy and stack.
-- `docs/BUSINESS_MODEL.md`: Dual-pillar B2B/B2C alignment.
-- `paperclip/doc/SPEC-implementation.md`: Orchestration and heartbeat template.
-- `docs/domains/*.md`: Domain-specific business logic and entities.
-- `paperclip/doc/spec/agent-runs.md`: Agent runs and cost tracking.
-- `paperclip/doc/spec/agents-runtime.md`: Agent runtime and cost tracking.
-- `paperclip/doc/plans/[DATE]-*.md`: Implementation plans and plus cost tracking.
+- [docs/MASTER_ARCHITECTURE.md](docs/MASTER_ARCHITECTURE.md): Core system philosophy and stack.
+- [docs/BUSINESS_MODEL.md](docs/BUSINESS_MODEL.md): Dual-pillar B2B/B2C alignment.
+- [paperclip/doc/SPEC-implementation.md](paperclip/doc/SPEC-implementation.md): Orchestration and heartbeat template.
+- [docs/domains/*.md](docs/domains/*.md): Domain-specific business logic and entities.
+- [paperclip/doc/spec/agent-runs.md](paperclip/doc/spec/agent-runs.md): Agent runs and cost tracking.
+- [paperclip/doc/spec/agents-runtime.md](paperclip/doc/spec/agents-runtime.md): Agent runtime and cost tracking.
+- [paperclip/doc/plans/[DATE]-*.md](paperclip/doc/plans/[DATE]-*.md): Implementation plans and plus cost tracking.
 
 ### 1.2 Internal Service Architecture (Detailed)
 
@@ -20,11 +20,18 @@ This document is the **definitive technical specification** for transforming EdA
 |                       UI: COMMAND CENTER (AI-ELEMENTS)                |
 +-----------------------------------------------------------------------+
            ^                                         ^
-           | Hono RPC (hc) / WebSockets              | TanStack DB Sync/Master Tooling
+           | Hono RPC (hc) / WebSockets              | TanStack DB Sync
            v                                         v
++-----------------------+                       +-----------------------+
+|  VETTING & SECURITY   |                       |   TANSTACK DB STORE   |
+| (Zod Validators,      |                       |   (Client Persistence)|
+|  Auth/Tenant Mid)     |                       |                       |
++-----------------------+                       +-----------------------+
+           |                                         ^
+           v                                         |
 +-----------------------+      +----------------------------------------+
 |   HONO CONTROLLERS    | <--> |        MASTRA ORCHESTRATOR             |
-| (BaseController Pattern)|      | (Agents, Workflows, Prompt Engine)     |
+| (BaseController)      |      | (Agents, Workflows, Prompt Engine)     |
 +-----------------------+      +----------------------------------------+
            |                                         |
            +--------------------+--------------------+
@@ -32,36 +39,52 @@ This document is the **definitive technical specification** for transforming EdA
            v                    v                    v
 +-----------------------+ +-----------------------+ +-----------------------+
 |   DOMAIN SERVICES     | |   ROUTINE ENGINE      | |   ADAPTER REGISTRY    |
-| (Registrar, Bursar,   | | (Cron, Event Triggers,| | (Claude, GPT, Gemini, |
-|  IT, HR Logic)        | |  Atomic Checkout)     | |  Unified Interface)   |
+| (Business Logic ACL)  | | (Cron, Event Triggers,| | (Unified Model      |
+|                       | |  Atomic Checkout)     | |  Interface)         |
 +-----------------------+ +-----------------------+ +-----------------------+
            |                    |                    |
            +----------+---------+----------+---------+
                       |                    |
                       v                    v
            +-----------------------+ +-----------------------+
-           |   DRIZZLE REPOSITORIES| |      COMPANY SECRETS  |
-           | (IRepository<T>,      | | (Encrypted Injection) |
-           |  Tenant Isolation)    | |                       |
+           |   INTERNAL EVENT BUS  | |   DRIZZLE REPOSITORIES|
+           | (Decoupled Handlers,  | | (IRepository<T>,      |
+           |  Task Re-triggers)    | |  Tenant Isolation)    |
            +-----------------------+ +-----------------------+
-                      |                    |
-            +---------+---------+----------+---------+
-            |                   |                    |
-         [MYSQL]             [POSTGRES]          [D1 / SQLITE]
+                                |
+                      +---------+---------+----------+
+                      |                   |          |
+                   [MYSQL]             [POSTGRES] [LibSQL / D1 / SQLITE]
 ```
+
+## 2. Professional Layering Strategy
+
+To ensure the Agentic School is robust and secure, it strictly adheres to the 8-layer architecture defined in [MASTER_ARCHITECTURE.md](docs/MASTER_ARCHITECTURE.md).
+
+### 2.1 The Validator Layer (Zod)
+- **Why**: Prevent malformed agent outputs or manual triggers from reaching the Drizzle repositories.
+- **V2 Role**: Every Mastra tool invocation output is validated against a Zod schema *before* being committed to a WorkProduct or Domain entity.
+
+### 2.2 The Middleware Layer (Hono Context)
+- **Why**: Mandatory for `TenantGuard` and `Auth` isolation.
+- **V2 Role**: Injects the active `tenant_id` and `actor_id` (Agent UUID) into the request context. This ensures that even in stateless execution, the agent never exits its school-boundary.
+
+### 2.3 The Internal Event Bus
+- **Why**: Necessary for **After-Action Decoupling**.
+- **V2 Role**: Domain Services (like Assessment) emit events to the bus (e.g., `assessment.computed`) rather than calling the PR/Notification service directly. This allows agents to 'finish' their current heartbeat turn faster, staying under the 10ms CPU limit.
 
 ### 1.3 Strategic Org Chart (HMAS Visualization)
 
 ```text
        [  Principal Assistant (Executive)  ] <--- (Administrator/Board)
                   |
-        +---------+---------+
-        |                   |
- [Academic Sup.]     [Finance Sup.]      [IT Supervisor]
-        |                   |                  |
-   +----+----+         +----+----+        +----+----+
-   |         |         |         |        |         |
-[Registrar][HOD]    [Bursar][Acct]    [AI Ops][DevOps]
+        +---------+---------+---------+---------+---------+
+        |                   |         |         |         |
+ [Academic Head]     [Bursar (Finance)] [Assessment Sup] [IT Supervisor] [HR Manager]
+        |                   |             |                |                |
+   +----+----+         +----+----+   +----+----+      +----+----+      +----+----+
+   |         |         |         |   |         |      |         |      |         |
+[Registrar][HOD]    [Acct][Payroll] [Evaluator][Proc] [AI Ops][DevOps] [PR][Safety]
 ```
 
 ### 1.4 Agent Heartbeat State Machine
@@ -126,11 +149,11 @@ The V2 evolution provides a complete control-plane loop for autonomous agents wi
 
 Every domain in the Agentic School follows this standardized, 5-phase execution lifecycle to ensure multi-tenant safety and fiscal accountability:
 
-1.  **Trigger**: A signal is enqueued in `agent_wakeup_requests` (via Cron, Webhook, or Edge Event).
-2.  **Checkout**: A Domain Supervisor performs an **Atomic Checkout**, obtaining a distributed lock and assigning a unique `run_id`.
-3.  **Execution**: The Mastra Agent hydrates context and invokes specialized Tools (validated against JSON schemas) via the Repository layer.
-4.  **Governance**: High-impact actions (deletions, high-cost turns) are paused for **Board Inbox** manual approval.
-5.  **Artifact**: The agent delivers a `WorkProduct` (artifact), persists logs, and releases the checkout lock.
+1.  **Trigger**: A signal is enqueued (Cron/Event). **Middleware** ensures the request is authenticated and tenant-scoped.
+2.  **Validation**: The payload is verified against a **Zod Validator** (Structural Guarantee).
+3.  **Checkout**: Supervisor performs an **Atomic Checkout** (Distributed Lock) and assigns a `run_id`.
+4.  **Execution**: Mastra Agent hydrates context (via `agent_runtime_state`) and invokes tools.
+5.  **Artifact & Emit**: Agent delivers a `WorkProduct`, releases the lock, and emits an **Internal Event** for decoupled subscribers.
 
 ## 3. Explicit V2 Technical Decisions
 
@@ -210,7 +233,9 @@ API endpoints in `controllers/` act as the entry point for the **Anti-Corruption
 
 All tables MUST include `tenant_id` (uuid), `id` (uuid), `created_at`, and `updated_at`.
 
-### 7.1 Core Orchestration Tables
+### 7.1 Core Orchestration Tables (AI Domain)
+
+These tables are defined within [src/db/sqlite/domain-ai.ts](src/db/sqlite/domain-ai.ts) and represent the evolution of the `aiAgentActions` and `aiToolInvocations` legacy telemetry.
 
 #### `agent_runs` (replaces Paperclip `heartbeat_runs`)
 - `id` uuid pk
@@ -221,6 +246,10 @@ All tables MUST include `tenant_id` (uuid), `id` (uuid), `created_at`, and `upda
 - `started_at` timestamptz null
 - `finished_at` timestamptz null
 - `context_snapshot` jsonb null (Thin vs Fat mode)
+
+### 7.2 Financial Ledger (Finance Domain)
+
+These events are integrated into [src/db/sqlite/domain-finance.ts](src/db/sqlite/domain-finance.ts), extending the `ledgerEntries` model with high-fidelity operational tracking.
 
 #### `cost_events` (Financial Ledger)
 - `id` uuid pk
@@ -241,7 +270,9 @@ All tables MUST include `tenant_id` (uuid), `id` (uuid), `created_at`, and `upda
 - `amount_cents` int not null
 - `balance_after_cents` int not null
 
-### 7.2 Work Product & Document System
+### 7.3 Work Product & Document System (Documents Domain)
+
+These tables extend [src/db/sqlite/domain-documents.ts](src/db/sqlite/domain-documents.ts), providing structured state for agentic output.
 
 #### `work_products` (replaces Paperclip `assets`)
 - `id` uuid pk
@@ -279,17 +310,23 @@ Roles are grouped by Domain and implemented as **Standard Educational Skills**. 
 
 | Domain | Key Roles | Supervisor Role | Responsibilities | Primary Agent Tools |
 | :--- | :--- | :--- | :--- | :--- |
-| **Core** | Principal, Board Sec.| Principal Assistant | Strategic goals, Tenant health, Board comms. | `get_school_info`, `set_goal`, `audit_health` |
-| **Academic** | Registrar, HOD, Teacher Asst, Evaluator. | Academic Head | Student records, Lesson Plans, Grading, Student Analytics. | `enroll_student`, `grade_work`, `lesson_plan` |
+| **Academic** | Registrar, HOD, Teacher Asst. | Academic Head | Student records, Lesson Plans, Student Analytics. | `enroll_student`, `lesson_plan`, `search_records` |
+| **AI** | AI Architect, Token Auditor. | IT Supervisor | Model selection, Cost tracking, Prompt versions. | `check_usage`, `rotate_keys`, `audit_tokens` |
+| **Assessment** | Evaluator, Proctor, Author. | Assessment Sup. | Exams, Grading, Question Banks, Results. | `grade_exam`, `generate_quiz`, `monitor_attempt` |
+| **Attendance** | Safety Officer, Sentinel. | Safety Officer | Presence verification, Absence flagging, Daily rollups. | `verify_presence`, `flag_absence`, `daily_rollup` |
+| **CMS** | Content Head, Webmaster. | IT Supervisor | School website, Blog, Portal content, SEO. | `publish_page`, `update_news`, `seo_audit` |
+| **Communication**| PR Officer, Broadcaster. | HR Manager | Parent comms, Broadcasts, Newsletters, Chat. | `send_broadcast`, `moderate_chat`, `draft_news` |
+| **Core** | Principal, Admin, Secretary. | Principal Assistant | Strategic goals, Tenant health, Board comms. | `get_school_info`, `set_goal`, `audit_health` |
+| **Documents** | Registrar, Archivist. | Registrar | Record archiving, Certificate generation, Signing. | `archive_record`, `generate_cert`, `sign_doc` |
+| **Events** | Event Planner, Secretary. | Principal Assistant | School calendar, Meetings, Graduations. | `create_event`, `send_invites`, `check_venue` |
+| **Facilities** | Asset Manager, Clerk. | Asset Manager | Inventory tracking, Room booking, Maintenance. | `track_inventory`, `book_room`, `schedule_mtce` |
 | **Finance** | Bursar, Accountant, Auditor, Payroll. | Bursar | Fees, Ledgers, Tax compliance, Budget Oversight. | `collect_fees`, `audit_ledger`, `process_payroll` |
-| **IT/Ops** | AI Ops, DevOps, Librarian, Asset Mgr. | IT Supervisor | Infra, Data Security, Resource Inventory, Cataloging. | `check_health`, `rotate_keys`, `search_archive` |
-| **HR/Admin** | HR Mgr, Compliance, Safety, PR. | HR Manager | Staff mgmt, Policy, Communications, Safety Audits. | `hire_staff`, `track_attendance`, `broadcast` |
-| **LMS** | Course Designer, Proctor. | Course Designer | Content publishing, Enrollment, Performance assessment. | `create_module`, `generate_quiz`, `monitor_exam` |
-| **PBAC** | Compliance Officer, Auditor. | Compliance Officer | Policy evaluation, Role granting, Permission auditing. | `evaluate_policy`, `grant_role`, `audit_perms` |
-| **Attendance**| Safety Officer, Sentinel. | Safety Officer | Presence verification, Absence flagging, Daily rollups. | `verify_presence`, `flag_absence`, `daily_rollup` |
-| **Facilities** | Asset Manager, Clerk. | Asset Manager | Inventory tracking, Room booking, Maintenance scheduling. | `track_inventory`, `book_room`, `schedule_mtce` |
-| **Documents** | Registrar, Archivist. | Registrar | Record archiving, Certificate generation, Digital signing. | `archive_record`, `generate_cert`, `sign_doc` |
-| **Homeschool**| Home Mentor, Facilitator. | Home Mentor | Personalized paths, Payouts, Parent portal synchronization. | `create_path`, `payout_facilitator`, `parent_sync` |
+| **Homeschool** | Home Mentor, Facilitator. | Home Mentor | Personalized paths, Payouts, Parent portal sync. | `create_path`, `payout_facilitator`, `parent_sync` |
+| **HR** | HR Mgr, Payroll Clerk. | HR Manager | Staff mgmt, Policy, Recruitment, Attendance. | `hire_staff`, `terminate_staff`, `view_payroll` |
+| **Library** | Librarian, Archivist. | IT Supervisor | Book cataloging, Digital assets, Loans, Archive. | `search_books`, `issue_book`, `check_overdue` |
+| **LMS** | Course Designer, Proctor. | Course Designer | Content publishing, Enrollment, Performance. | `create_module`, `generate_quiz`, `monitor_exam` |
+| **PBAC** | Compliance Officer, Auditor. | Compliance Officer | Policy evaluation, Role granting, Auditing. | `evaluate_policy`, `grant_role`, `audit_perms` |
+| **Settings** | Admin, Config Mgr. | Principal Assistant | School configs, Session dates, Grading scales. | `update_config`, `set_academic_year`, `set_scale` |
 
 ## 10. Security & PBAC: The Edge-Native Perimeter
 
@@ -426,126 +463,131 @@ Each role is a specialized Mastra Agent with its own `SKILL.md` manifest and a r
 #### 13.3.3 PR Officer (Communication Agent)
 - **Purpose**: Managing school-to-parent and school-to-community relations.
 - **Mastra Tools**:
-    - `comm.sendSmartBroadcast(segment, message)`: Uses LLM to personalize tones for specific groups.
-    - `comm.moderateCommunityFeed(feedId)`: Flags inappropriate content based on school values.
-    - `comm.draftNewsletter(weekNumber)`: Summarizes WorkProducts from Academic and Events domains.
-- **Reporting Line**: Reports to HR/Admin Supervisor.
+- **Purpose**: Managing student lifecycle and records.
+- **Mastra Tools**: `academic.enrollStudent`, `academic.searchRecords`, `academic.updateProfile`.
+- **Reporting Line**: Academic Head.
 
-### 13.4 IT & Operations Domain (The Engine Room)
+#### 13.1.2 HOD Agent (Pedagogical Lead)
+- **Purpose**: Oversight of departmental lesson plans and subject alignment.
+- **Mastra Tools**: `academic.createLessonPlan`, `academic.auditSyllabus`, `academic.assignTeacher`.
+- **Reporting Line**: Academic Head.
 
-#### 13.3.4 Safety Officer
-- **Purpose**: Autonomous monitoring of campus safety and entry logs.
-- **Mastra Tools**:
-    - `safety.getEntryLogs(gateId, date)`: Scans IoT entry events for unauthorized access.
-    - `safety.flagSecurityAnomaly(pattern)`: LLM-based pattern matching on gate activity.
-    - `safety.generateIncidentReport()`: Produces a WorkProduct for the Board.
-- **Reporting Line**: Reports to HR/Admin Supervisor.
+### 13.2 AI Domain (Orchestration & Costs)
 
-#### 13.3.5 Sentinel Agent (B2C/Homeschool)
-- **Purpose**: Monitoring student engagement and physical wellbeing in remote settings.
-- **Mastra Tools**:
-    - `sentinel.checkVitals(studentId)`: Integrates with wearable health data (placeholder).
-    - `sentinel.trackScreenTime(studentId)`: Analyzes LMS interaction frequency.
-    - `sentinel.emitParentAlert(urgency, details)`: Direct communication to the Parent Portal.
-- **Reporting Line**: Reports to Home Mentor.
+#### 13.2.1 AI Ops (The Orchestrator Assistant)
+- **Purpose**: Technical maintenance of the HMAS loop and token budgets.
+- **Mastra Tools**: `it.checkAgentHealth`, `it.rotateAPIKeys`, `it.auditTokenCents`.
+- **Reporting Line**: IT Supervisor.
 
-### 13.4 IT & Operations Domain (The Engine Room)
+### 13.3 Assessment Domain (The Examination Hall)
 
-#### 13.4.1 AI Ops (The Orchestrator Assistant)
-- **Purpose**: Technical maintenance of the Agentic School's HMAS loop.
-- **Mastra Tools**:
-    - `it.checkAgentHealth(agentId)`: pings the heartbeat endpoint and checks run logs.
-    - `it.rotateAPIKeys(agentId)`: Triggers hash update in `agent_api_keys`.
-    - `it.purgeOldRuns(days)`: Optimizes D1 storage by archiving succeeded runs.
-- **Reporting Line**: Reports to IT Supervisor.
+#### 13.3.1 Assessment Evaluator
+- **Purpose**: Autonomous grading and performance feedback loops.
+- **Mastra Tools**: `assessment.gradeExam`, `assessment.computeSchoolAverages`.
+- **Reporting Line**: Assessment Supervisor.
 
-#### 13.4.2 DevOps Agent
-- **Purpose**: Infrastructure management and deployment automation.
-- **Mastra Tools**:
-    - `it.deployStaticNotice(contentId)`: Updates the CMS domain via R2.
-    - `it.scaleWorkerCapacity(params)`: Adjusts Cloudflare Worker limits (Simulated).
-    - `it.monitorD1Storage()`: Alerts on capacity thresholds for the local/edge DB.
-- **Reporting Line**: Reports to IT Supervisor.
+### 13.4 Attendance Domain (Presence & Safety)
 
-#### 13.4.3 Librarian (The Knowledge Custodian)
-- **Purpose**: Management of the school's digital and physical archives.
-- **Mastra Tools**:
-    - `library.catalogWorkProduct(productId)`: Tags artifacts with searchable vector metadata.
-    - `library.searchArchive(query)`: High-performance semantic search across old documents.
-    - `library.trackResourceLoan(studentId, resourceId)`: Manages the checkout state of school assets.
-- **Reporting Line**: Reports to IT Supervisor.
+#### 13.4.1 Safety Officer
+- **Purpose**: Monitoring campus entry logs and security events.
+- **Mastra Tools**: `attendance.verifyPresence`, `attendance.flagSecurityAnomaly`.
+- **Reporting Line**: HR Manager.
 
-#### 13.4.4 Asset Manager (Facilities)
+### 13.5 CMS Domain (Digital Presence)
+
+#### 13.5.1 Content Head
+- **Purpose**: Strategic oversight of the school's public website and portal.
+- **Mastra Tools**: `cms.publishPage`, `cms.updateNews`, `cms.seoAudit`.
+- **Reporting Line**: IT Supervisor.
+
+### 13.6 Communication Domain (PR & Engagement)
+
+#### 13.6.1 PR Officer
+- **Purpose**: Managing parent communications and public relations.
+- **Mastra Tools**: `comm.sendBroadcast`, `comm.moderateChat`, `comm.draftNewsletter`.
+- **Reporting Line**: HR Manager.
+
+### 13.7 Core Domain (Executive Strategy)
+
+#### 13.7.1 Principal Assistant
+- **Purpose**: Top-level orchestration and goal decomposition.
+- **Mastra Tools**: `orchestrate.setGoal`, `orchestrate.reportStatus`, `orchestrate.auditTenant`.
+- **Reporting Line**: Administrator/Board.
+
+### 13.8 Documents Domain (The Archive)
+
+#### 13.8.1 Archivist Agent
+- **Purpose**: Document lifecycle and digital signing.
+- **Mastra Tools**: `docs.archiveRecord`, `docs.generateCertificate`, `docs.signDocument`.
+- **Reporting Line**: Registrar.
+
+### 13.9 Events Domain (School Life)
+
+#### 13.9.1 Event Planner
+- **Purpose**: Managing the school calendar and event logistics.
+- **Mastra Tools**: `events.createEvent`, `events.sendInvites`, `events.checkVenue`.
+- **Reporting Line**: Principal Assistant.
+
+### 13.10 Facilities Domain (Infrastructure)
+
+#### 13.10.1 Asset Manager
 - **Purpose**: Inventory and maintenance of physical school assets.
-- **Mastra Tools**:
-    - `facilities.getInventoryCount(itemId)`: Queries the local D1 inventory table.
-    - `facilities.reportDamagedAsset(assetId, details)`: Creates a maintenance ticket Trigger.
-    - `facilities.scheduleRoom(classId, roomId, time)`: Prevents schedule conflicts via calendar domain.
-- **Reporting Line**: Reports to IT Supervisor.
+- **Mastra Tools**: `facilities.trackInventory`, `facilities.bookRoom`, `facilities.scheduleMaintenance`.
+- **Reporting Line**: Asset Manager.
 
-#### 13.4.5 Clerk Agent
-- **Purpose**: Managing the physical document archive and request queue.
-- **Mastra Tools**:
-    - `clerk.processDocumentRequest(requisitionId)`: Validates PBAC for record release.
-    - `clerk.digitizeRecord(fileUri)`: Triggers OCR and vector ingestion via Librarian.
-    - `clerk.generateBarcode(entityId)`: Creates physical tracking identifiers.
-- **Reporting Line**: Reports to Asset Manager.
+### 13.11 Finance Domain (The Ledger)
 
-## 14. Technical Enhancements: The Edge-Native Evolution
+#### 13.11.1 Bursar Agent
+- **Purpose**: Revenue collection and fee management.
+- **Mastra Tools**: `finance.collectFees`, `finance.issueInvoice`.
+- **Reporting Line**: Bursar.
 
-EdApex V2 transforms stagnant Paperclip logic into a dynamic, edge-native system.
+#### 13.11.2 Accountant Agent
+- **Purpose**: Expenditure tracking and double-entry auditing.
+- **Mastra Tools**: `finance.auditLedger`, `finance.processPayroll`.
+- **Reporting Line**: Bursar.
 
-### 13.5 LMS & Content Domain (The Digital Campus)
+### 13.12 Homeschooling Domain (B2C Extension)
 
-#### 13.5.1 Course Designer
-- **Purpose**: Authoring and aligning courses with NERDC standards.
-- **Mastra Tools**:
-    - `lms.createModule(courseId, content)`: Uses LLM to structure markdown content into logical units.
-    - `lms.generateQuiz(moduleId)`: Produces assessment questions based on module content.
-    - `lms.publishToCMS(courseId)`: Bridges LMS content to the public-facing school website.
-- **Reporting Line**: Reports to Academic Supervisor.
-
-#### 13.5.2 Proctor Agent (V2)
-- **Purpose**: Monitoring online exams and flagging integrity issues.
-- **Mastra Tools**:
-    - `lms.monitorWindowFocus(sessionId)`: Scans for browser-tab switching events.
-    - `lms.analyzeSubmissionSpeed(sessionId)`: Flags answers submitted faster than human reading limits.
-    - `lms.logPlagiarismScore(submissionId)`: Cross-references session content with the Library archive.
-- **Reporting Line**: Reports to Assessment Evaluator.
-
-#### 13.5.3 Content Head
-- **Purpose**: Strategic oversight of the school's public digital presence.
-- **Mastra Tools**:
-    - `cms.updateNewsfeed(headline, body)`: Publishes to the school's mobile app and web portal.
-    - `cms.moderateComments(filter)`: Uses NLP to remove toxic community interactions.
-    - `cms.generateSEOReport()`: Optimizes public pages for parent discovery.
-- **Reporting Line**: Reports to IT Supervisor.
-
-### 13.6 Homeschooling & B2C Domain (The Parent Portal)
-
-#### 13.6.1 Home Mentor
+#### 13.12.1 Home Mentor
 - **Purpose**: Personalized academic coaching for distance learners.
-- **Mastra Tools**:
-    - `homeschool.createPath(studentId, goals)`: Generates a bespoke 12-week learning roadmap.
-    - `homeschool.scheduleSync(studentId, parentId)`: Coalesces calendars for live mentor sessions.
-    - `homeschool.recommendSupplements(studentId)`: Suggests third-party resources based on performance gaps.
-- **Reporting Line**: Reports to Principal Assistant.
+- **Mastra Tools**: `homeschool.createPath`, `homeschool.recommendSupplements`.
+- **Reporting Line**: Principal Assistant.
 
-#### 13.6.2 Facilitator Agent
-- **Purpose**: Managing the logistics of physical homeschool clusters.
-- **Mastra Tools**:
-    - `homeschool.payoutFacilitator(facilitatorId)`: Calculates commissions based on cluster size.
-    - `homeschool.auditVenueSafety(venueId)`: Verifies facility compliance for regional meetups.
-    - `homeschool.trackKitInventory()`: Manages the distribution of physical learning kits.
-- **Reporting Line**: Reports to HR/Admin Supervisor.
+### 13.13 HR Domain (Staff Management)
 
-#### 13.6.3 Parent Portal Sync
-- **Purpose**: Ensuring real-time synchronization between school records and parent dashboards.
-- **Mastra Tools**:
-    - `parent.pushDailySummary(studentId)`: Summarizes attendance, marks, and behavioral highlights.
-    - `parent.collectFeedback(studentId)`: Ingests parent concerns into the PR domain queue.
-    - `parent.requestApproval(studentId, actionId)`: Sends push notifications for field trips or medical consent.
-- **Reporting Line**: Reports to PR Officer.
+#### 13.13.1 HR Manager
+- **Purpose**: Staff management, recruitment, and policy compliance.
+- **Mastra Tools**: `hr.hireStaff`, `hr.terminateStaff`.
+- **Reporting Line**: HR Manager.
+
+### 13.14 Library Domain (The Knowledge Base)
+
+#### 13.14.1 Librarian Agent
+- **Purpose**: Management of books and digital learning assets.
+- **Mastra Tools**: `library.searchBooks`, `library.issueBook`, `library.checkOverdue`.
+- **Reporting Line**: IT Supervisor.
+
+### 13.15 LMS Domain (The Digital Classroom)
+
+#### 13.15.1 Course Designer
+- **Purpose**: Content creation and curriculum publishing.
+- **Mastra Tools**: `lms.createModule`, `lms.generateQuiz`.
+- **Reporting Line**: Academic Head.
+
+### 13.16 PBAC Domain (Governance)
+
+#### 13.16.1 Compliance Officer
+- **Purpose**: Security auditing and role-based access enforcement.
+- **Mastra Tools**: `pbac.evaluatePolicy`, `pbac.grantRole`, `pbac.auditPerms`.
+- **Reporting Line**: Principal Assistant.
+
+### 13.17 Settings Domain (Global Config)
+
+#### 13.17.1 Config Manager
+- **Purpose**: Managing school-wide configurations and term dates.
+- **Mastra Tools**: `settings.updateConfig`, `settings.setAcademicYear`.
+- **Reporting Line**: Principal Assistant.
 
 ## 14. Technical Enhancements: The Edge-Native Evolution
 - **Constraint**: Cloudflare's 10ms CPU limit prevents long-running synchronous agent loops.
@@ -810,11 +852,17 @@ All recurring tasks follow this standard schema:
 ```
 
 ### 20.2 Logic Hooks (Event Triggers)
+- `ON_EXAM_COMPLETED`: Triggers the Assessment Evaluator to begin rubric-based grading and update `computedResults`.
 - `ON_STUDENT_ENROLLED`: Triggers the Accountant to issue a tuition invoice and moves the student into the `Admissions` domain workflow.
+- `ON_MARK_PUBLISHED`: Triggers the PR Officer to send a notification to the Parent Portal.
+- `ON_BOOK_OVERDUE`: Triggers the Librarian to flag the `loan_state` and the PR Officer to send a notification.
+- `ON_PAGE_DRAFTED`: Triggers the Content Head to perform an SEO audit and request Principal approval for publishing.
+- `ON_CALENDAR_CONFLICT`: Triggers the Event Planner to suggest an alternative venue or timestamp.
 - `ON_COST_THRESHOLD_EXCEEDED`: Triggers the AI Auditor to pause non-essential runs and notify the Finance Supervisor.
 - `ON_PBAC_VIOLATION`: Triggers immediate Board notification, Agent lockdown, and creates a `SECURITY_INCIDENT` WorkProduct.
 - `ON_LMS_SCORE_LOW`: Triggers a Curriculum Head to review the recent Assessment evaluator logs and suggest a "Personalized Path".
 - `ON_FACILITY_DAMAGED`: Triggers the Asset Manager to create a maintenance ticket and notify the Facilities Supervisor.
+- `ON_SYSTEM_CONFIG_CHANGED`: Triggers a full tenant health audit by the AI Ops agent to ensure no breaking changes in term dates.
 
 ### 20.3 Wakeup Coalescing Logic
 To prevent redundant execution, the `Wakeup Coordinator` coalesces parallel signals:
@@ -843,7 +891,7 @@ The Maximizer attempts to maximize "Academic Growth" while minimizing "Operation
 - **Core Formula**: `Efficiency = (Sum(Artifact Quality) / Sum(Token Spend)) * UtilizationRate`.
 
 ### 22.2 Operation Sequence
-1. **Scoping**: Scans the `library` for all recent `WorkProducts` (artifacts) across Academic and LMS domains.
+1. **Scoping**: Scans the `library` for all recent `WorkProducts` (artifacts) across Academic, LMS, and Assessment domains.
 2. **Analysis**: Uses Gemini-1.5-Pro to analyze the "Quality Density" of artifacts against NERDC standards.
 3. **Drafting**: Creates a `STRATEGIC_PROPOSAL` WorkProduct in the Board Command Center.
 4. **Approval**: Once the human administrator reviews and approves, the Maximizer triggers the relevant Task Agents to execute systematic changes.
@@ -1018,10 +1066,66 @@ Follow this sequence to initialize a new Agentic School tenant:
 
 - [ ] **Infrastructure**: Run `pnpm wrangler d1 migrations apply edapex_db --local`.
 - [ ] **Registry**: Register at least one `StandardAdapter` via `StandardAdapterRegistry.register()`.
-- [ ] **Governance**: Create the initial `SCHOOL.md` and `AGENTS.md` manifests in the tenant root.
+- [ ] **Governance**: Create the initial `SCHOOL.md` and `AGENTS.md`- [ ] **Middleware**: Verify `TenantGuard` and `Auth` injection in [app.ts](src/app.ts).
+- [ ] **Validators**: Map all agent tool outputs to [validators/](src/validators/) Zod schemas.
+- [ ] **Domain**: Ensure the `IRepository<T>` covers the new domain tables.
 - [ ] **Sync**: Initialize the `TanStack DB` collection with the matching D1 schema.
+- [ ] **Events**: Register domain-specific handlers in the [events/](src/events/) layer.
 - [ ] **Pulse**: Enable the `Heartbeat` stream in the Command Center properties panel.
 
-## 36. Conclusion: Towards the Autonomous School
+## 36. 17-Domain Drizzle Schema Reference (Cross-Walk)
 
-The transformation of EdApex V2 into an Agentic School represents a paradigm shift in educational infrastructure. By synthesizing local-first performance, hierarchical multi-agent orchestration, and strict financial governance, we provide a robust, build-ready blueprint for the future of school management. Every line in this specification is designed to bridge the gap between static business logic and proactive, AI-driven educational optimization.
+| V2 Domain | Drizzle Schema File (src/db/sqlite/) | Primary Table Export |
+| :--- | :--- | :--- |
+| **Academic** | `domain-academic.ts` | `enrollments`, `classes` |
+| **AI** | `domain-ai.ts` | `aiAgents`, `aiAgentActions` |
+| **Assessment** | `domain-assessment.ts` | `exams`, `computedResults` |
+| **Attendance** | `domain-attendance.ts` | `attendanceLogs` |
+| **CMS** | `domain-cms.ts` | `pages`, `newsPosts` |
+| **Communication**| `domain-communication.ts` | `broadcasts`, `threads` |
+| **Core** | `domain-core.ts` | `tenants`, `users` |
+| **Documents** | `domain-documents.ts` | `documents` (Polymorphic) |
+| **Events** | `domain-events.ts` | `schoolEvents` |
+| **Facilities** | `domain-facilities.ts` | `assets`, `maintenanceLogs` |
+| **Finance** | `domain-finance.ts` | `ledgerEntries`, `invoices` |
+| **Homeschool** | `domain-homeschool.ts` | `homeschoolRecords` |
+| **HR** | `domain-hr.ts` | `staffProfiles` |
+| **Library** | `domain-library.ts` | `resources`, `loans` |
+| **LMS** | `domain-lms.ts` | `courses`, `modules` |
+| **PBAC** | `domain-pbac.ts` | `policies`, `roleGrants` |
+| **Settings** | `domain-settings.ts` | `schoolConfigs` |
+
+## 38. Canonical Directory Structure (The 17-Domain Layout)
+
+To ensure 100% logic parity and strict adherence to the **Backend Feasibility & Risk Index (BFRI)**, EdApex V2 employs the following standardized hierarchy:
+
+```bash
+src/
+├── config/              # Centralized environment & AI unifiedConfig
+├── controllers/         # Hono route handlers (req/res) via BaseController
+├── services/            # Framework-agnostic business logic & AI orchestration
+├── domain/              # Anti-Corruption Layer (Interfaces & Repositories)
+│   ├── interfaces/      # e.g., core.interface.ts, ai.interface.ts
+│   └── repositories/    # Drizzle ORM concrete implementations (mysql, postgres, sqlite)
+├── db/                  # Drizzle schemas, relations, and migrations
+├── routes/              # Hono route definitions
+├── middleware/          # Auth, TenantGuard, PBAC, Rate Limiting
+├── validators/          # Zod schemas for pre-flight input validation
+├── events/              # Internal Event Bus & reactive trigger definitions
+├── types/               # Shared TypeScript types & Enums
+├── utils/               # Helpers, loggers, formatting
+├── tests/               # Unit, Integration, and E2E specs
+├── instrument.ts        # Observability & Tracing setup
+├── app.ts               # Hono App instance configuration
+└── server.ts            # Bootstrapper & Dependency Injection
+```
+
+## 39. Implementation Detail: The Directory Flow
+- **Request Handlers**: All UI interactions (Agent Pulse, Artifacts) enter via `controllers/`.
+- **Orchestration**: The `MASTRA_ORCHESTRATOR` lives in `services/`, acting as the supervisor of all domain agents.
+- **Data Persistence**: All agentic state changes pass through the `validators/` before hitting the `domain/repositories/`.
+- **Reactive Backbone**: The `events/` directory manages the decoupling of agent actions from high-latency side effects (notifications, audits).
+
+## 40. Conclusion: Towards the Autonomous School
+
+The transformation of EdApex V2 into an Agentic School represents a paradigm shift in educational infrastructure. By synthesizing local-first performance, hierarchical multi-agent orchestration, and strict financial governance, we provide a robust, build-ready blueprint for the future of school management...

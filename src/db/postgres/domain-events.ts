@@ -10,7 +10,8 @@
  * - sm_system_logs
  * - sm_user_logs
  */
-import { pgSchema, text, doublePrecision, integer, serial, numeric, smallint, timestamp, jsonb, boolean, date, varchar, index } from "drizzle-orm/pg-core";
+import { pgSchema, text, doublePrecision, integer, uuid, numeric, smallint, timestamp, jsonb, boolean, date, varchar, index } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import { users, tenants, accounts } from "./domain-core";
 
 export type EventMetadata = {
@@ -24,13 +25,13 @@ export type AuditLogValues = Record<string, unknown>;
 export const eventsSchema = pgSchema("domain_events");
 
 export const events = eventsSchema.table("events", {
-  id: serial("id").primaryKey(),
-  tenantId: integer("tenant_id").notNull().references(() => tenants.id),
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id),
   eventType: varchar("event_type", { length: 100 }).notNull(),
   // e.g. 'student.enrolled', 'exam.completed', 'fee.paid', 'attendance.marked', 'agent.action_completed'
   aggregateType: varchar("aggregate_type", { length: 50 }).notNull(),
-  aggregateId: integer("aggregate_id").notNull(),
-  actorId: integer("actor_id").references(() => users.id),  // persona who triggered the event
+  aggregateId: uuid("aggregate_id").notNull(),
+  actorId: uuid("actor_id").references(() => users.id),  // persona who triggered the event
   payload: jsonb("payload").$type<Record<string, any>>().notNull(),
   metadata: jsonb("metadata").$type<EventMetadata>(),
   // Transactional Outbox: tracks event dispatch lifecycle
@@ -50,14 +51,14 @@ export const events = eventsSchema.table("events", {
 }));
 
 export const auditLog = eventsSchema.table("audit_log", {
-  id: serial("id").primaryKey(),
-  tenantId: integer("tenant_id").notNull().references(() => tenants.id),
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id),
   tableName: varchar("table_name", { length: 100 }).notNull(),
-  recordId: integer("record_id").notNull(),
+  recordId: uuid("record_id").notNull(),
   action: varchar("action", { length: 150 }).notNull(),
   oldValues: jsonb("old_values").$type<AuditLogValues>(),
   newValues: jsonb("new_values").$type<AuditLogValues>(),
-  changedBy: integer("changed_by").notNull().references(() => users.id), // Staff persona
+  changedBy: uuid("changed_by").notNull().references(() => users.id), // Staff persona
   changedAt: timestamp("changed_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => ({

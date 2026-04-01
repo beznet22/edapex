@@ -23,6 +23,7 @@ import {
 } from "drizzle-orm/mysql-core";
 
 import { tenants } from "./domain-core";
+import { generateId } from "../utils/id";
 
 // Settings Domain - dropped edx_ prefix
 
@@ -43,7 +44,7 @@ export type FinanceConfig = {
   currencySymbol?: string;
   feeReceiptPrefix?: string;
   invoicePrefix?: string;
-  academicYearId?: number;
+  academicYearId?: string;
 };
 
 export type LmsConfig = {
@@ -55,8 +56,8 @@ export type LmsConfig = {
 export type SettingConfig = GeneralConfig | FinanceConfig | LmsConfig | Record<string, any>;
 
 export const settings = mysqlTable("settings", {
-  id: int("id").autoincrement().primaryKey(),
-  tenantId: int("tenant_id").notNull().references(() => tenants.id),
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => generateId()),
+  tenantId: varchar("tenant_id", { length: 36 }).notNull().references(() => tenants.id),
   domain: varchar("domain", { length: 50 }).notNull(), // 'general', 'finance', 'attendance', 'ai'
   config: json("config").$type<SettingConfig>().notNull(), // Domain-specific JSON configuration
   createdAt: timestamp("created_at").defaultNow(),
@@ -68,13 +69,13 @@ export const settings = mysqlTable("settings", {
 // Feature Flags — tenant-scoped dark launches, A/B testing, module enablement
 export type FeatureFlagMetadata = {
   description?: string;
-  enabledForUserIds?: number[];  // targeted rollout
+  enabledForUserIds?: string[];  // targeted rollout
   variant?: string;  // A/B test variant
 };
 
 export const featureFlags = mysqlTable("feature_flags", {
-  id: int("id").autoincrement().primaryKey(),
-  tenantId: int("tenant_id").notNull().references(() => tenants.id),
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => generateId()),
+  tenantId: varchar("tenant_id", { length: 36 }).notNull().references(() => tenants.id),
   featureKey: varchar("feature_key", { length: 100 }).notNull(), // e.g. 'lms.ai_tutoring', 'finance.digital_wallet'
   isEnabled: int("is_enabled").notNull().default(0),
   rolloutPercentage: int("rollout_percentage").default(0), // 0-100 for gradual rollouts

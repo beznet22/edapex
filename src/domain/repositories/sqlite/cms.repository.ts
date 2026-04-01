@@ -12,7 +12,7 @@ export class SqliteCmsRepository implements ICmsRepository {
     };
   }
 
-  async getContentNodes(tenantId: number, filter?: { type?: string; publishedOnly?: boolean }): Promise<IContentNode[]> {
+  async getContentNodes(tenantId: string, filter?: { type?: string; publishedOnly?: boolean }): Promise<IContentNode[]> {
     let whereClause = eq(contentNodes.tenantId, tenantId);
     if (filter?.publishedOnly) {
       whereClause = and(whereClause, eq(contentNodes.publishedStatus, 1)) as any;
@@ -21,7 +21,7 @@ export class SqliteCmsRepository implements ICmsRepository {
     return results.map((row: any) => this.mapNode(row));
   }
 
-  async getNodeBySlug(tenantId: number, slug: string): Promise<IContentNode | null> {
+  async getNodeBySlug(tenantId: string, slug: string): Promise<IContentNode | null> {
     const [result] = await db
       .select()
       .from(contentNodes)
@@ -35,7 +35,7 @@ export class SqliteCmsRepository implements ICmsRepository {
     return this.mapNode(result);
   }
 
-  async updateContentNode(tenantId: number, id: number, data: Partial<IContentNode>): Promise<void> {
+  async updateContentNode(tenantId: string, id: string, data: Partial<IContentNode>): Promise<void> {
     await db.update(contentNodes)
       .set(data as any)
       .where(and(
@@ -44,7 +44,7 @@ export class SqliteCmsRepository implements ICmsRepository {
       ));
   }
 
-  async deleteContentNode(tenantId: number, id: number): Promise<void> {
+  async deleteContentNode(tenantId: string, id: string): Promise<void> {
     await db.delete(contentNodes)
       .where(and(
         eq(contentNodes.id, id),

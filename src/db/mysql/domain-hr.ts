@@ -28,20 +28,21 @@ import {
 } from "drizzle-orm/mysql-core";
 
 import { users, tenants, academicYears, accounts } from "./domain-core";
+import { generateId } from "../utils/id";
 
 // Extracts HR-specific data from sm_staffs
 
 export const hrDepartments = mysqlTable("departments", {
-  id: int("id").autoincrement().primaryKey(),
-  tenantId: int("tenant_id").notNull().references(() => tenants.id),
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => generateId()),
+  tenantId: varchar("tenant_id", { length: 36 }).notNull().references(() => tenants.id),
   departmentName: varchar("department_name", { length: 191 }).notNull(),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow(),
 });
 
 export const hrDesignations = mysqlTable("designations", {
-  id: int("id").autoincrement().primaryKey(),
-  tenantId: int("tenant_id").notNull().references(() => tenants.id),
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => generateId()),
+  tenantId: varchar("tenant_id", { length: 36 }).notNull().references(() => tenants.id),
   designationName: varchar("designation_name", { length: 191 }).notNull(),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow(),
@@ -49,8 +50,8 @@ export const hrDesignations = mysqlTable("designations", {
 
 // Leave Types — configurable leave categories (replaces smLeaveTypes)
 export const leaveTypes = mysqlTable("leave_types", {
-  id: int("id").autoincrement().primaryKey(),
-  tenantId: int("tenant_id").notNull().references(() => tenants.id),
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => generateId()),
+  tenantId: varchar("tenant_id", { length: 36 }).notNull().references(() => tenants.id),
   name: varchar("name", { length: 100 }).notNull(), // medical, casual, maternity, etc.
   totalDays: int("total_days"),  // annual allowance
   activeStatus: tinyint("active_status").default(1).notNull(),
@@ -59,17 +60,17 @@ export const leaveTypes = mysqlTable("leave_types", {
 });
 
 export const hrLeaveRequests = mysqlTable("leave_requests", {
-  id: int("id").autoincrement().primaryKey(),
-  tenantId: int("tenant_id").notNull().references(() => tenants.id),
-  userId: int("user_id").notNull().references(() => users.id), // Staff persona
-  leaveTypeId: int("leave_type_id").references(() => leaveTypes.id),
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => generateId()),
+  tenantId: varchar("tenant_id", { length: 36 }).notNull().references(() => tenants.id),
+  userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id), // Staff persona
+  leaveTypeId: varchar("leave_type_id", { length: 36 }).references(() => leaveTypes.id),
   leaveType: varchar("leave_type", { length: 100 }).notNull(), // kept for flexibility
   applyDate: date("apply_date", { mode: "string" }).notNull(),
   fromDate: date("from_date", { mode: "string" }).notNull(),
   toDate: date("to_date", { mode: "string" }).notNull(),
   reason: text("reason"),
   status: mysqlEnum("status", ["pending", "approved", "rejected"]).notNull().default("pending"),
-  approvedBy: int("approved_by").references(() => users.id), // Staff persona
+  approvedBy: varchar("approved_by", { length: 36 }).references(() => users.id), // Staff persona
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow(),
 }, (table) => ({
@@ -86,8 +87,8 @@ export type SalaryComponent = {
 };
 
 export const salaryTemplates = mysqlTable("salary_templates", {
-  id: int("id").autoincrement().primaryKey(),
-  tenantId: int("tenant_id").notNull().references(() => tenants.id),
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => generateId()),
+  tenantId: varchar("tenant_id", { length: 36 }).notNull().references(() => tenants.id),
   name: varchar("name", { length: 200 }).notNull(),
   components: json("components").$type<SalaryComponent[]>().notNull(),
   createdAt: timestamp("created_at").defaultNow(),
@@ -97,10 +98,10 @@ export const salaryTemplates = mysqlTable("salary_templates", {
 }));
 
 export const payrollRuns = mysqlTable("payroll_runs", {
-  id: int("id").autoincrement().primaryKey(),
-  tenantId: int("tenant_id").notNull().references(() => tenants.id),
-  userId: int("user_id").notNull().references(() => users.id), // Staff persona
-  salaryTemplateId: int("salary_template_id").references(() => salaryTemplates.id),
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => generateId()),
+  tenantId: varchar("tenant_id", { length: 36 }).notNull().references(() => tenants.id),
+  userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id), // Staff persona
+  salaryTemplateId: varchar("salary_template_id", { length: 36 }).references(() => salaryTemplates.id),
   payrollMonth: varchar("payroll_month", { length: 20 }).notNull(),
   payrollYear: varchar("payroll_year", { length: 20 }).notNull(),
   basicSalary: decimal("basic_salary", { precision: 12, scale: 2 }).notNull(),
@@ -125,15 +126,15 @@ export type EvaluationMetadata = {
 };
 
 export const staffEvaluations = mysqlTable("staff_evaluations", {
-  id: int("id").autoincrement().primaryKey(),
-  tenantId: int("tenant_id").notNull().references(() => tenants.id),
-  userId: int("user_id").notNull().references(() => users.id), // Staff being evaluated
-  evaluatorId: int("evaluator_id").notNull().references(() => users.id), // Staff persona
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => generateId()),
+  tenantId: varchar("tenant_id", { length: 36 }).notNull().references(() => tenants.id),
+  userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id), // Staff being evaluated
+  evaluatorId: varchar("evaluator_id", { length: 36 }).notNull().references(() => users.id), // Staff persona
   evaluationDate: date("evaluation_date", { mode: "string" }).notNull(),
   overallScore: decimal("overall_score", { precision: 5, scale: 2 }),
   remarks: text("remarks"),
   metadata: json("metadata").$type<EvaluationMetadata>(),
-  academicId: int("academic_id").references(() => academicYears.id),
+  academicId: varchar("academic_id", { length: 36 }).references(() => academicYears.id),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow(),
 }, (table) => ({

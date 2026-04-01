@@ -31,13 +31,14 @@ import {
 
 import { users, tenants, academicYears, accounts } from "./domain-core";
 import { classes, enrollments, sections, subjects } from "./domain-academic";
+import { generateId } from "../utils/id";
 
 export const exams = mysqlTable("exams", {
-  id: int("id").autoincrement().primaryKey(),
-  tenantId: int("tenant_id").notNull().references(() => tenants.id),
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => generateId()),
+  tenantId: varchar("tenant_id", { length: 36 }).notNull().references(() => tenants.id),
   examType: mysqlEnum("exam_type", ["term", "continuous", "mock", "final"]).notNull(),
   title: varchar("title", { length: 255 }).notNull(),
-  academicId: int("academic_id").notNull().references(() => academicYears.id),
+  academicId: varchar("academic_id", { length: 36 }).notNull().references(() => academicYears.id),
   percentage: decimal("percentage", { precision: 8, scale: 2 }),
   activeStatus: tinyint("active_status").notNull().default(1),
   createdAt: timestamp("created_at").defaultNow(),
@@ -47,12 +48,12 @@ export const exams = mysqlTable("exams", {
 }));
 
 export const examSetups = mysqlTable("exam_setups", {
-  id: int("id").autoincrement().primaryKey(),
-  tenantId: int("tenant_id").notNull().references(() => tenants.id),
-  examId: int("exam_id").notNull().references(() => exams.id),
-  classId: int("class_id").references(() => classes.id),
-  sectionId: int("section_id").references(() => sections.id),
-  subjectId: int("subject_id").references(() => subjects.id),
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => generateId()),
+  tenantId: varchar("tenant_id", { length: 36 }).notNull().references(() => tenants.id),
+  examId: varchar("exam_id", { length: 36 }).notNull().references(() => exams.id),
+  classId: varchar("class_id", { length: 36 }).references(() => classes.id),
+  sectionId: varchar("section_id", { length: 36 }).references(() => sections.id),
+  subjectId: varchar("subject_id", { length: 36 }).references(() => subjects.id),
   title: varchar("title", { length: 255 }).notNull(), // MTA, CA, REPORT, EXAM
   examMark: decimal("exam_mark", { precision: 8, scale: 2 }).notNull(),
   createdAt: timestamp("created_at").defaultNow(),
@@ -62,15 +63,15 @@ export const examSetups = mysqlTable("exam_setups", {
 }));
 
 export const examMarks = mysqlTable("exam_marks", {
-  id: int("id").autoincrement().primaryKey(),
-  tenantId: int("tenant_id").notNull().references(() => tenants.id),
-  examSetupId: int("exam_setup_id").notNull().references(() => examSetups.id),
-  enrollmentId: int("enrollment_id").notNull().references(() => enrollments.id),
-  userId: int("user_id").notNull().references(() => users.id),
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => generateId()),
+  tenantId: varchar("tenant_id", { length: 36 }).notNull().references(() => tenants.id),
+  examSetupId: varchar("exam_setup_id", { length: 36 }).notNull().references(() => examSetups.id),
+  enrollmentId: varchar("enrollment_id", { length: 36 }).notNull().references(() => enrollments.id),
+  userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id),
   totalMarks: decimal("total_marks", { precision: 8, scale: 2 }),
   isAbsent: tinyint("is_absent").notNull().default(0),
   teacherRemarks: text("teacher_remarks"),
-  gradedBy: int("graded_by").references(() => users.id), // Staff Persona
+  gradedBy: varchar("graded_by", { length: 36 }).references(() => users.id), // Staff Persona
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow(),
 }, (table) => ({
@@ -81,7 +82,7 @@ export const examMarks = mysqlTable("exam_marks", {
 
 export type ComputedResultMetadata = {
   marksBreakdown: {
-    subjectId: number;
+    subjectId: string;
     title: string[]; // e.g. ["MTA", "CA", "REPORT", "EXAM"]
     marks: number[]; // e.g. [30, 10, 10, 50]
     totalMarks: number; // e.g. 100
@@ -91,68 +92,68 @@ export type ComputedResultMetadata = {
   totalStudents?: number;
   averageMark?: number;
   gradePoints?: number;
-  subjectAverages?: Record<number, number>;
+  subjectAverages?: Record<string, number>;
 };
 
 export const computedResults = mysqlTable("computed_results", {
-  id: int("id").autoincrement().primaryKey(),
-  tenantId: int("tenant_id").notNull().references(() => tenants.id),
-  userId: int("user_id").notNull().references(() => users.id),
-  examId: int("exam_id").notNull().references(() => exams.id),
-  classId: int("class_id").notNull().references(() => classes.id),
-  sectionId: int("section_id").notNull().references(() => sections.id),
-  enrollmentId: int("enrollment_id").notNull().references(() => enrollments.id),
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => generateId()),
+  tenantId: varchar("tenant_id", { length: 36 }).notNull().references(() => tenants.id),
+  userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id),
+  examId: varchar("exam_id", { length: 36 }).notNull().references(() => exams.id),
+  classId: varchar("class_id", { length: 36 }).notNull().references(() => classes.id),
+  sectionId: varchar("section_id", { length: 36 }).notNull().references(() => sections.id),
+  enrollmentId: varchar("enrollment_id", { length: 36 }).notNull().references(() => enrollments.id),
   totalMarks: decimal("total_marks", { precision: 12, scale: 2 }),
   gpaPoint: decimal("gpa_point", { precision: 8, scale: 2 }),
   gpaGrade: varchar("gpa_grade", { length: 50 }),
   teacherRemarks: text("teacher_remarks"),
   metadata: json("metadata").$type<ComputedResultMetadata>(),
-  academicId: int("academic_id").notNull().references(() => academicYears.id),
+  academicId: varchar("academic_id", { length: 36 }).notNull().references(() => academicYears.id),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow(),
 });
 
 
 export const grades = mysqlTable("grades", {
-  id: int("id").autoincrement().primaryKey(),
-  tenantId: int("tenant_id").notNull().references(() => tenants.id),
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => generateId()),
+  tenantId: varchar("tenant_id", { length: 36 }).notNull().references(() => tenants.id),
   name: varchar("name", { length: 100 }).notNull(),
   point: decimal("point", { precision: 8, scale: 2 }).notNull(),
   fromMark: decimal("from_mark", { precision: 8, scale: 2 }).notNull(),
   toMark: decimal("to_mark", { precision: 8, scale: 2 }).notNull(),
   description: varchar("description", { length: 500 }),
-  academicId: int("academic_id").references(() => academicYears.id),
+  academicId: varchar("academic_id", { length: 36 }).references(() => academicYears.id),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow(),
 });
 
 export const examSchedules = mysqlTable("exam_schedules", {
-  id: int("id").autoincrement().primaryKey(),
-  tenantId: int("tenant_id").notNull().references(() => tenants.id),
-  examId: int("exam_id").notNull().references(() => exams.id),
-  classId: int("class_id").notNull().references(() => classes.id),
-  sectionId: int("section_id").notNull().references(() => sections.id),
-  subjectId: int("subject_id").notNull().references(() => subjects.id),
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => generateId()),
+  tenantId: varchar("tenant_id", { length: 36 }).notNull().references(() => tenants.id),
+  examId: varchar("exam_id", { length: 36 }).notNull().references(() => exams.id),
+  classId: varchar("class_id", { length: 36 }).notNull().references(() => classes.id),
+  sectionId: varchar("section_id", { length: 36 }).notNull().references(() => sections.id),
+  subjectId: varchar("subject_id", { length: 36 }).notNull().references(() => subjects.id),
   examDate: date("exam_date", { mode: "string" }).notNull(),
   startTime: varchar("start_time", { length: 20 }),
   endTime: varchar("end_time", { length: 20 }),
   roomNo: varchar("room_no", { length: 100 }),
-  academicId: int("academic_id").notNull().references(() => academicYears.id),
+  academicId: varchar("academic_id", { length: 36 }).notNull().references(() => academicYears.id),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow(),
 });
 
 // Student Ratings
 export const studentRatings = mysqlTable("student_ratings", {
-  id: int("id").autoincrement().primaryKey(),
-  tenantId: int("tenant_id").notNull().references(() => tenants.id),
-  userId: int("user_id").notNull().references(() => users.id),
-  examId: int("exam_id").notNull().references(() => exams.id),
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => generateId()),
+  tenantId: varchar("tenant_id", { length: 36 }).notNull().references(() => tenants.id),
+  userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id),
+  examId: varchar("exam_id", { length: 36 }).notNull().references(() => exams.id),
   attribute: varchar("attribute", { length: 255 }).notNull(),
   rate: int("rate").notNull(),
   color: varchar("color", { length: 50 }),
   remark: text("remark"),
-  academicId: int("academic_id").notNull().references(() => academicYears.id),
+  academicId: varchar("academic_id", { length: 36 }).notNull().references(() => academicYears.id),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow(),
 }, (table) => ({
@@ -166,13 +167,13 @@ export const studentRatings = mysqlTable("student_ratings", {
  * All data should be migrated to the `teacher_remarks` field on `computed_results`.
  */
 export const teacherRemarks = mysqlTable("teacher_remarks", {
-  id: int("id").autoincrement().primaryKey(),
-  tenantId: int("tenant_id").notNull().references(() => tenants.id),
-  userId: int("user_id").notNull().references(() => users.id),
-  examId: int("exam_id").notNull().references(() => exams.id),
-  staffId: int("staff_id").references(() => users.id),
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => generateId()),
+  tenantId: varchar("tenant_id", { length: 36 }).notNull().references(() => tenants.id),
+  userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id),
+  examId: varchar("exam_id", { length: 36 }).notNull().references(() => exams.id),
+  staffId: varchar("staff_id", { length: 36 }).references(() => users.id),
   remark: text("remark").notNull(),
-  academicId: int("academic_id").notNull().references(() => academicYears.id),
+  academicId: varchar("academic_id", { length: 36 }).notNull().references(() => academicYears.id),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow(),
 }, (table) => ({
@@ -185,14 +186,14 @@ export const teacherRemarks = mysqlTable("teacher_remarks", {
  * to `classAttendanceSummaries` in a future refactor.
  */
 export const classAttendances = mysqlTable("class_attendance_summaries", {
-  id: int("id").autoincrement().primaryKey(),
-  tenantId: int("tenant_id").notNull().references(() => tenants.id),
-  userId: int("user_id").notNull().references(() => users.id),
-  examId: int("exam_id").notNull().references(() => exams.id),
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => generateId()),
+  tenantId: varchar("tenant_id", { length: 36 }).notNull().references(() => tenants.id),
+  userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id),
+  examId: varchar("exam_id", { length: 36 }).notNull().references(() => exams.id),
   daysOpened: int("days_opened").default(0),
   daysAbsent: int("days_absent").default(0),
   daysPresent: int("days_present").default(0),
-  academicId: int("academic_id").notNull().references(() => academicYears.id),
+  academicId: varchar("academic_id", { length: 36 }).notNull().references(() => academicYears.id),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow(),
 }, (table) => ({
@@ -201,10 +202,10 @@ export const classAttendances = mysqlTable("class_attendance_summaries", {
 
 // Question Banks
 export const questionBanks = mysqlTable("question_banks", {
-  id: int("id").autoincrement().primaryKey(),
-  tenantId: int("tenant_id").notNull().references(() => tenants.id),
-  subjectId: int("subject_id").references(() => subjects.id),
-  classId: int("class_id").references(() => classes.id),
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => generateId()),
+  tenantId: varchar("tenant_id", { length: 36 }).notNull().references(() => tenants.id),
+  subjectId: varchar("subject_id", { length: 36 }).references(() => subjects.id),
+  classId: varchar("class_id", { length: 36 }).references(() => classes.id),
   questionType: mysqlEnum("question_type", ["mcq", "short_answer", "essay", "true_false", "fill_blank"]).notNull(),
   question: text("question").notNull(),
   options: json("options").$type<string[]>(),
@@ -212,8 +213,8 @@ export const questionBanks = mysqlTable("question_banks", {
   marks: decimal("marks", { precision: 8, scale: 2 }).notNull(),
   difficultyLevel: mysqlEnum("difficulty_level", ["easy", "medium", "hard"]).default("medium"),
   explanation: text("explanation"),
-  createdBy: int("created_by").references(() => users.id), // Staff Persona
-  academicId: int("academic_id").references(() => academicYears.id),
+  createdBy: varchar("created_by", { length: 36 }).references(() => users.id), // Staff Persona
+  academicId: varchar("academic_id", { length: 36 }).references(() => academicYears.id),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow(),
 }, (table) => ({
@@ -223,12 +224,12 @@ export const questionBanks = mysqlTable("question_banks", {
 
 // Online Exams
 export const onlineExams = mysqlTable("online_exams", {
-  id: int("id").autoincrement().primaryKey(),
-  tenantId: int("tenant_id").notNull().references(() => tenants.id),
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => generateId()),
+  tenantId: varchar("tenant_id", { length: 36 }).notNull().references(() => tenants.id),
   title: varchar("title", { length: 255 }).notNull(),
-  classId: int("class_id").references(() => classes.id),
-  sectionId: int("section_id").references(() => sections.id),
-  subjectId: int("subject_id").references(() => subjects.id),
+  classId: varchar("class_id", { length: 36 }).references(() => classes.id),
+  sectionId: varchar("section_id", { length: 36 }).references(() => sections.id),
+  subjectId: varchar("subject_id", { length: 36 }).references(() => subjects.id),
   totalMarks: decimal("total_marks", { precision: 8, scale: 2 }).notNull(),
   passingMarks: decimal("passing_marks", { precision: 8, scale: 2 }),
   duration: int("duration"),
@@ -237,8 +238,8 @@ export const onlineExams = mysqlTable("online_exams", {
   isPublished: tinyint("is_published").default(0),
   shuffleQuestions: tinyint("shuffle_questions").default(0),
   showResult: tinyint("show_result").default(1),
-  createdBy: int("created_by").references(() => users.id), // Staff Persona
-  academicId: int("academic_id").notNull().references(() => academicYears.id),
+  createdBy: varchar("created_by", { length: 36 }).references(() => users.id), // Staff Persona
+  academicId: varchar("academic_id", { length: 36 }).notNull().references(() => academicYears.id),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow(),
 }, (table) => ({
@@ -247,30 +248,32 @@ export const onlineExams = mysqlTable("online_exams", {
 
 // Online Exam Questions
 export const onlineExamQuestions = mysqlTable("online_exam_questions", {
-  id: int("id").autoincrement().primaryKey(),
-  onlineExamId: int("online_exam_id").notNull().references(() => onlineExams.id, { onDelete: "cascade" }),
-  questionBankId: int("question_bank_id").notNull().references(() => questionBanks.id),
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => generateId()),
+  tenantId: varchar("tenant_id", { length: 36 }).notNull().references(() => tenants.id),
+  onlineExamId: varchar("online_exam_id", { length: 36 }).notNull().references(() => onlineExams.id, { onDelete: "cascade" }),
+  questionBankId: varchar("question_bank_id", { length: 36 }).notNull().references(() => questionBanks.id),
   sortOrder: int("sort_order").default(0),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow(),
 }, (table) => ({
   examQuestionIdx: index("oeq_exam_idx").on(table.onlineExamId),
+  tenantExamIdx: index("oeq_tenant_ex_idx").on(table.tenantId, table.onlineExamId),
 }));
 
 // Online Exam Attempts
 export type AttemptAnswers = {
-  questionId: number;
+  questionId: string;
   selectedAnswer: string;
   isCorrect: boolean;
   marksAwarded: number;
 }[];
 
 export const onlineExamAttempts = mysqlTable("online_exam_attempts", {
-  id: int("id").autoincrement().primaryKey(),
-  tenantId: int("tenant_id").notNull().references(() => tenants.id),
-  onlineExamId: int("online_exam_id").notNull().references(() => onlineExams.id),
-  userId: int("user_id").notNull().references(() => users.id), // Student Persona
-  enrollmentId: int("enrollment_id").references(() => enrollments.id),
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => generateId()),
+  tenantId: varchar("tenant_id", { length: 36 }).notNull().references(() => tenants.id),
+  onlineExamId: varchar("online_exam_id", { length: 36 }).notNull().references(() => onlineExams.id),
+  userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id), // Student Persona
+  enrollmentId: varchar("enrollment_id", { length: 36 }).references(() => enrollments.id),
   totalMarks: decimal("total_marks", { precision: 8, scale: 2 }),
   obtainedMarks: decimal("obtained_marks", { precision: 8, scale: 2 }),
   status: mysqlEnum("status", ["in_progress", "completed", "timed_out"]).notNull().default("in_progress"),

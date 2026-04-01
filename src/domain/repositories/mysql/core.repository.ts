@@ -36,7 +36,7 @@ export class MySqlCoreRepository implements ICoreRepository {
     };
   }
 
-  async getTenantById(id: number): Promise<ITenant | null> {
+  async getTenantById(id: string): Promise<ITenant | null> {
     const [result] = await db.select().from(tenants).where(eq(tenants.id, id));
     return result ? this.mapTenant(result) : null;
   }
@@ -47,8 +47,8 @@ export class MySqlCoreRepository implements ICoreRepository {
   }
 
   async createTenant(data: Partial<ITenant>): Promise<ITenant> {
-    const [result] = await db.insert(tenants).values(data as any);
-    const tenant = await this.getTenantById(result.insertId);
+    await db.insert(tenants).values(data as any);
+    const tenant = await this.getTenantById(data.id!);
     if (!tenant) throw new Error("Failed to create tenant");
     return tenant;
   }
@@ -63,17 +63,17 @@ export class MySqlCoreRepository implements ICoreRepository {
     return result ? this.mapAccount(result) : null;
   }
 
-  async getAcademicYears(tenantId: number): Promise<IAcademicYear[]> {
+  async getAcademicYears(tenantId: string): Promise<IAcademicYear[]> {
     const results = await db.select().from(academicYears).where(eq(academicYears.tenantId, tenantId));
     return results.map(this.mapAcademicYear);
   }
 
-  async getCurrentAcademicYear(tenantId: number): Promise<IAcademicYear | null> {
+  async getCurrentAcademicYear(tenantId: string): Promise<IAcademicYear | null> {
     const [result] = await db.select().from(academicYears).where(and(eq(academicYears.tenantId, tenantId), eq(academicYears.isCurrent, 1)));
     return result ? this.mapAcademicYear(result) : null;
   }
 
-  async getEnumsByDomain(tenantId: number | null, domain: string): Promise<IEnumerator[]> {
+  async getEnumsByDomain(tenantId: string | null, domain: string): Promise<IEnumerator[]> {
     const results = await db.select().from(enumerations).where(and(
       tenantId ? eq(enumerations.tenantId, tenantId) : isNull(enumerations.tenantId),
       eq(enumerations.domain, domain)

@@ -32,7 +32,7 @@ export class MySqlFinanceRepository implements IFinanceRepository {
   }
 
   // --- Ledger ---
-  async getLedgerEntries(tenantId: number, filter?: { type?: string; userId?: number; academicId?: number }): Promise<ILedgerEntry[]> {
+  async getLedgerEntries(tenantId: string, filter?: { type?: string; userId?: string; academicId?: string }): Promise<ILedgerEntry[]> {
     let query = db.select().from(ledgerEntries).where(eq(ledgerEntries.tenantId, tenantId));
     // Dynamic filtering logic...
     const results = await query;
@@ -40,14 +40,14 @@ export class MySqlFinanceRepository implements IFinanceRepository {
   }
 
   async createLedgerEntry(data: Partial<ILedgerEntry>): Promise<ILedgerEntry> {
-    const [result] = await db.insert(ledgerEntries).values(data as any);
-    const [row] = await db.select().from(ledgerEntries).where(eq(ledgerEntries.id, result.insertId));
+    await db.insert(ledgerEntries).values(data as any);
+    const [row] = await db.select().from(ledgerEntries).where(eq(ledgerEntries.id, data.id!));
     if (!row) throw new Error("Failed to create ledger entry");
     return this.mapLedger(row);
   }
 
   // --- Fees ---
-  async getFeeMasters(tenantId: number, academicId: number): Promise<IFeeMaster[]> {
+  async getFeeMasters(tenantId: string, academicId: string): Promise<IFeeMaster[]> {
     const results = await db
       .select()
       .from(feeMasters)
@@ -63,8 +63,8 @@ export class MySqlFinanceRepository implements IFinanceRepository {
   }
 
   async createFeeMaster(data: Partial<IFeeMaster>): Promise<IFeeMaster> {
-    const [result] = await db.insert(feeMasters).values(data as any);
-    const [row] = await db.select().from(feeMasters).where(eq(feeMasters.id, result.insertId));
+    await db.insert(feeMasters).values(data as any);
+    const [row] = await db.select().from(feeMasters).where(eq(feeMasters.id, data.id!));
     if (!row) throw new Error("Failed to create fee master");
     return {
       ...row,
@@ -73,7 +73,7 @@ export class MySqlFinanceRepository implements IFinanceRepository {
     };
   }
 
-  async getFeeTypes(tenantId: number): Promise<IFeeType[]> {
+  async getFeeTypes(tenantId: string): Promise<IFeeType[]> {
     const results = await db.select().from(feeTypes).where(eq(feeTypes.tenantId, tenantId));
     return results.map((row: any) => ({
       id: row.id,
@@ -84,7 +84,7 @@ export class MySqlFinanceRepository implements IFinanceRepository {
   }
 
   // --- Assignments ---
-  async getStudentFeeAssignments(userId: number): Promise<IFeeAssignment[]> {
+  async getStudentFeeAssignments(userId: string): Promise<IFeeAssignment[]> {
     const results = await db.select().from(feeAssignments).where(eq(feeAssignments.userId, userId));
     return results.map((row: any) => ({
       ...row,
@@ -95,8 +95,8 @@ export class MySqlFinanceRepository implements IFinanceRepository {
   }
 
   async assignFeeToStudent(data: Partial<IFeeAssignment>): Promise<IFeeAssignment> {
-    const [result] = await db.insert(feeAssignments).values(data as any);
-    const [row] = await db.select().from(feeAssignments).where(eq(feeAssignments.id, result.insertId));
+    await db.insert(feeAssignments).values(data as any);
+    const [row] = await db.select().from(feeAssignments).where(eq(feeAssignments.id, data.id!));
     if (!row) throw new Error("Failed to assign fee");
     return {
       ...row,
@@ -106,12 +106,14 @@ export class MySqlFinanceRepository implements IFinanceRepository {
     };
   }
 
-  async updateFeeAssignment(id: number, data: Partial<IFeeAssignment>): Promise<void> {
-    await db.update(feeAssignments).set(data as any).where(eq(feeAssignments.id, id));
+  async updateFeeAssignment(tenantId: string, id: string, data: Partial<IFeeAssignment>): Promise<void> {
+    await db.update(feeAssignments)
+      .set(data as any)
+      .where(and(eq(feeAssignments.id, id), eq(feeAssignments.tenantId, tenantId)));
   }
 
   // --- Invoices ---
-  async getInvoices(tenantId: number, userId?: number): Promise<IInvoice[]> {
+  async getInvoices(tenantId: string, userId?: string): Promise<IInvoice[]> {
     let query = db.select().from(invoices).where(eq(invoices.tenantId, tenantId));
     if (userId) {
       query = db.select().from(invoices).where(and(eq(invoices.tenantId, tenantId), eq(invoices.userId, userId)));
@@ -126,8 +128,8 @@ export class MySqlFinanceRepository implements IFinanceRepository {
   }
 
   async createInvoice(data: Partial<IInvoice>): Promise<IInvoice> {
-    const [result] = await db.insert(invoices).values(data as any);
-    const [row] = await db.select().from(invoices).where(eq(invoices.id, result.insertId));
+    await db.insert(invoices).values(data as any);
+    const [row] = await db.select().from(invoices).where(eq(invoices.id, data.id!));
     if (!row) throw new Error("Failed to create invoice");
     return {
       ...row,
@@ -138,7 +140,7 @@ export class MySqlFinanceRepository implements IFinanceRepository {
   }
 
   // --- B2C Payments & Gateways ---
-  async getPaymentGateways(tenantId: number): Promise<IPaymentGateway[]> {
+  async getPaymentGateways(tenantId: string): Promise<IPaymentGateway[]> {
     const results = await db.select().from(paymentGateways).where(eq(paymentGateways.tenantId, tenantId));
     return results.map((row: any) => ({
       ...row,
@@ -148,8 +150,8 @@ export class MySqlFinanceRepository implements IFinanceRepository {
   }
 
   async createOnlinePayment(data: Partial<IOnlinePayment>): Promise<IOnlinePayment> {
-    const [result] = await db.insert(onlinePayments).values(data as any);
-    const [row] = await db.select().from(onlinePayments).where(eq(onlinePayments.id, result.insertId));
+    await db.insert(onlinePayments).values(data as any);
+    const [row] = await db.select().from(onlinePayments).where(eq(onlinePayments.id, data.id!));
     if (!row) throw new Error("Failed to create online payment intent");
     return {
       ...row,
@@ -160,7 +162,7 @@ export class MySqlFinanceRepository implements IFinanceRepository {
     };
   }
 
-  async updateOnlinePaymentStatus(transactionRef: string, status: string, ledgerEntryId?: number): Promise<void> {
+  async updateOnlinePaymentStatus(transactionRef: string, status: string, ledgerEntryId?: string): Promise<void> {
     const updateData: any = { status };
     if (ledgerEntryId) updateData.ledgerEntryId = ledgerEntryId;
     await db.update(onlinePayments).set(updateData).where(eq(onlinePayments.transactionRef, transactionRef));

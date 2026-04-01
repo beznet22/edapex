@@ -24,6 +24,7 @@ import {
 } from "drizzle-orm/mysql-core";
 
 import { users, tenants } from "./domain-core";
+import { generateId } from "../utils/id";
 
 // --- CORE CHAT INFRASTRUCTURE ---
 
@@ -48,9 +49,9 @@ export type MessageMetadata = {
 export type MessagePart = Record<string, any>;
 
 export const aiChats = mysqlTable("ai_chats", {
-  id: varchar("id", { length: 255 }).primaryKey(), 
-  tenantId: int("tenant_id").notNull().references(() => tenants.id),
-  userId: int("user_id").notNull().references(() => users.id),
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => generateId()), 
+  tenantId: varchar("tenant_id", { length: 36 }).notNull().references(() => tenants.id),
+  userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id),
   title: varchar("title", { length: 255 }).notNull().default("New Chat"),
   model: varchar("model", { length: 100 }),
   visibility: mysqlEnum("visibility", ["private", "public"]).default("private"),
@@ -60,48 +61,59 @@ export const aiChats = mysqlTable("ai_chats", {
 });
 
 export const aiMessages = mysqlTable("ai_messages", {
-  id: varchar("id", { length: 255 }).primaryKey(),
-  chatId: varchar("chat_id", { length: 255 }).notNull().references(() => aiChats.id, { onDelete: "cascade" }),
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => generateId()),
+  tenantId: varchar("tenant_id", { length: 36 }).notNull().references(() => tenants.id),
+  chatId: varchar("chat_id", { length: 36 }).notNull().references(() => aiChats.id, { onDelete: "cascade" }),
   role: mysqlEnum("role", ["user", "assistant", "system", "tool"]).notNull(),
   parts: json("parts").$type<MessagePart[]>().notNull(),
   metadata: json("metadata").$type<MessageMetadata>(),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow(),
-});
+}, (table) => ({
+  tenantChatIdx: index("msg_tenant_chat_idx").on(table.tenantId, table.chatId),
+}));
 
 export const aiVotes = mysqlTable("ai_votes", {
-  chatId: varchar("chat_id", { length: 255 }).notNull().references(() => aiChats.id, { onDelete: "cascade" }),
-  messageId: varchar("message_id", { length: 255 }).notNull().references(() => aiMessages.id, { onDelete: "cascade" }),
+  tenantId: varchar("tenant_id", { length: 36 }).notNull().references(() => tenants.id),
+  chatId: varchar("chat_id", { length: 36 }).notNull().references(() => aiChats.id, { onDelete: "cascade" }),
+  messageId: varchar("message_id", { length: 36 }).notNull().references(() => aiMessages.id, { onDelete: "cascade" }),
   isUpvoted: tinyint("is_upvoted").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow(),
 }, (table) => ({
   pk: index("pk").on(table.chatId, table.messageId),
+  tenantIdx: index("vote_tenant_idx").on(table.tenantId, table.chatId),
 }));
 
 export const aiDocuments = mysqlTable("ai_documents", {
-  id: varchar("id", { length: 255 }).primaryKey(),
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => generateId()),
+  tenantId: varchar("tenant_id", { length: 36 }).notNull().references(() => tenants.id),
   title: varchar("title", { length: 255 }).notNull(),
   kind: mysqlEnum("kind", ["text", "code", "image", "sheet"]).notNull(),
   content: text("content"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow(),
-});
+}, (table) => ({
+  tenantIdx: index("doc_tenant_idx").on(table.tenantId),
+}));
 
 export const aiSuggestions = mysqlTable("ai_suggestions", {
-  id: varchar("id", { length: 255 }).primaryKey(),
-  documentId: varchar("document_id", { length: 255 }).notNull().references(() => aiDocuments.id, { onDelete: "cascade" }),
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => generateId()),
+  tenantId: varchar("tenant_id", { length: 36 }).notNull().references(() => tenants.id),
+  documentId: varchar("document_id", { length: 36 }).notNull().references(() => aiDocuments.id, { onDelete: "cascade" }),
   content: text("content"),
   createdAt: timestamp("created_at").defaultNow(),
   documentCreatedAt: timestamp("document_created_at"),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow(),
-});
+}, (table) => ({
+  tenantDocIdx: index("sug_tenant_doc_idx").on(table.tenantId, table.documentId),
+}));
 
 // --- AGENTIC INFRASTRUCTURE ---
 
 export const aiAgents = mysqlTable("ai_agents", {
-  id: int("id").autoincrement().primaryKey(),
-  tenantId: int("tenant_id").notNull().references(() => tenants.id),
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => generateId()),
+  tenantId: varchar("tenant_id", { length: 36 }).notNull().references(() => tenants.id),
   name: varchar("name", { length: 100 }).notNull(),
   agentType: varchar("agent_type", { length: 50 }).notNull(),
   capabilities: json("capabilities").$type<string[]>(),
@@ -114,9 +126,9 @@ export const aiAgents = mysqlTable("ai_agents", {
 }));
 
 export const aiAgentActions = mysqlTable("ai_agent_actions", {
-  id: int("id").autoincrement().primaryKey(),
-  agentId: int("agent_id").notNull().references(() => aiAgents.id),
-  tenantId: int("tenant_id").notNull().references(() => tenants.id),
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => generateId()),
+  agentId: varchar("agent_id", { length: 36 }).notNull().references(() => aiAgents.id),
+  tenantId: varchar("tenant_id", { length: 36 }).notNull().references(() => tenants.id),
   actionType: varchar("action_type", { length: 100 }).notNull(),
   idempotencyKey: varchar("idempotency_key", { length: 100 }),
   status: mysqlEnum("status", ["pending", "running", "completed", "failed"]).notNull(),
@@ -133,12 +145,15 @@ export const aiAgentActions = mysqlTable("ai_agent_actions", {
 }));
 
 export const aiToolInvocations = mysqlTable("ai_tool_invocations", {
-  id: int("id").autoincrement().primaryKey(),
-  actionId: int("action_id").notNull().references(() => aiAgentActions.id, { onDelete: "cascade" }),
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => generateId()),
+  tenantId: varchar("tenant_id", { length: 36 }).notNull().references(() => tenants.id),
+  actionId: varchar("action_id", { length: 36 }).notNull().references(() => aiAgentActions.id, { onDelete: "cascade" }),
   toolName: varchar("tool_name", { length: 100 }).notNull(),
   parameters: json("parameters").$type<Record<string, any>>(),
   result: json("result").$type<Record<string, any>>(),
   latencyMs: int("latency_ms"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow(),
-});
+}, (table) => ({
+  tenantActionIdx: index("tool_tenant_act_idx").on(table.tenantId, table.actionId),
+}));

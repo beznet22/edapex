@@ -45,7 +45,7 @@ export class SqliteAssessmentRepository implements IAssessmentRepository {
   }
 
   // --- Exams ---
-  async getExams(tenantId: number, academicId: number, updatedSince?: Date): Promise<IExam[]> {
+  async getExams(tenantId: string, academicId: string, updatedSince?: Date): Promise<IExam[]> {
     const conditions = [
       eq(exams.tenantId, tenantId),
       eq(exams.academicId, academicId)
@@ -63,7 +63,7 @@ export class SqliteAssessmentRepository implements IAssessmentRepository {
     return results.map((row: any) => this.mapExam(row));
   }
 
-  async getExamSetup(examId: number, classId: number): Promise<IExamSetup[]> {
+  async getExamSetup(examId: string, classId: string): Promise<IExamSetup[]> {
     const results = await db
       .select()
       .from(examSetups)
@@ -75,7 +75,7 @@ export class SqliteAssessmentRepository implements IAssessmentRepository {
   }
 
   // --- Marks ---
-  async getMarksByExam(examId: number, classId: number, sectionId: number): Promise<IMark[]> {
+  async getMarksByExam(examId: string, classId: string, sectionId: string): Promise<IMark[]> {
     const results = await db
       .select({
         id: examMarks.id,
@@ -99,7 +99,7 @@ export class SqliteAssessmentRepository implements IAssessmentRepository {
     return results.map((row: any) => this.mapMark(row));
   }
 
-  async saveMarks(tenantId: number, marks: Partial<IMark>[]): Promise<void> {
+  async saveMarks(tenantId: string, marks: Partial<IMark>[]): Promise<void> {
     if (marks.length === 0) return;
 
     const batches = marks.map((mark) => {
@@ -133,7 +133,7 @@ export class SqliteAssessmentRepository implements IAssessmentRepository {
   }
 
   // --- Grades ---
-  async getGrades(tenantId: number): Promise<IGrade[]> {
+  async getGrades(tenantId: string): Promise<IGrade[]> {
     const results = await db.select().from(grades).where(eq(grades.tenantId, tenantId));
     return results.map((row: any) => ({
       id: row.id,
@@ -148,7 +148,7 @@ export class SqliteAssessmentRepository implements IAssessmentRepository {
     }));
   }
 
-  async getGradeForMark(tenantId: number, mark: number): Promise<IGrade | null> {
+  async getGradeForMark(tenantId: string, mark: number): Promise<IGrade | null> {
     const [result] = await db
       .select()
       .from(grades)

@@ -20,7 +20,7 @@ export class SqlitePbacRepository implements IPbacRepository {
     };
   }
 
-  async getPolicies(tenantId: number | null): Promise<IPolicyDefinition[]> {
+  async getPolicies(tenantId: string | null): Promise<IPolicyDefinition[]> {
     const results = await db
       .select()
       .from(policyDefinitions)
@@ -29,7 +29,7 @@ export class SqlitePbacRepository implements IPbacRepository {
     return results.map(this.mapToDomain);
   }
 
-  async getPolicyById(id: number): Promise<IPolicyDefinition | null> {
+  async getPolicyById(id: string): Promise<IPolicyDefinition | null> {
     const [result] = await db
       .select()
       .from(policyDefinitions)
@@ -44,16 +44,16 @@ export class SqlitePbacRepository implements IPbacRepository {
     return this.mapToDomain(result);
   }
 
-  async updatePolicy(id: number, data: Partial<PolicyDefinitionModel>): Promise<IPolicyDefinition | null> {
+  async updatePolicy(tenantId: string, id: string, data: Partial<PolicyDefinitionModel>): Promise<IPolicyDefinition | null> {
     const [result] = await db.update(policyDefinitions)
       .set({ definition: data as any })
-      .where(eq(policyDefinitions.id, id))
+      .where(and(eq(policyDefinitions.id, id), eq(policyDefinitions.tenantId, tenantId)))
       .returning();
     
     return result ? this.mapToDomain(result) : null;
   }
 
-  async getRoleAssignments(tenantId: number, userId: number): Promise<IRoleAssignment[]> {
+  async getRoleAssignments(tenantId: string, userId: string): Promise<IRoleAssignment[]> {
     const results = await db
       .select()
       .from(roleAssignments)
@@ -71,12 +71,12 @@ export class SqlitePbacRepository implements IPbacRepository {
     return this.mapRoleToDomain(result);
   }
 
-  async removeRole(id: number): Promise<boolean> {
-    const [result] = await db.delete(roleAssignments).where(eq(roleAssignments.id, id)).returning();
+  async removeRole(tenantId: string, id: string): Promise<boolean> {
+    const [result] = await db.delete(roleAssignments).where(and(eq(roleAssignments.id, id), eq(roleAssignments.tenantId, tenantId))).returning();
     return !!result;
   }
 
-  async bindPolicyToRole(tenantId: number, policyId: number, roleAssignmentId: number): Promise<IPolicyBinding> {
+  async bindPolicyToRole(tenantId: string, policyId: string, roleAssignmentId: string): Promise<IPolicyBinding> {
     const [result] = await db.insert(policyBindings).values({
       tenantId,
       policyId,
@@ -91,7 +91,7 @@ export class SqlitePbacRepository implements IPbacRepository {
     };
   }
 
-  async getBindingsByRoleAssignment(roleAssignmentId: number): Promise<IPolicyBinding[]> {
+  async getBindingsByRoleAssignment(roleAssignmentId: string): Promise<IPolicyBinding[]> {
     const results = await db
       .select()
       .from(policyBindings)

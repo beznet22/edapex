@@ -5,7 +5,7 @@ import { eq, and } from "drizzle-orm";
 
 export class PostgresEventsRepository implements IEventsRepository {
   // --- Events ---
-  async getEvents(tenantId: number): Promise<IDomainEvent[]> {
+  async getEvents(tenantId: string): Promise<IDomainEvent[]> {
     const results = await db.select().from(events).where(eq(events.tenantId, tenantId));
     return results.map((row: any) => ({
       ...row,
@@ -20,7 +20,7 @@ export class PostgresEventsRepository implements IEventsRepository {
   }
 
   // --- Audit ---
-  async getAuditLogs(tenantId: number): Promise<IAuditLog[]> {
+  async getAuditLogs(tenantId: string): Promise<IAuditLog[]> {
     const results = await db.select().from(auditLog).where(eq(auditLog.tenantId, tenantId));
     return results.map((row: any) => ({
       ...row,

@@ -71,7 +71,7 @@ export class PostgresAcademicRepository implements IAcademicRepository {
   }
 
   // --- Classes & Sections ---
-  async getClasses(tenantId: number, academicId: number): Promise<IClass[]> {
+  async getClasses(tenantId: string, academicId: string): Promise<IClass[]> {
     const results = await db
       .select()
       .from(classes)
@@ -82,7 +82,7 @@ export class PostgresAcademicRepository implements IAcademicRepository {
     return results.map((row: any) => this.mapClass(row));
   }
 
-  async getSectionsByClass(classId: number): Promise<ISection[]> {
+  async getSectionsByClass(classId: string): Promise<ISection[]> {
     const results = await db
       .select({
         id: sections.id,
@@ -99,7 +99,7 @@ export class PostgresAcademicRepository implements IAcademicRepository {
   }
 
   // --- Enrollments ---
-  async getEnrollmentByStudent(userId: number, academicId: number): Promise<IEnrollment | null> {
+  async getEnrollmentByStudent(userId: string, academicId: string): Promise<IEnrollment | null> {
     const [result] = await db
       .select()
       .from(enrollments)
@@ -117,7 +117,7 @@ export class PostgresAcademicRepository implements IAcademicRepository {
   }
 
   // --- Subjects ---
-  async getSubjectsByClass(classId: number, academicId: number): Promise<ISubject[]> {
+  async getSubjectsByClass(classId: string, academicId: string): Promise<ISubject[]> {
     const results = await db
       .select()
       .from(subjects)
@@ -128,7 +128,7 @@ export class PostgresAcademicRepository implements IAcademicRepository {
   }
 
   // --- Homework ---
-  async getHomeworkByClass(classId: number, sectionId: number, academicId: number): Promise<IHomework[]> {
+  async getHomeworkByClass(classId: string, sectionId: string, academicId: string): Promise<IHomework[]> {
     const results = await db
       .select()
       .from(homeworks)
@@ -147,7 +147,7 @@ export class PostgresAcademicRepository implements IAcademicRepository {
   }
 
   // --- Lessons ---
-  async getLessonsBySubject(subjectId: number, academicId: number): Promise<ILesson[]> {
+  async getLessonsBySubject(subjectId: string, academicId: string): Promise<ILesson[]> {
     const results = await db
       .select()
       .from(lessons)

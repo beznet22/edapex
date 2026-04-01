@@ -11,7 +11,8 @@
  * - sm_staff_documents
  * - sm_upload_contents / sm_teacher_upload_contents
  */
-import { pgSchema, text, doublePrecision, integer, serial, numeric, smallint, timestamp, jsonb, boolean, date, varchar, index } from "drizzle-orm/pg-core";
+import { pgSchema, text, doublePrecision, integer, uuid, numeric, smallint, timestamp, jsonb, boolean, date, varchar, index } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
 import { users, tenants, accounts } from "./domain-core";
 
@@ -19,18 +20,18 @@ import { users, tenants, accounts } from "./domain-core";
 export type DocumentMetadata = {
   title?: string;
   description?: string;
-  verifiedBy?: number; // userId
+  verifiedBy?: string; // userId
   version?: number;
-  previousVersionId?: number;
+  previousVersionId?: string;
 };
 export const documentsSchema = pgSchema("domain_documents");
 
 
 export const documents = documentsSchema.table("documents", {
-  id: serial("id").primaryKey(),
-  tenantId: integer("tenant_id").notNull().references(() => tenants.id),
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: uuid("tenant_id").notNull().references(() => tenants.id),
   ownerType: varchar("owner_type", { length: 30 }).notNull(),
-  ownerId: integer("owner_id").notNull(),
+  ownerId: uuid("owner_id").notNull(),
   documentType: varchar("document_type", { length: 50 }).notNull(),
   filePath: varchar("file_path", { length: 500 }).notNull(),
   fileSize: integer("file_size"),
@@ -38,7 +39,7 @@ export const documents = documentsSchema.table("documents", {
   status: varchar("status", { length: 150 }).default("approved"),
   metadata: jsonb("metadata").$type<DocumentMetadata>(),
   expiresAt: timestamp("expires_at"),
-  createdBy: integer("created_by").references(() => users.id),
+  createdBy: uuid("created_by").references(() => users.id),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => ({

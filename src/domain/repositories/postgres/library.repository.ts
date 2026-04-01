@@ -16,7 +16,7 @@ import { eq, and } from "drizzle-orm";
 
 export class PostgresLibraryRepository implements ILibraryRepository {
   // --- Catalog ---
-  async getBooks(tenantId: number): Promise<IBook[]> {
+  async getBooks(tenantId: string): Promise<IBook[]> {
     const results = await db.select().from(books).where(eq(books.tenantId, tenantId));
     return results.map((row: any) => ({
       ...row,
@@ -24,7 +24,7 @@ export class PostgresLibraryRepository implements ILibraryRepository {
     }));
   }
 
-  async getBookById(id: number): Promise<IBook | null> {
+  async getBookById(id: string): Promise<IBook | null> {
     const [result] = await db.select().from(books).where(eq(books.id, id));
     return result ? { ...result, price: result.price ? result.price.toString() : null } : null;
   }
@@ -35,7 +35,7 @@ export class PostgresLibraryRepository implements ILibraryRepository {
     return { ...result, price: result.price ? result.price.toString() : null };
   }
 
-  async getCategories(tenantId: number): Promise<IBookCategory[]> {
+  async getCategories(tenantId: string): Promise<IBookCategory[]> {
     const results = await db.select().from(bookCategories).where(eq(bookCategories.tenantId, tenantId));
     return results.map((row: any) => ({ ...row }));
   }
@@ -53,17 +53,17 @@ export class PostgresLibraryRepository implements ILibraryRepository {
     };
   }
 
-  async returnBook(issueId: number, returnDate: Date, fineAmount: number = 0): Promise<void> {
+  async returnBook(tenantId: string, issueId: string, returnDate: Date, fineAmount: number = 0): Promise<void> {
     await db.update(bookIssues)
       .set({ 
         status: "returned", 
         returnDate, 
         fineAmount: fineAmount.toString() 
       })
-      .where(eq(bookIssues.id, issueId));
+      .where(and(eq(bookIssues.id, issueId), eq(bookIssues.tenantId, tenantId)));
   }
 
-  async getUserIssues(userId: number): Promise<IBookIssue[]> {
+  async getUserIssues(userId: string): Promise<IBookIssue[]> {
     const results = await db.select().from(bookIssues).where(eq(bookIssues.userId, userId));
     return results.map((row: any) => ({
       ...row,
@@ -75,7 +75,7 @@ export class PostgresLibraryRepository implements ILibraryRepository {
   }
 
   // --- Membership ---
-  async getLibraryProfile(userId: number, tenantId: number): Promise<ILibraryProfile | null> {
+  async getLibraryProfile(userId: string, tenantId: string): Promise<ILibraryProfile | null> {
     const [result] = await db
       .select()
       .from(libraryProfiles)

@@ -1,25 +1,25 @@
 export type AttendanceStatus = "P" | "L" | "A" | "H" | "F"; // Present, Late, Absent, Holiday, Half-day
 
 export interface IStudentAttendance {
-  id: number;
-  tenantId: number;
-  enrollmentId: number;
-  userId: number;
-  classId: number;
-  sectionId: number;
+  id: string;
+  tenantId: string;
+  enrollmentId: string;
+  userId: string;
+  classId: string;
+  sectionId: string;
   attendanceDate: string;
   status: AttendanceStatus;
   note: string | null;
-  academicId: number;
+  academicId: string;
   createdAt: Date | null;
   updatedAt: Date | null;
 }
 
 export interface IStaffAttendance {
-  id: number;
-  tenantId: number;
-  staffId: number;
-  userId: number;
+  id: string;
+  tenantId: string;
+  staffId: string;
+  userId: string;
   attendanceDate: string;
   status: AttendanceStatus;
   note: string | null;
@@ -29,15 +29,15 @@ export interface IStaffAttendance {
 
 export interface IAttendanceRepository {
   // Student
-  getStudentAttendance(enrollmentId: number, month: string, year: string): Promise<IStudentAttendance[]>;
+  getStudentAttendance(tenantId: string, enrollmentId: string, month: string, year: string): Promise<IStudentAttendance[]>;
   bulkSaveStudentAttendance(data: Partial<IStudentAttendance>[]): Promise<void>;
   
   // Staff
-  getStaffAttendance(staffId: number, month: string, year: string): Promise<IStaffAttendance[]>;
+  getStaffAttendance(tenantId: string, staffId: string, month: string, year: string): Promise<IStaffAttendance[]>;
   saveStaffAttendance(data: Partial<IStaffAttendance>): Promise<IStaffAttendance>;
   
   // Reports
-  getDailyAttendanceStats(tenantId: number, date: string): Promise<{
+  getDailyAttendanceStats(tenantId: string, date: string): Promise<{
     students: { total: number; present: number; absent: number };
     staff: { total: number; present: number; absent: number };
   }>;

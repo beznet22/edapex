@@ -14,14 +14,15 @@
  * - sm_base_setups / sm_base_groups -> edx_enumerations
  * - users / sm_students / sm_staffs / sm_parents -> edx_accounts
  */
-import { unique,  sqliteTable, text, integer, real, index } from "drizzle-orm/sqlite-core";
+import { unique, sqliteTable, text, integer, real, index } from "drizzle-orm/sqlite-core";
 import { sql } from "drizzle-orm";
+import { generateId } from "../utils/id";
 
 // Tenant context injected into all repositories
 export interface TenantContext {
-  tenantId: number;    // school_id (stays integer for now, UUID in PG phase)
-  academicId: number;  // academic_year_id
-  userId: number;      // authenticated user
+  tenantId: string;    // UUID v7
+  academicId: string;  // academic_year_id UUID
+  userId: string;      // authenticated user UUID
 }
 
 // --- CORE TABLES ---
@@ -44,7 +45,7 @@ export type TenantMetadata = {
 };
 
 export const tenants = sqliteTable("domain_core_tenants", {
-  id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
   tenantType: text("tenant_type", { enum: ["conventional", "homeschool_family", "homeschool_coop"] }).default("conventional").notNull(),
   name: text("name", { length: 200 }).notNull(),
   code: text("code", { length: 50 }),
@@ -82,10 +83,10 @@ export const accounts = sqliteTable("domain_core_accounts", {
   language: text("language", { length: 191 }).default("en"),
   styleId: integer("style_id").default(1),
   rtlLtl: integer("rtl_ltl").default(2),
-  selectedSession: integer("selected_session").default(1),
+  selectedSession: text("selected_session"),
   accessStatus: integer("access_status").default(1),
-  tenantId: integer("tenant_id").references(() => tenants.id, { onDelete: "cascade" }), 
-  roleId: integer("role_id"), 
+  tenantId: text("tenant_id").references(() => tenants.id, { onDelete: "cascade" }), 
+  roleId: text("role_id"), 
   isAdministrator: text("is_administrator", { enum: ["yes", "no"] }).default("no").notNull(),
   isRegistered: integer("is_registered").default(0).notNull(),
   deviceToken: text("device_token"),
@@ -201,8 +202,8 @@ export type UserMetadata = StudentMetadata | StaffMetadata | ParentMetadata | Dr
 
 // Users Table — Domain Personas (Student, Staff, Parent)
 export const users = sqliteTable("domain_core_users", {
-  id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
-  tenantId: integer("tenant_id").notNull().references(() => tenants.id),
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id),
   accountId: text("account_id", { length: 255 }).references(() => accounts.id),
   userType: text("user_type", { enum: ["student", "staff", "parent", "driver", "facilitator"] }).notNull(),
   firstName: text("first_name", { length: 100 }).notNull(),
@@ -213,7 +214,7 @@ export const users = sqliteTable("domain_core_users", {
   genderId: integer("gender_id").references(() => enumerations.id),
   photo: text("photo", { length: 500 }),
   idNumber: text("id_number", { length: 100 }),  // national ID / passport
-  parentUserId: integer("parent_user_id"),  // self-ref FK for parent-child linking
+  parentUserId: text("parent_user_id"),  // self-ref FK for parent-child linking
   metadata: text("metadata", { mode: "json" }).$type<UserMetadata>(),  // role-specific fields
   activeStatus: integer("active_status").default(1).notNull(),
   createdAt: integer("created_at", { mode: "timestamp" }).defaultNow(),
@@ -228,8 +229,8 @@ export const users = sqliteTable("domain_core_users", {
 
 // Academic Years — replaces sm_academic_years
 export const academicYears = sqliteTable("domain_core_academic_years", {
-  id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
-  tenantId: integer("tenant_id").notNull().references(() => tenants.id),
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id),
   title: text("title", { length: 200 }).notNull(),
   year: text("year", { length: 20 }),
   startingDate: text("starting_date"),
@@ -249,8 +250,8 @@ export type EnumerationMetadata = {
 };
 
 export const enumerations = sqliteTable("domain_core_enumerations", {
-  id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
-  tenantId: integer("tenant_id").references(() => tenants.id),  // NULL = global
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  tenantId: text("tenant_id").references(() => tenants.id),  // NULL = global
   domain: text("domain", { length: 50 }).notNull(),  // 'gender', 'blood_group', 'religion', etc.
   code: text("code", { length: 50 }).notNull(),
   label: text("label", { length: 191 }).notNull(),
@@ -272,8 +273,8 @@ export type UserDocumentMetadata = {
 };
 
 export const userDocuments = sqliteTable("domain_core_user_documents", {
-  id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
-  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   documentType: text("document_type", { length: 50 }).notNull(),
   title: text("title", { length: 191 }),
   filePath: text("file_path", { length: 500 }).notNull(),
@@ -296,8 +297,8 @@ export type AddressData = {
 };
 
 export const userAddresses = sqliteTable("domain_core_user_addresses", {
-  id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
-  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   addressType: text("address_type", { enum: ["current", "permanent", "mailing"] }).notNull(),
   addressData: text("address_data", { mode: "json" }).$type<AddressData>().notNull(),
   createdAt: integer("created_at", { mode: "timestamp" }).defaultNow(),
@@ -309,7 +310,7 @@ export const userAddresses = sqliteTable("domain_core_user_addresses", {
 // --- SYSTEM JOBS ---
 
 export const jobs = sqliteTable("domain_core_jobs", {
-  id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
   queue: text("queue", { length: 255 }).notNull(),
   payload: text("payload").notNull(),
   attempts: integer("attempts").notNull().default(0),
@@ -319,7 +320,7 @@ export const jobs = sqliteTable("domain_core_jobs", {
 });
 
 export const failedJobs = sqliteTable("domain_core_failed_jobs", {
-  id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
   uuid: text("uuid", { length: 255 }),
   connection: text("connection").notNull(),
   queue: text("queue").notNull(),

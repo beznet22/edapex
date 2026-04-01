@@ -4,7 +4,7 @@ import { IDocumentsRepository, IDocument } from "../../interfaces/documents.inte
 import { eq, and } from "drizzle-orm";
 
 export class PostgresDocumentsRepository implements IDocumentsRepository {
-  async getDocumentsByOwner(tenantId: number, ownerType: string, ownerId: number): Promise<IDocument[]> {
+  async getDocumentsByOwner(tenantId: string, ownerType: string, ownerId: string): Promise<IDocument[]> {
     const results = await db
       .select()
       .from(documents)
@@ -28,11 +28,20 @@ export class PostgresDocumentsRepository implements IDocumentsRepository {
     };
   }
 
-  async updateDocumentStatus(id: number, status: string): Promise<void> {
-    await db.update(documents).set({ status: status as any }).where(eq(documents.id, id));
+  async updateDocumentStatus(tenantId: string, id: string, status: string): Promise<void> {
+    await db.update(documents)
+      .set({ status: status as any })
+      .where(and(
+        eq(documents.id, id),
+        eq(documents.tenantId, tenantId)
+      ));
   }
 
-  async deleteDocument(id: number): Promise<void> {
-    await db.delete(documents).where(eq(documents.id, id));
+  async deleteDocument(tenantId: string, id: string): Promise<void> {
+    await db.delete(documents)
+      .where(and(
+        eq(documents.id, id),
+        eq(documents.tenantId, tenantId)
+      ));
   }
 }

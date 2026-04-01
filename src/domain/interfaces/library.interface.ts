@@ -1,57 +1,57 @@
 export interface ILibraryRepository {
   // --- Catalog ---
-  getBooks(tenantId: number, filter?: { categoryId?: number; search?: string }): Promise<IBook[]>;
-  getBookById(id: number): Promise<IBook | null>;
+  getBooks(tenantId: string, filter?: { categoryId?: string; search?: string }): Promise<IBook[]>;
+  getBookById(tenantId: string, id: string): Promise<IBook | null>;
   createBook(data: Partial<IBook>): Promise<IBook>;
-  getCategories(tenantId: number): Promise<IBookCategory[]>;
+  getCategories(tenantId: string): Promise<IBookCategory[]>;
 
   // --- Circulation ---
   issueBook(data: Partial<IBookIssue>): Promise<IBookIssue>;
-  returnBook(issueId: number, returnDate: Date, fineAmount?: number): Promise<void>;
-  getUserIssues(userId: number): Promise<IBookIssue[]>;
+  returnBook(tenantId: string, issueId: string, returnDate: Date, fineAmount?: number): Promise<void>;
+  getUserIssues(tenantId: string, userId: string): Promise<IBookIssue[]>;
 
   // --- Membership ---
-  getLibraryProfile(userId: number, tenantId: number): Promise<ILibraryProfile | null>;
+  getLibraryProfile(userId: string, tenantId: string): Promise<ILibraryProfile | null>;
   createLibraryProfile(data: Partial<ILibraryProfile>): Promise<ILibraryProfile>;
 }
 
 export interface IBook {
-  id: number;
-  tenantId: number;
+  id: string;
+  tenantId: string;
   title: string;
   isbn?: string | null;
   author?: string | null;
-  categoryId?: number | null;
+  categoryId?: string | null;
   quantity: number;
   price?: string | number | null;
   rackNo?: string | null;
 }
 
 export interface IBookCategory {
-  id: number;
-  tenantId: number;
+  id: string;
+  tenantId: string;
   name: string;
   description?: string | null;
 }
 
 export interface IBookIssue {
-  id: number;
-  tenantId: number;
-  bookId: number;
-  userId: number;
+  id: string;
+  tenantId: string;
+  bookId: string;
+  userId: string;
   issueDate: Date;
   dueDate: Date;
   returnDate?: Date | null;
   status: "issued" | "returned" | "lost" | "damaged";
   fineAmount?: string | number | null;
-  isFinePaid?: number | null;
-  academicId?: number | null;
+  isFinePaid?: string | null;
+  academicId?: string | null;
 }
 
 export interface ILibraryProfile {
-  id: number;
-  tenantId: number;
-  userId: number;
+  id: string;
+  tenantId: string;
+  userId: string;
   maxBooksAllowed: number;
   currentBorrowed: number;
   totalFinesAccrued: string | number | null;

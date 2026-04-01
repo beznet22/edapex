@@ -25,12 +25,13 @@ import {
 } from "drizzle-orm/mysql-core";
 
 import { users, tenants, academicYears, accounts } from "./domain-core";
+import { generateId } from "../utils/id";
 
 // Rewritten Library Domain - drops edx_ prefix and adds improvements
 
 export const bookCategories = mysqlTable("book_categories", {
-  id: int("id").autoincrement().primaryKey(),
-  tenantId: int("tenant_id").notNull().references(() => tenants.id),
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => generateId()),
+  tenantId: varchar("tenant_id", { length: 36 }).notNull().references(() => tenants.id),
   name: varchar("name", { length: 200 }).notNull(),
   description: varchar("description", { length: 500 }),
   createdAt: timestamp("created_at").defaultNow(),
@@ -46,13 +47,13 @@ export type BookMetadata = {
 };
 
 export const books = mysqlTable("books", {
-  id: int("id").autoincrement().primaryKey(),
-  tenantId: int("tenant_id").notNull().references(() => tenants.id),
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => generateId()),
+  tenantId: varchar("tenant_id", { length: 36 }).notNull().references(() => tenants.id),
   title: varchar("title", { length: 255 }).notNull(),
   isbn: varchar("isbn", { length: 50 }),
   author: varchar("author", { length: 255 }),
   publisher: varchar("publisher", { length: 255 }),
-  categoryId: int("category_id").references(() => bookCategories.id),
+  categoryId: varchar("category_id", { length: 36 }).references(() => bookCategories.id),
   quantity: int("quantity").notNull().default(0),
   price: decimal("price", { precision: 12, scale: 2 }),
   rackNo: varchar("rack_no", { length: 100 }),
@@ -65,17 +66,17 @@ export const books = mysqlTable("books", {
 }));
 
 export const bookIssues = mysqlTable("book_issues", {
-  id: int("id").autoincrement().primaryKey(),
-  tenantId: int("tenant_id").notNull().references(() => tenants.id),
-  bookId: int("book_id").notNull().references(() => books.id),
-  userId: int("user_id").notNull().references(() => users.id), // Borrower persona
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => generateId()),
+  tenantId: varchar("tenant_id", { length: 36 }).notNull().references(() => tenants.id),
+  bookId: varchar("book_id", { length: 36 }).notNull().references(() => books.id),
+  userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id), // Borrower persona
   issueDate: timestamp("issue_date").defaultNow().notNull(),
   dueDate: timestamp("due_date").notNull(),
   returnDate: timestamp("return_date"),
   status: mysqlEnum("status", ["issued", "returned", "lost", "damaged"]).notNull().default("issued"),
   fineAmount: decimal("fine_amount", { precision: 12, scale: 2 }).default("0.00"),
   isFinePaid: int("is_fine_paid").default(0),
-  academicId: int("academic_id").references(() => academicYears.id),
+  academicId: varchar("academic_id", { length: 36 }).references(() => academicYears.id),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow(),
 }, (table) => ({
@@ -91,9 +92,9 @@ export type LibraryProfileMetadata = {
 };
 
 export const libraryProfiles = mysqlTable("library_profiles", {
-  id: int("id").autoincrement().primaryKey(),
-  tenantId: int("tenant_id").notNull().references(() => tenants.id),
-  userId: int("user_id").notNull().references(() => users.id),
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => generateId()),
+  tenantId: varchar("tenant_id", { length: 36 }).notNull().references(() => tenants.id),
+  userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id),
   maxBooksAllowed: int("max_books_allowed").notNull().default(3),
   currentBorrowed: int("current_borrowed").notNull().default(0),
   totalFinesAccrued: decimal("total_fines_accrued", { precision: 12, scale: 2 }).default("0.00"),

@@ -1,83 +1,83 @@
 export interface IFinanceRepository {
   // --- Ledger ---
-  getLedgerEntries(tenantId: number, filter?: { type?: string; userId?: number; academicId?: number }): Promise<ILedgerEntry[]>;
+  getLedgerEntries(tenantId: string, filter?: { type?: string; userId?: string; academicId?: string }): Promise<ILedgerEntry[]>;
   createLedgerEntry(data: Partial<ILedgerEntry>): Promise<ILedgerEntry>;
   
   // --- Fees Configuration ---
-  getFeeMasters(tenantId: number, academicId: number): Promise<IFeeMaster[]>;
+  getFeeMasters(tenantId: string, academicId: string): Promise<IFeeMaster[]>;
   createFeeMaster(data: Partial<IFeeMaster>): Promise<IFeeMaster>;
-  getFeeTypes(tenantId: number): Promise<IFeeType[]>;
+  getFeeTypes(tenantId: string): Promise<IFeeType[]>;
   
   // --- Assignments & Payments ---
-  getStudentFeeAssignments(userId: number): Promise<IFeeAssignment[]>;
+  getStudentFeeAssignments(userId: string): Promise<IFeeAssignment[]>;
   assignFeeToStudent(data: Partial<IFeeAssignment>): Promise<IFeeAssignment>;
-  updateFeeAssignment(tenantId: number, id: number, data: Partial<IFeeAssignment>): Promise<void>;
+  updateFeeAssignment(tenantId: string, id: string, data: Partial<IFeeAssignment>): Promise<void>;
   
   // --- Invoices ---
-  getInvoices(tenantId: number, userId?: number): Promise<IInvoice[]>;
+  getInvoices(tenantId: string, userId?: string): Promise<IInvoice[]>;
   createInvoice(data: Partial<IInvoice>): Promise<IInvoice>;
   
   // --- B2C Payments & Gateways ---
-  getPaymentGateways(tenantId: number): Promise<IPaymentGateway[]>;
+  getPaymentGateways(tenantId: string): Promise<IPaymentGateway[]>;
   createOnlinePayment(data: Partial<IOnlinePayment>): Promise<IOnlinePayment>;
-  updateOnlinePaymentStatus(transactionRef: string, status: string, ledgerEntryId?: number): Promise<void>;
+  updateOnlinePaymentStatus(transactionRef: string, status: string, ledgerEntryId?: string): Promise<void>;
 }
 
 export interface ILedgerEntry {
-  id: number;
-  tenantId: number;
+  id: string;
+  tenantId: string;
   transactionType: "fee_payment" | "fee_waiver" | "salary" | "expense" | "income" | "refund" | "wallet_topup";
   direction: "credit" | "debit";
   amount: string | number;
-  userId?: number | null;
-  enrollmentId?: number | null;
+  userId?: string | null;
+  enrollmentId?: string | null;
   referenceType?: string | null;
-  referenceId?: number | null;
+  referenceId?: string | null;
   metadata?: any;
   postedAt?: Date | null;
-  academicId?: number | null;
+  academicId?: string | null;
   createdAt?: Date | null;
   updatedAt?: Date | null;
 }
 
 export interface IFeeMaster {
-  id: number;
-  tenantId: number;
-  feeTypeId: number;
+  id: string;
+  tenantId: string;
+  feeTypeId: string;
   amount: string | number;
-  academicId: number;
+  academicId: string;
   dueDate?: Date | null;
   createdAt?: Date | null;
   updatedAt?: Date | null;
 }
 
 export interface IFeeType {
-  id: number;
-  tenantId: number;
+  id: string;
+  tenantId: string;
   name: string;
   description?: string | null;
 }
 
 export interface IFeeAssignment {
-  id: number;
-  tenantId: number;
-  feeMasterId: number;
-  userId: number;
-  enrollmentId?: number | null;
+  id: string;
+  tenantId: string;
+  feeMasterId: string;
+  userId: string;
+  enrollmentId?: string | null;
   assignedAmount: string | number;
   paidAmount: string | number;
   waivedAmount: string | number;
   status: "pending" | "partial" | "paid" | "overdue" | "waived";
-  academicId: number;
+  academicId: string;
 }
 
 export interface IInvoice {
-  id: number;
-  tenantId: number;
+  id: string;
+  tenantId: string;
   invoiceNumber: string;
   referenceType?: string;
-  referenceId?: number | null;
-  userId: number;
+  referenceId?: string | null;
+  userId: string;
   totalAmount: string | number;
   paidAmount: string | number;
   status: "draft" | "issued" | "paid" | "partial" | "overdue" | "cancelled";
@@ -87,8 +87,8 @@ export interface IInvoice {
 }
 
 export interface IPaymentGateway {
-  id: number;
-  tenantId: number;
+  id: string;
+  tenantId: string;
   provider: "stripe" | "paystack" | "flutterwave" | "paypal";
   publicKey?: string | null;
   isActive: boolean | number;
@@ -98,17 +98,17 @@ export interface IPaymentGateway {
 }
 
 export interface IOnlinePayment {
-  id: number;
-  tenantId: number;
-  userId: number;
-  gatewayId: number;
-  invoiceId?: number | null;
+  id: string;
+  tenantId: string;
+  userId: string;
+  gatewayId: string;
+  invoiceId?: string | null;
   amount: string | number;
   currency: string;
   providerFee?: string | number;
   status: "intent_created" | "processing" | "succeeded" | "failed" | "refunded";
   transactionRef: string;
-  ledgerEntryId?: number | null;
+  ledgerEntryId?: string | null;
   metadata?: any;
   createdAt?: Date | null;
   updatedAt?: Date | null;

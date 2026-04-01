@@ -1,8 +1,8 @@
 import { SqliteAssessmentRepository } from '../domain/repositories/sqlite/assessment.repository';
 
 export interface SyncPayload {
-  tenantId: number;
-  userId: number;
+  tenantId: string;
+  userId: string;
   changes: any[];
   lastSyncToken?: string;
 }
@@ -27,10 +27,10 @@ export class SyncService {
       lastSyncToken: new Date().toISOString(),
       updates: {
         exams: exams.map(e => ({
-          id: e.id.toString(),
+          id: e.id,
           title: e.title,
           exam_type: e.examType,
-          tenant_id: e.tenantId.toString(),
+          tenant_id: e.tenantId,
           updated_at: e.updatedAt?.toISOString() || new Date().toISOString()
         })),
         // Add more collections as needed

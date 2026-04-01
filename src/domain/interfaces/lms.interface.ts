@@ -2,33 +2,33 @@ export type ContentType = "video" | "document" | "quiz" | "external_url";
 export type CourseStatus = "draft" | "published" | "archived";
 
 export interface ILmsCourse {
-  id: number;
-  tenantId: number;
+  id: string;
+  tenantId: string;
   title: string;
   description: string | null;
   thumbnail: string | null;
-  instructorId: number | null;
-  feeMasterId: number | null;
+  instructorId: string | null;
+  feeMasterId: string | null;
   isFree: boolean | number;
   status: CourseStatus;
-  academicId?: number | null;
+  academicId?: string | null;
   createdAt: Date | null;
   updatedAt: Date | null;
 }
 
 export interface ILmsCategory {
-  id: number;
-  tenantId: number;
+  id: string;
+  tenantId: string;
   name: string;
-  parentId: number | null;
+  parentId: string | null;
   createdAt: Date | null;
   updatedAt: Date | null;
 }
 
 export interface ILmsModule {
-  id: number;
-  courseId: number;
-  tenantId: number;
+  id: string;
+  courseId: string;
+  tenantId: string;
   title: string;
   order: number;
   createdAt: Date | null;
@@ -36,9 +36,9 @@ export interface ILmsModule {
 }
 
 export interface ILmsContent {
-  id: number;
-  moduleId: number;
-  tenantId: number;
+  id: string;
+  moduleId: string;
+  tenantId: string;
   title: string;
   type: ContentType;
   content: string | null;
@@ -49,11 +49,11 @@ export interface ILmsContent {
 }
 
 export interface ILmsCourseEnrollment {
-  id: number;
-  courseId: number;
-  userId: number;
-  tenantId: number;
-  academicId?: number | null;
+  id: string;
+  courseId: string;
+  userId: string;
+  tenantId: string;
+  academicId?: string | null;
   enrolledAt: Date;
   completedAt: Date | null;
   progress: number; // 0-100
@@ -62,9 +62,9 @@ export interface ILmsCourseEnrollment {
 }
 
 export interface ILmsAssignment {
-  id: number;
-  courseId: number;
-  tenantId: number;
+  id: string;
+  courseId: string;
+  tenantId: string;
   title: string;
   description: string | null;
   dueDate: Date | null;
@@ -75,21 +75,21 @@ export interface ILmsAssignment {
 
 export interface ILmsRepository {
   // Courses
-  getCourseById(id: number): Promise<ILmsCourse | null>;
-  getCoursesByTenant(tenantId: number, academicId?: number | null): Promise<ILmsCourse[]>;
+  getCourseById(tenantId: string, id: string): Promise<ILmsCourse | null>;
+  getCoursesByTenant(tenantId: string, academicId: string): Promise<ILmsCourse[]>;
   createCourse(data: Partial<ILmsCourse>): Promise<ILmsCourse>;
   
   // Modules & Content
-  getModulesByCourse(courseId: number): Promise<ILmsModule[]>;
-  getContentByModule(moduleId: number): Promise<ILmsContent[]>;
+  getModulesByCourse(tenantId: string, courseId: string): Promise<ILmsModule[]>;
+  getContentByModule(tenantId: string, moduleId: string): Promise<ILmsContent[]>;
   createModule(data: Partial<ILmsModule>): Promise<ILmsModule>;
   createContent(data: Partial<ILmsContent>): Promise<ILmsContent>;
   
   // Enrollments
   enrollUser(data: Partial<ILmsCourseEnrollment>): Promise<ILmsCourseEnrollment>;
-  getUserEnrollments(userId: number): Promise<ILmsCourseEnrollment[]>;
-  updateProgress(enrollmentId: number, progress: number): Promise<void>;
+  getUserEnrollments(tenantId: string, userId: string): Promise<ILmsCourseEnrollment[]>;
+  updateProgress(tenantId: string, enrollmentId: string, progress: number): Promise<void>;
   
   // Assignments
-  getAssignmentsByCourse(courseId: number): Promise<ILmsAssignment[]>;
+  getAssignmentsByCourse(tenantId: string, courseId: string): Promise<ILmsAssignment[]>;
 }

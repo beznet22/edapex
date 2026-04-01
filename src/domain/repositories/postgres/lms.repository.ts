@@ -45,12 +45,12 @@ export class PostgresLmsRepository implements ILmsRepository {
   }
 
   // --- Courses ---
-  async getCourseById(id: number): Promise<ILmsCourse | null> {
-    const [result] = await db.select().from(lmsCourses).where(eq(lmsCourses.id, id));
+  async getCourseById(tenantId: string, id: string): Promise<ILmsCourse | null> {
+    const [result] = await db.select().from(lmsCourses).where(and(eq(lmsCourses.id, id), eq(lmsCourses.tenantId, tenantId)));
     return result ? this.mapCourse(result) : null;
   }
 
-  async getCoursesByTenant(tenantId: number, academicId: number): Promise<ILmsCourse[]> {
+  async getCoursesByTenant(tenantId: string): Promise<ILmsCourse[]> {
     const results = await db
       .select()
       .from(lmsCourses)
@@ -65,20 +65,20 @@ export class PostgresLmsRepository implements ILmsRepository {
   }
 
   // --- Modules & Content ---
-  async getModulesByCourse(courseId: number): Promise<ILmsModule[]> {
+  async getModulesByCourse(tenantId: string, courseId: string): Promise<ILmsModule[]> {
     const results = await db
       .select()
       .from(lmsModules)
-      .where(eq(lmsModules.courseId, courseId))
+      .where(and(eq(lmsModules.courseId, courseId), eq(lmsModules.tenantId, tenantId)))
       .orderBy(lmsModules.sortOrder);
     return results.map((row: any) => this.mapModule(row));
   }
 
-  async getContentByModule(moduleId: number): Promise<ILmsContent[]> {
+  async getContentByModule(tenantId: string, moduleId: string): Promise<ILmsContent[]> {
     const results = await db
       .select()
       .from(lmsLessons)
-      .where(eq(lmsLessons.moduleId, moduleId))
+      .where(and(eq(lmsLessons.moduleId, moduleId), eq(lmsLessons.tenantId, tenantId)))
       .orderBy(lmsLessons.sortOrder);
     return results.map((row: any) => this.mapContent(row));
   }
@@ -117,8 +117,8 @@ export class PostgresLmsRepository implements ILmsRepository {
     };
   }
 
-  async getUserEnrollments(userId: number): Promise<ILmsCourseEnrollment[]> {
-    const results = await db.select().from(lmsEnrollments).where(eq(lmsEnrollments.userId, userId));
+  async getUserEnrollments(tenantId: string, userId: string): Promise<ILmsCourseEnrollment[]> {
+    const results = await db.select().from(lmsEnrollments).where(and(eq(lmsEnrollments.userId, userId), eq(lmsEnrollments.tenantId, tenantId)));
     return results.map((row: any) => ({
       ...row,
       enrolledAt: row.enrollmentDate ? new Date(row.enrollmentDate) : new Date(),
@@ -129,13 +129,13 @@ export class PostgresLmsRepository implements ILmsRepository {
     }));
   }
 
-  async updateProgress(enrollmentId: number, progress: number): Promise<void> {
-    await db.update(lmsEnrollments).set({ progressPercent: progress }).where(eq(lmsEnrollments.id, enrollmentId));
+  async updateProgress(tenantId: string, enrollmentId: string, progress: number): Promise<void> {
+    await db.update(lmsEnrollments).set({ progressPercent: progress }).where(and(eq(lmsEnrollments.id, enrollmentId), eq(lmsEnrollments.tenantId, tenantId)));
   }
 
   // --- Assignments ---
-  async getAssignmentsByCourse(courseId: number): Promise<ILmsAssignment[]> {
-    const results = await db.select().from(lmsAssignments).where(eq(lmsAssignments.courseId, courseId));
+  async getAssignmentsByCourse(tenantId: string, courseId: string): Promise<ILmsAssignment[]> {
+    const results = await db.select().from(lmsAssignments).where(and(eq(lmsAssignments.courseId, courseId), eq(lmsAssignments.tenantId, tenantId)));
     return results.map((row: any) => ({
       ...row,
       marks: row.points,

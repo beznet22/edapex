@@ -23,6 +23,7 @@ import {
 } from "drizzle-orm/mysql-core";
 
 import { users, tenants, accounts } from "./domain-core";
+import { generateId } from "../utils/id";
 
 // Policy-Based Access Control (PBAC) schema - dropped edx_ prefix
 
@@ -40,8 +41,8 @@ export type PolicyDefinition = {
 };
 
 export const policyDefinitions = mysqlTable("policy_definitions", {
-  id: int("id").autoincrement().primaryKey(),
-  tenantId: int("tenant_id").references(() => tenants.id), // NULL = system-wide policy
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => generateId()),
+  tenantId: varchar("tenant_id", { length: 36 }).references(() => tenants.id), // NULL = system-wide policy
   name: varchar("name", { length: 191 }).notNull(),
   description: varchar("description", { length: 500 }),
   definition: json("definition").$type<PolicyDefinition>().notNull(),
@@ -58,15 +59,15 @@ export const policyDefinitions = mysqlTable("policy_definitions", {
 // Role Assignment Metadata
 export type RoleAssignmentMetadata = {
   isPrimary?: boolean;
-  grantedBy?: number; // userId
+  grantedBy?: string; // userId
   expiresAt?: string;
 };
 
 export const roleAssignments = mysqlTable("role_assignments", {
-  id: int("id").autoincrement().primaryKey(),
-  tenantId: int("tenant_id").notNull().references(() => tenants.id),
-  userId: int("user_id").notNull().references(() => users.id), // Persona
-  accountId: int("account_id").references(() => accounts.id), // Platform identity for account-level auth
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => generateId()),
+  tenantId: varchar("tenant_id", { length: 36 }).notNull().references(() => tenants.id),
+  userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id), // Persona
+  accountId: varchar("account_id", { length: 36 }).references(() => accounts.id), // Platform identity for account-level auth
   roleName: varchar("role_name", { length: 100 }).notNull(), // e.g. 'admin', 'teacher', 'student'
   metadata: json("metadata").$type<RoleAssignmentMetadata>(),
   createdAt: timestamp("created_at").defaultNow(),
@@ -80,10 +81,10 @@ export const roleAssignments = mysqlTable("role_assignments", {
 // M:N binding between policies and role assignments
 // Enables dynamic PBAC: "role X gets policy Y in tenant Z"
 export const policyBindings = mysqlTable("policy_bindings", {
-  id: int("id").autoincrement().primaryKey(),
-  tenantId: int("tenant_id").notNull().references(() => tenants.id),
-  policyId: int("policy_id").notNull().references(() => policyDefinitions.id),
-  roleAssignmentId: int("role_assignment_id").notNull().references(() => roleAssignments.id),
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => generateId()),
+  tenantId: varchar("tenant_id", { length: 36 }).notNull().references(() => tenants.id),
+  policyId: varchar("policy_id", { length: 36 }).notNull().references(() => policyDefinitions.id),
+  roleAssignmentId: varchar("role_assignment_id", { length: 36 }).notNull().references(() => roleAssignments.id),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow(),
 }, (table) => ({

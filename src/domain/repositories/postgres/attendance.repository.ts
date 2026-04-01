@@ -55,13 +55,14 @@ export class PostgresAttendanceRepository implements IAttendanceRepository {
   }
 
   // --- Student ---
-  async getStudentAttendance(enrollmentId: number, month: string, year: string): Promise<IStudentAttendance[]> {
+  async getStudentAttendance(tenantId: string, enrollmentId: string, month: string, year: string): Promise<IStudentAttendance[]> {
     const startDate = `${year}-${month}-01`;
     const endDate = `${year}-${month}-31`;
     const results = await db
       .select()
       .from(attendances)
       .where(and(
+        eq(attendances.tenantId, tenantId),
         eq(attendances.enrollmentId, enrollmentId),
         eq(attendances.actorType, "student"),
         sql`${attendances.attendanceDate} BETWEEN ${startDate} AND ${endDate}`
@@ -95,13 +96,14 @@ export class PostgresAttendanceRepository implements IAttendanceRepository {
   }
 
   // --- Staff ---
-  async getStaffAttendance(staffId: number, month: string, year: string): Promise<IStaffAttendance[]> {
+  async getStaffAttendance(tenantId: string, staffId: string, month: string, year: string): Promise<IStaffAttendance[]> {
     const startDate = `${year}-${month}-01`;
     const endDate = `${year}-${month}-31`;
     const results = await db
       .select()
       .from(attendances)
       .where(and(
+        eq(attendances.tenantId, tenantId),
         eq(attendances.userId, staffId),
         eq(attendances.actorType, "staff"),
         sql`${attendances.attendanceDate} BETWEEN ${startDate} AND ${endDate}`
@@ -132,7 +134,7 @@ export class PostgresAttendanceRepository implements IAttendanceRepository {
   }
 
   // --- Reports ---
-  async getDailyAttendanceStats(tenantId: number, date: string): Promise<{
+  async getDailyAttendanceStats(tenantId: string, date: string): Promise<{
     students: { total: number; present: number; absent: number };
     staff: { total: number; present: number; absent: number };
   }> {

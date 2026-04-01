@@ -2,52 +2,52 @@ export type ExamStatus = "pending" | "published" | "cancelled";
 export type ResultStatus = "pass" | "fail" | "withheld";
 
 export interface IExam {
-  id: number;
-  tenantId: number;
+  id: string;
+  tenantId: string;
   title: string;
   examType: string;
   startDate: string | null;
   endDate: string | null;
   status: ExamStatus;
-  academicId: number;
+  academicId: string;
   createdAt: Date | null;
   updatedAt: Date | null;
 }
 
 export interface IExamSetup {
-  id: number;
-  examId: number;
-  classId: number;
-  sectionId: number;
-  subjectId: number;
-  tenantId: number;
+  id: string;
+  examId: string;
+  classId: string;
+  sectionId: string;
+  subjectId: string;
+  tenantId: string;
   examDate: string | null;
   startTime: string | null;
   endTime: string | null;
   roomNo: string | null;
   marks: number | null;
-  academicId: number;
+  academicId: string;
   createdAt: Date | null;
   updatedAt: Date | null;
 }
 
 export interface IMark {
-  id: number;
-  userId: number;
-  enrollmentId: number;
-  examSetupId: number;
-  tenantId: number;
+  id: string;
+  userId: string;
+  enrollmentId: string;
+  examSetupId: string;
+  tenantId: string;
   marks: string | null;
   isAbsent: number | null;
   teacherRemarks: string | null;
-  academicId: number;
+  academicId: string;
   createdAt: Date | null;
   updatedAt: Date | null;
 }
 
 export interface IGrade {
-  id: number;
-  tenantId: number;
+  id: string;
+  tenantId: string;
   gradeName: string;
   gradePoint: string;
   minMark: string;
@@ -59,14 +59,14 @@ export interface IGrade {
 
 export interface IAssessmentRepository {
   // Exams
-  getExams(tenantId: number, academicId: number, updatedSince?: Date): Promise<IExam[]>;
-  getExamSetup(examId: number, classId: number): Promise<IExamSetup[]>;
+  getExams(tenantId: string, academicId: string, updatedSince?: Date): Promise<IExam[]>;
+  getExamSetup(tenantId: string, examId: string, classId: string): Promise<IExamSetup[]>;
   
   // Marks
-  getMarksByExam(examId: number, classId: number, sectionId: number): Promise<IMark[]>;
-  saveMarks(tenantId: number, marks: Partial<IMark>[]): Promise<void>;
+  getMarksByExam(tenantId: string, examId: string, classId: string, sectionId: string): Promise<IMark[]>;
+  saveMarks(tenantId: string, marks: Partial<IMark>[]): Promise<void>;
   
   // Grades
-  getGrades(tenantId: number): Promise<IGrade[]>;
-  getGradeForMark(tenantId: number, mark: number): Promise<IGrade | null>;
+  getGrades(tenantId: string): Promise<IGrade[]>;
+  getGradeForMark(tenantId: string, mark: number): Promise<IGrade | null>;
 }

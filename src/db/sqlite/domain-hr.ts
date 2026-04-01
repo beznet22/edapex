@@ -15,20 +15,21 @@
 import { unique,  sqliteTable, text, integer, real, index } from "drizzle-orm/sqlite-core";
 
 import { users, tenants, academicYears, accounts } from "./domain-core";
+import { generateId } from "../utils/id";
 
 // Extracts HR-specific data from sm_staffs
 
 export const hrDepartments = sqliteTable("domain_hr_departments", {
-  id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
-  tenantId: integer("tenant_id").notNull().references(() => tenants.id),
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id),
   departmentName: text("department_name", { length: 191 }).notNull(),
   createdAt: integer("created_at", { mode: "timestamp" }).defaultNow(),
   updatedAt: integer("updated_at", { mode: "timestamp" }).defaultNow(),
 });
 
 export const hrDesignations = sqliteTable("domain_hr_designations", {
-  id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
-  tenantId: integer("tenant_id").notNull().references(() => tenants.id),
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id),
   designationName: text("designation_name", { length: 191 }).notNull(),
   createdAt: integer("created_at", { mode: "timestamp" }).defaultNow(),
   updatedAt: integer("updated_at", { mode: "timestamp" }).defaultNow(),
@@ -36,8 +37,8 @@ export const hrDesignations = sqliteTable("domain_hr_designations", {
 
 // Leave Types — configurable leave categories (replaces smLeaveTypes)
 export const leaveTypes = sqliteTable("domain_hr_leave_types", {
-  id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
-  tenantId: integer("tenant_id").notNull().references(() => tenants.id),
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id),
   name: text("name", { length: 100 }).notNull(), // medical, casual, maternity, etc.
   totalDays: integer("total_days"),  // annual allowance
   activeStatus: integer("active_status").default(1).notNull(),
@@ -46,17 +47,17 @@ export const leaveTypes = sqliteTable("domain_hr_leave_types", {
 });
 
 export const hrLeaveRequests = sqliteTable("domain_hr_leave_requests", {
-  id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
-  tenantId: integer("tenant_id").notNull().references(() => tenants.id),
-  userId: integer("user_id").notNull().references(() => users.id), // Staff persona
-  leaveTypeId: integer("leave_type_id").references(() => leaveTypes.id),
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id),
+  userId: text("user_id").notNull().references(() => users.id), // Staff persona
+  leaveTypeId: text("leave_type_id").references(() => leaveTypes.id),
   leaveType: text("leave_type", { length: 100 }).notNull(), // kept for flexibility
   applyDate: text("apply_date").notNull(),
   fromDate: text("from_date").notNull(),
   toDate: text("to_date").notNull(),
   reason: text("reason"),
   status: text("status", { enum: ["pending", "approved", "rejected"] }).notNull().default("pending"),
-  approvedBy: integer("approved_by").references(() => users.id), // Staff persona
+  approvedBy: text("approved_by").references(() => users.id), // Staff persona
   createdAt: integer("created_at", { mode: "timestamp" }).defaultNow(),
   updatedAt: integer("updated_at", { mode: "timestamp" }).defaultNow(),
 }, (table) => ({
@@ -73,8 +74,8 @@ export type SalaryComponent = {
 };
 
 export const salaryTemplates = sqliteTable("domain_hr_salary_templates", {
-  id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
-  tenantId: integer("tenant_id").notNull().references(() => tenants.id),
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id),
   name: text("name", { length: 200 }).notNull(),
   components: text("components", { mode: "json" }).$type<SalaryComponent[]>().notNull(),
   createdAt: integer("created_at", { mode: "timestamp" }).defaultNow(),
@@ -84,10 +85,10 @@ export const salaryTemplates = sqliteTable("domain_hr_salary_templates", {
 }));
 
 export const payrollRuns = sqliteTable("domain_hr_payroll_runs", {
-  id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
-  tenantId: integer("tenant_id").notNull().references(() => tenants.id),
-  userId: integer("user_id").notNull().references(() => users.id), // Staff persona
-  salaryTemplateId: integer("salary_template_id").references(() => salaryTemplates.id),
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id),
+  userId: text("user_id").notNull().references(() => users.id), // Staff persona
+  salaryTemplateId: text("salary_template_id").references(() => salaryTemplates.id),
   payrollMonth: text("payroll_month", { length: 20 }).notNull(),
   payrollYear: text("payroll_year", { length: 20 }).notNull(),
   basicSalary: real("basic_salary").notNull(),
@@ -112,15 +113,15 @@ export type EvaluationMetadata = {
 };
 
 export const staffEvaluations = sqliteTable("domain_hr_staff_evaluations", {
-  id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
-  tenantId: integer("tenant_id").notNull().references(() => tenants.id),
-  userId: integer("user_id").notNull().references(() => users.id), // Staff being evaluated
-  evaluatorId: integer("evaluator_id").notNull().references(() => users.id), // Staff persona
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id),
+  userId: text("user_id").notNull().references(() => users.id), // Staff being evaluated
+  evaluatorId: text("evaluator_id").notNull().references(() => users.id), // Staff persona
   evaluationDate: text("evaluation_date").notNull(),
   overallScore: real("overall_score"),
   remarks: text("remarks"),
   metadata: text("metadata", { mode: "json" }).$type<EvaluationMetadata>(),
-  academicId: integer("academic_id").references(() => academicYears.id),
+  academicId: text("academic_id").references(() => academicYears.id),
   createdAt: integer("created_at", { mode: "timestamp" }).defaultNow(),
   updatedAt: integer("updated_at", { mode: "timestamp" }).defaultNow(),
 }, (table) => ({

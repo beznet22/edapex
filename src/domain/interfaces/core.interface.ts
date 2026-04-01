@@ -2,7 +2,7 @@
  * Reusable generic abstract types that don't depend on the Drizzle Dialect
  */
 export interface ITenant {
-  id: number;
+  id: string;
   name: string;
   code: string | null;
   email: string | null;
@@ -15,7 +15,7 @@ export interface ITenant {
 
 export interface IAccount {
   id: string; // Better-Auth UUID
-  tenantId: number | null;
+  tenantId: string | null;
   name: string;
   email: string | null;
   emailVerified: number;
@@ -28,8 +28,8 @@ export interface IAccount {
 }
 
 export interface IAcademicYear {
-  id: number;
-  tenantId: number;
+  id: string;
+  tenantId: string;
   title: string;
   year: string | null;
   startingDate: string | null;
@@ -41,8 +41,8 @@ export interface IAcademicYear {
 }
 
 export interface IEnumerator {
-  id: number;
-  tenantId: number | null;
+  id: string;
+  tenantId: string | null;
   domain: string;
   code: string;
   label: string;
@@ -59,7 +59,7 @@ export interface IEnumerator {
  */
 export interface ICoreRepository {
   // Tenant Operations
-  getTenantById(id: number): Promise<ITenant | null>;
+  getTenantById(id: string): Promise<ITenant | null>;
   getTenantByDomain(domain: string): Promise<ITenant | null>;
   createTenant(data: Partial<ITenant>): Promise<ITenant>;
 
@@ -68,9 +68,9 @@ export interface ICoreRepository {
   getAccountByEmail(email: string): Promise<IAccount | null>;
   
   // Academic Year Operations
-  getAcademicYears(tenantId: number): Promise<IAcademicYear[]>;
-  getCurrentAcademicYear(tenantId: number): Promise<IAcademicYear | null>;
+  getAcademicYears(tenantId: string): Promise<IAcademicYear[]>;
+  getCurrentAcademicYear(tenantId: string): Promise<IAcademicYear | null>;
 
   // Enumeration Operations
-  getEnumsByDomain(tenantId: number | null, domain: string): Promise<IEnumerator[]>;
+  getEnumsByDomain(tenantId: string | null, domain: string): Promise<IEnumerator[]>;
 }

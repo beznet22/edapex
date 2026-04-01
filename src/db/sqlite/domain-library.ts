@@ -14,12 +14,13 @@
 import { unique,  sqliteTable, text, integer, real, index } from "drizzle-orm/sqlite-core";
 
 import { users, tenants, academicYears, accounts } from "./domain-core";
+import { generateId } from "../utils/id";
 
 // Rewritten Library Domain - drops edx_ prefix and adds improvements
 
 export const bookCategories = sqliteTable("domain_library_book_categories", {
-  id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
-  tenantId: integer("tenant_id").notNull().references(() => tenants.id),
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id),
   name: text("name", { length: 200 }).notNull(),
   description: text("description", { length: 500 }),
   createdAt: integer("created_at", { mode: "timestamp" }).defaultNow(),
@@ -35,13 +36,13 @@ export type BookMetadata = {
 };
 
 export const books = sqliteTable("domain_library_books", {
-  id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
-  tenantId: integer("tenant_id").notNull().references(() => tenants.id),
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id),
   title: text("title", { length: 255 }).notNull(),
   isbn: text("isbn", { length: 50 }),
   author: text("author", { length: 255 }),
   publisher: text("publisher", { length: 255 }),
-  categoryId: integer("category_id").references(() => bookCategories.id),
+  categoryId: text("category_id").references(() => bookCategories.id),
   quantity: integer("quantity").notNull().default(0),
   price: real("price"),
   rackNo: text("rack_no", { length: 100 }),
@@ -54,17 +55,17 @@ export const books = sqliteTable("domain_library_books", {
 }));
 
 export const bookIssues = sqliteTable("domain_library_book_issues", {
-  id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
-  tenantId: integer("tenant_id").notNull().references(() => tenants.id),
-  bookId: integer("book_id").notNull().references(() => books.id),
-  userId: integer("user_id").notNull().references(() => users.id), // Borrower persona
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id),
+  bookId: text("book_id").notNull().references(() => books.id),
+  userId: text("user_id").notNull().references(() => users.id), // Borrower persona
   issueDate: integer("issue_date", { mode: "timestamp" }).defaultNow().notNull(),
   dueDate: integer("due_date", { mode: "timestamp" }).notNull(),
   returnDate: integer("return_date", { mode: "timestamp" }),
   status: text("status", { enum: ["issued", "returned", "lost", "damaged"] }).notNull().default("issued"),
   fineAmount: real("fine_amount").default(0.00),
   isFinePaid: integer("is_fine_paid").default(0),
-  academicId: integer("academic_id").references(() => academicYears.id),
+  academicId: text("academic_id").references(() => academicYears.id),
   createdAt: integer("created_at", { mode: "timestamp" }).defaultNow(),
   updatedAt: integer("updated_at", { mode: "timestamp" }).defaultNow(),
 }, (table) => ({
@@ -80,9 +81,9 @@ export type LibraryProfileMetadata = {
 };
 
 export const libraryProfiles = sqliteTable("domain_library_library_profiles", {
-  id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
-  tenantId: integer("tenant_id").notNull().references(() => tenants.id),
-  userId: integer("user_id").notNull().references(() => users.id),
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id),
+  userId: text("user_id").notNull().references(() => users.id),
   maxBooksAllowed: integer("max_books_allowed").notNull().default(3),
   currentBorrowed: integer("current_borrowed").notNull().default(0),
   totalFinesAccrued: real("total_fines_accrued").default(0.00),

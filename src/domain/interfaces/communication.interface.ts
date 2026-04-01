@@ -1,22 +1,22 @@
 export interface ICommunicationRepository {
   // --- Events ---
-  getCommunicationEvents(tenantId: number, filter?: { channel?: string; targetType?: string }): Promise<ICommunicationEvent[]>;
+  getCommunicationEvents(tenantId: string, filter?: { channel?: string; targetType?: string }): Promise<ICommunicationEvent[]>;
   createCommunicationEvent(data: Partial<ICommunicationEvent>): Promise<ICommunicationEvent>;
   
   // --- Recipients ---
-  getEventRecipients(eventId: number): Promise<ICommunicationRecipient[]>;
-  addRecipients(eventId: number, userIds: number[]): Promise<void>;
-  updateDeliveryStatus(recipientId: number, status: string, failureReason?: string): Promise<void>;
-  markAsRead(recipientId: number): Promise<void>;
+  getEventRecipients(tenantId: string, eventId: string): Promise<ICommunicationRecipient[]>;
+  addRecipients(tenantId: string, eventId: string, userIds: string[]): Promise<void>;
+  updateDeliveryStatus(tenantId: string, recipientId: string, status: string, failureReason?: string): Promise<void>;
+  markAsRead(tenantId: string, recipientId: string): Promise<void>;
 }
 
 export interface ICommunicationEvent {
-  id: number;
-  tenantId: number;
+  id: string;
+  tenantId: string;
   channel: "notification" | "notice" | "message" | "email" | "sms" | "chat";
-  senderId?: number | null;
+  senderId?: string | null;
   targetType: "person" | "role" | "class" | "section" | "broadcast";
-  targetRefId?: number | null;
+  targetRefId?: string | null;
   subject?: string | null;
   body?: string | null;
   priority: "low" | "normal" | "high" | "urgent";
@@ -26,9 +26,10 @@ export interface ICommunicationEvent {
 }
 
 export interface ICommunicationRecipient {
-  id: number;
-  eventId: number;
-  userId: number;
+  id: string;
+  tenantId: string;
+  eventId: string;
+  userId: string;
   deliveryStatus: "pending" | "sent" | "delivered" | "failed" | "bounced";
   readAt?: Date | null;
   deliveredAt?: Date | null;

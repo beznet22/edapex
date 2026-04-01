@@ -71,7 +71,7 @@ export class MySqlAcademicRepository implements IAcademicRepository {
   }
 
   // --- Classes & Sections ---
-  async getClasses(tenantId: number, academicId: number): Promise<IClass[]> {
+  async getClasses(tenantId: string, academicId: string): Promise<IClass[]> {
     const results = await db
       .select()
       .from(classes)
@@ -82,7 +82,7 @@ export class MySqlAcademicRepository implements IAcademicRepository {
     return results.map((row: any) => this.mapClass(row));
   }
 
-  async getSectionsByClass(classId: number): Promise<ISection[]> {
+  async getSectionsByClass(classId: string): Promise<ISection[]> {
     const results = await db
       .select({
         id: sections.id,
@@ -99,7 +99,7 @@ export class MySqlAcademicRepository implements IAcademicRepository {
   }
 
   // --- Enrollments ---
-  async getEnrollmentByStudent(userId: number, academicId: number): Promise<IEnrollment | null> {
+  async getEnrollmentByStudent(userId: string, academicId: string): Promise<IEnrollment | null> {
     const [result] = await db
       .select()
       .from(enrollments)
@@ -112,13 +112,13 @@ export class MySqlAcademicRepository implements IAcademicRepository {
 
   async createEnrollment(data: Partial<IEnrollment>): Promise<IEnrollment> {
     const [result] = await db.insert(enrollments).values(data as any);
-    const [newEnrollment] = await db.select().from(enrollments).where(eq(enrollments.id, result.insertId));
+    const [newEnrollment] = await db.select().from(enrollments).where(eq(enrollments.id, data.id!));
     if (!newEnrollment) throw new Error("Failed to create enrollment");
     return this.mapEnrollment(newEnrollment);
   }
 
   // --- Subjects ---
-  async getSubjectsByClass(classId: number, academicId: number): Promise<ISubject[]> {
+  async getSubjectsByClass(classId: string, academicId: string): Promise<ISubject[]> {
     const results = await db
       .select()
       .from(subjects)
@@ -130,7 +130,7 @@ export class MySqlAcademicRepository implements IAcademicRepository {
   }
 
   // --- Homework ---
-  async getHomeworkByClass(classId: number, sectionId: number, academicId: number): Promise<IHomework[]> {
+  async getHomeworkByClass(classId: string, sectionId: string, academicId: string): Promise<IHomework[]> {
     const results = await db
       .select()
       .from(homeworks)
@@ -144,13 +144,13 @@ export class MySqlAcademicRepository implements IAcademicRepository {
 
   async submitHomework(data: Partial<IHomeworkSubmission>): Promise<IHomeworkSubmission> {
     const [result] = await db.insert(homeworkSubmissions).values(data as any);
-    const [submission] = await db.select().from(homeworkSubmissions).where(eq(homeworkSubmissions.id, result.insertId));
+    const [submission] = await db.select().from(homeworkSubmissions).where(eq(homeworkSubmissions.id, data.id!));
     if (!submission) throw new Error("Failed to submit homework");
     return submission as any;
   }
 
   // --- Lessons ---
-  async getLessonsBySubject(subjectId: number, academicId: number): Promise<ILesson[]> {
+  async getLessonsBySubject(subjectId: string, academicId: string): Promise<ILesson[]> {
     const results = await db
       .select()
       .from(lessons)

@@ -16,7 +16,6 @@
  * - sm_class_routines / sm_class_times
  */
 import {
-
   mysqlTable,
   varchar,
   int,
@@ -29,17 +28,18 @@ import {
   date,
   json,
 } from "drizzle-orm/mysql-core";
+import { generateId } from "../utils/id";
 
 import { users, tenants, academicYears, accounts } from "./domain-core";
 
 // Unified Classes & Sections — replaces sm_classes, sm_sections, sm_class_sections, sm_subjects
 
 export const classes = mysqlTable("classes", {
-  id: int("id").autoincrement().primaryKey(),
-  tenantId: int("tenant_id").notNull().references(() => tenants.id),
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => generateId()),
+  tenantId: varchar("tenant_id", { length: 36 }).notNull().references(() => tenants.id),
   name: varchar("name", { length: 200 }).notNull(),
   passMark: decimal("pass_mark", { precision: 8, scale: 2 }),
-  academicId: int("academic_id").notNull().references(() => academicYears.id),
+  academicId: varchar("academic_id", { length: 36 }).notNull().references(() => academicYears.id),
   activeStatus: tinyint("active_status").notNull().default(1),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow(),
@@ -48,8 +48,8 @@ export const classes = mysqlTable("classes", {
 }));
 
 export const sections = mysqlTable("sections", {
-  id: int("id").autoincrement().primaryKey(),
-  tenantId: int("tenant_id").notNull().references(() => tenants.id),
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => generateId()),
+  tenantId: varchar("tenant_id", { length: 36 }).notNull().references(() => tenants.id),
   name: varchar("name", { length: 200 }).notNull(),
   activeStatus: tinyint("active_status").notNull().default(1),
   createdAt: timestamp("created_at").defaultNow(),
@@ -59,11 +59,11 @@ export const sections = mysqlTable("sections", {
 }));
 
 export const classSections = mysqlTable("class_sections", {
-  id: int("id").autoincrement().primaryKey(),
-  classId: int("class_id").notNull().references(() => classes.id),
-  sectionId: int("section_id").notNull().references(() => sections.id),
-  tenantId: int("tenant_id").notNull().references(() => tenants.id),
-  academicId: int("academic_id").notNull().references(() => academicYears.id),
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => generateId()),
+  classId: varchar("class_id", { length: 36 }).notNull().references(() => classes.id),
+  sectionId: varchar("section_id", { length: 36 }).notNull().references(() => sections.id),
+  tenantId: varchar("tenant_id", { length: 36 }).notNull().references(() => tenants.id),
+  academicId: varchar("academic_id", { length: 36 }).notNull().references(() => academicYears.id),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow(),
 }, (table) => ({
@@ -71,13 +71,13 @@ export const classSections = mysqlTable("class_sections", {
 }));
 
 export const subjects = mysqlTable("subjects", {
-  id: int("id").autoincrement().primaryKey(),
-  tenantId: int("tenant_id").notNull().references(() => tenants.id),
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => generateId()),
+  tenantId: varchar("tenant_id", { length: 36 }).notNull().references(() => tenants.id),
   name: varchar("name", { length: 255 }).notNull(),
   code: varchar("code", { length: 100 }),
   type: mysqlEnum("type", ["theory", "practical"]).notNull(),
   passMark: decimal("pass_mark", { precision: 8, scale: 2 }),
-  academicId: int("academic_id").notNull().references(() => academicYears.id),
+  academicId: varchar("academic_id", { length: 36 }).notNull().references(() => academicYears.id),
   activeStatus: tinyint("active_status").notNull().default(1),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow(),
@@ -86,12 +86,12 @@ export const subjects = mysqlTable("subjects", {
 }));
 
 export const enrollments = mysqlTable("enrollments", {
-  id: int("id").autoincrement().primaryKey(),
-  tenantId: int("tenant_id").notNull().references(() => tenants.id),
-  userId: int("user_id").notNull().references(() => users.id), // Student persona
-  classId: int("class_id").references(() => classes.id),
-  sectionId: int("section_id").references(() => sections.id),
-  academicId: int("academic_id").notNull().references(() => academicYears.id),
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => generateId()),
+  tenantId: varchar("tenant_id", { length: 36 }).notNull().references(() => tenants.id),
+  userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id), // Student persona
+  classId: varchar("class_id", { length: 36 }).references(() => classes.id),
+  sectionId: varchar("section_id", { length: 36 }).references(() => sections.id),
+  academicId: varchar("academic_id", { length: 36 }).notNull().references(() => academicYears.id),
   rollNo: varchar("roll_no", { length: 100 }),
   isDefault: tinyint("is_default").default(1),
   status: mysqlEnum("status", ["active", "promoted", "graduated", "withdrawn", "retained"]).notNull().default("active"),
@@ -103,17 +103,17 @@ export const enrollments = mysqlTable("enrollments", {
 }));
 
 export const classRoutines = mysqlTable("class_routines", {
-  id: int("id").autoincrement().primaryKey(),
-  tenantId: int("tenant_id").notNull().references(() => tenants.id),
-  classId: int("class_id").notNull().references(() => classes.id),
-  sectionId: int("section_id").notNull().references(() => sections.id),
-  subjectId: int("subject_id").notNull().references(() => subjects.id),
-  teacherId: int("teacher_id").references(() => users.id), // Staff persona
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => generateId()),
+  tenantId: varchar("tenant_id", { length: 36 }).notNull().references(() => tenants.id),
+  classId: varchar("class_id", { length: 36 }).notNull().references(() => classes.id),
+  sectionId: varchar("section_id", { length: 36 }).notNull().references(() => sections.id),
+  subjectId: varchar("subject_id", { length: 36 }).notNull().references(() => subjects.id),
+  teacherId: varchar("teacher_id", { length: 36 }).references(() => users.id), // Staff persona
   dayOfWeek: mysqlEnum("day_of_week", ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]).notNull(),
   startTime: varchar("start_time", { length: 20 }),
   endTime: varchar("end_time", { length: 20 }),
   roomNo: varchar("room_no", { length: 100 }),
-  academicId: int("academic_id").notNull().references(() => academicYears.id),
+  academicId: varchar("academic_id", { length: 36 }).notNull().references(() => academicYears.id),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow(),
 }, (table) => ({
@@ -122,17 +122,17 @@ export const classRoutines = mysqlTable("class_routines", {
 }));
 
 export const homeworks = mysqlTable("homeworks", {
-  id: int("id").autoincrement().primaryKey(),
-  tenantId: int("tenant_id").notNull().references(() => tenants.id),
-  classId: int("class_id").notNull().references(() => classes.id),
-  sectionId: int("section_id").notNull().references(() => sections.id),
-  subjectId: int("subject_id").notNull().references(() => subjects.id),
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => generateId()),
+  tenantId: varchar("tenant_id", { length: 36 }).notNull().references(() => tenants.id),
+  classId: varchar("class_id", { length: 36 }).notNull().references(() => classes.id),
+  sectionId: varchar("section_id", { length: 36 }).notNull().references(() => sections.id),
+  subjectId: varchar("subject_id", { length: 36 }).notNull().references(() => subjects.id),
   homeworkDate: date("homework_date", { mode: "string" }).notNull(),
   submissionDate: date("submission_date", { mode: "string" }).notNull(),
   description: text("description"),
   attachment: varchar("attachment", { length: 500 }),
   marks: decimal("marks", { precision: 8, scale: 2 }),
-  academicId: int("academic_id").notNull().references(() => academicYears.id),
+  academicId: varchar("academic_id", { length: 36 }).notNull().references(() => academicYears.id),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow(),
 }, (table) => ({
@@ -141,26 +141,26 @@ export const homeworks = mysqlTable("homeworks", {
 }));
 
 export const lessons = mysqlTable("lessons", {
-  id: int("id").autoincrement().primaryKey(),
-  tenantId: int("tenant_id").notNull().references(() => tenants.id),
-  classId: int("class_id").notNull().references(() => classes.id),
-  sectionId: int("section_id").notNull().references(() => sections.id),
-  subjectId: int("subject_id").notNull().references(() => subjects.id),
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => generateId()),
+  tenantId: varchar("tenant_id", { length: 36 }).notNull().references(() => tenants.id),
+  classId: varchar("class_id", { length: 36 }).notNull().references(() => classes.id),
+  sectionId: varchar("section_id", { length: 36 }).notNull().references(() => sections.id),
+  subjectId: varchar("subject_id", { length: 36 }).notNull().references(() => subjects.id),
   title: varchar("title", { length: 255 }).notNull(),
   description: text("description"),
-  academicId: int("academic_id").notNull().references(() => academicYears.id),
+  academicId: varchar("academic_id", { length: 36 }).notNull().references(() => academicYears.id),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow(),
 });
 
 export const subjectAssignments = mysqlTable("subject_assignments", {
-  id: int("id").autoincrement().primaryKey(),
-  tenantId: int("tenant_id").notNull().references(() => tenants.id),
-  staffId: int("staff_id").notNull().references(() => users.id), // Teacher persona
-  classId: int("class_id").notNull().references(() => classes.id),
-  sectionId: int("section_id").notNull().references(() => sections.id),
-  subjectId: int("subject_id").notNull().references(() => subjects.id),
-  academicId: int("academic_id").notNull().references(() => academicYears.id),
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => generateId()),
+  tenantId: varchar("tenant_id", { length: 36 }).notNull().references(() => tenants.id),
+  staffId: varchar("staff_id", { length: 36 }).notNull().references(() => users.id), // Teacher persona
+  classId: varchar("class_id", { length: 36 }).notNull().references(() => classes.id),
+  sectionId: varchar("section_id", { length: 36 }).notNull().references(() => sections.id),
+  subjectId: varchar("subject_id", { length: 36 }).notNull().references(() => subjects.id),
+  academicId: varchar("academic_id", { length: 36 }).notNull().references(() => academicYears.id),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow(),
 }, (table) => ({
@@ -172,12 +172,12 @@ export const subjectAssignments = mysqlTable("subject_assignments", {
 
 // Class Teachers — replaces smAssignClassTeachers
 export const classTeachers = mysqlTable("class_teachers", {
-  id: int("id").autoincrement().primaryKey(),
-  tenantId: int("tenant_id").notNull().references(() => tenants.id),
-  classId: int("class_id").notNull().references(() => classes.id),
-  sectionId: int("section_id").notNull().references(() => sections.id),
-  staffId: int("staff_id").notNull().references(() => users.id), // Teacher persona
-  academicId: int("academic_id").notNull().references(() => academicYears.id),
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => generateId()),
+  tenantId: varchar("tenant_id", { length: 36 }).notNull().references(() => tenants.id),
+  classId: varchar("class_id", { length: 36 }).notNull().references(() => classes.id),
+  sectionId: varchar("section_id", { length: 36 }).notNull().references(() => sections.id),
+  staffId: varchar("staff_id", { length: 36 }).notNull().references(() => users.id), // Teacher persona
+  academicId: varchar("academic_id", { length: 36 }).notNull().references(() => academicYears.id),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow(),
 }, (table) => ({
@@ -193,13 +193,13 @@ export type HomeworkSubmissionMetadata = {
 };
 
 export const homeworkSubmissions = mysqlTable("homework_submissions", {
-  id: int("id").autoincrement().primaryKey(),
-  tenantId: int("tenant_id").notNull().references(() => tenants.id),
-  homeworkId: int("homework_id").notNull().references(() => homeworks.id, { onDelete: "cascade" }),
-  userId: int("user_id").notNull().references(() => users.id), // Student persona
-  enrollmentId: int("enrollment_id").references(() => enrollments.id),
-  classId: int("class_id").references(() => classes.id),
-  sectionId: int("section_id").references(() => sections.id),
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => generateId()),
+  tenantId: varchar("tenant_id", { length: 36 }).notNull().references(() => tenants.id),
+  homeworkId: varchar("homework_id", { length: 36 }).notNull().references(() => homeworks.id, { onDelete: "cascade" }),
+  userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id), // Student persona
+  enrollmentId: varchar("enrollment_id", { length: 36 }).references(() => enrollments.id),
+  classId: varchar("class_id", { length: 36 }).references(() => classes.id),
+  sectionId: varchar("section_id", { length: 36 }).references(() => sections.id),
   marks: decimal("marks", { precision: 8, scale: 2 }),
   status: mysqlEnum("status", ["pending", "submitted", "evaluated", "returned"]).notNull().default("pending"),
   metadata: json("metadata").$type<HomeworkSubmissionMetadata>(),
@@ -211,17 +211,17 @@ export const homeworkSubmissions = mysqlTable("homework_submissions", {
 
 // Promotions — replaces smStudentPromotions
 export const promotions = mysqlTable("promotions", {
-  id: int("id").autoincrement().primaryKey(),
-  tenantId: int("tenant_id").notNull().references(() => tenants.id),
-  userId: int("user_id").notNull().references(() => users.id), // Student persona
-  fromClassId: int("from_class_id").notNull().references(() => classes.id),
-  fromSectionId: int("from_section_id").notNull().references(() => sections.id),
-  toClassId: int("to_class_id").notNull().references(() => classes.id),
-  toSectionId: int("to_section_id").notNull().references(() => sections.id),
-  fromAcademicId: int("from_academic_id").notNull().references(() => academicYears.id),
-  toAcademicId: int("to_academic_id").notNull().references(() => academicYears.id),
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => generateId()),
+  tenantId: varchar("tenant_id", { length: 36 }).notNull().references(() => tenants.id),
+  userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id), // Student persona
+  fromClassId: varchar("from_class_id", { length: 36 }).notNull().references(() => classes.id),
+  fromSectionId: varchar("from_section_id", { length: 36 }).notNull().references(() => sections.id),
+  toClassId: varchar("to_class_id", { length: 36 }).notNull().references(() => classes.id),
+  toSectionId: varchar("to_section_id", { length: 36 }).notNull().references(() => sections.id),
+  fromAcademicId: varchar("from_academic_id", { length: 36 }).notNull().references(() => academicYears.id),
+  toAcademicId: varchar("to_academic_id", { length: 36 }).notNull().references(() => academicYears.id),
   result: mysqlEnum("result", ["promoted", "retained", "graduated", "withdrawn"]).notNull(),
-  promotedBy: int("promoted_by").references(() => users.id),
+  promotedBy: varchar("promoted_by", { length: 36 }).references(() => users.id),
   notes: text("notes"),
   promotedAt: timestamp("promoted_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow(),
@@ -232,13 +232,13 @@ export const promotions = mysqlTable("promotions", {
 
 // Timelines — replaces smStudentTimelines
 export const timelines = mysqlTable("timelines", {
-  id: int("id").autoincrement().primaryKey(),
-  tenantId: int("tenant_id").notNull().references(() => tenants.id),
-  userId: int("user_id").notNull().references(() => users.id),
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => generateId()),
+  tenantId: varchar("tenant_id", { length: 36 }).notNull().references(() => tenants.id),
+  userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id),
   type: varchar("type", { length: 100 }).notNull(), // e.g., 'admission', 'promotion', 'exam-1'
   title: varchar("title", { length: 255 }).notNull(),
   description: text("description"),
-  academicId: int("academic_id").notNull().references(() => academicYears.id),
+  academicId: varchar("academic_id", { length: 36 }).notNull().references(() => academicYears.id),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow(),
 }, (table) => ({

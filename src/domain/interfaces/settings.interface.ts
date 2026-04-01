@@ -25,8 +25,8 @@ export interface FinanceConfig {
 export type SettingConfig = GeneralConfig | FinanceConfig | Record<string, any>;
 
 export interface ISetting {
-  id: number;
-  tenantId: number;
+  id: string;
+  tenantId: string;
   domain: string;
   config: SettingConfig;
   createdAt: Date | null;
@@ -40,8 +40,8 @@ export interface IFeatureFlagMetadata {
 }
 
 export interface IFeatureFlag {
-  id: number;
-  tenantId: number;
+  id: string;
+  tenantId: string;
   featureKey: string;
   isEnabled: number;
   rolloutPercentage: number | null;
@@ -52,11 +52,11 @@ export interface IFeatureFlag {
 
 export interface ISettingsRepository {
   // Settings
-  getSettingsByDomain(tenantId: number, domain: string): Promise<ISetting | null>;
-  updateSettings(tenantId: number, domain: string, config: SettingConfig): Promise<ISetting>;
+  getSettingsByDomain(tenantId: string, domain: string): Promise<ISetting | null>;
+  updateSettings(tenantId: string, domain: string, config: SettingConfig): Promise<ISetting>;
   
   // Feature Flags
-  getFeatureFlag(tenantId: number, featureKey: string): Promise<IFeatureFlag | null>;
-  getAllFeatureFlags(tenantId: number): Promise<IFeatureFlag[]>;
-  updateFeatureFlag(tenantId: number, featureKey: string, data: Partial<Omit<IFeatureFlag, "id" | "tenantId" | "featureKey" | "createdAt" | "updatedAt">>): Promise<IFeatureFlag>;
+  getFeatureFlag(tenantId: string, featureKey: string): Promise<IFeatureFlag | null>;
+  getAllFeatureFlags(tenantId: string): Promise<IFeatureFlag[]>;
+  updateFeatureFlag(tenantId: string, featureKey: string, data: Partial<Omit<IFeatureFlag, "id" | "tenantId" | "featureKey" | "createdAt" | "updatedAt">>): Promise<IFeatureFlag>;
 }

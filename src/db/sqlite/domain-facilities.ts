@@ -15,6 +15,7 @@
 import { unique,  sqliteTable, text, integer, real, index } from "drizzle-orm/sqlite-core";
 
 import { users, tenants, academicYears, accounts } from "./domain-core";
+import { generateId } from "../utils/id";
 
 // Consolidates transport and dormitory into a unified facilities schema using accounts FKs.
 
@@ -33,8 +34,8 @@ export type VehicleMetadata = {
 };
 
 export const dormitories = sqliteTable("domain_facilities_dormitories", {
-  id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
-  tenantId: integer("tenant_id").notNull().references(() => tenants.id),
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id),
   name: text("name", { length: 255 }).notNull(),
   type: text("type", { enum: ["boys", "girls", "mixed"] }).notNull(),
   address: text("address", { length: 500 }),
@@ -45,9 +46,9 @@ export const dormitories = sqliteTable("domain_facilities_dormitories", {
 });
 
 export const rooms = sqliteTable("domain_facilities_rooms", {
-  id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
-  tenantId: integer("tenant_id").notNull().references(() => tenants.id),
-  dormitoryId: integer("dormitory_id").notNull().references(() => dormitories.id),
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id),
+  dormitoryId: text("dormitory_id").notNull().references(() => dormitories.id),
   roomNumber: text("room_number", { length: 50 }).notNull(),
   roomType: text("room_type", { enum: ["standard", "deluxe", "suite"] }).notNull(),
   capacity: integer("capacity").notNull(),
@@ -58,8 +59,8 @@ export const rooms = sqliteTable("domain_facilities_rooms", {
 });
 
 export const routes = sqliteTable("domain_facilities_routes", {
-  id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
-  tenantId: integer("tenant_id").notNull().references(() => tenants.id),
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id),
   name: text("name", { length: 255 }).notNull(),
   cost: real("cost"),
   metadata: text("metadata", { mode: "json" }).$type<FacilityMetadata>(),
@@ -68,11 +69,11 @@ export const routes = sqliteTable("domain_facilities_routes", {
 });
 
 export const vehicles = sqliteTable("domain_facilities_vehicles", {
-  id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
-  tenantId: integer("tenant_id").notNull().references(() => tenants.id),
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id),
   vehicleNo: text("vehicle_no", { length: 100 }).notNull(),
   vehicleModel: text("vehicle_model", { length: 100 }),
-  driverId: integer("driver_id").references(() => users.id), // Staff persona
+  driverId: text("driver_id").references(() => users.id), // Staff persona
   capacity: integer("capacity").notNull(),
   metadata: text("metadata", { mode: "json" }).$type<VehicleMetadata>(),
   createdAt: integer("created_at", { mode: "timestamp" }).defaultNow(),
@@ -80,22 +81,22 @@ export const vehicles = sqliteTable("domain_facilities_vehicles", {
 });
 
 export const routeAssignments = sqliteTable("domain_facilities_route_assignments", {
-  id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
-  tenantId: integer("tenant_id").notNull().references(() => tenants.id),
-  routeId: integer("route_id").notNull().references(() => routes.id),
-  vehicleId: integer("vehicle_id").notNull().references(() => vehicles.id),
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id),
+  routeId: text("route_id").notNull().references(() => routes.id),
+  vehicleId: text("vehicle_id").notNull().references(() => vehicles.id),
   createdAt: integer("created_at", { mode: "timestamp" }).defaultNow(),
   updatedAt: integer("updated_at", { mode: "timestamp" }).defaultNow(),
 });
 
 export const facilityAllocations = sqliteTable("domain_facilities_facility_allocations", {
-  id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
-  tenantId: integer("tenant_id").notNull().references(() => tenants.id),
-  userId: integer("user_id").notNull().references(() => users.id), // Participant persona
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id),
+  userId: text("user_id").notNull().references(() => users.id), // Participant persona
   facilityType: text("facility_type", { enum: ["transport", "dormitory"] }).notNull(),
-  facilityRefId: integer("facility_ref_id").notNull(), // vehicle.id or room.id
+  facilityRefId: text("facility_ref_id").notNull(), // vehicle.id or room.id
   status: text("status", { enum: ["active", "released", "transferred"] }).notNull().default("active"),
-  academicId: integer("academic_id").notNull().references(() => academicYears.id),
+  academicId: text("academic_id").notNull().references(() => academicYears.id),
   createdAt: integer("created_at", { mode: "timestamp" }).defaultNow(),
   updatedAt: integer("updated_at", { mode: "timestamp" }).defaultNow(),
 }, (table) => ({
@@ -108,15 +109,15 @@ export const facilityAllocations = sqliteTable("domain_facilities_facility_alloc
 
 // Complaints — replaces smComplaints
 export const complaints = sqliteTable("domain_facilities_complaints", {
-  id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
-  tenantId: integer("tenant_id").notNull().references(() => tenants.id),
-  complaintBy: integer("complaint_by").notNull().references(() => users.id), // Reporter persona
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id),
+  complaintBy: text("complaint_by").notNull().references(() => users.id), // Reporter persona
   complaintType: text("complaint_type", { length: 100 }).notNull(),
   complaintSource: text("complaint_source", { enum: ["parent", "student", "staff", "external"] }).notNull(),
   description: text("description").notNull(),
   actionTaken: text("action_taken"),
   status: text("status", { enum: ["open", "in_progress", "resolved", "closed"] }).notNull().default("open"),
-  assignedTo: integer("assigned_to").references(() => users.id), // Staff persona
+  assignedTo: text("assigned_to").references(() => users.id), // Staff persona
   complaintDate: text("complaint_date").notNull(),
   resolvedAt: integer("resolved_at", { mode: "timestamp" }),
   createdAt: integer("created_at", { mode: "timestamp" }).defaultNow(),
@@ -127,13 +128,13 @@ export const complaints = sqliteTable("domain_facilities_complaints", {
 
 // Visitors — replaces smVisitors
 export const visitors = sqliteTable("domain_facilities_visitors", {
-  id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
-  tenantId: integer("tenant_id").notNull().references(() => tenants.id),
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id),
   name: text("name", { length: 200 }).notNull(),
   phone: text("phone", { length: 100 }),
   idNumber: text("id_number", { length: 100 }),
   purpose: text("purpose", { length: 500 }).notNull(),
-  personToMeet: integer("person_to_meet").references(() => users.id), // Staff persona
+  personToMeet: text("person_to_meet").references(() => users.id), // Staff persona
   checkInAt: integer("check_in_at", { mode: "timestamp" }).defaultNow(),
   checkOutAt: integer("check_out_at", { mode: "timestamp" }),
   noOfPersons: integer("no_of_persons").default(1),
@@ -151,8 +152,8 @@ export type InventoryMetadata = {
 };
 
 export const inventoryItems = sqliteTable("domain_facilities_inventory_items", {
-  id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
-  tenantId: integer("tenant_id").notNull().references(() => tenants.id),
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id),
   name: text("name", { length: 255 }).notNull(),
   category: text("category", { length: 100 }),
   quantity: integer("quantity").notNull().default(0),

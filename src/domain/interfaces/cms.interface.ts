@@ -1,15 +1,15 @@
 export interface ICmsRepository {
   // --- Content Nodes ---
-  getContentNodes(tenantId: number, filter?: { type?: string; publishedOnly?: boolean }): Promise<IContentNode[]>;
-  getNodeBySlug(tenantId: number, slug: string): Promise<IContentNode | null>;
+  getContentNodes(tenantId: string, filter?: { type?: string; publishedOnly?: boolean }): Promise<IContentNode[]>;
+  getNodeBySlug(tenantId: string, slug: string): Promise<IContentNode | null>;
   createContentNode(data: Partial<IContentNode>): Promise<IContentNode>;
-  updateContentNode(tenantId: number, id: number, data: Partial<IContentNode>): Promise<void>;
-  deleteContentNode(tenantId: number, id: number): Promise<void>;
+  updateContentNode(tenantId: string, id: string, data: Partial<IContentNode>): Promise<void>;
+  deleteContentNode(tenantId: string, id: string): Promise<void>;
 }
 
 export interface IContentNode {
-  id: number;
-  tenantId: number;
+  id: string;
+  tenantId: string;
   contentType: "page" | "news" | "event" | "testimonial" | "gallery" | "slider" | "menu_item";
   slug?: string | null;
   title: string;
@@ -18,9 +18,9 @@ export interface IContentNode {
   publishedStatus: number;
   publishedAt?: Date | null;
   expiresAt?: Date | null;
-  authorId?: number | null;
-  categoryId?: number | null;
-  parentId?: number | null;
+  authorId?: string | null;
+  categoryId?: string | null;
+  parentId?: string | null;
   sortOrder?: number | null;
   metadata?: any;
 }

@@ -45,12 +45,12 @@ export class PostgresAiRepository implements IAiRepository {
   }
 
   // --- Chat ---
-  async getChatById(chatId: string): Promise<IAiChat | null> {
-    const [result] = await db.select().from(aiChats).where(eq(aiChats.id, chatId));
+  async getChatById(tenantId: string, chatId: string): Promise<IAiChat | null> {
+    const [result] = await db.select().from(aiChats).where(and(eq(aiChats.id, chatId), eq(aiChats.tenantId, tenantId)));
     return result ? this.mapChat(result) : null;
   }
 
-  async getChatsByUser(tenantId: number, userId: number): Promise<IAiChat[]> {
+  async getChatsByUser(tenantId: string, userId: string): Promise<IAiChat[]> {
     const results = await db
       .select()
       .from(aiChats)
@@ -67,18 +67,18 @@ export class PostgresAiRepository implements IAiRepository {
     return this.mapChat(result);
   }
 
-  async updateChat(chatId: string, data: Partial<IAiChat>): Promise<IAiChat> {
-    const [result] = await db.update(aiChats).set(data as any).where(eq(aiChats.id, chatId)).returning();
+  async updateChat(tenantId: string, chatId: string, data: Partial<IAiChat>): Promise<IAiChat> {
+    const [result] = await db.update(aiChats).set(data as any).where(and(eq(aiChats.id, chatId), eq(aiChats.tenantId, tenantId))).returning();
     if (!result) throw new Error("Failed to update chat");
     return this.mapChat(result);
   }
 
   // --- Messages ---
-  async getMessagesByChat(chatId: string): Promise<IAiMessage[]> {
+  async getMessagesByChat(tenantId: string, chatId: string): Promise<IAiMessage[]> {
     const results = await db
       .select()
       .from(aiMessages)
-      .where(eq(aiMessages.chatId, chatId));
+      .where(and(eq(aiMessages.chatId, chatId), eq(aiMessages.tenantId, tenantId)));
     return results.map((row: any) => this.mapMessage(row));
   }
 
@@ -89,12 +89,12 @@ export class PostgresAiRepository implements IAiRepository {
   }
 
   // --- Voting ---
-  async upsertVote(chatId: string, messageId: string, isUpvoted: boolean): Promise<IAiVote> {
+  async upsertVote(tenantId: string, chatId: string, messageId: string, isUpvoted: boolean): Promise<IAiVote> {
     const voteValue = isUpvoted ? 1 : 0;
     const [result] = await db.insert(aiVotes)
-      .values({ chatId, messageId, isUpvoted: voteValue })
+      .values({ tenantId, chatId, messageId, isUpvoted: voteValue })
       .onConflictDoUpdate({ 
-        target: [aiVotes.chatId, aiVotes.messageId], 
+        target: [aiVotes.tenantId, aiVotes.chatId, aiVotes.messageId], 
         set: { isUpvoted: voteValue } 
       })
       .returning();
@@ -107,12 +107,12 @@ export class PostgresAiRepository implements IAiRepository {
   }
 
   // --- Agents ---
-  async getAgentById(id: number): Promise<IAiAgent | null> {
-    const [result] = await db.select().from(aiAgents).where(eq(aiAgents.id, id));
+  async getAgentById(tenantId: string, id: string): Promise<IAiAgent | null> {
+    const [result] = await db.select().from(aiAgents).where(and(eq(aiAgents.id, id), eq(aiAgents.tenantId, tenantId)));
     return result ? (result as any) : null;
   }
 
-  async getAgentsByTenant(tenantId: number): Promise<IAiAgent[]> {
+  async getAgentsByTenant(tenantId: string): Promise<IAiAgent[]> {
     const results = await db.select().from(aiAgents).where(eq(aiAgents.tenantId, tenantId));
     return results as any[];
   }
@@ -124,13 +124,13 @@ export class PostgresAiRepository implements IAiRepository {
     return this.mapAction(result);
   }
 
-  async updateAction(id: number, data: Partial<IAiAgentAction>): Promise<IAiAgentAction> {
-    const [result] = await db.update(aiAgentActions).set(data as any).where(eq(aiAgentActions.id, id)).returning();
+  async updateAction(tenantId: string, id: string, data: Partial<IAiAgentAction>): Promise<IAiAgentAction> {
+    const [result] = await db.update(aiAgentActions).set(data as any).where(and(eq(aiAgentActions.id, id), eq(aiAgentActions.tenantId, tenantId))).returning();
     if (!result) throw new Error("Failed to update agent action");
     return this.mapAction(result);
   }
 
-  async getActionByIdempotencyKey(tenantId: number, key: string): Promise<IAiAgentAction | null> {
+  async getActionByIdempotencyKey(tenantId: string, key: string): Promise<IAiAgentAction | null> {
     const [result] = await db
       .select()
       .from(aiAgentActions)

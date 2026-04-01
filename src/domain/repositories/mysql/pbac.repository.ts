@@ -20,7 +20,7 @@ export class MySqlPbacRepository implements IPbacRepository {
     };
   }
 
-  async getPolicies(tenantId: number | null): Promise<IPolicyDefinition[]> {
+  async getPolicies(tenantId: string | null): Promise<IPolicyDefinition[]> {
     const results = await db
       .select()
       .from(policyDefinitions)
@@ -29,31 +29,34 @@ export class MySqlPbacRepository implements IPbacRepository {
     return results.map(this.mapToDomain);
   }
 
-  async getPolicyById(id: number): Promise<IPolicyDefinition | null> {
+  async getPolicyById(tenantId: string | null, id: string): Promise<IPolicyDefinition | null> {
     const [result] = await db
       .select()
       .from(policyDefinitions)
-      .where(eq(policyDefinitions.id, id));
+      .where(and(
+        eq(policyDefinitions.id, id),
+        tenantId ? eq(policyDefinitions.tenantId, tenantId) : sql`${policyDefinitions.tenantId} IS NULL`
+      ));
     
     return result ? this.mapToDomain(result) : null;
   }
 
   async createPolicy(data: Omit<IPolicyDefinition, "id" | "createdAt" | "updatedAt">): Promise<IPolicyDefinition> {
-    const [result] = await db.insert(policyDefinitions).values(data as any);
-    const newPolicy = await this.getPolicyById(result.insertId);
+    await db.insert(policyDefinitions).values(data as any);
+    const newPolicy = await this.getPolicyById((data as any).tenantId || null, (data as any).id);
     if (!newPolicy) throw new Error("Failed to create policy");
     return newPolicy;
   }
 
-  async updatePolicy(id: number, data: Partial<PolicyDefinitionModel>): Promise<IPolicyDefinition | null> {
+  async updatePolicy(tenantId: string, id: string, data: Partial<PolicyDefinitionModel>): Promise<IPolicyDefinition | null> {
     await db.update(policyDefinitions)
       .set({ definition: data as any })
-      .where(eq(policyDefinitions.id, id));
+      .where(and(eq(policyDefinitions.id, id), eq(policyDefinitions.tenantId, tenantId)));
     
-    return this.getPolicyById(id);
+    return this.getPolicyById(tenantId, id);
   }
 
-  async getRoleAssignments(tenantId: number, userId: number): Promise<IRoleAssignment[]> {
+  async getRoleAssignments(tenantId: string, userId: string): Promise<IRoleAssignment[]> {
     const results = await db
       .select()
       .from(roleAssignments)
@@ -66,23 +69,26 @@ export class MySqlPbacRepository implements IPbacRepository {
   }
 
   async assignRole(data: Omit<IRoleAssignment, "id" | "createdAt" | "updatedAt">): Promise<IRoleAssignment> {
-    const [result] = await db.insert(roleAssignments).values(data as any);
+    await db.insert(roleAssignments).values(data as any);
     const [newRole] = await db
       .select()
       .from(roleAssignments)
-      .where(eq(roleAssignments.id, result.insertId));
+      .where(and(
+        eq(roleAssignments.id, (data as any).id),
+        eq(roleAssignments.tenantId, (data as any).tenantId)
+      ));
     
     if (!newRole) throw new Error("Failed to assign role");
     return this.mapRoleToDomain(newRole);
   }
 
-  async removeRole(id: number): Promise<boolean> {
-    const result = await db.delete(roleAssignments).where(eq(roleAssignments.id, id));
-    return result.rowsAffected > 0;
+  async removeRole(tenantId: string, id: string): Promise<boolean> {
+    const result = await db.delete(roleAssignments).where(and(eq(roleAssignments.id, id), eq(roleAssignments.tenantId, tenantId)));
+    return (result as any).rowsAffected > 0;
   }
 
-  async bindPolicyToRole(tenantId: number, policyId: number, roleAssignmentId: number): Promise<IPolicyBinding> {
-    const [result] = await db.insert(policyBindings).values({
+  async bindPolicyToRole(tenantId: string, policyId: string, roleAssignmentId: string): Promise<IPolicyBinding> {
+    await db.insert(policyBindings).values({
       tenantId,
       policyId,
       roleAssignmentId
@@ -91,7 +97,11 @@ export class MySqlPbacRepository implements IPbacRepository {
     const [newBinding] = await db
       .select()
       .from(policyBindings)
-      .where(eq(policyBindings.id, result.insertId));
+      .where(and(
+        eq(policyBindings.policyId, policyId),
+        eq(policyBindings.roleAssignmentId, roleAssignmentId),
+        eq(policyBindings.tenantId, tenantId)
+      ));
     
     if (!newBinding) throw new Error("Failed to bind policy");
     return {
@@ -101,11 +111,14 @@ export class MySqlPbacRepository implements IPbacRepository {
     };
   }
 
-  async getBindingsByRoleAssignment(roleAssignmentId: number): Promise<IPolicyBinding[]> {
+  async getBindingsByRoleAssignment(tenantId: string, roleAssignmentId: string): Promise<IPolicyBinding[]> {
     const results = await db
       .select()
       .from(policyBindings)
-      .where(eq(policyBindings.roleAssignmentId, roleAssignmentId));
+      .where(and(
+        eq(policyBindings.roleAssignmentId, roleAssignmentId),
+        eq(policyBindings.tenantId, tenantId)
+      ));
     
     return results.map((row: any) => ({
       ...row,

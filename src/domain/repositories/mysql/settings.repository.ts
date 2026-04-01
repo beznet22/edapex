@@ -20,7 +20,7 @@ export class MySqlSettingsRepository implements ISettingsRepository {
     };
   }
 
-  async getSettingsByDomain(tenantId: number, domain: string): Promise<ISetting | null> {
+  async getSettingsByDomain(tenantId: string, domain: string): Promise<ISetting | null> {
     const [result] = await db
       .select()
       .from(settings)
@@ -32,7 +32,7 @@ export class MySqlSettingsRepository implements ISettingsRepository {
     return result ? this.mapSettingToDomain(result) : null;
   }
 
-  async updateSettings(tenantId: number, domain: string, config: SettingConfig): Promise<ISetting> {
+  async updateSettings(tenantId: string, domain: string, config: SettingConfig): Promise<ISetting> {
     const existing = await this.getSettingsByDomain(tenantId, domain);
     
     if (existing) {
@@ -44,19 +44,21 @@ export class MySqlSettingsRepository implements ISettingsRepository {
       if (!updated) throw new Error("Failed to retrieve updated settings");
       return updated;
     } else {
-      const [result] = await db.insert(settings).values({
+      const id = crypto.randomUUID(); // Fallback if not provided, though typically caller provides it for UUID v7
+      await db.insert(settings).values({
+        id,
         tenantId,
         domain,
         config: config as any
       });
       
-      const [newSetting] = await db.select().from(settings).where(eq(settings.id, result.insertId));
+      const [newSetting] = await db.select().from(settings).where(eq(settings.id, id));
       if (!newSetting) throw new Error("Failed to create settings");
       return this.mapSettingToDomain(newSetting);
     }
   }
 
-  async getFeatureFlag(tenantId: number, featureKey: string): Promise<IFeatureFlag | null> {
+  async getFeatureFlag(tenantId: string, featureKey: string): Promise<IFeatureFlag | null> {
     const [result] = await db
       .select()
       .from(featureFlags)
@@ -68,7 +70,7 @@ export class MySqlSettingsRepository implements ISettingsRepository {
     return result ? this.mapFeatureToDomain(result) : null;
   }
 
-  async getAllFeatureFlags(tenantId: number): Promise<IFeatureFlag[]> {
+  async getAllFeatureFlags(tenantId: string): Promise<IFeatureFlag[]> {
     const results = await db
       .select()
       .from(featureFlags)
@@ -77,11 +79,11 @@ export class MySqlSettingsRepository implements ISettingsRepository {
     return results.map(this.mapFeatureToDomain);
   }
 
-  async updateFeatureFlag(tenantId: number, featureKey: string, data: Partial<Omit<IFeatureFlag, "id" | "tenantId" | "featureKey" | "createdAt" | "updatedAt">>): Promise<IFeatureFlag> {
+  async updateFeatureFlag(tenantId: string, featureKey: string, data: Partial<Omit<IFeatureFlag, "id" | "tenantId" | "featureKey" | "createdAt" | "updatedAt">>): Promise<IFeatureFlag> {
     const existing = await this.getFeatureFlag(tenantId, featureKey);
     
     const updatePayload: any = {};
-    if (data.isEnabled !== undefined) updatePayload.isEnabled = data.isEnabled;
+    if (data.isEnabled !== undefined) updatePayload.isEnabled = data.isEnabled ? 1 : 0;
     if (data.rolloutPercentage !== undefined) updatePayload.rolloutPercentage = data.rolloutPercentage;
     if (data.metadata !== undefined) updatePayload.metadata = data.metadata;
 
@@ -91,6 +93,7 @@ export class MySqlSettingsRepository implements ISettingsRepository {
         .where(eq(featureFlags.id, existing.id));
     } else {
       await db.insert(featureFlags).values({
+        id: crypto.randomUUID(),
         tenantId,
         featureKey,
         ...updatePayload

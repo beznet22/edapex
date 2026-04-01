@@ -15,16 +15,17 @@
  * - sm_exam_schedules / sm_exam_attendances
  */
 import { unique,  sqliteTable, text, integer, real, index } from "drizzle-orm/sqlite-core";
+import { generateId } from "../utils/id";
 
 import { users, tenants, academicYears, accounts } from "./domain-core";
 import { classes, enrollments, sections, subjects } from "./domain-academic";
 
 export const exams = sqliteTable("domain_assessment_exams", {
-  id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
-  tenantId: integer("tenant_id").notNull().references(() => tenants.id),
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id),
   examType: text("exam_type", { enum: ["term", "continuous", "mock", "final"] }).notNull(),
   title: text("title", { length: 255 }).notNull(),
-  academicId: integer("academic_id").notNull().references(() => academicYears.id),
+  academicId: text("academic_id").notNull().references(() => academicYears.id),
   percentage: real("percentage"),
   activeStatus: integer("active_status").notNull().default(1),
   createdAt: integer("created_at", { mode: "timestamp" }).defaultNow(),
@@ -34,12 +35,12 @@ export const exams = sqliteTable("domain_assessment_exams", {
 }));
 
 export const examSetups = sqliteTable("domain_assessment_exam_setups", {
-  id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
-  tenantId: integer("tenant_id").notNull().references(() => tenants.id),
-  examId: integer("exam_id").notNull().references(() => exams.id),
-  classId: integer("class_id").references(() => classes.id),
-  sectionId: integer("section_id").references(() => sections.id),
-  subjectId: integer("subject_id").references(() => subjects.id),
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id),
+  examId: text("exam_id").notNull().references(() => exams.id),
+  classId: text("class_id").references(() => classes.id),
+  sectionId: text("section_id").references(() => sections.id),
+  subjectId: text("subject_id").references(() => subjects.id),
   title: text("title", { length: 255 }).notNull(), // MTA, CA, REPORT, EXAM
   examMark: real("exam_mark").notNull(),
   createdAt: integer("created_at", { mode: "timestamp" }).defaultNow(),
@@ -49,15 +50,15 @@ export const examSetups = sqliteTable("domain_assessment_exam_setups", {
 }));
 
 export const examMarks = sqliteTable("domain_assessment_exam_marks", {
-  id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
-  tenantId: integer("tenant_id").notNull().references(() => tenants.id),
-  examSetupId: integer("exam_setup_id").notNull().references(() => examSetups.id),
-  enrollmentId: integer("enrollment_id").notNull().references(() => enrollments.id),
-  userId: integer("user_id").notNull().references(() => users.id),
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id),
+  examSetupId: text("exam_setup_id").notNull().references(() => examSetups.id),
+  enrollmentId: text("enrollment_id").notNull().references(() => enrollments.id),
+  userId: text("user_id").notNull().references(() => users.id),
   totalMarks: real("total_marks"),
   isAbsent: integer("is_absent").notNull().default(0),
   teacherRemarks: text("teacher_remarks"),
-  gradedBy: integer("graded_by").references(() => users.id), // Staff Persona
+  gradedBy: text("graded_by").references(() => users.id), // Staff Persona
   createdAt: integer("created_at", { mode: "timestamp" }).defaultNow(),
   updatedAt: integer("updated_at", { mode: "timestamp" }).defaultNow(),
 }, (table) => ({
@@ -68,7 +69,7 @@ export const examMarks = sqliteTable("domain_assessment_exam_marks", {
 
 export type ComputedResultMetadata = {
   marksBreakdown: {
-    subjectId: number;
+    subjectId: string;
     title: string[]; // e.g. ["MTA", "CA", "REPORT", "EXAM"]
     marks: number[]; // e.g. [30, 10, 10, 50]
     totalMarks: number; // e.g. 100
@@ -78,68 +79,68 @@ export type ComputedResultMetadata = {
   totalStudents?: number;
   averageMark?: number;
   gradePoints?: number;
-  subjectAverages?: Record<number, number>;
+  subjectAverages?: Record<string, number>;
 };
 
 export const computedResults = sqliteTable("domain_assessment_computed_results", {
-  id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
-  tenantId: integer("tenant_id").notNull().references(() => tenants.id),
-  userId: integer("user_id").notNull().references(() => users.id),
-  examId: integer("exam_id").notNull().references(() => exams.id),
-  classId: integer("class_id").notNull().references(() => classes.id),
-  sectionId: integer("section_id").notNull().references(() => sections.id),
-  enrollmentId: integer("enrollment_id").notNull().references(() => enrollments.id),
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id),
+  userId: text("user_id").notNull().references(() => users.id),
+  examId: text("exam_id").notNull().references(() => exams.id),
+  classId: text("class_id").notNull().references(() => classes.id),
+  sectionId: text("section_id").notNull().references(() => sections.id),
+  enrollmentId: text("enrollment_id").notNull().references(() => enrollments.id),
   totalMarks: real("total_marks"),
   gpaPoint: real("gpa_point"),
   gpaGrade: text("gpa_grade", { length: 50 }),
   teacherRemarks: text("teacher_remarks"),
   metadata: text("metadata", { mode: "json" }).$type<ComputedResultMetadata>(),
-  academicId: integer("academic_id").notNull().references(() => academicYears.id),
+  academicId: text("academic_id").notNull().references(() => academicYears.id),
   createdAt: integer("created_at", { mode: "timestamp" }).defaultNow(),
   updatedAt: integer("updated_at", { mode: "timestamp" }).defaultNow(),
 });
 
 
 export const grades = sqliteTable("domain_assessment_grades", {
-  id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
-  tenantId: integer("tenant_id").notNull().references(() => tenants.id),
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id),
   name: text("name", { length: 100 }).notNull(),
   point: real("point").notNull(),
   fromMark: real("from_mark").notNull(),
   toMark: real("to_mark").notNull(),
   description: text("description", { length: 500 }),
-  academicId: integer("academic_id").references(() => academicYears.id),
+  academicId: text("academic_id").references(() => academicYears.id),
   createdAt: integer("created_at", { mode: "timestamp" }).defaultNow(),
   updatedAt: integer("updated_at", { mode: "timestamp" }).defaultNow(),
 });
 
 export const examSchedules = sqliteTable("domain_assessment_exam_schedules", {
-  id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
-  tenantId: integer("tenant_id").notNull().references(() => tenants.id),
-  examId: integer("exam_id").notNull().references(() => exams.id),
-  classId: integer("class_id").notNull().references(() => classes.id),
-  sectionId: integer("section_id").notNull().references(() => sections.id),
-  subjectId: integer("subject_id").notNull().references(() => subjects.id),
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id),
+  examId: text("exam_id").notNull().references(() => exams.id),
+  classId: text("class_id").notNull().references(() => classes.id),
+  sectionId: text("section_id").notNull().references(() => sections.id),
+  subjectId: text("subject_id").notNull().references(() => subjects.id),
   examDate: text("exam_date").notNull(),
   startTime: text("start_time", { length: 20 }),
   endTime: text("end_time", { length: 20 }),
   roomNo: text("room_no", { length: 100 }),
-  academicId: integer("academic_id").notNull().references(() => academicYears.id),
+  academicId: text("academic_id").notNull().references(() => academicYears.id),
   createdAt: integer("created_at", { mode: "timestamp" }).defaultNow(),
   updatedAt: integer("updated_at", { mode: "timestamp" }).defaultNow(),
 });
 
 // Student Ratings
 export const studentRatings = sqliteTable("domain_assessment_student_ratings", {
-  id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
-  tenantId: integer("tenant_id").notNull().references(() => tenants.id),
-  userId: integer("user_id").notNull().references(() => users.id),
-  examId: integer("exam_id").notNull().references(() => exams.id),
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id),
+  userId: text("user_id").notNull().references(() => users.id),
+  examId: text("exam_id").notNull().references(() => exams.id),
   attribute: text("attribute", { length: 255 }).notNull(),
   rate: integer("rate").notNull(),
   color: text("color", { length: 50 }),
   remark: text("remark"),
-  academicId: integer("academic_id").notNull().references(() => academicYears.id),
+  academicId: text("academic_id").notNull().references(() => academicYears.id),
   createdAt: integer("created_at", { mode: "timestamp" }).defaultNow(),
   updatedAt: integer("updated_at", { mode: "timestamp" }).defaultNow(),
 }, (table) => ({
@@ -153,13 +154,13 @@ export const studentRatings = sqliteTable("domain_assessment_student_ratings", {
  * All data should be migrated to the `teacher_remarks` field on `computed_results`.
  */
 export const teacherRemarks = sqliteTable("domain_assessment_teacher_remarks", {
-  id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
-  tenantId: integer("tenant_id").notNull().references(() => tenants.id),
-  userId: integer("user_id").notNull().references(() => users.id),
-  examId: integer("exam_id").notNull().references(() => exams.id),
-  staffId: integer("staff_id").references(() => users.id),
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id),
+  userId: text("user_id").notNull().references(() => users.id),
+  examId: text("exam_id").notNull().references(() => exams.id),
+  staffId: text("staff_id").references(() => users.id),
   remark: text("remark").notNull(),
-  academicId: integer("academic_id").notNull().references(() => academicYears.id),
+  academicId: text("academic_id").notNull().references(() => academicYears.id),
   createdAt: integer("created_at", { mode: "timestamp" }).defaultNow(),
   updatedAt: integer("updated_at", { mode: "timestamp" }).defaultNow(),
 }, (table) => ({
@@ -172,14 +173,14 @@ export const teacherRemarks = sqliteTable("domain_assessment_teacher_remarks", {
  * to `classAttendanceSummaries` in a future refactor.
  */
 export const classAttendances = sqliteTable("domain_assessment_class_attendance_summaries", {
-  id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
-  tenantId: integer("tenant_id").notNull().references(() => tenants.id),
-  userId: integer("user_id").notNull().references(() => users.id),
-  examId: integer("exam_id").notNull().references(() => exams.id),
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id),
+  userId: text("user_id").notNull().references(() => users.id),
+  examId: text("exam_id").notNull().references(() => exams.id),
   daysOpened: integer("days_opened").default(0),
   daysAbsent: integer("days_absent").default(0),
   daysPresent: integer("days_present").default(0),
-  academicId: integer("academic_id").notNull().references(() => academicYears.id),
+  academicId: text("academic_id").notNull().references(() => academicYears.id),
   createdAt: integer("created_at", { mode: "timestamp" }).defaultNow(),
   updatedAt: integer("updated_at", { mode: "timestamp" }).defaultNow(),
 }, (table) => ({
@@ -188,10 +189,10 @@ export const classAttendances = sqliteTable("domain_assessment_class_attendance_
 
 // Question Banks
 export const questionBanks = sqliteTable("domain_assessment_question_banks", {
-  id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
-  tenantId: integer("tenant_id").notNull().references(() => tenants.id),
-  subjectId: integer("subject_id").references(() => subjects.id),
-  classId: integer("class_id").references(() => classes.id),
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id),
+  subjectId: text("subject_id").references(() => subjects.id),
+  classId: text("class_id").references(() => classes.id),
   questionType: text("question_type", { enum: ["mcq", "short_answer", "essay", "true_false", "fill_blank"] }).notNull(),
   question: text("question").notNull(),
   options: text("options", { mode: "json" }).$type<string[]>(),
@@ -199,8 +200,8 @@ export const questionBanks = sqliteTable("domain_assessment_question_banks", {
   marks: real("marks").notNull(),
   difficultyLevel: text("difficulty_level", { enum: ["easy", "medium", "hard"] }).default("medium"),
   explanation: text("explanation"),
-  createdBy: integer("created_by").references(() => users.id), // Staff Persona
-  academicId: integer("academic_id").references(() => academicYears.id),
+  createdBy: text("created_by").references(() => users.id), // Staff Persona
+  academicId: text("academic_id").references(() => academicYears.id),
   createdAt: integer("created_at", { mode: "timestamp" }).defaultNow(),
   updatedAt: integer("updated_at", { mode: "timestamp" }).defaultNow(),
 }, (table) => ({
@@ -210,12 +211,12 @@ export const questionBanks = sqliteTable("domain_assessment_question_banks", {
 
 // Online Exams
 export const onlineExams = sqliteTable("domain_assessment_online_exams", {
-  id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
-  tenantId: integer("tenant_id").notNull().references(() => tenants.id),
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id),
   title: text("title", { length: 255 }).notNull(),
-  classId: integer("class_id").references(() => classes.id),
-  sectionId: integer("section_id").references(() => sections.id),
-  subjectId: integer("subject_id").references(() => subjects.id),
+  classId: text("class_id").references(() => classes.id),
+  sectionId: text("section_id").references(() => sections.id),
+  subjectId: text("subject_id").references(() => subjects.id),
   totalMarks: real("total_marks").notNull(),
   passingMarks: real("passing_marks"),
   duration: integer("duration"),
@@ -224,8 +225,8 @@ export const onlineExams = sqliteTable("domain_assessment_online_exams", {
   isPublished: integer("is_published").default(0),
   shuffleQuestions: integer("shuffle_questions").default(0),
   showResult: integer("show_result").default(1),
-  createdBy: integer("created_by").references(() => users.id), // Staff Persona
-  academicId: integer("academic_id").notNull().references(() => academicYears.id),
+  createdBy: text("created_by").references(() => users.id), // Staff Persona
+  academicId: text("academic_id").notNull().references(() => academicYears.id),
   createdAt: integer("created_at", { mode: "timestamp" }).defaultNow(),
   updatedAt: integer("updated_at", { mode: "timestamp" }).defaultNow(),
 }, (table) => ({
@@ -234,9 +235,9 @@ export const onlineExams = sqliteTable("domain_assessment_online_exams", {
 
 // Online Exam Questions
 export const onlineExamQuestions = sqliteTable("domain_assessment_online_exam_questions", {
-  id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
-  onlineExamId: integer("online_exam_id").notNull().references(() => onlineExams.id, { onDelete: "cascade" }),
-  questionBankId: integer("question_bank_id").notNull().references(() => questionBanks.id),
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  onlineExamId: text("online_exam_id").notNull().references(() => onlineExams.id, { onDelete: "cascade" }),
+  questionBankId: text("question_bank_id").notNull().references(() => questionBanks.id),
   sortOrder: integer("sort_order").default(0),
   createdAt: integer("created_at", { mode: "timestamp" }).defaultNow(),
   updatedAt: integer("updated_at", { mode: "timestamp" }).defaultNow(),
@@ -246,18 +247,18 @@ export const onlineExamQuestions = sqliteTable("domain_assessment_online_exam_qu
 
 // Online Exam Attempts
 export type AttemptAnswers = {
-  questionId: number;
+  questionId: string;
   selectedAnswer: string;
   isCorrect: boolean;
   marksAwarded: number;
 }[];
 
 export const onlineExamAttempts = sqliteTable("domain_assessment_online_exam_attempts", {
-  id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
-  tenantId: integer("tenant_id").notNull().references(() => tenants.id),
-  onlineExamId: integer("online_exam_id").notNull().references(() => onlineExams.id),
-  userId: integer("user_id").notNull().references(() => users.id), // Student Persona
-  enrollmentId: integer("enrollment_id").references(() => enrollments.id),
+  id: text("id").primaryKey().$defaultFn(() => generateId()),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id),
+  onlineExamId: text("online_exam_id").notNull().references(() => onlineExams.id),
+  userId: text("user_id").notNull().references(() => users.id), // Student Persona
+  enrollmentId: text("enrollment_id").references(() => enrollments.id),
   totalMarks: real("total_marks"),
   obtainedMarks: real("obtained_marks"),
   status: text("status", { enum: ["in_progress", "completed", "timed_out"] }).notNull().default("in_progress"),

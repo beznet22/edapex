@@ -32,7 +32,7 @@ export class SqliteFinanceRepository implements IFinanceRepository {
   }
 
   // --- Ledger ---
-  async getLedgerEntries(tenantId: number, filter?: { type?: string; userId?: number; academicId?: number }): Promise<ILedgerEntry[]> {
+  async getLedgerEntries(tenantId: string, filter?: { type?: string; userId?: string; academicId?: string }): Promise<ILedgerEntry[]> {
     const conditions = [eq(ledgerEntries.tenantId, tenantId)];
     
     if (filter?.type) {
@@ -56,7 +56,7 @@ export class SqliteFinanceRepository implements IFinanceRepository {
   }
 
   // --- Fees ---
-  async getFeeMasters(tenantId: number, academicId: number): Promise<IFeeMaster[]> {
+  async getFeeMasters(tenantId: string, academicId: string): Promise<IFeeMaster[]> {
     const results = await db
       .select()
       .from(feeMasters)
@@ -81,7 +81,7 @@ export class SqliteFinanceRepository implements IFinanceRepository {
     };
   }
 
-  async getFeeTypes(tenantId: number): Promise<IFeeType[]> {
+  async getFeeTypes(tenantId: string): Promise<IFeeType[]> {
     const results = await db.select().from(feeTypes).where(eq(feeTypes.tenantId, tenantId));
     return results.map((row: any) => ({
       id: row.id,
@@ -92,7 +92,7 @@ export class SqliteFinanceRepository implements IFinanceRepository {
   }
 
   // --- Assignments ---
-  async getStudentFeeAssignments(userId: number): Promise<IFeeAssignment[]> {
+  async getStudentFeeAssignments(userId: string): Promise<IFeeAssignment[]> {
     const results = await db.select().from(feeAssignments).where(eq(feeAssignments.userId, userId));
     return results.map((row: any) => ({
       ...row,
@@ -113,7 +113,7 @@ export class SqliteFinanceRepository implements IFinanceRepository {
     };
   }
 
-  async updateFeeAssignment(tenantId: number, id: number, data: Partial<IFeeAssignment>): Promise<void> {
+  async updateFeeAssignment(tenantId: string, id: string, data: Partial<IFeeAssignment>): Promise<void> {
     await db.update(feeAssignments)
       .set(data as any)
       .where(and(
@@ -123,7 +123,7 @@ export class SqliteFinanceRepository implements IFinanceRepository {
   }
 
   // --- Invoices ---
-  async getInvoices(tenantId: number, userId?: number): Promise<IInvoice[]> {
+  async getInvoices(tenantId: string, userId?: string): Promise<IInvoice[]> {
     let query = db.select().from(invoices).where(eq(invoices.tenantId, tenantId));
     if (userId) {
       query = db.select().from(invoices).where(and(eq(invoices.tenantId, tenantId), eq(invoices.userId, userId)));
@@ -149,7 +149,7 @@ export class SqliteFinanceRepository implements IFinanceRepository {
   }
 
   // --- B2C Payments & Gateways ---
-  async getPaymentGateways(tenantId: number): Promise<IPaymentGateway[]> {
+  async getPaymentGateways(tenantId: string): Promise<IPaymentGateway[]> {
     const results = await db.select().from(paymentGateways).where(eq(paymentGateways.tenantId, tenantId));
     return results.map((row: any) => ({
       ...row,
@@ -170,7 +170,7 @@ export class SqliteFinanceRepository implements IFinanceRepository {
     };
   }
 
-  async updateOnlinePaymentStatus(transactionRef: string, status: string, ledgerEntryId?: number): Promise<void> {
+  async updateOnlinePaymentStatus(transactionRef: string, status: string, ledgerEntryId?: string): Promise<void> {
     const updateData: any = { status };
     if (ledgerEntryId) updateData.ledgerEntryId = ledgerEntryId;
     await db.update(onlinePayments).set(updateData).where(eq(onlinePayments.transactionRef, transactionRef));
