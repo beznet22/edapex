@@ -12,6 +12,7 @@ node_modules
 /bin/lib
 /temp
 /cache
+/paperclip
 
 # System
 .system
