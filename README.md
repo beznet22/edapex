@@ -284,3 +284,12 @@ pnpm run docker:up
 ### SSE Stream Disconnection
 **Error:** `Agentic Classroom stream closes after 100ms`
 **Solution:** Cloudflare restricts CPU limits. Ensure you are using the `saveToPolymorphicArtifact` tools instead of executing heavyweight LLM calls synchronously. Always route heavy compute to external providers (`@mastra/openai`).
+
+---
+
+## Acknowledgments
+
+EdApex's deep architectural patterns---specifically regarding the stateless graph engine execution for real-time WebSocket/SSE orchestration, and the autonomous agent control-plane featuring atomic task checkout, cost rollups, and stateless heartbeat execution loops---are deeply inspired by the groundbreaking open-source work of:
+
+- [THU-MAIC/OpenMAIC](https://github.com/THU-MAIC/OpenMAIC)
+- [Paperclip](https://github.com/paperclipai/paperclip)

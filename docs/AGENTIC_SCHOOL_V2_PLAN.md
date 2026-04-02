@@ -8,7 +8,11 @@ This document is the **definitive technical specification** for transforming EdA
 - [docs/MASTER_ARCHITECTURE.md](docs/MASTER_ARCHITECTURE.md): Core system philosophy and stack.
 - [docs/BUSINESS_MODEL.md](docs/BUSINESS_MODEL.md): Dual-pillar B2B/B2C alignment.
 - [docs/domains/*.md](docs/domains/*.md): Domain-specific business logic and entities.
-- Reference design: **Stateless Graph Engine** (`director-graph.ts`, `stateless-generate.ts`): Stateless execution loop, incremental JSON parsing over SSE.
+- Reference design: [https://github.com/paperclip/paperclip/blob/main/doc/SPEC-implementation.md](https://github.com/paperclip/paperclip/blob/main/doc/SPEC-implementation.md): Orchestration and heartbeat template.
+- Reference design: [https://github.com/paperclip/paperclip/blob/main/doc/spec/agent-runs.md](https://github.com/paperclip/paperclip/blob/main/doc/spec/agent-runs.md): Agent runs and cost tracking.
+- Reference design: [https://github.com/paperclip/paperclip/blob/main/doc/spec/agents-runtime.md](https://github.com/paperclip/paperclip/blob/main/doc/spec/agents-runtime.md): Agent runtime and cost tracking.
+- Reference design: [https://github.com/paperclip/paperclip/blob/main/doc/plans/[DATE]-*.md](https://github.com/paperclip/paperclip/blob/main/doc/plans/[DATE]-*.md): Implementation plans and plus cost tracking.
+- Reference design: **Stateless Graph Engine** (`director-graph.ts`, `stateless-generate.ts`): Stateless execution loop, incremental JSON parsing over SSE. [OpenMAIC](https://github.com/THU-MAIC/OpenMAIC)
 
 ### 1.2 Internal Service Architecture (Detailed)
 
