@@ -1,8 +1,7 @@
 # Agent Instructions
 
 ## Package Manager
-Use **pnpm**: `pnpm install`, `pnpm run db:push` / `pnpm wrangler d1 migrations apply`
-OR **bun**: `bun install`, `bun run db:push`
+Use **pnpm**: `pnpm install`, `pnpm run db:push`, `pnpm run dev`
 
 ## Commit Attribution
 AI commits MUST include:
@@ -11,27 +10,30 @@ Signed-off-by: Beznet <[EMAIL_ADDRESS]>
 Co-Authored-By: Antigravity <antigravity@google.com>
 ```
 
-## CLI Commands
+## File-Scoped Commands
 | Task | Command |
 |------|---------|
 | Typecheck | `pnpm tsc --noEmit src/path/to/file.ts` |
-| Edge Dev | `pnpm wrangler dev` |
+| Lint | `pnpm eslint src/path/to/file.ts` |
+| Format | `pnpm prettier --write src/path/to/file.ts` |
+| Test | `pnpm vitest run src/path/to/file.test.ts` |
+
+## CLI Commands
+| Task | Command |
+|------|---------|
+| Edge Dev | `pnpm wrangler dev src/server.ts` |
 | D1 Migrate | `pnpm wrangler d1 migrations apply edapex_db --local` |
+| Drizzle Push | `pnpm run db:push` |
 
 ## Key Conventions
-- **Multi-Tenant Isolation**: Every database query MUST include a `tenant_id` filter. Composite indexes are optimized for `(tenant_id, id)`.
-- **Layered Architecture**: Follow the strict `src/` hierarchy:
-  - `controllers/`: Hono route handlers via `BaseController`.
-  - `services/`: Business logic & AI orchestration.
-  - `domain/`: `IRepository<T>` interfaces and concrete Drizzle implementations.
-  - `db/`: Siloed Drizzle schemas by dialect (`mysql`, `postgres`, `sqlite`, `d1`).
-- **HMAS (Hierarchical Multi-Agent System)**: Built on **Mastra AI SDK**.
-  - Layers: Executive Orchestrator -> Domain Supervisors -> Task Agents.
-  - All tools must be validated against JSON schemas.
-- **Provider-Agnostic AI**: Define agents by capability; select provider (`workers-ai`, `openai`, etc.) at runtime based on budget/intent.
+- **Multi-Tenant Isolation**: Every database query MUST include a `tenant_id` filter.
+- **Layered Arch**: Follow `src/` hierarchy (`controllers/`, `services/`, `domain/`, `db/`).
+- **HMAS**: Mastra AI SDK orchestration (Executive -> Domain Supervisors -> Task Agents).
+- **Provider-Agnostic AI**: Define capabilities; pick provider (`workers-ai`, `openai`) at runtime.
 - **PBAC Security**: Evaluation happens *before* tool execution.
-- **No Dual-Write**: Use polymorphic `owner_type/owner_id` constraints.
+- **Agentic Classroom**: Domain 18 logic lives in `domain-classroom`. Respect edge execution constraints (stateless memory ledgers).
 
 ## Documentation
-- See `docs/MASTER_ARCHITECTURE.md` for the technical specification.
-- Per-module details in `docs/domains/`.
+- see `docs/AGENTIC_SCHOOL_V2_PLAN.md` for the low-level technical specification.
+- See `docs/MASTER_ARCHITECTURE.md` for architectural overview.
+- See `docs/domains/` for 18-domain module details.
