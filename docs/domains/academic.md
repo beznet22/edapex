@@ -58,9 +58,27 @@ Calculates weekly schedule. Currently uses `dayOfWeek` enum and raw start/end ti
 - **Academic Architect**: Handles the setup of classes, sections, and subject mappings.
 - **Schedule Coordinator**: Specialized in routine generation and conflict resolution.
 
-### Tools
+### Operational Tools (Mastra)
+- `registrar.enrollStudent(studentData)`: Validates structural compliance before Drizzle insert.
+- `registrar.searchStudents(query, filter)`: High-performance search with `tenant_id` filter.
+- `registrar.updateProfile(studentId, data)`: Updates student academic profile.
+- `registrar.verifyTranscript(studentId)`: Cross-references Assessment domain records.
+- `registrar.archiveRecord(recordId)`: Moves completed student files to long-term R2 storage.
+- `academic.getCurriculum(subjectId)`: Retrieves the current curriculum for a subject.
+- `academic.assignTeacher(classId, teacherId)`: Maps staff to courses in the LMS domain.
+- `academic.auditLessonPlan(planId)`: Compares plan vs curriculum for alignment.
+- `academic.validateResource(resourceId)`: Ensures textbook/media alignment with school policy.
+- `academic.createLessonPlan(subjectId, data)`: Generates a new lesson plan.
 - `validate_routine_collision`: Checks if a Teacher or Room is already occupied at a specific time.
 - `sync_class_section_logic`: Ensures that when a section is removed from a class, all associated routines and enrollments are handled.
+
+### [STRESS DEFENSE] Tools
+- `constraint_prioritizer`: Hall-splitting and core-subject prioritization during schedule collisions.
+- `hard_stop_optimizer`: Bounded optimization loop preventing CPU/RAM exhaustion from recursive scheduling.
+- `temporal_academic_state_sync`: Handles mid-term withdrawals and data resurrection.
+- `substitution_routing_engine`: 6 AM mass absenteeism workflow and emergency coverage.
+- `memory_validation_gate`: Prevents premature "graduated" flag poison in agent memory.
+- `academic_diff_audit`: Audits track-jumping and prerequisite chain integrity.
 
 ---
 
@@ -120,9 +138,10 @@ Routes → AcademicController → AcademicService → AcademicRepository
 
 | Agent | Type | Capabilities |
 |:---|:---|:---|
-| `academic_architect` | Task | Class/section setup, subject mapping |
-| `schedule_coordinator` | Task | Routine generation, collision detection |
-| `enrollment_manager` | Task | Bulk enrollment, promotion processing |
+| `academic_architect` | Task | Class/section setup, subject mapping, structural metadata management |
+| `schedule_coordinator` | Task | Routine generation, collision detection, constraint prioritization |
+| `enrollment_manager` | Task | Bulk enrollment, promotion processing, state resurrection |
+| `substitution_agent` | Task | Emergency routing for staff absenteeism |
 
 ---
 

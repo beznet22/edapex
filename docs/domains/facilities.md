@@ -1,114 +1,96 @@
-# Domain Architecture: Facilities
+# Facilities & Logistics Domain Architecture
 
-## 1. Domain Overview
-The **Facilities** domain manages the physical infrastructure and assets of the educational institution, including Student Housing (Hostels/Dormitories), Transport Services, and Inventory/Asset Management. In EdApex V2, this domain is characterized by **Tenant-Isolated Physical Assets** and **Polymorphic Allocation** systems.
+## Overview
+The Facilities domain manages physical school infrastructure including transportation (vehicles, routes), residential structures (dormitories, rooms), visitor management, complaint handling, and consumable inventory. It connects resource allocations strictly to user personas via `userId`.
 
-### 1.1 Core Components
-- **Transport**: Route planning, vehicle fleet management, and student/staff transit allocation.
-- **Dormitory**: Building management, room categorization, and residential occupancy tracking.
-- **Inventory**: Centralized stock management, procurement, sales, and internal issuance.
-- **Support Services**: Integrated visitor management and facility-related complaint tracking.
+### Key Business Logic
+- **Unified Allocations**: A polymorphic `facilityAllocations` table maps users to either transport or dormitory resources.
+- **Transport Management**: Vehicles → Routes → Route Assignments. Drivers are Staff personas.
+- **Hostel Management**: Dormitories → Rooms → Allocations. Room types support cost-per-term billing.
+- **Complaint Lifecycle**: Open → In Progress → Resolved → Closed with assignment tracking.
+- **Inventory Tracking**: Consumable items with reorder levels and automatic low-stock detection.
 
-## 2. Legacy Logic Parity (V1 -> V2)
+---
 
-### 2.1 Entity Mapping Table
-| V1 (InfixEdu) Table | V2 (EdApex) Table | Technical Transformation |
+## Logic Parity (Legacy to V2)
+
+### Schema Mapping
+| Legacy Table (`schoolify`) | V2 Entity (`src/db/domain-facilities.ts`) | Notes |
 | :--- | :--- | :--- |
-| `sm_dormitory_lists` | `facilities.dormitories` | Normalized building-level metadata. |
-| `sm_room_lists` | `facilities.rooms` | Linked to `dormitories` with `room_type` as metadata. |
-| `sm_room_types` | `facilities.rooms` (metadata) | Flattened into JSONB room attributes. |
-| `sm_routes` | `facilities.routes` | Preserves cost and title; isolated by `account_id`. |
-| `sm_vehicles` | `facilities.vehicles` | Links to `account_id`; stores driver/model info. |
-| `sm_assign_vehicles` | `facilities.route_assignments` | M:N relationship between routes and vehicles. |
-| `sm_students` (route/room cols) | `facilities.facility_allocations` | **CRITICAL**: Moved from student columns to a polymorphic allocation table. |
-| `sm_item_categories` | `facilities.inventory_categories` | Standard hierarchical categorization. |
-| `sm_items` | `facilities.inventory_items` | Central product registry with inventory tracking. |
-| `sm_item_stores` | `facilities.inventory_stores` | Physical warehouse isolation. |
-| `sm_item_receives` | `facilities.inventory_transactions` | Type: `RECEIVE`. Stores procurement history. |
-| `sm_item_sells` | `facilities.inventory_transactions` | Type: `SELL`. Stores revenue-generating transfers. |
-| `sm_item_issues` | `facilities.inventory_transactions` | Type: `ISSUE`. Tracks internal lending/consumption. |
+| `sm_dormitory_lists` | `dormitories` | Type enum: `boys`, `girls`, `mixed`. JSON metadata for amenities. |
+| `sm_room_lists` / `sm_room_types` | `rooms` | Room type enum: `standard`, `deluxe`, `suite`. Cost per term. |
+| `sm_vehicles` | `vehicles` | Driver FK to `users`. JSON metadata for insurance, service. |
+| `sm_routes` | `routes` | Route definitions with cost. |
+| `sm_assign_vehicles` | `routeAssignments` | Vehicle → Route junction. |
+| `sm_seat_plans` / `sm_seat_plan_children` | `facilityAllocations` | Polymorphic: `facilityType` + `facilityRefId`. |
+| `sm_complaints` | `complaints` | Source enum: `parent`, `student`, `staff`, `external`. |
+| `sm_visitors` | `visitors` | Check-in/out tracking with person-to-meet FK. |
+| — (new) | `inventoryItems` | Consumable tracking with reorder levels. |
 
-### 2.2 Logic Parity Notes
-- **Financial Integration**: In V1, inventory transactions directly updated `sm_bank_statements`. In V2, these must trigger `domain_events` (`inventory.item_received`, `inventory.sale_completed`) which the **Finance Agent** consumes to reconcile accounts.
-- **Occupancy Validation**: V1 relied on PHP-level checks for room capacity. V2 implements database-level aggregation or trigger-based validation on `facility_allocations` to prevent over-booking.
+---
 
-## 3. Database Schema (Drizzle)
+## Technical Implementation
 
-### 3.1 Facility Allocations (Polymorphic)
-```typescript
-export const facilityAllocations = mysqlTable("edx_facility_allocations", {
-  id: varchar("id", { length: 32 }).primaryKey(),
-  tenantId: varchar("tenant_id", { length: 32 }).notNull(),
-  accountId: varchar("account_id", { length: 32 }).notNull(),
-  userId: varchar("user_id", { length: 32 }).notNull(), // Student or Staff
-  facilityType: mysqlEnum("facility_type", ["TRANSPORT", "DORMITORY"]).notNull(),
-  facilityRefId: varchar("facility_ref_id", { length: 32 }).notNull(), // route_id or room_id
-  status: mysqlEnum("status", ["ACTIVE", "CANCELLED", "COMPLETED"]).default("ACTIVE"),
-  metadata: json("metadata"), // e.g., seat number, bed number
-  ...auditColumns,
-});
-```
+### Core Entities
 
-### 3.2 Inventory Extension (Proposed)
-> [!IMPORTANT]
-> The following tables are proposed to complete the Facilities domain logic for Inventory.
+#### [Dormitories / Rooms](file:///home/beznet/Workspace/edapex/src/db/sqlite/domain-facilities.ts#L36)
+Residential structure with typed rooms and cost-per-term for Finance integration.
 
-```typescript
-export const inventoryTransactions = mysqlTable("edx_inventory_transactions", {
-  id: varchar("id", { length: 32 }).primaryKey(),
-  type: mysqlEnum("transaction_type", ["RECEIVE", "SELL", "ISSUE", "RETURN"]),
-  sourceStoreId: varchar("source_store_id", { length: 32 }),
-  destStoreId: varchar("destination_store_id", { length: 32 }),
-  amount: decimal("amount", { precision: 20, scale: 2 }),
-  paidStatus: mysqlEnum("paid_status", ["PAID", "PARTIAL", "UNPAID"]),
-  metadata: json("metadata"), // Linked item IDs, quantities, supplier info
-  ...auditColumns,
-});
-```
+#### [Vehicles / Routes / RouteAssignments](file:///home/beznet/Workspace/edapex/src/db/sqlite/domain-facilities.ts#L61)
+Transport fleet with driver assignment and route mapping.
 
-## 4. AI-Driven Route Optimization
+#### [FacilityAllocations](file:///home/beznet/Workspace/edapex/src/db/sqlite/domain-facilities.ts#L92)
+Polymorphic allocation: `facilityType` (`transport` | `dormitory`) + `facilityRefId`. Status: `active`, `released`, `transferred`.
 
-EdApex V2 integrates AI to solve the **Vehicle Routing Problem (VRP)** for school transport.
+#### [Complaints](file:///home/beznet/Workspace/edapex/src/db/sqlite/domain-facilities.ts#L111)
+Issue tracking with assignment workflow and resolution timestamps.
 
-### 4.1 Optimization Protocol
-1.  **Data Ingestion**: Regional AI nodes consume `facility_allocations` (Transport type) and student geolocations (anonymized).
-2.  **Constraint Satisfaction**: Using tools like **Transfinder** or custom **Mastra Agents** (Geni-Routing), the system calculates:
-    *   Minimum fleet size required.
-    *   Optimal stop sequences to minimize ride time (< 45 mins).
-    *   Dynamic re-routing for road closures via real-time traffic APIs.
-3.  **Output**: Refined `routes` and `route_assignments` are pushed back to the DB, notifying drivers via the mobile app.
+#### [Visitors](file:///home/beznet/Workspace/edapex/src/db/sqlite/domain-facilities.ts#L130)
+Gate management with check-in/out logging and person-to-meet tracking.
 
-### 4.2 Logistics Automation
-- **Predictive Maintenance**: AI analyzes vehicle mileage and incident history to schedule preventive maintenance (`maintenance.scheduled` event).
-- **Smart Stocking**: Inventory agents predict "low stock" for uniforms/stationery based on academic calendar events (e.g., "Back to School" peak).
+#### [InventoryItems](file:///home/beznet/Workspace/edapex/src/db/sqlite/domain-facilities.ts#L154)
+Consumables with auto-status (`in_stock`, `low_stock`, `out_of_stock`) based on reorder levels.
 
-## 5. Security & Isolation
-- **Tenant Isolation**: All physical assets (`dormitories`, `vehicles`, `stores`) are strictly filtered by `tenant_id`.
-- **PBAC (Physical-Based Access Control)**: 
-    - `STORE_MANAGER` can only view/edit `inventory` tables.
-    - `TRANSPORT_DIRECTOR` manages `routes` and `vehicles`.
-    - `Warden` manages `dormitories` and `complaints`.
+---
+
+## AI Task Agents & Tools
+
+### Operational Tools (Mastra)
+- `facilities.trackInventory(tenantId)`: Real-time tracking of consumables and assets.
+- `facilities.bookRoom(roomId, timeslot)`: Reserves facility space with collision check.
+- `facilities.scheduleMaintenance(assetId)`: Logs and assigns repair/maintenance tasks.
+- `allocate_transport`: Assigns students to vehicle routes based on address proximity.
+- `allocate_dormitory`: Assigns students to rooms based on capacity and preferences.
+
+### [STRESS DEFENSE] Tools
+- `vehicle_gps_anomaly_detector`: Flags route deviation and driver behavior anomalies.
+- `overbooking_guard`: Prevents allocation beyond room/vehicle capacity.
+- `reorder_trigger_engine`: Fires procurement alerts when inventory hits reorder levels.
+- `complaint_sla_enforcer`: Escalates unresolved complaints past SLA deadlines.
+- `visitor_dwell_alarm`: Flags visitors exceeding expected duration for security review.
+
+---
+
+## PBAC & Security
+- **TenantAdmin**: Full control over all facilities.
+- **Staff**: Can manage complaints assigned to them and log visitors.
+- **Parent/Student**: Read-only access to their own facility allocations.
 
 ---
 
 ## Hono API Routes
 
-```
-Routes → FacilitiesController → FacilitiesService → FacilitiesRepository
-```
-
 | Method | Route | Description | Auth |
 |:---|:---|:---|:---|
 | `GET` | `/api/v1/facilities/dormitories` | List dormitories | Authenticated |
-| `POST` | `/api/v1/facilities/dormitories` | Create dormitory | `TenantAdmin` |
-| `GET` | `/api/v1/facilities/rooms` | List rooms (filterable by dormitory) | Authenticated |
-| `GET` | `/api/v1/facilities/routes` | List transport routes | Authenticated |
-| `POST` | `/api/v1/facilities/routes` | Create route | `TransportDirector` |
-| `GET` | `/api/v1/facilities/vehicles` | List vehicles | `TransportDirector` |
-| `POST` | `/api/v1/facilities/allocations` | Create facility allocation | `TenantAdmin` |
-| `GET` | `/api/v1/facilities/inventory` | List inventory items | `StoreManager` |
-| `POST` | `/api/v1/facilities/inventory/transactions` | Create inventory transaction | `StoreManager` |
-| `GET` | `/api/v1/facilities/visitors` | List visitor log | `TenantAdmin` |
+| `GET` | `/api/v1/facilities/rooms/:dormId` | List rooms in dormitory | Authenticated |
+| `GET` | `/api/v1/facilities/vehicles` | List vehicles | `TenantAdmin` |
+| `POST` | `/api/v1/facilities/allocations` | Create allocation | `TenantAdmin` |
+| `GET` | `/api/v1/facilities/complaints` | List complaints | `TenantAdmin` |
+| `POST` | `/api/v1/facilities/complaints` | File complaint | Authenticated |
+| `GET` | `/api/v1/facilities/visitors` | List visitors | `TenantAdmin` |
+| `POST` | `/api/v1/facilities/visitors` | Log visitor | Staff |
+| `GET` | `/api/v1/facilities/inventory` | List inventory | `TenantAdmin` |
 
 ---
 
@@ -116,10 +98,10 @@ Routes → FacilitiesController → FacilitiesService → FacilitiesRepository
 
 | Agent | Type | Capabilities |
 |:---|:---|:---|
-| `facilities_supervisor` | Supervisor | Routes facility tasks, manages allocations |
-| `route_optimizer` | Task | AI-driven vehicle routing (VRP solver) |
-| `inventory_agent` | Task | Stock prediction, reorder triggers |
-| `maintenance_agent` | Task | Predictive vehicle/building maintenance |
+| `asset_manager` | Task | Inventory management, reorder alerts, maintenance scheduling |
+| `transport_coordinator` | Task | Route optimization, allocation, GPS monitoring |
+| `hostel_manager` | Task | Room allocation, capacity tracking, billing integration |
+| `complaint_handler` | Task | SLA enforcement, escalation, resolution tracking |
 
 ---
 
@@ -127,7 +109,7 @@ Routes → FacilitiesController → FacilitiesService → FacilitiesRepository
 
 | Event | Payload | Consumers |
 |:---|:---|:---|
-| `facilities.allocation_created` | `{ userId, facilityType, facilityRefId }` | Finance (assign transport/dorm fees) |
-| `facilities.inventory_received` | `{ itemId, quantity, amount }` | Finance (ledger expense entry) |
-| `facilities.inventory_sold` | `{ itemId, quantity, amount }` | Finance (ledger income entry) |
-| `facilities.maintenance_due` | `{ vehicleId, type, dueDate }` | Communication (notify driver), Events (audit) |
+| `facilities.allocation_created` | `{ userId, facilityType, refId }` | Finance (billing), Events (audit) |
+| `facilities.complaint_filed` | `{ complaintId, source, type }` | Communication (notification), Events (audit) |
+| `facilities.visitor_checked_in` | `{ visitorId, purpose, tenantId }` | Events (audit) |
+| `facilities.inventory_low_stock` | `{ itemId, quantity, reorderLevel }` | Communication (procurement alert) |

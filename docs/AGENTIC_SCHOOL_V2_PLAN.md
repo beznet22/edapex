@@ -1,5 +1,51 @@
 # EdApex V2: The Agentic School - Master Architecture Blueprint
 
+## Table of Contents
+
+- [1. Document Role & Scope](#1-document-role--scope)
+- [2. System Role & Autonomous Logic](#2-system-role--autonomous-logic)
+- [3. Structural Alignment (Master Reference)](#3-structural-alignment-master-reference)
+- [4. Domain Architecture (The 18 Modules)](#4-domain-architecture-the-18-modules)
+- [5. HMAS Strategy (The Agentic Hierarchy)](#5-hmas-strategy-the-agentic-hierarchy)
+- [6. Principal Assistant (The School Executive)](#6-principal-assistant-the-school-executive)
+- [7. Domain Supervisors (The Module Managers)](#7-domain-supervisors-the-module-managers)
+- [8. Task Agents (The Operational Workforce)](#8-task-agents-the-operational-workforce)
+- [9. Governance & The Maximizer (Audit Integrity)](#9-governance--the-maximizer-audit-integrity)
+- [10. PBAC Evaluation & Risk Control](#10-pbac-evaluation--risk-control)
+- [11. PBAC Implementation Detail](#11-pbac-implementation-detail)
+- [12. Operational Tools Registry (Mastra)](#12-operational-tools-registry-mastra)
+- [13. Staff Role Library (31+ Agent Definitions)](#13-staff-role-library-31-agent-definitions)
+- [14. The Financial Ledger (Pulse Component)](#14-the-financial-ledger-pulse-component)
+- [15. Costs & Budget Calculus](#15-costs--budget-calculus)
+- [16. Agent Execution Runs (The Heartbeat)](#16-agent-execution-runs-the-heartbeat)
+- [17. The Routine Engine (Scheduling & Recovery)](#17-the-routine-engine-scheduling--recovery)
+- [18. Real-Time Heartbeat Telemetry (SSE)](#18-real-time-heartbeat-telemetry-sse)
+- [19. Edge Execution & Memory (Statelessness)](#19-edge-execution--memory-statelessness)
+- [20. Stateless Memory Ledger (Compaction)](#20-stateless-memory-ledger-compaction)
+- [21. Domain Data Consistency (Drizzle Sync)](#21-domain-data-consistency-drizzle-sync)
+- [22. Cross-Domain Integrity & Events](#22-cross-domain-integrity--events)
+- [23. System Self-Correction & Error Handling](#23-system-self-correction--error-handling)
+- [24. Performance & Scalability (V2 Metrics)](#24-performance--scalability-v2-metrics)
+- [26. Token Optimization & Delta Telemetry](#26-token-optimization--delta-telemetry)
+- [27. Budget Policies & Preflight Enforcement](#27-budget-policies--preflight-enforcement)
+- [28. Multi-Tenant Data Isolation (The Drizzle Layer)](#28-multi-tenant-data-isolation-the-drizzle-layer)
+- [29. Migration Strategy & Paperclip Decommissioning](#29-migration-strategy--paperclip-decommissioning)
+- [30. PBAC Policy Reference (JSON Schemas)](#30-pbac-policy-reference-json-schemas)
+- [31. Local-First Conflict Resolution Strategies](#31-local-first-conflict-resolution-strategies)
+- [32. Standardized Prompt Registry (Metadata Schema)](#32-standardized-prompt-registry-metadata-schema)
+- [33. Edge Infrastructure Lifecycle (Hardware & Vitals)](#33-edge-infrastructure-lifecycle-hardware--vitals)
+- [34. Stateless Heartbeat Error Recovery Matrix](#34-stateless-heartbeat-error-recovery-matrix)
+- [35. V2 Integration Checklist (Developer Handover)](#35-v2-integration-checklist-developer-handover)
+- [36. 18-Domain Drizzle Schema Reference (Cross-Walk)](#36-18-domain-drizzle-schema-reference-cross-walk)
+- [38. Canonical Directory Structure (The 18-Domain Layout)](#38-canonical-directory-structure-the-18-domain-layout)
+- [39. Implementation Detail: The Directory Flow](#39-implementation-detail-the-directory-flow)
+- [41. Logging & Traceability (8-Layer Namespacing)](#41-logging--traceability-8-layer-namespacing)
+- [42. Error Propagation & Resilience Pattern](#42-error-propagation--resilience-pattern)
+- [43. Notification System (Toasts & Push)](#43-notification-system-toasts--push)
+- [44. Proactive AI Issue Tracking](#44-proactive-ai-issue-tracking)
+- [40. Conclusion: Towards the Autonomous School](#40-conclusion-towards-the-autonomous-school)
+
+
 ## 1. Document Role & Scope
 
 This document is the **definitive technical specification** for transforming EdApex V2 into an autonomous "Agentic School." It serves as the concrete, build-ready contract for the V2 evolution, synthesizing Paperclip's orchestration engine, governance models, and financial ledgers into EdApex's multi-tenant, multi-dialect, Hono-driven architecture.
@@ -1108,9 +1154,14 @@ Transforming V1 assets and logic into the V2 Agentic School.
 2. **Ledger Rollup**: Summarize historical Paperclip spend into the new `finance_events` as an `INITIAL_BALANCE` credit.
 3. **Skill Porting**: Extract `SKILL.md` instructions from the Paperclip skill registry and register them in the Mastra `StandardAdapter` registry.
 
+### 29.3 Dynamic Structural Mapping (Schema-Agnostic Execution)
+EdApex V2 physically deletes the concept of hardcoded "terms", "grades", or "compulsory rules" from the database.
+- **Structure-as-a-Skill**: Educational constructs (e.g., Nigerian 6-3-3-4 or UK A-Levels), school policies, school handbooks (e.g., student handbook, staff handbook, parent handbook, etc.), penalties, enforcement triggers, and academic calendars are codified solely as Mastra AI Skills.
+- **Orchestration**: The `Executive Orchestrator` loads the tenant's exact structural and operational skills at boot, merging them into the context window. It teaches the PBAC, Finance, and Domain Supervisors how to enforce specific guidelines, calculate penalties, and manage school operations entirely dynamically, avoiding schema locking.
+
 ## 30. PBAC Policy Reference (JSON Schemas)
 
-EdApex V2 utilizes a centralized policy registry in D1/KV.
+EdApex V2 utilizes a centralized policy registry in D1/MySQL/PostgreSQL/KV.
 
 ```json
 {
@@ -1289,6 +1340,6 @@ The Agentic School is self-healing via the **IT Supervisor's Auditor Agents**:
 - **Anomaly Detection**: Background agents scan the `cost_events` and `agent_runs` tables for failed tokens or frequent status errors.
 - **Audit Proposals**: When a pattern is detected (e.g., "Recursive tool error in HR Domain"), the AI Auditor creates a `SECURITY_INCIDENT` or `SYSTEM_ISSUE` WorkProduct in the **Board Command Center**.
 
-## 40. Conclusion: Towards the Autonomous School
+## 45. Conclusion: Towards the Autonomous School
 
 The transformation of EdApex V2 into an Agentic School represents a paradigm shift in educational infrastructure. By synthesizing local-first performance, hierarchical multi-agent orchestration, and strict financial governance, we provide a robust, build-ready blueprint for the future of school management...

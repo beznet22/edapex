@@ -1,18 +1,18 @@
 Here is the **fully consolidated, domain-by-domain stress framework**, seamlessly merging your original matrix with the new checklist. Each domain now contains **contextually blended stressors, agentic failure modes, cross-domain chaos chains, and precision tooling**, followed by a **domainless systemic layer** for pre-mortem, HITL, offline, and governance requirements.
 
 > [!IMPORTANT]
-> **Nigerian Education Structure Integration**
-> All frameworks have been aggressively stressed against the real-world operational realities of the Nigerian 6-3-3-4 / 1-9-3-4 continuum:
-> - **ECCDE (Ages 0-6):** High-touch physical presence, authorized guardian pick-ups, pre-primary compulsory validation.
-> - **Lower/Middle/Upper Basic (UBE, Ages 6-14):** Free and compulsory constraints, BECE pre-vocational routing.
-> - **Senior Secondary (Ages 15-17):** High-stakes specialized tracks (Science, Humanities, Business) bounding to WAEC/NECO registrations.
+> **Multi-Structure Global Educational System Integration**
+> The platform thrives on a dynamically-defined, schema-agnostic foundation where every new school determines its structure as a localized "AI Skill." The framework is aggressively stressed against massive cross-structural realities:
+> - **Early Childhood (e.g., ECCDE/Crèche):** High-touch physical presence, authorized guardian pick-ups, compulsory pre-primary completion gates.
+> - **Foundational/Middle Tracks (e.g., UBE, K-8):** Broad compulsory/free public constraints juxtaposed with pre-vocational or regional standard tracking.
+> - **Advanced/Upper Tracks (e.g., SSS, IB, A-Levels):** High-stakes specialized tracks bounding deeply to arbitrary, region-specific portal exports (WAEC, NECO, SAT, UCAS).
 
 ---
 
 ## **1. Academic Domain**
 **⚠️ Stressors**
 - “Impossible” Timetable: More classes than rooms/teachers; requires hall-splitting, core-subject prioritization, or graceful degradation
-- **Senior Secondary Specialization Shock**: Mid-term track jumping (e.g., Science to Humanities in SSS 2) shattering prerequisite chains
+- **Global Track Specialization Shock**: Mid-term track jumping (e.g., IB Arts to Sciences, or Nigerian SSS Science to Humanities) shattering deeply woven prerequisite chains
 - Mid-term withdrawal & 2-year re-enrollment data resurrection
 - Memory poisoning: Premature “graduated” flag breaks longitudinal planning
 - Recursive schedule optimization loops consuming CPU/RAM
@@ -71,8 +71,8 @@ Here is the **fully consolidated, domain-by-domain stress framework**, seamlessl
 ## **3. Assessment Domain**
 **⚠️ Stressors**
 - Goal hijacking attempts to alter grades or skip prerequisites
-- **High-Stakes Examination Panic**: Bulk WAEC/NECO continuous assessment (CASS) exports failing hours before portal closure
-- **UBE / BECE Pipeline Jam**: Pre-vocational skill metrics mismatched with JSS 3 registry parameters
+- **High-Stakes Examination Panic**: Bulk regional/national board portal exports (e.g., WAEC (CASS), SAT, IB) failing hours before portal closure
+- **Structural Pipeline Jam**: Pre-vocational/standardization metrics mismatched with transition phase registries (e.g., BECE, Middle-to-High School gates)
 - Adaptive test difficulty oscillation mid-exam
 - Plagiarism detection false-positive cascade
 - Concurrent rubric edits by multiple graders
@@ -160,7 +160,7 @@ Here is the **fully consolidated, domain-by-domain stress framework**, seamlessl
 ## **6. Communication Domain**
 **⚠️ Stressors**
 - Multi-guardian routing (custodial vs non-custodial vs emergency)
-- **ECCDE Pick-Up & Daily Log Fatigue**: Spammed "nap-time" updates burying critical Crèche medical/allergy routing
+- **Early-Childhood Pick-Up & Daily Log Fatigue**: Spammed "nap-time" or "diaper" updates out-competing and burying critical Crèche medical/allergy routing alerts
 - Broadcast to wrong audience + message duplication storms
 - Email/SMS deliverability blackhole (provider throttling)
 - Notification fatigue → critical alert blindness
@@ -305,7 +305,7 @@ Here is the **fully consolidated, domain-by-domain stress framework**, seamlessl
 ## **11. Finance Domain**
 **⚠️ Stressors**
 - Fractional payments: Scholarship + sibling discount + late fee + currency conversion
-- **UBE Friction (Free vs Paid Collision)**: Free Universal Basic Education (Primary 1 to JSS 3) aggressively colliding with paid ECCDE (Crèche) and Senior Secondary (SSS 1-3) tuition rules within the same family ledger
+- **Compulsory vs Paid Collision**: Regionally mandated free foundational education (e.g., UBE or K-12 public funding) aggressively colliding with paid auxiliary stages (e.g., private Crèche or advanced exam fees) within the exact same family billing ledger
 - Mid-term withdrawal pro-rated refund calculation
 - Bulk billing import latency + duplicate payment detection
 - Tax regulation shift mid-fiscal year → retroactive recalc
@@ -313,7 +313,7 @@ Here is the **fully consolidated, domain-by-domain stress framework**, seamlessl
 
 **🧠 Agentic Risk**
 - Silent rounding drift across microtransactions
-- **Auto-Bills UBE Students**: Violates free/compulsory law by auto-invoicing Middle Basic students based on legacy settings
+- **Auto-Bills Compulsory Tiers**: Violates state/national free-education mandates by auto-invoicing foundational students based on tenant-wide settings intended for auxiliary tiers
 - Misclassifies expenses via embedding drift
 - Auto-processes duplicate invoices during recovery windows
 - Floating-point instability in multi-tier discount stacks

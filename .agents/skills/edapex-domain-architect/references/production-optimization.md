@@ -1,6 +1,6 @@
 # Production Optimization — Edge-Native Performance
 
-EdApex runs on Cloudflare's edge network. Every operation must respect the hard constraints of the Workers runtime. This document defines the canonical optimization strategies for production-grade performance.
+EdApex runs on Cloudflare's edge network. Every operation must respect the hard constraints of the Workers runtime, as detailed in `backend-dev-guidelines`.
 
 ---
 
@@ -8,9 +8,8 @@ EdApex runs on Cloudflare's edge network. Every operation must respect the hard 
 
 ### Hard Constraints
 - **10ms CPU Limit**: All synchronous computation must complete within 10ms. Offload heavy work with `ctx.waitUntil()`.
-- **1MB Query Result Limit**: Paginate large result sets. Use `LIMIT/OFFSET` or cursor-based pagination.
-- **No Distributed Transactions**: Each `db.batch()` call is a single transaction. Cross-table atomic operations must use batching.
-- **25MB Database Size (Free)**: Monitor DB size; archive old audit logs and attendance records quarterly.
+- **1MB Query Result Limit**: Paginate large result sets.
+- **No Distributed Transactions**: Each `db.batch()` call is a single transaction.
 
 ### Optimization Strategies
 ```typescript
@@ -23,28 +22,20 @@ const results = await db.batch([
 // ✅ Use ctx.waitUntil() for non-critical work
 ctx.waitUntil(async () => {
   await eventBus.emit('finance.payment_received', payload);
-  await auditLog.record(action);
 });
-
-// ❌ Never do this — sequential unbatched mutations
-await db.insert(ledgerEntries).values(entry);
-await db.update(bankAccounts).set({ balance: newBalance }); // Separate transaction!
 ```
 
 ### Index Strategy
 - **Composite Indexes**: `(tenant_id, id)` on every operational table.
-- **Covering Indexes**: For frequently queried columns, include them in the index to avoid table lookups.
-- **Partial Indexes**: Use `WHERE active_status = 1` for tables with soft-delete patterns.
-- **Query Plan Auditing**: Use `EXPLAIN QUERY PLAN` locally to validate index usage before deploying new queries.
+- **Covering Indexes**: Include frequently queried columns in the index.
+- **Partial Indexes**: Use `WHERE active_status = 1`.
 
 ---
 
 ## 2. Cloudflare R2 (Object Storage)
-- Store user uploads, documents, and media assets.
-- Generate presigned URLs for secure, time-limited access (TTL: 3600s for downloads, 300s for uploads).
-- Never store file content in D1; store only the R2 key reference.
+- Store documents and media assets.
+- Generate presigned URLs for secure access.
 - **Path Convention**: `tenants/{tenantId}/{ownerType}/{ownerId}/{filename}`.
-- **Lifecycle Rules**: Auto-delete expired temporary uploads after 24 hours.
 
 ---
 
@@ -87,7 +78,6 @@ return response;
 - **3MB Limit**: The total Worker bundle must not exceed 3MB after compression.
 - **Tree Shaking**: Import only what you need from Drizzle ORM and Mastra SDK.
 - **Dynamic Imports**: Use `import()` for rarely-needed modules (e.g., CSV export, PDF generation).
-- **No Heavy Dependencies**: Avoid bundling large libraries. Prefer edge-compatible alternatives.
 - **Bundle Analysis**: Run `wrangler deploy --dry-run --outdir dist` to inspect output size before deploying.
 
 ---
@@ -100,53 +90,16 @@ return response;
 ---
 
 ## 7. Observability & Monitoring
-
-### Structured Logging
-```typescript
-// Standard log format for all services
-console.log(JSON.stringify({
-  level: 'info',
-  tenantId, action: 'payment_received',
-  duration_ms: Date.now() - start,
-  metadata: { amount, ledgerEntryId },
-}));
-```
-
-### Performance Budgets
-| Operation | Budget | Action if Exceeded |
-|:---|:---|:---|
-| Controller → Response | < 50ms wall-clock | Profile DB queries |
-| Repository query | < 5ms CPU | Add covering index |
-| AI agent invocation | < 30s wall-clock | Streaming response |
-| Sync reconciliation | < 100ms | Reduce batch size |
-
-### Health Checks
-- `GET /healthz` — Returns D1 connectivity status, Worker version, and uptime.
-- `GET /readyz` — Returns readiness including KV, R2, and external API reachability.
+- **Structured Logging**: Use JSON format with `tenantId`, `action`, `layer`, and `run_id`.
+- **Performance Budgets**: Controller response < 50ms, Repo query < 5ms CPU.
+- **Proactive AI Issue Tracking**: Auditor agents scan `cost_events` and `agent_runs` for failures, automatically creating `SECURITY_INCIDENT` or `SYSTEM_ISSUE` WorkProducts in the Command Center.
 
 ---
 
-## 8. Disaster Recovery & Data Integrity
-
-### D1 Backup Strategy
-- **Point-in-Time Recovery**: D1 supports automatic 30-day backups.
-- **Export Schedule**: Weekly export of critical tables (ledger_entries, payroll_runs) via scheduled Workers.
-- **Migration Safety**: Always run `wrangler d1 migrations apply edapex_db --local` before `--remote`.
-
-### Data Validation
-- **Ledger Integrity Check**: Monthly scheduled job to verify `SUM(credits) == SUM(debits)` per tenant.
-- **Orphan Detection**: Quarterly scan for records with broken FK references (orphaned enrollments, allocations).
-
----
-
-## 9. Deployment Checklist
-
-Before every production deployment:
-
+## 8. Deployment Checklist
 - [ ] Bundle size < 3MB (`wrangler deploy --dry-run`)
 - [ ] All new queries use tenant_id composite indexes
 - [ ] D1 migrations tested locally first
-- [ ] KV cache invalidation handlers registered for new events
-- [ ] No `console.error` exposing raw SQL or stack traces
-- [ ] Health check endpoint updated if new dependencies added
-- [ ] Sync handlers registered in `frontend/src/lib/sync.ts` for new collections
+- [ ] KV cache invalidation handlers registered
+- [ ] Health check endpoint updated
+- [ ] Sync handlers registered in `frontend/src/lib/sync.ts`

@@ -1,82 +1,78 @@
 # Communication Domain Architecture
 
-## 🎯 Domain Overview
-The Communication domain provides a unified, omni-channel infrastructure for internal and external information exchange. It transitions from fragmented legacy tables to a centralized "Communications Event" hub, enabling structured delivery across Notifications, Email, SMS, Push, and Chat.
+## Overview
+The Communication domain re-architects message dispatching into a unified, multi-channel event system. It replaces 6+ legacy notification and messaging tables with a single `communicationEvents` table supporting polymorphic targeting and per-recipient delivery tracking.
 
-### Key Business Logic (Legacy)
-- **Role-Based Targeting**: Most communication (Notices, Events, Bulk Messages) is filtered by role (Student, Teacher, Parent).
-- **Multi-Channel Dispatch**: Support for simultaneous Email and SMS delivery.
-- **Acknowledgement Tracking**: Legacy notifications track "Read" status, whereas bulk messages only track "Sent".
+### Key Business Logic
+- **Multi-Channel Dispatch**: Supports `notification`, `notice`, `message`, `email`, `sms`, `chat` channels.
+- **Polymorphic Targeting**: `targetType` supports `person`, `role`, `class`, `section`, `broadcast` with `targetRefId` for dynamic resolution.
+- **Priority & Scheduling**: Messages can be scheduled (`scheduledAt`) or sent immediately with priority levels (`low`, `normal`, `high`, `urgent`).
+- **Per-Recipient Tracking**: `communicationRecipients` tracks delivery status per user: `pending` → `sent` → `delivered` / `failed` / `bounced`.
 
-## 📂 Entity Mapping (V1 -> V2)
+---
 
-| Legacy Entity | Table | V2 Entity | Improvement |
-| :--- | :--- | :--- | :--- |
-| Notice Board | `sm_notice_boards` | `communicationEvents` | Consolidates multiple broadcast types into one polymorphic table. |
-| School Events | `sm_events` | `communicationEvents` | Enables shared targeting logic with notices. |
-| Bulk Logs | `sm_email_sms_logs` | `communicationRecipients` | Per-user delivery status tracking for all channels. |
-| Chat History | `chat_conversations` | `chatMessages` (Proposed) | Dedicated storage for high-frequency messaging. |
+## Logic Parity (Legacy to V2)
 
-## 🤖 AI Agent & Tool Integration
+### Schema Mapping
+| Legacy Table (`schoolify`) | V2 Entity (`src/db/domain-communication.ts`) | Notes |
+| :--- | :--- | :--- |
+| `sm_notice_boards` | `communicationEvents` (channel: `notice`) | Notices as events. |
+| `sm_email_sms_logs` | `communicationEvents` (channel: `email`/`sms`) | Unified dispatch. |
+| `sm_communications` / `sm_send_messages` | `communicationEvents` (channel: `message`) | Direct messaging. |
+| `chat_conversations` / `chat_groups` | `communicationEvents` (channel: `chat`) | Chat unified into events. |
+| `chat_group_message_recipients` | `communicationRecipients` | Per-recipient tracking. |
 
-### Task Agents
-- **Moderation Agent**: Scans incoming chat and public news comments for toxicity/PII.
-- **Dispatch Agent**: Optimizes delivery timing based on user activity patterns.
-- **Summary Agent**: Generates daily digests of unread notices and events.
+---
 
-### Structured Tools
-- `send_notification.tool`: Low-level dispatch for single or bulk messages.
-- `moderate_content.tool`: AI utility to flag or redact problematic text.
-- `get_unread_summaries.tool`: Aggregates pending communications for the User Persona.
+## Technical Implementation
 
-## 🛡️ PBAC & Security
-- **Policy: Notice Creation**: Restricted to `role: admin` or `role: principal`.
-- **Policy: Specific Targeting**: Users can only target roles/classes they are associated with (e.g., Teacher to their assigned Class).
-- **Environment Scoping**:
-    - **Tenant Isolation**: Mandatory `tenantId` check on every query.
-    - **Academic Year**: Events are scoped to `academicId` to filter historical calendar items.
+### Core Entities
 
-## 💡 Recommendations & Justifications
+#### [CommunicationEvents](file:///home/beznet/Workspace/edapex/src/db/sqlite/domain-communication.ts#L29)
+Universal dispatch event. `channel` + `targetType` + `targetRefId` for flexible routing. `scheduledAt` for deferred delivery.
 
-### 1. High-Frequency Chat Storage
-**Current State**: `src/db/domain-communication.ts` includes `chat` as a channel in `communicationEvents`.
-**Recommendation**: Implement a dedicated `chatMessages` table for high-frequency exchange to avoid bloat in the audit-heavy `communicationEvents` table.
-**Justification**: Chat requires optimized indexing for `channelId` and `timestamp`, plus specific `moderation_status` flags. *(Note: Live Agentic Classroom streaming chats are wholly excluded from this domain and reside isolated natively in Domain 18's `classroomMemoryLedger` to respect Edge SSE limits).*
+#### [CommunicationRecipients](file:///home/beznet/Workspace/edapex/src/db/sqlite/domain-communication.ts#L59)
+Per-recipient delivery tracking. Status: `pending` → `sent` → `delivered` / `failed` / `bounced`. Tracks `readAt` and `failureReason`.
 
-### 2. Template Versioning in Metadata
-**Recommendation**: Use the `metadata` JSON field to store `template_id` and `version` for external providers (SendGrid/Twilio).
-**Justification**: Ensures reproducibility of sent messages even if templates change over time.
+---
 
-### 3. Moderation State in Events
-**Recommendation**: Record moderation results in the `events` table (Domain: Events) for auditability.
-**Justification**: Provides a centralized log of AI interventions without cluttering the primary communication tables.
+## AI Task Agents & Tools
 
-## 🛡️ Security & Privacy
-- **Tenancy**: Every communication event is strictly scoped to `tenantId`.
-- **RBAC**: Access to "Notice Creation" or "Bulk SMS" is restricted to specific role permissions.
-- **Metadata Protection**: Provider API responses containing PII must be encrypted or scrubbed in logs.
+### Operational Tools (Mastra)
+- `comms.sendBroadcast(message, targets)`: Multi-channel dispatch with target resolution.
+- `comms.resolveTargets(filter)`: High-performance target expansion for broadcasts.
+- `send_broadcast`: Dispatches a message to all users of a specific role/class/section.
+- `resolve_target_users`: Expands a polymorphic target into specific user IDs.
+- `draft_template_message`: AI-generated message from a template with variable substitution.
+- `schedule_reminder`: Creates a scheduled follow-up communication for overdue events.
+- `moderate_chat`: AI content moderation for chat messages.
 
-## 🚀 Transition Strategy
-1.  **Phase 1**: Migrate `sm_notice_boards` and `sm_events` into `communicationEvents`.
-2.  **Phase 2**: Replace legacy traits like `NotificationSend` with a unified `CommunicationService`.
-3.  **Phase 3**: Implement the Moderated Chat infrastructure in a dedicated module.
+### [STRESS DEFENSE] Tools
+- `delivery_retry_engine`: Retries failed SMS/email with exponential backoff.
+- `broadcast_throttle`: Rate-limits broadcast dispatch to prevent provider throttling.
+- `notification_dedup_filter`: Prevents duplicate notifications from event storms.
+- `channel_fallback_router`: Falls back to alternative channels (email → SMS → push) on delivery failure.
+
+---
+
+## PBAC & Security
+- **TenantAdmin**: Full communication access, can broadcast to any target.
+- **Teacher**: Can send messages to their assigned class/section and parents.
+- **Parent**: Can receive messages and reply to teachers.
+- **Student**: Can receive notifications, read-only for notices.
 
 ---
 
 ## Hono API Routes
 
-```
-Routes → CommunicationController → CommunicationService → CommunicationRepository
-```
-
 | Method | Route | Description | Auth |
 |:---|:---|:---|:---|
-| `GET` | `/api/v1/communications` | List communication events | Authenticated |
-| `POST` | `/api/v1/communications` | Create communication event | Teacher+ |
-| `POST` | `/api/v1/communications/broadcast` | Broadcast to role/class | `TenantAdmin` |
-| `GET` | `/api/v1/communications/:id/recipients` | Get recipient delivery status | Teacher+ |
-| `GET` | `/api/v1/notifications` | Get user's notifications | Authenticated |
-| `PATCH` | `/api/v1/notifications/:id/read` | Mark notification as read | Authenticated |
+| `POST` | `/api/v1/communication/send` | Send message | Teacher+ |
+| `POST` | `/api/v1/communication/broadcast` | Send broadcast | `TenantAdmin` |
+| `GET` | `/api/v1/communication/inbox` | Get received messages | Self |
+| `GET` | `/api/v1/communication/sent` | Get sent messages | Self |
+| `GET` | `/api/v1/communication/notices` | List notices | Authenticated |
+| `PATCH` | `/api/v1/communication/:id/read` | Mark as read | Self |
 
 ---
 
@@ -84,10 +80,10 @@ Routes → CommunicationController → CommunicationService → CommunicationRep
 
 | Agent | Type | Capabilities |
 |:---|:---|:---|
-| `communication_supervisor` | Supervisor | Routes messages, manages delivery dispatch |
-| `moderation_agent` | Task | Scans content for toxicity/PII |
-| `dispatch_agent` | Task | Optimizes delivery timing and channel |
-| `summary_agent` | Task | Generates daily digests of unread notices |
+| `communication_dispatcher` | Task | Multi-channel dispatch, target resolution, scheduling |
+| `notification_engine` | Task | Event-driven notification generation from domain events |
+| `chat_moderator` | Task | Content moderation, spam detection |
+| `pr_officer` | Task | Newsletter drafting, public relations messaging |
 
 ---
 
@@ -95,6 +91,6 @@ Routes → CommunicationController → CommunicationService → CommunicationRep
 
 | Event | Payload | Consumers |
 |:---|:---|:---|
-| `comm.event_dispatched` | `{ eventId, channel, recipientCount }` | Events (audit) |
-| `comm.delivery_failed` | `{ recipientId, reason }` | Events (alert), Communication (retry) |
-| `comm.content_moderated` | `{ eventId, approved, flags }` | Events (audit) |
+| `communication.message_sent` | `{ eventId, channel, targetType }` | Events (audit) |
+| `communication.delivery_failed` | `{ eventId, recipientId, reason }` | Communication (retry), Events (audit) |
+| `communication.broadcast_completed` | `{ eventId, recipientCount, channel }` | Events (audit) |

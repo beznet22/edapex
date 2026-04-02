@@ -1,71 +1,75 @@
-# Domain Events Architecture
+# Events & Audit Domain Architecture
 
-## 🎯 Domain Overview
-The **Domain Events** domain is the nervous system of EdApex V2. It facilitates decentralized, asynchronous coordination between the core system and the Hierarchical Multi-Agent System (HMAS). By transitioning from synchronous Laravel hooks to a persistent event bus, EdApex ensures "Planet-Scale" reliability and enables federated AI learning across regional nodes.
+## Overview
+The Events domain implements an event-sourcing and audit-logging pattern across the entire platform. It provides an immutable `events` table for domain event capture with a Transactional Outbox pattern for reliable dispatch, and an `auditLog` table for row-level change tracking across all domains.
 
-## 📂 Legacy Mapping
-The legacy system relied on synchronous controllers, traits (`NotificationSend`), and specialized asynchronous Jobs.
+### Key Business Logic
+- **Event Sourcing**: Every significant state mutation (enrollment, payment, attendance) emits a domain event with typed payload.
+- **Transactional Outbox**: `deliveryStatus` (`pending` → `dispatched` → `failed`) ensures events are reliably processed by consumers even during network failures.
+- **Correlation Tracking**: `correlationId` traces agent workflow chains across multiple domains (e.g., enrollment → fee assignment → notification).
+- **Audit Trail**: Row-level change tracking with `oldValues`/`newValues` JSON for forensic analysis and compliance.
+- **Optimistic Concurrency**: `version` field on events for conflict detection in distributed systems.
 
-| Legacy Entity | Legacy Implementation | V2 Domain Event (`events` table) |
+---
+
+## Logic Parity (Legacy to V2)
+
+### Schema Mapping
+| Legacy Table (`schoolify`) | V2 Entity (`src/db/domain-events.ts`) | Notes |
 | :--- | :--- | :--- |
-| **Notification Triggers** | `NotificationSend::sent_notifications()` | `eventType: '[entity].[action]'`, e.g., `homework.assigned` |
-| **Async Tasks (Jobs)** | `Jobs/SendUserMailJob`, `Jobs/sendSmsJob` | Event Consumer: `communication_supervisor` |
-| **Student Promotion** | `Events/StudentPromotion` | `eventType: 'student.promoted'`, `aggregateType: 'student'` |
-| **User Logs** | `sm_user_logs`, `sm_system_logs` | Unified `audit_log` with `INSERT \| UPDATE \| DELETE` |
-| **Registry Update** | `Chat/Listeners/InstituteRegisteredListener` | `eventType: 'tenant.provisioned'`, `aggregateType: 'tenant'` |
+| `sm_system_logs` | `events` | Event-sourced with typed payloads and outbox pattern. |
+| `sm_user_logs` | `auditLog` | Row-level change tracking with actor. |
 
-## 🏗️ Modern Architecture
+---
 
-### 1. Reliable Event Bus (At-least-once Delivery)
-EdApex V2 implements an **Transactional Outbox Pattern** using the `events` table.
-- **Persistence**: Domain services write events to the `events` table within the same database transaction as the state change.
-- **Dissemination**: A reliable relay service (or Mastra Workflow) reads `events` and publishes them to the active Event Bus (e.g., NATS, Redis Stream, or AI-Node queue).
-- **Acknowledgement**: Consumers (Task Agents) must acknowledge processing. Unacknowledged events are replayed based on a sliding-window retry policy.
+## Technical Implementation
 
-### 2. Event Schema (`events` table)
-- `eventType`: Strong-typed names (e.g., `assessment.result_calculated`).
-- `aggregateType` / `aggregateId`: Points to the specific resource (e.g., `ExamResult`, `Student`).
-- `correlationId`: Essential for HMAS to trace a chain of actions (e.g., `Voice Command -> Plan -> Action 1 -> Action 2`).
+### Core Entities
 
-### 3. Federated AI Integration (Regional Nodes)
-Regional AI nodes subscribe to the `events` stream for two purposes:
-1.  **Immediate Inference**: Triggering a `prediction_agent` when `attendance.marked` shows a streak of absences.
-2.  **Federated Learning**: Anonymized payloads from `events` are aggregated at the regional node level to retrain local models (e.g., localized curriculum difficulty) without original data leaving the tenant's primary storage.
+#### [Events](file:///home/beznet/Workspace/edapex/src/db/sqlite/domain-events.ts#L25)
+Immutable domain event store. `eventType` (e.g., `student.enrolled`), `aggregateType` + `aggregateId` for entity tracking. `correlationId` for workflow chaining. `deliveryStatus` for outbox pattern.
 
-## 🤖 AI Agent & Tool Integration
-Task Agents are the primary consumers of domain events.
+#### [AuditLog](file:///home/beznet/Workspace/edapex/src/db/sqlite/domain-events.ts#L51)
+Row-level change tracking. `action`: `INSERT`/`UPDATE`/`DELETE`. JSON `oldValues`/`newValues` for forensic diff. `changedBy` tracks the actor.
 
-| Agent | Event Subscription | Triggered Action |
-| :--- | :--- | :--- |
-| **Grading Agent** | `exam.marks_uploaded` | Calculates final grades and computes class rankings. |
-| **Attendance Agent** | `attendance.marked` | Analyzes trends and triggers parent notifications for low attendance. |
-| **Fee Recovery Agent** | `fee.due_date_approached` | Generates personalized reminders based on parent payment history. |
+---
 
-## 🔒 PBAC & Security
-- **Tenant Isolation**: Every query to the `events` or `audit_log` table is strictly scoped by `tenant_id`.
-- **Actor Integrity**: The `actor_id` field tracks which user or AI Agent ID triggered the event, ensuring full non-repudiation.
+## AI Task Agents & Tools
 
-## 📝 Recommendations & Justifications
-- **Status Column for Events**: Add a `delivery_status` column (`pending`, `delivered`, `failed`) to the `events` table to explicitly track the outbox state.
-- **Payload Indexing**: Implement `json_extract` generated columns for frequently-queried event fields (e.g., `action_result` within the payload) to optimize agent dashboards.
-- **Audit Data Retention**: Implement a partitioning scheme for `audit_log` based on `changed_at` (monthly) to ensure high-performance queries as the history grows.
+### Operational Tools (Mastra)
+- `events.createEvent(eventData)`: School calendar event initialization.
+- `events.sendInvites(eventId, targets)`: Automated invitation dispatch via Communication domain.
+- `events.checkVenue(venueId, timeslot)`: Dynamic availability check via Facilities domain.
+- `emit_domain_event`: Creates and persists a new domain event with typed payload.
+- `dispatch_pending_events`: Processes the outbox queue, dispatching to consumers.
+- `query_audit_trail`: Searches audit log by table, record, actor, or date range.
+- `generate_compliance_report`: Aggregates audit data into compliance-ready reports.
+- `trace_correlation_chain`: Reconstructs the full workflow chain for a given `correlationId`.
+
+### [STRESS DEFENSE] Tools
+- `event_replay_engine`: Replays failed events from the outbox with idempotency guarantees.
+- `audit_log_integrity_verifier`: Detects and flags audit log tampering attempts.
+- `event_storm_throttle`: Detects and rate-limits event storms from runaway agents.
+- `dead_letter_queue_handler`: Captures permanently failed events for manual review.
+
+---
+
+## PBAC & Security
+- **Events**: Immutable — no UPDATE or DELETE operations.
+- **TenantAdmin**: Can query events and audit logs for their tenant.
+- **Auditor**: Dedicated role for compliance review access.
+- **All Events**: Tenant-scoped via mandatory `tenantId`.
 
 ---
 
 ## Hono API Routes
 
-```
-Routes → EventsController → EventsService → EventsRepository → events/auditLog
-```
-
 | Method | Route | Description | Auth |
 |:---|:---|:---|:---|
-| `GET` | `/api/v1/events` | List events (filtered by type, aggregate) | `TenantAdmin` |
-| `GET` | `/api/v1/events/:id` | Get event detail | `TenantAdmin` |
-| `GET` | `/api/v1/events/pending` | List pending outbox events | `SystemAdmin` |
-| `POST` | `/api/v1/events/:id/dispatch` | Manually dispatch event | `SystemAdmin` |
-| `GET` | `/api/v1/audit-log` | Query audit trail | `TenantAdmin` |
-| `GET` | `/api/v1/audit-log/:aggregateType/:id` | Audit history for entity | `TenantAdmin` |
+| `GET` | `/api/v1/events` | Query domain events | `TenantAdmin` |
+| `GET` | `/api/v1/events/:correlationId` | Trace workflow chain | `TenantAdmin` |
+| `GET` | `/api/v1/audit-log` | Query audit log | `TenantAdmin` |
+| `GET` | `/api/v1/audit-log/:table/:recordId` | Get record change history | `TenantAdmin` |
 
 ---
 
@@ -73,19 +77,17 @@ Routes → EventsController → EventsService → EventsRepository → events/au
 
 | Agent | Type | Capabilities |
 |:---|:---|:---|
-| `event_relay` | Background | Polls pending events, dispatches to bus |
-| `audit_analyzer` | Task | Detects anomalous patterns in audit trail |
+| `event_dispatcher` | Task | Outbox processing, consumer notification, retry logic |
+| `audit_watchdog` | Task | Integrity verification, tamper detection |
+| `compliance_reporter` | Task | Report generation, correlation chain analysis |
+| `event_planner` | Task | School calendar events, invitations, venue management |
 
 ---
 
-## Outbox Lifecycle
+## Domain Events
 
-```mermaid
-graph LR
-    A[Domain Service] -->|INSERT event| B["events (pending)"]
-    B -->|Relay polls| C{event_relay agent}
-    C -->|Publish| D[Event Bus]
-    D -->|Consume| E[Task Agents]
-    C -->|Update| F["events (dispatched)"]
-    C -->|Retry exceeded| G["events (failed)"]
-```
+| Event | Payload | Consumers |
+|:---|:---|:---|
+| `events.dispatch_failed` | `{ eventId, error, retryCount }` | Events (dead letter), Communication (admin alert) |
+| `events.audit_tampered` | `{ logId, violationType }` | PBAC (lockout), Communication (security alert) |
+| `events.outbox_cleared` | `{ processedCount, failedCount }` | Events (telemetry) |

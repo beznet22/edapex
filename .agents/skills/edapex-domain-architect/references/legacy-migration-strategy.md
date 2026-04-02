@@ -55,20 +55,16 @@ For each critical user journey:
 
 ## 3. Legacy-to-V2 Layer Mapping
 
-| Legacy Pattern | V2 Architecture Target |
-|:---|:---|
-| Express/Laravel routes | `src/controllers/[module].controller.ts` via `BaseController` |
-| Inline request validation | `src/validators/[module].validator.ts` via Zod schemas |
-| Fat controllers with DB queries | `src/services/[module].service.ts` (business logic) + `src/domain/repositories/` (data access) |
-| Raw SQL / Eloquent / Sequelize queries | `src/db/sqlite/domain-[module].ts` (Drizzle schema) + `src/domain/repositories/sqlite/[module].repository.ts` |
-| `if/else` role checks in controllers | PBAC policy definitions in `src/domain/pbac/` |
-| `sendMail()` calls in controllers | Domain events → Communication service subscriber |
-| File uploads to local disk | Cloudflare R2 with presigned URLs via Documents domain |
-| Session-based auth | JWT/Bearer token via Hono middleware |
-| Cron jobs | Cloudflare Workers scheduled events or domain event triggers |
-| Frontend templates (Blade/EJS) | TanStack Start SPA + Shadcn UI components |
-| jQuery/Bootstrap UI | React 19 + Tailwind CSS v4 + Lucide React |
-| Local database (MySQL/PostgreSQL) | Cloudflare D1 (SQLite) with tenant_id partitioning |
+| Legacy Pattern | V2 Architecture Target | Authority / Skill |
+|:---|:---|:---|
+| Fat controllers | `src/controllers/` (Envelope) → `src/supervisors/` (HMAS) | `mastra` |
+| Request validation | `src/validators/` (Zod schemas) | Zod |
+| Service logic | `src/services/` (Pure rules) | `backend-architect` |
+| Model/ORM queries | `src/db/sqlite/` (Drizzle) + `repositories/` | `database-architect` |
+| Hardcoded RBAC | PBAC DSL in `src/domain/pbac/` | PBAC Domain |
+| Local File Store | Cloudflare R2 + Documents Domain | R2 / Documents |
+| Blade/EJS/jQuery | TanStack Start SPA + Tailwind v4 + Lucide | `ui-ux-pro-max` |
+| Traditional DB | Cloudflare D1 (SQLite) with UUID v7 | D1 / Drizzle |
 
 ---
 
@@ -76,96 +72,41 @@ For each critical user journey:
 
 ### Step 1: Schema Translation
 ```typescript
-// Legacy: MySQL/PostgreSQL table
-// CREATE TABLE students (
-//   id INT AUTO_INCREMENT PRIMARY KEY,
-//   school_id INT NOT NULL,
-//   name VARCHAR(255),
-//   class_id INT REFERENCES classes(id),
-//   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-// )
-
-// V2: Drizzle D1 Schema
+// V2: Drizzle D1 Schema with UUID v7
 export const students = sqliteTable('students', {
-  id: integer('id').primaryKey({ autoIncrement: true }),
-  tenantId: integer('tenant_id').notNull(),  // school_id → tenant_id
+  id: text('id').primaryKey().$defaultFn(() => uuid7()), // UUID v7 mandated
+  tenantId: text('tenant_id').notNull(),                // Strong multi-tenancy
   name: text('name').notNull(),
-  classId: integer('class_id').references(() => classes.id),
+  classId: text('class_id').references(() => classes.id),
   createdAt: text('created_at').default(sql`(datetime('now'))`),
 }, (table) => [
   index('idx_students_tenant').on(table.tenantId, table.id),
 ]);
 ```
 
-> [!WARNING]
-> Every `school_id`, `organization_id`, or `institute_id` in legacy code maps to `tenant_id` in V2. This is the MOST critical mapping.
-
-### Step 2: Business Logic Extraction → Service Layer
+### Step 2: HMAS Business Logic Extraction
 ```typescript
-// Legacy: Fat controller with inline business logic
-// app.post('/fees/assign', (req, res) => {
-//   const students = db.query('SELECT * FROM students WHERE class_id = ?', [req.body.class_id]);
-//   students.forEach(s => {
-//     db.query('INSERT INTO fee_assignments (student_id, amount) VALUES (?, ?)', [s.id, req.body.amount]);
-//   });
-//   sendEmail(students, 'Fee assigned');
-//   res.json({ success: true });
-// })
-
-// V2: Separated into layers
 // Controller — only HTTP envelope
 async assignFees(c: Context) {
   const data = FinanceValidator.assignFeesSchema.parse(await c.req.json());
-  const result = await this.financeService.assignFeesToStudents(c.get('tenantId'), data);
+  const result = await this.financeSupervisor.assignFees(c.get('tenantId'), data);
   return BaseController.sendSuccess(c, result, 'Fees assigned', 201);
 }
 
-// Service — business logic only
-async assignFeesToStudents(tenantId: number, data: AssignFeesInput) {
+// Supervisor (HMAS) — orchestration
+async assignFees(tenantId: string, data: AssignFeesInput) {
   const students = await this.academicRepo.getStudentsByClass(tenantId, data.classId);
-  const assignments = students.map(s => ({
-    tenantId, studentId: s.id, amount: data.amount, status: 'pending',
-  }));
-  const result = await this.financeRepo.createFeeAssignments(tenantId, assignments);
-  await this.eventBus.emit('finance.fees_assigned', { tenantId, classId: data.classId, count: students.length });
+  const result = await this.financeService.processBulkAssignments(tenantId, students, data.amount);
+  await this.eventBus.emit('finance.fees_assigned', { tenantId, count: students.length });
   return result;
 }
-
-// Repository — data access only
-async createFeeAssignments(tenantId: number, assignments: NewFeeAssignment[]) {
-  return this.db.batch(
-    assignments.map(a => this.db.insert(feeAssignments).values(a).returning())
-  );
-}
 ```
 
-### Step 3: Authorization Migration
-```typescript
-// Legacy: Inline role check
-// if (req.user.role !== 'admin' && req.user.role !== 'accountant') {
-//   return res.status(403).json({ error: 'Forbidden' });
-// }
-
-// V2: PBAC policy
-{
-  action: 'finance.fees.assign',
-  subject: { roles: ['admin', 'accountant'] },
-  conditions: { tenantId: '${subject.tenantId}' },
-  effect: 'allow'
-}
-// Evaluated automatically by PbacMiddleware before controller executes
-```
-
-### Step 4: Frontend Migration
-```
-Legacy jQuery/Bootstrap:      → React 19 component with Shadcn UI
-Legacy AJAX calls:            → TanStack Query with structured query keys
-Legacy localStorage:          → TanStack DB collection with sync handler
-Legacy form validation:       → Zod schema + React Hook Form
-Legacy event listeners:       → React hooks (useEffect, useCallback)
-Legacy template rendering:    → JSX with Tailwind CSS v4 utilities
-Legacy icon fonts (FA/Glphy): → Lucide React (import { Icon } from 'lucide-react')
-```
+### Step 3: Frontend Migration (`web-artifacts-builder`)
+- **Move to React 19 / TanStack Start**.
+- **Replace CSS with Tailwind v4 `@theme`**.
+- **Replace Fetch with TanStack DB `useLiveQuery`**.
+- **Replace icon fonts with Lucide React (import { Icon } from 'lucide-react')**
 
 ---
 
@@ -231,3 +172,4 @@ After completing a module migration, produce a report:
 ## Technical Debt
 - [List any shortcuts taken that need future work]
 ```
+

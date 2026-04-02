@@ -28,6 +28,7 @@ export type PolicyDefinition = {
   actions: string[]; // e.g. ["read", "write", "delete"]
   resources: string[]; // e.g. ["student:*", "finance:invoice"]
   conditions?: PolicyCondition[];
+  context?: Record<string, unknown>; // Allows dynamic structural bindings (e.g. { "structure": "6-3-3-4" })
 };
 
 export const policyDefinitions = sqliteTable("domain_pbac_policy_definitions", {

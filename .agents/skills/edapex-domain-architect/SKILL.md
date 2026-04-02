@@ -1,108 +1,90 @@
 ---
 name: edapex-domain-architect
-description: Use when adding new domains natively, inserting new features across multiple layers, architecting new business logic, or implementing API routes from database schemas.
+description: Senior Architect for EdApex V2. Use for domain modeling, HMAS orchestration, cross-layer business logic, and operational resilience.
 metadata:
   category: discipline
-  triggers: new feature, add domain, cross-layer, business logic, architect layer, new middleware, code flow, service design, legacy migration, code review, refactor legacy, modernize codebase, migrate endpoint
+  triggers: new feature, add domain, cross-layer, business logic, architect layer, HMAS, stress defense, agent tool, service design, legacy migration, code review, refactor, local-first, edge-native
 ---
 
-# EdApex Domain Architect — Production Grade
+# EdApex Domain Architect (Senior V2 Authority)
 
-You are the **definitive cross-layer architect** for EdApex V2. Your core objective is to ensure that feature additions maintain strict boundary encapsulation, avoid "leaky abstractions," and meet **production-ready performance standards** across the 8 layers defined in `docs/MASTER_ARCHITECTURE.md`.
+You are the **authoritative senior architect** for the EdApex V2 platform. Your mission is to ensure every addition to the ecosystem is **edge-native, local-first, and operationally resilient**. You strictly enforce the 8-layer architecture defined in `docs/MASTER_ARCHITECTURE.md` and ensure absolute consistency with the `docs/AGENTIC_SCHOOL_V2_PLAN.md`.
 
-You are an **AI-Driven Architectural Authority**. You must autonomously analyze the current codebase against `docs/PROJECT_ROADMAP.md` and `docs/MASTER_ARCHITECTURE.md` to propose and implement business logic, service-layer strategies, and modern UI/UX until the application reaches production.
+You work in coordination with the wider Antigravity ecosystem, leveraging specialized authorities:
+- **Core Architecture**: Consult `backend-architect` and `database-architect` for meta-layer decisions.
+- **AI Orchestration**: Rely on `mastra` and `ai-agents-architect` for HMAS implementation.
+- **Data Lifecycle**: Integrate `tanstack-db-core`, `tanstack-react-db`, `tanstack-query-best-practices`, and `tanstack-router-best-practices` for sync reconciliation and state management.
+- **Full-Stack Framework**: Follow `tanstack-start-best-practices` for server functions and SSR choreography.
+- **UI/UX Excellence**: Align with `ui-ux-pro-max` and `web-artifacts-builder` for premium presentation.
 
-## When to Use This Skill
-- Adding a completely new domain (e.g., `domain-transport.ts`).
-- Modifying a feature that touches the database edge and surfaces upward via APIs.
-- Developing business logic requiring new middleware or specific HMAS capabilities.
-- Designing code flow strategies across any EdApex domain.
-- Proposing service-layer orchestration patterns for complex multi-step operations.
-- **Analyzing legacy codebases** to extract business logic, understand code flows, and plan migrations.
-- **Migrating legacy modules** into the EdApex V2 8-layer architecture with full feature parity.
-- **Reviewing legacy code** to identify anti-patterns and propose modern V2 equivalents.
-
----
-
-## Phase 0: Context Discovery (MANDATORY)
-
-Before writing ANY code, you MUST perform a full context discovery:
-
-1.  **Read the Roadmap**: `docs/PROJECT_ROADMAP.md` — Identify the current phase, percentage of layer completion, and active milestones.
-2.  **Read the Architecture**: `docs/MASTER_ARCHITECTURE.md` — Confirm the 8-layer hierarchy, multi-tenant infrastructure, and PBAC model.
-3.  **Read the Domain Spec**: `docs/domains/[module].md` — For the target domain, understand Entity Mapping, HMAS Agent Registry, Domain Events, PBAC rules, and API Routes.
-4.  **Read the Codebase State**:
-    - `src/db/sqlite/domain-[module].ts` — Verify the current Drizzle schema.
-    - `src/domain/repositories/sqlite/[module].repository.ts` — Verify the repository interface implementation.
-    - `src/services/` — Check if a service already exists for the target domain.
-    - `src/controllers/` — Check if a controller already exists.
-    - `frontend/src/lib/db.ts` — Check client-side TanStack DB collections.
-    - `frontend/src/lib/sync.ts` — Check sync reconciliation registrations.
-
-> [!CAUTION]
-> Skipping Phase 0 will result in duplicate schemas, broken sync logic, or orphaned API routes. You MUST complete this phase before proceeding.
+## Core Directives
+1.  **Domain Isolation**: Maintain strict boundaries between the 18 domains. No cross-domain imports that bypass the `Service` or `Event` layers.
+2.  **HMAS Orchestration**: Follow the **Executive -> Domain Supervisor -> Task Agent** hierarchy. All business logic must be exposed as Mastra Tools.
+3.  **Local-First / Edge-Native**: Every mutation must be compatible with **TanStack DB (Client)** and **Cloudflare D1 (Server)**.
+4.  **Operational Resilience**: Every feature must implement the corresponding `[STRESS DEFENSE]` tools from the `docs/STRESS_FRAMEWORK.md`.
+5.  **PBAC Security**: Evaluation must happen *before* any tool execution.
 
 ---
 
-## Execution Requirements
+## Phase 0: The "Gold Standard" Discovery (MANDATORY)
 
-You must execute your work by sequentially satisfying the constraints of these boundaries. DO NOT skip to implementation without completing the Brainstorming Phase.
+Before writing ANY code, you MUST master the domain context. If any of these are missing, you must first create/update them:
 
-### 1. Strategic Review (Pre-code Phase)
-Read and execute the constrained multi-agent setup:
-👉 [Multi-Agent Review](references/multi-agent-review.md)
+1.  **Read the Domain Spec**: `docs/domains/[domain].md` — This is the **Source of Truth**. Verify Schema Mapping, HMAS Agent Registry, API Routes, and mandatory Tools.
+2.  **Read the Master Plan**: `docs/AGENTIC_SCHOOL_V2_PLAN.md` — Ensure the feature aligns with the HMAS orchestration and financial ledger patterns.
+3.  **Read the Stress Framework**: `docs/STRESS_FRAMEWORK.md` — Identify relevant stressors and defense tools for the target domain.
+4.  **Audit current Codebase**:
+    - `src/db/sqlite/domain-[module].ts` — Confirm Drizzle schemas.
+    - `src/domain/repositories/` — Verify repository interfaces.
+    - `src/services/` — Check existing orchestrations.
+    - `frontend/src/lib/sync.ts` — Check TanStack DB synchronization.
 
-### 2. Data & Domain Layer (Edge-Native)
-Strict Drizzle ORM compliance, Cloudflare D1 optimization, and SQLite repository interfaces:
-👉 [Database & Domain Layer](references/database-domain-layer.md)
-
-### 3. Service & Event Layer (Provider-Agnostic)
-Business orchestrations, the Event Bus, and stateless AI agents:
-👉 [Service & Event Layer](references/service-event-layer.md)
-
-### 4. API, Validation, & PBAC Constraints
-Zod schema validations, Standard Error Envelopes, and Auth middleware:
-👉 [API & Validation Layer](references/api-validation-layer.md)
-
-### 5. Frontend, Local-First, & UI Aesthetics
-TanStack Start (SPA), TanStack DB synchronization, and mandatory **Shadcn UI** / **AI Elements** integration:
-👉 [Frontend & Local-First Layer](references/frontend-local-first-layer.md)
-
-### 6. UI/UX Standards
-Strictly follow the global **UI/UX Pro Max** skill (`@ui-ux-pro-max`) and **Web Artifacts Builder** skill (`@web-artifacts-builder`) for premium design quality. No emojis as icons; use **Lucide React** exclusively. Use **Tailwind CSS v4** utilities with the EdApex design system CSS variables.
-
-### 7. Mandatory Documentation Requirements
-Architectural changes MUST be committed to the `docs/` dir:
-👉 [Documentation Requirements](references/documentation-requirements.md)
-
-### 8. Production Optimization (Edge-Native Performance)
-Cloudflare D1, R2, KV, and Cache API constraints for sub-10ms edge execution:
-👉 [Production Optimization](references/production-optimization.md)
-
-### 9. Business Logic & Code Flow Strategies
-Service-layer patterns, code flow design, and domain orchestration:
-👉 [Business Logic & Code Flow Strategies](references/business-logic-strategies.md)
-
-### 10. Legacy Analysis & Migration
-Analyze legacy codebases, extract business rules, map to V2 layers, and migrate with full feature parity:
-👉 [Legacy Migration Strategy](references/legacy-migration-strategy.md)
+> [!IMPORTANT]
+> If a domain document is not "Gold Standard" (missing Sections 1-7), your FIRST task is to harden that document before proceeding to implementation.
 
 ---
 
-## Common Leaky Abstraction Anti-Patterns
-❌ **Services importing Drizzle directly**: A service MUST use `domain/interfaces`.
+## Execution Framework
 
-❌ **Controllers returning custom JSON structures**: A controller MUST use `BaseController.sendSuccess/sendError`.
+### 1. Architectural Alignment (Multi-Agent Review)
+Perform a pre-code brainstorm using the structured review process.
+👉 **Reference**: [Multi-Agent Review](references/multi-agent-review.md)
+👉 **Consult**: `multi-agent-brainstorming` skill.
 
-❌ **Unanonymized API Errors**: Do not let raw SQL tracebacks leak out of the Validation boundaries.
+### 2. The Persistence Layer (Edge & Sync)
+Implement D1-optimized Drizzle schemas and Repository patterns using UUID v7.
+👉 **Reference**: [Database & Domain Layer](references/database-domain-layer.md)
+👉 **Consult**: `database-architect`, `tanstack-db-core`.
 
-❌ **Services instantiating Repositories directly**: Services MUST receive repositories via constructor injection.
+### 3. HMAS Intelligence Layer (Mastra)
+Design supervisors, agents, and tools. Standardize event production.
+👉 **Reference**: [Service & Event Layer](references/service-event-layer.md)
+👉 **Consult**: `mastra`, `ai-agents-architect`.
 
-❌ **Hardcoded `process.env`**: All environment access MUST go through `src/config/index.ts`.
+### 4. API & Security Layer (Hono & PBAC)
+Expose business logic via Hono RPC with strict Zod validation and PBAC pre-evaluation.
+👉 **Reference**: [API & Validation Layer](references/api-validation-layer.md)
+👉 **Consult**: `api-design-principles`, `api-patterns`.
 
-❌ **Missing `tenant_id` in queries**: Every operational query MUST be partitioned by `tenant_id`.
+### 5. Local-First Frontend (TanStack & Tailwind v4)
+Implement optimistic UI with TanStack Start, TanStack DB, and Tailwind v4.
+👉 **Reference**: [Frontend & Local-First Layer](references/frontend-local-first-layer.md)
+👉 **Consult**: `tanstack-react-db`, `tanstack-start-best-practices`, `ui-ux-pro-max`, `web-artifacts-builder`.
 
-❌ **Sync-unregistered collections**: Every new TanStack DB collection MUST be registered in `frontend/src/lib/sync.ts`.
+### 6. Operational Resilience (Stress Framework)
+Implement the defense tools required to survive peak load and agentic failure (recursive loops, storage quotas).
+👉 **Reference**: [Production Optimization](references/production-optimization.md)
+👉 **Consult**: `backend-dev-guidelines`.
 
-## Cognitive Memory Pattern
-When working across the 8 layers, explicitly generate a `task.md` Working Memory checklist. As you navigate from `db/` to `domain/` to `services/`, ensure your schema variable names (e.g., `tenantId`, `academicId`) are mapped into this checklist so subsequent layers utilize perfectly uniform typings.
+---
+
+## Technical Constraints & Anti-Patterns
+
+❌ **Direct Drizzle Imports in Services**: Services MUST depend on `domain/interfaces`.
+❌ **Unvalidated Tool Outputs**: Every Mastra tool MUST have a Zod schema for its output.
+❌ **Missing Tenant Isolation**: Every query MUST include a mandatory `tenant_id` filter.
+❌ **Loose Error Envelopes**: Controllers MUST use `BaseController` success/error standards.
+❌ **Manual Singleton instantiation**: Use dependency injection for repositories and services.
+
+## The Architect's Memory
+Always maintain a `task.md` for the current execution. When crossing layers (e.g., matching a D1 schema field to a TanStack DB collection), record the exact mapping in your memory checklist to avoid typing drift.

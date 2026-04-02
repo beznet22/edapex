@@ -5,18 +5,43 @@ Deploy the "Brain" of the Agentic School. Map the strategic HMAS orchestration (
 
 ## 📜 CORE CONSTRAINTS & TRANSFORMATION POLICY
 - **MASTRA SDK**: All agents must be defined using the Mastra SDK (`Agent` and `Workflow` classes).
-- **TOOL INTEGRITY**: Tools must be validated against JSON schemas and mapped 1:1 to the 18 `IRepository<T>` domain interfaces (including Domain 18: Classroom).
+- **SKILL-AS-A-STRUCTURE**: You MUST implement the "Structure-as-a-Skill" pattern. Educational constructs, school policies, and handbooks are loaded as AI Skills, NOT hardcoded in schemas.
+- **TOOL INTEGRITY**: Tools must be validated against JSON schemas and mapped 1:1 to the 18 `IRepository<T>` domain interfaces.
+- **AGENT RESILIENCE**: Implement `recursive_loop_breaker` and `context_window_throttler` in the agent execution loop to prevent amnesia or token-loop deadlocks.
 - **HIERARCHICAL FLOW**: Principal Assistant decomposes goals -> Domain Supervisors oversee silos -> Task Agents execute specialized tools.
+- **LAYER 1 RESILIENCE**: Every agent definition must include unit tests for systemic stressors (e.g., prompt injection, recursive loops).
 - **TEST DRIVEN**: The agent MUST run and pass automated testing (unit/integration) before completing this phase.
 - **GIT COMMIT**: The agent MUST create a standard git commit with AI attribution before signing out.
 - **SCOPE LOCK**: Do NOT modify files or domains outside the explicit scope of this phase.
 - **ESCALATION PROTOCOL**: If you encounter missing context, undocumented relations, or ambiguity, DO NOT HALLUCINATE. Pause and request clarification via `notify_user`.
 - **STRICT TYPECHECK**: Run `pnpm tsc --noEmit` on all modified files. You must resolve all TypeScript errors before signing out.
+- **PERSONA-CENTRIC FLOWS**: For every agent defined, you MUST first update its respective domain documentation (docs/domains/[module].md) with a "Professional Persona Flow" narrative. This narrative must describe how the real-world professional (Registrar, Bursar, etc.) interacts with the HMAS Supervisor and tools to achieve a business goal, using descriptive prose instead of code snippets.
 - **EXECUTION PLAN**: Before writing code, you MUST create a localized `docs/plans/phase-2-hmas-plan.md` detailing the precise files you will create/modify.
 
 ## 📦 Required Context & Skills
 - **Spec**: [AGENTIC_SCHOOL_V2_PLAN.md](../AGENTIC_SCHOOL_V2_PLAN.md) (Sections 13 and 36, Role Library & Domains).
-- **Domain Specs**: Read `docs/domains/*.md` (especially `ai.md` and `classroom.md`) for low-level technical execution details.
+- **Stress Framework**: [STRESS_FRAMEWORK.md](../STRESS_FRAMEWORK.md).
+- **Domain Specs** (MANDATORY — read ALL before defining agents and tools):
+  - [core.md](../domains/core.md): Identity, tenancy, personas, academic years.
+  - [academic.md](../domains/academic.md): Classes, sections, subjects, routines, promotions.
+  - [assessment.md](../domains/assessment.md): Exams, grading, results, report cards.
+  - [attendance.md](../domains/attendance.md): Unified attendance records.
+  - [finance.md](../domains/finance.md): Ledger, fees, payments, invoicing.
+  - [lms.md](../domains/lms.md): Courses, lessons, assignments, AI tutoring, learning paths.
+  - [hr.md](../domains/hr.md): Leave, payroll, evaluations.
+  - [facilities.md](../domains/facilities.md): Transport, dormitories, inventory, complaints.
+  - [ai.md](../domains/ai.md): Chat, agents, actions, tool invocations.
+  - [classroom.md](../domains/classroom.md): Sessions, memory ledger, whiteboard, participants.
+  - [homeschooling.md](../domains/homeschooling.md): Subscriptions, portfolios, schedules, revenue.
+  - [library.md](../domains/library.md): Books, issues, borrower profiles.
+  - [pbac.md](../domains/pbac.md): Policies, role assignments, policy bindings.
+  - [communication.md](../domains/communication.md): Multi-channel dispatch, recipient tracking.
+  - [events.md](../domains/events.md): Domain events, audit log, outbox.
+  - [settings.md](../domains/settings.md): Config, feature flags.
+  - [cms.md](../domains/cms.md): Content nodes, navigation.
+  - [documents.md](../domains/documents.md): Polymorphic file storage.
+- **TOOL MANDATE**: Each domain doc lists operational tools AND `[STRESS DEFENSE]` tools in the "AI Task Agents & Tools" section. When defining agents for a domain, ALL listed tools MUST be registered as Mastra tool definitions. The domain docs are the canonical source — tools there are not optional.
+- **AGENT REGISTRY**: Each domain doc has an "HMAS Agent Registry" table. Use these as the definitive agent definitions per domain.
 - **Target Domains**: ALL 18 Domains (including Classroom).
 - **Required Skills**:
   - `mastra` (Strict usage of Agent and Workflow abstractions)
@@ -27,8 +52,8 @@ Deploy the "Brain" of the Agentic School. Map the strategic HMAS orchestration (
 
 ### 1. The Executive Orchestrator
 Implement the `PrincipalAssistant` in `src/services/ai/principal.service.ts`.
-- Handles high-level goals (e.g., "Scale the Academic Program").
-- Decomposes into `SubGoals` for Domain Supervisors (Academic Head, Bursar).
+- **Skill Load**: At boot, load the tenant's exact **Structural Skill** (e.g. 6-3-3-4), **School Policy Skills**, and **Academic Calendar** into the orchestration context.
+- **Goal Decomposition**: Decomposes high-level goals into `SubGoals` for Domain Supervisors while enforcing skill-based constraints (e.g. "UBEC is free education").
 
 ### 2. The Staff Role Library
 Generate the 31+ specialized agent definitions in `src/services/ai/roles/`.
@@ -46,7 +71,8 @@ Generate the 31+ specialized agent definitions in `src/services/ai/roles/`.
 - [ ] `pnpm tsc --noEmit` strictly passed with zero errors.
 - [ ] 31+ Agent definitions verifiable via Mastra.
 - [ ] Zero-error tool registration across all 18 domains.
-- [ ] Goal decomposition trace verifiable through logs.
+- [ ] Goal decomposition trace verifiable through logs, including Skill-based constraints.
+- [ ] Layer 1 Resilience verified for `recursive_loop_breaker` and `context_window_throttler`.
 - [ ] All automated tests passed.
 - [ ] Code staged and committed with AI attribution.
 - [ ] Update `docs/PROJECT_ROADMAP.md` (Phase 2 marked as COMPLETE).

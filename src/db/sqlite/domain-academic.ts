@@ -20,6 +20,14 @@ import { generateId } from "../utils/id";
 
 import { users, tenants, academicYears, accounts } from "./domain-core";
 
+// --- STRUCTURAL METADATA TYPES ---
+export type AcademicStructuralMetadata = {
+  isCompulsory?: boolean; // Protects free tracks (UBE, K-8 public) from auxiliary billing
+  trackFamily?: string;   // Anchors specialization jumping (e.g., 'ib_science', 'sss_humanities')
+  customTags?: string[];  // Dynamic AI Skill context
+  [key: string]: unknown;
+};
+
 // Unified Classes & Sections — replaces sm_classes, sm_sections, sm_class_sections, sm_subjects
 
 export const classes = sqliteTable("domain_academic_classes", {
@@ -28,6 +36,7 @@ export const classes = sqliteTable("domain_academic_classes", {
   name: text("name", { length: 200 }).notNull(),
   passMark: real("pass_mark"),
   academicId: text("academic_id").notNull().references(() => academicYears.id),
+  metadata: text("metadata", { mode: "json" }).$type<AcademicStructuralMetadata>(),
   activeStatus: integer("active_status").notNull().default(1),
   createdAt: integer("created_at", { mode: "timestamp" }).defaultNow(),
   updatedAt: integer("updated_at", { mode: "timestamp" }).defaultNow(),
@@ -39,6 +48,7 @@ export const sections = sqliteTable("domain_academic_sections", {
   id: text("id").primaryKey().$defaultFn(() => generateId()),
   tenantId: text("tenant_id").notNull().references(() => tenants.id),
   name: text("name", { length: 200 }).notNull(),
+  metadata: text("metadata", { mode: "json" }).$type<AcademicStructuralMetadata>(),
   activeStatus: integer("active_status").notNull().default(1),
   createdAt: integer("created_at", { mode: "timestamp" }).defaultNow(),
   updatedAt: integer("updated_at", { mode: "timestamp" }).defaultNow(),
@@ -63,9 +73,10 @@ export const subjects = sqliteTable("domain_academic_subjects", {
   tenantId: text("tenant_id").notNull().references(() => tenants.id),
   name: text("name", { length: 255 }).notNull(),
   code: text("code", { length: 100 }),
-  type: text("type", { enum: ["theory", "practical"] }).notNull(),
+  type: text("type", { enum: ["theory", "practical", "vocational", "hybrid"] }).notNull(),
   passMark: real("pass_mark"),
   academicId: text("academic_id").notNull().references(() => academicYears.id),
+  metadata: text("metadata", { mode: "json" }).$type<AcademicStructuralMetadata>(),
   activeStatus: integer("active_status").notNull().default(1),
   createdAt: integer("created_at", { mode: "timestamp" }).defaultNow(),
   updatedAt: integer("updated_at", { mode: "timestamp" }).defaultNow(),

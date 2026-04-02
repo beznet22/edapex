@@ -1,45 +1,107 @@
-# EdApex Domain Architecture: Homeschooling
+# Homeschooling Domain Architecture
 
-## 1. Domain Overview
-The `Homeschooling` domain is a greenfield addition to the EdApex Planet-Scale Architecture, targeting the B2C and B2B2C markets. It enables alternative learning pathways outside the conventional school system by delivering the National Curriculum (NERDC) from Early Childhood (ECCDE) through to Senior Secondary.
-It introduces specialized operations such as flexible `homeschool_subscriptions`, management of TRCN-certified facilitators natively grouped as a core `userType` Persona, and automated `revenue_shares` designed to empower and compensate teachers dynamically based on their interaction metrics.
+## Overview
+The Homeschooling domain enables B2C and cooperative homeschool families to operate as lightweight tenants with subscription-based access to LMS courses, facilitator revenue sharing, student portfolios, and flexible scheduling. It bridges the institutional LMS with family-driven, self-paced learning.
 
-Crucially, it acts as a specialized administrative wrapper operating **inside the entire core school management system infrastructure**. It natively links with the `LMS` and `Academic` domains for curriculum delivery, and the `HR` domain to support robust, multi-tiered facilitator compensation models (`salaried`, `contractor` revenue-shares, or `hybrid`).
+### Key Business Logic
+- **Subscription Plans**: `basic`, `family`, `premium`, `b2b_micro` with renewal tracking and status lifecycle (`active`, `past_due`, `canceled`, `trial`).
+- **Revenue Sharing**: Facilitators earn `baseAmount` + `performanceBonus` per period, reconciled to the Finance ledger via `ledgerEntryId`.
+- **Student Portfolios**: Evidence-based achievement tracking (`project`, `exam`, `artwork`, `certification`) linked to LMS courses and submissions.
+- **Flexible Scheduling**: Per-student daily schedules linked to Academic subjects and LMS lessons with status tracking.
 
-## 2. Entity Mapping (V1 -> V2)
-The legacy `schoolify` monolith (InfixEdu) strictly operated on a conventional B2B institutional framework. Therefore, the Homeschooling schema is entirely native to EdApex V2.
+---
 
-| Legacy V1 (InfixEdu) | Modern V2 (Drizzle ORM) | Purpose / Improvement |
+## Logic Parity (Legacy to V2)
+
+### Schema Mapping
+| Legacy Table | V2 Entity (`src/db/domain-homeschool.ts`) | Notes |
 | :--- | :--- | :--- |
-| *None (Greenfield)* | `homeschool_subscriptions` | Tracks recurring billing intervals and pricing. Bound to the `Academic` domain via `academic_id`. |
-| *None (Greenfield)* | `users` (`facilitator` userType) | Tracks verified staff with specific certifications and hourly rates using JSON `metadata`. Natively links to `hr_departments` and `hr_designations` to support `salaried`, `contractor`, or `hybrid` employment models. |
-| *None (Greenfield)* | `revenue_shares` | Tracks base payouts and performance bonuses. Natively linked to the `Finance` domain via `ledger_entry_id` for holistic double-entry accounting. |
-| *None (Greenfield)* | `homeschool_portfolios`| Legally required evidence of work; deeply integrated with `lms_courses`, `lms_submissions`, and `academic_years`. |
-| *None (Greenfield)* | `homeschool_schedules`| Personalized scheduling that binds `users` to `lms_lessons`. Bound strictly to `academic_years`. |
+| — (new) | `homeschoolSubscriptions` | Tenant-level subscription plans with renewal tracking. |
+| — (new) | `revenueShares` | Facilitator earnings with ledger integration. |
+| — (new) | `homeschoolPortfolios` | Evidence-based student achievement records. |
+| — (new) | `homeschoolSchedules` | Flexible daily learning schedules. |
 
-*Note on Tenancy:* To unify the system, a homeschool family or co-op is treated as a distinct `tenant`, differentiated by the new `tenantType` field (`homeschool_family`, `homeschool_coop`) on the `domain-core` `tenants` table.
+### Cross-Domain Dependencies
+- **LMS**: Courses and lessons are consumed via `courseId` and `lessonId`.
+- **Finance**: Revenue shares link to `ledgerEntries` for accounting.
+- **Academic**: Subjects referenced for curricular alignment.
+- **Core**: Tenants with `tenantType: 'homeschool_family' | 'homeschool_coop'`.
 
-## 3. AI Agent & Tool Integration
-The success of the Homeschooling domain relies heavily on autonomous curriculum generation and adaptive learning.
+---
 
-### Task Agents
-1. **HomeschoolSupervisor:** The primary router and context manager. Interprets parent/student intent and coordinates curriculum flow. Extensively delegates active 1-on-1 live session execution to the **Domain 18 (Agentic Classroom)** `DirectorAgent` via the HMAS routing layer.
-2. **EarlyYearsAgent:** Tailored for ECCDE (ages 0-6). Focuses on thematic, play-based content generation for 8 core skill areas.
-3. **StemTutoringAgent:** Focused on Upper Basic and Secondary students. Handles deep, step-by-step logic, Coding & Robotics integration, and virtual lab simulations.
+## Technical Implementation
 
-### Structured Tools
-- `generate_lesson_plan.tool`: Creates NERDC-compliant weekly `homeschool_schedules` mapped tightly to `lms_lessons`.
-- `calculate_revenue_share.tool`: Periodically evaluates student retention metrics to compute the performance bonus for facilitators.
+### Core Entities
 
-## 4. PBAC & Security
-Homeschooling requires a tightly scoped execution environment to protect child data.
-- **Parental Oversight:** A `Parent` subject is granted explicit `read` and `update` privileges over `student_records` strictly bound to their self-referenced `parent_user_id`.
-- **Facilitator Access:** A `Facilitator` is granted ephemeral `read` privileges only for the duration of a scheduled tutoring session. Once the session ends, access reverts.
-- **Environment Context:** Policies evaluate the `tenant_type`. Conventional school staff roles cannot interact with homeschool tenants under any circumstance.
+#### [HomeschoolSubscriptions](file:///home/beznet/Workspace/edapex/src/db/sqlite/domain-homeschool.ts#L8)
+Tenant-level subscription. Plan types: `basic`, `family`, `premium`, `b2b_micro`. Lifecycle: `active` → `past_due` → `canceled`.
 
-## 5. Recommendations & Justifications
-- **Recommendation 1:** Expand the LMS Engine directly into the `homeschool_portfolios` logic.
-  - **Justification:** Avoids building parallel assessment tracking systems by utilizing LMS adaptive pathways for homeschool compliance mapping.
-- **Recommendation 2:** Isolate `revenue_shares` execution to background task queues.
-  - **Justification:** Complex profit-sharing calculations should not block synchronous user requests.
-- **Schema Extensibility:** The `subject_specializations` within the `FacilitatorMetadata` uses standard JSON arrays, providing flexibility as new specialized tracks (e.g., Coding & Robotics frameworks) emerge in the curriculum while adhering firmly to the core identity system.
+#### [RevenueShares](file:///home/beznet/Workspace/edapex/src/db/sqlite/domain-homeschool.ts#L21)
+Per-period facilitator earnings. Tracks `baseAmount`, `performanceBonus`, `totalEarned`, with status `pending` → `paid`. Links to Finance ledger.
+
+#### [HomeschoolPortfolios](file:///home/beznet/Workspace/edapex/src/db/sqlite/domain-homeschool.ts#L37)
+Student achievement evidence. Types: `project`, `exam`, `artwork`, `certification`. Links to LMS courses and submissions.
+
+#### [HomeschoolSchedules](file:///home/beznet/Workspace/edapex/src/db/sqlite/domain-homeschool.ts#L55)
+Daily learning schedules per student. Status: `planned` → `in_progress` → `completed` / `skipped`. Links to Academic subjects and LMS lessons.
+
+---
+
+## AI Task Agents & Tools
+
+### Operational Tools (Mastra)
+- `homeschool.createPath(studentId)`: Personalized academic coaching and curriculum routing.
+- `homeschool.recommendSupplements(studentId)`: AI-driven enrichment for portfolio gaps.
+- `generate_weekly_schedule`: Auto-generates a week's schedule based on learning pace.
+- `calculate_revenue_share`: Computes facilitator earnings based on engagement.
+- `compile_portfolio_report`: Aggregates entries into a validated achievement report.
+- `recommend_next_course`: Predictive enrollment based on historical competency.
+
+### [STRESS DEFENSE] Tools
+- `subscription_renewal_guard`: Prevents access gaps during payment processing delays.
+- `revenue_share_reconciler`: Ensures facilitator payouts match Finance ledger entries.
+- `portfolio_evidence_validator`: Validates attachment URLs and submission links.
+- `schedule_conflict_resolver`: Detects and resolves overlapping schedule entries.
+
+---
+
+## PBAC & Security
+- **Parent/Guardian**: Full control over their family tenant's schedules, portfolios, and subscriptions.
+- **Facilitator**: Can view assigned students' progress, submit evaluations, and view their revenue shares.
+- **Student**: Can view their own schedule and portfolio.
+
+---
+
+## Hono API Routes
+
+| Method | Route | Description | Auth |
+|:---|:---|:---|:---|
+| `GET` | `/api/v1/homeschool/subscriptions` | Get subscription status | Parent |
+| `POST` | `/api/v1/homeschool/subscriptions` | Create/renew subscription | Parent |
+| `GET` | `/api/v1/homeschool/schedules` | List schedules | Parent + Student |
+| `POST` | `/api/v1/homeschool/schedules` | Create schedule entry | Parent |
+| `GET` | `/api/v1/homeschool/portfolios` | List portfolio entries | Parent + Student |
+| `POST` | `/api/v1/homeschool/portfolios` | Add portfolio entry | Parent + Facilitator |
+| `GET` | `/api/v1/homeschool/revenue-shares` | List revenue shares | Facilitator |
+
+---
+
+## HMAS Agent Registry
+
+| Agent | Type | Capabilities |
+|:---|:---|:---|
+| `homeschool_supervisor` | Supervisor | Subscription enforcement, facilitator management |
+| `schedule_planner` | Task | Weekly schedule generation, conflict resolution |
+| `portfolio_curator` | Task | Evidence compilation, achievement reporting |
+| `revenue_agent` | Task | Revenue calculation, ledger reconciliation |
+
+---
+
+## Domain Events
+
+| Event | Payload | Consumers |
+|:---|:---|:---|
+| `homeschool.subscription_activated` | `{ tenantId, plan }` | Settings (config), Communication (welcome) |
+| `homeschool.subscription_past_due` | `{ tenantId, renewsAt }` | Communication (reminder), Finance (dunning) |
+| `homeschool.portfolio_entry_added` | `{ portfolioId, userId, evidenceType }` | Events (audit) |
+| `homeschool.revenue_share_paid` | `{ shareId, facilitatorId, amount }` | Finance (ledger), Communication (payout notification) |

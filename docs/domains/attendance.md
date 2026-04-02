@@ -31,6 +31,21 @@ All attendance mutations emit `attendance.marked` or `attendance.updated` events
 - **Chronic Absenteeism Engine**: Monitors individual `userId` patterns over a rolling 30-day window to identify students at risk of dropout or staff requiring HR intervention.
 - **Auto-Reconciliation Agent**: Cross-references approved `leave_requests` (HR/Student domains) to automatically transition `absent` records to `excused`.
 
+### Operational Tools (Mastra)
+- `attendance.markAttendance(userId, status)`: Records attendance entry for student/staff.
+- `attendance.bulkMark(classId, entries)`: Bulk attendance marking for a class.
+- `attendance.verifyPresence(userId)`: Multi-signal presence verification (IoT, Wi-Fi, manual).
+- `attendance.flagSecurityAnomaly(anomalyData)`: Flags suspicious entry/exit patterns.
+- `attendance.updateAttendance(staffId, date, status)`: Records daily staff presence for payroll.
+- `attendance.generateDailySummary(tenantId, date)`: Aggregates attendance stats for dashboard.
+
+### [STRESS DEFENSE] Tools
+- `multi_signal_presence_fusion`: Aggregates IoT, Wi-Fi, and manual signals to prevent proxy spoofing.
+- `tardy_nurse_routing`: Correctly routes credit for students in medical or administrative transit.
+- `offline_attendance_cache`: Local-first capture with conflict-aware async reconciliation.
+- `spoof_detection_mesh`: Detects GPS/Wi-Fi spoofing and battery drain anomalies.
+- `mass_absence_sub_trigger`: Auto-notifies HR/Substitution agent when absenteeism spikes.
+
 ## 🔒 Security & Performance
 - **PBAC Enforcement**: Attendance marking is strictly limited to authorized staff (teachers for assigned classes, HR for staff).
 - **Indexing Strategy**: 
@@ -62,9 +77,9 @@ Routes → AttendanceController → AttendanceService → AttendanceRepository
 
 | Agent | Type | Capabilities |
 |:---|:---|:---|
-| `attendance_monitor` | Task | Anomaly detection, chronic absenteeism alerts |
-| `auto_reconciler` | Task | Cross-references leave requests to mark excused |
-| `biometric_validator` | Task | Validates biometric/QR attendance data |
+| `attendance_monitor` | Task | Anomaly detection, chronic absenteeism alerts, spoof detection |
+| `auto_reconciler` | Task | Cross-references leave requests and nurse logs |
+| `biometric_validator` | Task | Multi-signal presence fusion and offline sync |
 
 ---
 
@@ -73,5 +88,6 @@ Routes → AttendanceController → AttendanceService → AttendanceRepository
 | Event | Payload | Consumers |
 |:---|:---|:---|
 | `attendance.marked` | `{ userId, classId, status, date }` | AI (anomaly detection), Events (audit) |
-| `attendance.anomaly_detected` | `{ classId, absentRate, threshold }` | Communication (alert admin), Events (audit) |
+| `attendance.anomaly_detected` | `{ classId, absentRate, threshold }` | Communication (alert admin), HR (substitute trigger) |
 | `attendance.reconciled` | `{ userId, date, oldStatus, newStatus }` | Events (audit) |
+| `attendance.sync_conflict` | `{ userId, date, deviceId }` | Core (device management) |

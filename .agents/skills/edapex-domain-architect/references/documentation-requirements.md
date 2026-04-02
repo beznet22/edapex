@@ -1,24 +1,32 @@
-# Documentation Compliance
+# Documentation Requirements (The Gold Standard)
 
-If it is not documented, it does not exist. You MUST finalize your workflow by updating the master documentation precisely.
+Every domain must have a "Gold Standard" specification in `docs/domains/[module].md`. As the architect, you are forbidden from implementing a feature if the domain spec lacks these sections:
 
-## 1. Domain-Specific Documentation Updates
-Whenever a new schema, API route, or AI agent is deployed, you must update the markdown specification in `docs/domains/[module].md`.
-- Ensure the documentation accurately reflects the multi-dialect DB schema logic.
-- Ensure the documentation lists the ReAct tools mapped to the new Agents.
-- Ensure the new PBAC (Policy-Based Access Control) rules are clearly defined.
-- Each domain doc MUST contain these sections: Overview, Entity Mapping, AI Agent & Tool Integration, PBAC & Security, Recommendations, Hono API Routes, HMAS Agent Registry, Domain Events.
+1. **Overview & Persona**: Real-world professional role mapping.
+2. **Entity Definitions**: Zod-validated schemas with UUID v7 and `tenant_id`.
+3. **HMAS Agent Registry**: List of Supervisors, Agents, and Tools.
+4. **API Manifest**: Hono RPC routes and PBAC constraints.
+5. **Event Catalog**: Produced and Consumed events.
+6. **Stress Defense Analysis**: Identification of stressors (Recursive loops, Storage quotas) and specific defense tools.
+7. **Implementation Roadmap**: Checkpointed progress matching `PROJECT_ROADMAP.md`.
 
-## 2. Project Roadmap Synchronization
-Whenever a feature moves from "Planned" to "Completed" or a new Phase is initialized:
-- You MUST update `docs/PROJECT_ROADMAP.md` to reflect the percentage of layer completion and check off the relevant milestones.
-- Ensure the "Status Dashboard" remains 100% synchronized with the actual codebase implementation.
+---
+
+## 1. Lifecycle of a Specification
+1. **Drafting**: Use the `multi-agent-brainstorming` skill to iterate on the design.
+2. **Approval**: User must approve the spec before Phase 1 coding begins.
+3. **Synchronization**: As code is written, update the "Implementation Roadmap" in the spec to `[x]`.
+
+## 2. Project Roadmap Sync
+Every completed task MUST be reflected in the top-level `PROJECT_ROADMAP.md`. If you finish a domain module, you must update the roadmap status to `COMPLETED`.
+
+## 3. Style Guide
+- Use GitHub alerts (`[!IMPORTANT]`, `[!WARNING]`) for critical edge-native constraints.
+- Use Mermaid diagrams for HMAS orchestration flows.
+- Reference neighbor skills (e.g., `api-patterns`) for design justification.
 
 ## 3. Master Architecture Tracking
 If a completely new layer concept or global feature is introduced:
-- You must append to `docs/MASTER_ARCHITECTURE.md` to ensure the blueprint map remains entirely accurate.
-
-## 4. API Route Generation
 Every API endpoint constructed in the `controllers/` layer MUST be logged in the Route definitions table of its respective domain documentation, complete with its Authorization/Tenant requirement.
 
 ## 5. Domain Event Registration
@@ -26,3 +34,4 @@ Every new domain event MUST be documented in the "Domain Events" section of the 
 - Event name (e.g., `finance.payment_received`)
 - Payload shape
 - Consumer domains
+

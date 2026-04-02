@@ -1,146 +1,64 @@
 # Frontend & Local-First Constraints
 
-Guided by the `tanstack-integration-best-practices` and `react-db` skills, the `frontend/` layer handles the reactive presentation and local-first data lifecycle.
+The EdApex frontend is a premium, local-first SPA built for professional users. You must strictly follow the `tanstack-react-db`, `ui-ux-pro-max`, and `web-artifacts-builder` skills to ensure visual excellence and operational reliability.
 
-## 1. Technology Stack (Verified)
+## 1. Technology Stack & Multi-Agent Authority
+- **Routing & State**: Rely on `tanstack-start-best-practices`, `tanstack-query-best-practices`, and `tanstack-router-best-practices`.
+- **Design Intelligence**: Use `ui-ux-pro-max` for curated palettes, typography, and chart scales.
+- **Component Mastery**: Use `web-artifacts-builder` standards for complex Shadcn/Tailwind v4 assemblies.
+- **Local-First Sync**: Use `tanstack-react-db` for reactive collection bindings (`useLiveQuery`).
 
-The EdApex frontend uses the following stack — all new code MUST use these exact dependencies:
-
-| Technology | Version | Purpose |
+| Technology | Purpose | Authority |
 |:---|:---|:---|
-| **React** | 19.x | UI rendering |
-| **TanStack Start** | latest | Meta-framework (SPA mode) |
-| **TanStack Router** | latest | File-based type-safe routing |
-| **TanStack Query** | 5.x | Server state & caching |
-| **TanStack DB** | 0.6.x | Local-first reactive collections |
-| **@tanstack/react-db** | 0.1.x | React bindings (`useLiveQuery`) |
-| **Tailwind CSS** | **4.1.x** | Utility-first styling (v4 syntax) |
-| **@tailwindcss/vite** | 4.1.x | Vite plugin (NOT PostCSS) |
-| **@tailwindcss/typography** | 0.5.x | Prose content styling |
-| **Shadcn UI** | — | Component library (`components/ui/`) |
-| **Radix UI** | — | Headless primitives (via Shadcn) |
-| **class-variance-authority** | — | Variant-based component styling |
-| **clsx + tailwind-merge** | — | `cn()` utility for class merging |
-| **Lucide React** | 0.545.x | Icon library (ONLY icon set) |
-| **AI SDK** | 4.x + `@ai-sdk/react` | AI chat interfaces |
-| **Vite** | 7.x | Build tool |
-| **Zod** | 3.x | Client-side validation |
+| **React 19** | Core UI | React Standard |
+| **TanStack Start** | Full-Stack SPA | `tanstack-start-best-practices` |
+| **TanStack Query** | Data Fetching | `tanstack-query-best-practices` |
+| **TanStack DB** | Local-First Engine | `tanstack-db-core` |
+| **Tailwind v4** | Modern Styling | `ui-ux-pro-max` |
+| **AI Elements** | AI Chat / Tools | `ai-elements` |
 
-> [!CAUTION]
-> **Tailwind CSS v4** uses a fundamentally different configuration system. There is NO `tailwind.config.ts`. Configuration is done via CSS `@theme` directives in `styles.css`. Do NOT generate v3-style config files.
+## 2. Premium Design System (WOW Factor)
+As mandated by `ui-ux-pro-max`, EdApex must feel "premium and state-of-the-art".
 
-## 2. Tailwind CSS v4 — EdApex Design System
+- **Styling**: Leverage Tailwind v4 `@theme` (no `tailwind.config.ts`).
+- **Aesthetics**: Use **Glassmorphism** (`--surface` glass panels), **Vibrant Gradients**, and **Subtle Micro-animations** (`rise-in`, `hover:scale-105`).
+- **Typography**: `Manrope` (Sans) for data, `Fraunces` (Serif) for character roles and major headings.
+- **Colors**: Use curated HSL palettes from `ui-ux-pro-max`. Avoid browser defaults.
 
-The EdApex design system is defined via CSS custom properties in `frontend/src/styles.css`, NOT a Tailwind config file.
-
-### Import Pattern
 ```css
-@import "tailwindcss";
-@plugin "@tailwindcss/typography";
-
+/* frontend/src/styles.css — Tailwind v4 Theme */
 @theme {
-  --font-sans: "Manrope", ui-sans-serif, system-ui, sans-serif;
+  --color-primary: oklch(0.5 0.1 200); /* Sea Ink */
+  --color-accent: oklch(0.7 0.2 180);  /* Lagoon */
+  --shadow-premium: 0 10px 30px -5px rgba(0, 0, 0, 0.1), 0 4px 18px -7px rgba(0, 0, 0, 0.05);
 }
 ```
 
-### Color Tokens (CSS Variables)
-```css
-:root {
-  --sea-ink: #173a40;        /* Primary text */
-  --sea-ink-soft: #416166;   /* Secondary text */
-  --lagoon: #4fb8b2;         /* Accent / CTA */
-  --lagoon-deep: #328f97;    /* Links / hover states */
-  --palm: #2f6a4a;           /* Success / green accents */
-  --sand: #e7f0e8;           /* Light surface */
-  --foam: #f3faf5;           /* Lightest background */
-  --surface: rgba(255,255,255,0.74);  /* Glassmorphism panels */
-  --line: rgba(23,58,64,0.14);        /* Borders */
-  --bg-base: #e7f3ec;                 /* Page background */
-}
-```
+## 3. Local-First & TanStack DB Lifecycle
+- **Collection-First**: Never fire `fetch()` in a component. All data must reside in a `db.collection`.
+- **Reactive Hooks**: Use `useLiveQuery` for real-time reactivity.
+- **Sync Reconciliation**: Every domain MUST implement a sync handler in `src/lib/sync.ts` that reconciles the D1 edge state with the local TanStack DB.
 
-### Usage in Tailwind v4
 ```tsx
-// ✅ Correct v4 syntax — use CSS variables with parentheses
-<div className="bg-(--surface) border-(--line) text-(--sea-ink)">
-
-// ❌ Wrong — v3 arbitrary value syntax (brackets)
-<div className="bg-[var(--surface)]">
+// ✅ Correct: Live reactive binding
+const { data: grades } = useLiveQuery(db.grades.from().where('tenant_id', '=', tenantId));
 ```
 
-### Dark Mode
-Dark mode is handled via `data-theme="dark"` attribute and `prefers-color-scheme: dark` media query — both defined in `styles.css`. All colors automatically swap via CSS variables.
+## 4. Complex Component Construction (`web-artifacts-builder`)
+- **Shadcn UI**: Build complex dashboards by nesting Shadcn primitives with variant-based styling (CVA).
+- **Interactive Shells**: Use `.island-shell` for isolated feature pods.
+- **Lucide Icons**: Use `lucide-react` exclusively for professional glyphs.
 
-## 3. Shadcn UI Component Pattern
+## 5. AI Interface Excellence
+- **AI-Elements**: Use standardized message, conversation, and tool-display components.
+- **Notification System**: Use Sonner/Shadcn for immediate human feedback.
+- **Agent Pulse Toasts**: Visualize granular agent heartbeats as low-priority "Ghost" notifications in the property panel (Right Pane).
+- **Tool Progress**: Visually show agentic tool execution (PBAC check → Service Call → Result).
+- **Streaming UI**: Always stream LLM responses for perceived speed.
 
-Components live in `frontend/src/components/ui/` and follow the Shadcn standard:
+## 6. Verification Checklist
+- [ ] Light/Dark modes verified via `ui-ux-pro-max` contrast standards.
+- [ ] All animations use `prefers-reduced-motion` guards.
+- [ ] Sync logic tested with simulated offline-to-online transitions.
+- [ ] Responsive layouts tested on mobile (320px) and ultrawide (1440px+).
 
-```typescript
-// Uses @radix-ui/react-slot for composition
-import { Slot } from "@radix-ui/react-slot"
-// Uses class-variance-authority for variants
-import { cva, type VariantProps } from "class-variance-authority"
-// Uses cn() utility from @/lib/utils
-import { cn } from "@/lib/utils.js"
-```
-
-When adding new Shadcn components:
-- Install via `npx shadcn@latest add <component>`
-- Component lands in `frontend/src/components/ui/`
-- Uses `cn()` for class merging (clsx + tailwind-merge)
-
-## 4. TanStack Start & Router Integration
-
-- **SPA Mode**: TanStack Start is configured as SPA with SSR-Query integration for optimal data loading.
-- **Type-Safe Routing**: File-based routing in `frontend/src/routes/`. All navigation MUST use `<Link>` or `useNavigate()` with full type checking.
-- **Route Configuration**: Router uses `defaultPreload: 'intent'` and `scrollRestoration: true`.
-- **Query Integration**: Uses `@tanstack/react-router-ssr-query` for data loading coordination.
-
-### Query Key Conventions
-```typescript
-// Structured query keys: [domain, entity, tenantId, ...params]
-['finance', 'ledger', tenantId, { page: 1 }]
-['academic', 'classes', tenantId, academicId]
-['assessment', 'exams', tenantId, { examType: 'midterm' }]
-```
-
-## 5. Local-First & TanStack DB
-
-- **Collection-First Logic**: UI components interact with `db.collection` via `useLiveQuery`. Never fetch data directly from the API in a component.
-- **Sync Reconciliation**: Every domain feature MUST be registered in `synchronizeWithEdge()` in `frontend/src/lib/sync.ts`.
-
-### Sync Registration Pattern
-When adding a new domain collection:
-1. Define the collection in `frontend/src/lib/db.ts` using `createCollection`.
-2. Register the sync handler in `frontend/src/lib/sync.ts` with upsert logic.
-3. Use `useLiveQuery` in components to bind to the collection reactively.
-
-```typescript
-// sync.ts — Register new domain sync handler
-if (updates.ledgerEntries) {
-  for (const entry of updates.ledgerEntries) {
-    const existing = await db.ledgerEntries.get(entry.id);
-    if (existing) {
-      db.ledgerEntries.update(entry.id, (draft) => Object.assign(draft, entry));
-    } else {
-      db.ledgerEntries.insert(entry);
-    }
-  }
-}
-```
-
-## 6. AI Interfaces
-
-- Use **AI SDK** (`@ai-sdk/react`) for chat UI hooks: `useChat`, `useCompletion`, `useAssistant`.
-- Chat components should follow the Stateless AI execution pattern from the service layer.
-- All AI interactions must track token usage for billing via deferred events.
-
-## 7. Design Constraints
-
-- **Icons**: Use **Lucide React** (`lucide-react`) exclusively. No emoji icons. No mixing icon sets.
-- **Typography**: Manrope (sans-serif) for body, Fraunces (serif) for display titles.
-- **Glassmorphism**: Use the `.island-shell` and `.feature-card` CSS classes for glassmorphic panels.
-- **Micro-animations**: Use the `.rise-in` animation class and CSS transitions (150-300ms).
-- **Responsive First**: All layouts MUST be mobile-first. Use Tailwind breakpoints (`sm:`, `md:`, `lg:`).
-- **PWA Support**: Support standalone and fullscreen modes via the Fullscreen API.
-- **Dark Mode**: Always test both light and dark themes. Use CSS variables, never hardcode colors.

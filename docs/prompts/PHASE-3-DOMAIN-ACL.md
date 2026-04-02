@@ -1,23 +1,38 @@
 # Phase 3 Implementation Prompt: Domain Alignment & Anti-Corruption Layer (ACL)
 
 ## 🎯 Objective
-Transform the business logic from all 18 EdApex domains into native `src/services/` logic. Your goal is to bridge the gap between Paperclip's generalized logic and EdApex's strict `Controller -> Service -> Repository` architecture.
+Transform the business logic from all 18 EdApex domains into native `src/services/` logic. Your goal is to bridge the gap between Paperclip's (located at `/home/beznet/Workspace/paperclip`) generalized logic and EdApex's strict `Controller -> Service -> Repository` architecture.
 
 ## 📜 CORE CONSTRAINTS & TRANSFORMATION POLICY
 - **ANTI-CORRUPTION LAYER (ACL)**: The service layer MUST act as the ACL, mapping specialized domain entities to Mastra tool outputs.
+- **[STRESS DEFENSE] TOOLING**: You MUST implement the 54+ defensive tools defined in `docs/domains/*.md` for each domain service (e.g., `fractional_payment_engine` in Finance, `guardian_access_filter` in PBAC).
 - **NO DUAL-WRITE**: Use polymorphic `owner_type/owner_id` constraints where applicable.
 - **EVENT-DRIVEN**: Long-running or side-effect logic must be decoupled via the `Internal Event Bus` (`src/events/`).
+- **LAYER 1 RESILIENCE**: Every Domain Service must include integration tests simulating its specific operational stressors (e.g., fractional payment drift).
 - **TEST DRIVEN**: The agent MUST run and pass automated testing (unit/integration) before completing this phase.
 - **GIT COMMIT**: The agent MUST create a standard git commit with AI attribution before signing out.
 - **SCOPE LOCK**: Do NOT modify files or domains outside the explicit scope of this phase.
 - **ESCALATION PROTOCOL**: If you encounter missing context, undocumented relations, or ambiguity, DO NOT HALLUCINATE. Pause and request clarification via `notify_user`.
 - **STRICT TYPECHECK**: Run `pnpm tsc --noEmit` on all modified files. You must resolve all TypeScript errors before signing out.
+- **PERSONA-CENTRIC FLOWS**: Before implementing any service logic, you MUST update the respective domain documentation (docs/domains/[module].md) with a "Professional Persona Flow" narrative. This narrative must describe how a real-world professional (e.g., Accountant, Teacher) uses the service's supervisors and tools to achieved business goals, using descriptive prose instead of code snippets.
 - **EXECUTION PLAN**: Before writing code, you MUST create a localized `docs/plans/phase-3-domain-acl-plan.md` detailing the precise files you will create/modify.
 
 ## 📦 Required Context & Skills
 - **Spec**: [AGENTIC_SCHOOL_V2_PLAN.md](../AGENTIC_SCHOOL_V2_PLAN.md) (Section 36: Domain Schema Reference).
 - **Architecture**: [MASTER_ARCHITECTURE.md](../MASTER_ARCHITECTURE.md).
-- **Domain Specs**: Read `docs/domains/*.md` for specific low-level logic (e.g., Standalone Mode in `settings.md`, Stream-Time Evaluation in `pbac.md`, RAG handoffs in `lms.md`).
+- **Stress Framework**: [STRESS_FRAMEWORK.md](../STRESS_FRAMEWORK.md) (ALL stressor categories).
+- **Domain Specs** (MANDATORY — these are the SOURCE OF TRUTH for service implementation):
+  - Each domain doc (`docs/domains/*.md`) defines:
+    - **Schema Mapping**: Legacy → V2 entity mapping with code links.
+    - **Entity Descriptions**: Detailed field-level documentation.
+    - **API Routes Table**: Exact REST endpoints that the Service must expose via Hono.
+    - **AI Task Agents & Tools**: ALL operational + `[STRESS DEFENSE]` tools that the Service must implement.
+    - **Domain Events**: Events emitted/consumed for cross-domain integration.
+  - Read ALL 18 domain docs before implementation:
+    [core.md](../domains/core.md) | [academic.md](../domains/academic.md) | [assessment.md](../domains/assessment.md) | [attendance.md](../domains/attendance.md) | [finance.md](../domains/finance.md) | [lms.md](../domains/lms.md) | [hr.md](../domains/hr.md) | [facilities.md](../domains/facilities.md) | [ai.md](../domains/ai.md) | [classroom.md](../domains/classroom.md) | [homeschooling.md](../domains/homeschooling.md) | [library.md](../domains/library.md) | [pbac.md](../domains/pbac.md) | [communication.md](../domains/communication.md) | [events.md](../domains/events.md) | [settings.md](../domains/settings.md) | [cms.md](../domains/cms.md) | [documents.md](../domains/documents.md)
+- **TOOL MANDATE**: ALL operational tools AND `[STRESS DEFENSE]` tools listed in each domain doc's "AI Task Agents & Tools" section MUST be implemented. These are not exhaustive — add additional tools as domain logic demands.
+- **API ROUTE MANDATE**: ALL routes listed in each domain doc's "Hono API Routes" table MUST be implemented. The domain doc is the canonical source.
+- **EVENT MANDATE**: ALL domain events listed in each domain doc MUST be registered in `src/events/` with proper cross-domain consumer wiring.
 - **Target Domains**: ALL 18 Domains (including Classroom).
 - **Required Skills**:
   - `backend-dev-guidelines` (Zod validations and Service injections)
@@ -27,15 +42,16 @@ Transform the business logic from all 18 EdApex domains into native `src/service
 
 ### 1. Domain Service Transformation
 Implement the logic for all 18 domains in their respective `src/services/` files (e.g., `AcademicService`, `FinanceService`, `AssessmentService`, `ClassroomService`).
-- **Policy**: Review Paperclip logic, discard legacy baggage, and implement as native EdApex Services.
+- **Policy**: Review logic in `/home/beznet/Workspace/paperclip`, discard legacy baggage, and implement as native EdApex Services.
 - **Repositories**: All state mutations must use the provided `IRepository<T>` implementations in `src/domain/repositories/`.
 
 ### 2. Internal Event Bus Integration
 - Register cross-domain event handlers in `src/events/`.
 - Example: An `enrollment.complete` event in the Academic domain should trigger an `invoice.generate` event in the Finance domain.
 
-### 3. Zod-Driven Validation
+### 3. Zod-Driven Validation & Error Propagation
 - Ensure all service inputs and outputs are wrapped in **Zod Validators** in `src/validators/`.
+- Implement specialized `DomainError` and `ValidationError` types for all 18 domains, ensuring they are caught by the `BaseController` and mapped to Hono RPC envelopes.
 
 ## 🏁 Completion Criteria
 - [ ] Generated and followed a localized `docs/plans/phase-3-domain-acl-plan.md`.
@@ -43,6 +59,8 @@ Implement the logic for all 18 domains in their respective `src/services/` files
 - [ ] 18-Domain service coverage (Logic parity with spec).
 - [ ] Successful cross-domain event emission and handling.
 - [ ] No direct DB calls from Controllers (everything via Services).
+- [ ] 18-Domain service coverage with 1:1 implementation of [STRESS DEFENSE] tools.
+- [ ] Layer 1 Resilience verified for all domain-specific defensive tools.
 - [ ] All automated tests passed.
 - [ ] Code staged and committed with AI attribution.
 - [ ] Update `docs/PROJECT_ROADMAP.md` (Phase 3 marked as COMPLETE).

@@ -1,103 +1,85 @@
-# Library Domain Architecture (Technical Specification)
+# Library Domain Architecture
 
-The **Library** domain in EdApex V2 manages non-consumable tracking within physical and digital libraries. It replaces the fragmented legacy implementation with a unified, tenant-isolated system that leverages the platform's core identity layer for seamless member management.
+## Overview
+The Library domain manages physical and digital book catalogs, borrower profiles, and book issue/return transactions. It enforces per-user borrowing limits and tracks fines for overdue, lost, or damaged items, with automatic reconciliation to the Finance ledger.
 
----
-
-## 1. Domain Overview
-
-The Library domain is responsible for:
-- **Inventory Management**: Tracking books, their categories, and physical location (rack numbers).
-- **Circulation**: Managing the issuance and return of library resources to students, staff, and parents.
-- **Financial Compliance**: Recording fines for overdue, lost, or damaged items.
-- **AI-Driven Insights**: Leveraging borrowing history to provide personalized recommendations.
-
-### Key Logic (Legacy Parity)
-- **Quantity Tracking**: Ensures books are only issued if stock is available (`books.quantity > 0`).
-- **Due Date Enforcement**: Automatic flagging of overdue items based on `due_date`.
-- **Status Workflow**: Tracks the lifecycle of an issue from `issued` to `returned`, `lost`, or `damaged`.
+### Key Business Logic
+- **Book Catalog**: Categories → Books hierarchy with ISBN, author, publisher, rack location, and quantity tracking.
+- **Borrower Profiles**: Per-user library membership with configurable `maxBooksAllowed`, real-time `currentBorrowed` count, and accumulated fines.
+- **Issue/Return Lifecycle**: `issued` → `returned` / `lost` / `damaged`. Overdue and damage fines auto-calculated.
+- **Auto-Fine Reconciliation**: Fines flow to the Finance ledger via the `fine_reconciliation_service` stress defense tool.
 
 ---
 
-## 2. Entity Mapping (V1 -> V2)
+## Logic Parity (Legacy to V2)
 
-The V2 schema shifts from persona-based membership to a **Unified Identity** model, where library interactions are linked directly to platform `users`.
-
-| Legacy Table (V1) | Modern Entity (V2) | Structural Improvement |
+### Schema Mapping
+| Legacy Table (`schoolify`) | V2 Entity (`src/db/domain-library.ts`) | Notes |
 | :--- | :--- | :--- |
-| `sm_books` | `books` | ISBN and Author formalized; added `metadata` (JSON) for flexible attributes (edition, language, tags). |
-| `sm_book_categories` | `book_categories` | Simplified tenant-isolated categories. |
-| `sm_book_issues` | `book_issues` | Links directly to `userId`; status handled via `mysqlEnum`; includes `fineAmount` tracking. |
-| `sm_library_members` | **Unified Identity** (`users`) | **REMOVED**. Every platform user is a potential library member. Legacy `member_ud_id` is migrated to `users.metadata.library_card_number`. |
-
-### Legacy Table: `sm_library_members`
-In V1, this acted as a bridge between books and different persona tables (`sm_students`, `sm_staffs`). In V2, the `users` table already consolidates these personas, making the specific "Member" table redundant.
+| `sm_book_categories` / `library_subjects` | `bookCategories` | Category definitions per tenant. |
+| `sm_books` | `books` | ISBN, author, publisher, quantity, price, rack. JSON metadata. |
+| `sm_book_issues` | `bookIssues` | Issue/return lifecycle with fine tracking. |
+| — (new) | `libraryProfiles` | Per-user membership with borrowing limits and fine totals. |
 
 ---
 
-## 3. AI Agent & Tool Integration
+## Technical Implementation
 
-The Library domain is integrated into the **Hierarchical Multi-Agent System (HMAS)** to automate administrative tasks and enhance the user experience.
+### Core Entities
 
-### Layer 2: Library Supervisor
-The `library_supervisor` coordinates library task agents and ensures that operations comply with tenant policies.
+#### [BookCategories](file:///home/beznet/Workspace/edapex/src/db/sqlite/domain-library.ts#L21)
+Category taxonomy for organizing the book catalog.
 
-### Layer 3: Task Agents
-- **`book_recommendation_agent`**: 
-  - **Logic**: Analyzes a user's `book_issues` history and cross-references with their academic domain data (subjects, courses).
-  - **Tool**: `get_user_borrowing_history.tool`, `search_available_books.tool`.
-- **`library_audit_agent`**:
-  - **Logic**: Periodically reconciles physical stock with high-latency transaction logs. Flags discrepancies for manual review.
-  - **Tool**: `reconcile_inventory.tool`.
+#### [Books](file:///home/beznet/Workspace/edapex/src/db/sqlite/domain-library.ts#L38)
+Book records with ISBN, author, publisher, `quantity`, `price`, `rackNo`. JSON `metadata` for edition, language, pages, tags.
 
----
+#### [BookIssues](file:///home/beznet/Workspace/edapex/src/db/sqlite/domain-library.ts#L57)
+Transaction log: `issued` → `returned`/`lost`/`damaged`. Tracks `issueDate`, `dueDate`, `returnDate`, `fineAmount`, `isFinePaid`.
 
-## 4. PBAC & Security
-
-Access to library records is strictly governed by **Policy-Based Access Control (PBAC)**.
-
-| Role | Action | Resource | Condition |
-| :--- | :--- | :--- | :--- |
-| `Librarian` | `all` | `books`, `book_issues` | Must belong to the same `tenant_id`. |
-| `Student` | `read` | `books` | Can browse all available books in the tenant. |
-| `Student` | `read` | `book_issues` | Limited to records where `userId == CurrentUser.id`. |
-| `Parent` | `read` | `book_issues` | Limited to records where `userId == ChildUser.id`. |
+#### [LibraryProfiles](file:///home/beznet/Workspace/edapex/src/db/sqlite/domain-library.ts#L83)
+Per-user borrower profile with `maxBooksAllowed`, `currentBorrowed`, `totalFinesAccrued`. Membership status: `active`/`suspended`/`expired`. Unique constraint on `(tenantId, userId)`.
 
 ---
 
-## 5. Recommendations & Justifications
+## AI Task Agents & Tools
 
-### 5.1 Library Profiles Entity
-**Proposal**: Add a `library_profiles` table or extend `users.metadata` to store library-specific constraints.
-- **Fields**: `max_books_allowed`, `default_issue_duration_days`.
-- **Justification**: Currently, these limits are hardcoded or managed externally. Formalizing them allows the `library_supervisor` to enforce borrowing policies autonomously.
+### Operational Tools (Mastra)
+- `library.searchBooks(query)`: Unified search across physical and digital assets.
+- `library.issueBook(bookId, userId)`: Records checkout and sets atomic return deadline.
+- `library.checkOverdue(tenantId)`: Scans for expired returns and triggers fine calculation.
+- `library.returnBook(issueId)`: Records return and updates `books.quantity` atomically.
+- `check_availability`: Verifies book availability before issuing.
+- `calculate_overdue_fine`: Computes fine based on days overdue and tenant fine policy.
+- `generate_catalog_report`: Exports catalog with stock levels and popular titles.
+- `recommend_reading`: AI-driven reading recommendations based on grade and history.
+- `auto_suspend_delinquent`: Suspends library membership for unpaid fines beyond quota.
 
-### 5.2 Event-Driven Fines
-**Proposal**: Trigger a `finance.create_ledger_entry` event when a book is marked as `lost` or returned after the `due_date`.
-- **Justification**: Integration with the Finance domain ensures that library fines are automatically reflected in the student's ledger, reducing manual administrative entry.
+### [STRESS DEFENSE] Tools
+- `concurrent_issue_guard`: Prevents race conditions when multiple users request the same last-copy book.
+- `quantity_integrity_checker`: Reconciles `books.quantity` against active `bookIssues` to detect phantom stocks.
+- `fine_reconciliation_service`: Auto-reconciles library fines into student Finance ledgers.
 
-### 5.3 Digital Resource Metadata
-**Proposal**: Expand `BookMetadata` to include `digital_asset_url` and `is_digital`.
-- **Justification**: Prepares the Library domain for Hybrid libraries (Physical + PDF/E-book) where "issuing" for a digital asset simply involves unlocking access for a period.
+---
+
+## PBAC & Security
+- **TenantAdmin**: Full library access.
+- **Librarian (Staff)**: Issue/return books, manage catalog, view all profiles.
+- **Student/Staff**: Can view catalog, view own borrowing history and fines.
+- **Parent**: Can view their child's borrowing history.
 
 ---
 
 ## Hono API Routes
 
-```
-Routes → LibraryController → LibraryService → LibraryRepository
-```
-
 | Method | Route | Description | Auth |
 |:---|:---|:---|:---|
-| `GET` | `/api/v1/library/books` | List books (search, filter by category) | Authenticated |
-| `POST` | `/api/v1/library/books` | Add book | Librarian |
-| `GET` | `/api/v1/library/categories` | List book categories | Authenticated |
-| `POST` | `/api/v1/library/issues` | Issue book to user | Librarian |
+| `GET` | `/api/v1/library/categories` | List categories | Authenticated |
+| `GET` | `/api/v1/library/books` | Search/list books | Authenticated |
+| `POST` | `/api/v1/library/books` | Add book | Librarian+ |
+| `POST` | `/api/v1/library/issues` | Issue book | Librarian |
 | `PATCH` | `/api/v1/library/issues/:id/return` | Return book | Librarian |
-| `GET` | `/api/v1/library/issues/my` | Get own issued books | Authenticated |
-| `GET` | `/api/v1/library/issues/overdue` | List overdue books | Librarian |
-| `GET` | `/api/v1/library/profiles/:userId` | Get library profile (limits, fines) | Librarian + Self |
+| `GET` | `/api/v1/library/issues/:userId` | Get borrowing history | Self + Librarian |
+| `GET` | `/api/v1/library/profiles/:userId` | Get borrower profile | Self + Librarian |
 
 ---
 
@@ -105,10 +87,9 @@ Routes → LibraryController → LibraryService → LibraryRepository
 
 | Agent | Type | Capabilities |
 |:---|:---|:---|
-| `library_supervisor` | Supervisor | Routes library tasks, enforces borrowing policies |
-| `book_recommendation_agent` | Task | Personalized suggestions from borrowing history |
-| `library_audit_agent` | Task | Stock reconciliation, discrepancy detection |
-| `overdue_notifier` | Task | Automated fine calculation and reminders |
+| `librarian_agent` | Task | Issue/return processing, fine calculation, catalog management |
+| `reading_advisor` | Task | AI-powered reading recommendations |
+| `inventory_auditor` | Task | Stock reconciliation, quantity integrity checks |
 
 ---
 
@@ -116,7 +97,7 @@ Routes → LibraryController → LibraryService → LibraryRepository
 
 | Event | Payload | Consumers |
 |:---|:---|:---|
-| `library.book_issued` | `{ issueId, userId, bookId }` | Events (audit) |
-| `library.book_returned` | `{ issueId, condition }` | Events (audit) |
-| `library.book_overdue` | `{ issueId, userId, daysOverdue, fineAmount }` | Finance (ledger fine entry), Communication (reminder) |
-| `library.stock_low` | `{ bookId, currentQuantity }` | Communication (alert librarian) |
+| `library.book_issued` | `{ issueId, bookId, userId }` | Events (audit) |
+| `library.book_returned` | `{ issueId, bookId, fineAmount }` | Finance (fine entry), Events (audit) |
+| `library.book_overdue` | `{ issueId, userId, daysOverdue }` | Communication (reminder) |
+| `library.membership_suspended` | `{ userId, reason }` | Communication (notification), PBAC (access restriction) |

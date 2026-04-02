@@ -1,13 +1,14 @@
 # Human Resources & Payroll Domain Architecture
 
 ## Overview
-The Human Resources (HR) domain in EdApex V2 manages the lifecycle of school employees, including recruitment metadata, department/designation assignments, leave management, and payroll execution. It is built on a "User-Persona" model, where HR attributes are decoupled from the core platform identity to allow for multi-role flexibility (e.g., a Staff member who is also a Parent).
+The HR domain decouples employee management, payroll, and leave tracking from the Core identity layer. It provides department/designation taxonomies, configurable leave policies, salary templates with earning/deduction components, payroll generation, and staff performance evaluations.
 
 ### Key Business Logic
-- **Staff vs Identity**: A `Staff` is a platform `User` with an associated `hr_account`. Personal data (name, email, password) lives in the Identity layer, while professional data (salary, joining date, qualification) lives in the HR layer.
-- **Hierarchical Structure**: Staff are organized by `hrDepartments` and `hrDesignations`, which are used for both reporting and automated permission scoping.
-- **Leave Lifecycle**: Leave types are defined per tenant. Leave requests follow a `pending -> approved/rejected` workflow, with approved leaves automatically impacting payroll deductions if they exceed the allocated balance.
-- **Automated Ledger Integration**: Payroll runs, once approved and paid, emit domain events that the Finance domain consumes to record salary expenses in the universal ledger.
+- **Department/Designation**: Organizational hierarchy for staff personas.
+- **Leave Management**: Configurable leave types with annual allowances. Request → Approval workflow.
+- **Salary Templates**: JSON-based component definitions (`earning`/`deduction`) supporting percentage-of-basic calculations.
+- **Payroll Runs**: Monthly generation with automated net salary calculation.
+- **Staff Evaluations**: Criteria-based performance tracking with scoring and remarks.
 
 ---
 
@@ -16,19 +17,13 @@ The Human Resources (HR) domain in EdApex V2 manages the lifecycle of school emp
 ### Schema Mapping
 | Legacy Table (`schoolify`) | V2 Entity (`src/db/domain-hr.ts`) | Notes |
 | :--- | :--- | :--- |
-| `sm_staffs` | `users` (Identity) + `hr_metadata` | Personal info vs. professional metadata. |
-| `sm_human_departments` | `hrDepartments` | Organizational grouping. |
-| `sm_designations` | `hrDesignations` | Functional roles/titles. |
-| `sm_leave_requests` | `hrLeaveRequests` | Workflow-based leave management. |
-| `sm_leave_types` | `leaveTypes` | Configurable leave categories. |
-| `sm_hr_payroll_generates`| `payrollRuns` | Snapshot of calculated monthly salary. |
-| `sm_hr_salary_templates` | Integrated via `users.metadata` | Base salary and regular allowances. |
-| `sm_staff_attendances` | `src/db/domain-attendance.ts` | Source for payroll triggers. |
-
-### Critical Logic Parity
-- **Multi-Tenancy**: The legacy `school_id` is replaced by a mandatory `tenantId` check on all HR entities.
-- **User Linking**: Legacy `sm_staffs.user_id` is now the primary key link in V2. A staff record cannot exist without a corresponding `users` entry.
-- **Status Mapping**: Legacy `active_status` is preserved to manage staff suspension/termination without deleting historical payroll data.
+| `sm_human_departments` | `hrDepartments` | Department definitions. |
+| `sm_designations` | `hrDesignations` | Designation/title definitions. |
+| `sm_leave_types` / `sm_leave_defines` | `leaveTypes` | Configurable leave categories with annual allowance. |
+| `sm_leave_requests` / `sm_leave_deduction_infos` | `hrLeaveRequests` | Request → Approval workflow with approver tracking. |
+| `sm_hr_salary_templates` | `salaryTemplates` | JSON components array replacing multiple legacy columns. |
+| `sm_hr_payroll_generates` | `payrollRuns` | Monthly payroll with draft → approved → disbursed lifecycle. |
+| — (new) | `staffEvaluations` | Criteria-based performance evaluations. |
 
 ---
 
@@ -36,68 +31,74 @@ The Human Resources (HR) domain in EdApex V2 manages the lifecycle of school emp
 
 ### Core Entities
 
-#### [HR Departments](file:///home/beznet/Workspace/edapex/src/db/domain-hr.ts#L34)
-Defines the organizational units within a school (e.g., Mathematics, Administration).
+#### [HrDepartments / HrDesignations](file:///home/beznet/Workspace/edapex/src/db/sqlite/domain-hr.ts#L22)
+Organizational taxonomy for staff personas. Referenced by `StaffMetadata.departmentId` in Core domain.
 
-#### [HR Designations](file:///home/beznet/Workspace/edapex/src/db/domain-hr.ts#L42)
-Defines job titles (e.g., Senior Teacher, Principal).
+#### [LeaveTypes](file:///home/beznet/Workspace/edapex/src/db/sqlite/domain-hr.ts#L39)
+Configurable leave categories (medical, casual, maternity) with annual day allowances.
 
-#### [Payroll Runs](file:///home/beznet/Workspace/edapex/src/db/domain-hr.ts#L80)
-The transactional heart of the HR domain.
-> [!IMPORTANT]
-> Payroll runs are snapshots. Once a run is marked as `paid`, it becomes immutable. Any corrections must happen in a subsequent month's adjustment.
+#### [HrLeaveRequests](file:///home/beznet/Workspace/edapex/src/db/sqlite/domain-hr.ts#L49)
+Leave request lifecycle: `pending` → `approved`/`rejected`. Tracks approver and date ranges.
 
-#### [Leave Requests](file:///home/beznet/Workspace/edapex/src/db/domain-hr.ts#L61)
-Tracks employee absences. Links to `leaveTypes` to enforce annual limits.
+#### [SalaryTemplates](file:///home/beznet/Workspace/edapex/src/db/sqlite/domain-hr.ts#L76)
+JSON `components` array of `SalaryComponent` objects with name, type (`earning`/`deduction`), amount, and percentage flag.
 
----
+#### [PayrollRuns](file:///home/beznet/Workspace/edapex/src/db/sqlite/domain-hr.ts#L87)
+Monthly payroll: `draft` → `approved` → `disbursed` → `cancelled`. Tracks basic, earnings, deductions, net.
 
-## Automated Payroll Recommendations
-
-To ensure 100% accuracy and reduce administrative overhead, the V2 HMAS (`hr_supervisor`) implements automated payroll triggers:
-
-### 1. Attendance-Driven Adjustments
-- **Trigger**: The `attendance.month_closed` event.
-- **Logic**: The `payroll_generator_agent` scans for "Unpaid Absent" days.
-- **Calculation**: `Net Salary = Base + Allowances - (Unpaid Days * Per-Day Rate)`.
-
-### 2. Leave Balance Reconciliation
-- **Trigger**: Approved `hrLeaveRequests`.
-- **Logic**: If an employee takes leaves beyond the `totalDays` defined in `leaveTypes`, the agent automatically flags the excess as "Unpaid" and queues a deduction for the next `payrollRun`.
-
-### 3. Integrated Disbursement
-- **Event**: `hr.payroll_approved`.
-- **Consumer**: The Finance domain's `ledger_agent` automatically creates a `salary_payable` entry in the Universal Ledger.
+#### [StaffEvaluations](file:///home/beznet/Workspace/edapex/src/db/sqlite/domain-hr.ts#L115)
+Performance evaluations with criteria-based scoring and evaluator tracking.
 
 ---
 
-## Security & PBAC
+## AI Task Agents & Tools
 
-HR data contains sensitive PII (Bank info, Salary, Home address).
-- **Access Control**: Only `SchoolAdmin` and specific `HRAgent` personas can view salary/bank metadata.
-- **Self-Service**: Users (Staff) can read their own `payrollRuns` and `hrLeaveRequests` but cannot modify them once submitted.
-- **Audit**: Every change to `basicSalary` or `netSalary` is logged with an `updatedBy` reference to ensure accountability.
+### Operational Tools (Mastra)
+- `hr.getStaffDetails(staffId)`: Fetches contract, role, and salary data.
+- `hr.updateAttendance(staffId, date, status)`: Records daily presence for payroll calculation.
+- `hr.initiateOnboarding(staffData)`: Creates skeleton record and assigns initial PBAC roles.
+- `hr.generateLeaveReport()`: Summarizes staff availability for Supervisor planning.
+- `hr.hireStaff(staffData)`: Registrar for new staff profiles.
+- `hr.terminateStaff(staffId)`: Offboarding workflow and access revocation.
+- `compliance.auditAttendanceRecords(date)`: Scans for missing entries required by law.
+- `compliance.generateNERDCReport()`: Aggregates school-wide metrics into prescribed format.
+- `compliance.checkSafetyPolicy(policyId)`: Verifies facility maintenance logs.
+- `generate_payroll`: Auto-generates monthly payroll runs from salary templates.
+- `calculate_leave_balance`: Computes remaining leave days per type per staff member.
+
+### [STRESS DEFENSE] Tools
+- `rapid_sub_assigner`: Emergency substitute teacher assignment during mass absenteeism.
+- `role_data_boundary_enforcer`: Prevents cross-department data access violations.
+- `disciplinary_version_control`: Manages concurrent edits to disciplinary records.
+- `performance_bias_detector`: Flags statistical anomalies in evaluation scoring patterns.
+- `termination_safety_check`: Multi-step validation before irreversible termination actions.
+- `payroll_double_run_guard`: Prevents duplicate payroll generation for the same period.
+- `leave_overlap_detector`: Detects conflicting leave requests for same date ranges.
+- `salary_component_integrity_checker`: Validates component math (earnings - deductions = net).
+
+---
+
+## PBAC & Security
+- **TenantAdmin**: Full HR access.
+- **HR Manager**: Department/payroll management.
+- **Staff**: Can submit leave requests and view own payroll/evaluations.
+- **Payroll Data**: Restricted to HR Manager + TenantAdmin only.
 
 ---
 
 ## Hono API Routes
 
-```
-Routes → HrController → HrService → HrRepository
-```
-
 | Method | Route | Description | Auth |
 |:---|:---|:---|:---|
 | `GET` | `/api/v1/hr/departments` | List departments | Authenticated |
-| `POST` | `/api/v1/hr/departments` | Create department | `TenantAdmin` |
 | `GET` | `/api/v1/hr/designations` | List designations | Authenticated |
-| `GET` | `/api/v1/hr/leave-types` | List leave types | Authenticated |
+| `GET` | `/api/v1/hr/leave-types` | List leave types | Staff+ |
 | `POST` | `/api/v1/hr/leave-requests` | Submit leave request | Staff |
-| `PATCH` | `/api/v1/hr/leave-requests/:id` | Approve/reject leave | `TenantAdmin` |
-| `POST` | `/api/v1/hr/payroll/generate` | Generate payroll run | `TenantAdmin` |
-| `GET` | `/api/v1/hr/payroll` | List payroll runs | `TenantAdmin` |
-| `GET` | `/api/v1/hr/payroll/my` | Get own payroll history | Staff |
-| `PATCH` | `/api/v1/hr/payroll/:id/approve` | Approve payroll for payment | `TenantAdmin` |
+| `GET` | `/api/v1/hr/leave-requests` | List leave requests | Self + HR Manager |
+| `PATCH` | `/api/v1/hr/leave-requests/:id` | Approve/reject leave | HR Manager |
+| `GET` | `/api/v1/hr/payroll` | List payroll runs | HR Manager |
+| `POST` | `/api/v1/hr/payroll/generate` | Generate payroll | HR Manager |
+| `GET` | `/api/v1/hr/evaluations/:userId` | Get staff evaluations | Self + HR Manager |
 
 ---
 
@@ -105,10 +106,10 @@ Routes → HrController → HrService → HrRepository
 
 | Agent | Type | Capabilities |
 |:---|:---|:---|
-| `hr_supervisor` | Supervisor | Routes HR tasks, policy enforcement |
-| `payroll_generator` | Task | Auto-calculates salary, deductions, allowances |
-| `leave_processor` | Task | Validates leave balance, auto-flag excess |
-| `attendance_reconciler` | Task | Cross-references attendance for payroll |
+| `hr_supervisor` | Supervisor | Leave policy enforcement, payroll oversight |
+| `payroll_calculator` | Task | Salary template application, net computation |
+| `leave_manager` | Task | Balance tracking, conflict detection, auto-reconciliation |
+| `evaluation_analyst` | Task | Scoring aggregation, bias detection |
 
 ---
 
@@ -116,7 +117,7 @@ Routes → HrController → HrService → HrRepository
 
 | Event | Payload | Consumers |
 |:---|:---|:---|
-| `hr.leave_approved` | `{ requestId, userId, leaveType, days }` | Attendance (mark excused), Events (audit) |
-| `hr.payroll_approved` | `{ runId, tenantId, totalAmount }` | Finance (ledger salary entries) |
-| `hr.payroll_disbursed` | `{ runId, disbursedAt }` | Communication (payslip notification), Events (audit) |
-| `hr.staff_onboarded` | `{ userId, departmentId, designationId }` | PBAC (assign default role), Communication (welcome) |
+| `hr.leave_approved` | `{ requestId, userId, dates }` | Attendance (auto-reconcile), Communication (notify) |
+| `hr.payroll_disbursed` | `{ payrollId, userId, netSalary }` | Finance (ledger entry), Communication (payslip) |
+| `hr.evaluation_completed` | `{ evaluationId, userId, score }` | Events (audit) |
+| `hr.leave_balance_exhausted` | `{ userId, leaveType }` | Communication (alert), HR (supervisor) |

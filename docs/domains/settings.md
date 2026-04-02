@@ -1,111 +1,74 @@
-# Domain Architecture: Settings
+# Settings Domain Architecture
 
-## 1. Domain Overview
-The **Settings** domain in EdApex V2 centralizes all system and tenant-level configurations. It replaces the legacy flat-table approach with a polymorphic, JSON-driven storage model that supports planet-scale multi-tenancy and dynamic feature toggeling.
+## Overview
+The Settings domain decouples system configuration from hardcoded files into database-driven, tenant-scoped settings. It provides a key-value configuration store indexed by `domain` (e.g., `general`, `finance`, `lms`) and a feature flag system for gradual rollouts, A/B testing, and module enablement.
 
-### Key Logic
-- **Decoupled Configuration**: All toggles (e.g., "Chat Enabled", "LMS Active") are moved from hardcoded columns to a flexible `config` JSON field.
-- **Categorization**: Settings are grouped by `domain` (e.g., `general`, `finance`, `ai`, `features`) to optimize lookup and caching.
-- **Tenant Isolation**: Every setting is scoped to a `tenant_id`, ensuring no cross-tenant leakage of configuration or credentials.
-- **Standalone Mode Toggle**: When `Settings.isStandalone() == true`, the **Agentic Classroom (Domain 18)** and **LMS** explicitly decouple from Academic/HR dependencies. This enables B2C retail deployment strategies completely decoupled from the institutional 17 domains.
+### Key Business Logic
+- **Domain-Scoped Config**: Each setting row represents a config block for a specific domain (`general`, `finance`, `attendance`, `ai`). JSON `config` stores typed configuration objects.
+- **Feature Flags**: Tenant-scoped dark launches with `featureKey`, `isEnabled`, `rolloutPercentage`, and optional targeted user IDs.
+- **Type Safety**: Config values use discriminated union types (`GeneralConfig`, `FinanceConfig`, `LmsConfig`).
 
-## 2. Entity Mapping (V1 -> V2)
+---
 
-### General Settings
-| Legacy Table (`sm_general_settings`) | V2 Entity (`settings`) | Transformation Logic |
+## Logic Parity (Legacy to V2)
+
+### Schema Mapping
+| Legacy Table (`schoolify`) | V2 Entity (`src/db/domain-settings.ts`) | Notes |
 | :--- | :--- | :--- |
-| `school_name` | `config.schoolName` | Extracted into `domain='general'`. |
-| `logo` / `favicon` | `config.logo` / `config.favicon` | Stored as relative paths in JSON. |
-| `address` / `phone` / `email` | `config.address` / `config.phone` / etc. | Consolidated into general identity metadata. |
-| `currency` / `currency_symbol` | `config.currency` / `config.symbol` | Extracted into `domain='finance'`. |
-| `session_id` | `config.sessionId` | Maps to the active session in `domain='general'`. |
+| `sm_general_settings` / `infixedu__settings` | `settings` (domain: `general`) | School name, logo, address, timezone. |
+| `sm_email_settings` / `sm_sms_gateways` | `settings` (domain: `communication`) | Channel provider config. |
+| `sm_payment_gateway_settings` | `settings` (domain: `finance`) | Currency, receipt prefix, invoice prefix. |
+| `sm_dashboard_settings` / `sm_home_page_settings` | `settings` (domain: `ui`) | Dashboard and homepage config. |
+| `invoice_settings` / `maintenance_settings` | `settings` (domain: specific) | Merged into domain-scoped settings. |
+| — (new) | `featureFlags` | Dark launches and gradual rollouts. |
 
-### Module & Feature Management
-| Legacy Table (`sm_modules`) | V2 Entity (`settings`) | Transformation Logic |
-| :--- | :--- | :--- |
-| `name` | `domain='features' -> config.featureKey` | Modules are now treated as feature flags. |
-| `active_status` | `config.enabled` | Boolean toggle in feature flag metadata. |
+---
 
-## 3. Configuration Hierarchy & Overrides
-To support global defaults with tenant-specific overrides, EdApex V2 implements a **Fallback Mechanism**.
+## Technical Implementation
 
-### Hierarchy Logic
-1.  **System Default**: A "Global" configuration record (reserved `tenant_id = 1` or a system-level seed).
-2.  **Tenant Override**: A record matching the current `tenant_id`.
-3.  **Resolution**: The `SettingsService` performs a `deepMerge(SystemDefault, TenantOverride)`.
+### Core Entities
 
-```mermaid
-graph TD
-    A[Request Context] --> B{Tenant Specific Setting?}
-    B -- Yes --> C[Deep Merge with System Default]
-    B -- No --> D[Return System Default]
-    C --> E[Final Config Object]
-    D --> E
-```
+#### [Settings](file:///home/beznet/Workspace/edapex/src/db/sqlite/domain-settings.ts#L48)
+Key-value config store. Unique constraint on `(tenantId, domain)`. JSON `config` supports `GeneralConfig`, `FinanceConfig`, `LmsConfig`, or arbitrary objects.
 
-## 4. Feature Flag Architecture
-For planet-scale deployment, EdApex V2 uses a "Feature Flag" domain within the `settings` table to control functionality without deployments.
+#### [FeatureFlags](file:///home/beznet/Workspace/edapex/src/db/sqlite/domain-settings.ts#L66)
+Feature toggle system. `featureKey` (e.g., `lms.ai_tutoring`), `isEnabled`, `rolloutPercentage` (0-100). Metadata supports targeted user IDs and A/B variants.
 
-### Feature Flag DSL
-```typescript
-interface FeatureFlag {
-  enabled: boolean;
-  rolloutPercentage?: number; // 0-100 for staggered release
-  targetAudiences?: string[]; // ["beta_testers", "internal_staff"]
-  activeDates?: { from: string; to: string };
-}
-```
+---
 
-### Justification
-- **Scalability**: Feature flags are cached at the Edge (Redis/KV Store) to prevent database round-trips for authorization and layout decisions.
-- **Stability**: Allows "Dark Launching" new services (like AI-Modules) to specific tenants safely.
+## AI Task Agents & Tools
 
-## 5. PBAC & Security
-Access to the Settings domain is strictly controlled to prevent unauthorized configuration changes.
+### Operational Tools (Mastra)
+- `settings.updateConfig(domain, config)`: Updates tenant-scoped configuration with validation.
+- `settings.setAcademicYear(yearId)`: Transitions the active academic period for a tenant.
+- `get_tenant_config`: Retrieves merged config for a domain (tenant-level + system defaults).
+- `check_feature_flag`: Evaluates if a feature is enabled for a given tenant/user.
+- `migrate_legacy_settings`: Imports legacy settings into the domain-scoped JSON format.
+- `sync_config_across_nodes`: Ensures config consistency across edge nodes.
 
-- **System Admin**: Full access to all `tenant_id` settings and System Defaults.
-- **Tenant Admin**: Access limited to their own `tenant_id`.
-- **Read-Only**: Service accounts (Agents) can only read specific domains (e.g., `ai_supervisor` reading `domain='ai'`).
+### [STRESS DEFENSE] Tools
+- `config_rollback_guard`: Captures config snapshots before mutations for instant rollback.
+- `feature_flag_circuit_breaker`: Auto-disables features causing error rate spikes.
+- `config_validation_engine`: Schema-validates config JSON against expected types.
 
-## 6. Recommendations & Justifications
+---
 
-### 1. Separate `system_settings` from `tenant_settings`
-**Current Implementation**: `settings.tenant_id` is `notNull()`.
-**Proposal**: Allow `tenant_id` to be NULL for system-wide defaults.
-**Justification**: Simplifies the lookup logic. If `tenant_id = ?` returns no results, the engine automatically falls back to `tenant_id IS NULL`.
-
-### 2. Add `version` to `SettingConfig`
-**Current Implementation**: No explicit versioning in JSON.
-**Proposal**: Add a `version` field to every `config` object.
-**Justification**: Supports seamless schema migrations of the JSON payloads as new features are added to modules.
-```json
-{
-  "domain": "general",
-  "config": {
-    "version": "1.0.0",
-    "schoolName": "Greenwood Academy",
-    "...": "..."
-  }
-}
-```
+## PBAC & Security
+- **TenantAdmin**: Full settings and feature flag management.
+- **SuperAdmin**: System-wide defaults and cross-tenant config.
+- **All Others**: Read-only access to public config (school name, logo).
 
 ---
 
 ## Hono API Routes
 
-```
-Routes → SettingsController → SettingsService → SettingsRepository → settings/featureFlags
-```
-
 | Method | Route | Description | Auth |
 |:---|:---|:---|:---|
-| `GET` | `/api/v1/settings` | List settings by domain | `TenantAdmin` |
-| `GET` | `/api/v1/settings/:domain` | Get specific domain config | Authenticated |
-| `PUT` | `/api/v1/settings/:domain` | Upsert domain config | `TenantAdmin` |
+| `GET` | `/api/v1/settings/:domain` | Get config for domain | Authenticated |
+| `PUT` | `/api/v1/settings/:domain` | Update config for domain | `TenantAdmin` |
 | `GET` | `/api/v1/feature-flags` | List feature flags | `TenantAdmin` |
 | `POST` | `/api/v1/feature-flags` | Create feature flag | `TenantAdmin` |
-| `PATCH` | `/api/v1/feature-flags/:id` | Toggle flag / update rollout | `TenantAdmin` |
-| `GET` | `/api/v1/feature-flags/evaluate/:key` | Evaluate flag for current user | Authenticated |
+| `PATCH` | `/api/v1/feature-flags/:key` | Toggle feature flag | `TenantAdmin` |
 
 ---
 
@@ -113,8 +76,9 @@ Routes → SettingsController → SettingsService → SettingsRepository → set
 
 | Agent | Type | Capabilities |
 |:---|:---|:---|
-| `config_provisioner` | Task | Seeds default settings on tenant creation |
-| `feature_evaluator` | Task | Evaluates feature flag with rollout % and user targeting |
+| `config_manager` | Task | Config retrieval, validation, default merging |
+| `feature_flag_evaluator` | Task | Rollout percentage calculation, A/B variant selection |
+| `config_auditor` | Task | Change tracking, rollback management |
 
 ---
 
@@ -122,5 +86,6 @@ Routes → SettingsController → SettingsService → SettingsRepository → set
 
 | Event | Payload | Consumers |
 |:---|:---|:---|
-| `settings.config_updated` | `{ tenantId, domain, changedKeys[] }` | Events (audit), affected domains (cache invalidation) |
-| `settings.feature_toggled` | `{ tenantId, featureKey, isEnabled }` | Events (audit), All domains (module enablement) |
+| `settings.config_updated` | `{ tenantId, domain, changedKeys }` | All domains (cache invalidation) |
+| `settings.feature_flag_toggled` | `{ featureKey, isEnabled, tenantId }` | Events (audit) |
+| `settings.config_rollback` | `{ tenantId, domain, reason }` | Communication (admin alert) |

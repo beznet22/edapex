@@ -152,6 +152,11 @@ HMAS organizes AI intelligence into four distinct functional layers to ensure st
 - **Responsibility**: Validates the JSON schema of agent tool calls.
 - **Gatekeeping**: Enforces the PBAC check *before* the domain service is called.
 
+### 3.5 Dynamic Educational Structures as AI Skills
+To achieve massive global scale across varying educational models (e.g., Nigerian 6-3-3-4 vs. K-12 vs. IB vs. UK A-Levels), **School Structures are removed from the database level**. Instead, they are defined strictly as dynamic "AI Skills" injected directly into the HMAS orchestration layer.
+- **Structural Loading**: When a campus is instantiated, the Executive Orchestrator pulls a localized structural skill (e.g., `structure-ube-nigeria.md`). This skill dictates local concepts like grading rubrics, "Terms", "Semesters", and critical boundary rules (e.g., UBE is free by federal law, whereas ECCDE Crèche bills tuition).
+- **Schema Autonomy**: The `domain-academic` schema utilizes entirely agnostic primitives (`classes`, `enrollments`) combined with Zod-validated JSON `metadata`. The Orchestrator leverages the runtime Skill structure to map real-world meaning to these agnostic DB rows.
+
 ---
 
 ## 4. Federated Multi-School Intelligence (FMSIA)

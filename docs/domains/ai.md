@@ -1,308 +1,121 @@
-# AI Domain Architecture: Orchestration & Agent Infrastructure
+# AI Integration Domain Architecture
 
-## 1. Domain Overview
+## Overview
+The AI domain manages the infrastructure for AI assistant interactions, agentic orchestration, and tool invocation tracking. It provides chat history, message storage, document artifacts, agent registration, and granular action/tool telemetry — all tenant-isolated and persona-scoped.
 
-The AI domain is the **orchestration backbone** of the EdApex HMAS (Hierarchical Multi-Agent System). Unlike other domains that migrate legacy code, this module is **entirely new** — designed from scratch to power AI-native education through the **Mastra SDK**.
-
-It comprises two sub-systems:
-
-| Sub-system | Purpose | Tables |
-|:---|:---|:---|
-| **Chat Infrastructure** | User-facing conversational AI interface | `ai_chats`, `ai_messages`, `ai_votes`, `ai_documents`, `ai_suggestions` |
-| **Agentic Infrastructure** | HMAS supervisor/task agent execution engine | `ai_agents`, `ai_agent_actions`, `ai_tool_invocations` |
-
-### Key Design Principles
-- **Mastra-Native**: All agent execution flows through `Mastra.Agent`, `Mastra.Workflow`, and `Mastra.Memory`
-- **Tenant-Isolated**: Every chat thread and agent action is scoped by `tenant_id`
-- **Observability-First**: Every agent invocation, tool call, and token usage is logged for auditing
-- **Idempotent Execution**: `idempotency_key` on `ai_agent_actions` prevents duplicate work on retries
+### Key Business Logic
+- **Chat Infrastructure**: `aiChats` → `aiMessages` with role support (`user`, `assistant`, `system`, `tool`). Messages store parts as JSON for multi-modal content.
+- **Document Artifacts**: AI-generated documents (`text`, `code`, `image`, `sheet`) with suggestion tracking.
+- **Agentic Infrastructure**: Registered `aiAgents` with capability lists, action tracking (`aiAgentActions`), and tool invocation logging (`aiToolInvocations`).
+- **Token Tracking**: Message metadata captures `promptTokens`, `completionTokens`, `totalTokens`, `latencyMs`, and `modelName`.
 
 ---
 
-## 2. Schema Analysis
+## Logic Parity (Legacy to V2)
 
-### Chat Infrastructure
-
-#### [aiChats](file:///home/beznet/Workspace/edapex/src/db/domain-ai.ts#L50)
-Maps to **Mastra Thread**. Each chat is a conversation thread owned by a user within a tenant. Table: `ai_chats`.
-- `id` (varchar) → Mastra `threadId`
-- `userId` → Mastra `resourceId` (combined as `{tenantId}-{userId}`)
-- `metadata` → Stores `ChatMetadata` (summary, tags, lastMessagePreview)
-
-#### [aiMessages](file:///home/beznet/Workspace/edapex/src/db/domain-ai.ts#L62)
-Maps to **Mastra Messages**. Stores the conversation history within a thread. Table: `ai_messages`.
-- `chatId` → FK to thread
-- `role` → `user | assistant | system | tool`
-- `parts` → JSON array of message parts (text, tool calls, tool results)
-
-#### [aiVotes](file:///home/beznet/Workspace/edapex/src/db/domain-ai.ts#L72)
-User feedback on assistant responses. Feeds into RLHF quality loops. Table: `ai_votes`.
-
-#### [aiDocuments](file:///home/beznet/Workspace/edapex/src/db/domain-ai.ts#L82) / [aiSuggestions](file:///home/beznet/Workspace/edapex/src/db/domain-ai.ts#L91)
-EdApex-specific: collaborative AI-generated documents with inline suggestions.
-
-### Agentic Infrastructure
-
-#### [aiAgents](file:///home/beznet/Workspace/edapex/src/db/domain-ai.ts#L102)
-Registry of all HMAS agents — both Supervisors and Task Agents.
-- `agentType` → Discriminator (e.g., `supervisor`, `task`, `background`)
-- `capabilities` → JSON array of tool names this agent can invoke
-- `config` → Agent-specific configuration (model, temperature, max tokens)
-
-#### [aiAgentActions](file:///home/beznet/Workspace/edapex/src/db/domain-ai.ts#L116)
-Execution log for agent invocations — the core audit trail.
-- `idempotencyKey` → Prevents duplicate execution on retries
-- `status` → Lifecycle: `pending → running → completed | failed`
-- `input/output` → Full request/response payload for debugging
-
-#### [aiToolInvocations](file:///home/beznet/Workspace/edapex/src/db/domain-ai.ts#L135)
-Sub-step logs: each tool call within an agent action.
+### Schema Mapping
+| Legacy Table | V2 Entity (`src/db/domain-ai.ts`) | Notes |
+| :--- | :--- | :--- |
+| — (new) | `aiChats` | Tenant-isolated chat sessions with model and visibility. |
+| — (new) | `aiMessages` | Multi-part messages with role and token metadata. |
+| — (new) | `aiVotes` | Per-message feedback (upvote/downvote). |
+| — (new) | `aiDocuments` | AI-generated artifacts (text, code, image, sheet). |
+| — (new) | `aiSuggestions` | AI suggestions linked to documents. |
+| — (new) | `aiAgents` | Registry of active agents with capabilities and config. |
+| — (new) | `aiAgentActions` | Action lifecycle tracking with idempotency keys. |
+| — (new) | `aiToolInvocations` | Granular tool call logging with parameters and results. |
 
 ---
 
-## 3. Mastra SDK Integration
+## Technical Implementation
 
-### Memory Model Alignment
+### Core Entities
 
-> [!IMPORTANT]
-> Mastra has its own Memory model with native storage. The AI domain schema must align with Mastra's `resource` + `thread` scoping.
+#### [AiChats](file:///home/beznet/Workspace/edapex/src/db/sqlite/domain-ai.ts#L39)
+Chat session with model selection, visibility (`private`/`public`), and summary metadata.
 
-#### Mastra Memory Types → EdApex Mapping
+#### [AiMessages](file:///home/beznet/Workspace/edapex/src/db/sqlite/domain-ai.ts#L51)
+Multi-part messages supporting `user`, `assistant`, `system`, `tool` roles. Token usage in metadata.
 
-| Mastra Memory Type | Purpose | EdApex Storage |
-|:---|:---|:---|
-| **Message History** | Raw conversation messages | `chats` + `messages` tables |
-| **Observational Memory** | Background agents compress old messages into dense observations | Auto-managed by `@mastra/memory` |
-| **Working Memory** | Persistent structured user data (names, preferences, goals) | `chats.metadata` or thread-scoped storage |
-| **Semantic Recall** | Embedding-based retrieval of past messages | Requires vector store (separate from MySQL) |
+#### [AiVotes](file:///home/beznet/Workspace/edapex/src/db/sqlite/domain-ai.ts#L65)
+RLHF feedback per message for model improvement.
 
-#### Resource & Thread Scoping
+#### [AiDocuments / AiSuggestions](file:///home/beznet/Workspace/edapex/src/db/sqlite/domain-ai.ts#L76)
+AI-generated artifacts with iterative suggestion tracking.
 
-```typescript
-// EdApex → Mastra memory mapping
-const response = await agent.generate(userMessage, {
-  memory: {
-    resource: `${tenantId}-${userId}`,  // Stable user identifier
-    thread: chatId,                      // Maps to chats.id
-  },
-});
-```
+#### [AiAgents](file:///home/beznet/Workspace/edapex/src/db/sqlite/domain-ai.ts#L102)
+Agent registry with capabilities, status (`active`/`inactive`/`maintenance`), and runtime config.
 
-#### HMAS Memory Isolation
-When a supervisor delegates to a subagent, Mastra auto-scopes memory:
-- **Thread ID**: Fresh per delegation (subagent starts clean)
-- **Resource ID**: `{parentResourceId}-{agentName}` (stable across delegations)
-- **Memory Instance**: Subagent inherits supervisor's `Memory` if no own config
+#### [AiAgentActions](file:///home/beznet/Workspace/edapex/src/db/sqlite/domain-ai.ts#L116)
+Action lifecycle: `pending` → `running` → `completed`/`failed`. Includes idempotency keys and duration.
 
-### Agent Configuration
-
-```typescript
-import { Agent } from '@mastra/core/agent';
-import { Memory } from '@mastra/memory';
-
-// Example: LMS Supervisor Agent
-export const lmsSupervisor = new Agent({
-  id: 'lms-supervisor',
-  name: 'LMS Supervisor',
-  instructions: `You are the LMS domain supervisor for EdApex...`,
-  model: openai('gpt-4o'),
-  tools: [enrollStudentTool, publishCourseTool, evaluateSubmissionTool],
-  memory: new Memory({
-    options: {
-      lastMessages: 20,
-      observationalMemory: true,  // Compress old messages
-    },
-  }),
-});
-```
-
-### Extensible Storage Adapters
-
-> [!CAUTION]
-> **Mastra existing adapters do not map perfectly to our isolated schema.** EdApex requires custom `[DB]Store` implementation based on the active database in use.
-
-Mastra officially supports: libSQL, PostgreSQL, MongoDB, Upstash, D1, DynamoDB, MSSQL — but **not MySQL**. Even for supported databases like Postgres, we want our specific schema conventions.
-
-**Recommendation**: Build custom `[DB]Store` adapters (e.g., `MysqlStore`, `PostgresStore`) implementing the `MastraStorage` interface:
-
-```typescript
-import { MastraStorage } from '@mastra/core';
-import { drizzle } from 'drizzle-orm';
-
-// Example MySQL adapter. Similarly for Postgres/SQLite.
-export class MysqlStore extends MastraStorage {
-  constructor(private db: ReturnType<typeof drizzle>) {
-    super({ id: 'edapex-mysql-store' });
-  }
-  // Implement: saveThread, getThread, saveMessages, getMessages, etc.
-}
-```
-
-### Workflow Integration
-
-Agent actions map to Mastra Workflows for multi-step operations:
-
-```typescript
-import { Workflow } from '@mastra/core/workflow';
-
-const gradingWorkflow = new Workflow({ name: 'grade-submission' })
-  .step('fetch-submission', fetchSubmissionStep)
-  .step('fetch-rubric', fetchRubricStep)
-  .step('evaluate', evaluateStep)
-  .step('store-result', storeResultStep);
-```
+#### [AiToolInvocations](file:///home/beznet/Workspace/edapex/src/db/sqlite/domain-ai.ts#L135)
+Per-tool-call logging with parameters, results, and latency for observability.
 
 ---
 
-## 4. HMAS Architecture
+## AI Task Agents & Tools
 
-### Agent Hierarchy
+### Operational Tools (Mastra)
+- `ai.getAgentSpend(agentId)`: Aggregates `cost_events` for the current month.
+- `ai.enforceAgentPause(agentId)`: Triggers status change if 100% budget reached.
+- `ai.predictMonthlySpend()`: Extrapolates current run frequency to end-of-month.
+- `ai.identifyWastefulRuns(threshold)`: Flags agents with high cost but low WorkProduct output.
+- `it.checkAgentHealth()`: Technical maintenance of the HMAS loop.
+- `it.rotateAPIKeys()`: Automated rotation of agent-level keys in Vault/D1.
+- `it.auditTokenCents()`: Real-time cost auditing per agent per tenant.
+- `register_agent`: Registers a new AI agent with capabilities and config.
+- `track_token_usage`: Aggregates token usage per tenant for billing/quotas.
 
-```mermaid
-graph TD
-    U[User Request] --> GW[Hono API Gateway]
-    GW --> CS[Coordinator Supervisor]
-    
-    CS -->|"Route: academic"| LS[lms_supervisor]
-    CS -->|"Route: finance"| FS[finance_supervisor]
-    CS -->|"Route: cms"| CMS[cms_supervisor]
-    CS -->|"Route: hr"| HS[hr_supervisor]
-    
-    LS -->|Delegate| TA1[tutor_agent]
-    LS -->|Delegate| TA2[grading_agent]
-    FS -->|Delegate| TA3[fee_calculator]
-    CMS -->|Delegate| TA4[content_generator]
-    HS -->|Delegate| TA5[leave_processor]
-    
-    subgraph "Mastra Memory Layer"
-        M1["resource: {tenantId}-{userId}"]
-        M2["thread: chatId"]
-        M3["Observational Memory"]
-        M4["Working Memory"]
-    end
-    
-    TA1 -.->|aiAgentActions| DB[(EdApex Database via [DB]Store)]
-    CS -.->|Memory| M1
-    M1 --> M2
-    M2 --> DB
-```
+### [STRESS DEFENSE] Tools
+- `token_budget_enforcer`: Hard-stops agent execution when token spend exceeds allocated budget.
+- `hallucination_circuit_breaker`: Detects and halts agent loops producing nonsensical outputs.
+- `agent_action_idempotency`: Prevents duplicate action execution using idempotency keys.
+- `tool_timeout_enforcer`: Kills tool invocations exceeding time limits.
+- `context_window_throttler`: Prevents amnesia or token-loop deadlocks via dynamic truncation.
+- `recursive_loop_breaker`: Prevents agents from entering infinite tool-call loops.
+- `offline_prompt_queue`: Buffers agent requests durante total packet loss/offline states.
+- `hitl_trigger_router`: Pauses high-risk agent actions for human intervention.
 
-### Agent Registry (aiAgents)
+---
 
-| Agent | Type | Domain | Capabilities |
+## PBAC & Security
+- **Tenant Isolation**: All AI data scoped by `tenantId`.
+- **TenantAdmin**: Full access to agent registry and analytics.
+- **Staff/Student**: Access to their own chats and documents.
+- **Agent Actions**: Logged and auditable for governance compliance.
+
+---
+
+## Hono API Routes
+
+| Method | Route | Description | Auth |
 |:---|:---|:---|:---|
-| `coordinator` | `supervisor` | Global | Route requests to domain supervisors |
-| `lms_supervisor` | `supervisor` | LMS | Enrollment, course management, pathing |
-| `finance_supervisor` | `supervisor` | Finance | Fee management, ledger operations |
-| `cms_supervisor` | `supervisor` | CMS | Content generation, moderation |
-| `hr_supervisor` | `supervisor` | HR | Leave, payroll, evaluations |
-| `tutor_agent` | `task` | LMS | 1-on-1 student tutoring via RAG |
-| `grading_agent` | `task` | LMS | AI-powered submission evaluation |
-| `content_generator` | `task` | CMS | AI article/event creation |
-| `content_moderator` | `task` | CMS | Content safety scanning |
-| `fee_calculator` | `task` | Finance | Fee computation and installments |
-
-### Handoff Protocol
-
-1. Supervisor receives user request
-2. Supervisor determines domain + task via structured reasoning
-3. Supervisor creates `aiAgentActions` record (`status: pending`)
-4. Supervisor delegates to Task Agent with context
-5. Task Agent executes, logging `aiToolInvocations`
-6. Task Agent returns result, `aiAgentActions.status → completed`
-7. Supervisor synthesizes response to user
+| `GET` | `/api/v1/ai/chats` | List chats | Self |
+| `POST` | `/api/v1/ai/chats` | Create chat | Authenticated |
+| `GET` | `/api/v1/ai/chats/:id/messages` | Get messages | Self |
+| `POST` | `/api/v1/ai/chats/:id/message` | Send message | Self |
+| `GET` | `/api/v1/ai/agents` | List agents | `TenantAdmin` |
+| `GET` | `/api/v1/ai/agents/:id/actions` | Get agent actions | `TenantAdmin` |
+| `GET` | `/api/v1/ai/documents` | List AI documents | Self |
 
 ---
 
-## 5. PBAC & Security
+## HMAS Agent Registry
 
-### Policy Rules
-
-| Rule | Effect | Conditions |
+| Agent | Type | Capabilities |
 |:---|:---|:---|
-| Tenant Chat Isolation | `allow` | `request.tenantId == chat.tenantId` |
-| User Chat Ownership | `allow` | `request.userId == chat.userId` |
-| Admin Chat Visibility | `allow` | `chat.visibility == public OR request.role == admin` |
-| Agent Invocation Auth | `allow` | `request.role ∈ [admin, teacher] OR agent.allowedRoles.includes(request.role)` |
-| Token Budget | `deny` | `user.tokenUsage >= tenant.tokenBudget` |
-| Rate Limiting | `deny` | `user.requestCount > tenant.rateLimit` within time window |
-
-### Security Measures
-- **Token Budget Enforcement**: Track `promptTokens + completionTokens` in `MessageMetadata.usage`
-- **Audit Trail**: Every agent action logged with full input/output in `aiAgentActions`
-- **Idempotency**: `idempotency_key` prevents repeated charges on retries
-- **Data Privacy**: Student data in agent context must be anonymized for external LLM calls
+| `ai_supervisor` | Supervisor | Agent orchestration, budget enforcement, health monitoring |
+| `chat_agent` | Task | Chat completion, context management, document generation |
+| `observability_agent` | Task | Token tracking, latency monitoring, anomaly detection |
 
 ---
 
-## 6. Recommendations & Justifications
-
-### A. Build Custom `[DB]Store` Adapters (CRITICAL)
-**Proposal**: Implement `MastraStorage` interface using Drizzle ORM based on the active database.
-- **Justification**: Custom adapters (like `MysqlStore` or `PostgresStore`) ensure Mastra memory, threads, and agent state save cleanly into our multi-tenant database using our exact table parameters.
-
-### B. Add `tenantId` to `aiDocuments`
-**Proposal**: Add `tenantId: int("tenant_id").references(() => tenants.id)` to `aiDocuments`.
-- **Justification**: Currently missing tenant isolation — a critical security gap.
-
-### C. Align Schema with Mastra Storage Interface
-**Proposal**: Ensure `chats` and `messages` tables match Mastra's expected column structure.
-- **Justification**: Avoids dual storage (Mastra-managed tables + custom EdApex tables). A single source of truth reduces complexity.
-
-### D. Vector Store for Semantic Recall
-**Proposal**: Integrate a vector database (e.g., pgvector, Qdrant, or Pinecone) for semantic recall.
-- **Justification**: Enhances AI capability to retrieve historical interactions that standard keyword DB searches miss.
-
-### E. Stateless AI Execution (Edge-Native Standard)
-
-To meet **Cloudflare's 10ms CPU limit** and ensure **Edge-Native performance**, EdApex uses a **Stateless Agent Execution Model** as the primary implementation pattern.
-
-#### Architecture Alignment
-1. `aiChats` and `aiMessages` remain strictly Drizzle-native and independent of `MastraStorage`.
-2. The `AiService` loads the DB history, maps it to generic LLM payloads, and invokes the Mastra agent statelessly.
-3. **Justification**: Stateless execution avoids the initialization overhead of heavy Mastra Memory adapters (e.g., ORM setup, connection pools) during the tight 10ms request window.
-4. **Justification**: Offloading conversation state to **TanStack DB** (client) and **D1** (edge) ensures sub-1ms local responsiveness and efficient remote persistence.
-
-```typescript
-// Standard Stateless Invocation Pattern
-const dbMessages = await aiRepository.getMessages(chatId);
-const standardMessages = dbMessages.map(m => ({
-  role: m.role,
-  content: m.parts[0]?.text || '', // Simplified mapping
-})); 
-
-const response = await agent.generate([ ...standardMessages, { role: 'user', content: req.text }]);
-await aiRepository.saveMessage(chatId, 'assistant', response.text);
-```
-
-#### OpenMAIC LangGraph Orchestration
-For live educational scenarios, the generic chat state machine is insufficiently nuanced. **Domain 18 (Agentic Classroom)** bypasses `aiChats` in favor of a specialized OpenMAIC **LangGraph** loop:
-- **State Dehydration**: Utilizes `classroomMemoryLedger` for interleaved `action`/`text` payload storage, bypassing standard memory formatting.
-- **SSE Streams**: LangGraph nodes yield arrays via Edge SSE rather than standard HTTP responses.
-- **Explicit Handoffs**: Director Agents control invocation state explicitly to respect the 10ms CPU slices over extended, 45-minute continuous sessions.
-
-### F. Hono API Routes
-
-```
-Routes → AiController → AiService → AiRepository → chats/messages/aiAgents
-```
-
-| Method | Route | Description |
-|:---|:---|:---|
-| `POST` | `/api/v1/ai/chat` | Create new chat thread |
-| `GET` | `/api/v1/ai/chats` | List user's active threads |
-| `GET` | `/api/v1/ai/chats/:id` | Get chat with messages |
-| `POST` | `/api/v1/ai/chats/:id/messages` | Send message (streams response) |
-| `POST` | `/api/v1/ai/chats/:id/vote` | Submit feedback on message |
-| `POST` | `/api/v1/ai/agents/:id/invoke` | Invoke agent action |
-| `GET` | `/api/v1/ai/agents/:id/actions` | List agent action history |
-| `GET` | `/api/v1/ai/agents` | List registered agents for tenant |
-
-### G. Domain Events
+## Domain Events
 
 | Event | Payload | Consumers |
 |:---|:---|:---|
-| `ai.agent_invoked` | `{ agentId, actionId, tenantId, actionType }` | Events (audit), Settings (rate limit check) |
-| `ai.action_completed` | `{ actionId, durationMs, tokenUsage }` | Finance (token billing), Events (audit) |
-| `ai.action_failed` | `{ actionId, errorMessage }` | Events (alert), Communication (notify admin) |
-| `ai.memory_compressed` | `{ threadId, observationCount }` | Events (audit) |
+| `ai.agent_action_completed` | `{ actionId, agentId, status }` | Events (audit), AI (telemetry) |
+| `ai.agent_action_failed` | `{ actionId, agentId, error }` | Communication (admin alert), Events (audit) |
+| `ai.token_budget_exceeded` | `{ tenantId, usage, limit }` | Finance (billing), Communication (alert) |
+| `ai.hallucination_detected` | `{ agentId, messageId, confidence }` | AI (circuit breaker), Events (audit) |

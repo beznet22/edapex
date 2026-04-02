@@ -56,17 +56,34 @@ erDiagram
 
 ### Result Engine Agent
 - **Trigger**: Fired when `examMarks` are updated, when an exam term is marked "Completed", or when an Agentic Classroom (Domain 18) `EvaluatorAgent` yields a graded turn transcript.
-- **Function**: Performs bulk calculation of GPAs, Grades, and subject-wise positions. Aggregates micro-evaluations from immersive live sessions into long-term `computedResults`.
+- **Function**: Performs bulk calculation of GPAs, Grades, and subject-wise positions.
 - **Verification**: Cross-references computed totals against `examSetups.exam_mark` constraints.
 
 ### Assessment Coordinator
 - **Function**: Automatically generates `examSetups` based on historical patterns or school policy.
-- **Validation**: Flags entries where total marks exceed the defined maximums (Logic parity with `CheckPoint 3` learnings).
+- **Validation**: Flags entries where total marks exceed the defined maximums.
+
+### Operational Tools (Mastra)
+- `assessment.gradeSubmission(submissionId)`: AI rubric-based grading with confidence scoring.
+- `assessment.generateTranscript(studentId)`: Produces a certified PDF WorkProduct.
+- `assessment.flagPerformanceAnomaly(minThreshold)`: Scans for grades outside 2 standard deviations.
+- `assessment.recommendIntervention(studentId)`: Suggests student for personalized path or remediation.
+- `assessment.computeSchoolAverages()`: Computes school-wide statistics per exam term.
+- `assessment.gradeExam(examId)`: Bulk-grade all submissions for an exam.
+
+### [STRESS DEFENSE] Tools
+- `uncertainty_handling_gate`: Prevents grading guesses under missing data pressure.
+- `rubric_version_locker`: Protects current exam terms from mid-cycle grading scale shifts.
+- `plagiarism_fp_filter`: Filters false-positive AI flags in academic writing.
+- `concurrent_grading_lock`: Manages distributed lock for bulk mark uploads.
+- `grade_anomaly_detector`: Flags suspicious grade inflation or bulk hallucinations.
+- `regional_portal_sync`: Manages regional/board portal export retries and validation (WAEC/SAT/IB).
 
 ## 🔒 Security & Multi-tenancy
 - **Tenant Isolation**: All assessment data is scoped via `tenantId`.
 - **PBAC**: Grading is restricted to assigned subject teachers or HODs via specific permission checks.
-- **Academic Year Scoping**: Data is strictly partitioned by `academicId` to prevent historical data leakage into current terms.
+- **Academic Year Scoping**: Data is strictly partitioned by `academicId` to prevent historical data leakage.
+- **Structural Enforcement**: Assessment logic must respect the `metadata.isCompulsory` flag from Dynamic Structure skills.
 
 ---
 
@@ -93,9 +110,10 @@ Routes → AssessmentController → AssessmentService → AssessmentRepository
 
 | Agent | Type | Capabilities |
 |:---|:---|:---|
-| `result_engine` | Task | Bulk GPA/grade computation, ranking |
-| `assessment_coordinator` | Task | Auto-generate exam setups from policy |
-| `grading_agent` | Task | AI-powered submission evaluation |
+| `result_engine` | Task | Bulk GPA/grade computation, ranking, anomaly detection |
+| `assessment_coordinator` | Task | Auto-generate exam setups from policy, portal sync |
+| `grading_agent` | Task | AI-powered submission evaluation, plagiarism filtering |
+| `portal_agent` | Task | External regional portal integration (WAEC/NECO/SAT/IB) |
 
 ---
 
@@ -106,3 +124,4 @@ Routes → AssessmentController → AssessmentService → AssessmentRepository
 | `assessment.marks_uploaded` | `{ examSetupId, classId, tenantId }` | AI (result_engine trigger) |
 | `assessment.result_calculated` | `{ examId, classId, studentCount }` | Communication (report cards), Events (audit) |
 | `assessment.online_exam_submitted` | `{ attemptId, userId, onlineExamId }` | AI (auto-grading) |
+| `assessment.portal_sync_failed` | `{ examId, error, retries }` | Communication (admin alert) |

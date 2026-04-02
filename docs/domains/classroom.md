@@ -1,81 +1,93 @@
-# Classroom Domain Architecture
+# Classroom Domain Architecture (Domain 18)
 
-## 🎯 Domain Overview
-The Classroom domain (Domain 18) encapsulates the **Agentic Classroom** — an autonomous, AI-driven instructional environment powered by OpenMAIC's stateless LangGraph orchestration. It provides real-time multi-agent collaboration via SSE streaming, maintaining strict isolation from the static Course (LMS), Academic, and AI telemetry domains.
+## Overview
+The Classroom domain (Domain 18) encapsulates the OpenMAIC-powered Agentic Classroom. It manages real-time, AI-driven teaching sessions where a **Director Agent** orchestrates pedagogical delivery via a LangGraph state machine. This domain is fully isolated from static Academic and LMS tables to prevent high-frequency stateless events from polluting term data.
 
-## 🏛️ Architectural Evolution
+### Key Business Logic
+- **Session Lifecycle**: `scheduled` → `active` → `paused` → `completed`. Sessions are instantiated from Academic routines or standalone LMS courses.
+- **Stateless Memory Ledger**: LangGraph state is buffered turn-by-turn in `classroomMemoryLedger`, not persisted in LMS. This prevents stateless execution from corrupting course-level data.
+- **Dynamic Participation**: `classroomParticipants` tracks per-session roster with real-time engagement scoring.
+- **Whiteboard State**: A dedicated `classroomWhiteboardState` table replays visual actions (`wb_highlight`, `wb_show_image`, `wb_pan`) for late-joining participants.
 
-### Greenfield Domain (No Legacy Mapping)
-| Feature | V2 Implementation |
-| :--- | :--- |
-| **Session Lifecycle** | `classroomSessions` (scheduled → active → paused → completed) |
-| **LangGraph Memory** | `classroomMemoryLedger` (interleaved action/text JSON arrays) |
-| **Roster & Engagement** | `classroomParticipants` (dynamic engagement scoring) |
-| **Whiteboard State** | `classroomWhiteboardState` (wb_ action timeline replica) |
+---
 
-### Schema Design
-V2 introduces 4 dedicated tables to prevent high-frequency LangGraph events from bleeding into static LMS or Academic schemas.
+## Logic Parity (Legacy to V2)
 
-- **Session State Machine**: `classroomSessions.status` tracks the full lifecycle with atomic checkout locking to prevent race conditions from concurrent observers.
-- **Memory Ledger**: Replaces `domain-ai`'s generic chat tables with native support for OpenMAIC's interleaved `action`/`text` arrays. Each entry maps `turnCount` to flattened `parsedContent` JSON.
-- **Engagement Scoring**: `classroomParticipants.engagementScore` is dynamically updated by Evaluator Agents based on response quality and participation frequency.
-- **Whiteboard Resilience**: `classroomWhiteboardState.timeline` stores the complete `wb_` action history as a JSONB timeline, enabling device drop/reconnection without state loss.
+### Schema Mapping
+| Legacy Table | V2 Entity (`src/db/domain-classroom.ts`) | Notes |
+| :--- | :--- | :--- |
+| — (new) | `classroomSessions` | Session lifecycle with Director Agent link and LMS course link. |
+| — (new) | `classroomMemoryLedger` | Turn-by-turn LangGraph state buffer. |
+| — (new) | `classroomParticipants` | Session roster with engagement scoring. |
+| — (new) | `classroomWhiteboardState` | Visual action timeline for whiteboard replay. |
 
 ### Cross-Domain Edges
-| Domain | Foreign Key | Purpose |
-| :--- | :--- | :--- |
-| **LMS** | `classroomSessions.courseId → lmsCourses.id` | Director Agent's pedagogical blueprint |
-| **AI** | `classroomSessions.directorAgentId → aiAgents.id` | Orchestration budget and adapters |
-| **Core** | `classroomSessions.tenantId → tenants.id` | Multi-tenant isolation |
-| **Core** | `classroomParticipants.userId → users.id` | Participant identity |
+- **LMS** (`courseId`): Director's pedagogical blueprint.
+- **AI** (`directorAgentId`): Orchestration budget and adapters.
+- **Core** (`tenantId`, `userId`): Authentication and tenant isolation.
+- **Academic** (via routine): Sessions auto-instantiated from `classRoutines`.
+- **Attendance**: `classroomParticipants` validation auto-emits `attendance.marked` events.
 
-## 🤖 AI & Automation Layer
+---
 
-### OpenMAIC LangGraph State Machine
-The Agentic Classroom operates via a `StateGraph` (`director-graph.ts`) with three specialized agent nodes:
+## Technical Implementation
 
-| Agent | Role | Tools |
-| :--- | :--- | :--- |
-| **Director Agent** | Graph traffic controller; routes turns | `stream_event`, `assign_turn`, `end_session` |
-| **Teacher Agent** | Pedagogical content delivery | `wb_highlight`, `wb_show_image`, `wb_pan`, `wb_spotlight` |
-| **Evaluator Agent** | Passive grading & RAG compaction | `eval_turn`, `compress_memory`, `generate_grading_report` |
+### Core Entities
 
-### Execution Flow
-1. **Trigger**: CRON `ON_SESSION_START` or student chat message.
-2. **Atomic Checkout**: `ClassroomService` locks the session to block concurrent runs.
-3. **LangGraph Loop**: Director picks the next agent → Agent yields interleaved JSON over Hono SSE → State dehydrated to `classroomMemoryLedger` per node tick.
-4. **Artifact & Emit**: Lock released. Evaluator may generate `WorkProduct` payloads. `CLASSROOM_TURN_COMPLETE` event fires.
+#### [ClassroomSessions](file:///home/beznet/Workspace/edapex/src/db/sqlite/domain-classroom.ts#L48)
+Session lifecycle. Links to `lmsCourses` for content and `aiAgents` for Director orchestration. Supports `standaloneMode` for sessions without Academic routing.
 
-### Standalone Mode
-When `Settings.isStandalone() == true`, the Classroom decouples from Academic/HR dependencies and operates linked only to `domain-lms` (content) and `domain-core` (tenancy), enabling B2C retail scaling with Stripe billing.
+#### [ClassroomMemoryLedger](file:///home/beznet/Workspace/edapex/src/db/sqlite/domain-classroom.ts#L64)
+Per-turn state buffer. Each entry has `turnCount`, `role` (`user`/`assistant`/`director_node_log`), and JSON `parsedContent` array of action/text parts.
 
-## 🔒 Security & Performance
-- **PBAC Enforcement**: All tool executions within the SSE stream are intercepted by a partial-JSON PBAC validator that regex-matches `action` elements before Mastra tool invocation.
-- **Stream-Time 403**: Unauthorized tool payloads yield inline `403` signals without terminating the SSE connection.
-- **Indexing Strategy**:
-  - `cls_session_tenant_status_idx`: Session lookups by tenant and status.
-  - `cls_memory_session_turn_idx`: Fast turn-ordered memory hydration.
-  - `cls_part_session_user_idx`: Participant presence checks.
-- **Edge Safety**: Director Graph yields after every major node execution to respect the Cloudflare 10ms CPU limit.
+#### [ClassroomParticipants](file:///home/beznet/Workspace/edapex/src/db/sqlite/domain-classroom.ts#L79)
+Session roster. `role`: `student` or `human_observer`. `engagementScore` tracks real-time participation quality.
+
+#### [ClassroomWhiteboardState](file:///home/beznet/Workspace/edapex/src/db/sqlite/domain-classroom.ts#L95)
+Timeline of whiteboard actions for replay and late-join catch-up.
+
+---
+
+## AI Task Agents & Tools
+
+### Operational Tools (Mastra)
+- `classroom.startSession(routineId)`: High-fidelity initialization with LangGraph context.
+- `classroom.evaluateEngagement(studentId)`: Real-time passive grading and participation tracking.
+- `classroom.generateSummary(sessionId)`: Turn-by-turn condensation and knowledge capture.
+- `wb_show_image(url)`: Visual asset injection into the live whiteboard array.
+- `wb_highlight(coords)`: Real-time focus targeting for students.
+- `wb_pan(coords)`: Synchronized viewport movement for all participants.
+- `instantiate_session`: Creates a classroom session from an Academic routine or LMS course.
+- `emit_whiteboard_action`: Appends a whiteboard action to the timeline.
+
+### [STRESS DEFENSE] Tools
+- `edge_latency_compensator`: Handles sub-100ms SSE delivery requirements on edge nodes.
+- `token_budget_enforcer`: Prevents runaway Director token consumption per session.
+- `memory_ledger_compactor`: Auto-summarizes old turns to prevent memory bloat.
+- `engagement_drift_detector`: Flags sessions with declining engagement for human intervention.
+- `whiteboard_replay_integrity`: Ensures timeline consistency for late-joiners.
+
+---
+
+## PBAC & Security
+- **TenantAdmin**: Can create/manage sessions and view all participation data.
+- **Teacher**: Can start/manage sessions for their assigned classes.
+- **Student**: Can join sessions they're enrolled in. Read-only for engagement data.
+- **Observer**: Read-only access to live sessions for evaluation purposes.
 
 ---
 
 ## Hono API Routes
 
-```
-Routes → ClassroomController → ClassroomService → ClassroomRepository
-```
-
 | Method | Route | Description | Auth |
 |:---|:---|:---|:---|
+| `GET` | `/api/v1/classroom/sessions` | List sessions | Teacher+ |
 | `POST` | `/api/v1/classroom/sessions` | Create session | Teacher+ |
 | `GET` | `/api/v1/classroom/sessions/:id` | Get session details | Participant |
-| `PATCH` | `/api/v1/classroom/sessions/:id/status` | Update session status | Teacher+ |
-| `GET` | `/api/v1/classroom/sse` | SSE stream (StatelessEvent) | Participant |
-| `POST` | `/api/v1/classroom/sessions/:id/chat` | Student chat input | Student |
-| `POST` | `/api/v1/classroom/sessions/:id/escalate` | Human takeover | Teacher+ |
-| `GET` | `/api/v1/classroom/sessions/:id/whiteboard` | Whiteboard state | Participant |
-| `GET` | `/api/v1/classroom/sessions/:id/participants` | Session roster | Teacher+ |
+| `GET` | `/api/v1/classroom/sessions/:id/memory` | Get memory ledger | Teacher+ |
+| `GET` | `/api/v1/classroom/sessions/:id/participants` | Get participants | Teacher+ |
+| `GET` | `/api/v1/classroom/sessions/:id/whiteboard` | Get whiteboard state | Participant |
+| `WS` | `/api/v1/classroom/sessions/:id/live` | SSE/WebSocket live stream | Participant |
 
 ---
 
@@ -83,9 +95,10 @@ Routes → ClassroomController → ClassroomService → ClassroomRepository
 
 | Agent | Type | Capabilities |
 |:---|:---|:---|
-| `director_agent` | Supervisor | LangGraph traffic control, turn assignment, session lifecycle |
-| `teacher_agent` | Task | Lesson delivery, whiteboard orchestration, SSE content streaming |
-| `evaluator_agent` | Task | Passive grading, RAG token compaction, engagement scoring |
+| `director_agent` | Supervisor | Session orchestration, pedagogical flow, LangGraph execution |
+| `tutor_agent` | Task | Real-time Q&A, adaptive explanation, engagement tracking |
+| `evaluator_agent` | Task | In-session assessment, grading, competency mapping |
+| `whiteboard_agent` | Task | Visual content delivery, timeline management |
 
 ---
 
@@ -93,7 +106,7 @@ Routes → ClassroomController → ClassroomService → ClassroomRepository
 
 | Event | Payload | Consumers |
 |:---|:---|:---|
-| `ON_SESSION_START` | `{ sessionId, tenantId, courseId }` | Classroom (LangGraph init), Events (audit) |
-| `CLASSROOM_TURN_COMPLETE` | `{ sessionId, turnCount, agentRole }` | Evaluator (memory compaction), Events (audit) |
-| `ON_CLASSROOM_ESCALATION` | `{ sessionId, userId, reason }` | HR (staff notification), Events (audit), Command Center (alert) |
-| `classroom.engagement_updated` | `{ sessionId, userId, score }` | Analytics (reporting), Events (audit) |
+| `classroom.session_started` | `{ sessionId, courseId, tenantId }` | Attendance (auto-mark), Events (audit) |
+| `classroom.session_ended` | `{ sessionId, turnCount, participantCount }` | LMS (progress update), Events (audit) |
+| `classroom.engagement_alert` | `{ sessionId, userId, score }` | Communication (teacher alert) |
+| `classroom.memory_compacted` | `{ sessionId, originalTurns, compactedTurns }` | Events (audit) |

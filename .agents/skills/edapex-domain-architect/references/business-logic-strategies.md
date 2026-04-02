@@ -8,25 +8,30 @@ You operate as a **Professional Skilled Agent** who understands the real-world r
 
 ## 1. The Canonical Code Flow (Request Lifecycle)
 
-Every feature in EdApex follows this strict, unidirectional flow:
+Every feature in EdApex follows this strict, bidirectional local-first/edge-native flow:
 
 ```
-Client (TanStack DB) → Edge API (Hono) → Middleware (Auth/PBAC) → Controller → Validator (Zod) → Service → Repository → Database (D1)
-                                                                                                        ↓
-                                                                                                  Domain Events
-                                                                                                        ↓
-                                                                                              Subscribing Services
+Client (TanStack DB) ⇋ Edge API (Hono RPC) ⇋ PBAC Evaluate ⇋ Controller ⇋ Validator (Zod) ⇋ HMAS Supervisor ⇋ Service ⇋ Repository ⇋ Database (D1)
+                                                                                                          ↓
+                                                                                                    Domain Events
+                                                                                                          ↓
+                                                                                                  Subscribing Services
 ```
 
 ### Layer Responsibilities
 
-| Layer | Responsibility | MUST NOT |
-|:---|:---|:---|
-| **Controller** | HTTP envelope, parameter extraction, response formatting | Contain business logic, import Drizzle |
-| **Validator** | Zod schema parsing, payload sanitization | Make database calls |
-| **Service** | Business rules, orchestration, event emission | Import `Context`, return HTTP status codes |
-| **Repository** | Data access, query construction, row mapping | Throw HTTP errors, contain business rules |
-| **Database** | Schema definition, migrations | Be imported by services directly |
+| Layer | Technology | Purpose | Authority |
+|:---|:---|:---|:---|
+| **React 19** | Core UI | React Standard |
+| **TanStack Start** | Full-Stack SPA | `tanstack-start-best-practices` |
+| **TanStack Query** | Data Fetching | `tanstack-query-best-practices` |
+| **TanStack DB** | Local-First Engine | `tanstack-db-core` |
+| **Tailwind v4** | Modern Styling | `ui-ux-pro-max` |
+| **AI Elements** | AI Chat / Tools | `ai-elements` |
+| **Supervisor** | Mastra HMAS orchestration, Agent coordination | `mastra` |
+| **Service** | Pure Business rules, event emission, repository usage | `backend-architect` |
+| **Repository** | Data access, D1 Query construction, row mapping | `database-architect` |
+| **Database** | Schema definition, UUID v7, D1 Migrations | D1 / Drizzle |
 
 ---
 
@@ -39,107 +44,39 @@ Each domain maps to real-world professional roles. The agent MUST embody the pro
 ### Core Domain — IT Director / System Administrator
 **Professional Persona**: The **IT Director** oversees platform identity, tenant provisioning, session control, and user lifecycle management. They are the gatekeeper of the entire multi-tenant infrastructure.
 
-```
-[Tenant Provisioning]
-IT Director → CoreController.createTenant → CoreValidator → CoreService.provisionTenant()
-  → CoreRepository.createTenant()
-  → SettingsRepository.seedDefaultConfig(tenantId)
-  → emit('core.tenant_provisioned')
-  → [PBAC subscribes] → PbacService.createDefaultPolicies()
-  → [Settings subscribes] → SettingsService.seedFeatureFlags()
-
-[User Onboarding]
-IT Director → CoreController.createUser → CoreValidator → CoreService.provisionAccount()
-  → CoreRepository.createAccount()
-  → CoreRepository.createUserPersona(userType)
-  → emit('core.user_created')
-  → [PBAC subscribes] → PbacService.assignDefaultRole()
-  → [Communication subscribes] → CommService.sendWelcome()
-```
+**Flow Strategy**:
+- **Tenant Provisioning**: The IT Director initiates a new tenant creation. The Core Supervisor orchestrates the provisioning service, which creates the tenant record, seeds domain-specific configurations, and emits a provisioning event. Security and Setting supervisors subscribe to this event to initialize default PBAC policies and feature flags for the new school.
+- **User Onboarding**: When the IT Director creates a new user, the system provisions the account, establishes the user's primary persona (e.g., Administrator, Parent), and triggers a welcome communication. Security supervisors ensure the correct regional and role-based policies are bound to the new identity.
 
 ---
 
 ### Academic Domain — Curriculum Coordinator / Vice Principal / Registrar
 **Professional Persona**: The **Curriculum Coordinator** designs class structures, maps subjects to teachers, and builds timetables. The **Vice Principal** approves scheduling. The **Registrar** manages student enrollment into academic groups.
 
-```
-[Class-Section Setup]
-Curriculum Coordinator → AcademicController.createClass → AcademicValidator
-  → AcademicService.setupClass()
-  → AcademicRepository.createClass(tenantId, academicId)
-  → AcademicRepository.createClassSections(classId, sectionIds)  [via db.batch()]
-
-[Timetable Generation]
-Vice Principal → AcademicController.createRoutine → AcademicValidator
-  → AcademicService.generateRoutine()
-  → AcademicRepository.validateCollision(teacher, room, timeSlot)
-  → AcademicRepository.createRoutineEntry()
-  → emit('academic.routine_updated')
-  → [Communication subscribes] → CommService.notifyTeachers()
-
-[Student Enrollment]
-Registrar → AcademicController.enrollStudent → AcademicValidator
-  → AcademicService.enrollStudent()
-  → AcademicRepository.createEnrollment(tenantId, classId, sectionId, userId)
-  → emit('academic.student_enrolled')
-  → [Attendance subscribes] → AttendanceService.initRecords()
-  → [Finance subscribes] → FinanceService.assignFees()
-```
+**Flow Strategy**:
+- **Class-Section Setup**: The Curriculum Coordinator defines the academic structure. The Academic Supervisor coordinates the creation of classes and their constituent sections using atomic database batching to ensure structural integrity across the domain.
+- **Timetable Generation**: At the start of a term, the Vice Principal initiates routine generation. The system performs collision detection for teachers and rooms before publishing the timetable and notifying all staff of their assigned schedules.
+- **Student Enrollment**: The Registrar enrolls students into specific sections. This action triggers a cascade of events: the Attendance domain initializes tracking records, and the Finance domain automatically assigns the relevant tuition and activity fees.
 
 ---
 
 ### Assessment Domain — Examinations Officer / Head of Department / Subject Teacher
 **Professional Persona**: The **Examinations Officer** defines exam structures and triggers result computation. The **Head of Department** oversees quality. The **Subject Teacher** captures marks for their assigned classes.
 
-```
-[Exam Configuration]
-Exams Officer → AssessmentController.createExam → AssessmentValidator
-  → AssessmentService.defineExam()
-  → AssessmentRepository.createExam(tenantId, examType, academicId)
-  → AssessmentRepository.createExamSetups(examId, subjects, markDistribution)
-
-[Mark Submission]
-Subject Teacher → AssessmentController.submitMarks → AssessmentValidator
-  → AssessmentService.submitMarks()
-  → AssessmentRepository.upsertExamMarks(tenantId, setupId, marks)  [via db.batch()]
-  → emit('assessment.marks_uploaded')
-  → [AI subscribes] → ResultEngine.compute()
-
-[Result Computation]
-Exams Officer → AssessmentController.computeResults → AssessmentValidator
-  → AssessmentService.computeResults()
-  → AssessmentRepository.aggregateMarks(examId, classId)
-  → AssessmentRepository.createComputedResults(rankings, gpas)  [via db.batch()]
-  → emit('assessment.result_calculated')
-  → [Communication subscribes] → CommService.publishReportCards()
-```
+**Flow Strategy**:
+- **Exam Configuration**: The Examinations Officer establishes the assessment blueprint, including mark distributions and weighted averages. This definition serves as the constraint for mark submission.
+- **Mark Submission**: Subject Teachers upload student marks per section. The system validates entries against the exam configuration and emits events that trigger background result aggregation.
+- **Result Computation**: The Examinations Officer initiates final processing. The system aggregates marks, calculates rankings and GPAs using D1 batching, and subsequently notifies the Communication domain to publish digital report cards to parents.
 
 ---
 
 ### Finance Domain — School Accountant / Bursar / Finance Officer
 **Professional Persona**: The **School Accountant** manages the universal ledger and financial reporting. The **Bursar** handles daily fee collection and receipt issuance. The **Finance Officer** approves disbursements and reconciles bank balances.
 
-```
-[Fee Assignment]
-Bursar → FinanceController.assignFees → FinanceValidator
-  → FinanceService.assignFeesToStudents()
-  → FinanceRepository.createFeeAssignments(tenantId, group, students)  [via db.batch()]
-  → FinanceRepository.createInstallments(assignments)  [optional]
-
-[Fee Payment Recording]
-Bursar → FinanceController.recordPayment → FinanceValidator
-  → FinanceService.recordPayment()
-  → FinanceRepository.createLedgerEntry(type: 'fee_payment')
-  → FinanceRepository.updateFeeAssignment(paidAmount)
-  → FinanceRepository.updateBankBalance()  [via db.batch()]
-  → emit('finance.payment_received')
-  → [Communication subscribes] → CommService.sendReceipt()
-
-[Balance Sheet Report]
-Bursar → FinanceController.getBalanceSheet → (no validator needed for GET)
-  → FinanceService.generateBalanceSheet(tenantId, dateRange)
-  → FinanceRepository.aggregateLedgerEntries(tenantId, dateRange)
-```
+**Flow Strategy**:
+- **Fee Assignment**: The Bursar assigns fees based on enrollment data. The system creates ledger assignments and, where configured, establishes installment plans for tuition management.
+- **Fee Payment Recording**: When a payment is made, the Bursar records the transaction. The Finance Supervisor ensures an immutable ledger entry is created, updates the assignment status, and reconciles the school's bank balance atomically.
+- **Reporting**: The Accountant generates real-time balance sheets and revenue reports. The system aggregates ledger entries within specific date ranges, ensuring absolute auditability since ledger entries are never deleted.
 
 > [!IMPORTANT]
 > All financial mutations MUST result in a `ledger_entries` record. Direct balance manipulation is prohibited. The ledger is the single source of truth.
@@ -149,271 +86,108 @@ Bursar → FinanceController.getBalanceSheet → (no validator needed for GET)
 ### AI Domain — AI Operations Manager
 **Professional Persona**: The **AI Operations Manager** oversees conversational AI quality, agent orchestration via the HMAS hierarchy, token budget allocation, and model provider selection (Workers AI vs OpenAI).
 
-```
-[Chat Interaction — Stateless Execution]
-Student/Teacher → AiController.sendMessage → AiValidator
-  → AiService.processMessage()
-  → AiRepository.getMessages(chatId)           // Load history
-  → AiRepository.getChatMetadata(chatId)        // Load working memory
-  → mapToStandardPayload(dbMessages)            // Transform for LLM
-  → agent.generate(standardMessages)            // Stateless invocation
-  → AiRepository.saveMessage(chatId, response)  // Persist response
-  → AiRepository.logAgentAction(actionId)       // Audit trail
-  → ctx.waitUntil(tokenBudgetService.track())   // Deferred billing
-```
+**Flow Strategy**:
+- **HMAS Chat Orchestration**: When a student or teacher sends a message, the AI Supervisor coordinates the interaction. It loads the relevant domain context and conversation history from the repository, invokes the suitable Mastra Agent (e.g., Instructor Agent) for generation, and persists the response. Non-critical operations like token budget tracking and billing are deferred via background processes to ensure sub-10ms edge responsiveness.
 
 ---
 
 ### HR Domain — HR Officer / HR Manager / Finance Officer
-**Professional Persona**: The **HR Officer** handles day-to-day staff operations (onboarding, leave requests). The **HR Manager** approves leave and manages departmental assignments. The **Finance Officer** executes payroll runs and coordinates salary ledger entries.
+**Professional Persona**: The **HR Officer** handles day-to-day staff operations. The **HR Manager** approves leave and manages departmental assignments. The **Finance Officer** executes payroll runs and coordinates salary ledger entries.
 
-```
-[Staff Onboarding]
-HR Manager → HrController.onboardStaff → HrValidator
-  → HrService.onboardStaff()
-  → CoreRepository.createUserPersona(userType: 'staff', metadata: StaffMetadata)
-  → HrRepository.assignDepartment(userId, departmentId)
-  → HrRepository.assignDesignation(userId, designationId)
-  → emit('hr.staff_onboarded')
-  → [PBAC subscribes] → PbacService.assignTeacherRole()
-
-[Leave Management]
-Staff Member → HrController.requestLeave → HrValidator
-  → HrService.submitLeaveRequest()
-  → HrRepository.checkLeaveBalance(userId, leaveTypeId)
-  → HrRepository.createLeaveRequest(status: 'pending')
-
-HR Manager → HrController.approveLeave → HrValidator
-  → HrService.approveLeave()
-  → HrRepository.updateLeaveRequest(status: 'approved')
-  → emit('hr.leave_approved')
-  → [Attendance subscribes] → AttendanceService.markExcused()
-
-[Payroll Processing]
-Finance Officer → HrController.generatePayroll → HrValidator
-  → HrService.generatePayroll()
-  → HrRepository.getActiveStaff(tenantId)
-  → HrRepository.calculateSalaries(staff, attendance, deductions)
-  → HrRepository.createPayrollRecords()  [via db.batch()]
-  → emit('hr.payroll_approved')
-  → [Finance subscribes] → FinanceService.createSalaryLedgerEntries()
-  → ctx.waitUntil(commService.sendPayslips())
-```
+**Flow Strategy**:
+- **Staff Onboarding**: The HR Manager enters new staff data. The system provisions a user persona, assigns professional designations, and triggers role-based security bindings (e.g., granting Teacher access in PBAC).
+- **Leave Management**: Staff members request leave, which the HR Manager approves or denies. Approvals trigger event handlers that automatically mark the staff member as excused in the Attendance domain.
+- **Payroll Processing**: The Finance Officer initiates a monthly payroll run. The system calculates earnings and deductions based on attendance and contract data, creates salary ledger entries, and prepares digital payslips for deferred delivery.
 
 ---
 
 ### Attendance Domain — Class Teacher / Form Teacher
-**Professional Persona**: The **Class Teacher** records daily attendance for their assigned class. The **Form Teacher** monitors long-term patterns and escalates chronic absenteeism to parents and administration via AI-driven anomaly detection.
+**Professional Persona**: The **Class Teacher** records daily attendance. The **Form Teacher** monitors long-term patterns and escalates chronic absenteeism to parents and administration via AI-driven anomaly detection.
 
-```
-[Daily Attendance Marking]
-Class Teacher → AttendanceController.bulkMark → AttendanceValidator
-  → AttendanceService.markBulkAttendance()
-  → AttendanceRepository.upsertAttendance(tenantId, classId, date, records)  [via db.batch()]
-  → emit('attendance.marked')
-  → [AI subscribes] → AnomalyDetector.analyze()
-
-[Chronic Absenteeism Check]
-[Event-Driven] → AttendanceService.checkChronicAbsenteeism()
-  → AttendanceRepository.getAbsenteeismStats(userId, 30days)
-  → emit('attendance.anomaly_detected')
-  → [Communication subscribes] → CommService.alertParent()
-```
+**Flow Strategy**:
+- **Daily Attendance Marking**: The Class Teacher records attendance for their section. The system performs a bulk upsert of records for the given date and triggers background AI analysis.
+- **Absenteeism Escalation**: The AI Supervisor periodically scans for absenteeism patterns. If an anomaly is detected (e.g., 3 consecutive days), the system emits an alert to the Communication domain to notify the parent automatically.
 
 ---
 
 ### LMS Domain — Course Instructor / E-Learning Coordinator / Educator
-**Professional Persona**: The **Course Instructor** creates and publishes courses with modular lessons. The **E-Learning Coordinator** manages platform-wide LMS settings and analytics. The **Educator** facilitates AI-tutored learning sessions and grades submissions.
+**Professional Persona**: The **Course Instructor** creates and publishes courses. The **E-Learning Coordinator** manages platform-wide LMS settings. The **Educator** facilitates AI-tutored learning sessions.
 
-```
-[Course Creation & Publishing]
-Instructor → LmsController.createCourse → LmsValidator
-  → LmsService.createCourse()
-  → LmsRepository.createCourse(tenantId, courseData)
-  → LmsRepository.createModules(courseId, modules)
-  → LmsRepository.createLessons(moduleId, lessons)  [via db.batch()]
-
-Instructor → LmsController.publishCourse → LmsValidator
-  → LmsService.publishCourse(courseId)
-  → LmsRepository.updateCourseStatus(courseId, 'published')
-  → emit('lms.course_published')
-  → [AI subscribes] → RAGIndexer.vectorizeLessons()
-
-[AI Tutoring Session]
-Student → LmsController.startTutoring → LmsValidator
-  → LmsService.startTutoringSession()
-  → LmsRepository.createTutoringSession(userId, courseId)
-  → TutorAgent.generate(courseContext, studentQuestion)
-  → LmsRepository.saveTutoringResponse()
-  → emit('lms.tutoring_completed')
-  → [Finance subscribes] → FinanceService.trackTokenUsage()
-```
+**Flow Strategy**:
+- **Course Lifecycle**: The Instructor builds the course hierarchy (Modules and Lessons) and eventually publishes it. This event triggers the AI domain to vectorize the content for R2-based search and RAG-assisted tutoring.
+- **AI Tutoring**: Students engage in AI-tutored sessions. The system loads the course context and student history, invokes the Tutor Agent via Mastra, saves the interaction, and tracks token consumption for billing.
 
 ---
 
 ### CMS Domain — Marketing Officer / Content Manager
-**Professional Persona**: The **Marketing Officer** drives the school's public-facing content strategy — news, events, and branding. The **Content Manager** handles day-to-day content creation, AI-assisted article generation, moderation, and SEO optimization.
+**Professional Persona**: The **Marketing Officer** drives content strategy. The **Content Manager** handles day-to-day creation, AI generation, and SEO.
 
-```
-[AI Content Generation & Publishing]
-Marketing Officer → CmsController.generateContent → CmsValidator
-  → CmsService.generateContent()
-  → ContentGeneratorAgent.create(topic, tone, tenantBranding)
-  → CmsRepository.createContentNode(type: 'news', status: 'draft')
-  → ContentModeratorAgent.scan(contentId)
-  → SeoOptimizerAgent.enhance(contentId)
-  → CmsRepository.publishContent(contentId)
-  → emit('cms.content_published')
-  → [Communication subscribes] → CommService.notifySubscribers()
-```
+**Flow Strategy**:
+- **AI Content Workflow**: The Marketing Officer triggers generation based on a topic. The Supervisor coordinates generation, moderation, and SEO agents before the content is published and distributed to subscribers via the Communication bus.
 
 ---
 
 ### Communication Domain — Communications Officer / Admin Officer
-**Professional Persona**: The **Communications Officer** orchestrates omni-channel messaging (Push, SMS, Email) and manages notification templates. The **Admin Officer** creates and targets broadcasts to specific roles, classes, or departments.
+**Professional Persona**: The **Communications Officer** orchestrates omni-channel messaging. The **Admin Officer** creates targeted broadcasts.
 
-```
-[Broadcast Notification]
-Admin → CommunicationController.broadcast → CommunicationValidator
-  → CommunicationService.broadcast()
-  → CommunicationRepository.createEvent(channel, targetRoles)
-  → CommunicationRepository.createRecipients(userIds)  [via db.batch()]
-  → ctx.waitUntil(pushService.dispatch(recipients))
-  → emit('comm.event_dispatched')
-```
+**Flow Strategy**:
+- **Broadcast Notification**: The Admin selects a target audience and message. The Supervisor records the communication event, creates recipient records, and dispatches messages via push/SMS/email in a deferred background process.
 
 ---
 
 ### Library Domain — Librarian / Library Manager
-**Professional Persona**: The **Librarian** manages daily circulation (issuance, returns, fine tracking). The **Library Manager** oversees collection development, stock auditing, and integration with the Finance domain for fine ledger entries.
+**Professional Persona**: The **Librarian** manages daily circulation. The **Library Manager** oversees collection and finance integration.
 
-```
-[Book Issuance]
-Librarian → LibraryController.issueBook → LibraryValidator
-  → LibraryService.issueBook()
-  → LibraryRepository.checkAvailability(bookId)
-  → LibraryRepository.createBookIssue(userId, bookId, dueDate)
-  → LibraryRepository.decrementStock(bookId)  [via db.batch()]
-  → emit('library.book_issued')
-
-[Overdue Fine Trigger]
-[Scheduled Event] → LibraryService.checkOverdueBooks()
-  → LibraryRepository.getOverdueIssues(tenantId)
-  → LibraryRepository.calculateFines(issues)
-  → emit('library.book_overdue')
-  → [Finance subscribes] → FinanceService.createFineLedgerEntry()
-  → [Communication subscribes] → CommService.sendOverdueReminder()
-```
+**Flow Strategy**:
+- **Circulation Flow**: The Librarian issues a book after validating availability. Returns are tracked, and overdue books trigger automated fine generation that is recorded in the student's finance ledger.
 
 ---
 
 ### Facilities Domain — Transport Director / Warden / Store Manager
-**Professional Persona**: The **Transport Director** manages fleet routes and vehicle allocation. The **Warden** oversees dormitory occupancy and student housing. The **Store Manager** handles inventory procurement, sales, and internal issuance with Finance domain integration.
+**Professional Persona**: The **Transport Director** manages routes. The **Warden** oversees housing. The **Store Manager** handles inventory and sales.
 
-```
-[Transport Allocation]
-Transport Director → FacilitiesController.allocateTransport → FacilitiesValidator
-  → FacilitiesService.allocateTransport()
-  → FacilitiesRepository.createAllocation(facilityType: 'TRANSPORT', userId, routeId)
-  → emit('facilities.allocation_created')
-  → [Finance subscribes] → FinanceService.assignTransportFee()
-
-[Inventory Transaction]
-Store Manager → FacilitiesController.recordTransaction → FacilitiesValidator
-  → FacilitiesService.recordInventoryTransaction()
-  → FacilitiesRepository.createTransaction(type: 'SELL', items)
-  → FacilitiesRepository.updateStock(itemId, newQuantity)  [via db.batch()]
-  → emit('facilities.inventory_sold')
-  → [Finance subscribes] → FinanceService.createIncomeLedgerEntry()
-```
+**Flow Strategy**:
+- **Allocation & Sales**: The Transport Director allocates students to routes, triggering recurring fee assignments. The Store Manager records inventory sales, ensuring stock levels are updated atomically and income is recorded in the general ledger.
 
 ---
 
 ### Documents Domain — Records Officer / Administrator
-**Professional Persona**: The **Records Officer** manages the document lifecycle — upload, categorization, verification, and archival. All documents use polymorphic ownership (`owner_type/owner_id`) and R2 presigned URLs for secure cloud storage.
+**Professional Persona**: The **Records Officer** manages document lifecycles.
 
-```
-[Document Upload & Verification]
-Records Officer → DocumentsController.presign → (get upload URL)
-Student/Staff → [Direct R2 Upload] → DocumentsController.create → DocumentsValidator
-  → DocumentsService.registerDocument()
-  → DocumentsRepository.createDocument(ownerType, ownerId, filePath)
-  → emit('docs.uploaded')
-  → [AI subscribes] → DocumentClassifier.categorize()
-
-Admin → DocumentsController.verify → DocumentsValidator
-  → DocumentsService.verifyDocument()
-  → DocumentsRepository.updateVerification(documentId, verifiedBy)
-  → emit('docs.verified')
-```
+**Flow Strategy**:
+- **Secure Handling**: The Records Officer oversees the upload process (R2 presigned URLs), categorization, and verification. Documents are bound to users/tenants via polymorphic references, and verification status controls access in other domains.
 
 ---
 
 ### Homeschooling Domain — Parent Educator / Facilitator / Educator
-**Professional Persona**: The **Parent Educator** manages their child's personalized learning path and compliance portfolio. The **Facilitator** is a TRCN-certified tutor compensated via revenue sharing. The **Educator** designs NERDC-compliant curriculum with AI-assisted lesson planning.
+**Professional Persona**: The **Parent Educator** manages child learning. The **Facilitator** earns revenue shares.
 
-```
-[Subscription & Enrollment]
-Parent → HomeschoolController.subscribe → HomeschoolValidator
-  → HomeschoolService.createSubscription()
-  → HomeschoolRepository.createSubscription(tenantId, plan, academicId)
-  → emit('homeschool.subscription_created')
-  → [Finance subscribes] → FinanceService.createSubscriptionInvoice()
-
-[Revenue Share Calculation]
-[Scheduled/Background] → HomeschoolService.calculateRevenueShares()
-  → HomeschoolRepository.getActiveFacilitators(tenantId)
-  → HomeschoolRepository.computePerformanceBonuses(retentionMetrics)
-  → HomeschoolRepository.createRevenueShares()  [via db.batch()]
-  → emit('homeschool.revenue_distributed')
-  → [Finance subscribes] → FinanceService.createRevenueShareLedgerEntries()
-```
+**Flow Strategy**:
+- **Self-Directed Learning**: Parents subscribe to personalized paths. The system handles recurring billing and revenue distribution to facilitators based on student performance and retention metrics.
 
 ---
 
 ### Events (Audit) Domain — Compliance Officer / System Administrator
-**Professional Persona**: The **Compliance Officer** monitors the event bus for anomalous patterns and ensures audit trail integrity. The **System Administrator** manages event relay, dispatch retries, and outbox lifecycle.
+**Professional Persona**: The **Compliance Officer** monitors integrity.
 
-```
-[Event Relay & Dispatch]
-[Background Agent] → EventsService.relayPendingEvents()
-  → EventsRepository.getPendingEvents(limit: 100)
-  → eventBus.publishBatch(events)
-  → EventsRepository.markAsDispatched(eventIds)  [via db.batch()]
-```
+**Flow Strategy**:
+- **Audit Integrity**: The system background-relays pending events from the outbox to ensure reliable delivery and an immutable audit trail for compliance officers.
 
 ---
 
 ### PBAC Domain — Security Administrator / IT Director
-**Professional Persona**: The **Security Administrator** designs fine-grained access policies using the PBAC DSL. The **IT Director** oversees policy bindings to roles and ensures tenant-level isolation of all authorization decisions.
+**Professional Persona**: The **Security Administrator** designs access policies.
 
-```
-[Policy Creation]
-Security Admin → PbacController.createPolicy → PbacValidator
-  → PbacService.createPolicy()
-  → PbacRepository.createPolicyDefinition(tenantId, definition)
-
-[Access Evaluation — Middleware]
-[Every Request] → PbacMiddleware.evaluate()
-  → PbacService.evaluate(subjectContext, action, resource)
-  → PbacRepository.getActivePolicies(tenantId, roleName)
-  → PolicyEvaluator.match(policies, context)
-  → allow | deny
-```
+**Flow Strategy**:
+- **Zero-Trust Access**: The Security Admin defines policies that are evaluated early at the gateway. Every request must pass PBAC evaluation against tenant-specific rules before service execution.
 
 ---
 
 ### Settings Domain — System Administrator / IT Director
-**Professional Persona**: The **System Administrator** configures tenant preferences, manages feature flags, and controls module activation. The **IT Director** manages system-wide defaults and configuration hierarchy (global → tenant override).
+**Professional Persona**: The **System Administrator** configures preferences.
 
-```
-[Configuration Update]
-Admin → SettingsController.upsertConfig → SettingsValidator
-  → SettingsService.upsertConfig()
-  → SettingsRepository.upsert(tenantId, domain, config)
-  → emit('settings.config_updated')
-  → [Affected Domains] → cacheInvalidation()
-```
+**Flow Strategy**:
+- **Dynamic Configuration**: Administrators update tenant settings, triggering feature flag activation and cache invalidation across all affected domain supervisors.
 
 ---
 
@@ -466,18 +240,15 @@ const balanceSheet = await financeQueryService.getBalanceSheet(tenantId);
 
 ```typescript
 // Domain errors — thrown by Services
-export class InsufficientBalanceError extends Error { /* ... */ }
-export class TenantNotFoundError extends Error { /* ... */ }
-export class ExamMarkExceedsMaxError extends Error { /* ... */ }
+export class InsufficientBalanceError extends Error { name = 'InsufficientBalanceError' }
+export class TenantNotFoundError extends Error { name = 'TenantNotFoundError' }
 
-// Controller mapping — never expose raw errors
+// Controller mapping via BaseController
 try {
-  const result = await financeService.processPayment(tenantId, data);
+  const result = await financeSupervisor.processPayment(tenantId, data);
   return BaseController.sendSuccess(c, result, 'Payment processed', 201);
 } catch (error) {
-  if (error instanceof InsufficientBalanceError) return BaseController.sendError(c, 'Insufficient funds', 402);
-  if (error instanceof TenantNotFoundError) return BaseController.sendError(c, 'Tenant not found', 404);
-  return BaseController.sendError(c, 'An unexpected error occurred', 500);
+  return BaseController.handleError(c, error); // Unified mapping
 }
 ```
 
@@ -497,3 +268,4 @@ Before implementing any service method, verify:
 - [ ] Is the API route documented in `docs/domains/[module].md`?
 - [ ] Is the sync handler registered in `frontend/src/lib/sync.ts`?
 - [ ] Does the professional role map to a real-world workflow?
+

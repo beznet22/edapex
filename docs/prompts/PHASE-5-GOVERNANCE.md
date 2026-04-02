@@ -5,17 +5,28 @@ Finalize the platform's reliability and security through **PBAC Governance** and
 
 ## 📜 CORE CONSTRAINTS & TRANSFORMATION POLICY
 - **PBAC SECURITY**: Evaluation MUST happen *before* any tool execution.
-- **EDGE-NATIVE EVALUATION**: Policies must be evaluated on the Cloudflare Edge (using KV for roles).
-- **NO UNREVIEWED DELETES**: High-impact actions are paused for human approval.
+- **PROACTIVE AUDITING**: Implement the **Maximizer Agent** to proactively scan for systemic stressors (deadlocks, amnesia).
+- **EDGE-NATIVE EVALUATION**: Policies must be evaluated on the Cloudflare Edge.
+- **NO UNREVIEWED DELETES**: High-impact actions are paused for human approval via the `HITL_trigger_router`.
+- **LAYER 2 RESILIENCE**: The phase is not complete until the platform survives the `load_test_simulator` and `chaos_mesh` scenarios.
 - **TEST DRIVEN**: The agent MUST run and pass automated testing (unit/integration) before completing this phase.
 - **GIT COMMIT**: The agent MUST create a standard git commit with AI attribution before signing out.
 - **SCOPE LOCK**: Do NOT modify files or domains outside the explicit scope of this phase.
 - **ESCALATION PROTOCOL**: If you encounter missing context, undocumented relations, or ambiguity, DO NOT HALLUCINATE. Pause and request clarification via `notify_user`.
 - **STRICT TYPECHECK**: Run `pnpm tsc --noEmit` on all modified files. You must resolve all TypeScript errors before signing out.
+- **PERSONA-CENTRIC COMPLIANCE**: Define the "Professional Persona Flow" for the Compliance Officer and Auditor. Describe how systemic stressors are monitored and resolved in the Command Center UI using descriptive narratives.
 - **EXECUTION PLAN**: Before writing code, you MUST create a localized `docs/plans/phase-5-governance-plan.md` detailing the precise files you will create/modify.
 
 ## 📦 Required Context & Skills
 - **Spec**: [AGENTIC_SCHOOL_V2_PLAN.md](../AGENTIC_SCHOOL_V2_PLAN.md) (Section 16, Section 44).
+- **Stress Framework**: [STRESS_FRAMEWORK.md](../STRESS_FRAMEWORK.md) (ALL categories — this phase validates the entire framework).
+- **Domain Specs** (MANDATORY — governance touches all 18 domains):
+  - [pbac.md](../domains/pbac.md): Policy definitions, role assignments, evaluation tools, guardian access filters, audit integrity verification.
+  - [events.md](../domains/events.md): Audit log, event outbox, replay engine, tampering detection.
+  - [ai.md](../domains/ai.md): Agent actions, tool invocations, token budget enforcement.
+  - [classroom.md](../domains/classroom.md): Stream-time PBAC, memory ledger, escalation protocol.
+  - ALL other domain docs: Each lists `[STRESS DEFENSE]` tools that must survive the Layer 2 Stress Testing suite.
+- **STRESS TEST MANDATE**: The `load_test_simulator` and `chaos_mesh` scenarios MUST exercise ALL `[STRESS DEFENSE]` tools listed across all 18 domain docs. The domain docs are the canonical inventory of stressors to test against.
 - **Required Skills**:
   - `backend-security-coder` (PBAC edge-evaluation strategies)
   - `mastra` (Building the "Maximizer" AI Auditor agent)
@@ -31,17 +42,19 @@ Implement the policy evaluator in `src/middleware/pbac.middleware.ts`.
 - Implement the "Manual Approval" pulse for high-impact agent actions.
 - Any tool marked `governance: required` in the schema must pause and create a `GOVERNANCE_REQUEST` WorkProduct.
 
-### 3. The AI Maximizer (Proactive Auditor)
-Implement the **Maximizer Agent** in the IT/Ops domain.
-- Background routine scanning for tool failure patterns or cost anomalies.
-- Proactively raises system issues in the dashboard when thresholds are exceeded.
+### 3. The AI Maximizer & Auditor Agents
+Implement the **Maximizer Agent** and the **Auditor Agents** for proactive issue tracking.
+- **Auditor Agent**: Scans `cost_events` and `agent_runs` for failures or token drift, automatically generating `SECURITY_INCIDENT` or `SYSTEM_ISSUE` WorkProducts.
+- **[STRESS DEFENSE]** `load_test_simulator`: Simulates multi-tenant peak logins (e.g. 5k concurrent users).
+- **[STRESS DEFENSE]** `chaos_mesh`: Injects network partitions and DB nodes failures during live agent runs.
+- **[STRESS DEFENSE]** `audit_log_integrity_verifier`: Detects attempted tampering of the PBAC audit trail.
 
 ## 🏁 Completion Criteria
 - [ ] Generated and followed a localized `docs/plans/phase-5-governance-plan.md`.
 - [ ] `pnpm tsc --noEmit` strictly passed with zero errors.
-- [ ] Verified blocking of unauthorized agent actions.
-- [ ] Working Pause/Approve/Reject flow for the Board Inbox.
-- [ ] Successful autonomous anomaly detection by the Maximizer.
+- [ ] Verified blocking of unauthorized agent actions and audit integrity.
+- [ ] Successful completion of Layer 2 Stress Testing (Load + Chaos).
+- [ ] Working Pause/Approve/Reject flow for the Board Inbox via `HITL_trigger_router`.
 - [ ] All automated tests passed.
 - [ ] Code staged and committed with AI attribution.
 - [ ] Update `docs/PROJECT_ROADMAP.md` (Phase 5 marked as COMPLETE).
