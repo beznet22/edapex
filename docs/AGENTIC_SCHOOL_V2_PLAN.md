@@ -12,7 +12,7 @@ This document is the **definitive technical specification** for transforming EdA
 - Reference design: [https://github.com/paperclip/paperclip/blob/main/doc/spec/agent-runs.md](https://github.com/paperclip/paperclip/blob/main/doc/spec/agent-runs.md): Agent runs and cost tracking.
 - Reference design: [https://github.com/paperclip/paperclip/blob/main/doc/spec/agents-runtime.md](https://github.com/paperclip/paperclip/blob/main/doc/spec/agents-runtime.md): Agent runtime and cost tracking.
 - Reference design: [https://github.com/paperclip/paperclip/blob/main/doc/plans/[DATE]-*.md](https://github.com/paperclip/paperclip/blob/main/doc/plans/[DATE]-*.md): Implementation plans and plus cost tracking.
-- Reference design: **OpenMAIC Stateless Graph Engine** (`director-graph.ts`, `stateless-generate.ts`): Stateless execution loop, incremental JSON parsing over SSE. [OpenMAIC](https://github.com/openmaic/openmaic)
+- Reference design: **Stateless Graph Engine** (`director-graph.ts`, `stateless-generate.ts`): Stateless execution loop, incremental JSON parsing over SSE.
 
 ### 1.2 Internal Service Architecture (Detailed)
 
@@ -207,7 +207,7 @@ EdApex V2 implements a recursive, goal-driven hierarchy.
 - **Capabilities**: Executing specific `SKILL.md` toolsets against the domain repositories.
 
 ### 5.4 The Agentic Classroom (Live Delivery Sub-System)
-An intense, live-streaming subset of HMAS formally integrated via the OpenMAIC architecture:
+An intense, live-streaming subset of HMAS formally integrated via the stateless graph engine architecture:
 - **Director Agent**: Acts as the LangGraph traffic controller, dynamically switching control between Teacher, Evaluator, or User turns.
 - **Teacher Agent**: Specialized in pedagogical content delivery, generating interleaved whiteboard (`wb_`) JSON actions and chat text locally.
 - **Evaluator Agent**: Passively parses action streams to compress token memory into permanent `WorkProduct` grading records.
@@ -243,7 +243,7 @@ API endpoints in `controllers/` act as the entry point for the **Anti-Corruption
 ### 6.3 Real-Time Telemetry & The SSE Pattern
 - **Constraint**: Cloudflare Workers (Free Tier) enforce strict limitations on persistent WebSocket connections.
 - **Solution**: The UI "Agent Pulse Toasts" and Command Center reactivity are powered via **Server-Sent Events (SSE)**. The edge emits unidirectional event streams (`ON_PBAC_VIOLATION`, `AGENT_HEARTBEAT`) to the browser.
-- **Agentic Classroom SSE Pipeline**: The live LangGraph execution engine yields OpenMAIC's `StatelessEvent` streams (`text` slices and interleaved `action` payload arrays) directly over the Hono `/sse` route, bypassing persistent connection constraints while respecting the 5-Phase atomic lock.
+- **Agentic Classroom SSE Pipeline**: The live LangGraph execution engine yields a `StatelessEvent` streams (`text` slices and interleaved `action` payload arrays) directly over the Hono `/sse` route, bypassing persistent connection constraints while respecting the 5-Phase atomic lock.
 - **Scalability**: The system architecture makes room for a future upgrade to **Cloudflare Durable Objects** for bidirectional WebSocket state when scaling beyond the free tier.
 
 ## 7. Canonical Data Model (V2)
@@ -308,7 +308,7 @@ These tables extend [src/db/sqlite/domain-documents.ts](src/db/sqlite/domain-doc
 
 ### 7.4 Classroom Domain (Domain 18 - Live Delivery State)
 
-Defined natively within `src/db/sqlite/domain-classroom.ts`, this domain entirely encapsulates the OpenMAIC orchestration logic. It ensures high-frequency stateless events do not pollute the static Course (LMS) or Academic term tables.
+Defined natively within `src/db/sqlite/domain-classroom.ts`, this domain entirely encapsulates the stateless graph engine orchestration logic. It ensures high-frequency stateless events do not pollute the static Course (LMS) or Academic term tables.
 
 #### `classroom_sessions` (Core)
 - `id` uuid pk
@@ -336,7 +336,7 @@ Defined natively within `src/db/sqlite/domain-classroom.ts`, this domain entirel
 - `id` uuid pk
 - `tenant_id` uuid not null fk
 - `session_id` uuid not null fk
-- `timeline` jsonb (A replica of the `whiteboardLedger` abstraction utilized by OpenMAIC agents via `wb_` actions)
+- `timeline` jsonb (A replica of the `whiteboardLedger` abstraction utilized by stateless graph engine agents via `wb_` actions)
 
 #### Cross-Domain Relationships (Domain 18 Edges)
 - **Academic**: Feeds curriculum context via `course_id` (polymorphic binding to classes/sections).
@@ -445,7 +445,7 @@ To ensure consistency across 18+ domains, all Agentic operations must follow the
 A deeper execution pattern occurs natively in **Domain 18 (Classroom)** for live, stateful multi-agent interactions:
 - **Phase 1 & 2**: CRON emits `ON_SESSION_START` into the classroom bus or a student sends a chat. Request passes `TenantGuard` and `validators/`.
 - **Phase 3**: DomainService performs atomic checkout to lock the active session, blocking race events.
-- **Phase 4 (LangGraph Loop)**: EdApex spins up the OpenMAIC `createOrchestrationGraph()`. The `DirectorAgent` evaluates state and assigns a turn. The selected agent (e.g., `TeacherAgent`) produces incrementally chunked JSON over SSE. Edge buffers the state into `classroom_memory_ledger` to safely yield under the 10ms CPU limit.
+- **Phase 4 (LangGraph Loop)**: EdApex spins up the `createOrchestrationGraph()`. The `DirectorAgent` evaluates state and assigns a turn. The selected agent (e.g., `TeacherAgent`) produces incrementally chunked JSON over SSE. Edge buffers the state into `classroom_memory_ledger` to safely yield under the 10ms CPU limit.
 - **Phase 5**: LangGraph concludes single-pass loop. Evaluators may passively generate `WorkProducts` for grading records. `CLASSROOM_TURN_COMPLETE` bus event fires.
 
 ## 12. Financial Accounting: Double-Entry Ledger System
@@ -935,7 +935,7 @@ EdApex V2 mandates a premium, high-density interface across all platforms, desig
     - Smooth status transition fades (150ms) for all agent state changes (`IDLE` -> `AWAKE` -> `RUNNING`).
     - Kinetic scrolling for long heartbeat logs.
 
-### 19.5 Agentic Classroom Interfaces (OpenMAIC Web UI)
+### 19.5 Agentic Classroom Interfaces (Web UI)
 The Edge-native classroom leverages `ai-elements` to render incoming `StatelessEvent` streams seamlessly:
 - **The Student Immersive Interface**: Subscribes to the `/sse` stream. Parses `action` arrays (tool executions, pop quizzes) as inline widgets or "Thinking" states, while `text` items type natively into the chat.
 - **The "Pulse" Whiteboard Pipeline**: Renders synchronized SVG whiteboards dynamically controlled by the Teacher Agent (`wb_highlight`, `wb_show_image`), drawing exactly in sync with the typing speed of the speech chunks.
