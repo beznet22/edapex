@@ -20,10 +20,11 @@ The central `documents` table uses a polymorphic pattern to serve all domains:
 - **`owner_id`**: The primary key of the owner entity.
 - **`document_type`**: Categorization for business logic (e.g., `'profile_doc'`, `'study_material'`, `'assignment'`).
 
-### B. Storage Abstraction
+### B. Storage & Binary Abstraction
 V2 implements a `StorageService` that abstracts physical file operations.
 - **File Paths**: Stored as relative keys (e.g., `tenants/1/students/101/birth-cert.pdf`).
 - **Cloud Transition**: The `filePath` column in V2 stores the cloud object identifier, facilitating easy migration from local testing to production S3/Cloudfront.
+- **Binary Generation (`html2pdf`)**: The `DocumentService` exposes an internal facade that executes the `html2pdf` binary directly on strings yielded by Domain AI task agents (such as `generate_grading_report`). This ensures complex dynamic content is converted locally without exposing sensitive academic records to external generation APIs.
 
 ## 4. Legacy Mapping & Migration
 

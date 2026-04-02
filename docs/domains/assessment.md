@@ -55,8 +55,8 @@ erDiagram
 ## 🤖 AI Task Agents & Automation
 
 ### Result Engine Agent
-- **Trigger**: Fired when `examMarks` are updated or when an exam term is marked as "Completed".
-- **Function**: Performs bulk calculation of GPAs, Grades, and subject-wise positions.
+- **Trigger**: Fired when `examMarks` are updated, when an exam term is marked "Completed", or when an Agentic Classroom (Domain 18) `EvaluatorAgent` yields a graded turn transcript.
+- **Function**: Performs bulk calculation of GPAs, Grades, and subject-wise positions. Aggregates micro-evaluations from immersive live sessions into long-term `computedResults`.
 - **Verification**: Cross-references computed totals against `examSetups.exam_mark` constraints.
 
 ### Assessment Coordinator

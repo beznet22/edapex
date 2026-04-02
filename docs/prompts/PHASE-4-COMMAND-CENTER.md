@@ -54,3 +54,13 @@ Implement the reconciliation logic between **TanStack DB** and **Cloudflare D1**
 ### 4. Real-Time Telemetry & Resiliency
 - Implement unidirectional edge streams utilizing standard Server-Sent Events (SSE) for sub-150ms "Agent Pulse Toasts".
 - Enforce "Snapshot Hydration Flow", completely restoring the Local-First IndexedDB from D1 Point-in-Time Recoveries upon empty cache startup states.
+
+### 5. Agentic Classroom UI (OpenMAIC Web Views)
+Build the live classroom experience as a dedicated TanStack Start route, leveraging `ai-elements` to render incoming `StatelessEvent` streams.
+- **Student Immersive Interface**: Subscribe to the `/api/classroom/sse` stream. Parse interleaved JSON arrays: `action` items render as inline tool widgets (pop quiz overlays, "Thinking" indicators), while `text` items type natively into the `ai-elements` chat component.
+- **Pulse Whiteboard Pipeline**: Render a synchronized SVG whiteboard driven by the Teacher Agent's `wb_highlight`, `wb_show_image`, `wb_pan` actions. Whiteboard drawing must animate in sync with the typing speed of the `text` stream chunks. Use `classroomWhiteboardState` as the document of record for device drop/reconnection.
+- **Teacher & Admin Escalate View (Command Center)**: Implement a 3-pane live supervision layout:
+  - **Left Pane**: Graph Pipeline Logs (Director Node decisions, Teacher Node stream events, Evaluator RAG operations).
+  - **Center Pane**: Shadow Whiteboard (real-time mirror of the student-facing canvas).
+  - **Right Pane**: Intervention Chat Stream with a `[TAKE OVER]` button that pushes a `type: "escalation"` event into the `classroomMemoryLedger`, halting the LangGraph loop and transferring control to the human instructor.
+- **Spec Reference**: [AGENTIC_CLASSROOM_V2_SPEC.md](../AGENTIC_CLASSROOM_V2_SPEC.md) (Section 4) and [AGENTIC_SCHOOL_V2_PLAN.md](../AGENTIC_SCHOOL_V2_PLAN.md) (Section 19.5).

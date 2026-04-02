@@ -5,7 +5,7 @@ The EdApex LMS is designed from the ground up to be **AI-Native**, leveraging th
 
 ### Key AI Workflow (HMAS)
 - **Personalized Pathing**: The `lms_supervisor` analyzes `lms_analytics_events` and performance data to dynamically adjust `lms_learning_paths`.
-- **Autonomous Tutoring**: The `tutor_agent` uses RAG (Retrieval Augmented Generation) over course materials to provide context-aware assistance in `lms_tutoring_sessions`.
+- **Autonomous Tutoring**: The `tutor_agent` uses RAG (Retrieval Augmented Generation) over course materials to provide context-aware assistance in `lms_tutoring_sessions`. *Note: For immersive, real-time live tutoring over OpenMAIC LangGraph, the LMS heavily syndicates with **Domain 18 (Agentic Classroom)**.*
 - **Automated Grading**: The `grading_agent` evaluates `lms_submissions` using `ai_grading_config` (rubrics and prompts), providing instant, high-fidelity feedback.
 
 ## 2. Entity Design (V2 Schema)

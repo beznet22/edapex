@@ -48,7 +48,7 @@ The critical junction table.
 Supports `subjectType` (theory/practical) and `subjectCode`.
 
 #### [ClassRoutines](file:///home/beznet/Workspace/edapex/src/db/domain-academic.ts#L106)
-Calculates weekly schedule. Currently uses `dayOfWeek` enum and raw start/end times.
+Calculates weekly schedule. Currently uses `dayOfWeek` enum and raw start/end times. *Note: In EdApex V2, active routine slots are what dynamically instantiate the live `classroomSessions` (Domain 18) for real-time edge execution.*
 
 ---
 

@@ -6,7 +6,7 @@ This roadmap outlines the strategic evolution of EdApex V2 into an autonomous "A
 
 ### Phase 0: Canonical Base & Edge Infrastructure
 - [x] **8-Layer Architecture**: Provisioned `routes/`, `controllers/`, `services/`, `domain/`, `db/`, `middleware/`, `validators/`, and `events/`.
-- [x] **17-Domain Schema**: Drizzle schemas for all domains (Academic -> Settings) are implemented for D1/SQLite.
+- [x] **18-Domain Schema**: Drizzle schemas for all domains (Academic -> Settings + Classroom) are implemented for D1/SQLite/MySQL/PostgreSQL.
 - [x] **Edge-Native Boot**: `app.ts` and `server.ts` configured for Cloudflare Workers orchestration.
 - [x] **AI Strategy**: Initial `AiOrchestrator` refactored for provider-agnostic, capability-based routing.
 
@@ -30,12 +30,12 @@ This roadmap outlines the strategic evolution of EdApex V2 into an autonomous "A
 ### Phase 2: HMAS & Specialized Role Library
 - **Role Deployment**: Implementation of the 31+ specialized Staff Roles (Registrar, Bursar, HR Manager, etc.).
 - **Supervisor Logic**: Principal Assistant logic for cross-domain goal decomposition.
-- **Mastra Integration**: Verification of JSON tools against the 17-domain repositories.
+- **Mastra Integration**: Verification of JSON tools against the 18-domain repositories.
 - **Data Privacy (GDPR/NDPR)**: Implement the PII Obfuscation Middleware to pre-process LLM queries.
 - **Operator Handoff**: Equip all B2C agents with the `request_human_operator` tool for explicit human escalation.
 
 ### Phase 3: Domain Alignment & Anti-Corruption Layer (ACL)
-- **Service Transformation**: Refactoring business logic from Paperclip into native `src/services/` for all 17 domains.
+- **Service Transformation**: Refactoring business logic from Paperclip into native `src/services/` for all 18 domains.
 - **Entity Mapping**: Implementing the ACL to bridge Mastra outputs to Drizzle entities.
 - **Internal Event Bus**: Reactive triggers for cross-domain side effects (e.g., Attendance -> Notification).
 - **External Webhooks Vault**: Implement facade tools for third-party HTTP egress (Stripe, Termii) without exposing raw API keys to agents.
@@ -63,6 +63,6 @@ This roadmap outlines the strategic evolution of EdApex V2 into an autonomous "A
 | **Services** | Domain Logic (ACL) | 10% | 🏗️ BUILDING |
 | **AI Orchestration**| Mastra HMAS Loop | 5% | 🏗️ BUILDING |
 | **Repositories** | Drizzle D1 Adapters | 100% | ✅ COMPLETED |
-| **Database** | 17-Domain Schema | 100% | ✅ COMPLETED |
+| **Database** | 18-Domain Schema | 100% | ✅ COMPLETED |
 | **Logging** | 8-Layer Namespacing | 5% | 🏗️ BUILDING |
 | **Frontend UI** | TanStack + AI-Elements| 5% | 🏗️ BUILDING |

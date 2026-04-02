@@ -23,7 +23,7 @@ The legacy `schoolify` monolith (InfixEdu) strictly operated on a conventional B
 The success of the Homeschooling domain relies heavily on autonomous curriculum generation and adaptive learning.
 
 ### Task Agents
-1. **HomeschoolSupervisor:** The primary router and context manager. Interprets parent/student intent and coordinates curriculum flow.
+1. **HomeschoolSupervisor:** The primary router and context manager. Interprets parent/student intent and coordinates curriculum flow. Extensively delegates active 1-on-1 live session execution to the **Domain 18 (Agentic Classroom)** `DirectorAgent` via the HMAS routing layer.
 2. **EarlyYearsAgent:** Tailored for ECCDE (ages 0-6). Focuses on thematic, play-based content generation for 8 core skill areas.
 3. **StemTutoringAgent:** Focused on Upper Basic and Secondary students. Handles deep, step-by-step logic, Coding & Robotics integration, and virtual lab simulations.
 

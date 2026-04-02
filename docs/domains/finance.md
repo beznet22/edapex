@@ -55,7 +55,7 @@ Manages institutional funds. Linked to `ledger_entries` via metadata for trackin
 Enables complex payment plans. A student can pay a single `fee_assignment` across multiple installments.
 
 #### Online Payments & Gateways (B2C Engine)
-Dedicated tables (`online_payments` and `payment_gateways`) securely handle immediate digital checkouts. They capture webhook intents from providers (Stripe/Flutterwave) and once verified, resolve transactions directly onto the `ledger_entries` log. `invoices` utilize polymorphic `reference_type` and `reference_id` fields to instantly un-gate the purchased product (LMS Course, Subscriptions).
+Dedicated tables (`online_payments` and `payment_gateways`) securely handle immediate digital checkouts. They capture webhook intents from providers (Stripe/Flutterwave) and once verified, resolve transactions directly onto the `ledger_entries` log. `invoices` utilize polymorphic `reference_type` and `reference_id` fields to instantly un-gate the purchased product (LMS Course, Subscriptions, or Live Agentic Classrooms).
 
 ---
 

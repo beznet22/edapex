@@ -275,7 +275,13 @@ const response = await agent.generate([ ...standardMessages, { role: 'user', con
 await aiRepository.saveMessage(chatId, 'assistant', response.text);
 ```
 
-### E. Hono API Routes
+#### OpenMAIC LangGraph Orchestration
+For live educational scenarios, the generic chat state machine is insufficiently nuanced. **Domain 18 (Agentic Classroom)** bypasses `aiChats` in favor of a specialized OpenMAIC **LangGraph** loop:
+- **State Dehydration**: Utilizes `classroomMemoryLedger` for interleaved `action`/`text` payload storage, bypassing standard memory formatting.
+- **SSE Streams**: LangGraph nodes yield arrays via Edge SSE rather than standard HTTP responses.
+- **Explicit Handoffs**: Director Agents control invocation state explicitly to respect the 10ms CPU slices over extended, 45-minute continuous sessions.
+
+### F. Hono API Routes
 
 ```
 Routes → AiController → AiService → AiRepository → chats/messages/aiAgents
@@ -292,7 +298,7 @@ Routes → AiController → AiService → AiRepository → chats/messages/aiAgen
 | `GET` | `/api/v1/ai/agents/:id/actions` | List agent action history |
 | `GET` | `/api/v1/ai/agents` | List registered agents for tenant |
 
-### F. Domain Events
+### G. Domain Events
 
 | Event | Payload | Consumers |
 |:---|:---|:---|

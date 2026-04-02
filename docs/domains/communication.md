@@ -41,7 +41,7 @@ The Communication domain provides a unified, omni-channel infrastructure for int
 ### 1. High-Frequency Chat Storage
 **Current State**: `src/db/domain-communication.ts` includes `chat` as a channel in `communicationEvents`.
 **Recommendation**: Implement a dedicated `chatMessages` table for high-frequency exchange to avoid bloat in the audit-heavy `communicationEvents` table.
-**Justification**: Chat requires optimized indexing for `channelId` and `timestamp`, plus specific `moderation_status` flags.
+**Justification**: Chat requires optimized indexing for `channelId` and `timestamp`, plus specific `moderation_status` flags. *(Note: Live Agentic Classroom streaming chats are wholly excluded from this domain and reside isolated natively in Domain 18's `classroomMemoryLedger` to respect Edge SSE limits).*
 
 ### 2. Template Versioning in Metadata
 **Recommendation**: Use the `metadata` JSON field to store `template_id` and `version` for external providers (SendGrid/Twilio).

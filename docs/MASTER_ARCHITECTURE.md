@@ -114,8 +114,8 @@ PBAC is the primary security mechanism, moving beyond static roles to dynamic at
 
 ### 2.1 PBAC Components
 - **Subjects**: `student`, `teacher`, `parent`, `accountant`, `admin`, `librarian`, `driver`, `warden`, and **AI Agents**.
-- **Resources**: `student_record`, `exam`, `attendance`, `fees`, `library_book`, `inventory_item`, `payroll`.
-- **Actions**: `create`, `read`, `update`, `delete`, `approve`, `grade`, `collect`, `assign`, `execute`.
+- **Resources**: `student_record`, `exam`, `attendance`, `fees`, `library_book`, `inventory_item`, `payroll`, `classroom_session`.
+- **Actions**: `create`, `read`, `update`, `delete`, `approve`, `grade`, `collect`, `assign`, `execute`, `stream`.
 - **Environment**: `tenant_id`, `time`, `location`, `ip_address`, `device_id`.
 
 ### 2.2 Evaluation Logic
@@ -141,7 +141,7 @@ HMAS organizes AI intelligence into four distinct functional layers to ensure st
 - **Coordination**: Uses state-machine logic to track the completion of sub-plans across Supervisors.
 
 ### Level 2: Domain Supervisors
-- **Registry**: `academic_supervisor`, `finance_supervisor`, `hr_supervisor`, `attendance_supervisor`, etc.
+- **Registry**: `academic_supervisor`, `finance_supervisor`, `hr_supervisor`, `attendance_supervisor`, `classroom_supervisor`, etc.
 - **Responsibility**: Manages domain-specific task agents. Ensures that a request like "Generate Report" correctly triggers the collection of attendance, grades, and behavioral data.
 
 ### Level 3: Task Agents
@@ -168,7 +168,7 @@ FMSIA enables cross-tenant intelligence without compromising data privacy.
 
 ## 5. Domain Module Architecture (V2 Schema)
 
-EdApex V2 decomposes the monolith into 15 distinct functional domains, each encapsulated in `src/db/domain-*.ts`. This modularity ensures that specialized AI agents can operate within bounded contexts while maintaining strict multi-tenant isolation.
+EdApex V2 decomposes the monolith into 18 distinct functional domains, each encapsulated in `src/db/domain-*.ts`. This modularity ensures that specialized AI agents can operate within bounded contexts while maintaining strict multi-tenant isolation.
 > [!NOTE] 
 > For detailed low-level documentation spanning entity mappings and PBAC rules per domain, see the **[Domain Specification Index](#56-domain-specification-index)** below.
 
@@ -190,6 +190,7 @@ EdApex V2 decomposes the monolith into 15 distinct functional domains, each enca
 | **Assessment** | `exams`, `exam_marks`, `computed_results` | Decouples exam definitions from mark setups; event-driven result engine. |
 | **Attendance** | `attendances` | Unified student/staff/subject tracking with anomaly detection triggers. |
 | **LMS (AI-First)** | `courses`, `lessons`, `progress`, `tutoring_sessions` | Built for RAG; dynamic learning paths based on analytics and AI feedback. |
+| **Classroom (Agentic)** | `classroom_sessions`, `classroom_memory_ledger`, `classroom_participants`, `classroom_whiteboard_state` | OpenMAIC-powered live classroom with LangGraph state machine, SSE streaming, and dynamic engagement scoring. |
 
 ### 5.3 Human Resources & Finance
 
@@ -215,7 +216,7 @@ Every domain is governed by a dedicated specification file in `docs/domains/` th
 | Category | Specifications |
 | :--- | :--- |
 | **Foundations** | [Core & Identity](docs/domains/core.md) • [PBAC & Security](docs/domains/pbac.md) • [Settings](docs/domains/settings.md) • [Documents](docs/domains/documents.md) • [Events](docs/domains/events.md) |
-| **Academic** | [Academic](docs/domains/academic.md) • [Assessment](docs/domains/assessment.md) • [Attendance](docs/domains/attendance.md) • [LMS](docs/domains/lms.md) • [Homeschooling](docs/domains/homeschooling.md) |
+| **Academic** | [Academic](docs/domains/academic.md) • [Assessment](docs/domains/assessment.md) • [Attendance](docs/domains/attendance.md) • [LMS](docs/domains/lms.md) • [Classroom](docs/domains/classroom.md) • [Homeschooling](docs/domains/homeschooling.md) |
 | **Operations** | [Finance](docs/domains/finance.md) • [HR & Payroll](docs/domains/hr.md) • [Library](docs/domains/library.md) • [Facilities](docs/domains/facilities.md) |
 | **Support** | [AI Engine](docs/domains/ai.md) • [Communication](docs/domains/communication.md) • [CMS](docs/domains/cms.md) |
 
@@ -235,8 +236,8 @@ To maintain this spec, all domain modifications must follow the **Agent Orchestr
 ## 7. Event-Driven Reliability
 
 The platform uses a distributed Event Bus to synchronize state across decoupled micro-agents:
-- **Producers**: Domain Services emit events like `exam_submitted`.
-- **Consumers**: Task Agents subscribe to events to trigger follow-up actions (e.g., `grading_agent` starts work when an exam is submitted).
+- **Producers**: Domain Services emit events like `exam_submitted`, `ON_SESSION_START`, `CLASSROOM_TURN_COMPLETE`.
+- **Consumers**: Task Agents subscribe to events to trigger follow-up actions (e.g., `grading_agent` starts work when an exam is submitted; `evaluator_agent` compresses memory on `CLASSROOM_TURN_COMPLETE`).
 - **Log**: Every event is stored in `edx_domain_events` for audit and replay.
 
 ---
@@ -264,7 +265,15 @@ Mastra requires a `Storage` adapter to persist memory and logs.
 To meet the **Cloudflare 10ms CPU limit** and ensure **Edge-Native performance**, EdApex uses a **Stateless Agent Execution Model**:
 - Treat `ai_chats` and `ai_messages` natively via Drizzle ORM repositories, wholly agnostic of the AI SDK.
 - The `AiService` loads conversation history and invokes the Mastra agent statelessly.
-- This ensures minimal холодный start (cold start) overhead and zero vendor lock-in.
+- This ensures minimal cold start overhead and zero vendor lock-in.
+
+### 8.5 Agentic Classroom: OpenMAIC LangGraph Integration
+The **Agentic Classroom** extends stateless execution via an OpenMAIC-powered **LangGraph `StateGraph`** (`director-graph.ts`):
+- **Director Node**: Analyzes `FatContext` (session state + memory ledger) and routes to the appropriate agent via an LLM decision pass.
+- **Agent Node (Teacher/Evaluator)**: Yields streaming **interleaved structured outputs** (`[{"type":"action", ...}, {"type":"text", ...}]`) over Hono SSE.
+- **Stateless Resolution**: After each graph node execution, streamed `StatelessEvent` arrays are dehydrated to `classroomMemoryLedger` before yielding the edge CPU slice.
+- **Escalation Edge**: Human instructors can inject an `escalation` event into the memory ledger to halt the autonomous loop and assume direct control.
+- **Spec Reference**: [AGENTIC_CLASSROOM_V2_SPEC.md](AGENTIC_CLASSROOM_V2_SPEC.md) for full detail.
 
 ---
 
@@ -322,7 +331,14 @@ EdApex is optimized for the constraints of Cloudflare's edge network:
 - **TanStack DB**: Acts as the primary state manager on the client (IndexedDB).
 - **Background Sync**: Uses a conflict-resolution engine to synchronize local state with Cloudflare D1.
 
-### 10.3 AI Orchestration (Provider-Agnostic)
+### 10.3 SSE Streaming Architecture
+Real-time unidirectional streaming powers both the HMAS Pulse telemetry and the Agentic Classroom:
+- **Hono SSE Pipe**: Streams `StatelessEvent` chunks from LangGraph graph node yields to the browser.
+- **Partial-JSON Parsing**: Edge-compatible incremental parser buffers incomplete JSON `[` arrays and yields deltas as they stabilize.
+- **Stream-Time PBAC**: A regex-match interceptor validates each `action` element against the PBAC policy engine *within* the SSE stream, emitting inline `403` signals without terminating the connection.
+- **Inertial Conflict Resolution**: In multi-observer scenarios, TanStack DB caches local inputs until SSE confirms state alignment with D1/SQLite.
+
+### 10.4 AI Orchestration (Provider-Agnostic)
 - **Mastra Core**: Lightweight orchestration without heavy stateful storage adapters.
 - **Runtime Provider Selection**: Agents are defined by capability and use the cheapest/fastest available provider at runtime.
 

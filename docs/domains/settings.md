@@ -7,6 +7,7 @@ The **Settings** domain in EdApex V2 centralizes all system and tenant-level con
 - **Decoupled Configuration**: All toggles (e.g., "Chat Enabled", "LMS Active") are moved from hardcoded columns to a flexible `config` JSON field.
 - **Categorization**: Settings are grouped by `domain` (e.g., `general`, `finance`, `ai`, `features`) to optimize lookup and caching.
 - **Tenant Isolation**: Every setting is scoped to a `tenant_id`, ensuring no cross-tenant leakage of configuration or credentials.
+- **Standalone Mode Toggle**: When `Settings.isStandalone() == true`, the **Agentic Classroom (Domain 18)** and **LMS** explicitly decouple from Academic/HR dependencies. This enables B2C retail deployment strategies completely decoupled from the institutional 17 domains.
 
 ## 2. Entity Mapping (V1 -> V2)
 

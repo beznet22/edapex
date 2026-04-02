@@ -66,6 +66,7 @@ To ensure consistency across the HMAS (Hierarchical Multi-Agent System), all aut
 2.  **Auditability**: Every access decision is logged in the `role_assignments.metadata` or a dedicated audit bus for compliance.
 3.  **Performance**: Policies are cached at the tenant level, allowing sub-millisecond evaluation without database hits on every request.
 4.  **Agent Integration**: Level 4 Tool Agents rely on the evaluator to determine if they can execute a specific tool on behalf of a user.
+5.  **Stream-Time Validation (SSE)**: For high-frequency environments like the Agentic Classroom (Domain 18), PBAC utilizes a partial-JSON interceptor to regex-match `action` streams in real-time. This blocks unauthorized tools natively across SSE loops returning inline `403` HTTP signals without terminating the active web socket.
 
 ## 5. Implementation Notes
 - **Tenant Isolation**: Policies with `tenant_id = NULL` act as global system defaults, while tenant-specific policies override or append to the global set.

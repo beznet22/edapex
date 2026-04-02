@@ -7,11 +7,12 @@ This document is the **definitive technical specification** for transforming EdA
 ### 1.1 Source Inputs
 - [docs/MASTER_ARCHITECTURE.md](docs/MASTER_ARCHITECTURE.md): Core system philosophy and stack.
 - [docs/BUSINESS_MODEL.md](docs/BUSINESS_MODEL.md): Dual-pillar B2B/B2C alignment.
-- [paperclip/doc/SPEC-implementation.md](paperclip/doc/SPEC-implementation.md): Orchestration and heartbeat template.
 - [docs/domains/*.md](docs/domains/*.md): Domain-specific business logic and entities.
-- [paperclip/doc/spec/agent-runs.md](paperclip/doc/spec/agent-runs.md): Agent runs and cost tracking.
-- [paperclip/doc/spec/agents-runtime.md](paperclip/doc/spec/agents-runtime.md): Agent runtime and cost tracking.
-- [paperclip/doc/plans/[DATE]-*.md](paperclip/doc/plans/[DATE]-*.md): Implementation plans and plus cost tracking.
+- Reference design: [https://github.com/paperclip/paperclip/blob/main/doc/SPEC-implementation.md](https://github.com/paperclip/paperclip/blob/main/doc/SPEC-implementation.md): Orchestration and heartbeat template.
+- Reference design: [https://github.com/paperclip/paperclip/blob/main/doc/spec/agent-runs.md](https://github.com/paperclip/paperclip/blob/main/doc/spec/agent-runs.md): Agent runs and cost tracking.
+- Reference design: [https://github.com/paperclip/paperclip/blob/main/doc/spec/agents-runtime.md](https://github.com/paperclip/paperclip/blob/main/doc/spec/agents-runtime.md): Agent runtime and cost tracking.
+- Reference design: [https://github.com/paperclip/paperclip/blob/main/doc/plans/[DATE]-*.md](https://github.com/paperclip/paperclip/blob/main/doc/plans/[DATE]-*.md): Implementation plans and plus cost tracking.
+- Reference design: **OpenMAIC Stateless Graph Engine** (`director-graph.ts`, `stateless-generate.ts`): Stateless execution loop, incremental JSON parsing over SSE. [OpenMAIC](https://github.com/openmaic/openmaic)
 
 ### 1.2 Internal Service Architecture (Detailed)
 
@@ -179,7 +180,7 @@ The EdApex V2 Agentic School is built on the convergence of two major codebases:
 
 ### 4.1 EdApex V2 Core (Backend/Infrastructure)
 - **Stack**: Hono, Drizzle ORM, Mastra SDK, Cloudflare D1/KV, MySQL, PostgreSQL, SQLite.
-- **Repository Pattern**: Multi-dialect support with strict isolation per domain (17 domains).
+- **Repository Pattern**: Multi-dialect support with strict isolation per domain (18 domains natively).
 - **PBAC**: Unified policy engine for staff and agents.
 
 ### 4.2 Paperclip (Orchestration/UX Patterns)
@@ -205,7 +206,13 @@ EdApex V2 implements a recursive, goal-driven hierarchy.
 - **Roles**: Registrar, Bursar, Inventory Clerk, Teacher Assistant.
 - **Capabilities**: Executing specific `SKILL.md` toolsets against the domain repositories.
 
-### 5.4 Unified Agent Lifecycle (State Machine)
+### 5.4 The Agentic Classroom (Live Delivery Sub-System)
+An intense, live-streaming subset of HMAS formally integrated via the OpenMAIC architecture:
+- **Director Agent**: Acts as the LangGraph traffic controller, dynamically switching control between Teacher, Evaluator, or User turns.
+- **Teacher Agent**: Specialized in pedagogical content delivery, generating interleaved whiteboard (`wb_`) JSON actions and chat text locally.
+- **Evaluator Agent**: Passively parses action streams to compress token memory into permanent `WorkProduct` grading records.
+
+### 5.5 Unified Agent Lifecycle (State Machine)
 All Agents in EdApex V2 follow a strict state transition model:
 - `IDLE`: Registered but awaiting heartbeat/task.
 - `AWAKE`: Heartbeat triggered; performing context retrieval.
@@ -214,7 +221,7 @@ All Agents in EdApex V2 follow a strict state transition model:
 - `ERROR`: Terminal execution failure; requires manual reset.
 - `TERMINATED`: Decommissioned.
 
-### 5.5 Human-in-the-Loop "Hand-off" Protocol
+### 5.6 Human-in-the-Loop "Hand-off" Protocol
 - **Constraint**: If a B2C Agent (e.g., Home Mentor) hallucinates or cannot interpret user intent, the user must not be deadlocked.
 - **Solution**: The **Escalation Edge Case**. The agent inherently possesses a `request_human_operator` tool. Upon invocation, the `thread_id` is paused and rerouted to the Command Center inbox where a human School Administrator assumes control of the context window.
 
@@ -236,6 +243,7 @@ API endpoints in `controllers/` act as the entry point for the **Anti-Corruption
 ### 6.3 Real-Time Telemetry & The SSE Pattern
 - **Constraint**: Cloudflare Workers (Free Tier) enforce strict limitations on persistent WebSocket connections.
 - **Solution**: The UI "Agent Pulse Toasts" and Command Center reactivity are powered via **Server-Sent Events (SSE)**. The edge emits unidirectional event streams (`ON_PBAC_VIOLATION`, `AGENT_HEARTBEAT`) to the browser.
+- **Agentic Classroom SSE Pipeline**: The live LangGraph execution engine yields OpenMAIC's `StatelessEvent` streams (`text` slices and interleaved `action` payload arrays) directly over the Hono `/sse` route, bypassing persistent connection constraints while respecting the 5-Phase atomic lock.
 - **Scalability**: The system architecture makes room for a future upgrade to **Cloudflare Durable Objects** for bidirectional WebSocket state when scaling beyond the free tier.
 
 ## 7. Canonical Data Model (V2)
@@ -298,6 +306,55 @@ These tables extend [src/db/sqlite/domain-documents.ts](src/db/sqlite/domain-doc
 - `revision_count` int not null
 - `owner_agent_id` uuid fk null
 
+### 7.4 Classroom Domain (Domain 18 - Live Delivery State)
+
+Defined natively within `src/db/sqlite/domain-classroom.ts`, this domain entirely encapsulates the OpenMAIC orchestration logic. It ensures high-frequency stateless events do not pollute the static Course (LMS) or Academic term tables.
+
+#### `classroom_sessions` (Core)
+- `id` uuid pk
+- `tenant_id` uuid not null fk
+- `course_id` uuid fk (Links to LMS)
+- `director_agent_id` uuid fk (Links to AI)
+- `status` enum: scheduled | active | completed
+
+#### `classroom_memory_ledger` (LangGraph Buffer)
+- `id` uuid pk
+- `tenant_id` uuid not null fk
+- `session_id` uuid not null fk
+- `turn_count` int not null
+- `parsed_content` jsonb (Flattened `action` / `text` streaming output arrays)
+
+#### `classroom_participants` (Roster)
+- `id` uuid pk
+- `tenant_id` uuid not null fk
+- `session_id` uuid not null fk
+- `user_id` uuid not null fk
+- `role` enum: student | human_observer
+- `engagement_score` real (dynamically updated by Evaluator Agents)
+
+#### `classroom_whiteboard_state` (WhiteboardLedger Replica)
+- `id` uuid pk
+- `tenant_id` uuid not null fk
+- `session_id` uuid not null fk
+- `timeline` jsonb (A replica of the `whiteboardLedger` abstraction utilized by OpenMAIC agents via `wb_` actions)
+
+#### Cross-Domain Relationships (Domain 18 Edges)
+- **Academic**: Feeds curriculum context via `course_id` (polymorphic binding to classes/sections).
+- **AI**: Ties execution passes directly to `cost_events` for tight token budgeting per heartbeat.
+- **Assessment**: Live grading tools; Teacher Agent issues `action` to evaluate in-stream logic.
+- **CMS**: Reading material; RAG index vectors generated natively from CMS articles.
+- **Core**: Standard Authentication; Tenant validation enforced across all `/sse` endpoints.
+- **Documents**: Yields LangGraph end-states directly to `WorkProducts` via `.saveToPolymorphicArtifact` tools.
+- **Finance**: Billing for tutors; Hooks evaluate `.budget()` before initiating execution loops.
+- **HR**: Supervisor maps; Defines escalation paths to live human staff.
+- **LMS**: Pulls `lmsModules` and quizzes as the Director's pedagogical blueprint.
+- **PBAC**: Gatekeeper rules; Pre-flight tool policy blocks dangerous `action` events.
+- **Settings**: Allows `Standalone Mode` configurations, detaching Classroom routines from Academic scopes (for B2C/retail scaling).
+
+#### Standalone Mode Configuration
+To serve the dual-pillar retail model:
+If `Settings.isStandalone() == true`, the Hono controllers explicitly ignore dependency lookups against `domain-academic` and `domain-hr`. The `domain-classroom` operates freely exclusively linked to `domain-lms` (the course content provider) and `domain-core` (the tenant user base), utilizing Stripe checkout webhooks for isolated billing separate from the enterprise ledger.
+
 ## 8. Frontend Architecture: The Local-First Command Center
 
 EdApex V2 utilizes a **Local-First** paradigm to ensure zero-latency interaction and offline resilience.
@@ -313,7 +370,7 @@ EdApex V2 utilizes a **Local-First** paradigm to ensure zero-latency interaction
 3. **Background Sync**: A conflict-resolution engine pushes local logs to the Cloudflare D1 backend via Hono RPC.
 4. **Reconciliation**: D1 acts as the authoritative source of truth for multi-device consistency.
 
-## 9. Domain-Tool Mapping (The 17 Pillars & 31+ Skills)
+## 9. Domain-Tool Mapping (The 18 Pillars & 31+ Skills)
 
 Roles are grouped by Domain and implemented as **Standard Educational Skills**. Every domain exposes a set of tools to the HMAS via the **Domain Supervisor**.
 
@@ -336,6 +393,7 @@ Roles are grouped by Domain and implemented as **Standard Educational Skills**. 
 | **LMS** | Course Designer, Proctor. | Course Designer | Content publishing, Enrollment, Performance. | `create_module`, `generate_quiz`, `monitor_exam` |
 | **PBAC** | Compliance Officer, Auditor. | Compliance Officer | Policy evaluation, Role granting, Auditing. | `evaluate_policy`, `grant_role`, `audit_perms` |
 | **Settings** | Admin, Config Mgr. | Principal Assistant | School configs, Session dates, Grading scales. | `update_config`, `set_academic_year`, `set_scale` |
+| **Classroom**| Director, Teacher, Evaluator. | Director Agent | Stream orchestration, Live pulse boards, Telemetry. | `wb_highlight`, `stream_event`, `eval_turn` |
 
 ## 10. Security & PBAC: The Edge-Native Perimeter
 
@@ -355,9 +413,12 @@ EdApex V2 enforces a "Zero-Trust Agent" model. Every tool execution is evaluated
 - **Constraint**: Task Agents (like the Bursar) require access to external APIs (e.g., Stripe, Termii SMS) without exposing raw API keys to the LLM context.
 - **Solution**: The **External Vault** and **Egress Policy**. Keys are stored encrypted in `tenant_settings`. Agents call internal facade tools (`trigger_payment`, `dispatch_sms`) rather than performing raw HTTP requests. The Hono controller decrypts the key and executes the external call, ensuring zero LLM API key leakage.
 
+### 10.4 Stream-Time Interception (Agentic Classroom)
+For the Live Classroom streaming API (`/sse` endpoint), PBAC validations are executed via a stream interceptor. As partial-JSON `action` elements stream back before the tool invokes, regex and incremental validators intercept and flag potential violations in real-time. If an unauthorized tool payload emerges, the stream forcibly yields a `403` signal to the edge and halts external execution boundaries immediately.
+
 ## 11. Professional Code Flow (The 5-Phase Lifecycle)
 
-To ensure consistency across 17+ domains, all Agentic operations must follow the **Standard Orchestration Cycle**.
+To ensure consistency across 18+ domains, all Agentic operations must follow the **Standard Orchestration Cycle**.
 
 ### 11.1 Phase 1: The Trigger (Signal)
 - **Source**: Cron Expression, Webhook (`POST /api/webhooks/raw`), or Manual Board Injection.
@@ -379,6 +440,13 @@ To ensure consistency across 17+ domains, all Agentic operations must follow the
 ### 11.5 Phase 5: Artifact & Completion (The Result)
 - **Persistence**: Work is finalized in the `work_products` registry.
 - **Log-off**: Agent run is marked `succeeded`, and the next dependent trigger is fired.
+
+### 11.6 Agentic Classroom Execution: The Director Graph Loop
+A deeper execution pattern occurs natively in **Domain 18 (Classroom)** for live, stateful multi-agent interactions:
+- **Phase 1 & 2**: CRON emits `ON_SESSION_START` into the classroom bus or a student sends a chat. Request passes `TenantGuard` and `validators/`.
+- **Phase 3**: DomainService performs atomic checkout to lock the active session, blocking race events.
+- **Phase 4 (LangGraph Loop)**: EdApex spins up the OpenMAIC `createOrchestrationGraph()`. The `DirectorAgent` evaluates state and assigns a turn. The selected agent (e.g., `TeacherAgent`) produces incrementally chunked JSON over SSE. Edge buffers the state into `classroom_memory_ledger` to safely yield under the 10ms CPU limit.
+- **Phase 5**: LangGraph concludes single-pass loop. Evaluators may passively generate `WorkProducts` for grading records. `CLASSROOM_TURN_COMPLETE` bus event fires.
 
 ## 12. Financial Accounting: Double-Entry Ledger System
 
@@ -601,6 +669,21 @@ Each role is a specialized Mastra Agent with its own `SKILL.md` manifest and a r
 - **Purpose**: Managing school-wide configurations and term dates.
 - **Mastra Tools**: `settings.updateConfig`, `settings.setAcademicYear`.
 - **Reporting Line**: Principal Assistant.
+
+### 13.18 Classroom Domain (Live Environment)
+
+#### 13.18.1 Director Agent
+- **Purpose**: Turn orchestration and LangGraph traffic control (`directorNode`).
+- **Reporting Line**: Principal Assistant.
+
+#### 13.18.2 Teacher Agent
+- **Purpose**: Streamed pedagogical instruction leveraging interleaved board/chat arrays.
+- **Mastra Tools**: `wb_show_image`, `wb_highlight`, `wb_pan`.
+- **Reporting Line**: Director Agent.
+
+#### 13.18.3 Evaluator Agent
+- **Purpose**: Passive grading and RAG token compaction across live session durations.
+- **Reporting Line**: Director Agent.
 
 ## 14. Technical Enhancements: The Edge-Native Evolution
 - **Constraint**: Cloudflare's 10ms CPU limit prevents long-running synchronous agent loops.
@@ -852,6 +935,12 @@ EdApex V2 mandates a premium, high-density interface across all platforms, desig
     - Smooth status transition fades (150ms) for all agent state changes (`IDLE` -> `AWAKE` -> `RUNNING`).
     - Kinetic scrolling for long heartbeat logs.
 
+### 19.5 Agentic Classroom Interfaces (OpenMAIC Web UI)
+The Edge-native classroom leverages `ai-elements` to render incoming `StatelessEvent` streams seamlessly:
+- **The Student Immersive Interface**: Subscribes to the `/sse` stream. Parses `action` arrays (tool executions, pop quizzes) as inline widgets or "Thinking" states, while `text` items type natively into the chat.
+- **The "Pulse" Whiteboard Pipeline**: Renders synchronized SVG whiteboards dynamically controlled by the Teacher Agent (`wb_highlight`, `wb_show_image`), drawing exactly in sync with the typing speed of the speech chunks.
+- **Teacher & Admin Escalate View**: Provides administrators a 3-pane live supervision perspective (Graph Pipeline Logs / Shadow Whiteboard / Intervention Chat). Human instructors can push a `type: "escalation"` event to forcibly halt the checkout loop and override the AI in real-time.
+
 ## 20. Event Bus & Routine Specification
 
 The Agentic School operates on a "Reactive Backbone" instead of polling.
@@ -954,6 +1043,8 @@ To ensure high-availability at the edge, EdApex V2 handles common failure modes 
 - **Max Concurrency**: 5,000 active agents per tenant cluster.
 - **Storage Strategy**: D1 for relational state; R2 for artifact blobs; KV for fast-path policy evaluation.
 - **Availability Target**: 99.9% uptime for the Edge HMAS bridge.
+- **Edge Worker Lifecycles**: Strict 10ms execution times are honored. The Live `DirectorGraph` explicitly yields execution loops between node ticks to stream chunks cleanly.
+- **Inertial Conflict Resolution**: In multi-observer instances (student/admin views), TanStack DB caches offline chat inputs locally, merging intelligently when SSE confirms synchronization against the canonical state.
 
 ## 26. Token Optimization & Delta Telemetry
 
@@ -1108,7 +1199,7 @@ Follow this sequence to initialize a new Agentic School tenant:
 - [ ] **Events**: Register domain-specific handlers in the [events/](src/events/) layer.
 - [ ] **Pulse**: Enable the `Heartbeat` stream in the Command Center properties panel.
 
-## 36. 17-Domain Drizzle Schema Reference (Cross-Walk)
+## 36. 18-Domain Drizzle Schema Reference (Cross-Walk)
 
 | V2 Domain | Drizzle Schema File (src/db/sqlite/) | Primary Table Export |
 | :--- | :--- | :--- |
@@ -1116,6 +1207,7 @@ Follow this sequence to initialize a new Agentic School tenant:
 | **AI** | `domain-ai.ts` | `aiAgents`, `aiAgentActions` |
 | **Assessment** | `domain-assessment.ts` | `exams`, `computedResults` |
 | **Attendance** | `domain-attendance.ts` | `attendanceLogs` |
+| **Classroom** | `domain-classroom.ts` | `classroomSessions`, `classroomMemoryLedger`, `classroomParticipants`, `classroomWhiteboardState` |
 | **CMS** | `domain-cms.ts` | `pages`, `newsPosts` |
 | **Communication**| `domain-communication.ts` | `broadcasts`, `threads` |
 | **Core** | `domain-core.ts` | `tenants`, `users` |
@@ -1130,7 +1222,7 @@ Follow this sequence to initialize a new Agentic School tenant:
 | **PBAC** | `domain-pbac.ts` | `policies`, `roleGrants` |
 | **Settings** | `domain-settings.ts` | `schoolConfigs` |
 
-## 38. Canonical Directory Structure (The 17-Domain Layout)
+## 38. Canonical Directory Structure (The 18-Domain Layout)
 
 To ensure 100% logic parity and strict adherence to the **Backend Feasibility & Risk Index (BFRI)**, EdApex V2 employs the following standardized hierarchy:
 

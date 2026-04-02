@@ -14,6 +14,7 @@ export * from "./domain-library.js";
 export * from "./domain-pbac.js";
 export * from "./domain-settings.js";
 export * from "./domain-lms.js";
+export * from "./domain-classroom.js";
 
 import { users, accounts, sessions, authAccounts, authVerifications } from "./domain-core.js";
 import { aiChats, aiMessages } from "./domain-ai.js";

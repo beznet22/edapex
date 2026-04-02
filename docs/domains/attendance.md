@@ -24,7 +24,7 @@ V2 utilizes a single `attendances` table to consolidate all tracking logic, redu
 ## 🤖 AI & Automation Layer
 
 ### Event-Driven Triggers
-All attendance mutations emit `attendance.marked` or `attendance.updated` events to the `events` table for downstream processing.
+All attendance mutations emit `attendance.marked` or `attendance.updated` events to the `events` table for downstream processing. *Note: Live sessions in Domain 18 (Agentic Classroom) automatically emit `attendance.marked` events for students validated via `classroomParticipants`, eliminating manual roll-call.*
 
 ### Anomaly Detection Agents
 - **Mass Absenteeism Alert**: Triggers when absenteeism in a specific `class_id` or `section_id` exceeds a tenant-defined threshold (>20%), flagging potential health outbreaks or pedagogical issues.

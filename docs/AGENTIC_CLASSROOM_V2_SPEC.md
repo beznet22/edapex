@@ -1,0 +1,192 @@
+# EdApex V2: Agentic Classroom Technical Specification
+
+This document provides a low-level technical specification for the **Agentic Classroom** feature within EdApex V2. It synthesizes the orchestration patterns from the `AGENTIC_SCHOOL_V2_PLAN.md`, the EdApex multi-tenant structure, and a deep architectural integration of the **OpenMAIC Execution Framework** (Stateless LangGraph Orchestration & Incremental Parsing) into a newly minted **18th EdApex Domain**.
+
+---
+
+## 1. System Overview
+
+The **Agentic Classroom** is an autonomous, scalable educational environment powered by a Hierarchical Multi-Agent System (HMAS). It provides real-time AI-driven instruction, assessment, and multi-agent collaboration seamlessly embedded within the EdApex ecosystem.
+
+### Core Capabilities
+- **Multi-Agent Orchestration**: Specialized coordination between a `Director Agent` (the classroom orchestrator), `Teacher Agents` (instruction), `Assistant Agents` (Q&A), and `Evaluator Agents` (grading).
+- **Stateless Server-Sent Events (SSE)**: Due to Cloudflare's strict limitations on persistent WebSockets in Edge/Free tiers, the classroom operates on a unidirectional single-pass generation flow over **SSE**. Tool executions and dialogue are streamed simultaneously as JSON arrays, parsed incrementally at the edge and dispatched to the browser.
+- **Adaptive Execution Paths**: The LangGraph state machine dynamically shifts conversation focus based on student responses, budget policies, and domain triggers.
+
+### Modes of Operation
+- **Fully Integrated Mode**: Functions as a deep extension of EdApex. Lives alongside Academics, Finance, PBAC, creating a dense interconnected web under standard school tenancy.
+- **Standalone Mode**: Configurable via the **Settings domain**, decoupling the classroom to function independently for scalable B2C retail deployments.
+
+---
+
+## 2. Backend Architecture: The OpenMAIC Integration
+
+The backend synthesizes EdApex's strict local-first repository pattern with OpenMAIC's stateless LangGraph abstractions.
+
+### The Stateless LangGraph State Machine
+The Agentic Classroom ditches synchronous polling in favor of a **LangGraph StateGraph** (`director-graph.ts`):
+1. **Director Node**: Triggers initially or on user messages. Analyzes the `FatContext` and determines which agent (or the human student) should act next via an LLM execution pass.
+2. **Agent Node**: Hydrates context. Yields streaming **interleaved structured outputs** (`[{"type":"action", ...}, {"type":"text", ...}]`).
+3. **Execution Loop**: The `stateless-generate.ts` runner chunks incomplete JSON streams natively. `text` parts stream to the UI chat, while `action` items immediately execute Mastra tools in the background. 
+4. **Resolution**: Dehydrated `StatelessEvent` streams are committed natively to EdApex's relational memory (the Classroom Domain) before yielding to avoid edge CPU timeouts.
+
+### Memory & Context Abstractions
+- **Short-Term (Stateless Memory)**: Handled externally via the `classroom_memory_store` buffer in the new Domain 18. Each run reconstructs the `StatelessChatRequest` by hydrating recent classroom events.
+- **Persistent Compaction**: Evaluator agents passively compress rolling token histories into `WorkProducts` in the `domain-documents` store to enforce budget constraints across long sessions.
+- **Tool Sandbox**: PBAC evaluations encapsulate all tool calls (`action` parts) securely before interfacing with internal EdApex routes.
+
+---
+
+## 3. Introducing Domain 18: `domain-classroom.ts`
+
+Our deep analysis indicates that `domain-lms`, `domain-academic`, and `domain-ai` possess strict contextual silos (courses vs. terms vs. raw telemetry). Bleeding live-class collaboration logic into these disrupts architectural boundaries.
+
+To resolve this, we mandate the creation of a dedicated **18th Domain: `domain-classroom.ts`**.
+
+### `classroomSessions` (Core)
+- `id` (uuid, pk)
+- `tenantId` (uuid, fk, not null)
+- `courseId` (uuid, fk) -> Links to `domain-lms.ts : lmsCourses`
+- `directorAgentId` (uuid, fk) -> Links to `domain-ai.ts : aiAgents`
+- `status` (enum: scheduled | active | paused | completed)
+- `metadata` (jsonb) -> Tracks current `LangGraph` node states.
+
+### `classroomParticipants` (Roster)
+- `id` (uuid, pk)
+- `tenantId` (uuid, fk, not null)
+- `sessionId` (uuid, fk, not null)
+- `userId` (uuid, fk, not null) 
+- `role` (enum: student | human_observer)
+- `engagementScore` (real) -> Dynamically updated by Evaluator Agents.
+
+### `classroomMemoryLedger` (LangGraph Buffer)
+Replaces `domain-ai`'s generic generic chat tables to handle OpenMAIC interleaving arrays natively.
+- `id` (uuid, pk)
+- `tenantId` (uuid, fk, not null)
+- `sessionId` (uuid, fk, not null)
+- `turnCount` (int, not null) -> Matches `director-graph.ts`'s turnCount tracker.
+- `role` (enum: user | assistant | director_node_log)
+- `parsedContent` (jsonb) -> The flattened sequence of `{ type: "action" | "text", content: ... }` generated by the graph stream.
+
+### `classroomWhiteboardState` (WhiteboardLedger Replica)
+- `id` (uuid, pk)
+- `tenantId` (uuid, fk, not null)
+- `sessionId` (uuid, fk, not null)
+- `timeline` (jsonb) -> A replica of the `whiteboardLedger` abstraction utilized by OpenMAIC agents (`wb_spotlight`, `wb_highlight` actions).
+
+---
+
+## 4. Frontend / UI Architecture
+
+The frontend orchestrates `ai-elements` to render the stream natively without lag, embedded perfectly within the TanStack Start edge-routing layout.
+
+### 4.1 The Student Immersive Interface
+The UI subscribes to an `/sse` stream from the Hono API. It parses `StatelessEvent` chunks identically. An `action` array item immediately draws a "Thinking" UI or an inline tool widget (like popping an exam overlay), while `text` items type out cleanly in the `ai-elements` chat.
+
+```text
++--------------------------------------------------------+
+|  EDAPEX V2: LIVE CLASSROOM                  [ Leave ]  |
++--------------------------------------------------------+
+|                                  |                     |
+|         TEACHER'S PULSE          |     CHAT STREAM     |
+|           WHITEBOARD             |                     |
+|                                  |  [Teacher Agent]    |
+|   +--------------------------+   |  Let's solve for x. |
+|   |         b ± √(b² - 4ac)  |   |                     |
+|   |   x = ------------------ |   |  > [wb_highlight]   |
+|   |              2a          |   |                     |
+|   +--------------------------+   |                     |
+|                                  |                     |
+|   [ Tool Overlay: Pop Quiz ]     |   [ User Input ]    |
+|   > What is the value of 'a'?    |   > [ Send msg ]    |
+|                                  |                     |
++--------------------------------------------------------+
+```
+
+### 4.2 The "Pulse" Whiteboard Pipeline
+Built explicitly for `wb_...` commands. As the Teacher Agent speaks to a concept, an interleaved `action` element strictly tells the frontend to zoom/pan the digital whiteboard SVG natively in sync with the typing speed of the `text` chunks. The `classroomWhiteboardState` acts as the document of record upon device drop and reconnection.
+
+### 4.3 Teacher & Admin Escalate View (Command Center)
+
+Administrators watch the live LangGraph execution pipeline deep inside the Edge command center utilizing the standard 3-pane shell.
+
+```text
++-----------------------------------------------------------------+
+|  EDAPEX V2: COMMAND CENTER - LIVE SESSION SUPERVISION           |
++-----------------------------------------------------------------+
+|  GRAPH PIPELINE LOGS |    SHADOW WHITEBOARD   |  INTERVENTION   |
+|                      |                        |                 |
+|  [Director Node]     |                        |  [Chat Stream]  |
+|  > Picked Teacher    |    +--------------+    |  Agent: "..."   |
+|                      |    |              |    |  User: "lost"   |
+|  [Teacher Node]      |    | Live Canvas  |    |                 |
+|  > stream_event      |    |              |    |  [ TAKE OVER ]  |
+|  > wb_highlight      |    +--------------+    |                 |
+|                      |                        |  Human Input:   |
+|  [Evaluator Node]    |  Observer: Admin       |  > Let me step  |
+|  > generating RAG    |  Roster Score: 88%     |    in here.     |
++-----------------------------------------------------------------+
+```
+
+- **Escalation Trigger**: Human instructors can manually push an event with `type: "escalation"` into the `classroom_memory_ledger`, forcibly halting the ongoing LangGraph checkout loop and assuming socket ownership to instruct the student directly.
+
+---
+
+## 5. Domain Integration Mapping (Cross-Walk)
+
+| Domain | Integration Point | Linkage / Foreign Key Strategy |
+| :--- | :--- | :--- |
+| **Academic** | Feeds curriculum contexts. | `classroomSessions.courseId` (polymorphic to class). |
+| **AI** | Orchestration budget & adapters. | `domain-ai` handles token `costEvents` per heartbeat check. |
+| **Assessment**| Live grading tools. | Teacher Agent issues `action` to evaluate in-stream logic. |
+| **CMS** | Reading material. | RAG index vectors generated natively from CMS articles. |
+| **Core** | Standard Authentication. | Tenant validation enforced across all socket endpoints. |
+| **Documents** | Saving transcripts. | Graph ends -> triggers `saveToPolymorphicArtifact` action. |
+| **Finance** | Billing for tutors. | Hooks evaluate `.budget()` before initiating execution loops. |
+| **HR** | Supervisor maps. | Defines escalation paths to live human staff. |
+| **LMS** | Course boundaries. | Sessions pull the `lmsModules` as the Director's blueprint. |
+| **PBAC** | Gatekeeper rules. | Pre-flight tool policy blocks dangerous `action` events. |
+| **Settings** | Standalone Switch. | Decouples Classroom Domain from ACADEMIC + HR hooks. |
+| **Classroom**| **(NEW DOMAIN 18)** | The definitive source of truth for the session state machine. |
+
+---
+
+## 6. Execution Flows: The Director Graph Loop
+
+The OpenMAIC architecture fits precisely into the **EdApex 5-Phase Execution Lifecycle** enforced by the Routine Engine:
+
+### Phase 1 & 2: Trigger & Zod Validation
+- CRON emits `ON_SESSION_START` into the `classroom` bus or a student sends a chat.
+- The payload passes through `validators/` ensuring exact payload bounds before hitting the `Router`.
+- `TenantGuard` middleware asserts the `tenant_id` context.
+
+### Phase 3: Atomic Checkout
+- The `DomainService` (Classroom logic) performs an atomic checkout to lock the active session run, blocking race events from multiple human observers.
+
+### Phase 4: LangGraph Execution
+- Backend spins up the OpenMAIC `createOrchestrationGraph()`.
+- The `DirectorAgent` takes turn 0, picking the `TeacherAgent` to speak.
+- `TeacherAgent` produces JSON output incrementally via `stateless-generate.ts`.
+- Edge node buffers the `[` array tokens and uses `partial-json` parser to stream deltas via the Hono SSE pipe.
+- State is hydrated back to `classroomMemoryLedger` so the edge worker can safely yield under the **10ms CPU limit**.
+
+### Phase 5: Artifact & Emit
+- The LangGraph concludes its single-pass loop.
+- The atomic lock is released.
+- Evaluator Agents may generate passive `WorkProduct` payload arrays containing grading reports, pushing them into `domain-documents`.
+- An internal `CLASSROOM_TURN_COMPLETE` bus event is fired.
+
+---
+
+## 7. Standalone Mode Configuration
+
+To serve the dual-pillar retail model:
+If `Settings.isStandalone() == true`, the Hono controllers explicitly ignore dependency lookups against `domain-academic` and `domain-hr`. The `domain-classroom` operates freely exclusively linked to `domain-lms` (the course content provider) and `domain-core` (the tenant user base), utilizing Stripe checkout webhooks for isolated billing separate from the enterprise ledger.
+
+---
+
+## 8. Scalability & Edge Robustness 
+
+- **Edge Worker Lifecycles**: Strict 10ms execution times are honored. The `DirectorGraph` yields immediately after every major node execution. Long inference generation steps (LLM calls) are streamed over Edge bounds securely.
+- **Inertial Conflict Resolution**: In multi-observer instances, TanStack DB (local) caches chat inputs until SSE confirms state alignment with D1/SQLite bounds. 
+- **Security Checkpoints**: PBAC validations intercept parsed `action` items immediately upon regex detection within the partial-JSON stream, throwing hard `403` signals prior to external tool execution boundaries.

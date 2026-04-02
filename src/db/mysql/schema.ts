@@ -14,6 +14,7 @@ export * from "./domain-library";
 export * from "./domain-pbac";
 export * from "./domain-settings";
 export * from "./domain-lms";
+export * from "./domain-classroom";
 
 import { users, accounts, sessions, authAccounts, authVerifications } from "./domain-core";
 import { aiChats, aiMessages } from "./domain-ai";
