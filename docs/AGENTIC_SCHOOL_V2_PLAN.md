@@ -39,11 +39,11 @@
 - [36. 18-Domain Drizzle Schema Reference (Cross-Walk)](#36-18-domain-drizzle-schema-reference-cross-walk)
 - [38. Canonical Directory Structure (The 18-Domain Layout)](#38-canonical-directory-structure-the-18-domain-layout)
 - [39. Implementation Detail: The Directory Flow](#39-implementation-detail-the-directory-flow)
-- [41. Logging & Traceability (8-Layer Namespacing)](#41-logging--traceability-8-layer-namespacing)
-- [42. Error Propagation & Resilience Pattern](#42-error-propagation--resilience-pattern)
-- [43. Notification System (Toasts & Push)](#43-notification-system-toasts--push)
-- [44. Proactive AI Issue Tracking](#44-proactive-ai-issue-tracking)
-- [40. Conclusion: Towards the Autonomous School](#40-conclusion-towards-the-autonomous-school)
+- [40. Logging & Traceability (8-Layer Namespacing)](#40-logging--traceability-8-layer-namespacing)
+- [41. Error Propagation & Resilience Pattern](#41-error-propagation--resilience-pattern)
+- [42. Notification System (Toasts & Push)](#42-notification-system-toasts--push)
+- [43. Proactive AI Issue Tracking](#43-proactive-ai-issue-tracking)
+- [44. Conclusion: Towards the Autonomous School](#44-conclusion-towards-the-autonomous-school)
 
 
 ## 1. Document Role & Scope
@@ -1310,7 +1310,7 @@ Violations yield a `429 Too Many Requests` response, halting execution pre-fligh
 - **Data Persistence**: All agentic state changes pass through the `validators/` before hitting the `domain/repositories/`.
 - **Reactive Backbone**: The `events/` directory manages the decoupling of agent actions from high-latency side effects (notifications, audits).
 
-## 41. Logging & Traceability (8-Layer Namespacing)
+## 40. Logging & Traceability (8-Layer Namespacing)
 
 To achieve granular visibility into the Agentic School's internal operations, EdApex V2 enforces standardized structured logging across the entire stack.
 
@@ -1319,7 +1319,7 @@ To achieve granular visibility into the Agentic School's internal operations, Ed
 - **Backend Implementation**: A Cloudflare-optimized structured JSON logger (`src/utils/logger.ts`).
   - Usage Example: `logger.child({ layer: 'services', domain: 'finance' })`.
 
-## 42. Error Propagation & Resilience Pattern
+## 41. Error Propagation & Resilience Pattern
 
 Every error follows a type-safe resilience chain from the persistent storage to the user-interface:
 
@@ -1327,19 +1327,19 @@ Every error follows a type-safe resilience chain from the persistent storage to 
 2.  **Controller**: Inherits from `BaseController` which catches unhandled exceptions and maps them to standardized Hono JSON envelopes (Hono RPC).
 3.  **Frontend (TanStack Query)**: A global interceptor in the Query Client catches error responses and maps them to the **UI Notification System**.
 
-## 43. Notification System (Toasts & Push)
+## 42. Notification System (Toasts & Push)
 
 - **Frontend Toasts (Sonner/Shadcn)**: Immediate, high-visibility feedback for human-triggered actions and critical agentic outcomes.
 - **Agent Pulse Toasts**: Low-priority "Ghost" notifications in the property panel that visualize granular agent heartbeat ticks without cluttering the main thread.
 - **Reactive Push**: The `Internal Event Bus` triggers the `Communication Service` to dispatch WebPush or SMS alerts for high-urgency reactive events (e.g., `ON_PBAC_VIOLATION`).
 
-## 44. Proactive AI Issue Tracking
+## 43. Proactive AI Issue Tracking
 
 The Agentic School is self-healing via the **IT Supervisor's Auditor Agents**:
 
 - **Anomaly Detection**: Background agents scan the `cost_events` and `agent_runs` tables for failed tokens or frequent status errors.
 - **Audit Proposals**: When a pattern is detected (e.g., "Recursive tool error in HR Domain"), the AI Auditor creates a `SECURITY_INCIDENT` or `SYSTEM_ISSUE` WorkProduct in the **Board Command Center**.
 
-## 45. Conclusion: Towards the Autonomous School
+## 44. Conclusion: Towards the Autonomous School
 
 The transformation of EdApex V2 into an Agentic School represents a paradigm shift in educational infrastructure. By synthesizing local-first performance, hierarchical multi-agent orchestration, and strict financial governance, we provide a robust, build-ready blueprint for the future of school management...
