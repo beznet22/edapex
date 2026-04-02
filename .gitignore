@@ -13,6 +13,7 @@ node_modules
 /temp
 /cache
 /paperclip
+/OpenMAIC
 
 # System
 .system

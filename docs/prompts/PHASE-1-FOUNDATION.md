@@ -48,3 +48,7 @@ Create `src/services/ai/heartbeat.service.ts` to manage the autonomous agent wak
 - [ ] All automated tests passed.
 - [ ] Code staged and committed with AI attribution.
 - [ ] Update `docs/PROJECT_ROADMAP.md` (Phase 1 marked as COMPLETE).
+
+### 4. Edge Middleware Integrity
+- Implement standard Rate Limiting ceilings (e.g. 50/min human, 1000/min AI) inside `middleware/` to protect D1 infrastructure from DDoS.
+- Introduce `BaseCurrency` and `Locale` to the Tenant Settings schema for explicit i18n support.

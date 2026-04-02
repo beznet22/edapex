@@ -49,3 +49,7 @@ Generate the 31+ specialized agent definitions in `src/services/ai/roles/`.
 - [ ] All automated tests passed.
 - [ ] Code staged and committed with AI attribution.
 - [ ] Update `docs/PROJECT_ROADMAP.md` (Phase 2 marked as COMPLETE).
+
+### 4. Privacy & Operator Controls
+- Implement an automated PII Obfuscation Middleware to pre-process LLM queries before standard payload generation mapping.
+- Ensure all B2C Sub-Agents contain an explicit `request_human_operator` tool, pausing execution and handing off the `thread_id` to standard operators.

@@ -19,7 +19,7 @@ export class SyncService {
 
     // 2. Fetch Differential Updates (Exams, Setups, Marks)
     const updatedSince = lastSyncToken ? new Date(lastSyncToken) : undefined;
-    const exams = await assessmentRepo.getExams(tenantId, 1, updatedSince);
+    const exams = await assessmentRepo.getExams(tenantId, "", updatedSince);
     
     // 3. Construct Response
     return {

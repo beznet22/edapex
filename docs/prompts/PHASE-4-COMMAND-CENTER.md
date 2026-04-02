@@ -50,3 +50,7 @@ Implement the reconciliation logic between **TanStack DB** and **Cloudflare D1**
 - [ ] All automated tests passed.
 - [ ] Code staged and committed with AI attribution.
 - [ ] Update `docs/PROJECT_ROADMAP.md` (Phase 4 marked as COMPLETE).
+
+### 4. Real-Time Telemetry & Resiliency
+- Implement unidirectional edge streams utilizing standard Server-Sent Events (SSE) for sub-150ms "Agent Pulse Toasts".
+- Enforce "Snapshot Hydration Flow", completely restoring the Local-First IndexedDB from D1 Point-in-Time Recoveries upon empty cache startup states.

@@ -20,6 +20,8 @@ This roadmap outlines the strategic evolution of EdApex V2 into an autonomous "A
 - [ ] **Atomic Checkout**: Implement distributed locking in the AI sub-domain for multi-agent safety.
 - [ ] **Financial Ledger**: Implement `cost_events` and `finance_events` schemas and their respective `IRepository<T>` implementations.
 - [ ] **Agent Pulse (API)**: Expose the real-time activity stream via Hono RPC (`src/routes/ai.ts`).
+- [ ] **Edge Middleware & Rate Limiting**: Implement strict ceilings (50/min human, 1000/min AI) to protect D1 infrastructure from DDoS.
+- [ ] **Metadata i18n Strategy**: Configure `BaseCurrency` and `Locale` in the Tenant Settings schema.
 
 ---
 
@@ -29,16 +31,22 @@ This roadmap outlines the strategic evolution of EdApex V2 into an autonomous "A
 - **Role Deployment**: Implementation of the 31+ specialized Staff Roles (Registrar, Bursar, HR Manager, etc.).
 - **Supervisor Logic**: Principal Assistant logic for cross-domain goal decomposition.
 - **Mastra Integration**: Verification of JSON tools against the 17-domain repositories.
+- **Data Privacy (GDPR/NDPR)**: Implement the PII Obfuscation Middleware to pre-process LLM queries.
+- **Operator Handoff**: Equip all B2C agents with the `request_human_operator` tool for explicit human escalation.
 
 ### Phase 3: Domain Alignment & Anti-Corruption Layer (ACL)
 - **Service Transformation**: Refactoring business logic from Paperclip into native `src/services/` for all 17 domains.
 - **Entity Mapping**: Implementing the ACL to bridge Mastra outputs to Drizzle entities.
 - **Internal Event Bus**: Reactive triggers for cross-domain side effects (e.g., Attendance -> Notification).
+- **External Webhooks Vault**: Implement facade tools for third-party HTTP egress (Stripe, Termii) without exposing raw API keys to agents.
+- **Binary Delegation Map**: Wire the Document Service to map generated `HTMLContent` strings to the `html2pdf` binary execution bridge.
 
 ### Phase 4: Command Center UI (TanStack Start)
 - **Shell Implementation**: The 3-pane dashboard with Tailwind CSS v4 and glassmorphism.
 - **TanStack DB Sync**: Local-first state management with background D1 reconciliation.
 - **AI-Elements**: Chat and Artifact viewer integration in the main viewport.
+- **Real-Time Telemetry (SSE)**: Implement unidirectional edge streams for sub-150ms "Agent Pulse Toasts".
+- **Snapshot Hydration Flow**: Complete Disaster Recovery implementation for restoring IndexedDB from D1 PITR states.
 
 ### Phase 5: Governance & Proactive Auditing
 - **PBAC Security**: Edge-native policy evaluation for all agentic actions.

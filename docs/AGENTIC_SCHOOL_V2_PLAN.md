@@ -214,6 +214,10 @@ All Agents in EdApex V2 follow a strict state transition model:
 - `ERROR`: Terminal execution failure; requires manual reset.
 - `TERMINATED`: Decommissioned.
 
+### 5.5 Human-in-the-Loop "Hand-off" Protocol
+- **Constraint**: If a B2C Agent (e.g., Home Mentor) hallucinates or cannot interpret user intent, the user must not be deadlocked.
+- **Solution**: The **Escalation Edge Case**. The agent inherently possesses a `request_human_operator` tool. Upon invocation, the `thread_id` is paused and rerouted to the Command Center inbox where a human School Administrator assumes control of the context window.
+
 ## 6. API & Communication Architecture
 
 EdApex V2 mandates end-to-end type safety via **Hono RPC**.
@@ -228,6 +232,11 @@ The frontend MUST avoid ad-hoc `fetch` or `axios` calls. Communication is conduc
 API endpoints in `controllers/` act as the entry point for the **Anti-Corruption Layer (ACL)**:
 - **Tenant Context**: Every endpoint injects the `tenant_id` from the PBAC/Auth session.
 - **Repository Injection**: Controllers delegate to the `DomainService`, which uses the `IRepository<T>` for the selected dialect (`D1`, `MySQL`, etc.).
+
+### 6.3 Real-Time Telemetry & The SSE Pattern
+- **Constraint**: Cloudflare Workers (Free Tier) enforce strict limitations on persistent WebSocket connections.
+- **Solution**: The UI "Agent Pulse Toasts" and Command Center reactivity are powered via **Server-Sent Events (SSE)**. The edge emits unidirectional event streams (`ON_PBAC_VIOLATION`, `AGENT_HEARTBEAT`) to the browser.
+- **Scalability**: The system architecture makes room for a future upgrade to **Cloudflare Durable Objects** for bidirectional WebSocket state when scaling beyond the free tier.
 
 ## 7. Canonical Data Model (V2)
 
@@ -341,6 +350,10 @@ EdApex V2 enforces a "Zero-Trust Agent" model. Every tool execution is evaluated
 ### 10.2 Resource Isolation
 - **Row-Level Security (RLS)**: Emulated at the Repository layer using `where(eq(schema.tenant_id, context.tenant_id))`.
 - **Credential Injection**: `company_secrets` are injected only into the process environment of the individual tool execution, never stored in the main Agent Run context.
+
+### 10.3 External Third-Party Integrations (The Webhooks Gateway)
+- **Constraint**: Task Agents (like the Bursar) require access to external APIs (e.g., Stripe, Termii SMS) without exposing raw API keys to the LLM context.
+- **Solution**: The **External Vault** and **Egress Policy**. Keys are stored encrypted in `tenant_settings`. Agents call internal facade tools (`trigger_payment`, `dispatch_sms`) rather than performing raw HTTP requests. The Hono controller decrypts the key and executes the external call, ensuring zero LLM API key leakage.
 
 ## 11. Professional Code Flow (The 5-Phase Lifecycle)
 
@@ -622,6 +635,19 @@ Each role is a specialized Mastra Agent with its own `SKILL.md` manifest and a r
 - **Maximizer Mode**: Proactive auditor agents scanning for inefficiencies in school metadata and creating Board Proposals.
 - **Work Product Registry**: Tracks artifacts ([Result](file:///home/beznet/Workspace/edapex/paperclip/ui/src/api/agents.ts#36-44)) separate from conversation history, allowing for clean structured data extraction and auditing.
 
+### 14.7 Document & Artifact Generation (The Binary Bridge)
+- **Constraint**: Edge networks (Cloudflare Workers) do not natively support headless browser environments or `child_process` execution for PDF rendering.
+- **Solution**: The Agentic School adapts the V1 MVP `html2pdf` binary execution pattern for heavy document artifacts (e.g., transcripts, invoices) while ensuring edge-compatibility.
+- **The Execution Flow**:
+    1. **Agent Output**: Instead of attempting to stream complex PDFs directly, Mastra Task Agents generate rich, standardized `HTMLContent` strings (using Tailwind tokens).
+    2. **Binary Delegation**: The `DocumentsService` delegates the HTML payload to a localized `generate({ htmlContent, fileName, preview })` utility.
+    3. **Container Bridge**: To bypass Edge constraints, this specific operation is either deferred to a Dockerized companion service (or Cloudflare Container) that mounts `/bin/html2pdf` and securely executes the transformation in a UUID-isolated `/temp` directory using `JSZip` and `fs`.
+    4. **Artifact Storage**: The resulting `.pdf` buffer (or `.zip` for image previews) is flushed to Cloudflare R2, and a permanent `WorkProduct` record is appended to the `documents` domain registry.
+
+### 14.8 Data Privacy & PII Obfuscation (GDPR/NDPR)
+- **Constraint**: Providing raw student data (names, medical conditions) to external LLM providers (OpenAI/Anthropic) violates privacy compliance.
+- **Solution**: An automated **PII Obfuscation Middleware** sits within the `StandardAdapterRegistry`. Before goals are dispatched, identifying fields are tokenized (e.g., replacing "John Doe" with `[STUDENT_A]`). The output is de-tokenized when returned to the Edge, ensuring zero PII leak to AI providers.
+
 ## 15. Low-Level API Reference (Hono RPC)
 
 End-to-end type safety is achieved by exporting the `AppType` from the Hono server.
@@ -736,6 +762,11 @@ Defines every AI agent available in the tenant.
 - **Adapter**: `openai-o3-mini`, `anthropic-claude-3-7-sonnet`, `gemini-2.0-flash`.
 - **Permission Scope**: List of Hono route groups (e.g., `["academic.*", "finance.read"]`).
 - **Reporting Lines**: Parent agent ID (Principal Assistant or Domain Supervisor).
+
+### 16.3 Multi-Currency, i18n, & Regional Localization
+To support borderless B2B constraints, metadata manifests explicitly define:
+- **BaseCurrency**: The unified currency code (e.g., `USD`, `NGN`) for rendering `amount_cents` ledgers.
+- **Locale**: The region standard (e.g., `en-GB`, `fr-CA`) governing date formats. This is injected into the Mastra context, ensuring generated PDF Artifacts match regional standards dynamically.
 
 ## 17. Finalized Phased Roadmap
 
@@ -911,6 +942,10 @@ To ensure high-availability at the edge, EdApex V2 handles common failure modes 
 - **Hallucination Guard**: Agents must cross-reference at least two tools or repository views before performing a `DELETION` or `FINANCIAL_EVENT`.
 - **Retry Policy**: Exponential backoff (max 5 retries) for all `toolCall` failures, backed by KV-stored error state.
 - **Manual Override**: The Board can kill any `runId` via the Hono API Gateway, regardless of agent status.
+
+### 23.1 Disaster Recovery & Local-First Resync
+- **The Wipe Scenario**: If a physical device clears its IndexedDB before a sync, or a D1 point-in-time corruption occurs.
+- **Recovery Protocol**: The tenant implements a **Snapshot Hydration Flow** fetching the last validated D1 Point-in-Time Recovery (PITR) state. The browser automatically clones the canonical cloud state down to IndexedDB upon the next authenticated login before resuming operations.
 
 ## 24. Performance & Scalability (V2 Metrics)
 
@@ -1119,6 +1154,12 @@ src/
 ├── app.ts               # Hono App instance configuration
 └── server.ts            # Bootstrapper & Dependency Injection
 ```
+
+### 38.1 Edge Rate Limiting & DDoS Protection (Availability)
+To protect Cloudflare D1 quotas and AI token budgets from malicious floods, the `middleware/` layer enforces distinct Rate Limiting ceilings:
+- **Human Interfaces**: 50 req/min limits (Standard).
+- **Agent Interfaces**: 1,000 req/min limits (Mastra Orchestration/System).
+Violations yield a `429 Too Many Requests` response, halting execution pre-flight before any Cloudflare AI inference costs are incurred.
 
 ## 39. Implementation Detail: The Directory Flow
 - **Request Handlers**: All UI interactions (Agent Pulse, Artifacts) enter via `controllers/`.

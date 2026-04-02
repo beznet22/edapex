@@ -45,3 +45,7 @@ Implement the logic for all 17 domains in their respective `src/services/` files
 - [ ] All automated tests passed.
 - [ ] Code staged and committed with AI attribution.
 - [ ] Update `docs/PROJECT_ROADMAP.md` (Phase 3 marked as COMPLETE).
+
+### 4. Egress & Binary Delegation
+- Construct the  to securely route HTTP requests to third-party providers (Stripe, Termii) via facade tools without exposing raw API keys to LLM environments.
+- Wire the Document Domain Service to cleanly map agent `HTMLContent` strings to the `html2pdf` binary execution bridge.
