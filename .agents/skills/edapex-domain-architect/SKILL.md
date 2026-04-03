@@ -1,6 +1,6 @@
 ---
 name: edapex-domain-architect
-description: Senior Architect for EdApex V2. Use for domain modeling, HMAS orchestration, cross-layer business logic, and operational resilience.
+description: Senior Architect for EdApex V2. Use for code review, code implemention, architect layer, domain modeling, HMAS orchestration, cross-layer business logic, and operational resilience.
 metadata:
   category: discipline
   triggers: new feature, add domain, cross-layer, business logic, architect layer, HMAS, stress defense, agent tool, service design, legacy migration, code review, refactor, local-first, edge-native
