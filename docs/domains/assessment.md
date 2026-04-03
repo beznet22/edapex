@@ -1,7 +1,8 @@
 # Assessment Domain Architecture
 
 ## 🎯 Overview
-The Assessment domain in EdApex V2 unifies physical exam tabulation, continuous assessment, and digital online examinations into a single, strictly-typed relational structure. It replaces the legacy system's reliance on flat mark stores and complex JSON-like parsing with a normalized architecture designed for high-fidelity reporting and AI-driven result computation.
+- **Result Aggregation**: GPA and Grades are calculated via the `result_engine` based on `examSetups` configurations.
+- **[NEW] Professional Persona Flow (The Exams Officer)**: Mr. Ade, the Exams Officer, manages the "Term 3 Result Tabulation" goal. He triggers the `result_engine` to compute GPAs for 2,000 students across 40 subjects. When the `grade_anomaly_detector` flags a mass inflation in Physics, he halts the `portal_agent` sync and reviews the `aiActivityLogs` for grading hallucinations. He uses the Boneyard-powered "Result Heatmap" to identify the error before the `principal_assistant` approves the final PDF transcript generation.
 
 ## 📂 Legacy System Analysis
 
@@ -19,6 +20,10 @@ The Assessment domain in EdApex V2 unifies physical exam tabulation, continuous 
 | `sm_mark_stores` | Raw marks for each setup part. | `examMarks` |
 | `sm_result_stores` | Aggregated totals, GPA, and Grades. | `computedResults` |
 | `sm_exam_schedules` | Date/Time/Room for exams. | `examSchedules` |
+| — (new) | `aiSessions` | [GOVERNANCE] Traceability for grading rubric discussions. |
+| — (new) | `aiTasks` | [GOVERNANCE] Atomic grading and computation tasks. |
+| — (new) | `aiGoals` | [GOVERNANCE] Alignment with regional board exam standards. |
+| — (new) | `aiApprovals` | [GOVERNANCE] Final human-in-the-loop sign-off for transcripts. |
 
 ### Critical Observations
 - **Flat Storage**: Legacy uses `sm_mark_stores` which forces application logic to reconstruct the "Total" mark from multiple rows. V2 handles this via related `examMarks` and a refined `computedResults` table.
@@ -108,12 +113,12 @@ Routes → AssessmentController → AssessmentService → AssessmentRepository
 
 ## HMAS Agent Registry
 
-| Agent | Type | Capabilities |
-|:---|:---|:---|
-| `result_engine` | Task | Bulk GPA/grade computation, ranking, anomaly detection |
-| `assessment_coordinator` | Task | Auto-generate exam setups from policy, portal sync |
-| `grading_agent` | Task | AI-powered submission evaluation, plagiarism filtering |
-| `portal_agent` | Task | External regional portal integration (WAEC/NECO/SAT/IB) |
+| Agent | Type | Capabilities | Link |
+|:---|:---|:---|:---|
+| `result_engine` | Task | Bulk GPA/grade computation, ranking, anomaly detection | [SOUL.md](../strategy/SOUL.md) |
+| `assessment_coordinator` | Task | Auto-generate exam setups from policy, portal sync | [SOUL.md](../strategy/SOUL.md) |
+| `grading_agent` | Task | AI-powered submission evaluation, plagiarism filtering | [SOUL.md](../strategy/SOUL.md) |
+| `portal_agent` | Task | External regional portal integration (WAEC/NECO/SAT/IB) | [SOUL.md](../strategy/SOUL.md) |
 
 ---
 
@@ -125,3 +130,9 @@ Routes → AssessmentController → AssessmentService → AssessmentRepository
 | `assessment.result_calculated` | `{ examId, classId, studentCount }` | Communication (report cards), Events (audit) |
 | `assessment.online_exam_submitted` | `{ attemptId, userId, onlineExamId }` | AI (auto-grading) |
 | `assessment.portal_sync_failed` | `{ examId, error, retries }` | Communication (admin alert) |
+
+---
+
+## UI Documentation (Boneyard)
+- **Mark Entry Sheet**: All high-density mark registers MUST implement `boneyard-js` skeletons for sub-100ms row-by-row saving.
+- **Report Card Preview**: The transcript generator must utilize "Refraction-Pro" glassmorphism cards for live result visualizations before PDF export.

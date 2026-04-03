@@ -32,7 +32,7 @@ export type VehicleMetadata = {
   trackerId?: string;
 };
 
-export const dormitories = sqliteTable("domain_facilities_dormitories", {
+export const dormitories = sqliteTable("dormitories", {
   id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
   tenantId: integer("tenant_id").notNull().references(() => tenants.id),
   name: text("name", { length: 255 }).notNull(),
@@ -44,7 +44,7 @@ export const dormitories = sqliteTable("domain_facilities_dormitories", {
   updatedAt: integer("updated_at", { mode: "timestamp" }).defaultNow(),
 });
 
-export const rooms = sqliteTable("domain_facilities_rooms", {
+export const rooms = sqliteTable("rooms", {
   id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
   tenantId: integer("tenant_id").notNull().references(() => tenants.id),
   dormitoryId: integer("dormitory_id").notNull().references(() => dormitories.id),
@@ -57,7 +57,7 @@ export const rooms = sqliteTable("domain_facilities_rooms", {
   updatedAt: integer("updated_at", { mode: "timestamp" }).defaultNow(),
 });
 
-export const routes = sqliteTable("domain_facilities_routes", {
+export const routes = sqliteTable("routes", {
   id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
   tenantId: integer("tenant_id").notNull().references(() => tenants.id),
   name: text("name", { length: 255 }).notNull(),
@@ -67,7 +67,7 @@ export const routes = sqliteTable("domain_facilities_routes", {
   updatedAt: integer("updated_at", { mode: "timestamp" }).defaultNow(),
 });
 
-export const vehicles = sqliteTable("domain_facilities_vehicles", {
+export const vehicles = sqliteTable("vehicles", {
   id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
   tenantId: integer("tenant_id").notNull().references(() => tenants.id),
   vehicleNo: text("vehicle_no", { length: 100 }).notNull(),
@@ -79,7 +79,7 @@ export const vehicles = sqliteTable("domain_facilities_vehicles", {
   updatedAt: integer("updated_at", { mode: "timestamp" }).defaultNow(),
 });
 
-export const routeAssignments = sqliteTable("domain_facilities_route_assignments", {
+export const routeAssignments = sqliteTable("route_assignments", {
   id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
   tenantId: integer("tenant_id").notNull().references(() => tenants.id),
   routeId: integer("route_id").notNull().references(() => routes.id),
@@ -88,7 +88,7 @@ export const routeAssignments = sqliteTable("domain_facilities_route_assignments
   updatedAt: integer("updated_at", { mode: "timestamp" }).defaultNow(),
 });
 
-export const facilityAllocations = sqliteTable("domain_facilities_facility_allocations", {
+export const facilityAllocations = sqliteTable("facility_allocations", {
   id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
   tenantId: integer("tenant_id").notNull().references(() => tenants.id),
   userId: integer("user_id").notNull().references(() => users.id), // Participant persona
@@ -107,7 +107,7 @@ export const facilityAllocations = sqliteTable("domain_facilities_facility_alloc
 // --- NEW TABLES ---
 
 // Complaints — replaces smComplaints
-export const complaints = sqliteTable("domain_facilities_complaints", {
+export const complaints = sqliteTable("complaints", {
   id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
   tenantId: integer("tenant_id").notNull().references(() => tenants.id),
   complaintBy: integer("complaint_by").notNull().references(() => users.id), // Reporter persona
@@ -126,7 +126,7 @@ export const complaints = sqliteTable("domain_facilities_complaints", {
 }));
 
 // Visitors — replaces smVisitors
-export const visitors = sqliteTable("domain_facilities_visitors", {
+export const visitors = sqliteTable("visitors", {
   id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
   tenantId: integer("tenant_id").notNull().references(() => tenants.id),
   name: text("name", { length: 200 }).notNull(),
@@ -150,7 +150,7 @@ export type InventoryMetadata = {
   expiryDate?: string;
 };
 
-export const inventoryItems = sqliteTable("domain_facilities_inventory_items", {
+export const inventoryItems = sqliteTable("inventory_items", {
   id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
   tenantId: integer("tenant_id").notNull().references(() => tenants.id),
   name: text("name", { length: 255 }).notNull(),

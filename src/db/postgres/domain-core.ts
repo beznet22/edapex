@@ -3,18 +3,18 @@
  * 
  * Purpose:
  * Establishes global platform multi-tenancy utilizing a native `tenant_id` foreign key. 
- * Centralizes identities into a polymorphic-ready `edx_accounts` table, reducing table 
+ * Centralizes identities into a polymorphic-ready `accounts` table, reducing table 
  * bloat and eliminating dual-writes across disparate user tables. Extends type safety 
- * with `metadata` JSON blobs for role-specific attributes, and utilizes `edx_enumerations`
+ * with `metadata` JSON blobs for role-specific attributes, and utilizes `enumerations`
  * for centralized taxonomy mapping.
  * 
  * Replaces Legacy Tables:
- * - sm_schools -> edx_tenants
- * - sm_academic_years -> edx_academic_years
- * - sm_base_setups / sm_base_groups -> edx_enumerations
- * - users / sm_students / sm_staffs / sm_parents -> edx_accounts
+ * - sm_schools -> tenants
+ * - sm_academic_years -> academic_years
+ * - sm_base_setups / sm_base_groups -> enumerations
+ * - users / sm_students / sm_staffs / sm_parents -> accounts
  */
-import { pgSchema, text, doublePrecision, integer, uuid, numeric, smallint, timestamp, jsonb, boolean, date, varchar, index, unique } from "drizzle-orm/pg-core";
+import { pgTable, pgSchema, text, doublePrecision, integer, uuid, numeric, smallint, timestamp, jsonb, boolean, date, varchar, index, unique } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { generateId } from "../utils/id";
 
@@ -242,6 +242,18 @@ export const academicYears = coreSchema.table("academic_years", {
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
+
+export const academicTerms = pgTable("academic_terms", {
+  id: text("id").primaryKey(),
+  tenantId: text("tenant_id").notNull(),
+  academicId: text("academic_id").notNull().references(() => academicYears.id),
+  title: text("title").notNull(),
+  startDate: timestamp("start_date").notNull(),
+  endDate: timestamp("end_date").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 
 // Enumerations — replaces sm_base_setups, sm_student_categories, etc
 export type EnumerationMetadata = {

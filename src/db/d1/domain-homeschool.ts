@@ -4,7 +4,7 @@ import { lmsCourses, lmsLessons, lmsSubmissions } from "./domain-lms";
 import { subjects } from "./domain-academic";
 import { ledgerEntries } from "./domain-finance";
 
-export const homeschoolSubscriptions = sqliteTable("domain_homeschool_subscriptions", {
+export const homeschoolSubscriptions = sqliteTable("subscriptions", {
   id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
   tenantId: integer("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
   academicId: integer("academic_id").notNull().references(() => academicYears.id),
@@ -17,7 +17,7 @@ export const homeschoolSubscriptions = sqliteTable("domain_homeschool_subscripti
   tenantIdx: index("hsub_tenant_idx").on(table.tenantId),
 }));
 
-export const revenueShares = sqliteTable("domain_homeschool_revenue_shares", {
+export const revenueShares = sqliteTable("revenue_shares", {
   id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
   facilitatorId: integer("facilitator_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   period: text("period", { length: 20 }).notNull(), 
@@ -32,7 +32,7 @@ export const revenueShares = sqliteTable("domain_homeschool_revenue_shares", {
   facilPeriodIdx: index("rev_facil_period_idx").on(table.facilitatorId, table.period),
 }));
 
-export const homeschoolPortfolios = sqliteTable("domain_homeschool_portfolios", {
+export const homeschoolPortfolios = sqliteTable("portfolios", {
   id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
   tenantId: integer("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
   userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }), 
@@ -50,7 +50,7 @@ export const homeschoolPortfolios = sqliteTable("domain_homeschool_portfolios", 
   userTenantIdx: index("hs_port_user_tenant_idx").on(table.userId, table.tenantId),
 }));
 
-export const homeschoolSchedules = sqliteTable("domain_homeschool_schedules", {
+export const homeschoolSchedules = sqliteTable("schedules", {
   id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
   tenantId: integer("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
   userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }), 

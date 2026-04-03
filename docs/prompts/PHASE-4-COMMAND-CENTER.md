@@ -84,4 +84,4 @@ Build the live classroom experience as a dedicated TanStack Start route, leverag
   - **Left Pane**: Graph Pipeline Logs (Director Node decisions, Teacher Node stream events, Evaluator RAG operations).
   - **Center Pane**: Shadow Whiteboard (real-time mirror of the student-facing canvas).
   - **Right Pane**: Intervention Chat Stream with a `[TAKE OVER]` button that pushes a `type: "escalation"` event into the `classroomMemoryLedger`, halting the LangGraph loop and transferring control to the human instructor.
-- **Spec Reference**: [AGENTIC_CLASSROOM_V2_SPEC.md](../AGENTIC_CLASSROOM_V2_SPEC.md) (Section 4) and [AGENTIC_SCHOOL_V2_PLAN.md](../AGENTIC_SCHOOL_V2_PLAN.md) (Section 19.5).
+- **Spec Reference**: [AGENTIC_SCHOOL_V2_PLAN.md](../AGENTIC_SCHOOL_V2_PLAN.md) (Section 5.4, 19.5).

@@ -2,7 +2,7 @@
  * ARCHITECTURE OVERVIEW: System Settings Domain
  * 
  * Purpose:
- * Decouples system toggles from hardcoded config files into database-driven `edx_settings`. 
+ * Decouples system toggles from hardcoded config files into database-driven `settings`. 
  * Enforces isolated tenant configurations via `tenant_id` ensuring multi-tenant customization 
  * safety for webhooks, gateways, and layout preferences.
  * 
@@ -25,7 +25,7 @@ import {
 import { tenants } from "./domain-core";
 import { generateId } from "../utils/id";
 
-// Settings Domain - dropped edx_ prefix
+// Settings Domain - dropped  prefix
 
 // --- SETTINGS METADATA TYPES ---
 
@@ -37,6 +37,11 @@ export type GeneralConfig = {
   session?: number;
   schoolCode?: string;
   logo?: string;
+};
+
+export type AcademicConfig = {
+  termStructure: "semesters" | "trimesters" | "quarters" | "custom";
+  termNomenclature: string;
 };
 
 export type FinanceConfig = {
@@ -53,7 +58,41 @@ export type LmsConfig = {
   instructorRevenueShare?: number;
 };
 
-export type SettingConfig = GeneralConfig | FinanceConfig | LmsConfig | Record<string, any>;
+export type HomeschoolConfig = {
+  facilitatorCommissionRate: number;
+  allowPublicPortfolios: boolean;
+  maxStudentsPerFamily?: number;
+};
+
+export type ClassroomConfig = {
+  autoSummarizeThreshold: number;
+  enableLiveWhiteboard: boolean;
+  retentionPolicyDays?: number;
+};
+
+export type CommunicationConfig = {
+  defaultSmsGateway?: string;
+  defaultEmailProvider?: string;
+  enableReadReceipts: boolean;
+};
+
+export type AttendanceConfig = {
+  lateMarkThresholdMinutes: number;
+  requireGeoLocation: boolean;
+};
+
+export type HrConfig = {
+  payrollCycle: "monthly" | "biweekly" | "weekly";
+  enableLeaveAutoApproval: boolean;
+};
+
+export type LibraryConfig = {
+  maxBooksPerStudent: number;
+  finePerDay: number;
+};
+
+
+export type SettingConfig = GeneralConfig | FinanceConfig | LmsConfig | AcademicConfig | Record<string, any>;
 
 export const settings = mysqlTable("settings", {
   id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => generateId()),

@@ -82,4 +82,4 @@ Implement the `ClassroomService` in `src/services/classroom.service.ts` as the A
 - **Whiteboard State Sync**: Buffer `wb_` action payloads from Teacher Agent streams into `classroomWhiteboardState` for device drop/reconnection resilience.
 - **Cross-Domain Events**: Register handlers for `ON_SESSION_START`, `CLASSROOM_TURN_COMPLETE`, and `ON_CLASSROOM_ESCALATION` in `src/events/classroom.events.ts`.
 - **Standalone Mode**: Respect `Settings.isStandalone()` to decouple Classroom from Academic/HR dependencies in B2C retail deployments.
-- **Spec Reference**: [AGENTIC_CLASSROOM_V2_SPEC.md](../AGENTIC_CLASSROOM_V2_SPEC.md) (Sections 2-7) and [AGENTIC_SCHOOL_V2_PLAN.md](../AGENTIC_SCHOOL_V2_PLAN.md) (Sections 7.4, 11.6).
+- **Spec Reference**: [AGENTIC_SCHOOL_V2_PLAN.md](../AGENTIC_SCHOOL_V2_PLAN.md) (Section 5.4, 19.5).

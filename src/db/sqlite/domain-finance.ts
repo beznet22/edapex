@@ -2,7 +2,7 @@
  * ARCHITECTURE OVERVIEW: Finance & Accounting Domain
  * 
  * Purpose:
- * Overhauls the cashflow architecture employing a robust `edx_ledger_entries` model enforcing 
+ * Overhauls the cashflow architecture employing a robust `ledger_entries` model enforcing 
  * transactional duality (credits/debits). Consolidates disparate fee and expense tables onto a 
  * unified chart of accounts linked tightly across the multi-tenant `account_id` space.
  * 
@@ -27,7 +27,7 @@ export type LedgerMetadata = {
   bankId?: string;
 };
 
-export const ledgerEntries = sqliteTable("domain_finance_ledger_entries", {
+export const ledgerEntries = sqliteTable("ledger_entries", {
   id: text("id").primaryKey().$defaultFn(() => generateId()),
   tenantId: text("tenant_id").notNull().references(() => tenants.id),
   transactionType: text("transaction_type", { enum: [
@@ -52,7 +52,7 @@ export const ledgerEntries = sqliteTable("domain_finance_ledger_entries", {
   postedAtIdx: index("ledger_posted_idx").on(table.tenantId, table.postedAt),
 }));
 
-export const feeGroups = sqliteTable("domain_finance_fee_groups", {
+export const feeGroups = sqliteTable("fee_groups", {
   id: text("id").primaryKey().$defaultFn(() => generateId()),
   tenantId: text("tenant_id").notNull().references(() => tenants.id),
   name: text("name", { length: 200 }).notNull(),
@@ -61,7 +61,7 @@ export const feeGroups = sqliteTable("domain_finance_fee_groups", {
   updatedAt: integer("updated_at", { mode: "timestamp" }).defaultNow(),
 });
 
-export const feeTypes = sqliteTable("domain_finance_fee_types", {
+export const feeTypes = sqliteTable("fee_types", {
   id: text("id").primaryKey().$defaultFn(() => generateId()),
   tenantId: text("tenant_id").notNull().references(() => tenants.id),
   feeGroupId: text("fee_group_id").references(() => feeGroups.id),
@@ -71,7 +71,7 @@ export const feeTypes = sqliteTable("domain_finance_fee_types", {
   updatedAt: integer("updated_at", { mode: "timestamp" }).defaultNow(),
 });
 
-export const feeMasters = sqliteTable("domain_finance_fee_masters", {
+export const feeMasters = sqliteTable("fee_masters", {
   id: text("id").primaryKey().$defaultFn(() => generateId()),
   tenantId: text("tenant_id").notNull().references(() => tenants.id),
   feeTypeId: text("fee_type_id").notNull().references(() => feeTypes.id),
@@ -82,7 +82,7 @@ export const feeMasters = sqliteTable("domain_finance_fee_masters", {
   updatedAt: integer("updated_at", { mode: "timestamp" }).defaultNow(),
 });
 
-export const bankAccounts = sqliteTable("domain_finance_bank_accounts", {
+export const bankAccounts = sqliteTable("bank_accounts", {
   id: text("id").primaryKey().$defaultFn(() => generateId()),
   tenantId: text("tenant_id").notNull().references(() => tenants.id),
   bankName: text("bank_name", { length: 255 }).notNull(),
@@ -100,7 +100,7 @@ export const bankAccounts = sqliteTable("domain_finance_bank_accounts", {
 // --- NEW TABLES ---
 
 // Fee Assignments — which fees apply to which students (replaces smFeesAssigns)
-export const feeAssignments = sqliteTable("domain_finance_fee_assignments", {
+export const feeAssignments = sqliteTable("fee_assignments", {
   id: text("id").primaryKey().$defaultFn(() => generateId()),
   tenantId: text("tenant_id").notNull().references(() => tenants.id),
   feeMasterId: text("fee_master_id").notNull().references(() => feeMasters.id),
@@ -121,7 +121,7 @@ export const feeAssignments = sqliteTable("domain_finance_fee_assignments", {
 }));
 
 // Fee Discounts — discount definitions (replaces smFeesDiscounts)
-export const feeDiscounts = sqliteTable("domain_finance_fee_discounts", {
+export const feeDiscounts = sqliteTable("fee_discounts", {
   id: text("id").primaryKey().$defaultFn(() => generateId()),
   tenantId: text("tenant_id").notNull().references(() => tenants.id),
   name: text("name", { length: 200 }).notNull(),
@@ -134,7 +134,7 @@ export const feeDiscounts = sqliteTable("domain_finance_fee_discounts", {
 });
 
 // Fee Installments — payment plans (replaces directFeesInstallments)
-export const feeInstallments = sqliteTable("domain_finance_fee_installments", {
+export const feeInstallments = sqliteTable("fee_installments", {
   id: text("id").primaryKey().$defaultFn(() => generateId()),
   tenantId: text("tenant_id").notNull().references(() => tenants.id),
   feeAssignmentId: text("fee_assignment_id").notNull().references(() => feeAssignments.id),
@@ -157,7 +157,7 @@ export type InvoiceMetadata = {
   notes?: string;
 };
 
-export const invoices = sqliteTable("domain_finance_invoices", {
+export const invoices = sqliteTable("invoices", {
   id: text("id").primaryKey().$defaultFn(() => generateId()),
   tenantId: text("tenant_id").notNull().references(() => tenants.id),
   referenceType: text("reference_type", { enum: ["school_fee", "lms_course", "homeschool_subscription", "other"] }).default("school_fee").notNull(),
@@ -180,7 +180,7 @@ export const invoices = sqliteTable("domain_finance_invoices", {
   invoiceNoIdx: index("inv_number_idx").on(table.tenantId, table.invoiceNumber),
 }));
 
-export const paymentGateways = sqliteTable("domain_finance_payment_gateways", {
+export const paymentGateways = sqliteTable("payment_gateways", {
   id: text("id").primaryKey().$defaultFn(() => generateId()),
   tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
   provider: text("provider", { enum: ["stripe", "paystack", "flutterwave", "paypal"] }).notNull(),
@@ -192,7 +192,7 @@ export const paymentGateways = sqliteTable("domain_finance_payment_gateways", {
   updatedAt: integer("updated_at", { mode: "timestamp" }).defaultNow(),
 });
 
-export const onlinePayments = sqliteTable("domain_finance_online_payments", {
+export const onlinePayments = sqliteTable("online_payments", {
   id: text("id").primaryKey().$defaultFn(() => generateId()),
   tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
   userId: text("user_id").notNull().references(() => users.id),

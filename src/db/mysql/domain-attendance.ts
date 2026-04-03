@@ -3,7 +3,7 @@
  * 
  * Purpose:
  * Consolidates discrete legacy attendance tables into a single high-performance 
- * `edx_attendances` model. Utilizes heavily optimized indexing strategies on 
+ * `attendances` model. Utilizes heavily optimized indexing strategies on 
  * `attendance_date`, `account_id`, and `tenant_id` to compute absenteeism metrics 
  * at scale and natively map absent events.
  * 

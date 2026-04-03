@@ -45,7 +45,7 @@ export type ClassroomWhiteboardTimeline = {
 
 // ─── classroom_sessions ──────────────────────────────────────────────────────
 
-export const classroomSessions = sqliteTable("domain_classroom_sessions", {
+export const classroomSessions = sqliteTable("classroom_sessions", {
   id: text("id").primaryKey().$defaultFn(() => generateId()),
   tenantId: text("tenant_id").notNull().references(() => tenants.id),
   courseId: text("course_id").references(() => lmsCourses.id),
@@ -61,7 +61,7 @@ export const classroomSessions = sqliteTable("domain_classroom_sessions", {
 
 // ─── classroom_memory_ledger ─────────────────────────────────────────────────
 
-export const classroomMemoryLedger = sqliteTable("domain_classroom_memory_ledger", {
+export const classroomMemoryLedger = sqliteTable("classroom_memory_ledger", {
   id: text("id").primaryKey().$defaultFn(() => generateId()),
   tenantId: text("tenant_id").notNull().references(() => tenants.id),
   sessionId: text("session_id").notNull().references(() => classroomSessions.id),
@@ -76,7 +76,7 @@ export const classroomMemoryLedger = sqliteTable("domain_classroom_memory_ledger
 
 // ─── classroom_participants ──────────────────────────────────────────────────
 
-export const classroomParticipants = sqliteTable("domain_classroom_participants", {
+export const classroomParticipants = sqliteTable("classroom_participants", {
   id: text("id").primaryKey().$defaultFn(() => generateId()),
   tenantId: text("tenant_id").notNull().references(() => tenants.id),
   sessionId: text("session_id").notNull().references(() => classroomSessions.id),
@@ -92,7 +92,7 @@ export const classroomParticipants = sqliteTable("domain_classroom_participants"
 
 // ─── classroom_whiteboard_state ──────────────────────────────────────────────
 
-export const classroomWhiteboardState = sqliteTable("domain_classroom_whiteboard_state", {
+export const classroomWhiteboardState = sqliteTable("classroom_whiteboard_state", {
   id: text("id").primaryKey().$defaultFn(() => generateId()),
   tenantId: text("tenant_id").notNull().references(() => tenants.id),
   sessionId: text("session_id").notNull().references(() => classroomSessions.id),

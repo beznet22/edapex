@@ -8,6 +8,7 @@ The Core domain is the foundation of the EdApex Planet-Scale Architecture. It ma
 - **Multi-Tenant Isolation**: Every query across all domains must include a `tenant_id` filter. Core provides the `TenantContext` interface injected into all repositories.
 - **Enumeration Taxonomy**: Replaces scattered lookup tables (`sm_base_setups`, `sm_student_categories`) with a unified `enumerations` table supporting tenant-scoped and global entries.
 - **Better-Auth Integration**: Authentication is handled via `accounts`, `sessions`, `authAccounts`, and `authVerifications` tables, supporting OAuth, Magic Links, and credential-based login.
+- **[NEW] Professional Persona Flow (The Registrar)**: Mrs. Adeleke, the School Registrar, uses her dashboard to orchestrate the "New Year Onboarding" goal. She interacts with the `identity_provisioner` agent to bulk-import 500 students, while the `tenant_architect` verifies branding consistency across campuses. When a duplicate record is detected, she receives a forensic audit trace to resolve the conflict before the `academic_supervisor` begins term scheduling.
 
 ---
 
@@ -28,6 +29,12 @@ The Core domain is the foundation of the EdApex Planet-Scale Architecture. It ma
 | — (new) | `userAddresses` | Address records (current, permanent, mailing). |
 | `jobs` | `jobs` | System job queue for async processing. |
 | `failed_jobs` | `failedJobs` | Failed job tracking for retry and debugging. |
+| — (new) | `aiSessions` | [GOVERNANCE] Dialect-agnostic UUID mapping with `parent_session_id`. |
+| — (new) | `aiTasks` | [GOVERNANCE] Atomic orchestration units with `status` tracking. |
+| — (new) | `aiGoals` | [GOVERNANCE] Recursive strategy nodes for institutional alignment. |
+| — (new) | `aiApprovals` | [GOVERNANCE] Human-in-the-loop oversight gates. |
+| — (new) | `aiCostEvents` | [FINANCE] Token/cent telemetry per task execution. |
+| — (new) | `aiActivityLogs` | [FORENSIC] Level-8 tracing of actor-entity interactions. |
 
 ### Critical Logic Parity
 - **Persona Metadata**: Legacy stored role-specific fields in separate tables (`sm_students.admission_no`, `sm_staffs.joining_date`). V2 consolidates into typed JSON `metadata` (`StudentMetadata`, `StaffMetadata`, `ParentMetadata`, `DriverMetadata`, `FacilitatorMetadata`).
@@ -39,31 +46,31 @@ The Core domain is the foundation of the EdApex Planet-Scale Architecture. It ma
 
 ### Core Entities
 
-#### [Tenants](file:///home/beznet/Workspace/edapex/src/db/sqlite/domain-core.ts#L47)
+#### [Tenants](/home/beznet/Workspace/edapex/src/db/sqlite/domain-core.ts#L47)
 Multi-tenant root. Supports subscription tiers (`free`, `basic`, `premium`, `enterprise`) and JSON metadata for branding, timezone, and currency.
 
-#### [Accounts](file:///home/beznet/Workspace/edapex/src/db/sqlite/domain-core.ts#L69)
+#### [Accounts](/home/beznet/Workspace/edapex/src/db/sqlite/domain-core.ts#L69)
 Authentication identity. Better-Auth compatible with email/password, OAuth, and token-based flows.
 
 > [!WARNING]
 > Legacy fields (`stripeId`, `walletBalance`, `styleId`, `rtlLtl`) are scheduled for migration to their respective domains (Finance, Settings).
 
-#### [Users (Personas)](file:///home/beznet/Workspace/edapex/src/db/sqlite/domain-core.ts#L204)
+#### [Users (Personas)](/home/beznet/Workspace/edapex/src/db/sqlite/domain-core.ts#L204)
 Domain-specific persona. `userType` enum: `student`, `staff`, `parent`, `driver`, `facilitator`. Linked to `accounts` via `accountId`.
 
-#### [AcademicYears](file:///home/beznet/Workspace/edapex/src/db/sqlite/domain-core.ts#L231)
+#### [AcademicYears](/home/beznet/Workspace/edapex/src/db/sqlite/domain-core.ts#L231)
 Temporal partitioning. All domain data is scoped to an academic year via `academicId`.
 
-#### [Enumerations](file:///home/beznet/Workspace/edapex/src/db/sqlite/domain-core.ts#L252)
+#### [Enumerations](/home/beznet/Workspace/edapex/src/db/sqlite/domain-core.ts#L252)
 Centralized taxonomy. `domain` field (e.g., `gender`, `blood_group`, `religion`) with unique constraint on `(tenantId, domain, code)`.
 
-#### [Sessions / AuthAccounts / AuthVerifications](file:///home/beznet/Workspace/edapex/src/db/sqlite/domain-core.ts#L107)
+#### [Sessions / AuthAccounts / AuthVerifications](/home/beznet/Workspace/edapex/src/db/sqlite/domain-core.ts#L107)
 Better-Auth session management, OAuth provider linking, and OTP/Magic Link verification.
 
-#### [UserDocuments / UserAddresses](file:///home/beznet/Workspace/edapex/src/db/sqlite/domain-core.ts#L275)
+#### [UserDocuments / UserAddresses](/home/beznet/Workspace/edapex/src/db/sqlite/domain-core.ts#L275)
 Identity verification documents and address records with typed metadata.
 
-#### [Jobs / FailedJobs](file:///home/beznet/Workspace/edapex/src/db/sqlite/domain-core.ts#L312)
+#### [Jobs / FailedJobs](/home/beznet/Workspace/edapex/src/db/sqlite/domain-core.ts#L312)
 System job queue for async processing and retry management.
 
 ---
@@ -119,12 +126,12 @@ Routes → CoreController → CoreService → CoreRepository
 
 ## HMAS Agent Registry
 
-| Agent | Type | Capabilities |
-|:---|:---|:---|
-| `identity_provisioner` | Task | Account creation, persona linking, onboarding, bulk import |
-| `tenant_architect` | Task | Tenant initialization, branding, subscription, checkpointing |
-| `context_resolver` | Task | Injects tenantId + academicId + temporal validation |
-| `principal_assistant` | Supervisor | Top-level orchestration, goal decomposition, audit |
+| Agent | Type | Capabilities | Link |
+|:---|:---|:---|:---|
+| `principal_assistant` | Supervisor | Top-level orchestration, goal decomposition, audit | [SOUL.md](../strategy/SOUL.md) |
+| `identity_provisioner` | Task | Account creation, persona linking, onboarding, bulk import | [SOUL.md](../strategy/SOUL.md) |
+| `tenant_architect` | Task | Tenant initialization, branding, subscription, checkpointing | [SOUL.md](../strategy/SOUL.md) |
+| `context_resolver` | Task | Injects tenantId + academicId + temporal validation | [SOUL.md](../strategy/SOUL.md) |
 
 ---
 
@@ -137,3 +144,10 @@ Routes → CoreController → CoreService → CoreRepository
 | `core.academic_year_activated` | `{ academicId, tenantId }` | All domains (context switch) |
 | `core.bulk_import_completed` | `{ tenantId, count, type }` | Events (audit), Communication (admin notification) |
 | `core.persona_linked` | `{ userId, accountId }` | PBAC (role sync) |
+| `core.audit_requested` | `{ tenantId, actorId, scope }` | AI (audit agent) |
+
+---
+
+## UI Documentation (Boneyard)
+- **High-Density Dashboards**: All Core dashboards (User Management, Tenant Settings) MUST implement `boneyard-js` skeleton screens to ensure sub-100ms perceived load times on Edge networks.
+- **Audit Viewport**: The Forensic Trace viewer must utilize the "Refraction-Pro" glassmorphism token for overlaying reasoning chains on top of active data views.

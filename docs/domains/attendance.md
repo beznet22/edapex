@@ -1,7 +1,8 @@
 # Attendance Domain Architecture
 
 ## 🎯 Domain Overview
-The Attendance domain is responsible for tracking the presence, absence, and partial attendance of students and staff across daily sessions and specific academic subjects. In V2, this domain transitions from fragmented, role-specific tables to a unified, event-driven model optimized for high-performance retrieval and AI-driven monitoring.
+- **Status Normalization**: Legacy codes (`P`, `A`, `L`, `F`) are mapped to a strict `status` enum: `present`, `absent`, `late`, `half_day`, `excused`.
+- **[NEW] Professional Persona Flow (The Discipline Master)**: Mr. Kwesi, the school's Discipline Master, monitors the "Morning Assembly Roll Call" goal. He uses the `attendance_monitor` to flag a 25% absenteeism spike in Senior Class 3. Before escalating to parents, the `auto_reconciler` verifies a regional "Public Transport Strike" news event, auto-transitioning the status to `excused`. Mr. Kwesi reviews the Boneyard-powered "Presence Heatmap" in the Command Center to confirm zero spoofing anomalies before the first period.
 
 ## 🏛️ Architectural Evolution
 
@@ -13,6 +14,10 @@ The Attendance domain is responsible for tracking the presence, absence, and par
 | **Subject Attendance** | `sm_subject_attendances` | `attendances` (scope_type: 'subject') |
 | **Bulk Storage** | `student_attendance_bulks` | Deprecated (Handled via Batch API) |
 | **Holidays/Weekends**| `sm_holidays`, `sm_weekends` | `holidays` (Centralized) |
+| — (new) | `aiSessions` | [GOVERNANCE] Traceability for absenteeism reconciliation. |
+| — (new) | `aiTasks` | [GOVERNANCE] Atomic verification of presence signals. |
+| — (new) | `aiGoals` | [GOVERNANCE] Alignment with school attendance policy. |
+| — (new) | `aiApprovals` | [GOVERNANCE] Parental sign-off for excused absences. |
 
 ### Unified Schema Design
 V2 utilizes a single `attendances` table to consolidate all tracking logic, reducing join complexity and enabling cross-persona analytics.
@@ -75,11 +80,11 @@ Routes → AttendanceController → AttendanceService → AttendanceRepository
 
 ## HMAS Agent Registry
 
-| Agent | Type | Capabilities |
-|:---|:---|:---|
-| `attendance_monitor` | Task | Anomaly detection, chronic absenteeism alerts, spoof detection |
-| `auto_reconciler` | Task | Cross-references leave requests and nurse logs |
-| `biometric_validator` | Task | Multi-signal presence fusion and offline sync |
+| Agent | Type | Capabilities | Link |
+|:---|:---|:---|:---|
+| `attendance_monitor` | Task | Anomaly detection, chronic absenteeism alerts, spoof detection | [SOUL.md](../strategy/SOUL.md) |
+| `auto_reconciler` | Task | Cross-references leave requests and nurse logs | [SOUL.md](../strategy/SOUL.md) |
+| `biometric_validator` | Task | Multi-signal presence fusion and offline sync | [SOUL.md](../strategy/SOUL.md) |
 
 ---
 
@@ -91,3 +96,9 @@ Routes → AttendanceController → AttendanceService → AttendanceRepository
 | `attendance.anomaly_detected` | `{ classId, absentRate, threshold }` | Communication (alert admin), HR (substitute trigger) |
 | `attendance.reconciled` | `{ userId, date, oldStatus, newStatus }` | Events (audit) |
 | `attendance.sync_conflict` | `{ userId, date, deviceId }` | Core (device management) |
+
+---
+
+## UI Documentation (Boneyard)
+- **Attendance Roll-Call**: The daily roll-call UI MUST implement `boneyard-js` skeletons for ultra-fast "Check-All" actions.
+- **Chronic Absence Dashboard**: High-density analytics views must utilize "Refraction-Pro" glassmorphism cards for scannable risk-factor visualization.

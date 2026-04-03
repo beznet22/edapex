@@ -36,7 +36,7 @@ export type MessageMetadata = {
 
 export type MessagePart = Record<string, any>;
 
-export const aiSessions = sqliteTable("domain_ai_ai_sessions", {
+export const aiSessions = sqliteTable("ai_sessions", {
   id: text("id", { length: 255 }).primaryKey().$defaultFn(() => generateId()), 
   tenantId: text("tenant_id").notNull().references(() => tenants.id),
   userId: text("user_id").notNull().references(() => users.id),
@@ -49,7 +49,7 @@ export const aiSessions = sqliteTable("domain_ai_ai_sessions", {
   updatedAt: integer("updated_at", { mode: "timestamp" }).defaultNow(),
 });
 
-export const aiMessages = sqliteTable("domain_ai_ai_messages", {
+export const aiMessages = sqliteTable("ai_messages", {
   id: text("id", { length: 255 }).primaryKey().$defaultFn(() => generateId()),
   tenantId: text("tenant_id").notNull().references(() => tenants.id),
   sessionId: text("session_id", { length: 255 }).notNull().references(() => aiSessions.id, { onDelete: "cascade" }),
@@ -63,7 +63,7 @@ export const aiMessages = sqliteTable("domain_ai_ai_messages", {
   sessionIdx: index("msg_session_idx").on(table.tenantId, table.sessionId),
 }));
 
-export const aiVotes = sqliteTable("domain_ai_ai_votes", {
+export const aiVotes = sqliteTable("ai_votes", {
   tenantId: text("tenant_id").notNull().references(() => tenants.id),
   sessionId: text("session_id", { length: 255 }).notNull().references(() => aiSessions.id, { onDelete: "cascade" }),
   messageId: text("message_id", { length: 255 }).notNull().references(() => aiMessages.id, { onDelete: "cascade" }),
@@ -74,7 +74,7 @@ export const aiVotes = sqliteTable("domain_ai_ai_votes", {
   pk: index("pk").on(table.tenantId, table.sessionId, table.messageId),
 }));
 
-export const aiDocuments = sqliteTable("domain_ai_ai_documents", {
+export const aiDocuments = sqliteTable("ai_documents", {
   id: text("id", { length: 255 }).primaryKey().$defaultFn(() => generateId()),
   tenantId: text("tenant_id").notNull().references(() => tenants.id),
   title: text("title", { length: 255 }).notNull(),
@@ -86,7 +86,7 @@ export const aiDocuments = sqliteTable("domain_ai_ai_documents", {
   tenantIdx: index("doc_tenant_idx").on(table.tenantId),
 }));
 
-export const aiSuggestions = sqliteTable("domain_ai_ai_suggestions", {
+export const aiSuggestions = sqliteTable("ai_suggestions", {
   id: text("id", { length: 255 }).primaryKey().$defaultFn(() => generateId()),
   tenantId: text("tenant_id").notNull().references(() => tenants.id),
   documentId: text("document_id", { length: 255 }).notNull().references(() => aiDocuments.id, { onDelete: "cascade" }),
@@ -100,7 +100,7 @@ export const aiSuggestions = sqliteTable("domain_ai_ai_suggestions", {
 
 // --- AGENTIC INFRASTRUCTURE ---
 
-export const aiAgents = sqliteTable("domain_ai_ai_agents", {
+export const aiAgents = sqliteTable("ai_agents", {
   id: text("id", { length: 255 }).primaryKey().$defaultFn(() => generateId()),
   tenantId: text("tenant_id").notNull().references(() => tenants.id),
   name: text("name", { length: 100 }).notNull(),
@@ -114,7 +114,7 @@ export const aiAgents = sqliteTable("domain_ai_ai_agents", {
   tenantTypeIdx: index("agent_tenant_type_idx").on(table.tenantId, table.agentType),
 }));
 
-export const aiAgentActions = sqliteTable("domain_ai_ai_agent_actions", {
+export const aiAgentActions = sqliteTable("ai_agent_actions", {
   id: text("id", { length: 255 }).primaryKey().$defaultFn(() => generateId()),
   agentId: text("agent_id").notNull().references(() => aiAgents.id),
   tenantId: text("tenant_id").notNull().references(() => tenants.id),
@@ -133,7 +133,7 @@ export const aiAgentActions = sqliteTable("domain_ai_ai_agent_actions", {
   idempotencyIdx: index("act_idempotency_idx").on(table.tenantId, table.idempotencyKey),
 }));
 
-export const aiToolInvocations = sqliteTable("domain_ai_ai_tool_invocations", {
+export const aiToolInvocations = sqliteTable("ai_tool_invocations", {
   id: text("id", { length: 255 }).primaryKey().$defaultFn(() => generateId()),
   tenantId: text("tenant_id").notNull().references(() => tenants.id),
   actionId: text("action_id").notNull().references(() => aiAgentActions.id, { onDelete: "cascade" }),
@@ -149,7 +149,7 @@ export const aiToolInvocations = sqliteTable("domain_ai_ai_tool_invocations", {
 
 // --- RECURSIVE STRATEGY & TASKS ---
 
-export const aiGoals = sqliteTable("domain_ai_ai_goals", {
+export const aiGoals = sqliteTable("ai_goals", {
   id: text("id", { length: 255 }).primaryKey().$defaultFn(() => generateId()),
   tenantId: text("tenant_id").notNull().references(() => tenants.id),
   title: text("title", { length: 255 }).notNull(),
@@ -165,7 +165,7 @@ export const aiGoals = sqliteTable("domain_ai_ai_goals", {
   tenantIdx: index("goal_tenant_idx").on(table.tenantId),
 }));
 
-export const aiTasks = sqliteTable("domain_ai_ai_tasks", {
+export const aiTasks = sqliteTable("ai_tasks", {
   id: text("id", { length: 255 }).primaryKey().$defaultFn(() => generateId()),
   tenantId: text("tenant_id").notNull().references(() => tenants.id),
   projectId: text("project_id", { length: 255 }),
@@ -189,7 +189,7 @@ export const aiTasks = sqliteTable("domain_ai_ai_tasks", {
   assigneeIdx: index("task_assignee_idx").on(table.tenantId, table.assigneeAgentId, table.status),
 }));
 
-export const aiApprovals = sqliteTable("domain_ai_ai_approvals", {
+export const aiApprovals = sqliteTable("ai_approvals", {
   id: text("id", { length: 255 }).primaryKey().$defaultFn(() => generateId()),
   tenantId: text("tenant_id").notNull().references(() => tenants.id),
   type: text("type", { enum: ["hire_agent", "approve_strategy", "budget_override"] }).notNull(),
@@ -206,7 +206,7 @@ export const aiApprovals = sqliteTable("domain_ai_ai_approvals", {
   tenantIdx: index("appr_tenant_idx").on(table.tenantId, table.status),
 }));
 
-export const aiCostEvents = sqliteTable("domain_ai_ai_cost_events", {
+export const aiCostEvents = sqliteTable("ai_cost_events", {
   id: text("id", { length: 255 }).primaryKey().$defaultFn(() => generateId()),
   tenantId: text("tenant_id").notNull().references(() => tenants.id),
   agentId: text("agent_id").notNull().references(() => aiAgents.id),
@@ -224,7 +224,7 @@ export const aiCostEvents = sqliteTable("domain_ai_ai_cost_events", {
   tenantTimeIdx: index("cost_tenant_time_idx").on(table.tenantId, table.occurredAt),
 }));
 
-export const aiActivityLogs = sqliteTable("domain_ai_ai_activity_logs", {
+export const aiActivityLogs = sqliteTable("ai_activity_logs", {
   id: text("id", { length: 255 }).primaryKey().$defaultFn(() => generateId()),
   tenantId: text("tenant_id").notNull().references(() => tenants.id),
   actorType: text("actor_type", { enum: ["agent", "user", "system"] }).notNull(),

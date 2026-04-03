@@ -3,8 +3,8 @@
  * 
  * Purpose:
  * Unifies physical exam tabulation and online digital assessments. Replaces fragile 
- * legacy JSON parsing and redundant grade stores with strictly typed `edx_exam_setups`, 
- * `edx_exam_marks`, and dynamic constraints driven by Drizzle ORM schemas. Implements 
+ * legacy JSON parsing and redundant grade stores with strictly typed `exam_setups`, 
+ * `exam_marks`, and dynamic constraints driven by Drizzle ORM schemas. Implements 
  * high-fidelity relational maps for grade compilation.
  * 
  * Replaces Legacy Tables:
@@ -155,19 +155,6 @@ export const studentRatings = assessmentSchema.table("student_ratings", {
  * This table is scheduled for removal in the next schema migration.
  * All data should be migrated to the `teacher_remarks` field on `computed_results`.
  */
-export const teacherRemarks = assessmentSchema.table("teacher_remarks", {
-  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
-  tenantId: uuid("tenant_id").notNull().references(() => tenants.id),
-  userId: uuid("user_id").notNull().references(() => users.id),
-  examId: uuid("exam_id").notNull().references(() => exams.id),
-  staffId: uuid("staff_id").references(() => users.id),
-  remark: text("remark").notNull(),
-  academicId: uuid("academic_id").notNull().references(() => academicYears.id),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
-}, (table) => ({
-  studentExamIdx: index("rem_stu_ex_idx").on(table.userId, table.examId),
-}));
 
 /**
  * NOTE: Export name `classAttendances` does NOT match DB table `class_attendance_summaries`.

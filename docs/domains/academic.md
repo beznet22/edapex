@@ -7,6 +7,7 @@ The Academic domain manages the core educational structure of the school, includ
 - **Class-Section Relationship**: Classes are high-level groupings (e.g., Grade 10). Sections are physical or logical sub-groups (e.g., Section A, Section B). Every class must have at least one section.
 - **Subject Assignment**: Subjects are linked to Class-Sections rather than just Classes. This allows different sections of the same grade to have different teachers or even elective subjects.
 - **Routine Management**: Routines are built based on Time Slots (Periods). A routine entry must specify Class, Section, Subject, Teacher, Room, and Day.
+- **[NEW] Professional Persona Flow (The Academic Director)**: Dr. Mensah, the Academic Director, uses the Command Center to resolve a "6 AM Substitution Crisis." He interacts with the `substitution_agent` to find coverage for 5 sick teachers while maintaining prerequisite chain integrity. He uses the `schedule_coordinator` to simulate a "Hard-Stop Optimization" that priorities core subjects during a hall-splitting event. All his overrides are logged in `aiActivityLogs` and verified via Boneyard skeletons before the morning bell.
 
 ---
 
@@ -22,6 +23,9 @@ The Academic domain manages the core educational structure of the school, includ
 | `sm_assign_subjects` | `subjectAssignments` | Links Class-Section to Subjects and Teachers. |
 | `sm_class_routines` | `classRoutines` | Weekly scheduling of subjects. |
 | `sm_academic_years` | `academicYears` | Cross-domain multi-year support. |
+| — (new) | `aiSessions` | [GOVERNANCE] Linked conversation lineage for scheduling intent. |
+| — (new) | `aiTasks` | [GOVERNANCE] Atomic checkout of routine optimization tasks. |
+| — (new) | `aiGoals` | [GOVERNANCE] Alignment with term-level academic goals. |
 
 ### Critical Logic parity
 - **Partitioning**: In Legacy, `school_id` and `academic_id` were columns in every table. V2 enforces `tenantId` (partition) and `academicId` across all entities to ensure strict multi-tenancy and historical data isolation.
@@ -136,12 +140,12 @@ Routes → AcademicController → AcademicService → AcademicRepository
 
 ## HMAS Agent Registry
 
-| Agent | Type | Capabilities |
-|:---|:---|:---|
-| `academic_architect` | Task | Class/section setup, subject mapping, structural metadata management |
-| `schedule_coordinator` | Task | Routine generation, collision detection, constraint prioritization |
-| `enrollment_manager` | Task | Bulk enrollment, promotion processing, state resurrection |
-| `substitution_agent` | Task | Emergency routing for staff absenteeism |
+| Agent | Type | Capabilities | Link |
+|:---|:---|:---|:---|
+| `academic_architect` | Task | Class/section setup, subject mapping, structural metadata | [SOUL.md](../strategy/SOUL.md) |
+| `schedule_coordinator` | Task | Routine generation, collision detection, constraint prioritization | [SOUL.md](../strategy/SOUL.md) |
+| `enrollment_manager` | Task | Bulk enrollment, promotion processing, state resurrection | [SOUL.md](../strategy/SOUL.md) |
+| `substitution_agent` | Task | Emergency routing for staff absenteeism | [SOUL.md](../strategy/SOUL.md) |
 
 ---
 
@@ -152,3 +156,9 @@ Routes → AcademicController → AcademicService → AcademicRepository
 | `academic.student_enrolled` | `{ userId, classId, sectionId, academicId }` | Attendance (init records), Finance (assign fees) |
 | `academic.routine_updated` | `{ classId, sectionId, academicId }` | Communication (notify teachers) |
 | `academic.student_promoted` | `{ userId, fromClassId, toClassId }` | Events (audit), Finance (adjust fees) |
+
+---
+
+## UI Documentation (Boneyard)
+- **Timetable/Routine Builder**: The routine editor MUST utilize `boneyard-js` skeletons for real-time conflict-resolution overlays.
+- **Enrollment Lists**: High-density student rosters must implement the "Refraction-Pro" glassmorphism style for scannable multi-year data tracking.

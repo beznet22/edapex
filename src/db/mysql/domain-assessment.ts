@@ -3,8 +3,8 @@
  * 
  * Purpose:
  * Unifies physical exam tabulation and online digital assessments. Replaces fragile 
- * legacy JSON parsing and redundant grade stores with strictly typed `edx_exam_setups`, 
- * `edx_exam_marks`, and dynamic constraints driven by Drizzle ORM schemas. Implements 
+ * legacy JSON parsing and redundant grade stores with strictly typed `exam_setups`, 
+ * `exam_marks`, and dynamic constraints driven by Drizzle ORM schemas. Implements 
  * high-fidelity relational maps for grade compilation.
  * 
  * Replaces Legacy Tables:
@@ -29,11 +29,13 @@ import {
   json,
 } from "drizzle-orm/mysql-core";
 
-import { users, tenants, academicYears, accounts } from "./domain-core";
+import { users, tenants, academicYears, accounts , academicTerms } from "./domain-core";
 import { classes, enrollments, sections, subjects } from "./domain-academic";
 import { generateId } from "../utils/id";
 
 export const exams = mysqlTable("exams", {
+  termId: text("term_id").references(() => academicTerms.id),
+
   id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => generateId()),
   tenantId: varchar("tenant_id", { length: 36 }).notNull().references(() => tenants.id),
   examType: mysqlEnum("exam_type", ["term", "continuous", "mock", "final"]).notNull(),
@@ -166,19 +168,6 @@ export const studentRatings = mysqlTable("student_ratings", {
  * This table is scheduled for removal in the next schema migration.
  * All data should be migrated to the `teacher_remarks` field on `computed_results`.
  */
-export const teacherRemarks = mysqlTable("teacher_remarks", {
-  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => generateId()),
-  tenantId: varchar("tenant_id", { length: 36 }).notNull().references(() => tenants.id),
-  userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id),
-  examId: varchar("exam_id", { length: 36 }).notNull().references(() => exams.id),
-  staffId: varchar("staff_id", { length: 36 }).references(() => users.id),
-  remark: text("remark").notNull(),
-  academicId: varchar("academic_id", { length: 36 }).notNull().references(() => academicYears.id),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow(),
-}, (table) => ({
-  studentExamIdx: index("rem_stu_ex_idx").on(table.userId, table.examId),
-}));
 
 /**
  * NOTE: Export name `classAttendances` does NOT match DB table `class_attendance_summaries`.

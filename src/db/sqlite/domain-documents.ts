@@ -2,7 +2,7 @@
  * ARCHITECTURE OVERVIEW: Documents Domain
  * 
  * Purpose:
- * Provides a highly scalable, polymorphic storage system for digital assets via `edx_documents`. 
+ * Provides a highly scalable, polymorphic storage system for digital assets via `documents`. 
  * Utilizes `owner_type` and `owner_id` polymorphic linkage to seamlessly attach files to any 
  * entity (profiles, homework, facilities) without altering their core tables.
  * 
@@ -25,7 +25,7 @@ export type DocumentMetadata = {
   previousVersionId?: string;
 };
 
-export const documents = sqliteTable("domain_documents_documents", {
+export const documents = sqliteTable("documents", {
   id: text("id", { length: 255 }).primaryKey().$defaultFn(() => generateId()),
   tenantId: text("tenant_id").notNull().references(() => tenants.id),
   ownerType: text("owner_type", { length: 30 }).notNull(),

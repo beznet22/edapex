@@ -322,7 +322,7 @@ The **Agentic Classroom** extends stateless execution via an OpenMAIC-powered **
 - **Agent Node (Teacher/Evaluator)**: Yields streaming **interleaved structured outputs** (`[{"type":"action", ...}, {"type":"text", ...}]`) over Hono SSE.
 - **Stateless Resolution**: After each graph node execution, streamed `StatelessEvent` arrays are dehydrated to `classroomMemoryLedger` before yielding the edge CPU slice.
 - **Escalation Edge**: Human instructors can inject an `escalation` event into the memory ledger to halt the autonomous loop and assume direct control.
-- **Spec Reference**: [AGENTIC_CLASSROOM_V2_SPEC.md](AGENTIC_CLASSROOM_V2_SPEC.md) for full detail.
+- **Spec Reference**: [AGENTIC_SCHOOL_V2_PLAN.md](AGENTIC_SCHOOL_V2_PLAN.md) for full detail.
 
 ---
 

@@ -4,7 +4,7 @@
  * Purpose:
  * Manages a tenant-isolated content delivery model for public facades. Employs 
  * Drizzle JSON/Text columns to store rich text blocks and media references, streamlining 
- * what used to be scattered legacy page tables into a flexible `edx_content_nodes` model.
+ * what used to be scattered legacy page tables into a flexible `content_nodes` model.
  * 
  * Replaces Legacy Tables:
  * - sm_front_cms_pages
@@ -38,7 +38,7 @@ export type ContentNodeMetadata = {
   sortOrder?: number;
 };
 
-export const contentNodes = sqliteTable("domain_cms_content_nodes", {
+export const contentNodes = sqliteTable("content_nodes", {
   id: text("id", { length: 255 }).primaryKey().$defaultFn(() => generateId()),
   tenantId: text("tenant_id").notNull().references(() => tenants.id),
   contentType: text("content_type", { enum: ["page", "news", "event", "testimonial", "gallery", "slider", "menu_item"] }).notNull(),

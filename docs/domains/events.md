@@ -9,6 +9,7 @@ The Events domain implements an event-sourcing and audit-logging pattern across 
 - **Correlation Tracking**: `correlationId` traces agent workflow chains across multiple domains (e.g., enrollment → fee assignment → notification).
 - **Audit Trail**: Row-level change tracking with `oldValues`/`newValues` JSON for forensic analysis and compliance.
 - **Optimistic Concurrency**: `version` field on events for conflict detection in distributed systems.
+- **[NEW] Professional Persona Flow (The Compliance Officer)**: Ms. Amadi, the Board's Compliance Officer, manages the "Annual Institutional Audit" goal. She triggers the `compliance_reporter` to trace the `correlationId` of a "Scholarship Award" across Finance and Academic domains. When the `audit_watchdog` flags a post-hoc mutation, she reviews the `aiActivityLogs` via the Boneyard-powered "Forensic Trace" viewport to identify the responsible actor. She uses the `event_replay_engine` to verify that no temporal state corruption occurred before the `principal_assistant` signs off on the final report.
 
 ---
 
@@ -19,6 +20,10 @@ The Events domain implements an event-sourcing and audit-logging pattern across 
 | :--- | :--- | :--- |
 | `sm_system_logs` | `events` | Event-sourced with typed payloads and outbox pattern. |
 | `sm_user_logs` | `auditLog` | Row-level change tracking with actor. |
+| — (new) | `aiSessions` | [GOVERNANCE] Traceability for audit and compliance discussions. |
+| — (new) | `aiTasks` | [GOVERNANCE] Atomic event processing and dispatch tasks. |
+| — (new) | `aiGoals` | [GOVERNANCE] Alignment with institutional compliance targets. |
+| — (new) | `aiApprovals` | [GOVERNANCE] Final human-in-the-loop sign-off for audit reports. |
 
 ---
 
@@ -75,12 +80,12 @@ Row-level change tracking. `action`: `INSERT`/`UPDATE`/`DELETE`. JSON `oldValues
 
 ## HMAS Agent Registry
 
-| Agent | Type | Capabilities |
-|:---|:---|:---|
-| `event_dispatcher` | Task | Outbox processing, consumer notification, retry logic |
-| `audit_watchdog` | Task | Integrity verification, tamper detection |
-| `compliance_reporter` | Task | Report generation, correlation chain analysis |
-| `event_planner` | Task | School calendar events, invitations, venue management |
+| Agent | Type | Capabilities | Link |
+|:---|:---|:---|:---|
+| `event_dispatcher` | Task | Outbox processing, notification, retry | [SOUL.md](../strategy/SOUL.md) |
+| `audit_watchdog` | Task | Integrity, tamper detection | [SOUL.md](../strategy/SOUL.md) |
+| `compliance_reporter` | Task | Report generation, correlation analysis | [SOUL.md](../strategy/SOUL.md) |
+| `event_planner` | Task | Calendar, invitations, venue management | [SOUL.md](../strategy/SOUL.md) |
 
 ---
 
@@ -91,3 +96,9 @@ Row-level change tracking. `action`: `INSERT`/`UPDATE`/`DELETE`. JSON `oldValues
 | `events.dispatch_failed` | `{ eventId, error, retryCount }` | Events (dead letter), Communication (admin alert) |
 | `events.audit_tampered` | `{ logId, violationType }` | PBAC (lockout), Communication (security alert) |
 | `events.outbox_cleared` | `{ processedCount, failedCount }` | Events (telemetry) |
+
+---
+
+## UI Documentation (Boneyard)
+- **Event Explorer**: The high-density event log MUST implement `boneyard-js` skeletons for sub-100ms real-time stream scrubbing.
+- **Forensic Trace View**: The correlation chain visualizer must utilize "Refraction-Pro" glassmorphism nodes for scannable multi-domain workflow tracing.

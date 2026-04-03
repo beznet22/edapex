@@ -17,14 +17,14 @@ export * from "./domain-lms.js";
 export * from "./domain-classroom.js";
 
 import { users, accounts, sessions, authAccounts, authVerifications } from "./domain-core.js";
-import { aiChats, aiMessages } from "./domain-ai.js";
+import { aiSessions, aiMessages } from "./domain-ai.js";
 
 // Authoritative Types
 export type User = typeof users.$inferSelect;
 export type Staff = typeof users.$inferSelect;
 export type Student = typeof users.$inferSelect;
 export type Parent = typeof users.$inferSelect;
-export type AIChat = typeof aiChats.$inferSelect;
+export type AIChat = typeof aiSessions.$inferSelect;
 export type AIMessage = typeof aiMessages.$inferSelect;
 
 // Better-Auth Core exports & Database Types

@@ -2,7 +2,7 @@
  * ARCHITECTURE OVERVIEW: Human Resources & Payroll Domain
  * 
  * Purpose:
- * Decouples employee payroll and leave metadata from the core `edx_accounts` table. 
+ * Decouples employee payroll and leave metadata from the core `accounts` table. 
  * Utilizes native relational constraints connecting `department_id` and `designation_id` 
  * directly to the identity layer, handling automated payroll generation securely.
  * 

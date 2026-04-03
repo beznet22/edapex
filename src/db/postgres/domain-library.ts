@@ -3,7 +3,7 @@
  * 
  * Purpose:
  * Manages non-consumable tracking within physical/digital libraries. Employs 
- * transaction logging limits on `edx_book_issues` securely tied to `account_id` 
+ * transaction logging limits on `book_issues` securely tied to `account_id` 
  * and homogeneously enforced via physical `tenant_id` logic.
  * 
  * Replaces Legacy Tables:
@@ -16,7 +16,7 @@ import { sql } from "drizzle-orm";
 
 import { users, tenants, academicYears, accounts } from "./domain-core";
 
-// Rewritten Library Domain - drops edx_ prefix and adds improvements
+// Rewritten Library Domain - drops  prefix and adds improvements
 export const librarySchema = pgSchema("domain_library");
 
 

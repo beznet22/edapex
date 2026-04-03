@@ -9,6 +9,7 @@ The Finance domain in EdApex V2 is built around a centralized, immutable **Unive
 - **B2C Standalone Monetization**: Digital checkouts for LMS/Homeschooling via polymorphic `invoices` (`referenceType`: `school_fee`, `lms_course`, `homeschool_subscription`).
 - **Auto-Reconciliation**: Cross-domain events automatically generate ledger entries (e.g., enrollment triggers fee assignment).
 - **Online Payments**: Gateway integration (Stripe, Paystack, Flutterwave, PayPal) with webhook-driven status tracking.
+- **[NEW] Professional Persona Flow (The Bursar)**: Mr. Okafor, the School Bursar, manages the "Third Term Fee Recovery" goal. He triggers the `fee_recovery_agent` to scan for 200 overdue installments. When a "Sibling Discount" is auto-detected by the `ledger_agent`, he approves the adjustment via the `aiApprovals` gate. He uses the Boneyard-powered "Universal Ledger" dashboard to verify that fractional rounding drift is handled before the `principal_assistant` emits the final fiscal WorkProduct.
 
 ---
 
@@ -31,6 +32,11 @@ The Finance domain in EdApex V2 is built around a centralized, immutable **Unive
 | — (new) | `bankAccounts` | School bank account management. |
 | — (new) | `paymentGateways` | Online payment provider configuration. |
 | — (new) | `onlinePayments` | Transaction tracking with provider fees. |
+| — (new) | `aiSessions` | [GOVERNANCE] Traceability for fee adjustment discussions. |
+| — (new) | `aiTasks` | [GOVERNANCE] Atomic ledger mutation and reconciliation tasks. |
+| — (new) | `aiGoals` | [GOVERNANCE] Alignment with school financial targets. |
+| — (new) | `aiApprovals` | [GOVERNANCE] Multi-sig sign-off for refunds and waivers. |
+| — (new) | `aiCostEvents` | [FINANCE] Token/cent telemetry per agent execution. |
 
 ### Critical Logic Parity
 - **Immutable Ledger**: Legacy allowed direct mutation of payment records. V2 enforces immutability — corrections happen via reversal entries only.
@@ -126,13 +132,13 @@ Routes → FinanceController → FinanceService → FinanceRepository
 
 ## HMAS Agent Registry
 
-| Agent | Type | Capabilities |
-|:---|:---|:---|
-| `finance_supervisor` | Supervisor | Ledger immutability enforcement, policy routing |
-| `fee_calculator` | Task | Fee/installment generation, fractional logic, discount scanning |
-| `fee_recovery_agent` | Task | Overdue reminders, payment pattern analysis |
-| `ledger_agent` | Task | Auto-creates entries from events, sibling scanning |
-| `payment_gateway_agent` | Task | Webhook reconciliation, refund processing |
+| Agent | Type | Capabilities | Link |
+|:---|:---|:---|:---|
+| `finance_supervisor` | Supervisor | Ledger immutability, policy routing | [SOUL.md](../strategy/SOUL.md) |
+| `fee_calculator` | Task | Fee/installment generation, fractional logic | [SOUL.md](../strategy/SOUL.md) |
+| `fee_recovery_agent` | Task | Overdue reminders, pattern analysis | [SOUL.md](../strategy/SOUL.md) |
+| `ledger_agent` | Task | Auto-creates entries, sibling scanning | [SOUL.md](../strategy/SOUL.md) |
+| `payment_gateway_agent` | Task | Webhook reconciliation, refund processing | [SOUL.md](../strategy/SOUL.md) |
 
 ---
 
@@ -146,3 +152,9 @@ Routes → FinanceController → FinanceService → FinanceRepository
 | `finance.invoice_issued` | `{ invoiceId, userId, totalAmount }` | Communication (email), Events (audit) |
 | `finance.fraud_alert` | `{ userId, reason, score }` | Finance (supervisor), PBAC (lockout) |
 | `finance.refund_processed` | `{ entryId, originalEntryId, amount }` | Communication (notification), Events (audit) |
+
+---
+
+## UI Documentation (Boneyard)
+- **Universal Ledger Dashboard**: All financial registers MUST implement `boneyard-js` skeletons for sub-100ms row-by-row immutable posting.
+- **Invoice Viewer**: The digital checkout viewport must utilize "Refraction-Pro" glassmorphism cards for live payment status visualization.

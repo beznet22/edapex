@@ -5,7 +5,7 @@ import { lmsCourses, lmsLessons, lmsSubmissions } from "./domain-lms";
 import { subjects } from "./domain-academic";
 import { ledgerEntries } from "./domain-finance";
 
-export const homeschoolSubscriptions = sqliteTable("domain_homeschool_subscriptions", {
+export const homeschoolSubscriptions = sqliteTable("homeschool_subscriptions", {
   id: text("id").primaryKey().$defaultFn(() => generateId()),
   tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
   academicId: text("academic_id").notNull().references(() => academicYears.id),
@@ -18,7 +18,7 @@ export const homeschoolSubscriptions = sqliteTable("domain_homeschool_subscripti
   tenantIdx: index("hsub_tenant_idx").on(table.tenantId),
 }));
 
-export const revenueShares = sqliteTable("domain_homeschool_revenue_shares", {
+export const revenueShares = sqliteTable("revenue_shares", {
   id: text("id").primaryKey().$defaultFn(() => generateId()),
   tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
   facilitatorId: text("facilitator_id").notNull().references(() => users.id, { onDelete: "cascade" }),
@@ -34,7 +34,7 @@ export const revenueShares = sqliteTable("domain_homeschool_revenue_shares", {
   facilPeriodIdx: index("rev_facil_period_idx").on(table.tenantId, table.facilitatorId, table.period),
 }));
 
-export const homeschoolPortfolios = sqliteTable("domain_homeschool_portfolios", {
+export const homeschoolPortfolios = sqliteTable("homeschool_portfolios", {
   id: text("id").primaryKey().$defaultFn(() => generateId()),
   tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
   userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }), 
@@ -52,7 +52,7 @@ export const homeschoolPortfolios = sqliteTable("domain_homeschool_portfolios", 
   userTenantIdx: index("hs_port_user_tenant_idx").on(table.userId, table.tenantId),
 }));
 
-export const homeschoolSchedules = sqliteTable("domain_homeschool_schedules", {
+export const homeschoolSchedules = sqliteTable("homeschool_schedules", {
   id: text("id").primaryKey().$defaultFn(() => generateId()),
   tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
   userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }), 

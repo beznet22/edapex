@@ -8,6 +8,7 @@ The Library domain manages physical and digital book catalogs, borrower profiles
 - **Borrower Profiles**: Per-user library membership with configurable `maxBooksAllowed`, real-time `currentBorrowed` count, and accumulated fines.
 - **Issue/Return Lifecycle**: `issued` → `returned` / `lost` / `damaged`. Overdue and damage fines auto-calculated.
 - **Auto-Fine Reconciliation**: Fines flow to the Finance ledger via the `fine_reconciliation_service` stress defense tool.
+- **[NEW] Professional Persona Flow (The Librarian)**: Mrs. Balogun, the School Librarian, manages the "Annual Catalog Audit" goal. She triggers the `inventory_auditor` to reconcile 1,000 physical books against active `bookIssues`. When `quantity_integrity_checker` flags a phantom stock, she uses the `reading_advisor` to analyze borrowing patterns and suggest replacements. She approves the "Damaged Book" fine via the `aiApprovals` gate, which the `fine_reconciliation_service` then posts to the student's Finance ledger, visualized through Boneyard skeletons.
 
 ---
 
@@ -20,6 +21,10 @@ The Library domain manages physical and digital book catalogs, borrower profiles
 | `sm_books` | `books` | ISBN, author, publisher, quantity, price, rack. JSON metadata. |
 | `sm_book_issues` | `bookIssues` | Issue/return lifecycle with fine tracking. |
 | — (new) | `libraryProfiles` | Per-user membership with borrowing limits and fine totals. |
+| — (new) | `aiSessions` | [GOVERNANCE] Traceability for fine waivers and reading advice. |
+| — (new) | `aiTasks` | [GOVERNANCE] Atomic issue/return and audit tasks. |
+| — (new) | `aiGoals` | [GOVERNANCE] Alignment with institutional literacy targets. |
+| — (new) | `aiApprovals` | [GOVERNANCE] Senior Librarian sign-off for book disposals. |
 
 ---
 
@@ -85,11 +90,11 @@ Per-user borrower profile with `maxBooksAllowed`, `currentBorrowed`, `totalFines
 
 ## HMAS Agent Registry
 
-| Agent | Type | Capabilities |
-|:---|:---|:---|
-| `librarian_agent` | Task | Issue/return processing, fine calculation, catalog management |
-| `reading_advisor` | Task | AI-powered reading recommendations |
-| `inventory_auditor` | Task | Stock reconciliation, quantity integrity checks |
+| Agent | Type | Capabilities | Link |
+|:---|:---|:---|:---|
+| `librarian_agent` | Task | Issue/return, fine calculation, catalog | [SOUL.md](../strategy/SOUL.md) |
+| `reading_advisor` | Task | AI-powered reading recommendations | [SOUL.md](../strategy/SOUL.md) |
+| `inventory_auditor` | Task | Stock reconciliation, quantity integrity | [SOUL.md](../strategy/SOUL.md) |
 
 ---
 
@@ -101,3 +106,9 @@ Per-user borrower profile with `maxBooksAllowed`, `currentBorrowed`, `totalFines
 | `library.book_returned` | `{ issueId, bookId, fineAmount }` | Finance (fine entry), Events (audit) |
 | `library.book_overdue` | `{ issueId, userId, daysOverdue }` | Communication (reminder) |
 | `library.membership_suspended` | `{ userId, reason }` | Communication (notification), PBAC (access restriction) |
+
+---
+
+## UI Documentation (Boneyard)
+- **Book Search & Issue**: The library catalog MUST implement `boneyard-js` skeletons for sub-100ms real-time availability checks.
+- **Borrower Profile**: High-density transaction logs must utilize "Refraction-Pro" glassmorphism cards for scannable fine-history visualization.

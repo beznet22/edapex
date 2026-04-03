@@ -9,6 +9,7 @@ The PBAC domain is the dynamic enforcement engine for EdApex. It evaluates acces
 - **Role Assignment**: `roleAssignments` map users to role names (`admin`, `teacher`, `student`) with metadata for expiry and primary role tracking.
 - **Policy Bindings**: M:N mapping between policies and role assignments enables dynamic PBAC: "role X gets policy Y in tenant Z".
 - **Context Binding**: Policy conditions can reference structural context (e.g., `{ "structure": "6-3-3-4" }`) loaded from School Operational Skills.
+- **[NEW] Professional Persona Flow (The Security Auditor)**: Mr. Okon, the Board's Internal Auditor, uses the Command Center to verify that no Teacher Agent has successfully accessed the Finance ledger. He triggers the `policy_auditor` to scan for "Role Expansion" attempts across 5,000 sessions. When the system detects a stale attribute bypass, it auto-emits a `pbac.access_denied` event, which Mr. Okon reviews via the Boneyard-powered forensic trace UI before the `principal_assistant` locks the affected persona.
 
 ---
 
@@ -28,13 +29,13 @@ The PBAC domain is the dynamic enforcement engine for EdApex. It evaluates acces
 
 ### Core Entities
 
-#### [PolicyDefinitions](file:///home/beznet/Workspace/edapex/src/db/sqlite/domain-pbac.ts#L34)
+#### [PolicyDefinitions](/home/beznet/Workspace/edapex/src/db/sqlite/domain-pbac.ts#L34)
 JSON policy rule: `effect` (allow/deny), `actions[]`, `resources[]` (e.g., `student:*`, `finance:invoice`), `conditions[]`, `context{}`. Null `tenantId` = system-wide.
 
-#### [RoleAssignments](file:///home/beznet/Workspace/edapex/src/db/sqlite/domain-pbac.ts#L57)
+#### [RoleAssignments](/home/beznet/Workspace/edapex/src/db/sqlite/domain-pbac.ts#L57)
 Maps `userId` (persona) + optional `accountId` (platform identity) to a `roleName`. Unique constraint on `(userId, roleName)`.
 
-#### [PolicyBindings](file:///home/beznet/Workspace/edapex/src/db/sqlite/domain-pbac.ts#L74)
+#### [PolicyBindings](/home/beznet/Workspace/edapex/src/db/sqlite/domain-pbac.ts#L74)
 M:N junction between `policyDefinitions` and `roleAssignments`. Unique constraint on `(policyId, roleAssignmentId)`.
 
 ---
@@ -83,12 +84,12 @@ M:N junction between `policyDefinitions` and `roleAssignments`. Unique constrain
 
 ## HMAS Agent Registry
 
-| Agent | Type | Capabilities |
-|:---|:---|:---|
-| `pbac_supervisor` | Supervisor | Policy loading from Operational Skills, conflict detection |
-| `policy_evaluator` | Task | Context-based access evaluation, condition matching |
-| `role_provisioner` | Task | Auto-assigns default roles on user creation |
-| `policy_auditor` | Task | Conflict loop detection, audit integrity verification |
+| Agent | Type | Capabilities | Link |
+|:---|:---|:---|:---|
+| `pbac_supervisor` | Supervisor | Policy loading from Operational Skills, conflict detection | [SOUL.md](../strategy/SOUL.md) |
+| `policy_evaluator` | Task | Context-based access evaluation, condition matching | [SOUL.md](../strategy/SOUL.md) |
+| `role_provisioner` | Task | Auto-assigns default roles on user creation | [SOUL.md](../strategy/SOUL.md) |
+| `policy_auditor` | Task | Conflict loop detection, audit integrity verification | [SOUL.md](../strategy/SOUL.md) |
 
 ---
 
@@ -100,3 +101,9 @@ M:N junction between `policyDefinitions` and `roleAssignments`. Unique constrain
 | `pbac.role_assigned` | `{ userId, roleName, tenantId }` | Events (audit) |
 | `pbac.policy_conflict_detected` | `{ policyIds, resource }` | Communication (admin alert) |
 | `pbac.audit_tampered` | `{ logId, violationType }` | PBAC (lockout), Events (emergency) |
+
+---
+
+## UI Documentation (Boneyard)
+- **Policy Management Console**: The PBAC editor MUST utilize `boneyard-js` skeletons for real-time policy evaluation previews.
+- **Evaluation Trace**: High-density access logs must use "Refraction-Pro" glassmorphism cards for scannable security audits.

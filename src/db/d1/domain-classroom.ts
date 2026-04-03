@@ -44,7 +44,7 @@ export type ClassroomWhiteboardTimeline = {
 
 // ─── classroom_sessions ──────────────────────────────────────────────────────
 
-export const classroomSessions = sqliteTable("domain_classroom_sessions", {
+export const classroomSessions = sqliteTable("sessions", {
   id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
   tenantId: integer("tenant_id").notNull().references(() => tenants.id),
   courseId: integer("course_id").references(() => lmsCourses.id),
@@ -60,7 +60,7 @@ export const classroomSessions = sqliteTable("domain_classroom_sessions", {
 
 // ─── classroom_memory_ledger ─────────────────────────────────────────────────
 
-export const classroomMemoryLedger = sqliteTable("domain_classroom_memory_ledger", {
+export const classroomMemoryLedger = sqliteTable("memory_ledger", {
   id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
   tenantId: integer("tenant_id").notNull().references(() => tenants.id),
   sessionId: integer("session_id").notNull().references(() => classroomSessions.id),
@@ -75,7 +75,7 @@ export const classroomMemoryLedger = sqliteTable("domain_classroom_memory_ledger
 
 // ─── classroom_participants ──────────────────────────────────────────────────
 
-export const classroomParticipants = sqliteTable("domain_classroom_participants", {
+export const classroomParticipants = sqliteTable("participants", {
   id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
   tenantId: integer("tenant_id").notNull().references(() => tenants.id),
   sessionId: integer("session_id").notNull().references(() => classroomSessions.id),
@@ -91,7 +91,7 @@ export const classroomParticipants = sqliteTable("domain_classroom_participants"
 
 // ─── classroom_whiteboard_state ──────────────────────────────────────────────
 
-export const classroomWhiteboardState = sqliteTable("domain_classroom_whiteboard_state", {
+export const classroomWhiteboardState = sqliteTable("whiteboard_state", {
   id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
   tenantId: integer("tenant_id").notNull().references(() => tenants.id),
   sessionId: integer("session_id").notNull().references(() => classroomSessions.id),

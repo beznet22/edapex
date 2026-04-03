@@ -9,6 +9,7 @@ The Facilities domain manages physical school infrastructure including transport
 - **Hostel Management**: Dormitories → Rooms → Allocations. Room types support cost-per-term billing.
 - **Complaint Lifecycle**: Open → In Progress → Resolved → Closed with assignment tracking.
 - **Inventory Tracking**: Consumable items with reorder levels and automatic low-stock detection.
+- **[NEW] Professional Persona Flow (The Facilities Manager)**: Mr. Ifeanyi, the Facilities Manager, manages the "Campus Asset Health" goal. He triggers the `asset_manager` to scan for 500 inventory items. When the `reorder_trigger_engine` flags a low-stock event for chemistry lab supplies, he approves the procurement task via the `aiApprovals` gate. He uses the Boneyard-powered "Complaint Dashboard" to verify that the `complaint_sla_enforcer` has correctly escalated an unresolved plumbing issue before the `principal_assistant` notifies the Board.
 
 ---
 
@@ -26,6 +27,10 @@ The Facilities domain manages physical school infrastructure including transport
 | `sm_complaints` | `complaints` | Source enum: `parent`, `student`, `staff`, `external`. |
 | `sm_visitors` | `visitors` | Check-in/out tracking with person-to-meet FK. |
 | — (new) | `inventoryItems` | Consumable tracking with reorder levels. |
+| — (new) | `aiSessions` | [GOVERNANCE] Traceability for facility allocation and maintenance discussions. |
+| — (new) | `aiTasks` | [GOVERNANCE] Atomic inventory tracking and booking tasks. |
+| — (new) | `aiGoals` | [GOVERNANCE] Alignment with institutional infrastructure targets. |
+| — (new) | `aiApprovals` | [GOVERNANCE] Multi-step sign-off for asset procurement and high-value bookings. |
 
 ---
 
@@ -96,12 +101,12 @@ Consumables with auto-status (`in_stock`, `low_stock`, `out_of_stock`) based on 
 
 ## HMAS Agent Registry
 
-| Agent | Type | Capabilities |
-|:---|:---|:---|
-| `asset_manager` | Task | Inventory management, reorder alerts, maintenance scheduling |
-| `transport_coordinator` | Task | Route optimization, allocation, GPS monitoring |
-| `hostel_manager` | Task | Room allocation, capacity tracking, billing integration |
-| `complaint_handler` | Task | SLA enforcement, escalation, resolution tracking |
+| Agent | Type | Capabilities | Link |
+|:---|:---|:---|:---|
+| `asset_manager` | Task | Inventory, reorder alerts, maintenance | [SOUL.md](../strategy/SOUL.md) |
+| `transport_coordinator` | Task | Route optimization, GPS monitoring | [SOUL.md](../strategy/SOUL.md) |
+| `hostel_manager` | Task | Room allocation, capacity tracking | [SOUL.md](../strategy/SOUL.md) |
+| `complaint_handler` | Task | SLA enforcement, escalation tracking | [SOUL.md](../strategy/SOUL.md) |
 
 ---
 
@@ -113,3 +118,9 @@ Consumables with auto-status (`in_stock`, `low_stock`, `out_of_stock`) based on 
 | `facilities.complaint_filed` | `{ complaintId, source, type }` | Communication (notification), Events (audit) |
 | `facilities.visitor_checked_in` | `{ visitorId, purpose, tenantId }` | Events (audit) |
 | `facilities.inventory_low_stock` | `{ itemId, quantity, reorderLevel }` | Communication (procurement alert) |
+
+---
+
+## UI Documentation (Boneyard)
+- **Inventory Dashboard**: The high-density asset roster MUST implement `boneyard-js` skeletons for sub-100ms row-by-row stock updates.
+- **Complaint Management**: The resolution viewport must utilize "Refraction-Pro" glassmorphism cards for scannable SLA deadline visualization.

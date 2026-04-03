@@ -2,7 +2,7 @@
  * ARCHITECTURE OVERVIEW: Policy-Based Access Control (PBAC) Domain
  * 
  * Purpose:
- * Instantiates an attribute-based & policy-based access control standard (`edx_policy_definitions`). 
+ * Instantiates an attribute-based & policy-based access control standard (`policy_definitions`). 
  * Discards legacy hard-coded boolean permission assignments in favor of dynamic JSON rule sets 
  * mapped per `tenant_id`, dynamically evaluating access without schema alterations per module.
  * 
@@ -15,7 +15,7 @@ import { unique,  sqliteTable, text, integer, real, index } from "drizzle-orm/sq
 
 import { users, tenants, accounts } from "./domain-core";
 
-// Policy-Based Access Control (PBAC) schema - dropped edx_ prefix
+// Policy-Based Access Control (PBAC) schema - dropped  prefix
 
 export type PolicyCondition = {
   field: string;
@@ -30,7 +30,7 @@ export type PolicyDefinition = {
   conditions?: PolicyCondition[];
 };
 
-export const policyDefinitions = sqliteTable("domain_pbac_policy_definitions", {
+export const policyDefinitions = sqliteTable("policy_definitions", {
   id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
   tenantId: integer("tenant_id").references(() => tenants.id), // NULL = system-wide policy
   name: text("name", { length: 191 }).notNull(),
@@ -53,7 +53,7 @@ export type RoleAssignmentMetadata = {
   expiresAt?: string;
 };
 
-export const roleAssignments = sqliteTable("domain_pbac_role_assignments", {
+export const roleAssignments = sqliteTable("role_assignments", {
   id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
   tenantId: integer("tenant_id").notNull().references(() => tenants.id),
   userId: integer("user_id").notNull().references(() => users.id), // Persona
@@ -70,7 +70,7 @@ export const roleAssignments = sqliteTable("domain_pbac_role_assignments", {
 
 // M:N binding between policies and role assignments
 // Enables dynamic PBAC: "role X gets policy Y in tenant Z"
-export const policyBindings = sqliteTable("domain_pbac_policy_bindings", {
+export const policyBindings = sqliteTable("policy_bindings", {
   id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
   tenantId: integer("tenant_id").notNull().references(() => tenants.id),
   policyId: integer("policy_id").notNull().references(() => policyDefinitions.id),

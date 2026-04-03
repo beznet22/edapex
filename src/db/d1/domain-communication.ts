@@ -2,7 +2,7 @@
  * ARCHITECTURE OVERVIEW: Communication Domain
  * 
  * Purpose:
- * Re-architects message dispatching via `edx_communication_events`. Supports polymorphic 
+ * Re-architects message dispatching via `communication_events`. Supports polymorphic 
  * `target_ref_id` strings mapping to accounts or roles, handling auditing, and delivery 
  * status of multi-channel logs (SMS, Email, Push) structurally across tenants.
  * 
@@ -25,7 +25,7 @@ export type CommunicationMetadata = {
   };
 };
 
-export const communicationEvents = sqliteTable("domain_communication_communication_events", {
+export const communicationEvents = sqliteTable("communication_events", {
   id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
   tenantId: integer("tenant_id").notNull().references(() => tenants.id),
   channel: text("channel", { enum: [
@@ -55,7 +55,7 @@ export const communicationEvents = sqliteTable("domain_communication_communicati
 // --- NEW TABLE ---
 
 // Communication Recipients — per-recipient delivery tracking
-export const communicationRecipients = sqliteTable("domain_communication_communication_recipients", {
+export const communicationRecipients = sqliteTable("communication_recipients", {
   id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
   eventId: integer("event_id").notNull().references(() => communicationEvents.id, { onDelete: "cascade" }),
   userId: integer("user_id").notNull().references(() => users.id), // Recipient persona

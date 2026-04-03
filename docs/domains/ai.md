@@ -8,6 +8,7 @@ The AI domain manages the infrastructure for AI assistant interactions, agentic 
 - **Document Artifacts**: AI-generated documents (`text`, `code`, `image`, `sheet`) with suggestion tracking.
 - **Agentic Infrastructure**: Registered `ai_agents` with capability lists, action tracking (`agent_runs`), and tool invocation logging (`ai_tool_invocations`).
 - **Token Tracking**: Message metadata captures `promptTokens`, `completionTokens`, `totalTokens`, `latencyMs`, and `modelName`.
+- **[NEW] Professional Persona Flow (The AI Lead)**: Mr. Tunde, the school's AI Infrastructure Lead, monitors the HMAS health via the Command Center. He uses the `observability_agent` to detect a "Token Usage Spike" in the Classroom domain. Relying on the `token_budget_enforcer`, he verifies that the session context was automatically compressed (Hermes Grade) before the `financial_circuit_breaker` suspended the task. He then reviews the Boneyard-powered "Stress Status" visualizer to ensure no latency-induced amnesia occurred during the recovery.
 
 ---
 
@@ -31,25 +32,25 @@ The AI domain manages the infrastructure for AI assistant interactions, agentic 
 
 ### Core Entities
 
-#### [AiSessions](file:///home/beznet/Workspace/edapex/src/db/sqlite/domain-ai.ts#L39)
+#### [AiSessions](/home/beznet/Workspace/edapex/src/db/sqlite/domain-ai.ts#L39)
 [HIGH-FIDELITY] Chat session with model selection, `parent_session_id`, and `token_stats`.
 
-#### [AiMessages](file:///home/beznet/Workspace/edapex/src/db/sqlite/domain-ai.ts#L51)
+#### [AiMessages](/home/beznet/Workspace/edapex/src/db/sqlite/domain-ai.ts#L51)
 [HIGH-FIDELITY] Multi-part messages supporting `user`, `assistant`, `system`, `tool` roles. Metadata includes `cache_breakpoint` and `tool_call_id`.
 
-#### [AiVotes](file:///home/beznet/Workspace/edapex/src/db/sqlite/domain-ai.ts#L65)
+#### [AiVotes](/home/beznet/Workspace/edapex/src/db/sqlite/domain-ai.ts#L65)
 RLHF feedback per message for model improvement.
 
-#### [AiDocuments / AiSuggestions](file:///home/beznet/Workspace/edapex/src/db/sqlite/domain-ai.ts#L76)
+#### [AiDocuments / AiSuggestions](/home/beznet/Workspace/edapex/src/db/sqlite/domain-ai.ts#L76)
 AI-generated artifacts with iterative suggestion tracking.
 
-#### [AiAgents](file:///home/beznet/Workspace/edapex/src/db/sqlite/domain-ai.ts#L102)
+#### [AiAgents](/home/beznet/Workspace/edapex/src/db/sqlite/domain-ai.ts#L102)
 Agent registry with capabilities, status (`active`/`inactive`/`maintenance`), and runtime config.
 
-#### [AiAgentActions](file:///home/beznet/Workspace/edapex/src/db/sqlite/domain-ai.ts#L116)
+#### [AiAgentActions](/home/beznet/Workspace/edapex/src/db/sqlite/domain-ai.ts#L116)
 Action lifecycle: `pending` → `running` → `completed`/`failed`. Includes idempotency keys and duration.
 
-#### [AiToolInvocations](file:///home/beznet/Workspace/edapex/src/db/sqlite/domain-ai.ts#L135)
+#### [AiToolInvocations](/home/beznet/Workspace/edapex/src/db/sqlite/domain-ai.ts#L135)
 Per-tool-call logging with parameters, results, and latency for observability.
 
 ---
@@ -103,11 +104,11 @@ Per-tool-call logging with parameters, results, and latency for observability.
 
 ## HMAS Agent Registry
 
-| Agent | Type | Capabilities |
-|:---|:---|:---|
-| `ai_supervisor` | Supervisor | Agent orchestration, budget enforcement, health monitoring |
-| `chat_agent` | Task | Chat completion, context management, document generation |
-| `observability_agent` | Task | Token tracking, latency monitoring, anomaly detection |
+| Agent | Type | Capabilities | Link |
+|:---|:---|:---|:---|
+| `ai_supervisor` | Supervisor | Agent orchestration, budget enforcement, health monitoring | [SOUL.md](../strategy/SOUL.md) |
+| `chat_agent` | Task | Chat completion, context management, document generation | [SOUL.md](../strategy/SOUL.md) |
+| `observability_agent` | Task | Token tracking, latency monitoring, anomaly detection | [SOUL.md](../strategy/SOUL.md) |
 
 ---
 
@@ -119,3 +120,9 @@ Per-tool-call logging with parameters, results, and latency for observability.
 | `ai.agent_action_failed` | `{ actionId, agentId, error }` | Communication (admin alert), Events (audit) |
 | `ai.token_budget_exceeded` | `{ tenantId, usage, limit }` | Finance (billing), Communication (alert) |
 | `ai.hallucination_detected` | `{ agentId, messageId, confidence }` | AI (circuit breaker), Events (audit) |
+
+---
+
+## UI Documentation (Boneyard)
+- **AI Command Console**: The HMAS monitor MUST utilize `boneyard-js` skeletons for real-time agent pulse telemetry.
+- **Chat Interface**: The `ai-elements` chat viewport must implement the "Refraction-Pro" glassmorphism theme for a premium local-first experience.

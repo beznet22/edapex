@@ -3,7 +3,7 @@
  * 
  * Purpose:
  * Manages non-consumable tracking within physical/digital libraries. Employs 
- * transaction logging limits on `edx_book_issues` securely tied to `account_id` 
+ * transaction logging limits on `book_issues` securely tied to `account_id` 
  * and homogeneously enforced via physical `tenant_id` logic.
  * 
  * Replaces Legacy Tables:
@@ -15,9 +15,9 @@ import { unique,  sqliteTable, text, integer, real, index } from "drizzle-orm/sq
 
 import { users, tenants, academicYears, accounts } from "./domain-core";
 
-// Rewritten Library Domain - drops edx_ prefix and adds improvements
+// Rewritten Library Domain - drops  prefix and adds improvements
 
-export const bookCategories = sqliteTable("domain_library_book_categories", {
+export const bookCategories = sqliteTable("book_categories", {
   id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
   tenantId: integer("tenant_id").notNull().references(() => tenants.id),
   name: text("name", { length: 200 }).notNull(),
@@ -34,7 +34,7 @@ export type BookMetadata = {
   tags?: string[];
 };
 
-export const books = sqliteTable("domain_library_books", {
+export const books = sqliteTable("books", {
   id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
   tenantId: integer("tenant_id").notNull().references(() => tenants.id),
   title: text("title", { length: 255 }).notNull(),
@@ -53,7 +53,7 @@ export const books = sqliteTable("domain_library_books", {
   categoryIdx: index("book_category_idx").on(table.categoryId),
 }));
 
-export const bookIssues = sqliteTable("domain_library_book_issues", {
+export const bookIssues = sqliteTable("book_issues", {
   id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
   tenantId: integer("tenant_id").notNull().references(() => tenants.id),
   bookId: integer("book_id").notNull().references(() => books.id),
@@ -79,7 +79,7 @@ export type LibraryProfileMetadata = {
   notes?: string;
 };
 
-export const libraryProfiles = sqliteTable("domain_library_library_profiles", {
+export const libraryProfiles = sqliteTable("library_profiles", {
   id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
   tenantId: integer("tenant_id").notNull().references(() => tenants.id),
   userId: integer("user_id").notNull().references(() => users.id),

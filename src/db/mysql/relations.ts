@@ -113,9 +113,9 @@ export const attendancesRelations = relations(schema.attendances, ({ one }) => (
 }));
 
 // AI Relations
-export const aiChatsRelations = relations(schema.aiChats, ({ one, many }) => ({
+export const aiSessionsRelations = relations(schema.aiSessions, ({ one, many }) => ({
   user: one(schema.users, {
-    fields: [schema.aiChats.userId],
+    fields: [schema.aiSessions.userId],
     references: [schema.users.id],
   }),
   messages: many(schema.aiMessages),
@@ -123,17 +123,17 @@ export const aiChatsRelations = relations(schema.aiChats, ({ one, many }) => ({
 }));
 
 export const aiMessagesRelations = relations(schema.aiMessages, ({ one, many }) => ({
-  chat: one(schema.aiChats, {
-    fields: [schema.aiMessages.chatId],
-    references: [schema.aiChats.id],
+  session: one(schema.aiSessions, {
+    fields: [schema.aiMessages.sessionId],
+    references: [schema.aiSessions.id],
   }),
   votes: many(schema.aiVotes),
 }));
 
 export const aiVotesRelations = relations(schema.aiVotes, ({ one }) => ({
-  chat: one(schema.aiChats, {
-    fields: [schema.aiVotes.chatId],
-    references: [schema.aiChats.id],
+  session: one(schema.aiSessions, {
+    fields: [schema.aiVotes.sessionId],
+    references: [schema.aiSessions.id],
   }),
   message: one(schema.aiMessages, {
     fields: [schema.aiVotes.messageId],

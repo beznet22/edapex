@@ -6,7 +6,8 @@ The Settings domain decouples system configuration from hardcoded files into dat
 ### Key Business Logic
 - **Domain-Scoped Config**: Each setting row represents a config block for a specific domain (`general`, `finance`, `attendance`, `ai`). JSON `config` stores typed configuration objects.
 - **Feature Flags**: Tenant-scoped dark launches with `featureKey`, `isEnabled`, `rolloutPercentage`, and optional targeted user IDs.
-- **Type Safety**: Config values use discriminated union types (`GeneralConfig`, `FinanceConfig`, `LmsConfig`).
+- **Type Safety**: Config values use discriminated union types (`GeneralConfig`, `FinanceConfig`, `LmsConfig`, `HomeschoolConfig`, `ClassroomConfig`).
+- **[NEW] Professional Persona Flow (The IT Admin)**: Mr. Chinedu, the IT Administrator, prepares the "Region-Specific Feature Rollout" goal. He uses the `config_manager` to update the localized grading scale in `Settings.Config`. Before promoting to production, he enables the `lms.ai_tutoring` feature flag for a 10% canary rollout. When the `feature_flag_circuit_breaker` detects a latency spike, it auto-reverts the setting, which Mr. Chinedu verifies via a Boneyard-powered "State Rollback" toast in his Command Center.
 
 ---
 
@@ -28,10 +29,10 @@ The Settings domain decouples system configuration from hardcoded files into dat
 
 ### Core Entities
 
-#### [Settings](file:///home/beznet/Workspace/edapex/src/db/sqlite/domain-settings.ts#L48)
-Key-value config store. Unique constraint on `(tenantId, domain)`. JSON `config` supports `GeneralConfig`, `FinanceConfig`, `LmsConfig`, or arbitrary objects.
+#### [Settings](/home/beznet/Workspace/edapex/src/db/sqlite/domain-settings.ts#L48)
+Key-value config store. Unique constraint on `(tenantId, domain)`. JSON `config` supports `GeneralConfig`, `FinanceConfig`, `LmsConfig`, `HomeschoolConfig`, `ClassroomConfig`, or arbitrary objects.
 
-#### [FeatureFlags](file:///home/beznet/Workspace/edapex/src/db/sqlite/domain-settings.ts#L66)
+#### [FeatureFlags](/home/beznet/Workspace/edapex/src/db/sqlite/domain-settings.ts#L66)
 Feature toggle system. `featureKey` (e.g., `lms.ai_tutoring`), `isEnabled`, `rolloutPercentage` (0-100). Metadata supports targeted user IDs and A/B variants.
 
 ---
@@ -74,11 +75,11 @@ Feature toggle system. `featureKey` (e.g., `lms.ai_tutoring`), `isEnabled`, `rol
 
 ## HMAS Agent Registry
 
-| Agent | Type | Capabilities |
-|:---|:---|:---|
-| `config_manager` | Task | Config retrieval, validation, default merging |
-| `feature_flag_evaluator` | Task | Rollout percentage calculation, A/B variant selection |
-| `config_auditor` | Task | Change tracking, rollback management |
+| Agent | Type | Capabilities | Link |
+|:---|:---|:---|:---|
+| `config_manager` | Task | Config retrieval, validation, default merging | [SOUL.md](../strategy/SOUL.md) |
+| `feature_flag_evaluator` | Task | Rollout percentage calculation, A/B variant selection | [SOUL.md](../strategy/SOUL.md) |
+| `config_auditor` | Task | Change tracking, rollback management | [SOUL.md](../strategy/SOUL.md) |
 
 ---
 
@@ -89,3 +90,11 @@ Feature toggle system. `featureKey` (e.g., `lms.ai_tutoring`), `isEnabled`, `rol
 | `settings.config_updated` | `{ tenantId, domain, changedKeys }` | All domains (cache invalidation) |
 | `settings.feature_flag_toggled` | `{ featureKey, isEnabled, tenantId }` | Events (audit) |
 | `settings.config_rollback` | `{ tenantId, domain, reason }` | Communication (admin alert) |
+
+---
+
+## UI Documentation (Boneyard)
+- **Configuration Dashboard**: All settings forms MUST implement `boneyard-js` skeletons to handle high-density JSON config editing without UI lag.
+- **Toggle Animations**: Feature flag toggles must use the "Refraction-Pro" glassmorphism style for immediate visual feedback of state changes.
+
+

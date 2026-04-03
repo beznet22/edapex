@@ -2,7 +2,7 @@
  * ARCHITECTURE OVERVIEW: Finance & Accounting Domain
  * 
  * Purpose:
- * Overhauls the cashflow architecture employing a robust `edx_ledger_entries` model enforcing 
+ * Overhauls the cashflow architecture employing a robust `ledger_entries` model enforcing 
  * transactional duality (credits/debits). Consolidates disparate fee and expense tables onto a 
  * unified chart of accounts linked tightly across the multi-tenant `account_id` space.
  * 

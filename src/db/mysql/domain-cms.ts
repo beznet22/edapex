@@ -4,7 +4,7 @@
  * Purpose:
  * Manages a tenant-isolated content delivery model for public facades. Employs 
  * Drizzle JSON/Text columns to store rich text blocks and media references, streamlining 
- * what used to be scattered legacy page tables into a flexible `edx_content_nodes` model.
+ * what used to be scattered legacy page tables into a flexible `content_nodes` model.
  * 
  * Replaces Legacy Tables:
  * - sm_front_cms_pages

@@ -2,8 +2,8 @@
  * ARCHITECTURE OVERVIEW: System Events & Audit Domain
  * 
  * Purpose:
- * Implements an event-sourcing architectural pattern via `edx_domain_events` and 
- * `edx_audit_log`. Stores heavily indexed immutable payloads detailing systemic 
+ * Implements an event-sourcing architectural pattern via `domain_events` and 
+ * `audit_log`. Stores heavily indexed immutable payloads detailing systemic 
  * state mutations for security forensics and webhook syndication.
  * 
  * Replaces Legacy Tables:
@@ -22,7 +22,7 @@ export type EventMetadata = {
 };
 
 export type AuditLogValues = Record<string, unknown>;
-export const events = sqliteTable("domain_events_events", {
+export const events = sqliteTable("events", {
   id: text("id").primaryKey().$defaultFn(() => generateId()),
   tenantId: text("tenant_id").notNull().references(() => tenants.id),
   eventType: text("event_type", { length: 100 }).notNull(),
@@ -48,7 +48,7 @@ export const events = sqliteTable("domain_events_events", {
   deliveryIdx: index("evt_delivery_idx").on(table.deliveryStatus, table.occurredAt),
 }));
 
-export const auditLog = sqliteTable("domain_events_audit_log", {
+export const auditLog = sqliteTable("audit_log", {
   id: text("id").primaryKey().$defaultFn(() => generateId()),
   tenantId: text("tenant_id").notNull().references(() => tenants.id),
   tableName: text("table_name", { length: 100 }).notNull(),

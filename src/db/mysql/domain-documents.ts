@@ -2,7 +2,7 @@
  * ARCHITECTURE OVERVIEW: Documents Domain
  * 
  * Purpose:
- * Provides a highly scalable, polymorphic storage system for digital assets via `edx_documents`. 
+ * Provides a highly scalable, polymorphic storage system for digital assets via `documents`. 
  * Utilizes `owner_type` and `owner_id` polymorphic linkage to seamlessly attach files to any 
  * entity (profiles, homework, facilities) without altering their core tables.
  * 

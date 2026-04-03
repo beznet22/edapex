@@ -9,6 +9,7 @@ The CMS domain manages tenant-isolated public-facing content delivery. It consol
 - **SEO Support**: `slug` for URL routing, `seoFocusKeyword` and `seoDescription` in metadata.
 - **Publishing Lifecycle**: `publishedStatus` with `publishedAt` and `expiresAt` for content scheduling.
 - **Category System**: Links to `enumerations` from Core domain for flexible categorization.
+- **[NEW] Professional Persona Flow (The Content Editor)**: Ms. Fatima, the School's Content Editor, manages the "Summer Camp Enrollment Campaign" goal. She triggers the `content_editor` to generate 5 news articles and 2 landing pages. When the `slug_collision_detector` flags a URL conflict, she reviews the `aiSessions` to verify that the `publish_scheduler` has correctly mapped the expiry dates. She approves the final SEO metadata via the `aiApprovals` gate, which then triggers the `content_cache_invalidator` to push live updates to the Boneyard-powered public portal.
 
 ---
 
@@ -26,6 +27,10 @@ The CMS domain manages tenant-isolated public-facing content delivery. It consol
 | — (new) | `contentNodes` (type: `testimonial`) | Client testimonials. |
 | — (new) | `contentNodes` (type: `gallery`) | Image galleries. |
 | — (new) | `contentNodes` (type: `menu_item`) | Navigation menu hierarchy. |
+| — (new) | `aiSessions` | [GOVERNANCE] Traceability for content and SEO discussions. |
+| — (new) | `aiTasks` | [GOVERNANCE] Atomic publishing and validation tasks. |
+| — (new) | `aiGoals` | [GOVERNANCE] Alignment with institutional marketing targets. |
+| — (new) | `aiApprovals` | [GOVERNANCE] Senior Editor/Admin sign-off for public content. |
 
 ---
 
@@ -78,11 +83,11 @@ Polymorphic content entity. `contentType` + `slug` for routing. `parentId` for h
 
 ## HMAS Agent Registry
 
-| Agent | Type | Capabilities |
-|:---|:---|:---|
-| `content_editor` | Task | AI content generation, SEO optimization |
-| `media_manager` | Task | Image/media validation, gallery management |
-| `publish_scheduler` | Task | Content lifecycle management, expiry handling |
+| Agent | Type | Capabilities | Link |
+|:---|:---|:---|:---|
+| `content_editor` | Task | AI content generation, SEO optimization | [SOUL.md](../strategy/SOUL.md) |
+| `media_manager` | Task | Image/media validation | [SOUL.md](../strategy/SOUL.md) |
+| `publish_scheduler` | Task | Lifecycle, expiry handling | [SOUL.md](../strategy/SOUL.md) |
 
 ---
 
@@ -93,3 +98,9 @@ Polymorphic content entity. `contentType` + `slug` for routing. `parentId` for h
 | `cms.content_published` | `{ nodeId, contentType, slug }` | Events (audit), Communication (newsletter) |
 | `cms.content_expired` | `{ nodeId, contentType }` | Events (audit) |
 | `cms.content_updated` | `{ nodeId, changedFields }` | Settings (cache invalidation) |
+
+---
+
+## UI Documentation (Boneyard)
+- **Content Editor**: All CMS editing viewports MUST implement `boneyard-js` skeletons for sub-100ms real-time preview rendering.
+- **Navigation Tree**: The menu hierarchy visualizer must utilize "Refraction-Pro" glassmorphism nodes for scannable parent/child mapping.

@@ -68,4 +68,4 @@ Implement real-time security enforcement for the live Classroom SSE pipeline.
 - **Partial-JSON Interceptor**: As the LangGraph engine yields incremental JSON `action` payload arrays over the `/api/classroom/sse` stream, a PBAC stream interceptor must regex-match and validate each `action` element against the policy engine *before* the corresponding Mastra tool is invoked.
 - **Inline 403 Signaling**: If an unauthorized tool payload is detected within the stream (e.g., a Teacher Agent attempting a Finance-domain tool), the interceptor forcibly yields a `403` signal to the edge and halts external execution boundaries immediately—without terminating the entire SSE connection.
 - **Audit Trail**: Every intercepted violation must generate a `SECURITY_INCIDENT` WorkProduct and fire an `ON_PBAC_VIOLATION` event to the Board Command Center.
-- **Spec Reference**: [AGENTIC_CLASSROOM_V2_SPEC.md](../AGENTIC_CLASSROOM_V2_SPEC.md) (Section 8) and [AGENTIC_SCHOOL_V2_PLAN.md](../AGENTIC_SCHOOL_V2_PLAN.md) (Section 10.4).
+- **Spec Reference**: [AGENTIC_SCHOOL_V2_PLAN.md](../AGENTIC_SCHOOL_V2_PLAN.md) (Section 10.4).

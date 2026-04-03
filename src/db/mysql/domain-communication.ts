@@ -2,7 +2,7 @@
  * ARCHITECTURE OVERVIEW: Communication Domain
  * 
  * Purpose:
- * Re-architects message dispatching via `edx_communication_events`. Supports polymorphic 
+ * Re-architects message dispatching via `communication_events`. Supports polymorphic 
  * `target_ref_id` strings mapping to accounts or roles, handling auditing, and delivery 
  * status of multi-channel logs (SMS, Email, Push) structurally across tenants.
  * 

@@ -8,6 +8,7 @@ The Documents domain provides a polymorphic, scalable file management system for
 - **Review Workflow**: `status`: `draft` → `pending_review` → `approved` / `rejected` for verified document management.
 - **Version Tracking**: Metadata supports `version` and `previousVersionId` for document revision chains.
 - **Expiry Management**: `expiresAt` for time-sensitive documents (licenses, certifications).
+- **[NEW] Professional Persona Flow (The Registrar)**: Mr. Tunde, the Registrar, manages the "Student Record Hardening" goal. He triggers the `verification_agent` to scan for 200 pending admissions documents. When the `malware_scan_gate` flags a suspicious PDF, he reviews the `aiSessions` to verify that the `storage_quota_enforcer` has correctly blocked the upload. He approves the final student certificates via the `aiApprovals` gate, which then triggers the `archivist_agent` to sign and store the PDF WorkProducts, visualized via Boneyard skeletons.
 
 ---
 
@@ -19,6 +20,10 @@ The Documents domain provides a polymorphic, scalable file management system for
 | `sm_student_documents` | `documents` (ownerType: `student`) | Student-attached files. |
 | `sm_staff_documents` | `documents` (ownerType: `staff`) | Staff-attached files. |
 | `sm_upload_contents` / `sm_teacher_upload_contents` | `documents` (ownerType: varies) | Shared content uploads. |
+| — (new) | `aiSessions` | [GOVERNANCE] Traceability for document review and verification. |
+| — (new) | `aiTasks` | [GOVERNANCE] Atomic upload, scan, and signing tasks. |
+| — (new) | `aiGoals` | [GOVERNANCE] Alignment with institutional record-keeping targets. |
+| — (new) | `aiApprovals` | [GOVERNANCE] Human sign-off for certificate issuance and verification. |
 
 ---
 
@@ -77,9 +82,11 @@ Universal document store. `ownerType` (e.g., `student`, `staff`, `homework`, `fa
 
 | Agent | Type | Capabilities |
 |:---|:---|:---|
-| `archivist_agent` | Task | Document lifecycle, digital signing, certificate generation |
-| `verification_agent` | Task | Review workflow, integrity checking |
-| `storage_agent` | Task | Quota management, orphan cleanup, archival |
+| Agent | Type | Capabilities | Link |
+|:---|:---|:---|:---|
+| `archivist_agent` | Task | Lifecycle, signing, certificates | [SOUL.md](../strategy/SOUL.md) |
+| `verification_agent` | Task | Review workflow, integrity check | [SOUL.md](../strategy/SOUL.md) |
+| `storage_agent` | Task | Quota, orphan cleanup, archival | [SOUL.md](../strategy/SOUL.md) |
 
 ---
 
@@ -91,3 +98,9 @@ Universal document store. `ownerType` (e.g., `student`, `staff`, `homework`, `fa
 | `documents.verified` | `{ documentId, status, verifiedBy }` | Communication (notification), Events (audit) |
 | `documents.expired` | `{ documentId, ownerType }` | Communication (renewal reminder) |
 | `documents.certificate_generated` | `{ documentId, userId, certificateType }` | Communication (delivery), Events (audit) |
+
+---
+
+## UI Documentation (Boneyard)
+- **Document Explorer**: All document viewports MUST implement `boneyard-js` skeletons for sub-100ms file-list retrieval.
+- **Review Workflow**: The verification viewport must utilize "Refraction-Pro" glassmorphism cards for scannable status/rejection reason visualization.

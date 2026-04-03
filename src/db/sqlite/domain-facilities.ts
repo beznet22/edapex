@@ -33,7 +33,7 @@ export type VehicleMetadata = {
   trackerId?: string;
 };
 
-export const dormitories = sqliteTable("domain_facilities_dormitories", {
+export const dormitories = sqliteTable("dormitories", {
   id: text("id").primaryKey().$defaultFn(() => generateId()),
   tenantId: text("tenant_id").notNull().references(() => tenants.id),
   name: text("name", { length: 255 }).notNull(),
@@ -45,7 +45,7 @@ export const dormitories = sqliteTable("domain_facilities_dormitories", {
   updatedAt: integer("updated_at", { mode: "timestamp" }).defaultNow(),
 });
 
-export const rooms = sqliteTable("domain_facilities_rooms", {
+export const rooms = sqliteTable("rooms", {
   id: text("id").primaryKey().$defaultFn(() => generateId()),
   tenantId: text("tenant_id").notNull().references(() => tenants.id),
   dormitoryId: text("dormitory_id").notNull().references(() => dormitories.id),
@@ -58,7 +58,7 @@ export const rooms = sqliteTable("domain_facilities_rooms", {
   updatedAt: integer("updated_at", { mode: "timestamp" }).defaultNow(),
 });
 
-export const routes = sqliteTable("domain_facilities_routes", {
+export const routes = sqliteTable("routes", {
   id: text("id").primaryKey().$defaultFn(() => generateId()),
   tenantId: text("tenant_id").notNull().references(() => tenants.id),
   name: text("name", { length: 255 }).notNull(),
@@ -68,7 +68,7 @@ export const routes = sqliteTable("domain_facilities_routes", {
   updatedAt: integer("updated_at", { mode: "timestamp" }).defaultNow(),
 });
 
-export const vehicles = sqliteTable("domain_facilities_vehicles", {
+export const vehicles = sqliteTable("vehicles", {
   id: text("id").primaryKey().$defaultFn(() => generateId()),
   tenantId: text("tenant_id").notNull().references(() => tenants.id),
   vehicleNo: text("vehicle_no", { length: 100 }).notNull(),
@@ -80,7 +80,7 @@ export const vehicles = sqliteTable("domain_facilities_vehicles", {
   updatedAt: integer("updated_at", { mode: "timestamp" }).defaultNow(),
 });
 
-export const routeAssignments = sqliteTable("domain_facilities_route_assignments", {
+export const routeAssignments = sqliteTable("route_assignments", {
   id: text("id").primaryKey().$defaultFn(() => generateId()),
   tenantId: text("tenant_id").notNull().references(() => tenants.id),
   routeId: text("route_id").notNull().references(() => routes.id),
@@ -89,7 +89,7 @@ export const routeAssignments = sqliteTable("domain_facilities_route_assignments
   updatedAt: integer("updated_at", { mode: "timestamp" }).defaultNow(),
 });
 
-export const facilityAllocations = sqliteTable("domain_facilities_facility_allocations", {
+export const facilityAllocations = sqliteTable("facility_allocations", {
   id: text("id").primaryKey().$defaultFn(() => generateId()),
   tenantId: text("tenant_id").notNull().references(() => tenants.id),
   userId: text("user_id").notNull().references(() => users.id), // Participant persona
@@ -108,7 +108,7 @@ export const facilityAllocations = sqliteTable("domain_facilities_facility_alloc
 // --- NEW TABLES ---
 
 // Complaints — replaces smComplaints
-export const complaints = sqliteTable("domain_facilities_complaints", {
+export const complaints = sqliteTable("complaints", {
   id: text("id").primaryKey().$defaultFn(() => generateId()),
   tenantId: text("tenant_id").notNull().references(() => tenants.id),
   complaintBy: text("complaint_by").notNull().references(() => users.id), // Reporter persona
@@ -127,7 +127,7 @@ export const complaints = sqliteTable("domain_facilities_complaints", {
 }));
 
 // Visitors — replaces smVisitors
-export const visitors = sqliteTable("domain_facilities_visitors", {
+export const visitors = sqliteTable("visitors", {
   id: text("id").primaryKey().$defaultFn(() => generateId()),
   tenantId: text("tenant_id").notNull().references(() => tenants.id),
   name: text("name", { length: 200 }).notNull(),
@@ -151,7 +151,7 @@ export type InventoryMetadata = {
   expiryDate?: string;
 };
 
-export const inventoryItems = sqliteTable("domain_facilities_inventory_items", {
+export const inventoryItems = sqliteTable("inventory_items", {
   id: text("id").primaryKey().$defaultFn(() => generateId()),
   tenantId: text("tenant_id").notNull().references(() => tenants.id),
   name: text("name", { length: 255 }).notNull(),

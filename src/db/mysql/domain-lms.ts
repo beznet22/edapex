@@ -25,7 +25,7 @@ import {
   boolean
 } from "drizzle-orm/mysql-core";
 
-import { users, tenants, academicYears, accounts } from "./domain-core";
+import { users, tenants, academicYears, accounts , academicTerms } from "./domain-core";
 import { subjects } from "./domain-academic";
 import { feeMasters } from "./domain-finance";
 import { generateId } from "../utils/id";
@@ -66,6 +66,8 @@ export type TutoringMessage = {
 
 // Brand New LMS Domain - AI-Native & Standalone-Friendly
 export const lmsCourses = mysqlTable("lms_courses", {
+  termId: text("term_id").references(() => academicTerms.id),
+
   id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => generateId()),
   tenantId: varchar("tenant_id", { length: 36 }).notNull().references(() => tenants.id),
   title: varchar("title", { length: 500 }).notNull(),

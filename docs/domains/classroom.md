@@ -8,6 +8,7 @@ The Classroom domain (Domain 18) encapsulates the OpenMAIC-powered Agentic Class
 - **Stateless Memory Ledger**: LangGraph state is buffered turn-by-turn in `classroomMemoryLedger`, not persisted in LMS. This prevents stateless execution from corrupting course-level data.
 - **Dynamic Participation**: `classroomParticipants` tracks per-session roster with real-time engagement scoring.
 - **Whiteboard State**: A dedicated `classroomWhiteboardState` table replays visual actions (`wb_highlight`, `wb_show_image`, `wb_pan`) for late-joining participants.
+- **[NEW] Professional Persona Flow (The Teacher)**: Mr. Ade, the Mathematics Teacher, manages the "Linear Equations Live" goal. He triggers the `director_agent` to orchestrate a 40-minute session. When the `engagement_drift_detector` flags a drop in student participation, he uses the `tutor_agent` to inject interactive Q&A. He approves the final session summary via the `aiApprovals` gate, which then triggers the `memory_ledger_compactor` to store the distilled knowledge in the student's LMS profile, visualized via Boneyard-powered skeletons.
 
 ---
 
@@ -20,6 +21,10 @@ The Classroom domain (Domain 18) encapsulates the OpenMAIC-powered Agentic Class
 | — (new) | `classroomMemoryLedger` | Turn-by-turn LangGraph state buffer. |
 | — (new) | `classroomParticipants` | Session roster with engagement scoring. |
 | — (new) | `classroomWhiteboardState` | Visual action timeline for whiteboard replay. |
+| — (new) | `aiSessions` | [GOVERNANCE] Traceability for teaching and orchestration discussions. |
+| — (new) | `aiTasks` | [GOVERNANCE] Atomic state buffering and replay tasks. |
+| — (new) | `aiGoals` | [GOVERNANCE] Alignment with institutional pedagogical targets. |
+| — (new) | `aiApprovals` | [GOVERNANCE] Senior Faculty sign-off for session summaries and outcomes. |
 
 ### Cross-Domain Edges
 - **LMS** (`courseId`): Director's pedagogical blueprint.
@@ -95,10 +100,12 @@ Timeline of whiteboard actions for replay and late-join catch-up.
 
 | Agent | Type | Capabilities |
 |:---|:---|:---|
-| `director_agent` | Supervisor | Session orchestration, pedagogical flow, LangGraph execution |
-| `tutor_agent` | Task | Real-time Q&A, adaptive explanation, engagement tracking |
-| `evaluator_agent` | Task | In-session assessment, grading, competency mapping |
-| `whiteboard_agent` | Task | Visual content delivery, timeline management |
+| Agent | Type | Capabilities | Link |
+|:---|:---|:---|:---|
+| `director_agent` | Supervisor | Session orchestration, pedagogical flow | [SOUL.md](../strategy/SOUL.md) |
+| `tutor_agent` | Task | Real-time Q&A, adaptive explanation | [SOUL.md](../strategy/SOUL.md) |
+| `evaluator_agent` | Task | In-session assessment, grading | [SOUL.md](../strategy/SOUL.md) |
+| `whiteboard_agent` | Task | Visual content delivery, timeline | [SOUL.md](../strategy/SOUL.md) |
 
 ---
 
@@ -110,3 +117,9 @@ Timeline of whiteboard actions for replay and late-join catch-up.
 | `classroom.session_ended` | `{ sessionId, turnCount, participantCount }` | LMS (progress update), Events (audit) |
 | `classroom.engagement_alert` | `{ sessionId, userId, score }` | Communication (teacher alert) |
 | `classroom.memory_compacted` | `{ sessionId, originalTurns, compactedTurns }` | Events (audit) |
+
+---
+
+## UI Documentation (Boneyard)
+- **Agentic Classroom Live**: The session viewport MUST implement `boneyard-js` skeletons for sub-100ms turn-by-turn state updates.
+- **Interactive Whiteboard**: The visual action layer must utilize "Refraction-Pro" glassmorphism overlays for non-intrusive focus targeting.

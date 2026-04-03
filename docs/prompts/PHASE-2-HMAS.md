@@ -19,7 +19,7 @@ Deploy the "Brain" of the Agentic School. Map the strategic HMAS orchestration (
 - **EXECUTION PLAN**: Before writing code, you MUST create a localized `docs/plans/phase-2-hmas-plan.md` detailing the precise files you will create/modify.
 
 ## 📦 Required Context & Skills
-- **Spec**: [AGENTIC_SCHOOL_V2_PLAN.md](../AGENTIC_SCHOOL_V2_PLAN.md) (Sections 13 and 36, Role Library & Domains).
+- **Spec**: [AGENTIC_SCHOOL_V2_PLAN.md](../AGENTIC_SCHOOL_V2_PLAN.md) (Sections 11.2, 13, 36, 46).
 - **Stress Framework**: [STRESS_FRAMEWORK.md](../STRESS_FRAMEWORK.md).
 - **Domain Specs** (MANDATORY — read ALL before defining agents and tools):
   - [core.md](../domains/core.md): Identity, tenancy, personas, academic years.
@@ -68,9 +68,9 @@ Generate the 31+ specialized agent definitions in `src/services/ai/roles/`.
 - **Toolset Grouping**: Enforce least-privilege by mapping domain-specific toolsets to each Supervisor.
 - **System + 3 Assembly**: [HIGH-FIDELITY] Implement the `prompt-builder.ts` with strict assembly order and Anthropic-style cache breakpoints (Section 1-46 as Breakpoint 1).
 - **Memory Tools**: Implement the `memory_tool` (`add`, `replace`, `remove`) for all 3-tier buffers (Section 44).
-- **Strategic Providers**: Implement the dynamic `ProviderRegistry` and `FallbackManager` (Workers AI, OpenAI, Anthropic, Ollama) within the Orchestrator with smart routing and mid-session failover (Section 3.9).
+- **Strategic Providers**: Implement the dynamic `ProviderRegistry` and `FallbackManager` (Workers AI, OpenAI, Anthropic, Ollama) within the Orchestrator with smart routing and mid-session failover (Section 46).
 - **Personality (SOUL)**: Initialize the `src/services/ai/strategy/SOUL.md` and map supervisor sub-personas in the registry.
-- **Atomic Task Checkout**: Implement the logic to consume `ai_tasks` using the single-trip `checkoutTask` repository method to ensure race-condition-free concurrency in Edge environments (Section 10.2).
+- **Atomic Task Checkout**: Implement the logic to consume `ai_tasks` using the single-trip `checkoutTask` repository method to ensure race-condition-free concurrency in Edge environments (Section 11.2).
 - **Background Protocol**: Implement the `session_id` tracking for high-latency tools (e.g., bulk enrollment).
 - Initialize the `src/services/ai/skills/` directory for the active domain.
 - **[STRESS DEFENSE]** `skill_integrity_lock`: Prevents accidental overwriting of agent-managed skills during concurrent runs.
@@ -78,7 +78,7 @@ Generate the 31+ specialized agent definitions in `src/services/ai/roles/`.
 ## 🏁 Completion Criteria
 - [ ] Generated and followed a localized `docs/plans/phase-2-hmas-plan.md`.
 - [ ] `pnpm tsc --noEmit` strictly passed with zero errors.
-- [ ] **Atomic Asset Checkout**: Implementation of the single-trip SQL update pattern (Section 7.2) for task acquisition.
+- [ ] **Atomic Asset Checkout**: Implementation of the single-trip SQL update pattern (Section 11.2) for task acquisition.
 - [ ] 31+ Agent definitions verifiable via Mastra.
 - [ ] Zero-error tool registration across all 18 domains.
 - [ ] Goal decomposition trace verifiable through logs, including Skill-based constraints.
@@ -96,5 +96,4 @@ Define the 3 specialized Classroom agents in `src/services/ai/roles/classroom/`:
 - **Director Agent**: LangGraph traffic controller (`directorNode`). Tools: `stream_event`, `assign_turn`, `end_session`. Orchestrates the `createOrchestrationGraph()` state machine.
 - **Teacher Agent**: Pedagogical content delivery. Tools: `wb_highlight`, `wb_show_image`, `wb_pan`, `wb_spotlight`. Generates interleaved `action`/`text` JSON arrays for SSE streaming.
 - **Evaluator Agent**: Passive grading and RAG token compaction. Tools: `eval_turn`, `compress_memory`, `generate_grading_report`. Produces `WorkProduct` records from live session data.
-- **Escalation**: Wire the human escalation edge (`type: "escalation"`) so administrators can halt the LangGraph loop and assume direct control.
-- **Spec Reference**: [AGENTIC_CLASSROOM_V2_SPEC.md](../AGENTIC_CLASSROOM_V2_SPEC.md) (Sections 1-3) and [AGENTIC_SCHOOL_V2_PLAN.md](../AGENTIC_SCHOOL_V2_PLAN.md) (Section 5.4, 13.18).
+- **Spec Reference**: [AGENTIC_SCHOOL_V2_PLAN.md](../AGENTIC_SCHOOL_V2_PLAN.md) (Section 5.4, 11.6, 13.18).

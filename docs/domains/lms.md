@@ -1,7 +1,8 @@
 # LMS (Learning Management System) Domain Architecture
 
 ## Overview
-The LMS domain in EdApex V2 is a fully AI-native, standalone-capable learning platform. It supports both B2B institutional coursework (linked to Academic subjects) and B2C retail education (standalone courses with monetization). The domain features AI tutoring sessions, competency-based tracking, adaptive learning paths, and granular analytics.
+- **Competency Tracking**: Mastery-based learning with evidence-backed competency records.
+- **[NEW] Professional Persona Flow (The Course Creator)**: Ms. Amara, a Senior Lecturer, uses the LMS to build an "Adaptive Calculus" course. She triggers the `content_architect` to generate 20 lessons from her PDF notes. When the `scorm_integrity_validator` flags a manifest error, she uses the `ai_tutor` to simulate a "Student Persona" walkthrough to verify the learning path logic. All her edits are protected by `content_version_control` and visualized via Boneyard skeletons before she triggers the `lms.course_published` event.
 
 ### Key Business Logic
 - **Course Hierarchy**: Courses → Modules → Lessons → Assignments. Each level is independently manageable.
@@ -31,6 +32,10 @@ The LMS domain in EdApex V2 is a fully AI-native, standalone-capable learning pl
 | — (new) | `lmsLearningPaths` | AI-generated adaptive learning paths. |
 | — (new) | `lmsLearningPathSteps` | Prerequisite-locked sequential steps. |
 | — (new) | `lmsAnalyticsEvents` | Granular event tracking (page_view, quiz_submit, video_pause). |
+| — (new) | `aiSessions` | [GOVERNANCE] Linked tutoring and content generation sessions. |
+| — (new) | `aiTasks` | [GOVERNANCE] Atomic content creation and grading tasks. |
+| — (new) | `aiGoals` | [GOVERNANCE] Curricular alignment with institutional goals. |
+| — (new) | `aiApprovals` | [GOVERNANCE] Senior Faculty sign-off for AI-generated content. |
 
 ---
 
@@ -129,12 +134,14 @@ Routes → LMSController → LMSService → LMSRepository
 
 | Agent | Type | Capabilities |
 |:---|:---|:---|
-| `lms_supervisor` | Supervisor | Course curation, content quality, enrollment management |
-| `content_architect` | Task | Course/module/lesson generation, media validation |
-| `ai_tutor` | Task | Real-time AI tutoring, session summarization |
-| `grading_agent` | Task | AI-powered auto-grading, plagiarism detection |
-| `learning_path_agent` | Task | Adaptive curriculum generation, competency gap analysis |
-| `analytics_agent` | Task | Progress reporting, engagement insights, retention alerts |
+| Agent | Type | Capabilities | Link |
+|:---|:---|:---|:---|
+| `lms_supervisor` | Supervisor | Course curation, content quality, enrollment management | [SOUL.md](../strategy/SOUL.md) |
+| `content_architect` | Task | Course/module/lesson generation, media validation | [SOUL.md](../strategy/SOUL.md) |
+| `ai_tutor` | Task | Real-time AI tutoring, session summarization | [SOUL.md](../strategy/SOUL.md) |
+| `grading_agent` | Task | AI-powered auto-grading, plagiarism detection | [SOUL.md](../strategy/SOUL.md) |
+| `learning_path_agent` | Task | Adaptive curriculum generation, competency gaps | [SOUL.md](../strategy/SOUL.md) |
+| `analytics_agent` | Task | Progress reporting, engagement insights, retention alerts | [SOUL.md](../strategy/SOUL.md) |
 
 ---
 
@@ -148,3 +155,9 @@ Routes → LMSController → LMSService → LMSRepository
 | `lms.lesson_completed` | `{ progressId, lessonId, userId }` | LMS (path unlock), Events (audit) |
 | `lms.tutoring_session_ended` | `{ sessionId, userId, messageCount }` | AI (summarization), Events (audit) |
 | `lms.competency_attained` | `{ recordId, userId, level }` | Communication (certificate trigger), Events (audit) |
+
+---
+
+## UI Documentation (Boneyard)
+- **Course Builder**: The curriculum editor MUST utilize `boneyard-js` skeletons for real-time drag-and-drop module reordering.
+- **AI Tutoring Chat**: The tutoring viewport must implement the "Refraction-Pro" glassmorphism theme for a focused, distraction-free learning environment.

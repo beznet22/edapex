@@ -13,7 +13,7 @@
  */
 import { unique,  sqliteTable, text, integer, real, index } from "drizzle-orm/sqlite-core";
 
-import { users, tenants, academicYears, accounts } from "./domain-core";
+import { users, tenants, academicYears, accounts , academicTerms } from "./domain-core";
 import { subjects } from "./domain-academic";
 import { feeMasters } from "./domain-finance";
 
@@ -52,7 +52,9 @@ export type TutoringMessage = {
 };
 
 // Brand New LMS Domain - AI-Native & Standalone-Friendly
-export const lmsCourses = sqliteTable("domain_lms_lms_courses", {
+export const lmsCourses = sqliteTable("lms_courses", {
+  termId: text("term_id").references(() => academicTerms.id),
+
   id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
   tenantId: integer("tenant_id").notNull().references(() => tenants.id),
   title: text("title", { length: 500 }).notNull(),
@@ -73,7 +75,7 @@ export const lmsCourses = sqliteTable("domain_lms_lms_courses", {
   levelIdx: index("lms_crs_level_idx").on(table.educationLevel),
 }));
 
-export const lmsModules = sqliteTable("domain_lms_lms_modules", {
+export const lmsModules = sqliteTable("lms_modules", {
   id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
   courseId: integer("course_id").notNull().references(() => lmsCourses.id, { onDelete: "cascade" }),
   title: text("title", { length: 500 }).notNull(),
@@ -83,7 +85,7 @@ export const lmsModules = sqliteTable("domain_lms_lms_modules", {
   updatedAt: integer("updated_at", { mode: "timestamp" }).defaultNow(),
 });
 
-export const lmsLessons = sqliteTable("domain_lms_lms_lessons", {
+export const lmsLessons = sqliteTable("lms_lessons", {
   id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
   moduleId: integer("module_id").notNull().references(() => lmsModules.id, { onDelete: "cascade" }),
   title: text("title", { length: 500 }).notNull(),
@@ -97,7 +99,7 @@ export const lmsLessons = sqliteTable("domain_lms_lms_lessons", {
   updatedAt: integer("updated_at", { mode: "timestamp" }).defaultNow(),
 });
 
-export const lmsLearningObjectives = sqliteTable("domain_lms_lms_learning_objectives", {
+export const lmsLearningObjectives = sqliteTable("lms_learning_objectives", {
   id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
   lessonId: integer("lesson_id").references(() => lmsLessons.id),
   moduleId: integer("module_id").references(() => lmsModules.id),
@@ -106,7 +108,7 @@ export const lmsLearningObjectives = sqliteTable("domain_lms_lms_learning_object
   updatedAt: integer("updated_at", { mode: "timestamp" }).defaultNow(),
 });
 
-export const lmsAssignments = sqliteTable("domain_lms_lms_assignments", {
+export const lmsAssignments = sqliteTable("lms_assignments", {
   id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
   tenantId: integer("tenant_id").notNull().references(() => tenants.id),
   lessonId: integer("lesson_id").references(() => lmsLessons.id),
@@ -120,7 +122,7 @@ export const lmsAssignments = sqliteTable("domain_lms_lms_assignments", {
   updatedAt: integer("updated_at", { mode: "timestamp" }).defaultNow(),
 });
 
-export const lmsSubmissions = sqliteTable("domain_lms_lms_submissions", {
+export const lmsSubmissions = sqliteTable("lms_submissions", {
   id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
   tenantId: integer("tenant_id").notNull().references(() => tenants.id),
   assignmentId: integer("assignment_id").notNull().references(() => lmsAssignments.id),
@@ -136,7 +138,7 @@ export const lmsSubmissions = sqliteTable("domain_lms_lms_submissions", {
   updatedAt: integer("updated_at", { mode: "timestamp" }).defaultNow(),
 });
 
-export const lmsEnrollments = sqliteTable("domain_lms_lms_enrollments", {
+export const lmsEnrollments = sqliteTable("lms_enrollments", {
   id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
   tenantId: integer("tenant_id").notNull().references(() => tenants.id),
   courseId: integer("course_id").notNull().references(() => lmsCourses.id),
@@ -151,7 +153,7 @@ export const lmsEnrollments = sqliteTable("domain_lms_lms_enrollments", {
   userCourseIdx: index("lms_enr_user_crs_idx").on(table.userId, table.courseId),
 }));
 
-export const lmsProgress = sqliteTable("domain_lms_lms_progress", {
+export const lmsProgress = sqliteTable("lms_progress", {
   id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
   enrollmentId: integer("enrollment_id").notNull().references(() => lmsEnrollments.id, { onDelete: "cascade" }),
   lessonId: integer("lesson_id").notNull().references(() => lmsLessons.id),
@@ -162,7 +164,7 @@ export const lmsProgress = sqliteTable("domain_lms_lms_progress", {
   updatedAt: integer("updated_at", { mode: "timestamp" }).defaultNow(),
 });
 
-export const lmsCompetencies = sqliteTable("domain_lms_lms_competencies", {
+export const lmsCompetencies = sqliteTable("lms_competencies", {
   id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
   tenantId: integer("tenant_id").notNull().references(() => tenants.id),
   title: text("title", { length: 500 }).notNull(),
@@ -172,7 +174,7 @@ export const lmsCompetencies = sqliteTable("domain_lms_lms_competencies", {
   updatedAt: integer("updated_at", { mode: "timestamp" }).defaultNow(),
 });
 
-export const lmsCompetencyRecords = sqliteTable("domain_lms_lms_competency_records", {
+export const lmsCompetencyRecords = sqliteTable("lms_competency_records", {
   id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
   tenantId: integer("tenant_id").notNull().references(() => tenants.id),
   userId: integer("user_id").notNull().references(() => users.id), // Participant persona
@@ -184,7 +186,7 @@ export const lmsCompetencyRecords = sqliteTable("domain_lms_lms_competency_recor
   updatedAt: integer("updated_at", { mode: "timestamp" }).defaultNow(),
 });
 
-export const lmsTutoringSessions = sqliteTable("domain_lms_lms_tutoring_sessions", {
+export const lmsTutoringSessions = sqliteTable("lms_tutoring_sessions", {
   id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
   tenantId: integer("tenant_id").notNull().references(() => tenants.id),
   userId: integer("user_id").notNull().references(() => users.id),
@@ -197,7 +199,7 @@ export const lmsTutoringSessions = sqliteTable("domain_lms_lms_tutoring_sessions
   updatedAt: integer("updated_at", { mode: "timestamp" }).defaultNow(),
 });
 
-export const lmsLearningPaths = sqliteTable("domain_lms_lms_learning_paths", {
+export const lmsLearningPaths = sqliteTable("lms_learning_paths", {
   id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
   tenantId: integer("tenant_id").notNull().references(() => tenants.id),
   userId: integer("user_id").notNull().references(() => users.id),
@@ -208,7 +210,7 @@ export const lmsLearningPaths = sqliteTable("domain_lms_lms_learning_paths", {
   updatedAt: integer("updated_at", { mode: "timestamp" }).defaultNow(),
 });
 
-export const lmsLearningPathSteps = sqliteTable("domain_lms_lms_learning_path_steps", {
+export const lmsLearningPathSteps = sqliteTable("lms_learning_path_steps", {
   id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
   pathId: integer("path_id").notNull().references(() => lmsLearningPaths.id, { onDelete: "cascade" }),
   lessonId: integer("lesson_id").notNull().references(() => lmsLessons.id),
@@ -219,7 +221,7 @@ export const lmsLearningPathSteps = sqliteTable("domain_lms_lms_learning_path_st
   updatedAt: integer("updated_at", { mode: "timestamp" }).defaultNow(),
 });
 
-export const lmsAnalyticsEvents = sqliteTable("domain_lms_lms_analytics_events", {
+export const lmsAnalyticsEvents = sqliteTable("lms_analytics_events", {
   id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
   tenantId: integer("tenant_id").notNull().references(() => tenants.id),
   userId: integer("user_id").notNull().references(() => users.id), // Participant persona

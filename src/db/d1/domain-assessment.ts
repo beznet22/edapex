@@ -3,8 +3,8 @@
  * 
  * Purpose:
  * Unifies physical exam tabulation and online digital assessments. Replaces fragile 
- * legacy JSON parsing and redundant grade stores with strictly typed `edx_exam_setups`, 
- * `edx_exam_marks`, and dynamic constraints driven by Drizzle ORM schemas. Implements 
+ * legacy JSON parsing and redundant grade stores with strictly typed `exam_setups`, 
+ * `exam_marks`, and dynamic constraints driven by Drizzle ORM schemas. Implements 
  * high-fidelity relational maps for grade compilation.
  * 
  * Replaces Legacy Tables:
@@ -16,10 +16,12 @@
  */
 import { unique,  sqliteTable, text, integer, real, index } from "drizzle-orm/sqlite-core";
 
-import { users, tenants, academicYears, accounts } from "./domain-core";
+import { users, tenants, academicYears, accounts , academicTerms } from "./domain-core";
 import { classes, enrollments, sections, subjects } from "./domain-academic";
 
-export const exams = sqliteTable("domain_assessment_exams", {
+export const exams = sqliteTable("exams", {
+  termId: text("term_id").references(() => academicTerms.id),
+
   id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
   tenantId: integer("tenant_id").notNull().references(() => tenants.id),
   examType: text("exam_type", { enum: ["term", "continuous", "mock", "final"] }).notNull(),
@@ -33,7 +35,7 @@ export const exams = sqliteTable("domain_assessment_exams", {
   tenantAcademicIdx: index("exam_tenant_academic_idx").on(table.tenantId, table.academicId),
 }));
 
-export const examSetups = sqliteTable("domain_assessment_exam_setups", {
+export const examSetups = sqliteTable("exam_setups", {
   id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
   tenantId: integer("tenant_id").notNull().references(() => tenants.id),
   examId: integer("exam_id").notNull().references(() => exams.id),
@@ -48,7 +50,7 @@ export const examSetups = sqliteTable("domain_assessment_exam_setups", {
   examTargetIdx: index("exmset_exam_target_idx").on(table.examId, table.classId, table.subjectId),
 }));
 
-export const examMarks = sqliteTable("domain_assessment_exam_marks", {
+export const examMarks = sqliteTable("exam_marks", {
   id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
   tenantId: integer("tenant_id").notNull().references(() => tenants.id),
   examSetupId: integer("exam_setup_id").notNull().references(() => examSetups.id),
@@ -81,7 +83,7 @@ export type ComputedResultMetadata = {
   subjectAverages?: Record<number, number>;
 };
 
-export const computedResults = sqliteTable("domain_assessment_computed_results", {
+export const computedResults = sqliteTable("computed_results", {
   id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
   tenantId: integer("tenant_id").notNull().references(() => tenants.id),
   userId: integer("user_id").notNull().references(() => users.id),
@@ -100,7 +102,7 @@ export const computedResults = sqliteTable("domain_assessment_computed_results",
 });
 
 
-export const grades = sqliteTable("domain_assessment_grades", {
+export const grades = sqliteTable("grades", {
   id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
   tenantId: integer("tenant_id").notNull().references(() => tenants.id),
   name: text("name", { length: 100 }).notNull(),
@@ -113,7 +115,7 @@ export const grades = sqliteTable("domain_assessment_grades", {
   updatedAt: integer("updated_at", { mode: "timestamp" }).defaultNow(),
 });
 
-export const examSchedules = sqliteTable("domain_assessment_exam_schedules", {
+export const examSchedules = sqliteTable("exam_schedules", {
   id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
   tenantId: integer("tenant_id").notNull().references(() => tenants.id),
   examId: integer("exam_id").notNull().references(() => exams.id),
@@ -130,7 +132,7 @@ export const examSchedules = sqliteTable("domain_assessment_exam_schedules", {
 });
 
 // Student Ratings
-export const studentRatings = sqliteTable("domain_assessment_student_ratings", {
+export const studentRatings = sqliteTable("student_ratings", {
   id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
   tenantId: integer("tenant_id").notNull().references(() => tenants.id),
   userId: integer("user_id").notNull().references(() => users.id),
@@ -152,26 +154,13 @@ export const studentRatings = sqliteTable("domain_assessment_student_ratings", {
  * This table is scheduled for removal in the next schema migration.
  * All data should be migrated to the `teacher_remarks` field on `computed_results`.
  */
-export const teacherRemarks = sqliteTable("domain_assessment_teacher_remarks", {
-  id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
-  tenantId: integer("tenant_id").notNull().references(() => tenants.id),
-  userId: integer("user_id").notNull().references(() => users.id),
-  examId: integer("exam_id").notNull().references(() => exams.id),
-  staffId: integer("staff_id").references(() => users.id),
-  remark: text("remark").notNull(),
-  academicId: integer("academic_id").notNull().references(() => academicYears.id),
-  createdAt: integer("created_at", { mode: "timestamp" }).defaultNow(),
-  updatedAt: integer("updated_at", { mode: "timestamp" }).defaultNow(),
-}, (table) => ({
-  studentExamIdx: index("rem_stu_ex_idx").on(table.userId, table.examId),
-}));
 
 /**
  * NOTE: Export name `classAttendances` does NOT match DB table `class_attendance_summaries`.
  * This is intentional for brevity but may cause confusion. Consider renaming the export
  * to `classAttendanceSummaries` in a future refactor.
  */
-export const classAttendances = sqliteTable("domain_assessment_class_attendance_summaries", {
+export const classAttendances = sqliteTable("class_attendance_summaries", {
   id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
   tenantId: integer("tenant_id").notNull().references(() => tenants.id),
   userId: integer("user_id").notNull().references(() => users.id),
@@ -187,7 +176,7 @@ export const classAttendances = sqliteTable("domain_assessment_class_attendance_
 }));
 
 // Question Banks
-export const questionBanks = sqliteTable("domain_assessment_question_banks", {
+export const questionBanks = sqliteTable("question_banks", {
   id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
   tenantId: integer("tenant_id").notNull().references(() => tenants.id),
   subjectId: integer("subject_id").references(() => subjects.id),
@@ -209,7 +198,7 @@ export const questionBanks = sqliteTable("domain_assessment_question_banks", {
 }));
 
 // Online Exams
-export const onlineExams = sqliteTable("domain_assessment_online_exams", {
+export const onlineExams = sqliteTable("online_exams", {
   id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
   tenantId: integer("tenant_id").notNull().references(() => tenants.id),
   title: text("title", { length: 255 }).notNull(),
@@ -233,7 +222,7 @@ export const onlineExams = sqliteTable("domain_assessment_online_exams", {
 }));
 
 // Online Exam Questions
-export const onlineExamQuestions = sqliteTable("domain_assessment_online_exam_questions", {
+export const onlineExamQuestions = sqliteTable("online_exam_questions", {
   id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
   onlineExamId: integer("online_exam_id").notNull().references(() => onlineExams.id, { onDelete: "cascade" }),
   questionBankId: integer("question_bank_id").notNull().references(() => questionBanks.id),
@@ -252,7 +241,7 @@ export type AttemptAnswers = {
   marksAwarded: number;
 }[];
 
-export const onlineExamAttempts = sqliteTable("domain_assessment_online_exam_attempts", {
+export const onlineExamAttempts = sqliteTable("online_exam_attempts", {
   id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
   tenantId: integer("tenant_id").notNull().references(() => tenants.id),
   onlineExamId: integer("online_exam_id").notNull().references(() => onlineExams.id),

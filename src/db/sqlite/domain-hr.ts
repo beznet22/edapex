@@ -2,7 +2,7 @@
  * ARCHITECTURE OVERVIEW: Human Resources & Payroll Domain
  * 
  * Purpose:
- * Decouples employee payroll and leave metadata from the core `edx_accounts` table. 
+ * Decouples employee payroll and leave metadata from the core `accounts` table. 
  * Utilizes native relational constraints connecting `department_id` and `designation_id` 
  * directly to the identity layer, handling automated payroll generation securely.
  * 
@@ -19,7 +19,7 @@ import { generateId } from "../utils/id";
 
 // Extracts HR-specific data from sm_staffs
 
-export const hrDepartments = sqliteTable("domain_hr_departments", {
+export const hrDepartments = sqliteTable("departments", {
   id: text("id").primaryKey().$defaultFn(() => generateId()),
   tenantId: text("tenant_id").notNull().references(() => tenants.id),
   departmentName: text("department_name", { length: 191 }).notNull(),
@@ -27,7 +27,7 @@ export const hrDepartments = sqliteTable("domain_hr_departments", {
   updatedAt: integer("updated_at", { mode: "timestamp" }).defaultNow(),
 });
 
-export const hrDesignations = sqliteTable("domain_hr_designations", {
+export const hrDesignations = sqliteTable("designations", {
   id: text("id").primaryKey().$defaultFn(() => generateId()),
   tenantId: text("tenant_id").notNull().references(() => tenants.id),
   designationName: text("designation_name", { length: 191 }).notNull(),
@@ -36,7 +36,7 @@ export const hrDesignations = sqliteTable("domain_hr_designations", {
 });
 
 // Leave Types — configurable leave categories (replaces smLeaveTypes)
-export const leaveTypes = sqliteTable("domain_hr_leave_types", {
+export const leaveTypes = sqliteTable("leave_types", {
   id: text("id").primaryKey().$defaultFn(() => generateId()),
   tenantId: text("tenant_id").notNull().references(() => tenants.id),
   name: text("name", { length: 100 }).notNull(), // medical, casual, maternity, etc.
@@ -46,7 +46,7 @@ export const leaveTypes = sqliteTable("domain_hr_leave_types", {
   updatedAt: integer("updated_at", { mode: "timestamp" }).defaultNow(),
 });
 
-export const hrLeaveRequests = sqliteTable("domain_hr_leave_requests", {
+export const hrLeaveRequests = sqliteTable("leave_requests", {
   id: text("id").primaryKey().$defaultFn(() => generateId()),
   tenantId: text("tenant_id").notNull().references(() => tenants.id),
   userId: text("user_id").notNull().references(() => users.id), // Staff persona
@@ -73,7 +73,7 @@ export type SalaryComponent = {
   isPercentage?: boolean;  // if true, amount is % of basic
 };
 
-export const salaryTemplates = sqliteTable("domain_hr_salary_templates", {
+export const salaryTemplates = sqliteTable("salary_templates", {
   id: text("id").primaryKey().$defaultFn(() => generateId()),
   tenantId: text("tenant_id").notNull().references(() => tenants.id),
   name: text("name", { length: 200 }).notNull(),
@@ -84,7 +84,7 @@ export const salaryTemplates = sqliteTable("domain_hr_salary_templates", {
   tenantIdx: index("st_tenant_idx").on(table.tenantId),
 }));
 
-export const payrollRuns = sqliteTable("domain_hr_payroll_runs", {
+export const payrollRuns = sqliteTable("payroll_runs", {
   id: text("id").primaryKey().$defaultFn(() => generateId()),
   tenantId: text("tenant_id").notNull().references(() => tenants.id),
   userId: text("user_id").notNull().references(() => users.id), // Staff persona
@@ -112,7 +112,7 @@ export type EvaluationMetadata = {
   observerNotes?: string;
 };
 
-export const staffEvaluations = sqliteTable("domain_hr_staff_evaluations", {
+export const staffEvaluations = sqliteTable("staff_evaluations", {
   id: text("id").primaryKey().$defaultFn(() => generateId()),
   tenantId: text("tenant_id").notNull().references(() => tenants.id),
   userId: text("user_id").notNull().references(() => users.id), // Staff being evaluated

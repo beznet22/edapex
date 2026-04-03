@@ -9,6 +9,7 @@ The HR domain decouples employee management, payroll, and leave tracking from th
 - **Salary Templates**: JSON-based component definitions (`earning`/`deduction`) supporting percentage-of-basic calculations.
 - **Payroll Runs**: Monthly generation with automated net salary calculation.
 - **Staff Evaluations**: Criteria-based performance tracking with scoring and remarks.
+- **[NEW] Professional Persona Flow (The HR Manager)**: Ms. Zaynab, the HR Manager, manages the "Monthly Payroll Disbursement" goal. She triggers the `payroll_calculator` to compute net salaries for 150 staff. When the `payroll_double_run_guard` blocks a duplicate entry, she reviews the `aiActivityLogs` to identify the retry storm source. She uses the Boneyard-powered "Staff Onboarding" wizard to verify that the `leave_manager` has correctly initialized annual balances before the `principal_assistant` approves the final bank export.
 
 ---
 
@@ -24,6 +25,10 @@ The HR domain decouples employee management, payroll, and leave tracking from th
 | `sm_hr_salary_templates` | `salaryTemplates` | JSON components array replacing multiple legacy columns. |
 | `sm_hr_payroll_generates` | `payrollRuns` | Monthly payroll with draft → approved → disbursed lifecycle. |
 | — (new) | `staffEvaluations` | Criteria-based performance evaluations. |
+| — (new) | `aiSessions` | [GOVERNANCE] Traceability for performance and hiring discussions. |
+| — (new) | `aiTasks` | [GOVERNANCE] Atomic payroll and leave verification tasks. |
+| — (new) | `aiGoals` | [GOVERNANCE] Alignment with institutional staffing targets. |
+| — (new) | `aiApprovals` | [GOVERNANCE] Multi-step sign-off for terminations and hiring. |
 
 ---
 
@@ -106,10 +111,12 @@ Performance evaluations with criteria-based scoring and evaluator tracking.
 
 | Agent | Type | Capabilities |
 |:---|:---|:---|
-| `hr_supervisor` | Supervisor | Leave policy enforcement, payroll oversight |
-| `payroll_calculator` | Task | Salary template application, net computation |
-| `leave_manager` | Task | Balance tracking, conflict detection, auto-reconciliation |
-| `evaluation_analyst` | Task | Scoring aggregation, bias detection |
+| Agent | Type | Capabilities | Link |
+|:---|:---|:---|:---|
+| `hr_supervisor` | Supervisor | Leave policy enforcement, payroll oversight | [SOUL.md](../strategy/SOUL.md) |
+| `payroll_calculator` | Task | Salary template application, net computation | [SOUL.md](../strategy/SOUL.md) |
+| `leave_manager` | Task | Balance tracking, conflict detection | [SOUL.md](../strategy/SOUL.md) |
+| `evaluation_analyst` | Task | Scoring aggregation, bias detection | [SOUL.md](../strategy/SOUL.md) |
 
 ---
 
@@ -121,3 +128,9 @@ Performance evaluations with criteria-based scoring and evaluator tracking.
 | `hr.payroll_disbursed` | `{ payrollId, userId, netSalary }` | Finance (ledger entry), Communication (payslip) |
 | `hr.evaluation_completed` | `{ evaluationId, userId, score }` | Events (audit) |
 | `hr.leave_balance_exhausted` | `{ userId, leaveType }` | Communication (alert), HR (supervisor) |
+
+---
+
+## UI Documentation (Boneyard)
+- **Staff Directory**: The high-density staff roster MUST implement `boneyard-js` skeletons for sub-100ms profile retrieval.
+- **Leave Approval Workflow**: The approve/reject viewport must utilize "Refraction-Pro" glassmorphism cards for scannable date-range conflict visualization.

@@ -21,7 +21,7 @@ import { users, tenants, academicYears, accounts } from "./domain-core";
 
 // Unified Classes & Sections — replaces sm_classes, sm_sections, sm_class_sections, sm_subjects
 
-export const classes = sqliteTable("domain_academic_classes", {
+export const classes = sqliteTable("classes", {
   id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
   tenantId: integer("tenant_id").notNull().references(() => tenants.id),
   name: text("name", { length: 200 }).notNull(),
@@ -34,7 +34,7 @@ export const classes = sqliteTable("domain_academic_classes", {
   tenantAcademicIdx: index("cls_tenant_academic_idx").on(table.tenantId, table.academicId),
 }));
 
-export const sections = sqliteTable("domain_academic_sections", {
+export const sections = sqliteTable("sections", {
   id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
   tenantId: integer("tenant_id").notNull().references(() => tenants.id),
   name: text("name", { length: 200 }).notNull(),
@@ -45,7 +45,7 @@ export const sections = sqliteTable("domain_academic_sections", {
   tenantIdx: index("sec_tenant_idx").on(table.tenantId),
 }));
 
-export const classSections = sqliteTable("domain_academic_class_sections", {
+export const classSections = sqliteTable("class_sections", {
   id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
   classId: integer("class_id").notNull().references(() => classes.id),
   sectionId: integer("section_id").notNull().references(() => sections.id),
@@ -57,7 +57,7 @@ export const classSections = sqliteTable("domain_academic_class_sections", {
   classSectionIdx: index("clsec_class_sec_idx").on(table.classId, table.sectionId),
 }));
 
-export const subjects = sqliteTable("domain_academic_subjects", {
+export const subjects = sqliteTable("subjects", {
   id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
   tenantId: integer("tenant_id").notNull().references(() => tenants.id),
   name: text("name", { length: 255 }).notNull(),
@@ -72,7 +72,7 @@ export const subjects = sqliteTable("domain_academic_subjects", {
   tenantAcademicIdx: index("sub_tenant_academic_idx").on(table.tenantId, table.academicId),
 }));
 
-export const enrollments = sqliteTable("domain_academic_enrollments", {
+export const enrollments = sqliteTable("enrollments", {
   id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
   tenantId: integer("tenant_id").notNull().references(() => tenants.id),
   userId: integer("user_id").notNull().references(() => users.id), // Student persona
@@ -89,7 +89,7 @@ export const enrollments = sqliteTable("domain_academic_enrollments", {
   tenantClassIdx: index("enr_tenant_class_idx").on(table.tenantId, table.classId),
 }));
 
-export const classRoutines = sqliteTable("domain_academic_class_routines", {
+export const classRoutines = sqliteTable("class_routines", {
   id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
   tenantId: integer("tenant_id").notNull().references(() => tenants.id),
   classId: integer("class_id").notNull().references(() => classes.id),
@@ -108,7 +108,7 @@ export const classRoutines = sqliteTable("domain_academic_class_routines", {
   classScheduleIdx: index("cr_class_schedule_idx").on(table.classId, table.sectionId, table.dayOfWeek),
 }));
 
-export const homeworks = sqliteTable("domain_academic_homeworks", {
+export const homeworks = sqliteTable("homeworks", {
   id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
   tenantId: integer("tenant_id").notNull().references(() => tenants.id),
   classId: integer("class_id").notNull().references(() => classes.id),
@@ -127,7 +127,7 @@ export const homeworks = sqliteTable("domain_academic_homeworks", {
   classSubjectIdx: index("hw_class_subject_idx").on(table.classId, table.subjectId),
 }));
 
-export const lessons = sqliteTable("domain_academic_lessons", {
+export const lessons = sqliteTable("lessons", {
   id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
   tenantId: integer("tenant_id").notNull().references(() => tenants.id),
   classId: integer("class_id").notNull().references(() => classes.id),
@@ -140,7 +140,7 @@ export const lessons = sqliteTable("domain_academic_lessons", {
   updatedAt: integer("updated_at", { mode: "timestamp" }).defaultNow(),
 });
 
-export const subjectAssignments = sqliteTable("domain_academic_subject_assignments", {
+export const subjectAssignments = sqliteTable("subject_assignments", {
   id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
   tenantId: integer("tenant_id").notNull().references(() => tenants.id),
   staffId: integer("staff_id").notNull().references(() => users.id), // Teacher persona
@@ -158,7 +158,7 @@ export const subjectAssignments = sqliteTable("domain_academic_subject_assignmen
 // --- NEW TABLES ---
 
 // Class Teachers — replaces smAssignClassTeachers
-export const classTeachers = sqliteTable("domain_academic_class_teachers", {
+export const classTeachers = sqliteTable("class_teachers", {
   id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
   tenantId: integer("tenant_id").notNull().references(() => tenants.id),
   classId: integer("class_id").notNull().references(() => classes.id),
@@ -179,7 +179,7 @@ export type HomeworkSubmissionMetadata = {
   attachments?: string[];
 };
 
-export const homeworkSubmissions = sqliteTable("domain_academic_homework_submissions", {
+export const homeworkSubmissions = sqliteTable("homework_submissions", {
   id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
   tenantId: integer("tenant_id").notNull().references(() => tenants.id),
   homeworkId: integer("homework_id").notNull().references(() => homeworks.id, { onDelete: "cascade" }),
@@ -197,7 +197,7 @@ export const homeworkSubmissions = sqliteTable("domain_academic_homework_submiss
 }));
 
 // Promotions — replaces smStudentPromotions
-export const promotions = sqliteTable("domain_academic_promotions", {
+export const promotions = sqliteTable("promotions", {
   id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
   tenantId: integer("tenant_id").notNull().references(() => tenants.id),
   userId: integer("user_id").notNull().references(() => users.id), // Student persona
@@ -218,7 +218,7 @@ export const promotions = sqliteTable("domain_academic_promotions", {
 }));
 
 // Timelines — replaces smStudentTimelines
-export const timelines = sqliteTable("domain_academic_timelines", {
+export const timelines = sqliteTable("timelines", {
   id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
   tenantId: integer("tenant_id").notNull().references(() => tenants.id),
   userId: integer("user_id").notNull().references(() => users.id),
