@@ -3,6 +3,12 @@
 ## Package Manager
 Use **pnpm**: `pnpm install`, `pnpm run db:push`, `pnpm run dev`
 
+## Frontend Tech Stack
+- **Framework**: TanStack Start (React 19)
+- **Styling**: Tailwind CSS v4
+- **Components**: Shadcn UI + AI Elements
+- **Loading**: `boneyard-js` (Skeleton screens)
+
 ## Commit Attribution
 AI commits MUST include:
 ```
@@ -32,6 +38,7 @@ Co-Authored-By: Antigravity <antigravity@google.com>
 - **Provider-Agnostic AI**: Define capabilities; pick provider (`workers-ai`, `openai`) at runtime.
 - **PBAC Security**: Evaluation happens *before* tool execution.
 - **Agentic Classroom**: Domain 18 logic lives in `domain-classroom`. Respect edge execution constraints (stateless memory ledgers).
+- **UI Skeletons (Boneyard)**: Use `boneyard-js` for pixel-perfect skeleton screens in all high-density views.
 
 ## Documentation
 - see `docs/AGENTIC_SCHOOL_V2_PLAN.md` for the low-level technical specification.

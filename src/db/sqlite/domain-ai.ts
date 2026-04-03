@@ -36,11 +36,12 @@ export type MessageMetadata = {
 
 export type MessagePart = Record<string, any>;
 
-export const aiChats = sqliteTable("domain_ai_ai_chats", {
+export const aiSessions = sqliteTable("domain_ai_ai_sessions", {
   id: text("id", { length: 255 }).primaryKey().$defaultFn(() => generateId()), 
   tenantId: text("tenant_id").notNull().references(() => tenants.id),
   userId: text("user_id").notNull().references(() => users.id),
-  title: text("title", { length: 255 }).notNull().default("New Chat"),
+  parentSessionId: text("parent_session_id", { length: 255 }), // Lineage
+  title: text("title", { length: 255 }).notNull().default("New Session"),
   model: text("model", { length: 100 }),
   visibility: text("visibility", { enum: ["private", "public"] }).default("private"),
   metadata: text("metadata", { mode: "json" }).$type<ChatMetadata>(),
@@ -51,7 +52,7 @@ export const aiChats = sqliteTable("domain_ai_ai_chats", {
 export const aiMessages = sqliteTable("domain_ai_ai_messages", {
   id: text("id", { length: 255 }).primaryKey().$defaultFn(() => generateId()),
   tenantId: text("tenant_id").notNull().references(() => tenants.id),
-  chatId: text("chat_id", { length: 255 }).notNull().references(() => aiChats.id, { onDelete: "cascade" }),
+  sessionId: text("session_id", { length: 255 }).notNull().references(() => aiSessions.id, { onDelete: "cascade" }),
   role: text("role", { enum: ["user", "assistant", "system", "tool"] }).notNull(),
   parts: text("parts", { mode: "json" }).$type<MessagePart[]>().notNull(),
   metadata: text("metadata", { mode: "json" }).$type<MessageMetadata>(),
@@ -59,18 +60,18 @@ export const aiMessages = sqliteTable("domain_ai_ai_messages", {
   updatedAt: integer("updated_at", { mode: "timestamp" }).defaultNow(),
 }, (table) => ({
   tenantIdx: index("msg_tenant_idx").on(table.tenantId),
-  chatIdx: index("msg_chat_idx").on(table.tenantId, table.chatId),
+  sessionIdx: index("msg_session_idx").on(table.tenantId, table.sessionId),
 }));
 
 export const aiVotes = sqliteTable("domain_ai_ai_votes", {
   tenantId: text("tenant_id").notNull().references(() => tenants.id),
-  chatId: text("chat_id", { length: 255 }).notNull().references(() => aiChats.id, { onDelete: "cascade" }),
+  sessionId: text("session_id", { length: 255 }).notNull().references(() => aiSessions.id, { onDelete: "cascade" }),
   messageId: text("message_id", { length: 255 }).notNull().references(() => aiMessages.id, { onDelete: "cascade" }),
   isUpvoted: integer("is_upvoted").notNull(),
   createdAt: integer("created_at", { mode: "timestamp" }).defaultNow(),
   updatedAt: integer("updated_at", { mode: "timestamp" }).defaultNow(),
 }, (table) => ({
-  pk: index("pk").on(table.tenantId, table.chatId, table.messageId),
+  pk: index("pk").on(table.tenantId, table.sessionId, table.messageId),
 }));
 
 export const aiDocuments = sqliteTable("domain_ai_ai_documents", {
@@ -144,4 +145,95 @@ export const aiToolInvocations = sqliteTable("domain_ai_ai_tool_invocations", {
   updatedAt: integer("updated_at", { mode: "timestamp" }).defaultNow(),
 }, (table) => ({
   tenantActionIdx: index("tool_tenant_action_idx").on(table.tenantId, table.actionId),
+}));
+
+// --- RECURSIVE STRATEGY & TASKS ---
+
+export const aiGoals = sqliteTable("domain_ai_ai_goals", {
+  id: text("id", { length: 255 }).primaryKey().$defaultFn(() => generateId()),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id),
+  title: text("title", { length: 255 }).notNull(),
+  description: text("description"),
+  level: text("level", { enum: ["institution", "department", "agent", "task"] }).notNull(),
+  parentId: text("parent_id", { length: 255 }).references((): any => aiGoals.id),
+  ownerAgentId: text("owner_agent_id", { length: 255 }).references(() => aiAgents.id),
+  status: text("status", { enum: ["planned", "active", "achieved", "cancelled"] }).default("planned"),
+  academicYearId: text("academic_year_id", { length: 255 }), // Placeholder FK
+  createdAt: integer("created_at", { mode: "timestamp" }).defaultNow(),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).defaultNow(),
+}, (table) => ({
+  tenantIdx: index("goal_tenant_idx").on(table.tenantId),
+}));
+
+export const aiTasks = sqliteTable("domain_ai_ai_tasks", {
+  id: text("id", { length: 255 }).primaryKey().$defaultFn(() => generateId()),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id),
+  projectId: text("project_id", { length: 255 }),
+  goalId: text("goal_id", { length: 255 }).references(() => aiGoals.id),
+  parentId: text("parent_id", { length: 255 }).references((): any => aiTasks.id),
+  title: text("title", { length: 255 }).notNull(),
+  description: text("description"),
+  status: text("status", { enum: ["backlog", "todo", "in_progress", "in_review", "done", "blocked", "cancelled"] }).default("todo"),
+  priority: text("priority", { enum: ["critical", "high", "medium", "low"] }).default("medium"),
+  assigneeAgentId: text("assignee_agent_id", { length: 255 }).references(() => aiAgents.id),
+  createdByAgentId: text("created_by_agent_id", { length: 255 }).references(() => aiAgents.id),
+  createdByUserId: text("created_by_user_id", { length: 255 }).references(() => users.id),
+  billingCode: text("billing_code", { length: 100 }),
+  startedAt: integer("started_at", { mode: "timestamp" }),
+  completedAt: integer("completed_at", { mode: "timestamp" }),
+  cancelledAt: integer("cancelled_at", { mode: "timestamp" }),
+  createdAt: integer("created_at", { mode: "timestamp" }).defaultNow(),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).defaultNow(),
+}, (table) => ({
+  tenantIdx: index("task_tenant_idx").on(table.tenantId),
+  assigneeIdx: index("task_assignee_idx").on(table.tenantId, table.assigneeAgentId, table.status),
+}));
+
+export const aiApprovals = sqliteTable("domain_ai_ai_approvals", {
+  id: text("id", { length: 255 }).primaryKey().$defaultFn(() => generateId()),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id),
+  type: text("type", { enum: ["hire_agent", "approve_strategy", "budget_override"] }).notNull(),
+  requestedByAgentId: text("requested_by_agent_id", { length: 255 }).references(() => aiAgents.id),
+  requestedByUserId: text("requested_by_user_id", { length: 255 }).references(() => users.id),
+  status: text("status", { enum: ["pending", "approved", "rejected", "cancelled"] }).default("pending"),
+  payload: text("payload", { mode: "json" }).$type<Record<string, any>>().notNull(),
+  decisionNote: text("decision_note"),
+  decidedByUserId: text("decided_by_user_id", { length: 255 }).references(() => users.id),
+  decidedAt: integer("decided_at", { mode: "timestamp" }),
+  createdAt: integer("created_at", { mode: "timestamp" }).defaultNow(),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).defaultNow(),
+}, (table) => ({
+  tenantIdx: index("appr_tenant_idx").on(table.tenantId, table.status),
+}));
+
+export const aiCostEvents = sqliteTable("domain_ai_ai_cost_events", {
+  id: text("id", { length: 255 }).primaryKey().$defaultFn(() => generateId()),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id),
+  agentId: text("agent_id").notNull().references(() => aiAgents.id),
+  taskId: text("task_id", { length: 255 }).references(() => aiTasks.id),
+  projectId: text("project_id", { length: 255 }),
+  goalId: text("goal_id", { length: 255 }).references(() => aiGoals.id),
+  billingCode: text("billing_code", { length: 100 }),
+  provider: text("provider", { length: 100 }).notNull(),
+  model: text("model", { length: 100 }).notNull(),
+  inputTokens: integer("input_tokens").notNull().default(0),
+  outputTokens: integer("output_tokens").notNull().default(0),
+  costCents: integer("cost_cents").notNull(),
+  occurredAt: integer("occurred_at", { mode: "timestamp" }).notNull(),
+}, (table) => ({
+  tenantTimeIdx: index("cost_tenant_time_idx").on(table.tenantId, table.occurredAt),
+}));
+
+export const aiActivityLogs = sqliteTable("domain_ai_ai_activity_logs", {
+  id: text("id", { length: 255 }).primaryKey().$defaultFn(() => generateId()),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id),
+  actorType: text("actor_type", { enum: ["agent", "user", "system"] }).notNull(),
+  actorId: text("actor_id", { length: 255 }).notNull(),
+  action: text("action", { length: 255 }).notNull(),
+  entityType: text("entity_type", { length: 100 }).notNull(),
+  entityId: text("entity_id", { length: 255 }).notNull(),
+  details: text("details", { mode: "json" }).$type<Record<string, any>>(),
+  createdAt: integer("created_at", { mode: "timestamp" }).defaultNow(),
+}, (table) => ({
+  tenantTimeIdx: index("log_tenant_time_idx").on(table.tenantId, table.createdAt),
 }));

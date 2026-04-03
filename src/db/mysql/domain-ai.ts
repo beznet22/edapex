@@ -48,11 +48,12 @@ export type MessageMetadata = {
 
 export type MessagePart = Record<string, any>;
 
-export const aiChats = mysqlTable("ai_chats", {
+export const aiSessions = mysqlTable("ai_sessions", {
   id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => generateId()), 
   tenantId: varchar("tenant_id", { length: 36 }).notNull().references(() => tenants.id),
   userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id),
-  title: varchar("title", { length: 255 }).notNull().default("New Chat"),
+  parentSessionId: varchar("parent_session_id", { length: 36 }), // Lineage
+  title: varchar("title", { length: 255 }).notNull().default("New Session"),
   model: varchar("model", { length: 100 }),
   visibility: mysqlEnum("visibility", ["private", "public"]).default("private"),
   metadata: json("metadata").$type<ChatMetadata>(),
@@ -63,26 +64,26 @@ export const aiChats = mysqlTable("ai_chats", {
 export const aiMessages = mysqlTable("ai_messages", {
   id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => generateId()),
   tenantId: varchar("tenant_id", { length: 36 }).notNull().references(() => tenants.id),
-  chatId: varchar("chat_id", { length: 36 }).notNull().references(() => aiChats.id, { onDelete: "cascade" }),
+  sessionId: varchar("session_id", { length: 36 }).notNull().references(() => aiSessions.id, { onDelete: "cascade" }),
   role: mysqlEnum("role", ["user", "assistant", "system", "tool"]).notNull(),
   parts: json("parts").$type<MessagePart[]>().notNull(),
   metadata: json("metadata").$type<MessageMetadata>(),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow(),
 }, (table) => ({
-  tenantChatIdx: index("msg_tenant_chat_idx").on(table.tenantId, table.chatId),
+  tenantSessionIdx: index("msg_tenant_session_idx").on(table.tenantId, table.sessionId),
 }));
 
 export const aiVotes = mysqlTable("ai_votes", {
   tenantId: varchar("tenant_id", { length: 36 }).notNull().references(() => tenants.id),
-  chatId: varchar("chat_id", { length: 36 }).notNull().references(() => aiChats.id, { onDelete: "cascade" }),
+  sessionId: varchar("session_id", { length: 36 }).notNull().references(() => aiSessions.id, { onDelete: "cascade" }),
   messageId: varchar("message_id", { length: 36 }).notNull().references(() => aiMessages.id, { onDelete: "cascade" }),
   isUpvoted: tinyint("is_upvoted").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow(),
 }, (table) => ({
-  pk: index("pk").on(table.chatId, table.messageId),
-  tenantIdx: index("vote_tenant_idx").on(table.tenantId, table.chatId),
+  pk: index("pk").on(table.sessionId, table.messageId),
+  tenantIdx: index("vote_tenant_idx").on(table.tenantId, table.sessionId),
 }));
 
 export const aiDocuments = mysqlTable("ai_documents", {
@@ -156,4 +157,95 @@ export const aiToolInvocations = mysqlTable("ai_tool_invocations", {
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow(),
 }, (table) => ({
   tenantActionIdx: index("tool_tenant_act_idx").on(table.tenantId, table.actionId),
+}));
+
+// --- RECURSIVE STRATEGY & TASKS ---
+
+export const aiGoals = mysqlTable("ai_goals", {
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => generateId()),
+  tenantId: varchar("tenant_id", { length: 36 }).notNull().references(() => tenants.id),
+  title: varchar("title", { length: 255 }).notNull(),
+  description: text("description"),
+  level: mysqlEnum("level", ["institution", "department", "agent", "task"]).notNull(),
+  parentId: varchar("parent_id", { length: 36 }).references((): any => aiGoals.id),
+  ownerAgentId: varchar("owner_agent_id", { length: 36 }).references(() => aiAgents.id),
+  status: mysqlEnum("status", ["planned", "active", "achieved", "cancelled"]).default("planned"),
+  academicYearId: varchar("academic_year_id", { length: 36 }), 
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow(),
+}, (table) => ({
+  tenantIdx: index("goal_tenant_idx").on(table.tenantId),
+}));
+
+export const aiTasks = mysqlTable("ai_tasks", {
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => generateId()),
+  tenantId: varchar("tenant_id", { length: 36 }).notNull().references(() => tenants.id),
+  projectId: varchar("project_id", { length: 36 }),
+  goalId: varchar("goal_id", { length: 36 }).references(() => aiGoals.id),
+  parentId: varchar("parent_id", { length: 36 }).references((): any => aiTasks.id),
+  title: varchar("title", { length: 255 }).notNull(),
+  description: text("description"),
+  status: mysqlEnum("status", ["backlog", "todo", "in_progress", "in_review", "done", "blocked", "cancelled"]).default("todo"),
+  priority: mysqlEnum("priority", ["critical", "high", "medium", "low"]).default("medium"),
+  assigneeAgentId: varchar("assignee_agent_id", { length: 36 }).references(() => aiAgents.id),
+  createdByAgentId: varchar("created_by_agent_id", { length: 36 }).references(() => aiAgents.id),
+  createdByUserId: varchar("created_by_user_id", { length: 36 }).references(() => users.id),
+  billingCode: varchar("billing_code", { length: 100 }),
+  startedAt: timestamp("started_at"),
+  completedAt: timestamp("completed_at"),
+  cancelledAt: timestamp("cancelled_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow(),
+}, (table) => ({
+  tenantIdx: index("task_tenant_idx").on(table.tenantId),
+  assigneeIdx: index("task_assignee_idx").on(table.tenantId, table.assigneeAgentId, table.status),
+}));
+
+export const aiApprovals = mysqlTable("ai_approvals", {
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => generateId()),
+  tenantId: varchar("tenant_id", { length: 36 }).notNull().references(() => tenants.id),
+  type: mysqlEnum("type", ["hire_agent", "approve_strategy", "budget_override"]).notNull(),
+  requestedByAgentId: varchar("requested_by_agent_id", { length: 36 }).references(() => aiAgents.id),
+  requestedByUserId: varchar("requested_by_user_id", { length: 36 }).references(() => users.id),
+  status: mysqlEnum("status", ["pending", "approved", "rejected", "cancelled"]).default("pending"),
+  payload: json("payload").notNull(),
+  decisionNote: text("decision_note"),
+  decidedByUserId: varchar("decided_by_user_id", { length: 36 }).references(() => users.id),
+  decidedAt: timestamp("decided_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow(),
+}, (table) => ({
+  tenantIdx: index("appr_tenant_idx").on(table.tenantId, table.status),
+}));
+
+export const aiCostEvents = mysqlTable("ai_cost_events", {
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => generateId()),
+  tenantId: varchar("tenant_id", { length: 36 }).notNull().references(() => tenants.id),
+  agentId: varchar("agent_id", { length: 36 }).notNull().references(() => aiAgents.id),
+  taskId: varchar("task_id", { length: 36 }).references(() => aiTasks.id),
+  projectId: varchar("project_id", { length: 36 }),
+  goalId: varchar("goal_id", { length: 36 }).references(() => aiGoals.id),
+  billingCode: varchar("billing_code", { length: 100 }),
+  provider: varchar("provider", { length: 100 }).notNull(),
+  model: varchar("model", { length: 100 }).notNull(),
+  inputTokens: int("input_tokens").notNull().default(0),
+  outputTokens: int("output_tokens").notNull().default(0),
+  costCents: int("cost_cents").notNull(),
+  occurredAt: timestamp("occurred_at").notNull(),
+}, (table) => ({
+  tenantTimeIdx: index("cost_tenant_time_idx").on(table.tenantId, table.occurredAt),
+}));
+
+export const aiActivityLogs = mysqlTable("ai_activity_logs", {
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => generateId()),
+  tenantId: varchar("tenant_id", { length: 36 }).notNull().references(() => tenants.id),
+  actorType: mysqlEnum("actor_type", ["agent", "user", "system"]).notNull(),
+  actorId: varchar("actor_id", { length: 255 }).notNull(),
+  action: varchar("action", { length: 255 }).notNull(),
+  entityType: varchar("entity_type", { length: 100 }).notNull(),
+  entityId: varchar("entity_id", { length: 255 }).notNull(),
+  details: json("details"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => ({
+  tenantTimeIdx: index("log_tenant_time_idx").on(table.tenantId, table.createdAt),
 }));

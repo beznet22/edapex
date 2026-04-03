@@ -18,7 +18,7 @@ Build the **Command Center**—the stunning, keyboard-driven UI for the Agentic 
 - **EXECUTION PLAN**: Before writing code, you MUST create a localized `docs/plans/phase-4-command-center-plan.md` detailing the precise files you will create/modify.
 
 ## 📦 Required Context & Skills
-- **Spec**: [AGENTIC_SCHOOL_V2_PLAN.md](../AGENTIC_SCHOOL_V2_PLAN.md) (Section 35, Section 3).
+- **Spec**: [AGENTIC_SCHOOL_V2_PLAN.md](../AGENTIC_SCHOOL_V2_PLAN.md) (Section 34, Section 3).
 - **Stress Framework**: [STRESS_FRAMEWORK.md](../STRESS_FRAMEWORK.md).
 - **Domain Specs** (MANDATORY — read for API routes, events, and stress tools relevant to UI):
   - [classroom.md](../domains/classroom.md): Session lifecycle, SSE endpoints, whiteboard actions, memory ledger, domain events.
@@ -42,7 +42,10 @@ Build the **Command Center**—the stunning, keyboard-driven UI for the Agentic 
 Implement the responsive layout in the TanStack Start root.
 - **Left Panel**: Navigation (Inbox, Domains, Logs).
 - **Center Panel**: The Viewport (Chat, Artifact Viewer, Table Views).
-- **Right Panel**: The Property Panel (Agent Pulse, Artifact Audit, **Stress Status Visualizer**).
+- **Right Panel**: The Property Panel (Agent Pulse, Artifact Audit, **Stress Status Visualizer**, **Financial Attribution Monitor**).
+- **Skeleton Screens (Boneyard)**: Implement `boneyard-js` skeleton screens for all three panes (Navigation, Viewport, and Property Panel) to ensure pixel-perfect loading states.
+- **Financial Attribution Monitor**: Real-time display of `cents` and `tokens` consumed per session/task (using `aiCostEvents`).
+- **Workflow Status Monitor**: Visual tree of recursive `aiGoals` and their child `aiTasks` with live status updates (using `checkoutTask` telemetry).
 
 ### 2. Local-First Synchronization & Offline Mode
 Implement the reconciliation logic between **TanStack DB** and **Cloudflare D1**.
@@ -51,7 +54,11 @@ Implement the reconciliation logic between **TanStack DB** and **Cloudflare D1**
 
 ### 3. AI-Elements, WorkProduct & Notification Components
 - Integrate the AI-Elements chat interface into the Center Panel.
-- Implement **WorkProduct Thumbnails** with interactive "Preview" and "Audit" actions (Section 35.2 of the spec).
+- **Context References (@)**: Implement the `@-syntax` parser (`@file`, `@folder`, `@url`) in the Orchestrator with **70/20 Head-Tail Truncation** (exceeding 20k chars).
+- **AI Gateway**: Expose the Orchestrator as an OpenAI-compatible endpoint (`/api/v1/chat/completions`) for third-party interoperability.
+- **Boundary-Aware Compression**: [HIGH-FIDELITY] Implement the dual-stage context compression (85% hygiene / 50% summarization) with walk-back realignment to never split tool call pairs.
+- **Session Lineage Visualizer**: Implement a recursive tree view in the Property Panel to visualize session lineage (`parent_session_id`), allowing operators to trace sub-agent spawns and goal decomposition flows.
+- Implement **WorkProduct Thumbnails** with interactive "Preview" and "Audit" actions (Section 19.4 of the spec).
 - **Notification System**: Integrate Sonner/Shadcn for immediate human feedback and "Agent Pulse Toasts" in the Property Panel (Right Pane) for granular agent heartbeats.
 
 ## 🏁 Completion Criteria

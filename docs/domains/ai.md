@@ -4,9 +4,9 @@
 The AI domain manages the infrastructure for AI assistant interactions, agentic orchestration, and tool invocation tracking. It provides chat history, message storage, document artifacts, agent registration, and granular action/tool telemetry — all tenant-isolated and persona-scoped.
 
 ### Key Business Logic
-- **Chat Infrastructure**: `aiChats` → `aiMessages` with role support (`user`, `assistant`, `system`, `tool`). Messages store parts as JSON for multi-modal content.
+- **Chat Infrastructure**: `ai_sessions` → `ai_messages` with role support (`user`, `assistant`, `system`, `tool`). Messages store parts as JSON for multi-modal content.
 - **Document Artifacts**: AI-generated documents (`text`, `code`, `image`, `sheet`) with suggestion tracking.
-- **Agentic Infrastructure**: Registered `aiAgents` with capability lists, action tracking (`aiAgentActions`), and tool invocation logging (`aiToolInvocations`).
+- **Agentic Infrastructure**: Registered `ai_agents` with capability lists, action tracking (`agent_runs`), and tool invocation logging (`ai_tool_invocations`).
 - **Token Tracking**: Message metadata captures `promptTokens`, `completionTokens`, `totalTokens`, `latencyMs`, and `modelName`.
 
 ---
@@ -16,14 +16,14 @@ The AI domain manages the infrastructure for AI assistant interactions, agentic 
 ### Schema Mapping
 | Legacy Table | V2 Entity (`src/db/domain-ai.ts`) | Notes |
 | :--- | :--- | :--- |
-| — (new) | `aiChats` | Tenant-isolated chat sessions with model and visibility. |
-| — (new) | `aiMessages` | Multi-part messages with role and token metadata. |
-| — (new) | `aiVotes` | Per-message feedback (upvote/downvote). |
-| — (new) | `aiDocuments` | AI-generated artifacts (text, code, image, sheet). |
-| — (new) | `aiSuggestions` | AI suggestions linked to documents. |
-| — (new) | `aiAgents` | Registry of active agents with capabilities and config. |
-| — (new) | `aiAgentActions` | Action lifecycle tracking with idempotency keys. |
-| — (new) | `aiToolInvocations` | Granular tool call logging with parameters and results. |
+| — (new) | `ai_sessions` | [HIGH-FIDELITY] Tenant-isolated sessions with `parent_session_id` lineage. |
+| — (new) | `ai_messages` | [HIGH-FIDELITY] Multi-part messages with `cache_breakpoint` metadata. |
+| — (new) | `ai_votes` | Per-message feedback (upvote/downvote). |
+| — (new) | `ai_documents` | AI-generated artifacts (text, code, image, sheet). |
+| — (new) | `ai_suggestions` | AI suggestions linked to documents. |
+| — (new) | `ai_agents` | Registry of active agents with capabilities and config. |
+| — (new) | `agent_runs` | Action lifecycle tracking with idempotency keys. |
+| — (new) | `ai_tool_invocations` | Granular tool call logging with parameters and results. |
 
 ---
 
@@ -31,11 +31,11 @@ The AI domain manages the infrastructure for AI assistant interactions, agentic 
 
 ### Core Entities
 
-#### [AiChats](file:///home/beznet/Workspace/edapex/src/db/sqlite/domain-ai.ts#L39)
-Chat session with model selection, visibility (`private`/`public`), and summary metadata.
+#### [AiSessions](file:///home/beznet/Workspace/edapex/src/db/sqlite/domain-ai.ts#L39)
+[HIGH-FIDELITY] Chat session with model selection, `parent_session_id`, and `token_stats`.
 
 #### [AiMessages](file:///home/beznet/Workspace/edapex/src/db/sqlite/domain-ai.ts#L51)
-Multi-part messages supporting `user`, `assistant`, `system`, `tool` roles. Token usage in metadata.
+[HIGH-FIDELITY] Multi-part messages supporting `user`, `assistant`, `system`, `tool` roles. Metadata includes `cache_breakpoint` and `tool_call_id`.
 
 #### [AiVotes](file:///home/beznet/Workspace/edapex/src/db/sqlite/domain-ai.ts#L65)
 RLHF feedback per message for model improvement.

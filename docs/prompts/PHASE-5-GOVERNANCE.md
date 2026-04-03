@@ -18,7 +18,7 @@ Finalize the platform's reliability and security through **PBAC Governance** and
 - **EXECUTION PLAN**: Before writing code, you MUST create a localized `docs/plans/phase-5-governance-plan.md` detailing the precise files you will create/modify.
 
 ## 📦 Required Context & Skills
-- **Spec**: [AGENTIC_SCHOOL_V2_PLAN.md](../AGENTIC_SCHOOL_V2_PLAN.md) (Section 16, Section 44).
+- **Spec**: [AGENTIC_SCHOOL_V2_PLAN.md](../AGENTIC_SCHOOL_V2_PLAN.md) (Section 16, Section 42).
 - **Stress Framework**: [STRESS_FRAMEWORK.md](../STRESS_FRAMEWORK.md) (ALL categories — this phase validates the entire framework).
 - **Domain Specs** (MANDATORY — governance touches all 18 domains):
   - [pbac.md](../domains/pbac.md): Policy definitions, role assignments, evaluation tools, guardian access filters, audit integrity verification.
@@ -39,12 +39,16 @@ Implement the policy evaluator in `src/middleware/pbac.middleware.ts`.
 - Uses the `domain-pbac` repository for hierarchical role caching.
 
 ### 2. Board Inbox & Governance Workflows
-- Implement the "Manual Approval" pulse for high-impact agent actions.
-- Any tool marked `governance: required` in the schema must pause and create a `GOVERNANCE_REQUEST` WorkProduct.
+- Implement the "Manual Approval" pulse for high-impact agent actions using the `aiApprovals` schema.
+- Any tool marked `governance: required` in the schema must pause and create a `PENDING` record in `ai_approvals`.
+- HMITL (Human-in-the-loop) triggers: The `HITL_trigger_router` must map approval decisions back to the blocked `aiTask`.
 
 ### 3. The AI Maximizer & Auditor Agents
 Implement the **Maximizer Agent** and the **Auditor Agents** for proactive issue tracking.
-- **Auditor Agent**: Scans `cost_events` and `agent_runs` for failures or token drift, automatically generating `SECURITY_INCIDENT` or `SYSTEM_ISSUE` WorkProducts.
+- **Auditor Agent**: Scans `ai_cost_events` and `ai_activity_logs` for failures, token drift, or over-budget operations.
+- **Forensic Trace**: Implement the binary-locked audit trail (Section 10.3) where every goal/task mutation is logged to `aiActivityLogs`.
+- **Memory Compactor**: Implement the char-count audit (80% warning / 95% compaction) for all 3-tier memory buffers (Section 44).
+- **Stress Lab Integration**: When an anomaly is detected, the Auditor "snaps" the tenant state to the **EdApex Stress Lab** (`MODE=STRESS_LAB`) to run isolated diagnostics.
 - **[STRESS DEFENSE]** `load_test_simulator`: Simulates multi-tenant peak logins (e.g. 5k concurrent users).
 - **[STRESS DEFENSE]** `chaos_mesh`: Injects network partitions and DB nodes failures during live agent runs.
 - **[STRESS DEFENSE]** `audit_log_integrity_verifier`: Detects attempted tampering of the PBAC audit trail.

@@ -289,7 +289,9 @@ pnpm run docker:up
 
 ## Acknowledgments
 
-EdApex's deep architectural patterns---specifically regarding the stateless graph engine execution for real-time WebSocket/SSE orchestration, and the autonomous agent control-plane featuring atomic task checkout, cost rollups, and stateless heartbeat execution loops---are deeply inspired by the groundbreaking open-source work of:
+EdApex's deep architectural patterns---specifically regarding the stateless graph engine execution for real-time WebSocket/SSE orchestration, the prompt assembly & context intelligence (System+3), and the autonomous agent control-plane featuring atomic task checkout, cost rollups, and stateless heartbeat execution loops---are deeply inspired by the groundbreaking open-source work of:
+
+- [NousResearch/Hermes Agent](https://github.com/NousResearch/hermes-agent)
 
 - [THU-MAIC/OpenMAIC](https://github.com/THU-MAIC/OpenMAIC)
 - [Paperclip](https://github.com/paperclipai/paperclip)

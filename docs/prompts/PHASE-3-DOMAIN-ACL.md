@@ -18,7 +18,7 @@ Transform the business logic from all 18 EdApex domains into native `src/service
 - **EXECUTION PLAN**: Before writing code, you MUST create a localized `docs/plans/phase-3-domain-acl-plan.md` detailing the precise files you will create/modify.
 
 ## 📦 Required Context & Skills
-- **Spec**: [AGENTIC_SCHOOL_V2_PLAN.md](../AGENTIC_SCHOOL_V2_PLAN.md) (Section 36: Domain Schema Reference).
+- **Spec**: [AGENTIC_SCHOOL_V2_PLAN.md](../AGENTIC_SCHOOL_V2_PLAN.md) (Section 35: 18-Domain Drizzle Schema Reference).
 - **Architecture**: [MASTER_ARCHITECTURE.md](../MASTER_ARCHITECTURE.md).
 - **Stress Framework**: [STRESS_FRAMEWORK.md](../STRESS_FRAMEWORK.md) (ALL stressor categories).
 - **Domain Specs** (MANDATORY — these are the SOURCE OF TRUTH for service implementation):
@@ -44,9 +44,13 @@ Transform the business logic from all 18 EdApex domains into native `src/service
 Implement the logic for all 18 domains in their respective `src/services/` files (e.g., `AcademicService`, `FinanceService`, `AssessmentService`, `ClassroomService`).
 - **Policy**: Review logic in `/home/beznet/Workspace/paperclip`, discard legacy baggage, and implement as native EdApex Services.
 - **Repositories**: All state mutations must use the provided `IRepository<T>` implementations in `src/domain/repositories/`.
+- **Cost Reporting**: Every AI-driven tool execution within a service MUST call `reportCost` with token/cent telemetry (using `aiCostEvents`).
+- **Task-Goal Linkage**: Domain services must ensure all spawned `aiTasks` are linked to an active `aiGoal` to maintain the strategic execution trace.
 
-### 2. Internal Event Bus Integration
+### 2. Internal Event Bus & Memory Mirroring
 - Register cross-domain event handlers in `src/events/`.
+- **Memory Provider Sync**: Implement the `PROVIDER_SYNC` event. Every write to the `ai_memories` repository MUST emit this event.
+- **Async Mirroring**: Update the `AIService` to consume this event and mirror the memory to external providers (Mem0/Honcho/OpenViking) using **Cloudflare Queues** for performance isolation and retry-resilience (Section 44).
 - Example: An `enrollment.complete` event in the Academic domain should trigger an `invoice.generate` event in the Finance domain.
 
 ### 3. Zod-Driven Validation & Error Propagation

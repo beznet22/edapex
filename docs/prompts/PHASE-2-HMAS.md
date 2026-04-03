@@ -53,7 +53,8 @@ Deploy the "Brain" of the Agentic School. Map the strategic HMAS orchestration (
 ### 1. The Executive Orchestrator
 Implement the `PrincipalAssistant` in `src/services/ai/principal.service.ts`.
 - **Skill Load**: At boot, load the tenant's exact **Structural Skill** (e.g. 6-3-3-4), **School Policy Skills**, and **Academic Calendar** into the orchestration context.
-- **Goal Decomposition**: Decomposes high-level goals into `SubGoals` for Domain Supervisors while enforcing skill-based constraints (e.g. "UBEC is free education").
+- **Goal Decomposition**: Decomposes high-level goals into recursive `aiGoals` (institution -> department -> agent -> task) using the `createGoal` repository method.
+- **Session Lineage**: Maintain strict session propagation using `parent_session_id` to ensure forensic auditability of sub-agent calls.
 
 ### 2. The Staff Role Library
 Generate the 31+ specialized agent definitions in `src/services/ai/roles/`.
@@ -62,13 +63,22 @@ Generate the 31+ specialized agent definitions in `src/services/ai/roles/`.
 - **HR Manager (HR)**: Staff management and payroll verification.
 - (Implement ALL roles from Section 13 of the spec).
 
-### 3. Cross-Domain Tooling
-- Register the toolset for each agent in the `StandardAdapterRegistry`.
-- Ensure each tool is wrapped in a **Zod Validator** before execution.
+### 3. Agent Registry & Skill Mapping
+- Register the Executive and Supervisors in `src/services/ai/strategy/registry.ts`.
+- **Toolset Grouping**: Enforce least-privilege by mapping domain-specific toolsets to each Supervisor.
+- **System + 3 Assembly**: [HIGH-FIDELITY] Implement the `prompt-builder.ts` with strict assembly order and Anthropic-style cache breakpoints (Section 1-46 as Breakpoint 1).
+- **Memory Tools**: Implement the `memory_tool` (`add`, `replace`, `remove`) for all 3-tier buffers (Section 44).
+- **Strategic Providers**: Implement the dynamic `ProviderRegistry` and `FallbackManager` (Workers AI, OpenAI, Anthropic, Ollama) within the Orchestrator with smart routing and mid-session failover (Section 3.9).
+- **Personality (SOUL)**: Initialize the `src/services/ai/strategy/SOUL.md` and map supervisor sub-personas in the registry.
+- **Atomic Task Checkout**: Implement the logic to consume `ai_tasks` using the single-trip `checkoutTask` repository method to ensure race-condition-free concurrency in Edge environments (Section 10.2).
+- **Background Protocol**: Implement the `session_id` tracking for high-latency tools (e.g., bulk enrollment).
+- Initialize the `src/services/ai/skills/` directory for the active domain.
+- **[STRESS DEFENSE]** `skill_integrity_lock`: Prevents accidental overwriting of agent-managed skills during concurrent runs.
 
 ## 🏁 Completion Criteria
 - [ ] Generated and followed a localized `docs/plans/phase-2-hmas-plan.md`.
 - [ ] `pnpm tsc --noEmit` strictly passed with zero errors.
+- [ ] **Atomic Asset Checkout**: Implementation of the single-trip SQL update pattern (Section 7.2) for task acquisition.
 - [ ] 31+ Agent definitions verifiable via Mastra.
 - [ ] Zero-error tool registration across all 18 domains.
 - [ ] Goal decomposition trace verifiable through logs, including Skill-based constraints.

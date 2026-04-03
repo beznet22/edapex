@@ -19,7 +19,7 @@ Deploy the "Pulse" of the EdApex V2 Agentic School. Your goal is to transform Pa
 - **EXECUTION PLAN**: Before writing code, you MUST create a localized `docs/plans/phase-1-foundation-plan.md` detailing the precise files you will create/modify.
 
 ## 📦 Required Context & Skills
-- **Spec**: [AGENTIC_SCHOOL_V2_PLAN.md](../AGENTIC_SCHOOL_V2_PLAN.md) (Sections 2.3, 4, 41-44).
+- **Spec**: [AGENTIC_SCHOOL_V2_PLAN.md](../AGENTIC_SCHOOL_V2_PLAN.md) (Sections 2.3, 4, 41-45).
 - **Arch**: [MASTER_ARCHITECTURE.md](../MASTER_ARCHITECTURE.md).
 - **Stress Framework**: [STRESS_FRAMEWORK.md](../STRESS_FRAMEWORK.md) (Infrastructure Section).
 - **Domain Specs** (MANDATORY — read before implementing any domain logic):
@@ -35,13 +35,19 @@ Deploy the "Pulse" of the EdApex V2 Agentic School. Your goal is to transform Pa
 
 ## 🚀 Tasks
 
-### 1. The Financial Ledger (Infrastructure)
-Implement the `cost_events` and `finance_events` repositories in `src/domain/repositories/finance.repository.ts`.
+### 1. The Financial Ledger & AI Persistence (Infrastructure)
+Implement the `cost_events`, `finance_events`, `ai_sessions`, and `ai_messages` repositories.
+- **ai_tasks**: [CONTROL PLANE] Implement Paperclip-grade diagnostics: `usage_json` (Tokens/Cost), `log_ref` (Trace pointer), `error_code`, and `exit_code`. Target the `checkoutTask` atomic acquisition pattern.
+- **ai_goals**: [RECURSIVE STRATEGY] Implement the recursive goal hierarchy ( institution, department, agent, task) with `parent_id` support.
+- **ai_approvals**: [GOVERNANCE] Implement the approval gate table for multi-tenant oversight.
+- **ai_sessions**: [HIGH-FIDELITY] Implement session store with `parent_session_id` (lineage) and `token_stats`.
+- **ai_messages**: [HIGH-FIDELITY] Implement trace log with `cache_breakpoint` and `tool_call_id`.
 - Ensure multi-tenant safety and fiscal alignment with NERDC standards (Section 21 of the spec).
-- Expose the ledger through the `FinanceService`.
+- Expose the ledger and persistence layers through the `FinanceService` and `AIService`.
 
 ### 2. The Routine Engine (Orchestration)
 Create `src/services/ai/heartbeat.service.ts` to manage the autonomous agent wakeup cycle.
+- **Boot Flags**: Support `MODE=STRESS_LAB` to initialize in restricted, laboratory-only mode.
 - **Atomic Checkout**: Use a distributed locking mechanism to ensure only one supervisor handles an `agent_wakeup_request` at a time.
 - **[STRESS DEFENSE]** `idempotency_key_generator`: Prevents duplicate account/tenant creation during network retry storms.
 - **[STRESS DEFENSE]** `clock_sync_validator`: Detects and prevents temporal state corruption across distributed edge nodes.
@@ -55,7 +61,7 @@ Create `src/services/ai/heartbeat.service.ts` to manage the autonomous agent wak
 - [ ] Generated and followed a localized `docs/plans/phase-1-foundation-plan.md`.
 - [ ] 100% Type-Safe completion (no `any`).
 - [ ] `pnpm tsc --noEmit` strictly passed with zero errors.
-- [ ] Successful Drizzle migration push for finance tables.
+- [ ] Successful Drizzle migration push for finance and AI persistence (`ai_sessions`, `ai_messages`) tables.
 - [ ] Classroom SSE endpoint streaming `StatelessEvent` chunks.
 - [ ] Atomic session locking verified for classroom runs.
 - [ ] Unit tests for `Atomic Checkout` locking and Infrastructure Stress Defenses (`idempotency_key_generator`, `clock_sync_validator`).

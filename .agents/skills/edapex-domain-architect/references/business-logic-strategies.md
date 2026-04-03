@@ -87,7 +87,9 @@ Each domain maps to real-world professional roles. The agent MUST embody the pro
 **Professional Persona**: The **AI Operations Manager** oversees conversational AI quality, agent orchestration via the HMAS hierarchy, token budget allocation, and model provider selection (Workers AI vs OpenAI).
 
 **Flow Strategy**:
-- **HMAS Chat Orchestration**: When a student or teacher sends a message, the AI Supervisor coordinates the interaction. It loads the relevant domain context and conversation history from the repository, invokes the suitable Mastra Agent (e.g., Instructor Agent) for generation, and persists the response. Non-critical operations like token budget tracking and billing are deferred via background processes to ensure sub-10ms edge responsiveness.
+- **HMAS Chat Orchestration**: When a student or teacher sends a message, the AI Supervisor coordinates the interaction. It loads the relevant domain context and conversation history from the repository, invokes the suitable Mastra Agent (e.g., Instructor Agent) for generation, and persists the response using the `ai_sessions` lineage pattern.
+- **Paperclip Orchestration**: The AI Operations Manager ensures every objective is decomposed into a recursive **Institution > Department > Agent > Task** hierarchy. All tasks MUST be acquired using the atomic `checkoutTask` pattern to prevent distributed race conditions.
+- **Financial & Forensic Accountability**: Every agent run MUST emit `ai_cost_events` (for departmental billing) and `ai_activity_logs` (for level-8 forensic auditing) to ensure institutional oversight.
 
 ---
 
@@ -156,6 +158,7 @@ Each domain maps to real-world professional roles. The agent MUST embody the pro
 
 **Flow Strategy**:
 - **Secure Handling**: The Records Officer oversees the upload process (R2 presigned URLs), categorization, and verification. Documents are bound to users/tenants via polymorphic references, and verification status controls access in other domains.
+- **Binary Delegation Bridge**: Heavy document transformations (PDF generation, ZIP archiving) MUST be delegated to the localized bridge at `.agents/skills/edapex-domain-architect/temp` to bypass Edge CPU/Memory limits.
 
 ---
 

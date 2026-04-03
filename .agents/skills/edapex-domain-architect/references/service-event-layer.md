@@ -27,8 +27,11 @@ export class FinanceService {
 ## 3. Provider-Agnostic AI (Mastra & HMAS)
 - **Unified Orchestration**: All AI tasks MUST use [Mastra](https://mastra.ai/) as taught in the `mastra` skill.
 - **HMAS Hierarchy**: Follow the **Executive -> Supervisor -> Task Agent** pattern.
+- **Recursive Goal Hierarchy**: Decompose objectives into **Institution > Department > Agent > Task** tiers.
 - **Stateless Agents**: Agents MUST not hold internal state; offload memory to D1/KV (see `ai-agents-architect`).
 - **Stateless Execution Pattern**: Load DB history → Map to LLM payloads → Invoke agent statelessly → Persist response.
+- **Financial Attribution**: EVERY agent run MUST report token/cent costs via `ai_cost_events` to ensure departmental budget accountability.
+- **Forensic Auditing**: Emit `ai_activity_logs` for every major decision or tool call to enable post-execution forensics.
 
 ```typescript
 // Standard Stateless Invocation Pattern

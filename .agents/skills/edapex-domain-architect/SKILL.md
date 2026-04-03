@@ -15,7 +15,7 @@ You work in coordination with the wider Antigravity ecosystem, leveraging specia
 - **AI Orchestration**: Rely on `mastra` and `ai-agents-architect` for HMAS implementation.
 - **Data Lifecycle**: Integrate `tanstack-db-core`, `tanstack-react-db`, `tanstack-query-best-practices`, and `tanstack-router-best-practices` for sync reconciliation and state management.
 - **Full-Stack Framework**: Follow `tanstack-start-best-practices` for server functions and SSR choreography.
-- **UI/UX Excellence**: Align with `ui-ux-pro-max` and `web-artifacts-builder` for premium presentation.
+- **UI/UX Excellence**: Align with `ui-ux-pro-max`, `web-artifacts-builder`, and **Boneyard** for premium, skeleton-backed presentation.
 
 ## Core Directives
 1.  **Domain Isolation**: Maintain strict boundaries between the 18 domains. No cross-domain imports that bypass the `Service` or `Event` layers.
@@ -23,6 +23,10 @@ You work in coordination with the wider Antigravity ecosystem, leveraging specia
 3.  **Local-First / Edge-Native**: Every mutation must be compatible with **TanStack DB (Client)** and **Cloudflare D1 (Server)**.
 4.  **Operational Resilience**: Every feature must implement the corresponding `[STRESS DEFENSE]` tools from the `docs/STRESS_FRAMEWORK.md`.
 5.  **PBAC Security**: Evaluation must happen *before* any tool execution.
+6.  **Skeleton Screens**: Every high-density dashboard VIEW must implement `boneyard-js` skeletons for absolute pixel-perfect loading states.
+7.  **Paperclip V1 Governance**: All AI operations MUST implement forensic auditing, financial attribution, and recursive goal hierarchies (Institution > Department > Agent > Task).
+8.  **Atomic Orchestration**: Every task checkout logic MUST use the single-trip `checkoutTask` pattern to prevent distributed race conditions.
+9.  **Binary Delegation Bridge**: Large-scale PDF generation or archive processing MUST be delegated to the container-side bridge at `.agents/skills/edapex-domain-architect/temp`.
 
 ---
 
@@ -69,7 +73,7 @@ Expose business logic via Hono RPC with strict Zod validation and PBAC pre-evalu
 ### 5. Local-First Frontend (TanStack & Tailwind v4)
 Implement optimistic UI with TanStack Start, TanStack DB, and Tailwind v4.
 👉 **Reference**: [Frontend & Local-First Layer](references/frontend-local-first-layer.md)
-👉 **Consult**: `tanstack-react-db`, `tanstack-start-best-practices`, `ui-ux-pro-max`, `web-artifacts-builder`.
+👉 **Consult**: `tanstack-react-db`, `tanstack-start-best-practices`, `ui-ux-pro-max`, `web-artifacts-builder`, `boneyard-js`.
 
 ### 6. Operational Resilience (Stress Framework)
 Implement the defense tools required to survive peak load and agentic failure (recursive loops, storage quotas).
@@ -85,6 +89,8 @@ Implement the defense tools required to survive peak load and agentic failure (r
 ❌ **Missing Tenant Isolation**: Every query MUST include a mandatory `tenant_id` filter.
 ❌ **Loose Error Envelopes**: Controllers MUST use `BaseController` success/error standards.
 ❌ **Manual Singleton instantiation**: Use dependency injection for repositories and services.
+❌ **Shadowing Financial Attribution**: Services MUST NOT ignore token usage; report costs via `aiCostEvents`.
+❌ **Ignoring Session Lineage**: All child sessions MUST be correctly linked to their `parent_session_id`.
 
 ## The Architect's Memory
 Always maintain a `task.md` for the current execution. When crossing layers (e.g., matching a D1 schema field to a TanStack DB collection), record the exact mapping in your memory checklist to avoid typing drift.

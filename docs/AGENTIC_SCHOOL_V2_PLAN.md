@@ -22,28 +22,33 @@
 - [18. Real-Time Heartbeat Telemetry (SSE)](#18-real-time-heartbeat-telemetry-sse)
 - [19. Edge Execution & Memory (Statelessness)](#19-edge-execution--memory-statelessness)
 - [20. Stateless Memory Ledger (Compaction)](#20-stateless-memory-ledger-compaction)
-- [21. Domain Data Consistency (Drizzle Sync)](#21-domain-data-consistency-drizzle-sync)
+- [21. Anti-Corruption Layer (ACL) Transformation Mapping](#21-anti-corruption-layer-acl-transformation-mapping)
 - [22. Cross-Domain Integrity & Events](#22-cross-domain-integrity--events)
 - [23. System Self-Correction & Error Handling](#23-system-self-correction--error-handling)
 - [24. Performance & Scalability (V2 Metrics)](#24-performance--scalability-v2-metrics)
-- [26. Token Optimization & Delta Telemetry](#26-token-optimization--delta-telemetry)
-- [27. Budget Policies & Preflight Enforcement](#27-budget-policies--preflight-enforcement)
-- [28. Multi-Tenant Data Isolation (The Drizzle Layer)](#28-multi-tenant-data-isolation-the-drizzle-layer)
-- [29. Migration Strategy & Paperclip Decommissioning](#29-migration-strategy--paperclip-decommissioning)
-- [30. PBAC Policy Reference (JSON Schemas)](#30-pbac-policy-reference-json-schemas)
-- [31. Local-First Conflict Resolution Strategies](#31-local-first-conflict-resolution-strategies)
-- [32. Standardized Prompt Registry (Metadata Schema)](#32-standardized-prompt-registry-metadata-schema)
-- [33. Edge Infrastructure Lifecycle (Hardware & Vitals)](#33-edge-infrastructure-lifecycle-hardware--vitals)
-- [34. Stateless Heartbeat Error Recovery Matrix](#34-stateless-heartbeat-error-recovery-matrix)
-- [35. V2 Integration Checklist (Developer Handover)](#35-v2-integration-checklist-developer-handover)
-- [36. 18-Domain Drizzle Schema Reference (Cross-Walk)](#36-18-domain-drizzle-schema-reference-cross-walk)
-- [38. Canonical Directory Structure (The 18-Domain Layout)](#38-canonical-directory-structure-the-18-domain-layout)
-- [39. Implementation Detail: The Directory Flow](#39-implementation-detail-the-directory-flow)
-- [40. Logging & Traceability (8-Layer Namespacing)](#40-logging--traceability-8-layer-namespacing)
-- [41. Error Propagation & Resilience Pattern](#41-error-propagation--resilience-pattern)
-- [42. Notification System (Toasts & Push)](#42-notification-system-toasts--push)
-- [43. Proactive AI Issue Tracking](#43-proactive-ai-issue-tracking)
-- [44. Conclusion: Towards the Autonomous School](#44-conclusion-towards-the-autonomous-school)
+- [25. Token Optimization & Delta Telemetry](#25-token-optimization--delta-telemetry)
+- [26. Budget Policies & Preflight Enforcement](#26-budget-policies--preflight-enforcement)
+- [27. Multi-Tenant Data Isolation (The Drizzle Layer)](#27-multi-tenant-data-isolation-the-drizzle-layer)
+- [28. Migration Strategy & Paperclip Decommissioning](#28-migration-strategy--paperclip-decommissioning)
+- [29. PBAC Policy Reference (JSON Schemas)](#29-pbac-policy-reference-json-schemas)
+- [30. Local-First Conflict Resolution Strategies](#30-local-first-conflict-resolution-strategies)
+- [31. Standardized Prompt Registry (Metadata Schema)](#31-standardized-prompt-registry-metadata-schema)
+- [32. Edge Infrastructure Lifecycle (Hardware & Vitals)](#32-edge-infrastructure-lifecycle-hardware--vitals)
+- [33. Stateless Heartbeat Error Recovery Matrix](#33-stateless-heartbeat-error-recovery-matrix)
+- [34. V2 Integration Checklist (Developer Handover)](#34-v2-integration-checklist-developer-handover)
+- [35. 18-Domain Drizzle Schema Reference (Cross-Walk)](#35-18-domain-drizzle-schema-reference-cross-walk)
+- [36. Canonical Directory Structure (The 18-Domain Layout)](#36-canonical-directory-structure-the-18-domain-layout)
+- [37. Implementation Detail: The Directory Flow](#37-implementation-detail-the-directory-flow)
+- [38. Logging & Traceability (8-Layer Namespacing)](#38-logging--traceability-8-layer-namespacing)
+- [39. Error Propagation & Resilience Pattern](#39-error-propagation--resilience-pattern)
+- [40. Notification System (Toasts & Push)](#40-notification-system-toasts--push)
+- [41. Proactive AI Issue Tracking](#41-proactive-ai-issue-tracking)
+- [42. Strategic Orchestration & Deployed Skills (Hermes Pattern)](#42-strategic-orchestration--deployed-skills-hermes-pattern)
+- [43. Tool Execution & Chaos Mesh (Hermes Protocol)](#43-tool-execution--chaos-mesh-hermes-protocol)
+- [44. Persistent Memory & Compaction Runs (Hermes Protocol)](#44-persistent-memory--compaction-runs-hermes-protocol)
+- [45. Context, Identity & Personality (Hermes Protocol)](#45-context-identity--personality-hermes-protocol)
+- [46. AI Providers, Routing & Fallback (Hermes Protocol)](#46-ai-providers-routing--fallback-hermes-protocol)
+- [47. Conclusion: Towards the Autonomous School](#47-conclusion-towards-the-autonomous-school)
 
 
 ## 1. Document Role & Scope
@@ -300,30 +305,51 @@ All tables MUST include `tenant_id` (uuid), `id` (uuid), `created_at`, and `upda
 
 These tables are defined within [src/db/sqlite/domain-ai.ts](src/db/sqlite/domain-ai.ts) and represent the evolution of the `aiAgentActions` and `aiToolInvocations` legacy telemetry.
 
-#### `agent_runs` (replaces Paperclip `heartbeat_runs`)
+#### `ai_tasks` (High-Fidelity Control Plane)
+[BEST OF BOTH WORLDS] Replaces Paperclip `heartbeat_runs` while retaining diagnostic power.
 - `id` uuid pk
 - `tenant_id` uuid not null
-- `agent_id` uuid fk not null
+- `session_id` uuid fk not null (Lineage to Session)
+- `goal_id` uuid fk null (Recursive hierarchy)
 - `status` enum: `queued | running | succeeded | failed | cancelled`
 - `invocation_type` enum: `scheduler | manual | event`
 - `started_at` timestamptz null
 - `finished_at` timestamptz null
-- `context_snapshot` jsonb null (Thin vs Fat mode)
+- `error_code` text null (Diagnostic ID)
+- `usage_json` jsonb null (Tokens, Latency, API Costs)
+- `log_ref` text null (Pointer to 8-layer forensic trace)
+
+#### `ai_sessions` (High-Fidelity Memory)
+- `id` uuid pk
+- `tenant_id` uuid not null
+- `parent_session_id` uuid (NULL for root)
+- `summary` text (Dual-stage summarized context)
+- `token_stats` json (Dialect-agnostic token tracking)
+- `is_compressed` boolean (Flag for compaction cleanup)
+- `metadata` jsonb (Supports context-window caching)
+
+#### `ai_messages` (Rich Trace)
+- `id` uuid pk
+- `session_id` uuid fk
+- `role` enum (system, user, assistant, tool)
+- `content` text
+- `metadata` json (Supports `cache_breakpoint` and `tool_call_id`)
 
 ### 7.2 Financial Ledger (Finance Domain)
 
 These events are integrated into [src/db/sqlite/domain-finance.ts](src/db/sqlite/domain-finance.ts), extending the `ledgerEntries` model with high-fidelity operational tracking.
 
-#### `cost_events` (Financial Ledger)
+#### `ai_cost_events` (Financial Ledger)
 - `id` uuid pk
 - `tenant_id` uuid not null
 - `agent_id` uuid fk not null
-- `issue_id` uuid fk null (Attribution to specific task)
-- `provider` text not null (OpenAI, Claude, etc.)
+- `task_id` uuid fk null (Attribution to specific task)
+- `provider` text not null
 - `model` text not null
 - `input_tokens` int not null
 - `output_tokens` int not null
-- `cost_cents` int not null (Calculated at ingestion)
+- `cost_cents` int not null
+- `currency` text default 'USD'
 
 #### `finance_events` (Double-Entry Ledger)
 - `id` uuid pk
@@ -367,7 +393,9 @@ Defined natively within `src/db/sqlite/domain-classroom.ts`, this domain entirel
 - `id` uuid pk
 - `tenant_id` uuid not null fk
 - `session_id` uuid not null fk
+- `parent_ledger_id` uuid fk (Session Lineage)
 - `turn_count` int not null
+- `is_compacted` boolean
 - `parsed_content` jsonb (Flattened `action` / `text` streaming output arrays)
 
 #### `classroom_participants` (Roster)
@@ -477,7 +505,7 @@ To ensure consistency across 18+ domains, all Agentic operations must follow the
 ### 11.3 Phase 3: Execution (The Run)
 - **Context Retrieval**: Agent pulls `Fat Context` (Budget, Goals, Recent Comments).
 - **Tool Invocations**: Agent interacts with Domain Repositories (e.g., `Registrar.getStudent()`).
-- **Reporting**: Periodic `Heartbeat` status updates to `agent_runs`.
+- **Reporting**: Periodic `Heartbeat` status updates to `ai_tasks`.
 
 ### 11.4 Phase 4: Governance (The Board Approval)
 - **Impact Analysis**: If cost > $1.00 or deletion of core data is requested, the run enters `PAUSED_FOR_APPROVAL`.
@@ -746,9 +774,11 @@ Each role is a specialized Mastra Agent with its own `SKILL.md` manifest and a r
 
 ### 14.2 Session Compaction (The Memory Service)
 - **Problem**: Context window inflation leads to $10+ per-run costs.
-- **Solution**: The `MemoryService` performs **Recursive Summarization**.
-    - Every 5 tool calls, the agent's recent history is summarized into a "Compressed Memo."
-    - The full history is moved to `WorkProducts` for archival, while the agent keeps ONLY the memo and the last 3 turns.
+- **Solution**: The `MemoryService` performs **Boundary-Aware Dual-Stage Compression**.
+    - **Stage 1 (85% Threshold)**: Gateway Hygiene removes system-noise and redundant headers.
+    - **Stage 2 (50% Threshold)**: Recursive summarization into a "Compressed Memo."
+    - **Boundary Realignment**: The Auditor ensures that history is NEVER split inside a tool-execution block. It walk-backs until a clean narrative breakpoint is found before summarizing.
+    - The full history is moved to `WorkProducts` for archival, while the agent keeps ONLY the memo and the last 3 turns (**System + 3**).
 
 ### 14.4 AI Domain & Adapter Registry
 - **Unified Adapter**: Standardizes [Claude](paperclip/ui/src/api/agents.ts#193-195), `GPT`, and `Gemini` into a single Mastra-backed `StandardAdapter` interface.
@@ -770,7 +800,7 @@ Each role is a specialized Mastra Agent with its own `SKILL.md` manifest and a r
 - **The Execution Flow**:
     1. **Agent Output**: Instead of attempting to stream complex PDFs directly, Mastra Task Agents generate rich, standardized `HTMLContent` strings (using Tailwind tokens).
     2. **Binary Delegation**: The `DocumentsService` delegates the HTML payload to a localized `generate({ htmlContent, fileName, preview })` utility.
-    3. **Container Bridge**: To bypass Edge constraints, this specific operation is either deferred to a Dockerized companion service (or Cloudflare Container) that mounts `/bin/html2pdf` and securely executes the transformation in a UUID-isolated `/temp` directory using `JSZip` and `fs`.
+    3. **Container Bridge**: To bypass Edge constraints, this specific operation is either deferred to a Dockerized companion service (or Cloudflare Container) that mounts `/bin/html2pdf` and securely executes the transformation in a UUID-isolated `.agents/skills/edapex-domain-architect/temp` directory using `JSZip` and `fs`.
     4. **Artifact Storage**: The resulting `.pdf` buffer (or `.zip` for image previews) is flushed to Cloudflare R2, and a permanent `WorkProduct` record is appended to the `documents` domain registry.
 
 ### 14.8 Data Privacy & PII Obfuscation (GDPR/NDPR)
@@ -972,6 +1002,7 @@ EdApex V2 mandates a premium, high-density interface across all platforms, desig
     - Real-time "Agent Pulse" showing current tool-call and token usage.
     - Historical budget performance sparklines (last 30 days).
     - Quick Actions: Pause, Trigger Heartbeat, View Run Logs.
+- **Skeleton Screens (Boneyard)**: Every pane in the Command Center must utilize `boneyard-js` for pixel-perfect skeleton screens during asynchronous data loads (TanStack Query/DB integration).
 
 ### 19.4 Specialized UI Components
 - **Agent Pulse**: A real-time timeline in the right panel showing the `Heartbeat` stream and `Atomic Checkout` events. This provides instant visibility into agent autonomy.
@@ -981,11 +1012,13 @@ EdApex V2 mandates a premium, high-density interface across all platforms, desig
     - Smooth status transition fades (150ms) for all agent state changes (`IDLE` -> `AWAKE` -> `RUNNING`).
     - Kinetic scrolling for long heartbeat logs.
 
-### 19.5 Agentic Classroom Interfaces (Web UI)
-The Edge-native classroom leverages `ai-elements` to render incoming `StatelessEvent` streams seamlessly:
-- **The Student Immersive Interface**: Subscribes to the `/sse` stream. Parses `action` arrays (tool executions, pop quizzes) as inline widgets or "Thinking" states, while `text` items type natively into the chat.
-- **The "Pulse" Whiteboard Pipeline**: Renders synchronized SVG whiteboards dynamically controlled by the Teacher Agent (`wb_highlight`, `wb_show_image`), drawing exactly in sync with the typing speed of the speech chunks.
 - **Teacher & Admin Escalate View**: Provides administrators a 3-pane live supervision perspective (Graph Pipeline Logs / Shadow Whiteboard / Intervention Chat). Human instructors can push a `type: "escalation"` event to forcibly halt the checkout loop and override the AI in real-time.
+
+### 19.6 Memory Snapshot Injection (Stateless Recovery)
+To maintain the "Frozen Snapshot" pattern while surviving edge cold starts:
+- **Pre-fetch**: The Orchestrator fetches the 3-tier memory buffer (`EXECUTIVE`, `DOMAIN`, `USER`) from Drizzle/KV *before* the first inference tick.
+- **Injection**: The buffer is rendered as a standard Hermes Memory block in the System Prompt.
+- **Consistency**: Mid-session `memory_tool` updates are persisted immediately to D1/Postgres but do not re-render the current session's system prompt (preserving context integrity).
 
 ## 20. Event Bus & Routine Specification
 
@@ -1041,9 +1074,9 @@ Mapping the proven Paperclip logic to the strict EdApex Domain-Repository archit
 
 | Paperclip Service (Legacy) | EdApex Domain | EdApex BaseController Method | EdApex Repository Call |
 | :--- | :--- | :--- | :--- |
-| `costs.ts/aggregate()` | AI Ops | `GET /api/ai/costs` | `agent_runs.getSum(tenant_id)` |
-| `issues.ts/adopt()` | HMAS Core | `POST /api/orchestrate/checkout` | `agent_wakeup.update(status='running')` |
-| `heartbeat.ts/run()` | HMAS Core | `POST /api/orchestrate/heartbeat`| `agent_runs.upsert(status, log)` |
+| `costs.ts/aggregate()` | AI Ops | `GET /api/ai/costs` | `ai_cost_events.getSum(tenant_id)` |
+| `issues.ts/adopt()` | HMAS Core | `POST /api/orchestrate/checkout` | `ai_tasks.checkoutTask()` |
+| `heartbeat.ts/run()` | HMAS Core | `POST /api/orchestrate/heartbeat`| `ai_tasks.upsert(status, log)` |
 | `assets.ts/save()` | Documents | `POST /api/docs/artifact` | `work_products.insert(uri, meta)` |
 | `billing.ts/invoice()`| Finance | `POST /api/finance/invoice` | `ledger.insert(debit, credit)` |
 | `staff.ts/get()` | HR | `GET /api/hr/staff` | `employees.select().where(id)` |
@@ -1092,7 +1125,7 @@ To ensure high-availability at the edge, EdApex V2 handles common failure modes 
 - **Edge Worker Lifecycles**: Strict 10ms execution times are honored. The Live `DirectorGraph` explicitly yields execution loops between node ticks to stream chunks cleanly.
 - **Inertial Conflict Resolution**: In multi-observer instances (student/admin views), TanStack DB caches offline chat inputs locally, merging intelligently when SSE confirms synchronization against the canonical state.
 
-## 26. Token Optimization & Delta Telemetry
+## 25. Token Optimization & Delta Telemetry
 
 To minimize operational costs, EdApex V2 implements the "Delta Preamble" strategy for all heartbeats.
 
@@ -1110,7 +1143,7 @@ Agents are instructed to use "Lite" endpoints by default:
 - `GET /api/docs/inbox-lite`: Returns only IDs and `updated_at` timestamps for pending tasks.
 - `GET /api/docs/comments?since=...`: Fetches only new thread messages since the last heartbeat.
 
-## 27. Budget Policies & Preflight Enforcement
+## 26. Budget Policies & Preflight Enforcement
 
 The "Bursar" domain manages systemic guardrails to prevent runaway costs.
 
@@ -1126,7 +1159,7 @@ Execution is blocked *before* the LLM is invoked:
 2. **The Lock**: If the current monthly/lifetime balance >= budget, the request is rejected with `402 Payment Required`.
 3. **The Unlock**: The Board must explicitly "Raise Budget" or "Override for this Run" to resume.
 
-## 28. Multi-Tenant Data Isolation (The Drizzle Layer)
+## 27. Multi-Tenant Data Isolation (The Drizzle Layer)
 
 EdApex V2 enforces strict multi-tenancy at the repository level, ensuring that no agent or user can ever leak data across school boundaries.
 
@@ -1140,7 +1173,7 @@ While EdApex V2 runs on Cloudflare D1 (SQLite) in production, the schema remains
 - **Polymorphic Constraints**: Instead of hard foreign keys for `owner_id`, use `owner_type` + `owner_id` strings to support broad entity mapping.
 - **Migration Policy**: All migrations are managed via `pnpm wrangler d1 migrations apply --local` during development, ensuring the edge-native schema is always in sync.
 
-## 29. Migration Strategy & Paperclip Decommissioning
+## 28. Migration Strategy & Paperclip Decommissioning
 
 Transforming V1 assets and logic into the V2 Agentic School.
 
@@ -1159,7 +1192,7 @@ EdApex V2 physically deletes the concept of hardcoded "terms", "grades", or "com
 - **Structure-as-a-Skill**: Educational constructs (e.g., Nigerian 6-3-3-4 or UK A-Levels), school policies, school handbooks (e.g., student handbook, staff handbook, parent handbook, etc.), penalties, enforcement triggers, and academic calendars are codified solely as Mastra AI Skills.
 - **Orchestration**: The `Executive Orchestrator` loads the tenant's exact structural and operational skills at boot, merging them into the context window. It teaches the PBAC, Finance, and Domain Supervisors how to enforce specific guidelines, calculate penalties, and manage school operations entirely dynamically, avoiding schema locking.
 
-## 30. PBAC Policy Reference (JSON Schemas)
+## 29. PBAC Policy Reference (JSON Schemas)
 
 EdApex V2 utilizes a centralized policy registry in D1/MySQL/PostgreSQL/KV.
 
@@ -1181,7 +1214,7 @@ EdApex V2 utilizes a centralized policy registry in D1/MySQL/PostgreSQL/KV.
 }
 ```
 
-## 31. Local-First Conflict Resolution Strategies
+## 30. Local-First Conflict Resolution Strategies
 
 The `SyncEngine` handles multi-device synchronization using these prioritized strategies:
 
@@ -1189,7 +1222,7 @@ The `SyncEngine` handles multi-device synchronization using these prioritized st
 2.  **Semantic Merge**: Used for WorkProducts (Markdown). EdApex utilizes a "Diff-Match-Patch" approach to merge concurrent agent edits.
 3.  **Strict Transactional**: Used for the **Finance Ledger** and **Atomic Checkout**. Conflict returns `409 Conflict` and requires a fresh heartbeat turn with a re-fetched state.
 
-## 32. Standardized Prompt Registry (Metadata Schema)
+## 31. Standardized Prompt Registry (Metadata Schema)
 
 All agent prompts in EdApex V2 are versioned and stored as **Prompt Assets**.
 
@@ -1209,7 +1242,7 @@ All agent prompts in EdApex V2 are versioned and stored as **Prompt Assets**.
 }
 ```
 
-## 33. Edge Infrastructure Lifecycle (Hardware & Vitals)
+## 32. Edge Infrastructure Lifecycle (Hardware & Vitals)
 
 While EdApex V2 is "Edge-First" (Cloudflare), it supports local school clusters (On-prem Edge) with the following vitals monitoring:
 
@@ -1226,7 +1259,7 @@ While EdApex V2 is "Edge-First" (Cloudflare), it supports local school clusters 
 | **Disk** | 256 GB SSD | 1 TB NVMe | D1 local cache & R2 local buffer storage. |
 | **Network** | 100 Mbps | 1 Gbps | Real-time sync with Cloudflare Edge. |
 
-## 34. Stateless Heartbeat Error Recovery Matrix
+## 33. Stateless Heartbeat Error Recovery Matrix
 
 Common failures in the stateless heartbeat loop and their automated resolutions:
 
@@ -1237,7 +1270,7 @@ Common failures in the stateless heartbeat loop and their automated resolutions:
 | `ERR_D1_READ_ONLY` | Edge database lock. | SyncEngine buffers to IndexedDB; retries with jitter. |
 | `ERR_PBAC_DENIED` | Policy violation. | Log security event; kill run; rotate agent credentials. |
 
-## 35. V2 Integration Checklist (Developer Handover)
+## 34. V2 Integration Checklist (Developer Handover)
 
 Follow this sequence to initialize a new Agentic School tenant:
 
@@ -1250,7 +1283,7 @@ Follow this sequence to initialize a new Agentic School tenant:
 - [ ] **Events**: Register domain-specific handlers in the [events/](src/events/) layer.
 - [ ] **Pulse**: Enable the `Heartbeat` stream in the Command Center properties panel.
 
-## 36. 18-Domain Drizzle Schema Reference (Cross-Walk)
+## 35. 18-Domain Drizzle Schema Reference (Cross-Walk)
 
 | V2 Domain | Drizzle Schema File (src/db/sqlite/) | Primary Table Export |
 | :--- | :--- | :--- |
@@ -1273,7 +1306,7 @@ Follow this sequence to initialize a new Agentic School tenant:
 | **PBAC** | `domain-pbac.ts` | `policies`, `roleGrants` |
 | **Settings** | `domain-settings.ts` | `schoolConfigs` |
 
-## 38. Canonical Directory Structure (The 18-Domain Layout)
+## 36. Canonical Directory Structure (The 18-Domain Layout)
 
 To ensure 100% logic parity and strict adherence to the **Backend Feasibility & Risk Index (BFRI)**, EdApex V2 employs the following standardized hierarchy:
 
@@ -1304,13 +1337,13 @@ To protect Cloudflare D1 quotas and AI token budgets from malicious floods, the 
 - **Agent Interfaces**: 1,000 req/min limits (Mastra Orchestration/System).
 Violations yield a `429 Too Many Requests` response, halting execution pre-flight before any Cloudflare AI inference costs are incurred.
 
-## 39. Implementation Detail: The Directory Flow
+## 37. Implementation Detail: The Directory Flow
 - **Request Handlers**: All UI interactions (Agent Pulse, Artifacts) enter via `controllers/`.
 - **Orchestration**: The `MASTRA_ORCHESTRATOR` lives in `services/`, acting as the supervisor of all domain agents.
 - **Data Persistence**: All agentic state changes pass through the `validators/` before hitting the `domain/repositories/`.
 - **Reactive Backbone**: The `events/` directory manages the decoupling of agent actions from high-latency side effects (notifications, audits).
 
-## 40. Logging & Traceability (8-Layer Namespacing)
+## 38. Logging & Traceability (8-Layer Namespacing)
 
 To achieve granular visibility into the Agentic School's internal operations, EdApex V2 enforces standardized structured logging across the entire stack.
 
@@ -1319,7 +1352,7 @@ To achieve granular visibility into the Agentic School's internal operations, Ed
 - **Backend Implementation**: A Cloudflare-optimized structured JSON logger (`src/utils/logger.ts`).
   - Usage Example: `logger.child({ layer: 'services', domain: 'finance' })`.
 
-## 41. Error Propagation & Resilience Pattern
+## 39. Error Propagation & Resilience Pattern
 
 Every error follows a type-safe resilience chain from the persistent storage to the user-interface:
 
@@ -1327,19 +1360,80 @@ Every error follows a type-safe resilience chain from the persistent storage to 
 2.  **Controller**: Inherits from `BaseController` which catches unhandled exceptions and maps them to standardized Hono JSON envelopes (Hono RPC).
 3.  **Frontend (TanStack Query)**: A global interceptor in the Query Client catches error responses and maps them to the **UI Notification System**.
 
-## 42. Notification System (Toasts & Push)
+## 40. Notification System (Toasts & Push)
 
 - **Frontend Toasts (Sonner/Shadcn)**: Immediate, high-visibility feedback for human-triggered actions and critical agentic outcomes.
 - **Agent Pulse Toasts**: Low-priority "Ghost" notifications in the property panel that visualize granular agent heartbeat ticks without cluttering the main thread.
 - **Reactive Push**: The `Internal Event Bus` triggers the `Communication Service` to dispatch WebPush or SMS alerts for high-urgency reactive events (e.g., `ON_PBAC_VIOLATION`).
 
-## 43. Proactive AI Issue Tracking
+## 41. Proactive AI Issue Tracking
 
 The Agentic School is self-healing via the **IT Supervisor's Auditor Agents**:
 
 - **Anomaly Detection**: Background agents scan the `cost_events` and `agent_runs` tables for failed tokens or frequent status errors.
 - **Audit Proposals**: When a pattern is detected (e.g., "Recursive tool error in HR Domain"), the AI Auditor creates a `SECURITY_INCIDENT` or `SYSTEM_ISSUE` WorkProduct in the **Board Command Center**.
 
-## 44. Conclusion: Towards the Autonomous School
+## 42. Strategic Orchestration & Deployed Skills (Hermes Pattern)
+
+EdApex V2 distinguishes between **Architectural Authority** (Dev-time) and **Operational Procedural Memory** (Runtime).
+
+- **The Strategic Directory (`src/services/ai/strategy/`)**: The "Command & Control" hub for the HMAS hierarchy. Centralizes agent registration, goal decomposition logic, and orchestration state.
+- **Deployed Skills (`src/services/ai/skills/`)**: Utilizing the **Hermes Skill Pattern** (`SKILL.md`, `scripts/`, `templates/`) to provide agents with verified, version-controlled execution playbooks.
+- **Progressive Disclosure**: Agents load procedural context in levels (0-2) to maintain token efficiency and edge performance.
+- **Skill Bootstrapping**: Every new domain specification automatically initializes its corresponding skills directory to ensure immediate agentic readiness.
+
+## 43. Tool Execution & Chaos Mesh (Hermes Protocol)
+
+EdApex V2 mandates production-grade tool reliability through the **Hermes Tool Protocol**.
+
+- **Isolated Backends**: Standard tools run on the Edge; high-risk tools (Stress Defense) are snapped into the **EdApex Stress Lab**.
+- **Background Persistence**: Durable tasks use **Cloudflare Queues** and **session_id** tracking to survive edge timeouts.
+- **Cost-Efficient Lifecycle**:
+  - **Phase 1 (Free)**: Stress Lab runs **Locally** only.
+  - **Phase 2 (Paid)**: Stress Lab scales to a **Shared Institutional Sandbox** for live cloud diagnostics.
+- **Toolset Least-Privilege**: Every HMAS Supervisor is physically restricted to a domain-specific toolset registry.
+
+## 44. Persistent Memory & Compaction Runs (Hermes Protocol)
+
+EdApex V2 manages agentic continuity through structured, environment-agnostic memory.
+
+- **Storage**: Maps to the `ai_memories` registry. Supports multi-dialect storage (D1/Postgres/MySQL) and local-first sync via TanStack DB.
+- **Tiers**:
+    - **Executive**: 1,000 chars (Institutional rules/conventions).
+    - **Domain**: 800 chars (Supervisor workflow quirks).
+    - **User**: 400 chars (Individual preferences).
+- **Proactive Management**: The **Auditor Agent** executes async maintenance runs:
+    - **Warning (80%)**: Triggers an internal log event.
+    - **Compaction (95%)**: Triggers a specialized "Summary Run" where related entries are merged into compact, info-dense narratives using LLM synthesis.
+- **Memory Tools**: Standardized `add`, `replace`, `remove` actions exposed to all HMAS agents.
+- **Provider Mirroring**:
+    - **Additive Sync**: Supports external providers (Mem0, Honcho, OpenViking) as secondary, redundant stores.
+    - **Performance Isolation**: Mirrored writes are dispatched as async **Event Bus** tasks (`PROVIDER_SYNC`), preventing external API latency from blocking the Edge Worker response.
+    - **Tenant Config**: External credentials are stored in `domain-settings` with multi-tenant encryption.
+
+## 45. Context, Identity & Personality (Hermes Protocol)
+
+EdApex V2 formalizes agent behavior and project grounding through the **Hermes Context System**.
+
+- **The SOUL Pattern**: Global identity (`SOUL.md`) defines the institutional voice. Sub-personas for Supervisors extend this base identity.
+- **Context Discovery**: The Orchestrator recursively discovers and injects `AGENTS.md`, `SKILL.md`, and `.cursorrules` based on active domain priority.
+- **Grounding References**: Agents and users can utilize the `@-syntax` (`@file`, `@folder`, `@url`, `@diff`) to anchor discussions in specific external data.
+- **Edge Truncation**: All context files and references are subject to a **70% Head / 20% Tail** truncation if they exceed 20,000 characters, ensuring token efficiency on the Edge.
+
+- **Edge Truncation**: All context files and references are subject to a **70% Head / 20% Tail** truncation if they exceed 20,000 characters, ensuring token efficiency on the Edge.
+
+## 46. AI Providers, Routing & Fallback (Hermes Protocol)
+
+EdApex V2 optimizes LLM infrastructure through the **Hermes Strategic Provider Management** pattern.
+
+- **The Provider Registry**: Models are decoupled from code. The active `ProviderRegistry` maps HMAS Agents to their optimal inference engine (Workers AI, OpenAI, OpenRouter, or Local Ollama).
+- **Smart Routing Logic**: Requests are automatically routed based on priority:
+  - **Background Tasks**: Sorted by **Price** (Workers AI/Llama 3).
+  - **User Interaction**: Sorted by **Latency** (Groq/OpenAI).
+  - **Complex Planning**: Sorted by **Intelligence** (GPT-4o/Claude 3.5).
+- **Resilient Failover**: If a provider fails (429/500), the Orchestrator implements a **Mid-Session Swap** to the configured fallback model while preserving the conversation buffer.
+- **Interoperability Gateway**: The backend exposes an OpenAI-compatible gateway (`/v1/chat/completions`), allowing the "School Agent" to serve as a backend for third-party tools (Cursor, OpenWebUI).
+
+## 47. Conclusion: Towards the Autonomous School
 
 The transformation of EdApex V2 into an Agentic School represents a paradigm shift in educational infrastructure. By synthesizing local-first performance, hierarchical multi-agent orchestration, and strict financial governance, we provide a robust, build-ready blueprint for the future of school management...

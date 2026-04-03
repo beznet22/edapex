@@ -1,11 +1,15 @@
 import { db } from "../../../db/index.js";
 import { 
-  aiChats, 
+  aiSessions, 
   aiMessages, 
   aiVotes, 
   aiAgents, 
   aiAgentActions, 
-  aiToolInvocations 
+  aiToolInvocations,
+  aiTasks,
+  aiGoals,
+  aiApprovals,
+  aiCostEvents
 } from "../../../db/mysql/domain-ai.js";
 import { 
   IAiRepository, 
@@ -14,12 +18,44 @@ import {
   IAiVote, 
   IAiAgent, 
   IAiAgentAction, 
-  IAiToolInvocation 
+  IAiToolInvocation,
+  IAiTask,
+  IAiGoal,
+  IAiApproval,
+  IAiCostEvent
 } from "../../interfaces/ai.interface.js";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and, inArray, or, isNull } from "drizzle-orm";
 
 export class MySqlAiRepository implements IAiRepository {
-  private mapChat(row: any): IAiChat {
+  private mapSession(row: IAiChat): IAiChat {
+    return {
+      ...row,
+      createdAt: row.createdAt ? new Date(row.createdAt) : null,
+      updatedAt: row.updatedAt ? new Date(row.updatedAt) : null,
+    } as any;
+  }
+
+  private mapTask(row: IAiTask): IAiTask {
+    return {
+      ...row,
+      startedAt: row.startedAt ? new Date(row.startedAt) : null,
+      completedAt: row.completedAt ? new Date(row.completedAt) : null,
+      cancelledAt: row.cancelledAt ? new Date(row.cancelledAt) : null,
+      createdAt: row.createdAt ? new Date(row.createdAt) : null,
+      updatedAt: row.updatedAt ? new Date(row.updatedAt) : null,
+    };
+  }
+
+  private mapApproval(row: IAiApproval): IAiApproval {
+    return {
+      ...row,
+      decidedAt: row.decidedAt ? new Date(row.decidedAt) : null,
+      createdAt: row.createdAt ? new Date(row.createdAt) : null,
+      updatedAt: row.updatedAt ? new Date(row.updatedAt) : null,
+    };
+  }
+
+  private mapGoal(row: IAiGoal): IAiGoal {
     return {
       ...row,
       createdAt: row.createdAt ? new Date(row.createdAt) : null,
@@ -27,7 +63,7 @@ export class MySqlAiRepository implements IAiRepository {
     };
   }
 
-  private mapMessage(row: any): IAiMessage {
+  private mapMessage(row: IAiMessage): IAiMessage {
     return {
       ...row,
       createdAt: row.createdAt ? new Date(row.createdAt) : null,
@@ -35,7 +71,7 @@ export class MySqlAiRepository implements IAiRepository {
     };
   }
 
-  private mapAction(row: any): IAiAgentAction {
+  private mapAction(row: IAiAgentAction): IAiAgentAction {
     return {
       ...row,
       createdAt: row.createdAt ? new Date(row.createdAt) : null,
@@ -44,36 +80,36 @@ export class MySqlAiRepository implements IAiRepository {
     };
   }
 
-  // --- Chat ---
+  // --- Sessions (Replaces Chat) ---
   async getChatById(tenantId: string, chatId: string): Promise<IAiChat | null> {
-    const [result] = await db.select().from(aiChats).where(and(eq(aiChats.id, chatId), eq(aiChats.tenantId, tenantId)));
-    return result ? this.mapChat(result) : null;
+    const [result] = await db.select().from(aiSessions).where(and(eq(aiSessions.id, chatId), eq(aiSessions.tenantId, tenantId)));
+    return result ? this.mapSession(result) : null;
   }
 
   async getChatsByUser(tenantId: string, userId: string): Promise<IAiChat[]> {
     const results = await db
       .select()
-      .from(aiChats)
+      .from(aiSessions)
       .where(and(
-        eq(aiChats.tenantId, tenantId),
-        eq(aiChats.userId, userId)
+        eq(aiSessions.tenantId, tenantId),
+        eq(aiSessions.userId, userId)
       ));
-    return results.map((row: any) => this.mapChat(row));
+    return results.map((row: IAiChat) => this.mapSession(row));
   }
 
   async createChat(data: Partial<IAiChat>): Promise<IAiChat> {
-    await db.insert(aiChats).values(data as any);
+    await db.insert(aiSessions).values(data as any);
     const result = await this.getChatById(data.tenantId!, data.id!);
-    if (!result) throw new Error("Failed to create chat");
+    if (!result) throw new Error("Failed to create session");
     return result;
   }
 
   async updateChat(tenantId: string, chatId: string, data: Partial<IAiChat>): Promise<IAiChat> {
-    await db.update(aiChats)
+    await db.update(aiSessions)
       .set(data as any)
-      .where(and(eq(aiChats.id, chatId), eq(aiChats.tenantId, tenantId)));
+      .where(and(eq(aiSessions.id, chatId), eq(aiSessions.tenantId, tenantId)));
     const result = await this.getChatById(tenantId, chatId);
-    if (!result) throw new Error("Failed to update chat");
+    if (!result) throw new Error("Failed to update session");
     return result;
   }
 
@@ -82,8 +118,8 @@ export class MySqlAiRepository implements IAiRepository {
     const results = await db
       .select()
       .from(aiMessages)
-      .where(and(eq(aiMessages.chatId, chatId), eq(aiMessages.tenantId, tenantId)));
-    return results.map((row: any) => this.mapMessage(row));
+      .where(and(eq(aiMessages.sessionId, chatId), eq(aiMessages.tenantId, tenantId)));
+    return results.map((row: IAiMessage) => this.mapMessage(row));
   }
 
   async createMessage(data: Partial<IAiMessage>): Promise<IAiMessage> {
@@ -97,11 +133,11 @@ export class MySqlAiRepository implements IAiRepository {
   async upsertVote(tenantId: string, chatId: string, messageId: string, isUpvoted: boolean): Promise<IAiVote> {
     const voteValue = isUpvoted ? 1 : 0;
     await db.insert(aiVotes)
-      .values({ tenantId, chatId, messageId, isUpvoted: voteValue })
+      .values({ tenantId, sessionId: chatId, messageId, isUpvoted: voteValue })
       .onDuplicateKeyUpdate({ set: { isUpvoted: voteValue } });
     
     const [result] = await db.select().from(aiVotes).where(and(
-      eq(aiVotes.chatId, chatId), 
+      eq(aiVotes.sessionId, chatId), 
       eq(aiVotes.messageId, messageId),
       eq(aiVotes.tenantId, tenantId)
     ));
@@ -109,7 +145,7 @@ export class MySqlAiRepository implements IAiRepository {
       ...result,
       createdAt: result.createdAt ? new Date(result.createdAt) : null,
       updatedAt: result.updatedAt ? new Date(result.updatedAt) : null,
-    } as IAiVote;
+    } as any;
   }
 
   // --- Agents ---
@@ -161,5 +197,78 @@ export class MySqlAiRepository implements IAiRepository {
       createdAt: newTool.createdAt ? new Date(newTool.createdAt) : null,
       updatedAt: newTool.updatedAt ? new Date(newTool.updatedAt) : null,
     } as IAiToolInvocation;
+  }
+
+  // --- Tasks (High-Fidelity) ---
+  async getTaskById(tenantId: string, id: string): Promise<IAiTask | null> {
+    const [result] = await db.select().from(aiTasks).where(and(eq(aiTasks.id, id), eq(aiTasks.tenantId, tenantId)));
+    return result ? this.mapTask(result) : null;
+  }
+
+  /**
+   * Atomic Single-Trip Task Checkout
+   * Mandated by Paperclip V1 Integration Plan for Edge Resilience
+   * (MySQL version - non-returning, requires post-fetch)
+   */
+  async checkoutTask(tenantId: string, id: string, agentId: string): Promise<IAiTask> {
+    await db
+      .update(aiTasks)
+      .set({ 
+        status: 'in_progress', 
+        assigneeAgentId: agentId, 
+        startedAt: new Date() 
+      })
+      .where(and(
+        eq(aiTasks.id, id),
+        eq(aiTasks.tenantId, tenantId),
+        inArray(aiTasks.status, ['todo', 'backlog', 'blocked']),
+        or(isNull(aiTasks.assigneeAgentId), eq(aiTasks.assigneeAgentId, agentId))
+      ));
+
+    // Refetch to verify checkout success
+    const result = await this.getTaskById(tenantId, id);
+    if (!result || result.assigneeAgentId !== agentId || result.status !== 'in_progress') {
+      throw new Error("Task already claimed or invalid state for checkout");
+    }
+
+    return result;
+  }
+
+  async updateTask(tenantId: string, id: string, data: Partial<IAiTask>): Promise<IAiTask> {
+    await db
+      .update(aiTasks)
+      .set(data as any)
+      .where(and(eq(aiTasks.id, id), eq(aiTasks.tenantId, tenantId)));
+    const result = await this.getTaskById(tenantId, id);
+    if (!result) throw new Error("Failed to update task");
+    return result;
+  }
+
+  // --- Approvals & Governance ---
+  async createApproval(data: Partial<IAiApproval>): Promise<IAiApproval> {
+    await db.insert(aiApprovals).values(data as any);
+    const [result] = await db.select().from(aiApprovals).where(and(eq(aiApprovals.id, data.id!), eq(aiApprovals.tenantId, data.tenantId!)));
+    if (!result) throw new Error("Failed to create approval request");
+    return this.mapApproval(result);
+  }
+
+  async getPendingApprovals(tenantId: string): Promise<IAiApproval[]> {
+    const results = await db
+      .select()
+      .from(aiApprovals)
+      .where(and(eq(aiApprovals.tenantId, tenantId), eq(aiApprovals.status, "pending")));
+    return results.map((row: IAiApproval) => this.mapApproval(row));
+  }
+
+  // --- Goals & Costing ---
+  async createGoal(data: Partial<IAiGoal>): Promise<IAiGoal> {
+    await db.insert(aiGoals).values(data as any);
+    const [result] = await db.select().from(aiGoals).where(and(eq(aiGoals.id, data.id!), eq(aiGoals.tenantId, data.tenantId!)));
+    if (!result) throw new Error("Failed to create goal");
+    return this.mapGoal(result);
+  }
+
+  async reportCost(data: IAiCostEvent): Promise<void> {
+    await db.insert(aiCostEvents).values(data as any);
   }
 }

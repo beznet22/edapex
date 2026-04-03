@@ -21,8 +21,16 @@ Repositories MUST support differential synchronization as taught in `tanstack-db
 - **D1 Batching**: Use `db.batch()` for all multi-row mutations to respect Cloudflare's 10ms CPU limit.
 - **Interface Barrier**: The `domain/interfaces/` layer encapsulates all DB types. Services NEVER import Drizzle schemas directly.
 - **Mapper Methods**: Every repository MUST have private `map[Entity]` methods to transform raw Drizzle rows into domain interfaces, ensuring date conversions and type safety.
+- **Atomic Task Checkout**: Every task queue implementation MUST use the `checkoutTask` pattern (a single atomic `UPDATE ... WHERE status='PENDING' RETURNING *`) to prevent distributed race conditions.
 
-## 4. Scale & Normalization (Consult `database-architect`)
+## 4. Paperclip V1 Schema Mapping (MANDATORY)
+Every domain module with agentic capabilities MUST implement the following canonical tables:
+- `ai_sessions`: Deep lineage with `parent_session_id`.
+- `ai_tasks`: Atomic work units for checkout.
+- `ai_goals`: Recursive 4-level goal hierarchy.
+- `ai_approvals`: HMITL governance gates.
+- `ai_cost_events`: Financial attribution ledger.
+- `ai_activity_logs`: Level-8 forensic execution trace.
 Ensure you are prioritizing normalized designs leveraging JSON/JSONB properly for schemaless configurations. Never use raw SQL when Drizzle provides type-safe methods.
 
 ## 5. Schema Naming Convention

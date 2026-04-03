@@ -82,6 +82,12 @@ return response;
 
 ---
 
+## 6. Binary Delegation Bridge (Computing Offload)
+To bypass Edge CPU/Memory constraints for heavy binary operations (PDF generation, ZIP archiving, Image processing):
+- **Deferred Execution**: Delegate the HTML/Data payload to the containerized bridge.
+- **Canonical Path**: Use the UUID-isolated staging area at `.agents/skills/edapex-domain-architect/temp`.
+- **R2 Persistence**: The bridge must flush results directly to Cloudflare R2 and return the object URL.
+
 ## 6. Connection Management
 - D1 connections are managed by the runtime—no connection pool configuration needed.
 - For external APIs (Stripe, OpenAI), use connection reuse via `fetch` with `keepalive: true`.
@@ -92,7 +98,8 @@ return response;
 ## 7. Observability & Monitoring
 - **Structured Logging**: Use JSON format with `tenantId`, `action`, `layer`, and `run_id`.
 - **Performance Budgets**: Controller response < 50ms, Repo query < 5ms CPU.
-- **Proactive AI Issue Tracking**: Auditor agents scan `cost_events` and `agent_runs` for failures, automatically creating `SECURITY_INCIDENT` or `SYSTEM_ISSUE` WorkProducts in the Command Center.
+- **Level-8 Forensic Auditing**: EVERY major agentic decision and tool call must emit an `ai_activity_logs` entry.
+- **Proactive AI Issue Tracking**: Auditor agents scan `ai_cost_events` and `ai_activity_logs` for failures, automatically creating `SECURITY_INCIDENT` or `SYSTEM_ISSUE` WorkProducts.
 
 ---
 

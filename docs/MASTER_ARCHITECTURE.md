@@ -148,14 +148,53 @@ HMAS organizes AI intelligence into four distinct functional layers to ensure st
 - **Atomic Operations**: Specialized agents like `student_registration_agent` or `payroll_generator_agent`.
 - **Isolation**: These agents have access to specific domain knowledge but cannot "see" other domains without going back to the Supervisor.
 
-### Level 4: Tool Execution Layer
-- **Responsibility**: Validates the JSON schema of agent tool calls.
-- **Gatekeeping**: Enforces the PBAC check *before* the domain service is called.
+### 3.4 Deployed Agent Skills (Hermes Standard)
+Every agent in the HMAS hierarchy retrieves its operational knowledge from the **Skills System**:
+- **Progressive Disclosure**: Token-efficient loading of `src/services/ai/skills/{domain}/SKILL.md`.
+- **Procedural Memory**: Skills bundle verified `scripts/` (e.g., migration tools) and `templates/` (e.g., report formats).
+- **Fallback Logic**: Skills can declare conditional activation for local-first recovery when edge latency is high.
 
-### 3.5 Dynamic Educational Structures as AI Skills
+### 3.5 The EdApex Stress Lab (Sidecar Isolation)
+To maintain environment parity while ensuring production safety:
+- **The Laboratory**: A self-contained, restricted mode of the EdApex V2 backend (`MODE=STRESS_LAB`).
+- **Isolation**: Hardware-capped via Docker (`cpus`, `memory`) or physically isolated on a remote diagnostic VPS.
+- **Data Airgap**: Operates on a **Disposable SQLite Instance**, cloning tenant schemas for destructive chaos tests and benchmarking Section 24 performance budgets.
+- **Hybrid Bridge**: Edge Workers "snap" (delegate) high-risk tools into the Lab via a secure mTLS/SSH bridge.
+
+### 3.6 Persistent Memory (HMAS Context)
+To maintain long-term coherence across sessions and platforms:
+- **Three-Tier Buffer**: Memory is partitioned into `EXECUTIVE` (Institution), `DOMAIN` (Supervisor), and `USER` (Individual) tiers.
+- **Environment Agnostic**: Persistence is handled via **Drizzle ORM** (D1 for Edge, Postgres for VPS/Docker) with **TanStack DB** client-side synchronization.
+- **Session Lineage**: [HIGH-FIDELITY] Every conversation turn implements `parent_session_id` chains to maintain a chronological narrative across multi-year academic cycles, even after history compression.
+- **Frozen Snapshot**: At the start of an orchestration cycle, the pre-fetched memory buffer is injected into the system prompt as an immutable context block.
+- **Boundary-Aware Compaction**: [HIGH-FIDELITY] The Auditor Agent executes async dual-stage history compaction (85% hygiene / 50% summarization). To prevent context breakage, it walk-back realigns boundaries to ensure `tool_call` and `tool_result` pairs are never split.
+- **Provider Mirroring**: Supports external sync (e.g., Mem0, Honcho) via an async event-bus pattern.
+
+### 3.7 Dynamic Educational Structures as AI Skills
 To achieve massive global scale across varying educational models (e.g., Nigerian 6-3-3-4 vs. K-12 vs. IB vs. UK A-Levels), **School Structures are removed from the database level**. Instead, they are defined strictly as dynamic "AI Skills" injected directly into the HMAS orchestration layer.
 - **Structural Loading**: When a campus is instantiated, the Executive Orchestrator pulls a localized structural skill (e.g., `structure-ube-nigeria.md`). This skill dictates local concepts like grading rubrics, "Terms", "Semesters", and critical boundary rules (e.g., UBE is free by federal law, whereas ECCDE Crèche bills tuition).
 - **Schema Autonomy**: The `domain-academic` schema utilizes entirely agnostic primitives (`classes`, `enrollments`) combined with Zod-validated JSON `metadata`. The Orchestrator leverages the runtime Skill structure to map real-world meaning to these agnostic DB rows.
+
+### 3.8 Context & Personality (Grounding Layer)
+To maintain grounding and consistent identity:
+- **SOUL.md (Identity)**: A global identity file defining the "Institutional Voice" of EdApex AI.
+- **Hierarchical Context**: Automatic loading of `AGENTS.md` (Project) and `SKILL.md` (Domain) into the system prompt.
+- **Context References (@)**: Inline parsing of `@file`, `@folder`, and `@url` for precision grounding, utilizing a 70/20 head-tail truncation strategy for edge safety.
+
+### 3.9 AI Providers, Routing & Fallback (Resilience Layer)
+To ensure cost-efficiency and 100% uptime:
+- **Dynamic Provider Registry**: A configuration-driven system that maps models to providers (Workers AI, OpenAI, Anthropic, Ollama).
+- **Smart Routing**: Automatic request sorting based on `price`, `latency`, or `throughput`.
+- **Mid-Session Failover**: Automatic fallback to secondary providers (e.g., OpenAI -> Workers AI) if the primary model encounters rate limits or errors, retaining session context.
+- **OpenAI-Compatible Gateway**: Exposing the HMAS Orchestrator as a standardized API (/v1/chat) for external interoperability.
+
+### 3.10 Orchestration & Governance (Paperclip Standard)
+To ensure industrial-grade reliability and institutional oversight:
+- **Atomic Task Checkout**: [HIGH-FIDELITY] Mandates a single-trip SQL update pattern (via `checkoutTask`) to prevent task-claim collisions across distributed Edge nodes, ensuring that exactly one agent acquires a `PENDING` task.
+- **Recursive Strategy Goals**: Implements a 4-level goal hierarchy (**Institution > Department > Agent > Task**) to align AI activities with academic terms and departmental budgets.
+- **Governance Approval Gates**: High-risk actions (e.g., budget overrides, sensitive data access) trigger `ai_approvals` which halt the agent loop until a human administrator provides a signed decision via the Command Center.
+- **Financial Cost Attribution**: Every task execution emits an `ai_cost_event`, attributing LLM expenditures to specific goals and departments for precise forensic accounting.
+- **Forensic Audit Trace**: Level-8 forensic tracing logs every actor-entity interaction in `ai_activity_logs`, providing a complete reconstruction of agent reasoning and tool usage.
 
 ---
 
@@ -264,11 +303,16 @@ Mastra's `Memory` system is used to handle cross-interaction coherence:
 ### 8.3 Storage Adapters
 Mastra requires a `Storage` adapter to persist memory and logs. 
 - **`[DB]Store` Adapter**: A custom or Drizzle-based `[DB]Store` (e.g., `MysqlStore`, `PostgresStore`) MUST be used to persist threads, messages, and workflow snapshots to the `edapex_v2` database based on the active environment dialect.
-- **Schema Management**: Mastra's internal memory tables (e.g., `mastra_messages`, `mastra_threads`) are currently integrated into the V2 migration lifecycle.
+- **Schema Management**: EdApex evolves the basic Mastra schema into a **High-Fidelity AI Persistence Layer**:
+    - **`ai_sessions`**: Dialect-agnostic UUID mapping with `parent_session_id` and `token_stats`.
+    - **`ai_messages`**: Rich trace metadata including `cache_breakpoint` (Boolean) and `tool_call_id`.
+    - **`ai_tasks`**: Atomic orchestration units with status-lifecycle tracking.
+    - **`ai_goals`**: Recursive strategy nodes for institutional alignment.
+    - **`ai_approvals`**: Governance gates for human-in-the-loop oversight.
 
 ### 8.4 Stateless AI Execution Model
 To meet the **Cloudflare 10ms CPU limit** and ensure **Edge-Native performance**, EdApex uses a **Stateless Agent Execution Model**:
-- Treat `ai_chats` and `ai_messages` natively via Drizzle ORM repositories, wholly agnostic of the AI SDK.
+- Treat `ai_sessions` and `ai_messages` natively via Drizzle ORM repositories, wholly agnostic of the AI SDK.
 - The `AiService` loads conversation history and invokes the Mastra agent statelessly.
 - This ensures minimal cold start overhead and zero vendor lock-in.
 
@@ -291,7 +335,11 @@ To ensure 100% logic parity and strict adherence to the **Backend Feasibility & 
 src/
 ├── config/              # Centralized environment & unifiedConfig
 ├── controllers/         # Hono route handlers (req/res) via BaseController
-├── services/            # Framework-agnostic business logic & AI orchestration
+├── services/            # Framework-agnostic business logic
+│   └── ai/              # HMAS Intelligence & Orchestration
+│       ├── strategy/    # [NEW] Orchestration logic & Agent Registry
+│       ├── skills/      # [NEW] Deployed procedural memory (Hermes Standard)
+│       └── agents/      # Mastra Agent & Workflow definitions
 ├── domain/              # Anti-Corruption Layer (Interfaces & Repositories)
 │   ├── interfaces/      # e.g., core.interface.ts, ai.interface.ts
 │   └── repositories/    # Drizzle ORM concrete implementations (mysql, postgres, sqlite)
@@ -330,6 +378,7 @@ EdApex is optimized for the constraints of Cloudflare's edge network:
 ### 10.1 Constraint-First Design
 - **3MB Bundle Size**: Aggressive code splitting via `wrangler` and dynamic imports for heavy AI providers.
 - **10ms CPU Time**: Stateless execution, offloading heavy processing to the client or background tasks.
+- **System + 3 Caching**: [HIGH-FIDELITY] To survive Edge budget constraints, prompt assembly utilizes Anthropic-style cache breakpoints: Section 1-46 as Immutable Breakpoint 1, with a rolling 3-turn window for Breakpoints 2-4.
 - **10k AI Neurons/Day**: Runtime model tiering (Small/Medium/Large) and token usage tracking.
 
 ### 10.2 Local-First Synchronization

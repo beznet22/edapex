@@ -3,6 +3,12 @@ export type MessageRole = "user" | "assistant" | "system" | "tool";
 export type AgentStatus = "active" | "inactive" | "maintenance";
 export type ActionStatus = "pending" | "running" | "completed" | "failed";
 export type DocumentKind = "text" | "code" | "image" | "sheet";
+export type TaskStatus = "backlog" | "todo" | "in_progress" | "in_review" | "done" | "blocked" | "cancelled";
+export type TaskPriority = "critical" | "high" | "medium" | "low";
+export type GoalLevel = "institution" | "department" | "agent" | "task";
+export type GoalStatus = "planned" | "active" | "achieved" | "cancelled";
+export type ApprovalType = "hire_agent" | "approve_strategy" | "budget_override";
+export type ApprovalStatus = "pending" | "approved" | "rejected" | "cancelled";
 
 export interface IChatMetadata {
   summary?: string;
@@ -116,6 +122,72 @@ export interface IAiToolInvocation {
   updatedAt: Date | null;
 }
 
+export interface IAiGoal {
+  id: string;
+  tenantId: string;
+  title: string;
+  description: string | null;
+  level: GoalLevel;
+  parentId: string | null;
+  ownerAgentId: string | null;
+  status: GoalStatus;
+  academicYearId: string | null;
+  createdAt: Date | null;
+  updatedAt: Date | null;
+}
+
+export interface IAiTask {
+  id: string;
+  tenantId: string;
+  projectId: string | null;
+  goalId: string | null;
+  parentId: string | null;
+  title: string;
+  description: string | null;
+  status: TaskStatus;
+  priority: TaskPriority;
+  assigneeAgentId: string | null;
+  createdByAgentId: string | null;
+  createdByUserId: string | null;
+  billingCode: string | null;
+  startedAt: Date | null;
+  completedAt: Date | null;
+  cancelledAt: Date | null;
+  createdAt: Date | null;
+  updatedAt: Date | null;
+}
+
+export interface IAiApproval {
+  id: string;
+  tenantId: string;
+  type: ApprovalType;
+  requestedByAgentId: string | null;
+  requestedByUserId: string | null;
+  status: ApprovalStatus;
+  payload: Record<string, any>;
+  decisionNote: string | null;
+  decidedByUserId: string | null;
+  decidedAt: Date | null;
+  createdAt: Date | null;
+  updatedAt: Date | null;
+}
+
+export interface IAiCostEvent {
+  id: string;
+  tenantId: string;
+  agentId: string;
+  issueId: string | null;
+  projectId: string | null;
+  goalId: string | null;
+  billingCode: string | null;
+  provider: string;
+  model: string;
+  inputTokens: number;
+  outputTokens: number;
+  costCents: number;
+  occurredAt: Date;
+}
+
 export interface IAiRepository {
   // Chat
   getChatById(tenantId: string, chatId: string): Promise<IAiChat | null>;
@@ -141,4 +213,17 @@ export interface IAiRepository {
   
   // Tool Invocations
   createToolInvocation(data: Partial<IAiToolInvocation>): Promise<IAiToolInvocation>;
+
+  // Tasks (High-Fidelity)
+  getTaskById(tenantId: string, id: string): Promise<IAiTask | null>;
+  checkoutTask(tenantId: string, id: string, agentId: string): Promise<IAiTask>; // Atomic
+  updateTask(tenantId: string, id: string, data: Partial<IAiTask>): Promise<IAiTask>;
+
+  // Approvals & Governance
+  createApproval(data: Partial<IAiApproval>): Promise<IAiApproval>;
+  getPendingApprovals(tenantId: string): Promise<IAiApproval[]>;
+
+  // Goals & Costing
+  createGoal(data: Partial<IAiGoal>): Promise<IAiGoal>;
+  reportCost(data: IAiCostEvent): Promise<void>;
 }

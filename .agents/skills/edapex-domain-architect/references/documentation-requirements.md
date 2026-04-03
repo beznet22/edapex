@@ -9,6 +9,10 @@ Every domain must have a "Gold Standard" specification in `docs/domains/[module]
 5. **Event Catalog**: Produced and Consumed events.
 6. **Stress Defense Analysis**: Identification of stressors (Recursive loops, Storage quotas) and specific defense tools.
 7. **Implementation Roadmap**: Checkpointed progress matching `PROJECT_ROADMAP.md`.
+8. **HMAS Registry**: List of Executive, Supervisors, and Task Agents.
+9. **Deployed Agent Skills**: A table mapping each agent to its required Hermes-style skills (`src/services/ai/skills/`).
+10. **Tool Safety & Execution**: A table defining which tools require **Sidecar Isolation (Stress Lab)** vs. **Native Edge** execution, including their **Background Protocol** (`session_id`) requirement.
+11. **Persistent Memory Registry**: A table mapping the `ai_memories` targets (`EXECUTIVE`, `DOMAIN`, `USER`) and their character budgets.
 
 ---
 

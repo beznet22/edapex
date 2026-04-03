@@ -17,10 +17,15 @@ import { users, tenants } from "./domain-core";
 
 // --- AI METADATA TYPES ---
 
-export type ChatMetadata = {
+export type SessionMetadata = {
   summary?: string;
   tags?: string[];
   lastMessagePreview?: string;
+  tokenStats?: {
+    prompt: number;
+    completion: number;
+    total: number;
+  };
 };
 
 export type MessageMetadata = {
@@ -31,18 +36,21 @@ export type MessageMetadata = {
   };
   modelName?: string;
   latencyMs?: number;
+  cacheBreakpoint?: boolean;
+  toolCallId?: string;
 };
 
 export type MessagePart = Record<string, any>;
 
-export const aiChats = sqliteTable("domain_ai_ai_chats", {
+export const aiSessions = sqliteTable("domain_ai_ai_sessions", {
   id: text("id", { length: 36 }).primaryKey(), 
   tenantId: text("tenant_id", { length: 36 }).notNull().references(() => tenants.id),
   userId: text("user_id", { length: 36 }).notNull().references(() => users.id),
-  title: text("title", { length: 255 }).notNull().default("New Chat"),
+  parentSessionId: text("parent_session_id", { length: 36 }), // Session lineage
+  title: text("title", { length: 255 }).notNull().default("New Session"),
   model: text("model", { length: 100 }),
   visibility: text("visibility", { enum: ["private", "public"] }).default("private"),
-  metadata: text("metadata", { mode: "json" }).$type<ChatMetadata>(),
+  metadata: text("metadata", { mode: "json" }).$type<SessionMetadata>(),
   createdAt: integer("created_at", { mode: "timestamp" }).defaultNow(),
   updatedAt: integer("updated_at", { mode: "timestamp" }).defaultNow(),
 });
@@ -50,7 +58,7 @@ export const aiChats = sqliteTable("domain_ai_ai_chats", {
 export const aiMessages = sqliteTable("domain_ai_ai_messages", {
   id: text("id", { length: 36 }).primaryKey(),
   tenantId: text("tenant_id", { length: 36 }).notNull().references(() => tenants.id),
-  chatId: text("chat_id", { length: 36 }).notNull().references(() => aiChats.id, { onDelete: "cascade" }),
+  chatId: text("chat_id", { length: 36 }).notNull().references(() => aiSessions.id, { onDelete: "cascade" }),
   role: text("role", { enum: ["user", "assistant", "system", "tool"] }).notNull(),
   parts: text("parts", { mode: "json" }).$type<MessagePart[]>().notNull(),
   metadata: text("metadata", { mode: "json" }).$type<MessageMetadata>(),
@@ -63,7 +71,7 @@ export const aiMessages = sqliteTable("domain_ai_ai_messages", {
 
 export const aiVotes = sqliteTable("domain_ai_ai_votes", {
   tenantId: text("tenant_id", { length: 36 }).notNull().references(() => tenants.id),
-  chatId: text("chat_id", { length: 36 }).notNull().references(() => aiChats.id, { onDelete: "cascade" }),
+  chatId: text("chat_id", { length: 36 }).notNull().references(() => aiSessions.id, { onDelete: "cascade" }),
   messageId: text("message_id", { length: 36 }).notNull().references(() => aiMessages.id, { onDelete: "cascade" }),
   isUpvoted: integer("is_upvoted").notNull(),
   createdAt: integer("created_at", { mode: "timestamp" }).defaultNow(),
@@ -72,31 +80,79 @@ export const aiVotes = sqliteTable("domain_ai_ai_votes", {
   pk: index("pk").on(table.tenantId, table.chatId, table.messageId),
 }));
 
-export const aiDocuments = sqliteTable("domain_ai_ai_documents", {
+// --- ORCHESTRATION & GOVERNANCE ---
+
+export const aiTasks = sqliteTable("domain_ai_ai_tasks", {
   id: text("id", { length: 36 }).primaryKey(),
   tenantId: text("tenant_id", { length: 36 }).notNull().references(() => tenants.id),
+  goalId: text("goal_id", { length: 36 }),
+  sessionId: text("session_id", { length: 36 }).references(() => aiSessions.id),
   title: text("title", { length: 255 }).notNull(),
-  kind: text("kind", { enum: ["text", "code", "image", "sheet"] }).notNull(),
-  content: text("content"),
+  description: text("description"),
+  status: text("status", { enum: ["backlog", "todo", "in_progress", "completed", "failed", "cancelled", "blocked"] }).default("todo"),
+  priority: integer("priority").default(0),
+  assigneeAgentId: text("assignee_agent_id", { length: 36 }),
+  input: text("input", { mode: "json" }),
+  output: text("output", { mode: "json" }),
+  error: text("error"),
+  startedAt: integer("started_at", { mode: "timestamp" }),
+  completedAt: integer("completed_at", { mode: "timestamp" }),
+  cancelledAt: integer("cancelled_at", { mode: "timestamp" }),
   createdAt: integer("created_at", { mode: "timestamp" }).defaultNow(),
   updatedAt: integer("updated_at", { mode: "timestamp" }).defaultNow(),
-}, (table) => ({
-  tenantIdx: index("doc_tenant_idx").on(table.tenantId),
-}));
+});
 
-export const aiSuggestions = sqliteTable("domain_ai_ai_suggestions", {
+export const aiApprovals = sqliteTable("domain_ai_ai_approvals", {
   id: text("id", { length: 36 }).primaryKey(),
   tenantId: text("tenant_id", { length: 36 }).notNull().references(() => tenants.id),
-  documentId: text("document_id", { length: 36 }).notNull().references(() => aiDocuments.id, { onDelete: "cascade" }),
-  content: text("content"),
+  taskId: text("task_id", { length: 36 }).references(() => aiTasks.id),
+  requesterAgentId: text("requester_agent_id", { length: 36 }),
+  approverUserId: text("approver_user_id", { length: 36 }),
+  requestType: text("request_type", { length: 100 }).notNull(),
+  status: text("status", { enum: ["pending", "approved", "rejected", "escalated"] }).default("pending"),
+  payload: text("payload", { mode: "json" }),
+  decisionReason: text("decision_reason"),
+  decidedAt: integer("decided_at", { mode: "timestamp" }),
   createdAt: integer("created_at", { mode: "timestamp" }).defaultNow(),
-  documentCreatedAt: integer("document_created_at", { mode: "timestamp" }),
-  updatedAt: integer("updated_at", { mode: "timestamp" }).defaultNow(),
-}, (table) => ({
-  tenantDocIdx: index("sug_tenant_doc_idx").on(table.tenantId, table.documentId),
-}));
+  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull().defaultNow(),
+});
 
-// --- AGENTIC INFRASTRUCTURE ---
+export const aiGoals = sqliteTable("domain_ai_ai_goals", {
+  id: text("id", { length: 36 }).primaryKey(),
+  tenantId: text("tenant_id", { length: 36 }).notNull().references(() => tenants.id),
+  parentGoalId: text("parent_goal_id", { length: 36 }), // Recursive hierarchy
+  title: text("title", { length: 255 }).notNull(),
+  description: text("description"),
+  category: text("category", { length: 100 }), // Institution, Department, Agent, Task
+  status: text("status", { enum: ["active", "achieved", "abandoned"] }).default("active"),
+  createdAt: integer("created_at", { mode: "timestamp" }).defaultNow(),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).defaultNow(),
+});
+
+export const aiCostEvents = sqliteTable("domain_ai_ai_cost_events", {
+  id: text("id", { length: 36 }).primaryKey(),
+  tenantId: text("tenant_id", { length: 36 }).notNull().references(() => tenants.id),
+  taskId: text("task_id", { length: 36 }).references(() => aiTasks.id),
+  goalId: text("goal_id", { length: 36 }).references(() => aiGoals.id),
+  provider: text("provider", { length: 100 }),
+  model: text("model", { length: 100 }),
+  tokensPrompt: integer("tokens_prompt"),
+  tokensCompletion: integer("tokens_completion"),
+  costUsd: real("cost_usd"),
+  createdAt: integer("created_at", { mode: "timestamp" }).defaultNow(),
+});
+
+export const aiActivityLogs = sqliteTable("domain_ai_ai_activity_logs", {
+  id: text("id", { length: 36 }).primaryKey(),
+  tenantId: text("tenant_id", { length: 36 }).notNull().references(() => tenants.id),
+  actorId: text("actor_id", { length: 100 }).notNull(), // Agent ID or User ID
+  actorType: text("actor_type", { enum: ["agent", "user", "system"] }).notNull(),
+  entityId: text("entity_id", { length: 36 }),
+  entityType: text("entity_type", { length: 100 }),
+  action: text("action", { length: 100 }).notNull(),
+  metadata: text("metadata", { mode: "json" }),
+  createdAt: integer("created_at", { mode: "timestamp" }).defaultNow(),
+});
 
 export const aiAgents = sqliteTable("domain_ai_ai_agents", {
   id: text("id", { length: 36 }).primaryKey(),
