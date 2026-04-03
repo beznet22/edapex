@@ -255,10 +255,10 @@ export const academicYears = mysqlTable("academic_years", {
 });
 
 export const academicTerms = mysqlTable("academic_terms", {
-  id: text("id").primaryKey(),
-  tenantId: text("tenant_id").notNull(),
-  academicId: text("academic_id").notNull().references(() => academicYears.id),
-  title: text("title").notNull(),
+  id: varchar("id", { length: 36 }).primaryKey(),
+  tenantId: varchar("tenant_id", { length: 36 }).notNull(),
+  academicId: varchar("academic_id", { length: 36 }).notNull().references(() => academicYears.id),
+  title: varchar("title", { length: 200 }).notNull(),
   startDate: timestamp("start_date").notNull(),
   endDate: timestamp("end_date").notNull(),
   createdAt: timestamp("created_at").defaultNow(),

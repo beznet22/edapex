@@ -781,7 +781,7 @@ Each role is a specialized Mastra Agent with its own `SKILL.md` manifest and a r
     - The full history is moved to `WorkProducts` for archival, while the agent keeps ONLY the memo and the last 3 turns (**System + 3**).
 
 ### 14.4 AI Domain & Adapter Registry
-- **Unified Adapter**: Standardizes [Claude](paperclip/ui/src/api/agents.ts#193-195), `GPT`, and `Gemini` into a single Mastra-backed `StandardAdapter` interface.
+- **Unified Adapter**: Standardizes [Claude](/home/beznet/Workspace/paperclip/ui/src/api/agents.ts#193-195), `GPT`, and `Gemini` into a single Mastra-backed `StandardAdapter` interface.
 - **Provider Switching**: Dynamic model selection based on `intent` (reasoning vs. speed) and `budget` availability.
 - **Global Skill Injection**: Agents pull skills from the `edapex-domain-architect` registry, ensuring cross-domain tool consistency.
 
@@ -792,7 +792,7 @@ Each role is a specialized Mastra Agent with its own `SKILL.md` manifest and a r
 
 ### 14.6 Governance: Maximizer & WorkProducts
 - **Maximizer Mode**: Proactive auditor agents scanning for inefficiencies in school metadata and creating Board Proposals.
-- **Work Product Registry**: Tracks artifacts ([Result](file:///home/beznet/Workspace/edapex/paperclip/ui/src/api/agents.ts#36-44)) separate from conversation history, allowing for clean structured data extraction and auditing.
+- **Work Product Registry**: Tracks artifacts ([Result](file:///home/beznet/Workspace/paperclip/ui/src/api/agents.ts#36-44)) separate from conversation history, allowing for clean structured data extraction and auditing.
 
 ### 14.7 Document & Artifact Generation (The Binary Bridge)
 - **Constraint**: Edge networks (Cloudflare Workers) do not natively support headless browser environments or `child_process` execution for PDF rendering.

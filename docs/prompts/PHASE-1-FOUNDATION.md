@@ -4,7 +4,8 @@
 Deploy the "Pulse" of the EdApex V2 Agentic School. Your goal is to transform Paperclip's (located at `/home/beznet/Workspace/paperclip`) generalized orchestration into a production-grade, edge-native heartbeat and locking system.
 
 ## 📜 CORE CONSTRAINTS & TRANSFORMATION POLICY
-- **NO COPY-PASTE**: Analyze Paperclip's `/home/beznet/Workspace/paperclip/server/src/core/heartbeat.ts` and `costs.ts`, then **Reconstruct** them into EdApex-native patterns (`BaseController`, `IRepository<T>`, `Service`).
+- **NO COPY-PASTE**: Analyze Paperclip's [heartbeat](/home/beznet/Workspace/paperclip/server/src/services/heartbeat.ts) and [costs](/home/beznet/Workspace/paperclip/server/src/services/costs.ts), then **Reconstruct** them into EdApex-native patterns (`BaseController`, `IRepository<T>`, `Service`).
+- **PAPERCLIP FILE NOT FOUND**: If you cannot find a file in Paperclip, search for it or something similar that conforms to the EdApex architecture and specs in the codebase.
 - **STRESS AWARENESS**: Review [STRESS_FRAMEWORK.md](../STRESS_FRAMEWORK.md) (Infrastructure Section) before writing logic. You are building for a 3G/Rural environment with 40% packet loss and high-frequency concurrency.
 - **TENANT ISOLATION**: Every query must include a `tenant_id` filter.
 - **8-LAYER RULES**: All code must reside in the canonical `src/` hierarchy.

@@ -30,6 +30,26 @@ export interface IMessagePart {
   [key: string]: any;
 }
 
+export type InvocationType = "scheduler" | "manual" | "event";
+
+export interface ITokenStats {
+  promptTokens?: number;
+  completionTokens?: number;
+  totalTokens?: number;
+  cachedTokens?: number;
+  costCents?: number;
+}
+
+export interface ITaskUsageJson {
+  promptTokens?: number;
+  completionTokens?: number;
+  totalTokens?: number;
+  latencyMs?: number;
+  costCents?: number;
+  provider?: string;
+  model?: string;
+}
+
 export interface IAiChat {
   id: string; // Mastra threadId
   tenantId: string;
@@ -37,6 +57,9 @@ export interface IAiChat {
   title: string;
   model: string | null;
   visibility: ChatVisibility;
+  summary: string | null;
+  tokenStats: ITokenStats | null;
+  isCompressed: boolean | number | null;
   metadata: IChatMetadata | null;
   createdAt: Date | null;
   updatedAt: Date | null;
@@ -48,6 +71,8 @@ export interface IAiMessage {
   chatId: string;
   role: MessageRole;
   parts: IMessagePart[];
+  cacheBreakpoint: boolean | number | null;
+  toolCallId: string | null;
   metadata: IMessageMetadata | null;
   createdAt: Date | null;
   updatedAt: Date | null;
@@ -139,17 +164,23 @@ export interface IAiGoal {
 export interface IAiTask {
   id: string;
   tenantId: string;
+  sessionId: string | null;
   projectId: string | null;
   goalId: string | null;
   parentId: string | null;
   title: string;
   description: string | null;
   status: TaskStatus;
+  invocationType: InvocationType;
   priority: TaskPriority;
   assigneeAgentId: string | null;
   createdByAgentId: string | null;
   createdByUserId: string | null;
   billingCode: string | null;
+  usageJson: ITaskUsageJson | null;
+  logRef: string | null;
+  errorCode: string | null;
+  exitCode: string | null;
   startedAt: Date | null;
   completedAt: Date | null;
   cancelledAt: Date | null;
@@ -194,23 +225,23 @@ export interface IAiRepository {
   getChatsByUser(tenantId: string, userId: string): Promise<IAiChat[]>;
   createChat(data: Partial<IAiChat>): Promise<IAiChat>;
   updateChat(tenantId: string, chatId: string, data: Partial<IAiChat>): Promise<IAiChat>;
-  
+
   // Messages
   getMessagesByChat(tenantId: string, chatId: string): Promise<IAiMessage[]>;
   createMessage(data: Partial<IAiMessage>): Promise<IAiMessage>;
-  
+
   // Voting
   upsertVote(tenantId: string, chatId: string, messageId: string, isUpvoted: boolean): Promise<IAiVote>;
-  
+
   // Agents
   getAgentById(tenantId: string, id: string): Promise<IAiAgent | null>;
   getAgentsByTenant(tenantId: string): Promise<IAiAgent[]>;
-  
+
   // Actions
   createAction(data: Partial<IAiAgentAction>): Promise<IAiAgentAction>;
   updateAction(tenantId: string, id: string, data: Partial<IAiAgentAction>): Promise<IAiAgentAction>;
   getActionByIdempotencyKey(tenantId: string, key: string): Promise<IAiAgentAction | null>;
-  
+
   // Tool Invocations
   createToolInvocation(data: Partial<IAiToolInvocation>): Promise<IAiToolInvocation>;
 

@@ -1,18 +1,18 @@
 /**
  * ARCHITECTURE OVERVIEW: Finance & Accounting Domain
- * 
+ *
  * Purpose:
- * Overhauls the cashflow architecture employing a robust `ledger_entries` model enforcing 
- * transactional duality (credits/debits). Consolidates disparate fee and expense tables onto a 
+ * Overhauls the cashflow architecture employing a robust `ledger_entries` model enforcing
+ * transactional duality (credits/debits). Consolidates disparate fee and expense tables onto a
  * unified chart of accounts linked tightly across the multi-tenant `account_id` space.
- * 
+ *
  * Replaces Legacy Tables:
  * - sm_fees_masters / sm_fees_groups / sm_fees_types / fm_fees_groups / fm_fees_types
  * - sm_fees_assigns / sm_fees_payments / sm_bank_payment_slips
  * - sm_add_incomes / sm_add_expenses / sm_expense_heads / sm_income_heads
  * - sm_chart_of_accounts / transcations / wallet_transactions
  */
-import { unique,  sqliteTable, text, integer, real, index } from "drizzle-orm/sqlite-core";
+import { unique, sqliteTable, text, integer, real, index } from "drizzle-orm/sqlite-core";
 
 import { users, tenants, academicYears, accounts } from "./domain-core";
 import { classes, enrollments, sections } from "./domain-academic";
@@ -27,34 +27,46 @@ export type LedgerMetadata = {
   bankId?: string;
 };
 
-export const ledgerEntries = sqliteTable("ledger_entries", {
-  id: text("id").primaryKey().$defaultFn(() => generateId()),
-  tenantId: text("tenant_id").notNull().references(() => tenants.id),
-  transactionType: text("transaction_type", { enum: [
-    "fee_payment", "fee_waiver", "salary", "expense", "income", "refund", "wallet_topup"
-  ] }).notNull(),
-  // Double-entry accounting: every transaction has a direction
-  direction: text("direction", { enum: ["credit", "debit"] }).notNull(),
-  amount: real("amount").notNull(),
-  userId: text("user_id").references(() => users.id), // Participant Persona
-  enrollmentId: text("enrollment_id"), // Student record ID if applicable
-  referenceType: text("reference_type", { length: 50 }),
-  referenceId: text("reference_id"),
-  metadata: text("metadata", { mode: "json" }).$type<LedgerMetadata>(),
-  postedAt: integer("posted_at", { mode: "timestamp" }).defaultNow(),
-  createdBy: text("created_by").references(() => users.id), // Staff Persona
-  academicId: text("academic_id").references(() => academicYears.id),
-  updatedAt: integer("updated_at", { mode: "timestamp" }).defaultNow(),
-}, (table) => ({
-  tenantIdx: index("ledger_tenant_idx").on(table.tenantId),
-  userIdx: index("ledger_user_idx").on(table.userId),
-  typeIdx: index("ledger_type_idx").on(table.tenantId, table.transactionType),
-  postedAtIdx: index("ledger_posted_idx").on(table.tenantId, table.postedAt),
-}));
+export const ledgerEntries = sqliteTable(
+  "ledger_entries",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => generateId()),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id),
+    transactionType: text("transaction_type", {
+      enum: ["fee_payment", "fee_waiver", "salary", "expense", "income", "refund", "wallet_topup"],
+    }).notNull(),
+    // Double-entry accounting: every transaction has a direction
+    direction: text("direction", { enum: ["credit", "debit"] }).notNull(),
+    amount: real("amount").notNull(),
+    userId: text("user_id").references(() => users.id), // Participant Persona
+    enrollmentId: text("enrollment_id"), // Student record ID if applicable
+    referenceType: text("reference_type", { length: 50 }),
+    referenceId: text("reference_id"),
+    metadata: text("metadata", { mode: "json" }).$type<LedgerMetadata>(),
+    postedAt: integer("posted_at", { mode: "timestamp" }).defaultNow(),
+    createdBy: text("created_by").references(() => users.id), // Staff Persona
+    academicId: text("academic_id").references(() => academicYears.id),
+    updatedAt: integer("updated_at", { mode: "timestamp" }).defaultNow(),
+  },
+  (table) => ({
+    tenantIdx: index("ledger_tenant_idx").on(table.tenantId),
+    userIdx: index("ledger_user_idx").on(table.userId),
+    typeIdx: index("ledger_type_idx").on(table.tenantId, table.transactionType),
+    postedAtIdx: index("ledger_posted_idx").on(table.tenantId, table.postedAt),
+  }),
+);
 
 export const feeGroups = sqliteTable("fee_groups", {
-  id: text("id").primaryKey().$defaultFn(() => generateId()),
-  tenantId: text("tenant_id").notNull().references(() => tenants.id),
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => generateId()),
+  tenantId: text("tenant_id")
+    .notNull()
+    .references(() => tenants.id),
   name: text("name", { length: 200 }).notNull(),
   description: text("description", { length: 500 }),
   createdAt: integer("created_at", { mode: "timestamp" }).defaultNow(),
@@ -62,8 +74,12 @@ export const feeGroups = sqliteTable("fee_groups", {
 });
 
 export const feeTypes = sqliteTable("fee_types", {
-  id: text("id").primaryKey().$defaultFn(() => generateId()),
-  tenantId: text("tenant_id").notNull().references(() => tenants.id),
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => generateId()),
+  tenantId: text("tenant_id")
+    .notNull()
+    .references(() => tenants.id),
   feeGroupId: text("fee_group_id").references(() => feeGroups.id),
   name: text("name", { length: 200 }).notNull(),
   description: text("description", { length: 500 }),
@@ -72,26 +88,38 @@ export const feeTypes = sqliteTable("fee_types", {
 });
 
 export const feeMasters = sqliteTable("fee_masters", {
-  id: text("id").primaryKey().$defaultFn(() => generateId()),
-  tenantId: text("tenant_id").notNull().references(() => tenants.id),
-  feeTypeId: text("fee_type_id").notNull().references(() => feeTypes.id),
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => generateId()),
+  tenantId: text("tenant_id")
+    .notNull()
+    .references(() => tenants.id),
+  feeTypeId: text("fee_type_id")
+    .notNull()
+    .references(() => feeTypes.id),
   amount: real("amount").notNull(),
-  academicId: text("academic_id").notNull().references(() => academicYears.id),
+  academicId: text("academic_id")
+    .notNull()
+    .references(() => academicYears.id),
   dueDate: integer("due_date", { mode: "timestamp" }),
   createdAt: integer("created_at", { mode: "timestamp" }).defaultNow(),
   updatedAt: integer("updated_at", { mode: "timestamp" }).defaultNow(),
 });
 
 export const bankAccounts = sqliteTable("bank_accounts", {
-  id: text("id").primaryKey().$defaultFn(() => generateId()),
-  tenantId: text("tenant_id").notNull().references(() => tenants.id),
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => generateId()),
+  tenantId: text("tenant_id")
+    .notNull()
+    .references(() => tenants.id),
   bankName: text("bank_name", { length: 255 }).notNull(),
   accountName: text("account_name", { length: 255 }).notNull(),
   accountNumber: text("account_number", { length: 100 }).notNull(),
   accountType: text("account_type", { length: 50 }),
   bankAddress: text("bank_address", { length: 500 }),
-  openingBalance: real("opening_balance").default(0.00),
-  currentBalance: real("current_balance").default(0.00),
+  openingBalance: real("opening_balance").default(0.0),
+  currentBalance: real("current_balance").default(0.0),
   activeStatus: integer("active_status").notNull().default(1),
   createdAt: integer("created_at", { mode: "timestamp" }).defaultNow(),
   updatedAt: integer("updated_at", { mode: "timestamp" }).defaultNow(),
@@ -100,30 +128,50 @@ export const bankAccounts = sqliteTable("bank_accounts", {
 // --- NEW TABLES ---
 
 // Fee Assignments — which fees apply to which students (replaces smFeesAssigns)
-export const feeAssignments = sqliteTable("fee_assignments", {
-  id: text("id").primaryKey().$defaultFn(() => generateId()),
-  tenantId: text("tenant_id").notNull().references(() => tenants.id),
-  feeMasterId: text("fee_master_id").notNull().references(() => feeMasters.id),
-  userId: text("user_id").notNull().references(() => users.id), // Student Persona
-  enrollmentId: text("enrollment_id").references(() => enrollments.id),
-  classId: text("class_id").references(() => classes.id),
-  sectionId: text("section_id").references(() => sections.id),
-  assignedAmount: real("assigned_amount").notNull(),
-  paidAmount: real("paid_amount").default(0.00),
-  waivedAmount: real("waived_amount").default(0.00),
-  status: text("status", { enum: ["pending", "partial", "paid", "overdue", "waived"] }).notNull().default("pending"),
-  academicId: text("academic_id").notNull().references(() => academicYears.id),
-  createdAt: integer("created_at", { mode: "timestamp" }).defaultNow(),
-  updatedAt: integer("updated_at", { mode: "timestamp" }).defaultNow(),
-}, (table) => ({
-  userFeeIdx: index("fa_user_fee_idx").on(table.userId, table.feeMasterId),
-  tenantStatusIdx: index("fa_tenant_status_idx").on(table.tenantId, table.status),
-}));
+export const feeAssignments = sqliteTable(
+  "fee_assignments",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => generateId()),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id),
+    feeMasterId: text("fee_master_id")
+      .notNull()
+      .references(() => feeMasters.id),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id), // Student Persona
+    enrollmentId: text("enrollment_id").references(() => enrollments.id),
+    classId: text("class_id").references(() => classes.id),
+    sectionId: text("section_id").references(() => sections.id),
+    assignedAmount: real("assigned_amount").notNull(),
+    paidAmount: real("paid_amount").default(0.0),
+    waivedAmount: real("waived_amount").default(0.0),
+    status: text("status", { enum: ["pending", "partial", "paid", "overdue", "waived"] })
+      .notNull()
+      .default("pending"),
+    academicId: text("academic_id")
+      .notNull()
+      .references(() => academicYears.id),
+    createdAt: integer("created_at", { mode: "timestamp" }).defaultNow(),
+    updatedAt: integer("updated_at", { mode: "timestamp" }).defaultNow(),
+  },
+  (table) => ({
+    userFeeIdx: index("fa_user_fee_idx").on(table.userId, table.feeMasterId),
+    tenantStatusIdx: index("fa_tenant_status_idx").on(table.tenantId, table.status),
+  }),
+);
 
 // Fee Discounts — discount definitions (replaces smFeesDiscounts)
 export const feeDiscounts = sqliteTable("fee_discounts", {
-  id: text("id").primaryKey().$defaultFn(() => generateId()),
-  tenantId: text("tenant_id").notNull().references(() => tenants.id),
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => generateId()),
+  tenantId: text("tenant_id")
+    .notNull()
+    .references(() => tenants.id),
   name: text("name", { length: 200 }).notNull(),
   discountType: text("discount_type", { enum: ["percentage", "fixed"] }).notNull(),
   amount: real("amount").notNull(),
@@ -134,22 +182,34 @@ export const feeDiscounts = sqliteTable("fee_discounts", {
 });
 
 // Fee Installments — payment plans (replaces directFeesInstallments)
-export const feeInstallments = sqliteTable("fee_installments", {
-  id: text("id").primaryKey().$defaultFn(() => generateId()),
-  tenantId: text("tenant_id").notNull().references(() => tenants.id),
-  feeAssignmentId: text("fee_assignment_id").notNull().references(() => feeAssignments.id),
-  title: text("title", { length: 200 }).notNull(),
-  amount: real("amount").notNull(),
-  dueDate: text("due_date").notNull(),
-  paidAmount: real("paid_amount").default(0.00),
-  status: text("status", { enum: ["pending", "partial", "paid", "overdue"] }).notNull().default("pending"),
-  paidAt: integer("paid_at", { mode: "timestamp" }),
-  createdAt: integer("created_at", { mode: "timestamp" }).defaultNow(),
-  updatedAt: integer("updated_at", { mode: "timestamp" }).defaultNow(),
-}, (table) => ({
-  assignmentIdx: index("fi_assignment_idx").on(table.feeAssignmentId),
-  dueDateIdx: index("fi_due_date_idx").on(table.tenantId, table.dueDate),
-}));
+export const feeInstallments = sqliteTable(
+  "fee_installments",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => generateId()),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id),
+    feeAssignmentId: text("fee_assignment_id")
+      .notNull()
+      .references(() => feeAssignments.id),
+    title: text("title", { length: 200 }).notNull(),
+    amount: real("amount").notNull(),
+    dueDate: text("due_date").notNull(),
+    paidAmount: real("paid_amount").default(0.0),
+    status: text("status", { enum: ["pending", "partial", "paid", "overdue"] })
+      .notNull()
+      .default("pending"),
+    paidAt: integer("paid_at", { mode: "timestamp" }),
+    createdAt: integer("created_at", { mode: "timestamp" }).defaultNow(),
+    updatedAt: integer("updated_at", { mode: "timestamp" }).defaultNow(),
+  },
+  (table) => ({
+    assignmentIdx: index("fi_assignment_idx").on(table.feeAssignmentId),
+    dueDateIdx: index("fi_due_date_idx").on(table.tenantId, table.dueDate),
+  }),
+);
 
 // Invoices — generated invoices (replaces multiple invoice tables)
 export type InvoiceMetadata = {
@@ -157,32 +217,52 @@ export type InvoiceMetadata = {
   notes?: string;
 };
 
-export const invoices = sqliteTable("invoices", {
-  id: text("id").primaryKey().$defaultFn(() => generateId()),
-  tenantId: text("tenant_id").notNull().references(() => tenants.id),
-  referenceType: text("reference_type", { enum: ["school_fee", "lms_course", "homeschool_subscription", "other"] }).default("school_fee").notNull(),
-  referenceId: text("reference_id"),
-  invoiceNumber: text("invoice_number", { length: 50 }).notNull(),
-  userId: text("user_id").notNull().references(() => users.id), // Student Persona
-  totalAmount: real("total_amount").notNull(),
-  paidAmount: real("paid_amount").default(0.00),
-  status: text("status", { enum: ["draft", "issued", "paid", "partial", "overdue", "cancelled"] }).notNull().default("draft"),
-  issuedAt: integer("issued_at", { mode: "timestamp" }),
-  dueDate: text("due_date"),
-  metadata: text("metadata", { mode: "json" }).$type<InvoiceMetadata>(),
-  academicId: text("academic_id").references(() => academicYears.id),
-  createdBy: text("created_by").references(() => users.id), // Staff Persona
-  createdAt: integer("created_at", { mode: "timestamp" }).defaultNow(),
-  updatedAt: integer("updated_at", { mode: "timestamp" }).defaultNow(),
-}, (table) => ({
-  userIdx: index("inv_user_idx").on(table.userId),
-  tenantStatusIdx: index("inv_tenant_status_idx").on(table.tenantId, table.status),
-  invoiceNoIdx: index("inv_number_idx").on(table.tenantId, table.invoiceNumber),
-}));
+export const invoices = sqliteTable(
+  "invoices",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => generateId()),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id),
+    referenceType: text("reference_type", {
+      enum: ["school_fee", "lms_course", "homeschool_subscription", "other"],
+    })
+      .default("school_fee")
+      .notNull(),
+    referenceId: text("reference_id"),
+    invoiceNumber: text("invoice_number", { length: 50 }).notNull(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id), // Student Persona
+    totalAmount: real("total_amount").notNull(),
+    paidAmount: real("paid_amount").default(0.0),
+    status: text("status", { enum: ["draft", "issued", "paid", "partial", "overdue", "cancelled"] })
+      .notNull()
+      .default("draft"),
+    issuedAt: integer("issued_at", { mode: "timestamp" }),
+    dueDate: text("due_date"),
+    metadata: text("metadata", { mode: "json" }).$type<InvoiceMetadata>(),
+    academicId: text("academic_id").references(() => academicYears.id),
+    createdBy: text("created_by").references(() => users.id), // Staff Persona
+    createdAt: integer("created_at", { mode: "timestamp" }).defaultNow(),
+    updatedAt: integer("updated_at", { mode: "timestamp" }).defaultNow(),
+  },
+  (table) => ({
+    userIdx: index("inv_user_idx").on(table.userId),
+    tenantStatusIdx: index("inv_tenant_status_idx").on(table.tenantId, table.status),
+    invoiceNoIdx: index("inv_number_idx").on(table.tenantId, table.invoiceNumber),
+  }),
+);
 
 export const paymentGateways = sqliteTable("payment_gateways", {
-  id: text("id").primaryKey().$defaultFn(() => generateId()),
-  tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => generateId()),
+  tenantId: text("tenant_id")
+    .notNull()
+    .references(() => tenants.id, { onDelete: "cascade" }),
   provider: text("provider", { enum: ["stripe", "paystack", "flutterwave", "paypal"] }).notNull(),
   publicKey: text("public_key", { length: 255 }),
   secretKey: text("secret_key"),
@@ -193,18 +273,74 @@ export const paymentGateways = sqliteTable("payment_gateways", {
 });
 
 export const onlinePayments = sqliteTable("online_payments", {
-  id: text("id").primaryKey().$defaultFn(() => generateId()),
-  tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
-  userId: text("user_id").notNull().references(() => users.id),
-  gatewayId: text("gateway_id").notNull().references(() => paymentGateways.id),
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => generateId()),
+  tenantId: text("tenant_id")
+    .notNull()
+    .references(() => tenants.id, { onDelete: "cascade" }),
+  userId: text("user_id")
+    .notNull()
+    .references(() => users.id),
+  gatewayId: text("gateway_id")
+    .notNull()
+    .references(() => paymentGateways.id),
   invoiceId: text("invoice_id").references(() => invoices.id),
   amount: real("amount").notNull(),
   currency: text("currency", { length: 10 }).default("NGN").notNull(),
   providerFee: real("provider_fee").default(0),
-  status: text("status", { enum: ["intent_created", "processing", "succeeded", "failed", "refunded"] }).notNull(),
+  status: text("status", {
+    enum: ["intent_created", "processing", "succeeded", "failed", "refunded"],
+  }).notNull(),
   transactionRef: text("transaction_ref", { length: 255 }).unique().notNull(),
   ledgerEntryId: text("ledger_entry_id").references(() => ledgerEntries.id),
   metadata: text("metadata", { mode: "json" }),
   createdAt: integer("created_at", { mode: "timestamp" }).defaultNow(),
   updatedAt: integer("updated_at", { mode: "timestamp" }).defaultNow(),
 });
+
+// --- FINANCE EVENTS (AI Cost Tracking & Double-Entry Audit) ---
+// Records granular financial events from AI operations, tuition, payroll etc.
+// Each event represents a single debit or credit with running balance.
+
+export type FinanceEventMetadata = {
+  agentId?: string;
+  taskId?: string;
+  sessionId?: string;
+  provider?: string;
+  model?: string;
+  notes?: string;
+};
+
+export const financeEvents = sqliteTable(
+  "finance_events",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => generateId()),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id),
+    type: text("type", { enum: ["debit", "credit"] }).notNull(),
+    category: text("category", {
+      enum: ["ai_cost", "tuition", "payroll", "operational", "refund", "adjustment"],
+    }).notNull(),
+    amountCents: integer("amount_cents").notNull(), // Integer cents for precision
+    balanceAfterCents: integer("balance_after_cents").notNull(), // Running balance
+    currency: text("currency", { length: 10 }).notNull().default("USD"),
+    description: text("description", { length: 500 }),
+    referenceType: text("reference_type", { length: 50 }), // e.g. 'ai_task', 'invoice', 'payroll_run'
+    referenceId: text("reference_id", { length: 255 }), // FK to source entity
+    idempotencyKey: text("idempotency_key", { length: 100 }), // Prevents duplicate events during retry storms
+    metadata: text("metadata", { mode: "json" }).$type<FinanceEventMetadata>(),
+    postedAt: integer("posted_at", { mode: "timestamp" }).defaultNow(),
+    createdBy: text("created_by").references(() => users.id),
+    createdAt: integer("created_at", { mode: "timestamp" }).defaultNow(),
+  },
+  (table) => ({
+    tenantIdx: index("fe_tenant_idx").on(table.tenantId),
+    categoryIdx: index("fe_category_idx").on(table.tenantId, table.category),
+    postedIdx: index("fe_posted_idx").on(table.tenantId, table.postedAt),
+    idempotencyIdx: index("fe_idempotency_idx").on(table.tenantId, table.idempotencyKey),
+  }),
+);

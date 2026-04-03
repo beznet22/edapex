@@ -7,7 +7,7 @@
  *   Contains global and route-specific functions that intercept requests BEFORE
  *   they reach the Controller. All logic regarding security, access restriction,
  *   and traffic shaping belongs here.
- * 
+ *
  * Rules/Scope:
  *   - Global Error Interceptor (Sentry propagation).
  *   - Auth checking (Better-Auth session parsing).
@@ -16,3 +16,5 @@
  */
 
 // export * from './authMiddleware';
+export { rateLimiter, clearRateLimitWindows } from "./rateLimiter.js";
+export type { RateLimiterConfig } from "./rateLimiter.js";

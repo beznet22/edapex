@@ -1,22 +1,25 @@
 export interface IFinanceRepository {
   // --- Ledger ---
-  getLedgerEntries(tenantId: string, filter?: { type?: string; userId?: string; academicId?: string }): Promise<ILedgerEntry[]>;
+  getLedgerEntries(
+    tenantId: string,
+    filter?: { type?: string; userId?: string; academicId?: string },
+  ): Promise<ILedgerEntry[]>;
   createLedgerEntry(data: Partial<ILedgerEntry>): Promise<ILedgerEntry>;
-  
+
   // --- Fees Configuration ---
   getFeeMasters(tenantId: string, academicId: string): Promise<IFeeMaster[]>;
   createFeeMaster(data: Partial<IFeeMaster>): Promise<IFeeMaster>;
   getFeeTypes(tenantId: string): Promise<IFeeType[]>;
-  
+
   // --- Assignments & Payments ---
   getStudentFeeAssignments(userId: string): Promise<IFeeAssignment[]>;
   assignFeeToStudent(data: Partial<IFeeAssignment>): Promise<IFeeAssignment>;
   updateFeeAssignment(tenantId: string, id: string, data: Partial<IFeeAssignment>): Promise<void>;
-  
+
   // --- Invoices ---
   getInvoices(tenantId: string, userId?: string): Promise<IInvoice[]>;
   createInvoice(data: Partial<IInvoice>): Promise<IInvoice>;
-  
+
   // --- B2C Payments & Gateways ---
   getPaymentGateways(tenantId: string): Promise<IPaymentGateway[]>;
   createOnlinePayment(data: Partial<IOnlinePayment>): Promise<IOnlinePayment>;
@@ -112,4 +115,49 @@ export interface IOnlinePayment {
   metadata?: any;
   createdAt?: Date | null;
   updatedAt?: Date | null;
+}
+
+// --- Finance Events (AI Cost Tracking & Double-Entry Audit) ---
+
+export type FinanceEventType = "debit" | "credit";
+export type FinanceEventCategory =
+  | "ai_cost"
+  | "tuition"
+  | "payroll"
+  | "operational"
+  | "refund"
+  | "adjustment";
+
+export interface IFinanceEventMetadata {
+  agentId?: string;
+  taskId?: string;
+  sessionId?: string;
+  provider?: string;
+  model?: string;
+  notes?: string;
+}
+
+export interface IFinanceEvent {
+  id: string;
+  tenantId: string;
+  type: FinanceEventType;
+  category: FinanceEventCategory;
+  amountCents: number;
+  balanceAfterCents: number;
+  currency: string;
+  description: string | null;
+  referenceType: string | null;
+  referenceId: string | null;
+  idempotencyKey: string | null;
+  metadata: IFinanceEventMetadata | null;
+  postedAt: Date | null;
+  createdBy: string | null;
+  createdAt: Date | null;
+}
+
+export interface IFinanceEventRepository {
+  createFinanceEvent(data: Partial<IFinanceEvent>): Promise<IFinanceEvent>;
+  getFinanceEventsByTenant(tenantId: string, category?: FinanceEventCategory): Promise<IFinanceEvent[]>;
+  getBalanceByCurrency(tenantId: string, currency?: string): Promise<number>;
+  getFinanceEventByIdempotencyKey(tenantId: string, key: string): Promise<IFinanceEvent | null>;
 }

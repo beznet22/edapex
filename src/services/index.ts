@@ -9,7 +9,7 @@
  *     1. Multi-Agent dispatch routines (HMAS).
  *     2. Domain Event emissions.
  *     3. Data persistence via injected Repositories.
- * 
+ *
  * Constraints:
  *   - A Service MUST be strictly HTTP-agnostic (no `req` or `res` objects).
  *   - A Service MUST receive DB dependencies via constructor injection.
@@ -17,3 +17,12 @@
  */
 
 // export * from './authService';
+export {
+  HeartbeatService,
+  generateIdempotencyKey,
+  validateClockSync,
+  captureStateCheckpoint,
+} from "./ai/heartbeat.service.js";
+export { AIService } from "./ai/ai.service.js";
+export { FinanceService } from "./finance/finance.service.js";
+export { ClassroomService } from "./classroom/classroom.service.js";

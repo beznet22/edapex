@@ -15,3 +15,4 @@ export * from "./cms.repository.js";
 export * from "./events.repository.js";
 export * from "./documents.repository.js";
 export * from "./homeschool.repository.js";
+export * from "./classroom.repository.js";
