@@ -64,8 +64,8 @@ Create `src/services/ai/heartbeat.service.ts` to manage the autonomous agent wak
 - [ ] Successful Drizzle migration push for finance and AI persistence (`ai_sessions`, `ai_messages`) tables.
 - [ ] Classroom SSE endpoint streaming `StatelessEvent` chunks.
 - [ ] Atomic session locking verified for classroom runs.
-- [ ] Unit tests for `Atomic Checkout` locking and Infrastructure Stress Defenses (`idempotency_key_generator`, `clock_sync_validator`).
-- [ ] Layer 1 Resilience verified for all core infrastructure tools.
+- [ ] Unit tests for `Atomic Checkout` (single-trip SQL) specifically simulating **Concurrent Task Claim** race conditions.
+- [ ] Layer 1 Resilience verified for all core infrastructure tools, specifically testing `idempotency_key_generator` against **Network Retry Storms**.
 - [ ] All automated tests passed.
 - [ ] Code staged and committed with AI attribution.
 - [ ] Update `docs/PROJECT_ROADMAP.md` (Phase 1 marked as COMPLETE).

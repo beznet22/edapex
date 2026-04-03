@@ -56,8 +56,8 @@ Implement the **Maximizer Agent** and the **Auditor Agents** for proactive issue
 ## 🏁 Completion Criteria
 - [ ] Generated and followed a localized `docs/plans/phase-5-governance-plan.md`.
 - [ ] `pnpm tsc --noEmit` strictly passed with zero errors.
-- [ ] Verified blocking of unauthorized agent actions and audit integrity.
-- [ ] Successful completion of Layer 2 Stress Testing (Load + Chaos).
+- [ ] Verified blocking of unauthorized agent actions and **Audit Log Integrity** against tampering stressors.
+- [ ] Successful completion of Layer 2 Stress Testing (Load + Chaos), including verification of the **Auditor Agent**'s forensic trace across costs and activity.
 - [ ] Working Pause/Approve/Reject flow for the Board Inbox via `HITL_trigger_router`.
 - [ ] All automated tests passed.
 - [ ] Code staged and committed with AI attribution.

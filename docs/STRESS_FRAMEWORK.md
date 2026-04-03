@@ -60,11 +60,14 @@ Here is the **fully consolidated, domain-by-domain stress framework**, seamlessl
 - Core: Cascade failure if AI service drops below SLA threshold
 
 **🛠 Tools**
-- `prompt_hierarchy_enforcer`
-- `context_window_throttler`
-- `recursive_loop_breaker`
+- `prompt_hierarchy_enforcer` (SOUL.md)
+- `context_window_throttler` (Hermes Context Compression)
+- `recursive_loop_breaker` (Recursive Goal Hierarchies)
 - `offline_prompt_queue`
-- `hitl_trigger_router`
+- `hitl_trigger_router` (aiApprovals)
+- `atomic_task_checkout` (checkoutTask)
+- `forensic_audit_trail` (aiActivityLogs)
+- `financial_circuit_breaker` (aiCostEvents)
 
 ---
 
@@ -241,6 +244,7 @@ Here is the **fully consolidated, domain-by-domain stress framework**, seamlessl
 - `concurrent_edit_locker`
 - `sensitive_field_mapper`
 - `signing_chain_auditor`
+- `binary_delegation_bridge` (.agents/skills/edapex-domain-architect/temp)
 
 ---
 
@@ -446,6 +450,7 @@ Here is the **fully consolidated, domain-by-domain stress framework**, seamlessl
 - `student_context_preserver`
 - `sis_sync_reconciler`
 - `offline_content_packer`
+- `boneyard_skeleton_orchestrator` (Pixel-perfect loading)
 
 ---
 
@@ -548,6 +553,9 @@ Here is the **fully consolidated, domain-by-domain stress framework**, seamlessl
 | **Amnesia & Context Loss** | Student disciplinary/academic history drops between sessions | `context_integrity_probe` returns null | Persistent vector DB + session checkpointing |
 | **Pre-Mortem Launch Failure** | 5,000 parents check results → DB lockup + agent hallucination | `load_test_simulator` + `chaos_mesh` | Canary rollout + rate limiting + fallback static UI |
 | **Offline/Low-Bandwidth Reality** | 3G rural deployment with 40% packet loss | `sync_lag_monitor` > threshold | Local caching + idempotent async queue + conflict resolution |
+| **Distributed Orchestration Race** | Concurrent Edge nodes claiming same task | `checkoutTask` return code null | Atomic SQL `RETURNING` pattern checkout |
+| **Budget Exhaustion Spike** | Sudden LLM cost surge via agent loop | `aiCostEvents` threshold exceeded | Financial circuit breaker + automatic task suspension |
+| **Context Overload** | Multi-turn chat exceeding 128k tokens | `HermesContextCompressor` signal | System+3 Caching + Boundary-Aware Compression |
 
 ---
 

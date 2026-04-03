@@ -82,7 +82,7 @@ Generate the 31+ specialized agent definitions in `src/services/ai/roles/`.
 - [ ] 31+ Agent definitions verifiable via Mastra.
 - [ ] Zero-error tool registration across all 18 domains.
 - [ ] Goal decomposition trace verifiable through logs, including Skill-based constraints.
-- [ ] Layer 1 Resilience verified for `recursive_loop_breaker` and `context_window_throttler`.
+- [ ] Layer 1 Resilience verified for `recursive_loop_breaker` (verified against **Infinite Agent Loops**) and `context_window_throttler` (verified against **Context Window Overflow** using Hermes-grade compression).
 - [ ] All automated tests passed.
 - [ ] Code staged and committed with AI attribution.
 - [ ] Update `docs/PROJECT_ROADMAP.md` (Phase 2 marked as COMPLETE).

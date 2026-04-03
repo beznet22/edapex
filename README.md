@@ -294,4 +294,4 @@ EdApex's deep architectural patterns---specifically regarding the stateless grap
 - [NousResearch/Hermes Agent](https://github.com/NousResearch/hermes-agent)
 
 - [THU-MAIC/OpenMAIC](https://github.com/THU-MAIC/OpenMAIC)
-- [Paperclip](https://github.com/paperclipai/paperclip)
+- [paperclipai/Paperclip](https://github.com/paperclipai/paperclip)

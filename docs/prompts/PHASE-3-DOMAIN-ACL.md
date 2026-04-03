@@ -63,8 +63,8 @@ Implement the logic for all 18 domains in their respective `src/services/` files
 - [ ] 18-Domain service coverage (Logic parity with spec).
 - [ ] Successful cross-domain event emission and handling.
 - [ ] No direct DB calls from Controllers (everything via Services).
-- [ ] 18-Domain service coverage with 1:1 implementation of [STRESS DEFENSE] tools.
-- [ ] Layer 1 Resilience verified for all domain-specific defensive tools.
+- [ ] Layer 1 Resilience verified for all domain-specific defensive tools, specifically testing the **Binary Delegation Bridge** for heavy Document transformations.
+- [ ] Verified that all AI tool executions report telemetry to `aiCostEvents` for financial circuit-breaking.
 - [ ] All automated tests passed.
 - [ ] Code staged and committed with AI attribution.
 - [ ] Update `docs/PROJECT_ROADMAP.md` (Phase 3 marked as COMPLETE).

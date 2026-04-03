@@ -66,7 +66,8 @@ Implement the reconciliation logic between **TanStack DB** and **Cloudflare D1**
 - [ ] `pnpm tsc --noEmit` strictly passed with zero errors.
 - [ ] Full 3-pane layout implementation (Tailwind CSS v4).
 - [ ] Verified local-first sync between IndexedDB and D1/SQLite.
-- [ ] Stunning aesthetics (Glassmorphism & Micro-animations).
+- [ ] Stunning aesthetics (Glassmorphism & Micro-animations) with pixel-perfect **Boneyard Skeleton** screens verified across all three panes.
+- [ ] **Stress Status Visualizer** active, reporting context compression status (Hermes-grade) and agent confidence.
 - [ ] All automated tests passed.
 - [ ] Code staged and committed with AI attribution.
 - [ ] Update `docs/PROJECT_ROADMAP.md` (Phase 4 marked as COMPLETE).
