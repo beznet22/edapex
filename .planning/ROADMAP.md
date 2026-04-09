@@ -3,7 +3,7 @@
 Phased execution plan for the Agentic School transformation, aligned with the 18-domain architecture.
 
 ## Milestone 1: Foundation & Gateway
-Status: 🟢 Active
+Status: 🟢 Complete
 Goal: Establish the edge-native backbone and secure control plane.
 
 ### Phase 1: Foundation & Ledger
@@ -12,23 +12,23 @@ Goal: Establish the edge-native backbone and secure control plane.
 - [x] **HMAS Initial**: Registry for Specialized Assistants.
 
 ### Phase 2: Gateway & Sync
-- [ ] **PBAC Edge**: Policy evaluator middleware in Hono + KV Caching.
-- [ ] **Local-First**: TanStack DB setup for all domain collections.
-- [ ] **Background Sync**: IndexedDB to D1 reconciliation engine.
+- [x] **PBAC Edge**: Policy evaluator middleware in Hono + KV Caching.
+- [x] **Local-First**: TanStack DB setup for all domain collections.
+- [x] **Background Sync**: IndexedDB to D1 reconciliation engine.
 
 ### Phase 3: Cognitive Core
-- [ ] **Principal Dispatcher**: LLM-based goal decomposition using `SOUL.md`.
-- [ ] **Recursive Memory**: Automated context snapshots and summarization.
-- [ ] **Tool Discovery**: Dynamic skill registry with PBAC vetting.
+- [x] **Principal Dispatcher**: LLM-based goal decomposition using `SOUL.md`.
+- [x] **Recursive Memory**: Automated context snapshots and summarization.
+- [x] **Tool Discovery**: Dynamic skill registry with PBAC vetting.
 
 ## Milestone 2: Professional Control Plane
-Status: ⚪ Upcoming
+Status: 🟡 Active
 Goal: Deploy the high-density Command Center and core academic domains.
 
 ### Phase 4: Command Center UI
-- [ ] **3-Pane Shell**: Layout implementation using TanStack Start & Tailwind v4.
-- [ ] **SSE Pipeline**: Real-time heartbeat and pulse telemetry.
-- [ ] **Work Gallery**: Masonry grid for high-density artifact review.
+- [x] **3-Pane Shell**: Layout implementation using TanStack Start & Tailwind v4.
+- [x] **SSE Pipeline**: Real-time heartbeat and pulse telemetry.
+- [x] **Work Gallery**: Masonry grid for high-density artifact review.
 
 ### Phase 5: Academic Domain
 - [ ] **Academic Ledger**: Immutable student record audit trail.

@@ -1,6 +1,6 @@
 # Phase 4: Command Center UI - Plan
 
-**Objective:** Implement the 3-pane Command Center UI using TanStack Start, Tailwind v4, and AI-Elements.
+**Objective:** Implement the 3-pane Command Center UI using TanStack Start, Tailwind v4, Shadcn UI, and AI-Elements.
 
 ## Acceptance Criteria (UAT)
 

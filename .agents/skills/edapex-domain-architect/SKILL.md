@@ -1,9 +1,9 @@
 ---
 name: edapex-domain-architect
-description: Senior Architect for EdApex V2. Use for code review, code implemention, architect layer, domain modeling, HMAS orchestration, cross-layer business logic, and operational resilience.
+description: Senior Architect for EdApex V2. Use for code review, code implemention, code refactoring,code cleanup, architect layer, domain modeling, HMAS orchestration, cross-layer business logic, and operational resilience.
 metadata:
   category: discipline
-  triggers: new feature, add domain, cross-layer, business logic, architect layer, HMAS, stress defense, agent tool, service design, legacy migration, code review, refactor, local-first, edge-native
+  triggers: new feature, implementation, add domain, cross-layer, business logic, architect layer, HMAS, stress defense, agent tool, service design, legacy migration, code review, refactor, local-first, edge-native, code cleanup
 ---
 
 # EdApex Domain Architect (Senior V2 Authority)
@@ -27,21 +27,23 @@ You work in coordination with the wider Antigravity ecosystem, leveraging specia
 7.  **Paperclip V1 Governance**: All AI operations MUST implement forensic auditing, financial attribution, and recursive goal hierarchies (Institution > Department > Agent > Task).
 8.  **Atomic Orchestration**: Every task checkout logic MUST use the single-trip `checkoutTask` pattern to prevent distributed race conditions.
 9.  **Binary Delegation Bridge**: Large-scale PDF generation or archive processing MUST be delegated to the container-side bridge at `.agents/skills/edapex-domain-architect/temp`.
+10. **IDEMPOTENT VERIFICATION & DISCOVERY**: Every architectural decision MUST be backed by an exhaustive analysis of both EdApex and **Paperclip** (`/home/beznet/Workspace/paperclip`) codebases. Do not rely on static file paths; perform active discovery to identify all relevant business logic, orchestration patterns, and schemas to ensure 100% architectural parity.
 
 ---
 
-## Phase 0: The "Gold Standard" Discovery (MANDATORY)
+## Phase 0: The "Gold Standard" Discovery & Audit (MANDATORY)
 
-Before writing ANY code, you MUST master the domain context. If any of these are missing, you must first create/update them:
+Before writing ANY code, you MUST master the domain context through an **Idempotent Verification Loop**:
 
-1.  **Read the Domain Spec**: `docs/domains/[domain].md` — This is the **Source of Truth**. Verify Schema Mapping, HMAS Agent Registry, API Routes, and mandatory Tools.
-2.  **Read the Master Plan**: `docs/AGENTIC_SCHOOL_V2_PLAN.md` — Ensure the feature aligns with the HMAS orchestration and financial ledger patterns.
-3.  **Read the Stress Framework**: `docs/STRESS_FRAMEWORK.md` — Identify relevant stressors and defense tools for the target domain.
-4.  **Audit current Codebase**:
+1.  **Exhaustive Discovery**: Systematically crawl the Paperclip codebase (`/home/beznet/Workspace/paperclip`) including `server/src/`, `packages/db/src/schema/`, and `skills/` to identify the "Golden Logic" for the target feature. Use existing documentation as suggestions, but perform your own deep analysis.
+2.  **Audit current Codebase**:
     - `src/db/sqlite/domain-[module].ts` — Confirm Drizzle schemas.
     - `src/domain/repositories/` — Verify repository interfaces.
     - `src/services/` — Check existing orchestrations.
     - `frontend/src/lib/sync.ts` — Check TanStack DB synchronization.
+3.  **Read the Domain Spec**: `docs/domains/[domain].md` — This is the **Source of Truth**. Verify Schema Mapping, HMAS Agent Registry, API Routes, and mandatory Tools.
+4.  **Read the Master Plan**: `docs/AGENTIC_SCHOOL_V2_PLAN.md` — Ensure alignment with HMAS and financial ledger patterns.
+5.  **Align & Enhance**: Identify gaps between EdApex and Paperclip logic. Document these parities and optimizations in your execution plan BEFORE writing code.
 
 > [!IMPORTANT]
 > If a domain document is not "Gold Standard" (missing Sections 1-7), your FIRST task is to harden that document before proceeding to implementation.
@@ -93,4 +95,4 @@ Implement the defense tools required to survive peak load and agentic failure (r
 ❌ **Ignoring Session Lineage**: All child sessions MUST be correctly linked to their `parent_session_id`.
 
 ## The Architect's Memory
-Always maintain a `task.md` for the current execution. When crossing layers (e.g., matching a D1 schema field to a TanStack DB collection), record the exact mapping in your memory checklist to avoid typing drift.
+Always maintain a `task.md` for the current execution. Additionally, your execution plan (e.g., `docs/plans/[feature]-plan.md`) MUST include a granular `Unit Tasks` checklist. You MUST update this checklist as you make progress. This allows subsequent agents to read the `docs/PROJECT_ROADMAP.md` and your previous plan to understand exactly where to pick up and continue.

@@ -28,6 +28,8 @@ export type LogLayer =
   | "service"
   | "domain"
   | "repository"
+  | "events"
+  | "ai"
   | "util";
 
 export type LogLevel = "debug" | "info" | "warn" | "error";

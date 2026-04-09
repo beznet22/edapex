@@ -47,12 +47,12 @@ export type ClassroomWhiteboardTimeline = {
 export const classroomSessions = sqliteTable(
   "sessions",
   {
-    id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
-    tenantId: integer("tenant_id")
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id")
       .notNull()
       .references(() => tenants.id),
-    courseId: integer("course_id").references(() => lmsCourses.id),
-    directorAgentId: integer("director_agent_id").references(() => aiAgents.id),
+    courseId: text("course_id").references(() => lmsCourses.id),
+    directorAgentId: text("director_agent_id").references(() => aiAgents.id),
     status: text("status", { enum: ["scheduled", "active", "paused", "completed"] })
       .notNull()
       .default("scheduled"),
@@ -71,14 +71,14 @@ export const classroomSessions = sqliteTable(
 export const classroomMemoryLedger = sqliteTable(
   "memory_ledger",
   {
-    id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
-    tenantId: integer("tenant_id")
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id")
       .notNull()
       .references(() => tenants.id),
-    sessionId: integer("session_id")
+    sessionId: text("session_id")
       .notNull()
       .references(() => classroomSessions.id),
-    parentLedgerId: integer("parent_ledger_id"), // Session lineage for compacted chains
+    parentLedgerId: text("parent_ledger_id"), // Session lineage for compacted chains
     turnCount: integer("turn_count").notNull(),
     role: text("role", { enum: ["user", "assistant", "director_node_log"] }).notNull(),
     parsedContent: text("parsed_content", { mode: "json" }).$type<ClassroomMemoryContent>(),
@@ -96,14 +96,14 @@ export const classroomMemoryLedger = sqliteTable(
 export const classroomParticipants = sqliteTable(
   "participants",
   {
-    id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
-    tenantId: integer("tenant_id")
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id")
       .notNull()
       .references(() => tenants.id),
-    sessionId: integer("session_id")
+    sessionId: text("session_id")
       .notNull()
       .references(() => classroomSessions.id),
-    userId: integer("user_id")
+    userId: text("user_id")
       .notNull()
       .references(() => users.id),
     role: text("role", { enum: ["student", "human_observer"] }).notNull(),
@@ -122,11 +122,11 @@ export const classroomParticipants = sqliteTable(
 export const classroomWhiteboardState = sqliteTable(
   "whiteboard_state",
   {
-    id: integer("id", { mode: "number" }).primaryKey({ autoIncrement: true }),
-    tenantId: integer("tenant_id")
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id")
       .notNull()
       .references(() => tenants.id),
-    sessionId: integer("session_id")
+    sessionId: text("session_id")
       .notNull()
       .references(() => classroomSessions.id),
     timeline: text("timeline", { mode: "json" }).$type<ClassroomWhiteboardTimeline>(),

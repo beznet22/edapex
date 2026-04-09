@@ -6,7 +6,7 @@
 <domain>
 ## Phase Boundary
 
-Implement the 3-pane Command Center UI using TanStack Start, Tailwind v4, and AI-Elements. This phase delivers the primary user workspace, featuring real-time telemetry (Agent Pulse), atomic checkout streams, and a local-first WorkProduct gallery.
+Implement the 3-pane Command Center UI using TanStack Start, Tailwind v4, and AI-Elements Shadcn UI. This phase delivers the primary user workspace, featuring real-time telemetry (Agent Pulse), atomic checkout streams, and a local-first WorkProduct gallery.
 
 </domain>
 

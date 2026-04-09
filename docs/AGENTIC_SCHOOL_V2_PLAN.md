@@ -537,89 +537,15 @@ Every `cost_event` triggers a corresponding `finance_event`:
 - **Credit**: EdApex Platform Infrastructure Account.
 - **Auditability**: These rows are append-only. Any adjustment requires a "Counter-Entry" record.
 
-## 13. Specialized AI Role Library (The 31+ Skills)
+## 13. Staff Role Library (Dynamic Skill-Based Roles)
 
-Each role is a specialized Mastra Agent with its own `SKILL.md` manifest and a restricted toolset.
+Roles in EdApex V2 are no longer hardcoded agent definitions. Instead, they are **Dynamic Skills** loaded from the Skill Pool. Each role consists of a `src/services/ai/skills/{domain}/{role}/` directory containing `AGENTS.md` (Identity) and `SKILL.md` (Procedures).
 
 ### 13.1 Academic Domain (The Registrar's Office)
 
-#### 13.1.1 Registrar Agent
-- **Purpose**: Authority over student enrollment and record integrity.
-- **Mastra Tools**:
-    - `registrar.searchStudents(query, filter)`: High-performance RDS search with `tenant_id` filter.
-    - `registrar.enrollStudent(studentData)`: Validates NERDC compliance before Drizzle insert.
-    - `registrar.verifyTranscript(studentId)`: Cross-references Assessment domain records.
-    - `registrar.archiveRecord(recordId)`: Moves completed student files to long-term R2 storage.
-- **Reporting Line**: Reports to Academic Supervisor.
-
-#### 13.1.2 HOD (Head of Department)
-- **Purpose**: Academic quality assurance and curriculum oversight.
-- **Mastra Tools**:
-    - `academic.getCurriculum(subjectId)`: Retrieves the current NERDC-aligned curriculum.
-    - `academic.assignTeacher(classId, teacherId)`: Maps staff to courses in the LMS domain.
-    - `academic.auditLessonPlan(planId)`: Compares plan vs curriculum for alignment.
-    - `academic.validateResource(resourceId)`: Ensures textbook/media alignment with school policy.
-- **Reporting Line**: Reports to Academic Supervisor.
-
-#### 13.1.3 Assessment Evaluator
-- **Purpose**: Autonomous grading and performance feedback loops.
-- **Mastra Tools**:
-    - `assessment.gradeSubmission(submissionId)`: Uses Gemini-1.5-Pro for rubric-based grading.
-    - `assessment.generateTranscript(studentId)`: Produces a certified PDF WorkProduct.
-    - `assessment.flagPerformanceAnomaly(minThreshold)`: Scans for grades outside 2 standard deviations.
-    - `assessment.recommendIntervention(studentId)`: Suggests student for "Personalized Path" (Homeschooling domain).
-
-### 13.2 Finance Domain (The Bursar's Office)
-
-#### 13.2.1 Bursar Agent
-- **Purpose**: Managing the school's inflow and fee collection cycle.
-- **Mastra Tools**:
-    - `bursar.calculateFees(studentId)`: Computes base tuition + arrears + late fees.
-    - `bursar.issueInvoice(studentId, amount)`: Creates a payment-link WorkProduct.
-    - `bursar.reconcilePayment(refId)`: Bridges third-party gateway signal to the Ledger.
-    - `bursar.generateAgingReport()`: Lists students with outstanding fees over 30 days.
-- **Reporting Line**: Reports to Finance Supervisor.
-
-#### 13.2.2 Accountant Agent
-- **Purpose**: Managing the school's outflow and operational budget.
-- **Mastra Tools**:
-    - `finance.processPayroll(cycleId)`: Calculates deductions and net pay via HR domain.
-    - `finance.auditLedgerEntries(startDate, endDate)`: Scans for un-reconciled debit/credit pairs.
-    - `finance.generateFiscalReport()`: Produces a P&L WorkProduct for the Board.
-    - `finance.approveExpense(requestId)`: Validates expense against domain budget policy.
-
-#### 13.2.3 AI Auditor (Cost Control)
-- **Purpose**: Ensuring AI-token spend is within budget policies.
-- **Mastra Tools**:
-    - `ai.getAgentSpend(agentId)`: Aggregates `cost_events` for the current month.
-    - `ai.enforceAgentPause(agentId)`: Triggers status change if 100% budget reached.
-    - `ai.predictMonthlySpend()`: Extrapolates current run frequency to end-of-month.
-    - `ai.identifyWastefulRuns(threshold)`: Flags agents with high cost but low WorkProduct output.
-
-### 13.3 HR & Admin Domain (The Front Office)
-
-#### 13.3.1 HR Manager Agent
-- **Purpose**: Staff lifecycle management and payroll orchestration.
-- **Mastra Tools**:
-    - `hr.getStaffDetails(staffId)`: Fetches contract, role, and salary data.
-    - `hr.updateAttendance(staffId, date, status)`: Records daily presence for payroll calculation.
-    - `hr.initiateOnboarding(staffData)`: Creates skeleton record and assigns initial PBAC roles.
-    - `hr.generateLeaveReport()`: Summarizes staff availability for Supervisor planning.
-- **Reporting Line**: Reports to HR/Admin Supervisor.
-
-#### 13.3.2 Compliance Officer (Regulatory Bot)
-- **Purpose**: Enforcing state and NERDC educational standards.
-- **Mastra Tools**:
-    - `compliance.auditAttendanceRecords(date)`: Scans for missing entries required by state law.
-    - `compliance.generateNERDCReport()`: Aggregates school-wide metrics into prescribed format.
-    - `compliance.checkSafetyPolicy(policyId)`: Verifies facility maintenance logs via IT domain.
-- **Reporting Line**: Reports to HR/Admin Supervisor.
-
-#### 13.3.3 PR Officer (Communication Agent)
-- **Purpose**: Managing school-to-parent and school-to-community relations.
-- **Mastra Tools**:
-- **Purpose**: Managing student lifecycle and records.
-- **Mastra Tools**: `academic.enrollStudent`, `academic.searchRecords`, `academic.updateProfile`.
+#### 13.1.1 Registrar Skill
+- **Mission**: Managing student lifecycle and records.
+- **Skillset**: `academic.enrollStudent`, `academic.searchRecords`, `academic.updateProfile`.
 - **Reporting Line**: Academic Head.
 
 #### 13.1.2 HOD Agent (Pedagogical Lead)
@@ -1375,12 +1301,12 @@ The Agentic School is self-healing via the **IT Supervisor's Auditor Agents**:
 
 ## 42. Strategic Orchestration & Deployed Skills (Hermes Pattern)
 
-EdApex V2 distinguishes between **Architectural Authority** (Dev-time) and **Operational Procedural Memory** (Runtime).
+Strategic goals are executed via the dynamic hydration of agents with specific **Skills**.
 
-- **The Strategic Directory (`src/services/ai/strategy/`)**: The "Command & Control" hub for the HMAS hierarchy. Centralizes agent registration, goal decomposition logic, and orchestration state.
-- **Deployed Skills (`src/services/ai/skills/`)**: Utilizing the **Hermes Skill Pattern** (`SKILL.md`, `scripts/`, `templates/`) to provide agents with verified, version-controlled execution playbooks.
-- **Progressive Disclosure**: Agents load procedural context in levels (0-2) to maintain token efficiency and edge performance.
-- **Skill Bootstrapping**: Every new domain specification automatically initializes its corresponding skills directory to ensure immediate agentic readiness.
+- **HMAS Skill Loading**: When the Principal Assistant (Executive) delegates to a Supervisor, the Supervisor instantiates a **Universal Worker** and mounts the relevant Skill (e.g., `finance.bursar`).
+- **Skill Evolution (Self-Improvement)**: Agents audit their own performance. If a complex multi-step workflow succeeds, the agent uses the `skill_manage` tool to update the underlying `SKILL.md` with the verified "working path".
+- **Portability (Skills Hub)**: Skills are versioned bundles, allowing cross-school sharing and global curriculum optimization.
+- **Global Skill Injection**: Agents pull skills from the decentralized library, ensuring cross-domain tool consistency.
 
 ## 43. Tool Execution & Chaos Mesh (Hermes Protocol)
 

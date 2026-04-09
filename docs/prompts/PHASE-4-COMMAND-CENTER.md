@@ -1,21 +1,17 @@
 # Phase 4 Implementation Prompt: Command Center UI (TanStack Start)
 
 ## 🎯 Objective
-Build the **Command Center**—the stunning, keyboard-driven UI for the Agentic School. Your goal is to implement the local-first, AI-native SPA using **TanStack Start**, **Tailwind CSS v4**, and **AI-Elements**.
+Build the **Command Center**—the stunning, keyboard-driven UI for the Agentic School—through a rigorous **Verify, Align, and Enhance** mandate. Your goal is to implement the local-first, AI-native SPA using **TanStack Start**, **Tailwind CSS v4**, and **AI-Elements**, while ensuring 100% architectural parity with Paperclip's (located at `/home/beznet/Workspace/paperclip`) proven UI adapters and synchronization patterns.
 
 ## 📜 CORE CONSTRAINTS & TRANSFORMATION POLICY
+- **IDEMPOTENT VERIFICATION & DISCOVERY LOOP**: This prompt is designed for continuous refinement. Every execution MUST:
+    1. **Exhaustive Discovery**: Perform a comprehensive analysis of the Paperclip UI layer (`/home/beznet/Workspace/paperclip/ui/`) to identify all relevant adapters, context providers, and API reconciliation patterns. Use [ui/src/adapters/registry.ts](/home/beznet/Workspace/paperclip/ui/src/adapters/registry.ts) and [LiveUpdatesProvider.tsx](/home/beznet/Workspace/paperclip/ui/src/context/LiveUpdatesProvider.tsx) as high-signal **suggestions**, but do not limit your search to them.
+    2. **Audit**: Compare the discovered Paperclip UI logic against existing EdApex frontend code (e.g., `frontend/src/lib/sync.ts`, `frontend/src/components/`).
+    3. **Align & Enhance**: Refine the local-first synchronization, glassmorphism components, and stress telemetry to reach 100% parity with Paperclip's patterns.
+- **ATOMIC PROGRESS LOGGING**: Your execution plan (e.g., `docs/plans/phase-4-command-center-plan.md`) MUST include a granular `Unit Tasks` checklist. You MUST update this checklist as you complete each task. This ensures the next agent can seamlessly resume work by referencing `docs/PROJECT_ROADMAP.md` and your plan's progress state.
+- **NO COPY-PASTE**: Reconstruct Paperclip's logic into EdApex-native patterns (Tailwind v4, Shadcn, TanStack DB).
 - **LOCAL-FIRST**: Use **TanStack DB (IndexedDB)** as the primary source of truth for the client.
-- **UI RESILIENCE**: Implement `network_degradation_fallback` for SSE streams. If latentcy exceeds 500ms, the UI must gracefully switch to a "Low-Bandwidth" polling or offline mode.
-- **HONO RPC**: All backend interaction must use the type-safe Hono `hc` client.
-- **GLASSMORPHISM**: Adhere to the "Refraction-Pro" design token.
-- **STRESS TELEMETRY**: The UI MUST expose a "Stress Status" visualizer in the property panel, showing agent confidence, token drift, and network health.
-- **TEST DRIVEN**: The agent MUST run and pass automated testing (unit/integration) before completing this phase.
-- **GIT COMMIT**: The agent MUST create a standard git commit with AI attribution before signing out.
-- **SCOPE LOCK**: Do NOT modify files or domains outside the explicit scope of this phase.
-- **ESCALATION PROTOCOL**: If you encounter missing context, undocumented relations, or ambiguity, DO NOT HALLUCINATE. Pause and request clarification via `notify_user`.
-- **STRICT TYPECHECK**: Run `pnpm tsc --noEmit` on all modified files. You must resolve all TypeScript errors before signing out.
-- **PERSONA-CENTRIC UX**: Every UI view implemented must have a corresponding "Professional Persona UX Flow" in the domain documentation. This describes the keyboard-driven, local-first experience from the perspective of the professional user (e.g. Bursar checking for payment anomalies).
-- **EXECUTION PLAN**: Before writing code, you MUST create a localized `docs/plans/phase-4-command-center-plan.md` detailing the precise files you will create/modify.
+- **UI RESILIENCE**: Implement `network_degradation_fallback` for SSE streams. If latency exceeds 500ms, the UI must gracefully switch to a "Low-Bandwidth" polling or offline mode.
 
 ## 📦 Required Context & Skills
 - **Spec**: [AGENTIC_SCHOOL_V2_PLAN.md](../AGENTIC_SCHOOL_V2_PLAN.md) (Section 34, Section 3).

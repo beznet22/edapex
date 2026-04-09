@@ -26,6 +26,13 @@
   --link-bg-hover: rgba(255, 255, 255, 0.9);
   --hero-a: rgba(79, 184, 178, 0.36);
   --hero-b: rgba(47, 106, 74, 0.2);
+  --kinetic-blue: #3b82f6;
+  --kinetic-blue-soft: rgba(59, 130, 246, 0.4);
+  --kinetic-deep: #1d4ed8;
+  --deep-obsidian: #0b0b0c;
+  --obsidian-surface: rgba(11, 11, 12, 0.7);
+  --obsidian-border: rgba(59, 130, 246, 0.15);
+  --bg-card: rgba(255, 255, 255, 0.92);
 }
 
 :root[data-theme="dark"] {
@@ -48,6 +55,10 @@
   --link-bg-hover: rgba(24, 44, 49, 0.8);
   --hero-a: rgba(96, 215, 207, 0.18);
   --hero-b: rgba(110, 200, 154, 0.12);
+  --bg-base: var(--deep-obsidian);
+  --surface: var(--obsidian-surface);
+  --line: var(--obsidian-border);
+  --bg-card: rgba(15, 27, 31, 0.92);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -71,6 +82,7 @@
     --link-bg-hover: rgba(24, 44, 49, 0.8);
     --hero-a: rgba(96, 215, 207, 0.18);
     --hero-b: rgba(110, 200, 154, 0.12);
+    --bg-card: rgba(15, 27, 31, 0.92);
   }
 }
 
@@ -170,7 +182,7 @@ pre code {
     0 1px 0 var(--inset-glint) inset,
     0 22px 44px rgba(30, 90, 72, 0.1),
     0 6px 18px rgba(23, 58, 64, 0.08);
-  backdrop-filter: blur(4px);
+  backdrop-filter: blur(12px);
 }
 
 .feature-card {

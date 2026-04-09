@@ -148,11 +148,18 @@ HMAS organizes AI intelligence into four distinct functional layers to ensure st
 - **Atomic Operations**: Specialized agents like `student_registration_agent` or `payroll_generator_agent`.
 - **Isolation**: These agents have access to specific domain knowledge but cannot "see" other domains without going back to the Supervisor.
 
-### 3.4 Deployed Agent Skills (Hermes Standard)
-Every agent in the HMAS hierarchy retrieves its operational knowledge from the **Skills System**:
-- **Progressive Disclosure**: Token-efficient loading of `src/services/ai/skills/{domain}/SKILL.md`.
-- **Procedural Memory**: Skills bundle verified `scripts/` (e.g., migration tools) and `templates/` (e.g., report formats).
-- **Fallback Logic**: Skills can declare conditional activation for local-first recovery when edge latency is high.
+### 3.4 Intelligence Layer: Skills System (Hermes Standard)
+Every agent in the HMAS hierarchy retrieves its operational knowledge from a decentralized **Skills Library**.
+
+- **Progressive Disclosure**: Token-efficient loading pattern:
+    - **List**: `skills_list()` returns names and categories (~3k tokens).
+    - **View**: `skill_view(name)` loads full `SKILL.md` content only when needed.
+- **Skill Structure**: Defined in `src/services/ai/skills/{domain}/{role}/`:
+    - `AGENTS.md`: Defines identity, mission, and personality (Soul).
+    - `SKILL.md`: Defines procedures, triggers, pitfalls, and verification steps.
+- **Skill Evolution (Self-Improvement)**: Agents possess the `skill_manage` tool to `create`, `patch`, and `optimize` their own procedural memory after successful execution of complex tasks.
+- **Portability (Skills Hub)**: Skills are packaged as versioned bundles, enabling cross-school import/export and upstream synchronization for global curriculum alignment.
+- **Fallback Logic**: Skills declare conditional activation (e.g., `requires_toolsets: [terminal]`) for local-first recovery.
 
 ### 3.5 The EdApex Stress Lab (Sidecar Isolation)
 To maintain environment parity while ensuring production safety:

@@ -1,23 +1,24 @@
 # Phase 1 Implementation Prompt: Foundation & Orchestration Backbone
 
 ## 🎯 Objective
-Deploy the "Pulse" of the EdApex V2 Agentic School. Your goal is to transform Paperclip's (located at `/home/beznet/Workspace/paperclip`) generalized orchestration into a production-grade, edge-native heartbeat and locking system.
+Deploy the "Pulse" of the EdApex V2 Agentic School through a rigorous **Verify, Align, and Enhance** mandate. Your goal is to transform Paperclip's (located at `/home/beznet/Workspace/paperclip`) generalized orchestration into a production-grade, edge-native heartbeat and locking system, ensuring 100% architectural parity through continuous auditing of the existing backbone.
 
 ## 📜 CORE CONSTRAINTS & TRANSFORMATION POLICY
-- **NO COPY-PASTE**: Analyze Paperclip's [heartbeat](/home/beznet/Workspace/paperclip/server/src/services/heartbeat.ts) and [costs](/home/beznet/Workspace/paperclip/server/src/services/costs.ts), then **Reconstruct** them into EdApex-native patterns (`BaseController`, `IRepository<T>`, `Service`).
-- **PAPERCLIP FILE NOT FOUND**: If you cannot find a file in Paperclip, search for it or something similar that conforms to the EdApex architecture and specs in the codebase.
-- **STRESS AWARENESS**: Review [STRESS_FRAMEWORK.md](../STRESS_FRAMEWORK.md) (Infrastructure Section) before writing logic. You are building for a 3G/Rural environment with 40% packet loss and high-frequency concurrency.
+- **IDEMPOTENT VERIFICATION & DISCOVERY LOOP**: This prompt is designed for continuous refinement. Every execution MUST:
+    1. **Exhaustive Discovery**: Perform a comprehensive analysis of the Paperclip codebase (located at `/home/beznet/Workspace/paperclip`) to identify all relevant business logic for the Foundation phase. Use files like [heartbeat.ts](/home/beznet/Workspace/paperclip/server/src/services/heartbeat.ts) and [costs.ts](/home/beznet/Workspace/paperclip/server/src/services/costs.ts) as high-signal **suggestions**, but do not limit your search to them.
+    2. **Audit**: Compare the discovered Paperclip logic against existing EdApex code (e.g., `src/services/ai/heartbeat.service.ts`, `src/services/ai/ai.service.ts`).
+    3. **Align & Enhance**: Identify missing "Operational Intent" and implement improvements to reach 100% parity with Paperclip's proven patterns while obeying EdApex layer rules.
+- **ATOMIC PROGRESS LOGGING**: Your execution plan (e.g., `docs/plans/phase-1-foundation-plan.md`) MUST include a granular `Unit Tasks` checklist. You MUST update this checklist as you complete each task. This ensures the next agent can seamlessly resume work by referencing `docs/PROJECT_ROADMAP.md` and your plan's progress state.
+- **NO COPY-PASTE**: Reconstruct Paperclip's logic into EdApex-native patterns (`BaseController`, `IRepository<T>`, `Service`).
+- **HIGH-FIDELITY REFERENCES**:
+    - **UI Reconciler**: [ui/src/api/heartbeats.ts](/home/beznet/Workspace/paperclip/ui/src/api/heartbeats.ts)
+    - **Real-time Provider**: [LiveUpdatesProvider.tsx](/home/beznet/Workspace/paperclip/ui/src/context/LiveUpdatesProvider.tsx)
+    - **Finance Schema**: [finance_events.ts](/home/beznet/Workspace/paperclip/packages/db/src/schema/finance_events.ts)
+- **STRESS AWARENESS**: Review [STRESS_FRAMEWORK.md](../STRESS_FRAMEWORK.md) (Infrastructure Section).
 - **TENANT ISOLATION**: Every query must include a `tenant_id` filter.
 - **8-LAYER RULES**: All code must reside in the canonical `src/` hierarchy.
-- **LOGGING**: Initialize the 8-layer trace log using `logger.child({ layer: '...' })`.
-- **LAYER 1 RESILIENCE**: Every defensive tool implemented must have a unit test specifically simulating the stressor it defends against (e.g., duplicate IDs for idempotency).
-- **TEST DRIVEN**: The agent MUST run and pass automated testing (unit/integration) before completing this phase.
-- **GIT COMMIT**: The agent MUST create a standard git commit with AI attribution before signing out.
-- **SCOPE LOCK**: Do NOT modify files or domains outside the explicit scope of this phase.
-- **ESCALATION PROTOCOL**: If you encounter missing context, undocumented relations, or ambiguity, DO NOT HALLUCINATE. Pause and request clarification via `notify_user`.
-- **STRICT TYPECHECK**: Run `pnpm tsc --noEmit` on all modified files. You must resolve all TypeScript errors before signing out.
-- **PERSONA-CENTRIC FLOWS**: Before implementing any domain-specific logic, you MUST update the respective domain documentation (docs/domains/[module].md) with a "Professional Persona Flow" narrative. This narrative must describe how a real-world professional (e.g., IT Director) interacts with the system, using descriptive prose instead of code snippets.
-- **EXECUTION PLAN**: Before writing code, you MUST create a localized `docs/plans/phase-1-foundation-plan.md` detailing the precise files you will create/modify.
+- **PERSONA-CENTRIC FLOWS**: Update [docs/domains/ai.md](../domains/ai.md) with a "Professional Persona Flow" before implementing logic.
+- **EXECUTION PLAN**: Create `docs/plans/phase-1-foundation-plan.md` before writing code.
 
 ## 📦 Required Context & Skills
 - **Spec**: [AGENTIC_SCHOOL_V2_PLAN.md](../AGENTIC_SCHOOL_V2_PLAN.md) (Sections 2.3, 4, 41-45).

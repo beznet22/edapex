@@ -119,4 +119,21 @@ export class AIService {
       model: costEvent.model,
     });
   }
+
+  // --- Agent Orchestration ---
+
+  /**
+   * High-level bridge to create an agent via the Orchestrator,
+   * injecting this service instance for tool capabilities (e.g. handoff).
+   */
+  async createAgent(options: { domain: string; role: string; tenantId?: string }, env: Record<string, string | undefined>) {
+    const { AiOrchestrator } = await import("./orchestrator.js");
+    
+    return AiOrchestrator.createAgent({
+      domain: options.domain,
+      role: options.role,
+      tenantId: options.tenantId || "GLOBAL",
+      aiService: this,
+    }, env);
+  }
 }

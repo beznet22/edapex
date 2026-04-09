@@ -56,11 +56,9 @@ export type TokenStats = {
 export const aiSessions = sqliteTable("ai_sessions", {
   id: text("id", { length: 36 }).primaryKey(),
   tenantId: text("tenant_id", { length: 36 })
-    .notNull()
-    .references(() => tenants.id),
+    .notNull(),
   userId: text("user_id", { length: 36 })
-    .notNull()
-    .references(() => users.id),
+    .notNull(),
   parentSessionId: text("parent_session_id", { length: 36 }), // Session lineage
   title: text("title", { length: 255 }).notNull().default("New Session"),
   model: text("model", { length: 100 }),
@@ -244,15 +242,14 @@ export const aiGoals = sqliteTable("ai_goals", {
 export const aiCostEvents = sqliteTable("ai_cost_events", {
   id: text("id", { length: 36 }).primaryKey(),
   tenantId: text("tenant_id", { length: 36 })
-    .notNull()
-    .references(() => tenants.id),
-  taskId: text("task_id", { length: 36 }).references(() => aiTasks.id),
-  goalId: text("goal_id", { length: 36 }).references(() => aiGoals.id),
+    .notNull(),
+  taskId: text("task_id", { length: 36 }),
+  goalId: text("goal_id", { length: 36 }),
   provider: text("provider", { length: 100 }),
   model: text("model", { length: 100 }),
-  tokensPrompt: integer("tokens_prompt"),
-  tokensCompletion: integer("tokens_completion"),
-  costUsd: real("cost_usd"),
+  inputTokens: integer("input_tokens"),
+  outputTokens: integer("output_tokens"),
+  costCents: integer("cost_cents"),
   createdAt: integer("created_at", { mode: "timestamp" }).defaultNow(),
 });
 

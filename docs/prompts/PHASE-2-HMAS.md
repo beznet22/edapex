@@ -1,22 +1,25 @@
 # Phase 2 Implementation Prompt: HMAS & Specialized Role Library
 
 ## 🎯 Objective
-Deploy the "Brain" of the Agentic School. Map the strategic HMAS orchestration (Principal Assistant) and the 31+ specialized Staff Roles documented in the spec.
+Deploy the "Brain" of the EdApex V2 Agentic School. Map the strategic HMAS orchestration (Principal Assistant) and the 31+ specialized Staff Roles documented in the spec, while iteratively performing a **Verify, Align, and Enhance** audit against Paperclip's (located at `/home/beznet/Workspace/paperclip`) proven agentic patterns.
 
 ## 📜 CORE CONSTRAINTS & TRANSFORMATION POLICY
+- **IDEMPOTENT VERIFICATION & DISCOVERY LOOP**: This prompt is designed for continuous refinement. Every execution MUST:
+    1. **Exhaustive Discovery**: Perform a comprehensive analysis of the Paperclip codebase (located at `/home/beznet/Workspace/paperclip`) to identify all relevant agent roles, orchestration patterns, and skill definitions. Use files like [agents.ts](/home/beznet/Workspace/paperclip/server/src/services/agents.ts) and [SKILL.md](/home/beznet/Workspace/paperclip/skills/paperclip/SKILL.md) as high-signal **suggestions**, but do not limit your search to them.
+    2. **Audit**: Compare the discovered Paperclip patterns against existing EdApex Agent/Workflow definitions in `src/services/ai/`.
+    3. **Align & Enhance**: Refine the orchestration logic, provider fallbacks, and tool mappings to reach 100% parity with Paperclip's patterns while maximizing reuse of the Mastra SDK.
+- **ATOMIC PROGRESS LOGGING**: Your execution plan (e.g., `docs/plans/phase-2-hmas-plan.md`) MUST include a granular `Unit Tasks` checklist. You MUST update this checklist as you complete each task. This ensures the next agent can seamlessly resume work by referencing `docs/PROJECT_ROADMAP.md` and your plan's progress state.
+- **NO COPY-PASTE**: Reconstruct Paperclip's logic into EdApex-native patterns (`BaseController`, `IRepository<T>`, `Service`).
+- **HIGH-FIDELITY REFERENCES**:
+    - **Skill Blueprint**: [SKILL.md](/home/beznet/Workspace/paperclip/skills/paperclip/SKILL.md)
+    - **Model Adapters**: [/home/beznet/Workspace/paperclip/packages/adapters/](/home/beznet/Workspace/paperclip/packages/adapters/)
+    - **UI Adapters**: [registry.ts](/home/beznet/Workspace/paperclip/ui/src/adapters/registry.ts)
+    - **Runtime State**: [agent_runtime_state.ts](/home/beznet/Workspace/paperclip/packages/db/src/schema/agent_runtime_state.ts)
 - **MASTRA SDK**: All agents must be defined using the Mastra SDK (`Agent` and `Workflow` classes).
-- **SKILL-AS-A-STRUCTURE**: You MUST implement the "Structure-as-a-Skill" pattern. Educational constructs, school policies, and handbooks are loaded as AI Skills, NOT hardcoded in schemas.
-- **TOOL INTEGRITY**: Tools must be validated against JSON schemas and mapped 1:1 to the 18 `IRepository<T>` domain interfaces.
-- **AGENT RESILIENCE**: Implement `recursive_loop_breaker` and `context_window_throttler` in the agent execution loop to prevent amnesia or token-loop deadlocks.
-- **HIERARCHICAL FLOW**: Principal Assistant decomposes goals -> Domain Supervisors oversee silos -> Task Agents execute specialized tools.
-- **LAYER 1 RESILIENCE**: Every agent definition must include unit tests for systemic stressors (e.g., prompt injection, recursive loops).
-- **TEST DRIVEN**: The agent MUST run and pass automated testing (unit/integration) before completing this phase.
-- **GIT COMMIT**: The agent MUST create a standard git commit with AI attribution before signing out.
-- **SCOPE LOCK**: Do NOT modify files or domains outside the explicit scope of this phase.
-- **ESCALATION PROTOCOL**: If you encounter missing context, undocumented relations, or ambiguity, DO NOT HALLUCINATE. Pause and request clarification via `notify_user`.
-- **STRICT TYPECHECK**: Run `pnpm tsc --noEmit` on all modified files. You must resolve all TypeScript errors before signing out.
-- **PERSONA-CENTRIC FLOWS**: For every agent defined, you MUST first update its respective domain documentation (docs/domains/[module].md) with a "Professional Persona Flow" narrative. This narrative must describe how the real-world professional (Registrar, Bursar, etc.) interacts with the HMAS Supervisor and tools to achieve a business goal, using descriptive prose instead of code snippets.
-- **EXECUTION PLAN**: Before writing code, you MUST create a localized `docs/plans/phase-2-hmas-plan.md` detailing the precise files you will create/modify.
+- **SKILL-AS-A-STRUCTURE**: Implement the "Structure-as-a-Skill" pattern. Educational constructs and policies are loaded as AI Skills.
+- **TENANT ISOLATION**: Every query must include a `tenant_id` filter.
+- **PERSONA-CENTRIC FLOWS**: Before defining agents, update [docs/domains/](../domains/) documentation with a "Professional Persona Flow" narrative.
+- **EXECUTION PLAN**: Create `docs/plans/phase-2-hmas-plan.md` before writing code.
 
 ## 📦 Required Context & Skills
 - **Spec**: [AGENTIC_SCHOOL_V2_PLAN.md](../AGENTIC_SCHOOL_V2_PLAN.md) (Sections 11.2, 13, 36, 46).

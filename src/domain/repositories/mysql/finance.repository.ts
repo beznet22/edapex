@@ -6,7 +6,8 @@ import {
   feeAssignments, 
   invoices,
   paymentGateways,
-  onlinePayments
+  onlinePayments,
+  financeEvents
 } from "../../../db/mysql/domain-finance.js";
 import { 
   IFinanceRepository, 
@@ -16,11 +17,61 @@ import {
   IFeeAssignment, 
   IInvoice,
   IPaymentGateway,
-  IOnlinePayment
+  IOnlinePayment,
+  IFinanceEventRepository,
+  IFinanceEvent,
+  FinanceEventCategory
 } from "../../interfaces/finance.interface.js";
-import { eq, and } from "drizzle-orm";
+import { eq, and, desc, sql } from "drizzle-orm";
 
-export class MySqlFinanceRepository implements IFinanceRepository {
+export class MySqlFinanceRepository implements IFinanceRepository, IFinanceEventRepository {
+  // --- Finance Events (IFinanceEventRepository) ---
+  async createFinanceEvent(data: Partial<IFinanceEvent>): Promise<IFinanceEvent> {
+    await db.insert(financeEvents).values(data as any);
+    const [result] = await db
+      .select()
+      .from(financeEvents)
+      .where(eq(financeEvents.id, data.id!));
+    
+    if (!result) throw new Error("Failed to create finance event");
+    return result as IFinanceEvent;
+  }
+
+  async getFinanceEventsByTenant(tenantId: string, category?: FinanceEventCategory): Promise<IFinanceEvent[]> {
+    const conditions = [eq(financeEvents.tenantId, tenantId)];
+    if (category) conditions.push(eq(financeEvents.category, category));
+
+    const results = await db.select().from(financeEvents).where(and(...conditions)).orderBy(desc(financeEvents.postedAt));
+    return results as IFinanceEvent[];
+  }
+
+  async getBalanceByCurrency(tenantId: string, currency?: string): Promise<number> {
+    const conditions = [eq(financeEvents.tenantId, tenantId)];
+    if (currency) conditions.push(eq(financeEvents.currency, currency));
+
+    const [result] = await db
+      .select({
+        balance: sql<number>`sum(${financeEvents.amountCents})`
+      })
+      .from(financeEvents)
+      .where(and(...conditions));
+    
+    return Number(result?.balance || 0);
+  }
+
+  async getFinanceEventByIdempotencyKey(tenantId: string, key: string): Promise<IFinanceEvent | null> {
+    const [result] = await db
+      .select()
+      .from(financeEvents)
+      .where(and(
+        eq(financeEvents.tenantId, tenantId),
+        eq(financeEvents.idempotencyKey, key)
+      ))
+      .limit(1);
+    
+    return result ? (result as IFinanceEvent) : null;
+  }
+
   private mapLedger(row: any): ILedgerEntry {
     return {
       ...row,
@@ -33,9 +84,19 @@ export class MySqlFinanceRepository implements IFinanceRepository {
 
   // --- Ledger ---
   async getLedgerEntries(tenantId: string, filter?: { type?: string; userId?: string; academicId?: string }): Promise<ILedgerEntry[]> {
-    let query = db.select().from(ledgerEntries).where(eq(ledgerEntries.tenantId, tenantId));
-    // Dynamic filtering logic...
-    const results = await query;
+    const conditions = [eq(ledgerEntries.tenantId, tenantId)];
+    
+    if (filter?.type) {
+      conditions.push(eq(ledgerEntries.transactionType, filter.type as any));
+    }
+    if (filter?.userId) {
+      conditions.push(eq(ledgerEntries.userId, filter.userId));
+    }
+    if (filter?.academicId) {
+      conditions.push(eq(ledgerEntries.academicId, filter.academicId));
+    }
+
+    const results = await db.select().from(ledgerEntries).where(and(...conditions));
     return results.map((row: any) => this.mapLedger(row));
   }
 

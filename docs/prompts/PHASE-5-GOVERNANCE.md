@@ -1,21 +1,17 @@
 # Phase 5 Implementation Prompt: Governance & Proactive Auditing
 
 ## 🎯 Objective
-Finalize the platform's reliability and security through **PBAC Governance** and **Autonomous Proactive Auditing**. Your goal is to implement the "Executive Oversight" of the Agentic School.
+Finalize the platform's reliability and security through **PBAC Governance** and **Autonomous Proactive Auditing** while performing an exhaustive **Verify, Align, and Enhance** audit of the platform's security boundaries. Your goal is to implement the "Executive Oversight" of the Agentic School, ensuring 100% architectural parity with Paperclip's (located at `/home/beznet/Workspace/paperclip`) proven governance and auditing patterns.
 
 ## 📜 CORE CONSTRAINTS & TRANSFORMATION POLICY
+- **IDEMPOTENT VERIFICATION & DISCOVERY LOOP**: This prompt is designed for continuous refinement. Every execution MUST:
+    1. **Exhaustive Discovery**: Systematically crawl the Paperclip codebase (`/home/beznet/Workspace/paperclip`) to identify all relevant security middleware, PBAC evaluation logic, and proactive auditing patterns. Use Paperclip's [src/middleware/](/home/beznet/Workspace/paperclip/server/src/middleware/) and [src/services/costs.ts](/home/beznet/Workspace/paperclip/server/src/services/costs.ts) as high-signal **suggestions**, but do not limit your search to them.
+    2. **Audit**: Compare the discovered Paperclip governance logic against existing EdApex code (e.g., `src/middleware/pbac.middleware.ts`, `src/services/ai/auditor.service.ts`).
+    3. **Align & Enhance**: Refine the PBAC evaluation, proactive troubleshooting (Maximizer Agent), and forensic audit shells to reach 100% parity with Paperclip's patterns.
+- **ATOMIC PROGRESS LOGGING**: Your execution plan (e.g., `docs/plans/phase-5-governance-plan.md`) MUST include a granular `Unit Tasks` checklist. You MUST update this checklist as you complete each task. This ensures the next agent can seamlessly resume work by referencing `docs/PROJECT_ROADMAP.md` and your plan's progress state.
+- **NO COPY-PASTE**: Reconstruct Paperclip's logic into EdApex-native patterns (Hono Middleware, Drizzle Repositories).
 - **PBAC SECURITY**: Evaluation MUST happen *before* any tool execution.
 - **PROACTIVE AUDITING**: Implement the **Maximizer Agent** to proactively scan for systemic stressors (deadlocks, amnesia).
-- **EDGE-NATIVE EVALUATION**: Policies must be evaluated on the Cloudflare Edge.
-- **NO UNREVIEWED DELETES**: High-impact actions are paused for human approval via the `HITL_trigger_router`.
-- **LAYER 2 RESILIENCE**: The phase is not complete until the platform survives the `load_test_simulator` and `chaos_mesh` scenarios.
-- **TEST DRIVEN**: The agent MUST run and pass automated testing (unit/integration) before completing this phase.
-- **GIT COMMIT**: The agent MUST create a standard git commit with AI attribution before signing out.
-- **SCOPE LOCK**: Do NOT modify files or domains outside the explicit scope of this phase.
-- **ESCALATION PROTOCOL**: If you encounter missing context, undocumented relations, or ambiguity, DO NOT HALLUCINATE. Pause and request clarification via `notify_user`.
-- **STRICT TYPECHECK**: Run `pnpm tsc --noEmit` on all modified files. You must resolve all TypeScript errors before signing out.
-- **PERSONA-CENTRIC COMPLIANCE**: Define the "Professional Persona Flow" for the Compliance Officer and Auditor. Describe how systemic stressors are monitored and resolved in the Command Center UI using descriptive narratives.
-- **EXECUTION PLAN**: Before writing code, you MUST create a localized `docs/plans/phase-5-governance-plan.md` detailing the precise files you will create/modify.
 
 ## 📦 Required Context & Skills
 - **Spec**: [AGENTIC_SCHOOL_V2_PLAN.md](../AGENTIC_SCHOOL_V2_PLAN.md) (Section 16, Section 42).

@@ -1,28 +1,20 @@
-/**
- * ==========================================
- * Layer: SERVICES (BUSINESS LOGIC)
- * Protocol: @backend-architect, @backend-dev-guidelines
- * ==========================================
- * Purpose:
- *   The heart of the application's domain complexity.
- *   Services define the "rules" of the system and coordinate:
- *     1. Multi-Agent dispatch routines (HMAS).
- *     2. Domain Event emissions.
- *     3. Data persistence via injected Repositories.
- *
- * Constraints:
- *   - A Service MUST be strictly HTTP-agnostic (no `req` or `res` objects).
- *   - A Service MUST receive DB dependencies via constructor injection.
- *   - Filename convention: `camelCaseService.ts`.
- */
-
-// export * from './authService';
-export {
-  HeartbeatService,
-  generateIdempotencyKey,
-  validateClockSync,
-  captureStateCheckpoint,
-} from "./ai/heartbeat.service.js";
-export { AIService } from "./ai/ai.service.js";
-export { FinanceService } from "./finance/finance.service.js";
-export { ClassroomService } from "./classroom/classroom.service.js";
+export * from "./academic/academic.service.js";
+export * from "./ai/ai.service.js";
+export * from "./ai/heartbeat.service.js";
+export * from "./assessment/assessment.service.ts";
+export * from "./attendance/attendance.service.js";
+export * from "./classroom/classroom.service.js";
+export * from "./cms/cms.service.js";
+export * from "./communication/communication.service.js";
+export * from "./core/core.service.js";
+export * from "./documents/documents.service.js";
+export * from "./events/events.service.js";
+export * from "./facilities/facilities.service.js";
+export * from "./finance/finance.service.js";
+export * from "./homeschool/homeschool.service.js";
+export * from "./hr/hr.service.js";
+export * from "./library/library.service.js";
+export * from "./lms/lms.service.js";
+export * from "./pbac/pbac.service.js";
+export * from "./settings/settings.service.js";
+export * from "./sync.service.js";

@@ -1,0 +1,26 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugin": ["opencode-qwen-proxy"],
+  "provider": {
+    "qwen-code": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "Qwen Code",
+      "options": {
+        "baseURL": "https://portal.qwen.ai/v1"
+      },
+      "models": {
+        "coder-model": {
+          "name": "Qwen Coder",
+          "limit": { "context": 1048576, "output": 65536 },
+          "modalities": { "input": ["text"], "output": ["text"] }
+        },
+        "vision-model": {
+          "name": "Qwen Vision",
+          "limit": { "context": 131072, "output": 32768 },
+          "modalities": { "input": ["text", "image"], "output": ["text"] },
+          "attachment": true
+        }
+      }
+    }
+  }
+}

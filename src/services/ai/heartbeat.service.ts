@@ -86,7 +86,7 @@ export function captureStateCheckpoint(
   tenantId: string,
   entityType: string,
   entityId: string,
-  stateSnapshot: Record<string, unknown>,
+  stateSnapshot: Record<string, string | number | boolean | null | object>,
 ): StateCheckpoint {
   return {
     checkpointId: crypto.randomUUID(),
@@ -148,7 +148,7 @@ export class HeartbeatService {
 
     // Guard: STRESS_LAB mode blocks real task checkout
     if (this.status === "stress_lab") {
-      tickLog.info("STRESS_LAB mode — simulating wakeup without task checkout");
+      tickLog.info("STRESS_LAB mode — Execution restricted to safe-testing environment");
       return this.buildTick(runId, request, "stress_lab", null, clockResult.driftMs);
     }
 
@@ -164,7 +164,7 @@ export class HeartbeatService {
             request.tenantId,
             "ai_task",
             request.taskId,
-            task as unknown as Record<string, unknown>,
+            task as unknown as Record<string, string | number | boolean | null | object>,
           );
         }
 

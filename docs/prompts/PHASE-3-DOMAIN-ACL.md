@@ -1,21 +1,23 @@
 # Phase 3 Implementation Prompt: Domain Alignment & Anti-Corruption Layer (ACL)
 
 ## 🎯 Objective
-Transform the business logic from all 18 EdApex domains into native `src/services/` logic. Your goal is to bridge the gap between Paperclip's (located at `/home/beznet/Workspace/paperclip`) generalized logic and EdApex's strict `Controller -> Service -> Repository` architecture.
+Transform the business logic from all 18 EdApex domains into native `src/services/` logic. Your goal is to bridge the gap between Paperclip's (located at `/home/beznet/Workspace/paperclip`) generalized logic and EdApex's strict `Controller -> Service -> Repository` architecture through a systematic **Verify, Align, and Enhance** audit of all domain services.
 
 ## 📜 CORE CONSTRAINTS & TRANSFORMATION POLICY
+- **IDEMPOTENT VERIFICATION & DISCOVERY LOOP**: This prompt is designed for continuous refinement. Every execution MUST:
+    1. **Exhaustive Discovery**: Systematically crawl the Paperclip codebase (located at `/home/beznet/Workspace/paperclip`), starting with [server/src/services/](/home/beznet/Workspace/paperclip/server/src/services/), to identify the business logic for all 18 domains. Use Paperclip schemas (e.g., [finance_events.ts](/home/beznet/Workspace/paperclip/packages/db/src/schema/finance_events.ts)) as structural **suggestions**, but do not limit your audit to them.
+    2. **Audit**: Compare the discovered Paperclip logic against existing EdApex Domain Services (e.g., `FinanceService`, `AcademicService`).
+    3. **Align & Enhance**: Refine the Anti-Corruption Layer (ACL) mapping to ensure zero legacy logic leaks into the V2 architecture.
+- **ATOMIC PROGRESS LOGGING**: Your execution plan (e.g., `docs/plans/phase-3-domain-acl-plan.md`) MUST include a granular `Unit Tasks` checklist. You MUST update this checklist as you complete each task. This ensures the next agent can seamlessly resume work by referencing `docs/PROJECT_ROADMAP.md` and your plan's progress state.
+- **NO COPY-PASTE**: Reconstruct Paperclip's logic into EdApex-native patterns (`BaseController`, `IRepository<T>`, `Service`).
+- **HIGH-FIDELITY REFERENCES**:
+    - **Financial Ledger**: [finance_events.ts](/home/beznet/Workspace/paperclip/packages/db/src/schema/finance_events.ts)
+    - **Work Products**: [issue_work_products.ts](/home/beznet/Workspace/paperclip/packages/db/src/schema/issue_work_products.ts)
+    - **Logic Counterparts**: [server/src/services/](/home/beznet/Workspace/paperclip/server/src/services/)
 - **ANTI-CORRUPTION LAYER (ACL)**: The service layer MUST act as the ACL, mapping specialized domain entities to Mastra tool outputs.
-- **[STRESS DEFENSE] TOOLING**: You MUST implement the 54+ defensive tools defined in `docs/domains/*.md` for each domain service (e.g., `fractional_payment_engine` in Finance, `guardian_access_filter` in PBAC).
-- **NO DUAL-WRITE**: Use polymorphic `owner_type/owner_id` constraints where applicable.
-- **EVENT-DRIVEN**: Long-running or side-effect logic must be decoupled via the `Internal Event Bus` (`src/events/`).
-- **LAYER 1 RESILIENCE**: Every Domain Service must include integration tests simulating its specific operational stressors (e.g., fractional payment drift).
-- **TEST DRIVEN**: The agent MUST run and pass automated testing (unit/integration) before completing this phase.
-- **GIT COMMIT**: The agent MUST create a standard git commit with AI attribution before signing out.
-- **SCOPE LOCK**: Do NOT modify files or domains outside the explicit scope of this phase.
-- **ESCALATION PROTOCOL**: If you encounter missing context, undocumented relations, or ambiguity, DO NOT HALLUCINATE. Pause and request clarification via `notify_user`.
-- **STRICT TYPECHECK**: Run `pnpm tsc --noEmit` on all modified files. You must resolve all TypeScript errors before signing out.
-- **PERSONA-CENTRIC FLOWS**: Before implementing any service logic, you MUST update the respective domain documentation (docs/domains/[module].md) with a "Professional Persona Flow" narrative. This narrative must describe how a real-world professional (e.g., Accountant, Teacher) uses the service's supervisors and tools to achieved business goals, using descriptive prose instead of code snippets.
-- **EXECUTION PLAN**: Before writing code, you MUST create a localized `docs/plans/phase-3-domain-acl-plan.md` detailing the precise files you will create/modify.
+- **TENANT ISOLATION**: Every query must include a `tenant_id` filter.
+- **PERSONA-CENTRIC FLOWS**: Before implementing service logic, update [docs/domains/](../domains/) documentation with a "Professional Persona Flow" narrative.
+- **EXECUTION PLAN**: Create `docs/plans/phase-3-domain-acl-plan.md` before writing code.
 
 ## 📦 Required Context & Skills
 - **Spec**: [AGENTIC_SCHOOL_V2_PLAN.md](../AGENTIC_SCHOOL_V2_PLAN.md) (Section 35: 18-Domain Drizzle Schema Reference).
@@ -42,7 +44,7 @@ Transform the business logic from all 18 EdApex domains into native `src/service
 
 ### 1. Domain Service Transformation
 Implement the logic for all 18 domains in their respective `src/services/` files (e.g., `AcademicService`, `FinanceService`, `AssessmentService`, `ClassroomService`).
-- **Policy**: Review logic in `/home/beznet/Workspace/paperclip`, discard legacy baggage, and implement as native EdApex Services.
+- **Policy**: Review logic in `/home/beznet/Workspace/paperclip/server/src/services/`, discard legacy baggage, and implement as native EdApex Services.
 - **Repositories**: All state mutations must use the provided `IRepository<T>` implementations in `src/domain/repositories/`.
 - **Cost Reporting**: Every AI-driven tool execution within a service MUST call `reportCost` with token/cent telemetry (using `aiCostEvents`).
 - **Task-Goal Linkage**: Domain services must ensure all spawned `aiTasks` are linked to an active `aiGoal` to maintain the strategic execution trace.

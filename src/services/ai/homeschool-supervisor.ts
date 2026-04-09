@@ -1,8 +1,8 @@
-import { AiOrchestrator } from './orchestrator';
+import { AiOrchestrator } from './orchestrator.js';
 
 /**
- * Agent Factories
- * Defining the definitions that the orchestrator will use at runtime.
+ * Homeschool Domain - Supervisor Definition
+ * Defines the core identity and routing logic for homeschooling orchestration.
  */
 
 export const earlyYearsDef = {
@@ -46,7 +46,16 @@ Your responsibilities:
   capabilities: ['orchestration'],
 };
 
-// Exporting a getter for dynamic instantiation in Workers
-export async function getHomeschoolSupervisor(env: any) {
-  return AiOrchestrator.createAgent(homeschoolSupervisorDef, env);
+/**
+ * Dynamic instantiation for homeschooling agents.
+ * 
+ * @param env - Environment variables for provider initialization
+ * @param tenantId - Mandatory multi-tenant isolation identifier
+ */
+export async function getHomeschoolSupervisor(env: Record<string, string | undefined>, tenantId: string) {
+  return AiOrchestrator.createAgent({
+    domain: 'homeschool',
+    role: 'supervisor',
+    tenantId,
+  }, env);
 }

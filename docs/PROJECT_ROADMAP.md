@@ -32,37 +32,47 @@ This roadmap outlines the strategic evolution of EdApex V2 into an autonomous "A
 
 ---
 
+- [x] **Operator Handoff**: `request_human_operator` tool for explicit escalation.
+
+---
+
+## ✅ Phase 3 - Domain Alignment & ACL — 100% COMPLETE
+
+**Goal**: Refactor business logic into native `src/services/` and bridge to Mastra.
+
+- [x] **Service Transformation**: All 18 domain services implemented in `src/services/`.
+- [x] **Entity Mapping**: Drizzle entities mapped and accessible via domain interfaces.
+- [x] **Internal Event Bus**: Reactive triggers in `src/events/` for cross-domain side effects.
+- [x] **External Webhooks Vault**: Facade tools for HTTP egress (Stripe, Termii).
+- [x] **Binary Delegation Map**: HTML-to-PDF bridge in `DocumentsService`.
+
+---
+
+## ✅ Phase 3.5 - Agent Architecture Alignment (Hermes) — COMPLETE
+
+**Goal**: Transition to dynamic, filesystem-based skill hydration.
+
+- [x] **Markdown-First Skills**: `AGENTS.md` and `SKILL.md` are the sources of truth for agent behavior.
+- [x] **SkillLoaderService**: Dynamic discovery and loading of skills from the filesystem.
+- [x] **Authority Injection**: Domain-specific guardrails injected via `UniversalWorker.getDomainContext`.
+- [x] **Role Unification**: Deleted redundant `src/services/ai/roles/` directory.
+
+---
+
 ## 🛠️ Upcoming Phases
-
-### 🚀 Current Focus: Phase 2 - HMAS & Specialized Role Library
-
-- **Role Deployment**: Implementation of the 31+ specialized Staff Roles (Registrar, Bursar, HR Manager, etc.).
-- **Supervisor Logic**: Principal Assistant logic for cross-domain goal decomposition.
-- **Mastra Integration**: Verification of JSON tools against the 18-domain repositories.
-- **Data Privacy (GDPR/NDPR)**: Implement the PII Obfuscation Middleware to pre-process LLM queries.
-- **Operator Handoff**: Equip all B2C agents with the `request_human_operator` tool for explicit human escalation.
-
-### Phase 3: Domain Alignment & Anti-Corruption Layer (ACL)
-
-- **Service Transformation**: Refactoring business logic from Paperclip into native `src/services/` for all 18 domains.
-- **Entity Mapping**: Implementing the ACL to bridge Mastra outputs to Drizzle entities.
-- **Internal Event Bus**: Reactive triggers for cross-domain side effects (e.g., Attendance -> Notification).
-- **External Webhooks Vault**: Implement facade tools for third-party HTTP egress (Stripe, Termii) without exposing raw API keys to agents.
-- **Binary Delegation Map**: Wire the Document Service to map generated `HTMLContent` strings to the `html2pdf` binary execution bridge.
 
 ### Phase 4: Command Center UI (TanStack Start)
 
-- **Shell Implementation**: The 3-pane dashboard with Tailwind CSS v4 and glassmorphism.
-- **TanStack DB Sync**: Local-first state management with background D1 reconciliation.
-- **AI-Elements**: Chat and Artifact viewer integration in the main viewport.
-- **Real-Time Telemetry (SSE)**: Implement unidirectional edge streams for sub-150ms "Agent Pulse Toasts".
-- **Snapshot Hydration Flow**: Complete Disaster Recovery implementation for restoring IndexedDB from D1 PITR states.
+- **Shell Implementation**: The 3-pane dashboard with Tailwind CSS v4.
+- **TanStack DB Sync**: Local-first state management.
+- **AI-Elements**: Chat and Artifact viewer integration.
+- **Real-Time Telemetry**: SSE edge streams for sub-150ms "Agent Pulse Toasts".
 
 ### Phase 5: Governance & Proactive Auditing
 
-- **PBAC Security**: Edge-native policy evaluation for all agentic actions.
-- **Maximizer Agents**: Proactive audit agents for system health and financial compliance.
-- **Board Approval Inbox**: Governance UI for overriding or approving high-impact AI proposals.
+- **PBAC Security**: Edge-native policy evaluation.
+- **Maximizer Agents**: Proactive audit agents.
+- **Board Approval Inbox**: Governance UI for high-impact AI proposals.
 
 ---
 
@@ -70,9 +80,9 @@ This roadmap outlines the strategic evolution of EdApex V2 into an autonomous "A
 
 | Layer                | Responsibility         | Coverage | Status       |
 | :------------------- | :--------------------- | :------- | :----------- |
-| **API/Routes**       | Hono RPC endpoints     | 25%      | 🏗️ BUILDING  |
-| **Services**         | Domain Logic (ACL)     | 25%      | 🏗️ BUILDING  |
-| **AI Orchestration** | Mastra HMAS Loop       | 15%      | 🏗️ BUILDING  |
+| **API/Routes**       | Hono RPC endpoints     | 30%      | 🏗️ BUILDING  |
+| **Services**         | Domain Logic (ACL)     | 85%      | ✅ MOSTLY DONE |
+| **AI Orchestration** | Mastra HMAS Loop       | 90%      | ✅ MOSTLY DONE |
 | **Repositories**     | Drizzle D1 Adapters    | 100%     | ✅ COMPLETED |
 | **Database**         | 18-Domain Schema       | 100%     | ✅ COMPLETED |
 | **Logging**          | 8-Layer Namespacing    | 100%     | ✅ COMPLETED |
