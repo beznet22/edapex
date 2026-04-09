@@ -14,17 +14,28 @@ Implement the 3-pane Command Center UI using TanStack Start, Tailwind v4, and AI
 ## Implementation Decisions
 
 ### Layout & Navigation
-- **D-01:** 3-Pane Dashboard: Sidebar (Global Control), Main Workspace (Execution), Agent Pulse (Observability).
+- **D-01:** **Three-Pane Dashboard**:
+    - **Sidebar (Left - 240px)**: Global Control, Scoping (Institutional/Personal), and navigation.
+    - **Main Workspace (Center - Flex)**: AI-Elements chat + WorkProduct Gallery.
+    - **Agent Pulse Panel (Right - 320px)**: Real-time telemetry and Checkout log.
 - **D-02:** **Cmd+K Command Bar** (using `cmdk`) for global "Principal Intent" search and agent goal entry; keeps the sidebar clean.
-- **D-03:** **Masonry Grid** for the "WorkProduct" tab to allow high-density artifact review, while maintaining a standard vertical chat for the "Conversation" tab.
+- **D-03:** **WorkProduct Gallery**: Masonry grid layout for artifact review, while maintaining a standard vertical chat for the "Conversation" tab.
 
 ### Telemetry & SSE Pipeline
 - **D-04:** **Aggregated Telemetry**: SSE heartbeats are throttled to "Per-thought" or "Per-action" cycles to reduce network chatter and enhance human readability in the Pulse pane.
-- **D-05:** Real-time **Atomic Checkout** stream displaying cent-spend directly within the observability panel.
+- **D-05:** Real-time **Atomic Checkout** stream displaying cent-spend directly within the observability panel (instead of token count).
+- **D-06:** **Alert Handlers**: High-priority Toast alerts for `ON_PBAC_VIOLATION` and `ON_COST_THRESHOLD_EXCEEDED` events.
+
+### Local-First Sync & Conflict
+- **D-07:** Integrated via **TanStack DB** with the following resolution rules:
+    - **Financial Ledger**: Strict Transactional (`409 Conflict`). Requires re-fetch on collision.
+    - **WorkProducts**: Semantic Merge or LWW.
+    - **UI Preferences**: Last Write Wins (LWW).
 
 ### Visual Identity & UX
-- **D-06:** **Component-Level Skeletons** using `boneyard-js` to maintain layout structure during data hydration.
-- **D-07:** Obsidian Theme with Kinetic Blue primary accents, utilizing 12px backdrop blurs and glassmorphism.
+- **D-08:** **Component-Level Skeletons** using `boneyard-js` to maintain layout structure during data hydration.
+- **D-09:** **Obsidian Theme**: Deep Obsidian (#0B0B0C) with "Kinetic Blue" primary accents.
+- **D-10:** **Effects**: 12px backdrop blurs, `Refraction-Pro` hover effects, and 150ms smooth transitions for all UI states.
 
 ### the agent's Discretion
 - Choice of specific icon set (Lucide vs. Phospor) for consistent visual language.
