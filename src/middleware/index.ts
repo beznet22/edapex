@@ -17,4 +17,5 @@
 
 // export * from './authMiddleware';
 export { rateLimiter, clearRateLimitWindows } from "./rateLimiter.js";
+export { pbacEvaluator } from "./pbacEvaluator.js";
 export type { RateLimiterConfig } from "./rateLimiter.js";

@@ -7,6 +7,7 @@ import { unifiedConfig } from "./config/index";
 type Bindings = {
   NODE_VERSION: string;
   D1_DB: any; // Type 'D1Database' from @cloudflare/workers-types if available
+  EDAPEX_PBAC_KV: any; // Type 'KVNamespace' from @cloudflare/workers-types if available
   PREFER_OPENAI?: string;
   MODE?: string;
 };

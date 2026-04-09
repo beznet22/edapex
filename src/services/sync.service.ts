@@ -1,40 +1,70 @@
-import { SqliteAssessmentRepository } from '../domain/repositories/sqlite/assessment.repository';
+import { db } from "../db/index.js";
+import { users, aiMessages, aiSessions, accounts } from "../db/sqlite/schema.js";
+import { sql, eq } from "drizzle-orm";
+import { getDatabaseV2 } from "../db/index.js";
+
+export interface SyncMutation {
+  table: "users" | "ai_messages" | "ai_sessions" | "accounts";
+  type: "insert" | "update" | "delete";
+  key: string;
+  value: any;
+  timestamp: string;
+}
 
 export interface SyncPayload {
   tenantId: string;
   userId: string;
-  changes: any[];
-  lastSyncToken?: string;
+  changes: SyncMutation[];
 }
 
 export class SyncService {
-  constructor(private db: any) {}
+  private db: any;
+
+  constructor(env: any, dialect: string) {
+    this.db = getDatabaseV2(env);
+  }
 
   async reconcile(payload: SyncPayload) {
-    const { tenantId, lastSyncToken } = payload;
-    const assessmentRepo = new SqliteAssessmentRepository();
+    const { tenantId, changes } = payload;
+    const results = [];
 
-    // 1. Process Incoming Changes (Placeholder for now, assuming client mostly pulls)
-    // In a full implementation, we would iterate payload.changes and call repo.saveX()
+    for (const change of changes) {
+      const table = this.getTable(change.table);
+      if (!table) continue;
 
-    // 2. Fetch Differential Updates (Exams, Setups, Marks)
-    const updatedSince = lastSyncToken ? new Date(lastSyncToken) : undefined;
-    const exams = await assessmentRepo.getExams(tenantId, "", updatedSince);
-    
-    // 3. Construct Response
+      try {
+        if (change.type === "insert" || change.type === "update") {
+          // LWW: Upsert based on key and tenant_id
+          await this.db
+            .insert(table)
+            .values({ ...change.value, tenantId, updatedAt: new Date(change.timestamp) })
+            .onConflictDoUpdate({
+              target: table.id,
+              set: { ...change.value, updatedAt: new Date(change.timestamp) } as any,
+            });
+        } else if (change.type === "delete") {
+          await this.db.delete(table).where(eq(table.id, change.key));
+        }
+        results.push({ key: change.key, status: "sync_success" });
+      } catch (error: any) {
+        results.push({ key: change.key, status: "sync_error", error: error.message });
+      }
+    }
+
     return {
       success: true,
+      results,
       lastSyncToken: new Date().toISOString(),
-      updates: {
-        exams: exams.map(e => ({
-          id: e.id,
-          title: e.title,
-          exam_type: e.examType,
-          tenant_id: e.tenantId,
-          updated_at: e.updatedAt?.toISOString() || new Date().toISOString()
-        })),
-        // Add more collections as needed
-      }
     };
+  }
+
+  private getTable(tableName: string) {
+    switch (tableName) {
+      case "users": return users;
+      case "ai_messages": return aiMessages;
+      case "ai_sessions": return aiSessions;
+      case "accounts": return accounts;
+      default: return null;
+    }
   }
 }

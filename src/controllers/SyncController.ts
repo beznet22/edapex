@@ -14,8 +14,8 @@ export class SyncController extends BaseController {
    */
   static async reconcile(c: Context) {
     const body = await c.req.json();
-    const db = getDatabaseV2(c.env);
-    const syncService = new SyncService(db);
+    const dialect = c.env.D1_DB ? "d1" : (process.env.DATABASE_DIALECT || "sqlite");
+    const syncService = new SyncService(c.env, dialect);
     
     try {
       const result = await syncService.reconcile(body);
