@@ -32,3 +32,5 @@ vite.config.ts.timestamp-*
 
 qwen-code-repo/
 qwen-inspect/
+_backup_legacy/
+.spec/
