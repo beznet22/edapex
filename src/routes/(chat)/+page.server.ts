@@ -1,6 +1,7 @@
 import { fileSchema } from "$lib/schema/chat-schema";
 import { resultInputSchema } from "$lib/schema/result-input";
 import { generateContent } from "$lib/server/helpers/chat-helper";
+import { resolveProviderForTask } from "$lib/server/provider/router";
 import { resultRepo, staffRepo } from "$lib/server/repository";
 import { assessment } from "$lib/server/service/assessment.service";
 import { put } from "$lib/utils/fs-blob";
@@ -76,7 +77,8 @@ export const actions: Actions = {
       // console.log(mappingData)
       if (mappingData.subjects.length === 0) throw new Error("You are not assigned to any subjects");
       const mapString = JSON.stringify(mappingData);
-      const { success, content, message } = await generateContent(validatedFile.data, mapString);
+      const { provider } = await resolveProviderForTask(user.id, "vision");
+      const { success, content, message } = await generateContent(validatedFile.data, provider, mapString);
       if (!content || !success) return { success: false, status: "error", message };
 
       const parsedResult = JSON.parse(content.trim());

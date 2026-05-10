@@ -15,6 +15,7 @@ Discard all existing provider logic and implement a strictly API key-based provi
 ### 2. Database Integration
 - Do not create a new schema. Use the completely compatible `personalAccessTokens` (`personal_access_tokens` database table) schema exported from [`src/lib/server/db/sms-schema.ts`](../src/lib/server/db/sms-schema.ts).
 - Model the logic to insert, retrieve, and validate raw API keys for different users/tenants using `tokenable_type` to denote the specific AI provider (e.g., `nvidia_nim`, `openrouter`, `groq`, `mistral`) and `tokenable_id` for the user/tenant associative ID.
+- **Security & DB Constraint Override:** Because the `token` field is restricted to `varchar(64)` and API keys exceed this length (and shouldn't be stored in plaintext), the system must store a fixed-length reference hash (or partial identifier) in the `token` column. The actual BYOK API key must be AES-256 encrypted and stored securely within the `abilities` (TEXT) column.
 
 
 
@@ -127,22 +128,22 @@ To ensure production-grade stability, the rewritten provider matrix MUST impleme
 1. **Automated Error Handling & UI Propagation:**
    - Provider wrappers must automatically intercept and handle session drops, token expirations, and `Vercel AI SDK` tool-call initialization failures (e.g., catching `AI_APICallError` or network timeouts).
    - **Critical:** All errors must be properly propagated back to the UI state (Toast notifications, Error messages, etc.) gracefully, and deeply logged to the backend console utilizing a **namespaced logger** (e.g. `[ProviderRouter:Cerebras] Quota Exceeded`).
-   - If everything fails (Emergency Degraded Mode), the requests should be routed into an Async queue + retry worker mechanism rather than silently terminating.
+   - If everything fails (Emergency Degraded Mode), the requests should trigger a graceful UI termination (synthesized assistant response: "All inference engines degraded") and log the massive failure to a backend telemetry table instead of hanging silently in a non-existent Async queue.
 
 2. **Free Tier Limit & Quota Awareness:**
    - Provider runtime must intelligently account for free-tier constraints (e.g., Cerebras RP/min limits, Groq TPM limits) to ensure continuous execution flow.
    - The system must detect `429 Too Many Requests` or threshold breaches instantly, utilizing this status as a hard trigger to immediately route the workload to the next available fallback in the lane (e.g., switching from Cerebras to NVIDIA).
 
-3. **Lane-Aware Configurable Smart Routing & Dynamic Model Selection:**
+   - **Lane-Aware Configurable Smart Routing & Dynamic Model Selection:**
    - **Strongest model decides. Fastest model executes.** Do not deviate.
-   - If a user explicitly selects a precise manual model ID from the UI (e.g. `llama3.1-70b`), the router must instantly pinpoint which Provider cluster actually serves that specific model utilizing the **Provider Configuration Registry** (defined below).
-   - If a preferred or assigned provider encounters session issues, trigger the **Emergency Degraded Mode** bridge: `Cerebras -> NVIDIA fallback planner -> OpenRouter panic button -> Async queue`.
-   - **Crucial Rule:** If a user supplies only a *single* API key (e.g. they only have NVIDIA NIM), Smart Routing must collapse into that single provider boundary, gracefully degrading features but utilizing the models within *that* provider. 
+   - If a user explicitly selects a precise manual model ID from the UI (e.g. `llama3.1-70b`), the router must instantly pinpoint which Provider cluster actually serves that specific model utilizing the **Provider Configuration Registry**.
+   - If a preferred or assigned provider encounters session issues, trigger the **Emergency Degraded Mode** bridge: `Cerebras -> NVIDIA fallback planner -> OpenRouter panic button -> UI Termination`.
+   - **Crucial Rule:** If a user supplies only a *single* API key (e.g. they only have NVIDIA NIM), Smart Routing must collapse into that single provider boundary for autonomous flows (like Lane A/B execution stages).
+   - **Hard UI Filtering & Transparent Fallbacks:** For explicit user chat interactions, the UI modal must filter the available model dropdown strictly to the models supported by the API keys stored in the user's `personal_access_tokens`. If a prompt is explicitly bound to a specific model and the user's key for that provider is missing, the backend must instantly hard-fail the request with an unauthorized error rather than silently rewriting their model choice to a different provider.
 
 4. **Reasoning-First Agent Pipelines & Thinking Budgets:**
-   - `BAD:` Groq plans -> Groq executes -> Groq verifies.
-   - `BEST:` Cerebras plans -> Groq executes -> NVIDIA audits -> Cerebras finalizes.
-   - Guarantee that all `tool calls` mapped in the agent loops invoke fast utility nodes (Groq) triggered strategically after the planning phase (Cerebras/NVIDIA) executes the architecture plan.
+   - **For Background/Async Offline Tasks:** `Cerebras plans -> Groq executes -> NVIDIA audits -> Cerebras finalizes`. Restrict these heterogeneous multi-op model hops strictly to async tasks outside of the UI stream to avoid destroying Time-to-First-Byte (TTFB) latency.
+   - **For Realtime Chat UI Routes:** Restrict the execution strictly to the single primary configured model (e.g. Cerebras). Do NOT attempt to hijack the Vercel AI SDK `streamText` loop to switch models mid-flight during tool calls. Let the native SDK handle `maxSteps` using the single selected model for both reasoning and execution to ensure flawless streaming behavior.
    - **Thinking budgets:** Configure the Vercel AI SDK integration inside the agent service to utilize `providerOptions` or system abstractions to allocate strict **reasoning token budgets**, or setting `reasoningEffort: 'high'` whenever supported.
    - **Token Usage Calculations:** The SDK must actively capture and log the `usage` payloads emitted continuously from streaming/generating outputs, strictly tracking metrics like `promptTokens`, `completionTokens`, and `reasoningTokens` explicitly. All outputs must structurally compile the utilized token usage metrics for cost-calculations and Free-Tier awareness.
 
@@ -155,15 +156,15 @@ export const providerRegistry = {
   cerebras: {
     name: "Cerebras",
     description: "Primary planner and chief architect for deep reasoning",
-    options: { fetchApiKey: "personal_access_tokens" }, // Denotes fetching via BYOK Tokenable
-    fallback: "nvidia_nim", // If Cerebras breaches limit or 5xx, instantly crash down to NVIDIA
-    capabilities: ["planner", "agentic", "reasoning"], // Defines task alignments
+    options: { fetchApiKey: "personal_access_tokens" }, 
+    fallback: ["nvidia_nim", "openrouter"], 
+    capabilities: ["planner", "agentic", "reasoning"], 
     models: {
       "llama-3.3-70b": {
         name: "Llama 3.3 70B",
         description: "High-capacity reasoning engine",
         tool_call: true,
-        reasoning: false, // Standard instruct
+        reasoning: false, 
         limit: { context: 8192, output: 8192 }
       }
     }
@@ -171,8 +172,8 @@ export const providerRegistry = {
   nvidia_nim: {
     name: "NVIDIA NIM",
     description: "Diverse fallback architect with embeddings capabilities",
-    options: { fetchApiKey: "global_fallback" }, // Fetches .env if no BYOK
-    fallback: "openrouter", // The secondary fallback path
+    options: { fetchApiKey: "global_fallback" }, 
+    fallback: ["cerebras", "openrouter"], 
     capabilities: ["fallback_planner", "audit", "embeddings", "vision"],
     models: {
       "qwen2.5-coder-32b-instruct": {
@@ -188,7 +189,7 @@ export const providerRegistry = {
     name: "Mistral SDK",
     description: "High-precision document intelligence layer",
     options: { fetchApiKey: "global_fallback" },
-    fallback: "nvidia_nim", 
+    fallback: ["nvidia_nim", "cerebras", "openrouter"], 
     capabilities: ["ocr", "document_intelligence"],
     models: {
       "mistral-large-latest": {
@@ -211,7 +212,7 @@ export const providerRegistry = {
     name: "Groq",
     description: "Lightning fast utility execution engine",
     options: { fetchApiKey: "personal_access_tokens" },
-    fallback: "openrouter", 
+    fallback: ["nvidia_nim", "openrouter"], 
     capabilities: ["fast_utility", "executor", "titles"],
     models: {
       "llama3-70b-8192": {
@@ -227,7 +228,7 @@ export const providerRegistry = {
     name: "OpenRouter",
     description: "Emergency bridge network for zero downtime",
     options: { fetchApiKey: "personal_access_tokens" },
-    fallback: "async_queue", // Dead end, triggers backend queue logging
+    fallback: [], // Absolute last resort 
     capabilities: ["emergency_bridge"],
     models: { ... }
   }
@@ -334,3 +335,84 @@ const result = await generateText({
 console.log('REASONING:', result.reasoningText);
 console.log('ANSWER:', result.text);
 ```
+
+---
+
+## Execution Changelog
+
+> Completed: 2026-05-01
+
+### Files Created
+| File | Purpose |
+|------|---------|
+| `.env.example` | Sanitized env template with AI provider variables |
+
+### Files Modified
+| File | Changes |
+|------|---------|
+| `src/lib/schema/chat-schema.ts` | Gutted `DeviceAuth`, `OAuth2Client`, `JwtPayload`, `ProviderConfig`, `Credential`. Replaced `CredentialType` enum with `CEREBRAS`, `NVIDIA_NIM`, `GROQ`, `MISTRAL`, `OPENROUTER`. |
+| `src/lib/chat/models.ts` | Replaced legacy `chatProviders` (Qwen, Google, OpenRouter, API Token) with new provider stack. |
+| `src/lib/server/provider/router.ts` | Complete rewrite: AES-256 encryption/decryption, `providerRegistry` with capability-based resolution, array-topology fallbacks, `resolveProvider`/`resolveProviderForTask` functions, `storeApiKey`/`retrieveApiKey`/`deleteApiKey`/`getUserProviderKeys` DB operations. |
+| `src/lib/server/provider/index.ts` | Updated exports to only re-export `router.ts`. |
+| `src/lib/server/service/agent.service.ts` | Removed `OAuth2Client` maps and cookie-based provider tracking. Added `getProviderForUser`/`getProviderForTask` using DB-backed resolution. |
+| `src/lib/api/agent.remote.ts` | Replaced `addProvder`/`addToken` device-code RPCs with `addProvider` (direct key storage), `removeProvider`, `getProviders`. Retained `setDefaultProvider`. |
+| `src/routes/api/chat/+server.ts` | Switched from cookie-based `OAuth2Client` chain to `resolveProvider`. Added 503 graceful error for total degradation. |
+| `src/lib/server/helpers/chat-helper.ts` | `generateContent` now accepts a `Provider` parameter. Removed `useAgent` dependency. |
+| `src/lib/server/service/assessment.service.ts` | Updated `generateContent` call to pass resolved provider. |
+| `src/lib/api/chat.remote.ts` | Updated `extractFile` to resolve a vision provider before calling `generateContent`. |
+| `src/routes/(chat)/+page.server.ts` | Updated `generateContent` call to pass resolved provider. |
+| `src/lib/components/integrations-modal.svelte` | Complete rewrite: removed device-code polling/OAuth popups. Added password-masked API key input, copy-to-clipboard with checkmark toggle, remove key, dynamic connected status from DB. |
+| `.env` | Added `TOKEN_ENCRYPTION_KEY`, `NVIDIA_API_KEY`, `MISTRAL_API_KEY`. |
+| `.env.example` | Updated with all variables including AI providers. |
+
+### Files Deleted
+| File | Reason |
+|------|--------|
+| `src/lib/context/oauth.svelte.ts` | Legacy OAuth context state |
+| `src/lib/server/provider/google-provider.ts` | Legacy Google OAuth provider |
+| `src/lib/server/provider/google-middleware.ts` | Legacy Google middleware |
+| `src/lib/server/provider/qwen-provider.ts` | Legacy Qwen OAuth provider |
+| `src/lib/server/provider/openrouter-provider.ts` | Legacy OpenRouter OAuth provider |
+| `src/lib/server/config.ts` | Legacy OAuth configuration (clientId, secrets, scopes) |
+| `src/routes/api/auth/callback/[provider]/+server.ts` | Legacy OAuth callback endpoint |
+
+---
+
+## Technical Review: OCR Pipeline Modernization
+
+> Decision Log: 2026-05-02
+
+### Architecture Decision: Two-Pass OCR Pipeline
+Based on intense technical review of the `assessment.service.ts` extraction flow, we identified that OCR-specialized models like `mistral-ocr-latest` are tuned for high-fidelity markdown transcription (preserving tables/layouts), not for zero-shot structure mapping into arbitrary JSON schemas.
+
+**The Solution:**
+Switching to a robust Two-Pass Architecture:
+1. **Pass 1 (Read):** Mistral (`mistral-ocr-latest`) runs natively via `@ai-sdk/mistral`'s `document_url` support to extract perfect markdown transcription from the image/PDF.
+2. **Pass 2 (Map):** A fast reasoning/schema model (like `groq/llama-3.3-70b-versatile` or `mistral-small-latest`) takes the raw OCR text + `mappingData` and uses strictly-typed structured output (`generateObject`) to map it cleanly into the `studentData/marksData` JSON schema.
+
+**Orchestration:**
+The pipeline orchestration logic will live in the Service Layer (`assessment.service.ts` / `chat-helper.ts`), while the Provider Registry remains a pure repository of model capabilities and fallbacks.
+
+**Intermediate State & Retries:**
+1. **Persistence:** The raw result of Pass 1 (Structured Markdown) will be persisted in the student's storage directory as `ocr.md`.
+2. **Logic Optimization:** The service will check for the existence of `ocr.md` before initiating a Pass 1 call. This enables "Retry Mapping" without re-running the expensive OCR step.
+3. **Auditing:** This provides a clear audit trail between "What the OCR saw" and "What the Mapper extracted."
+
+**Resiliency & Fallbacks:**
+1. **Primary Pass 1 Fallback:** If Mistral OCR fails, the system will automatically fallback to a **NVIDIA NIM Vision model** (e.g., `mistral-large-3` or `qwen2.5-coder-32b-vision`). 
+2. **Mode Switch:** Fallback will switch from the Two-Pass architecture to a single-pass Vision-to-JSON extraction to optimize for reliability when specialized OCR APIs are degraded.
+3. **User Notification:** Fallback results will be flagged with `is_fallback: true` in metadata, triggering a "Reduced Precision Warning" in the UI for the teacher.
+
+**Extraction Strategy:**
+1. **Pass 2 Method:** The second pass will utilize `generateObject` with the `resultInputSchema`. This ensures the LLM output is strictly typed and valid according to the Zod schema, eliminating JSON parsing and validation errors.
+2. **Prompt Optimization:** We will decouple logical mapping rules (how to match subjects, grades, and categories) from response formatting instructions (no more "Return ONLY raw JSON" boilerplate).
+3. **Reference Data Indexing:** For the second pass, `mappingData` will be transformed from raw JSON into a highly-readable Markdown Lookup Index. This enables the LLM to use fuzzy-matching logic to map transcribed subject names to database IDs with significantly higher accuracy.
+
+**Logic Porting (Post-Processing):**
+1. **Math & Formatting:** All non-deterministic logic (grade range calculations, attendance sum validation, and HTML `<span>` generation) will be moved out of the LLM prompts and into a **TypeScript Utility** in the Service Layer.
+2. **Reliability:** This guarantees 100% predictable formatting and math, reducing Pass 2's job to pure field-to-ID mapping.
+
+**Final Pipeline Refinements:**
+1. **Mapper Choice:** Pass 2 will default to **Cerebras `llama-3.3-70b`** for highest reasoning and lowest latency, falling back to Groq or Mistral if unavailable.
+2. **UI Feedback:** The extraction process will remain an **Atomic POST** for Phase 1. No streaming/SSE progress updates will be implemented to ensure architectural stability.
+3. **Multi-Page Support:** For Phase 1, only the **first page** of PDFs/Images will be processed, but the sequential architecture is built to support multi-page expansion in the future.

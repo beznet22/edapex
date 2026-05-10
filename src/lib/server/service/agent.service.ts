@@ -1,66 +1,35 @@
-/**
- * Authentication Manager - Handles multiple OAuth2 providers
- */
-
 import { getRequestEvent } from "$app/server";
 import { chatModels, DEFAULT_CHAT_MODEL } from "$lib/chat/models.js";
 import { coordinatorTools, teacherTools, defaultTools } from "$lib/chat/tools/index.js";
-import { CredentialType, type OAuth2Client } from "$lib/schema/chat-schema.js";
+import { CredentialType } from "$lib/schema/chat-schema.js";
 import type { AuthUser } from "$lib/types/auth-types.js";
 import type { AgentWorkflow, Assistant } from "$lib/types/chat-types.js";
 import type { ClassSection } from "$lib/types/result-types.js";
 import { defaultPrompt } from "../prompts/default.js";
-import { GoogleProvider, QwenProvider, OpenRouterProvider } from "../provider/index.js";
 import { resultRepo } from "../repository";
 import { agentWorkflows } from "../agents/index.js";
-import { getProviderType } from "../provider/router.js";
+import {
+  resolveProvider,
+  resolveProviderForTask,
+  type TaskType,
+} from "../provider/router.js";
+// import type { Provider } from "ai";
 
 export class AgentService {
-  private providers: Map<CredentialType, OAuth2Client> = new Map();
-
-  constructor() {
-    this.providers.set(CredentialType.QWEN_CODE, new QwenProvider());
-    this.providers.set(CredentialType.GOOGLE_OAUTH, new GoogleProvider());
-    this.providers.set(CredentialType.OPENROUTER, new OpenRouterProvider());
+  async getProviderForUser(userId: number, preferredProvider?: string): Promise<any> {
+    const { provider } = await resolveProvider(userId, preferredProvider);
+    return provider;
   }
 
-  use(type: CredentialType): OAuth2Client {
-    if (!this.providers.has(type)) {
-      throw new Error(`Provider ${type} not found`);
-    }
-    return this.providers.get(type)!;
-  }
-
-  getProviderForAgent(agentId?: string): OAuth2Client {
-    const { cookies } = getRequestEvent();
-    
-    // 1. Check for user-selected default provider
-    const defaultType = cookies.get("default-provider") as CredentialType;
-    if (defaultType && cookies.get(defaultType)) {
-      return this.use(defaultType);
-    }
-
-    // 2. Check for agent-preferred provider
-    const preferredType = getProviderType(agentId);
-    if (cookies.get(preferredType)) {
-      return this.use(preferredType);
-    }
-
-    // 3. Fallback to any connected provider
-    for (const type of Object.values(CredentialType)) {
-      if (cookies.get(type)) {
-        return this.use(type);
-      }
-    }
-
-    // 4. Ultimate fallback to preferred (defaulting to QWEN if nothing else works)
-    return this.use(preferredType);
+  async getProviderForTask(userId: number, task: TaskType): Promise<any> {
+    const { provider } = await resolveProviderForTask(userId, task);
+    return provider;
   }
 
   static initChatModels(): string {
     const { cookies } = getRequestEvent();
     let modelId = cookies.get("selected-model");
-    if (!modelId || !chatModels.find((model) => model.id === modelId)) {
+    if (!modelId) {
       modelId = DEFAULT_CHAT_MODEL;
       cookies.set("selected-model", modelId, {
         path: "/",
@@ -101,7 +70,6 @@ export class AgentService {
     if (!user?.designation) return [];
     const designation = user.designation;
     return agentWorkflows.map((work) => {
-      // Filter and strip systemPromptto prevent leaking to browser
       const assistants = work.assistants
         .filter((assistant): assistant is Assistant => assistant.designation.includes(designation))
         .map(({ instructions, tools, ...safeTask }) => safeTask);
@@ -116,4 +84,4 @@ export class AgentService {
 
 export const useAgent = () => {
   return new AgentService();
-}
+};

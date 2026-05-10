@@ -965,10 +965,9 @@ export const changeParentEmail = tool({
   ].join("\n"),
   inputSchema: zodSchema(
     z.object({
-      newEmail: z.string().email().describe("The new email address to set."),
+      newEmail: z.string().describe("The new email address to set."),
       currentEmail: z
         .string()
-        .email()
         .optional()
         .describe("The current email address of the parent (used for direct selection)."),
       parentName: z.string().optional().describe("The name of the parent/guardian."),
@@ -1182,7 +1181,7 @@ export const registerStaff = tool({
     z.object({
       firstName: z.string().describe("Staff first name. REQUIRED."),
       lastName: z.string().describe("Staff last name. REQUIRED."),
-      email: z.string().email().describe("Staff email. REQUIRED."),
+      email: z.string().describe("Staff email. REQUIRED."),
       mobile: z.string().describe("Staff phone number. REQUIRED."),
       designationId: z.number().describe("Designation ID from options. REQUIRED."),
       departmentId: z.number().describe("Department ID from options. REQUIRED."),
@@ -1246,7 +1245,7 @@ export const resetPassword = tool({
   ].join("\n"),
   inputSchema: zodSchema(
     z.object({
-      email: z.string().email().optional().describe("The email of the user to update."),
+      email: z.string().optional().describe("The email of the user to update."),
       userId: z.number().optional().describe("The ID of the user to update."),
       admissionNo: z.number().optional().describe("Optional Admission number (for students)."),
       newPassword: z.string().optional().describe("The new password to set. If omitted, one will be generated."),
@@ -1358,7 +1357,7 @@ export const updateStaffStatus = tool({
   ].join("\n"),
   inputSchema: zodSchema(
     z.object({
-      email: z.string().email().optional().describe("The email address of the staff member to update."),
+      email: z.string().optional().describe("The email address of the staff member to update."),
       teacherId: z.number().optional().describe("The teacher ID (staff ID) of the staff member to update."),
       classId: z.number().optional().describe("The class ID, used to auto-resolve a teacher if email and teacherId are omitted."),
       sectionId: z.number().optional().describe("The section ID, used to auto-resolve a teacher if email and teacherId are omitted."),
@@ -1420,7 +1419,7 @@ export const deleteStaff = tool({
   ].join("\n"),
   inputSchema: zodSchema(
     z.object({
-      email: z.string().email().optional().describe("The email address of the staff member to permanently delete."),
+      email: z.string().optional().describe("The email address of the staff member to permanently delete."),
       teacherId: z.number().optional().describe("The teacher ID (staff ID) of the staff member to permanently delete."),
       classId: z.number().optional().describe("The class ID, used to auto-resolve a teacher if email and teacherId are omitted."),
       sectionId: z.number().optional().describe("The section ID, used to auto-resolve a teacher if email and teacherId are omitted."),

@@ -1,23 +1,29 @@
-You are able to use the Svelte MCP server, where you have access to comprehensive Svelte 5 and SvelteKit documentation. Here's how to use the available tools effectively:
+# Agent Instructions
 
-## Available MCP Tools:
+## Package Manager & Scripts
+Use **bun**: `bun install`, `bun run dev`, `bun run build`.
 
-### 1. list-sections
+## Commit Attribution
+AI commits MUST include:
+```
+Co-Authored-By: AI Agent <noreply@example.com>
+```
 
-Use this FIRST to discover all available documentation sections. Returns a structured list with titles, use_cases, and paths.
-When asked about Svelte or SvelteKit topics, ALWAYS use this tool at the start of the chat to find relevant sections.
+## File-Scoped Commands
+| Task | Command |
+|------|---------|
+| Typecheck | `bun run svelte-check --workspace path/to/file.svelte` |
+| Lint | `bun run lint path/to/file.ts` |
+| Test | `bun test path/to/file.test.ts` |
 
-### 2. get-documentation
+## Key Conventions (EdApex Mastra Migration)
+- **Architecture**: Modular monolith using Svelte 5 and Mastra AI Framework. Never create global singletons.
+- **Isolation Boundaries**: Always bind queries and AI agents to the active `TenantContext` (`classId`, `schoolId`). Use Drizzle ORM.
+- **Sovereign Storage**: Legacy MySQL `ai_` tables are deprecated. Mastra memory, configurations, and states run natively on `libSQL` (`mastra.db`).
+- **UI/UX Guidelines**: Adhere to the robust 4-panel "Hermes" layout. Utilize "Gold on Slate" `oklch` tokens and shadcn-svelte.
+- **Safety**: Apply `.omit()` on Zod schema mutations to prevent mass-assignment. Supervised LLM intents must reach a 90% confidence threshold to execute state mutations. See `docs/agent_migration_prompt.md`.
 
-Retrieves full documentation content for specific sections. Accepts single or multiple sections.
-After calling the list-sections tool, you MUST analyze the returned documentation sections (especially the use_cases field) and then use the get-documentation tool to fetch ALL documentation sections that are relevant for the user's task.
-
-### 3. svelte-autofixer
-
-Analyzes Svelte code and returns issues and suggestions.
-You MUST use this tool whenever writing Svelte code before sending it to the user. Keep calling it until no issues or suggestions are returned.
-
-### 4. playground-link
-
-Generates a Svelte Playground link with the provided code.
-After completing the code, ask the user if they want a playground link. Only call this tool after user confirmation and NEVER if code was written to files in their project.
+## MCP Usage (Svelte 5 / SvelteKit)
+- Run `list-sections` FIRST for new frontend topics.
+- Run `get-documentation` based on `use_cases`.
+- Run `svelte-autofixer` repeatedly until all Svelte specific issues resolve cleanly before submitting code.

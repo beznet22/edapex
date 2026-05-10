@@ -1,5 +1,4 @@
 import { allowAnonymousChats } from "$lib/constants";
-import { CredentialType } from "$lib/schema/chat-schema";
 import { repo } from "$lib/server/repository";
 import { generateTitle } from "$lib/server/helpers/chat-helper";
 import type { ChatResponse, xUIMessage } from "$lib/types/chat-types";
@@ -11,19 +10,19 @@ import {
   createUIMessageStream,
   createUIMessageStreamResponse,
   stepCountIs,
-  generateText,
 } from "ai";
 import { AgentService, useAgent } from "$lib/server/service/agent.service";
 import type { ClassSection } from "$lib/types/result-types";
+import { resolveProvider } from "$lib/server/provider/router";
 
 export const POST: RequestHandler = async ({ request, locals: { user, session }, cookies }) => {
   let { chatId, messages, agentId, selectedClass }: ChatResponse & { selectedClass?: ClassSection } = await request.json();
   if ((!user || !session) && !allowAnonymousChats) error(401, "Unauthorized");
+  if (!user) error(401, "User session required for provider resolution");
 
   const selectedChatModel = cookies.get("selected-model");
   if (!selectedChatModel) error(400, "No chat model selected");
 
-  // Fallback to cookies if not provided in request body
   if (!agentId) {
     agentId = cookies.get("selected-agent") || "";
   }
@@ -38,13 +37,17 @@ export const POST: RequestHandler = async ({ request, locals: { user, session },
 
   console.log(`[api/chat] Agent: ${agentId}, Class: ${selectedClass?.className}(${selectedClass?.sectionName})`);
 
-  const agentService = useAgent();
-  const provider = await agentService.getProviderForAgent(agentId).getModelProvider();
-  if (!provider) error(400, "No provider found");
+  const preferredProvider = cookies.get("default-provider");
+  let resolved: { provider: import("ai").Provider; providerType: string };
+  try {
+    resolved = await resolveProvider(user.id, preferredProvider, selectedChatModel);
+  } catch (err) {
+    error(503, err instanceof Error ? err.message : "All inference engines are currently degraded.");
+  }
+  const { provider } = resolved;
 
   let message = messages[messages.length - 1];
   if (user) {
-    // Create chat if it doesn't exist
     if (!chatId && messages.length === 1) {
       chatId = await repo.chat.createChat({
         userId: user.id,
@@ -100,8 +103,8 @@ export const POST: RequestHandler = async ({ request, locals: { user, session },
     },
     onError: (e) => {
       const message = e instanceof Error ? e.message : String(e);
-      console.error(`message: ${message}, error: ${e}`);
-      return "Oops!";
+      console.error(`[api/chat] Error: ${message}`);
+      return "Oops! Something went wrong.";
     },
     onFinish: async ({ responseMessage }) => {
       if (!user) return;

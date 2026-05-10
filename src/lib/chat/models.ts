@@ -1,73 +1,56 @@
 import { CredentialType } from "$lib/schema/chat-schema";
-import z from "zod";
+import { staticProviderRegistry, type ModelConfig } from "./provider-registry";
 
 export const DEFAULT_CHAT_MODEL: string = "chat-model";
 
+export interface ChatProviders {
+  id: CredentialType;
+  name: string;
+  description: string;
+  url?: string;
+}
 
+export const chatProviders: Array<ChatProviders> = Object.entries(staticProviderRegistry).map(
+  ([id, entry]) => ({
+    id: id as CredentialType,
+    name: entry.name,
+    description: entry.description,
+    url: entry.url,
+  })
+);
 
-export const chatProviderSchema = z.object({
-  id: z.enum(CredentialType),
-  name: z.string().optional(),
-  description: z.string().optional(),
-});
-export type ChatProviders = z.infer<typeof chatProviderSchema>;
-
-
-export const chatProviders: Array<ChatProviders> = [
-  {
-    id: CredentialType.QWEN_CODE,
-    name: "Qwen",
-    description: "QwenCode provider for all models",
-  },
-  {
-    id: CredentialType.GOOGLE_OAUTH,
-    name: "Gemini",
-    description: "Google's chat model",
-  },
-  {
-    id: CredentialType.OPENROUTER,
-    name: "OpenRouter",
-    description: "OpenRouter provider for all models",
-  },
-  {
-    id: CredentialType.API_TOKEN,
-    name: "API Key",
-    description: "Use your own API key",
-  },
-];
-
-interface ChatModel {
+export interface ChatModel {
   id: string;
   name: string;
   description: string;
+  provider: CredentialType | "all";
 }
 
-export const chatModels: Array<ChatModel> = [
+const conceptualModels: Array<ChatModel> = [
   {
     id: "chat-model",
-    name: "Chat model",
-    description: "Primary model for all-purpose chat",
-  },
-  {
-    id: "vision-model",
-    name: "Vision model",
-    description: "Vision language for image understanding",
+    name: "Auto (Smart)",
+    description: "Best available model for general purpose chat",
+    provider: "all",
   },
   {
     id: "chat-model-reasoning",
-    name: "Reasoning model",
-    description: "Uses advanced reasoning",
-  },
-  {
-    id: "coder-model",
-    name: "Coding model",
-    description: "Best for coding tasks",
-  },
-  {
-    id: "text-embedding",
-    name: "Text embedding model",
-    description: "Text embedding for similarity search",
+    name: "Deep Reasoning",
+    description: "Advanced logic and planning",
+    provider: "all",
   },
 ];
+
+const registryModels: Array<ChatModel> = Object.entries(staticProviderRegistry).flatMap(
+  ([providerId, entry]) =>
+    Object.entries(entry.models).map(([modelId, config]) => ({
+      id: modelId,
+      name: config.name,
+      description: config.description,
+      provider: providerId as CredentialType,
+    }))
+);
+
+export const chatModels: Array<ChatModel> = [...conceptualModels, ...registryModels];
 
 export const defaultChatModel = chatModels.find((m) => m.id === DEFAULT_CHAT_MODEL)!;

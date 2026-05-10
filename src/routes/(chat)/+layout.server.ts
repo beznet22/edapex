@@ -14,6 +14,7 @@ import type { ClassSection } from "$lib/types/result-types";
 import { resultRepo } from "$lib/server/repository";
 import { DESIGNATIONS, type Designation } from "$lib/types/sms-types";
 import { generateId } from "ai";
+import { getUserProviderKeys, getAvailableModels, getUserPriority } from "$lib/server/provider/router";
 
 export const load: LayoutServerLoad = async ({ cookies, locals, url }) => {
   const { user, session } = locals;
@@ -98,6 +99,16 @@ export const load: LayoutServerLoad = async ({ cookies, locals, url }) => {
 
   const defaultProvider = cookies.get("default-provider");
 
+  let connectedProviders: string[] = [];
+  let availableModels: any[] = [];
+  let userPriority: string[] = [];
+  if (user) {
+    const keys = await getUserProviderKeys(user.id);
+    connectedProviders = keys.map((k: { provider: string }) => k.provider);
+    availableModels = getAvailableModels(user.id);
+    userPriority = getUserPriority(user.id);
+  }
+
   return {
     agents,
     user: user || undefined,
@@ -110,5 +121,8 @@ export const load: LayoutServerLoad = async ({ cookies, locals, url }) => {
     uploads,
     assignedSection,
     defaultProvider,
+    connectedProviders,
+    availableModels,
+    userPriority,
   };
 };

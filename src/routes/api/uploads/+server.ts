@@ -55,19 +55,11 @@ export const POST: RequestHandler = async ({ request, locals }) => {
       return json({ success: true, status: "uploaded", filename: photoFilename });
     }
 
-    let staffId: number = user.staffId || 1;
-    if (classId && sectionId) {
-      const staff = await staffRepo.getStaffByClassSection({ classId, sectionId });
-      if (!staff.teacherId) throw new Error("Class not assigned to any teacher");
-      staffId = staff.teacherId;
-      token = `${className}(${sectionName})`.toLowerCase().replaceAll(" ", "_");
-    } else {
-      const classSection = await resultRepo.getAssignedClassSection(staffId);
-      if (!classSection?.className || !classSection?.sectionName) throw new Error("Class not assigned");
-      token = `${classSection.className}(${classSection.sectionName})`.toLowerCase().replaceAll(" ", "_");
-    }
+    if (!classId || !sectionId) throw new Error("Missing class or section information");
+    token = `${className}(${sectionName})`.toLowerCase().replaceAll(" ", "_");
 
-    if (filename) {
+    // Handle re-extraction if only filename/fileId is provided
+    if (filename && !file) {
       try {
         const buffer = await studentFileStorage.getImage(fileId || filename);
         if (buffer) {
@@ -86,17 +78,20 @@ export const POST: RequestHandler = async ({ request, locals }) => {
       throw new Error(errorMessage);
     }
 
-    if (!classId || !sectionId) throw new Error("Missing class or section information");
-
+    const staff = await staffRepo.getStaffByClassSection({ classId: classId as number, sectionId: sectionId as number });
     const extractionResult = await assessment.runExtraction({
+      userId: user.id, // Authenticated user ID for AI provider resolution
+      teacherId: staff.teacherId || 1, // Staff ID for domain data lookups
       file,
-      classId,
-      sectionId,
+      classId: classId as number,
+      sectionId: sectionId as number,
       studentId: studentId ?? undefined,
       fullName: fullName || undefined,
       admissionNo: admissionNo ?? undefined,
       originalName: file.name
     });
+
+    if (!extractionResult) throw new Error("Extraction failed to return results");
 
     return json({
       ...extractionResult,
@@ -189,34 +184,34 @@ export const DELETE: RequestHandler = async ({ url, locals, cookies }) => {
 
   const actualPath = targetPath.includes('/') ? targetPath : (token ? join(token, studentFileStorage.formatName(targetPath.split('.')[0] || targetPath)) : targetPath);
   const fullPath = join(EXTRACTED_DIR, actualPath);
-  
+
   if (existsSync(fullPath)) {
     try {
-        // 1. Load assessment data to check for DB record linkages
-        const assessmentData = await studentFileStorage.load(actualPath);
-        
-        // 2. If it has DB records (marks/results), clean them up
-        if (assessmentData?.data?.studentData) {
-            const { studentId, classId, sectionId, recordId, examTypeId } = assessmentData.data.studentData;
-            if (studentId && classId && sectionId && recordId && examTypeId) {
-                const schoolId = assessmentData.data.studentData.schoolId || 1;
-                await resultRepo.cleanMarks({
-                    recordId,
-                    studentId,
-                    classId,
-                    sectionId,
-                    examTermId: examTypeId,
-                    schoolId
-                });
-            }
-        }
+      // 1. Load assessment data to check for DB record linkages
+      const assessmentData = await studentFileStorage.load(actualPath);
 
-        // 3. Delete the directory/file from the filesystem
-        rmdirSync(fullPath, { recursive: true });
-        return json({ success: true });
+      // 2. If it has DB records (marks/results), clean them up
+      if (assessmentData?.data?.studentData) {
+        const { studentId, classId, sectionId, recordId, examTypeId } = assessmentData.data.studentData;
+        if (studentId && classId && sectionId && recordId && examTypeId) {
+          const schoolId = assessmentData.data.studentData.schoolId || 1;
+          await resultRepo.cleanMarks({
+            recordId,
+            studentId,
+            classId,
+            sectionId,
+            examTermId: examTypeId,
+            schoolId
+          });
+        }
+      }
+
+      // 3. Delete the directory/file from the filesystem
+      rmdirSync(fullPath, { recursive: true });
+      return json({ success: true });
     } catch (e) {
-        console.error("Deletion error:", e);
-        return json({ success: false, message: e instanceof Error ? e.message : "Internal deletion error" });
+      console.error("Deletion error:", e);
+      return json({ success: false, message: e instanceof Error ? e.message : "Internal deletion error" });
     }
   }
 
@@ -230,3 +225,5 @@ function unlink_internal(path: string) {
     console.error("Failed to unlink", path, e);
   }
 }
+
+

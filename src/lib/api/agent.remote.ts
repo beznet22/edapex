@@ -1,81 +1,97 @@
 import { command, getRequestEvent } from "$app/server";
 import { allowAnonymousChats } from "$lib/constants";
 import { CredentialType } from "$lib/schema/chat-schema";
-import { useAgent } from "$lib/server/service/agent.service";
+import {
+  storeApiKey,
+  deleteApiKey,
+  getUserProviderKeys,
+} from "$lib/server/provider/router";
+import { discoverModels, saveUserModelsCached } from "$lib/server/provider/discovery";
 import z from "zod";
 
-export const addProvder = command(
+export const addProvider = command(
+  z.object({
+    provider: z.enum(CredentialType),
+    apiKey: z.string().min(1),
+  }),
+  async ({ provider, apiKey }) => {
+    const { locals } = getRequestEvent();
+    if (!locals.user && !allowAnonymousChats) {
+      return { success: false, message: "Unauthorized" };
+    }
+
+    if (!locals.user) {
+      return { success: false, message: "User session required to store API keys" };
+    }
+
+    try {
+      await storeApiKey(locals.user.id, provider, apiKey);
+
+      // Trigger dynamic model discovery in the background
+      try {
+        const models = await discoverModels(provider, apiKey);
+        if (models.length > 0) {
+          saveUserModelsCached(locals.user.id, provider, models);
+        }
+      } catch (discoveryError) {
+        console.error(`[addProvider:${provider}] Model discovery failed:`, discoveryError);
+      }
+
+      return { success: true, message: `${provider} API key saved and models discovered` };
+    } catch (error) {
+      console.error(`[addProvider:${provider}] Failed to store API key:`, error);
+      return { success: false, message: "Failed to save API key" };
+    }
+  },
+);
+
+export const removeProvider = command(
   z.object({
     provider: z.enum(CredentialType),
   }),
   async ({ provider }) => {
     const { locals } = getRequestEvent();
     if (!locals.user && !allowAnonymousChats) {
-      console.log("allowAnonymousChats: ", allowAnonymousChats);
       return { success: false, message: "Unauthorized" };
     }
 
-    try {
-      const deviceAuth = await useAgent().use(provider).generateAuthUrl();
-      if (!deviceAuth) {
-        return { success: false, message: "Failed to authorize device" };
-      }
-
-      return { success: true, message: "Device authorization successful", deviceAuth, provider };
-    } catch (error) {
-      console.error("Device authorization error:", error);
-      return { success: false, message: "Failed to authorize device" };
+    if (!locals.user) {
+      return { success: false, message: "User session required" };
     }
-  }
+
+    try {
+      const deleted = await deleteApiKey(locals.user.id, provider);
+      if (!deleted) {
+        return { success: false, message: `No API key found for ${provider}` };
+      }
+      return { success: true, message: `${provider} API key removed` };
+    } catch (error) {
+      console.error(`[removeProvider:${provider}] Failed to remove API key:`, error);
+      return { success: false, message: "Failed to remove API key" };
+    }
+  },
 );
 
-export const addToken = command(
-  z.object({
-    device_code: z.string(),
-    provider: z.enum(CredentialType),
-    manual_code: z.string().optional(),
-  }),
-  async ({ device_code, provider, manual_code }) => {
-    const { cookies, locals } = getRequestEvent();
-    if ((!locals.user || !provider) && !allowAnonymousChats) {
-      return { success: false, message: "User not authenticated or provider not specified" };
+export const getProviders = command(
+  z.object({}),
+  async () => {
+    const { locals } = getRequestEvent();
+    if (!locals.user && !allowAnonymousChats) {
+      return { success: false, message: "Unauthorized", providers: [] };
     }
 
-    const device_verifier = cookies.get(`v_${provider}`);
-    if (!device_verifier) {
-      console.log("❌ No device verifier cookie found (expired)");
-      return { success: false, message: "Device code expired" };
+    if (!locals.user) {
+      return { success: true, message: "No user session", providers: [] };
     }
 
-    const { code, verifier } = JSON.parse(device_verifier) as {
-      code: string;
-      verifier: string;
-    };
-    if (!code || !verifier) {
-      console.log("❌ No device verifier cookie found (expired)");
-      return { success: false, message: "Device code expired" };
+    try {
+      const providers = await getUserProviderKeys(locals.user.id);
+      return { success: true, providers };
+    } catch (error) {
+      console.error("[getProviders] Failed to fetch providers:", error);
+      return { success: false, message: "Failed to fetch providers", providers: [] };
     }
-
-    if (code !== device_code) {
-      console.log(`❌ Invalid or mismatched device code: ${device_code}`);
-      return { success: false, message: "Invalid device code" };
-    }
-
-    // For Gemini (Google OAuth), we need the manual_code if it's not polling
-    const result = await useAgent().use(provider).getToken(manual_code || device_code, verifier);
-    
-    if ("status" in result && result.status === "pending") {
-      console.log(`[addToken] Token still pending for ${provider}`);
-      return { ...result };
-    }
-
-    if ("status" in result && result.status === "error") {
-      return { success: false, message: "Authorization failed" };
-    }
-
-    console.log(`[addToken] Successfully added token for ${provider}`);
-    return { success: true, status: "complete" };
-  }
+  },
 );
 
 export const setDefaultProvider = command(
@@ -92,9 +108,9 @@ export const setDefaultProvider = command(
       path: "/",
       httpOnly: true,
       sameSite: "lax",
-      maxAge: 60 * 60 * 24 * 30, // 30 days
+      maxAge: 60 * 60 * 24 * 30,
     });
 
     return { success: true, message: `Default provider set to ${provider}` };
-  }
+  },
 );

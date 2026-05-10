@@ -11,6 +11,7 @@
     SelectedAgent,
   } from "$lib/context/sync.svelte";
   import { ImageContext } from "$lib/context/image.context.svelte";
+  import { useAI } from "$lib/context/ai-context.svelte";
   import type { PageData } from "./$types.js";
 
   let { data, children } = $props<{
@@ -73,6 +74,11 @@
 
   const imageContext = new ImageContext();
   imageContext.setContext();
+
+  const ai = useAI();
+  $effect(() => {
+    ai.sync(data);
+  });
 
   $effect(() => {
     appContext.rehydrate(data.user, data.classes, data.assignedSection);

@@ -5,6 +5,7 @@ import { chatVisibilitySchema, fileSchema } from "$lib/schema/chat-schema";
 import { resultInputSchema } from "$lib/schema/result-input";
 import { repo } from "$lib/server/repository";
 import { generateContent } from "$lib/server/helpers/chat-helper";
+import { resolveProviderForTask } from "$lib/server/provider/router";
 import z from "zod";
 import { staffRepo, resultRepo, studentRepo } from "$lib/server/repository";
 import { studentFileStorage } from "$lib/server/storage/student-files";
@@ -76,7 +77,7 @@ export const syncCookie = command(
 
     switch (key) {
       case "selected-model":
-        if (!chatModels.find((model) => model.id === value)) return null;
+        // Allow selection of any model ID; the ProviderRouter handles fallbacks if the ID is invalid.
         break;
       case "selected-class":
       case "selected-agent":
@@ -127,7 +128,8 @@ export const extractFile = command(
     }
 
     try {
-      const content = await generateContent(file);
+      const { provider } = await resolveProviderForTask(user.id, "vision");
+      const content = await generateContent(file, provider);
       return { success: true, content };
     } catch {
       return { success: false, message: "An error occurred while processing your request" };

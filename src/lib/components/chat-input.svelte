@@ -1,4 +1,4 @@
-<script lang="ts">
+ and https://mastra.ai/docs/workspace/skills<script lang="ts">
   import { Button } from "$lib/components/ui/button";
   import ArrowUpIcon from "@lucide/svelte/icons/arrow-up";
   import PackageIcon from "@lucide/svelte/icons/package";

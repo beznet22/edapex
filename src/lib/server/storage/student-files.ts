@@ -230,6 +230,35 @@ export class StudentFileStorage {
         }
     }
 
+    async saveRawText(folderPath: string, filename: string, text: string): Promise<void> {
+        const dir = join(this.basePath, folderPath);
+        await fs.mkdir(dir, { recursive: true });
+        await fs.writeFile(join(dir, filename), text, "utf-8");
+    }
+
+    async loadRawText(folderPath: string, filename: string): Promise<string | null> {
+        const fullPath = join(this.basePath, folderPath, filename);
+        try {
+            return await fs.readFile(fullPath, "utf-8");
+        } catch (error) {
+            if ((error as any).code === "ENOENT") {
+                return null;
+            }
+            throw error;
+        }
+    }
+
+    async deleteRawText(folderPath: string, filename: string): Promise<void> {
+        const fullPath = join(this.basePath, folderPath, filename);
+        try {
+            await fs.unlink(fullPath);
+        } catch (error) {
+            if ((error as any).code !== "ENOENT") {
+                throw error;
+            }
+        }
+    }
+
     encodeFolder(classId: number, sectionId: number): string {
         return Buffer.from(`${classId}:${sectionId}`).toString("base64url");
     }

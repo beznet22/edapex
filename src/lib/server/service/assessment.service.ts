@@ -31,13 +31,18 @@ import ResultTemplate from "$lib/components/template/ResultTemplate.svelte";
 import ResultEmail from "$lib/components/template/result-email.svelte";
 import { JobWorker, type JobPayload, type JobResult } from "../worker";
 
-import { generateContent } from "../helpers/chat-helper";
+import { runTwoPassExtraction } from "../helpers/chat-helper";
+import { 
+  applyGradingBusinessLogic, 
+  formatMappingDataToIndex, 
+  validateAttendance 
+} from "../helpers/extract-helper";
 import { studentFileStorage } from "../storage/student-files";
 import path from "path";
 import fs from "fs";
 import type { MySQLDrizzleClient } from "../db";
 
-const GRADE_RANGES = {
+export const GRADE_RANGES = {
   EYFS: [
     { min: 0, max: 80, grade: "EMERGING", color: "bg-purple-200" },
     { min: 81, max: 90, grade: "EXPECTED", color: "bg-blue-200" },
@@ -894,6 +899,8 @@ export class AssessmentService {
   }
 
   async runExtraction(params: {
+    userId: number; // Session User ID (for provider resolution)
+    teacherId: number; // Staff ID (for data lookup)
     file: Blob;
     classId: number;
     sectionId: number;
@@ -902,69 +909,104 @@ export class AssessmentService {
     admissionNo?: number;
     originalName?: string;
   }) {
-    const { file, classId, sectionId, studentId, fullName, admissionNo } = params;
+    const { userId, teacherId, file, classId, sectionId, studentId, fullName, admissionNo, originalName } = params;
 
-    const staff = await staffRepo.getStaffByClassSection({ classId, sectionId });
-    if (!staff.teacherId) throw new Error("Class not assigned to any teacher");
-
-    const mappingData = await this.getMappingData(staff.teacherId, classId, sectionId);
+    const mappingData = await this.getMappingData(teacherId, classId, sectionId);
     if (studentId) {
       mappingData.studentData = { studentId, admissionNo, fullName };
     }
 
-    const mapString = JSON.stringify(mappingData);
-    const { success, content, message } = await generateContent(file, mapString);
-    if (!success || !content) {
-      throw new Error(message || "AI extraction failed");
-    }
-
-    const parsedResult = JSON.parse(content.trim());
-
-    // Patch class section data
+    // 1. Preparation: Index the mapping context
+    const mappingIndex = formatMappingDataToIndex(mappingData);
+    
+    // Resolve storage paths (consistent with studentFileStorage.save)
     const classSection = await resultRepo.getClassSectionById(classId, sectionId);
-    const finalClassName = classSection?.className || (parsedResult.studentData as any).className || "Unknown";
-    const finalSectionName = classSection?.sectionName || (parsedResult.studentData as any).sectionName || "Unknown";
+    if (!classSection) throw new Error("Class section not found");
 
-    if (!parsedResult.studentData.className) parsedResult.studentData.className = finalClassName;
-    if (!parsedResult.studentData.sectionName) parsedResult.studentData.sectionName = finalSectionName;
-    if (!parsedResult.studentData.class) {
-      parsedResult.studentData.class = `${finalClassName} ${finalSectionName}`.trim();
+    const folder = studentFileStorage.getFolderPath(classSection.className || "Unknown", classSection.sectionName || "Unknown");
+    
+    // Use studentId or fullName or admissionNo for unique folder name
+    const identifier = studentId?.toString() || admissionNo?.toString() || fullName || "Unknown";
+    const studentFolder = studentFileStorage.formatName(identifier);
+    const studentFolderPath = path.join(folder, studentFolder);
+
+    // 2. Check for intermediate state (OCR Transcription)
+    let existingOcrText = await studentFileStorage.loadRawText(studentFolderPath, "ocr.md");
+
+    // 3. Execute Pipeline (Transcription + Mapping + Fallback)
+    const result = await runTwoPassExtraction({
+      file,
+      userId,
+      mappingIndex,
+      existingOcrText: existingOcrText || undefined,
+      schema: resultInputSchema,
+    });
+    
+    if (!result.success) {
+      const errorMsg = (result as any).error || "Unknown extraction error";
+      console.error("Extraction failed after all attempts", errorMsg);
+      return null;
     }
 
-    // Patch student data
-    if (studentId) parsedResult.studentData.studentId = studentId;
-    if (admissionNo) parsedResult.studentData.admissionNo = admissionNo;
-    if (fullName) parsedResult.studentData.fullName = fullName;
-    // console.log("Parsed result", parsedResult.StudentData);
-    const validated = await resultInputSchema.safeParseAsync(parsedResult);
+    // 4. Save newly generated OCR text for future retries
+    if (result.success && !result.isFallback && !existingOcrText && result.rawText) {
+      await studentFileStorage.saveRawText(studentFolderPath, "ocr.md", result.rawText);
+    }
+
+    // 5. Post-Processing & Validation
+    let extractedData = result.data;
+
+    // Ensure student data matches request context
+    const finalClassName = classSection?.className || extractedData.studentData?.className || "Unknown";
+    const finalSectionName = classSection?.sectionName || extractedData.studentData?.sectionName || "Unknown";
+
+    if (!extractedData.studentData) extractedData.studentData = {};
+    extractedData.studentData.className = finalClassName;
+    extractedData.studentData.sectionName = finalSectionName;
+    if (!extractedData.studentData.class) {
+      extractedData.studentData.class = `${finalClassName} ${finalSectionName}`.trim();
+    }
+
+    if (studentId) extractedData.studentData.studentId = studentId;
+    if (admissionNo) extractedData.studentData.admissionNo = admissionNo;
+    if (fullName) extractedData.studentData.fullName = fullName;
+
+    // Apply grading logic (grading calculations, HTML generation)
+    const category = (mappingData.classSection as any).category || "LOWERBASIC";
+    extractedData = applyGradingBusinessLogic(extractedData, category);
+
+    if (extractedData.studentData?.attendance) {
+      extractedData.studentData.attendance = validateAttendance(extractedData.studentData.attendance);
+    }
+
+    // Final schema validation
+    const validated = await resultInputSchema.safeParseAsync(extractedData);
     if (!validated.success) {
-      console.log("Extraction validation failed", validated.error.issues);
-      const errors = validated.error.issues.map((issue) => {
-        const path = issue.path.join(".");
-        return `${path}: ${issue.message}`;
-      });
-      throw new Error(`Validation failed:\n${errors.join("\n")}`);
+      const errors = validated.error.issues.map((issue) => `${issue.path.join(".")}: ${issue.message}`);
+      throw new Error(`Extraction validation failed:\n${errors.join("\n")}`);
     }
+    extractedData = validated.data;
+    extractedData.studentData.className = finalClassName;
+    extractedData.studentData.sectionName = finalSectionName;
 
-    validated.data.studentData.className = finalClassName;
-    validated.data.studentData.sectionName = finalSectionName;
-
+    // 6. Persistence
     const storagePath = await studentFileStorage.save(
       {
-        data: validated.data,
+        data: extractedData,
         extractedAt: new Date(),
         verified: false,
         status: "extracted",
-        originalName: params.originalName,
+        originalName: originalName || "file.json",
       },
       Buffer.from(await file.arrayBuffer())
     );
 
     return {
       success: true,
-      studentData: validated.data.studentData,
-      marks: validated.data,
+      studentData: extractedData.studentData,
+      marks: extractedData,
       storagePath,
+      is_fallback: result.isFallback,
     };
   }
 
