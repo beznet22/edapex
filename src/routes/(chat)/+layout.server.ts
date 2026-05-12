@@ -12,6 +12,8 @@ import type { UploadedData } from "$lib/types/chat-types";
 import { existsSync, rm, rmdirSync, type Dirent } from "fs";
 import type { ClassSection } from "$lib/types/result-types";
 import { resultRepo } from "$lib/server/repository";
+import type { DBChat } from "$lib/server/db/schema";
+import { repo } from "$lib/server/repository";
 import { DESIGNATIONS, type Designation } from "$lib/types/sms-types";
 import { generateId } from "ai";
 import { getUserProviderKeys, getAvailableModels, getUserPriority } from "$lib/server/provider/router";
@@ -22,7 +24,7 @@ export const load: LayoutServerLoad = async ({ cookies, locals, url }) => {
     redirect(302, "/signin");
   }
 
-  const sidebarCollapsed = cookies.get("sidebar:state") !== "true";
+  const sidebarCollapsed = false;
   let modelId = AgentService.initChatModels();
   let agents = AgentService.getAgentWorkflows(user);
 
@@ -31,9 +33,11 @@ export const load: LayoutServerLoad = async ({ cookies, locals, url }) => {
 
   let students: ClassStudent[] | null = null;
   let classes: ClassSection[] = [];
+  let chats: DBChat[] = [];
   if (user) {
     classes = await resultRepo.getClassSections();
     students = await studentRepo.getStudentsByStaffId(user?.staffId);
+    chats = await repo.chat.getChatsByUserId({ id: user.id });
   }
 
   const className = url.searchParams.get("className");

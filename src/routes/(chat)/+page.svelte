@@ -3,6 +3,10 @@
   import { signout, updatePassword } from "$lib/api/auth.remote.js";
   import ChatHeader from "$lib/components/chat-header.svelte";
   import Chat from "$lib/components/chat.svelte";
+  import WorkspaceSidebar from "$lib/components/workspace/WorkspaceSidebar.svelte";
+
+  import MobileNavBar from "$lib/components/mobile-nav-bar.svelte";
+  import ResponsiveSheet from "$lib/components/shared/responsive-sheet.svelte";
   import * as AlertDialog from "$lib/components/ui/alert-dialog";
   import * as Select from "$lib/components/ui/select";
   import { Input } from "$lib/components/ui/input";
@@ -15,6 +19,7 @@
   import { SelectedClass, SelectedAgent } from "$lib/context/sync.svelte";
   import EyeIcon from "@lucide/svelte/icons/eye";
   import EyeOffIcon from "@lucide/svelte/icons/eye-off";
+  import { IsMobile } from "$lib/hooks/is-mobile.svelte.js";
 
   let { data } = $props();
   // svelte-ignore state_referenced_locally
@@ -24,9 +29,11 @@
   let newPassword = $state("");
   let showPassword = $state(false);
   let isUpdating = $state(false);
+  let inspectorOpen = $state(false);
   let userContext = $derived(UserContext.fromContext());
   const selectedClass = SelectedClass.fromContext();
   const selectedAgent = SelectedAgent.fromContext();
+  const isMobile = new IsMobile();
 
   const chatContext = new ChatContext({
     initialMessages: [],
@@ -69,7 +76,7 @@
         const pwdRes = await updatePassword({ password: newPassword });
         if (!pwdRes.success) {
           toast.error(pwdRes.message);
-          return; // Stop if password update failed
+          return;
         }
         toast.success("Password updated successfully.");
       }
@@ -91,10 +98,20 @@
   };
 </script>
 
-<div class="flex-1 flex flex-col min-h-0 w-full">
-  <ChatHeader {user} />
-  <Chat readonly={false} {user} />
+<!-- Hermes 4-Panel Row: Panel 3 (Chat Stage) & Panel 4 (Workspace Inspector) -->
+<div class="flex flex-1 min-h-0 w-full">
+  <!-- Panel 3: Chat Stage -->
+  <div class="flex-1 flex flex-col min-h-0 min-w-0">
+    <ChatHeader {user} onToggleInspector={() => inspectorOpen = !inspectorOpen} />
+    <Chat readonly={false} {user} />
+  </div>
+  
+  <!-- Panel 4: Workspace Inspector (Persistent on Desktop, Sheet on Mobile) -->
+  <WorkspaceSidebar bind:open={inspectorOpen} />
 </div>
+
+<!-- Mobile Bottom Navigation Bar (<768px) -->
+<MobileNavBar />
 
 <AlertDialog.Root bind:open>
   <AlertDialog.Content class="bg-background/95 backdrop-blur-3xl border border-white/10 rounded-[2.5rem] p-8 shadow-2xl max-w-[calc(100%-1.5rem)] sm:max-w-md">

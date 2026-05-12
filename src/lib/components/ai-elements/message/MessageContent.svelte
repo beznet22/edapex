@@ -8,12 +8,12 @@
     variants: {
       variant: {
         contained: [
-          "max-w-[80%] rounded-lg px-4 py-3",
+          "max-w-[80%] rounded-[2rem] px-5 py-4 shadow-sm",
           "group-[.is-user]:bg-primary group-[.is-user]:text-primary-foreground",
           "group-[.is-assistant]:bg-secondary group-[.is-assistant]:text-foreground",
         ],
         flat: [
-          "group-[.is-user]:bg-secondary group-[.is-user]:text-foreground group-[.is-user]:max-w-[80%] group-[.is-user]:rounded-lg group-[.is-user]:px-4 group-[.is-user]:py-3",
+          "group-[.is-user]:bg-secondary group-[.is-user]:text-foreground group-[.is-user]:max-w-[80%] group-[.is-user]:rounded-[2rem] group-[.is-user]:px-5 group-[.is-user]:py-4",
           "group-[.is-assistant]:text-foreground",
         ],
       },

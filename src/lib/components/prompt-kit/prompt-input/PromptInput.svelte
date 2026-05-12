@@ -21,12 +21,12 @@
   } = $props();
 
   const contextInstance = new PromptInputClass({
-    isLoading,
-    value,
-    onValueChange,
-    maxHeight,
-    onSubmit,
-    disabled: isLoading,
+    get isLoading() { return isLoading; },
+    get value() { return value; },
+    get onValueChange() { return onValueChange; },
+    get maxHeight() { return maxHeight; },
+    get onSubmit() { return onSubmit; },
+    get disabled() { return isLoading; },
   });
 
   setPromptInputContext(contextInstance);
@@ -72,7 +72,7 @@
 <TooltipPrimitive.Provider>
   <div
     class={cn(
-      "border-input bg-background cursor-text rounded-3xl border p-2 shadow-xs",
+      "cursor-text transition-all duration-300",
       className,
     )}
     onclick={handleClick}

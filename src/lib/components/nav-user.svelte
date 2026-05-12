@@ -3,24 +3,37 @@
   import { signout } from "$lib/api/auth.remote";
   import * as DropdownMenu from "$lib/components/ui/dropdown-menu/index.js";
   import * as Sidebar from "$lib/components/ui/sidebar/index.js";
-
   import { useSidebar } from "$lib/components/ui/sidebar/index.js";
-  import { useFileActions } from "$lib/context/file-context.svelte";
+  import { UserContext } from "$lib/context/user-context.svelte";
   import type { AuthUser } from "$lib/types/auth-types";
   import { clearLocalStore } from "$lib/utils";
-  import BadgeCheckIcon from "@lucide/svelte/icons/badge-check";
-  import BellIcon from "@lucide/svelte/icons/bell";
   import ChevronsUpDownIcon from "@lucide/svelte/icons/chevrons-up-down";
-  import CreditCardIcon from "@lucide/svelte/icons/credit-card";
   import LogOutIcon from "@lucide/svelte/icons/log-out";
   import SparklesIcon from "@lucide/svelte/icons/sparkles";
-  import CircleHelpIcon from "@lucide/svelte/icons/circle-help";
-  import FolderIcon from "@lucide/svelte/icons/folder";
+  import MoonIcon from "@lucide/svelte/icons/moon";
+  import UserIcon from "@lucide/svelte/icons/user";
+  import SettingsIcon from "@lucide/svelte/icons/settings";
+  import LifeBuoyIcon from "@lucide/svelte/icons/life-buoy";
+  import TriangleAlertIcon from "@lucide/svelte/icons/triangle-alert";
+  import { cn } from "$lib/utils/shadcn";
 
-  let { user }: { user?: AuthUser } = $props();
+  let { user, hideDetails = false }: { user?: AuthUser, hideDetails?: boolean } = $props();
 
   const sidebar = useSidebar();
-  let fileCtx = $derived(useFileActions());
+  const userContext = UserContext.fromContext();
+
+  let designationLabel = $derived.by(() => {
+    if (userContext.isIt) return "IT";
+    if (userContext.isCoordinator) return "Coordinator";
+    if (userContext.isTeacher) return "Class Teacher";
+    return "Staff";
+  });
+
+  let workspaceLockLabel = $derived.by(() => {
+    if (!userContext.assignedSection) return null;
+    const s = userContext.assignedSection;
+    return `${s.className} ${s.sectionName}`;
+  });
 </script>
 
 <Sidebar.Menu>
@@ -41,7 +54,10 @@
               class="rounded-full"
             />
             <div
-              class="grid flex-1 text-start text-sm leading-tight group-data-[collapsible=icon]:hidden"
+              class={cn(
+                "grid flex-1 text-start text-sm leading-tight group-data-[collapsible=icon]:hidden",
+                hideDetails && "hidden"
+              )}
             >
               <span class="truncate font-medium"
                 >{user?.fullName || "Guest"}</span
@@ -51,9 +67,11 @@
               >
             </div>
 
-            <ChevronsUpDownIcon
-              class="ms-auto size-4 group-data-[collapsible=icon]:hidden"
-            />
+            {#if !hideDetails}
+              <ChevronsUpDownIcon
+                class="ms-auto size-4 group-data-[collapsible=icon]:hidden"
+              />
+            {/if}
           </Sidebar.MenuButton>
         {/snippet}
       </DropdownMenu.Trigger>
@@ -68,62 +86,80 @@
             <img
               src={`https://avatar.vercel.sh/${user?.email || "user"}`}
               alt={user?.email ?? "User Avatar"}
-              width={24}
-              height={24}
+              width={32}
+              height={32}
               class="rounded-full"
             />
             <div class="grid flex-1 text-start text-sm leading-tight">
               <span class="truncate font-medium"
                 >{user?.fullName || "Guest"}</span
               >
-              <span class="truncate text-xs">{user?.email || "Guest"}</span>
+              <span class="truncate text-xs text-muted-foreground">{user?.email || "Guest"}</span>
             </div>
           </div>
         </DropdownMenu.Label>
+
+        <!-- Designation + Workspace Badges -->
+        <div class="flex flex-wrap gap-1.5 px-2 pb-2">
+          <span class="workspace-badge workspace-badge--active">
+            {designationLabel}
+          </span>
+          {#if workspaceLockLabel}
+            <span class="workspace-badge workspace-badge--active">
+              {workspaceLockLabel}
+            </span>
+          {:else}
+            <span class="workspace-badge workspace-badge--unassigned">
+              <TriangleAlertIcon class="size-3" />
+              Unassigned
+            </span>
+          {/if}
+        </div>
+
         <DropdownMenu.Separator />
         <DropdownMenu.Group>
           <DropdownMenu.Item>
             <SparklesIcon />
-            Upgrade to Pro
+            Try Plus free
           </DropdownMenu.Item>
         </DropdownMenu.Group>
         <DropdownMenu.Separator />
         <DropdownMenu.Group>
           <DropdownMenu.Item>
-            <BadgeCheckIcon />
-            Account
+            <MoonIcon />
+            Personalization
+          </DropdownMenu.Item>
+          <DropdownMenu.Item>
+            <UserIcon />
+            Profile
           </DropdownMenu.Item>
           <DropdownMenu.Item onSelect={() => {
             if (sidebar.isMobile) sidebar.setOpenMobile(false);
-            goto("/filestore");
           }}>
-            <FolderIcon />
-            Filestore
-          </DropdownMenu.Item>
-          <DropdownMenu.Item>
-            <BellIcon />
-            Notifications
-          </DropdownMenu.Item>
-          <DropdownMenu.Item>
-            <CircleHelpIcon />
-            Get Help
+            <SettingsIcon />
+            Settings
           </DropdownMenu.Item>
         </DropdownMenu.Group>
         <DropdownMenu.Separator />
-        <DropdownMenu.Item
-          onSelect={async () => {
-            if (sidebar.isMobile) sidebar.setOpenMobile(false);
-            const result = await signout();
-            if (result) {
-              clearLocalStore("selected-class");
-              goto("/signin");
-            }
-          }}
-        >
-          <LogOutIcon />
-          Log out
-          <!-- <a href="/signout" data-sveltekit-preload-data="false" data-sveltekit-reload>Log out</a> -->
-        </DropdownMenu.Item>
+        <DropdownMenu.Group>
+          <DropdownMenu.Item>
+            <LifeBuoyIcon />
+            Help
+          </DropdownMenu.Item>
+          <DropdownMenu.Item
+            onSelect={async () => {
+              if (sidebar.isMobile) sidebar.setOpenMobile(false);
+              const result = await signout();
+              if (result) {
+                clearLocalStore("selected-class");
+                goto("/signin");
+              }
+            }}
+          >
+            <LogOutIcon />
+            Log out
+          </DropdownMenu.Item>
+        </DropdownMenu.Group>
       </DropdownMenu.Content>
     </DropdownMenu.Root>
   </Sidebar.MenuItem>

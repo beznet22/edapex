@@ -31,19 +31,26 @@ export class ChatHistory {
     return this.#revalidating;
   }
 
-  constructor(chatsPromise: Promise<DBChat[]>) {
-    this.rehydrate(chatsPromise);
+  constructor(chatsInput: DBChat[] | Promise<DBChat[]>) {
+    this.rehydrate(chatsInput);
   }
 
-  rehydrate(chatsPromise: Promise<DBChat[]>) {
+  rehydrate(chatsInput: DBChat[] | Promise<DBChat[]>) {
     this.#loading = true;
     this.#revalidating = true;
-    chatsPromise
-      .then((chats) => (this.chats = chats))
-      .finally(() => {
-        this.#loading = false;
-        this.#revalidating = false;
-      });
+    
+    if (chatsInput && typeof (chatsInput as any).then === "function") {
+      (chatsInput as Promise<DBChat[]>)
+        .then((chats) => (this.chats = chats))
+        .finally(() => {
+          this.#loading = false;
+          this.#revalidating = false;
+        });
+    } else {
+      this.chats = (chatsInput as DBChat[]) || [];
+      this.#loading = false;
+      this.#revalidating = false;
+    }
   }
 
   groupChatsByDate(chats: DBChat[]): GroupedChats {

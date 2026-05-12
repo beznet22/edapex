@@ -1,114 +1,208 @@
 <script lang="ts" module>
-  // sample data
-  const data = [
-    {
-      title: "Integrations",
-      url: "#settings",
-      icon: SettingsIcon,
-    },
-  ];
+  const workspaceNavItems = [
+    { title: "Orchestrator", value: "orchestrator" },
+    { title: "System Timeline", value: "timeline" },
+    { title: "Class Hierarchy", value: "hierarchy" },
+    { title: "Skill Engine", value: "skills" },
+    { title: "Extract Buffer", value: "extract" },
+    { title: "User Directory", value: "users" },
+  ] as const;
 </script>
 
 <script lang="ts">
   import * as Sidebar from "$lib/components/ui/sidebar/index.js";
   import { useSidebar } from "$lib/components/ui/sidebar/index.js";
+  import { cn } from "$lib/utils/shadcn";
+  import * as DropdownMenu from "$lib/components/ui/dropdown-menu/index.js";
   import type { AuthUser } from "$lib/types/auth-types";
   import type { ComponentProps } from "svelte";
   import NavUser from "./nav-user.svelte";
   import NavSecondary from "./nav-secondary.svelte";
   import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
   import { SidebarHistory } from "./sidebar-history";
+  import { Badge } from "./ui/badge";
   import SettingsIcon from "@lucide/svelte/icons/settings";
-  import CircleQuestionMark from "@lucide/svelte/icons/circle-help";
   import CommandIcon from "@lucide/svelte/icons/command";
   import PlusIcon from "@lucide/svelte/icons/plus";
+  import LayoutDashboardIcon from "@lucide/svelte/icons/layout-dashboard";
+  import FolderIcon from "@lucide/svelte/icons/folder";
+  import InboxIcon from "@lucide/svelte/icons/inbox";
+  import ChevronDownIcon from "@lucide/svelte/icons/chevron-down";
+  import SearchIcon from "@lucide/svelte/icons/search";
   import { Button } from "./ui/button";
   import { goto } from "$app/navigation";
-  import { useFileActions } from "$lib/context/file-context.svelte";
+  import { UserContext } from "$lib/context/user-context.svelte";
 
   type SidebarProps = {
     user?: AuthUser;
     ref?: HTMLElement | null;
-    items?: unknown[]; // Assuming items is part of SidebarProps
-    version?: string; // Assuming version is part of SidebarProps
   } & ComponentProps<typeof Sidebar.Root>;
 
   let {
     user,
     ref = $bindable(null),
-    items, // Added items
-    version, // Added version
     ...restProps
   }: SidebarProps = $props();
 
-  const context = useSidebar();
-  let fileCtx = $derived(useFileActions());
+  const sidebar = useSidebar();
+  const userContext = UserContext.fromContext();
+
+  let activeWorkspaceNav = $state("orchestrator");
+  let hasBackgroundTasks = $state(false);
+  let unreadInbox = $state(0);
+  let sessionFilter = $state("");
+
+  const navItems = [
+    { title: "Integrations", url: "#settings", icon: SettingsIcon },
+  ];
+
+  function handleNewSession() {
+    sidebar.setOpenMobile(false);
+    goto("/", { invalidateAll: true });
+  }
+
+  function handleKeydown(e: KeyboardEvent) {
+    if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+      e.preventDefault();
+      handleNewSession();
+    }
+  }
+
+  $effect(() => {
+    document.addEventListener("keydown", handleKeydown);
+    return () => document.removeEventListener("keydown", handleKeydown);
+  });
 </script>
 
-<Sidebar.Root collapsible="icon" {...restProps} bind:ref>
-  <Sidebar.Header>
-    <Sidebar.Menu>
-      <Sidebar.MenuItem>
-        <Sidebar.MenuButton
-          size="lg"
-          class="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
-        >
-          {#snippet child({ props })}
-            <a
-              href="/"
-              {...props}
-              onclick={() => {
-                if (context.isMobile) {
-                  context.setOpenMobile(false);
-                }
-              }}
-            >
-              <div
-                class="bg-sidebar-primary text-sidebar-primary-foreground flex aspect-square size-8 items-center justify-center rounded-lg"
-              >
-                <CommandIcon class="size-4" />
-              </div>
-              <div
-                class="grid flex-1 text-start text-sm leading-tight group-data-[collapsible=icon]:hidden"
-              >
-                <span class="truncate font-medium">Edapex AI</span>
-                <span class="truncate text-xs">Enterprise</span>
-              </div>
-            </a>
-          {/snippet}
-        </Sidebar.MenuButton>
-        <Sidebar.MenuAction
-          class="group-data-[collapsible=icon]:hidden top-1/2 -translate-y-1/2"
-        >
+<Sidebar.Root
+  bind:ref
+  collapsible="icon"
+  class="overflow-hidden *:data-[sidebar=sidebar]:flex-row bg-sidebar border-r-0"
+  {...restProps}
+>
+  <!-- Panel 1: The Rail -->
+  <Sidebar.Root collapsible="none" class="w-16! border-e border-sidebar-border/10 bg-sidebar shrink-0 h-full">
+    <Sidebar.Header class="items-center py-4">
+      <div class="flex aspect-square size-10 items-center justify-center rounded-xl bg-primary shadow-lg shadow-primary/20 transition-all hover:scale-105 active:scale-95 cursor-pointer overflow-hidden">
+        <img src="/logo.svg" alt="Hermes" class="size-6 dark:invert" />
+      </div>
+    </Sidebar.Header>
+
+    <Sidebar.Content class="items-center py-2 gap-4">
+      <Sidebar.Group class="p-0 items-center">
+        <Sidebar.GroupContent class="flex flex-col gap-2">
           <Tooltip>
             <TooltipTrigger>
               {#snippet child({ props })}
-                <Button
-                  {...props}
-                  variant="ghost"
-                  type="button"
-                  class="h-fit p-1"
-                  onclick={() => {
-                    context.setOpenMobile(false);
-                    goto("/", { invalidateAll: true });
-                  }}
-                >
-                  <PlusIcon class="size-4" />
+                <Button {...props} variant="ghost" size="icon" class="size-12 rounded-xl text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent group relative transition-colors">
+                  <LayoutDashboardIcon class="size-5" />
+                  {#if hasBackgroundTasks}
+                    <span class="absolute top-3.5 right-3.5 size-1.5 bg-primary rounded-full border border-sidebar"></span>
+                  {/if}
                 </Button>
               {/snippet}
             </TooltipTrigger>
-            <TooltipContent align="end">New Chat</TooltipContent>
+            <TooltipContent side="right">Dashboard</TooltipContent>
           </Tooltip>
-        </Sidebar.MenuAction>
-      </Sidebar.MenuItem>
-    </Sidebar.Menu>
-  </Sidebar.Header>
-  <Sidebar.Content>
-    <SidebarHistory {user} />
-  </Sidebar.Content>
-  <Sidebar.Footer>
-    <NavSecondary items={data} class="mt-auto" />
-    <NavUser {user} />
-  </Sidebar.Footer>
-  <Sidebar.Rail />
+
+          <Tooltip>
+            <TooltipTrigger>
+              {#snippet child({ props })}
+                <Button {...props} variant="ghost" size="icon" class="size-12 rounded-xl bg-primary/10 text-primary hover:bg-primary/20 group relative transition-all">
+                  <FolderIcon class="size-5" />
+                </Button>
+              {/snippet}
+            </TooltipTrigger>
+            <TooltipContent side="right">Workspace</TooltipContent>
+          </Tooltip>
+
+          <Tooltip>
+            <TooltipTrigger>
+              {#snippet child({ props })}
+                <Button {...props} variant="ghost" size="icon" class="size-12 rounded-xl text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent group relative transition-colors">
+                  <InboxIcon class="size-5" />
+                  {#if unreadInbox > 0}
+                    <span class="absolute top-3.5 right-3.5 size-1.5 bg-primary rounded-full border border-sidebar"></span>
+                  {/if}
+                </Button>
+              {/snippet}
+            </TooltipTrigger>
+            <TooltipContent side="right">Inbox</TooltipContent>
+          </Tooltip>
+        </Sidebar.GroupContent>
+      </Sidebar.Group>
+    </Sidebar.Content>
+
+    <Sidebar.Footer class="items-center pb-4">
+      <NavUser {user} hideDetails={true} />
+    </Sidebar.Footer>
+  </Sidebar.Root>
+
+  <!-- Panel 2: Contextual Workspace Sidebar -->
+  <Sidebar.Root collapsible="none" class="hidden flex-1 md:flex bg-sidebar-accent/5 h-full">
+    <Sidebar.Header class="gap-4 border-b border-sidebar-border/10 p-4 bg-transparent">
+      <div class="flex w-full items-center justify-between">
+        <DropdownMenu.Root>
+          <DropdownMenu.Trigger>
+            {#snippet child({ props })}
+              <Button {...props} variant="ghost" class="w-full justify-between px-2 font-bold text-[13px] text-sidebar-foreground/80 hover:bg-sidebar-accent tracking-tight">
+                EdApex Workspace
+                <ChevronDownIcon class="size-3.5 opacity-30" />
+              </Button>
+            {/snippet}
+          </DropdownMenu.Trigger>
+          <DropdownMenu.Content class="w-64 bg-sidebar border-sidebar-border" align="start">
+            <DropdownMenu.Label class="text-[10px] uppercase tracking-widest text-sidebar-foreground/30 px-3 py-2">Select Workspace</DropdownMenu.Label>
+            {#each workspaceNavItems as item (item.value)}
+              <DropdownMenu.Item
+                onSelect={() => { activeWorkspaceNav = item.value; }}
+                class="text-sm px-3 py-2 text-sidebar-foreground/70 focus:bg-sidebar-accent focus:text-sidebar-accent-foreground cursor-pointer transition-colors"
+              >
+                {item.title}
+                {#if activeWorkspaceNav === item.value}
+                   <CommandIcon class="ml-auto size-3.5 opacity-50" />
+                {/if}
+              </DropdownMenu.Item>
+            {/each}
+          </DropdownMenu.Content>
+        </DropdownMenu.Root>
+      </div>
+
+      <Button variant="secondary" size="sm" class="w-full justify-start gap-2.5 text-[11px] font-bold h-10 bg-sidebar-accent/50 hover:bg-sidebar-accent text-sidebar-foreground/60 border border-sidebar-border rounded-xl transition-all" onclick={handleNewSession}>
+        <PlusIcon class="size-4 text-primary/80" />
+        New Session
+        <kbd class="ml-auto rounded-lg bg-background/50 px-2 py-0.5 text-[0.6rem] font-mono text-sidebar-foreground/20 border border-sidebar-border">⌘K</kbd>
+      </Button>
+
+      <div class="relative group">
+        <SearchIcon class="absolute left-3.5 top-1/2 -translate-y-1/2 size-3.5 text-sidebar-foreground/10 group-focus-within:text-primary/50 transition-colors pointer-events-none" />
+        <input
+          type="text"
+          placeholder="Filter sessions..."
+          class="h-10 w-full rounded-xl border border-sidebar-border bg-background/30 pl-10 pr-3 text-xs text-sidebar-foreground/80 placeholder:text-sidebar-foreground/10 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/30 transition-all font-medium"
+          bind:value={sessionFilter}
+        />
+      </div>
+
+      {#if userContext.isCoordinator || userContext.isIt}
+        <div class="flex gap-2 overflow-x-auto scrollbar-hide py-1">
+          {#if userContext.assignedSection}
+            <Badge variant="secondary" class="shrink-0 text-[10px] font-black tracking-tight bg-primary/20 text-primary border-primary/20 px-2.5 py-1 rounded-lg">
+              @{userContext.assignedSection.className}{userContext.assignedSection.sectionName}
+            </Badge>
+          {/if}
+          <Badge variant="outline" class="shrink-0 text-[10px] font-bold border-sidebar-border text-sidebar-foreground/20 cursor-pointer hover:bg-sidebar-accent hover:text-sidebar-foreground/40 transition-all px-2.5 py-1 rounded-lg uppercase tracking-wider">#Ext</Badge>
+          <Badge variant="outline" class="shrink-0 text-[10px] font-bold border-sidebar-border text-sidebar-foreground/20 cursor-pointer hover:bg-sidebar-accent hover:text-sidebar-foreground/40 transition-all px-2.5 py-1 rounded-lg uppercase tracking-wider">#Pub</Badge>
+        </div>
+      {/if}
+    </Sidebar.Header>
+
+    <Sidebar.Content class="scrollbar-hide bg-transparent">
+      <SidebarHistory {user} />
+    </Sidebar.Content>
+
+    <Sidebar.Footer class="border-t border-sidebar-border p-3 bg-transparent">
+      <NavSecondary items={navItems} class="mt-auto opacity-40 hover:opacity-100 transition-opacity" />
+    </Sidebar.Footer>
+  </Sidebar.Root>
 </Sidebar.Root>

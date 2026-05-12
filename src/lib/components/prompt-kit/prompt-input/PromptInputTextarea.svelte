@@ -9,9 +9,11 @@
     class: className,
     onkeydown,
     disableAutosize = false,
+    ref = $bindable(null),
     ...restProps
   }: HTMLTextareaAttributes & {
     disableAutosize?: boolean;
+    ref?: HTMLTextAreaElement | null;
   } = $props();
 
   const context = getPromptInputContext();
@@ -42,15 +44,21 @@
   function handleInput(e: Event & { currentTarget: HTMLTextAreaElement }) {
     context.setValue(e.currentTarget.value);
   }
+
+  $effect(() => {
+    if (ref) {
+      context.textareaRef = ref;
+    }
+  });
 </script>
 
 <Textarea
-  bind:ref={context.textareaRef}
+  bind:ref={ref}
   value={context.value}
   oninput={handleInput}
   onkeydown={handleKeyDown}
   class={cn(
-    "min-h-11 w-full resize-none border-none bg-transparent! shadow-none outline-none focus-visible:ring-0 focus-visible:ring-offset-0",
+    "w-full resize-none border-none! bg-transparent! shadow-none outline-none focus-visible:ring-0 focus-visible:ring-offset-0 p-0",
     className
   )}
   rows={1}

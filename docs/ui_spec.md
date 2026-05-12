@@ -7,36 +7,23 @@ The EdApex AI interface is transitioning to a **4-Panel Architecture** inspired 
 
 The UI is built using strict Tailwind CSS Flexbox/Grid layouts for horizontal stability. Panels 2 and 4 utilize native UI Sidebars and responsive `<Sheet>` components on smaller screens to ensure a fluid experience without the overhead of heavy pane-resizing libraries.
 
-### Panel 1: Premium App Switcher (Far Left Mini Sidebar)
-- **Role**: Dedicated high-level routing across the EdApex ecosystem, acting as the foundational structural pillar.
-- **Implementation**: Built utilizing the `collapsible="icon"` property on the `shadcn-svelte` `<Sidebar>`. It forms a narrow, highly polished vertical rail that seamlessly adjoins Panel 2 without harsh borders, sharing a unified glassmorphic depth.
+### Panel 1 & 2: Unified Sidebar (Far Left Rail + Contextual Pane)
+- **Role**: Combines high-level routing (Rail) and contextual workspace management (Sidebar) into a single, high-performance `shadcn-svelte` component.
+- **Implementation**: A single `app-sidebar.svelte` using `collapsible="icon"`. 
+  - **The Rail (Panel 1)**: Visualized when the sidebar is collapsed; houses the **Brand Mark**, **Primary Apps** (Dashboard, Workspace, Inbox), and **Activity Badges**.
+  - **The Contextual Sidebar (Panel 2)**: Visualized when the sidebar is expanded; houses the **Workspace Navigation Header**, **Quick Actions (+ New)**, **Context Filter Chips**, and **Thread List**.
 - **Layout Anatomy**:
-  - **Top Anchor (App Navigation)**:
-    - **Brand Mark**: The EdApex logo anchored at the top.
-    - **Primary Apps**: Fluid, icon-only `<Tooltip>` buttons for **Dashboard** (top position, TBD), **Workspace** (active state highlighted, serves as the current home), and **Inbox** (TBD). 
-    - **Activity Badges**: Icons feature an absolute-positioned color dot badge (e.g., EdApex Gold or Slate red) at the top-right corner to instantly signal "active background tasks" or "unread/done" notifications across the rail.
-  - **Bottom Anchor (Utilities & Identity)**:
-    - **Telemetry**: A distinct activity pulse icon for system vitals (TBD).
-    - **Global User Dropdown**: The User Avatar is pinned to the very bottom. Clicking this triggers a premium `<DropdownMenu>` containing actions for **Profile**, **Global Settings**, and **Logout**. This naturally shifts identity management out of Panel 2 (the workspace), keeping the UI incredibly clean and modern.
-
-### Panel 2: Contextual Workspace Sidebar (Inner Left Pane)
-- **Role**: Context filtering and threading for the currently active app, rendered as a vertical flex sidebar (`w-72` to `w-80`).
-- **Workspace Navigation Header**:
-  - Displays the current Global App Name prominently as a `<DropdownMenu>` trigger (e.g., "EdApex Workspace").
-  - The dropdown acts as the internal switcher for navigating Mastra framework components: Orchestrator, System Timeline, Class Hierarchy, Skill Engine, Workspace Extract Buffer, and User Directory.
-  - *Responsive Behavior*: On mobile devices (`< 768px`), this routing morphs into an Adaptive Bottom Navigation Bar with haptic-aware icon triggers.
-- **Workspace Actions**:
-  - Prominent `<Button variant="outline">` for `+ New Orchestration Session` paired with a `<kbd>` shortcut (`Cmd+K`). Instantiates a blank thread auto-hydrated with the user's base `TenantContext`.
-  - Search `<Input>` placeholder: "Filter sessions...".
-- **Context Filter Chips** (Gated by Designation):
-  - *Visibility*: Only visible if the user's `TenantContext` designation is **Coordinator** or **IT**. Class Teachers have a naturally scoped workspace and do not require cross-class filtering.
-  - Scrollable horizontal row of interactive `<Badge>` components representing hard bounds derived from `mastra_migration_specs.md`.
-  - Chips map directly to **Workspace Locking** (`@Primary1A`, `@TermEndExam`) and **Skill Execution** (`#ExtractionWorkflow`, `#PublishResults`, `#Grading`). This permits staff to filter dense thread history contextually.
-- **Thread List**: 
-  - Managed by a fluid `<ScrollArea>`.
-  - Grouped by temporal or pinned status (`★ PINNED`, `TODAY`, `EARLIER`). "Pinned" is leveraged to persist long-running async Mastra Jobs (e.g., batch publishing) above the fold.
-  - List items render with Gateway Agent intent summaries (e.g., "Extracted Term 1 Forms" instead of default AI greetings).
-- **Sidebar Footer**: A sticky bottom `<Button variant="secondary">` card displaying environment settings access (e.g., "Mastra Gateway - Connections & States"). This acts as the primary trigger for the **User Avatar Dropdown**.
+  - **Header (Top Anchor)**: 
+    - **Brand Mark**: EdApex logo + "Enterprise" label.
+    - **App Rail**: `LayoutDashboard`, `Folder`, `Inbox` icons with activity dots.
+  - **Content (The Workspace Pane)**:
+    - **Workspace Switcher**: Dropdown trigger for Mastra sub-modules (Orchestrator, Timeline, etc.).
+    - **Quick Actions**: `+ New Orchestration Session` (⌘K).
+    - **Discovery Chips**: Role-gated filter badges.
+    - **Memory Feed**: `SidebarHistory` grouped temporal thread list.
+  - **Footer (Identity & Utilities)**:
+    - **Settings Trigger**: `NavSecondary` sticky bottom.
+    - **User Identity**: `NavUser` with avatar, designation, and workspace lock badges.
 
 ### User Avatar Dropdown Menu (Nav / Footer Trigger)
 - Built with `shadcn-svelte` `<DropdownMenu>` and triggered from the footer or Profile nav icon.
@@ -179,3 +166,5 @@ Responsiveness is not a feature; it is the core foundation of the EdApex orchest
   - [ ] Enforce `@mention` contextual linking directly mapping into `TenantContext` isolation checks.
   - [ ] Connect Model Selector to the dynamic `libSQL` hierarchy resolved by the Gateway.
   - [ ] Integrate Mastra `OTel` stream rendering natively inside the collapsible `TerminalDock` footer array.
+
+

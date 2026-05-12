@@ -225,7 +225,7 @@ export function loadUserProviderRegistry(userId: number): Record<string, Provide
   if (existsSync(modelsDir)) {
     try {
       const files = readdirSync(modelsDir).filter(f => f.endsWith(".json"));
-      console.log(`[loadUserProviderRegistry] Loading isolated caches from ${modelsDir}:`, files);
+      // console.log(`[loadUserProviderRegistry] Loading isolated caches from ${modelsDir}:`, files);
       
       for (const file of files) {
         const cachePath = join(modelsDir, file);
@@ -258,7 +258,7 @@ export function loadUserProviderRegistry(userId: number): Record<string, Provide
               limit: m.limit,
             };
           } else {
-            console.warn(`[loadUserProviderRegistry] Skipping mismatched model ${m.id} (found in ${file}, but provider is ${providerId})`);
+            // console.warn(`[loadUserProviderRegistry] Skipping mismatched model ${m.id} (found in ${file}, but provider is ${providerId})`);
           }
         }
       }
@@ -269,7 +269,7 @@ export function loadUserProviderRegistry(userId: number): Record<string, Provide
 
   // Final validation log
   Object.keys(registry).forEach(p => {
-    console.log(`[loadUserProviderRegistry] Resolved ${p} with models:`, Object.keys(registry[p].models));
+    // console.log(`[loadUserProviderRegistry] Resolved ${p} with models:`, Object.keys(registry[p].models));
   });
 
   return registry;
@@ -372,7 +372,7 @@ export async function resolveProvider(
       const [providerId] = owner;
       const apiKey = await resolveApiKey(userId, providerId);
       if (apiKey) {
-        console.log(`[resolveProvider] Direct match found! Model ${modelId} belongs to ${providerId}.`);
+        // console.log(`[resolveProvider] Direct match found! Model ${modelId} belongs to ${providerId}.`);
         const rawProvider = instantiateRawProvider(providerId, apiKey);
         return {
           provider: new ProviderWrapper(rawProvider, providerId, registry) as any,

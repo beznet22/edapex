@@ -615,15 +615,14 @@ Staff members follow this standard sequence for assessment management:
     - Migrate SDK routes and base Drizzle topologies.
 
 2.  **Phase 2: The Hermes UI 4-Panel Scaffolding (P0)**
-    - **Panel 1 (Premium App Switcher)**: Stand up the `collapsible="icon"` sidebar layout, integrating top-level navigation, Global App Switching, Activity Badges, and the Bottom Global User Profile Dropdown.
-    - **Panel 2 (Context Sidebar)**: Implement fluid thread navigation, `<ScrollArea>` lists, and the role-gated Context Filter Chips (for Coordinator/IT) tied to `TenantContext` arrays.
+    - **Unified Sidebar (Panel 1+2)**: Stand up the `collapsible="icon"` sidebar layout (`app-sidebar.svelte`), integrating the horizontal AppRail (Brand, Primary Apps, Badges) as the collapsed state, and the vertical Context Sidebar (Thread Navigation, ScrollArea, context chips) as the expanded state.
     - **Panel 3 (The Arena)**: Setup the main chat message loop powered by `ai-elements` adhering strictly to the "Gold on Slate" aesthetic constraints.
     - **ChatComposer (The Input Island)**: Build the sticky bottom composer with resilient `@mention` hydration logic enforcing the explicit `TenantContext` bounds from Section 4, and the Model Selector enforcing the Provider Hierarchy.
 
-### [NEW] LibSQL-Native EdApexGateway
+### [NEW] LibSQL-Native EdApexGateway ([Custom Gateway](https://mastra.ai/models/gateways/custom-gateways))
 To achieve absolute isolation, we discard the legacy MySQL-based routing and implement a libSQL-native `MastraModelGateway`:
 
-- **Sovereign Configuration**: The gateway reads its API keys and hierarchy from the local `mastra.db` (libSQL) `provider_configs` table.
+- **Sovereign Configuration**: The gateway reads its API keys and hierarchy from the local `mastra.db` (libSQL) `provider_configs` table which fully configured via the UI settings -> AI Providers tab.
 - **Isolation Boundary**: The AI layer is now **read-isolated** from the SMS MySQL DB. It only interacts with MySQL for domain-specific writes (timeline entries, grades) via the scoped repositories.
 - **Initialization**: Instantiated per-request within `event.locals.mastra`.
 - **Smart Model Routing**: Supports the standard format `edapex/[provider]/[model]`.

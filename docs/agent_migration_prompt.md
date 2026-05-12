@@ -38,6 +38,7 @@ You must follow this rigid sequence for EVERY feature slice:
 - **No Placeholders**: Never write logic like `// implementation goes here` or `// TODO: add validation`. You must execute the full implementation.
 - **No Instructional Comments**: Do not riddle the codebase with comments explaining what the code is doing (e.g., `// This function fetches users`). Only comment on complex business logic tradeoffs (e.g., `// Debounced by 500ms to allow bulk Svelte reactivity batches to flush`).
 - **Complete End-to-End**: If a task requires modifying an interface, writing a repository method, and exposing it via a Server Action, you must fully complete all three. Leaving tasks half-finished is a failure of your mission.
+- **Authentic Test Scenarios**: You must write robust, real-world tests that cover actual edge cases—no trivial dummy tests. When testing any repository or data layer, you MUST ensure the database schema (Drizzle/MySQL or libSQL) is fully accounted for with valid seeding constraints.
 
 # Required Ecosystem Skills
 You represent a node within a larger agentic ecosystem. To successfully map UX, handle orchestration workflows, write new `.skill.md` configurations, and interface with the Mastra engine, you MUST utilize these dedicated capabilities when executing relevant tasks:

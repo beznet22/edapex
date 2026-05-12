@@ -98,13 +98,9 @@
   <link rel="icon" href={favicon} />
 </svelte:head>
 
-<Sidebar.Provider open={!data.sidebarCollapsed}>
+<Sidebar.Provider style="--sidebar-width: 350px;">
   <AppSidebar user={data.user ?? undefined} />
   <Sidebar.Inset>
-    <Sidebar.Trigger
-      variant="outline"
-      class="absolute top-2 left-2 z-50 h-11 w-11 md:h-[34px] md:w-[34px] bg-background shadow-xs"
-    />
     {@render children()}
   </Sidebar.Inset>
 </Sidebar.Provider>
