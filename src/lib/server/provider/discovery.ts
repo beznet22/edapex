@@ -5,11 +5,11 @@ import { writeFileSync, mkdirSync, existsSync } from "fs";
 import { STORAGE_DIR } from "$lib/constants";
 
 const BASE_URLS: Record<CredentialType, string> = {
-  [CredentialType.CEREBRAS]: "https://api.cerebras.ai/v1",
+  [CredentialType.DEEPSEEK]: "https://api.deepseek.com",
   [CredentialType.NVIDIA_NIM]: "https://integrate.api.nvidia.com/v1",
   [CredentialType.GROQ]: "https://api.groq.com/openai/v1",
   [CredentialType.MISTRAL]: "https://api.mistral.ai/v1",
-  [CredentialType.OPENROUTER]: "https://openrouter.ai/api/v1",
+  [CredentialType.OPENCODE]: "https://opencode.ai/zen/v1/models",
 };
 
 export interface DiscoveredModel extends ModelConfig {
@@ -78,13 +78,7 @@ function enrichModels(rawModels: any[], provider: CredentialType): DiscoveredMod
         }
       }
 
-      // 3. OpenRouter Free-Only Filter
-      if (provider === CredentialType.OPENROUTER) {
-        // OpenRouter returns pricing in 'pricing' object. Prompt/Completion must be '0' for free models.
-        if (m.pricing && (parseFloat(m.pricing.prompt) > 0 || parseFloat(m.pricing.completion) > 0)) {
-          return false;
-        }
-      }
+
 
       return true;
     })

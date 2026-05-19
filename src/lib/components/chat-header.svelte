@@ -3,7 +3,6 @@
   import * as Sidebar from "$lib/components/ui/sidebar/index.js";
   import { useSidebar } from "$lib/components/ui/sidebar/index.js";
   import type { AuthUser } from "$lib/types/auth-types";
-  import type { DBChat } from "$lib/server/db/schema";
   import { UserContext } from "$lib/context/user-context.svelte";
   import PanelRightIcon from "@lucide/svelte/icons/panel-right";
 
@@ -14,7 +13,7 @@
     onToggleInspector,
   }: {
     user?: AuthUser;
-    chat?: DBChat;
+    chat?: any;
     readonly?: boolean;
     onToggleInspector?: () => void;
   } = $props();
@@ -35,7 +34,7 @@
       class="h-8 w-8 shrink-0 text-muted-foreground hover:text-foreground"
     />
     <div class="flex items-center gap-2 min-w-0 overflow-hidden">
-      <h2 class="text-sm font-semibold tracking-tight text-white/90">Hermes</h2>
+      <h2 class="text-sm font-semibold tracking-tight text-white/90">Edapex AI</h2>
       {#if !chat?.title}
         <span class="text-[10px] uppercase tracking-widest text-white/30 font-bold ml-1 hidden sm:inline">New conversation</span>
       {:else}

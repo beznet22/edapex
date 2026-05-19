@@ -2,7 +2,7 @@ import { goto } from "$app/navigation";
 import { page } from "$app/state";
 import { deleteChat, getHistory, updateVisibility } from "$lib/api/chat.remote";
 import type { ChatVisibility } from "$lib/schema/chat-schema";
-import type { DBChat } from "$lib/server/db/schema";
+import type { DBChat } from "$lib/types/chat-types";
 import { isToday, isYesterday, subMonths, subWeeks } from "date-fns";
 import { getContext, setContext } from "svelte";
 import { toast } from "svelte-sonner";

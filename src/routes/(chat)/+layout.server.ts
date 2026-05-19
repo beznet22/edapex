@@ -1,9 +1,8 @@
-import { SelectedModel, SelectedClass, SelectedAgent } from "$lib/context/sync.svelte";
+import { SelectedModel, SelectedClass } from "$lib/context/sync.svelte";
 import { base } from "$lib/server/repository";
 import { error, redirect } from "@sveltejs/kit";
 import type { LayoutServerLoad } from "./$types";
 import { allowAnonymousChats, STORAGE_DIR, UPLOADS_DIR } from "$lib/constants";
-import { AgentService } from "$lib/server/service/agent.service";
 import { studentRepo } from "$lib/server/repository";
 import type { ClassStudent } from "$lib/server/repository/student.repo";
 import { readdir, stat } from "fs/promises";
@@ -12,11 +11,13 @@ import type { UploadedData } from "$lib/types/chat-types";
 import { existsSync, rm, rmdirSync, type Dirent } from "fs";
 import type { ClassSection } from "$lib/types/result-types";
 import { resultRepo } from "$lib/server/repository";
-import type { DBChat } from "$lib/server/db/schema";
 import { repo } from "$lib/server/repository";
 import { DESIGNATIONS, type Designation } from "$lib/types/sms-types";
 import { generateId } from "ai";
-import { getUserProviderKeys, getAvailableModels, getUserPriority } from "$lib/server/provider/router";
+import { createMastraDb } from "$lib/server/mastra/db";
+import { getUserProviderKeys } from "$lib/server/mastra/provider-config";
+import { SUPPORTED_PROVIDERS, getAvailableModels } from "$lib/server/mastra/registry";
+import { env } from "$env/dynamic/private";
 
 export const load: LayoutServerLoad = async ({ cookies, locals, url }) => {
   const { user, session } = locals;
@@ -25,19 +26,18 @@ export const load: LayoutServerLoad = async ({ cookies, locals, url }) => {
   }
 
   const sidebarCollapsed = false;
-  let modelId = AgentService.initChatModels();
-  let agents = AgentService.getAgentWorkflows(user);
+  let modelId = "openai/gpt-4o-mini";
+  let agents: any[] = [];
 
   const selectedClassRaw = cookies.get("selected-class");
   const selectedAgentId = cookies.get("selected-agent") || "";
 
   let students: ClassStudent[] | null = null;
   let classes: ClassSection[] = [];
-  let chats: DBChat[] = [];
+  let chats: any[] = [];
   if (user) {
     classes = await resultRepo.getClassSections();
     students = await studentRepo.getStudentsByStaffId(user?.staffId);
-    chats = await repo.chat.getChatsByUserId({ id: user.id });
   }
 
   const className = url.searchParams.get("className");
@@ -103,14 +103,19 @@ export const load: LayoutServerLoad = async ({ cookies, locals, url }) => {
 
   const defaultProvider = cookies.get("default-provider");
 
-  let connectedProviders: string[] = [];
+  // ─── Mastra-Native Provider & Model Resolution ────────────────────────────
+  let connectedProviders: any[] = [];
   let availableModels: any[] = [];
   let userPriority: string[] = [];
+
   if (user) {
-    const keys = await getUserProviderKeys(user.id);
-    connectedProviders = keys.map((k: { provider: string }) => k.provider);
-    availableModels = getAvailableModels(user.id);
-    userPriority = getUserPriority(user.id);
+    const db = createMastraDb();
+    const envKeys = env as Record<string, string | undefined>;
+    const supportedList = [...SUPPORTED_PROVIDERS] as string[];
+
+    connectedProviders = await getUserProviderKeys(db, user.id, envKeys, supportedList);
+    userPriority = connectedProviders.filter(p => p.enabled).map(p => p.provider);
+    availableModels = getAvailableModels(connectedProviders);
   }
 
   return {

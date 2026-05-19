@@ -1,11 +1,7 @@
 import { command, getRequestEvent, query } from "$app/server";
-import { chatModels } from "$lib/chat/models";
 import { allowAnonymousChats, EXTRACTED_DIR } from "$lib/constants";
 import { chatVisibilitySchema, fileSchema } from "$lib/schema/chat-schema";
 import { resultInputSchema } from "$lib/schema/result-input";
-import { repo } from "$lib/server/repository";
-import { generateContent } from "$lib/server/helpers/chat-helper";
-import { resolveProviderForTask } from "$lib/server/provider/router";
 import z from "zod";
 import { staffRepo, resultRepo, studentRepo } from "$lib/server/repository";
 import { studentFileStorage } from "$lib/server/storage/student-files";
@@ -13,6 +9,18 @@ import { readdir, stat } from "fs/promises";
 import { join } from "path";
 import type { UploadedData } from "$lib/types/chat-types";
 import { existsSync, rmdirSync } from "fs";
+import { createMastraStorage } from "$lib/server/mastra/storage";
+
+/**
+ * Mastra Storage Helpers
+ * 
+ * These functions replace the legacy ChatRepository with direct
+ * Mastra storage calls. Threads map to chats, resources map to users.
+ */
+
+function getMastraStorage() {
+  return createMastraStorage();
+}
 
 export const updateHistory = command(
   z.object({
@@ -26,7 +34,18 @@ export const updateHistory = command(
     }
 
     try {
-      await repo.chat.updateChatVisibilityById({ chatId, visibility });
+      const storage = getMastraStorage();
+      const memory = await storage.getStore("memory");
+      if (!memory) return { success: false };
+      
+      const thread = await memory.getThreadById({ threadId: chatId });
+      if (thread) {
+        await memory.updateThread({ 
+          id: chatId, 
+          title: thread.title || "New Chat",
+          metadata: { ...(thread.metadata || {}), visibility } 
+        });
+      }
       return { success: true };
     } catch {
       return { success: false };
@@ -40,8 +59,22 @@ export const getHistory = query(z.object({}), async () => {
   if (!user || !session) return null;
 
   try {
-    const chats = await repo.chat.getChatsByUserId({ id: user.id });
-    return chats;
+    const storage = getMastraStorage();
+    const memory = await storage.getStore("memory");
+    if (!memory) return null;
+
+    const resourceId = `user-${user.id}`;
+    const result = await memory.listThreads({ filter: { resourceId } });
+    
+    // Map Mastra threads to the DBChat-compatible shape the UI expects
+    return result.threads.map((t: any) => ({
+      id: t.id,
+      title: t.title || 'New Chat',
+      model: t.metadata?.model || 'auto',
+      createdAt: t.createdAt || new Date(),
+      userId: user.id,
+      visibility: t.metadata?.visibility || 'private',
+    }));
   } catch {
     return null;
   }
@@ -56,9 +89,15 @@ export const deleteChat = command(
     if (!user || !session) return { success: false, message: "Unauthorized" };
 
     try {
-      const chat = await repo.chat.getChatById(chatId);
-      if (chat && chat.userId !== user.id) return { success: false, message: "Forbidden" };
-      await repo.chat.deleteChat(chatId);
+      const storage = getMastraStorage();
+      const memory = await storage.getStore("memory");
+      if (!memory) return { success: false, message: "Storage error" };
+
+      const thread = await memory.getThreadById({ threadId: chatId });
+      if (thread && thread.resourceId !== `user-${user.id}`) {
+        return { success: false, message: "Forbidden" };
+      }
+      await memory.deleteThread({ threadId: chatId });
       return { success: true, message: "Chat deleted" };
     } catch {
       return { success: false, message: "An error occurred while processing your request" };
@@ -80,7 +119,6 @@ export const syncCookie = command(
         // Allow selection of any model ID; the ProviderRouter handles fallbacks if the ID is invalid.
         break;
       case "selected-class":
-      case "selected-agent":
         if (!value) return null;
         break;
       default:
@@ -109,7 +147,18 @@ export const updateVisibility = command(
     }
 
     try {
-      await repo.chat.updateChatVisibilityById({ chatId, visibility });
+      const storage = getMastraStorage();
+      const memory = await storage.getStore("memory");
+      if (!memory) return { success: false, message: "Storage error" };
+
+      const thread = await memory.getThreadById({ threadId: chatId });
+      if (thread) {
+        await memory.updateThread({
+          id: chatId,
+          title: thread.title || "New Chat",
+          metadata: { ...(thread.metadata || {}), visibility }
+        });
+      }
       return { success: true };
     } catch {
       return { success: false, message: "An error occurred while processing your request" };
@@ -117,6 +166,11 @@ export const updateVisibility = command(
   }
 );
 
+/**
+ * Legacy extractFile command — kept for backward compatibility with the
+ * workspace extraction flow. Uses the Mastra gateway for model resolution
+ * instead of the legacy resolveProviderForTask.
+ */
 export const extractFile = command(
   z.object({
     file: fileSchema,
@@ -128,35 +182,27 @@ export const extractFile = command(
     }
 
     try {
-      const { provider } = await resolveProviderForTask(user.id, "vision");
-      const content = await generateContent(file, provider);
-      return { success: true, content };
+      // TODO: Migrate to Mastra gateway extraction workflow
+      // For now, this command is deprecated in favor of the /extract slash command
+      return { success: false, message: "Use the /extract slash command in chat instead" };
     } catch {
       return { success: false, message: "An error occurred while processing your request" };
     }
   }
 );
 
+/**
+ * Suggestion and vote commands are deprecated.
+ * Mastra memory handles observational memory natively.
+ * These stubs prevent runtime errors from existing UI bindings.
+ */
 export const suggestion = command(
   z.object({
     documentId: z.string(),
   }),
   async ({ documentId }) => {
-    const { user } = getRequestEvent().locals;
-    if (!user) {
-      return { success: false, message: "Unauthorized" };
-    }
-
-    try {
-      const suggestions = await repo.chat.getSuggestionsByDocumentId({ documentId });
-      const suggestion = suggestions.at(0);
-      if (suggestion && suggestion.userId !== user.id) {
-        return { success: false, message: "Forbidden" };
-      }
-      return { success: true, suggestion };
-    } catch {
-      return { success: false, message: "An error occurred while processing your request" };
-    }
+    // Suggestions are now managed by Mastra observational memory
+    return { success: false, message: "Suggestions are managed by Mastra memory" };
   }
 );
 
@@ -167,26 +213,8 @@ export const vote = command(
     type: z.enum(["up", "down"]),
   }),
   async ({ chatId, messageId, type }) => {
-    const { user } = getRequestEvent().locals;
-    if (!user) {
-      return { success: false, message: "Unauthorized" };
-    }
-
-    try {
-      const chat = await repo.chat.getChatById(chatId);
-      if (chat && chat.userId !== user.id) {
-        return { success: false, message: "Forbidden" };
-      }
-    } catch {
-      return { success: false, message: "Not found" };
-    }
-
-    try {
-      await repo.chat.voteMessage({ chatId, messageId, type });
-      return { success: true };
-    } catch {
-      return { success: false, message: "An error occurred while processing your request" };
-    }
+    // Voting is deprecated — Mastra memory handles feedback natively
+    return { success: false, message: "Voting is managed by Mastra memory" };
   }
 );
 

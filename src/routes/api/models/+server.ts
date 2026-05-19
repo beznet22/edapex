@@ -1,5 +1,5 @@
 import { json } from "@sveltejs/kit";
-import { getAvailableModels } from "$lib/server/provider/router";
+import { MODEL_REGISTRY } from "$lib/server/mastra/registry";
 import type { RequestHandler } from "./$types";
 
 export const GET: RequestHandler = async ({ locals: { user } }) => {
@@ -10,7 +10,7 @@ export const GET: RequestHandler = async ({ locals: { user } }) => {
   try {
     return json({ 
       success: true, 
-      models: getAvailableModels(user.id)
+      models: MODEL_REGISTRY
     });
   } catch (error) {
     console.error("[api/models] Failed to fetch models:", error);

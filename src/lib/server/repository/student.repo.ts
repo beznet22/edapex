@@ -55,6 +55,7 @@ export type StudentDetails = {
   schoolId: number | null;
   academicId: number | null;
   rollNo: number | null;
+  userId: number | null;
 };
 
 export type ClassStudent = {
@@ -122,7 +123,7 @@ export class StudentRepository extends BaseRepository {
 
     // Construct full name from first and last name
     const fullName = `${firstName} ${lastName}`.trim();
-    const finalAdmissionNo = admissionNo ?? ((await this.getLastAdmissionNo()) + 1);
+    const finalAdmissionNo = admissionNo ?? (await this.getLastAdmissionNo()) + 1;
     const academicId = input.academicId ?? (await this.getAcademicId());
 
     // Step 1: Check for existing student email conflicts
@@ -138,12 +139,12 @@ export class StudentRepository extends BaseRepository {
     let parentUserId: number | null = null;
 
     // Step 2: Try to find existing parent via sibling or email
-    let existingParentRecord: (typeof smParents.$inferSelect) | null = null;
+    let existingParentRecord: typeof smParents.$inferSelect | null = null;
 
     if (siblingAdmissionNo) {
       const results = await this.db
-        .select({ 
-          parent: smParents
+        .select({
+          parent: smParents,
         })
         .from(smStudents)
         .innerJoin(smParents, eq(smStudents.parentId, smParents.id))
@@ -172,7 +173,11 @@ export class StudentRepository extends BaseRepository {
       // Verify if the linked user account actually exists
       let userExists = false;
       if (parentUserId) {
-        const [u] = await this.db.select({ id: users.id }).from(users).where(eq(users.id, parentUserId)).limit(1);
+        const [u] = await this.db
+          .select({ id: users.id })
+          .from(users)
+          .where(eq(users.id, parentUserId))
+          .limit(1);
         userExists = !!u;
       }
 
@@ -193,7 +198,7 @@ export class StudentRepository extends BaseRepository {
             activeStatus: 1,
           })
           .$returningId();
-        
+
         parentUserId = recoveredUser.id;
         // Update the existing parent record with the new userId
         await this.db.update(smParents).set({ userId: parentUserId }).where(eq(smParents.id, parentId!));
@@ -205,7 +210,7 @@ export class StudentRepository extends BaseRepository {
         .from(users)
         .where(and(eq(users.email, guardiansEmail), eq(users.roleId, 3)))
         .limit(1);
-      
+
       if (orphanedUser) {
         parentUserId = orphanedUser.id;
       }
@@ -344,10 +349,29 @@ export class StudentRepository extends BaseRepository {
     return student || null;
   }
 
-  async getStudentsByClassSection(params: { classId: number; sectionId: number }) {
+  async getStudentsByClassSection(params: { classId: number; sectionId: number }, query?: string) {
     const { classId, sectionId } = params;
     if (!classId || !sectionId) return null;
     const academicId = await this.getAcademicId();
+
+    const conditions = [
+      eq(studentRecords.classId, classId),
+      eq(studentRecords.sectionId, sectionId),
+      eq(studentRecords.academicId, academicId),
+      eq(studentRecords.activeStatus, 1),
+      eq(smStudents.activeStatus, 1),
+      eq(studentRecords.isDefault, 1),
+    ];
+
+    if (query) {
+      conditions.push(
+        or(
+          like(smStudents.fullName, `%${query}%`),
+          like(smStudents.admissionNo, `%${query}%`)
+        ) as any
+      );
+    }
+
     const students = await this.db
       .select({
         id: smStudents.id,
@@ -356,16 +380,8 @@ export class StudentRepository extends BaseRepository {
       })
       .from(smStudents)
       .innerJoin(studentRecords, eq(smStudents.id, studentRecords.studentId))
-      .where(
-        and(
-          eq(studentRecords.classId, classId),
-          eq(studentRecords.sectionId, sectionId),
-          eq(studentRecords.academicId, academicId),
-          eq(studentRecords.activeStatus, 1),
-          eq(smStudents.activeStatus, 1),
-          eq(studentRecords.isDefault, 1)
-        )
-      ).orderBy(asc(smStudents.id));
+      .where(and(...conditions))
+      .orderBy(asc(smStudents.id));
     return students;
   }
 
@@ -379,8 +395,8 @@ export class StudentRepository extends BaseRepository {
         and(
           eq(smAssignSubjects.teacherId, staffId),
           eq(smAssignSubjects.academicId, academicId),
-          eq(smAssignSubjects.activeStatus, 1)
-        )
+          eq(smAssignSubjects.activeStatus, 1),
+        ),
       )
       .limit(1);
     if (!classSection) return null;
@@ -411,8 +427,8 @@ export class StudentRepository extends BaseRepository {
           eq(studentRecords.classId, classSection.classId || 0),
           eq(studentRecords.sectionId, classSection.sectionId || 0),
           eq(studentRecords.academicId, academicId),
-          eq(smStudents.activeStatus, 1)
-        )
+          eq(smStudents.activeStatus, 1),
+        ),
       )
       .groupBy(smStudents.id);
     return students;
@@ -436,8 +452,8 @@ export class StudentRepository extends BaseRepository {
           eq(studentRecords.sectionId, sectionId),
           eq(studentRecords.isDefault, 1),
           eq(studentRecords.academicId, academicId),
-          eq(studentRecords.activeStatus, 1)
-        )
+          eq(studentRecords.activeStatus, 1),
+        ),
       )
       .limit(1);
     if (record) return record.id;
@@ -480,8 +496,8 @@ export class StudentRepository extends BaseRepository {
           eq(studentRecords.sectionId, sectionId),
           eq(studentRecords.isDefault, 1),
           eq(studentRecords.academicId, academicId),
-          eq(studentRecords.activeStatus, 1)
-        )
+          eq(studentRecords.activeStatus, 1),
+        ),
       )
       .limit(1);
     return record || null;
@@ -510,8 +526,8 @@ export class StudentRepository extends BaseRepository {
           eq(smStudents.id, studentRecords.studentId),
           eq(studentRecords.academicId, academicId),
           eq(studentRecords.isDefault, 1),
-          eq(studentRecords.activeStatus, 1)
-        )
+          eq(studentRecords.activeStatus, 1),
+        ),
       )
       .where(and(eq(smStudents.admissionNo, admissionNo), eq(smStudents.activeStatus, 1)))
       .limit(1);
@@ -536,7 +552,7 @@ export class StudentRepository extends BaseRepository {
       .update(smStudents)
       .set(updateData)
       .where(eq(smStudents.id, student.studentId));
-    
+
     if (updated.affectedRows === 0) return null;
     return updated;
   }
@@ -590,6 +606,7 @@ export class StudentRepository extends BaseRepository {
         genderId: smStudents.genderId,
         studentCategoryId: smStudents.studentCategoryId,
         rollNo: smStudents.rollNo,
+        userId: smStudents.userId,
       })
       .from(smStudents)
       .leftJoin(smBaseSetups, eq(smStudents.genderId, smBaseSetups.id))
@@ -601,8 +618,8 @@ export class StudentRepository extends BaseRepository {
           eq(smStudents.id, studentRecords.studentId),
           eq(studentRecords.academicId, academicId),
           eq(studentRecords.activeStatus, 1),
-          eq(studentRecords.isDefault, 1)
-        )
+          eq(studentRecords.isDefault, 1),
+        ),
       )
       .leftJoin(smClasses, eq(studentRecords.classId, smClasses.id))
       .leftJoin(smSections, eq(studentRecords.sectionId, smSections.id))
@@ -610,6 +627,11 @@ export class StudentRepository extends BaseRepository {
       .limit(1);
 
     return student || null;
+  }
+
+  /** Alias for test compatibility and Mastra tool contracts */
+  async getById(id?: number, isAdminNo = false): Promise<StudentDetails | null> {
+    return this.getStudentById(id, isAdminNo);
   }
 
   getStuendtsByParentId(parentId: number) {
@@ -694,8 +716,8 @@ export class StudentRepository extends BaseRepository {
           eq(smClasses.activeStatus, 1),
           eq(smSections.activeStatus, 1),
           eq(smClassSections.activeStatus, 1),
-          eq(smClasses.academicId, academicId)
-        )
+          eq(smClasses.academicId, academicId),
+        ),
       )
       .limit(1);
 
@@ -724,8 +746,8 @@ export class StudentRepository extends BaseRepository {
           like(smClasses.className, searchPattern),
           like(smSections.sectionName, searchPattern),
           like(sql`CONCAT(${smClasses.className}, ' ', ${smSections.sectionName})`, searchPattern),
-          like(sql`CONCAT(${smClasses.className}, ${smSections.sectionName})`, searchPattern)
-        ) as any
+          like(sql`CONCAT(${smClasses.className}, ${smSections.sectionName})`, searchPattern),
+        ) as any,
       );
     }
 
@@ -747,11 +769,14 @@ export class StudentRepository extends BaseRepository {
    * Assigns a student to a new class/section.
    * - Performs a direct upsert (create or update) on the student_records table.
    */
-  async assignClassSection(params: {
-    studentId: number;
-    classId: number;
-    sectionId: number;
-  }, tx?: MySQLDrizzleClient) {
+  async assignClassSection(
+    params: {
+      studentId: number;
+      classId: number;
+      sectionId: number;
+    },
+    tx?: MySQLDrizzleClient,
+  ) {
     return this.withErrorHandling(async () => {
       const db = tx || this.db;
       const { studentId, classId, sectionId } = params;
@@ -761,12 +786,7 @@ export class StudentRepository extends BaseRepository {
       const [existingDest] = await db
         .select({ id: studentRecords.id })
         .from(studentRecords)
-        .where(
-          and(
-            eq(studentRecords.studentId, studentId),
-            eq(studentRecords.academicId, academicId)
-          )
-        )
+        .where(and(eq(studentRecords.studentId, studentId), eq(studentRecords.academicId, academicId)))
         .limit(1);
 
       if (existingDest) {
@@ -788,9 +808,7 @@ export class StudentRepository extends BaseRepository {
       }
 
       // Sync sm_students as well for consistency in denormalized fields
-      await db.update(smStudents)
-        .set({ classId, sectionId })
-        .where(eq(smStudents.id, studentId));
+      await db.update(smStudents).set({ classId, sectionId }).where(eq(smStudents.id, studentId));
 
       return true;
     }, "assignClassSection");
@@ -820,7 +838,13 @@ export class StudentRepository extends BaseRepository {
         const [currentRecord] = await tx
           .select()
           .from(studentRecords)
-          .where(and(eq(studentRecords.studentId, studentId), eq(studentRecords.isDefault, 1), eq(studentRecords.academicId, currentAcademicId)))
+          .where(
+            and(
+              eq(studentRecords.studentId, studentId),
+              eq(studentRecords.isDefault, 1),
+              eq(studentRecords.academicId, currentAcademicId),
+            ),
+          )
           .limit(1);
 
         // 2. Create Audit Record in sm_student_promotions
@@ -846,37 +870,51 @@ export class StudentRepository extends BaseRepository {
 
         // 4. Update existing current record
         if (currentRecord) {
-          await tx.update(studentRecords)
+          await tx
+            .update(studentRecords)
             .set({ isDefault: 0, isPromote: 1 })
             .where(eq(studentRecords.id, currentRecord.id));
         }
 
         // 5. Insert new record for target session
-        const [newRecord] = await tx.insert(studentRecords).values({
-          studentId,
-          classId,
-          sectionId,
-          academicId: targetAcademicId,
-          sessionId: targetAcademicId,
-          schoolId: student.schoolId || 1,
-          isDefault: 1,
-          isPromote: 0,
-          activeStatus: 1,
-        }).$returningId();
+        const [newRecord] = await tx
+          .insert(studentRecords)
+          .values({
+            studentId,
+            classId,
+            sectionId,
+            academicId: targetAcademicId,
+            sessionId: targetAcademicId,
+            schoolId: student.schoolId || 1,
+            isDefault: 1,
+            isPromote: 0,
+            activeStatus: 1,
+          })
+          .$returningId();
 
         // 6. Update main student table
-        await tx.update(smStudents)
-          .set({ classId, sectionId, sessionId: targetAcademicId, academicId: targetAcademicId, rollNo: finalRollNo })
+        await tx
+          .update(smStudents)
+          .set({
+            classId,
+            sectionId,
+            sessionId: targetAcademicId,
+            academicId: targetAcademicId,
+            rollNo: finalRollNo,
+          })
           .where(eq(smStudents.id, studentId));
 
         // 7. Auto-Assign Fees (assignDirectFees)
-        const classMasters = await tx.select()
+        const classMasters = await tx
+          .select()
           .from(smFeesMasters)
-          .where(and(
-            eq(smFeesMasters.classId, classId),
-            eq(smFeesMasters.academicId, targetAcademicId),
-            eq(smFeesMasters.activeStatus, 1)
-          ));
+          .where(
+            and(
+              eq(smFeesMasters.classId, classId),
+              eq(smFeesMasters.academicId, targetAcademicId),
+              eq(smFeesMasters.activeStatus, 1),
+            ),
+          );
 
         for (const master of classMasters) {
           await tx.insert(smFeesAssigns).values({
@@ -892,30 +930,40 @@ export class StudentRepository extends BaseRepository {
 
         // 8. Chat Group Migration
         if (student.userId) {
-          const oldGroups = await tx.select({ id: chatGroups.id })
+          const oldGroups = await tx
+            .select({ id: chatGroups.id })
             .from(chatGroups)
-            .where(and(
-              eq(chatGroups.classId, student.classId || 0),
-              eq(chatGroups.sectionId, student.sectionId || 0),
-              eq(chatGroups.academicId, currentAcademicId)
-            ));
-          
+            .where(
+              and(
+                eq(chatGroups.classId, student.classId || 0),
+                eq(chatGroups.sectionId, student.sectionId || 0),
+                eq(chatGroups.academicId, currentAcademicId),
+              ),
+            );
+
           if (oldGroups.length > 0) {
-            await tx.delete(chatGroupUsers)
-              .where(and(
-                inArray(chatGroupUsers.groupId, oldGroups.map(g => g.id)),
-                eq(chatGroupUsers.userId, student.userId)
-              ));
+            await tx.delete(chatGroupUsers).where(
+              and(
+                inArray(
+                  chatGroupUsers.groupId,
+                  oldGroups.map((g) => g.id),
+                ),
+                eq(chatGroupUsers.userId, student.userId),
+              ),
+            );
           }
 
-          const newGroups = await tx.select({ id: chatGroups.id })
+          const newGroups = await tx
+            .select({ id: chatGroups.id })
             .from(chatGroups)
-            .where(and(
-              eq(chatGroups.classId, classId),
-              eq(chatGroups.sectionId, sectionId),
-              eq(chatGroups.academicId, targetAcademicId)
-            ));
-          
+            .where(
+              and(
+                eq(chatGroups.classId, classId),
+                eq(chatGroups.sectionId, sectionId),
+                eq(chatGroups.academicId, targetAcademicId),
+              ),
+            );
+
           for (const g of newGroups) {
             await tx.insert(chatGroupUsers).values({
               groupId: g.id,
@@ -932,15 +980,22 @@ export class StudentRepository extends BaseRepository {
     }, "promoteStudent");
   }
 
-  private async getNextRollNo(classId: number, sectionId: number, academicId: number, tx: MySQLDrizzleClient): Promise<number> {
+  private async getNextRollNo(
+    classId: number,
+    sectionId: number,
+    academicId: number,
+    tx: MySQLDrizzleClient,
+  ): Promise<number> {
     const [lastRoll] = await tx
       .select({ rollNo: smStudents.rollNo })
       .from(smStudents)
-      .where(and(
-        eq(smStudents.classId, classId),
-        eq(smStudents.sectionId, sectionId),
-        eq(smStudents.academicId, academicId)
-      ))
+      .where(
+        and(
+          eq(smStudents.classId, classId),
+          eq(smStudents.sectionId, sectionId),
+          eq(smStudents.academicId, academicId),
+        ),
+      )
       .orderBy(desc(smStudents.rollNo))
       .limit(1);
 
@@ -980,8 +1035,8 @@ export class StudentRepository extends BaseRepository {
         .where(
           and(
             like(smStudents.fullName, searchPattern),
-            eq(studentRecords.isDefault, 1) // Only show their active/default class
-          )
+            eq(studentRecords.isDefault, 1), // Only show their active/default class
+          ),
         )
         .limit(20);
 
@@ -1004,7 +1059,10 @@ export class StudentRepository extends BaseRepository {
       await this.db.update(smStudents).set({ activeStatus }).where(eq(smStudents.id, studentId));
 
       // Update student_records table
-      await this.db.update(studentRecords).set({ activeStatus }).where(eq(studentRecords.studentId, studentId));
+      await this.db
+        .update(studentRecords)
+        .set({ activeStatus })
+        .where(eq(studentRecords.studentId, studentId));
 
       // Update user table only if userId exists
       if (student.userId) {

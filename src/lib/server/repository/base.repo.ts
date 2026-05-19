@@ -6,6 +6,7 @@ import type { ExamType } from "$lib/schema/result-output";
 import { DbInternalError } from "../helpers/errors";
 
 import { type MySQLDrizzleClient } from "../db";
+import type { TenantContext } from "../mastra/tenant-context";
 export type { MySQLDrizzleClient };
 
 export type AcademicYearData = typeof smAcademicYears.$inferSelect;
@@ -21,19 +22,18 @@ interface ConfigurationCache {
   lastUpdated: number;
 }
 
-// Global configuration cache
-let configCache: ConfigurationCache | null = null;
+// Global configuration cache mapped by schoolId
+let configCache: Map<number, ConfigurationCache> = new Map();
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes cache TTL
 
 export class BaseRepository {
-  public db!: MySQLDrizzleClient;
+  constructor(public readonly db: MySQLDrizzleClient, public readonly tenant: TenantContext) {}
 
-  constructor() { }
-
-  static async build<T extends BaseRepository>(this: new () => T): Promise<T> {
-    const inst = new this();
-    inst.db = await getDatabase();
-    return inst;
+  static async build<T extends BaseRepository>(this: new (db: MySQLDrizzleClient, tenant: TenantContext) => T, db?: MySQLDrizzleClient, tenant?: TenantContext): Promise<T> {
+    const finalDb = db || await getDatabase();
+    // Default tenant for singleton fallback (though we should avoid it)
+    const finalTenant = tenant || { schoolId: 1, userId: 1, designationId: 1, classId: null, sectionId: null, examId: null, academicId: null };
+    return new this(finalDb, finalTenant as TenantContext);
   }
 
   /**
@@ -82,24 +82,27 @@ export class BaseRepository {
    */
   async loadConfigurations(forceRefresh: boolean = false): Promise<ConfigurationCache> {
     const now = Date.now();
+    const schoolId = this.tenant.schoolId;
+
+    const cached = configCache.get(schoolId);
 
     // Return cached data if valid and not forcing refresh
-    if (!forceRefresh && configCache && now - configCache.lastUpdated < CACHE_TTL) {
-      return configCache;
+    if (!forceRefresh && cached && now - cached.lastUpdated < CACHE_TTL) {
+      return cached;
     }
 
     // Load all configurations in parallel
     const [generalSettings, academicYears, examTypes] = await Promise.all([
-      this.db.select().from(smGeneralSettings),
-      this.db.select().from(smAcademicYears).orderBy(smAcademicYears.id),
-      this.db.select().from(smExamTypes).orderBy(smExamTypes.id),
+      this.db.select().from(smGeneralSettings).where(eq(smGeneralSettings.schoolId, schoolId)),
+      this.db.select().from(smAcademicYears).where(eq(smAcademicYears.schoolId, schoolId)).orderBy(smAcademicYears.id),
+      this.db.select().from(smExamTypes).where(eq(smExamTypes.schoolId, schoolId)).orderBy(smExamTypes.id),
     ]);
 
     // Find active academic year based on current date
     const activeAcademicYear = this.findActiveAcademicYear(academicYears);
 
     // Update cache
-    configCache = {
+    const newCache: ConfigurationCache = {
       generalSettings,
       academicYears,
       examTypes,
@@ -107,7 +110,9 @@ export class BaseRepository {
       lastUpdated: now,
     };
 
-    return configCache;
+    configCache.set(schoolId, newCache);
+
+    return newCache;
   }
 
   /**
@@ -196,7 +201,7 @@ export class BaseRepository {
    * Clear configuration cache (useful after updates)
    */
   clearConfigCache(): void {
-    configCache = null;
+    configCache.clear();
   }
 
   /**

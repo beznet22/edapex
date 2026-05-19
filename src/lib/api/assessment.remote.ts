@@ -3,7 +3,6 @@ import ResultTemplate from "$lib/components/template/ResultTemplate.svelte";
 import { fileSchema } from "$lib/schema/chat-schema";
 import { resultInputSchema } from "$lib/schema/result-input";
 import { pageToHtml } from "$lib/server/helpers";
-import { generateContent } from "$lib/server/helpers/chat-helper";
 import { generate } from "$lib/server/helpers/pdf-generator";
 import { staffRepo, studentRepo, resultRepo } from "$lib/server/repository";
 import { assessment } from "$lib/server/service/assessment.service";

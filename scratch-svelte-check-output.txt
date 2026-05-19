@@ -1,0 +1,359 @@
+Loading svelte-check in workspace: /home/beznet/Workspace/edapex
+Getting Svelte diagnostics...
+
+/home/beznet/Workspace/edapex/src/lib/server/repository/chat.repo.ts:5:3
+Error: Module '"../db/schema"' has no exported member 'chats'. 
+import {
+  chats,
+  documents,
+
+/home/beznet/Workspace/edapex/src/lib/server/repository/chat.repo.ts:6:3
+Error: Module '"../db/schema"' has no exported member 'documents'. 
+  chats,
+  documents,
+  messages,
+
+/home/beznet/Workspace/edapex/src/lib/server/repository/chat.repo.ts:7:3
+Error: Module '"../db/schema"' has no exported member 'messages'. 
+  documents,
+  messages,
+  suggestions,
+
+/home/beznet/Workspace/edapex/src/lib/server/repository/chat.repo.ts:8:3
+Error: Module '"../db/schema"' has no exported member 'suggestions'. 
+  messages,
+  suggestions,
+  votes,
+
+/home/beznet/Workspace/edapex/src/lib/server/repository/chat.repo.ts:9:3
+Error: Module '"../db/schema"' has no exported member 'votes'. 
+  suggestions,
+  votes,
+  type DBChat,
+
+/home/beznet/Workspace/edapex/src/lib/server/repository/chat.repo.ts:10:8
+Error: Module '"../db/schema"' has no exported member 'DBChat'. 
+  votes,
+  type DBChat,
+  type DBMessage,
+
+/home/beznet/Workspace/edapex/src/lib/server/repository/chat.repo.ts:11:8
+Error: Module '"../db/schema"' has no exported member 'DBMessage'. 
+  type DBChat,
+  type DBMessage,
+  type Document,
+
+/home/beznet/Workspace/edapex/src/lib/server/repository/chat.repo.ts:12:8
+Error: Module '"../db/schema"' has no exported member 'Document'. 
+  type DBMessage,
+  type Document,
+  type Vote,
+
+/home/beznet/Workspace/edapex/src/lib/server/repository/chat.repo.ts:13:8
+Error: Module '"../db/schema"' has no exported member 'Vote'. 
+  type Document,
+  type Vote,
+} from "../db/schema";
+
+/home/beznet/Workspace/edapex/src/lib/components/template/RecordsTable.svelte:10:34
+Warn: This reference only captures the initial value of `student`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+  let { records, student }: Props = $props();
+  const { category, fullName } = student;
+
+/home/beznet/Workspace/edapex/src/lib/components/template/ResultTemplate.svelte:15:24
+Warn: This reference only captures the initial value of `data`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+  let { data }: Props = $props();
+  const { category } = data.student;
+
+/home/beznet/Workspace/edapex/src/lib/context/chat-history.svelte.ts:5:15
+Error: Module '"$lib/server/db/schema"' has no exported member 'DBChat'. 
+import type { ChatVisibility } from "$lib/schema/chat-schema";
+import type { DBChat } from "$lib/server/db/schema";
+import { isToday, isYesterday, subMonths, subWeeks } from "date-fns";
+
+/home/beznet/Workspace/edapex/src/lib/api/assessment.remote.ts:146:45
+Error: Argument of type '{ file: Blob; classId: number; sectionId: number; }' is not assignable to parameter of type '{ userId: number; teacherId: number; file: Blob; classId: number; sectionId: number; studentId?: number | undefined; fullName?: string | undefined; admissionNo?: number | undefined; originalName?: string | undefined; }'.
+  Type '{ file: Blob; classId: number; sectionId: number; }' is missing the following properties from type '{ userId: number; teacherId: number; file: Blob; classId: number; sectionId: number; studentId?: number | undefined; fullName?: string | undefined; admissionNo?: number | undefined; originalName?: string | undefined; }': userId, teacherId 
+    try {
+      return await assessment.runExtraction({ file, classId, sectionId });
+    } catch (error: any) {
+
+/home/beznet/Workspace/edapex/src/lib/components/ai-elements/code/Code.svelte:36:2
+Warn: Unknown at rule @reference (css)
+<style>
+	@reference '../../../../routes/layout.css';
+
+/home/beznet/Workspace/edapex/src/lib/components/ai-elements/code/Code.svelte:58:3
+Warn: Unknown at rule @apply (css)
+	.ai-code-wrapper :global(pre.shiki) {
+		@apply overflow-x-auto rounded-lg bg-inherit py-4 text-sm;
+	}
+
+/home/beznet/Workspace/edapex/src/lib/components/ai-elements/code/Code.svelte:62:3
+Warn: Unknown at rule @apply (css)
+	.ai-code-wrapper :global(pre.shiki:not([data-code-overflow] *):not([data-code-overflow])) {
+		@apply overflow-y-auto;
+		max-height: min(100%, 650px);
+
+/home/beznet/Workspace/edapex/src/lib/components/ai-elements/code/Code.svelte:67:3
+Warn: Unknown at rule @apply (css)
+	.ai-code-wrapper :global(pre.shiki code) {
+		@apply grid min-w-full rounded-none border-0 bg-transparent p-0 break-words;
+		counter-reset: line;
+
+/home/beznet/Workspace/edapex/src/lib/components/ai-elements/code/Code.svelte:87:3
+Warn: Unknown at rule @apply (css)
+	.ai-code-wrapper :global(pre.line-numbers .line::before) {
+		@apply text-muted-foreground;
+	}
+
+/home/beznet/Workspace/edapex/src/lib/components/ai-elements/code/Code.svelte:91:3
+Warn: Unknown at rule @apply (css)
+	.ai-code-wrapper :global(pre .line.line--highlighted) {
+		@apply bg-secondary;
+		/* border-l-2 border-primary/40 if needed */
+
+/home/beznet/Workspace/edapex/src/lib/components/ai-elements/code/Code.svelte:96:3
+Warn: Unknown at rule @apply (css)
+	.ai-code-wrapper :global(pre .line.line--highlighted span) {
+		@apply relative;
+	}
+
+/home/beznet/Workspace/edapex/src/lib/components/ai-elements/code/Code.svelte:100:3
+Warn: Unknown at rule @apply (css)
+	.ai-code-wrapper :global(pre .line) {
+		@apply inline-block min-h-4 w-full px-4 py-0.5;
+	}
+
+/home/beznet/Workspace/edapex/src/lib/components/ai-elements/code/Code.svelte:104:3
+Warn: Unknown at rule @apply (css)
+	.ai-code-wrapper :global(pre.line-numbers .line) {
+		@apply px-2;
+	}
+
+/home/beznet/Workspace/edapex/src/lib/components/ai-elements/copy-button/CopyButton.svelte:26:6
+Warn: This reference only captures the initial value of `size`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+	// this way if the user passes text then the button will be the default size
+	if (size === "icon" && children) {
+		size = "default";
+
+/home/beznet/Workspace/edapex/src/lib/components/ai-elements/copy-button/CopyButton.svelte:26:25
+Warn: This reference only captures the initial value of `children`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+	// this way if the user passes text then the button will be the default size
+	if (size === "icon" && children) {
+		size = "default";
+
+/home/beznet/Workspace/edapex/src/lib/components/file-drop-zone/file-drop-zone.svelte:22:7
+Warn: This reference only captures the initial value of `maxFiles`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+
+  if (maxFiles !== undefined && fileCount === undefined) {
+    console.warn(
+
+/home/beznet/Workspace/edapex/src/lib/components/file-drop-zone/file-drop-zone.svelte:22:33
+Warn: This reference only captures the initial value of `fileCount`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+
+  if (maxFiles !== undefined && fileCount === undefined) {
+    console.warn(
+
+/home/beznet/Workspace/edapex/src/lib/components/prompt-kit/reasoning/reasoning.svelte:23:47
+Warn: This reference only captures the initial value of `onOpenChange`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+
+	const context = createReasoningContext(open, onOpenChange, isStreaming);
+	setContext("reasoning", context);
+
+/home/beznet/Workspace/edapex/src/lib/components/prompt-kit/reasoning/reasoning.svelte:23:61
+Warn: This reference only captures the initial value of `isStreaming`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+
+	const context = createReasoningContext(open, onOpenChange, isStreaming);
+	setContext("reasoning", context);
+
+/home/beznet/Workspace/edapex/src/lib/components/sidebar-history/item.svelte:3:17
+Error: Module '"$lib/server/db/schema"' has no exported member 'DBChat'. (ts)
+  import { goto } from "$app/navigation";
+  import type { DBChat } from "$lib/server/db/schema";
+  import {
+
+/home/beznet/Workspace/edapex/src/lib/components/ui/carousel/carousel.svelte:25:3
+Warn: This reference only captures the initial value of `orientation`. Did you mean to reference it inside a derived instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+		scrollNext,
+		orientation,
+		canScrollNext: false,
+
+/home/beznet/Workspace/edapex/src/lib/components/ui/carousel/carousel.svelte:29:12
+Warn: This reference only captures the initial value of `opts`. Did you mean to reference it inside a derived instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+		handleKeyDown,
+		options: opts,
+		plugins,
+
+/home/beznet/Workspace/edapex/src/lib/components/ui/carousel/carousel.svelte:30:3
+Warn: This reference only captures the initial value of `plugins`. Did you mean to reference it inside a derived instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+		options: opts,
+		plugins,
+		onInit,
+
+/home/beznet/Workspace/edapex/src/lib/context/chat-context.svelte.ts:3:15
+Error: Module '"$lib/server/db/schema"' has no exported member 'DBChat'. 
+import { goto, replaceState } from "$app/navigation";
+import type { DBChat } from "$lib/server/db/schema";
+import type { AuthUser } from "$lib/types/auth-types";
+
+/home/beznet/Workspace/edapex/src/lib/server/agents/assessment.ts:3:48
+Error: Cannot find module '$lib/chat/tools' or its corresponding type declarations. 
+
+import { coordinatorTools, teacherTools } from "$lib/chat/tools";
+import type { AgentWorkflow } from "$lib/types/chat-types";
+
+/home/beznet/Workspace/edapex/src/lib/server/mastra/skill-watcher.ts:1:39
+Error: Could not find a declaration file for module 'chokidar'. '/home/beznet/Workspace/edapex/node_modules/chokidar/index.js' implicitly has an 'any' type.
+  Try `npm i --save-dev @types/chokidar` if it exists or add a new declaration (.d.ts) file containing `declare module 'chokidar';` 
+import { watch, type FSWatcher } from 'chokidar';
+import { writeFileSync, renameSync, existsSync, mkdirSync } from 'node:fs';
+
+/home/beznet/Workspace/edapex/src/lib/server/mastra/__tests__/gateway.test.ts:160:31
+Error: Property 'getFailoverChain' does not exist on type 'EdApexGateway'. 
+		const gateway = new EdApexGateway(db, 1, TEST_ENCRYPTION_KEY);
+		const chain = await gateway.getFailoverChain();
+		expect(chain).toEqual(['cerebras', 'groq', 'nvidia', 'mistral']);
+
+/home/beznet/Workspace/edapex/src/lib/server/mastra/__tests__/gateway.test.ts:248:32
+Error: Property 'resolveModelForTask' does not exist on type 'EdApexGateway'. 
+		const gateway = new EdApexGateway(db, 1, TEST_ENCRYPTION_KEY);
+		const result = await gateway.resolveModelForTask('ocr');
+		expect(result.providerId).toBe('mistral');
+
+/home/beznet/Workspace/edapex/src/lib/server/mastra/__tests__/gateway.test.ts:255:32
+Error: Property 'resolveModelForTask' does not exist on type 'EdApexGateway'. 
+		const gateway = new EdApexGateway(db, 1, TEST_ENCRYPTION_KEY);
+		const result = await gateway.resolveModelForTask('chat');
+		expect(result.providerId).toBe('mistral');
+
+/home/beznet/Workspace/edapex/src/lib/server/mastra/__tests__/gateway.test.ts:262:18
+Error: Property 'buildUrl' does not exist on type 'EdApexGateway'. 
+		const gateway = new EdApexGateway(db, 1, TEST_ENCRYPTION_KEY);
+		expect(gateway.buildUrl('edapex/cerebras/llama-3')).toBe('https://api.cerebras.ai/v1');
+		expect(gateway.buildUrl('groq/llama-3')).toBe('https://api.groq.com/openai/v1');
+
+/home/beznet/Workspace/edapex/src/lib/server/mastra/__tests__/gateway.test.ts:263:18
+Error: Property 'buildUrl' does not exist on type 'EdApexGateway'. 
+		expect(gateway.buildUrl('edapex/cerebras/llama-3')).toBe('https://api.cerebras.ai/v1');
+		expect(gateway.buildUrl('groq/llama-3')).toBe('https://api.groq.com/openai/v1');
+		expect(gateway.buildUrl('nvidia')).toBe('https://integrate.api.nvidia.com/v1');
+
+/home/beznet/Workspace/edapex/src/lib/server/mastra/__tests__/gateway.test.ts:264:18
+Error: Property 'buildUrl' does not exist on type 'EdApexGateway'. 
+		expect(gateway.buildUrl('groq/llama-3')).toBe('https://api.groq.com/openai/v1');
+		expect(gateway.buildUrl('nvidia')).toBe('https://integrate.api.nvidia.com/v1');
+		expect(gateway.buildUrl('mistral')).toBe('https://api.mistral.ai/v1');
+
+/home/beznet/Workspace/edapex/src/lib/server/mastra/__tests__/gateway.test.ts:265:18
+Error: Property 'buildUrl' does not exist on type 'EdApexGateway'. 
+		expect(gateway.buildUrl('nvidia')).toBe('https://integrate.api.nvidia.com/v1');
+		expect(gateway.buildUrl('mistral')).toBe('https://api.mistral.ai/v1');
+	});
+
+/home/beznet/Workspace/edapex/src/lib/server/mastra/__tests__/gateway.test.ts:271:24
+Error: Property 'resolveModelForTask' does not exist on type 'EdApexGateway'. 
+		await client.execute('DELETE FROM provider_configs');
+		await expect(gateway.resolveModelForTask('ocr')).rejects.toThrow('No provider configured for task');
+	});
+
+/home/beznet/Workspace/edapex/src/lib/server/mastra/__tests__/settings-persistence.test.ts:58:13
+Error: Object literal may only specify known properties, and 'taskMappings' does not exist in type 'Omit<{ id: string; updatedAt: string; userId: number; provider: string; apiKeyEncrypted: string | null; baseUrl: string; priority: number; enabled: number; }, "id" | "updatedAt">'. 
+            baseUrl: 'https://groq.api',
+            taskMappings: '{}',
+            enabled: 1
+
+/home/beznet/Workspace/edapex/src/lib/server/mastra/__tests__/settings-persistence.test.ts:92:13
+Error: Object literal may only specify known properties, and 'taskMappings' does not exist in type 'Omit<{ id: string; updatedAt: string; userId: number; provider: string; apiKeyEncrypted: string | null; baseUrl: string; priority: number; enabled: number; }, "id" | "updatedAt">'. 
+            baseUrl: '',
+            taskMappings: '{}',
+            enabled: 1
+
+/home/beznet/Workspace/edapex/src/lib/server/mastra/__tests__/settings-persistence.test.ts:103:13
+Error: Object literal may only specify known properties, and 'taskMappings' does not exist in type 'Omit<{ id: string; updatedAt: string; userId: number; provider: string; apiKeyEncrypted: string | null; baseUrl: string; priority: number; enabled: number; }, "id" | "updatedAt">'. 
+            baseUrl: '',
+            taskMappings: '{}',
+            enabled: 1
+
+/home/beznet/Workspace/edapex/src/lib/server/mastra/__tests__/settings-persistence.test.ts:124:13
+Error: Object literal may only specify known properties, and 'taskMappings' does not exist in type 'Omit<{ id: string; updatedAt: string; userId: number; provider: string; apiKeyEncrypted: string | null; baseUrl: string; priority: number; enabled: number; }, "id" | "updatedAt">'. 
+            baseUrl: '',
+            taskMappings: '{}',
+            enabled: 1
+
+/home/beznet/Workspace/edapex/src/lib/server/mastra/__tests__/settings-persistence.test.ts:134:13
+Error: Object literal may only specify known properties, and 'taskMappings' does not exist in type 'Omit<{ id: string; updatedAt: string; userId: number; provider: string; apiKeyEncrypted: string | null; baseUrl: string; priority: number; enabled: number; }, "id" | "updatedAt">'. 
+            baseUrl: 'new-url',
+            taskMappings: '{}',
+            enabled: 1
+
+/home/beznet/Workspace/edapex/src/lib/components/chat.svelte:280:26
+Error: Cannot find name 'isToolUIPart'. (ts)
+                    <!-- Then render tool parts -->
+                    {#if isToolUIPart(part)}
+                      <div class="flex">
+
+/home/beznet/Workspace/edapex/src/lib/components/file-view-modal.svelte:248:21
+Warn: `<div>` with a pointerdown, pointermove, pointerup or pointercancel handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions (svelte)
+                    <!-- Image Display -->
+                    <div
+                        class="flex-1 flex items-center justify-center p-6 sm:p-10 lg:p-20 overflow-hidden touch-none"
+                        onpointerdown={handlePointerDown}
+                        onpointermove={handlePointerMove}
+                        onpointerup={handlePointerUp}
+                        onpointercancel={handlePointerUp}
+                        onwheel={(e) => {
+                            if (e.ctrlKey) {
+                                e.preventDefault();
+                                store.zoom = Math.min(Math.max(store.zoom + (e.deltaY < 0 ? 0.1 : -0.1), 0.5), 3);
+                            }
+                        }}
+                    >
+                        {#if store.selectedFile?.url}
+                            <div
+                                class="relative transition-transform duration-75 ease-out shadow-[0_0_100px_rgba(0,0,0,0.3)] origin-center cursor-grab active:cursor-grabbing"
+                                style="transform: translate({panX}px, {panY}px) scale({store.zoom}) rotate({store.rotation}deg);"
+                            >
+                                <img
+                                    src={store.selectedFile.url}
+                                    alt={store.selectedFile.filename}
+                                    class="max-w-[85vw] max-h-[70vh] sm:max-w-full sm:max-h-[60vh] object-contain bg-white rounded-2xl shadow-2xl transition-all duration-300"
+                                    draggable="false"
+                                />
+                                {#if store.showGrids}
+                                    <div class="absolute inset-0 grid grid-cols-12 grid-rows-12 pointer-events-none opacity-30 mix-blend-overlay">
+                                        {#each Array(144) as _}
+                                            <div class="border-[0.5px] border-primary/50"></div>
+                                        {/each}
+                                    </div>
+                                {/if}
+                            </div>
+                        {:else}
+                            <div class="flex flex-col items-center justify-center text-muted-foreground/20 animate-pulse">
+                                <FileText class="h-32 w-32 mb-6" />
+                                <p class="text-xs font-black uppercase tracking-[0.4em]">Empty Canvas</p>
+                            </div>
+                        {/if}
+                    </div>
+
+/home/beznet/Workspace/edapex/src/routes/(chat)/+layout.svelte:63:41
+Warn: This reference only captures the initial value of `data`. Did you mean to reference it inside a closure instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+
+  const filesContext = new FilesContext(data.uploads, selectedClass, true);
+  filesContext.setContext();
+
+====================================
+svelte-check found 29 errors and 22 warnings in 19 files

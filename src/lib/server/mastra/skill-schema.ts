@@ -4,6 +4,13 @@ import { join, basename } from 'node:path';
 import matter from 'gray-matter';
 
 /**
+ * Reserved Global Tool IDs that skills MUST NOT declare.
+ * These tools are always injected by the Gateway regardless of active skill.
+ * Skills attempting to register tools with these IDs will be rejected during validation.
+ */
+export const RESERVED_GLOBAL_TOOL_IDS = new Set(['web-search', 'web-fetch']);
+
+/**
  * Zod schema for `.skill.md` frontmatter (spec: mastra_migration_specs.md §2.2 L59-66).
  * Enforces non-empty name, description, and tools to prevent poisoned skills.
  */
@@ -54,7 +61,8 @@ export async function parseSkillFile(filePath: string): Promise<SkillDefinition>
 
 /**
  * CI-grade validation of an entire skill directory.
- * Checks both Zod schema conformance AND tool existence against the registry.
+ * Checks Zod schema conformance, tool existence against the registry,
+ * AND rejects skills that declare reserved Global Tool IDs (web-search, web-fetch).
  */
 export async function validateSkillDirectory(
 	dirPath: string,
@@ -70,6 +78,17 @@ export async function validateSkillDirectory(
 
 		try {
 			const skill = await parseSkillFile(filePath);
+
+			// Reject skills that declare reserved Global Tool IDs
+			const conflictingTools = skill.tools.filter((t) => RESERVED_GLOBAL_TOOL_IDS.has(t));
+			if (conflictingTools.length > 0) {
+				result.valid = false;
+				for (const tool of conflictingTools) {
+					result.errors.push(
+						`Tool "${tool}" in ${file} conflicts with a reserved Global Tool — skills cannot declare Global Tool IDs`
+					);
+				}
+			}
 
 			const missingTools = skill.tools.filter((t) => !knownTools.has(t));
 			if (missingTools.length > 0) {

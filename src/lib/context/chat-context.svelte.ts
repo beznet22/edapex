@@ -1,6 +1,6 @@
 // @/src/lib/hooks/chat-context.svelte.ts
 import { goto, replaceState } from "$app/navigation";
-import type { DBChat } from "$lib/server/db/schema";
+import type { DBChat } from "$lib/types/chat-types";
 import type { AuthUser } from "$lib/types/auth-types";
 import type {
   AgentWorkflow,
@@ -19,9 +19,16 @@ import { page } from "$app/state";
 import { localStore } from "$lib/utils";
 import type { ClassStudent } from "$lib/server/repository/student.repo";
 
-import { SelectedClass, SelectedAgent } from "./sync.svelte";
+import { SelectedClass, SelectedModel } from "./sync.svelte";
 
 const CHAT_CONTEXT_KEY = Symbol("chat-context");
+
+export type MentionPayload = {
+  category: string;
+  id: number;
+  name: string;
+  parentContext?: string;
+};
 
 export type InitChat = {
   initialMessages?: xUIMessage[];
@@ -29,7 +36,6 @@ export type InitChat = {
   chatData?: DBChat;
   agents: AgentWorkflow[];
   selectedClass: SelectedClass;
-  selectedAgent: SelectedAgent;
 };
 
 export class ChatContext {
@@ -41,6 +47,20 @@ export class ChatContext {
   docPart = $state<CreateDocumentPart | undefined>(undefined);
   docState = $derived(this.docPart?.status);
   error = $state<Error | undefined>(undefined);
+  profile = $state<'strong' | 'balanced' | 'simple'>('strong');
+  thinkingEnabled = $state<boolean>(false);
+  activeWorkflows = $state<{tool: string, args: any}[]>([]);
+  pendingConfirmation = $state<{
+    type: 'mutation' | 'navigation';
+    confidence: number;
+    threshold: number;
+    reasoning: string;
+    originalMessage: string;
+  } | null>(null);
+  pendingMentions = $state<MentionPayload[]>([]);
+  fileReferences = $state<{ key: string; name: string; type: 'file' | 'dir'; mimeType?: string }[]>([]);
+  #selectedModel = SelectedModel.fromContext();
+  get modelOverride() { return this.#selectedModel.value; }
 
   // Chat properties
   agents: AgentWorkflow[];
@@ -53,7 +73,7 @@ export class ChatContext {
   chatHistory = ChatHistory.fromContext();
 
   #selectedClass: SelectedClass;
-  #selectedAgent: SelectedAgent;
+  // #selectedAgent removed
 
   constructor({
     initialMessages,
@@ -61,7 +81,6 @@ export class ChatContext {
     chatData,
     agents,
     selectedClass,
-    selectedAgent,
   }: InitChat) {
     this.client = $derived(
       new Chat<xUIMessage>({
@@ -83,18 +102,9 @@ export class ChatContext {
     this.lastMessage = $derived(this.messages.at(-1));
     this.agents = $state(agents);
     this.#selectedClass = selectedClass;
-    this.#selectedAgent = selectedAgent;
   }
 
-  get activeAgent() {
-    const id = this.#selectedAgent.value;
-    if (id === "none") return null;
-    return this.agents.find((a) => a.id === id) || this.agents[0];
-  }
 
-  set activeAgent(v: AgentWorkflow | null) {
-    this.#selectedAgent.value = v?.id || "none";
-  }
 
   get selectedClass() {
     return this.#selectedClass.data;
@@ -109,21 +119,36 @@ export class ChatContext {
   }
 
   #prepareSendMessagesRequest = ({ messages }: { messages: xUIMessage[] }) => {
-    return {
-      body: {
-        messages: this.user ? [messages.at(-1)] : messages,
-        chatId: this.chatData?.id,
-        agentId: this.activeAgent?.id,
-        data: this.studentData as any,
-        selectedClass: this.selectedClass,
-      },
+    const body: Record<string, any> = {
+      messages: this.user ? [messages.at(-1)] : messages,
+      chatId: this.chatData?.id,
+      data: this.studentData as any,
+      selectedClass: this.selectedClass,
+      profile: this.profile,
+      thinkingEnabled: this.thinkingEnabled,
+      modelOverride: this.modelOverride,
+      fileReferences: this.fileReferences.length > 0 ? this.fileReferences : undefined,
     };
+
+    // Include @mention tags if any were selected for this message
+    if (this.pendingMentions.length > 0) {
+      body.mentions = this.pendingMentions;
+      this.pendingMentions = [];
+    }
+
+    return { body };
   };
 
   #onFinish = async () => {
-    goto(`/chat/${this.chatData?.id}`, {
-      replaceState: true,
-    });
+    this.activeWorkflows = [];
+    this.pendingConfirmation = null;
+    // Only navigate if we have a valid chatId
+    // (on new chats, the URL is updated via data-chat in #onData)
+    if (this.chatData?.id) {
+      goto(`/chat/${this.chatData.id}`, {
+        replaceState: true,
+      });
+    }
   };
 
   #onData = (part: any) => {
@@ -140,6 +165,14 @@ export class ChatContext {
       this.openedDocumentId = part.id;
       this.openPanel = part.data.status === "success" || part.data.status === "streaming";
       this.docPart = part.data;
+    }
+
+    if (part.type === "data-workflow") {
+      this.activeWorkflows = [...this.activeWorkflows, part.data];
+    }
+
+    if (part.type === "data-confirmation") {
+      this.pendingConfirmation = part.data;
     }
   };
 

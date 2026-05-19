@@ -1,11 +1,7 @@
 <script lang="ts">
   import type { Snippet } from "svelte";
   import type { xUIMessagePart } from "$lib/types/chat-types";
-  import type {
-    UpsertMarkStoreOutput,
-    ValidateClassResultsOutput,
-  } from "$lib/chat/tools/coordinator.tool";
-  import type { upsertResultOutput } from "$lib/chat/tools/result.tool";
+
   import {
     Tool,
     ToolContent,
@@ -39,9 +35,9 @@
 </script>
 
 {#snippet upsertStudentResult(
-  p: Extract<xUIMessagePart, { type: "tool-upsertStudentResult" }>,
+  p: any,
 )}
-  {@const output = p.output as upsertResultOutput}
+  {@const output = p.output as any}
   <ToolOutput
     output={`Status: ${output?.status}\nMessage: ${output?.message}`}
     errorText={p.errorText}
@@ -52,9 +48,9 @@
 {/snippet}
 
 {#snippet validateClassResults(
-  p: Extract<xUIMessagePart, { type: "tool-validateClassResults" }>,
+  p: any,
 )}
-  {@const output = p.output as ValidateClassResultsOutput}
+  {@const output = p.output as any}
   <ValidationSummary
     valid={output.validCount}
     invalid={output.invalidCount}
@@ -81,9 +77,9 @@
         {/if}
 
         {#if (part as any).state === "output-available" || (part as any).state === "output-error"}
-          {#if part.type === "tool-validateClassResults"}
+          {#if part.type === "tool-validate-extraction"}
             {@render validateClassResults(part as any)}
-          {:else if part.type === "tool-upsertStudentResult"}
+          {:else if part.type === "tool-manage-results"}
             {@render upsertStudentResult(part as any)}
           {:else}
             {@render defaultTool(part)}

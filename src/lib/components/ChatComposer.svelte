@@ -16,16 +16,28 @@
   import CloudUploadIcon from "@lucide/svelte/icons/cloud-upload";
   import FilePlusIcon from "@lucide/svelte/icons/file-plus";
   import ChevronDownIcon from "@lucide/svelte/icons/chevron-down";
+  import RefreshCwIcon from "@lucide/svelte/icons/refresh-cw";
+  import CheckIcon from "@lucide/svelte/icons/check";
+  import ZapIcon from "@lucide/svelte/icons/zap";
+  import ActivityIcon from "@lucide/svelte/icons/activity";
+  import WindIcon from "@lucide/svelte/icons/wind";
+  import BrainCircuitIcon from "@lucide/svelte/icons/brain-circuit";
+  import SparklesIcon from "@lucide/svelte/icons/sparkles";
+  import ShieldAlertIcon from "@lucide/svelte/icons/shield-alert";
 
   import { useChat } from "$lib/context/chat-context.svelte";
   import { useFileActions } from "$lib/context/file-context.svelte";
   import { UserContext } from "$lib/context/user-context.svelte";
+  import { SelectedModel } from "$lib/context/sync.svelte";
   import { cn } from "$lib/utils/shadcn";
+  import { DESIGNATIONS } from "$lib/types/sms-types";
   import type { AuthUser } from "$lib/types/auth-types";
+  import type { MentionPayload } from "$lib/context/chat-context.svelte";
   import ModelSelector from "./model-selector.svelte";
   import CommandDropdown from "./chat/CommandDropdown.svelte";
   import MentionDropdown from "./chat/MentionDropdown.svelte";
   import { PromptInput, PromptInputTextarea, PromptInputActions } from "./prompt-kit/prompt-input";
+  import { toast } from "svelte-sonner";
 
   let {
     user,
@@ -43,10 +55,32 @@
   let showMentions = $state(false);
   let mentionQuery = $state("");
   let commandQuery = $state("");
+  let blockedWorkflowMessage = $state<string | null>(null);
+  let selectedMentions = $state<MentionPayload[]>([]);
 
   const chat = useChat();
   const file = useFileActions();
   const userContext = UserContext.fromContext();
+  const selectedChatModel = SelectedModel.fromContext();
+
+  /**
+   * Extract the slash command type from input text.
+   * Returns the command name (e.g., "extract", "validate", "publish") or null.
+   */
+  function extractSlashCommand(text: string): string | null {
+    const match = text.trim().match(/^\/(\w+)/);
+    return match ? match[1] : null;
+  }
+
+  /**
+   * Check if a workflow of the same type is already active.
+   * Blocks duplicate workflow slash commands per Requirement 14.6.
+   */
+  function isDuplicateWorkflow(command: string): boolean {
+    return chat.activeWorkflows.some(
+      (wf) => wf.tool.toLowerCase() === command.toLowerCase()
+    );
+  }
 
   function onSubmit() {
     if (chat.loading) {
@@ -55,8 +89,30 @@
     }
 
     if (input.trim() && chat.status === "ready") {
+      // Block duplicate workflow slash commands (Requirement 14.6)
+      const slashCommand = extractSlashCommand(input);
+      if (slashCommand && isDuplicateWorkflow(slashCommand)) {
+        blockedWorkflowMessage = `A "${slashCommand}" workflow is already in progress. Please wait for it to complete.`;
+        // Auto-dismiss the blocked message after 5 seconds
+        setTimeout(() => {
+          blockedWorkflowMessage = null;
+        }, 5000);
+        return;
+      }
+
+      blockedWorkflowMessage = null;
+      // Pass selected mentions to the chat context for inclusion in request body
+      chat.pendingMentions = [...selectedMentions];
+      // Pass file references to chat context before sending (Requirement 9.4)
+      chat.fileReferences = file.references ? [...file.references] : [];
       chat.client.sendMessage({ text: input });
       input = "";
+      selectedMentions = [];
+      // Clear file references after submission
+      chat.fileReferences = [];
+      if (file.references?.length) {
+        file.references = [];
+      }
       chat.scrollToBottom();
     }
   }
@@ -107,15 +163,33 @@
     const cursor = textareaRef?.selectionStart || 0;
     const beforeCursor = input.substring(0, cursor);
     const afterCursor = input.substring(cursor);
-    const newBefore = beforeCursor.replace(/@(\w*)$/, `@${mention.name} `);
+    const displayName = mention.name.length > 40 ? mention.name.slice(0, 40) : mention.name;
+    const newBefore = beforeCursor.replace(/@(\w*)$/, `@${displayName} `);
     input = newBefore + afterCursor;
     showMentions = false;
+    // Track the structured mention for submission
+    selectedMentions = [...selectedMentions, {
+      category: mention.category,
+      id: mention.id,
+      name: mention.name,
+      parentContext: mention.parentContext,
+    }];
     textareaRef?.focus();
   }
 
   function handleNativeUpload() {
     file.openFileDialog();
   }
+
+  // Profile selection logic
+  const profiles = [
+    { id: 'strong', label: 'Strong', icon: ZapIcon, description: 'Pro models for complex tasks' },
+    { id: 'balanced', label: 'Balanced', icon: ActivityIcon, description: 'Speed & intelligence mix' },
+    { id: 'simple', label: 'Simple', icon: WindIcon, description: 'Fast, efficient responses' }
+  ];
+
+  let selectedProfile = $derived(chat.profile);
+  let thinkingEnabled = $derived(chat.thinkingEnabled);
 </script>
 
 <div class="w-full flex justify-center px-4 pb-6">
@@ -129,7 +203,7 @@
     onSubmit={onSubmit}
   >
     <!-- Attachment Tray (Top Layer) -->
-    {#if file.files.length > 0 || chat.studentData}
+    {#if file.files.length > 0 || chat.studentData || (file.references && file.references.length > 0)}
       <div class="flex flex-wrap gap-2 px-4 pt-4 pb-2 transition-all duration-500 ease-out">
         {#if chat.studentData}
           <div class="flex items-center gap-1.5 px-2 py-1 rounded-md bg-primary/10 border border-primary/20 text-xs font-medium text-primary">
@@ -146,18 +220,38 @@
         {/if}
 
         {#each file.files as f, i}
-          <div class="flex items-center gap-1.5 px-2 py-1 rounded-md bg-primary/10 border border-primary/20 text-xs font-medium text-primary group">
-            <PaperclipIcon class="size-3.5" />
-            <span class="max-w-[150px] truncate">{f.name}</span>
+          <div class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary/10 border border-primary/20 text-[11px] font-bold tracking-wide text-primary group shadow-sm">
+            <PaperclipIcon class="size-3.5 opacity-70" />
+            <span class="max-w-[150px] truncate uppercase tracking-tighter">{f.name}</span>
             <button 
               onclick={() => file.remove(i)} 
-              class="opacity-50 group-hover:opacity-100 hover:text-foreground/80 transition-all"
+              class="opacity-40 group-hover:opacity-100 hover:text-foreground transition-all ml-1"
               aria-label={`Remove ${f.name}`}
             >
               <XIcon class="size-3" />
             </button>
           </div>
         {/each}
+
+        {#if file.references}
+          {#each file.references as ref (ref.key)}
+            <div class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/60 border border-white/5 text-[11px] font-bold tracking-wide text-foreground/70 group shadow-sm">
+              {#if ref.type === "dir"}
+                <FolderOpenIcon class="size-3.5 opacity-50" />
+              {:else}
+                <PaperclipIcon class="size-3.5 opacity-50" />
+              {/if}
+              <span class="max-w-[150px] truncate uppercase tracking-tighter">{ref.name}</span>
+              <button 
+                onclick={() => file.removeReference(ref.key)} 
+                class="opacity-40 group-hover:opacity-100 hover:text-destructive transition-all ml-1"
+                aria-label={`Remove reference ${ref.name}`}
+              >
+                <XIcon class="size-3" />
+              </button>
+            </div>
+          {/each}
+        {/if}
       </div>
     {/if}
 
@@ -167,6 +261,26 @@
       onclick={() => textareaRef?.focus()}
       role="presentation"
     >
+      <!-- Active Workflow Badge (Requirement 14.2) -->
+      {#if chat.activeWorkflows.length > 0}
+        <div class="flex flex-wrap gap-1.5 px-4 pt-2">
+          {#each chat.activeWorkflows as wf (wf.tool)}
+            <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-primary/10 border border-primary/20 text-[10px] font-bold tracking-wide text-primary animate-pulse">
+              <span class="size-1.5 rounded-full bg-primary"></span>
+              <span class="uppercase">{wf.tool}</span>
+              <span class="opacity-60">Running</span>
+            </div>
+          {/each}
+        </div>
+      {/if}
+
+      <!-- Blocked Workflow Message (Requirement 14.6) -->
+      {#if blockedWorkflowMessage}
+        <div class="mx-4 mt-2 px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-[11px] font-medium text-amber-300 animate-in fade-in slide-in-from-bottom-1 duration-200">
+          {blockedWorkflowMessage}
+        </div>
+      {/if}
+
       <PromptInputTextarea
         bind:ref={textareaRef}
         onkeydown={handleKeydown}
@@ -184,7 +298,52 @@
 
     {#if showMentions}
       <div class="absolute bottom-full left-4 right-4 mb-4 z-50">
-        <MentionDropdown query={mentionQuery} onSelect={selectMention} />
+        <MentionDropdown
+          query={mentionQuery}
+          designationId={DESIGNATIONS.indexOf(userContext.user?.designation ?? 'it')}
+          visible={showMentions}
+          onSelect={selectMention}
+          onDismiss={() => (showMentions = false)}
+        />
+      </div>
+    {/if}
+
+    <!-- Confidence Gate Confirmation Overlay -->
+    {#if chat.pendingConfirmation}
+      <div class="absolute bottom-full left-0 right-0 mb-3 z-50 px-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
+        <div class="w-full max-w-[780px] mx-auto hermes-glass rounded-2xl border border-amber-500/20 shadow-[0_0_30px_-8px_rgba(212,175,55,0.15)] p-4">
+          <div class="flex items-start gap-3">
+            <div class="flex-shrink-0 p-2 rounded-xl bg-amber-500/10 border border-amber-500/20">
+              <ShieldAlertIcon class="size-5 text-amber-400" />
+            </div>
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2 mb-1.5">
+                <span class="text-[10px] font-black uppercase tracking-widest text-amber-400">
+                  {chat.pendingConfirmation.type === 'mutation' ? 'Mutation Gate' : 'Navigation Gate'}
+                </span>
+                <Badge variant="outline" class="text-[9px] font-bold border-amber-500/30 text-amber-300 px-1.5 py-0">
+                  {Math.round(chat.pendingConfirmation.confidence * 100)}% / {Math.round(chat.pendingConfirmation.threshold * 100)}%
+                </Badge>
+              </div>
+              <p class="text-xs text-muted-foreground/80 leading-relaxed line-clamp-2">
+                {chat.pendingConfirmation.reasoning}
+              </p>
+              <div class="flex items-center gap-2 mt-3">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  class="h-7 text-[10px] font-bold uppercase tracking-wider text-muted-foreground hover:text-foreground hover:bg-white/5 rounded-lg"
+                  onclick={() => chat.pendingConfirmation = null}
+                >
+                  Dismiss
+                </Button>
+                <span class="text-[9px] text-muted-foreground/40">
+                  Use a slash command (e.g. /extract) to bypass
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     {/if}
 
@@ -232,31 +391,63 @@
 
         <!-- Dynamic Context Chips -->
         <div class="flex items-center gap-1 font-sans overflow-x-auto scrollbar-hide">
-          <Tooltip.Root>
-            <Tooltip.Trigger>
+          <!-- Profile Selector -->
+          <DropdownMenu.Root>
+            <DropdownMenu.Trigger>
               {#snippet child({ props })}
                 <Button {...props} variant="ghost" size="sm" class="h-8 px-2 gap-1.5 text-xs font-medium rounded-lg hover:bg-white/5 text-muted-foreground hover:text-primary shrink-0 transition-colors">
-                   <CircleUserIcon class="size-3.5" />
-                   <span class="text-primary font-bold">default</span>
-                   <ChevronDownIcon class="size-3 opacity-50" />
+                    {@const profile = profiles.find(p => p.id === chat.profile)}
+                    {#if profile}
+                      {@const Icon = profile.icon}
+                      <Icon class="size-3.5" />
+                      <span class="text-primary font-bold">{profile.label}</span>
+                    {/if}
+                    <ChevronDownIcon class="size-3 opacity-50" />
                 </Button>
               {/snippet}
-            </Tooltip.Trigger>
-            <Tooltip.Content>Active Personality Profile</Tooltip.Content>
-          </Tooltip.Root>
+            </DropdownMenu.Trigger>
+            <DropdownMenu.Content align="start" class="w-56 hermes-glass border-white/5 shadow-2xl">
+              <DropdownMenu.Label class="text-[10px] font-bold uppercase tracking-widest opacity-40 px-2 py-2">Agent Profile</DropdownMenu.Label>
+              <DropdownMenu.Separator class="bg-white/5" />
+              {#each profiles as profile}
+                <DropdownMenu.Item 
+                  class={cn(
+                    "gap-3 px-3 py-2.5 rounded-lg transition-all focus:bg-primary/10 focus:text-primary",
+                    selectedProfile === profile.id ? "text-primary bg-primary/5" : ""
+                  )}
+                  onclick={() => chat.profile = profile.id as "strong" | "balanced" | "simple"}
+                >
+                  {@const Icon = profile.icon}
+                  <Icon class="size-4" />
+                  <div class="flex flex-col">
+                    <span class="text-[11px] font-bold uppercase tracking-tight">{profile.label}</span>
+                    <span class="text-[9px] opacity-40 leading-none">{profile.description}</span>
+                  </div>
+                </DropdownMenu.Item>
+              {/each}
+            </DropdownMenu.Content>
+          </DropdownMenu.Root>
 
-          <Tooltip.Root>
-            <Tooltip.Trigger>
-              {#snippet child({ props })}
-                <Button {...props} variant="ghost" size="sm" class="h-8 px-2 gap-1.5 text-xs font-medium rounded-lg hover:bg-white/5 text-muted-foreground hover:text-primary shrink-0 transition-colors">
-                   <FolderOpenIcon class="size-3.5" />
-                   <span>Home</span>
-                   <ChevronDownIcon class="size-3 opacity-50" />
-                </Button>
-              {/snippet}
-            </Tooltip.Trigger>
-            <Tooltip.Content>Current Tenant Isolation Layer</Tooltip.Content>
-          </Tooltip.Root>
+          <!-- Thinking Toggle -->
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            class={cn(
+              "h-8 px-2.5 gap-1.5 text-[10px] font-black uppercase tracking-widest rounded-full border transition-all duration-300",
+              chat.thinkingEnabled 
+                ? "bg-primary/10 border-primary/40 text-primary shadow-[0_0_15px_rgba(212,175,55,0.1)]" 
+                : "bg-white/5 border-white/5 text-muted-foreground hover:border-white/10"
+            )}
+            onclick={() => {
+              chat.thinkingEnabled = !chat.thinkingEnabled;
+              if (chat.thinkingEnabled) {
+                selectedChatModel.value = 'auto';
+              }
+            }}
+          >
+            <BrainCircuitIcon class={cn("size-3.5", chat.thinkingEnabled ? "animate-pulse" : "opacity-50")} />
+            Thinking
+          </Button>
 
           <ModelSelector class="h-8 rounded-lg border-none bg-transparent hover:bg-white/5 text-muted-foreground hover:text-primary shrink-0 transition-all" />
         </div>

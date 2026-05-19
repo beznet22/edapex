@@ -31,11 +31,11 @@ import ResultTemplate from "$lib/components/template/ResultTemplate.svelte";
 import ResultEmail from "$lib/components/template/result-email.svelte";
 import { JobWorker, type JobPayload, type JobResult } from "../worker";
 
-import { runTwoPassExtraction } from "../helpers/chat-helper";
-import { 
-  applyGradingBusinessLogic, 
-  formatMappingDataToIndex, 
-  validateAttendance 
+import { EdApexGateway } from "../mastra/gateway";
+import { createMastraDb } from "../mastra/db";
+import {
+  applyGradingBusinessLogic,
+  validateAttendance
 } from "../helpers/extract-helper";
 import { studentFileStorage } from "../storage/student-files";
 import path from "path";
@@ -259,15 +259,15 @@ export class AssessmentService {
 
   async assignSubjects(classId: number, sectionId: number, teacherId?: number) {
     const academicId = await resultRepo.getAcademicId();
-    
+
     // 1. Try to get subjects for this specific section first
     let assignedSubjects = await resultRepo.getAssignedSubjects(classId, sectionId);
-    
+
     // 2. If empty, try to get subjects from any other section in the same class
     if (assignedSubjects.length === 0) {
       const allClassSections = await resultRepo.getClassSections();
       const parentSections = allClassSections.filter(s => s.classId === classId && s.sectionId !== sectionId);
-      
+
       for (const section of parentSections) {
         if (section.sectionId) {
           const proxySubjects = await resultRepo.getAssignedSubjects(classId, section.sectionId);
@@ -363,7 +363,7 @@ export class AssessmentService {
 
     return await resultRepo.db.transaction(async (tx: MySQLDrizzleClient) => {
       const category = categoryEnum.parse(studentData.studentCategory);
-      
+
       const academicId = await resultRepo.getAcademicId();
       const schoolId = studentData.schoolId || 1;
       const sId = studentId || 0;
@@ -916,40 +916,45 @@ export class AssessmentService {
       mappingData.studentData = { studentId, admissionNo, fullName };
     }
 
-    // 1. Preparation: Index the mapping context
-    const mappingIndex = formatMappingDataToIndex(mappingData);
-    
     // Resolve storage paths (consistent with studentFileStorage.save)
     const classSection = await resultRepo.getClassSectionById(classId, sectionId);
     if (!classSection) throw new Error("Class section not found");
 
     const folder = studentFileStorage.getFolderPath(classSection.className || "Unknown", classSection.sectionName || "Unknown");
-    
+
     // Use studentId or fullName or admissionNo for unique folder name
     const identifier = studentId?.toString() || admissionNo?.toString() || fullName || "Unknown";
     const studentFolder = studentFileStorage.formatName(identifier);
     const studentFolderPath = path.join(folder, studentFolder);
 
-    // 2. Check for intermediate state (OCR Transcription)
-    let existingOcrText = await studentFileStorage.loadRawText(studentFolderPath, "ocr.md");
+    // 2. Execute Pipeline via Gateway (Transcription + Mapping + Fallback)
+    const { env } = await import("$env/dynamic/private");
+    const mastraDb = createMastraDb();
+    const encryptionKey = env.TOKEN_ENCRYPTION_KEY || "edapex-default-encryption-key-32ch";
+    const envKeys = env as Record<string, string | undefined>;
+    const gateway = new EdApexGateway(mastraDb, userId, encryptionKey, envKeys);
 
-    // 3. Execute Pipeline (Transcription + Mapping + Fallback)
-    const result = await runTwoPassExtraction({
-      file,
+    const tenantContext = {
+      schoolId: 1,
       userId,
-      mappingIndex,
-      existingOcrText: existingOcrText || undefined,
-      schema: resultInputSchema,
-    });
-    
+      designationId: 1,
+      staffId: teacherId,
+      roleId: null,
+      classId,
+      sectionId,
+      examId: null,
+      academicId: null,
+    } as const;
+
+    const result = await gateway.executeExtraction(file, tenantContext, { staffId: teacherId, classId, sectionId });
+
     if (!result.success) {
-      const errorMsg = (result as any).error || "Unknown extraction error";
-      console.error("Extraction failed after all attempts", errorMsg);
+      console.error("Extraction failed after all attempts", result.error);
       return null;
     }
 
-    // 4. Save newly generated OCR text for future retries
-    if (result.success && !result.isFallback && !existingOcrText && result.rawText) {
+    // 3. Save OCR text for future retries
+    if (result.success && !result.isFallback && result.rawText) {
       await studentFileStorage.saveRawText(studentFolderPath, "ocr.md", result.rawText);
     }
 

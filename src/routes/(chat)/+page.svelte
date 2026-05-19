@@ -9,6 +9,7 @@
   import ResponsiveSheet from "$lib/components/shared/responsive-sheet.svelte";
   import * as AlertDialog from "$lib/components/ui/alert-dialog";
   import * as Select from "$lib/components/ui/select";
+  import * as Resizable from "$lib/components/ui/resizable";
   import { Input } from "$lib/components/ui/input";
   import { Button } from "$lib/components/ui/button";
   import { ChatContext } from "$lib/context/chat-context.svelte.js";
@@ -16,7 +17,7 @@
   import { onMount } from "svelte";
   import { toast } from "svelte-sonner";
 
-  import { SelectedClass, SelectedAgent } from "$lib/context/sync.svelte";
+  import { SelectedClass } from "$lib/context/sync.svelte";
   import EyeIcon from "@lucide/svelte/icons/eye";
   import EyeOffIcon from "@lucide/svelte/icons/eye-off";
   import { IsMobile } from "$lib/hooks/is-mobile.svelte.js";
@@ -32,7 +33,6 @@
   let inspectorOpen = $state(false);
   let userContext = $derived(UserContext.fromContext());
   const selectedClass = SelectedClass.fromContext();
-  const selectedAgent = SelectedAgent.fromContext();
   const isMobile = new IsMobile();
 
   const chatContext = new ChatContext({
@@ -40,7 +40,6 @@
     chatData: undefined,
     agents,
     selectedClass,
-    selectedAgent,
   });
   chatContext.setContext();
   const chat = $derived(ChatContext.fromContext());
@@ -99,16 +98,27 @@
 </script>
 
 <!-- Hermes 4-Panel Row: Panel 3 (Chat Stage) & Panel 4 (Workspace Inspector) -->
-<div class="flex flex-1 min-h-0 w-full">
+<Resizable.PaneGroup direction="horizontal" class="flex flex-1 min-h-0 w-full">
   <!-- Panel 3: Chat Stage -->
-  <div class="flex-1 flex flex-col min-h-0 min-w-0">
+  <Resizable.Pane defaultSize={inspectorOpen && !isMobile.current ? 70 : 100} minSize={30} class="flex flex-col min-h-0 min-w-0 h-full relative">
     <ChatHeader {user} onToggleInspector={() => inspectorOpen = !inspectorOpen} />
     <Chat readonly={false} {user} />
-  </div>
+  </Resizable.Pane>
   
-  <!-- Panel 4: Workspace Inspector (Persistent on Desktop, Sheet on Mobile) -->
-  <WorkspaceSidebar bind:open={inspectorOpen} />
-</div>
+  <!-- Panel 4: Workspace Inspector (Desktop Resizable) -->
+  {#if inspectorOpen && !isMobile.current}
+    <!-- Glassmorphic divider -->
+    <Resizable.Handle withHandle class="w-1.5 bg-muted/20 hover:bg-muted/50 active:bg-muted transition-colors z-10" />
+    <Resizable.Pane defaultSize={50} minSize={20} maxSize={60}>
+      <WorkspaceSidebar bind:open={inspectorOpen} isMobile={isMobile.current} />
+    </Resizable.Pane>
+  {/if}
+</Resizable.PaneGroup>
+
+<!-- Mobile Sheet Overlay -->
+{#if isMobile.current && inspectorOpen}
+  <WorkspaceSidebar bind:open={inspectorOpen} isMobile={true} />
+{/if}
 
 <!-- Mobile Bottom Navigation Bar (<768px) -->
 <MobileNavBar />

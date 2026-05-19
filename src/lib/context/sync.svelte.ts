@@ -43,12 +43,3 @@ export class SelectedClass extends SynchronizedCookie {
 	}
 }
 
-export class SelectedAgent extends SynchronizedCookie {
-	constructor(value: string) {
-		super("selected-agent", value);
-	}
-
-	static fromContext(): SelectedAgent {
-		return super.fromContext("selected-agent") as SelectedAgent;
-	}
-}

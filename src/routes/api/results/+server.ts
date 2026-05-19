@@ -1,7 +1,6 @@
 import { json, type RequestHandler } from "@sveltejs/kit";
 import { resultRepo, studentRepo } from "$lib/server/repository";
 import { assessment } from "$lib/server/service/assessment.service";
-import { generateContent } from "$lib/server/helpers/chat-helper";
 import { resultInputSchema } from "$lib/schema/result-input";
 import { readFileSync } from "fs";
 import { join, dirname } from "path";
@@ -12,36 +11,6 @@ import ResultTemplate from "$lib/components/template/ResultTemplate.svelte";
 import { pageToHtml } from "$lib/server/helpers";
 import { Worker } from "worker_threads";
 import crypto from "crypto";
-
-// export const GET: RequestHandler = async ({ request }) => {
-//   try {
-//     // Resolve the path to the static directory
-//     const __filename = fileURLToPath(import.meta.url);
-//     const __dirname = dirname(__filename);
-//     const filePath = join(__dirname, "..", "..", "..", "static", "05_MB6a.jpeg");
-//   //  const parsedResult = await extractFromLocalFile(filePath);
-
-//     // Read the file as a buffer
-//     const fileBuffer = readFileSync(filePath);
-
-//     // Create a Blob from the buffer
-//     const fileBlob = new Blob([fileBuffer], { type: "image/jpeg" });
-
-//     // Convert buffer to base64 for testing
-//     // const base64 = fileBuffer.toString("base64");
-
-//     const data = await result.getMappingData(1);
-//     const mapString = JSON.stringify(data);
-//     const content = await generateContent(fileBlob, mapString);
-//     const parsedResult = JSON.parse(content.trim());
-//     const marks = resultInputSchema.parse(parsedResult);
-//     return json(marks);
-//   } catch (error: any) {
-//     console.error("Error creating job:", error);
-//     return new Response(error.message, { status: 500 });
-//   }
-// };
-
 
 export const GET: RequestHandler = async ({ request, url }) => {
   try {

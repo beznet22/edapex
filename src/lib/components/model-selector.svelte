@@ -12,12 +12,25 @@
     DropdownMenuSeparator,
   } from "./ui/dropdown-menu";
   import CircleCheckIcon from "@lucide/svelte/icons/circle-check";
+  import { Badge } from "./ui/badge";
   import ChevronDownIcon from "@lucide/svelte/icons/chevron-down";
   import type { ClassValue } from "svelte/elements";
 
   import { page } from "$app/state";
   import { useAI } from "$lib/context/ai-context.svelte";
+  import { useChat } from "$lib/context/chat-context.svelte";
   import { CredentialType, CREDENTIAL_LABELS } from "$lib/schema/chat-schema";
+
+  import { ScrollArea } from "./ui/scroll-area";
+  import SparklesIcon from "@lucide/svelte/icons/sparkles";
+
+  const PROVIDER_LOGOS: Record<string, string> = {
+    groq: "https://raw.githubusercontent.com/simple-icons/simple-icons/develop/icons/groq.svg",
+    nvidia_nim: "https://raw.githubusercontent.com/simple-icons/simple-icons/develop/icons/nvidia.svg",
+    mistral: "https://raw.githubusercontent.com/simple-icons/simple-icons/develop/icons/mistral.svg",
+    deepseek: "https://raw.githubusercontent.com/simple-icons/simple-icons/develop/icons/deepseek.svg",
+    opencode: "https://opencode.ai/favicon.ico",
+  };
 
   let {
     class: c,
@@ -28,41 +41,42 @@
   let open = $state(false);
   const selectedChatModel = SelectedModel.fromContext();
   const ai = useAI();
-  
-  const models = $derived<ChatModel[]>(ai.availableModels.length > 0 ? ai.availableModels : chatModels);
-  const selectedChatModelDetails = $derived(
-    models.find((model: ChatModel) => model.id === selectedChatModel.value),
-  );
+  const chat = useChat();
 
-  const connectedProviders = $derived(ai.connectedProviders);
-  const availableChatModels = $derived(
-    models.filter((model: ChatModel) => {
-      if (model.provider === "all") {
-        return connectedProviders.length > 0;
-      }
-      return connectedProviders.includes(model.provider);
-    }),
+  const models = $derived(ai.availableModels);
+  
+  const selectedChatModelDetails = $derived(
+    models.find((model) => model.id === selectedChatModel.value) || models.find(m => m.id === 'auto') || { name: 'Auto (Smart)', id: 'auto', provider: 'system' }
   );
 
   const groupedModels = $derived.by(() => {
-    const groups: Array<{ label: string; models: typeof availableChatModels }> = [];
+    const groups: Array<{ label: string; models: any[] }> = [];
 
-    // 1. General group
-    const generalModels = availableChatModels.filter((m: ChatModel) => m.provider === "all");
-    if (generalModels.length > 0) {
-      groups.push({ label: "Smart Selection", models: generalModels });
+    // 1. Smart Selection group
+    const smartModels = models.filter((m) => m.provider === "system" || m.provider === "all");
+    if (smartModels.length > 0) {
+      groups.push({ label: "Smart Selection", models: smartModels });
     }
 
-    // 2. Provider groups
-    Object.values(CredentialType).forEach((provider) => {
-      const providerModels = availableChatModels.filter((m: ChatModel) => m.provider === provider);
+    // 2. OpenGateway group
+    const openModels = models.filter((m) => m.provider === "opengateway");
+    if (openModels.length > 0) {
+      groups.push({ label: "Open Models", models: openModels });
+    }
+
+    // 3. Provider groups
+    const providers = [...new Set(models.map(m => m.provider))].filter(p => p !== 'system' && p !== 'all' && p !== 'opengateway');
+    providers.forEach((provider) => {
+      const providerModels = models.filter((m) => m.provider === provider);
       if (providerModels.length > 0) {
-        groups.push({ label: CREDENTIAL_LABELS[provider], models: providerModels });
+        const label = CREDENTIAL_LABELS[provider as keyof typeof CREDENTIAL_LABELS] || (provider as string).toUpperCase();
+        groups.push({ label, models: providerModels });
       }
     });
 
     return groups;
   });
+
 </script>
 
 <DropdownMenu {open} onOpenChange={(val) => (open = val)}>
@@ -72,49 +86,61 @@
         {...props}
         variant="outline"
         class={cn(
-          "data-[state=open]:bg-accent data-[state=open]:text-accent-foreground w-fit px-1.5 sm:px-2 md:h-[34px]",
+          "data-[state=open]:bg-accent data-[state=open]:text-accent-foreground w-fit px-1.5 sm:px-2 md:h-[34px] group",
           c,
         )}
       >
-        <div class="max-w-[70px] sm:max-w-none truncate">
+        <div class="max-w-[100px] sm:max-w-none truncate font-bold text-xs tracking-tight">
           {selectedChatModelDetails?.name}
         </div>
-        <ChevronDownIcon />
+        <ChevronDownIcon class="size-4 opacity-50 group-hover:opacity-100 transition-opacity" />
       </Button>
     {/snippet}
   </DropdownMenuTrigger>
-  <DropdownMenuContent align="start" class="min-w-[280px] max-h-[300px] overflow-y-auto scrollbar-thin">
-    {#each groupedModels as group, i (group.label)}
-      {#if i > 0}
-        <DropdownMenuSeparator />
-      {/if}
-      <DropdownMenuLabel
-        class="text-muted-foreground px-2 py-1.5 text-[10px] font-bold uppercase tracking-wider"
-      >
-        {group.label}
-      </DropdownMenuLabel>
-      {#each group.models as chatModel (chatModel.id)}
-        <DropdownMenuItem
-          onSelect={() => {
-            open = false;
-            selectedChatModel.value = chatModel.id;
-          }}
-          class="group/item flex flex-row items-center justify-between gap-4"
-          data-active={chatModel.id === selectedChatModel.value}
-        >
-          <div class="flex flex-col items-start gap-0.5">
-            <div class="text-xs font-medium">{chatModel.name.split(" - ").pop()}</div>
-            <div class="text-muted-foreground text-[10px] leading-tight">
-              {chatModel.description}
-            </div>
-          </div>
-
-          <div
-            class="h-4 w-1 rounded-full bg-primary opacity-0 group-data-[active=true]/item:opacity-100"
+  <DropdownMenuContent 
+    align="start" 
+    class="min-w-[240px] hermes-glass p-0 shadow-2xl border-sidebar-border/30 rounded-xl overflow-hidden"
+  >
+    <ScrollArea class="max-h-[400px] w-full" type="auto">
+      <div class="p-1 flex flex-col gap-px">
+        {#each groupedModels as group, i (group.label)}
+          {#if i > 0}
+            <div class="h-px bg-sidebar-border/10 my-1 mx-2"></div>
+          {/if}
+          <DropdownMenuLabel
+            class="text-muted-foreground px-3 py-1.5 text-[9px] font-black uppercase tracking-widest opacity-30 sticky top-0 bg-transparent backdrop-blur-sm z-20"
           >
-          </div>
-        </DropdownMenuItem>
-      {/each}
-    {/each}
+            {group.label}
+          </DropdownMenuLabel>
+          {#each group.models as chatModel (chatModel.id)}
+            <DropdownMenuItem
+              onSelect={() => {
+                open = false;
+                selectedChatModel.value = chatModel.id;
+              }}
+              class="group/item flex flex-row items-center justify-between gap-2 px-3 py-1.5 rounded-lg transition-all hover:bg-primary/10 cursor-pointer data-[active=true]:bg-primary/10 relative overflow-hidden"
+              data-active={chatModel.id === selectedChatModel.value}
+            >
+              <div class="flex items-center gap-2 relative z-10 w-full min-w-0">
+                <div class="text-[11px] font-bold tracking-tight text-sidebar-foreground/70 group-hover/item:text-primary transition-colors truncate">
+                  {chatModel.name.split(" - ").pop()}
+                </div>
+                {#if (chatModel as any).source}
+                  <Badge
+                    class="{(chatModel as any).source === 'db' ? 'bg-primary/20 text-primary' : 'bg-muted-foreground/10 text-muted-foreground/60'} border-none text-[8px] font-black px-1 py-0 rounded-sm scale-90"
+                  >
+                    {(chatModel as any).source === 'db' ? 'PERSONAL' : 'GLOBAL'}
+                  </Badge>
+                {/if}
+              </div>
+
+              {#if chatModel.id === selectedChatModel.value}
+                <div class="size-1 rounded-full bg-primary shadow-[0_0_8px_var(--primary)] shrink-0"></div>
+              {/if}
+            </DropdownMenuItem>
+          {/each}
+        {/each}
+      </div>
+    </ScrollArea>
   </DropdownMenuContent>
 </DropdownMenu>

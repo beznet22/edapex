@@ -1,5 +1,6 @@
-import { describe, it, expect, afterEach } from 'vitest';
-import { existsSync, unlinkSync } from 'node:fs';
+import { describe, it, expect, afterEach, beforeEach } from 'vitest';
+import { existsSync, unlinkSync, mkdirSync } from 'node:fs';
+import { randomUUID } from 'node:crypto';
 import { createClient } from '@libsql/client';
 import { LibSQLStore } from '@mastra/libsql';
 import { Mastra } from '@mastra/core';
@@ -9,44 +10,42 @@ import { createTenantContext, type TenantContext } from '../tenant-context';
 import { ScopedRepositoryProvider } from '../scoped-repository';
 import type { MySQLDrizzleClient } from '../../db';
 
-const TEST_DB_PATH = './test-mastra-init.db';
-const TEST_DB_URL = `file:${TEST_DB_PATH}`;
-
-function cleanupTestDb() {
-	try {
-		unlinkSync(TEST_DB_PATH);
-	} catch {
-		// File may not exist — safe to ignore
-	}
-}
-
 describe('Phase 1.1 — libSQL Initialization', () => {
+	let testDbPath: string;
+	let testDbUrl: string;
+
+	beforeEach(() => {
+		mkdirSync('./temp_dir', { recursive: true });
+		testDbPath = `./temp_dir/test-mastra-init-${randomUUID()}.db`;
+		testDbUrl = `file:${testDbPath}`;
+	});
+
 	afterEach(() => {
-		cleanupTestDb();
+		try { unlinkSync(testDbPath); } catch {}
 	});
 
 	it('creates the database file on disk after LibSQLStore initialization', async () => {
-		expect(existsSync(TEST_DB_PATH)).toBe(false);
+		expect(existsSync(testDbPath)).toBe(false);
 
 		const storage = new LibSQLStore({
 			id: 'test-init',
-			url: TEST_DB_URL
+			url: testDbUrl
 		});
 
 		await storage.init();
 
-		expect(existsSync(TEST_DB_PATH)).toBe(true);
+		expect(existsSync(testDbPath)).toBe(true);
 	});
 
 	it('creates Mastra schema tables inside the database', async () => {
 		const storage = new LibSQLStore({
 			id: 'test-schema',
-			url: TEST_DB_URL
+			url: testDbUrl
 		});
 
 		await storage.init();
 
-		const client = createClient({ url: TEST_DB_URL });
+		const client = createClient({ url: testDbUrl });
 		const result = await client.execute(
 			"SELECT name FROM sqlite_master WHERE type='table' ORDER BY name"
 		);
@@ -61,17 +60,17 @@ describe('Phase 1.1 — libSQL Initialization', () => {
 	});
 
 	it('returns a functional storage via the createMastraStorage factory', async () => {
-		const storage = createMastraStorage(TEST_DB_URL);
+		const storage = createMastraStorage(testDbUrl);
 
 		expect(storage).toBeInstanceOf(LibSQLStore);
 
 		await storage.init();
 
-		expect(existsSync(TEST_DB_PATH)).toBe(true);
+		expect(existsSync(testDbPath)).toBe(true);
 	});
 
 	it('mounts cleanly onto a Mastra instance via getStorage()', async () => {
-		const storage = createMastraStorage(TEST_DB_URL);
+		const storage = createMastraStorage(testDbUrl);
 		await storage.init();
 
 		const mastra = new Mastra({
@@ -88,7 +87,7 @@ describe('Phase 1.1 — libSQL Initialization', () => {
 	});
 
 	it('provides domain-scoped stores (memory, workflows)', async () => {
-		const storage = createMastraStorage(TEST_DB_URL);
+		const storage = createMastraStorage(testDbUrl);
 		await storage.init();
 
 		const memoryStore = await storage.getStore('memory');
@@ -100,24 +99,27 @@ describe('Phase 1.1 — libSQL Initialization', () => {
 });
 
 describe('Phase 1.1 — Singleton Guard', () => {
-	const DB_A_PATH = './test-singleton-a.db';
-	const DB_B_PATH = './test-singleton-b.db';
-	const DB_A_URL = `file:${DB_A_PATH}`;
-	const DB_B_URL = `file:${DB_B_PATH}`;
+	let dbAPath: string;
+	let dbBPath: string;
+	let dbAUrl: string;
+	let dbBUrl: string;
+
+	beforeEach(() => {
+		dbAPath = `./test-singleton-a-${randomUUID()}.db`;
+		dbBPath = `./test-singleton-b-${randomUUID()}.db`;
+		dbAUrl = `file:${dbAPath}`;
+		dbBUrl = `file:${dbBPath}`;
+	});
 
 	afterEach(() => {
-		for (const p of [DB_A_PATH, DB_B_PATH]) {
-			try {
-				unlinkSync(p);
-			} catch {
-				// noop
-			}
+		for (const p of [dbAPath, dbBPath]) {
+			try { unlinkSync(p); } catch {}
 		}
 	});
 
 	it('produces distinct Mastra instances on each call', () => {
-		const resultA = createMastraInstance({ dbUrl: DB_A_URL });
-		const resultB = createMastraInstance({ dbUrl: DB_B_URL });
+		const resultA = createMastraInstance({ dbUrl: dbAUrl });
+		const resultB = createMastraInstance({ dbUrl: dbBUrl });
 
 		expect(resultA.mastra).not.toBe(resultB.mastra);
 		expect(resultA.storage).not.toBe(resultB.storage);
@@ -135,14 +137,14 @@ describe('Phase 1.1 — Singleton Guard', () => {
 	});
 
 	it('each instance initializes its own isolated storage', async () => {
-		const resultA = createMastraInstance({ dbUrl: DB_A_URL });
-		const resultB = createMastraInstance({ dbUrl: DB_B_URL });
+		const resultA = createMastraInstance({ dbUrl: dbAUrl });
+		const resultB = createMastraInstance({ dbUrl: dbBUrl });
 
 		await resultA.storage.init();
 		await resultB.storage.init();
 
-		expect(existsSync(DB_A_PATH)).toBe(true);
-		expect(existsSync(DB_B_PATH)).toBe(true);
+		expect(existsSync(dbAPath)).toBe(true);
+		expect(existsSync(dbBPath)).toBe(true);
 
 		const storageA = resultA.mastra.getStorage();
 		const storageB = resultB.mastra.getStorage();
@@ -154,19 +156,20 @@ describe('Phase 1.1 — Singleton Guard', () => {
 });
 
 describe('Phase 1.1 — Concurrent Isolation', () => {
-	const SHARED_DB_PATH = './test-concurrent.db';
-	const SHARED_DB_URL = `file:${SHARED_DB_PATH}`;
+	let sharedDbPath: string;
+	let sharedDbUrl: string;
+
+	beforeEach(() => {
+		sharedDbPath = `./test-concurrent-${randomUUID()}.db`;
+		sharedDbUrl = `file:${sharedDbPath}`;
+	});
 
 	afterEach(() => {
-		try {
-			unlinkSync(SHARED_DB_PATH);
-		} catch {
-			// noop
-		}
+		try { unlinkSync(sharedDbPath); } catch {}
 	});
 
 	it('threads tagged with schoolId=100 are invisible to schoolId=200 queries', async () => {
-		const storage = createMastraStorage(SHARED_DB_URL);
+		const storage = createMastraStorage(sharedDbUrl);
 		await storage.init();
 
 		const memory = await storage.getStore('memory');
@@ -213,7 +216,7 @@ describe('Phase 1.1 — Concurrent Isolation', () => {
 	});
 
 	it('concurrent thread writes from different tenants do not interleave', async () => {
-		const storage = createMastraStorage(SHARED_DB_URL);
+		const storage = createMastraStorage(sharedDbUrl);
 		await storage.init();
 		const memory = await storage.getStore('memory');
 
@@ -258,7 +261,7 @@ describe('Phase 1.1 — Concurrent Isolation', () => {
 	});
 
 	it('messages saved to tenant A thread are not retrievable via tenant B thread', async () => {
-		const storage = createMastraStorage(SHARED_DB_URL);
+		const storage = createMastraStorage(sharedDbUrl);
 		await storage.init();
 		const memory = await storage.getStore('memory');
 

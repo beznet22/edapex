@@ -1,17 +1,20 @@
 import { page } from "$app/state";
 
 export class AIContext {
-    connectedProviders = $state<string[]>([]);
+    connectedProviders = $state<Array<{ provider: string; name: string; enabled: boolean; source: 'db' | 'env' }>>([]);
     availableModels = $state<any[]>([]);
 
-    addProvider(providerId: string) {
-        if (!this.connectedProviders.includes(providerId)) {
-            this.connectedProviders = [...this.connectedProviders, providerId];
+    addProvider(config: { provider: string; name: string; enabled: boolean; source: 'db' | 'env' }) {
+        const index = this.connectedProviders.findIndex(p => p.provider === config.provider);
+        if (index === -1) {
+            this.connectedProviders = [...this.connectedProviders, config];
+        } else {
+            this.connectedProviders[index] = config;
         }
     }
 
     removeProvider(providerId: string) {
-        this.connectedProviders = this.connectedProviders.filter(id => id !== providerId);
+        this.connectedProviders = this.connectedProviders.filter(p => p.provider !== providerId);
     }
 
     updateModels(models: any[]) {
@@ -23,13 +26,10 @@ export class AIContext {
      * This should be called inside an effect in the root layout.
      */
     sync(data: any) {
-        if (data.connectedProviders) {
-            // Merge or replace depending on needs. 
-            // For discovery, we usually want to replace with the server's truth while keeping optimistic ones?
-            // Actually, server truth is the most reliable.
+        if (Array.isArray(data.connectedProviders)) {
             this.connectedProviders = [...data.connectedProviders];
         }
-        if (data.availableModels) {
+        if (Array.isArray(data.availableModels)) {
             this.availableModels = [...data.availableModels];
         }
     }

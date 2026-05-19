@@ -10,8 +10,11 @@ export interface ChatProviders {
   url?: string;
 }
 
-export const chatProviders: Array<ChatProviders> = Object.entries(staticProviderRegistry).map(
-  ([id, entry]) => ({
+const SUPPORTED_PROVIDERS = ['groq', 'deepseek', 'mistral', 'nvidia_nim', 'opencode'];
+
+export const chatProviders: Array<ChatProviders> = Object.entries(staticProviderRegistry)
+  .filter(([id]) => SUPPORTED_PROVIDERS.includes(id))
+  .map(([id, entry]) => ({
     id: id as CredentialType,
     name: entry.name,
     description: entry.description,

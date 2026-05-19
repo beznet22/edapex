@@ -35,6 +35,8 @@ qwen-inspect/
 _backup_legacy/
 .spec/
 hermes-webui/
-mastra.db
-mastra.db-shm
-mastra.db-wal
+*.db
+*.db-shm
+*.db-wal
+.workspaces
+temp_dir/

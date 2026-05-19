@@ -1,11 +1,13 @@
 <script lang="ts" module>
   const workspaceNavItems = [
-    { title: "Orchestrator", value: "orchestrator" },
-    { title: "System Timeline", value: "timeline" },
-    { title: "Class Hierarchy", value: "hierarchy" },
-    { title: "Skill Engine", value: "skills" },
-    { title: "Extract Buffer", value: "extract" },
-    { title: "User Directory", value: "users" },
+    { title: "Chat", value: "chat" },
+    { title: "Schedule", value: "schedule" },
+    { title: "Skills", value: "skills" },
+    { title: "Files", value: "files" },
+    { title: "Memory", value: "memory" },
+    { title: "Workspace", value: "workspace" },
+    { title: "Profiles", value: "profiles" },
+    { title: "Tasks", value: "tasks" },
   ] as const;
 </script>
 
@@ -17,7 +19,6 @@
   import type { AuthUser } from "$lib/types/auth-types";
   import type { ComponentProps } from "svelte";
   import NavUser from "./nav-user.svelte";
-  import NavSecondary from "./nav-secondary.svelte";
   import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
   import { SidebarHistory } from "./sidebar-history";
   import { Badge } from "./ui/badge";
@@ -29,9 +30,16 @@
   import InboxIcon from "@lucide/svelte/icons/inbox";
   import ChevronDownIcon from "@lucide/svelte/icons/chevron-down";
   import SearchIcon from "@lucide/svelte/icons/search";
+  import SunIcon from "@lucide/svelte/icons/sun";
+  import MoonIcon from "@lucide/svelte/icons/moon";
+  import MaximizeIcon from "@lucide/svelte/icons/maximize";
+  import MinimizeIcon from "@lucide/svelte/icons/minimize";
   import { Button } from "./ui/button";
-  import { goto } from "$app/navigation";
+  import { goto, pushState } from "$app/navigation";
   import { UserContext } from "$lib/context/user-context.svelte";
+  import { SelectedClass } from "$lib/context/sync.svelte";
+  import { getTheme } from "@sejohnson/svelte-themes";
+  import { usePWA } from "$lib/context/pwa.svelte";
 
   type SidebarProps = {
     user?: AuthUser;
@@ -46,15 +54,22 @@
 
   const sidebar = useSidebar();
   const userContext = UserContext.fromContext();
+  const selectedClass = SelectedClass.fromContext();
+  const theme = getTheme();
+  const pwa = usePWA();
 
   let activeWorkspaceNav = $state("orchestrator");
   let hasBackgroundTasks = $state(false);
   let unreadInbox = $state(0);
   let sessionFilter = $state("");
 
-  const navItems = [
-    { title: "Integrations", url: "#settings", icon: SettingsIcon },
-  ];
+  let displayContext = $derived(
+    userContext.isTeacher && userContext.assignedSection
+      ? `${userContext.assignedSection.className} (${userContext.assignedSection.sectionName})`
+      : selectedClass.data
+        ? `${selectedClass.data.className} (${selectedClass.data.sectionName})`
+        : "Workspace Context"
+  );
 
   function handleNewSession() {
     sidebar.setOpenMobile(false);
@@ -133,7 +148,69 @@
       </Sidebar.Group>
     </Sidebar.Content>
 
-    <Sidebar.Footer class="items-center pb-4">
+    <Sidebar.Footer class="items-center pb-4 gap-2">
+      <Tooltip>
+        <TooltipTrigger>
+          {#snippet child({ props })}
+            <Button
+              {...props}
+              variant="ghost"
+              size="icon"
+              class="size-10 rounded-xl text-sidebar-foreground/40 hover:text-primary hover:bg-primary/10 transition-all"
+              onclick={() => pwa.toggleFullscreen()}
+            >
+              {#if pwa.isFullscreen}
+                <MinimizeIcon class="size-4.5" />
+              {:else}
+                <MaximizeIcon class="size-4.5" />
+              {/if}
+            </Button>
+          {/snippet}
+        </TooltipTrigger>
+        <TooltipContent side="right">{pwa.isFullscreen ? "Exit Focus" : "Focus Mode"}</TooltipContent>
+      </Tooltip>
+
+      <Tooltip>
+        <TooltipTrigger>
+          {#snippet child({ props })}
+            <Button
+              {...props}
+              variant="ghost"
+              size="icon"
+              class="size-10 rounded-xl text-sidebar-foreground/40 hover:text-primary hover:bg-primary/10 transition-all"
+              onclick={() => {
+                theme.selectedTheme = theme.resolvedTheme === "light" ? "dark" : "light";
+              }}
+            >
+              <div class="relative size-4.5 flex items-center justify-center">
+                <SunIcon class="size-full rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+                <MoonIcon class="absolute size-full rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+              </div>
+            </Button>
+          {/snippet}
+        </TooltipTrigger>
+        <TooltipContent side="right">Toggle Theme</TooltipContent>
+      </Tooltip>
+
+      <Tooltip>
+        <TooltipTrigger>
+          {#snippet child({ props })}
+            <Button
+              {...props}
+              variant="ghost"
+              size="icon"
+              class="size-10 rounded-xl text-sidebar-foreground/40 hover:text-primary hover:bg-primary/10 transition-all"
+              onclick={() => pushState("#settings", { showModal: true })}
+            >
+              <SettingsIcon class="size-4.5" />
+            </Button>
+          {/snippet}
+        </TooltipTrigger>
+        <TooltipContent side="right">Settings</TooltipContent>
+      </Tooltip>
+
+      <div class="mt-2 h-px w-8 bg-sidebar-border/10"></div>
+
       <NavUser {user} hideDetails={true} />
     </Sidebar.Footer>
   </Sidebar.Root>
@@ -146,7 +223,7 @@
           <DropdownMenu.Trigger>
             {#snippet child({ props })}
               <Button {...props} variant="ghost" class="w-full justify-between px-2 font-bold text-[13px] text-sidebar-foreground/80 hover:bg-sidebar-accent tracking-tight">
-                EdApex Workspace
+                Workspace
                 <ChevronDownIcon class="size-3.5 opacity-30" />
               </Button>
             {/snippet}
@@ -201,8 +278,12 @@
       <SidebarHistory {user} />
     </Sidebar.Content>
 
-    <Sidebar.Footer class="border-t border-sidebar-border p-3 bg-transparent">
-      <NavSecondary items={navItems} class="mt-auto opacity-40 hover:opacity-100 transition-opacity" />
+    <Sidebar.Footer class="border-t border-sidebar-border bg-transparent">
+      <div class="flex flex-col px-2 py-1.5">
+        <span class="text-[10px] font-black tracking-widest uppercase">Workspace Context</span>
+        <span class="text-[10px] opacity-20 font-bold truncate shrink-0">{displayContext}</span>
+      </div>
     </Sidebar.Footer>
   </Sidebar.Root>
 </Sidebar.Root>
+

@@ -3,13 +3,12 @@
   import Chat from "$lib/components/chat.svelte";
   import WorkspaceSidebar from "$lib/components/workspace/WorkspaceSidebar.svelte";
   import { ChatContext } from "$lib/context/chat-context.svelte.js";
-  import { SelectedClass, SelectedAgent } from "$lib/context/sync.svelte";
+  import { SelectedClass } from "$lib/context/sync.svelte";
   import { IsMobile } from "$lib/hooks/is-mobile.svelte.js";
 
   let { data } = $props();
 
   const selectedClass = SelectedClass.fromContext();
-  const selectedAgent = SelectedAgent.fromContext();
   const isMobile = new IsMobile();
   let inspectorOpen = $state(false);
 
@@ -19,7 +18,6 @@
     chatData: data.chat ?? undefined,
     agents: data.agents,
     selectedClass,
-    selectedAgent,
   });
 
   chatContext.setContext();

@@ -5,7 +5,7 @@
   import PWAInstallPrompt from "$lib/components/PWAInstallPrompt.svelte";
   import { Toaster } from "$lib/components/ui/sonner";
   import { PWAContext } from "$lib/context/pwa.svelte";
-  import IntegrationsModal from "$lib/components/integrations-modal.svelte";
+  import SettingsModal from "$lib/components/settings-modal.svelte";
   import { onMount } from "svelte";
   import { toast } from "svelte-sonner";
 
@@ -46,7 +46,7 @@
   <ThemeHead />
   <PWAInstallPrompt />
   <Toaster position="bottom-center" />
-  <IntegrationsModal />
+  <SettingsModal />
   {@render children()}
 </ThemeProvider>
 

@@ -17,19 +17,19 @@ export const fileSchema = z
   });
 
 export enum CredentialType {
-  CEREBRAS = "cerebras",
+  DEEPSEEK = "deepseek",
   NVIDIA_NIM = "nvidia_nim",
   GROQ = "groq",
   MISTRAL = "mistral",
-  OPENROUTER = "openrouter",
+  OPENCODE = "opencode",
 }
 
 export const CREDENTIAL_LABELS: Record<CredentialType, string> = {
-  [CredentialType.CEREBRAS]: "Cerebras",
+  [CredentialType.DEEPSEEK]: "DeepSeek",
   [CredentialType.NVIDIA_NIM]: "NVIDIA NIM",
   [CredentialType.GROQ]: "Groq",
   [CredentialType.MISTRAL]: "Mistral",
-  [CredentialType.OPENROUTER]: "OpenRouter",
+  [CredentialType.OPENCODE]: "OpenCode",
 };
 
 export type OpenAICompatibleCompletionModelId = string;

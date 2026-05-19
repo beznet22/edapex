@@ -7,7 +7,6 @@
   import { useChat } from "$lib/context/chat-context.svelte";
   import { UserContext } from "$lib/context/user-context.svelte";
   import type { AuthUser } from "$lib/types/auth-types";
-  import { isToolUIPart } from "ai";
   import { toast } from "svelte-sonner";
   import { Message, MessageContent } from "./ai-elements/message";
   import Shimmer from "./ai-elements/shimmer/Shimmer.svelte";
@@ -16,6 +15,7 @@
   import MessageAction from "./message-action.svelte";
   import PreviewModal from "./pdf-preview.svelte";
   import { Markdown } from "./prompt-kit/markdown";
+  import { Reasoning, ReasoningTrigger, ReasoningContent } from "./prompt-kit/reasoning";
   import ToolMessage from "./tool-message.svelte";
   import { Button } from "./ui/button"; 
   import * as Tooltip from "./ui/tooltip";
@@ -50,6 +50,35 @@
   const chat = $derived(useChat());
   const userContext = UserContext.fromContext();
   let dropdownOpen = $state(false);
+
+  let groupedClasses = $derived(() => {
+    const groups: Record<string, any[]> = {
+      "CRECHE": [],
+      "NURSERY": [],
+      "GRADEK": [],
+      "LOWER BASIC": [],
+      "MIDDLE BASIC": [],
+      "OTHER": []
+    };
+    
+    for (const cls of userContext?.classes || []) {
+      const name = cls.className?.toUpperCase() || "";
+      if (name.includes("CREACH") || name.includes("CRECHE") || name.includes("DAYCARE")) {
+        groups["CRECHE"].push(cls);
+      } else if (name.includes("NURSERY")) {
+        groups["NURSERY"].push(cls);
+      } else if (name.includes("GRADE K") || name.includes("GRADEK") || name.includes("GRADE")) {
+        groups["GRADEK"].push(cls);
+      } else if (name.includes("LOWER BASIC")) {
+        groups["LOWER BASIC"].push(cls);
+      } else if (name.includes("MIDDLE BASIC")) {
+        groups["MIDDLE BASIC"].push(cls);
+      } else {
+        groups["OTHER"].push(cls);
+      }
+    }
+    return Object.entries(groups).filter(([_, classes]) => classes.length > 0);
+  });
 
   let copyMessage = (content: string, role: string) => {
     navigator.clipboard.writeText(content);
@@ -110,58 +139,50 @@
           align="center"
           sideOffset={12}
         >
-          <DropdownMenuGroup>
-            <DropdownMenuLabel
-              class="text-[10px] uppercase tracking-widest text-muted-foreground/60 px-2.5 py-1.5"
-            >
-              Active Class Contexts
-            </DropdownMenuLabel>
-            {#each userContext?.classes || [] as cls (cls.id)}
-              <DropdownMenuItem
-                onSelect={() => (chat.selectedClass = cls)}
-                class={cn(
-                  "flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl transition-all duration-200 cursor-pointer mb-0.5 last:mb-0",
-                  chat.selectedClass?.id === cls.id
-                    ? "bg-primary/10 text-primary"
-                    : "hover:bg-primary/5",
-                )}
+          {#each groupedClasses() as [groupName, classes], i}
+            <DropdownMenuGroup>
+              <DropdownMenuLabel
+                class="text-[10px] uppercase tracking-widest text-muted-foreground/60 px-2.5 py-1.5"
               >
-                <!-- <div
+                {groupName}
+              </DropdownMenuLabel>
+              {#each classes as cls (cls.id)}
+                <DropdownMenuItem
+                  onSelect={() => (chat.selectedClass = cls)}
                   class={cn(
-                    "size-7 rounded-lg flex items-center justify-center text-[10px] font-bold transition-colors",
+                    "flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl transition-all duration-200 cursor-pointer mb-0.5 last:mb-0",
                     chat.selectedClass?.id === cls.id
-                      ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20"
-                      : "bg-secondary text-muted-foreground",
+                      ? "bg-primary/10 text-primary"
+                      : "hover:bg-primary/5",
                   )}
                 >
-                  {cls.className?.charAt(0) || "C"}
-                </div> -->
-                <div class="flex min-w-0 flex-1 justify-between">
-                  <span class="text-[13px] font-semibold truncate leading-tight"
-                    >{cls.className}</span
-                  >
-                  <span 
-                    class={cn(
-                      "opacity-60 truncate size-7 rounded-lg flex items-center justify-center text-[10px] font-bold transition-colors",
-                      chat.selectedClass?.id === cls.id
-                        ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20"
-                        : "bg-secondary text-muted-foreground",
-                    )}
-                    >{cls.sectionName || "Universal Content"}</span
-                  >
-                </div>
-                {#if chat.selectedClass?.id === cls.id}
-                  <CircleCheckIcon class="size-4 text-primary ml-auto" />
-                {/if}
-              </DropdownMenuItem>
-            {:else}
-              <div
-                class="px-3 py-6 text-center text-xs text-muted-foreground italic"
-              >
-                No classes assigned to this account
-              </div>
-            {/each}
-          </DropdownMenuGroup>
+                  <div class="flex min-w-0 flex-1 justify-between">
+                    <span class="text-[13px] font-semibold truncate leading-tight"
+                      >{cls.className}</span
+                    >
+                    <span 
+                      class={cn(
+                        "opacity-60 truncate size-7 rounded-lg flex items-center justify-center text-[10px] font-bold transition-colors",
+                        chat.selectedClass?.id === cls.id
+                          ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20"
+                          : "bg-secondary text-muted-foreground",
+                      )}
+                      >{cls.sectionName || "Universal Content"}</span
+                    >
+                  </div>
+                  {#if chat.selectedClass?.id === cls.id}
+                    <CircleCheckIcon class="size-4 text-primary ml-auto" />
+                  {/if}
+                </DropdownMenuItem>
+              {/each}
+            </DropdownMenuGroup>
+          {:else}
+            <div
+              class="px-3 py-6 text-center text-xs text-muted-foreground italic"
+            >
+              No classes assigned to this account
+            </div>
+          {/each}
         </DropdownMenuContent>
       </DropdownMenu>
     </div>
@@ -256,11 +277,23 @@
                 >
                   {#each message.parts as part}
                     <!-- Then render tool parts -->
-                    {#if isToolUIPart(part)}
+                    {#if part.type === 'tool-invocation'}
                       <div class="flex">
                         <ToolMessage {part} />
                       </div>
                     {/if}
+                    <!-- Render reasoning parts -->
+                    {#if part.type === "reasoning"}
+                      <div class="mb-2">
+                        <Reasoning isStreaming={chat.status === "streaming" && message.id === chat.lastMessage?.id}>
+                          <ReasoningTrigger>Thinking process...</ReasoningTrigger>
+                          <ReasoningContent class="text-muted-foreground text-sm border-l-2 border-primary/20 pl-4 py-1 my-2">
+                            <Markdown content={part.text || ""} animation={{ enabled: false }} />
+                          </ReasoningContent>
+                        </Reasoning>
+                      </div>
+                    {/if}
+
                     <!-- Render text parts -->
                     {#if part.type === "text"}
                       {#if message.role === "assistant"}

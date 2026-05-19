@@ -2,27 +2,34 @@
   import * as Sheet from "$lib/components/ui/sheet/index.js";
   import WorkspacePane from "./WorkspacePane.svelte";
   import { cn } from "$lib/utils/shadcn";
+  import { fly } from "svelte/transition";
+  import { quintOut } from "svelte/easing";
 
-  let { open = $bindable(false) }: { open?: boolean } = $props();
+  let { 
+    open = $bindable(false),
+    isMobile = false 
+  }: { 
+    open?: boolean,
+    isMobile?: boolean
+  } = $props();
 </script>
 
-<!-- Desktop persistent sidebar -->
-<aside class={cn(
-  "hidden lg:flex flex-col h-full border-l border-border/40 bg-background/50 backdrop-blur-md transition-all duration-300 ease-in-out overflow-hidden shadow-2xl",
-  open ? "w-80 opacity-100" : "w-0 opacity-0 border-none"
-)}>
-  <div class="w-80 h-full flex flex-col">
-    <WorkspacePane onClose={() => open = false} />
-  </div>
-</aside>
-
-<!-- Mobile sheet -->
-<div class="lg:hidden">
-  <Sheet.Root bind:open>
-    <Sheet.Content side="right" class="w-[85vw] sm:w-[400px] p-0 border-l border-border bg-background outline-none">
-      <div class="flex h-full w-full flex-col">
-        <WorkspacePane onClose={() => open = false} />
-      </div>
-    </Sheet.Content>
-  </Sheet.Root>
+<!-- Desktop/Mobile persistent sidebar -->
+<div 
+  class={cn(
+    "flex-col h-full overflow-hidden bg-background/40 backdrop-blur-3xl",
+    isMobile ? "fixed inset-0 z-50 w-full h-full lg:hidden" : "hidden lg:flex"
+  )}
+  transition:fly={{ x: 500, duration: 500, easing: quintOut }}
+>
+  {#if isMobile}
+    <!-- Mobile specific backdrop/wrapper if needed, but WorkspacePane has its own style -->
+    <div class="h-full w-full">
+      <WorkspacePane onClose={() => open = false} isMobile={true} />
+    </div>
+  {:else}
+    <div class="h-full w-full border-l border-white/5">
+      <WorkspacePane onClose={() => open = false} />
+    </div>
+  {/if}
 </div>

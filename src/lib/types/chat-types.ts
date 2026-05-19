@@ -1,6 +1,22 @@
-import type { DBChat } from "$lib/server/db/schema";
+export interface DBChat {
+  id: string;
+  createdAt: Date;
+  title: string;
+  model: string;
+  userId: number | null;
+  visibility: string;
+}
+
+export interface DBMessage {
+  id: string;
+  chatId: string;
+  role: string;
+  parts: any;
+  metadata?: any;
+  createdAt: Date;
+}
+
 import type { InferUITools, JSONValue, UIMessage, UIMessagePart } from "ai";
-import type { coordinatorTools, teacherTools } from "$lib/chat/tools";
 import type { IconName } from "$lib/utils/icons";
 import type { Designation } from "./sms-types";
 
@@ -11,7 +27,7 @@ export interface Assistant {
   suggestions: readonly string[];
   highlight: string;
   instructions?: string;
-  tools?: typeof teacherTools | typeof coordinatorTools;
+  tools?: any;
   maxSteps?: number;
 }
 
@@ -89,7 +105,7 @@ export function getAssessmentStatusDescription(status?: AssessmentStatus | strin
   }
 }
 // Combine all possible tools for type inference in the UI
-export type xToolUIPart = InferUITools<typeof teacherTools & typeof coordinatorTools>;
+export type xToolUIPart = any;
 export type xUIMessage = UIMessage<xMetadata, xDataPart, xToolUIPart>;
 export type xUIMessagePart = UIMessagePart<xDataPart, xToolUIPart>;
 export type xProviderMetadata = Record<string, Record<string, JSONValue>>;

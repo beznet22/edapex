@@ -22,6 +22,18 @@ export class FilesContext {
   openResourceModal = $state(false);
   openFileStoreModal = $state(false);
 
+  references = $state<{ key: string; name: string; type: "file" | "dir" }[]>([]);
+
+  addReference = (ref: { key: string; name: string; type: "file" | "dir" }) => {
+    if (!this.references.find(r => r.key === ref.key)) {
+      this.references = [...this.references, ref];
+    }
+  };
+
+  removeReference = (key: string) => {
+    this.references = this.references.filter((r) => r.key !== key);
+  };
+
   #selectedContext: SelectedClass;
 
   constructor(uploads: UploadedData[], selectedClass: SelectedClass, public doUpload?: boolean) {

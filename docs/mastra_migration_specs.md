@@ -9,9 +9,10 @@ Discard the Planner-Executor network model to minimize token overhead. Instead, 
 
 ### 2.1 The Gateway Agent (Supervisor)
 A single, lightweight agent serves as the entry point and **Supervisor**. It has minimal instructions and no default tools. Its primary job is to:
-1. Parse user intent and route to the correct **Mastra Skill**.
-2. Sequence complex, multi-domain requests into atomic **Mastra Workflows**.
-3. Provide consistent persona and safety gating.
+1. Parse user intent and route to the correct **Mastra Skill** or **Workflow**.
+2. Enforce a **90% Confidence Gate** for all mutation intents (slash commands).
+3. Utilize **Context Injection** to hydrate the session with School, Class, and Section metadata.
+4. Delegate conversational turns to the **Assistant** or **Default** personas.
 
 #### [REFACTOR] Agent Factory
 The Gateway Agent is instantiated via a factory to preserve multi-provider routing and dynamic context hydration.
@@ -151,7 +152,42 @@ The implementation of the Hermes Grid enables the removal of these legacy UI art
 - **`src/lib/context/ai-context.svelte.ts` [DELETED]**: The logic for syncing model and tools (Lines 78-81) is replaced by the Mastra stream.
 - **`src/lib/context/sync.svelte.ts` [GUT]**: Remove `SelectedModel`, `SelectedClass`, and `SelectedAgent` (Lines 39-46). These are replaced by the unified `WorkspaceContext`.
 
-### 3.1 The Hermes 4-Panel Grid
+### 3.1 Execution Flow (The Orchestration Path)
+The following diagram illustrates the path from user input to response, highlighting the Supervisor's role in intent gating and context injection.
+
+```text
+               [ USER INPUT ] ChatComposer Prompt (Chat / Slash Command / Voice / Upload PDF/Images/Word/Excel...)
+                     │
+                     ▼
+       ┌────────────────────────────┐
+       │   SUPERVISOR (Gateway)     │
+       │  (Intent & Confidence & Slash Command & Others)     │
+       └─────────────┬──────────────┘
+                     │
+          [ CONTEXT INJECTION ]  <─── (Workspace / School, Class, Section, exam, subject, academic year, Workspace/workflow context and other Dynamic Context)  (confirm if this already exist or needs to be refactored or re-implemented from scratch)
+                     │  
+           ┌─────────┴─────────┐
+           ▼                   ▼
+    [ MUTATION? ]       [ CONVERSATION? ]
+           │                   │
+     ┌─────┴─────┐       ┌─────┴─────┐
+     ▼           ▼       ▼           ▼
+ [ < 90% ]   [ > 90% ] [ SKILL? ] [ GENERIC? ]
+     │           │       │           │
+     ▼           ▼       ▼           ▼
+[ APPROVAL ] [ WORKFLOW ] [ ASSISTANT ] [ DEFAULT ]
+[  CARD ] [ WORKFLOW RUNNER   ] [ (SKILLS)  ] [ (PURE)  ]
+     │           │       └─────┬───────┘     │
+     │           │             │             │
+     │           │             ▼             │
+     │           │      [ GLOBAL TOOLS ]     │
+     │           │     (Search / Fetch)      │
+     │           │             │             │
+     ▼           ▼             ▼             ▼
+   [ UI (Overlay on ChatComposer) ] <── [ MEMORY ] <── [ RESPONSE (EdapexGateway.stream() OR EdapexGateway.generate() (goes to Workspace Panel as a markdown formatted response ready end user review and action)) ] <──┘
+```
+
+### 3.2 The Hermes 4-Panel Grid
 The application shell implements the high-density **Hermes Agent** layout, designed for complex task management:
 
 1.  **The Rail (`AppRail`)**: Far-left narrow bar (64px). Houses global navigation icons (Chat, Calendar, Skills, Files, Settings).
@@ -329,11 +365,11 @@ To ensure **zero feature loss** during the migration, the 31 legacy tools are co
 
 ### 5.1 Storage Adapter (The LibSQL Sovereign)
 - **Configuration**: Mastra uses **libSQL (self-hosted SQLite file: `file:./mastra.db`)** via `@mastra/storage-libsql` for all AI-related data:
-  - **Memory**: Threads and Messages.
+  - **Memory**: Threads and Messages, strictly isolated per `userId`.
   - **State**: Workflow run history and tracing.
-  - **Provider Config (NEW)**: API keys and models are moved from MySQL to a `provider_configs` table in this isolated file.
-- **Strict Dual-DB Isolation**: The AI layer becomes **100% self-contained** for its own configuration. It no longer reads from MySQL for API keys or routing logic.
-- **Legacy Purge**: Discard `src/lib/server/provider/router.ts` and the `personal_access_tokens` MySQL table for AI usage. All management now happens via the Mastra engine.
+  - **Provider Credentials (NEW)**: API keys and models are moved from MySQL to a `provider_credentials` table in this isolated file.
+- **Strict Dual-DB Isolation**: The AI layer becomes **100% self-contained**. It no longer reads from MySQL for API keys or routing logic.
+- **Privacy Hardening**: Every AI-specific table (`agent_routing`, `provider_credentials`, `agent_settings`) is bound by an indexed `userId` field to ensure user-level data sovereignty.
 - **Zero Schema Change**: No manual DDL changes to the school MySQL schema are required.
 
 ### 5.2 Workspace Inheritance (Memory Scoping)
@@ -423,9 +459,9 @@ A Dual-Path pipeline optimized for volume and latency.
 ### 10. Multi-Skill Orchestration (The Gateway Agent)
 - **Direct Routing**: Users can target a skill explicitly via slash commands (e.g., `/extract`).
 - **Autonomous Handoff**: 
-  - If a user provides a natural language request that spans multiple skills (e.g., "Extract this and then publish it"), the **Gateway Agent** acts as the Supervisor.
-  - It triggers a **Mastra Workflow** that sequences the `ExtractionWorkflow` and `PublishResultsWorkflow`.
-- **State Preservation**: The workflow state is persisted in the `mastra_workflows` table, allowing the UI to show a "Step 1: Extracting... Step 2: Publishing..." progress indicator.
+  - If a user provides a natural language request that spans multiple skills, the **Supervisor** acts as the dispatcher.
+  - It triggers a **Mastra Workflow** or routes to the **Assistant** for conversational execution.
+- **Persona Resolution**: All orchestration turns use the `AgentRouter` to resolve the model for the active persona (Supervisor/Assistant/Default) or task (Extraction/Reasoning).
 
 #### [NEW] High-Volume Batch Extraction
 - **The Protocol**: Uses Mistral's specialized `/v1/batch/ocr` endpoint.
@@ -626,7 +662,7 @@ To achieve absolute isolation, we discard the legacy MySQL-based routing and imp
 - **Isolation Boundary**: The AI layer is now **read-isolated** from the SMS MySQL DB. It only interacts with MySQL for domain-specific writes (timeline entries, grades) via the scoped repositories.
 - **Initialization**: Instantiated per-request within `event.locals.mastra`.
 - **Smart Model Routing**: Supports the standard format `edapex/[provider]/[model]`.
-- **Failover Logic**: The Gateway intercepts provider errors (429/500) and automatically rotates to the next provider stored in the libSQL hierarchy (`Cerebras → Groq → NVIDIA → Mistral`).
+- **Failover Logic**: The Gateway intercepts provider errors (429/500) and automatically rotates to the next provider stored in the libSQL hierarchy (`Groq → Deepseek → Mistral → NVIDIA → OpenCode`).
 
 ---
 
@@ -671,3 +707,27 @@ The following tables in `src/lib/server/db/schema.ts` will be **DELTED** once Ma
 - `ai-votes`
 
 *Note: Data from these tables MUST be migrated to Mastra's native storage if historical continuity is required for Phase 0.*
+
+## 17. Model Registry & Hierarchical Routing
+
+### 17.1 Centralized Model Registry
+A single source of truth for all AI model capabilities and provider metadata resides in `src/lib/server/mastra/registry.ts`. This registry classifies models into tiers (`pro`, `mid`, `low`) and profiles (`strong`, `balanced`, `simple`).
+
+### 17.2 The 6-Tier Hierarchical Routing Engine
+The `AgentRouter` resolves models based on the following precedence:
+1.  **Conversation Override**: Explicitly selected models (e.g., GPT-4o, Claude 3.5 Sonnet).
+2.  **Deep Reasoning Mode**: A conceptual model choice that forces the best available reasoning-capable model.
+3.  **Persona Mapping**: Manual user-defined assignments for specific personas (e.g., Supervisor assigned to GPT-4o).
+4.  **Profile Selection**: Global profile setting (`strong`, `balanced`, `simple`) mapping to model tiers.
+5.  **Thinking Toggle**: Real-time filtering to enable or suppress reasoning chains.
+6.  **Global Fallback**: Standard lightweight model (e.g., Llama 3 8B via OpenGateway).
+
+### 17.3 Thinking Toggle Mechanism
+The "Thinking" toggle in the UI allows users to dynamically request reasoning for any selected model.
+- If **Enabled**: The router attempts to find a reasoning-capable version of the profile or persona's assigned model.
+- If **Disabled**: The router suppresses reasoning chains even for models that support it, ensuring faster response times.
+
+### 17.4 UI Interaction Model
+- **Model Selector**: Offers "Auto (Smart)", "Deep Reasoning", and specific model overrides.
+- **Profile Selector**: Swaps the routing baseline between performance (`strong`) and efficiency (`simple`).
+- **Mention Workflow**: Class selection is handled via `@mention` in the chat, removing redundant dropdowns.

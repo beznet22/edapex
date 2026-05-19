@@ -28,6 +28,16 @@ export class ScopedRepositoryProvider {
 		return this.cache.get(key) as T;
 	}
 
+	getService<T>(ServiceClass: new (provider: ScopedRepositoryProvider) => T): T {
+		const key = ServiceClass.name;
+
+		if (!this.cache.has(key)) {
+			this.cache.set(key, new ServiceClass(this));
+		}
+
+		return this.cache.get(key) as T;
+	}
+
 	getTenant(): TenantContext {
 		return this.tenant;
 	}

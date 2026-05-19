@@ -1,20 +1,24 @@
 # Agent Instructions
 
 ## Package Manager & Scripts
-Use **bun**: `bun install`, `bun run dev`, `bun run build`.
+Use **pnpm**: `pnpm install`, `pnpm run dev`, `pnpm run build`.
+Use `pnx` or Aliases: `pnpm dlx`, `pnpx` to run any package or script that is not installed globally. 
+Do not assume any package or script is installed globally.
+
+
 
 ## Commit Attribution
 AI commits MUST include:
 ```
-Co-Authored-By: AI Agent <noreply@example.com>
+Co-Authored-By: Beznet AI <[EMAIL_ADDRESS]>
 ```
 
 ## File-Scoped Commands
 | Task | Command |
 |------|---------|
-| Typecheck | `bun run svelte-check --workspace path/to/file.svelte` |
-| Lint | `bun run lint path/to/file.ts` |
-| Test | `bun test path/to/file.test.ts` |
+| Typecheck | `pnpm run svelte-check --workspace path/to/file.svelte` |
+| Lint | `pnpm run lint path/to/file.ts` |
+| Test | `pnpm test path/to/file.test.ts` |
 
 ## Key Conventions (EdApex Mastra Migration)
 - **Architecture**: Modular monolith using Svelte 5 and Mastra AI Framework. Never create global singletons.

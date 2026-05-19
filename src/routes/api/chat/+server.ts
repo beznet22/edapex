@@ -1,22 +1,34 @@
 import { allowAnonymousChats } from "$lib/constants";
-import { repo } from "$lib/server/repository";
-import { generateTitle } from "$lib/server/helpers/chat-helper";
-import type { ChatResponse, xUIMessage } from "$lib/types/chat-types";
+import type { xUIMessage } from "$lib/types/chat-types";
 import { error, type RequestHandler } from "@sveltejs/kit";
 import {
-  convertToModelMessages,
-  streamText,
-  smoothStream,
   createUIMessageStream,
   createUIMessageStreamResponse,
-  stepCountIs,
+  generateId,
 } from "ai";
-import { AgentService, useAgent } from "$lib/server/service/agent.service";
+import { EdApexGateway } from "$lib/server/mastra/gateway";
+import { createTenantContext, WorkspaceMismatchError } from "$lib/server/mastra/tenant-context";
+import { createMastraDb } from "$lib/server/mastra/db";
+import { env } from "$env/dynamic/private";
 import type { ClassSection } from "$lib/types/result-types";
-import { resolveProvider } from "$lib/server/provider/router";
+import { processMentions, type MentionTag } from "$lib/server/mastra/mention-processor";
+import { TenantContextCache } from "$lib/server/mastra/context-cache";
+import type { FileReference } from "$lib/server/mastra/file-context";
+
+// Module-level cache instance persists across requests for session-based caching
+const tenantContextCache = new TenantContextCache();
 
 export const POST: RequestHandler = async ({ request, locals: { user, session }, cookies }) => {
-  let { chatId, messages, agentId, selectedClass }: ChatResponse & { selectedClass?: ClassSection } = await request.json();
+  const mastraDb = createMastraDb();
+  let { chatId, messages, agentId, selectedClass, fileReferences, mentions }: {
+    chatId: string;
+    messages: xUIMessage[];
+    agentId: string;
+    selectedClass?: ClassSection;
+    fileReferences?: FileReference[];
+    mentions?: MentionTag[];
+  } = await request.json();
+
   if ((!user || !session) && !allowAnonymousChats) error(401, "Unauthorized");
   if (!user) error(401, "User session required for provider resolution");
 
@@ -27,95 +39,145 @@ export const POST: RequestHandler = async ({ request, locals: { user, session },
     agentId = cookies.get("selected-agent") || "";
   }
 
-  if (!selectedClass && cookies.get("selected-class")) {
+  // Generate a thread ID if this is a new conversation.
+  // Mastra memory uses threadId + resourceId for persistence.
+  if (!chatId && messages.length > 0) {
+    chatId = generateId();
+  }
+
+  const resourceId = `user-${user.id}`;
+  const message = messages[messages.length - 1];
+
+  const tenantContext = createTenantContext({
+      schoolId: user.schoolId ?? 1,
+      userId: user.id ?? 1,
+      designationId: (user as any).designationId ?? 1,
+      staffId: (user as any).staffId ?? 1,
+      roleId: (user as any).roleId ?? null,
+      classId: selectedClass?.id ?? null,
+      sectionId: selectedClass?.sectionId ?? null,
+      examId: null,
+      academicId: null
+  });
+
+  // Process @mention tags to update TenantContext before routing to Gateway
+  let activeContext = tenantContext;
+  if (mentions && mentions.length > 0) {
     try {
-      selectedClass = JSON.parse(cookies.get("selected-class")!);
+      const sessionId = session?.id ?? `anon-${user.id}`;
+      const designationId = (user as any).designationId ?? 1;
+      activeContext = await processMentions(
+        mentions,
+        tenantContext,
+        tenantContextCache,
+        sessionId,
+        designationId
+      );
     } catch (e) {
-      console.error("Error parsing selected-class cookie in chat API:", e);
+      if (e instanceof WorkspaceMismatchError) {
+        return new Response(
+          JSON.stringify({ error: 'WORKSPACE_MISMATCH', message: e.message }),
+          { status: 403, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
+      throw e;
     }
   }
 
-  console.log(`[api/chat] Agent: ${agentId}, Class: ${selectedClass?.className}(${selectedClass?.sectionName})`);
+  const gateway = new EdApexGateway(
+      mastraDb,
+      user.id,
+      env.ENCRYPTION_KEY || '',
+      {
+          OPENAI_API_KEY: env.OPENAI_API_KEY,
+          ANTHROPIC_API_KEY: env.ANTHROPIC_API_KEY,
+          GOOGLE_API_KEY: env.GOOGLE_API_KEY,
+          DEEPSEEK_API_KEY: env.DEEPSEEK_API_KEY,
+      }
+  );
 
-  const preferredProvider = cookies.get("default-provider");
-  let resolved: { provider: import("ai").Provider; providerType: string };
-  try {
-    resolved = await resolveProvider(user.id, preferredProvider, selectedChatModel);
-  } catch (err) {
-    error(503, err instanceof Error ? err.message : "All inference engines are currently degraded.");
-  }
-  const { provider } = resolved;
-
-  let message = messages[messages.length - 1];
-  if (user) {
-    if (!chatId && messages.length === 1) {
-      chatId = await repo.chat.createChat({
-        userId: user.id,
-        title: "New Chat",
-        model: selectedChatModel,
-      });
-    }
-    await repo.chat.upsertMessage({ chatId, message });
-    messages = await repo.chat.loadMessages(chatId);
-  }
-
-  const tools = AgentService.getTools(user, agentId);
-  const instructions = await AgentService.getInstructions(user, agentId, selectedClass);
-  const userStopSignal = new AbortController();
   const stream = createUIMessageStream<xUIMessage>({
     execute: async ({ writer }) => {
-      if (user && chatId && messages.length === 1) {
-        generateTitle({ message, provider })
-          .then(async (title) => {
-            const chat = await repo.chat.updateChat({ id: chatId, title, model: selectedChatModel });
+      // Title generation for new conversations (non-blocking)
+      if (chatId && messages.length === 1) {
+        const promptText = (message.parts as any)?.find((p: any) => p.type === 'text')?.text || '';
+        gateway.generate(
+          `Generate a very short title (under 20 characters) summarizing the following user message. Return ONLY the title text, no quotes or colons:\n\n${promptText || 'New Chat'}`,
+          activeContext,
+          { conversationOverride: selectedChatModel }
+        )
+          .then(async (titleResult: any) => {
+            const title = (titleResult?.text || 'New Chat').slice(0, 20).trim();
+            // Emit the chat metadata to the client for sidebar updates
             writer.write({
               type: "data-chat",
               id: chatId,
-              data: chat,
+              data: { id: chatId, title, model: selectedChatModel, createdAt: new Date() },
               transient: true,
             });
           })
           .catch((e) => {
-            console.error(e);
+            console.error('[api/chat] Title generation failed:', e);
           });
       }
-      const model = provider.languageModel(selectedChatModel);
-      const result = streamText({
-        model,
-        system: instructions,
-        messages: await convertToModelMessages(messages),
-        abortSignal: userStopSignal.signal,
-        stopWhen: stepCountIs(30),
-        tools: tools,
-        experimental_transform: smoothStream({
-          delayInMs: 20,
-          chunking: "line",
-        }),
-      });
 
-      result.consumeStream();
-      const uiStream = result.toUIMessageStream({
-        originalMessages: messages,
-        sendStart: false,
-      });
+      const promptText = (message.parts as any)?.find((p: any) => p.type === 'text')?.text || (message as any).content || "";
+      
+      // Construct workspace identifier for file-as-context injection (Requirement 9.4)
+      const workspace = activeContext.classId && activeContext.sectionId
+          ? `${activeContext.classId}_${activeContext.sectionId}`
+          : undefined;
 
-      writer.merge(uiStream);
+      const result = await gateway.stream(promptText, activeContext, {
+          threadId: chatId,
+          resourceId,
+          conversationOverride: selectedChatModel,
+          fileReferences: fileReferences?.length ? fileReferences : undefined,
+          workspace,
+          onStepFinish: (step) => {
+              if (step.toolCalls && step.toolCalls.length > 0) {
+                  for (const call of step.toolCalls) {
+                      writer.write({
+                          type: "data-workflow",
+                          data: { tool: call.toolName, args: call.args }
+                      } as any);
+                  }
+              }
+          }
+      });
+      
+      if ('rejected' in result && result.rejected) {
+          // Emit confirmation chunk if the gateway provides structured confirmation data
+          const gatewayResult = result as any;
+          if (gatewayResult.confirmation) {
+              writer.write({
+                  type: "data-confirmation",
+                  data: gatewayResult.confirmation
+              } as any);
+          }
+
+          // Manual streaming for fallback responses
+          for await (const chunk of result.textStream as AsyncIterable<string>) {
+              writer.write({ type: "text-delta", delta: chunk, id: generateId() } as any);
+          }
+          writer.write({ type: 'finish', finishReason: 'stop' } as any);
+          return;
+      }
+      
+      const vResult = result as any;
+      if (vResult.toUIMessageStream) {
+          vResult.consumeStream();
+          const uiStream = vResult.toUIMessageStream({
+              originalMessages: messages,
+              sendStart: false,
+          });
+          writer.merge(uiStream);
+      }
     },
     onError: (e) => {
-      const message = e instanceof Error ? e.message : String(e);
-      console.error(`[api/chat] Error: ${message}`);
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error(`[api/chat] Error: ${msg}`);
       return "Oops! Something went wrong.";
-    },
-    onFinish: async ({ responseMessage }) => {
-      if (!user) return;
-      try {
-        await repo.chat.upsertMessage({
-          chatId,
-          message: responseMessage,
-        });
-      } catch (error) {
-        console.error(error);
-      }
     },
   });
 

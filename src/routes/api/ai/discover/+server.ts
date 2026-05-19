@@ -1,7 +1,8 @@
 import { error, json } from "@sveltejs/kit";
 import { CredentialType } from "$lib/schema/chat-schema";
 import { discoverModels, saveUserModelsCached } from "$lib/server/provider/discovery";
-import { retrieveApiKey } from "$lib/server/provider/router";
+import { getProviderCredentialWithFallback, decrypt } from "$lib/server/mastra/provider-config";
+import { createMastraDb } from "$lib/server/mastra/db";
 import type { RequestHandler } from "./$types";
 
 export const POST: RequestHandler = async ({ request, locals }) => {
@@ -13,7 +14,21 @@ export const POST: RequestHandler = async ({ request, locals }) => {
     error(400, "Invalid provider");
   }
 
-  const apiKey = await retrieveApiKey(user.id, provider);
+  const { env } = await import('$env/dynamic/private');
+  const db = createMastraDb();
+  const envKeys = env as Record<string, string | undefined>;
+  const config = await getProviderCredentialWithFallback(db, user.id, provider, envKeys);
+
+  let apiKey: string | null = null;
+  if (config) {
+    if (config.source === 'env') {
+      apiKey = envKeys[`${provider.toUpperCase()}_API_KEY`] || null;
+    } else if (config.apiKeyEncrypted) {
+      const encryptionKey = env.TOKEN_ENCRYPTION_KEY || "edapex-default-encryption-key-32ch";
+      apiKey = decrypt(config.apiKeyEncrypted, encryptionKey);
+    }
+  }
+
   if (!apiKey) {
     error(404, `No API key found for ${provider}`);
   }

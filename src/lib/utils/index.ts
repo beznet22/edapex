@@ -1,5 +1,4 @@
-import type { DBMessage } from "$lib/server/db/schema";
-import type { xUIMessage } from "$lib/types/chat-types";
+import type { DBMessage, xUIMessage } from "$lib/types/chat-types";
 
 export function convertToUIMessages(messages: Array<DBMessage>): Array<xUIMessage> {
   return messages.map((message) => ({

@@ -1,6 +1,6 @@
 <script lang="ts">
   import { goto } from "$app/navigation";
-  import type { DBChat } from "$lib/server/db/schema";
+  import type { DBChat } from "$lib/types/chat-types";
   import {
     DropdownMenu,
     DropdownMenuContent,

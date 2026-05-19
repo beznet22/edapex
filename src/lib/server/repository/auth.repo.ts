@@ -2,7 +2,6 @@ import { BaseRepository } from "./base.repo";
 import { users, smStaffs } from "../db/sms-schema";
 import { sessions } from "../db/schema";
 import { eq, and, gt } from "drizzle-orm";
-import { generateId } from "ai";
 
 type UserRow = typeof users.$inferSelect;
 type StaffRow = typeof smStaffs.$inferSelect;

@@ -62,7 +62,7 @@ The UI is built using strict Tailwind CSS Flexbox/Grid layouts for horizontal st
   - A comprehensive accordion or tree-view of the workspace filesystem (e.g., `.git`, `agent-messages`, `archive`, `docs`, `kb`, `screenshots`).
   - Tree items feature file-type icons and right-aligned size metadata labels (e.g., `4.2k`, `8.8k`).
 - **Mastra Workflow Context integration**:
-  - **Extraction Staging** (`/extract`): The Inspector mounts a live preview of the **Mastra Workflow State** for the current suspended extraction run. The OCR mapped JSON is read from the workflow snapshot — never from the school DB — ensuring complete agent/school-layer isolation.
+  - **Extraction Staging** (`/extract`): The Inspector mounts a live preview of the **Mastra Workflow State** for the current suspended extraction run. The OCR mapped markdown response from the workflow snapshot is displayed here never from the school DB — ensuring complete agent/school-layer isolation.
   - **Publish Artifacts** (`/publish`): Finalized PDF report cards from PrinceXML are mounted here for viewing before dispatch.
   - **Run History / Observability**: A dedicated trace view for current and past **Mastra Workflow Runs**. Displays step-by-step success/failure markers, allowing staff to troubleshoot batch jobs (e.g., "Student X failed due to blurry image OCR") directly from the `mastra_runs` libSQL history.
 
@@ -168,3 +168,56 @@ Responsiveness is not a feature; it is the core foundation of the EdApex orchest
   - [ ] Integrate Mastra `OTel` stream rendering natively inside the collapsible `TerminalDock` footer array.
 
 
+
+
+HTML_Markdown_Middleware is for DuckDuckGo only
+
+
+
+TinyFish Search
+
+Web search built for agents. Structured JSON results, low latency, rank-stable across calls. Use it as a discovery step in front of Fetch, the retrieval layer in a RAG pipeline, or a quick verification step inside a multi-turn agent run. Free just the like the web was meant to be.
+
+TinyFish Fetch
+
+Most web fetches dump raw HTML into your agent's context, even nav bars, scripts, cookie banners, all of it. Your model pays for every token of that noise.
+
+TinyFish Fetch cleans it up. Hand it any URL, and we render the page in a real, full browser with JavaScript, SPAs, and dynamic content, strip out everything unnecessary, and return clean Markdown, JSON, or HTML. Whichever your agent needs.
+
+Failed URLs don't count against your quota. And, it’s still free.
+
+We're not just giving you free web access. We're cutting your token costs on every single call.
+
+
+
+Extraction_Inspector and all inpections should use the existing workspace pannel src/lib/components/workspace. We should add hover icon buttons to each directory item to enable user to reference file on the ChatComposer as chat context for any flow/slash command.
+
+
+
+Publish_Viewer and all other file viewers will use the existing workspace pannel src/lib/components/workspace for file/artifact  CRUD operations.
+
+
+
+Run_History will also use the observability UI in the existing workspace pannel src/lib/components/workspace
+
+
+
+Workflow_State should be indicated in existing workspace pannel src/lib/components/workspace
+
+Validation, extraction, and publish results are self-contained (no chat-helper dependency) and all state is held in the orchestrator
+/extract → runs extraction workflow → suspends pending /validate
+/validate → resumes workflow → validates schema → applies business logic → commits to DB
+/publish → resumes workflow → generates PDF → sends via email → commits to DB  → releases lock on orchestrator
+
+We must implement a mastra server sent events mechanism to update the UI with the workflow status.
+
+When a workflow is triggered, the UI should display a "Workflow Running" indicator. When the workflow completes, the UI should update to show the results.
+
+All workflows should be self-contained. No need for a helper/child agent to do any work!
+
+Complete the workspace pannel src/lib/components/workspace directory/file actions for Create, Read, Update, Delete (CRUD) operations, upload, download, sharing, and other relevant file management tasks.
+
+Coordinator/IT users can switch between schools/students/classes/sections/academic_year/term while Class Teachers/Staff users can switch between students/academic_year/term context using @mention syntax in the ChatComposer. This will be context aware for all flows and slash commands.
+
+- In the ChatComposer, when user types @mention for any school/student/class/section/academic_year/term, the ChatComposer should display a dropdown of all matching entities. The user can select an entity from the dropdown and the ChatComposer should display the selected entity in the chat message as a tag. The selected entity will be used as context for all flows and slash commands.
+- In the Workspace pannel src/lib/components/workspace, when user clicks on "Add Context" action icon in directory/file action menu, it should automatically reference the file in the ChatComposer as a @file tag for processing. The file content will be available to the LLM as context for processing

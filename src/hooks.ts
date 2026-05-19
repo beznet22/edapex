@@ -1,5 +1,5 @@
 import { ChatHistory } from "$lib/context/chat-history.svelte";
-import { SelectedModel, SelectedClass, SelectedAgent, SelectedCategory } from "$lib/context/sync.svelte";
+import { SelectedModel, SelectedClass, SelectedCategory } from "$lib/context/sync.svelte";
 import type { Transport } from "@sveltejs/kit";
 
 export const transport: Transport = {

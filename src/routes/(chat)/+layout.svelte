@@ -8,7 +8,6 @@
   import {
     SelectedModel,
     SelectedClass,
-    SelectedAgent,
   } from "$lib/context/sync.svelte";
   import { ImageContext } from "$lib/context/image.context.svelte";
   import { useAI } from "$lib/context/ai-context.svelte";
@@ -27,7 +26,6 @@
     chats,
     modelId,
     selectedClassRaw,
-    selectedAgentId,
     uploads,
     sidebarCollapsed,
     // svelte-ignore state_referenced_locally
@@ -42,9 +40,6 @@
   const selectedClass = new SelectedClass(selectedClassRaw || "");
   selectedClass.setContext();
 
-  const selectedAgent = new SelectedAgent(selectedAgentId || "");
-  selectedAgent.setContext();
-
   $effect(() => {
     chatHistory.rehydrate(data.chats);
   });
@@ -55,10 +50,6 @@
 
   $effect(() => {
     selectedClass.rehydrate(data.selectedClassRaw || "");
-  });
-
-  $effect(() => {
-    selectedAgent.rehydrate(data.selectedAgentId || "");
   });
 
   const appContext = new UserContext(

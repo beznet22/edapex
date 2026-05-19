@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { goto } from "$app/navigation";
+  import { goto, pushState } from "$app/navigation";
   import { signout } from "$lib/api/auth.remote";
   import * as DropdownMenu from "$lib/components/ui/dropdown-menu/index.js";
   import * as Sidebar from "$lib/components/ui/sidebar/index.js";
@@ -135,6 +135,7 @@
           </DropdownMenu.Item>
           <DropdownMenu.Item onSelect={() => {
             if (sidebar.isMobile) sidebar.setOpenMobile(false);
+            pushState("", { showModal: true });
           }}>
             <SettingsIcon />
             Settings
