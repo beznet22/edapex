@@ -59,6 +59,7 @@ export class ChatContext {
   } | null>(null);
   pendingMentions = $state<MentionPayload[]>([]);
   fileReferences = $state<{ key: string; name: string; type: 'file' | 'dir'; mimeType?: string }[]>([]);
+  #receivedDataChat = false;
   #selectedModel = SelectedModel.fromContext();
   get modelOverride() { return this.#selectedModel.value; }
 
@@ -119,6 +120,9 @@ export class ChatContext {
   }
 
   #prepareSendMessagesRequest = ({ messages }: { messages: xUIMessage[] }) => {
+    // Reset the data-chat received flag at the start of each new stream
+    this.#receivedDataChat = false;
+
     const body: Record<string, any> = {
       messages: this.user ? [messages.at(-1)] : messages,
       chatId: this.chatData?.id,
@@ -142,10 +146,26 @@ export class ChatContext {
   #onFinish = async () => {
     this.activeWorkflows = [];
     this.pendingConfirmation = null;
-    // Only navigate if we have a valid chatId
-    // (on new chats, the URL is updated via data-chat in #onData)
+
+    // Only navigate if we have a valid chatId AND conditions require it:
+    // - Skip goto() if no data-chat event was received during stream (URL was already correct)
+    // - Skip goto() if replaceState already updated the URL to /chat/[chatId]
+    // - Otherwise call goto() (e.g., user navigated away during stream)
     if (this.chatData?.id) {
-      goto(`/chat/${this.chatData.id}`, {
+      const targetPath = `/chat/${this.chatData.id}`;
+
+      if (!this.#receivedDataChat) {
+        // No data-chat event received — URL was already correct before stream started
+        return;
+      }
+
+      if (window.location.pathname === targetPath) {
+        // replaceState already handled the URL update — skip to avoid duplicate history entry
+        return;
+      }
+
+      // URL doesn't match (user navigated away during stream) — redirect back
+      goto(targetPath, {
         replaceState: true,
       });
     }
@@ -153,9 +173,10 @@ export class ChatContext {
 
   #onData = (part: any) => {
     if (part.type === "data-chat") {
+      this.#receivedDataChat = true;
       this.chatData = part.data;
       if (!this.chatData || !this.chatData.id) return;
-      this.chatHistory.addChat(this.chatData);
+      this.chatHistory.upsertChat(this.chatData);
       replaceState(`/chat/${this.chatData.id}`, {
         settings: { chatId: this.chatData?.id },
       });

@@ -21,6 +21,10 @@ This feature finalizes the EdApex Mastra orchestration migration by implementing
 - **Class_Teacher**: A user with designation ID 8 restricted to their assigned class and section
 - **Context_Cache**: The `TenantContextCache` at `src/lib/server/mastra/context-cache.ts` with 5-minute TTL and synchronous bust on `/switch`
 - **Skill_Registry**: The file-driven skill discovery system that maps slash commands to tool bundles
+- **Supervisor_Pattern**: Mastra's native multi-agent orchestration pattern where a supervisor agent is configured with child `agents` and delegates tasks internally via `supervisor.stream()`
+- **handleChatStream**: The adapter function from `@mastra/ai-sdk` that bridges a Mastra Agent stream to the AI SDK's `createUIMessageStreamResponse` format for SvelteKit integration
+- **Mastra_Memory**: The built-in memory system in `@mastra/core` that persists conversation messages to a configured storage backend, keyed by `threadId` and `resourceId`
+- **Mastra_Instance**: The top-level Mastra framework object that holds shared configuration (storage, telemetry, agents) and is instantiated per-request in the EdApex architecture
 
 ## Requirements
 
@@ -288,6 +292,100 @@ This feature finalizes the EdApex Mastra orchestration migration by implementing
 5. THE developer SHALL NOT guess or assume Mastra API capabilities — all decisions SHALL be based on verified documentation lookups or inspecting the installed `@mastra/core` package exports
 6. WHEN modifying existing Mastra-layer modules (gateway.ts, router.ts, workflows/*.ts), THE developer SHALL verify that the modification aligns with Mastra's documented patterns for that module type (Agent, Workflow, Tool, Memory) before making changes
 
+### Requirement 20: Mastra Native Supervisor Pattern for Gateway
+
+**User Story:** As a developer, I want the EdApex Gateway to use Mastra's native supervisor pattern with the `agents` property, so that `supervisor.stream()` returns a proper Mastra stream that can be consumed directly and piped correctly to the AI SDK writer.
+
+#### Acceptance Criteria
+
+1. THE Gateway SHALL instantiate the supervisor agent using Mastra's native supervisor pattern with the `agents` property (as documented at `https://mastra.ai/docs/agents/supervisor-agents`), passing child agents (Assistant, workflow agents) as registered sub-agents rather than manually orchestrating classification and routing
+2. WHEN the supervisor streams a response, THE Gateway SHALL consume the stream using `for await (const chunk of stream.textStream)` or equivalent Mastra stream iteration — the stream returned by `supervisor.stream()` SHALL be a proper Mastra Agent stream compatible with `@mastra/ai-sdk` adapters
+3. THE Gateway SHALL remove the manual `executeOrchestration` two-step pattern (separate Supervisor classification followed by Assistant instantiation) and replace it with a single `supervisor.stream()` call that delegates internally to the appropriate child agent
+4. THE Gateway SHALL pass `abortSignal` from the incoming HTTP request directly to `supervisor.stream()` options (as documented at `https://mastra.ai/reference/streaming/agents/stream`) to support client-initiated cancellation via the stop button
+5. IF the supervisor pattern requires tool-based routing (e.g., a `getContext` tool for dynamic context discovery), THEN THE Gateway SHALL register those tools on the supervisor agent itself, not on child agents — child agents SHALL only receive their domain-specific tools
+
+### Requirement 21: Proper Streaming via handleChatStream from @mastra/ai-sdk
+
+**User Story:** As a developer, I want the chat API endpoint to use `handleChatStream` from `@mastra/ai-sdk` as the adapter between Mastra's Agent stream and the AI SDK's `createUIMessageStreamResponse`, so that streaming works correctly without manual chunk-type translation.
+
+#### Acceptance Criteria
+
+1. THE chat API endpoint (`src/routes/api/chat/+server.ts`) SHALL import `handleChatStream` from `@mastra/ai-sdk` and use it to bridge the Mastra agent stream returned by `gateway.stream()` to the AI SDK response format, passing the stream result object directly as the first argument to `handleChatStream`
+2. THE chat API endpoint SHALL remove the manual `fullStream` reader loop (the `switch` block translating `reasoning-start`, `reasoning-delta`, `reasoning-end`, `text-delta`, `text-end` chunk types into AI SDK writer events) and SHALL remove the `textStream` fallback reader loop — `handleChatStream` SHALL handle all chunk-type translation natively for non-rejected responses
+3. WHEN `handleChatStream` is invoked, THE chat API endpoint SHALL NOT call `consumeStream()`, `toUIMessageStream()`, or manually iterate `textStream` on the Mastra stream result — the adapter SHALL handle stream consumption internally
+4. IF the gateway returns a rejected response (confidence gate below threshold), THEN THE chat API endpoint SHALL continue to use the existing manual writer approach (emitting `text-start`, `text-delta`, `text-end`, and `finish` events) for the rejection message, since rejected responses produce an async generator rather than a Mastra agent stream
+5. THE chat API endpoint SHALL continue to emit custom data events (`data-chat`, `data-workflow`, `data-confirmation`) using the AI SDK `writer` within the `createUIMessageStream` execute callback, and SHALL merge the `handleChatStream` output into the same stream using `writer.merge()` so that custom events and agent response chunks are delivered on a single response stream
+6. WHEN `gateway.stream()` returns a non-rejected result, THE chat API endpoint SHALL pass `request.signal` as the `abortSignal` option to `handleChatStream` (if supported) or to `gateway.stream()` options, so that client-initiated cancellation (stop button) terminates the stream within 1 second of the abort event
+
+### Requirement 22: AbortSignal Support in Agent Streaming
+
+**User Story:** As a user, I want to be able to stop a running AI response by clicking the stop button, so that I can cancel long-running or unwanted generations immediately.
+
+#### Acceptance Criteria
+
+1. WHEN the user clicks the stop button in the chat UI, THE chat API endpoint SHALL propagate the `request.signal` (AbortSignal) to the Mastra agent's `stream()` call via the `abortSignal` option (as documented at `https://mastra.ai/reference/streaming/agents/stream`)
+2. WHEN the AbortSignal is triggered, THE Mastra agent SHALL terminate the active LLM generation and close the stream without emitting error-type chunks to the client, returning the HTTP response with a 200 status code
+3. IF the stream is aborted, THEN THE chat API endpoint SHALL close any open message parts (text-start without text-end, reasoning-start without reasoning-end) and emit a `finish` event with `finishReason: "stop"` to the client so the UI transitions out of the loading state
+4. IF the stream is aborted, THEN THE chat API endpoint SHALL NOT persist the partial assistant message to Mastra memory for the active thread, ensuring the conversation history contains only complete messages
+5. IF the AbortSignal is triggered during the supervisor classification phase (before the assistant agent begins streaming), THEN THE Gateway SHALL cancel the classification request and return without initiating the assistant stream
+6. IF the supervisor pattern is active and a child agent is streaming, THEN THE Gateway SHALL propagate the `abortSignal` from the HTTP request through to the actively streaming child agent within 100ms of signal activation
+
+### Requirement 23: Message Persistence via Mastra Memory/Thread System
+
+**User Story:** As a user, I want my chat messages to be persisted to Mastra storage, so that when I reload the page or navigate back to a conversation, all previous messages are available.
+
+#### Acceptance Criteria
+
+1. WHEN the supervisor agent processes a message, THE Mastra Memory system SHALL automatically persist both the user message and the assistant response to the thread identified by `threadId` and `resourceId` — persistence SHALL happen as part of the agent's native memory integration (via the `memory` option passed to `agent.stream()` or `agent.generate()`), not as a separate manual step
+2. WHEN SvelteKit loads the chat page from scratch (`src/routes/(chat)/chat/[chatId]/+page.server.ts`), THE page server SHALL retrieve persisted messages from Mastra storage via `storage.getMessages({ threadId: chatId })` and return them as an array of message objects containing role, content parts, and metadata compatible with the AI SDK `useChat` hook's `initialMessages` prop
+3. THE Mastra Memory SHALL be configured on the assistant agent with the `LibSQLStore` storage adapter so that all interactions within a thread (including tool call results and multi-step reasoning) are persisted to the same thread history identified by `threadId`
+4. IF a thread does not exist when the first message is sent, THEN THE Mastra Memory system SHALL create the thread automatically using the `threadId` generated by the chat API endpoint
+5. THE persisted messages SHALL include all message parts (text, reasoning, tool calls, tool results) so that the full conversation context is available on page reload
+6. IF Mastra storage is unavailable or throws an error during message persistence, THEN THE Gateway SHALL log the error to the server console and continue streaming the response to the user without blocking — message persistence failure SHALL NOT cause the chat response to fail
+7. IF the page server fails to retrieve messages from Mastra storage (connection error or timeout), THEN THE page server SHALL return an empty messages array and a null chat object rather than returning an HTTP error response
+8. WHEN the page server retrieves a thread, IF the thread's visibility is "private" and the requesting user's resource ID does not match the thread's `resourceId`, THEN THE page server SHALL return a 404 response
+9. WHEN the page server loads messages for a thread, THE page server SHALL retrieve a maximum of 200 messages ordered by creation time (most recent last) to prevent unbounded memory usage on long-running conversations
+
+### Requirement 24: Sidebar Chat History from Mastra Storage
+
+**User Story:** As a user, I want the sidebar chat history to display my previous conversations loaded from Mastra storage, so that I can navigate between conversations and see their titles.
+
+#### Acceptance Criteria
+
+1. THE sidebar chat history component (`src/lib/components/sidebar-history`) SHALL fetch the list of chat threads from Mastra storage (as documented at `https://mastra.ai/docs/memory/message-history`) using the current user's `resourceId` (formatted as `user-{userId}`) as the filter
+2. WHEN the sidebar loads, THE sidebar chat history SHALL retrieve threads sorted by thread creation date descending, displaying a maximum of 50 threads, and SHALL group them into relative date categories (Today, Yesterday, Last 7 days, Last 30 days, Older)
+3. THE sidebar chat history SHALL display each thread with its title (from thread metadata, truncated to a single line with ellipsis if exceeding the sidebar width) and grouped under its relative date heading
+4. WHEN a `data-chat` event is received in `#onData` for a thread ID not already present in the list, THE sidebar chat history SHALL prepend the new thread to the top of the list without requiring a full page reload
+5. WHEN a `data-chat` event is received in `#onData` for a thread ID already present in the list, THE sidebar chat history SHALL update that thread's title in place without duplicating the entry
+6. IF Mastra storage returns an empty thread list, THEN THE sidebar chat history SHALL display an empty state message indicating no previous conversations exist
+7. IF Mastra storage is unavailable or returns an error, THEN THE sidebar chat history SHALL display skeleton loading placeholders during the fetch attempt and fall back to the empty state message if the request fails within 10 seconds
+
+### Requirement 25: Storage Configuration at Mastra Instance Level
+
+**User Story:** As a developer, I want storage to be configured at the Mastra instance level rather than per-agent, so that all agents within the supervisor hierarchy share the same storage backend and thread history.
+
+#### Acceptance Criteria
+
+1. THE Mastra instance SHALL be configured with a centralized storage adapter (libSQL-based) passed at the instance level (as documented at `https://mastra.ai/docs/memory/message-history` and `https://mastra.ai/docs/agents/supervisor-agents`), rather than configuring storage individually on each agent's Memory constructor
+2. THE centralized storage adapter SHALL use the existing `createMastraStorage()` factory from `src/lib/server/mastra/storage.ts` to ensure consistency with the page server's storage access
+3. WHEN the supervisor agent or any child agent accesses Memory, THE Mastra framework SHALL resolve storage from the instance-level configuration — individual agents SHALL NOT instantiate their own `Memory({ storage: ... })` independently
+4. THE Mastra instance SHALL be instantiated per-request (not as a global singleton) to respect the modular monolith architecture and TenantContext isolation boundaries
+5. IF the storage adapter fails to initialize (e.g., libSQL connection error or timeout exceeding 5 seconds), THEN THE Mastra instance SHALL throw an error at construction time that includes the storage backend URL and the nature of the failure (connection refused, timeout, or authentication error) rather than failing silently during message persistence
+6. WHEN the supervisor agent writes a message to a thread and a child agent subsequently reads from the same thread within the same request, THE child agent SHALL retrieve the message written by the supervisor, confirming that both agents resolve to the same storage instance
+7. IF a developer adds a new agent to the supervisor hierarchy without explicitly assigning storage, THEN THE new agent SHALL inherit the instance-level storage configuration by default without additional configuration
+
+### Requirement 26: Navigation Fix — Prevent Duplicate goto After replaceState
+
+**User Story:** As a user, I want the chat URL to update smoothly without unnecessary page navigations, so that creating a new chat does not cause flickering or redundant history entries.
+
+#### Acceptance Criteria
+
+1. WHEN `#onData` receives a `data-chat` event and calls `replaceState()` to update the URL to `/chat/[chatId]`, THE `#onFinish` handler SHALL NOT call `goto()` if the current page URL pathname equals `/chat/[chatId]` for the active `chatId`
+2. IF the current page URL pathname already equals `/chat/[chatId]` for the active `chatId` at the time `#onFinish` executes, THEN THE `#onFinish` handler SHALL skip the `goto()` call and perform no navigation
+3. IF `#onData` has NOT received a `data-chat` event during the stream, THEN `#onFinish` SHALL also skip the `goto()` call since the URL was already correct before the stream started
+4. WHEN `replaceState` is called in `#onData`, THE system SHALL replace the current browser history entry without adding a new entry, and skipping `goto()` in `#onFinish` SHALL result in zero additional history entries being created during the entire stream lifecycle
+5. WHEN the navigation fix is applied, THE system SHALL preserve existing `goto()` behavior for any case where `chatData.id` is defined but the current page URL pathname does not equal `/chat/[chatId]` for that `chatId`
+
 ## Implementation Status
 
 ### Global Tools (Req 1-4, 15-16, 18)
@@ -343,3 +441,25 @@ This feature finalizes the EdApex Mastra orchestration migration by implementing
 - No SSE/EventSource implementation exists anywhere in the codebase
 - `chat-context.svelte.ts` has `activeWorkflows` state array — can be driven by SSE events
 - No `/api/workflow/events` or similar SSE endpoint exists
+
+### Mastra Supervisor Pattern & Streaming (Req 20-22)
+- **Status: REFACTOR — Major architectural change to Gateway**
+- The current Gateway uses a manual two-step orchestration: Supervisor classifies, then a separate Assistant agent streams
+- Needs to be replaced with Mastra's native supervisor pattern using the `agents` property
+- The chat API endpoint (`+server.ts`) currently has a complex manual chunk-type translation loop for `fullStream` — this should be replaced by `handleChatStream` from `@mastra/ai-sdk`
+- `@mastra/ai-sdk` package may need to be installed
+- `request.signal` (AbortSignal) is already checked in the manual reader loop but needs to be passed natively to `agent.stream()` options
+
+### Message Persistence & Storage (Req 23-25)
+- **Status: PARTIALLY COMPLETE — Storage exists, persistence wiring incomplete**
+- `createMastraStorage()` exists in `src/lib/server/mastra/storage.ts` and is used by the page server to load messages
+- The page server (`+page.server.ts`) already calls `storage.getMessages({ threadId })` — but messages may not be persisted correctly during streaming
+- Memory is currently configured per-agent (`new Memory({ storage: createMastraStorage() })`) — needs to move to Mastra instance level
+- No Mastra instance-level configuration exists yet — agents are instantiated directly in the Gateway
+- Sidebar chat history component exists but its data source needs verification against Mastra storage
+
+### Navigation Fix (Req 26)
+- **Status: BUG FIX — Small targeted change**
+- `#onFinish` in `chat-context.svelte.ts` currently always calls `goto()` when `chatData.id` exists
+- `#onData` already calls `replaceState()` to update the URL when a `data-chat` event arrives
+- The fix requires `#onFinish` to check if the URL was already updated before calling `goto()`

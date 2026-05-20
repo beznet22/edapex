@@ -27,17 +27,17 @@
 
   const chat = useChat();
   let doPreview = $derived(
-    message.parts.some(
+    message.parts?.some(
       (part) =>
         part.type === "tool-upsertStudentResult" &&
         (part as any).output?.status === "approved" &&
         (part as any).output?.data,
-    ),
+    ) ?? false,
   );
 
   let token = $derived(
     (
-      message.parts.find(
+      message.parts?.find(
         (part) => part.type === "tool-upsertStudentResult",
       ) as any
     )?.output?.data?.student.token,
@@ -60,7 +60,7 @@
       tooltip="Copy"
       onclick={() =>
         copyMessage(
-          message.parts
+          (message.parts ?? [])
             .map((p: xUIMessagePart) => (p.type === "text" ? p.text : ""))
             .join(""),
           message.role,
@@ -88,7 +88,7 @@
       tooltip="Copy"
       onclick={() =>
         copyMessage(
-          message.parts
+          (message.parts ?? [])
             .map((p: xUIMessagePart) => (p.type === "text" ? p.text : ""))
             .join(""),
           message.role,

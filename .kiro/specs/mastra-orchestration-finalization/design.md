@@ -2,13 +2,18 @@
 
 ## Overview
 
-This design finalizes the EdApex Mastra orchestration migration by implementing five interconnected subsystems within the existing modular monolith (SvelteKit + Mastra AI Framework):
+This design finalizes the EdApex Mastra orchestration migration by implementing ten interconnected subsystems within the existing modular monolith (SvelteKit + Mastra AI Framework):
 
 1. **Global Tools** — `web_search` and `web_fetch` as always-available Mastra `createTool` definitions with TinyFish primary / DuckDuckGo+HTTP fallback chain
 2. **HTML-to-Markdown Middleware** — Lightweight server-side pipeline for token-efficient content extraction
 3. **SSE Mechanism** — Server-Sent Events endpoint for real-time workflow status push to the browser
 4. **Workspace Panel Extensions** — Extraction Inspector, Publish Viewer, Run History views, file-as-context hover button, and file sharing
 5. **@Mention System Redesign** — Category-based entity resolution with server-side search, keyboard navigation, and role-scoped context switching
+6. **Mastra Native Supervisor Pattern** — Refactor Gateway to use Mastra's native supervisor pattern with `agents` property, replacing the manual two-step orchestration
+7. **Streaming Adapter (handleChatStream)** — Replace manual fullStream reader loop with `handleChatStream` from `@mastra/ai-sdk` for proper stream bridging
+8. **AbortSignal Propagation** — End-to-end abort signal support from HTTP request through supervisor to child agents for client-initiated cancellation
+9. **Message Persistence & Storage** — Mastra Memory auto-persistence via native thread system, centralized libSQL storage at Mastra instance level, page server retrieval
+10. **Sidebar Chat History & Navigation Fix** — Thread listing from Mastra storage with reactive updates, and duplicate `goto()` prevention after `replaceState`
 
 All subsystems operate within the existing `EdApexGateway` Supervisor/Assistant routing architecture and respect the strict SMS/Mastra decoupling boundary — linked only via `TenantContext` injection.
 
@@ -24,6 +29,14 @@ All subsystems operate within the existing `EdApexGateway` Supervisor/Assistant 
 | `mastra_runs` in libSQL | Consistent with existing Mastra sovereign storage pattern; queryable via Drizzle |
 | Role-based @mention categories | Enforces workspace isolation at the UI layer before server validation |
 | Mastra-native-first principle | Every module MUST verify Mastra docs before custom implementation — use native APIs/plugins where available |
+| Native supervisor pattern over manual orchestration | Mastra's `agents` property provides built-in delegation, tool isolation, and proper stream types — eliminates custom classification + re-instantiation overhead |
+| `handleChatStream` over manual fullStream reader | The `@mastra/ai-sdk` adapter handles all chunk-type translation (reasoning, text, tool calls) natively — removes 80+ lines of brittle manual stream parsing |
+| `writer.merge()` for combining streams | Allows custom data events (`data-chat`, `data-workflow`) to coexist with the agent stream on a single HTTP response without interleaving issues |
+| Per-request Mastra instance (not singleton) | Respects modular monolith TenantContext isolation; each request gets fresh agent hierarchy with correct context bindings |
+| Instance-level storage over per-agent Memory | Ensures supervisor and child agents share the same thread history within a request; avoids duplicate storage connections |
+| AbortSignal passthrough to `agent.stream()` | Mastra natively supports `abortSignal` option — propagates cancellation to the LLM provider without custom abort logic |
+| Max 200 messages on page load | Prevents unbounded memory usage for long-running threads while providing sufficient conversation context |
+| Conditional `goto()` in `#onFinish` | Prevents duplicate navigation when `replaceState` already updated the URL — eliminates flickering and redundant history entries |
 
 ### Mastra Native API Verification Protocol
 
@@ -190,6 +203,96 @@ sequenceDiagram
 
     loop Every 30s
         Mgr-->>Browser: : keepalive
+    end
+```
+
+### Data Flow: Chat Message (Supervisor Pattern + handleChatStream)
+
+```mermaid
+sequenceDiagram
+    participant Client as Browser (useChat)
+    participant API as POST /api/chat
+    participant GW as EdApexGateway
+    participant Sup as Supervisor Agent
+    participant Child as Assistant Agent
+    participant LLM as LLM Provider
+    participant Mem as Mastra Memory (libSQL)
+
+    Client->>API: POST { messages, chatId, mentions, fileReferences }
+    API->>API: Process mentions, create TenantContext
+    API->>GW: gateway.stream(message, context, { abortSignal, threadId })
+    GW->>GW: injectFileContext(fileReferences)
+    GW->>GW: createMastraInstance() [per-request]
+    GW->>Sup: supervisor.stream(augmentedMessage, { abortSignal, memory })
+    Sup->>Sup: Classify intent, select child agent
+    Sup->>Child: Delegate to Assistant (internal via agents property)
+    Child->>LLM: Stream generation request
+    LLM-->>Child: Token stream (text, reasoning, tool calls)
+    Child-->>Sup: Mastra Agent stream
+    Sup-->>GW: Mastra Agent stream result
+    GW-->>API: Stream result object
+    API->>API: handleChatStream(result) → chatStream
+    API->>API: writer.merge(chatStream)
+    API-->>Client: SSE response (text-delta, reasoning, finish events)
+    Mem->>Mem: Auto-persist user + assistant messages to threadId
+
+    alt Client Abort (Stop Button)
+        Client->>API: AbortSignal triggered
+        API->>GW: abortSignal propagates
+        GW->>Sup: abortSignal → cancel LLM
+        Sup-->>API: Stream closed
+        API->>API: Emit finish { finishReason: "stop" }
+        API-->>Client: Stream ends cleanly
+        Note over Mem: Partial message NOT persisted
+    end
+```
+
+### Data Flow: Message Persistence & Page Reload
+
+```mermaid
+sequenceDiagram
+    participant Client as Browser
+    participant API as POST /api/chat
+    participant Agent as Supervisor/Assistant
+    participant Mem as Mastra Memory
+    participant Store as libSQL Storage
+    participant Page as +page.server.ts
+
+    Note over API,Mem: During Chat (Auto-Persistence)
+    API->>Agent: agent.stream(message, { memory: { thread, resource } })
+    Agent->>Mem: Persist user message (threadId, resourceId)
+    Mem->>Store: INSERT into messages table
+    Agent->>Agent: Generate response
+    Agent->>Mem: Persist assistant message (threadId, resourceId)
+    Mem->>Store: INSERT into messages table
+
+    Note over Client,Page: On Page Reload
+    Client->>Page: GET /chat/[chatId]
+    Page->>Store: storage.getMessages({ threadId: chatId, limit: 200 })
+    Store-->>Page: Messages array (ordered by createdAt ASC)
+    Page->>Page: Verify resourceId matches (404 if private + mismatch)
+    Page-->>Client: { messages, chat } as initialMessages
+```
+
+### Data Flow: Sidebar Chat History
+
+```mermaid
+sequenceDiagram
+    participant Sidebar as Sidebar Component
+    participant Store as Mastra Storage
+    participant Chat as Chat Context (onData)
+
+    Note over Sidebar,Store: Initial Load
+    Sidebar->>Store: getThreadsByResourceId(user-{userId}, { limit: 50, order: desc })
+    Store-->>Sidebar: Thread[] (id, title, createdAt)
+    Sidebar->>Sidebar: groupThreadsByDate(threads) → Today, Yesterday, Last 7d, Last 30d, Older
+
+    Note over Sidebar,Chat: Reactive Updates
+    Chat->>Chat: Receive data-chat event { id, title }
+    alt Thread ID not in list
+        Chat->>Sidebar: Prepend new thread to top
+    else Thread ID already exists
+        Chat->>Sidebar: Update title in place (no duplicate)
     end
 ```
 
@@ -587,6 +690,322 @@ async function processMentions(
   return createTenantContext(updatedContext);
 }
 ```
+
+
+### 12. Mastra Native Supervisor Pattern (Gateway Refactor)
+
+**Location:** `src/lib/server/mastra/gateway.ts`
+
+The Gateway is refactored to use Mastra's native supervisor pattern. Instead of a manual two-step orchestration (Supervisor classifies → separate Assistant instantiated), the Gateway creates a single supervisor agent with child agents registered via the `agents` property.
+
+```typescript
+import { Agent } from '@mastra/core/agent';
+import { Mastra } from '@mastra/core';
+import { createMastraStorage } from './storage';
+
+/**
+ * Creates the Mastra instance with centralized storage and supervisor hierarchy.
+ * Instantiated per-request (NOT a singleton) to respect TenantContext isolation.
+ */
+function createMastraInstance(storage: ReturnType<typeof createMastraStorage>) {
+  return new Mastra({
+    storage,
+    // Agents registered at instance level inherit storage automatically
+  });
+}
+
+/**
+ * Refactored Gateway — uses Mastra native supervisor pattern.
+ * The supervisor delegates to child agents internally via `supervisor.stream()`.
+ */
+export class EdApexGateway {
+  // ...existing constructor...
+
+  async stream(
+    message: string,
+    context: TenantContext,
+    options: {
+      threadId?: string;
+      resourceId?: string;
+      conversationOverride?: string;
+      fileReferences?: FileReference[];
+      workspace?: string;
+      abortSignal?: AbortSignal;
+      onStepFinish?: (step: any) => void;
+    } = {}
+  ) {
+    const storage = createMastraStorage();
+    const mastra = createMastraInstance(storage);
+
+    // Inject file-as-context before routing
+    let augmentedMessage = message;
+    if (options.fileReferences?.length && options.workspace) {
+      const fileContext = await injectFileContext(options.fileReferences, options.workspace);
+      if (fileContext) augmentedMessage = `${fileContext}\n\n${message}`;
+    }
+
+    // Build child agents with domain-specific tools
+    const assistantAgent = new Agent({
+      id: 'assistant',
+      name: 'Assistant',
+      instructions: this.getAssistantInstructions(context),
+      model: await this.getMastraModel(await this.router.resolveModel('assistant')),
+      tools: this.resolveToolsForIntent(/* ... */),
+    });
+
+    // Supervisor with `agents` property — Mastra native pattern
+    const supervisor = new Agent({
+      id: 'supervisor',
+      name: 'EdApex Supervisor',
+      instructions: this.getSupervisorInstructions(context),
+      model: await this.getMastraModel(await this.router.resolveModel('supervisor')),
+      agents: [assistantAgent],  // Child agents registered here
+      tools: {
+        getContext: this.createGetContextTool(context),
+      },
+    });
+
+    // Single stream call — Mastra handles delegation internally
+    const result = await supervisor.stream(augmentedMessage, {
+      abortSignal: options.abortSignal,
+      memory: options.threadId ? {
+        thread: { id: options.threadId },
+        resource: options.resourceId || `user-${context.userId}`,
+      } : undefined,
+      onStepFinish: options.onStepFinish,
+    });
+
+    return result;
+  }
+}
+```
+
+**Key Changes:**
+- `executeOrchestration()` is removed — no separate classification step
+- Supervisor uses `agents: [assistantAgent]` for native delegation
+- `abortSignal` passed directly to `supervisor.stream()` options
+- Tools for routing (e.g., `getContext`) registered on supervisor, not child agents
+- Memory configured via instance-level storage inheritance
+
+### 13. Chat API Streaming via handleChatStream
+
+**Location:** `src/routes/api/chat/+server.ts`
+
+The chat endpoint uses `handleChatStream` from `@mastra/ai-sdk` to bridge the Mastra agent stream to the AI SDK response format, eliminating the manual chunk-type translation loop.
+
+```typescript
+import { handleChatStream } from '@mastra/ai-sdk';
+import { createUIMessageStream, createUIMessageStreamResponse, generateId } from 'ai';
+
+export const POST: RequestHandler = async ({ request, locals: { user, session }, cookies }) => {
+  // ...existing setup (parse body, create context, process mentions)...
+
+  const gateway = new EdApexGateway(/* ... */);
+
+  const stream = createUIMessageStream({
+    execute: async ({ writer }) => {
+      // Emit custom data events (data-chat for new conversation, data-workflow for tool calls)
+      if (chatId && messages.length === 1) {
+        writer.write({ type: "data-chat", id: chatId, data: { /* ... */ } } as any);
+        // Async title generation...
+      }
+
+      const result = await gateway.stream(promptText, activeContext, {
+        threadId: chatId,
+        resourceId,
+        abortSignal: request.signal,  // Pass abort signal
+        fileReferences,
+        workspace,
+        onStepFinish: (step) => {
+          if (step.toolCalls?.length) {
+            for (const call of step.toolCalls) {
+              writer.write({ type: "data-workflow", data: { tool: call.toolName, args: call.args } } as any);
+            }
+          }
+        },
+      });
+
+      if ('rejected' in result && result.rejected) {
+        // Manual writer for rejected responses (confidence gate)
+        const rejectPartId = generateId();
+        writer.write({ type: "text-start", id: rejectPartId } as any);
+        for await (const chunk of result.textStream as AsyncIterable<string>) {
+          writer.write({ type: "text-delta", id: rejectPartId, delta: chunk } as any);
+        }
+        writer.write({ type: "text-end", id: rejectPartId } as any);
+        writer.write({ type: "finish", finishReason: "stop" } as any);
+        return;
+      }
+
+      // Use handleChatStream adapter — replaces manual fullStream/textStream reader loops
+      const chatStream = handleChatStream(result, {
+        abortSignal: request.signal,
+      });
+      writer.merge(chatStream);
+    },
+    onError: (e) => {
+      console.error(`[api/chat] Error: ${e instanceof Error ? e.message : String(e)}`);
+      return "Oops! Something went wrong.";
+    },
+  });
+
+  return createUIMessageStreamResponse({ stream });
+};
+```
+
+**What's Removed:**
+- The `vResult.toUIMessageStream` branch
+- The `vResult.fullStream` manual reader loop (switch on `reasoning-start`, `text-delta`, etc.)
+- The `vResult.textStream` fallback reader loop
+- Manual `consumeStream()` calls
+
+**What's Preserved:**
+- Custom `data-chat`, `data-workflow`, `data-confirmation` events via `writer.write()`
+- Manual writer for rejected responses (async generator, not a Mastra stream)
+- `writer.merge()` to combine custom events with the agent stream
+
+### 14. Mastra Instance Factory (Per-Request Storage)
+
+**Location:** `src/lib/server/mastra/instance.ts`
+
+```typescript
+import { Mastra } from '@mastra/core';
+import { createMastraStorage } from './storage';
+
+/**
+ * Creates a per-request Mastra instance with centralized storage.
+ * NOT a singleton — each request gets a fresh instance to respect TenantContext isolation.
+ * 
+ * All agents within the supervisor hierarchy inherit this storage automatically.
+ * No agent should instantiate its own Memory({ storage: ... }) independently.
+ */
+export function createMastraInstance() {
+  const storage = createMastraStorage();
+
+  const mastra = new Mastra({
+    storage,
+  });
+
+  return { mastra, storage };
+}
+```
+
+**Usage in Gateway:**
+```typescript
+// In EdApexGateway.stream()
+const { mastra, storage } = createMastraInstance();
+// Agents created within this request inherit `storage` from the instance
+```
+
+**Constraints:**
+- Per-request instantiation (not global singleton)
+- Uses existing `createMastraStorage()` factory for libSQL backend
+- Agents inherit storage — no per-agent `new Memory({ storage })` needed
+- Throws on init failure with connection details (URL, error type)
+
+### 15. Sidebar Chat History Data Layer
+
+**Location:** `src/lib/components/sidebar-history/`
+
+```typescript
+// Thread fetching from Mastra storage
+interface SidebarThread {
+  id: string;
+  title: string;
+  createdAt: Date;
+  resourceId: string;
+}
+
+interface GroupedThreads {
+  today: SidebarThread[];
+  yesterday: SidebarThread[];
+  last7Days: SidebarThread[];
+  last30Days: SidebarThread[];
+  older: SidebarThread[];
+}
+
+/**
+ * Fetches and groups threads for the sidebar.
+ * Uses resourceId filter to scope to current user.
+ */
+export async function fetchSidebarThreads(
+  storage: MastraStorage,
+  resourceId: string
+): Promise<GroupedThreads> {
+  const threads = await storage.getThreadsByResourceId(resourceId, {
+    limit: 50,
+    orderBy: 'createdAt',
+    order: 'desc',
+  });
+
+  return groupThreadsByDate(threads);
+}
+
+/**
+ * Groups threads into relative date categories.
+ */
+function groupThreadsByDate(threads: SidebarThread[]): GroupedThreads {
+  const now = new Date();
+  const todayStart = startOfDay(now);
+  const yesterdayStart = startOfDay(subDays(now, 1));
+  const last7Start = startOfDay(subDays(now, 7));
+  const last30Start = startOfDay(subDays(now, 30));
+
+  return {
+    today: threads.filter(t => t.createdAt >= todayStart),
+    yesterday: threads.filter(t => t.createdAt >= yesterdayStart && t.createdAt < todayStart),
+    last7Days: threads.filter(t => t.createdAt >= last7Start && t.createdAt < yesterdayStart),
+    last30Days: threads.filter(t => t.createdAt >= last30Start && t.createdAt < last7Start),
+    older: threads.filter(t => t.createdAt < last30Start),
+  };
+}
+```
+
+**Reactive Updates (in chat-context.svelte.ts):**
+```typescript
+// In #onData handler
+if (event.type === 'data-chat') {
+  const existingIndex = sidebarThreads.findIndex(t => t.id === event.data.id);
+  if (existingIndex === -1) {
+    // New thread — prepend to list
+    sidebarThreads.unshift({ id: event.data.id, title: event.data.title, createdAt: new Date() });
+  } else {
+    // Existing thread — update title in place
+    sidebarThreads[existingIndex].title = event.data.title;
+  }
+}
+```
+
+### 16. Navigation Fix (chat-context.svelte.ts)
+
+**Location:** `src/lib/context/chat-context.svelte.ts`
+
+```typescript
+// In #onFinish handler — prevent duplicate goto after replaceState
+function onFinish() {
+  // If no data-chat event was received during this stream, skip navigation entirely
+  if (!chatData?.id) return;
+
+  // If replaceState already updated the URL to match, skip goto
+  const currentPath = window.location.pathname;
+  const targetPath = `/chat/${chatData.id}`;
+
+  if (currentPath === targetPath) {
+    // URL already correct — replaceState handled it in #onData
+    return;
+  }
+
+  // URL doesn't match — navigate (e.g., started from /chat/new or different route)
+  goto(targetPath);
+}
+```
+
+**Logic:**
+1. `#onData` receives `data-chat` event → calls `replaceState('/chat/[chatId]')` (no new history entry)
+2. `#onFinish` fires → checks if `window.location.pathname === '/chat/[chatId]'`
+3. If match → skip `goto()` (already there)
+4. If no match → call `goto()` (e.g., navigated from a different route during stream)
+5. If no `data-chat` event received → skip `goto()` entirely (URL was already correct)
 
 
 ## Data Models
@@ -993,6 +1412,48 @@ private resolveToolsForIntent(...): Record<string, any> {
 
 **Validates: Requirements 4.7**
 
+### Property 38: Abort stream cleanup emits proper close events
+
+*For any* active stream state (with zero or more open message parts — text-start without text-end, reasoning-start without reasoning-end), when the AbortSignal is triggered, the chat API endpoint SHALL close all open parts and emit a `finish` event with `finishReason: "stop"`, resulting in a well-formed event sequence regardless of which parts were open at abort time.
+
+**Validates: Requirements 22.3**
+
+### Property 39: Message persistence round-trip preserves all parts
+
+*For any* message containing a valid combination of parts (text, reasoning, tool calls, tool results), persisting the message to Mastra Memory and then retrieving it via `storage.getMessages({ threadId })` SHALL return a message containing all original parts with their content intact.
+
+**Validates: Requirements 23.5**
+
+### Property 40: Private thread access control
+
+*For any* thread with visibility set to "private" and any requesting user, the page server SHALL return a 404 response if and only if the requesting user's `resourceId` does not match the thread's `resourceId`; threads with non-private visibility or matching `resourceId` SHALL return the thread data normally.
+
+**Validates: Requirements 23.8**
+
+### Property 41: Thread message pagination limit
+
+*For any* thread containing N messages (where N >= 0), the page server SHALL retrieve at most 200 messages ordered by creation time ascending (most recent last), returning exactly `min(N, 200)` messages.
+
+**Validates: Requirements 23.9**
+
+### Property 42: Sidebar thread date grouping
+
+*For any* set of threads with varying creation dates and a reference "now" timestamp, the `groupThreadsByDate` function SHALL partition threads into exactly five groups (Today, Yesterday, Last 7 days, Last 30 days, Older) where each thread appears in exactly one group based on its creation date relative to "now", with the total count across all groups equaling the input count (up to max 50 threads).
+
+**Validates: Requirements 24.2**
+
+### Property 43: Sidebar reactive thread list updates
+
+*For any* existing sidebar thread list and a `data-chat` event containing a thread ID and title: if the thread ID is not present in the list, the thread SHALL be prepended to the top of the list (increasing list length by 1); if the thread ID is already present, the thread's title SHALL be updated in place without changing list length or creating duplicates.
+
+**Validates: Requirements 24.4, 24.5**
+
+### Property 44: Navigation guard — conditional goto after replaceState
+
+*For any* combination of (1) whether a `data-chat` event was received during the stream, (2) the current page URL pathname, and (3) the active `chatId`: the `#onFinish` handler SHALL call `goto()` if and only if a `data-chat` event was received AND the current URL pathname does not equal `/chat/${chatId}`; in all other cases, `goto()` SHALL be skipped.
+
+**Validates: Requirements 26.1, 26.2, 26.3, 26.5**
+
 
 ## Error Handling
 
@@ -1043,6 +1504,40 @@ private resolveToolsForIntent(...): Record<string, any> {
 | Share URL generation failure | Toast error notification |
 | Delete failure | Keep editor tabs open, show error |
 
+### Supervisor Pattern & Streaming Error Strategy
+
+| Error Condition | Behavior |
+|----------------|----------|
+| Supervisor classification fails | Return generic error response; do not stream |
+| Child agent not found for delegation | Supervisor handles directly or returns error |
+| `handleChatStream` receives invalid stream | `onError` callback returns user-friendly message |
+| AbortSignal triggered during classification | Cancel classification, return without streaming |
+| AbortSignal triggered during child stream | Close open parts, emit `finish` with `finishReason: "stop"` |
+| AbortSignal propagation delay > 100ms | Log warning; stream terminates on next chunk read |
+| `@mastra/ai-sdk` import failure | Build-time error; caught during deployment |
+
+### Message Persistence & Storage Error Strategy
+
+| Error Condition | Behavior |
+|----------------|----------|
+| Mastra storage unavailable during persist | Log error, continue streaming (non-blocking) |
+| Mastra storage unavailable on page load | Return empty messages array, null chat object |
+| Thread not found on page load | Return empty messages array, null chat object |
+| Private thread with wrong resourceId | Return 404 response |
+| Storage init failure (connection refused) | Throw at Mastra instance construction with details |
+| Storage init timeout (> 5s) | Throw at Mastra instance construction with timeout error |
+| Message count exceeds 200 on load | Return only most recent 200 messages |
+
+### Sidebar & Navigation Error Strategy
+
+| Error Condition | Behavior |
+|----------------|----------|
+| Sidebar storage fetch fails | Show skeleton loading → fall back to empty state after 10s |
+| Sidebar storage returns empty | Display "No previous conversations" empty state |
+| `data-chat` event with malformed data | Ignore event, log warning |
+| `replaceState` fails (browser compat) | Fall through to `goto()` as normal |
+| `goto()` called when URL already matches | No-op (prevented by navigation guard) |
+
 
 ## Testing Strategy
 
@@ -1050,7 +1545,7 @@ private resolveToolsForIntent(...): Record<string, any> {
 
 **Library:** `fast-check` (via `vitest` test runner)
 
-Property-based tests will validate the 37 correctness properties defined above. Each test runs a minimum of 100 iterations with randomized inputs.
+Property-based tests will validate the 44 correctness properties defined above. Each test runs a minimum of 100 iterations with randomized inputs.
 
 **Tag Format:** `Feature: mastra-orchestration-finalization, Property {N}: {title}`
 
@@ -1062,6 +1557,10 @@ Property-based tests will validate the 37 correctness properties defined above. 
 - `src/lib/server/mastra/__tests__/file-context.property.test.ts` — Properties 15-21
 - `src/lib/server/mastra/__tests__/run-history.property.test.ts` — Properties 11-14
 - `src/lib/components/workspace/__tests__/workflow-views.property.test.ts` — Properties 9-10, 33
+- `src/lib/server/mastra/__tests__/stream-abort.property.test.ts` — Property 38
+- `src/lib/server/mastra/__tests__/message-persistence.property.test.ts` — Properties 39-41
+- `src/lib/components/sidebar-history/__tests__/thread-grouping.property.test.ts` — Properties 42-43
+- `src/lib/context/__tests__/navigation-guard.property.test.ts` — Property 44
 
 **Generator Strategy:**
 - HTML documents: Generate random DOM trees with varying element types, nesting depths, and content lengths
@@ -1071,6 +1570,10 @@ Property-based tests will validate the 37 correctness properties defined above. 
 - TenantContext: Generate random context objects with valid/null field combinations
 - Mention sequences: Generate random arrays of mention tags with varying categories and IDs
 - Workflow step sequences: Generate random step arrays with varying statuses and durations
+- Message parts: Generate random combinations of text, reasoning, tool-call, and tool-result parts with varying content lengths
+- Thread lists: Generate random arrays of thread objects with varying creation dates spanning days/weeks/months
+- URL pathnames: Generate random pathname strings and chatId values to test navigation guard logic
+- AbortSignal states: Generate random stream states with varying combinations of open text/reasoning parts
 
 ### Unit Tests (Example-Based)
 
@@ -1081,6 +1584,13 @@ Property-based tests will validate the 37 correctness properties defined above. 
 - @Mention dropdown: verify category filtering by role, keyboard navigation
 - File tree hover button: verify visibility on hover, click behavior
 - Workspace Panel views: verify correct view mounting based on workflow state
+- Supervisor pattern: verify child agent registration, tool placement on supervisor vs children
+- `handleChatStream` integration: verify rejected responses still use manual writer, non-rejected use adapter
+- AbortSignal: verify abort during classification cancels without streaming, abort during stream closes cleanly
+- Message persistence: verify storage failure doesn't block streaming, verify empty array on load failure
+- Page server: verify 404 for private thread with wrong resourceId, verify max 200 messages returned
+- Sidebar history: verify empty state on no threads, verify skeleton loading on error, verify max 50 threads
+- Navigation guard: verify `goto()` skipped when URL matches, called when URL differs, skipped when no data-chat event
 
 ### Integration Tests
 
@@ -1090,6 +1600,12 @@ Property-based tests will validate the 37 correctness properties defined above. 
 - @Mention flow: type @ → search → select → context update → cache bust
 - File-as-context flow: hover → click → tag appears → send message → content injected
 - Workflow state display: trigger workflow → SSE events → UI updates
+- Supervisor delegation: message → supervisor classifies → delegates to child → stream returned
+- handleChatStream end-to-end: gateway.stream() → handleChatStream → writer.merge → SSE response with correct event types
+- Abort signal propagation: trigger abort → verify stream terminates within 100ms → verify no partial message persisted
+- Message persistence round-trip: send message → verify persisted → reload page → verify messages returned with all parts
+- Sidebar reactive updates: send message → verify data-chat event → verify sidebar prepends/updates thread
+- Navigation lifecycle: new chat → data-chat event → replaceState → onFinish → verify no duplicate goto
 
 ### Test Configuration
 
@@ -1110,9 +1626,13 @@ export default defineConfig({
   "devDependencies": {
     "fast-check": "^3.22.0",
     "linkedom": "^0.18.0"
+  },
+  "dependencies": {
+    "@mastra/ai-sdk": "latest"
   }
 }
 ```
 
 - `fast-check`: Property-based testing framework for generating random inputs
 - `linkedom`: Lightweight DOM implementation for server-side HTML parsing (used by HTML-to-markdown middleware and tests)
+- `@mastra/ai-sdk`: Adapter package providing `handleChatStream` to bridge Mastra Agent streams to AI SDK response format

@@ -226,4 +226,21 @@ The 92 passing tests (including slash-commands and skill-discovery) all pass fin
 - For each requirement we must analyze and investigate existing implementation on the codebase to confirm if a featue already exist or needs to be refactored/reused or re-implemented from scratch
 
 
+
+- The proper archtecture from mastre docs is to refactor the gateway to use Mastra's native supervisor pattern (https://mastra.ai/docs/agents/supervisor-agents) with the agents property. This way, supervisor.stream() returns a proper Mastra stream that can be consumed directly with for await (const chunk of stream.textStream) — and we pipe it correctly to the AI SDK writer using the right event format.
+
+- The official Mastra + SvelteKit integration uses handleChatStream from @mastra/ai-sdk. That's the proper adapter between Mastra's Agent stream and the AI SDK's createUIMessageStreamResponse. see https://mastra.ai/guides/getting-started/sveltekit
+
+- agent.stream() accepts abortSignal directly in options. see https://mastra.ai/reference/streaming/agents/stream
+- There's toAISdkStream from @mastra/ai-sdk that converts Mastra streams to AI SDK format — but we may not have that package
+fullStream contains all chunk types including reasoning
+
+- #onFinish in src/lib/context/chat-context.svelte.ts should NOT call goto() if the URL was already updated via replaceState() in #onData. The replaceState already changed the URL without a navigation
+
+- We should also ensure messages are persisted to storage (the Mastra memory/thread system needs to save them) so  that when SvelteKit loads the page from scratch, calling src/routes/(chat)/chat/[chatId]/+page.server.ts.ts which tries to load messages from Mastra storage will be able to fetch the actual message. visite the mastra docs for memory and storage system. See https://mastra.ai/docs/memory/message-history
+
+- Also we must ensure that the sidebar chat history (src/lib/components/sidebar-history) can also fetch message history form the storage. See the mastra docs for memory and storage system. https://mastra.ai/docs/memory/message-history
+
+- We should pass storage at the Mastra instance level. Since we now use a Mastra supervisor central instance. see https://mastra.ai/docs/memory/message-history and https://mastra.ai/docs/agents/supervisor-agents
+
 The spec prevents duplicate slash commands when a workflow of the same type is running, but should it allow users to queue up the same workflow type to run after the current one completes?

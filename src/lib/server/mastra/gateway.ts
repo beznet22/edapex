@@ -6,7 +6,7 @@ import {
 } from './provider-config';
 import type { LibSQLDatabase } from 'drizzle-orm/libsql';
 import * as schema from './db/schema';
-import { AgentRouter, type ResolvedModel, type AgentRole } from './router';
+import { AgentRouter, type ResolvedModel } from './router';
 import { Agent } from '@mastra/core/agent';
 import { resolveModelConfig } from '@mastra/core/llm';
 import type { LanguageModel as MastraLanguageModel } from '@mastra/core/llm';
@@ -34,6 +34,7 @@ import {
 } from './tools/index';
 import { globalTools } from './tools/global-tools';
 import { SkillRegistry } from './skill-registry';
+import { getModelById } from './registry';
 import { resultInputSchema, type ResultInput } from '$lib/schema/result-input';
 import {
 	OCR_SYSTEM_PROMPT,
@@ -43,6 +44,9 @@ import {
 import { assessment } from '../service/assessment.service';
 import { formatMappingDataToIndex } from '../helpers/extract-helper';
 import { injectFileContext, type FileReference } from './file-context';
+import { createMastraInstance } from './instance';
+import { createMastraStorage, ensureStorageInitialized } from './storage';
+import { Memory } from '@mastra/memory';
 
 /** Result of a single-file extraction via the Gateway. */
 export type ExtractionResult =
@@ -95,124 +99,6 @@ export class EdApexGateway {
 
 	readonly id = 'edapex';
 	readonly name = 'EdApex Sovereign Gateway';
-
-	/**
-	 * Helper that orchestrates classification, discovery, and Agent instantiation.
-	 */
-	private async executeOrchestration(
-		message: string, 
-		context: TenantContext,
-		options: {
-			threadId?: string;
-			conversationOverride?: string;
-			thinkingEnabled?: boolean;
-			profile?: string;
-		} = {}
-	) {
-		await this.ensureRegistry();
-
-		const { threadId, conversationOverride, thinkingEnabled = false, profile } = options;
-
-		// 1. Literal Slash Command Detection (Bypasses Confidence Gate)
-		const isSlashCommand = message.trim().startsWith('/');
-
-		// 2. Resolve Supervisor Model
-		const supervisorModel = await this.router.resolveModel('supervisor', conversationOverride, thinkingEnabled, profile);
-		const resolvedSupervisorModel = await this.getMastraModel(supervisorModel);
-		
-		// 3. Instantiate Supervisor with getContext tool
-		const supervisor = new Agent({
-			id: 'supervisor',
-			name: 'Supervisor',
-			instructions: this.getSupervisorInstructions(context),
-			model: resolvedSupervisorModel,
-			tools: {
-				getContext: this.createGetContextTool(context)
-			}
-		});
-
-		// 4. Classification & Dynamic Context Discovery
-		const classification = await supervisor.generate(
-			`Analyze the following user request: "${message}"\nClassify the intent and determine if additional domain context (assessment setups, student lists, or class assignments) is required to fulfill the request.\nIf context is required, call the "getContext" tool with the appropriate "types" (e.g., ['assessment', 'students']) BEFORE finalizing your classification.`,
-			{
-				structuredOutput: {
-					schema: z.object({
-						intent: z.enum(['conversational', 'mutation', 'navigation']),
-						confidence: z.number().describe('Confidence score from 0 to 1'),
-						requiresContext: z.boolean(),
-						contextTypes: z.array(z.enum(['assessment', 'students', 'class'])).optional(),
-						discoveredData: z.any().optional().describe('Data returned from the getContext tool, if used'),
-						toolSelection: z.array(z.string()).optional().describe('Hint for which tools might be required based on the user intent'),
-						reasoning: z.string().describe('Explanation for the classification')
-					})
-				}
-			}
-		);
-
-		const result = classification.object as any;
-
-		// 5. Enforce Confidence Gate for mutations (Unless it's an explicit slash command)
-		const mutationThreshold = 0.9;
-		const readThreshold = 0.7;
-
-		if (!isSlashCommand) {
-			if (result.intent === 'mutation' && result.confidence < mutationThreshold) {
-				const message = `I've detected an intent to modify data, but my confidence is below the ${Math.round(mutationThreshold * 100)}% threshold (${Math.round(result.confidence * 100)}%). \n\nReasoning: ${result.reasoning}\n\nCould you please provide more specific details or use a literal slash command (e.g., /extract) to confirm your intent?`;
-				return {
-					rejected: true,
-					textStream: (async function* () { yield message; })(),
-					text: message,
-					classification: result,
-					confirmation: {
-						type: 'mutation' as const,
-						confidence: result.confidence,
-						threshold: mutationThreshold,
-						reasoning: result.reasoning,
-						originalMessage: message,
-					}
-				};
-			}
-
-			if (result.intent === 'navigation' && result.confidence < readThreshold) {
-				const message = `I'm not entirely sure which information you're looking for (Confidence: ${Math.round(result.confidence * 100)}%). \n\nReasoning: ${result.reasoning}\n\nCould you please clarify your search or use a literal slash command (e.g., /search)?`;
-				return {
-					rejected: true,
-					textStream: (async function* () { yield message; })(),
-					text: message,
-					classification: result,
-					confirmation: {
-						type: 'navigation' as const,
-						confidence: result.confidence,
-						threshold: readThreshold,
-						reasoning: result.reasoning,
-						originalMessage: message,
-					}
-				};
-			}
-		}
-
-		// 6. Resolve Skill-Based Tools and Target Model
-		const targetModelType = isSlashCommand || result.intent === 'mutation' ? 'workflow' : 'assistant';
-		const targetModel = await this.router.resolveModel(targetModelType, conversationOverride, thinkingEnabled, profile);
-		const resolvedTargetModel = await this.getMastraModel(targetModel);
-
-		// Dynamically build toolset from skill registry based on intent routing
-		const assistantTools = this.resolveToolsForIntent(result, isSlashCommand, message);
-
-		const assistant = new Agent({
-			id: 'assistant',
-			name: 'Assistant',
-			instructions: this.getAssistantInstructions(context, result.discoveredData, result.toolSelection),
-			model: resolvedTargetModel,
-			tools: assistantTools
-		});
-
-		return {
-			rejected: false,
-			assistant,
-			classification: result
-		};
-	}
 
 	/**
 	 * Resolves the tool map to inject into the Assistant based on the classified intent.
@@ -293,21 +179,29 @@ export class EdApexGateway {
 
 	/**
 	 * Main entry point for chat interactions with streaming support.
-	 * Implements the routing flow: Supervisor -> Assistant/Workflow/Default.
+	 * Uses Mastra's native supervisor pattern with `agents` property for delegation.
+	 * Per-request Mastra instance ensures TenantContext isolation.
+	 *
+	 * Replaces the manual two-step orchestration (classification + re-instantiation)
+	 * with a single `supervisor.stream()` call that delegates internally.
 	 */
 	async stream(
 		message: string, 
 		context: TenantContext,
 		options: {
 			threadId?: string;
+			resourceId?: string;
 			conversationOverride?: string;
 			thinkingEnabled?: boolean;
 			profile?: string;
 			onStepFinish?: (step: any) => void;
 			fileReferences?: FileReference[];
 			workspace?: string;
+			abortSignal?: AbortSignal;
 		} = {}
 	) {
+		await this.ensureRegistry();
+
 		// Inject file-as-context before routing to assistant
 		let augmentedMessage = message;
 		if (options.fileReferences?.length && options.workspace) {
@@ -317,41 +211,102 @@ export class EdApexGateway {
 			}
 		}
 
-		const orchestration = await this.executeOrchestration(augmentedMessage, context, options);
+		// Per-request Mastra instance with the supervisor registered.
+		// Storage is a module-level singleton (prevents SQLite WAL corruption).
+		// Await initialization to ensure tables exist before memory operations.
+		const storage = createMastraStorage();
+		await ensureStorageInitialized();
+		const memory = new Memory({ storage });
 
-		if (orchestration.rejected) {
-			return {
-				textStream: orchestration.textStream,
-				classification: orchestration.classification
-			};
-		}
+		// Resolve models for supervisor and assistant
+		const { conversationOverride, thinkingEnabled = false, profile } = options;
+		const supervisorModel = await this.router.resolveModel('supervisor', conversationOverride, thinkingEnabled, profile);
+		const resolvedSupervisorModel = await this.getMastraModel(supervisorModel);
 
-		// 7. Execute Target Agent with Streaming and Memory persistence
-		return orchestration.assistant!.stream(augmentedMessage, {
-			memory: options.threadId ? { 
-				thread: options.threadId, 
-				resource: `school_${context.schoolId}` 
-			} : undefined,
-			onStepFinish: options.onStepFinish
+		const isSlashCommand = augmentedMessage.trim().startsWith('/');
+		const targetModelType = isSlashCommand ? 'workflow' : 'assistant';
+		const targetModel = await this.router.resolveModel(targetModelType, conversationOverride, thinkingEnabled, profile);
+		const resolvedTargetModel = await this.getMastraModel(targetModel);
+
+		// Build child assistant agent with domain-specific tools
+		const assistantTools = this.resolveToolsForIntent(
+			{ intent: isSlashCommand ? 'mutation' : 'conversational' },
+			isSlashCommand,
+			augmentedMessage
+		);
+
+		const assistantAgent = new Agent({
+			id: 'assistant',
+			name: 'Assistant',
+			description: 'Handles user queries, executes tools, and provides educational support.',
+			instructions: this.getAssistantInstructions(context),
+			model: resolvedTargetModel,
+			tools: assistantTools,
 		});
+
+		// Supervisor with `agents` property — Mastra native supervisor pattern.
+		// Memory is configured on the supervisor so that Mastra's internal workflow
+		// (prepare-memory-step → stream → save-messages) can auto-persist messages.
+		const supervisor = new Agent({
+			id: 'supervisor',
+			name: 'EdApex Supervisor',
+			instructions: this.getSupervisorInstructions(context),
+			model: resolvedSupervisorModel,
+			agents: { assistant: assistantAgent },
+			memory,
+			tools: {
+				getContext: this.createGetContextTool(context),
+			},
+		});
+
+		// Register the supervisor on a Mastra instance so the internal execution workflow
+		// can access the mastra context. Then explicitly register the supervisor with mastra
+		// via __registerMastra so the lifecycle hooks (including save-messages) fire properly.
+		const { mastra } = createMastraInstance({ agents: { supervisor } });
+		supervisor.__registerMastra(mastra);
+		assistantAgent.__registerMastra(mastra);
+		memory.__registerMastra(mastra);
+
+		// Single stream call — Mastra handles delegation internally.
+		// AbortSignal propagation (Requirements 22.1, 22.5, 22.6):
+		// - abortSignal is passed directly to supervisor.stream() which propagates to child agents
+		// - Mastra natively cancels LLM generation when the signal fires
+		// - Memory auto-persistence is skipped when the stream is aborted (Requirement 22.4)
+		//   because Mastra only persists messages on successful stream completion
+		const result = await supervisor.stream(augmentedMessage, {
+			abortSignal: options.abortSignal,
+			memory: options.threadId ? {
+				thread: { id: options.threadId },
+				resource: options.resourceId || `user-${context.userId}`,
+			} : undefined,
+			onStepFinish: options.onStepFinish,
+		});
+
+		return result;
 	}
 
 	/**
 	 * Non-streaming equivalent of stream().
+	 * Uses Mastra's native supervisor pattern with `agents` property for delegation.
+	 * Per-request Mastra instance ensures TenantContext isolation.
 	 */
 	async generate(
 		message: string, 
 		context: TenantContext,
 		options: {
 			threadId?: string;
+			resourceId?: string;
 			conversationOverride?: string;
 			thinkingEnabled?: boolean;
 			profile?: string;
 			onStepFinish?: (step: any) => void;
 			fileReferences?: FileReference[];
 			workspace?: string;
+			abortSignal?: AbortSignal;
 		} = {}
 	) {
+		await this.ensureRegistry();
+
 		// Inject file-as-context before routing to assistant
 		let augmentedMessage = message;
 		if (options.fileReferences?.length && options.workspace) {
@@ -361,163 +316,114 @@ export class EdApexGateway {
 			}
 		}
 
-		const orchestration = await this.executeOrchestration(augmentedMessage, context, options);
+		// Per-request Mastra instance with supervisor registered.
+		// Storage is a module-level singleton. Memory configured on the supervisor.
+		const storageGen = createMastraStorage();
+		await ensureStorageInitialized();
+		const memoryGen = new Memory({ storage: storageGen });
 
-		if (orchestration.rejected) {
-			return {
-				text: orchestration.text,
-				classification: orchestration.classification
-			};
-		}
+		// Resolve models for supervisor and assistant
+		const { conversationOverride, thinkingEnabled = false, profile } = options;
+		const supervisorModel = await this.router.resolveModel('supervisor', conversationOverride, thinkingEnabled, profile);
+		const resolvedSupervisorModel = await this.getMastraModel(supervisorModel);
 
-		// 7. Execute Target Agent with Memory persistence
-		return orchestration.assistant!.generate(augmentedMessage, {
-			memory: options.threadId ? { 
-				thread: options.threadId, 
-				resource: `school_${context.schoolId}` 
+		const isSlashCommand = augmentedMessage.trim().startsWith('/');
+		const targetModelType = isSlashCommand ? 'workflow' : 'assistant';
+		const targetModel = await this.router.resolveModel(targetModelType, conversationOverride, thinkingEnabled, profile);
+		const resolvedTargetModel = await this.getMastraModel(targetModel);
+
+		// Build child assistant agent with domain-specific tools
+		const assistantTools = this.resolveToolsForIntent(
+			{ intent: isSlashCommand ? 'mutation' : 'conversational' },
+			isSlashCommand,
+			augmentedMessage
+		);
+
+		const assistantAgent = new Agent({
+			id: 'assistant',
+			name: 'Assistant',
+			description: 'Handles user queries, executes tools, and provides educational support.',
+			instructions: this.getAssistantInstructions(context),
+			model: resolvedTargetModel,
+			tools: assistantTools,
+		});
+
+		// Supervisor with memory — registered on Mastra instance for proper lifecycle
+		const supervisor = new Agent({
+			id: 'supervisor',
+			name: 'EdApex Supervisor',
+			instructions: this.getSupervisorInstructions(context),
+			model: resolvedSupervisorModel,
+			agents: { assistant: assistantAgent },
+			memory: memoryGen,
+			tools: {
+				getContext: this.createGetContextTool(context),
+			},
+		});
+
+	
+
+		const { mastra: mastraGen } = createMastraInstance({ agents: { supervisor } });
+		supervisor.__registerMastra(mastraGen);
+		assistantAgent.__registerMastra(mastraGen);
+		memoryGen.__registerMastra(mastraGen);
+
+		// Single generate call — Mastra handles delegation internally
+		const result = await supervisor.generate(augmentedMessage, {
+			abortSignal: options.abortSignal,
+			memory: options.threadId ? {
+				thread: { id: options.threadId },
+				resource: options.resourceId || `user-${context.userId}`,
 			} : undefined,
-			onStepFinish: options.onStepFinish
+			onStepFinish: options.onStepFinish,
 		});
+
+		return result;
 	}
 
 	/**
-	 * Execute document extraction using the two-pass pipeline (OCR → structured mapping)
-	 * with automatic fallback to single-pass vision extraction.
-	 *
-	 * Provides a clean API for `+page.server.ts` to call without needing to know
-	 * about AgentRouter internals or model resolution.
+	 * Lightweight title generation that bypasses the full orchestration pipeline.
+	 * Uses a speed-tier model directly without Supervisor classification or structured output.
+	 * Prefers Groq (fast inference) with fallback to any available speed-tier model.
 	 */
-	async executeExtraction(
-		file: Blob,
-		tenantContext: TenantContext,
-		options: { staffId: number; classId?: number; sectionId?: number }
-	): Promise<ExtractionResult> {
-		const { staffId, classId, sectionId } = options;
-
-		// Load mapping context for the target class/section
-		const mappingData = await assessment.getMappingData(staffId, classId, sectionId);
-		if (!mappingData.subjects || mappingData.subjects.length === 0) {
-			return { success: false, error: 'No subjects assigned to this teacher' };
-		}
-		const mappingIndex = formatMappingDataToIndex(mappingData);
-
-		// Resolve models via AgentRouter
-		const ocrModel = await this.router.resolveMastraModel('ocr', this.envKeys, this.encryptionKey);
-		const mapperModel = await this.router.resolveMastraModel('chat', this.envKeys, this.encryptionKey);
-		const fallbackModel = await this.router.resolveMastraModel('vision', this.envKeys, this.encryptionKey);
-
-		// Create inline agents
-		const ocrAgent = new Agent({
-			id: 'ocr-agent',
-			name: 'OCR Transcription Agent',
-			instructions: OCR_SYSTEM_PROMPT,
-			model: ocrModel,
-		});
-
-		const mapperAgent = new Agent({
-			id: 'mapper-agent',
-			name: 'Structured Mapping Agent',
-			instructions: MAPPER_SYSTEM_PROMPT,
-			model: mapperModel,
-		});
-
-		const fallbackAgent = new Agent({
-			id: 'fallback-vision-agent',
-			name: 'Fallback Vision Agent',
-			instructions: legacyExtractPrompt,
-			model: fallbackModel,
-		});
-
-		// --- Pass 1: OCR Transcription ---
-		let ocrText: string | undefined;
+	async generateTitle(userMessage: string, context: TenantContext): Promise<string> {
 		try {
-			const ocrResponse = await ocrAgent.generate([
-				{
-					role: 'user',
-					content: [
-						{
-							type: 'file',
-							data: await file.arrayBuffer(),
-							mediaType: file.type,
-						},
-					],
-				},
-			]);
-			ocrText = ocrResponse.text;
-		} catch (error) {
-			console.warn('[EdApexGateway] OCR Pass 1 failed, attempting single-pass fallback', error);
-			return this.runFallbackExtraction(file, mappingIndex, fallbackAgent);
-		}
-
-		// --- Pass 2: Structured Mapping ---
-		try {
-			const mapperResponse = await mapperAgent.generate(
-				`OCR Transcription:\n${ocrText}\n\nMapping Data (Look up IDs here):\n${mappingIndex}`,
-				{
-					structuredOutput: {
-						schema: resultInputSchema,
-					},
+			// Prefer Groq for title generation (fastest inference, most reliable)
+			// Fall back to any available speed-tier model if Groq is unavailable
+			let resolvedModel: MastraLanguageModel;
+			try {
+				const groqModel = getModelById('groq/llama-3.3-70b-versatile');
+				if (groqModel) {
+					resolvedModel = await this.getMastraModel({
+						provider: groqModel.provider,
+						model: groqModel.id,
+						capabilities: groqModel.capabilities
+					});
+				} else {
+					const titleModel = await this.router.resolveModel('default', undefined, false, 'simple');
+					resolvedModel = await this.getMastraModel(titleModel);
 				}
+			} catch {
+				// Groq key not available — fall back to router resolution
+				const titleModel = await this.router.resolveModel('default', undefined, false, 'simple');
+				resolvedModel = await this.getMastraModel(titleModel);
+			}
+
+			const titleAgent = new Agent({
+				id: 'title-generator',
+				name: 'Title Generator',
+				instructions: 'Generate a very short title (under 20 characters) summarizing the user message. Return ONLY the title text, no quotes, colons, or explanation.',
+				model: resolvedModel,
+			});
+
+			const result = await titleAgent.generate(
+				`Summarize this in under 20 characters: "${userMessage}"`
 			);
 
-			return {
-				success: true,
-				data: mapperResponse.object as ResultInput,
-				rawText: ocrText,
-				isFallback: false,
-			};
-		} catch (error) {
-			console.warn('[EdApexGateway] Mapping Pass 2 failed, attempting single-pass fallback', error);
-			return this.runFallbackExtraction(file, mappingIndex, fallbackAgent);
-		}
-	}
-
-	/**
-	 * Single-pass fallback using a vision model that extracts structured data
-	 * directly from the document image.
-	 */
-	private async runFallbackExtraction(
-		file: Blob,
-		mappingIndex: string,
-		fallbackAgent: Agent<any, any, any, any>
-	): Promise<ExtractionResult> {
-		try {
-			const response = await fallbackAgent.generate(
-				[
-					{
-						role: 'user',
-						content: [
-							{
-								type: 'text',
-								text: `Extract data using this mapping context:\n${mappingIndex}`,
-							},
-							{
-								type: 'file',
-								data: await file.arrayBuffer(),
-								mediaType: file.type,
-							},
-						],
-					},
-				],
-				{
-					structuredOutput: {
-						schema: resultInputSchema,
-					},
-				}
-			);
-
-			return {
-				success: true,
-				data: response.object as ResultInput,
-				rawText: '',
-				isFallback: true,
-			};
-		} catch (error) {
-			console.error('[EdApexGateway] Critical: All extraction attempts failed', error);
-			return {
-				success: false,
-				error: 'All extraction attempts failed',
-			};
+			return (result?.text || 'New Chat').slice(0, 20).trim();
+		} catch (e) {
+			console.error('[Gateway] Title generation error:', e);
+			return 'New Chat';
 		}
 	}
 
@@ -618,6 +524,14 @@ Your primary role is to classify user intent, discover necessary domain context,
 
 		return `${baseInstructions}
 
+AVAILABLE AGENTS:
+- assistant: Handles all user queries, executes tools, and provides educational support. Delegate ALL user requests to this agent.
+
+DELEGATION STRATEGY:
+1. For EVERY user message, delegate to the "assistant" agent. Pass the user's full request as the prompt.
+2. Use the "getContext" tool ONLY if the user's request involves assessments, students, or marks AND you don't already have the specific names, IDs or setups in your context.
+3. After the assistant responds, return its response directly to the user without modification.
+
 DOMAIN CONTEXT (IDs):
 - School ID: ${context.schoolId}
 - User ID: ${context.userId}
@@ -626,12 +540,9 @@ DOMAIN CONTEXT (IDs):
 - Active Section ID: ${context.sectionId || 'None'}
 - Active Exam ID: ${context.examId || 'None'}
 
-ORCHESTRATION RULES:
-1. ALWAYS use the "getContext" tool if the user's request involves assessments, students, or marks and you don't already have the specific names, IDs or setups in your context.
-2. For any intent that results in a "mutation" (e.g., /extract, /validate, /publish, or natural language requests to "update", "create", or "delete" marks/students), you MUST achieve a confidence score of >= 0.9.
-3. If confidence is low, or if the intent is ambiguous, stay in "conversational" mode and ask for clarification.
-4. "navigation" intent is for switching views or searching for specific items without modifying them.
-5. "conversational" intent is for general questions or pedagogical support.
+CONFIDENCE GATE:
+- For any intent that results in a "mutation" (e.g., /extract, /validate, /publish, or natural language requests to "update", "create", or "delete" marks/students), the assistant MUST achieve a confidence score of >= 0.9.
+- If confidence is low, or if the intent is ambiguous, ask for clarification before delegating.
 
 DO NOT hallucinate data. If you don't know the assessment setups for a class or the names of the students, use getContext(types: ['assessment', 'students']).`;
 	}
@@ -700,8 +611,9 @@ BEHAVIORAL GUIDELINES:
 				apiKey: apiKey || 'keyless',
 				baseURL,
 				// Disable gzip to work around gateway returning malformed gzip responses
-				// (content-encoding: gzip header present but body not properly compressed)
 				headers: { 'Accept-Encoding': 'identity' },
+				// Opengateway doesn't support response_format parameter
+				supportsStructuredOutputs: false,
 			});
 			return provider.chatModel(bareModel) as unknown as MastraLanguageModel;
 		}

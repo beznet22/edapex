@@ -40,8 +40,21 @@ export class ChatHistory {
     this.#revalidating = true;
     
     if (chatsInput && typeof (chatsInput as any).then === "function") {
-      (chatsInput as Promise<DBChat[]>)
-        .then((chats) => (this.chats = chats))
+      const fetchPromise = chatsInput as Promise<DBChat[]>;
+      
+      // 10s timeout — fall back to empty state on storage error or timeout (Req 24.7)
+      const timeoutPromise = new Promise<null>((_, reject) =>
+        setTimeout(() => reject(new Error('Storage timeout')), 10000)
+      );
+
+      Promise.race([fetchPromise, timeoutPromise])
+        .then((chats) => {
+          this.chats = (chats as DBChat[]) || [];
+        })
+        .catch(() => {
+          // Fall back to empty state on error or timeout — don't show error to user
+          this.chats = [];
+        })
         .finally(() => {
           this.#loading = false;
           this.#revalidating = false;
@@ -137,9 +150,15 @@ export class ChatHistory {
   async refetch() {
     this.#revalidating = true;
     try {
-      const chats = await getHistory({});
+      const timeoutPromise = new Promise<null>((_, reject) =>
+        setTimeout(() => reject(new Error('Storage timeout')), 10000)
+      );
+      const chats = await Promise.race([getHistory({}), timeoutPromise]);
       if (!chats) return;
-      this.chats = chats;
+      this.chats = chats as DBChat[];
+    } catch {
+      // Fall back to empty state on error or timeout (Req 24.7)
+      this.chats = [];
     } finally {
       this.#revalidating = false;
     }
@@ -147,6 +166,22 @@ export class ChatHistory {
 
   addChat(chat: DBChat) {
     this.chats = [chat, ...this.chats];
+  }
+
+  /**
+   * Upsert a chat into the sidebar list:
+   * - If the thread ID is NOT in the list → prepend to top (length +1)
+   * - If the thread ID IS already in the list → update title in place (no duplicate, same length)
+   */
+  upsertChat(chat: DBChat) {
+    const existingIndex = this.chats.findIndex((c) => c.id === chat.id);
+    if (existingIndex === -1) {
+      // New thread: prepend to top
+      this.chats = [chat, ...this.chats];
+    } else {
+      // Existing thread: update title in place
+      this.chats[existingIndex] = { ...this.chats[existingIndex], title: chat.title };
+    }
   }
 
   static fromContext(): ChatHistory {

@@ -61,7 +61,7 @@
         <div
           class="flex w-full flex-row items-center justify-center gap-2 px-2 text-sm text-zinc-500"
         >
-          Your conversations will appear here once you start chatting!
+          No previous conversations yet. Start chatting to see your history here.
         </div>
       </SidebarGroupContent>
     </SidebarGroup>

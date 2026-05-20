@@ -99,9 +99,9 @@
   </DropdownMenuTrigger>
   <DropdownMenuContent 
     align="start" 
-    class="min-w-[240px] hermes-glass p-0 shadow-2xl border-sidebar-border/30 rounded-xl overflow-hidden"
+    class="min-w-[240px] max-h-[70vh] hermes-glass p-0 shadow-2xl border-sidebar-border/30 rounded-xl overflow-hidden"
   >
-    <ScrollArea class="max-h-[400px] w-full" type="auto">
+    <ScrollArea class="h-full max-h-[70vh] w-full" type="always">
       <div class="p-1 flex flex-col gap-px">
         {#each groupedModels as group, i (group.label)}
           {#if i > 0}

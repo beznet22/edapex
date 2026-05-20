@@ -2,6 +2,7 @@
   import ChatHeader from "$lib/components/chat-header.svelte";
   import Chat from "$lib/components/chat.svelte";
   import WorkspaceSidebar from "$lib/components/workspace/WorkspaceSidebar.svelte";
+  import * as Resizable from "$lib/components/ui/resizable";
   import { ChatContext } from "$lib/context/chat-context.svelte.js";
   import { SelectedClass } from "$lib/context/sync.svelte";
   import { IsMobile } from "$lib/hooks/is-mobile.svelte.js";
@@ -23,12 +24,24 @@
   chatContext.setContext();
 </script>
 
-<!-- Hermes 4-Panel: Panel 3 (Chat Stage) -->
-<div class="flex flex-1 min-h-0 w-full">
-  <div class="flex-1 flex flex-col min-h-0 min-w-0">
+<!-- Hermes 4-Panel Row: Panel 3 (Chat Stage) & Panel 4 (Workspace Inspector) -->
+<Resizable.PaneGroup direction="horizontal" class="flex flex-1 min-h-0 w-full">
+  <!-- Panel 3: Chat Stage -->
+  <Resizable.Pane defaultSize={inspectorOpen && !isMobile.current ? 70 : 100} minSize={30} class="flex flex-col min-h-0 min-w-0 h-full relative">
     <ChatHeader user={data.user} chat={data.chat} onToggleInspector={() => inspectorOpen = !inspectorOpen} />
     <Chat readonly={false} user={data.user} />
-  </div>
-</div>
+  </Resizable.Pane>
 
-<WorkspaceSidebar bind:open={inspectorOpen} />
+  <!-- Panel 4: Workspace Inspector (Desktop Resizable) -->
+  {#if inspectorOpen && !isMobile.current}
+    <Resizable.Handle withHandle class="w-1.5 bg-muted/20 hover:bg-muted/50 active:bg-muted transition-colors z-10" />
+    <Resizable.Pane defaultSize={50} minSize={20} maxSize={60}>
+      <WorkspaceSidebar bind:open={inspectorOpen} isMobile={isMobile.current} />
+    </Resizable.Pane>
+  {/if}
+</Resizable.PaneGroup>
+
+<!-- Mobile Sheet Overlay -->
+{#if isMobile.current && inspectorOpen}
+  <WorkspaceSidebar bind:open={inspectorOpen} isMobile={true} />
+{/if}

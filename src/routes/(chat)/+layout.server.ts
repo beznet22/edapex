@@ -26,7 +26,7 @@ export const load: LayoutServerLoad = async ({ cookies, locals, url }) => {
   }
 
   const sidebarCollapsed = false;
-  let modelId = "openai/gpt-4o-mini";
+  let modelId = cookies.get("selected-model") || "auto";
   let agents: any[] = [];
 
   const selectedClassRaw = cookies.get("selected-class");
