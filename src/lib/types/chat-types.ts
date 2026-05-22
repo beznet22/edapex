@@ -1,15 +1,18 @@
-export interface DBChat {
-  id: string;
-  createdAt: Date;
+export type ChatVisibility = "PUBLIC" | "PRIVATE" | "SHARED"
+export interface ChatThread {
+  threadId: string;
+  resourceId: string;
   title: string;
-  model: string;
-  userId: number | null;
-  visibility: string;
+  model?: string;
+  userId: number;
+  visibility: ChatVisibility;
+  createdAt: string;
+  updatedAt: string;
 }
 
-export interface DBMessage {
+export interface ChatMessage {
   id: string;
-  chatId: string;
+  threadId: string;
   role: string;
   parts: any;
   metadata?: any;
@@ -66,12 +69,23 @@ export type xDataPart = {
   createDocument: CreateDocumentPart;
   generatePDF: GeneratePDFPart;
   notification: Notification;
-  chat: DBChat | null;
+  threadCreated: ChatThread;
+  threadTitle: {
+    title: string;
+  };
 };
+
+export type StreamDataPart = {
+  [K in keyof xDataPart]: {
+    type: `data-${K}`;
+    data: xDataPart[K];
+  }
+}[keyof xDataPart] | { type: string; data: any };
 
 export type xMetadata = {
   documentId: string;
   createdAt: string;
+  threadId: string;
 };
 
 export type UploadedData = {
@@ -94,14 +108,14 @@ export type AssessmentStatus = "uploading" | "retrying" | "error" | "uploaded" |
 export function getAssessmentStatusDescription(status?: AssessmentStatus | string, errorMessage?: string): string {
   if (status === "error" && errorMessage) return errorMessage;
   switch (status) {
-      case "uploading": return "Image is currently being uploaded.";
-      case "retrying": return "Retry attempt is in progress.";
-      case "uploaded": return "Image uploaded and waiting for AI extraction.";
-      case "extracted": return "Data extracted successfully, pending teacher approval.";
-      case "approved": return "Data verified and saved, ready to publish.";
-      case "published": return "Results have been published and emailed to parents.";
-      case "error": return errorMessage || "An error occurred during processing.";
-      default: return status || "Unknown status";
+    case "uploading": return "Image is currently being uploaded.";
+    case "retrying": return "Retry attempt is in progress.";
+    case "uploaded": return "Image uploaded and waiting for AI extraction.";
+    case "extracted": return "Data extracted successfully, pending teacher approval.";
+    case "approved": return "Data verified and saved, ready to publish.";
+    case "published": return "Results have been published and emailed to parents.";
+    case "error": return errorMessage || "An error occurred during processing.";
+    default: return status || "Unknown status";
   }
 }
 // Combine all possible tools for type inference in the UI

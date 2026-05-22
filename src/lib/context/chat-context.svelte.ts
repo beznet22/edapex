@@ -1,12 +1,13 @@
 // @/src/lib/hooks/chat-context.svelte.ts
 import { goto, replaceState } from "$app/navigation";
-import type { DBChat } from "$lib/types/chat-types";
+import type { ChatThread } from "$lib/types/chat-types";
 import type { AuthUser } from "$lib/types/auth-types";
 import type {
   AgentWorkflow,
   CreateDocumentPart,
   xUIMessage,
   xUIMessagePart,
+  StreamDataPart,
 } from "$lib/types/chat-types";
 import { Chat } from "@ai-sdk/svelte";
 import { DefaultChatTransport, type ChatStatus } from "ai";
@@ -14,12 +15,10 @@ import { getContext, setContext } from "svelte";
 import { toast } from "svelte-sonner";
 import { ChatHistory } from "./chat-history.svelte";
 import type { ClassSection } from "$lib/types/result-types";
-import type { Student } from "$lib/schema/result-output";
-import { page } from "$app/state";
-import { localStore } from "$lib/utils";
 import type { ClassStudent } from "$lib/server/repository/student.repo";
 
 import { SelectedClass, SelectedModel } from "./sync.svelte";
+import { ThreadData } from "./thread-data.svelte";
 
 const CHAT_CONTEXT_KEY = Symbol("chat-context");
 
@@ -33,8 +32,7 @@ export type MentionPayload = {
 export type InitChat = {
   initialMessages?: xUIMessage[];
   api?: string;
-  chatData?: DBChat;
-  agents: AgentWorkflow[];
+  chatData?: ChatThread;
   selectedClass: SelectedClass;
 };
 
@@ -49,28 +47,24 @@ export class ChatContext {
   error = $state<Error | undefined>(undefined);
   profile = $state<'strong' | 'balanced' | 'simple'>('strong');
   thinkingEnabled = $state<boolean>(false);
-  activeWorkflows = $state<{tool: string, args: any}[]>([]);
-  pendingConfirmation = $state<{
-    type: 'mutation' | 'navigation';
-    confidence: number;
-    threshold: number;
-    reasoning: string;
-    originalMessage: string;
-  } | null>(null);
+  get activeWorkflows() { return this.threadData.activeWorkflows; }
+  set activeWorkflows(v) { this.threadData.activeWorkflows = v; }
+  get pendingConfirmation() { return this.threadData.pendingConfirmation; }
+  set pendingConfirmation(v) { this.threadData.pendingConfirmation = v; }
   pendingMentions = $state<MentionPayload[]>([]);
   fileReferences = $state<{ key: string; name: string; type: 'file' | 'dir'; mimeType?: string }[]>([]);
-  #receivedDataChat = false;
   #selectedModel = SelectedModel.fromContext();
   get modelOverride() { return this.#selectedModel.value; }
 
   // Chat properties
-  agents: AgentWorkflow[];
   client: Chat<xUIMessage>;
   messages: xUIMessage[];
   lastMessage?: xUIMessage;
   parts?: xUIMessagePart[];
   status: ChatStatus;
-  chatData?: DBChat;
+  threadData: ThreadData;
+  get chatData() { return this.threadData.chatData; }
+  set chatData(v) { this.threadData.chatData = v; }
   chatHistory = ChatHistory.fromContext();
 
   #selectedClass: SelectedClass;
@@ -80,12 +74,11 @@ export class ChatContext {
     initialMessages,
     api,
     chatData,
-    agents,
     selectedClass,
   }: InitChat) {
     this.client = $derived(
       new Chat<xUIMessage>({
-        id: chatData?.id,
+        id: chatData?.threadId,
         messages: initialMessages,
         transport: new DefaultChatTransport({
           api,
@@ -97,11 +90,10 @@ export class ChatContext {
       })
     );
 
-    this.chatData = $state(chatData);
+    this.threadData = new ThreadData(chatData);
     this.status = $derived(this.client.status);
     this.messages = $derived(this.client?.messages ?? []);
     this.lastMessage = $derived(this.messages.at(-1));
-    this.agents = $state(agents);
     this.#selectedClass = selectedClass;
   }
 
@@ -119,13 +111,12 @@ export class ChatContext {
     return this.status === "ready" ? false : true;
   }
 
-  #prepareSendMessagesRequest = ({ messages }: { messages: xUIMessage[] }) => {
+  #prepareSendMessagesRequest = ({ messages, id }: { messages: xUIMessage[], id?: string }) => {
     // Reset the data-chat received flag at the start of each new stream
-    this.#receivedDataChat = false;
-
+    this.threadData.resetReceived();
     const body: Record<string, any> = {
       messages: this.user ? [messages.at(-1)] : messages,
-      chatId: this.chatData?.id,
+      threadId: id,
       data: this.studentData as any,
       selectedClass: this.selectedClass,
       profile: this.profile,
@@ -151,10 +142,10 @@ export class ChatContext {
     // - Skip goto() if no data-chat event was received during stream (URL was already correct)
     // - Skip goto() if replaceState already updated the URL to /chat/[chatId]
     // - Otherwise call goto() (e.g., user navigated away during stream)
-    if (this.chatData?.id) {
-      const targetPath = `/chat/${this.chatData.id}`;
+    if (this.chatData?.threadId) {
+      const targetPath = `/chat/${this.chatData.threadId}`;
 
-      if (!this.#receivedDataChat) {
+      if (!this.threadData.receivedDataChat) {
         // No data-chat event received — URL was already correct before stream started
         return;
       }
@@ -171,30 +162,8 @@ export class ChatContext {
     }
   };
 
-  #onData = (part: any) => {
-    if (part.type === "data-chat") {
-      this.#receivedDataChat = true;
-      this.chatData = part.data;
-      if (!this.chatData || !this.chatData.id) return;
-      this.chatHistory.upsertChat(this.chatData);
-      replaceState(`/chat/${this.chatData.id}`, {
-        settings: { chatId: this.chatData?.id },
-      });
-    }
-
-    if (part.type === "data-createDocument") {
-      this.openedDocumentId = part.id;
-      this.openPanel = part.data.status === "success" || part.data.status === "streaming";
-      this.docPart = part.data;
-    }
-
-    if (part.type === "data-workflow") {
-      this.activeWorkflows = [...this.activeWorkflows, part.data];
-    }
-
-    if (part.type === "data-confirmation") {
-      this.pendingConfirmation = part.data;
-    }
+  #onData = (part: StreamDataPart) => {
+    this.threadData.handlePart(part);
   };
 
   #onError = (error: Error) => {

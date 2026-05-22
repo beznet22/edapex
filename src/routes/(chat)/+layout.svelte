@@ -5,10 +5,7 @@
   import { ChatHistory } from "$lib/context/chat-history.svelte.js";
   import { FilesContext } from "$lib/context/file-context.svelte.js";
   import { UserContext } from "$lib/context/user-context.svelte.js";
-  import {
-    SelectedModel,
-    SelectedClass,
-  } from "$lib/context/sync.svelte";
+  import { SelectedModel, SelectedClass } from "$lib/context/sync.svelte";
   import { ImageContext } from "$lib/context/image.context.svelte";
   import { useAI } from "$lib/context/ai-context.svelte";
   import type { PageData } from "./$types.js";
@@ -17,6 +14,8 @@
     data: PageData;
     children: any;
   }>();
+
+  let sidebarOpen = $state(!data.sidebarCollapsed);
 
   let {
     user,
@@ -89,7 +88,7 @@
   <link rel="icon" href={favicon} />
 </svelte:head>
 
-<Sidebar.Provider style="--sidebar-width: 350px;">
+<Sidebar.Provider bind:open={sidebarOpen} style="--sidebar-width: 350px; --sidebar-width-icon: 4rem;">
   <AppSidebar user={data.user ?? undefined} />
   <Sidebar.Inset>
     {@render children()}

@@ -1,6 +1,7 @@
 export interface ModelDefinition {
 	id: string;
 	name: string;
+	apiName: string;
 	provider: string;
 	description: string;
 	tier: 'flagship' | 'pro' | 'mid' | 'speed' | 'lite' | 'reasoning' | 'omni' | 'low';
@@ -17,8 +18,9 @@ export interface ModelDefinition {
 export const MODEL_REGISTRY: ModelDefinition[] = [
 	// ─── Opengateway: Xiaomi MiMo ─────────────────────────────────────────────
 	{
-		id: 'opengateway/mimo-v2.5-pro',
+		id: 'opengateway:mimo-v2.5-pro',
 		name: 'MiMo v2.5 Pro',
+		apiName: 'mimo-v2.5-pro',
 		provider: 'opengateway',
 		description: 'Flagship 1M context with deep reasoning and coding',
 		tier: 'flagship',
@@ -28,8 +30,9 @@ export const MODEL_REGISTRY: ModelDefinition[] = [
 		capabilities: { supportsReasoning: true, supportsVision: false, supportsTools: true }
 	},
 	{
-		id: 'opengateway/mimo-v2-pro',
+		id: 'opengateway:mimo-v2-pro',
 		name: 'MiMo v2 Pro',
+		apiName: 'mimo-v2-pro',
 		provider: 'opengateway',
 		description: 'Previous-gen professional model with 1M context',
 		tier: 'pro',
@@ -39,8 +42,9 @@ export const MODEL_REGISTRY: ModelDefinition[] = [
 		capabilities: { supportsReasoning: true, supportsVision: false, supportsTools: true }
 	},
 	{
-		id: 'opengateway/mimo-v2.5',
+		id: 'opengateway:mimo-v2.5',
 		name: 'MiMo v2.5',
+		apiName: 'mimo-v2.5',
 		provider: 'opengateway',
 		description: 'Flagship multimodal with vision and 1M context',
 		tier: 'flagship',
@@ -50,8 +54,9 @@ export const MODEL_REGISTRY: ModelDefinition[] = [
 		capabilities: { supportsReasoning: true, supportsVision: true, supportsTools: true }
 	},
 	{
-		id: 'opengateway/mimo-v2-omni',
+		id: 'opengateway:mimo-v2-omni',
 		name: 'MiMo v2 Omni',
+		apiName: 'mimo-v2-omni',
 		provider: 'opengateway',
 		description: 'Balanced multimodal model with 256K context',
 		tier: 'omni',
@@ -61,8 +66,9 @@ export const MODEL_REGISTRY: ModelDefinition[] = [
 		capabilities: { supportsReasoning: true, supportsVision: true, supportsTools: true }
 	},
 	{
-		id: 'opengateway/mimo-v2-flash',
+		id: 'opengateway:mimo-v2-flash',
 		name: 'MiMo v2 Flash',
+		apiName: 'mimo-v2-flash',
 		provider: 'opengateway',
 		description: 'Fast inference optimized for speed',
 		tier: 'speed',
@@ -74,8 +80,9 @@ export const MODEL_REGISTRY: ModelDefinition[] = [
 
 	// ─── Opengateway: Google Gemini ────────────────────────────────────────────
 	{
-		id: 'opengateway/google/gemini-3.1-flash-lite-preview',
+		id: 'opengateway:google/gemini-3.1-flash-lite-preview',
 		name: 'Gemini 3.1 Flash Lite',
+		apiName: 'google/gemini-3.1-flash-lite-preview',
 		provider: 'opengateway',
 		description: 'Lightweight vision model with 1M context via GMI Cloud',
 		tier: 'lite',
@@ -87,8 +94,9 @@ export const MODEL_REGISTRY: ModelDefinition[] = [
 
 	// ─── Opengateway: Zhipu GLM ───────────────────────────────────────────────
 	{
-		id: 'opengateway/zai-org/GLM-5.1-FP8',
+		id: 'opengateway:zai-org/GLM-5.1-FP8',
 		name: 'GLM 5.1 FP8',
+		apiName: 'zai-org/GLM-5.1-FP8',
 		provider: 'opengateway',
 		description: 'Chain-of-thought reasoning model with 200K context',
 		tier: 'reasoning',
@@ -100,8 +108,9 @@ export const MODEL_REGISTRY: ModelDefinition[] = [
 
 	// ─── NVIDIA NIM ───────────────────────────────────────────────────────────
 	{
-		id: 'nvidia/minimaxai/minimax-m2.7',
+		id: 'nvidia:minimaxai/minimax-m2.7',
 		name: 'MiniMax M2.7',
+		apiName: 'minimaxai/minimax-m2.7',
 		provider: 'nvidia',
 		description: 'MiniMax reasoning model via NVIDIA NIM',
 		tier: 'pro',
@@ -111,8 +120,9 @@ export const MODEL_REGISTRY: ModelDefinition[] = [
 		capabilities: { supportsReasoning: true, supportsVision: false, supportsTools: true }
 	},
 	{
-		id: 'nvidia/stepfun-ai/step-3.5-flash',
+		id: 'nvidia:stepfun-ai/step-3.5-flash',
 		name: 'Step 3.5 Flash',
+		apiName: 'stepfun-ai/step-3.5-flash',
 		provider: 'nvidia',
 		description: 'StepFun fast reasoning model via NVIDIA NIM',
 		tier: 'speed',
@@ -122,8 +132,9 @@ export const MODEL_REGISTRY: ModelDefinition[] = [
 		capabilities: { supportsReasoning: true, supportsVision: false, supportsTools: true }
 	},
 	{
-		id: 'nvidia/mistralai/mistral-large-3-675b-instruct-2512',
+		id: 'nvidia:mistralai/mistral-large-3-675b-instruct-2512',
 		name: 'Mistral Large 3 675B',
+		apiName: 'mistralai/mistral-large-3-675b-instruct-2512',
 		provider: 'nvidia',
 		description: 'Mistral flagship via NVIDIA NIM',
 		tier: 'pro',
@@ -133,8 +144,9 @@ export const MODEL_REGISTRY: ModelDefinition[] = [
 		capabilities: { supportsReasoning: true, supportsVision: false, supportsTools: true }
 	},
 	{
-		id: 'nvidia/qwen/qwen3-coder-480b-a35b-instruct',
+		id: 'nvidia:qwen/qwen3-coder-480b-a35b-instruct',
 		name: 'Qwen3 Coder 480B',
+		apiName: 'qwen/qwen3-coder-480b-a35b-instruct',
 		provider: 'nvidia',
 		description: 'Qwen coding specialist via NVIDIA NIM',
 		tier: 'pro',
@@ -146,8 +158,9 @@ export const MODEL_REGISTRY: ModelDefinition[] = [
 
 	// ─── Groq (Native) ───────────────────────────────────────────────────────
 	{
-		id: 'groq/llama-3.3-70b-versatile',
+		id: 'groq:llama-3.3-70b-versatile',
 		name: 'Llama 3.3 70B',
+		apiName: 'llama-3.3-70b-versatile',
 		provider: 'groq',
 		description: 'Meta open model on Groq inference',
 		tier: 'pro',
@@ -157,8 +170,9 @@ export const MODEL_REGISTRY: ModelDefinition[] = [
 		capabilities: { supportsReasoning: false, supportsVision: false, supportsTools: true }
 	},
 	{
-		id: 'groq/openai/gpt-oss-120b',
+		id: 'groq:openai/gpt-oss-120b',
 		name: 'GPT-OSS 120B',
+		apiName: 'openai/gpt-oss-120b',
 		provider: 'groq',
 		description: 'OpenAI open-source model on Groq',
 		tier: 'pro',
@@ -168,8 +182,21 @@ export const MODEL_REGISTRY: ModelDefinition[] = [
 		capabilities: { supportsReasoning: false, supportsVision: false, supportsTools: true }
 	},
 	{
-		id: 'groq/qwen/qwen3-32b',
+		id: 'groq:llama-3.1-8b-instant',
+		name: 'Llama 3.1 8B Instant',
+		apiName: 'llama-3.1-8b-instant',
+		provider: 'groq',
+		description: 'Llama 3.1 8B Instant on Groq',
+		tier: 'low',
+		classification: 'simple',
+		contextWindow: 128_000,
+		maxOutputTokens: 16_384,
+		capabilities: { supportsReasoning: false, supportsVision: false, supportsTools: true }
+	},
+	{
+		id: 'groq:qwen/qwen3-32b',
 		name: 'Qwen3 32B',
+		apiName: 'qwen/qwen3-32b',
 		provider: 'groq',
 		description: 'Qwen mid-tier model on Groq',
 		tier: 'mid',
@@ -181,8 +208,9 @@ export const MODEL_REGISTRY: ModelDefinition[] = [
 
 	// ─── DeepSeek (Native) ────────────────────────────────────────────────────
 	{
-		id: 'deepseek/deepseek-v4-flash',
+		id: 'deepseek:deepseek-v4-flash',
 		name: 'DeepSeek V4 Flash',
+		apiName: 'deepseek-v4-flash',
 		provider: 'deepseek',
 		description: 'Fast inference with strong reasoning',
 		tier: 'speed',
@@ -192,8 +220,9 @@ export const MODEL_REGISTRY: ModelDefinition[] = [
 		capabilities: { supportsReasoning: true, supportsVision: false, supportsTools: true }
 	},
 	{
-		id: 'deepseek/deepseek-v4-pro',
+		id: 'deepseek:deepseek-v4-pro',
 		name: 'DeepSeek V4 Pro',
+		apiName: 'deepseek-v4-pro',
 		provider: 'deepseek',
 		description: 'DeepSeek flagship reasoning model',
 		tier: 'pro',
@@ -205,8 +234,21 @@ export const MODEL_REGISTRY: ModelDefinition[] = [
 
 	// ─── OpenCode Zen (Free — API Key Required) ──────────────────────────────
 	{
-		id: 'opencode/deepseek-v4-flash-free',
+		id: 'opencode:minimax-m2.5-free',
+		name: 'MiniMax M2.5 Free',
+		apiName: 'minimax-m2.5-free',
+		provider: 'opencode',
+		description: 'MiniMax M2.5 free via OpenCode Zen',
+		tier: 'mid',
+		classification: 'balanced',
+		contextWindow: 128_000,
+		maxOutputTokens: 16_384,
+		capabilities: { supportsReasoning: true, supportsVision: false, supportsTools: true }
+	},
+	{
+		id: 'opencode:deepseek-v4-flash-free',
 		name: 'DeepSeek V4 Flash Free',
+		apiName: 'deepseek-v4-flash-free',
 		provider: 'opencode',
 		description: 'DeepSeek V4 Flash free via OpenCode Zen',
 		tier: 'speed',
@@ -216,8 +258,9 @@ export const MODEL_REGISTRY: ModelDefinition[] = [
 		capabilities: { supportsReasoning: true, supportsVision: false, supportsTools: true }
 	},
 	{
-		id: 'opencode/nemotron-3-super-free',
+		id: 'opencode:nemotron-3-super-free',
 		name: 'Nemotron 3 Super Free',
+		apiName: 'nemotron-3-super-free',
 		provider: 'opencode',
 		description: 'NVIDIA Nemotron 3 Super free via OpenCode Zen',
 		tier: 'pro',
@@ -227,8 +270,9 @@ export const MODEL_REGISTRY: ModelDefinition[] = [
 		capabilities: { supportsReasoning: true, supportsVision: false, supportsTools: true }
 	},
 	{
-		id: 'opencode/ring-2.6-1t-free',
+		id: 'opencode:ring-2.6-1t-free',
 		name: 'Ring 2.6 1T Free',
+		apiName: 'ring-2.6-1t-free',
 		provider: 'opencode',
 		description: 'Ring 2.6 1T free via OpenCode Zen',
 		tier: 'pro',
@@ -237,22 +281,13 @@ export const MODEL_REGISTRY: ModelDefinition[] = [
 		maxOutputTokens: 16_384,
 		capabilities: { supportsReasoning: true, supportsVision: false, supportsTools: true }
 	},
-	{
-		id: 'opencode/minimax-m2.5-free',
-		name: 'MiniMax M2.5 Free',
-		provider: 'opencode',
-		description: 'MiniMax M2.5 free via OpenCode Zen',
-		tier: 'mid',
-		classification: 'balanced',
-		contextWindow: 128_000,
-		maxOutputTokens: 16_384,
-		capabilities: { supportsReasoning: true, supportsVision: false, supportsTools: true }
-	},
+
 
 	// ─── Mistral (Native — Extraction Only) ───────────────────────────────────
 	{
-		id: 'mistral/mistral-ocr-latest',
+		id: 'mistral:mistral-ocr-latest',
 		name: 'Mistral OCR',
+		apiName: 'mistral-ocr-latest',
 		provider: 'mistral',
 		description: 'Document extraction specialist (not for chat routing)',
 		tier: 'mid',
@@ -292,6 +327,45 @@ export function getChatRoutableModels(): ModelDefinition[] {
 export const SUPPORTED_PROVIDERS = [
 	'opengateway', 'nvidia', 'groq', 'deepseek', 'opencode', 'mistral'
 ] as const;
+
+export const SUPPORTED_PROVIDERS_META = [
+	{
+		id: 'opengateway',
+		name: 'OpenGateway',
+		description: 'Default platform AI gateway',
+		url: 'https://edapex.io',
+	},
+	{
+		id: 'nvidia',
+		name: 'NVIDIA NIM',
+		description: 'Diverse fallback architect with embeddings capabilities',
+		url: 'https://build.nvidia.com/settings/api-keys',
+	},
+	{
+		id: 'groq',
+		name: 'Groq',
+		description: 'Lightning fast utility execution',
+		url: 'https://console.groq.com/keys',
+	},
+	{
+		id: 'deepseek',
+		name: 'DeepSeek',
+		description: 'Deep reasoning and code intelligence',
+		url: 'https://platform.deepseek.com/api_keys',
+	},
+	{
+		id: 'opencode',
+		name: 'OpenCode Zen',
+		description: 'Curated model endpoint for low-latency reasoning',
+		url: 'https://opencode.ai/docs/zen/',
+	},
+	{
+		id: 'mistral',
+		name: 'Mistral SDK',
+		description: 'High-precision document intelligence layer',
+		url: 'https://console.mistral.ai/api-keys',
+	}
+];
 
 export type SupportedProvider = (typeof SUPPORTED_PROVIDERS)[number];
 

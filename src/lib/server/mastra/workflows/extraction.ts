@@ -1,7 +1,7 @@
 import { createWorkflow, createStep } from "@mastra/core/workflows";
 import { z } from "zod";
 import { Agent } from "@mastra/core/agent";
-import { AgentRouter } from "../router";
+import { ModelRouter } from "../router";
 import { createMastraDb } from "../db";
 import {
   OCR_SYSTEM_PROMPT,
@@ -80,11 +80,11 @@ const extractStep = createStep({
     // Load environment and initialize router
     const { env } = await import("$env/dynamic/private");
     const db = createMastraDb();
-    const router = new AgentRouter(db, userId);
+    const router = new ModelRouter(db, userId);
     const encryptionKey = env.TOKEN_ENCRYPTION_KEY || "edapex-default-encryption-key-32ch";
     const envKeys = env as Record<string, string | undefined>;
 
-    // Resolve models inline via AgentRouter
+    // Resolve models inline via ModelRouter
     const ocrModel = await router.resolveMastraModel("ocr", envKeys, encryptionKey);
     const mapperModel = await router.resolveMastraModel("chat", envKeys, encryptionKey);
     const fallbackModel = await router.resolveMastraModel("vision", envKeys, encryptionKey);

@@ -7,7 +7,7 @@ import { studentRepo } from "$lib/server/repository";
 import type { ClassStudent } from "$lib/server/repository/student.repo";
 import { readdir, stat } from "fs/promises";
 import { join } from "path";
-import type { UploadedData } from "$lib/types/chat-types";
+import type { ChatThread, UploadedData } from "$lib/types/chat-types";
 import { existsSync, rm, rmdirSync, type Dirent } from "fs";
 import type { ClassSection } from "$lib/types/result-types";
 import { resultRepo } from "$lib/server/repository";
@@ -16,8 +16,10 @@ import { DESIGNATIONS, type Designation } from "$lib/types/sms-types";
 import { generateId } from "ai";
 import { createMastraDb } from "$lib/server/mastra/db";
 import { getUserProviderKeys } from "$lib/server/mastra/provider-config";
-import { SUPPORTED_PROVIDERS, getAvailableModels } from "$lib/server/mastra/registry";
+import { SUPPORTED_PROVIDERS, SUPPORTED_PROVIDERS_META, getAvailableModels } from "$lib/server/mastra/registry";
 import { env } from "$env/dynamic/private";
+import { getMemory, mastra } from "$lib/server/mastra";
+import type { StorageThreadType } from "@mastra/core/memory";
 
 export const load: LayoutServerLoad = async ({ cookies, locals, url }) => {
   const { user, session } = locals;
@@ -25,9 +27,9 @@ export const load: LayoutServerLoad = async ({ cookies, locals, url }) => {
     redirect(302, "/signin");
   }
 
-  const sidebarCollapsed = false;
+  const sidebarCookie = cookies.get("sidebar:state");
+  const sidebarCollapsed = sidebarCookie ? sidebarCookie === "false" : true;
   let modelId = cookies.get("selected-model") || "auto";
-  let agents: any[] = [];
 
   const selectedClassRaw = cookies.get("selected-class");
   const selectedAgentId = cookies.get("selected-agent") || "";
@@ -38,6 +40,30 @@ export const load: LayoutServerLoad = async ({ cookies, locals, url }) => {
   if (user) {
     classes = await resultRepo.getClassSections();
     students = await studentRepo.getStudentsByStaffId(user?.staffId);
+
+    // Load chat history from Mastra memory for the sidebar
+    try {
+      const memory = await getMemory();
+      if (!memory) return null;
+
+      const resourceId = `user-${user.id}`;
+      const result = await memory.listThreads({ filter: { resourceId } });
+
+      // Map Mastra threads to the ChatThread shape the UI expects
+      chats = result.threads.map((t: StorageThreadType) => ({
+        id: t.id,
+        threadId: t.id,
+        resourceId: t.resourceId,
+        userId: user.id,
+        title: t.title || 'New Chat',
+        model: t.metadata?.model || 'auto' as any,
+        visibility: t.metadata?.visibility || 'PRIVATE' as any,
+        createdAt: new Date(t.createdAt).toISOString(),
+        updatedAt: new Date(t.updatedAt).toISOString(),
+      })) as ChatThread[];
+    } catch (e) {
+      console.error('[layout.server] Failed to load chat history:', e);
+    }
   }
 
   const className = url.searchParams.get("className");
@@ -119,10 +145,10 @@ export const load: LayoutServerLoad = async ({ cookies, locals, url }) => {
   }
 
   return {
-    agents,
     user: user || undefined,
     students,
     classes,
+    chats,
     sidebarCollapsed,
     modelId,
     selectedClassRaw,
@@ -132,6 +158,7 @@ export const load: LayoutServerLoad = async ({ cookies, locals, url }) => {
     defaultProvider,
     connectedProviders,
     availableModels,
+    supportedProviders: SUPPORTED_PROVIDERS_META,
     userPriority,
   };
 };

@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { chatModels, type ChatModel } from "$lib/chat/models";
   import { SelectedModel } from "$lib/context/sync.svelte";
   import { cn } from "$lib/utils/shadcn.js";
   import { Button } from "./ui/button";
@@ -9,28 +8,15 @@
     DropdownMenuItem,
     DropdownMenuTrigger,
     DropdownMenuLabel,
-    DropdownMenuSeparator,
   } from "./ui/dropdown-menu";
-  import CircleCheckIcon from "@lucide/svelte/icons/circle-check";
   import { Badge } from "./ui/badge";
   import ChevronDownIcon from "@lucide/svelte/icons/chevron-down";
   import type { ClassValue } from "svelte/elements";
 
-  import { page } from "$app/state";
   import { useAI } from "$lib/context/ai-context.svelte";
   import { useChat } from "$lib/context/chat-context.svelte";
-  import { CredentialType, CREDENTIAL_LABELS } from "$lib/schema/chat-schema";
+  import { CREDENTIAL_LABELS } from "$lib/schema/chat-schema";
 
-  import { ScrollArea } from "./ui/scroll-area";
-  import SparklesIcon from "@lucide/svelte/icons/sparkles";
-
-  const PROVIDER_LOGOS: Record<string, string> = {
-    groq: "https://raw.githubusercontent.com/simple-icons/simple-icons/develop/icons/groq.svg",
-    nvidia_nim: "https://raw.githubusercontent.com/simple-icons/simple-icons/develop/icons/nvidia.svg",
-    mistral: "https://raw.githubusercontent.com/simple-icons/simple-icons/develop/icons/mistral.svg",
-    deepseek: "https://raw.githubusercontent.com/simple-icons/simple-icons/develop/icons/deepseek.svg",
-    opencode: "https://opencode.ai/favicon.ico",
-  };
 
   let {
     class: c,
@@ -99,10 +85,9 @@
   </DropdownMenuTrigger>
   <DropdownMenuContent 
     align="start" 
-    class="min-w-[240px] max-h-[70vh] hermes-glass p-0 shadow-2xl border-sidebar-border/30 rounded-xl overflow-hidden"
+    class="min-w-[240px] h-[320px] hermes-glass p-0 shadow-2xl border-sidebar-border/30 rounded-xl overflow-hidden"
   >
-    <ScrollArea class="h-full max-h-[70vh] w-full" type="always">
-      <div class="p-1 flex flex-col gap-px">
+    <div class="h-full w-full overflow-y-auto overflow-x-hidden p-2 flex flex-col gap-px">
         {#each groupedModels as group, i (group.label)}
           {#if i > 0}
             <div class="h-px bg-sidebar-border/10 my-1 mx-2"></div>
@@ -118,7 +103,7 @@
                 open = false;
                 selectedChatModel.value = chatModel.id;
               }}
-              class="group/item flex flex-row items-center justify-between gap-2 px-3 py-1.5 rounded-lg transition-all hover:bg-primary/10 cursor-pointer data-[active=true]:bg-primary/10 relative overflow-hidden"
+              class="group/item flex flex-row items-center justify-between gap-1 px-3 py-3 rounded-lg transition-all hover:bg-primary/10 cursor-pointer data-[active=true]:bg-primary/10 relative overflow-hidden"
               data-active={chatModel.id === selectedChatModel.value}
             >
               <div class="flex items-center gap-2 relative z-10 w-full min-w-0">
@@ -141,6 +126,5 @@
           {/each}
         {/each}
       </div>
-    </ScrollArea>
   </DropdownMenuContent>
 </DropdownMenu>

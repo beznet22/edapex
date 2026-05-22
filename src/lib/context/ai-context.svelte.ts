@@ -3,6 +3,7 @@ import { page } from "$app/state";
 export class AIContext {
     connectedProviders = $state<Array<{ provider: string; name: string; enabled: boolean; source: 'db' | 'env' }>>([]);
     availableModels = $state<any[]>([]);
+    supportedProviders = $state<Array<{ id: string; name: string; description: string; url: string }>>([]);
 
     addProvider(config: { provider: string; name: string; enabled: boolean; source: 'db' | 'env' }) {
         const index = this.connectedProviders.findIndex(p => p.provider === config.provider);
@@ -31,6 +32,9 @@ export class AIContext {
         }
         if (Array.isArray(data.availableModels)) {
             this.availableModels = [...data.availableModels];
+        }
+        if (Array.isArray(data.supportedProviders)) {
+            this.supportedProviders = [...data.supportedProviders];
         }
     }
 }

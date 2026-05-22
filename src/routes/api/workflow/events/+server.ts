@@ -11,11 +11,6 @@ import { createTenantContext } from '$lib/server/mastra/tenant-context';
  */
 const sseManager = new SSEManager();
 
-/**
- * Exported for use by workflow orchestration code that needs to emit events.
- */
-export { sseManager };
-
 export const GET: RequestHandler = ({ url, locals }) => {
 	const runId = url.searchParams.get('runId');
 	if (!runId) {

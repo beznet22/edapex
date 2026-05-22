@@ -1,6 +1,6 @@
 import type { RequestHandler } from '@sveltejs/kit';
 import { json } from '@sveltejs/kit';
-import { verifyShareToken } from '../../share/+server';
+import { verifyShareToken } from '../../share/share-utils';
 import { workspaceFiles } from '$lib/server/storage/files';
 
 /**

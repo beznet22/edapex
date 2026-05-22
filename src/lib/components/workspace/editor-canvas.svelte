@@ -12,6 +12,8 @@
   import ZapIcon from "@lucide/svelte/icons/zap";
   import { onMount } from "svelte";
   import { cn } from "$lib/utils/shadcn";
+  import WysiwygEditor from "$lib/components/editor/WysiwygEditor.svelte";
+  import EditorModeToggle from "$lib/components/editor/EditorModeToggle.svelte";
 
   // EmbedPDF imports
   import { usePdfiumEngine } from '@embedpdf/engines/svelte';
@@ -45,6 +47,29 @@
   let isSaving = $state(false);
   let containerWidth = $state(0);
   let containerRef = $state<HTMLDivElement | null>(null);
+
+  // WYSIWYG mode state
+  let editorMode = $state<"wysiwyg" | "raw">("wysiwyg");
+  const isMarkdownFile = $derived(filename.endsWith(".md") || filename.endsWith(".markdown"));
+  let wysiwygContent = $state("");
+
+  function handleWysiwygUpdate(markdown: string) {
+    wysiwygContent = markdown;
+    editContent = markdown;
+  }
+
+  function saveWysiwygFile() {
+    if (!url) return;
+    isSaving = true;
+    const content = editorMode === "wysiwyg" ? wysiwygContent : editContent;
+    fetch(url, {
+      method: "POST",
+      body: new Blob([content], { type: 'text/plain' })
+    }).then(() => {
+      textContent = content;
+    }).catch(err => console.error("Save error:", err))
+      .finally(() => isSaving = false);
+  }
 
   function startEdit() {
      isEditing = true;
@@ -102,16 +127,55 @@
 {#if filename}
   <div class="flex flex-col w-full overflow-hidden border-t {isMaximized ? 'fixed inset-0 z-100 bg-background border-none' : 'h-full'}">
 
-
-    <!-- Wrapping text and image in ScrollArea, but letting EmbedPDF manage its own virtual scrolling -->
+    <!-- Text/Markdown files -->
     {#if type === "text"}
-      <ScrollArea class="flex-1 w-full bg-background overflow-hidden relative group">
-        {#if isEditing}
-           <textarea bind:value={editContent} class="w-full min-h-full absolute inset-0 p-4 text-[0.7rem] font-mono leading-relaxed bg-transparent resize-none outline-none border-none focus:ring-0"></textarea>
-        {:else}
-           <pre class="p-4 w-full text-[0.7rem] font-mono leading-relaxed whitespace-pre-wrap wrap-break-word">{textContent}</pre>
-        {/if}
-      </ScrollArea>
+      <!-- Mode toggle for markdown files -->
+      {#if isMarkdownFile}
+        <div class="flex items-center justify-between px-3 py-1.5 border-b border-border/20 bg-background/50 shrink-0">
+          <span class="text-[9px] font-black uppercase tracking-[0.15em] text-muted-foreground">{filename}</span>
+          <div class="flex items-center gap-2">
+            {#if editorMode === "wysiwyg" || isEditing}
+              <Button
+                variant="ghost"
+                size="sm"
+                class="h-6 px-2 text-[9px] font-bold uppercase tracking-widest text-muted-foreground hover:text-primary"
+                onclick={editorMode === "wysiwyg" ? saveWysiwygFile : saveFile}
+                disabled={isSaving}
+              >
+                <SaveIcon class="size-3 mr-1" />
+                {isSaving ? "Saving..." : "Save"}
+              </Button>
+            {/if}
+            <EditorModeToggle bind:mode={editorMode} />
+          </div>
+        </div>
+      {/if}
+
+      {#if isMarkdownFile && editorMode === "wysiwyg"}
+        <!-- WYSIWYG Markdown Editor -->
+        <div class="flex-1 min-h-0 overflow-hidden bg-background">
+          {#if textContent !== "Loading..."}
+            <WysiwygEditor
+              content={textContent}
+              onUpdate={handleWysiwygUpdate}
+              class="h-full"
+            />
+          {:else}
+            <div class="flex items-center justify-center h-full text-muted-foreground text-sm">
+              Loading editor...
+            </div>
+          {/if}
+        </div>
+      {:else}
+        <!-- Raw text / non-markdown files -->
+        <ScrollArea class="flex-1 w-full bg-background overflow-hidden relative group">
+          {#if isEditing}
+            <textarea bind:value={editContent} class="w-full min-h-full absolute inset-0 p-4 text-[0.7rem] font-mono leading-relaxed bg-transparent resize-none outline-none border-none focus:ring-0"></textarea>
+          {:else}
+            <pre class="p-4 w-full text-[0.7rem] font-mono leading-relaxed whitespace-pre-wrap wrap-break-word">{textContent}</pre>
+          {/if}
+        </ScrollArea>
+      {/if}
     {:else if type === "image"}
       <ScrollArea class="flex-1">
         <div class="flex items-center justify-center p-4">

@@ -17,7 +17,7 @@
   import { replaceState } from "$app/navigation";
   import { getStudents } from "$lib/api/chat.remote";
   import { toast } from "svelte-sonner";
-  import { localStore } from "$lib/utils";
+  import { localStore } from "$lib/utils/index";
 
   let {
     class: c,

@@ -1,26 +1,16 @@
 import { command, getRequestEvent, query } from "$app/server";
 import { allowAnonymousChats, EXTRACTED_DIR } from "$lib/constants";
-import { chatVisibilitySchema, fileSchema } from "$lib/schema/chat-schema";
+import { chatVisibilitySchema, fileSchema, type ChatVisibility } from "$lib/schema/chat-schema";
 import { resultInputSchema } from "$lib/schema/result-input";
 import z from "zod";
 import { staffRepo, resultRepo, studentRepo } from "$lib/server/repository";
 import { studentFileStorage } from "$lib/server/storage/student-files";
 import { readdir, stat } from "fs/promises";
 import { join } from "path";
-import type { UploadedData } from "$lib/types/chat-types";
+import type { ChatThread, UploadedData } from "$lib/types/chat-types";
 import { existsSync, rmdirSync } from "fs";
-import { createMastraStorage } from "$lib/server/mastra/storage";
-
-/**
- * Mastra Storage Helpers
- * 
- * These functions replace the legacy ChatRepository with direct
- * Mastra storage calls. Threads map to chats, resources map to users.
- */
-
-function getMastraStorage() {
-  return createMastraStorage();
-}
+import { getMemory, mastra } from "$lib/server/mastra";
+import type { StorageThreadType } from "@mastra/core/memory";
 
 export const updateHistory = command(
   z.object({
@@ -34,16 +24,17 @@ export const updateHistory = command(
     }
 
     try {
-      const storage = getMastraStorage();
-      const memory = await storage.getStore("memory");
+      const memory = await getMemory() as any;
       if (!memory) return { success: false };
-      
+
       const thread = await memory.getThreadById({ threadId: chatId });
       if (thread) {
-        await memory.updateThread({ 
-          id: chatId, 
-          title: thread.title || "New Chat",
-          metadata: { ...(thread.metadata || {}), visibility } 
+        await memory.saveThread({
+          thread: {
+            ...thread,
+            metadata: { ...(thread.metadata || {}), visibility },
+            updatedAt: new Date(),
+          }
         });
       }
       return { success: true };
@@ -59,47 +50,50 @@ export const getHistory = query(z.object({}), async () => {
   if (!user || !session) return null;
 
   try {
-    const storage = getMastraStorage();
-    const memory = await storage.getStore("memory");
+    const memory = await getMemory();
     if (!memory) return null;
 
     const resourceId = `user-${user.id}`;
     const result = await memory.listThreads({ filter: { resourceId } });
-    
-    // Map Mastra threads to the DBChat-compatible shape the UI expects
-    return result.threads.map((t: any) => ({
+
+    // Map Mastra threads to the ChatThread shape the UI expects
+    return result.threads.map((t: StorageThreadType) => ({
       id: t.id,
-      title: t.title || 'New Chat',
-      model: t.metadata?.model || 'auto',
-      createdAt: t.createdAt || new Date(),
+      threadId: t.id,
+      resourceId: t.resourceId,
       userId: user.id,
-      visibility: t.metadata?.visibility || 'private',
-    }));
-  } catch {
-    return null;
+      title: t.title || 'New Chat',
+      model: t.metadata?.model || 'auto' as any,
+      visibility: t.metadata?.visibility || 'PRIVATE' as any,
+      createdAt: new Date(t.createdAt).toISOString(),
+      updatedAt: new Date(t.updatedAt).toISOString(),
+    })) as ChatThread[];
+  } catch (error) {
+    console.error(error);
+    return [];
   }
 });
 
 export const deleteChat = command(
   z.object({
-    chatId: z.string(),
+    threadId: z.string(),
   }),
-  async ({ chatId }) => {
+  async ({ threadId }) => {
     const { user, session } = getRequestEvent().locals;
     if (!user || !session) return { success: false, message: "Unauthorized" };
 
     try {
-      const storage = getMastraStorage();
-      const memory = await storage.getStore("memory");
+      const memory = await getMemory();
       if (!memory) return { success: false, message: "Storage error" };
 
-      const thread = await memory.getThreadById({ threadId: chatId });
+      const thread = await memory.getThreadById({ threadId });
       if (thread && thread.resourceId !== `user-${user.id}`) {
         return { success: false, message: "Forbidden" };
       }
-      await memory.deleteThread({ threadId: chatId });
+      await memory.deleteThread(threadId);
       return { success: true, message: "Chat deleted" };
-    } catch {
+    } catch (error) {
+      console.error("deleteChat error:", error);
       return { success: false, message: "An error occurred while processing your request" };
     }
   }
@@ -137,26 +131,27 @@ export const syncCookie = command(
 
 export const updateVisibility = command(
   z.object({
-    chatId: z.string(),
+    threadId: z.string(),
     visibility: chatVisibilitySchema,
   }),
-  async ({ chatId, visibility }) => {
+  async ({ threadId, visibility }) => {
     const { locals } = getRequestEvent();
     if (!locals.user) {
       return { success: false, message: "Unauthorized" };
     }
 
     try {
-      const storage = getMastraStorage();
-      const memory = await storage.getStore("memory");
+      const memory = await getMemory();
       if (!memory) return { success: false, message: "Storage error" };
 
-      const thread = await memory.getThreadById({ threadId: chatId });
+      const thread = await memory.getThreadById({ threadId });
       if (thread) {
-        await memory.updateThread({
-          id: chatId,
-          title: thread.title || "New Chat",
-          metadata: { ...(thread.metadata || {}), visibility }
+        await memory.saveThread({
+          thread: {
+            ...thread,
+            metadata: { ...(thread.metadata || {}), visibility },
+            updatedAt: new Date(),
+          }
         });
       }
       return { success: true };

@@ -10,6 +10,7 @@
   import * as AlertDialog from "$lib/components/ui/alert-dialog";
   import * as Select from "$lib/components/ui/select";
   import * as Resizable from "$lib/components/ui/resizable";
+  import { cn } from "$lib/utils/shadcn";
   import { Input } from "$lib/components/ui/input";
   import { Button } from "$lib/components/ui/button";
   import { ChatContext } from "$lib/context/chat-context.svelte.js";
@@ -21,24 +22,35 @@
   import EyeIcon from "@lucide/svelte/icons/eye";
   import EyeOffIcon from "@lucide/svelte/icons/eye-off";
   import { IsMobile } from "$lib/hooks/is-mobile.svelte.js";
+  import type { PageData } from "./$types.js";
 
-  let { data } = $props();
+  let { data } = $props<{ data: PageData }>();
   // svelte-ignore state_referenced_locally
-  const { user, agents } = data;
+  const { user } = data;
   let open = $state(false);
   let value = $state<string | undefined>();
   let newPassword = $state("");
   let showPassword = $state(false);
   let isUpdating = $state(false);
   let inspectorOpen = $state(false);
+  let inspectorPane = $state<any>(undefined);
   let userContext = $derived(UserContext.fromContext());
   const selectedClass = SelectedClass.fromContext();
   const isMobile = new IsMobile();
 
+  $effect(() => {
+    if (inspectorPane) {
+      if (inspectorOpen) {
+        if (inspectorPane.isCollapsed()) inspectorPane.expand();
+      } else {
+        if (inspectorPane.isExpanded()) inspectorPane.collapse();
+      }
+    }
+  });
+
   const chatContext = new ChatContext({
     initialMessages: [],
     chatData: undefined,
-    agents,
     selectedClass,
   });
   chatContext.setContext();
@@ -106,11 +118,11 @@
   </Resizable.Pane>
   
   <!-- Panel 4: Workspace Inspector (Desktop Resizable) -->
-  {#if inspectorOpen && !isMobile.current}
+  {#if !isMobile.current}
     <!-- Glassmorphic divider -->
-    <Resizable.Handle withHandle class="w-1.5 bg-muted/20 hover:bg-muted/50 active:bg-muted transition-colors z-10" />
-    <Resizable.Pane defaultSize={50} minSize={20} maxSize={60}>
-      <WorkspaceSidebar bind:open={inspectorOpen} isMobile={isMobile.current} />
+    <Resizable.Handle class={cn("w-1 bg-muted/20 transition-colors z-10", !inspectorOpen && "hidden")} />
+    <Resizable.Pane bind:this={inspectorPane} collapsible={true} collapsedSize={0} defaultSize={inspectorOpen ? 30 : 0} minSize={20} maxSize={60} class="transition-all duration-300 ease-out overflow-hidden" onExpand={() => { inspectorOpen = true; }} onCollapse={() => { inspectorOpen = false; }}>
+      <WorkspaceSidebar bind:open={inspectorOpen} isMobile={false} />
     </Resizable.Pane>
   {/if}
 </Resizable.PaneGroup>

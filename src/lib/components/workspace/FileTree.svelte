@@ -3,6 +3,7 @@
   import { Button } from "$lib/components/ui/button";
   import * as Tooltip from "$lib/components/ui/tooltip";
   import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
+  import * as Collapsible from "$lib/components/ui/collapsible";
   import FolderIcon from "@lucide/svelte/icons/folder";
   import FileTextIcon from "@lucide/svelte/icons/file-text";
   import FileImageIcon from "@lucide/svelte/icons/file-image";
@@ -229,24 +230,27 @@
   {#if nameInputState && (nameInputState.mode === "rename" || nameInputState.mode === "move") && nameInputState.originalKey === fullPath}
     {@render inlineInput(parentPath, depth)}
   {:else if entry.type === "dir"}
-    <div class="flex w-full items-center pr-2 py-px">
-      <div style="width: {depth * 20 + 4}px" class="shrink-0 flex items-center justify-end pr-1.5 opacity-60">
-        {#if isExpanded}
-          <div class="w-1.5 h-1.5 bg-current shadow-sm" style="clip-path: polygon(0 0, 100% 0, 50% 100%);"></div>
-        {:else}
-          <div class="w-1.5 h-1.5 bg-current shadow-sm" style="clip-path: polygon(0 0, 0 100%, 100% 50%);"></div>
-        {/if}
-      </div>
-      <div 
-        role="button"
-        tabindex={0}
-        class={cn(
-          "flex-1 min-w-0 flex items-center gap-2 pl-1 pr-1 py-0.5 rounded-lg group transition-colors cursor-pointer text-left focus:outline-none focus:bg-white/5",
-          activeDirKey === fullPath ? 'bg-white/10' : 'hover:bg-white/5'
-        )}
-        onclick={() => onToggleDir(fullPath)}
-        onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') onToggleDir(fullPath) }}
-      >
+    <Collapsible.Root open={isExpanded} onOpenChange={(v) => { if (v !== isExpanded) onToggleDir(fullPath) }}>
+      <div class="flex w-full items-center pr-2 py-px">
+        <div style="width: {depth * 20 + 4}px" class="shrink-0 flex items-center justify-end pr-1.5 opacity-60 pointer-events-none">
+          {#if isExpanded}
+            <div class="w-1.5 h-1.5 bg-current shadow-sm" style="clip-path: polygon(0 0, 100% 0, 50% 100%);"></div>
+          {:else}
+            <div class="w-1.5 h-1.5 bg-current shadow-sm" style="clip-path: polygon(0 0, 0 100%, 100% 50%);"></div>
+          {/if}
+        </div>
+        
+        <Collapsible.Trigger>
+          {#snippet child({ props: triggerProps })}
+            <div 
+              role="button"
+              tabindex={0}
+              {...triggerProps}
+              class={cn(
+                "flex-1 min-w-0 flex items-center gap-2 pl-1 pr-1 py-0.5 rounded-lg group transition-colors cursor-pointer text-left focus:outline-none focus:bg-white/5",
+                activeDirKey === fullPath ? 'bg-white/10' : 'hover:bg-white/5'
+              )}
+            >
         <FolderIcon class="size-[15px] shrink-0 opacity-70 stroke-[1.5]" />
         <span class="flex-1 truncate text-[0.8125rem] font-medium tracking-wide opacity-90 group-hover:text-foreground group-hover:opacity-100 transition-colors duration-200 text-left text-muted-foreground">{entry.name}</span>
         
@@ -296,17 +300,22 @@
             </DropdownMenu.Item>
           </DropdownMenu.Content>
         </DropdownMenu.Root>
+            </div>
+          {/snippet}
+        </Collapsible.Trigger>
       </div>
-    </div>
-    
-    {#if isExpanded && entry.children}
-      {#if nameInputState && nameInputState.mode === "create" && nameInputState.parentPath === fullPath}
-         {@render inlineInput(fullPath, depth + 1)}
-      {/if}
-      {#each entry.children as child (child.key)}
-        {@render treeItem(child, fullPath)}
-      {/each}
-    {/if}
+      
+      <Collapsible.Content class="overflow-hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
+        {#if entry.children}
+          {#if nameInputState && nameInputState.mode === "create" && nameInputState.parentPath === fullPath}
+             {@render inlineInput(fullPath, depth + 1)}
+          {/if}
+          {#each entry.children as child (child.key)}
+            {@render treeItem(child, fullPath)}
+          {/each}
+        {/if}
+      </Collapsible.Content>
+    </Collapsible.Root>
   {:else}
     {@const Icon = getFileIcon(entry.name)}
     <Tooltip.Root>

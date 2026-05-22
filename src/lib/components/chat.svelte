@@ -19,19 +19,12 @@
   import ToolMessage from "./tool-message.svelte";
   import { Button } from "./ui/button"; 
   import * as Tooltip from "./ui/tooltip";
-  import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuTrigger,
-    DropdownMenuGroup,
-    DropdownMenuLabel,
-  } from "./ui/dropdown-menu";
+
   import FolderIcon from "@lucide/svelte/icons/folder";
   import CalendarIcon from "@lucide/svelte/icons/calendar";
   import MapIcon from "@lucide/svelte/icons/map";
   import ChevronDownIcon from "@lucide/svelte/icons/chevron-down";
-  import CircleCheckIcon from "@lucide/svelte/icons/circle-check";
+
   import { cn } from "$lib/utils/shadcn";
 
   let {
@@ -49,36 +42,7 @@
   // Context
   const chat = $derived(useChat());
   const userContext = UserContext.fromContext();
-  let dropdownOpen = $state(false);
 
-  let groupedClasses = $derived(() => {
-    const groups: Record<string, any[]> = {
-      "CRECHE": [],
-      "NURSERY": [],
-      "GRADEK": [],
-      "LOWER BASIC": [],
-      "MIDDLE BASIC": [],
-      "OTHER": []
-    };
-    
-    for (const cls of userContext?.classes || []) {
-      const name = cls.className?.toUpperCase() || "";
-      if (name.includes("CREACH") || name.includes("CRECHE") || name.includes("DAYCARE")) {
-        groups["CRECHE"].push(cls);
-      } else if (name.includes("NURSERY")) {
-        groups["NURSERY"].push(cls);
-      } else if (name.includes("GRADE K") || name.includes("GRADEK") || name.includes("GRADE")) {
-        groups["GRADEK"].push(cls);
-      } else if (name.includes("LOWER BASIC")) {
-        groups["LOWER BASIC"].push(cls);
-      } else if (name.includes("MIDDLE BASIC")) {
-        groups["MIDDLE BASIC"].push(cls);
-      } else {
-        groups["OTHER"].push(cls);
-      }
-    }
-    return Object.entries(groups).filter(([_, classes]) => classes.length > 0);
-  });
 
   let copyMessage = (content: string, role: string) => {
     navigator.clipboard.writeText(content);
@@ -102,91 +66,7 @@
 <div
   class="relative flex flex-1 min-h-0 w-full flex-col bg-background font-sans selection:bg-primary/30"
 >
-  {#if user?.designation && user.designation !== "class_teacher"}
-    <div
-      class="absolute top-10 left-1/2 -translate-x-1/2 z-40 animate-in fade-in slide-in-from-top-4 duration-1000"
-    >
-      <DropdownMenu bind:open={dropdownOpen}>
-        <DropdownMenuTrigger>
-          {#snippet child({ props })}
-            <Button
-              {...props}
-              variant="ghost"
-              class="h-10 px-6 gap-3 rounded-full hermes-glass border border-primary/20 hover:border-primary/50 transition-all duration-300 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.6)] hover:shadow-primary/20 group/trigger relative overflow-hidden"
-            >
-              <!-- Sublte gold glow behind button -->
-              <div class="absolute inset-0 bg-primary/5 blur-xl group-hover:bg-primary/10 transition-colors"></div>
-              
-              <div class="flex flex-col items-start leading-none relative z-10">
-                <span
-                  class="text-[9px] uppercase tracking-widest text-primary/50 font-bold mb-0.5"
-                  >Staff Portal</span
-                >
-                <span
-                  class="text-[12px] font-bold tracking-wide uppercase text-primary/90 group-hover/trigger:text-primary transition-colors"
-                >
-                  {chat.selectedClass?.className || "Switch Context"}
-                </span>
-              </div>
-              <ChevronDownIcon
-                class="size-4 opacity-60 group-hover/trigger:opacity-100 transition-opacity relative z-10"
-              />
-            </Button>
-          {/snippet}
-        </DropdownMenuTrigger>
-        <DropdownMenuContent
-          class="hermes-glass border-primary/20 min-w-[260px] max-h-[320px] overflow-y-auto p-1.5 shadow-2xl custom-scrollbar"
-          align="center"
-          sideOffset={12}
-        >
-          {#each groupedClasses() as [groupName, classes], i}
-            <DropdownMenuGroup>
-              <DropdownMenuLabel
-                class="text-[10px] uppercase tracking-widest text-muted-foreground/60 px-2.5 py-1.5"
-              >
-                {groupName}
-              </DropdownMenuLabel>
-              {#each classes as cls (cls.id)}
-                <DropdownMenuItem
-                  onSelect={() => (chat.selectedClass = cls)}
-                  class={cn(
-                    "flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl transition-all duration-200 cursor-pointer mb-0.5 last:mb-0",
-                    chat.selectedClass?.id === cls.id
-                      ? "bg-primary/10 text-primary"
-                      : "hover:bg-primary/5",
-                  )}
-                >
-                  <div class="flex min-w-0 flex-1 justify-between">
-                    <span class="text-[13px] font-semibold truncate leading-tight"
-                      >{cls.className}</span
-                    >
-                    <span 
-                      class={cn(
-                        "opacity-60 truncate size-7 rounded-lg flex items-center justify-center text-[10px] font-bold transition-colors",
-                        chat.selectedClass?.id === cls.id
-                          ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20"
-                          : "bg-secondary text-muted-foreground",
-                      )}
-                      >{cls.sectionName || "Universal Content"}</span
-                    >
-                  </div>
-                  {#if chat.selectedClass?.id === cls.id}
-                    <CircleCheckIcon class="size-4 text-primary ml-auto" />
-                  {/if}
-                </DropdownMenuItem>
-              {/each}
-            </DropdownMenuGroup>
-          {:else}
-            <div
-              class="px-3 py-6 text-center text-xs text-muted-foreground italic"
-            >
-              No classes assigned to this account
-            </div>
-          {/each}
-        </DropdownMenuContent>
-      </DropdownMenu>
-    </div>
-  {/if}
+
 
   {#if chat.messages.length === 0}
     <!-- Welcome Hero State -->
@@ -275,26 +155,36 @@
                   variant="flat"
                   class="pb-2 {message.role === 'user' ? 'bg-accent!' : ''}"
                 >
-                  {#each message.parts as part}
-                    <!-- Then render tool parts -->
+                  {@const mergedReasoning = (() => {
+                    // Collect ALL reasoning parts regardless of position
+                    return message.parts
+                      .filter((p) => p.type === 'reasoning')
+                      .map((p) => (p as any).text || '')
+                      .filter(Boolean)
+                      .join('\n\n');
+                  })()}
+                  {@const nonReasoningParts = message.parts.filter((p) => p.type !== 'reasoning')}
+
+                  <!-- Render single merged reasoning block at the top -->
+                  {#if mergedReasoning}
+                    <div class="mb-2">
+                      <Reasoning isStreaming={chat.status === "streaming" && message.id === chat.lastMessage?.id}>
+                        <ReasoningTrigger>Thinking process...</ReasoningTrigger>
+                        <ReasoningContent class="border-l-2 border-primary/20 pl-4 py-1 my-2" contentClass="!text-foreground/40 dark:!text-foreground/35 prose-sm">
+                          <Markdown content={mergedReasoning} animation={{ enabled: false }} />
+                        </ReasoningContent>
+                      </Reasoning>
+                    </div>
+                  {/if}
+
+                  <!-- Render all non-reasoning parts -->
+                  {#each nonReasoningParts as part}
                     {#if part.type === 'tool-invocation'}
                       <div class="flex">
                         <ToolMessage {part} />
                       </div>
                     {/if}
-                    <!-- Render reasoning parts -->
-                    {#if part.type === "reasoning"}
-                      <div class="mb-2">
-                        <Reasoning isStreaming={chat.status === "streaming" && message.id === chat.lastMessage?.id}>
-                          <ReasoningTrigger>Thinking process...</ReasoningTrigger>
-                          <ReasoningContent class="text-muted-foreground text-sm border-l-2 border-primary/20 pl-4 py-1 my-2">
-                            <Markdown content={part.text || ""} animation={{ enabled: false }} />
-                          </ReasoningContent>
-                        </Reasoning>
-                      </div>
-                    {/if}
 
-                    <!-- Render text parts -->
                     {#if part.type === "text"}
                       {#if message.role === "assistant"}
                         <Markdown

@@ -49,7 +49,6 @@
     getAgentSettings,
     updateAgentSettings,
   } from "$lib/api/agent.remote.js";
-  import { chatProviders } from "$lib/chat/models";
   import type { CredentialType } from "$lib/schema/chat-schema";
   import type { AgentSetting } from "$lib/server/mastra/db/schema";
 
@@ -539,7 +538,7 @@
                 <div
                   class="grid grid-cols-1 md:grid-cols-2 gap-4 pb-12 items-start"
                 >
-                  {#each chatProviders as provider (provider.id)}
+                  {#each ai.supportedProviders.filter(p => p.id !== 'opengateway') as provider (provider.id)}
                     {@const connected = connectedProviders.find(
                       (p) => p.provider === provider.id,
                     )}

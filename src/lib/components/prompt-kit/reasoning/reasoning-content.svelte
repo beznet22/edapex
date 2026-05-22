@@ -9,7 +9,7 @@
 	// Import Shiki themes
 	import githubLightDefault from "@shikijs/themes/github-light-default";
 	import githubDarkDefault from "@shikijs/themes/github-dark-default";
-	import { code } from '@streamdown-svelte/code';
+	import { code } from "@streamdown-svelte/code";
 
 	interface Props {
 		children?: Snippet;
@@ -53,25 +53,35 @@
 			}
 
 			return () => observer.disconnect();
-		}
+		},
 	);
 
 	// Compute max height reactively
-	let maxHeight = $derived(context.isOpen && contentRef ? `${contentRef.scrollHeight}px` : "0px");
+	let maxHeight = $derived(
+		context.isOpen && contentRef ? `${contentRef.scrollHeight}px` : "0px",
+	);
 	let currentTheme = $derived(
-		mode.current === "dark" ? "github-dark-default" : "github-light-default"
+		mode.current === "dark"
+			? "github-dark-default"
+			: "github-light-default",
 	);
 </script>
 
 <div
 	bind:this={contentRef}
-	class={cn("overflow-hidden transition-[max-height] duration-150 ease-out", className)}
+	class={cn(
+		"overflow-hidden transition-[max-height] duration-150 ease-out",
+		className,
+	)}
 	style:max-height={maxHeight}
 	{...rest}
 >
 	<div
 		bind:this={innerRef}
-		class={cn("text-muted-foreground prose prose-sm dark:prose-invert", contentClass)}
+		class={cn(
+			"text-muted-foreground prose prose-sm dark:prose-invert",
+			contentClass,
+		)}
 	>
 		{#if content}
 			<!-- Basic -->

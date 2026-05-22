@@ -3,7 +3,7 @@ import type { ClassStudent } from "$lib/server/repository/student.repo";
 import type { AuthUser } from "$lib/types/auth-types";
 import type { AssignedSubject, ClassSection } from "$lib/types/result-types";
 import { DESIGNATION_TITLES, DESIGNATIONS, type Designation } from "$lib/types/sms-types";
-import { localStore } from "$lib/utils";
+import { localStore } from "$lib/utils/index";
 import { getContext, setContext } from "svelte";
 
 const USER_CONTEXT_KEY = Symbol("user-context");

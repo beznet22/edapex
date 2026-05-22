@@ -1,15 +1,14 @@
 import { error } from "@sveltejs/kit";
 import type { PageServerLoad } from "./$types";
-import { createMastraStorage, ensureStorageInitialized } from "$lib/server/mastra/storage";
+import { getMemory, mastra } from "$lib/server/mastra";
+import { toAISdkMessages } from "@mastra/ai-sdk/ui";
 
 export const load: PageServerLoad = async ({ params, locals }) => {
   const { chatId } = params;
   const user = locals.user;
-  const storage = createMastraStorage();
-  await ensureStorageInitialized();
+  const memory = await getMemory();
 
   try {
-    const memory = await storage.getStore('memory');
     if (!memory) {
       return { chat: null, messages: [] };
     }
@@ -26,28 +25,34 @@ export const load: PageServerLoad = async ({ params, locals }) => {
       }
     }
 
-    // Load messages from Mastra storage (max 200 to prevent unbounded memory usage)
-    const result = await memory.listMessages({ threadId: chatId, perPage: 200 });
+    // Recall messages using the static Memory instance
+    const resourceId = user ? `user-${user.id}` : thread.resourceId;
+    let recallResponse = null;
+    try {
+      recallResponse = await memory.recall({
+        threadId: chatId,
+        resourceId,
+      });
+    } catch {
+      console.log('No previous messages found.');
+    }
 
-    // Order messages by creation time ascending (most recent last)
-    const messages = result?.messages ?? [];
-    const sortedMessages = [...messages].sort((a, b) => {
-      const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-      const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-      return dateA - dateB;
-    });
+    // Convert Mastra messages to AI SDK v5 UI format
+    const uiMessages = toAISdkMessages(recallResponse?.messages || []);
 
-    // Map thread to the DBChat-compatible shape the UI expects
+    // Map thread to the ChatThread compatible shape the UI expects
     const chat = {
-      id: thread.id,
+      threadId: thread.id,
+      resourceId: thread.resourceId,
       title: thread.title || 'New Chat',
-      model: (thread.metadata?.model as string) || 'auto',
-      createdAt: thread.createdAt || new Date(),
+      model: (thread.metadata?.model as string),
       userId: user?.id ?? null,
-      visibility: (thread.metadata?.visibility as string) || 'private',
+      visibility: thread.metadata?.visibility as string,
+      createdAt: thread.createdAt,
+      updatedAt: thread.updatedAt,
     };
 
-    return { chat, messages: sortedMessages };
+    return { chat, messages: uiMessages };
   } catch (err: unknown) {
     // Re-throw SvelteKit HTTP errors (from error() calls above)
     if (err && typeof err === 'object' && 'status' in err) {

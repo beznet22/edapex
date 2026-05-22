@@ -1,4 +1,37 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
+
+// Mock SvelteKit environment modules (required because sidebar-threads imports mastra → agents → $lib/server/db)
+vi.mock('$env/dynamic/private', () => ({
+	env: {
+		DATABASE_URL: 'mysql://test:test@localhost:3306/test',
+		TOKEN_ENCRYPTION_KEY: 'test-encryption-key-32-chars-ok!',
+		OPENGATEWAY_BASE_URL: 'https://opengateway.example.com/v1',
+	}
+}));
+
+vi.mock('$env/dynamic/public', () => ({
+	env: {
+		PUBLIC_STORAGE_PATH: '/tmp/test-storage'
+	}
+}));
+
+vi.mock('$app/server', () => ({
+	getRequestEvent: () => null
+}));
+
+vi.mock('$app/environment', () => ({
+	dev: true,
+	browser: false
+}));
+
+vi.mock('$lib/components/template/ResultTemplate.svelte', () => ({
+	default: {}
+}));
+
+vi.mock('$lib/components/template/result-email.svelte', () => ({
+	default: {}
+}));
+
 import { groupThreadsByDate, type SidebarThread } from '$lib/components/sidebar-history/sidebar-threads';
 
 function makeThread(id: string, createdAt: Date): SidebarThread {

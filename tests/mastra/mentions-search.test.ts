@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getAllowedCategories, type MentionCategory } from '../../src/routes/api/mentions/search/+server';
+import { getAllowedCategories, type MentionCategory } from '../../src/routes/api/mentions/search/mention-utils';
 
 describe('@Mention Search API', () => {
 	describe('getAllowedCategories', () => {

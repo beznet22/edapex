@@ -1,30 +1,42 @@
+/**
+ * Chat API Route — EdApex
+ *
+ * Implements the Quintui/openchat pattern:
+ * 1. Parse request, build TenantContext
+ * 2. Register per-request EdApexGateway (dynamic credential resolution)
+ * 3. Build RequestContext with model/tools/tenant context
+ * 4. Call handleChatStream → createUIMessageStreamResponse
+ * 5. Thread resolution + title generation via agents/index utilities
+ */
 import { allowAnonymousChats } from "$lib/constants";
 import type { xUIMessage } from "$lib/types/chat-types";
 import { error, type RequestHandler } from "@sveltejs/kit";
 import {
   createUIMessageStream,
   createUIMessageStreamResponse,
-  generateId,
 } from "ai";
-import { toAISdkStream } from "@mastra/ai-sdk";
-import { EdApexGateway } from "$lib/server/mastra/gateway";
+import { handleChatStream } from "@mastra/ai-sdk";
+import { toAISdkV5Messages } from "@mastra/ai-sdk/ui";
 import { createTenantContext, WorkspaceMismatchError } from "$lib/server/mastra/tenant-context";
-import { createMastraDb } from "$lib/server/mastra/db";
-import { env } from "$env/dynamic/private";
 import type { ClassSection } from "$lib/types/result-types";
 import { processMentions, type MentionTag } from "$lib/server/mastra/mention-processor";
 import { TenantContextCache } from "$lib/server/mastra/context-cache";
 import type { FileReference } from "$lib/server/mastra/file-context";
+import { injectFileContext } from "$lib/server/mastra/file-context";
+import { mastra } from "$lib/server/mastra";
+import { EdApexGateway } from "$lib/server/mastra/gateway";
+import { buildRequestContext, resolveThread, generateThreadTitle } from "$lib/server/helpers/chat-helper";
+import { createMastraDb } from "$lib/server/mastra/db";
+import { ModelRouter } from "$lib/server/mastra/router";
+import { env } from "$env/dynamic/private";
 
-// Module-level cache instance persists across requests for session-based caching
+// Module-level cache (singleton)
 const tenantContextCache = new TenantContextCache();
 
 export const POST: RequestHandler = async ({ request, locals: { user, session }, cookies }) => {
-  const mastraDb = createMastraDb();
-  let { chatId, messages, agentId, selectedClass, fileReferences, mentions }: {
-    chatId: string;
+  let { threadId, messages, selectedClass, fileReferences, mentions }: {
+    threadId: string;
     messages: xUIMessage[];
-    agentId: string;
     selectedClass?: ClassSection;
     fileReferences?: FileReference[];
     mentions?: MentionTag[];
@@ -36,32 +48,22 @@ export const POST: RequestHandler = async ({ request, locals: { user, session },
   const selectedChatModel = cookies.get("selected-model");
   if (!selectedChatModel) error(400, "No chat model selected");
 
-  if (!agentId) {
-    agentId = cookies.get("selected-agent") || "";
-  }
-
-  // Generate a thread ID if this is a new conversation.
-  // Mastra memory uses threadId + resourceId for persistence.
-  if (!chatId && messages.length > 0) {
-    chatId = generateId();
-  }
-
   const resourceId = `user-${user.id}`;
-  const message = messages[messages.length - 1];
+
+  // ─── Build Tenant Context ─────────────────────────────────────────────────
 
   const tenantContext = createTenantContext({
-      schoolId: user.schoolId ?? 1,
-      userId: user.id ?? 1,
-      designationId: (user as any).designationId ?? 1,
-      staffId: (user as any).staffId ?? 1,
-      roleId: (user as any).roleId ?? null,
-      classId: selectedClass?.id ?? null,
-      sectionId: selectedClass?.sectionId ?? null,
-      examId: null,
-      academicId: null
+    schoolId: user.schoolId ?? 1,
+    userId: user.id ?? 1,
+    designationId: (user as any).designationId ?? 1,
+    staffId: (user as any).staffId ?? 1,
+    roleId: (user as any).roleId ?? null,
+    classId: selectedClass?.id ?? null,
+    sectionId: selectedClass?.sectionId ?? null,
+    examId: null,
+    academicId: null
   });
 
-  // Process @mention tags to update TenantContext before routing to Gateway
   let activeContext = tenantContext;
   if (mentions && mentions.length > 0) {
     try {
@@ -85,225 +87,144 @@ export const POST: RequestHandler = async ({ request, locals: { user, session },
     }
   }
 
-  const gateway = new EdApexGateway(
-      mastraDb,
-      user.id,
-      env.ENCRYPTION_KEY || '',
-      {
-          OPENAI_API_KEY: env.OPENAI_API_KEY,
-          ANTHROPIC_API_KEY: env.ANTHROPIC_API_KEY,
-          GOOGLE_API_KEY: env.GOOGLE_API_KEY,
-          DEEPSEEK_API_KEY: env.DEEPSEEK_API_KEY,
-          GROQ_API_KEY: env.GROQ_API_KEY,
-          NVIDIA_NIM_API_KEY: env.NVIDIA_NIM_API_KEY,
-          MISTRAL_API_KEY: env.MISTRAL_API_KEY,
-          OPENCODE_API_KEY: env.OPENCODE_API_KEY,
-      }
-  );
+  // ─── Message Augmentation ─────────────────────────────────────────────────
+
+  const lastMessage = messages[messages.length - 1];
+  const promptText = lastMessage.parts?.find((p) => p.type === "text")?.text || "";
+  const workspace = activeContext.classId && activeContext.sectionId
+    ? `${activeContext.classId}_${activeContext.sectionId}`
+    : undefined;
+
+  // Inject file-as-context before routing to assistant
+  let augmentedPrompt = promptText;
+  if (fileReferences?.length && workspace) {
+    const fileContext = await injectFileContext(fileReferences, workspace);
+    if (fileContext) {
+      augmentedPrompt = `${fileContext}\n\n${promptText}`;
+    }
+  }
+
+  // Update the last message's text part with the augmented prompt
+  if (augmentedPrompt !== promptText && lastMessage.parts) {
+    const textPart = lastMessage.parts.find((p) => p.type === "text");
+    if (textPart && 'text' in textPart) {
+      (textPart as any).text = augmentedPrompt;
+    }
+  }
+
+  const mastraDb = createMastraDb();
+  const gateway = new EdApexGateway(mastraDb, user.id);
+  mastra.addGateway(gateway);
+
+  // ─── Build Request Context ────────────────────────────────────────────────
+
+  const isSlashCommand = augmentedPrompt.trim().startsWith('/');
+  const requestContext = await buildRequestContext({
+    context: activeContext,
+    userId: user.id,
+    modelId: selectedChatModel,
+    isSlashCommand,
+    lastMessage: augmentedPrompt,
+    mastraDb,
+  });
 
   const stream = createUIMessageStream<xUIMessage>({
+    originalMessages: messages,
     execute: async ({ writer }) => {
-      // Track open message parts so we can close them on abort (Requirement 22.3)
-      const openParts: { type: 'text' | 'reasoning'; id: string }[] = [];
-
-      // Emit chatId immediately so the client can navigate to /chat/[chatId]
-      // Title will be updated asynchronously via a second data-chat event
-      if (chatId && messages.length === 1) {
-        writer.write({
-          type: "data-chat",
-          id: chatId,
-          data: {
-            id: chatId, title: 'New Chat', model: selectedChatModel, createdAt: new Date(),
-            userId: null,
-            visibility: ""
-          },
-          transient: true,
-        } as any);
-
-        // Generate title asynchronously (non-blocking)
-        const promptText = (message.parts as any)?.find((p: any) => p.type === 'text')?.text || '';
-        gateway.generateTitle(
-          promptText || 'New Chat',
-          activeContext
-        )
-          .then(async (title: string) => {
-            writer.write({
-              type: "data-chat",
-              id: chatId,
-              data: {
-                id: chatId, title, model: selectedChatModel, createdAt: new Date(),
-                userId: null,
-                visibility: ""
-              },
-              transient: true,
-            });
-          })
-          .catch((e) => {
-            console.error('[api/chat] Title generation failed:', e);
-          });
-      }
-
-      const promptText = (message.parts as any)?.find((p: any) => p.type === 'text')?.text || (message as any).content || "";
-      
-      // Construct workspace identifier for file-as-context injection (Requirement 9.4)
-      const workspace = activeContext.classId && activeContext.sectionId
-          ? `${activeContext.classId}_${activeContext.sectionId}`
-          : undefined;
-
       try {
-        const result = await gateway.stream(promptText, activeContext, {
-            threadId: chatId,
-            resourceId,
-            conversationOverride: selectedChatModel,
-            fileReferences: fileReferences?.length ? fileReferences : undefined,
-            workspace,
+        const agent = mastra.getAgent("assistant");
+        const memory = await agent.getMemory();
+        if (!memory) {
+          throw new Error("Memory is not configured for the assistant agent.");
+        }
+
+        // Resolve (get or create) thread — emits data-new-thread-created if new
+        const { thread, isNew } = await resolveThread(
+          memory,
+          threadId,
+          resourceId,
+          writer,
+        );
+
+        // Stream via handleChatStream — the core of the openchat pattern
+        const chatStream = await handleChatStream<xUIMessage>({
+          version: 'v6',
+          mastra,
+          agentId: agent.id,
+          params: {
+            messages,
+            maxSteps: 20,
+            requestContext,
             abortSignal: request.signal,
-            onStepFinish: (step) => {
-                if (step.toolCalls && step.toolCalls.length > 0) {
-                    for (const call of step.toolCalls) {
-                        writer.write({
-                            type: "data-workflow",
-                            data: { tool: call.toolName, args: call.args }
-                        } as any);
-                    }
-                }
+            memory: {
+              thread,
+              resource: resourceId,
+            },
+            onFinish: async ({ text }) => {
+              if (!isNew) return;
+              try {
+                await generateThreadTitle(
+                  user.id,
+                  memory,
+                  threadId,
+                  text,
+                  writer,
+                );
+              } catch (err) {
+                console.error("Failed to generate thread title:", err);
+              }
+            },
+          },
+          sendReasoning: true,
+          sendSources: true,
+          sendStart: false,
+          onError: (e) => {
+            const msg = e instanceof Error ? e.message : String(e);
+            if (msg.includes('AbortError') || msg.includes('aborted')) {
+              return "Generation stopped.";
             }
+            console.error(`[api/chat] Error: ${msg}`);
+            return "Oops! Something went wrong.";
+          },
         });
-        
-        if ('rejected' in result && result.rejected) {
-            // Emit confirmation chunk if the gateway provides structured confirmation data
-            const gatewayResult = result as any;
-            if (gatewayResult.confirmation) {
-                writer.write({
-                    type: "data-confirmation",
-                    data: gatewayResult.confirmation
-                } as any);
-            }
 
-            // Manual streaming for rejected responses (confidence gate async generator)
-            const rejectPartId = generateId();
-            openParts.push({ type: 'text', id: rejectPartId });
-            writer.write({ type: "text-start", id: rejectPartId } as any);
-            for await (const chunk of result.textStream as AsyncIterable<string>) {
-                writer.write({ type: "text-delta", id: rejectPartId, delta: chunk } as any);
-            }
-            writer.write({ type: "text-end", id: rejectPartId } as any);
-            openParts.pop();
-            writer.write({ type: "finish", finishReason: "stop" } as any);
-            return;
-        }
-
-        // Use toAISdkStream — the official Mastra adapter for AI SDK v5+ format.
-        // This is the documented pattern from https://mastra.ai/reference/streaming/agents/stream
-        const chatStream = toAISdkStream(result as any, {
-            from: 'agent',
-            sendReasoning: true,
-            sendSources: true,
-        });
+        // Merge the Mastra chat stream into the UI message stream
         writer.merge(chatStream as any);
-
-        // Manual message persistence — Mastra's auto-persistence in the supervisor
-        // pattern doesn't reliably fire with dynamic per-request agents.
-        // We persist explicitly after the stream completes to ensure messages
-        // survive page refreshes.
-        if (chatId && !request.signal.aborted) {
-            (async () => {
-                try {
-                    const { createMastraStorage, ensureStorageInitialized } = await import("$lib/server/mastra/storage");
-                    await ensureStorageInitialized();
-                    const persistStorage = createMastraStorage();
-                    const memoryStore = await persistStorage.getStore('memory');
-                    if (!memoryStore) return;
-
-                    // Wait for the assistant's full text to be available
-                    let assistantText = '';
-                    try {
-                        assistantText = await result.text;
-                    } catch {
-                        return; // Aborted or errored — skip persistence
-                    }
-                    if (!assistantText) return;
-
-                    // Ensure thread exists
-                    let thread = await memoryStore.getThreadById({ threadId: chatId });
-                    if (!thread) {
-                        thread = await memoryStore.saveThread({
-                            thread: {
-                                id: chatId,
-                                resourceId,
-                                title: 'New Chat',
-                                metadata: { model: selectedChatModel, visibility: 'private' },
-                                createdAt: new Date(),
-                                updatedAt: new Date(),
-                            }
-                        });
-                    }
-
-                    // Save user + assistant messages
-                    await memoryStore.saveMessages({
-                        messages: [
-                            {
-                                id: generateId(),
-                                type: 'text',
-                                role: 'user',
-                                content: { parts: [{ type: 'text', text: promptText }], format: 2 },
-                                createdAt: new Date(),
-                                threadId: chatId,
-                                resourceId,
-                            } as any,
-                            {
-                                id: generateId(),
-                                type: 'text',
-                                role: 'assistant',
-                                content: { parts: [{ type: 'text', text: assistantText }], format: 2 },
-                                createdAt: new Date(Date.now() + 1),
-                                threadId: chatId,
-                                resourceId,
-                            } as any
-                        ]
-                    });
-                } catch (persistErr) {
-                    console.error('[api/chat] Manual persistence failed:', persistErr);
-                }
-            })();
-        }
-      } catch (e: unknown) {
-        // AbortSignal propagation (Requirements 22.1, 22.2, 22.3, 22.4)
-        // When the client clicks stop, request.signal fires and the stream aborts.
-        // We close any open message parts and emit a clean finish event.
-        // Mastra Memory does NOT persist partial messages because the agent stream
-        // was cancelled before completion (native abort behavior).
-        const isAbort = (e instanceof Error && e.name === 'AbortError') ||
-                        (e instanceof DOMException && e.name === 'AbortError') ||
-                        request.signal.aborted;
-
-        if (isAbort) {
-          // Close any open message parts so the UI transitions out of loading state
-          for (const part of openParts) {
-            const endType = part.type === 'text' ? 'text-end' : 'reasoning-end';
-            writer.write({ type: endType, id: part.id } as any);
-          }
-          openParts.length = 0;
-
-          // Emit finish with finishReason: "stop" so the client knows the stream ended cleanly
-          writer.write({ type: "finish", finishReason: "stop" } as any);
-          return;
-        }
-
-        // Re-throw non-abort errors to be handled by onError
-        throw e;
+      } catch (err) {
+        console.error("Chat stream error:", err);
+        throw err;
       }
-    },
-    onError: (e) => {
-      const msg = e instanceof Error ? e.message : String(e);
-      // Don't log abort errors — they are expected user-initiated cancellations
-      if (msg.includes('AbortError') || msg.includes('aborted')) {
-        return "Generation stopped.";
-      }
-      console.error(`[api/chat] Error: ${msg}`);
-      return "Oops! Something went wrong.";
     },
   });
 
   return createUIMessageStreamResponse({ stream });
+};
+
+/**
+ * GET handler for history hydration.
+ * When the client navigates to `/chat/[chatId]`, this endpoint returns
+ * the persisted messages in AI SDK v5 format for UI hydration.
+ *
+ * Uses the static assistant agent's Memory instance — the same instance
+ * that auto-persists messages during streaming.
+ */
+export const GET: RequestHandler = async ({ url, locals: { user } }) => {
+  if (!user) error(401, 'Unauthorized');
+
+  const chatId = url.searchParams.get('chatId');
+  if (!chatId) error(400, 'Missing chatId');
+
+  const resourceId = `user-${user.id}`;
+  const assistant = mastra.getAgent('assistant');
+  const memory = await assistant.getMemory();
+
+  let response = null;
+  try {
+    response = await memory?.recall({ threadId: chatId, resourceId });
+  } catch {
+    console.log('No previous messages found.');
+  }
+
+  const uiMessages = toAISdkV5Messages(response?.messages || []);
+  return Response.json(uiMessages);
 };

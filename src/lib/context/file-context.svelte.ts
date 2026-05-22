@@ -8,7 +8,7 @@ import { doExtraction } from "$lib/api/assessment.remote";
 import type { ClassSection } from "$lib/types/result-types";
 import { page } from "$app/state";
 import { goto, replaceState } from "$app/navigation";
-import { localStore } from "$lib/utils";
+import { localStore } from "$lib/utils/index";
 import { getResources } from "$lib/api/chat.remote";
 
 import { SelectedClass } from "./sync.svelte";

@@ -61,7 +61,8 @@
         <div
           class="flex w-full flex-row items-center justify-center gap-2 px-2 text-sm text-zinc-500"
         >
-          No previous conversations yet. Start chatting to see your history here.
+          No previous conversations yet. Start chatting to see your history
+          here.
         </div>
       </SidebarGroupContent>
     </SidebarGroup>
@@ -75,12 +76,12 @@
                 <div class="text-sidebar-foreground/50 px-2 py-1 text-xs">
                   {chatGroupTitles[group as keyof typeof chatGroupTitles]}
                 </div>
-                {#each chats as chat (chat.id)}
+                {#each chats as chat (chat.threadId)}
                   <ChatItem
                     {chat}
-                    active={chat.id === page.params.chatId}
-                    ondelete={(chatId) => {
-                      chatIdToDelete = chatId;
+                    active={chat.threadId === page.params.chatId}
+                    ondelete={(threadId) => {
+                      chatIdToDelete = threadId;
                       chatHistory.alertDialogOpen = true;
                     }}
                   />
@@ -92,7 +93,9 @@
       </SidebarGroupContent>
     </SidebarGroup>
     <AlertDialog.Root bind:open={chatHistory.alertDialogOpen}>
-      <AlertDialog.Content class="bg-background/95 backdrop-blur-3xl border border-white/10 rounded-[2.5rem] p-8 shadow-2xl max-w-[calc(100%-1.5rem)] sm:max-w-md">
+      <AlertDialog.Content
+        class="bg-background/95 backdrop-blur-3xl border border-white/10 rounded-[2.5rem] p-8 shadow-2xl max-w-[calc(100%-1.5rem)] sm:max-w-md"
+      >
         <AlertDialog.Header>
           <AlertDialog.Title>Are you absolutely sure?</AlertDialog.Title>
           <AlertDialog.Description>
@@ -104,8 +107,9 @@
           <AlertDialog.Cancel>Cancel</AlertDialog.Cancel>
           <AlertDialog.Action
             onclick={() => chatHistory.deleteChat(chatIdToDelete)}
-            >Continue</AlertDialog.Action
           >
+            Continue
+          </AlertDialog.Action>
         </AlertDialog.Footer>
       </AlertDialog.Content>
     </AlertDialog.Root>

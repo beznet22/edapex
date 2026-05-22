@@ -40,3 +40,5 @@ hermes-webui/
 *.db-wal
 .workspaces
 temp_dir/
+basic-ai-editor/
+.kiro

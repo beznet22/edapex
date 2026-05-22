@@ -34,9 +34,16 @@
       class="h-8 w-8 shrink-0 text-muted-foreground hover:text-foreground"
     />
     <div class="flex items-center gap-2 min-w-0 overflow-hidden">
-      <h2 class="text-sm font-semibold tracking-tight text-white/90">Edapex AI</h2>
+      <a
+        href="/"
+        class="text-sm font-semibold tracking-tight text-white/90 hover:text-white transition-colors"
+        >Edapex AI</a
+      >
       {#if !chat?.title}
-        <span class="text-[10px] uppercase tracking-widest text-white/30 font-bold ml-1 hidden sm:inline">New conversation</span>
+        <span
+          class="text-[10px] uppercase tracking-widest text-white/30 font-bold ml-1 hidden sm:inline"
+          >New conversation</span
+        >
       {:else}
         <span class="text-xs text-white/40 truncate ml-1">{chat.title}</span>
       {/if}
@@ -44,17 +51,13 @@
   </div>
 
   <div class="flex items-center gap-2 shrink-0">
-     <Button 
-       variant="outline" 
-       size="sm" 
-       class="h-8 px-3 gap-2 border-white/10 bg-white/5 hover:bg-white/10 text-xs font-medium rounded-lg transition-all group"
-       onclick={onToggleInspector}
-     >
-       <FolderIcon class="size-3.5 opacity-60 group-hover:opacity-100" />
-       <span>Files</span>
-     </Button>
-     <Button variant="ghost" size="icon" class="size-8 rounded-lg text-white/40 hover:text-white">
-       <LayoutPanelLeftIcon class="size-4" />
-     </Button>
+    <Button
+      variant="outline"
+      size="sm"
+      class="h-8 px-3 gap-2 border-white/10 bg-white/5 hover:bg-white/10 text-xs font-medium rounded-lg transition-all group"
+      onclick={onToggleInspector}
+    >
+      <LayoutPanelLeftIcon class="size-4" />
+    </Button>
   </div>
 </header>

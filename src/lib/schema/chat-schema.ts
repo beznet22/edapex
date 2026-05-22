@@ -1,7 +1,7 @@
 import type { Provider } from "ai";
 import { z } from "zod";
 
-export const chatVisibilitySchema = z.enum(["private", "public"]);
+export const chatVisibilitySchema = z.enum(["PUBLIC", "PRIVATE", "SHARED"]);
 export type ChatVisibility = z.infer<typeof chatVisibilitySchema>;
 
 export const chatTypeSchema = z.enum(["chat", "voice", "image", "video"]);

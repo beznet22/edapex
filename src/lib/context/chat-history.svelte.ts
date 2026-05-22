@@ -2,7 +2,7 @@ import { goto } from "$app/navigation";
 import { page } from "$app/state";
 import { deleteChat, getHistory, updateVisibility } from "$lib/api/chat.remote";
 import type { ChatVisibility } from "$lib/schema/chat-schema";
-import type { DBChat } from "$lib/types/chat-types";
+import type { ChatThread } from "$lib/types/chat-types";
 import { isToday, isYesterday, subMonths, subWeeks } from "date-fns";
 import { getContext, setContext } from "svelte";
 import { toast } from "svelte-sonner";
@@ -10,17 +10,17 @@ import { toast } from "svelte-sonner";
 const contextKey = Symbol("ChatHistory");
 
 type GroupedChats = {
-  today: DBChat[];
-  yesterday: DBChat[];
-  lastWeek: DBChat[];
-  lastMonth: DBChat[];
-  older: DBChat[];
+  today: ChatThread[];
+  yesterday: ChatThread[];
+  lastWeek: ChatThread[];
+  lastMonth: ChatThread[];
+  older: ChatThread[];
 };
 
 export class ChatHistory {
   #loading = $state(false);
   #revalidating = $state(false);
-  chats = $state<DBChat[]>([]);
+  chats = $state<ChatThread[]>([]);
   alertDialogOpen = $state(false);
 
   get loading() {
@@ -31,16 +31,16 @@ export class ChatHistory {
     return this.#revalidating;
   }
 
-  constructor(chatsInput: DBChat[] | Promise<DBChat[]>) {
+  constructor(chatsInput: ChatThread[] | Promise<ChatThread[]>) {
     this.rehydrate(chatsInput);
   }
 
-  rehydrate(chatsInput: DBChat[] | Promise<DBChat[]>) {
+  rehydrate(chatsInput: ChatThread[] | Promise<ChatThread[]>) {
     this.#loading = true;
     this.#revalidating = true;
     
     if (chatsInput && typeof (chatsInput as any).then === "function") {
-      const fetchPromise = chatsInput as Promise<DBChat[]>;
+      const fetchPromise = chatsInput as Promise<ChatThread[]>;
       
       // 10s timeout — fall back to empty state on storage error or timeout (Req 24.7)
       const timeoutPromise = new Promise<null>((_, reject) =>
@@ -49,7 +49,7 @@ export class ChatHistory {
 
       Promise.race([fetchPromise, timeoutPromise])
         .then((chats) => {
-          this.chats = (chats as DBChat[]) || [];
+          this.chats = (chats as ChatThread[]) || [];
         })
         .catch(() => {
           // Fall back to empty state on error or timeout — don't show error to user
@@ -59,14 +59,14 @@ export class ChatHistory {
           this.#loading = false;
           this.#revalidating = false;
         });
-    } else {
-      this.chats = (chatsInput as DBChat[]) || [];
+    } else {  
+      this.chats = (chatsInput as ChatThread[]) || [];
       this.#loading = false;
       this.#revalidating = false;
     }
   }
 
-  groupChatsByDate(chats: DBChat[]): GroupedChats {
+  groupChatsByDate(chats: ChatThread[]): GroupedChats {
     const now = new Date();
     const oneWeekAgo = subWeeks(now, 1);
     const oneMonthAgo = subMonths(now, 1);
@@ -99,43 +99,47 @@ export class ChatHistory {
     );
   }
 
-  async deleteChat(chatId?: string) {
-    if (!chatId) return;
+  async deleteChat(threadId?: string) {
+    if (!threadId) return;
 
     // Optimistic UI update for immediate reactivity
     const previousChats = this.chats;
-    this.chats = this.chats.filter((chat) => chat.id !== chatId);
+    this.chats = this.chats.filter((chat) => chat.threadId !== threadId);   
     this.alertDialogOpen = false;
 
-    if (chatId === page.params.chatId) {
+    if (threadId === page.params.chatId) {
       goto("/");
     }
 
-    const deletePromise = deleteChat({ chatId });
+    const deletePromise = deleteChat({ threadId }).then((res) => {
+      if (!res.success) throw new Error(res.message || "Failed to delete chat");
+      return res;
+    });
+
     toast.promise(deletePromise, {
       loading: "Deleting chat...",
       success: () => {
         this.refetch();
         return "Chat deleted successfully";
       },
-      error: () => {
+      error: (err: any) => {
         // Revert optimistic update on error
         this.chats = previousChats;
-        return "Failed to delete chat";
+        return err.message || "Failed to delete chat";
       },
     });
   }
 
-  getChatDetails = (chatId: string) => {
-    return this.chats.find((c) => c.id === chatId);
+  getChatDetails = (threadId: string) => {
+    return this.chats.find((c) => c.threadId === threadId);
   };
 
-  updateVisibility = async (chatId: string, visibility: ChatVisibility) => {
-    const chat = this.chats.find((c) => c.id === chatId);
+  updateVisibility = async (threadId: string, visibility: ChatVisibility) => {
+    const chat = this.chats.find((c) => c.threadId === threadId);
     if (chat) {
       chat.visibility = visibility;
     }
-    const res = await updateVisibility({ chatId, visibility });
+    const res = await updateVisibility({ threadId, visibility });
     if (!res.success) {
       toast.error("Failed to update chat visibility");
       // try reloading data from source in case another competing mutation caused an issue
@@ -153,10 +157,12 @@ export class ChatHistory {
       const timeoutPromise = new Promise<null>((_, reject) =>
         setTimeout(() => reject(new Error('Storage timeout')), 10000)
       );
-      const chats = await Promise.race([getHistory({}), timeoutPromise]);
-      if (!chats) return;
-      this.chats = chats as DBChat[];
-    } catch {
+      const threads = await Promise.race([getHistory({}).run(), timeoutPromise]);
+      console.log(threads)
+      if (!threads) return;
+      this.chats = threads
+    } catch (err) {
+      console.error("[ChatHistory] refetch failed:", err);
       // Fall back to empty state on error or timeout (Req 24.7)
       this.chats = [];
     } finally {
@@ -164,8 +170,9 @@ export class ChatHistory {
     }
   }
 
-  addChat(chat: DBChat) {
-    this.chats = [chat, ...this.chats];
+  addChat(thread: ChatThread) {
+    // Add new thread to top of list
+    this.chats = [thread, ...this.chats];
   }
 
   /**
@@ -173,14 +180,14 @@ export class ChatHistory {
    * - If the thread ID is NOT in the list → prepend to top (length +1)
    * - If the thread ID IS already in the list → update title in place (no duplicate, same length)
    */
-  upsertChat(chat: DBChat) {
-    const existingIndex = this.chats.findIndex((c) => c.id === chat.id);
+  upsertChat(thread: ChatThread) {
+    const existingIndex = this.chats.findIndex((c) => c.threadId === thread.threadId);
     if (existingIndex === -1) {
       // New thread: prepend to top
-      this.chats = [chat, ...this.chats];
+      this.chats = [thread, ...this.chats];
     } else {
       // Existing thread: update title in place
-      this.chats[existingIndex] = { ...this.chats[existingIndex], title: chat.title };
+      this.chats[existingIndex] = { ...this.chats[existingIndex], title: thread.title };
     }
   }
 

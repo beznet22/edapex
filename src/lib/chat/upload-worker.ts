@@ -71,7 +71,7 @@ self.onmessage = async function (e) {
         const errData = await response.json();
         if (errData.message) errMsg = errData.message;
         else if (errData.error) errMsg = errData.error;
-      } catch (e) {}
+      } catch (e) { }
       throw new Error(errMsg);
     }
 

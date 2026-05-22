@@ -15,7 +15,7 @@ vi.mock('$lib/server/storage/files', () => ({
 	}
 }));
 
-import { signShareToken, verifyShareToken } from '../../src/routes/api/file/share/+server';
+import { signShareToken, verifyShareToken } from '../../src/routes/api/file/share/share-utils';
 
 describe('File Share API', () => {
 	describe('signShareToken', () => {

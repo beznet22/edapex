@@ -36,7 +36,10 @@ export type TaskType =
 	| 'video-gen'
 	| 'audio-gen';
 
-export class AgentRouter {
+/** @deprecated Use `ModelRouter` instead */
+export type AgentRouter = ModelRouter;
+
+export class ModelRouter {
 	static readonly BASE_URLS: Record<string, string> = {
 		nvidia_nim: 'https://integrate.api.nvidia.com/v1',
 		groq: 'https://api.groq.com/openai/v1',
@@ -68,7 +71,7 @@ export class AgentRouter {
 			if (model) {
 				return {
 					provider: model.provider,
-					model: model.id,
+					model: model.apiName,
 					capabilities: model.capabilities
 				};
 			}
@@ -94,7 +97,7 @@ export class AgentRouter {
 			if (model) {
 				return {
 					provider: model.provider,
-					model: model.id,
+					model: model.apiName,
 					capabilities: model.capabilities
 				};
 			}
@@ -164,7 +167,7 @@ export class AgentRouter {
 				});
 				resolved = {
 					provider: sorted[0].provider,
-					model: sorted[0].id,
+					model: sorted[0].apiName,
 					capabilities: sorted[0].capabilities,
 				};
 			} else {
@@ -230,7 +233,7 @@ export class AgentRouter {
 		if (sorted[0]) {
 			return {
 				provider: sorted[0].provider,
-				model: sorted[0].id,
+				model: sorted[0].apiName,
 				capabilities: sorted[0].capabilities
 			};
 		}
@@ -238,7 +241,7 @@ export class AgentRouter {
 		// Tier 6: Global Fallback (Last Resort)
 		return {
 			provider: 'opengateway',
-			model: 'opengateway/mimo-v2-flash'
+			model: 'mimo-v2-flash'
 		};
 	}
 
@@ -259,7 +262,7 @@ export class AgentRouter {
 		if (reasoningModels[0]) {
 			return {
 				provider: reasoningModels[0].provider,
-				model: reasoningModels[0].id,
+				model: reasoningModels[0].apiName,
 				capabilities: reasoningModels[0].capabilities
 			};
 		}
