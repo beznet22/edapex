@@ -8,13 +8,13 @@
   } = $props();
 </script>
 
-<div class="flex items-center gap-0.5 bg-secondary/50 rounded-lg p-0.5 border border-border/30">
+<div class="flex items-center gap-0.5 bg-slate-950/80 backdrop-blur-xl rounded-full p-1 border border-white/10 shadow-[0_4px_20px_rgba(0,0,0,0.5)]">
   <button
     class={cn(
-      "px-2.5 py-1 rounded-md text-[9px] font-black uppercase tracking-[0.15em] transition-all duration-200",
+      "px-3 py-1.5 rounded-full text-[9px] font-black uppercase tracking-[0.15em] transition-all duration-200",
       mode === "wysiwyg"
-        ? "bg-primary/15 text-primary border border-primary/20 shadow-sm"
-        : "text-muted-foreground hover:text-foreground/70"
+        ? "bg-primary/20 text-primary shadow-sm"
+        : "text-white/40 hover:text-white/70"
     )}
     onclick={() => mode = "wysiwyg"}
   >
@@ -22,10 +22,10 @@
   </button>
   <button
     class={cn(
-      "px-2.5 py-1 rounded-md text-[9px] font-black uppercase tracking-[0.15em] transition-all duration-200",
+      "px-3 py-1.5 rounded-full text-[9px] font-black uppercase tracking-[0.15em] transition-all duration-200",
       mode === "raw"
-        ? "bg-primary/15 text-primary border border-primary/20 shadow-sm"
-        : "text-muted-foreground hover:text-foreground/70"
+        ? "bg-primary/20 text-primary shadow-sm"
+        : "text-white/40 hover:text-white/70"
     )}
     onclick={() => mode = "raw"}
   >

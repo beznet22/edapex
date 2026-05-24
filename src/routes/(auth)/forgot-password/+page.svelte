@@ -28,7 +28,7 @@
   ></div>
 
   <!-- Micro-Dithering -->
-  <div class="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-[0.03] dark:opacity-[0.08] mix-blend-overlay pointer-events-none"></div>
+  <div class="absolute inset-0 opacity-[0.03] dark:opacity-[0.08] mix-blend-overlay pointer-events-none"></div>
 </div>
 
 <div

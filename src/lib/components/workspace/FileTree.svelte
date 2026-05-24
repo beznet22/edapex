@@ -22,6 +22,8 @@
   import FolderPlusIcon from "@lucide/svelte/icons/folder-plus";
   import CheckIcon from "@lucide/svelte/icons/check";
   import Share2Icon from "@lucide/svelte/icons/share-2";
+  import ChevronRightIcon from "@lucide/svelte/icons/chevron-right";
+  import PinIcon from "@lucide/svelte/icons/pin";
   import { toast } from "svelte-sonner";
 
   interface FileEntry {
@@ -135,7 +137,7 @@
   }
 
   function formatRelativeTime(dateStr?: string) {
-    if (!dateStr) return "Just now";
+    if (!dateStr) return "now";
     const date = new Date(dateStr);
     const now = new Date();
     const diff = now.getTime() - date.getTime();
@@ -143,10 +145,10 @@
     const hours = Math.floor(mins / 60);
     const days = Math.floor(hours / 24);
 
-    if (days > 0) return `${days} day${days > 1 ? 's' : ''} ago`;
-    if (hours > 0) return `${hours} hour${hours > 1 ? 's' : ''} ago`;
-    if (mins > 0) return `${mins} min${mins > 1 ? 's' : ''} ago`;
-    return "Just now";
+    if (days > 0) return `${days}d`;
+    if (hours > 0) return `${hours}h`;
+    if (mins > 0) return `${mins}m`;
+    return "now";
   }
 
   function focusAction(node: HTMLInputElement) {
@@ -190,7 +192,7 @@
 {#snippet inlineInput(parentPath: string, depth: number)}
   <div class="flex flex-col w-full pr-2 py-px">
     <div class="flex items-center">
-      <div style="width: {depth * 20 + 20}px" class="shrink-0"></div>
+      <div style="width: {depth * 12 + 12}px" class="shrink-0 transition-all duration-300"></div>
       <div class={cn("flex-1 flex items-center gap-2 pl-1 pr-2 py-0.5 rounded-lg bg-white/10 border", inlineError ? "border-destructive/60" : "border-primary/30")}>
         {#if nameInputState?.type === "dir"}
           <FolderPlusIcon class="size-[14px] opacity-60 text-primary" />
@@ -215,7 +217,7 @@
     </div>
     {#if inlineError}
       <div class="flex items-center">
-        <div style="width: {depth * 20 + 20}px" class="shrink-0"></div>
+        <div style="width: {depth * 12 + 12}px" class="shrink-0 transition-all duration-300"></div>
         <p class="text-[10px] text-destructive font-medium mt-0.5 pl-1">{inlineError}</p>
       </div>
     {/if}
@@ -231,75 +233,67 @@
     {@render inlineInput(parentPath, depth)}
   {:else if entry.type === "dir"}
     <Collapsible.Root open={isExpanded} onOpenChange={(v) => { if (v !== isExpanded) onToggleDir(fullPath) }}>
-      <div class="flex w-full items-center pr-2 py-px">
-        <div style="width: {depth * 20 + 4}px" class="shrink-0 flex items-center justify-end pr-1.5 opacity-60 pointer-events-none">
-          {#if isExpanded}
-            <div class="w-1.5 h-1.5 bg-current shadow-sm" style="clip-path: polygon(0 0, 100% 0, 50% 100%);"></div>
-          {:else}
-            <div class="w-1.5 h-1.5 bg-current shadow-sm" style="clip-path: polygon(0 0, 0 100%, 100% 50%);"></div>
-          {/if}
-        </div>
-        
-        <Collapsible.Trigger>
+      <div class="flex w-full items-center min-w-0">
+        <Collapsible.Trigger class="w-full min-w-0 text-left">
           {#snippet child({ props: triggerProps })}
             <div 
               role="button"
               tabindex={0}
               {...triggerProps}
               class={cn(
-                "flex-1 min-w-0 flex items-center gap-2 pl-1 pr-1 py-0.5 rounded-lg group transition-colors cursor-pointer text-left focus:outline-none focus:bg-white/5",
-                activeDirKey === fullPath ? 'bg-white/10' : 'hover:bg-white/5'
+                "flex-1 min-w-0 flex items-center gap-1.5 pr-1 py-0.5 rounded-md group transition-all duration-300 hover:bg-white/5 cursor-pointer text-left focus:outline-none focus:bg-white/5 relative overflow-hidden"
               )}
             >
-        <FolderIcon class="size-[15px] shrink-0 opacity-70 stroke-[1.5]" />
-        <span class="flex-1 truncate text-[0.8125rem] font-medium tracking-wide opacity-90 group-hover:text-foreground group-hover:opacity-100 transition-colors duration-200 text-left text-muted-foreground">{entry.name}</span>
+              <div style="width: {depth * 8}px" class="shrink-0 transition-all duration-300"></div>
+              <ChevronRightIcon class={cn("size-3.5 shrink-0 opacity-50 transition-transform duration-200", isExpanded && "rotate-90")} />
+              <FolderIcon class={cn("size-[15px] shrink-0 opacity-70 stroke-[1.5]", activeDirKey === fullPath ? 'text-primary opacity-100' : '')} />
+              <span class={cn("flex-1 text-[0.85rem] tracking-wide transition-colors duration-200 text-left truncate leading-tight block min-w-0 pr-6", activeDirKey === fullPath ? 'text-primary font-semibold opacity-100' : 'opacity-80 font-medium text-muted-foreground group-hover:opacity-100 group-hover:text-foreground')}>{entry.name}</span>
         
-        <Button
-          variant="ghost"
-          size="icon"
-          class={cn(
-            "size-6 rounded-full hover:bg-primary/20 transition-all flex items-center justify-center shrink-0 cursor-pointer",
-            isEntryReferenced(entry.key) ? "opacity-100!" : "opacity-0 group-hover:opacity-100!"
-          )}
-          onclick={(e) => { e.stopPropagation(); handleToggleReference(entry); }}
-        >
-          <MessageSquarePlusIcon class={cn("size-3.5", isEntryReferenced(entry.key) ? "text-primary" : "text-white/50 hover:text-white")} />
-        </Button>
+              <div class="flex items-center gap-0.5 opacity-0 group-hover:opacity-100! absolute right-1 transition-opacity bg-background/70 backdrop-blur-md rounded-md pl-1">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  class="size-6 rounded-md hover:bg-white/10 transition-all flex items-center justify-center shrink-0 cursor-pointer"
+                  onclick={(e) => { e.stopPropagation(); handleToggleReference(entry); }}
+                >
+                  <MessageSquarePlusIcon class={cn("size-3.5", isEntryReferenced(entry.key) ? "text-primary" : "text-white/50 hover:text-white")} />
+                </Button>
 
-        <DropdownMenu.Root>
-          <DropdownMenu.Trigger>
-            {#snippet child({ props })}
-              <Button
-                variant="ghost"
-                size="icon"
-                {...props}
-                class="size-6 rounded-full opacity-0 group-hover:opacity-100! hover:bg-white/10 transition-all flex items-center justify-center shrink-0 cursor-pointer"
-                onclick={(e) => { e.stopPropagation(); }}
-              >
-                <MoreVerticalIcon class="size-3.5 text-white/50 hover:text-white" />
-              </Button>
-            {/snippet}
-          </DropdownMenu.Trigger>
-          <DropdownMenu.Content align="end" class="bg-slate-950/90 backdrop-blur-xl border-white/10 rounded-xl p-1 shadow-2xl min-w-[150px]">
-            <DropdownMenu.Item class="rounded-lg text-[10px] font-bold uppercase tracking-tight gap-2 focus:bg-white/10 transition-all h-9" onclick={() => onCopyPathToClipboard(entry)}>
-              <CopyIcon class="size-3.5 opacity-40" />
-              Copy Path
-            </DropdownMenu.Item>
-            <DropdownMenu.Item class="rounded-lg text-[10px] font-bold uppercase tracking-tight gap-2 focus:bg-white/10 transition-all h-9" onclick={() => onStartRename(entry, parentPath)}>
-              <PencilIcon class="size-3.5 opacity-40" />
-              Rename
-            </DropdownMenu.Item>
-            <DropdownMenu.Item class="rounded-lg text-[10px] font-bold uppercase tracking-tight gap-2 focus:bg-white/10 transition-all h-9" onclick={() => onTriggerExtract(entry)}>
-              <ZapIcon class="size-3.5 opacity-40" />
-              Extract
-            </DropdownMenu.Item>
-            <DropdownMenu.Separator class="bg-white/5 my-1" />
-            <DropdownMenu.Item class="rounded-lg text-[10px] font-bold uppercase tracking-tight gap-2 focus:bg-destructive/20 focus:text-destructive transition-all h-9" onclick={() => onDeleteFile(entry)}>
-              <TrashIcon class="size-3.5 opacity-40" />
-              Delete Folder
-            </DropdownMenu.Item>
-          </DropdownMenu.Content>
-        </DropdownMenu.Root>
+                <DropdownMenu.Root>
+                  <DropdownMenu.Trigger>
+                    {#snippet child({ props })}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        {...props}
+                        class="size-6 rounded-md hover:bg-white/10 transition-all flex items-center justify-center shrink-0 cursor-pointer"
+                        onclick={(e) => { e.stopPropagation(); }}
+                      >
+                        <MoreVerticalIcon class="size-3.5 text-white/50 hover:text-white" />
+                      </Button>
+                    {/snippet}
+                  </DropdownMenu.Trigger>
+                  <DropdownMenu.Content align="end" class="bg-slate-950/90 backdrop-blur-xl border-white/10 rounded-xl p-1 shadow-2xl min-w-[150px]">
+                    <DropdownMenu.Item class="rounded-lg text-[10px] font-bold uppercase tracking-tight gap-2 focus:bg-white/10 transition-all h-9" onclick={() => onCopyPathToClipboard(entry)}>
+                      <CopyIcon class="size-3.5 opacity-40" />
+                      Copy Path
+                    </DropdownMenu.Item>
+                    <DropdownMenu.Item class="rounded-lg text-[10px] font-bold uppercase tracking-tight gap-2 focus:bg-white/10 transition-all h-9" onclick={() => onStartRename(entry, parentPath)}>
+                      <PencilIcon class="size-3.5 opacity-40" />
+                      Rename
+                    </DropdownMenu.Item>
+                    <DropdownMenu.Item class="rounded-lg text-[10px] font-bold uppercase tracking-tight gap-2 focus:bg-white/10 transition-all h-9" onclick={() => onTriggerExtract(entry)}>
+                      <ZapIcon class="size-3.5 opacity-40" />
+                      Extract
+                    </DropdownMenu.Item>
+                    <DropdownMenu.Separator class="bg-white/5 my-1" />
+                    <DropdownMenu.Item class="rounded-lg text-[10px] font-bold uppercase tracking-tight gap-2 focus:bg-destructive/20 focus:text-destructive transition-all h-9" onclick={() => onDeleteFile(entry)}>
+                      <TrashIcon class="size-3.5 opacity-40" />
+                      Delete Folder
+                    </DropdownMenu.Item>
+                  </DropdownMenu.Content>
+                </DropdownMenu.Root>
+              </div>
             </div>
           {/snippet}
         </Collapsible.Trigger>
@@ -321,49 +315,38 @@
     <Tooltip.Root>
       <Tooltip.Trigger>
         {#snippet child({ props: tooltipProps })}
-          <div class="flex w-full items-center pr-2 py-px" {...tooltipProps}>
-            <div style="width: {depth * 20 + 20}px" class="shrink-0"></div>
+          <div class="flex w-full items-center min-w-0" {...tooltipProps}>
+            <div style="width: {depth * 8 + 8}px" class="shrink-0 transition-all duration-300"></div>
             <div 
               role="button"
               tabindex={0}
               class={cn(
-                "flex-1 min-w-0 flex items-center gap-2 pl-1.5 pr-1 py-0.5 rounded-lg group/file transition-colors duration-200 cursor-pointer text-left focus:outline-none focus:bg-white/5 flex-nowrap",
-                activeFileKey === entry.key ? 'bg-white/10' : 'hover:bg-white/5'
+                "flex-1 min-w-0 flex items-center gap-1.5 pr-1 py-0.5 rounded-md group/file transition-all duration-300 hover:bg-white/5 cursor-pointer text-left focus:outline-none focus:bg-white/5 flex-nowrap relative overflow-hidden",
+                activeFileKey === entry.key ? 'bg-white/10' : ''
               )}
               onclick={() => onFileClick(entry)}
               onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') onFileClick(entry) }}
             >
               <Icon class={cn("size-[14px] shrink-0 opacity-60 stroke-[1.5]", activeFileKey === entry.key ? 'text-primary opacity-100' : '')} />
-              <span class={cn("flex-1 truncate text-[0.8125rem] tracking-wide", activeFileKey === entry.key ? 'text-foreground font-semibold opacity-100' : 'opacity-90 font-medium text-muted-foreground group-hover/file:text-foreground group-hover/file:opacity-100 transition-colors duration-200')}>
+              <span class={cn("flex-1 text-[0.85rem] tracking-wide truncate pr-6 block min-w-0", activeFileKey === entry.key ? 'text-foreground font-semibold opacity-100' : 'opacity-80 font-medium text-muted-foreground group-hover/file:text-foreground group-hover/file:opacity-100 transition-colors duration-200')}>
                 {entry.name}
               </span>
               
-              <Button
-                variant="ghost"
-                size="icon"
-                class={cn(
-                  "size-6 rounded-full hover:bg-primary/20 transition-all flex items-center justify-center shrink-0 cursor-pointer",
-                  isEntryReferenced(entry.key) ? "opacity-100!" : "opacity-0 group-hover/file:opacity-100!"
-                )}
-                onclick={(e) => { e.stopPropagation(); handleToggleReference(entry); }}
-              >
-                <MessageSquarePlusIcon class={cn("size-3.5", isEntryReferenced(entry.key) ? "text-primary" : "text-white/50 hover:text-white")} />
-              </Button>
-
-              <DropdownMenu.Root>
-                <DropdownMenu.Trigger>
-                  {#snippet child({ props: dp })}
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      {...dp}
-                      class="size-6 rounded-full opacity-0 group-hover/file:opacity-100! hover:bg-white/10 transition-all flex items-center justify-center shrink-0 cursor-pointer"
-                      onclick={(e) => { e.stopPropagation(); }}
-                    >
-                      <MoreVerticalIcon class="size-3.5 text-white/50 hover:text-white" />
-                    </Button>
-                  {/snippet}
-                </DropdownMenu.Trigger>
+              <div class="flex items-center gap-0.5 opacity-0 group-hover/file:opacity-100! absolute right-1 transition-opacity bg-background/70 backdrop-blur-md rounded-md pl-1">
+                <DropdownMenu.Root>
+                  <DropdownMenu.Trigger>
+                    {#snippet child({ props: dp })}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        {...dp}
+                        class="size-6 rounded-md hover:bg-white/10 transition-all flex items-center justify-center shrink-0 cursor-pointer"
+                        onclick={(e) => { e.stopPropagation(); }}
+                      >
+                        <MoreVerticalIcon class="size-3.5 text-white/50 hover:text-white" />
+                      </Button>
+                    {/snippet}
+                  </DropdownMenu.Trigger>
                 <DropdownMenu.Content align="end" class="bg-slate-950/90 backdrop-blur-xl border-white/10 rounded-xl p-1 shadow-2xl min-w-[150px]">
                   <DropdownMenu.Item class="rounded-lg text-[10px] font-bold uppercase tracking-tight gap-2 focus:bg-white/10 transition-all h-9" onclick={() => onFileClick(entry)}>
                     <EyeIcon class="size-3.5 opacity-40" />
@@ -401,7 +384,20 @@
                   </DropdownMenu.Item>
                 </DropdownMenu.Content>
               </DropdownMenu.Root>
+              <Button
+                variant="ghost"
+                size="icon"
+                class="size-6 rounded-md hover:bg-white/10 transition-all flex items-center justify-center shrink-0 cursor-pointer"
+                onclick={(e) => { e.stopPropagation(); handleToggleReference(entry); }}
+              >
+                <MessageSquarePlusIcon class={cn("size-3.5", isEntryReferenced(entry.key) ? "text-primary" : "text-white/50 hover:text-white")} />
+              </Button>
             </div>
+            
+            <div class="flex items-center justify-end text-[10px] font-medium text-white/30 opacity-100 group-hover/file:opacity-0 absolute right-2 pointer-events-none transition-opacity">
+              {formatRelativeTime(entry.lastModified)}
+            </div>
+          </div>
           </div>
         {/snippet}
       </Tooltip.Trigger>

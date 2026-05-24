@@ -1,56 +1,60 @@
 <script lang="ts">
   import { ScrollArea } from "$lib/components/ui/scroll-area";
-  import { Button } from "$lib/components/ui/button";
-  import FileTextIcon from "@lucide/svelte/icons/file-text";
-  import ImageIcon from "@lucide/svelte/icons/image";
-  import XIcon from "@lucide/svelte/icons/x";
-  import MaximizeIcon from "@lucide/svelte/icons/maximize-2";
-  import MinimizeIcon from "@lucide/svelte/icons/minimize-2";
-  import SaveIcon from "@lucide/svelte/icons/save";
-  import EditIcon from "@lucide/svelte/icons/edit-3";
-  import ArrowDownToLine from "@lucide/svelte/icons/arrow-down-to-line";
-  import ZapIcon from "@lucide/svelte/icons/zap";
-  import { onMount } from "svelte";
-  import { cn } from "$lib/utils/shadcn";
   import WysiwygEditor from "$lib/components/editor/WysiwygEditor.svelte";
   import EditorModeToggle from "$lib/components/editor/EditorModeToggle.svelte";
+  import { toast } from "svelte-sonner";
 
   // EmbedPDF imports
-  import { usePdfiumEngine } from '@embedpdf/engines/svelte';
-  import { EmbedPDF } from '@embedpdf/core/svelte';
-  import { createPluginRegistration } from '@embedpdf/core';
-  import { ViewportPluginPackage, Viewport } from '@embedpdf/plugin-viewport/svelte';
-  import { Scroller, ScrollPluginPackage, type RenderPageProps } from '@embedpdf/plugin-scroll/svelte';
-  import { DocumentManagerPluginPackage, DocumentContent } from '@embedpdf/plugin-document-manager/svelte';
-  import { RenderLayer, RenderPluginPackage } from '@embedpdf/plugin-render/svelte';
+  import { usePdfiumEngine } from "@embedpdf/engines/svelte";
+  import { EmbedPDF } from "@embedpdf/core/svelte";
+  import { createPluginRegistration } from "@embedpdf/core";
+  import {
+    ViewportPluginPackage,
+    Viewport,
+  } from "@embedpdf/plugin-viewport/svelte";
+  import {
+    Scroller,
+    ScrollPluginPackage,
+    type RenderPageProps,
+  } from "@embedpdf/plugin-scroll/svelte";
+  import {
+    DocumentManagerPluginPackage,
+    DocumentContent,
+  } from "@embedpdf/plugin-document-manager/svelte";
+  import {
+    RenderLayer,
+    RenderPluginPackage,
+  } from "@embedpdf/plugin-render/svelte";
 
   let {
     filename = "",
     url = "",
     type = "text",
+    editorMode = $bindable("wysiwyg"),
+    isSaving = $bindable(false),
     onClose,
     onDownload,
-    onExtract
+    onExtract,
   }: {
     filename?: string;
     url?: string;
     type?: "text" | "image" | "pdf";
+    editorMode?: "wysiwyg" | "raw";
+    isSaving?: boolean;
     onClose?: () => void;
     onDownload?: () => void;
     onExtract?: () => void;
   } = $props();
 
-  let isMaximized = $state(false);
   let textContent = $state("Loading...");
-  let isEditing = $state(false);
   let editContent = $state("");
-  let isSaving = $state(false);
   let containerWidth = $state(0);
   let containerRef = $state<HTMLDivElement | null>(null);
 
   // WYSIWYG mode state
-  let editorMode = $state<"wysiwyg" | "raw">("wysiwyg");
-  const isMarkdownFile = $derived(filename.endsWith(".md") || filename.endsWith(".markdown"));
+  const isMarkdownFile = $derived(
+    filename.endsWith(".md") || filename.endsWith(".markdown"),
+  );
   let wysiwygContent = $state("");
 
   function handleWysiwygUpdate(markdown: string) {
@@ -58,102 +62,101 @@
     editContent = markdown;
   }
 
-  function saveWysiwygFile() {
+  export function save() {
     if (!url) return;
     isSaving = true;
     const content = editorMode === "wysiwyg" ? wysiwygContent : editContent;
     fetch(url, {
       method: "POST",
-      body: new Blob([content], { type: 'text/plain' })
-    }).then(() => {
-      textContent = content;
-    }).catch(err => console.error("Save error:", err))
-      .finally(() => isSaving = false);
+      body: new Blob([content], { type: "text/plain" }),
+    })
+      .then(() => {
+        textContent = content;
+        toast.success("File saved successfully");
+      })
+      .catch((err) => {
+        console.error("Save error:", err);
+        toast.error("Failed to save file");
+      })
+      .finally(() => (isSaving = false));
   }
 
-  function startEdit() {
-     isEditing = true;
-     editContent = textContent;
+  export function copy() {
+    const content = editorMode === "wysiwyg" && isMarkdownFile ? wysiwygContent : editContent;
+    if (content) {
+      navigator.clipboard.writeText(content);
+      toast.success("Copied to clipboard");
+    }
   }
 
-  function saveFile() {
-     if (!url) return;
-     isSaving = true;
-     fetch(url, {
-        method: "POST",
-        body: new Blob([editContent], { type: 'text/plain' })
-     }).then(() => {
-        textContent = editContent;
-        isEditing = false;
-     }).catch(err => console.error("Save error:", err))
-       .finally(() => isSaving = false);
+  export function share() {
+    toast.info("Share functionality coming soon");
   }
-  
+
+  export function toggleMode() {
+    editorMode = editorMode === "wysiwyg" ? "raw" : "wysiwyg";
+  }
+
   // PDF Engine initialization
   const pdfEngine = usePdfiumEngine();
 
-  let plugins = $derived(url ? [
-    createPluginRegistration(DocumentManagerPluginPackage, {
-      initialDocuments: [{ url: url }],
-    }),
-    createPluginRegistration(ViewportPluginPackage),
-    createPluginRegistration(ScrollPluginPackage),
-    createPluginRegistration(RenderPluginPackage),
-  ] : []);
+  let plugins = $derived(
+    url
+      ? [
+          createPluginRegistration(DocumentManagerPluginPackage, {
+            initialDocuments: [{ url: url }],
+          }),
+          createPluginRegistration(ViewportPluginPackage),
+          createPluginRegistration(ScrollPluginPackage),
+          createPluginRegistration(RenderPluginPackage),
+        ]
+      : [],
+  );
 
   $effect(() => {
     if (type === "text" && url) {
-       textContent = "Loading...";
-       fetch(url)
-         .then(r => r.text())
-         .then(t => textContent = t)
-         .catch(e => textContent = `Error loading file: ${e.message}`);
+      textContent = "Loading...";
+      editContent = "";
+      fetch(url)
+        .then((r) => r.text())
+        .then((t) => {
+          textContent = t;
+          editContent = t; // keep raw editor in sync
+        })
+        .catch((e) => {
+          textContent = `Error loading file: ${e.message}`;
+          editContent = textContent;
+        });
     }
   });
-  
+
   $effect(() => {
     if (containerRef) {
-      const observer = new ResizeObserver(entries => {
+      const observer = new ResizeObserver((entries) => {
         containerWidth = entries[0].contentRect.width;
       });
       observer.observe(containerRef);
       return () => observer.disconnect();
     }
   });
-
-
 </script>
 
 {#if filename}
-  <div class="flex flex-col w-full overflow-hidden border-t {isMaximized ? 'fixed inset-0 z-100 bg-background border-none' : 'h-full'}">
-
+  <div class="flex flex-col w-full h-full relative pb-4">
     <!-- Text/Markdown files -->
     {#if type === "text"}
-      <!-- Mode toggle for markdown files -->
+      <!-- Mode toggle for markdown files (Floating FAB) -->
       {#if isMarkdownFile}
-        <div class="flex items-center justify-between px-3 py-1.5 border-b border-border/20 bg-background/50 shrink-0">
-          <span class="text-[9px] font-black uppercase tracking-[0.15em] text-muted-foreground">{filename}</span>
-          <div class="flex items-center gap-2">
-            {#if editorMode === "wysiwyg" || isEditing}
-              <Button
-                variant="ghost"
-                size="sm"
-                class="h-6 px-2 text-[9px] font-bold uppercase tracking-widest text-muted-foreground hover:text-primary"
-                onclick={editorMode === "wysiwyg" ? saveWysiwygFile : saveFile}
-                disabled={isSaving}
-              >
-                <SaveIcon class="size-3 mr-1" />
-                {isSaving ? "Saving..." : "Save"}
-              </Button>
-            {/if}
-            <EditorModeToggle bind:mode={editorMode} />
-          </div>
+        <div
+          class="absolute top-4 left-1/2 -translate-x-1/2 z-50 opacity-0 group-hover:opacity-100 transition-all duration-300 shadow-2xl rounded-full pointer-events-auto"
+        >
+          <EditorModeToggle bind:mode={editorMode} />
         </div>
       {/if}
 
       {#if isMarkdownFile && editorMode === "wysiwyg"}
         <!-- WYSIWYG Markdown Editor -->
-        <div class="flex-1 min-h-0 overflow-hidden bg-background">
+        <div class="flex-1 min-h-0 overflow-hidden">
           {#if textContent !== "Loading..."}
             <WysiwygEditor
               content={textContent}
@@ -161,35 +164,44 @@
               class="h-full"
             />
           {:else}
-            <div class="flex items-center justify-center h-full text-muted-foreground text-sm">
+            <div
+              class="flex items-center justify-center h-full text-muted-foreground text-sm"
+            >
               Loading editor...
             </div>
           {/if}
         </div>
       {:else}
         <!-- Raw text / non-markdown files -->
-        <ScrollArea class="flex-1 w-full bg-background overflow-hidden relative group">
-          {#if isEditing}
-            <textarea bind:value={editContent} class="w-full min-h-full absolute inset-0 p-4 text-[0.7rem] font-mono leading-relaxed bg-transparent resize-none outline-none border-none focus:ring-0"></textarea>
-          {:else}
-            <pre class="p-4 w-full text-[0.7rem] font-mono leading-relaxed whitespace-pre-wrap wrap-break-word">{textContent}</pre>
-          {/if}
+        <ScrollArea
+          class="flex-1 w-full bg-background overflow-hidden relative"
+        >
+          <textarea
+            bind:value={editContent}
+            class="w-full min-h-full absolute inset-0 p-4 text-[0.7rem] font-mono leading-relaxed bg-transparent resize-none outline-none border-none focus:ring-0"
+          ></textarea>
         </ScrollArea>
       {/if}
     {:else if type === "image"}
       <ScrollArea class="flex-1">
         <div class="flex items-center justify-center p-4">
-          <img src={url} alt={filename} class="max-w-full rounded-md shadow-sm" />
+          <img
+            src={url}
+            alt={filename}
+            class="max-w-full rounded-md shadow-sm"
+          />
         </div>
       </ScrollArea>
     {:else if type === "pdf"}
-      <div 
-        class="flex-1 overflow-hidden relative bg-white" 
+      <div
+        class="flex-1 overflow-hidden relative bg-white"
         bind:this={containerRef}
       >
         {#if pdfEngine.isLoading || !pdfEngine.engine}
-          <div class="absolute inset-0 flex justify-center items-center text-sm font-medium text-muted-foreground">
-             Loading PDF Engine...
+          <div
+            class="absolute inset-0 flex justify-center items-center text-sm font-medium text-muted-foreground"
+          >
+            Loading PDF Engine...
           </div>
         {:else}
           <EmbedPDF engine={pdfEngine.engine} {plugins}>
@@ -200,20 +212,25 @@
                   {#snippet children(documentContent)}
                     {#if documentContent.isLoaded}
                       {#snippet renderPage(page: RenderPageProps)}
-                        {@const pageScale = containerWidth ? containerWidth / page.width : 1}
-                        <div 
-                          style:width="{page.width * pageScale}px" 
-                          style:height="{page.height * pageScale}px" 
+                        {@const pageScale = containerWidth
+                          ? containerWidth / page.width
+                          : 1}
+                        <div
+                          style:width="{page.width * pageScale}px"
+                          style:height="{page.height * pageScale}px"
                           class="bg-white origin-top transition-all duration-300"
                         >
-                          <RenderLayer 
-                            {documentId} 
-                            pageIndex={page.pageIndex} 
+                          <RenderLayer
+                            {documentId}
+                            pageIndex={page.pageIndex}
                             scale={pageScale}
                           />
                         </div>
                       {/snippet}
-                      <Viewport {documentId} class="w-full h-full overflow-x-hidden relative">
+                      <Viewport
+                        {documentId}
+                        class="w-full h-full overflow-x-hidden relative"
+                      >
                         <Scroller {documentId} {renderPage} />
                       </Viewport>
                     {/if}
@@ -226,27 +243,6 @@
       </div>
     {/if}
 
-    <!-- Dual FABs -->
-    <div class="absolute bottom-10 right-10 flex flex-col gap-2 z-50">
-      {#if type === "pdf" || type === "image"}
-        <Button 
-          variant="secondary"
-          size="icon"
-          class="rounded-full bg-primary hover:bg-primary/80 text-slate-950 shadow-[0_0_30px_rgba(212,175,55,0.4)] border border-white/20 transition-all duration-500 scale-100 hover:scale-110 active:scale-95 cursor-pointer group/fab"
-          onclick={onExtract}
-        >
-          <ZapIcon class="size-4 fill-current group-hover/fab:animate-pulse" />
-        </Button>
-      {/if}
-      
-      <Button 
-        variant="secondary"
-        size="icon"
-        class="rounded-full bg-slate-900/60 backdrop-blur-3xl hover:bg-slate-800 border border-white/10 text-white shadow-2xl transition-all duration-500 scale-100 hover:scale-110 active:scale-95 cursor-pointer group/fab"
-        onclick={onDownload}
-      >
-        <ArrowDownToLine class="size-4 opacity-60 group-hover/fab:opacity-100" />
-      </Button>
-    </div>
+
   </div>
 {/if}

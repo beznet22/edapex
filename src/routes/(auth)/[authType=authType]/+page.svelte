@@ -3,7 +3,7 @@
   import { page } from "$app/state";
   import AuthForm, { type FormData } from "$lib/components/auth-form.svelte";
   import { onMount } from "svelte";
-  import { clearLocalStore } from "$lib/utils";
+  import { clearLocalStore } from "$lib/utils/index.js";
 
   let { form }: { form?: FormData } = $props();
 
@@ -38,9 +38,7 @@
   ></div>
 
   <!-- Micro-Dithering -->
-  <div
-    class="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-[0.03] dark:opacity-[0.08] mix-blend-overlay pointer-events-none"
-  ></div>
+  <div class="absolute inset-0 opacity-[0.03] dark:opacity-[0.08] mix-blend-overlay pointer-events-none"></div>
 </div>
 
 <div

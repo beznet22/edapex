@@ -11,11 +11,17 @@
   import { quintOut } from "svelte/easing";
   import { untrack } from "svelte";
 
-  import WorkspaceHeader from "./WorkspaceHeader.svelte";
+  import FloatingToolbar from "./FloatingToolbar.svelte";
   import FileBrowserHeader from "./FileBrowserHeader.svelte";
   import FileTree from "./FileTree.svelte";
-  import EditorTabs from "./EditorTabs.svelte";
-  import WorkspaceStatus from "./WorkspaceStatus.svelte";
+  import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
+  import { Button } from "$lib/components/ui/button";
+  import ChevronDownIcon from "@lucide/svelte/icons/chevron-down";
+  import SaveIcon from "@lucide/svelte/icons/save";
+  import ShareIcon from "@lucide/svelte/icons/share-2";
+  import CopyIcon from "@lucide/svelte/icons/copy";
+  import BotIcon from "@lucide/svelte/icons/bot";
+  import CheckIcon from "@lucide/svelte/icons/check";
   import WorkflowStatusPills from "./WorkflowStatusPills.svelte";
   import ExtractionInspector from "./ExtractionInspector.svelte";
   import PublishViewer from "./PublishViewer.svelte";
@@ -31,6 +37,7 @@
   import UploadIcon from "@lucide/svelte/icons/upload";
   import EyeIcon from "@lucide/svelte/icons/eye";
   import FolderIcon from "@lucide/svelte/icons/folder";
+  import SearchIcon from "@lucide/svelte/icons/search";
   import ActivityIcon from "@lucide/svelte/icons/activity";
   import HistoryIcon from "@lucide/svelte/icons/history";
 
@@ -55,11 +62,15 @@
 
   let {
     onClose,
+    class: className,
     isMobile = false,
   }: {
+    class?: string;
     onClose?: () => void;
     isMobile?: boolean;
   } = $props();
+
+  let editorCanvasRef = $state<any>(null);
 
   const userContext = UserContext.fromContext();
   const selectedClass = SelectedClass.fromContext();
@@ -104,6 +115,17 @@
   let activeFileDef = $derived(
     openedFiles.find((f) => f.key === activeFileKey),
   );
+  let fileBrowserPane: any = $state();
+
+  $effect(() => {
+    if (fileBrowserPane) {
+      if (maxPreviewMode) {
+        fileBrowserPane.collapse();
+      } else {
+        fileBrowserPane.expand();
+      }
+    }
+  });
 
   let fileInput: HTMLInputElement;
   let folderInput: HTMLInputElement;
@@ -790,7 +812,7 @@
 
   function toggleDir(path: string) {
     activeDirKey = path;
-    activeFileKey = null;
+    // We intentionally DO NOT set activeFileKey = null here so the editor remains open
     const next = new Set(expandedDirs);
     if (next.has(path)) next.delete(path);
     else next.add(path);
@@ -916,6 +938,7 @@
 <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 <aside
   class={cn(
+    className,
     "flex flex-col bg-background/40 backdrop-blur-3xl relative overflow-hidden shadow-2xl",
     !isMobile
       ? "h-[calc(100%-1rem)] m-2 rounded-2xl border border-white/10"
@@ -970,165 +993,261 @@
     {completionSummaries}
   />
 
-  <WorkspaceHeader
-    bind:maxPreviewMode
-    bind:ocrEnabled
-    bind:compressionEnabled
-    {chat}
-    onClose={onClose!}
-  />
-
-  <Resizable.PaneGroup direction="horizontal" class="flex-1 min-h-0">
+  <Resizable.PaneGroup direction="horizontal" class="flex-1 min-h-0 w-full">
     <!-- Panel A: File Browser -->
-    {#if !maxPreviewMode}
-      <Resizable.Pane
-        defaultSize={30}
-        minSize={20}
-        class="flex flex-col min-h-0 border-r border-white/5"
-      >
-        <FileBrowserHeader
-          bind:searchQuery
-          onStartCreate={startCreate}
-          onTriggerUpload={triggerUpload}
-          onTriggerFolderUpload={triggerFolderUpload}
-        />
+    <Resizable.Pane
+      bind:this={fileBrowserPane}
+      order={1}
+      collapsible={true}
+      collapsedSize={0}
+      defaultSize={maxPreviewMode ? 0 : 30}
+      minSize={20}
+      class="flex flex-col min-h-0 border-r border-white/5 transition-all duration-300 ease-out overflow-hidden"
+    >
+      <FileBrowserHeader
+        onStartCreate={startCreate}
+        onTriggerUpload={triggerUpload}
+        onTriggerFolderUpload={triggerFolderUpload}
+      />
 
-        {#if recentFiles.length > 0 && !searchQuery}
-          <div class="px-3 pt-3 pb-1 border-b border-white/5 bg-slate-950/20">
-            <h3
-              class="text-[9px] font-black uppercase tracking-[0.2em] text-white/20 mb-2 px-1"
+      {#if recentFiles.length > 0 && !searchQuery}
+        <details
+          class="group/recent border-b border-white/5 bg-slate-950/20 px-3 py-2 cursor-pointer outline-none"
+        >
+          <summary
+            class="flex items-center justify-between text-[9px] font-black uppercase tracking-[0.2em] text-white/40 group-open/recent:text-white/60 mb-1 outline-none list-none marker:hidden"
+          >
+            <span class="flex items-center gap-2">Recent Files</span>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="12"
+              height="12"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              class="transition-transform group-open/recent:rotate-180 opacity-50"
+              ><polyline points="6 9 12 15 18 9"></polyline></svg
             >
-              Recent Files
-            </h3>
-            <div class="flex flex-wrap gap-1.5 pb-2">
-              {#each recentFiles as file}
-                {@const Icon = getFileIcon(file.name)}
-                <button
-                  class={cn(
-                    "group flex items-center gap-2 px-2.5 py-1.5 rounded-lg border transition-all duration-300",
-                    activeFileKey === file.key
-                      ? "bg-primary/20 border-primary/30 text-white shadow-[0_0_10px_rgba(var(--primary),0.1)]"
-                      : "bg-white/5 border-white/5 text-white/40 hover:bg-white/10 hover:text-white/70",
-                  )}
-                  onclick={() => handleFileClick(file)}
+          </summary>
+          <div class="flex flex-col gap-0.5 pt-2 pb-1">
+            {#each recentFiles as file}
+              {@const Icon = getFileIcon(file.name)}
+              <button
+                class={cn(
+                  "group flex items-center gap-2 px-2 py-1.5 rounded-lg transition-all duration-300 w-full text-left",
+                  activeFileKey === file.key
+                    ? "text-primary bg-white/5 font-semibold"
+                    : "text-white/40 hover:text-white hover:bg-white/5 font-medium",
+                )}
+                onclick={() => handleFileClick(file)}
+              >
+                <Icon class="size-3.5 opacity-60 group-hover:opacity-100" />
+                <span class="text-[10.5px] truncate max-w-[180px]"
+                  >{file.name}</span
                 >
-                  <Icon class="size-3 opacity-60 group-hover:opacity-100" />
-                  <span class="text-[10px] font-bold truncate max-w-[80px]"
-                    >{file.name}</span
-                  >
-                </button>
-              {/each}
-            </div>
+              </button>
+            {/each}
           </div>
-        {/if}
+        </details>
+      {/if}
 
-        <div class="flex-1 w-full bg-slate-950/10 overflow-hidden">
-          <FileTree
-            tree={filteredFileTree}
-            {expandedDirs}
-            {activeFileKey}
-            {activeDirKey}
-            {workspaceId}
-            {nameInputState}
-            bind:nameInputValue
-            {fileContext}
-            {inlineError}
-            references={fileContext.references}
-            onToggleDir={toggleDir}
-            onFileClick={handleFileClick}
-            onToggleReference={toggleReference}
-            onRenameFile={renameFile}
-            onDeleteFile={deleteFile}
-            onCopyPathToClipboard={copyPathToClipboard}
-            onSubmitInlineAction={submitInlineAction}
-            onCancelInlineAction={cancelInlineAction}
-            onStartRename={startRename}
-            onTriggerExtract={triggerExtract}
-            onDownloadFile={downloadFile}
-            onShareFile={shareFile}
-            onStartCreate={startCreate}
+      <div class="flex-1 w-full bg-slate-950/10 overflow-hidden">
+        <FileTree
+          tree={filteredFileTree}
+          {expandedDirs}
+          {activeFileKey}
+          {activeDirKey}
+          {workspaceId}
+          {nameInputState}
+          bind:nameInputValue
+          {fileContext}
+          {inlineError}
+          references={fileContext.references}
+          onToggleDir={toggleDir}
+          onFileClick={handleFileClick}
+          onToggleReference={toggleReference}
+          onRenameFile={renameFile}
+          onDeleteFile={deleteFile}
+          onCopyPathToClipboard={copyPathToClipboard}
+          onSubmitInlineAction={submitInlineAction}
+          onCancelInlineAction={cancelInlineAction}
+          onStartRename={startRename}
+          onTriggerExtract={triggerExtract}
+          onDownloadFile={downloadFile}
+          onShareFile={shareFile}
+          onStartCreate={startCreate}
+        />
+      </div>
+
+      <div class="p-3 border-t border-white/5 bg-slate-950/20 shrink-0">
+        <div class="relative group">
+          <SearchIcon
+            class="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-white/20 group-focus-within:text-[#D4AF37] transition-colors pointer-events-none"
+          />
+          <input
+            type="text"
+            placeholder="Search files..."
+            class="w-full h-8 bg-white/5 border border-white/5 rounded-lg pl-9 pr-3 text-[11px] text-white/90 placeholder:text-white/20 focus:outline-none focus:ring-1 focus:ring-[#D4AF37]/40 transition-all font-medium"
+            bind:value={searchQuery}
           />
         </div>
-      </Resizable.Pane>
-      <Resizable.Handle
-        withHandle
-        class="w-px bg-white/5 hover:bg-primary/40 transition-colors"
-      />
-    {/if}
+      </div>
+    </Resizable.Pane>
+    <Resizable.Handle
+      withHandle
+      class={cn(
+        "w-px bg-white/5 hover:bg-primary/40 transition-colors z-10",
+        maxPreviewMode && "hidden",
+      )}
+    />
 
     <!-- Panel B: Preview Area -->
     <Resizable.Pane
+      order={2}
       defaultSize={maxPreviewMode ? 100 : 70}
       minSize={30}
-      class="flex flex-col min-h-0 bg-slate-900/20 backdrop-blur-md"
+      class="flex flex-col min-h-0 bg-slate-900/20 backdrop-blur-md relative group"
     >
-      <!-- View Tabs -->
-      <div
-        class="flex items-center gap-1 px-3 py-1.5 border-b border-white/5 bg-slate-950/30 shrink-0"
-      >
-        <button
-          class={cn(
-            "flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all",
-            activeView === "files"
-              ? "bg-primary/15 text-primary border border-primary/20"
-              : "text-white/40 hover:text-white/60 hover:bg-white/5",
-          )}
-          onclick={() => (activeView = "files")}
-        >
-          <FolderIcon class="size-3" />
-          <span>Files</span>
-        </button>
-
-        <button
-          class={cn(
-            "flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all",
-            activeView === "workflow"
-              ? "bg-[#D4AF37]/15 text-[#D4AF37] border border-[#D4AF37]/20"
-              : "text-white/40 hover:text-white/60 hover:bg-white/5",
-            workflowEvents.workflowStatus !== "idle" &&
-              activeView !== "workflow" &&
-              "text-[#D4AF37]/60",
-          )}
-          onclick={() => (activeView = "workflow")}
-        >
-          <ActivityIcon class="size-3" />
-          <span>Workflow</span>
-          {#if workflowEvents.workflowStatus !== "idle" && workflowEvents.workflowStatus !== "complete"}
-            <div class="size-1.5 rounded-full bg-[#D4AF37] animate-pulse"></div>
-          {/if}
-        </button>
-
-        {#if canViewRunHistory}
-          <button
-            class={cn(
-              "flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all",
-              activeView === "run-history"
-                ? "bg-primary/15 text-primary border border-primary/20"
-                : "text-white/40 hover:text-white/60 hover:bg-white/5",
-            )}
-            onclick={() => (activeView = "run-history")}
-          >
-            <HistoryIcon class="size-3" />
-            <span>History</span>
-          </button>
-        {/if}
-      </div>
+      <!-- View Tabs Removed for Floating Island Paradigm -->
 
       <!-- View Content -->
       {#if activeView === "files"}
-        <!-- Files View (existing editor/preview) -->
+        <!-- Files View (headless editor with top bar) -->
         {#if openedFiles.length > 0}
           <div class="flex flex-col h-full bg-slate-950/10">
-            <EditorTabs
-              {openedFiles}
-              bind:activeFileKey
-              {activeFileDef}
-              onTabClose={closeFile}
-            />
+            <!-- Flat Headless Top Bar -->
+            <div
+              class="flex items-center justify-between h-12 px-4 shrink-0 bg-transparent"
+            >
+              <!-- Left: Document Title Dropdown -->
+              <DropdownMenu.Root>
+                <DropdownMenu.Trigger>
+                  {#snippet child({ props })}
+                    <Button
+                      {...props}
+                      variant="ghost"
+                      size="sm"
+                      class="h-8 px-2 text-[13px] font-semibold text-white/90 hover:bg-white/5 hover:text-white flex items-center gap-2"
+                    >
+                      <FileIcon class="size-4 text-primary/80" />
+                      {activeFileDef?.name || "Untitled"}
+                      <ChevronDownIcon class="size-3.5 text-white/40" />
+                    </Button>
+                  {/snippet}
+                </DropdownMenu.Trigger>
+                <DropdownMenu.Content
+                  align="start"
+                  class="w-56 bg-slate-950/90 backdrop-blur-xl border-white/10 rounded-xl shadow-2xl"
+                >
+                  <DropdownMenu.Group>
+                    <DropdownMenu.Label
+                      class="text-[10px] uppercase tracking-wider text-white/40 px-2 py-1.5"
+                      >Open Files</DropdownMenu.Label
+                    >
+                    {#each openedFiles as file}
+                      <DropdownMenu.Item
+                        class={cn(
+                          "text-[12px] font-medium rounded-lg cursor-pointer my-0.5",
+                          activeFileKey === file.key
+                            ? "bg-primary/20 text-white"
+                            : "text-white/60 hover:text-white hover:bg-white/5",
+                        )}
+                        onclick={() => (activeFileKey = file.key)}
+                      >
+                        <FileIcon class="size-3 mr-2" />
+                        {file.name}
+                        {#if activeFileKey === file.key}
+                          <CheckIcon class="size-3 ml-auto text-primary" />
+                        {/if}
+                      </DropdownMenu.Item>
+                    {/each}
+                  </DropdownMenu.Group>
+                </DropdownMenu.Content>
+              </DropdownMenu.Root>
 
-            <div class="flex-1 min-h-0 relative group">
+              <!-- Far Right: Actions & Agent Role -->
+              <div class="flex items-center gap-1">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  class="size-8 rounded-lg text-white/60 hover:text-white hover:bg-white/5"
+                  onclick={() => editorCanvasRef?.save()}
+                >
+                  <SaveIcon class="size-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  class="size-8 rounded-lg text-white/60 hover:text-white hover:bg-white/5"
+                  onclick={() => editorCanvasRef?.copy()}
+                >
+                  <CopyIcon class="size-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  class="size-8 rounded-lg text-white/60 hover:text-white hover:bg-white/5"
+                  onclick={() => editorCanvasRef?.share()}
+                >
+                  <ShareIcon class="size-4" />
+                </Button>
+
+                <div class="w-px h-4 bg-white/10 mx-1"></div>
+
+                <!-- Agent Role Dropdown -->
+                <DropdownMenu.Root>
+                  <DropdownMenu.Trigger>
+                    {#snippet child({ props })}
+                      {@const chatAny = chat as any}
+                      <Button
+                        {...props}
+                        variant="ghost"
+                        size="sm"
+                        class="h-8 px-2.5 rounded-lg text-[11px] font-semibold text-primary bg-primary/10 hover:bg-primary/20 flex items-center gap-1.5 ml-1"
+                      >
+                        <BotIcon class="size-3.5" />
+                        <span class="max-w-[80px] truncate"
+                          >{chatAny?.activeAgent?.label || "Hermes"}</span
+                        >
+                        <ChevronDownIcon class="size-3 opacity-70" />
+                      </Button>
+                    {/snippet}
+                  </DropdownMenu.Trigger>
+                  <DropdownMenu.Content
+                    align="end"
+                    class="w-48 bg-slate-950/90 backdrop-blur-xl border-white/10 rounded-xl shadow-2xl"
+                  >
+                    {@const chatAny = chat as any}
+                    <DropdownMenu.Label
+                      class="text-[10px] uppercase tracking-wider text-white/40"
+                      >Select Agent</DropdownMenu.Label
+                    >
+                    <DropdownMenu.Separator class="bg-white/5" />
+                    {#if chatAny?.agents}
+                      {#each chatAny.agents as agent}
+                        <DropdownMenu.Item
+                          class="text-[12px] font-medium rounded-lg cursor-pointer my-0.5 text-white/70 hover:text-white hover:bg-white/5"
+                          onclick={() => (chatAny.activeAgent = agent)}
+                        >
+                          {agent.label}
+                          {#if chatAny?.activeAgent?.id === agent.id}
+                            <CheckIcon class="size-3 ml-auto text-primary" />
+                          {/if}
+                        </DropdownMenu.Item>
+                      {/each}
+                    {/if}
+                  </DropdownMenu.Content>
+                </DropdownMenu.Root>
+              </div>
+            </div>
+
+            <div class="flex-1 min-h-0 relative">
               {#if activeFileDef}
                 <EditorCanvas
+                  bind:this={editorCanvasRef}
                   filename={activeFileDef.name}
                   url={`/api/file/${encodeURIComponent(activeFileDef.key)}?workspace=${workspaceId}`}
                   type={activeFileDef.type}
@@ -1145,20 +1264,12 @@
                       type: "file",
                     } as any)}
                 />
-                <div
-                  class="absolute top-4 right-4 px-3 py-1.5 bg-slate-950/60 backdrop-blur-xl border border-white/10 rounded-lg opacity-0 group-hover:opacity-100 transition-all duration-500 shadow-2xl pointer-events-none"
-                >
-                  <span
-                    class="text-[9px] font-black uppercase tracking-widest text-white/40"
-                    >{activeFileDef.type}</span
-                  >
-                </div>
               {/if}
             </div>
           </div>
         {:else}
           <div
-            class="flex-1 flex flex-col items-center justify-center text-center px-12 opacity-20"
+            class="h-full flex flex-col items-center justify-center text-center px-12 opacity-20"
           >
             <div
               class="size-24 rounded-[2.5rem] bg-white/5 flex items-center justify-center mb-8 border border-white/5"
@@ -1212,7 +1323,7 @@
             {:else if workflowEvents.workflowStatus === "complete"}
               <!-- Completion state -->
               <div
-                class="flex-1 flex flex-col items-center justify-center text-center px-8 gap-4"
+                class="h-full flex flex-col items-center justify-center text-center px-8 gap-4"
               >
                 <div
                   class="size-16 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center"
@@ -1234,7 +1345,7 @@
             {:else}
               <!-- Idle / waiting state -->
               <div
-                class="flex-1 flex flex-col items-center justify-center text-center px-8 opacity-30"
+                class="h-full flex flex-col items-center justify-center text-center px-8 opacity-30"
               >
                 <div
                   class="size-20 rounded-4xl bg-white/5 flex items-center justify-center mb-6 border border-white/5"
@@ -1269,10 +1380,20 @@
           />
         </div>
       {/if}
+
+      <!-- Floating Contextual UI — always present, auto-shows on Panel B hover -->
+      <FloatingToolbar
+        bind:maxPreviewMode
+        bind:ocrEnabled
+        bind:compressionEnabled
+        bind:activeView
+        {chat}
+        {uploadingFiles}
+        workflowStatus={workflowEvents.workflowStatus}
+        {canViewRunHistory}
+      />
     </Resizable.Pane>
   </Resizable.PaneGroup>
-
-  <WorkspaceStatus {uploadingFiles} assetCount={rawFiles.length} />
 
   <input
     type="file"
