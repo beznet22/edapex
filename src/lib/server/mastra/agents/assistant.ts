@@ -64,7 +64,9 @@ export const assistantAgent = new Agent({
 		// Ensure registry is loaded (fire-and-forget for first request, cached after)
 		ensureRegistry().catch(console.error);
 
-		return resolveToolsForMessage(message || '', !!isSlashCommand) as ToolsInput;
+		const tools = resolveToolsForMessage(message || '', !!isSlashCommand) as ToolsInput;
+		console.log(tools);
+		return tools;
 	},
 	memory: new Memory({
 		storage: createMastraStorage(),

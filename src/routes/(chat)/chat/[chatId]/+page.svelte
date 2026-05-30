@@ -3,6 +3,6 @@
   let { data } = $props();
 </script>
 
-{#key data.chat?.id}
+{#key data.chat?.threadId}
   <ChatView {data} />
 {/key}

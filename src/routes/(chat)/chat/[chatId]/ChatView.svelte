@@ -7,6 +7,7 @@
   import { ChatContext } from "$lib/context/chat-context.svelte.js";
   import { SelectedClass } from "$lib/context/sync.svelte";
   import { IsMobile } from "$lib/hooks/is-mobile.svelte.js";
+  import { createWorkspaceContext } from "$lib/components/workspace/workspace-context.svelte.js";
 
   let { data } = $props();
 
@@ -33,6 +34,7 @@
   });
 
   chatContext.setContext();
+  const ws = createWorkspaceContext();
 </script>
 
 <!-- Hermes 4-Panel Row: Panel 3 (Chat Stage) & Panel 4 (Workspace Inspector) -->

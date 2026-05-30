@@ -66,7 +66,7 @@
 
   /**
    * Extract the slash command type from input text.
-   * Returns the command name (e.g., "extract", "validate", "publish") or null.
+   * Returns the command name (e.g., generate "extract", "validate", "publish") or null.
    */
   function extractSlashCommand(text: string): string | null {
     const match = text.trim().match(/^\/(\w+)/);
@@ -402,7 +402,7 @@
                   Dismiss
                 </Button>
                 <span class="text-[9px] text-muted-foreground/40">
-                  Use a slash command (e.g. /extract) to bypass
+                  Use a slash command (e.g. /extract) to bypass 
                 </span>
               </div>
             </div>

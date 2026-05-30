@@ -39,14 +39,83 @@ export const behavioralRatingSchema = z.object({
   rating: z.number().min(1).max(5),
 });
 
-export const manageResultsSchema = z.discriminatedUnion("type", [
-  academicMarkSchema,
-  attendanceSchema,
-  qualitativeRemarkSchema,
-  behavioralRatingSchema,
-]);
+export const manageResultsSchema = z.object({
+  type: z.enum(["academic", "attendance", "qualitative", "behavioral"]),
+  studentId: z.number(),
+  subjectId: z.number().optional(),
+  score: z.number().min(0).max(100).optional(),
+  examTypeId: z.number().optional(),
+  present: z.number().min(0).optional(),
+  absent: z.number().min(0).optional(),
+  daysOpened: z.number().optional(),
+  remark: z.string().min(1).optional(),
+  trait: z.string().optional(),
+  rating: z.number().min(1).max(5).optional(),
+}).superRefine((data, ctx) => {
+  if (data.type === "academic") {
+    if (data.subjectId === undefined) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["subjectId"],
+        message: "subjectId is required for academic type",
+      });
+    }
+    if (data.score === undefined) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["score"],
+        message: "score is required for academic type",
+      });
+    }
+  } else if (data.type === "attendance") {
+    if (data.present === undefined) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["present"],
+        message: "present is required for attendance type",
+      });
+    }
+    if (data.absent === undefined) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["absent"],
+        message: "absent is required for attendance type",
+      });
+    }
+  } else if (data.type === "qualitative") {
+    if (data.remark === undefined || data.remark.trim() === "") {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["remark"],
+        message: "remark is required for qualitative type",
+      });
+    }
+  } else if (data.type === "behavioral") {
+    if (data.trait === undefined || data.trait.trim() === "") {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["trait"],
+        message: "trait is required for behavioral type",
+      });
+    }
+    if (data.rating === undefined) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["rating"],
+        message: "rating is required for behavioral type",
+      });
+    }
+  }
+});
 
-export type ManageResultsInput = z.infer<typeof manageResultsSchema>;
+export type ManageResultsInput = {
+  studentId: number;
+} & (
+  | { type: "academic"; subjectId: number; score: number; examTypeId?: number }
+  | { type: "attendance"; present: number; absent: number; daysOpened?: number }
+  | { type: "qualitative"; remark: string }
+  | { type: "behavioral"; trait: string; rating: number }
+);
 
 export const manageResultsLogic = async (
   context: MastraToolContext,

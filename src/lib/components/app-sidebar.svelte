@@ -19,7 +19,7 @@
   import NavMain from "./nav-main.svelte";
   import WorkspaceSwitcher from "./workspace-switcher.svelte";
   import type { AuthUser } from "$lib/types/auth-types";
-  import type { ComponentProps } from "svelte";
+  import { tick, type ComponentProps } from "svelte";
   import NavUser from "./nav-user.svelte";
   import { SidebarHistory } from "./sidebar-history";
   import SettingsIcon from "@lucide/svelte/icons/settings";
@@ -30,7 +30,7 @@
   import MoonIcon from "@lucide/svelte/icons/moon";
   import SunIcon from "@lucide/svelte/icons/sun";
   import PlusIcon from "@lucide/svelte/icons/plus";
-  import { goto, pushState } from "$app/navigation";
+  import { goto, invalidateAll, pushState } from "$app/navigation";
   import { UserContext } from "$lib/context/user-context.svelte";
 
   type SidebarProps = {
@@ -58,9 +58,12 @@
 
 <Sidebar.Root bind:ref collapsible="icon" {...restProps}>
   <Sidebar.Header>
-    <WorkspaceSwitcher items={workspaceNavItems} bind:activeItem={activeWorkspaceNav} />
+    <WorkspaceSwitcher
+      items={workspaceNavItems}
+      bind:activeItem={activeWorkspaceNav}
+    />
   </Sidebar.Header>
-  
+
   <Sidebar.Content class="scrollbar-hide">
     <!--
       TODO: Temporarily disabled pending re-architecture/re-strategy of main navigation functionalities.
@@ -72,21 +75,30 @@
         ]} 
       />
     -->
-    
+
     <Sidebar.Group class="pt-0 pb-2">
       <Sidebar.GroupContent class="flex flex-col gap-2">
         <Sidebar.Menu>
           <Sidebar.MenuItem>
-            <Sidebar.MenuButton tooltipContent="New Session" onclick={handleNewSession} class="text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent transition-colors font-medium">
+            <Sidebar.MenuButton
+              tooltipContent="New Session"
+              onclick={handleNewSession}
+              class="text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent transition-colors font-medium"
+            >
               <PlusIcon class="size-4 text-primary" />
               <span>New Session</span>
-              <kbd class="ml-auto group-data-[collapsible=icon]:hidden rounded-md bg-background/50 px-1.5 py-0.5 text-[10px] font-mono text-sidebar-foreground/40 border border-sidebar-border">⌘K</kbd>
+              <kbd
+                class="ml-auto group-data-[collapsible=icon]:hidden rounded-md bg-background/50 px-1.5 py-0.5 text-[10px] font-mono text-sidebar-foreground/40 border border-sidebar-border"
+                >⌘K</kbd
+              >
             </Sidebar.MenuButton>
           </Sidebar.MenuItem>
         </Sidebar.Menu>
 
         <div class="relative group px-2 group-data-[collapsible=icon]:hidden">
-          <SearchIcon class="absolute left-4 top-1/2 -translate-y-1/2 size-3.5 text-sidebar-foreground/30 pointer-events-none" />
+          <SearchIcon
+            class="absolute left-4 top-1/2 -translate-y-1/2 size-3.5 text-sidebar-foreground/30 pointer-events-none"
+          />
           <input
             type="text"
             placeholder="Filter sessions..."
@@ -99,7 +111,7 @@
 
     <SidebarHistory {user} />
 
-    <NavSecondary 
+    <NavSecondary
       class="mt-auto"
       {user}
       items={[
@@ -109,15 +121,16 @@
           action: () => {
             if (sidebar.isMobile) sidebar.setOpenMobile(false);
             pushState("", { showModal: true });
-          }
+          },
         },
         {
           title: "Toggle Theme",
           icon: theme.resolvedTheme === "dark" ? MoonIcon : SunIcon,
           action: () => {
-            theme.selectedTheme = theme.resolvedTheme === "dark" ? "light" : "dark";
-          }
-        }
+            theme.selectedTheme =
+              theme.resolvedTheme === "dark" ? "light" : "dark";
+          },
+        },
       ]}
     />
   </Sidebar.Content>
