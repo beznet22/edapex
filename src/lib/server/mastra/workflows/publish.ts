@@ -121,12 +121,11 @@ const publishBatchStep = createStep({
 });
 
 /**
- * Step 3 — Record Status
- * Persists the final publish run outcome into workflow state for
- * downstream UI inspection and audit traceability.
+ * Step 3 — Report Publish
+ * Persists the final publish run outcome and generates a natural language summary.
  */
-const recordStatusStep = createStep({
-  id: "record-status",
+const reportPublishStep = createStep({
+  id: "report-publish",
   inputSchema: z.object({
     success: z.boolean(),
     sent: z.number(),
@@ -139,6 +138,7 @@ const recordStatusStep = createStep({
     sentCount: z.number(),
     failedCount: z.number(),
     totalErrors: z.number(),
+    summary: z.string().optional()
   }),
   stateSchema: publishStateSchema,
   execute: async ({ inputData, getStepResult, setState }) => {
@@ -159,23 +159,22 @@ const recordStatusStep = createStep({
       sentCount: sent,
       failedCount: failed,
       totalErrors: errors.length,
+      summary: `Successfully sent ${sent} emails. Failed: ${failed}.`
     };
   },
 });
 
 export const publishWorkflow = createWorkflow({
   id: "publish-results",
-  description: "Publish Results Workflow",
   inputSchema: publishTriggerSchema,
   outputSchema: z.object({
     completed: z.boolean(),
     sentCount: z.number(),
     failedCount: z.number(),
     totalErrors: z.number(),
+    summary: z.string().optional()
   }),
   stateSchema: publishStateSchema,
 });
 
-publishWorkflow.then(resolveTargetsStep as any).then(publishBatchStep as any).then(recordStatusStep as any);
-
-publishWorkflow.commit();
+publishWorkflow.then(resolveTargetsStep).then(publishBatchStep).then(reportPublishStep).commit();

@@ -88,7 +88,7 @@
   <link rel="icon" href={favicon} />
 </svelte:head>
 
-<Sidebar.Provider bind:open={sidebarOpen} style="--sidebar-width: 350px; --sidebar-width-icon: 4rem;">
+<Sidebar.Provider bind:open={sidebarOpen}>
   <AppSidebar user={data.user ?? undefined} />
   <Sidebar.Inset>
     {@render children()}

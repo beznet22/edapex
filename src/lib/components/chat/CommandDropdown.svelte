@@ -1,12 +1,10 @@
 <script lang="ts">
   import { Button } from "$lib/components/ui/button";
   import { cn } from "$lib/utils/shadcn";
-  import FileTextIcon from "@lucide/svelte/icons/file-text";
-  import SearchIcon from "@lucide/svelte/icons/search";
-  import GraduationCapIcon from "@lucide/svelte/icons/graduation-cap";
   import ShieldCheckIcon from "@lucide/svelte/icons/shield-check";
-  import LayoutPanelLeftIcon from "@lucide/svelte/icons/layout-panel-left";
-  import ShuffleIcon from "@lucide/svelte/icons/shuffle";
+  import ScanLineIcon from "@lucide/svelte/icons/scan-line";
+  import FileSignatureIcon from "@lucide/svelte/icons/file-signature";
+  import SendIcon from "@lucide/svelte/icons/send";
 
   let { 
     query, 
@@ -17,12 +15,10 @@
   } = $props();
 
   const commands = [
-    { id: 'extract', label: 'Extract', icon: FileTextIcon, desc: 'Process assessment PDFs' },
-    { id: 'grade', label: 'Grade', icon: GraduationCapIcon, desc: 'Execute grading logic' },
-    { id: 'onboard', label: 'Onboard', icon: LayoutPanelLeftIcon, desc: 'Setup class context' },
-    { id: 'gov', label: 'Governance', icon: ShieldCheckIcon, desc: 'Check compliance' },
-    { id: 'switch', label: 'Switch', icon: ShuffleIcon, desc: 'Change orchestration mode' },
-    { id: 'search', label: 'Search', icon: SearchIcon, desc: 'Deep codebase query' },
+    { id: 'extract', label: 'extract', icon: ScanLineIcon, desc: 'Extract data via Mistral OCR' },
+    { id: 'validate', label: 'validate', icon: ShieldCheckIcon, desc: 'Human-in-the-loop review' },
+    { id: 'generate', label: 'generate', icon: FileSignatureIcon, desc: 'Upsert student results' },
+    { id: 'publish', label: 'publish', icon: SendIcon, desc: 'Publish final grade reports' },
   ];
 
   const filtered = $derived(

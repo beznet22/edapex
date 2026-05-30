@@ -9,20 +9,26 @@
   import { Markdown } from "tiptap-markdown";
   import WysiwygBubbleMenu from "./WysiwygBubbleMenu.svelte";
   import type { Editor } from "@tiptap/core";
+  import { Chat } from "@ai-sdk/svelte";
+  import { DefaultChatTransport, type UIMessage } from "ai";
+  import { CopilotExtension } from "./extensions/copilot";
+  import { SlashMenuExtension } from "./extensions/slash-menu";
+  import { MentionExtension } from "./extensions/mention-menu";
+  import { AiStreamNode } from "./extensions/ai-stream-node";
 
   let {
     content = "",
     onUpdate,
-    onAiImprove,
-    onAiGenerate,
     class: className = "",
   }: {
     content?: string;
     onUpdate?: (markdown: string) => void;
-    onAiImprove?: (selectedText: string) => void;
-    onAiGenerate?: () => void;
     class?: string;
   } = $props();
+
+  let isAiProcessing = $state(false);
+  let aiStreamNodePos = $state<number | null>(null);
+  let accumulatedContent = $state("");
 
   let editorInstance = $state<Editor | null>(null);
 
@@ -63,11 +69,20 @@
         transformPastedText: true,
         transformCopiedText: true,
       }),
+      CopilotExtension.configure({
+        debounceDelay: 500,
+        api: "/api/ai/editor/copilot",
+      }),
+      SlashMenuExtension,
+      MentionExtension,
+      AiStreamNode,
     ],
     content,
     editorProps: {
       attributes: {
         class: "outline-none min-h-[200px] px-6 py-4",
+        spellcheck: "true",
+        lang: "en",
       },
     },
     onUpdate: ({ editor: e }) => {
@@ -84,7 +99,7 @@
   });
 
   // Update content when external content changes (e.g. file switch)
-  let lastExternalContent = content;
+  let lastExternalContent = $state(content);
   $effect(() => {
     if (content !== lastExternalContent && $editor) {
       lastExternalContent = content;
@@ -92,23 +107,162 @@
     }
   });
 
-  function handleAiImprove() {
-    if (!$editor) return;
+  let currentCtx = $state<any>(null);
+
+  // Initialize once. The closure in prepareSendMessagesRequest will read the latest currentCtx
+  const chatClient = new Chat<UIMessage>({
+    id: "editor-command",
+    transport: new DefaultChatTransport({
+      api: "/api/ai/editor/command",
+      prepareSendMessagesRequest: ({ messages }) => {
+        return {
+          body: {
+            messages,
+            ctx: currentCtx,
+          },
+        };
+      },
+    }),
+    onError: (err) => {
+      console.error("AI Improve Error:", err);
+      isAiProcessing = false;
+    },
+  });
+
+  let lastMessageId = $state("");
+
+  // Reactive streaming effect — renders into AiStreamNode NodeView
+  $effect(() => {
+    if (!$editor || !isAiProcessing) return;
+
+    const messages = chatClient.messages;
+    if (messages.length === 0) return;
+
+    const lastMessage = messages[messages.length - 1];
+
+    if (lastMessage?.role === "assistant") {
+      // New message — insert the NodeView island
+      if (lastMessage.id !== lastMessageId) {
+        lastMessageId = lastMessage.id;
+        accumulatedContent = "";
+
+        if (currentCtx?.toolName === "edit") {
+          $editor.commands.deleteSelection();
+        }
+
+        // Insert the aiStreamBlock node at the current cursor position
+        const insertPos = $editor.state.selection.from;
+        $editor
+          .chain()
+          .focus()
+          .insertContentAt(insertPos, {
+            type: "aiStreamBlock",
+            attrs: { content: "" },
+          })
+          .run();
+
+        // Find the position of the node we just inserted
+        let foundPos: number | null = null;
+        $editor.state.doc.descendants((node, pos) => {
+          if (node.type.name === "aiStreamBlock" && foundPos === null) {
+            foundPos = pos;
+          }
+          return foundPos === null;
+        });
+        aiStreamNodePos = foundPos;
+      }
+
+      // Extract the full text content from the message
+      const anyMsg = lastMessage as any;
+      let fullContent = anyMsg.content || "";
+      if (!fullContent && anyMsg.parts) {
+        fullContent =
+          anyMsg.parts.find((p: any) => p.type === "text")?.text || "";
+      }
+
+      // Update the NodeView's content attribute with the accumulated markdown
+      if (
+        fullContent.length > accumulatedContent.length &&
+        aiStreamNodePos !== null
+      ) {
+        accumulatedContent = fullContent;
+
+        // Verify the node still exists at the tracked position
+        const nodeAtPos = $editor.state.doc.nodeAt(aiStreamNodePos);
+        if (nodeAtPos?.type.name === "aiStreamBlock") {
+          const tr = $editor.state.tr.setNodeMarkup(
+            aiStreamNodePos,
+            undefined,
+            {
+              content: accumulatedContent,
+            },
+          );
+          tr.setMeta("aiStream", true);
+          $editor.view.dispatch(tr);
+        }
+      }
+    }
+
+    // Stream finished — present Accept/Reject options
+    if (chatClient.status === "ready" || chatClient.status === "error") {
+      if (aiStreamNodePos !== null && accumulatedContent && $editor) {
+        const nodeAtPos = $editor.state.doc.nodeAt(aiStreamNodePos);
+        if (nodeAtPos?.type.name === "aiStreamBlock") {
+          const tr = $editor.state.tr.setNodeMarkup(
+            aiStreamNodePos,
+            undefined,
+            {
+              content: accumulatedContent,
+              status: "finished",
+            },
+          );
+          $editor.view.dispatch(tr);
+        }
+      }
+
+      aiStreamNodePos = null;
+      accumulatedContent = "";
+      isAiProcessing = false;
+    }
+  });
+
+  async function handleAiImprove() {
+    if (!$editor || isAiProcessing) return;
     const { from, to } = $editor.state.selection;
     const selectedText = $editor.state.doc.textBetween(from, to, " ");
-    if (selectedText && onAiImprove) {
-      onAiImprove(selectedText);
-    }
+    if (!selectedText) return;
+
+    isAiProcessing = true;
+    const markdown =
+      ($editor.storage as any).markdown?.getMarkdown?.() ?? $editor.getHTML();
+
+    currentCtx = { markdown, selectedText, toolName: "edit" };
+    chatClient.sendMessage({ text: "Improve this text" });
   }
+
+  function handleAiGenerate() {
+    if (!$editor || isAiProcessing) return;
+    isAiProcessing = true;
+    const markdown =
+      ($editor.storage as any).markdown?.getMarkdown?.() ?? $editor.getHTML();
+    currentCtx = { markdown, selectedText: "", toolName: "generate" };
+    chatClient.sendMessage({ text: "Generate content here" });
+  }
+
+  let container = $state<HTMLElement>();
+
+  $effect(() => {
+    if (!container) return;
+    container.addEventListener("ai-generate", handleAiGenerate);
+    return () =>
+      container?.removeEventListener("ai-generate", handleAiGenerate);
+  });
 </script>
 
-<div class="flex-1 overflow-y-auto {className}">
+<div bind:this={container} class="flex-1 overflow-y-auto {className}">
   {#if $editor}
     <BubbleMenu editor={$editor} class="z-50">
-      <WysiwygBubbleMenu
-        editor={$editor}
-        onAiImprove={onAiImprove ? handleAiImprove : undefined}
-      />
+      <WysiwygBubbleMenu editor={$editor} onAiImprove={handleAiImprove} />
     </BubbleMenu>
   {/if}
 

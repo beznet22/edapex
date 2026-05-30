@@ -19,7 +19,9 @@ export interface StepEvent {
 
 export type WorkflowPhase =
 	| 'idle'
+	| 'generating'
 	| 'extracting'
+	| 'awaiting-ocr-review'
 	| 'awaiting-validation'
 	| 'validating'
 	| 'awaiting-publish'
@@ -43,6 +45,9 @@ export class WorkflowEventSource {
 	workflowStatus = $state<WorkflowPhase>('idle');
 	connectionStatus = $state<ConnectionStatus>('connected');
 	error = $state<string | null>(null);
+	
+	// Callback for suspend events (Phase 7.7)
+	onSuspend = $state<((data: any) => void) | null>(null);
 
 	/**
 	 * Connect to the SSE endpoint for a given workflow run.
@@ -125,6 +130,18 @@ export class WorkflowEventSource {
 			}
 		});
 
+		this.source.addEventListener('suspend', (event: MessageEvent) => {
+			try {
+				const data = JSON.parse(event.data);
+				this.workflowStatus = 'awaiting-ocr-review';
+				if (this.onSuspend) {
+					this.onSuspend(data);
+				}
+			} catch {
+				// Ignore malformed suspend data
+			}
+		});
+
 		this.source.addEventListener('workflow-complete', (event: MessageEvent) => {
 			try {
 				const data = JSON.parse(event.data) as {
@@ -203,7 +220,9 @@ export class WorkflowEventSource {
 	 */
 	private derivePhase(stepName: string): WorkflowPhase {
 		const normalized = stepName.toLowerCase();
+		if (normalized.includes('generat')) return 'generating';
 		if (normalized.includes('extract')) return 'extracting';
+		if (normalized.includes('suspend') || normalized.includes('review')) return 'awaiting-ocr-review';
 		if (normalized.includes('await') && normalized.includes('valid')) return 'awaiting-validation';
 		if (normalized.includes('valid')) return 'validating';
 		if (normalized.includes('await') && normalized.includes('publish')) return 'awaiting-publish';

@@ -52,9 +52,7 @@ const opengatewayProvider = createOpenAICompatible({
 
 export const DEFAULT_MODEL = opengatewayProvider.chatModel('mimo-v2.5-pro') as any;
 
-/**
- * Default title model — prefers Groq for fast inference.
- */
+
 const groqProvider = createOpenAICompatible({
 	name: 'opengateway',
 	apiKey: env.GROQ_API_KEY,
@@ -63,4 +61,17 @@ const groqProvider = createOpenAICompatible({
 	supportsStructuredOutputs: false,
 });
 
-export const DEFAULT_TITLE_MODEL = groqProvider.chatModel('llama-3.1-8b-instant') as any;
+/**
+ * Default title model — prefers Groq for fast inference.
+ */
+export const DEFAULT_TITLE_MODEL = groqProvider.chatModel('llama-3.1-8b-instant');
+
+/**
+ * Default copilot model — prefers Groq for fast inference.
+ */
+export const DEFAULT_COPILOT_MODEL = groqProvider.chatModel('llama-3.1-8b-instant');
+
+/**
+ * Default editor agent model — prefers Groq for fast inference.
+ */
+export const DEFAULT_EDITOR_MODEL = groqProvider.chatModel('llama-3.1-8b-instant');

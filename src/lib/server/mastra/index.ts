@@ -10,6 +10,12 @@
  */
 import { Mastra } from '@mastra/core';
 import { supervisorAgent, assistantAgent, titleAgent } from './agents';
+import { editorEditAgent, editorGenerateAgent, editorCopilotAgent } from './agents';
+import { editorCommandWorkflow } from './workflows/editor-command';
+import { validationWorkflow } from './workflows/validation';
+import { publishWorkflow } from './workflows/publish';
+import { extractionWorkflow } from './workflows/extraction';
+import { generateWorkflow } from './workflows/generate';
 import { createMastraStorage } from './storage';
 
 // ─── Singleton Mastra Instance ──────────────────────────────────────────────
@@ -30,6 +36,16 @@ export const mastra = new Mastra({
   agents: {
     assistant: assistantAgent,
     title: titleAgent,
+    editorEdit: editorEditAgent,
+    editorGenerate: editorGenerateAgent,
+    editorCopilot: editorCopilotAgent,
+  },
+  workflows: {
+    editorCommandWorkflow,
+    validationWorkflow,
+    publishWorkflow,
+    extractionWorkflow,
+    generateWorkflow,
   },
   storage: createMastraStorage(),
   server: {
@@ -53,7 +69,7 @@ export function getMastra(): Mastra {
 /**
  * Retrieves a registered agent by ID from the singleton Mastra instance.
  */
-export function getAgent(id: 'supervisor' | 'assistant' | 'title') {
+export function getAgent(id: 'supervisor' | 'assistant' | 'title' | 'editorEdit' | 'editorGenerate' | 'editorCopilot') {
   return mastra.getAgent(id);
 }
 

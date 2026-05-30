@@ -27,7 +27,7 @@
   ]);
 </script>
 
-<div class="flex items-center gap-0.5 px-1.5 py-1 hermes-glass rounded-xl shadow-2xl transition-spring">
+<div class="flex items-center gap-0.5 px-1.5 py-1 bg-popover text-popover-foreground border border-border rounded-xl shadow-2xl transition-spring">
   {#each actions as action, i}
     <button
       class={cn(

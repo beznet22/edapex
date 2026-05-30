@@ -1,6 +1,6 @@
 // workspace-context.svelte.ts
 // Centralizes all workspace state and logic, consumed by WorkspacePane and child components.
-import { getContext, setContext } from "svelte";
+import { getContext, setContext, untrack } from "svelte";
 import { useChat } from "$lib/context/chat-context.svelte";
 import { UserContext } from "$lib/context/user-context.svelte";
 import { SelectedClass } from "$lib/context/sync.svelte";
@@ -91,6 +91,12 @@ export type NameInputState = {
   originalKey?: string;
 } | null;
 
+export interface ArtifactGroup {
+  name: string;
+  icon: string; // category icon key: "media" | "image" | "document" | "data" | "markdown" | "file"
+  files: FlatFile[];
+}
+
 // ─── Context Class ────────────────────────────────────────────────────────────
 
 export class WorkspaceContext {
@@ -144,6 +150,31 @@ export class WorkspaceContext {
 
   // ── Panel view ─────────────────────────────────────────────────────────────
   activeView = $state<PanelView>("files");
+  
+  // ── Editor Features ────────────────────────────────────────────────────────
+  copilotEnabled = $state(true);
+
+  // ── Workspace mode (Files vs Artifacts) ───────────────────────────────────
+  workspaceMode = $state<"files" | "artifacts">("artifacts");
+  artifactView = $state<"list" | "grid">("grid");
+
+  artifactModeContent = $state<any>(null);
+  artifactModeType = $state<"markdown" | "pdf" | null>(null);
+  artifactModeCallbacks = $state<{ onApprove: (data: any) => void; onReject: (data: any) => void } | null>(null);
+
+  openArtifact(type: "markdown" | "pdf", content: any, callbacks?: { onApprove: (data: any) => void; onReject: (data: any) => void }) {
+    this.workspaceMode = "artifacts";
+    this.artifactModeType = type;
+    this.artifactModeContent = content;
+    if (callbacks) this.artifactModeCallbacks = callbacks;
+  }
+  
+  closeArtifact() {
+    this.artifactModeType = null;
+    this.artifactModeContent = null;
+    this.artifactModeCallbacks = null;
+    this.workspaceMode = "files";
+  }
 
   // ── Role / permissions ─────────────────────────────────────────────────────
   canViewRunHistory = $derived(this.userContext.isIt || this.userContext.isCoordinator);
@@ -203,6 +234,24 @@ export class WorkspaceContext {
   runHistorySteps = $state<RunStep[]>([]);
   runHistoryLoading = $state(false);
 
+  // ── Unified OCR System (Phase 3.1) ─────────────────────────────────────────
+  ocrArtifact = $state<{
+    fileId: string;
+    markdown: string;
+    status: 'idle' | 'processing' | 'done' | 'error';
+    error?: string;
+  } | null>(null);
+
+  activeArtifact = $state<{
+    fileId: string;
+    markdown: string;
+    status: 'idle' | 'reviewing' | 'submitting' | 'done';
+    error?: string;
+    runId?: string;
+    stepId?: string;
+    workflowId?: string;
+  } | null>(null);
+
   // ── Inline rename/create ───────────────────────────────────────────────────
   nameInputState = $state<NameInputState>(null);
   nameInputValue = $state("");
@@ -212,11 +261,64 @@ export class WorkspaceContext {
   resolvedEntries = $derived(this.#buildGroupedTree(this.rawFiles));
   filteredFileTree = $derived(this.#filterTree(this.resolvedEntries, this.searchQuery));
 
+  // ── Artifact groups (categorized by file type for Artifact mode) ────────────
+  artifactGroups = $derived(this.#buildArtifactGroups(this.rawFiles, this.searchQuery));
+
+
   constructor() {
     // Persist recent files
     $effect(() => {
       localStorage.setItem("hermes_recent_files", JSON.stringify(this.recentFiles));
     });
+
+    // Phase 7.7: Wire up suspend events to open Artifact Mode
+    this.workflowEvents.onSuspend = (data) => {
+      this.openArtifact("markdown", JSON.stringify(data.resumeData?.extractedResults, null, 2), {
+        onApprove: async (correctedMarkdown) => {
+          this.artifactModeType = null; // show loading or close
+          toast.info("Submitting approved artifact...");
+          try {
+            const res = await fetch("/api/ai/workflow/resume", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                workflowId: data.workflowId || "document-extraction",
+                runId: data.runId,
+                stepId: data.stepId || "suspend-for-validation",
+                resumeData: {
+                  approved: true,
+                  correctedMarkdown
+                }
+              })
+            });
+            if (!res.ok) throw new Error("Failed to resume workflow");
+            toast.success("Artifact approved!");
+            this.closeArtifact();
+          } catch (err: any) {
+            toast.error(err.message || "Approval failed");
+          }
+        },
+        onReject: async () => {
+          try {
+            const res = await fetch("/api/ai/workflow/resume", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                workflowId: data.workflowId || "document-extraction",
+                runId: data.runId,
+                stepId: data.stepId || "suspend-for-validation",
+                resumeData: { approved: false }
+              })
+            });
+            if (!res.ok) throw new Error("Failed to reject workflow");
+            toast.success("Artifact rejected.");
+            this.closeArtifact();
+          } catch (err: any) {
+            toast.error(err.message || "Rejection failed");
+          }
+        }
+      });
+    };
 
     // Auto-switch to workflow view on active workflow
     $effect(() => {
@@ -239,23 +341,25 @@ export class WorkspaceContext {
     // Detect workflow completions for auto-dismiss summaries
     $effect(() => {
       const currentTools = this.chat.activeWorkflows.map((w) => w.tool);
-      const prev = this.#previousWorkflowTools;
-      for (const tool of prev) {
-        if (!currentTools.includes(tool)) {
-          const summary = {
-            id: `${tool}-${Date.now()}`,
-            workflowName: tool,
-            status: "success" as const,
-            stepsCompleted: 1,
-            stepsFailed: 0,
-          };
-          this.completionSummaries = [...this.completionSummaries, summary];
-          setTimeout(() => {
-            this.completionSummaries = this.completionSummaries.filter((s) => s.id !== summary.id);
-          }, 10_000);
+      untrack(() => {
+        const prev = this.#previousWorkflowTools;
+        for (const tool of prev) {
+          if (!currentTools.includes(tool)) {
+            const summary = {
+              id: `${tool}-${Date.now()}`,
+              workflowName: tool,
+              status: "success" as const,
+              stepsCompleted: 1,
+              stepsFailed: 0,
+            };
+            this.completionSummaries = [...this.completionSummaries, summary];
+            setTimeout(() => {
+              this.completionSummaries = this.completionSummaries.filter((s) => s.id !== summary.id);
+            }, 10_000);
+          }
         }
-      }
-      this.#previousWorkflowTools = currentTools;
+        this.#previousWorkflowTools = currentTools;
+      });
     });
 
     // Fetch workspace on workspaceId change
@@ -323,7 +427,7 @@ export class WorkspaceContext {
 
   // ── File operations ────────────────────────────────────────────────────────
 
-  handleFileClick(entry: FileEntry) {
+  handleFileClick = (entry: FileEntry) => {
     if (entry.type !== "file" || !this.workspaceId) return;
     this.activeDirKey = null;
     this.activeFileKey = entry.key;
@@ -335,24 +439,38 @@ export class WorkspaceContext {
       type: this.getFileType(entry.name),
       url: `/api/file/${entry.key}?workspace=${this.workspaceId}`,
     }];
-  }
+  };
 
-  closeFile(key: string) {
+  closeFile = (key: string) => {
     this.openedFiles = this.openedFiles.filter((f) => f.key !== key);
     if (this.activeFileKey === key) {
       this.activeFileKey = this.openedFiles.length > 0 ? this.openedFiles[this.openedFiles.length - 1].key : null;
     }
-  }
+  };
 
-  deleteFile(entry: FileEntry) {
+  deleteFile = (entry: FileEntry) => {
     if (!confirm(`Are you sure you want to delete ${entry.name}?`)) return;
     this.isLoading = true;
     fetch(`/api/file/${encodeURIComponent(entry.key)}?workspace=${this.workspaceId}`, { method: "DELETE" })
       .then(() => this.fetchWorkspace())
       .finally(() => (this.isLoading = false));
-  }
+  };
 
-  downloadFile(entry: FileEntry) {
+  renameFile = (entry: FileEntry) => {
+    const newName = prompt(`Rename ${entry.name} to:`, entry.name);
+    if (!newName || newName === entry.name) return;
+
+    const pathParts = entry.key.split("/");
+    pathParts[pathParts.length - 1] = newName;
+    const newKey = pathParts.join("/");
+
+    this.isLoading = true;
+    fetch(`/api/file/${encodeURIComponent(entry.key)}?workspace=${this.workspaceId}&action=rename&to=${encodeURIComponent(newKey)}`, { method: "POST" })
+      .then(() => this.fetchWorkspace())
+      .finally(() => (this.isLoading = false));
+  };
+
+  downloadFile = (entry: FileEntry) => {
     if (!this.workspaceId) return;
     const a = document.createElement("a");
     a.href = `/api/file/${encodeURIComponent(entry.key)}?workspace=${this.workspaceId}&action=download`;
@@ -360,9 +478,9 @@ export class WorkspaceContext {
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
-  }
+  };
 
-  async shareFile(entry: FileEntry) {
+  shareFile = async (entry: FileEntry) => {
     if (!this.workspaceId) return;
     try {
       const res = await fetch("/api/file/share", {
@@ -379,29 +497,144 @@ export class WorkspaceContext {
     } catch {
       toast.error("Failed to generate share link");
     }
-  }
+  };
 
-  copyPathToClipboard(entry: FileEntry) {
+  copyPathToClipboard = (entry: FileEntry) => {
     navigator.clipboard.writeText(entry.key);
-  }
+  };
 
-  toggleReference(entry: FileEntry) {
+  toggleReference = (entry: FileEntry) => {
     const isRef = this.fileContext.references.some((r) => r.key === entry.key);
     if (isRef) this.fileContext.removeReference(entry.key);
     else this.fileContext.addReference({ key: entry.key, name: entry.name, type: entry.type });
-  }
+  };
 
-  triggerExtract(entry: FileEntry) {
+  triggerExtract = (entry: FileEntry) => {
     if (!this.workspaceId) return;
     this.uploadingFiles = [...this.uploadingFiles, { name: entry.name, status: "extracting" }];
     setTimeout(() => {
       this.uploadingFiles = this.uploadingFiles.filter((u) => u.name !== entry.name);
     }, 2000);
-  }
+  };
+
+  triggerInstantOcr = async (file: File) => {
+    this.ocrArtifact = {
+      fileId: file.name,
+      markdown: "",
+      status: "processing"
+    };
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("filename", file.name);
+
+    try {
+      const res = await fetch("/api/file/ocr", {
+        method: "POST",
+        body: formData
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to process OCR");
+      }
+      this.ocrArtifact = {
+        fileId: file.name,
+        markdown: data.markdown,
+        status: "done"
+      };
+      this.activeArtifact = {
+        fileId: file.name,
+        markdown: data.markdown,
+        status: "reviewing"
+      };
+      toast.success("OCR completed successfully");
+      this.fetchWorkspace();
+    } catch (err: any) {
+      console.error("[InstantOCR]", err);
+      this.ocrArtifact = {
+        fileId: file.name,
+        markdown: "",
+        status: "error",
+        error: err.message
+      };
+      toast.error(err.message || "OCR processing failed");
+    }
+  };
+
+  triggerBatchOcr = async (fileKeys: string[]) => {
+    this.ocrArtifact = {
+      fileId: "batch-job",
+      markdown: "Preparing batch job...",
+      status: "processing"
+    };
+
+    try {
+      const res = await fetch("/api/file/ocr/batch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fileKeys })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to create batch job");
+      }
+
+      const { jobId, totalFiles } = data;
+      this.ocrArtifact.markdown = `Batch job created. Job ID: ${jobId}. Total files: ${totalFiles}. Polling for results...`;
+
+      let attempts = 0;
+      const maxAttempts = 60;
+      while (attempts < maxAttempts) {
+        await new Promise((r) => setTimeout(r, 5000));
+        const statusRes = await fetch(`/api/file/ocr/batch?jobId=${jobId}`);
+        const statusData = await statusRes.json();
+        if (!statusRes.ok) {
+          throw new Error(statusData.error || "Failed to poll batch job");
+        }
+
+        if (statusData.status === "completed") {
+          this.ocrArtifact.markdown = "Batch job completed. Downloading results...";
+          const resultsRes = await fetch("/api/file/ocr/batch/results", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ outputFileId: statusData.outputFileId })
+          });
+          const resultsData = await resultsRes.json();
+          if (!resultsRes.ok) {
+            throw new Error(resultsData.error || "Failed to download batch results");
+          }
+
+          this.ocrArtifact = {
+            fileId: "batch-job",
+            markdown: `Processed ${resultsData.results.length} files successfully.`,
+            status: "done"
+          };
+          toast.success(`Batch OCR processed ${resultsData.results.length} files`);
+          this.fetchWorkspace();
+          return;
+        } else if (statusData.status === "failed") {
+          throw new Error("Mistral batch job failed");
+        } else {
+          this.ocrArtifact.markdown = `Job ${jobId} status: ${statusData.status}...`;
+        }
+        attempts++;
+      }
+      throw new Error("Batch OCR job timed out");
+    } catch (err: any) {
+      console.error("[BatchOCR]", err);
+      this.ocrArtifact = {
+        fileId: "batch-job",
+        markdown: "",
+        status: "error",
+        error: err.message
+      };
+      toast.error(err.message || "Batch OCR failed");
+    }
+  };
+
 
   // ── Upload / drag ──────────────────────────────────────────────────────────
 
-  async processUpload(files: FileList) {
+  processUpload = async (files: FileList) => {
     if (!this.workspaceId || !files.length) return;
     for (const file of Array.from(files)) {
       this.uploadingFiles = [...this.uploadingFiles, { name: file.name, status: "uploading" }];
@@ -428,18 +661,18 @@ export class WorkspaceContext {
       }
       setTimeout(() => { this.uploadingFiles = this.uploadingFiles.filter((u) => u.name !== file.name); }, 3000);
     }
-  }
+  };
 
-  handleDragOver(e: DragEvent) { e.preventDefault(); this.isDragging = true; }
-  handleDragLeave(e: DragEvent) { if (e.currentTarget === e.target) this.isDragging = false; }
-  handleDrop(e: DragEvent) {
+  handleDragOver = (e: DragEvent) => { e.preventDefault(); this.isDragging = true; };
+  handleDragLeave = (e: DragEvent) => { if (e.currentTarget === e.target) this.isDragging = false; };
+  handleDrop = (e: DragEvent) => {
     e.preventDefault(); this.isDragging = false;
     if (e.dataTransfer?.files) this.processUpload(e.dataTransfer.files);
-  }
+  };
 
   // ── Inline name input ──────────────────────────────────────────────────────
 
-  startCreate(type: "file" | "dir", parentPath: string = "") {
+  startCreate = (type: "file" | "dir", parentPath: string = "") => {
     const targetPath = parentPath || this.activeDirKey || "";
     this.nameInputState = { mode: "create", type, parentPath: targetPath, initialValue: "" };
     this.nameInputValue = "";
@@ -449,20 +682,20 @@ export class WorkspaceContext {
       next.add(targetPath);
       this.expandedDirs = next;
     }
-  }
+  };
 
-  startRename(entry: FileEntry, parentPath: string, isMove = false) {
+  startRename = (entry: FileEntry, parentPath: string, isMove = false) => {
     this.nameInputState = {
       mode: isMove ? "move" : "rename", type: entry.type, parentPath,
       initialValue: isMove ? entry.key : entry.name, originalKey: entry.key,
     };
     this.nameInputValue = this.nameInputState.initialValue;
     this.inlineError = null;
-  }
+  };
 
-  cancelInlineAction() { this.nameInputState = null; this.nameInputValue = ""; this.inlineError = null; }
+  cancelInlineAction = () => { this.nameInputState = null; this.nameInputValue = ""; this.inlineError = null; };
 
-  submitInlineAction() {
+  submitInlineAction = () => {
     if (!this.nameInputState || !this.nameInputValue.trim() || !this.workspaceId) {
       this.cancelInlineAction(); return;
     }
@@ -485,16 +718,16 @@ export class WorkspaceContext {
       fetch(`/api/file/${encodedOld}?workspace=${this.workspaceId}&action=rename&to=${encodeURIComponent(newPath).replace(/%2F/g, "/")}`, { method: "POST" })
         .then(() => this.fetchWorkspace()).finally(() => (this.isLoading = false));
     }
-  }
+  };
 
   // ── Dir toggle ─────────────────────────────────────────────────────────────
 
-  toggleDir(path: string) {
+  toggleDir = (path: string) => {
     this.activeDirKey = path; this.activeFileKey = null;
     const next = new Set(this.expandedDirs);
     if (next.has(path)) next.delete(path); else next.add(path);
     this.expandedDirs = next;
-  }
+  };
 
   // ── File helpers ───────────────────────────────────────────────────────────
 
@@ -578,6 +811,44 @@ export class WorkspaceContext {
       }
       return node.name.toLowerCase().includes(q) ? node : null;
     }).filter(Boolean) as FileEntry[];
+  }
+
+  #buildArtifactGroups(flat: FlatFile[], query: string): ArtifactGroup[] {
+    const CATEGORIES: { name: string; icon: string; extensions: string[] }[] = [
+      { name: "Media", icon: "media", extensions: ["mp4", "mp3", "mov", "avi", "wav", "ogg", "webm", "gif"] },
+      { name: "Images", icon: "image", extensions: ["png", "jpg", "jpeg", "svg", "webp", "bmp", "avif"] },
+      { name: "Documents", icon: "document", extensions: ["pdf", "docx", "doc", "pptx", "ppt", "xlsx", "xls"] },
+      { name: "Data", icon: "data", extensions: ["csv", "json", "xml", "yaml", "yml"] },
+      { name: "Markdown", icon: "markdown", extensions: ["md", "mdx", "txt"] },
+    ];
+
+    const q = query.trim().toLowerCase();
+
+    // Collect all real files (skip .keep placeholders and dir markers)
+    const allFiles = flat.filter((f) => !f.key.endsWith("/") && !f.key.endsWith(".keep"));
+
+    const groups: ArtifactGroup[] = [];
+    const categorised = new Set<string>();
+
+    for (const cat of CATEGORIES) {
+      const files = allFiles.filter((f) => {
+        const ext = f.key.split(".").pop()?.toLowerCase() ?? "";
+        const matches = cat.extensions.includes(ext);
+        if (!matches) return false;
+        categorised.add(f.key);
+        return !q || f.key.split("/").pop()?.toLowerCase().includes(q);
+      });
+      if (files.length > 0) groups.push({ name: cat.name, icon: cat.icon, files });
+    }
+
+    // Uncategorised "Other" group
+    const otherFiles = allFiles.filter((f) => {
+      if (categorised.has(f.key)) return false;
+      return !q || f.key.split("/").pop()?.toLowerCase().includes(q);
+    });
+    if (otherFiles.length > 0) groups.push({ name: "Other", icon: "file", files: otherFiles });
+
+    return groups;
   }
 
   // ── Context registration ───────────────────────────────────────────────────

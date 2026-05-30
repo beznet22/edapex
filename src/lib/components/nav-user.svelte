@@ -20,12 +20,17 @@
   import MinimizeIcon from "@lucide/svelte/icons/minimize";
   import SunIcon from "@lucide/svelte/icons/sun";
   import TriangleAlertIcon from "@lucide/svelte/icons/triangle-alert";
-
+  import FolderIcon from "@lucide/svelte/icons/folder";
+  import CircleCheckIcon from "@lucide/svelte/icons/circle-check";
+  import { SelectedClass } from "$lib/context/sync.svelte";
+  import { cn } from "$lib/utils/shadcn";
+  import { Badge } from "./ui/badge";
 
   let { user, hideDetails = false }: { user?: AuthUser, hideDetails?: boolean } = $props();
 
   const sidebar = useSidebar();
   const userContext = UserContext.fromContext();
+  const selectedClass = SelectedClass.fromContext();
   const pwa = usePWA();
   const theme = getTheme();
 
@@ -40,6 +45,42 @@
     if (!userContext.assignedSection) return null;
     const s = userContext.assignedSection;
     return `${s.className} ${s.sectionName}`;
+  });
+  let displayContext = $derived(
+    userContext.isTeacher && userContext.assignedSection
+      ? `${userContext.assignedSection.className} (${userContext.assignedSection.sectionName})`
+      : selectedClass.data
+        ? `${selectedClass.data.className} (${selectedClass.data.sectionName})`
+        : user?.email || "Guest",
+  );
+
+  let groupedClasses = $derived(() => {
+    const groups: Record<string, any[]> = {
+      "CRECHE": [],
+      "NURSERY": [],
+      "GRADEK": [],
+      "LOWER BASIC": [],
+      "MIDDLE BASIC": [],
+      "OTHER": []
+    };
+    
+    for (const cls of userContext?.classes || []) {
+      const name = cls.className?.toUpperCase() || "";
+      if (name.includes("CREACH") || name.includes("CRECHE") || name.includes("DAYCARE")) {
+        groups["CRECHE"].push(cls);
+      } else if (name.includes("NURSERY")) {
+        groups["NURSERY"].push(cls);
+      } else if (name.includes("GRADE K") || name.includes("GRADEK") || name.includes("GRADE")) {
+        groups["GRADEK"].push(cls);
+      } else if (name.includes("LOWER BASIC")) {
+        groups["LOWER BASIC"].push(cls);
+      } else if (name.includes("MIDDLE BASIC")) {
+        groups["MIDDLE BASIC"].push(cls);
+      } else {
+        groups["OTHER"].push(cls);
+      }
+    }
+    return Object.entries(groups).filter(([_, classes]) => classes.length > 0);
   });
 </script>
 
@@ -57,7 +98,7 @@
         <span class="truncate font-bold text-sidebar-foreground text-[13px]"
           >{user?.fullName || "Guest"}</span
         >
-        <span class="truncate text-xs text-muted-foreground/80">{user?.email || "Guest"}</span>
+        <span class="truncate text-xs text-muted-foreground/80">{displayContext}</span>
       </div>
     </div>
   </DropdownMenu.Label>
@@ -77,6 +118,18 @@
         Unassigned
       </span>
     {/if}
+    {#if userContext.isCoordinator || userContext.isIt}
+      <Badge
+        variant="outline"
+        class="shrink-0 text-[10px] font-bold border-sidebar-border text-sidebar-foreground/20 cursor-pointer hover:bg-sidebar-accent hover:text-sidebar-foreground/40 transition-all px-1 py-0 rounded-lg uppercase tracking-wider"
+        >#Ext</Badge
+      >
+      <Badge
+        variant="outline"
+        class="shrink-0 text-[10px] font-bold border-sidebar-border text-sidebar-foreground/20 cursor-pointer hover:bg-sidebar-accent hover:text-sidebar-foreground/40 transition-all px-1 py-0 rounded-lg uppercase tracking-wider"
+        >#Pub</Badge
+      >
+    {/if}
   </div>
 
   <DropdownMenu.Separator class="bg-primary/10 my-1" />
@@ -89,19 +142,8 @@
   <DropdownMenu.Separator class="bg-primary/10 my-1" />
   <DropdownMenu.Group>
     <DropdownMenu.Item class="flex items-center gap-2.5 px-2.5 py-2 rounded-xl cursor-pointer mb-0.5 last:mb-0 transition-all duration-200 hover:bg-primary/10 hover:text-primary text-[13px] font-semibold text-sidebar-foreground/80 focus:bg-primary/10 focus:text-primary focus-visible:outline-none focus:ring-0 focus-visible:ring-0 [&>svg]:size-4 [&>svg]:shrink-0 [&>svg]:opacity-60">
-      <MoonIcon />
-      Personalization
-    </DropdownMenu.Item>
-    <DropdownMenu.Item class="flex items-center gap-2.5 px-2.5 py-2 rounded-xl cursor-pointer mb-0.5 last:mb-0 transition-all duration-200 hover:bg-primary/10 hover:text-primary text-[13px] font-semibold text-sidebar-foreground/80 focus:bg-primary/10 focus:text-primary focus-visible:outline-none focus:ring-0 focus-visible:ring-0 [&>svg]:size-4 [&>svg]:shrink-0 [&>svg]:opacity-60">
       <UserIcon />
       Profile
-    </DropdownMenu.Item>
-    <DropdownMenu.Item onSelect={() => {
-      if (sidebar.isMobile) sidebar.setOpenMobile(false);
-      pushState("", { showModal: true });
-    }} class="flex items-center gap-2.5 px-2.5 py-2 rounded-xl cursor-pointer mb-0.5 last:mb-0 transition-all duration-200 hover:bg-primary/10 hover:text-primary text-[13px] font-semibold text-sidebar-foreground/80 focus:bg-primary/10 focus:text-primary focus-visible:outline-none focus:ring-0 focus-visible:ring-0 [&>svg]:size-4 [&>svg]:shrink-0 [&>svg]:opacity-60">
-      <SettingsIcon />
-      Settings
     </DropdownMenu.Item>
     <DropdownMenu.Item onSelect={() => pwa.toggleFullscreen()} class="flex items-center gap-2.5 px-2.5 py-2 rounded-xl cursor-pointer mb-0.5 last:mb-0 transition-all duration-200 hover:bg-primary/10 hover:text-primary text-[13px] font-semibold text-sidebar-foreground/80 focus:bg-primary/10 focus:text-primary focus-visible:outline-none focus:ring-0 focus-visible:ring-0 [&>svg]:size-4 [&>svg]:shrink-0 [&>svg]:opacity-60">
       {#if pwa.isFullscreen}
@@ -110,17 +152,6 @@
       {:else}
         <MaximizeIcon />
         Focus Mode
-      {/if}
-    </DropdownMenu.Item>
-    <DropdownMenu.Item onSelect={() => {
-      theme.selectedTheme = theme.resolvedTheme === "light" ? "dark" : "light";
-    }} class="flex items-center gap-2.5 px-2.5 py-2 rounded-xl cursor-pointer mb-0.5 last:mb-0 transition-all duration-200 hover:bg-primary/10 hover:text-primary text-[13px] font-semibold text-sidebar-foreground/80 focus:bg-primary/10 focus:text-primary focus-visible:outline-none focus:ring-0 focus-visible:ring-0 [&>svg]:size-4 [&>svg]:shrink-0 [&>svg]:opacity-60">
-      {#if theme.resolvedTheme === "dark"}
-        <SunIcon />
-        Light Mode
-      {:else}
-        <MoonIcon />
-        Dark Mode
       {/if}
     </DropdownMenu.Item>
   </DropdownMenu.Group>
@@ -184,7 +215,7 @@
           {#snippet child({ props })}
             <Sidebar.MenuButton
               size="lg"
-              class="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0!"
+              class="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
               {...props}
             >
               <img

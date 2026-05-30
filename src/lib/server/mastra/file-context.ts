@@ -15,6 +15,7 @@ export interface FileReference {
 	type: 'file' | 'dir';
 	size?: number;
 	mimeType?: string;
+	fileId?: string; // Mistral file ID for OCR documents
 }
 
 /**
@@ -72,6 +73,19 @@ export async function injectFileContext(
 	const parts: string[] = [];
 
 	for (const ref of validRefs) {
+		// OCR processed files: download markdown from Mistral
+		if (ref.fileId) {
+			try {
+				// We dynamically import to avoid circular dependencies if needed, or just use the service
+				const { mistralOcrService } = await import('$lib/server/service/mistral-ocr.service');
+				const content = await mistralOcrService.getMarkdownByFileId(null, ref.fileId);
+				parts.push(`--- ${ref.name} (OCR Extraction) ---\n${content}`);
+			} catch (err) {
+				parts.push(`[File: ${ref.name} — OCR Extraction Failed]`);
+			}
+			continue;
+		}
+
 		// Binary files: metadata only
 		if (isBinaryMimeType(ref.mimeType)) {
 			parts.push(`[File: ${ref.name}, Type: ${ref.mimeType}, Size: ${ref.size ?? 'unknown'}]`);

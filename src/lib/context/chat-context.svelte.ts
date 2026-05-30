@@ -114,8 +114,23 @@ export class ChatContext {
   #prepareSendMessagesRequest = ({ messages, id }: { messages: xUIMessage[], id?: string }) => {
     // Reset the data-chat received flag at the start of each new stream
     this.threadData.resetReceived();
+
+    let api = '/api/chat';
+    const lastMessage = messages.at(-1);
+    if (lastMessage?.parts) {
+      const textPart = lastMessage.parts.find(p => p.type === 'text') as any;
+      if (textPart && textPart.text) {
+        if (textPart.text.startsWith('/extract') ||
+            textPart.text.startsWith('/generate') ||
+            textPart.text.startsWith('/validate') ||
+            textPart.text.startsWith('/publish')) {
+          api = '/api/ai/workflow';
+        }
+      }
+    }
+
     const body: Record<string, any> = {
-      messages: this.user ? [messages.at(-1)] : messages,
+      messages: this.user ? [lastMessage] : messages,
       threadId: id,
       data: this.studentData as any,
       selectedClass: this.selectedClass,
@@ -131,7 +146,7 @@ export class ChatContext {
       this.pendingMentions = [];
     }
 
-    return { body };
+    return { body, api };
   };
 
   #onFinish = async () => {

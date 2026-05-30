@@ -12,12 +12,17 @@
   import Shimmer from "./ai-elements/shimmer/Shimmer.svelte";
   import ChatComposer from "./ChatComposer.svelte";
   import ChatResource from "./chat-resource.svelte";
+  import PdfLinkCard from "./chat/pdf-link-card.svelte";
   import MessageAction from "./message-action.svelte";
   import PreviewModal from "./pdf-preview.svelte";
   import { Markdown } from "./prompt-kit/markdown";
-  import { Reasoning, ReasoningTrigger, ReasoningContent } from "./prompt-kit/reasoning";
+  import {
+    Reasoning,
+    ReasoningTrigger,
+    ReasoningContent,
+  } from "./prompt-kit/reasoning";
   import ToolMessage from "./tool-message.svelte";
-  import { Button } from "./ui/button"; 
+  import { Button } from "./ui/button";
   import * as Tooltip from "./ui/tooltip";
 
   import FolderIcon from "@lucide/svelte/icons/folder";
@@ -45,7 +50,6 @@
   const chat = $derived(useChat());
   const userContext = UserContext.fromContext();
 
-
   let copyMessage = (content: string, role: string) => {
     navigator.clipboard.writeText(content);
     if (role === "assistant") {
@@ -66,14 +70,14 @@
 </script>
 
 <div
-  class={cn("relative flex flex-1 min-h-0 w-full flex-col bg-background font-sans selection:bg-primary/30", className)}
+  class={cn(
+    "relative flex flex-1 min-h-0 w-full flex-col bg-background font-sans selection:bg-primary/30",
+    className,
+  )}
 >
-
-
   {#if chat.messages.length === 0}
     <!-- Welcome Hero State -->
     <div class="flex-1 flex flex-col items-center justify-center px-4 -mt-12">
-
       <div class="mb-8 relative group">
         <!-- Ultra-soft outer glow -->
         <div
@@ -160,20 +164,31 @@
                   {@const mergedReasoning = (() => {
                     // Collect ALL reasoning parts regardless of position
                     return message.parts
-                      .filter((p) => p.type === 'reasoning')
-                      .map((p) => (p as any).text || '')
+                      .filter((p) => p.type === "reasoning")
+                      .map((p) => (p as any).text || "")
                       .filter(Boolean)
-                      .join('\n\n');
+                      .join("\n\n");
                   })()}
-                  {@const nonReasoningParts = message.parts.filter((p) => p.type !== 'reasoning')}
+                  {@const nonReasoningParts = message.parts.filter(
+                    (p) => p.type !== "reasoning",
+                  )}
 
                   <!-- Render single merged reasoning block at the top -->
                   {#if mergedReasoning}
                     <div class="mb-2">
-                      <Reasoning isStreaming={chat.status === "streaming" && message.id === chat.lastMessage?.id}>
+                      <Reasoning
+                        isStreaming={chat.status === "streaming" &&
+                          message.id === chat.lastMessage?.id}
+                      >
                         <ReasoningTrigger>Thinking process...</ReasoningTrigger>
-                        <ReasoningContent class="border-l-2 border-primary/20 pl-4 py-1 my-2" contentClass="!text-foreground/40 dark:!text-foreground/35 prose-sm">
-                          <Markdown content={mergedReasoning} animation={{ enabled: false }} />
+                        <ReasoningContent
+                          class="border-l-2 border-primary/20 pl-4 py-1 my-2"
+                          contentClass="!text-foreground/40 dark:!text-foreground/35 prose-sm"
+                        >
+                          <Markdown
+                            content={mergedReasoning}
+                            animation={{ enabled: false }}
+                          />
                         </ReasoningContent>
                       </Reasoning>
                     </div>
@@ -181,7 +196,7 @@
 
                   <!-- Render all non-reasoning parts -->
                   {#each nonReasoningParts as part}
-                    {#if part.type === 'tool-invocation'}
+                    {#if part.type === "tool-invocation"}
                       <div class="flex">
                         <ToolMessage {part} />
                       </div>
@@ -189,10 +204,18 @@
 
                     {#if part.type === "text"}
                       {#if message.role === "assistant"}
+                        {@const pdfLinks = Array.from(part.text.matchAll(/\[([^\]]+)\]\(([^)]+\.pdf|[^)]+\/api\/results\/[^)]+)\)/g)).map(m => ({ text: m[1], url: m[2] }))}
                         <Markdown
                           content={part.text}
                           animation={{ enabled: true }}
                         />
+                        {#if pdfLinks.length > 0}
+                          <div class="mt-4 flex flex-col gap-2">
+                            {#each pdfLinks as link}
+                              <PdfLinkCard filename={link.text} url={link.url} />
+                            {/each}
+                          </div>
+                        {/if}
                       {:else}
                         <div
                           class="prose prose-sm dark:prose-invert max-w-none"

@@ -16,19 +16,19 @@
   import FolderIcon from "@lucide/svelte/icons/folder";
 
   let {
-    maxPreviewMode = $bindable(),
     ocrEnabled = $bindable(),
     compressionEnabled = $bindable(),
     activeView = $bindable(),
+    maxPreviewMode = $bindable(false),
     chat,
     uploadingFiles,
     workflowStatus,
     canViewRunHistory,
   }: {
-    maxPreviewMode: boolean;
     ocrEnabled: boolean;
     compressionEnabled: boolean;
     activeView: "files" | "workflow" | "run-history";
+    maxPreviewMode: boolean;
     chat: any;
     uploadingFiles: { name: string; status: string }[];
     workflowStatus: string;
@@ -51,31 +51,6 @@
   <div
     class="mb-3 flex flex-col items-center gap-1.5 rounded-2xl bg-slate-950/90 backdrop-blur-3xl border border-white/10 shadow-[0_15px_40px_-10px_rgba(0,0,0,0.6)] px-1.5 py-0 max-h-0 opacity-0 overflow-hidden transition-all duration-300 group-hover/fab:max-h-[500px] group-hover/fab:opacity-100 group-hover/fab:py-2"
   >
-    <!-- Sidebar Toggle -->
-    <Tooltip.Root>
-      <Tooltip.Trigger>
-        {#snippet child({ props })}
-          <Button
-            {...props}
-            variant="ghost"
-            size="icon"
-            class={cn(
-              "size-9 shrink-0 rounded-xl transition-all duration-300",
-              !maxPreviewMode
-                ? "text-[#D4AF37] bg-[#D4AF37]/10"
-                : "text-white/40 hover:text-white hover:bg-white/5",
-            )}
-            onclick={() => (maxPreviewMode = !maxPreviewMode)}
-          >
-            <PanelLeftIcon class="size-4.5" />
-          </Button>
-        {/snippet}
-      </Tooltip.Trigger>
-      <Tooltip.Content side="left">Toggle File Browser</Tooltip.Content>
-    </Tooltip.Root>
-
-    <div class="h-px shrink-0 w-5 bg-white/10 my-0.5"></div>
-
     <!-- Active View Controls -->
     <Tooltip.Root>
       <Tooltip.Trigger>

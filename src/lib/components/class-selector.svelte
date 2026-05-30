@@ -1,116 +1,95 @@
 <script lang="ts">
-  import { useChat } from "$lib/context/chat-context.svelte";
-  import { useFileActions } from "$lib/context/file-context.svelte";
+  import * as Sidebar from "$lib/components/ui/sidebar/index.js";
+  import * as DropdownMenu from "$lib/components/ui/dropdown-menu/index.js";
   import { UserContext } from "$lib/context/user-context.svelte";
-  import { cn } from "$lib/utils/shadcn.js";
-  import { Button } from "./ui/button";
-  import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuTrigger,
-  } from "./ui/dropdown-menu";
+  import { SelectedClass } from "$lib/context/sync.svelte";
+  import FolderIcon from "@lucide/svelte/icons/folder";
   import CircleCheckIcon from "@lucide/svelte/icons/circle-check";
-  import ChevronDownIcon from "@lucide/svelte/icons/chevron-down";
-  import type { ClassSection } from "$lib/types/result-types";
-  import type { ClassValue } from "svelte/elements";
-  import { replaceState } from "$app/navigation";
-  import { getStudents } from "$lib/api/chat.remote";
-  import { toast } from "svelte-sonner";
-  import { localStore } from "$lib/utils/index";
+  import { cn } from "$lib/utils/shadcn";
 
   let {
-    class: c,
+    user
   }: {
-    class?: ClassValue;
+    user?: any;
   } = $props();
 
-  let open = $state(false);
   const userContext = UserContext.fromContext();
-  const chat = useChat();
-  const file = useFileActions();
-  let loading = $state(true);
+  const selectedClass = SelectedClass.fromContext();
 
-  const loadStudents = async () => {
-    loading = true;
-    const result = await getStudents({
-      classId: file.selectedClass?.classId || undefined,
-      sectionId: file.selectedClass?.sectionId || undefined,
-    });
-
-    if (!result.success || (!result.data && result.message)) {
-      loading = false;
-      toast.error(result.message);
-      return;
-    }
-
-    userContext.students = result.data!;
-    localStore("students", result.data);
-    loading = false;
-  };
-
-  const onSelect = (cls: ClassSection) => {
-    open = false;
-    file.selectedClass = cls;
-    if (chat) chat.selectedClass = cls;
-    loadStudents();
-  };
-
-  $effect(() => {
-    if (userContext.isTeacher && userContext.assignedSection) {
-      if (file.selectedClass?.id !== userContext.assignedSection.id) {
-        onSelect(userContext.assignedSection);
+  let groupedClasses = $derived(() => {
+    const groups: Record<string, any[]> = {
+      "CRECHE": [],
+      "NURSERY": [],
+      "GRADEK": [],
+      "LOWER BASIC": [],
+      "MIDDLE BASIC": [],
+      "OTHER": []
+    };
+    
+    for (const cls of userContext?.classes || []) {
+      const name = cls.className?.toUpperCase() || "";
+      if (name.includes("CREACH") || name.includes("CRECHE") || name.includes("DAYCARE")) {
+        groups["CRECHE"].push(cls);
+      } else if (name.includes("NURSERY")) {
+        groups["NURSERY"].push(cls);
+      } else if (name.includes("GRADE K") || name.includes("GRADEK") || name.includes("GRADE")) {
+        groups["GRADEK"].push(cls);
+      } else if (name.includes("LOWER BASIC")) {
+        groups["LOWER BASIC"].push(cls);
+      } else if (name.includes("MIDDLE BASIC")) {
+        groups["MIDDLE BASIC"].push(cls);
+      } else {
+        groups["OTHER"].push(cls);
       }
     }
+    return Object.entries(groups).filter(([_, classes]) => classes.length > 0);
   });
-
-  const onOpenChange = (val: boolean) => {
-    if (userContext.isTeacher && userContext.assignedSection) return;
-    open = val;
-  };
 </script>
 
-<DropdownMenu {open} {onOpenChange}>
-  <DropdownMenuTrigger
-    disabled={userContext.isTeacher && !!userContext.assignedSection}
-  >
-    {#snippet child({ props })}
-      <Button
-        {...props}
-        variant="outline"
-        class={cn(
-          "data-[state=open]:bg-accent data-[state=open]:text-accent-foreground w-fit px-1.5 sm:px-2 md:h-[34px]",
-          c,
-        )}
-      >
-        <div class="max-w-[85px] sm:max-w-[120px] truncate">
-          {#if !file.selectedClass?.id}
-            Select a Class
-          {:else}
-            {`${file.selectedClass?.className} (${file.selectedClass?.sectionName})`}
-          {/if}
-        </div>
-        <ChevronDownIcon class="opacity-50" />
-      </Button>
-    {/snippet}
-  </DropdownMenuTrigger>
-  <DropdownMenuContent align="start" class="max-h-96 min-w-[300px]">
-    {#each userContext.classes as cls (cls.id)}
-      <DropdownMenuItem
-        onSelect={() => onSelect(cls)}
-        class="group/item flex flex-row items-center justify-between gap-4"
-        data-active={cls.id === file.selectedClass?.id}
-      >
-        <div class="flex flex-col items-start gap-1">
-          <div>{`${cls.className} (${cls.sectionName})`}</div>
-        </div>
-
-        <div
-          class="text-foreground dark:text-foreground opacity-0 group-data-[active=true]/item:opacity-100"
-        >
-          <CircleCheckIcon />
-        </div>
-      </DropdownMenuItem>
-    {/each}
-  </DropdownMenuContent>
-</DropdownMenu>
+{#if user?.designation && user.designation !== "class_teacher"}
+  <Sidebar.MenuItem>
+    <DropdownMenu.Root>
+      <DropdownMenu.Trigger>
+        {#snippet child({ props })}
+          <Sidebar.MenuButton size="sm" {...props} class="w-full text-sidebar-foreground/70 hover:text-sidebar-foreground">
+            <FolderIcon />
+            <span>Workspace Context</span>
+          </Sidebar.MenuButton>
+        {/snippet}
+      </DropdownMenu.Trigger>
+      <DropdownMenu.Content class="hermes-glass border-primary/20 min-w-[260px] max-h-[340px] overflow-y-auto p-1.5 shadow-2xl custom-scrollbar rounded-2xl" align="start" side="right" sideOffset={12}>
+        {#each groupedClasses() as [groupName, classes], i}
+          <DropdownMenu.Group>
+            <DropdownMenu.Label class="text-[10px] uppercase tracking-widest text-muted-foreground/60 px-2.5 py-2">
+              {groupName}
+            </DropdownMenu.Label>
+            {#each classes as cls (cls.id)}
+              <DropdownMenu.Item
+                onSelect={() => (selectedClass.data = cls)}
+                class={cn(
+                  "flex items-center gap-2.5 px-2.5 py-2 rounded-xl cursor-pointer mb-0.5 last:mb-0 transition-all duration-50",
+                  selectedClass.data?.id === cls.id ? "bg-primary/15 text-primary shadow-sm" : "hover:bg-primary/5"
+                )}
+              >
+                <div class="flex min-w-0 flex-1 justify-between items-center">
+                  <span class="text-[13px] font-semibold truncate leading-tight">{cls.className}</span>
+                  <span class={cn(
+                    "opacity-70 truncate rounded-lg flex items-center justify-center text-[10px] font-bold px-1.5 py-0.5 ml-2 transition-colors",
+                    selectedClass.data?.id === cls.id ? "bg-primary text-primary-foreground shadow-sm shadow-primary/20" : "bg-secondary/60 text-muted-foreground"
+                  )}>{cls.sectionName || "Univ"}</span>
+                </div>
+                {#if selectedClass.data?.id === cls.id}
+                  <CircleCheckIcon class="size-4 text-primary ml-1 shrink-0" />
+                {/if}
+              </DropdownMenu.Item>
+            {/each}
+          </DropdownMenu.Group>
+        {:else}
+          <div class="px-3 py-8 text-center text-xs text-muted-foreground/60 italic font-medium">
+            No classes assigned to this account
+          </div>
+        {/each}
+      </DropdownMenu.Content>
+    </DropdownMenu.Root>
+  </Sidebar.MenuItem>
+{/if}

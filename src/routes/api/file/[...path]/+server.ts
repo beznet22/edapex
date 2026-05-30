@@ -15,7 +15,7 @@ function getScopedPath(url: URL, params: Record<string, string>) {
   const cleanPath = rawPath.replace(/^\/+/, '').replace(/\.\.\//g, '');
   
   // Ensure we don't end up with trailing slash if cleanPath is empty
-  console.log("getScopedPath:", cleanWorkspace, cleanPath);
+  // console.log("getScopedPath:", cleanWorkspace, cleanPath);
   return cleanPath ? `${cleanWorkspace}/${cleanPath}` : cleanWorkspace;
 }
 

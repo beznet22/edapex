@@ -1,43 +1,40 @@
 <script lang="ts">
-  import { Button } from "$lib/components/ui/button";
   import { Badge } from "$lib/components/ui/badge";
-  import { Separator } from "$lib/components/ui/separator";
-  import { Textarea } from "$lib/components/ui/textarea";
-  import * as Tooltip from "$lib/components/ui/tooltip";
+  import { Button } from "$lib/components/ui/button";
   import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
+  import * as Tooltip from "$lib/components/ui/tooltip";
+  import ActivityIcon from "@lucide/svelte/icons/activity";
   import ArrowUpIcon from "@lucide/svelte/icons/arrow-up";
-  import SquareIcon from "@lucide/svelte/icons/square";
-  import PaperclipIcon from "@lucide/svelte/icons/paperclip";
-  import MicIcon from "@lucide/svelte/icons/mic";
-  import XIcon from "@lucide/svelte/icons/x";
-  import GraduationCapIcon from "@lucide/svelte/icons/graduation-cap";
-  import FolderOpenIcon from "@lucide/svelte/icons/folder-open";
-  import CircleUserIcon from "@lucide/svelte/icons/circle-user";
+  import BrainCircuitIcon from "@lucide/svelte/icons/brain-circuit";
+  import ChevronDownIcon from "@lucide/svelte/icons/chevron-down";
   import CloudUploadIcon from "@lucide/svelte/icons/cloud-upload";
   import FilePlusIcon from "@lucide/svelte/icons/file-plus";
-  import ChevronDownIcon from "@lucide/svelte/icons/chevron-down";
-  import RefreshCwIcon from "@lucide/svelte/icons/refresh-cw";
-  import CheckIcon from "@lucide/svelte/icons/check";
-  import ZapIcon from "@lucide/svelte/icons/zap";
-  import ActivityIcon from "@lucide/svelte/icons/activity";
-  import WindIcon from "@lucide/svelte/icons/wind";
-  import BrainCircuitIcon from "@lucide/svelte/icons/brain-circuit";
-  import SparklesIcon from "@lucide/svelte/icons/sparkles";
+  import FolderOpenIcon from "@lucide/svelte/icons/folder-open";
+  import GraduationCapIcon from "@lucide/svelte/icons/graduation-cap";
+  import MicIcon from "@lucide/svelte/icons/mic";
+  import PaperclipIcon from "@lucide/svelte/icons/paperclip";
   import ShieldAlertIcon from "@lucide/svelte/icons/shield-alert";
+  import SquareIcon from "@lucide/svelte/icons/square";
+  import WindIcon from "@lucide/svelte/icons/wind";
+  import XIcon from "@lucide/svelte/icons/x";
+  import ZapIcon from "@lucide/svelte/icons/zap";
+  import LoaderCircleIcon from "@lucide/svelte/icons/loader-circle";
+  import CheckCircleIcon from "@lucide/svelte/icons/check-circle";
+  import XCircleIcon from "@lucide/svelte/icons/x-circle";
+  import { generateId } from "ai";
 
+  import type { MentionPayload } from "$lib/context/chat-context.svelte";
   import { useChat } from "$lib/context/chat-context.svelte";
   import { useFileActions } from "$lib/context/file-context.svelte";
-  import { UserContext } from "$lib/context/user-context.svelte";
   import { SelectedModel } from "$lib/context/sync.svelte";
-  import { cn } from "$lib/utils/shadcn";
-  import { DESIGNATIONS } from "$lib/types/sms-types";
+  import { UserContext } from "$lib/context/user-context.svelte";
   import type { AuthUser } from "$lib/types/auth-types";
-  import type { MentionPayload } from "$lib/context/chat-context.svelte";
-  import ModelSelector from "./model-selector.svelte";
+  import { DESIGNATIONS } from "$lib/types/sms-types";
+  import { cn } from "$lib/utils/shadcn";
   import CommandDropdown from "./chat/CommandDropdown.svelte";
   import MentionDropdown from "./chat/MentionDropdown.svelte";
-  import { PromptInput, PromptInputTextarea, PromptInputActions } from "./prompt-kit/prompt-input";
-  import { toast } from "svelte-sonner";
+  import ModelSelector from "./model-selector.svelte";
+  import { PromptInput, PromptInputActions, PromptInputTextarea } from "./prompt-kit/prompt-input";
 
   let {
     user,
@@ -57,6 +54,10 @@
   let commandQuery = $state("");
   let blockedWorkflowMessage = $state<string | null>(null);
   let selectedMentions = $state<MentionPayload[]>([]);
+
+  let ocrFileInput = $state<HTMLInputElement | null>(null);
+  type OcrFile = { id: string; name: string; status: 'uploading' | 'extracted' | 'error'; fileId?: string; markdown?: string };
+  let ocrFiles = $state<OcrFile[]>([]);
 
   const chat = useChat();
   const file = useFileActions();
@@ -113,6 +114,7 @@
       if (file.references?.length) {
         file.references = [];
       }
+      ocrFiles = []; // Clear OCR chips on submit
       chat.scrollToBottom();
     }
   }
@@ -178,7 +180,48 @@
   }
 
   function handleNativeUpload() {
-    file.openFileDialog();
+    ocrFileInput?.click();
+  }
+
+  async function handleOcrChange(e: Event) {
+    const input = e.target as HTMLInputElement;
+    if (!input.files?.length) return;
+    
+    for (const f of Array.from(input.files)) {
+      const id = generateId();
+      ocrFiles.push({ id, name: f.name, status: 'uploading' });
+      
+      const formData = new FormData();
+      formData.append('file', f);
+      formData.append('filename', f.name);
+      
+      try {
+        const res = await fetch('/api/file/ocr', { method: 'POST', body: formData });
+        const json = await res.json();
+        
+        const idx = ocrFiles.findIndex(o => o.id === id);
+        if (json.success && idx !== -1) {
+          ocrFiles[idx] = { ...ocrFiles[idx], status: 'extracted', fileId: json.fileId, markdown: json.markdown };
+          // Add to file references so it gets sent in payload
+          file.addReference({ key: json.fileId, name: f.name, type: 'file' });
+        } else if (idx !== -1) {
+          ocrFiles[idx] = { ...ocrFiles[idx], status: 'error' };
+        }
+      } catch (err) {
+        const idx = ocrFiles.findIndex(o => o.id === id);
+        if (idx !== -1) ocrFiles[idx] = { ...ocrFiles[idx], status: 'error' };
+      }
+    }
+    
+    input.value = ''; // Reset input
+  }
+
+  function removeOcrFile(id: string) {
+    const f = ocrFiles.find(o => o.id === id);
+    if (f?.fileId) {
+      file.removeReference(f.fileId);
+    }
+    ocrFiles = ocrFiles.filter(o => o.id !== id);
   }
 
   // Profile selection logic
@@ -203,7 +246,7 @@
     onSubmit={onSubmit}
   >
     <!-- Attachment Tray (Top Layer) -->
-    {#if file.files.length > 0 || chat.studentData || (file.references && file.references.length > 0)}
+    {#if file.files.length > 0 || chat.studentData || (file.references && file.references.length > 0) || ocrFiles.length > 0}
       <div class="flex flex-wrap gap-2 px-4 pt-4 pb-2 transition-all duration-500 ease-out">
         {#if chat.studentData}
           <div class="flex items-center gap-1.5 px-2 py-1 rounded-md bg-primary/10 border border-primary/20 text-xs font-medium text-primary">
@@ -227,6 +270,27 @@
               onclick={() => file.remove(i)} 
               class="opacity-40 group-hover:opacity-100 hover:text-foreground transition-all ml-1"
               aria-label={`Remove ${f.name}`}
+            >
+              <XIcon class="size-3" />
+            </button>
+          </div>
+        {/each}
+
+        <!-- OCR Attachment Chips -->
+        {#each ocrFiles as ocr (ocr.id)}
+          <div class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary/10 border border-primary/20 text-[11px] font-bold tracking-wide text-primary group shadow-sm">
+            {#if ocr.status === 'uploading'}
+              <LoaderCircleIcon class="size-3.5 opacity-70 animate-spin" />
+            {:else if ocr.status === 'extracted'}
+              <CheckCircleIcon class="size-3.5 text-green-500 opacity-90" />
+            {:else}
+              <XCircleIcon class="size-3.5 text-destructive opacity-90" />
+            {/if}
+            <span class="max-w-[150px] truncate uppercase tracking-tighter">{ocr.name}</span>
+            <button 
+              onclick={() => removeOcrFile(ocr.id)} 
+              class="opacity-40 group-hover:opacity-100 hover:text-foreground transition-all ml-1"
+              aria-label={`Remove ${ocr.name}`}
             >
               <XIcon class="size-3" />
             </button>
@@ -388,6 +452,14 @@
 
           <div class="mx-2 h-4 w-px bg-white/10 shrink-0"></div>
         </div>
+
+        <input
+          type="file"
+          multiple
+          class="hidden"
+          bind:this={ocrFileInput}
+          onchange={handleOcrChange}
+        />
 
         <!-- Dynamic Context Chips -->
         <div class="flex items-center gap-1 font-sans overflow-x-auto scrollbar-hide">

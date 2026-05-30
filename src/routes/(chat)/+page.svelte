@@ -23,6 +23,7 @@
   import EyeOffIcon from "@lucide/svelte/icons/eye-off";
   import { IsMobile } from "$lib/hooks/is-mobile.svelte.js";
   import type { PageData } from "./$types.js";
+    import { createWorkspaceContext } from "$lib/components/workspace/workspace-context.svelte.js";
 
   let { data } = $props<{ data: PageData }>();
   // svelte-ignore state_referenced_locally
@@ -37,6 +38,17 @@
   let userContext = $derived(UserContext.fromContext());
   const selectedClass = SelectedClass.fromContext();
   const isMobile = new IsMobile();
+  let wasAutoCollapsed = $state(false);
+
+  const chatContext = new ChatContext({
+    initialMessages: [],
+    chatData: undefined,
+    selectedClass,
+  });
+  chatContext.setContext();
+  const chat = $derived(ChatContext.fromContext());
+
+  const ws = createWorkspaceContext();
 
   $effect(() => {
     if (inspectorPane) {
@@ -48,13 +60,12 @@
     }
   });
 
-  const chatContext = new ChatContext({
-    initialMessages: [],
-    chatData: undefined,
-    selectedClass,
+  $effect(() => {
+    // If the user manually toggles the file browser back open, reset the auto-collapsed tracking flag
+    if (!ws.maxPreviewMode) {
+      wasAutoCollapsed = false;
+    }
   });
-  chatContext.setContext();
-  const chat = $derived(ChatContext.fromContext());
 
   onMount(() => {
     if (userContext.isTeacher && !userContext.assignedSection) open = true;
@@ -140,8 +151,17 @@
       collapsedSize={0}
       defaultSize={inspectorOpen ? 40 : 0}
       minSize={20}
-      maxSize={60}
+      maxSize={50}
       class="transition-all duration-300 ease-out overflow-hidden"
+      onResize={(size) => {
+        if (size < 30 && !ws.maxPreviewMode) {
+          ws.maxPreviewMode = true;
+          wasAutoCollapsed = true;
+        } else if (size >= 30 && wasAutoCollapsed) {
+          ws.maxPreviewMode = false;
+          wasAutoCollapsed = false;
+        }
+      }}
       onExpand={() => {
         inspectorOpen = true;
       }}

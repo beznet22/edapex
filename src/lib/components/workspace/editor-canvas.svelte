@@ -29,6 +29,7 @@
   let {
     filename = "",
     url = "",
+    content = "",
     type = "text",
     editorMode = $bindable("wysiwyg"),
     isSaving = $bindable(false),
@@ -38,12 +39,13 @@
   }: {
     filename?: string;
     url?: string;
+    content?: string;
     type?: "text" | "image" | "pdf";
     editorMode?: "wysiwyg" | "raw";
     isSaving?: boolean;
     onClose?: () => void;
     onDownload?: () => void;
-    onExtract?: () => void;
+    onExtract?: (content: string) => void;
   } = $props();
 
   let textContent = $state("Loading...");
@@ -114,19 +116,24 @@
   );
 
   $effect(() => {
-    if (type === "text" && url) {
-      textContent = "Loading...";
-      editContent = "";
-      fetch(url)
-        .then((r) => r.text())
-        .then((t) => {
-          textContent = t;
-          editContent = t; // keep raw editor in sync
-        })
-        .catch((e) => {
-          textContent = `Error loading file: ${e.message}`;
-          editContent = textContent;
-        });
+    if (type === "text") {
+      if (url) {
+        textContent = "Loading...";
+        editContent = "";
+        fetch(url)
+          .then((r) => r.text())
+          .then((t) => {
+            textContent = t;
+            editContent = t; // keep raw editor in sync
+          })
+          .catch((e) => {
+            textContent = `Error loading file: ${e.message}`;
+            editContent = textContent;
+          });
+      } else if (content) {
+        textContent = content;
+        editContent = content;
+      }
     }
   });
 
@@ -243,6 +250,20 @@
       </div>
     {/if}
 
+
+    <!-- Floating Action Buttons -->
+    <div class="absolute bottom-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 pointer-events-auto">
+      {#if content && onExtract}
+        <button onclick={() => onExtract(editorMode === 'wysiwyg' ? wysiwygContent : editContent)} class="px-4 py-2 bg-green-500/20 text-green-400 hover:bg-green-500/30 rounded-full text-xs font-bold transition-all shadow-lg border border-green-500/30 backdrop-blur-md">
+          Approve (✓)
+        </button>
+      {/if}
+      {#if content && onClose}
+        <button onclick={onClose} class="px-4 py-2 bg-red-500/20 text-red-400 hover:bg-red-500/30 rounded-full text-xs font-bold transition-all shadow-lg border border-red-500/30 backdrop-blur-md">
+          Reject / Retry (✗)
+        </button>
+      {/if}
+    </div>
 
   </div>
 {/if}

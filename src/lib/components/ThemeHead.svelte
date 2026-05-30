@@ -8,6 +8,6 @@
 
 <svelte:head>
   <meta name="theme-color" content={themeColor} />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 </svelte:head>

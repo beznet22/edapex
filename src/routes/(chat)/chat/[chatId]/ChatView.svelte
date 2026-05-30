@@ -29,7 +29,6 @@
   const chatContext = new ChatContext({
     initialMessages: data.messages,
     chatData: data.chat ?? undefined,
-    agents: data.agents,
     selectedClass,
   });
 

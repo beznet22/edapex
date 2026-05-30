@@ -1,64 +1,29 @@
 <script lang="ts">
-  import { useChat } from "$lib/context/chat-context.svelte";
-  import { UserContext } from "$lib/context/user-context.svelte";
-  import { SelectedClass } from "$lib/context/sync.svelte";
-  import { FilesContext } from "$lib/context/file-context.svelte";
-  import { validateFileName } from "$lib/utils/file-validation";
-  import EditorCanvas from "./editor-canvas.svelte";
   import * as Resizable from "$lib/components/ui/resizable";
-  import { Skeleton } from "$lib/components/ui/skeleton";
-  import { fly } from "svelte/transition";
-  import { quintOut } from "svelte/easing";
-  import { untrack } from "svelte";
+  import EditorCanvas from "./editor-canvas.svelte";
+  import * as Accordion from "$lib/components/ui/accordion";
 
-  import FloatingToolbar from "./FloatingToolbar.svelte";
+  import { cn } from "$lib/utils/shadcn";
+  import { toast } from "svelte-sonner";
+  import ActivityIcon from "@lucide/svelte/icons/activity";
+  import EyeIcon from "@lucide/svelte/icons/eye";
+  import FileIcon from "@lucide/svelte/icons/file";
+  import FileImageIcon from "@lucide/svelte/icons/file-image";
+  import FileJsonIcon from "@lucide/svelte/icons/file-json";
+  import FileTextIcon from "@lucide/svelte/icons/file-text";
+  import SearchIcon from "@lucide/svelte/icons/search";
+  import UploadIcon from "@lucide/svelte/icons/upload";
+  import ArtifactView from "./ArtifactView.svelte";
+  import ExtractionInspector from "./ExtractionInspector.svelte";
   import FileBrowserHeader from "./FileBrowserHeader.svelte";
   import FileTree from "./FileTree.svelte";
-  import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
-  import { Button } from "$lib/components/ui/button";
-  import ChevronDownIcon from "@lucide/svelte/icons/chevron-down";
-  import SaveIcon from "@lucide/svelte/icons/save";
-  import ShareIcon from "@lucide/svelte/icons/share-2";
-  import CopyIcon from "@lucide/svelte/icons/copy";
-  import BotIcon from "@lucide/svelte/icons/bot";
-  import CheckIcon from "@lucide/svelte/icons/check";
-  import WorkflowStatusPills from "./WorkflowStatusPills.svelte";
-  import ExtractionInspector from "./ExtractionInspector.svelte";
+  import FloatingToolbar from "./FloatingToolbar.svelte";
   import PublishViewer from "./PublishViewer.svelte";
   import RunHistory from "./RunHistory.svelte";
   import WorkflowStatusBadge from "./WorkflowStatusBadge.svelte";
-  import { WorkflowEventSource } from "$lib/context/workflow-events.svelte";
-  import { cn } from "$lib/utils/shadcn";
-  import FileIcon from "@lucide/svelte/icons/file";
-  import { toast } from "svelte-sonner";
-  import FileTextIcon from "@lucide/svelte/icons/file-text";
-  import FileImageIcon from "@lucide/svelte/icons/file-image";
-  import FileJsonIcon from "@lucide/svelte/icons/file-json";
-  import UploadIcon from "@lucide/svelte/icons/upload";
-  import EyeIcon from "@lucide/svelte/icons/eye";
-  import FolderIcon from "@lucide/svelte/icons/folder";
-  import SearchIcon from "@lucide/svelte/icons/search";
-  import ActivityIcon from "@lucide/svelte/icons/activity";
-  import HistoryIcon from "@lucide/svelte/icons/history";
-
-  interface FlatFile {
-    name: string;
-    size: number;
-    type: string;
-    key: string;
-    lastModified?: string;
-  }
-
-  interface FileEntry {
-    name: string;
-    type: "file" | "dir";
-    key: string;
-    size?: number;
-    lastModified?: string;
-    children?: FileEntry[];
-    pinned?: boolean;
-    tag?: "processed" | "invalid" | "reviewed";
-  }
+  import WorkflowStatusPills from "./WorkflowStatusPills.svelte";
+  import { useWorkspace } from "./workspace-context.svelte.ts";
+  import WorkspaceHeader from "./WorkspaceHeader.svelte";
 
   let {
     onClose,
@@ -69,755 +34,21 @@
     onClose?: () => void;
     isMobile?: boolean;
   } = $props();
-
   let editorCanvasRef = $state<any>(null);
-
-  const userContext = UserContext.fromContext();
-  const selectedClass = SelectedClass.fromContext();
-  const fileContext = FilesContext.fromContext();
-
-  let displayContext = $derived(
-    userContext.isTeacher && userContext.assignedSection
-      ? `${userContext.assignedSection.className} (${userContext.assignedSection.sectionName})`
-      : selectedClass.data
-        ? `${selectedClass.data.className} (${selectedClass.data.sectionName})`
-        : "MAIN",
-  );
-
-  let workspaceId = $derived(
-    userContext.isTeacher && userContext.assignedSection
-      ? `${userContext.assignedSection.classId}_${userContext.assignedSection.sectionId}`
-      : selectedClass.data
-        ? `${selectedClass.data.classId}_${selectedClass.data.sectionId}`
-        : null,
-  );
-
-  let expandedDirs = $state<Set<string>>(new Set());
-  let rawFiles = $state<FlatFile[]>([]);
-  let isLoading = $state(false);
-  let searchQuery = $state("");
-
-  let openedFiles = $state<
-    { key: string; name: string; type: "text" | "image" | "pdf"; url: string }[]
-  >([]);
-  let recentFiles = $state<FileEntry[]>(
-    typeof localStorage !== "undefined"
-      ? JSON.parse(localStorage.getItem("hermes_recent_files") || "[]")
-      : [],
-  );
-
-  $effect(() => {
-    localStorage.setItem("hermes_recent_files", JSON.stringify(recentFiles));
-  });
-  let activeFileKey = $state<string | null>(null);
-  let activeDirKey = $state<string | null>(null);
-  let maxPreviewMode = $state(true);
-  let activeFileDef = $derived(
-    openedFiles.find((f) => f.key === activeFileKey),
-  );
   let fileBrowserPane: any = $state();
+  let fileInput: HTMLInputElement;
+  let folderInput: HTMLInputElement;
+  let ws = useWorkspace();
 
   $effect(() => {
     if (fileBrowserPane) {
-      if (maxPreviewMode) {
+      if (ws.maxPreviewMode) {
         fileBrowserPane.collapse();
       } else {
         fileBrowserPane.expand();
       }
     }
   });
-
-  let fileInput: HTMLInputElement;
-  let folderInput: HTMLInputElement;
-
-  let extractHookEnabled = $state(true);
-  let ocrEnabled = $state(false);
-  let compressionEnabled = $state(true);
-  let isDragging = $state(false);
-  let uploadingFiles = $state<
-    { name: string; status: "uploading" | "extracting" | "done" | "error" }[]
-  >([]);
-
-  const chat = useChat();
-
-  // Workflow completion summaries with auto-dismiss after 10s
-  let completionSummaries = $state<
-    Array<{
-      id: string;
-      workflowName: string;
-      status: "success" | "partial-failure";
-      stepsCompleted: number;
-      stepsFailed: number;
-    }>
-  >([]);
-
-  // Track previous activeWorkflows to detect completions
-  let previousWorkflowTools = $state<string[]>([]);
-
-  $effect(() => {
-    const currentTools = chat.activeWorkflows.map((w) => w.tool);
-    untrack(() => {
-      // Detect workflows that were active but are no longer (completed)
-      for (const tool of previousWorkflowTools) {
-        if (!currentTools.includes(tool)) {
-          const summary = {
-            id: `${tool}-${Date.now()}`,
-            workflowName: tool,
-            status: "success" as const,
-            stepsCompleted: 1,
-            stepsFailed: 0,
-          };
-          completionSummaries = [...completionSummaries, summary];
-
-          // Auto-dismiss after 10 seconds
-          const summaryId = summary.id;
-          setTimeout(() => {
-            completionSummaries = completionSummaries.filter(
-              (s) => s.id !== summaryId,
-            );
-          }, 10_000);
-        }
-      }
-      previousWorkflowTools = currentTools;
-    });
-  });
-
-  // ─── WorkflowEventSource SSE Integration ───────────────────────────────────
-  // Connects SSE events to ExtractionInspector, PublishViewer, and WorkflowStatusBadge
-  // Validates: Requirements 5.1, 6.1, 17.1
-
-  const workflowEvents = new WorkflowEventSource();
-
-  // View mode for the right panel: 'files' (default), 'workflow', 'run-history'
-  type PanelView = "files" | "workflow" | "run-history";
-  let activeView = $state<PanelView>("files");
-
-  // Role-based visibility for Run History (designationId 1 = IT, 5 = Coordinator)
-  let canViewRunHistory = $derived(
-    userContext.isIt || userContext.isCoordinator,
-  );
-
-  // Derive designationId from designation string for RunHistory component
-  let designationId = $derived(
-    userContext.designation === "it"
-      ? 1
-      : userContext.designation === "coordinator"
-        ? 5
-        : userContext.designation === "class_teacher"
-          ? 8
-          : 0,
-  );
-
-  // Auto-switch to workflow view when a workflow starts (non-idle phase)
-  $effect(() => {
-    const phase = workflowEvents.workflowStatus;
-    if (phase !== "idle" && phase !== "complete") {
-      activeView = "workflow";
-    }
-  });
-
-  // Connect WorkflowEventSource when a workflow starts via chat activeWorkflows
-  $effect(() => {
-    const workflows = chat.activeWorkflows;
-    if (workflows.length > 0 && !workflowEvents.currentStep) {
-      // Connect to the first active workflow's run ID if available in args
-      const firstWorkflow = workflows[0];
-      const runId = firstWorkflow.args?.runId ?? firstWorkflow.args?.run_id;
-      if (runId) {
-        workflowEvents.connect(runId);
-      }
-    }
-  });
-
-  // Expose connection status from WorkflowEventSource
-  let derivedConnectionStatus = $derived(workflowEvents.connectionStatus);
-
-  // Retry connection handler
-  function retryWorkflowConnection() {
-    const runId =
-      workflowEvents.currentStep?.runId ??
-      chat.activeWorkflows[0]?.args?.runId ??
-      chat.activeWorkflows[0]?.args?.run_id;
-    if (runId) {
-      workflowEvents.connect(runId);
-    }
-  }
-
-  // ─── Extraction Inspector State ───────────────────────────────────────────────
-  // Placeholder state derived from workflow events — in production, this would
-  // come from the SSE step-progress data payload containing student extractions
-
-  interface StudentExtraction {
-    name: string;
-    fields: Record<string, string>;
-    confidence: "high" | "medium" | "low";
-  }
-
-  interface ValidationResult {
-    studentName: string;
-    passed: boolean;
-    failures: Array<{ field: string; reason: string }>;
-  }
-
-  let extractionStudents = $state<StudentExtraction[]>([]);
-  let extractionRunId = $derived(workflowEvents.currentStep?.runId ?? "");
-  let extractionStatus = $derived(
-    workflowEvents.workflowStatus === "extracting"
-      ? ("extracting" as const)
-      : workflowEvents.workflowStatus === "awaiting-validation"
-        ? ("awaiting-validation" as const)
-        : workflowEvents.workflowStatus === "validating"
-          ? ("validated" as const)
-          : ("extracting" as const),
-  );
-  let validationResults = $state<ValidationResult[] | undefined>(undefined);
-
-  // ─── Publish Viewer State ─────────────────────────────────────────────────────
-
-  interface CompletionSummary {
-    pdfCount: number;
-    emailCount: number;
-    failedCount: number;
-    errors: Array<{ studentName: string; reason: string }>;
-  }
-
-  let publishPdfs = $state<Array<{ url: string; studentName: string }>>([]);
-  let publishStatus = $derived(
-    workflowEvents.workflowStatus === "awaiting-publish"
-      ? ("awaiting-publish" as const)
-      : workflowEvents.workflowStatus === "publishing"
-        ? ("dispatching" as const)
-        : workflowEvents.workflowStatus === "complete"
-          ? ("complete" as const)
-          : ("generating" as const),
-  );
-  let publishCurrentStep = $derived(workflowEvents.currentStep?.stepName ?? "");
-  let publishCompletionSummary = $state<CompletionSummary | undefined>(
-    undefined,
-  );
-  let publishFailedGenerations = $state<
-    Array<{ studentName: string; reason: string }> | undefined
-  >(undefined);
-
-  // ─── Run History State ────────────────────────────────────────────────────────
-  interface WorkflowRun {
-    id: string;
-    workflowId: string;
-    status: string;
-    startedAt: string;
-    completedAt: string | null;
-    totalSteps: number;
-    completedSteps: number;
-    failedSteps: number;
-    durationMs: number | null;
-  }
-
-  interface RunStep {
-    stepName: string;
-    stepIndex: number;
-    status: string;
-    inputPayload: string | null;
-    outputPayload: string | null;
-    error: string | null;
-    stackTrace: string | null;
-    durationMs: number | null;
-  }
-
-  let runHistoryRuns = $state<WorkflowRun[]>([]);
-  let selectedRun = $state<WorkflowRun | null>(null);
-  let runHistorySteps = $state<RunStep[]>([]);
-  let runHistoryLoading = $state(false);
-
-  // Fetch run history when the view is activated
-  $effect(() => {
-    if (activeView === "run-history" && canViewRunHistory && workspaceId) {
-      fetchRunHistory();
-    }
-  });
-
-  async function fetchRunHistory() {
-    if (!workspaceId) return;
-    runHistoryLoading = true;
-    try {
-      const res = await fetch(`/api/workflow/runs?workspace=${workspaceId}`);
-      if (res.ok) {
-        const data = await res.json();
-        runHistoryRuns = data.runs ?? [];
-      }
-    } catch (err) {
-      console.error("Failed to fetch run history:", err);
-    } finally {
-      runHistoryLoading = false;
-    }
-  }
-
-  async function handleSelectRun(run: WorkflowRun) {
-    selectedRun = run;
-    try {
-      const res = await fetch(`/api/workflow/runs/${run.id}/steps`);
-      if (res.ok) {
-        const data = await res.json();
-        runHistorySteps = data.steps ?? [];
-      }
-    } catch (err) {
-      console.error("Failed to fetch run steps:", err);
-      runHistorySteps = [];
-    }
-  }
-
-  // Determine which workflow view to show based on phase
-  let showExtractionInspector = $derived(
-    workflowEvents.workflowStatus === "extracting" ||
-      workflowEvents.workflowStatus === "awaiting-validation" ||
-      workflowEvents.workflowStatus === "validating",
-  );
-
-  let showPublishViewer = $derived(
-    workflowEvents.workflowStatus === "awaiting-publish" ||
-      workflowEvents.workflowStatus === "publishing",
-  );
-
-  function toggleReference(entry: FileEntry) {
-    const isReference = fileContext.references.some((r) => r.key === entry.key);
-    if (isReference) {
-      fileContext.removeReference(entry.key);
-    } else {
-      fileContext.addReference({
-        key: entry.key,
-        name: entry.name,
-        type: entry.type,
-      });
-    }
-  }
-
-  let nameInputState = $state<{
-    mode: "create" | "rename" | "move";
-    type: "file" | "dir";
-    parentPath: string;
-    initialValue: string;
-    originalKey?: string;
-  } | null>(null);
-  let nameInputValue = $state("");
-  let inlineError = $state<string | null>(null);
-
-  function startCreate(type: "file" | "dir", parentPath: string = "") {
-    const targetPath = parentPath || activeDirKey || "";
-    nameInputState = {
-      mode: "create",
-      type,
-      parentPath: targetPath,
-      initialValue: "",
-    };
-    nameInputValue = "";
-    inlineError = null;
-    if (targetPath) {
-      const next = new Set(expandedDirs);
-      next.add(targetPath);
-      expandedDirs = next;
-    }
-  }
-
-  function startRename(entry: FileEntry, parentPath: string, isMove = false) {
-    nameInputState = {
-      mode: isMove ? "move" : "rename",
-      type: entry.type,
-      parentPath,
-      initialValue: isMove ? entry.key : entry.name,
-      originalKey: entry.key,
-    };
-    nameInputValue = nameInputState.initialValue;
-    inlineError = null;
-  }
-
-  function cancelInlineAction() {
-    nameInputState = null;
-    nameInputValue = "";
-    inlineError = null;
-  }
-
-  function submitInlineAction() {
-    if (!nameInputState || !nameInputValue.trim() || !workspaceId) {
-      nameInputState = null;
-      nameInputValue = "";
-      inlineError = null;
-      return;
-    }
-    const state = nameInputState;
-    const name = nameInputValue.trim();
-
-    // Validate file/directory name (Requirements 8.1, 8.2)
-    const validation = validateFileName(name);
-    if (!validation.valid) {
-      inlineError = validation.error ?? "Invalid name";
-      return; // Retain input for correction
-    }
-
-    inlineError = null;
-    nameInputState = null;
-    nameInputValue = "";
-    isLoading = true;
-
-    if (state.mode === "create") {
-      let path = state.parentPath ? `${state.parentPath}/${name}` : name;
-      if (state.type === "dir" && !path.endsWith("/")) {
-        path += "/.keep";
-      }
-      const encodedPath = encodeURIComponent(path).replace(/%2F/g, "/");
-      fetch(`/api/file/${encodedPath}?workspace=${workspaceId}`, {
-        method: "POST",
-        body: new Blob([""], { type: "text/plain" }),
-      })
-        .then(fetchWorkspace)
-        .finally(() => {
-          isLoading = false;
-        });
-    } else if (state.mode === "rename" || state.mode === "move") {
-      let oldPath = state.originalKey!;
-      let newPath =
-        state.mode === "move"
-          ? name
-          : state.parentPath
-            ? `${state.parentPath}/${name}`
-            : name;
-
-      const encodedOldPath = encodeURIComponent(oldPath).replace(/%2F/g, "/");
-      fetch(
-        `/api/file/${encodedOldPath}?workspace=${workspaceId}&action=rename&to=${encodeURIComponent(newPath).replace(/%2F/g, "/")}`,
-        {
-          method: "POST",
-        },
-      )
-        .then(fetchWorkspace)
-        .finally(() => {
-          isLoading = false;
-        });
-    }
-  }
-
-  function copyPathToClipboard(entry: FileEntry) {
-    navigator.clipboard.writeText(entry.key);
-  }
-
-  async function shareFile(entry: FileEntry) {
-    if (!workspaceId) return;
-    try {
-      const res = await fetch("/api/file/share", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ key: entry.key, workspace: workspaceId }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        toast.error(data.error || "Failed to generate share link");
-        return;
-      }
-      await navigator.clipboard.writeText(data.url);
-      toast.success("Share link copied to clipboard", {
-        description: `Expires ${new Date(data.expiresAt).toLocaleDateString()}`,
-      });
-    } catch (err: any) {
-      toast.error("Failed to generate share link");
-    }
-  }
-
-  function triggerUpload() {
-    if (fileInput) fileInput.click();
-  }
-
-  function triggerFolderUpload() {
-    if (folderInput) folderInput.click();
-  }
-
-  function triggerExtract(entry: FileEntry) {
-    if (!workspaceId) return;
-    const isDir = entry.type === "dir";
-    const msg = isDir
-      ? `Extracting images and PDFs from ${entry.name}...`
-      : `Extracting text from ${entry.name}...`;
-    uploadingFiles = [
-      ...uploadingFiles,
-      { name: entry.name, status: "extracting" },
-    ];
-    // The actual mistral OCR logic should be hooked up to an API endpoint here.
-    setTimeout(() => {
-      uploadingFiles = uploadingFiles.filter((u) => u.name !== entry.name);
-    }, 2000); // placeholder simulation
-  }
-
-  function focusAction(node: HTMLInputElement) {
-    node.focus();
-    node.select();
-  }
-
-  async function processUpload(files: FileList) {
-    if (!workspaceId || !files.length) return;
-
-    for (const file of Array.from(files)) {
-      const uploadState = { name: file.name, status: "uploading" as const };
-      uploadingFiles = [...uploadingFiles, uploadState];
-
-      // Hook logic: Pre-upload compression simulation
-      if (compressionEnabled && file.type.startsWith("image/")) {
-        console.log(`Compressing ${file.name}...`);
-        await new Promise((r) => setTimeout(r, 600));
-      }
-
-      const formData = new FormData();
-      formData.append("file", file);
-
-      try {
-        await fetch(
-          `/api/file/${encodeURIComponent(file.name)}?workspace=${workspaceId}`,
-          {
-            method: "POST",
-            body: formData,
-          },
-        );
-
-        // Hook logic: Post-upload extraction/OCR
-        if (extractHookEnabled) {
-          uploadingFiles = uploadingFiles.map((u) =>
-            u.name === file.name ? { ...u, status: "extracting" } : u,
-          );
-
-          if (
-            ocrEnabled &&
-            (file.type === "application/pdf" || file.type.startsWith("image/"))
-          ) {
-            // Simulate Mistral Batch API polling
-            await new Promise((r) => setTimeout(r, 1800));
-            try {
-              await fetch(
-                `/api/file/hook/ocr?workspace=${workspaceId}&file=${encodeURIComponent(file.name)}`,
-                { method: "POST" },
-              );
-            } catch (e) {}
-          } else {
-            await new Promise((r) => setTimeout(r, 600));
-          }
-        }
-
-        uploadingFiles = uploadingFiles.map((u) =>
-          u.name === file.name ? { ...u, status: "done" } : u,
-        );
-        fetchWorkspace();
-      } catch (err) {
-        uploadingFiles = uploadingFiles.map((u) =>
-          u.name === file.name ? { ...u, status: "error" } : u,
-        );
-      }
-
-      setTimeout(() => {
-        uploadingFiles = uploadingFiles.filter((u) => u.name !== file.name);
-      }, 3000);
-    }
-  }
-
-  function handleUpload(e: Event) {
-    const target = e.target as HTMLInputElement;
-    if (target.files) {
-      processUpload(target.files);
-    }
-    target.value = "";
-  }
-
-  function handleDragOver(e: DragEvent) {
-    e.preventDefault();
-    isDragging = true;
-  }
-
-  function handleDragLeave(e: DragEvent) {
-    if (e.currentTarget === e.target) {
-      isDragging = false;
-    }
-  }
-
-  function handleDrop(e: DragEvent) {
-    e.preventDefault();
-    isDragging = false;
-    if (e.dataTransfer?.files) {
-      processUpload(e.dataTransfer.files);
-    }
-  }
-
-  function deleteFile(entry: FileEntry) {
-    if (!confirm(`Are you sure you want to delete ${entry.name}?`)) return;
-    isLoading = true;
-    fetch(
-      `/api/file/${encodeURIComponent(entry.key)}?workspace=${workspaceId}`,
-      {
-        method: "DELETE",
-      },
-    )
-      .then(fetchWorkspace)
-      .finally(() => (isLoading = false));
-  }
-
-  function renameFile(entry: FileEntry) {
-    const newName = prompt(`Rename ${entry.name} to:`, entry.name);
-    if (!newName || newName === entry.name) return;
-
-    const pathParts = entry.key.split("/");
-    pathParts[pathParts.length - 1] = newName;
-    const newKey = pathParts.join("/");
-
-    isLoading = true;
-    fetch(
-      `/api/file/${encodeURIComponent(entry.key)}?workspace=${workspaceId}&action=rename&to=${encodeURIComponent(newKey)}`,
-      {
-        method: "POST",
-      },
-    )
-      .then(fetchWorkspace)
-      .finally(() => (isLoading = false));
-  }
-
-  function fetchWorkspace() {
-    if (!workspaceId) {
-      rawFiles = [];
-      return;
-    }
-    isLoading = true;
-    fetch(`/api/file/?workspace=${workspaceId}&action=list`)
-      .then((r) => r.json())
-      .then((d) => {
-        if (d.success && Array.isArray(d.result?.items)) {
-          rawFiles = d.result.items;
-          // Expand root dirs by default conceptually
-        } else {
-          rawFiles = [];
-        }
-      })
-      .catch((err) => console.error("FS Error:", err))
-      .finally(() => (isLoading = false));
-  }
-
-  $effect(() => {
-    // Whenever workspaceId changes, re-fetch the files automatically
-    fetchWorkspace();
-    openedFiles = [];
-    activeFileKey = null;
-    activeDirKey = null;
-  });
-
-  function buildGroupedTree(flat: FlatFile[]): FileEntry[] {
-    const root: FileEntry[] = [];
-    const map = new Map<string, FileEntry>();
-
-    // First pass: create all directory entries (implied by paths)
-    for (const f of flat) {
-      const parts = f.key.split("/").filter(Boolean);
-      let currentPath = "";
-      for (let i = 0; i < parts.length - 1; i++) {
-        currentPath = currentPath ? `${currentPath}/${parts[i]}` : parts[i];
-        if (!map.has(currentPath)) {
-          map.set(currentPath, {
-            name: parts[i],
-            type: "dir",
-            key: currentPath,
-            children: [],
-          });
-        }
-      }
-      // Also handle explicit raw dirs if they end with '/'
-      if (f.key.endsWith("/")) {
-        const dirPath = f.key.slice(0, -1);
-        if (dirPath && !map.has(dirPath)) {
-          const name = dirPath.split("/").pop() || dirPath;
-          map.set(dirPath, { name, type: "dir", key: dirPath, children: [] });
-        }
-      }
-    }
-
-    // Second pass: place file items in their parent directories
-    for (const f of flat) {
-      if (f.key.endsWith("/") || f.key.endsWith(".keep")) continue;
-
-      const parts = f.key.split("/").filter(Boolean);
-      const parentPath = parts.slice(0, -1).join("/");
-      const entry: FileEntry = {
-        name: parts[parts.length - 1],
-        type: "file",
-        key: f.key,
-        size: f.size,
-        lastModified: f.lastModified,
-      };
-
-      if (parentPath && map.has(parentPath)) {
-        map.get(parentPath)!.children!.push(entry);
-      } else {
-        root.push(entry);
-      }
-    }
-
-    // Third pass: link directories to their parents
-    for (const [path, dirEntry] of map.entries()) {
-      const parts = path.split("/");
-      const parentPath = parts.slice(0, -1).join("/");
-      if (parentPath && map.has(parentPath)) {
-        map.get(parentPath)!.children!.push(dirEntry);
-      } else {
-        root.push(dirEntry);
-      }
-    }
-
-    // Fourth pass: recursively sort, folders first, then by name alphabetically
-    function sortTree(nodes: FileEntry[]) {
-      nodes.sort((a, b) => {
-        if (a.type !== b.type) {
-          return a.type === "dir" ? -1 : 1;
-        }
-        return a.name.localeCompare(b.name);
-      });
-      for (const node of nodes) {
-        if (node.children) {
-          sortTree(node.children);
-        }
-      }
-    }
-    sortTree(root);
-
-    return root;
-  }
-
-  let resolvedEntries = $derived(buildGroupedTree(rawFiles));
-
-  function filterTree(tree: FileEntry[], query: string): FileEntry[] {
-    if (!query.trim()) return tree;
-    const lowerQuery = query.toLowerCase();
-
-    return tree
-      .map((node) => {
-        if (node.type === "dir" && node.children) {
-          const filteredChildren = filterTree(node.children, query);
-          if (
-            filteredChildren.length > 0 ||
-            node.name.toLowerCase().includes(lowerQuery)
-          ) {
-            return {
-              ...node,
-              children: node.name.toLowerCase().includes(lowerQuery)
-                ? node.children
-                : filteredChildren,
-            };
-          }
-          return null;
-        }
-        return node.name.toLowerCase().includes(lowerQuery) ? node : null;
-      })
-      .filter(Boolean) as FileEntry[];
-  }
-
-  let filteredFileTree = $derived(filterTree(resolvedEntries, searchQuery));
-
-  function toggleDir(path: string) {
-    activeDirKey = path;
-    // We intentionally DO NOT set activeFileKey = null here so the editor remains open
-    const next = new Set(expandedDirs);
-    if (next.has(path)) next.delete(path);
-    else next.add(path);
-    expandedDirs = next;
-  }
 
   function formatSize(bytes?: number) {
     if (!bytes) return "";
@@ -861,64 +92,6 @@
     return "bg-slate-800/40 text-slate-400";
   }
 
-  function getFileType(name: string): "text" | "image" | "pdf" {
-    const ext = name.split(".").pop()?.toLowerCase();
-    if (
-      ext === "jpg" ||
-      ext === "png" ||
-      ext === "jpeg" ||
-      ext === "svg" ||
-      ext === "webp" ||
-      ext === "gif"
-    )
-      return "image";
-    if (ext === "pdf") return "pdf";
-    return "text";
-  }
-
-  function handleFileClick(entry: FileEntry) {
-    if (entry.type === "file" && workspaceId) {
-      activeDirKey = null;
-      activeFileKey = entry.key;
-
-      // Update recent files
-      const filteredRecent = recentFiles.filter((f) => f.key !== entry.key);
-      recentFiles = [entry, ...filteredRecent].slice(0, 5);
-
-      if (openedFiles.some((f) => f.key === entry.key)) return;
-
-      const type = getFileType(entry.name);
-      openedFiles = [
-        ...openedFiles,
-        {
-          key: entry.key,
-          name: entry.name,
-          type,
-          url: `/api/file/${entry.key}?workspace=${workspaceId}`,
-        },
-      ];
-    }
-  }
-
-  function closeFile(key: string) {
-    openedFiles = openedFiles.filter((f) => f.key !== key);
-    if (activeFileKey === key) {
-      activeFileKey =
-        openedFiles.length > 0 ? openedFiles[openedFiles.length - 1].key : null;
-    }
-  }
-
-  function downloadFile(entry: FileEntry) {
-    if (!workspaceId) return;
-    const url = `/api/file/${encodeURIComponent(entry.key)}?workspace=${workspaceId}&action=download`;
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = entry.name;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-  }
-
   function formatRelativeTime(dateStr?: string) {
     if (!dateStr) return "Just now";
     const date = new Date(dateStr);
@@ -933,6 +106,27 @@
     if (mins > 0) return `${mins} min${mins > 1 ? "s" : ""} ago`;
     return "Just now";
   }
+
+  function handleUpload(e: Event) {
+    const target = e.target as HTMLInputElement;
+    if (target.files) {
+      ws.processUpload(target.files);
+    }
+    target.value = "";
+  }
+
+  function triggerUpload() {
+    if (fileInput) fileInput.click();
+  }
+
+  function triggerFolderUpload() {
+    if (folderInput) folderInput.click();
+  }
+
+  function focusAction(node: HTMLInputElement) {
+    node.focus();
+    node.select();
+  }
 </script>
 
 <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
@@ -944,11 +138,11 @@
       ? "h-[calc(100%-1rem)] m-2 rounded-2xl border border-white/10"
       : "h-full w-full border-l border-white/5",
   )}
-  ondragover={handleDragOver}
-  ondragleave={handleDragLeave}
-  ondrop={handleDrop}
+  ondragover={ws.handleDragOver}
+  ondragleave={ws.handleDragLeave}
+  ondrop={ws.handleDrop}
 >
-  {#if isDragging}
+  {#if ws.isDragging}
     <div
       class="absolute inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center border-2 border-dashed border-primary/50 m-2 rounded-xl pointer-events-none"
     >
@@ -962,11 +156,11 @@
   {/if}
 
   <!-- Status Pill Overlay -->
-  {#if uploadingFiles.length > 0}
+  {#if ws.uploadingFiles.length > 0}
     <div
       class="absolute bottom-12 left-1/2 -translate-x-1/2 z-50 flex flex-col gap-1.5 min-w-[200px] max-w-[280px]"
     >
-      {#each uploadingFiles as f}
+      {#each ws.uploadingFiles as f}
         <div
           class="rounded-full bg-background/95 backdrop-blur-md border shadow-lg px-3 py-1.5 flex items-center justify-between gap-3 text-[10px] font-semibold tracking-wide"
         >
@@ -988,9 +182,9 @@
 
   <!-- Workflow Running Indicators (Requirements 14.1, 14.3, 14.4, 14.5, 14.7) -->
   <WorkflowStatusPills
-    connectionStatus={derivedConnectionStatus}
-    onRetryConnection={retryWorkflowConnection}
-    {completionSummaries}
+    connectionStatus={ws.derivedConnectionStatus}
+    onRetryConnection={ws.retryWorkflowConnection}
+    completionSummaries={ws.completionSummaries}
   />
 
   <Resizable.PaneGroup direction="horizontal" class="flex-1 min-h-0 w-full">
@@ -1000,87 +194,160 @@
       order={1}
       collapsible={true}
       collapsedSize={0}
-      defaultSize={maxPreviewMode ? 0 : 30}
+      defaultSize={ws.maxPreviewMode ? 0 : 30}
       minSize={20}
+      onCollapse={() => {
+        ws.maxPreviewMode = true;
+      }}
+      onExpand={() => {
+        ws.maxPreviewMode = false;
+      }}
       class="flex flex-col min-h-0 border-r border-white/5 transition-all duration-300 ease-out overflow-hidden"
     >
       <FileBrowserHeader
-        onStartCreate={startCreate}
+        workspaceMode={ws.workspaceMode}
+        artifactView={ws.artifactView}
+        onStartCreate={ws.startCreate}
         onTriggerUpload={triggerUpload}
         onTriggerFolderUpload={triggerFolderUpload}
+        onToggleArtifactView={() =>
+          (ws.artifactView = ws.artifactView === "grid" ? "list" : "grid")}
       />
 
-      {#if recentFiles.length > 0 && !searchQuery}
-        <details
-          class="group/recent border-b border-white/5 bg-slate-950/20 px-3 py-2 cursor-pointer outline-none"
-        >
-          <summary
-            class="flex items-center justify-between text-[9px] font-black uppercase tracking-[0.2em] text-white/40 group-open/recent:text-white/60 mb-1 outline-none list-none marker:hidden"
-          >
-            <span class="flex items-center gap-2">Recent Files</span>
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="12"
-              height="12"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              class="transition-transform group-open/recent:rotate-180 opacity-50"
-              ><polyline points="6 9 12 15 18 9"></polyline></svg
-            >
-          </summary>
-          <div class="flex flex-col gap-0.5 pt-2 pb-1">
-            {#each recentFiles as file}
-              {@const Icon = getFileIcon(file.name)}
-              <button
-                class={cn(
-                  "group flex items-center gap-2 px-2 py-1.5 rounded-lg transition-all duration-300 w-full text-left",
-                  activeFileKey === file.key
-                    ? "text-primary bg-white/5 font-semibold"
-                    : "text-white/40 hover:text-white hover:bg-white/5 font-medium",
-                )}
-                onclick={() => handleFileClick(file)}
-              >
-                <Icon class="size-3.5 opacity-60 group-hover:opacity-100" />
-                <span class="text-[10.5px] truncate max-w-[180px]"
-                  >{file.name}</span
-                >
-              </button>
-            {/each}
-          </div>
-        </details>
-      {/if}
+      <Accordion.Root type="single" value="explorer" class="flex flex-col flex-1 min-h-0 w-full overflow-hidden">
+        {#if ws.recentFiles.length > 0 && !ws.searchQuery}
+          <Accordion.Item value="recent" class="border-b border-white/5 bg-slate-950/20 shrink-0">
+            <Accordion.Trigger class="px-3 py-2 text-[9px] font-black uppercase tracking-[0.2em] text-white/40 hover:text-white/60 !no-underline w-full hover:bg-white/5">
+              <span class="flex items-center gap-2">Recent Files</span>
+            </Accordion.Trigger>
+            <Accordion.Content class="px-3 pb-2 data-[state=open]:animate-accordion-down ">
+              {#if ws.workspaceMode === "artifacts" && ws.artifactView === "grid"}
+                <div class="grid grid-cols-[repeat(auto-fill,minmax(80px,1fr))] gap-2 pt-2">
+                  {#each ws.recentFiles as file}
+                    {@const Icon = getFileIcon(file.name)}
+                    <button
+                      class={cn(
+                        "group flex flex-col items-center justify-center gap-1.5 p-3 rounded-xl border text-center transition-all duration-150 cursor-pointer",
+                        ws.activeFileKey === file.key
+                          ? "border-primary/40 bg-primary/10 text-white"
+                          : "border-white/8 bg-white/3 text-white/60 hover:border-white/15 hover:bg-white/7 hover:text-white",
+                      )}
+                      onclick={() => ws.handleFileClick(file)}
+                    >
+                      <Icon class="size-6 shrink-0 opacity-60 group-hover:opacity-100" />
+                      <span class="text-[10px] font-medium leading-tight line-clamp-2 w-full break-all">{file.name}</span>
+                    </button>
+                  {/each}
+                </div>
+              {:else}
+                <div class="flex flex-col gap-0.5 pt-2">
+                  {#each ws.recentFiles as file}
+                    {@const Icon = getFileIcon(file.name)}
+                    <button
+                      class={cn(
+                        "group flex items-center gap-2 px-2 py-1.5 rounded-lg transition-all duration-300 w-full text-left",
+                        ws.activeFileKey === file.key
+                          ? "text-primary bg-primary/10 font-semibold"
+                          : "text-white/40 hover:text-white hover:bg-white/5 font-medium",
+                      )}
+                      onclick={() => ws.handleFileClick(file)}
+                    >
+                      <Icon class="size-3.5 opacity-60 group-hover:opacity-100" />
+                      <span class="text-[10.5px] truncate max-w-[180px]">{file.name}</span>
+                    </button>
+                  {/each}
+                </div>
+              {/if}
+            </Accordion.Content>
+          </Accordion.Item>
+        {/if}
 
-      <div class="flex-1 w-full bg-slate-950/10 overflow-hidden">
-        <FileTree
-          tree={filteredFileTree}
-          {expandedDirs}
-          {activeFileKey}
-          {activeDirKey}
-          {workspaceId}
-          {nameInputState}
-          bind:nameInputValue
-          {fileContext}
-          {inlineError}
-          references={fileContext.references}
-          onToggleDir={toggleDir}
-          onFileClick={handleFileClick}
-          onToggleReference={toggleReference}
-          onRenameFile={renameFile}
-          onDeleteFile={deleteFile}
-          onCopyPathToClipboard={copyPathToClipboard}
-          onSubmitInlineAction={submitInlineAction}
-          onCancelInlineAction={cancelInlineAction}
-          onStartRename={startRename}
-          onTriggerExtract={triggerExtract}
-          onDownloadFile={downloadFile}
-          onShareFile={shareFile}
-          onStartCreate={startCreate}
-        />
-      </div>
+        <Accordion.Item value="explorer" class="data-[state=open]:flex-1 flex flex-col min-h-0 border-0">
+          <Accordion.Trigger class="px-3 py-2 text-[9px] font-black uppercase tracking-[0.2em] text-white/40 hover:text-white/60 border-b border-white/5 !no-underline w-full hover:bg-white/5 shrink-0">
+            <span class="flex items-center gap-2">Explorer</span>
+          </Accordion.Trigger>
+          <Accordion.Content class="data-[state=open]:flex-1 data-[state=open]:animate-accordion-down min-h-0 overflow-y-auto overflow-x-hidden bg-slate-950/10 !pb-0 w-full">
+            {#if ws.workspaceMode === "files"}
+              <div class="h-full w-full">
+                <FileTree
+                  tree={ws.filteredFileTree}
+                  expandedDirs={ws.expandedDirs}
+                  activeFileKey={ws.activeFileKey}
+                  activeDirKey={ws.activeDirKey}
+                  workspaceId={ws.workspaceId}
+                  nameInputState={ws.nameInputState}
+                  bind:nameInputValue={ws.nameInputValue}
+                  fileContext={ws.fileContext}
+                  inlineError={ws.inlineError}
+                  references={ws.fileContext.references}
+                  onToggleDir={ws.toggleDir}
+                  onFileClick={ws.handleFileClick}
+                  onToggleReference={ws.toggleReference}
+                  onRenameFile={ws.renameFile}
+                  onDeleteFile={ws.deleteFile}
+                  onCopyPathToClipboard={ws.copyPathToClipboard}
+                  onSubmitInlineAction={ws.submitInlineAction}
+                  onCancelInlineAction={ws.cancelInlineAction}
+                  onStartRename={ws.startRename}
+                  onTriggerExtract={ws.triggerExtract}
+                  onDownloadFile={ws.downloadFile}
+                  onShareFile={ws.shareFile}
+                  onStartCreate={ws.startCreate}
+                />
+              </div>
+            {:else}
+              <div class="h-full w-full">
+                <ArtifactView
+                  groups={ws.artifactGroups}
+                  viewMode={ws.artifactView}
+                  activeFileKey={ws.activeFileKey}
+                  references={ws.fileContext.references}
+                  onFileClick={(file) =>
+                    ws.handleFileClick({
+                      name: file.name,
+                      type: "file",
+                      key: file.key,
+                      size: file.size,
+                      lastModified: file.lastModified,
+                    })}
+                  onToggleReference={(file) =>
+                    ws.toggleReference({
+                      name: file.name,
+                      type: "file",
+                      key: file.key,
+                      size: file.size,
+                      lastModified: file.lastModified,
+                    })}
+                />
+              </div>
+            {/if}
+          </Accordion.Content>
+        </Accordion.Item>
+
+        <Accordion.Item value="cloud" class="border-t border-white/5 bg-slate-950/20 shrink-0 border-0">
+          <Accordion.Trigger class="px-3 py-2 text-[9px] font-black uppercase tracking-[0.2em] text-white/40 hover:text-white/60 !no-underline w-full hover:bg-white/5">
+            <span class="flex items-center gap-2">Cloud Storage</span>
+          </Accordion.Trigger>
+          <Accordion.Content class="px-3 pb-2">
+            <div class="flex flex-col gap-1.5 pt-2">
+              <button class="flex items-center justify-between px-2 py-1.5 rounded-md hover:bg-white/5 transition-colors text-white/50 hover:text-white/80 group">
+                <div class="flex items-center gap-2.5">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="opacity-70 group-hover:opacity-100"><path d="M12 2v20"></path><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+                  <span class="text-[10.5px] font-medium">Google Drive</span>
+                </div>
+                <span class="text-[9px] px-1.5 py-0.5 rounded-sm bg-white/10 text-white/40 group-hover:text-white/70">Connect</span>
+              </button>
+              <button class="flex items-center justify-between px-2 py-1.5 rounded-md hover:bg-white/5 transition-colors text-white/50 hover:text-white/80 group">
+                <div class="flex items-center gap-2.5">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="opacity-70 group-hover:opacity-100"><rect width="20" height="20" x="2" y="2" rx="5" ry="5"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path><line x1="17.5" x2="17.51" y1="6.5" y2="6.5"></line></svg>
+                  <span class="text-[10.5px] font-medium">OneDrive</span>
+                </div>
+                <span class="text-[9px] px-1.5 py-0.5 rounded-sm bg-white/10 text-white/40 group-hover:text-white/70">Connect</span>
+              </button>
+            </div>
+          </Accordion.Content>
+        </Accordion.Item>
+      </Accordion.Root>
 
       <div class="p-3 border-t border-white/5 bg-slate-950/20 shrink-0">
         <div class="relative group">
@@ -1091,7 +358,7 @@
             type="text"
             placeholder="Search files..."
             class="w-full h-8 bg-white/5 border border-white/5 rounded-lg pl-9 pr-3 text-[11px] text-white/90 placeholder:text-white/20 focus:outline-none focus:ring-1 focus:ring-[#D4AF37]/40 transition-all font-medium"
-            bind:value={searchQuery}
+            bind:value={ws.searchQuery}
           />
         </div>
       </div>
@@ -1100,227 +367,273 @@
       withHandle
       class={cn(
         "w-px bg-white/5 hover:bg-primary/40 transition-colors z-10",
-        maxPreviewMode && "hidden",
+        ws.maxPreviewMode && "hidden",
       )}
     />
 
     <!-- Panel B: Preview Area -->
     <Resizable.Pane
       order={2}
-      defaultSize={maxPreviewMode ? 100 : 70}
+      defaultSize={ws.maxPreviewMode ? 100 : 70}
       minSize={30}
+      onResize={(size) => {
+        if (size < 30 && fileBrowserPane) {
+          fileBrowserPane.collapse();
+        }
+      }}
       class="flex flex-col min-h-0 bg-slate-900/20 backdrop-blur-md relative group"
     >
       <!-- View Tabs Removed for Floating Island Paradigm -->
 
       <!-- View Content -->
-      {#if activeView === "files"}
-        <!-- Files View (headless editor with top bar) -->
-        {#if openedFiles.length > 0}
-          <div class="flex flex-col h-full bg-slate-950/10">
-            <!-- Flat Headless Top Bar -->
-            <div
-              class="flex items-center justify-between h-12 px-4 shrink-0 bg-transparent"
-            >
-              <!-- Left: Document Title Dropdown -->
-              <DropdownMenu.Root>
-                <DropdownMenu.Trigger>
-                  {#snippet child({ props })}
-                    <Button
-                      {...props}
-                      variant="ghost"
-                      size="sm"
-                      class="h-8 px-2 text-[13px] font-semibold text-white/90 hover:bg-white/5 hover:text-white flex items-center gap-2"
-                    >
-                      <FileIcon class="size-4 text-primary/80" />
-                      {activeFileDef?.name || "Untitled"}
-                      <ChevronDownIcon class="size-3.5 text-white/40" />
-                    </Button>
-                  {/snippet}
-                </DropdownMenu.Trigger>
-                <DropdownMenu.Content
-                  align="start"
-                  class="w-56 bg-slate-950/90 backdrop-blur-xl border-white/10 rounded-xl shadow-2xl"
-                >
-                  <DropdownMenu.Group>
-                    <DropdownMenu.Label
-                      class="text-[10px] uppercase tracking-wider text-white/40 px-2 py-1.5"
-                      >Open Files</DropdownMenu.Label
-                    >
-                    {#each openedFiles as file}
-                      <DropdownMenu.Item
-                        class={cn(
-                          "text-[12px] font-medium rounded-lg cursor-pointer my-0.5",
-                          activeFileKey === file.key
-                            ? "bg-primary/20 text-white"
-                            : "text-white/60 hover:text-white hover:bg-white/5",
-                        )}
-                        onclick={() => (activeFileKey = file.key)}
-                      >
-                        <FileIcon class="size-3 mr-2" />
-                        {file.name}
-                        {#if activeFileKey === file.key}
-                          <CheckIcon class="size-3 ml-auto text-primary" />
-                        {/if}
-                      </DropdownMenu.Item>
-                    {/each}
-                  </DropdownMenu.Group>
-                </DropdownMenu.Content>
-              </DropdownMenu.Root>
+      {#if ws.artifactModeType}
+        <div class="flex flex-col h-full bg-slate-950/20 backdrop-blur-md min-w-0 relative">
+          <!-- Premium Header -->
+          <div class="flex items-center justify-between px-6 py-4 border-b border-white/5 bg-slate-950/40 shrink-0">
+            <div class="flex flex-col">
+              <span class="text-[10px] font-black uppercase tracking-[0.2em] text-[#D4AF37]">Artifact Mode</span>
+              <h2 class="text-sm font-bold text-white flex items-center gap-2 truncate mt-0.5">
+                <FileTextIcon class="size-4 text-primary shrink-0" />
+                <span>Reviewing Artifact</span>
+              </h2>
+            </div>
+            
+            <div class="flex items-center gap-3">
+              <button
+                class="px-3 py-1.5 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 text-white/80 hover:text-white text-[11px] font-semibold transition-all"
+                onclick={() => ws.closeArtifact()}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
 
-              <!-- Far Right: Actions & Agent Role -->
-              <div class="flex items-center gap-1">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  class="size-8 rounded-lg text-white/60 hover:text-white hover:bg-white/5"
-                  onclick={() => editorCanvasRef?.save()}
-                >
-                  <SaveIcon class="size-4" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  class="size-8 rounded-lg text-white/60 hover:text-white hover:bg-white/5"
-                  onclick={() => editorCanvasRef?.copy()}
-                >
-                  <CopyIcon class="size-4" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  class="size-8 rounded-lg text-white/60 hover:text-white hover:bg-white/5"
-                  onclick={() => editorCanvasRef?.share()}
-                >
-                  <ShareIcon class="size-4" />
-                </Button>
+          <div class="flex-1 flex min-h-0 overflow-hidden relative">
+            <EditorCanvas 
+              type={ws.artifactModeType === 'pdf' ? 'pdf' : 'text'}
+              filename={ws.artifactModeType === 'pdf' ? 'artifact.pdf' : 'artifact.md'}
+              content={ws.artifactModeType === 'pdf' ? undefined : (typeof ws.artifactModeContent === 'string' ? ws.artifactModeContent : JSON.stringify(ws.artifactModeContent, null, 2))}
+              url={ws.artifactModeType === 'pdf' && typeof ws.artifactModeContent === 'string' ? ws.artifactModeContent : undefined}
+              editorMode="wysiwyg"
+              onExtract={() => ws.artifactModeCallbacks?.onApprove?.(ws.artifactModeContent)}
+              onClose={() => ws.artifactModeCallbacks?.onReject?.(ws.artifactModeContent)}
+            />
+          </div>
+        </div>
+      {:else if ws.activeArtifact}
+        <!-- HITL OCR/Artifact review view (Phase 3.2) -->
+        <div class="flex flex-col h-full bg-slate-950/20 backdrop-blur-md min-w-0">
+          <!-- Premium Header -->
+          <div class="flex items-center justify-between px-6 py-4 border-b border-white/5 bg-slate-950/40 shrink-0">
+            <div class="flex flex-col">
+              <span class="text-[10px] font-black uppercase tracking-[0.2em] text-[#D4AF37]">Human-In-The-Loop Verification</span>
+              <h2 class="text-sm font-bold text-white flex items-center gap-2 truncate mt-0.5">
+                <FileTextIcon class="size-4 text-primary shrink-0" />
+                <span>Reviewing {ws.activeArtifact.fileId}</span>
+              </h2>
+            </div>
+            
+            <div class="flex items-center gap-3">
+              <button
+                class="px-3 py-1.5 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 text-white/80 hover:text-white text-[11px] font-semibold transition-all"
+                onclick={() => { ws.activeArtifact = null; }}
+                disabled={ws.activeArtifact.status === 'submitting'}
+              >
+                Cancel
+              </button>
+              <button
+                class="px-4 py-1.5 rounded-lg bg-primary text-white text-[11px] font-bold transition-all gold-glow hover:brightness-110 flex items-center gap-2"
+                onclick={async () => {
+                  if (!ws.activeArtifact) return;
+                  ws.activeArtifact.status = 'submitting';
+                  try {
+                    if (ws.activeArtifact.runId) {
+                      const res = await fetch('/api/ai/workflow/resume', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          workflowId: ws.activeArtifact.workflowId || 'document-extraction',
+                          runId: ws.activeArtifact.runId,
+                          stepId: ws.activeArtifact.stepId || 'suspend-for-validation',
+                          resumeData: {
+                            extractedResults: JSON.parse(ws.activeArtifact.markdown)
+                          }
+                        })
+                      });
+                      if (!res.ok) {
+                        const data = await res.json();
+                        throw new Error(data.error || 'Failed to resume workflow');
+                      }
+                    }
+                    ws.activeArtifact.status = 'done';
+                    toast.success('Artifact approved successfully!');
+                    setTimeout(() => {
+                      ws.activeArtifact = null;
+                    }, 800);
+                  } catch (err: any) {
+                    console.error(err);
+                    ws.activeArtifact.status = 'reviewing';
+                    ws.activeArtifact.error = err.message;
+                    toast.error(err.message || 'Approval failed');
+                  }
+                }}
+                disabled={ws.activeArtifact.status === 'submitting'}
+              >
+                {#if ws.activeArtifact.status === 'submitting'}
+                  <ActivityIcon class="size-3.5 animate-spin" />
+                  <span>Submitting...</span>
+                {:else}
+                  <span>Approve & Resume</span>
+                {/if}
+              </button>
+            </div>
+          </div>
 
-                <div class="w-px h-4 bg-white/10 mx-1"></div>
+          <!-- Main Layout Split -->
+          <div class="flex-1 flex min-h-0 overflow-hidden relative">
+            {#if ws.activeArtifact.status === 'submitting'}
+              <div class="absolute inset-0 bg-background/55 backdrop-blur-xs z-50 flex items-center justify-center">
+                <div class="flex flex-col items-center gap-3">
+                  <ActivityIcon class="size-8 text-primary animate-spin" />
+                  <span class="text-xs font-semibold text-white/60 animate-pulse">Processing approval...</span>
+                </div>
+              </div>
+            {/if}
 
-                <!-- Agent Role Dropdown -->
-                <DropdownMenu.Root>
-                  <DropdownMenu.Trigger>
-                    {#snippet child({ props })}
-                      {@const chatAny = chat as any}
-                      <Button
-                        {...props}
-                        variant="ghost"
-                        size="sm"
-                        class="h-8 px-2.5 rounded-lg text-[11px] font-semibold text-primary bg-primary/10 hover:bg-primary/20 flex items-center gap-1.5 ml-1"
-                      >
-                        <BotIcon class="size-3.5" />
-                        <span class="max-w-[80px] truncate"
-                          >{chatAny?.activeAgent?.label || "Hermes"}</span
-                        >
-                        <ChevronDownIcon class="size-3 opacity-70" />
-                      </Button>
-                    {/snippet}
-                  </DropdownMenu.Trigger>
-                  <DropdownMenu.Content
-                    align="end"
-                    class="w-48 bg-slate-950/90 backdrop-blur-xl border-white/10 rounded-xl shadow-2xl"
-                  >
-                    {@const chatAny = chat as any}
-                    <DropdownMenu.Label
-                      class="text-[10px] uppercase tracking-wider text-white/40"
-                      >Select Agent</DropdownMenu.Label
-                    >
-                    <DropdownMenu.Separator class="bg-white/5" />
-                    {#if chatAny?.agents}
-                      {#each chatAny.agents as agent}
-                        <DropdownMenu.Item
-                          class="text-[12px] font-medium rounded-lg cursor-pointer my-0.5 text-white/70 hover:text-white hover:bg-white/5"
-                          onclick={() => (chatAny.activeAgent = agent)}
-                        >
-                          {agent.label}
-                          {#if chatAny?.activeAgent?.id === agent.id}
-                            <CheckIcon class="size-3 ml-auto text-primary" />
-                          {/if}
-                        </DropdownMenu.Item>
-                      {/each}
-                    {/if}
-                  </DropdownMenu.Content>
-                </DropdownMenu.Root>
+            <div class="w-1/2 flex flex-col border-r border-white/5">
+              <div class="px-4 py-2 bg-slate-950/20 border-b border-white/5 flex items-center justify-between shrink-0">
+                <span class="text-[10px] font-bold text-white/40 uppercase tracking-wider">Raw Output / Markdown</span>
+                <span class="text-[9px] px-1.5 py-0.5 rounded bg-white/5 font-mono text-white/50">Svelte 5 Reactive Editor</span>
+              </div>
+              <textarea
+                class="flex-1 w-full bg-slate-950/30 p-4 text-xs font-mono text-white/90 placeholder:text-white/20 focus:outline-none resize-none overflow-y-auto leading-relaxed border-0"
+                bind:value={ws.activeArtifact.markdown}
+              ></textarea>
+            </div>
+            
+            <div class="w-1/2 flex flex-col bg-slate-950/10">
+              <div class="px-4 py-2 bg-slate-950/20 border-b border-white/5 flex items-center justify-between shrink-0">
+                <span class="text-[10px] font-bold text-white/40 uppercase tracking-wider">Formatted Live Preview</span>
+                <span class="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-mono">Synced</span>
+              </div>
+              <div class="flex-1 p-6 overflow-y-auto prose prose-invert prose-xs max-w-none">
+                {#if ws.activeArtifact.markdown.trim().startsWith('{') || ws.activeArtifact.markdown.trim().startsWith('[')}
+                  <pre class="bg-black/40 border border-white/5 rounded-xl p-4 text-[11px] text-amber-300 overflow-x-auto leading-relaxed font-mono">
+                    {ws.activeArtifact.markdown}
+                  </pre>
+                {:else}
+                  <div class="text-xs font-medium text-white/80 leading-relaxed whitespace-pre-wrap">
+                    {ws.activeArtifact.markdown}
+                  </div>
+                {/if}
               </div>
             </div>
+          </div>
 
+          {#if ws.activeArtifact.error}
+            <div class="px-6 py-3 border-t border-destructive/20 bg-destructive/10 text-destructive text-xs font-semibold shrink-0">
+              Error: {ws.activeArtifact.error}
+            </div>
+          {/if}
+        </div>
+      {:else if ws.activeView === "files"}
+        <!-- Files View (headless editor with top bar) -->
+        <div class="flex flex-col h-full bg-slate-950/10 min-w-0">
+          <!-- Flat Headless Top Bar -->
+          <WorkspaceHeader
+            onSave={() => editorCanvasRef?.save()}
+            onCopy={() => editorCanvasRef?.copy()}
+            onShare={() => editorCanvasRef?.share()}
+            onUpload={triggerUpload}
+            onDownload={() => {
+              if (ws.activeFileDef) {
+                ws.downloadFile({
+                  name: ws.activeFileDef.name,
+                  key: ws.activeFileDef.key,
+                  type: "file",
+                } as any);
+              }
+            }}
+          />
+
+          {#if ws.openedFiles.length > 0}
             <div class="flex-1 min-h-0 relative">
-              {#if activeFileDef}
+              {#if ws.activeFileDef}
                 <EditorCanvas
                   bind:this={editorCanvasRef}
-                  filename={activeFileDef.name}
-                  url={`/api/file/${encodeURIComponent(activeFileDef.key)}?workspace=${workspaceId}`}
-                  type={activeFileDef.type}
+                  filename={ws.activeFileDef.name}
+                  url={`/api/file/${encodeURIComponent(ws.activeFileDef.key)}?workspace=${ws.workspaceId}`}
+                  type={ws.activeFileDef.type}
                   onDownload={() =>
-                    downloadFile({
-                      name: activeFileDef!.name,
-                      key: activeFileDef!.key,
+                    ws.downloadFile({
+                      name: ws.activeFileDef!.name,
+                      key: ws.activeFileDef!.key,
                       type: "file",
                     } as any)}
                   onExtract={() =>
-                    triggerExtract({
-                      name: activeFileDef!.name,
-                      key: activeFileDef!.key,
+                    ws.triggerExtract({
+                      name: ws.activeFileDef!.name,
+                      key: ws.activeFileDef!.key,
                       type: "file",
                     } as any)}
                 />
               {/if}
             </div>
-          </div>
-        {:else}
-          <div
-            class="h-full flex flex-col items-center justify-center text-center px-12 opacity-20"
-          >
+          {:else}
             <div
-              class="size-24 rounded-[2.5rem] bg-white/5 flex items-center justify-center mb-8 border border-white/5"
+              class="flex-1 flex flex-col items-center justify-center text-center px-12 opacity-20"
             >
-              <EyeIcon class="size-10" />
+              <div
+                class="size-24 rounded-[2.5rem] bg-white/5 flex items-center justify-center mb-8 border border-white/5"
+              >
+                <EyeIcon class="size-10" />
+              </div>
+              <p
+                class="text-[13px] font-black tracking-widest uppercase mb-3 text-white"
+              >
+                Workspace Preview
+              </p>
+              <p
+                class="text-[11px] font-bold text-white/60 leading-relaxed max-w-[280px]"
+              >
+                Select a file to inspect and trigger AI workflows.
+              </p>
             </div>
-            <p
-              class="text-[13px] font-black tracking-widest uppercase mb-3 text-white"
-            >
-              Workspace Preview
-            </p>
-            <p
-              class="text-[11px] font-bold text-white/60 leading-relaxed max-w-[280px]"
-            >
-              Select a file to inspect and trigger AI workflows.
-            </p>
-          </div>
-        {/if}
-      {:else if activeView === "workflow"}
+          {/if}
+        </div>
+      {:else if ws.activeView === "workflow"}
         <!-- Workflow View: phase-based component mounting -->
         <div class="flex flex-col h-full min-h-0">
           <!-- WorkflowStatusBadge (always shown when not idle) -->
-          {#if workflowEvents.workflowStatus !== "idle"}
+          {#if ws.workflowEvents.workflowStatus !== "idle"}
             <div
               class="px-4 py-3 border-b border-white/5 bg-slate-950/30 shrink-0"
             >
               <WorkflowStatusBadge
-                workflowStatus={workflowEvents.workflowStatus}
-                error={workflowEvents.error}
+                workflowStatus={ws.workflowEvents.workflowStatus}
+                error={ws.workflowEvents.error}
               />
             </div>
           {/if}
 
           <!-- Phase-based view mounting -->
           <div class="flex-1 min-h-0 overflow-hidden">
-            {#if showExtractionInspector}
+            {#if ws.showExtractionInspector}
               <ExtractionInspector
-                students={extractionStudents}
-                runId={extractionRunId}
-                status={extractionStatus}
-                {validationResults}
+                students={ws.extractionStudents}
+                runId={ws.extractionRunId}
+                status={ws.extractionStatus}
+                validationResults={ws.validationResults}
               />
-            {:else if showPublishViewer}
+            {:else if ws.showPublishViewer}
               <PublishViewer
-                pdfs={publishPdfs}
-                status={publishStatus}
-                currentStep={publishCurrentStep}
-                completionSummary={publishCompletionSummary}
-                failedGenerations={publishFailedGenerations}
+                pdfs={ws.publishPdfs}
+                status={ws.publishStatus}
+                currentStep={ws.publishCurrentStep}
+                completionSummary={ws.publishCompletionSummary}
+                failedGenerations={ws.publishFailedGenerations}
               />
-            {:else if workflowEvents.workflowStatus === "complete"}
+            {:else if ws.workflowEvents.workflowStatus === "complete"}
               <!-- Completion state -->
               <div
                 class="h-full flex flex-col items-center justify-center text-center px-8 gap-4"
@@ -1367,30 +680,30 @@
             {/if}
           </div>
         </div>
-      {:else if activeView === "run-history"}
+      {:else if ws.activeView === "run-history"}
         <!-- Run History View (role-gated) -->
         <div class="flex flex-col h-full min-h-0">
           <RunHistory
-            runs={runHistoryRuns}
-            {selectedRun}
-            steps={runHistorySteps}
-            {designationId}
-            onSelectRun={handleSelectRun}
-            isLoading={runHistoryLoading}
+            runs={ws.runHistoryRuns}
+            selectedRun={ws.selectedRun}
+            steps={ws.runHistorySteps}
+            designationId={ws.designationId}
+            onSelectRun={ws.handleSelectRun}
+            isLoading={ws.runHistoryLoading}
           />
         </div>
       {/if}
 
       <!-- Floating Contextual UI — always present, auto-shows on Panel B hover -->
       <FloatingToolbar
-        bind:maxPreviewMode
-        bind:ocrEnabled
-        bind:compressionEnabled
-        bind:activeView
-        {chat}
-        {uploadingFiles}
-        workflowStatus={workflowEvents.workflowStatus}
-        {canViewRunHistory}
+        bind:maxPreviewMode={ws.maxPreviewMode}
+        bind:ocrEnabled={ws.ocrEnabled}
+        bind:compressionEnabled={ws.compressionEnabled}
+        bind:activeView={ws.activeView}
+        chat={ws.chat}
+        uploadingFiles={ws.uploadingFiles}
+        workflowStatus={ws.workflowEvents.workflowStatus}
+        canViewRunHistory={ws.canViewRunHistory}
       />
     </Resizable.Pane>
   </Resizable.PaneGroup>
@@ -1402,7 +715,7 @@
     multiple
     onchange={(e) => {
       const files = (e.target as HTMLInputElement).files;
-      if (files) fileContext.add(files);
+      if (files) ws.fileContext.add(files);
     }}
   />
   <input
@@ -1413,7 +726,7 @@
     multiple
     onchange={(e) => {
       const files = (e.target as HTMLInputElement).files;
-      if (files) fileContext.add(files);
+      if (files) ws.fileContext.add(files);
     }}
   />
 </aside>
