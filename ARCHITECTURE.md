@@ -1,6 +1,6 @@
 # EdApex Architecture
 
-A detailed technical specification of the EdApex agentic school management system. This document is the canonical reference for how the platform's layers fit together, how a request flows end-to-end, and which invariants must be preserved by any change.
+An **agentic school management system** (an agentic school OS). EdApex is an AI-native platform in which autonomous agents operate alongside school staff with governed, per-request access to live school data. This document is the canonical reference for how the platform's layers fit together, how a request flows end-to-end, and which invariants must be preserved by any change.
 
 > **Scope.** Aimed at contributors and reviewers. It assumes familiarity with TypeScript and SvelteKit 2, but not with the project's specific patterns.
 > **Companion docs.** [`AGENTS.md`](./AGENTS.md) — contributor contract. [`docs/slash_command_tool_hardening_plan.md`](./docs/slash_command_tool_hardening_plan.md) — the rationale for the per-request provider pattern. [`docs/responsive_design.md`](./docs/responsive_design.md) — UI rules.
