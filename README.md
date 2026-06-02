@@ -1,6 +1,6 @@
 # EdApex (eduprime)
 
-An **agentic school management system** (an agentic school OS). EdApex is a SvelteKit-based, AI-native platform where autonomous agents operate alongside school staff with governed, per-request access to live academic data — running structured workflows (extract, generate, validate, publish) and atomic tool calls under strict tenant isolation, with explicit workspace boundaries enforced on every request.
+An **agentic school management system** (agentic school OS). EdApex is a SvelteKit-based, AI-native platform where autonomous agents operate alongside school staff with governed, per-request access to live academic data — running structured workflows (extract, generate, validate, publish) and atomic tool calls under strict tenant isolation, with explicit workspace boundaries enforced on every request.
 
 ## Highlights
 

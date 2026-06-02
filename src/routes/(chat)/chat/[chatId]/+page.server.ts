@@ -1,10 +1,15 @@
-import { error } from "@sveltejs/kit";
+import { error, redirect } from "@sveltejs/kit";
 import type { PageServerLoad } from "./$types";
 import { getMemory, mastra } from "$lib/server/mastra";
 import { toAISdkMessages } from "@mastra/ai-sdk/ui";
 
 export const load: PageServerLoad = async ({ params, locals }) => {
   const { chatId } = params;
+  // redirect to home if chat is not found
+  if (!chatId || chatId.trim() === "undefined") {
+    redirect(302, "/");
+  }
+
   const user = locals.user;
   const memory = await getMemory();
 
@@ -15,7 +20,7 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 
     const thread = await memory.getThreadById({ threadId: chatId });
     if (!thread) {
-      error(404, "Not found");
+      redirect(302, "/");
     }
 
     // Enforce ownership for private threads
