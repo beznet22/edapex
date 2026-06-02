@@ -2,30 +2,31 @@ import { z } from 'zod';
 import { createTool } from '@mastra/core/tools';
 import { ResultsRepository } from '../../repository/result.repo';
 import { StudentRepository } from '../../repository/student.repo';
-import { getDatabase } from '$lib/server/db';
-import type { TenantContext } from '../tenant-context';
+import { buildMastraToolContext } from '../tenant-context';
 
 /**
- * Static getContext tool for the supervisor — fetches domain context on demand.
- * Uses requestContext to access the active TenantContext at call time.
+ * Static getContext tool for the supervisor — retrieves domain context on demand.
+ * Uses the Slice 0 bridge (buildMastraToolContext) to access the active
+ * TenantContext and ScopedRepositoryProvider at call time. Read-only: no sm*
+ * table is written.
  */
 export const getContextTool = createTool({
     id: 'getContext',
-    description: 'Fetches specific domain context (assessment setups, students, subjects, etc.) on demand. Use this if the user asks about assessments, marks, students, or class assignments.',
+    description: 'Retrieve specific domain context (assessment setups, students, subjects, etc.) on demand. Use this if the user asks about assessments, marks, students, or class assignments.',
     inputSchema: z.object({
         types: z.array(z.enum(['assessment', 'students', 'class'])).describe('The specific categories of context needed'),
         query: z.string().optional().describe('Optional filter/search term for students or assessments'),
     }),
     execute: async ({ types, query }, { requestContext }) => {
-        const ctx = requestContext?.get('tenantContext') as TenantContext | undefined;
+        const bridge = await buildMastraToolContext(requestContext);
+        const ctx = bridge.tenantContext;
         if (!ctx) {
             return { error: 'No tenant context available. Cannot fetch domain data.' };
         }
 
         const staffId = ctx.userId;
-        const db = await getDatabase();
-        const resultRepo = new ResultsRepository(db, ctx);
-        const studentRepo = new StudentRepository(db, ctx);
+        const resultRepo = bridge.getRepo(ResultsRepository);
+        const studentRepo = bridge.getRepo(StudentRepository);
 
         const results: any = {};
 
@@ -94,4 +95,4 @@ export const getContextTool = createTool({
             return { error: 'Failed to fetch domain context from repositories.' };
         }
     },
-}); 
+});

@@ -209,3 +209,181 @@ describe("Slice 8: tool and slash-command rename contract", () => {
     });
   });
 });
+
+/**
+ * Slice 11: read-only tools contract.
+ *
+ * Per plan §7 #15, the read-only tools (`web-search`, `web-fetch`, `getContext`)
+ * share a contract that the DB tools do not: they must never write to the
+ * application database. "Read-only" was an assumption in earlier reviews; this
+ * slice encodes it as a static source-text audit so a regression fails CI.
+ *
+ * The same audit covers:
+ *  - Drizzle import isolation (no `eq`, `and`, `select`, `insert`, etc.)
+ *  - Repository import isolation (no `*Repo` from `src/lib/server/repository`)
+ *  - No direct `db.*` or `getDatabase()` call (B1)
+ *  - Use of the Slice 0 bridge `buildMastraToolContext` (B2)
+ *  - Jargon-free, academic-voice descriptions (plan §9.5)
+ *  - Drop `health: 'operational'` from `get-academic-context` output
+ *    (plan line 643)
+ */
+describe("Slice 11: read-only tools contract", () => {
+  const globalToolsSrc = readFileSync(
+    join(process.cwd(), "src/lib/server/mastra/tools/global-tools.ts"),
+    "utf-8",
+  );
+  const contextToolSrc = readFileSync(
+    join(process.cwd(), "src/lib/server/mastra/tools/context-tool.ts"),
+    "utf-8",
+  );
+  const coreToolsSrc = readFileSync(
+    join(process.cwd(), "src/lib/server/mastra/tools/core-tools.ts"),
+    "utf-8",
+  );
+
+  // Tools defined in this file are web-search and web-fetch.
+  function extractWebSearchBody(): string {
+    const idx = globalToolsSrc.indexOf("export const webSearchTool");
+    const end = globalToolsSrc.indexOf("// ─── Web Fetch Tool");
+    return globalToolsSrc.slice(idx, end > 0 ? end : globalToolsSrc.length);
+  }
+  function extractWebFetchBody(): string {
+    const idx = globalToolsSrc.indexOf("export const webFetchTool");
+    const end = globalToolsSrc.indexOf("// ─── HTTP Fetch Fallback");
+    return globalToolsSrc.slice(idx, end > 0 ? end : globalToolsSrc.length);
+  }
+  function extractGetContextBody(): string {
+    const idx = contextToolSrc.indexOf("export const getContextTool");
+    return contextToolSrc.slice(idx);
+  }
+  function extractSystemStatusLogicBody(): string {
+    const idx = coreToolsSrc.indexOf("export const systemStatusLogic");
+    return coreToolsSrc.slice(idx);
+  }
+
+  describe("web-search / web-fetch — no DB surface", () => {
+    it("web-search source does not import `drizzle-orm`", () => {
+      const body = extractWebSearchBody();
+      expect(/from\s+['"]drizzle-orm['"]/.test(body), "web-search imports drizzle-orm").toBe(false);
+    });
+
+    it("web-search source does not import any *Repo from src/lib/server/repository", () => {
+      const body = extractWebSearchBody();
+      expect(
+        /from\s+['"][^'"]*repository[^'"]*['"]/.test(body),
+        "web-search imports a repository class",
+      ).toBe(false);
+    });
+
+    it("web-search source does not call db.* or getDatabase()", () => {
+      const body = extractWebSearchBody();
+      expect(/getDatabase\s*\(/.test(body), "web-search calls getDatabase()").toBe(false);
+      expect(/\bdb\.(select|insert|update|delete|execute)\b/.test(body), "web-search calls db.*").toBe(false);
+    });
+
+    it("web-fetch source does not import `drizzle-orm`", () => {
+      const body = extractWebFetchBody();
+      expect(/from\s+['"]drizzle-orm['"]/.test(body), "web-fetch imports drizzle-orm").toBe(false);
+    });
+
+    it("web-fetch source does not import any *Repo from src/lib/server/repository", () => {
+      const body = extractWebFetchBody();
+      expect(
+        /from\s+['"][^'"]*repository[^'"]*['"]/.test(body),
+        "web-fetch imports a repository class",
+      ).toBe(false);
+    });
+
+    it("web-fetch source does not call db.* or getDatabase()", () => {
+      const body = extractWebFetchBody();
+      expect(/getDatabase\s*\(/.test(body), "web-fetch calls getDatabase()").toBe(false);
+      expect(/\bdb\.(select|insert|update|delete|execute)\b/.test(body), "web-fetch calls db.*").toBe(false);
+    });
+  });
+
+  describe("getContext — read-only DB contract", () => {
+    it("does not call Drizzle mutating operations (insert/update/delete)", () => {
+      const body = extractGetContextBody();
+      expect(
+        /\.(insert|update|delete)\s*\(/.test(body),
+        "getContext calls a mutating Drizzle operation",
+      ).toBe(false);
+    });
+
+    it("does not write to any sm* table (no INSERT/UPDATE/DELETE on sm* identifiers)", () => {
+      const body = extractGetContextBody();
+      expect(/INSERT\s+INTO/i.test(body), "getContext contains raw INSERT").toBe(false);
+      expect(/UPDATE\s+sm/i.test(body), "getContext contains raw UPDATE on sm*").toBe(false);
+      expect(/DELETE\s+FROM\s+sm/i.test(body), "getContext contains raw DELETE on sm*").toBe(false);
+    });
+
+    it("does not call getDatabase() directly (B1 fix — must use buildMastraToolContext)", () => {
+      const body = extractGetContextBody();
+      expect(/getDatabase\s*\(/.test(body), "getContext calls getDatabase() directly").toBe(false);
+    });
+
+    it("uses buildMastraToolContext bridge (B2 fix — does not access requestContext.get directly)", () => {
+      const body = extractGetContextBody();
+      expect(
+        /buildMastraToolContext\s*\(/.test(body),
+        "getContext must use buildMastraToolContext to read tenant",
+      ).toBe(true);
+      expect(
+        /requestContext\.get\s*\(\s*['"]tenantContext['"]/.test(body),
+        "getContext reads requestContext.get('tenantContext') directly — should use buildMastraToolContext",
+      ).toBe(false);
+    });
+  });
+
+  describe("jargon audit — descriptions are academic voice", () => {
+    const BANNED = ["Tavily", "TinyFish"] as const;
+    const ACADEMIC_WRAPPED_OK = ["search the academic web", "open the resource"];
+
+    it("web-search description does not contain banned vendor names", () => {
+      const body = extractWebSearchBody();
+      const m = body.match(/description:\s*['"`]([^'"`]+)['"`]/);
+      expect(m, "web-search description not found").toBeTruthy();
+      const desc = m![1];
+      for (const token of BANNED) {
+        expect(desc.includes(token), `web-search description mentions "${token}"`).toBe(false);
+      }
+    });
+
+    it("web-fetch description does not contain banned vendor names", () => {
+      const body = extractWebFetchBody();
+      const m = body.match(/description:\s*['"`]([^'"`]+)['"`]/);
+      expect(m, "web-fetch description not found").toBeTruthy();
+      const desc = m![1];
+      for (const token of BANNED) {
+        expect(desc.includes(token), `web-fetch description mentions "${token}"`).toBe(false);
+      }
+    });
+
+    it("getContext description does not contain banned vendor names and is academic voice", () => {
+      const body = extractGetContextBody();
+      const m = body.match(/description:\s*['"`]([^'"`]+)['"`]/);
+      expect(m, "getContext description not found").toBeTruthy();
+      const desc = m![1];
+      for (const token of BANNED) {
+        expect(desc.includes(token), `getContext description mentions "${token}"`).toBe(false);
+      }
+      // Per plan §9.5: bare "fetch" should be wrapped in academic context.
+      // Acceptable: "fetch" as part of an academic phrase.
+      const bareFetch = /\bFetches?\b/;
+      expect(
+        bareFetch.test(desc) && !desc.toLowerCase().includes("academic"),
+        `getContext description uses bare "Fetches" — wrap in academic context`,
+      ).toBe(false);
+    });
+  });
+
+  describe("get-academic-context — drop meaningless health literal", () => {
+    it("systemStatusLogic output does not include `health: 'operational'`", () => {
+      const body = extractSystemStatusLogicBody();
+      expect(
+        /health\s*:\s*['"]operational['"]/.test(body),
+        "systemStatusLogic still emits the meaningless health: 'operational' literal",
+      ).toBe(false);
+    });
+  });
+});

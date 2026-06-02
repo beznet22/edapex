@@ -94,7 +94,6 @@ export const systemStatusLogic = async (context: MastraToolContext) => {
   const { tenantContext } = context;
   return {
     status: "SUCCESS" as const,
-    health: "operational" as const,
     tenant: {
       schoolId: tenantContext.schoolId,
       classId: tenantContext.classId,
