@@ -7,14 +7,17 @@ import { DbInternalError } from "../helpers/errors";
 
 import { type MySQLDrizzleClient } from "../db";
 import type { TenantContext } from "../mastra/tenant-context";
+import type { ScopedRepositoryProvider } from "../mastra/scoped-repository";
 export type { MySQLDrizzleClient };
 
 export type AcademicYearData = typeof smAcademicYears.$inferSelect;
 export type ExamTypeData = typeof smExamTypes.$inferSelect;
 export type GeneralSetting = typeof smGeneralSettings.$inferSelect;
 
-// Configuration cache interface
-interface ConfigurationCache {
+// Configuration cache interface. Owned by ScopedRepositoryProvider (Slice 9);
+// the Map<schoolId, ConfigurationCache> is gone — each provider has its own
+// cache bound to the request lifetime.
+export interface ConfigurationCache {
   generalSettings: GeneralSetting[];
   academicYears: AcademicYearData[];
   examTypes: ExamTypeData[];
@@ -22,18 +25,20 @@ interface ConfigurationCache {
   lastUpdated: number;
 }
 
-// Global configuration cache mapped by schoolId
-let configCache: Map<number, ConfigurationCache> = new Map();
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes cache TTL
 
 export class BaseRepository {
-  constructor(public readonly db: MySQLDrizzleClient, public readonly tenant: TenantContext) {}
+  constructor(
+    public readonly db: MySQLDrizzleClient,
+    public readonly tenant: TenantContext,
+    public readonly provider?: ScopedRepositoryProvider
+  ) {}
 
-  static async build<T extends BaseRepository>(this: new (db: MySQLDrizzleClient, tenant: TenantContext) => T, db?: MySQLDrizzleClient, tenant?: TenantContext): Promise<T> {
+  static async build<T extends BaseRepository>(this: new (db: MySQLDrizzleClient, tenant: TenantContext, provider?: ScopedRepositoryProvider) => T, db?: MySQLDrizzleClient, tenant?: TenantContext, provider?: ScopedRepositoryProvider): Promise<T> {
     const finalDb = db || await getDatabase();
     // Default tenant for singleton fallback (though we should avoid it)
     const finalTenant = tenant || { schoolId: 1, userId: 1, designationId: 1, classId: null, sectionId: null, examId: null, academicId: null };
-    return new this(finalDb, finalTenant as TenantContext);
+    return new this(finalDb, finalTenant as TenantContext, provider);
   }
 
   /**
@@ -77,14 +82,18 @@ export class BaseRepository {
   }
 
   /**
-   * Load all configurations (general settings, academic years, exam types)
-   * Results are cached for 5 minutes to improve performance
+   * Load all configurations (general settings, academic years, exam types).
+   *
+   * Slice 9: the cache is owned by ScopedRepositoryProvider (per-request).
+   * Repos without a provider (cron/worker fallback) skip caching entirely —
+   * every call hits the database. This is intentional: the process-global
+   * Map<schoolId, ConfigurationCache> that previously lived in this module
+   * is gone, because it leaked state across concurrent requests.
    */
   async loadConfigurations(forceRefresh: boolean = false): Promise<ConfigurationCache> {
     const now = Date.now();
     const schoolId = this.tenant.schoolId;
-
-    const cached = configCache.get(schoolId);
+    const cached = this.provider?.getConfigCache() ?? null;
 
     // Return cached data if valid and not forcing refresh
     if (!forceRefresh && cached && now - cached.lastUpdated < CACHE_TTL) {
@@ -101,7 +110,6 @@ export class BaseRepository {
     // Find active academic year based on current date
     const activeAcademicYear = this.findActiveAcademicYear(academicYears);
 
-    // Update cache
     const newCache: ConfigurationCache = {
       generalSettings,
       academicYears,
@@ -110,7 +118,7 @@ export class BaseRepository {
       lastUpdated: now,
     };
 
-    configCache.set(schoolId, newCache);
+    this.provider?.setConfigCache(newCache);
 
     return newCache;
   }
@@ -195,13 +203,6 @@ export class BaseRepository {
       .limit(1);
 
     return examType;
-  }
-
-  /**
-   * Clear configuration cache (useful after updates)
-   */
-  clearConfigCache(): void {
-    configCache.clear();
   }
 
   /**
