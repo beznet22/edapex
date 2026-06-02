@@ -1,7 +1,8 @@
 import { createWorkflow, createStep } from '@mastra/core/workflows';
 import { z } from 'zod';
 import { resultOutputSchema } from '$lib/schema/result-output';
-import { assessment } from '../../service/assessment.service';
+import { createAssessmentServiceForRequest } from '../../service/assessment.service';
+import { createTenantContext } from '../../mastra/tenant-context';
 import { applyGradingBusinessLogic, validateAttendance } from '../../helpers/extract-helper';
 import { mastra } from '$lib/server/mastra';
 
@@ -98,8 +99,14 @@ const handleValidationStep = createStep({
     applyGradingBusinessLogic(output);
     validateAttendance(output);
 
-    // Commit to DB
+    // Commit to DB (Slice 10: per-request provider)
     const { staffId, tenantContext, examId } = context.workflowState?.triggerData ?? {};
+    const assessment = await createAssessmentServiceForRequest(
+      createTenantContext({
+        schoolId: tenantContext?.schoolId ?? 1,
+        userId: staffId ?? 1,
+      }),
+    );
     await assessment.upsertStudentResult(output, examId, tenantContext.schoolId);
 
     // Construct PDF token

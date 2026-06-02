@@ -1,6 +1,7 @@
 import { json } from "@sveltejs/kit";
 import { studentFileStorage } from "$lib/server/storage/student-files";
-import { assessment } from "$lib/server/service/assessment.service";
+import { createAssessmentServiceForRequest } from "$lib/server/service/assessment.service";
+import { createTenantContext } from "$lib/server/mastra/tenant-context";
 import { join } from "path";
 import type { RequestHandler } from "./$types";
 import type { ResultInput } from "$lib/schema/result-input";
@@ -33,6 +34,14 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 
         // 3. Save to Database
         const teacherId = user.staffId || 1;
+        // Slice 10: per-request provider
+        const assessment = await createAssessmentServiceForRequest(
+            createTenantContext({
+                schoolId: user.schoolId ?? 1,
+                userId: user.id,
+                staffId: teacherId,
+            }),
+        );
         // Upsert returns the MarkResponse, we just need to ensure it doesn't throw
         const dbResult = await assessment.upsertStudentResult(resultInput, teacherId);
 

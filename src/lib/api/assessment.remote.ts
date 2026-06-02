@@ -5,7 +5,8 @@ import { resultInputSchema } from "$lib/schema/result-input";
 import { pageToHtml } from "$lib/server/helpers";
 import { generate } from "$lib/server/helpers/pdf-generator";
 import { staffRepo, studentRepo, resultRepo } from "$lib/server/repository";
-import { assessment } from "$lib/server/service/assessment.service";
+import { createAssessmentServiceForRequest } from "$lib/server/service/assessment.service";
+import { createTenantContext } from "$lib/server/mastra/tenant-context";
 import { studentFileStorage } from "$lib/server/storage/student-files";
 import { render } from "svelte/server";
 import z from "zod";
@@ -17,6 +18,10 @@ export const generateResultPdf = command(
   }),
   async ({ studentId, examId }) => {
     try {
+      // Slice 10: per-request provider
+      const assessment = await createAssessmentServiceForRequest(
+        createTenantContext({ schoolId: 1, userId: 0 }),
+      );
       const resultData = await assessment.getStudentResult({ id: studentId, examId });
       if (!resultData) throw new Error("Result not found");
 
@@ -53,6 +58,14 @@ export const publishResult = command(
       return { success: false, message: "User not authenticated" };
     }
     try {
+      // Slice 10: per-request provider
+      const assessment = await createAssessmentServiceForRequest(
+        createTenantContext({
+          schoolId: locals.user.schoolId ?? 1,
+          userId: locals.user.id,
+          staffId: locals.user.staffId ?? undefined,
+        }),
+      );
       const response = await assessment.publishResults({
         studentIds: [studentId],
         examId: examTypeId,
@@ -108,6 +121,16 @@ export const assignSubjects = command(
 
       let staffId: number = 0;
       if (designation === "class_teacher") {
+        // Slice 10: per-request provider
+        const assessment = await createAssessmentServiceForRequest(
+          createTenantContext({
+            schoolId: user.schoolId ?? 1,
+            userId: user.id,
+            staffId: user.staffId ?? undefined,
+            classId,
+            sectionId,
+          }),
+        );
         const assigned = await assessment.assignSubjects(classId, sectionId, user.staffId);
         if (!assigned || !user.staffId) return { success: false, message: "Failed to assign subjects" };
         staffId = user.staffId;
@@ -142,6 +165,16 @@ export const doExtraction = command(
       return { success: false, status: "error", error: "Unauthorized" };
     }
     try {
+      // Slice 10: per-request provider
+      const assessment = await createAssessmentServiceForRequest(
+        createTenantContext({
+          schoolId: user.schoolId ?? 1,
+          userId: user.id,
+          staffId: user.staffId ?? undefined,
+          classId,
+          sectionId,
+        }),
+      );
       return await assessment.runExtraction({
         file,
         classId,

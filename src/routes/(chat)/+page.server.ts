@@ -4,7 +4,7 @@ import { EdApexGateway } from "$lib/server/mastra/gateway";
 import { createMastraDb } from "$lib/server/mastra/db";
 import { createTenantContext } from "$lib/server/mastra/tenant-context";
 import { resultRepo, staffRepo } from "$lib/server/repository";
-import { assessment } from "$lib/server/service/assessment.service";
+import { createAssessmentServiceForRequest } from "$lib/server/service/assessment.service";
 import { mistralOcrService } from "$lib/server/service/mistral-ocr.service";
 import { mastra } from "$lib/server/mastra";
 import { put } from "$lib/utils/fs-blob";
@@ -177,6 +177,14 @@ export const actions: Actions = {
         return { success: false, status: "error", message: validated.error.issues.map(i => i.message).join("\n") };
       }
 
+      // Slice 10: per-request provider
+      const assessment = await createAssessmentServiceForRequest(
+        createTenantContext({
+          schoolId: user.schoolId ?? 1,
+          userId: user.id,
+          staffId,
+        }),
+      );
       const res = await assessment.upsertStudentResult(validated.data, staffId);
       return {
         success: true,

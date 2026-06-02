@@ -1,6 +1,7 @@
 import { createWorkflow, createStep } from "@mastra/core/workflows";
 import { z } from "zod";
-import { assessment } from "../../service/assessment.service";
+import { createAssessmentServiceForRequest } from "../../service/assessment.service";
+import { createTenantContext } from "../../mastra/tenant-context";
 import { studentRepo } from "$lib/server/repository";
 
 /**
@@ -43,10 +44,11 @@ const resolveTargetsStep = createStep({
     examId: z.number().int().positive(),
     resend: z.boolean(),
     errors: z.array(z.string()),
+    tenantContext: z.object({ schoolId: z.number().int().positive() }).optional(),
   }),
   stateSchema: publishStateSchema,
   execute: async ({ inputData, setState }) => {
-    const { classId, sectionId, examId, studentIds: explicitIds, resend } = inputData;
+    const { classId, sectionId, examId, studentIds: explicitIds, resend, tenantContext } = inputData;
     const errors: string[] = [];
     let resolvedIds: number[] = [];
 
@@ -64,7 +66,7 @@ const resolveTargetsStep = createStep({
     }
 
     await setState({ resolvedStudentIds: resolvedIds, errors });
-    return { studentIds: resolvedIds, examId, resend: resend ?? false, errors };
+    return { studentIds: resolvedIds, examId, resend: resend ?? false, errors, tenantContext };
   },
 });
 
@@ -80,6 +82,7 @@ const publishBatchStep = createStep({
     examId: z.number().int().positive(),
     resend: z.boolean(),
     errors: z.array(z.string()),
+    tenantContext: z.object({ schoolId: z.number().int().positive() }).optional(),
   }),
   outputSchema: z.object({
     success: z.boolean(),
@@ -90,17 +93,22 @@ const publishBatchStep = createStep({
   }),
   stateSchema: publishStateSchema,
   execute: async ({ inputData, getStepResult, setState }) => {
-    const prev = getStepResult<{ studentIds: number[]; examId: number; resend: boolean; errors: string[] }>(
+    const prev = getStepResult<{ studentIds: number[]; examId: number; resend: boolean; errors: string[]; tenantContext?: { schoolId: number } }>(
       "resolve-targets"
     );
     const studentIds = prev?.studentIds ?? inputData.studentIds;
     const examId = prev?.examId ?? inputData.examId;
     const resend = prev?.resend ?? inputData.resend;
+    const tenantContext = prev?.tenantContext ?? inputData.tenantContext;
 
     if (studentIds.length === 0) {
       return { success: false, sent: 0, failed: 0, errors: inputData.errors, emailResults: [] };
     }
 
+    // Slice 10: per-request provider, no global singleton
+    const assessment = await createAssessmentServiceForRequest(
+      createTenantContext({ schoolId: tenantContext?.schoolId ?? 1, userId: 0 }),
+    );
     const result = await assessment.publishResults({ studentIds, examId, resend });
 
     await setState({

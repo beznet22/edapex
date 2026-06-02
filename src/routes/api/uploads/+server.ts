@@ -1,7 +1,8 @@
 import { STATIC_DIR, EXTRACTED_DIR } from "$lib/constants";
 import { fileSchema } from "$lib/schema/chat-schema";
 import { resultRepo, staffRepo, studentRepo } from "$lib/server/repository";
-import { assessment } from "$lib/server/service/assessment.service";
+import { createAssessmentServiceForRequest } from "$lib/server/service/assessment.service";
+import { createTenantContext } from "$lib/server/mastra/tenant-context";
 import { studentFileStorage } from "$lib/server/storage/student-files";
 import type { RequestHandler } from "@sveltejs/kit";
 import { error, json } from "@sveltejs/kit";
@@ -79,6 +80,16 @@ export const POST: RequestHandler = async ({ request, locals }) => {
     }
 
     const staff = await staffRepo.getStaffByClassSection({ classId: classId as number, sectionId: sectionId as number });
+    // Slice 10: per-request provider
+    const assessment = await createAssessmentServiceForRequest(
+      createTenantContext({
+        schoolId: user.schoolId ?? 1,
+        userId: user.id,
+        staffId: staff.teacherId || undefined,
+        classId: classId as number,
+        sectionId: sectionId as number,
+      }),
+    );
     const extractionResult = await assessment.runExtraction({
       userId: user.id, // Authenticated user ID for AI provider resolution
       teacherId: staff.teacherId || 1, // Staff ID for domain data lookups

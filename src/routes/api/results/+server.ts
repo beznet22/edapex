@@ -1,6 +1,7 @@
 import { json, type RequestHandler } from "@sveltejs/kit";
 import { resultRepo, studentRepo } from "$lib/server/repository";
-import { assessment } from "$lib/server/service/assessment.service";
+import { createAssessmentServiceForRequest } from "$lib/server/service/assessment.service";
+import { createTenantContext } from "$lib/server/mastra/tenant-context";
 import { resultInputSchema } from "$lib/schema/result-input";
 import { readFileSync } from "fs";
 import { join, dirname } from "path";
@@ -21,6 +22,10 @@ export const GET: RequestHandler = async ({ request, url }) => {
     const filePath = join(__dirname, "..", "..", "..", "static/extracted", "6a.json");
     const parsedResult = JSON.parse(readFileSync(filePath, "utf-8"));
     const marks = await resultInputSchema.parseAsync(parsedResult);
+    // Slice 10: per-request provider
+    const assessment = await createAssessmentServiceForRequest(
+      createTenantContext({ schoolId: 1, userId: 1 }),
+    );
     const res = await assessment.upsertStudentResult(marks, 1);
     const resultData = await assessment.getStudentResult({ id: 20, examId: 5 });
 

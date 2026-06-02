@@ -2,7 +2,8 @@ import { resultInputSchema } from "$lib/schema/result-input";
 import { resultOutputSchema } from "$lib/schema/result-output";
 import { pageToHtml } from "$lib/server/helpers";
 import { generate } from "$lib/server/helpers/pdf-generator";
-import { assessment } from "$lib/server/service/assessment.service";
+import { createAssessmentServiceForRequest } from "$lib/server/service/assessment.service";
+import { createTenantContext } from "$lib/server/mastra/tenant-context";
 import { error, json, type RequestHandler } from "@sveltejs/kit";
 import { readFileSync } from "fs";
 import { render } from "svelte/server";
@@ -15,6 +16,10 @@ export const GET: RequestHandler = async () => {
     const students = await studentRepo.getStudentsByClassSection({ classId: 15, sectionId: 5 })
     const studentRecord = await studentRepo.getStudentRecordByAdmissionNo(765)
     const staff = await staffRepo.getStaffByClassSection({ classId: 17, sectionId: 7 })
+    // Slice 10: per-request provider
+    const assessment = await createAssessmentServiceForRequest(
+      createTenantContext({ schoolId: 1, userId: 1 }),
+    );
     const mappingData = await assessment.getMappingData(staff?.teacherId ?? 0)
     const resultData = await assessment.getStudentResult({ id: 580, examId: 5 })
     const validated = await resultOutputSchema.safeParseAsync(resultData)

@@ -1,5 +1,6 @@
 import { generate } from "$lib/server/helpers/pdf-generator";
-import { assessment } from "$lib/server/service/assessment.service";
+import { createAssessmentServiceForRequest } from "$lib/server/service/assessment.service";
+import { createTenantContext } from "$lib/server/mastra/tenant-context";
 import ResultTemplate from "$lib/components/template/ResultTemplate.svelte";
 import type { RequestHandler } from "@sveltejs/kit";
 import { base64url } from "jose";
@@ -17,6 +18,10 @@ export const GET: RequestHandler = async ({ url, params }) => {
     const { studentId, examId } = JSON.parse(jsonString);
     console.log({ studentId, examId });
 
+    // Slice 10: per-request provider
+    const assessment = await createAssessmentServiceForRequest(
+      createTenantContext({ schoolId: 1, userId: 0 }),
+    );
     const resultData = await assessment.getStudentResult({ id: studentId, examId, withImages: true });
     if (!resultData) throw new Error("Result not found");
     const props = { data: resultData };

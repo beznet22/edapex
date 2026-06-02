@@ -18,8 +18,8 @@ import {
   type School,
   type Student,
 } from "$lib/schema/result-output";
-import { studentRepo, resultRepo, timelineRepo, staffRepo, StudentRepository, ResultsRepository, TimelineRepository, StaffRepository } from "$lib/server/repository";
-import type { ScopedRepositoryProvider } from "../mastra/scoped-repository";
+import { StudentRepository, ResultsRepository, TimelineRepository, StaffRepository } from "$lib/server/repository";
+import { ScopedRepositoryProvider } from "../mastra/scoped-repository";
 import type { TenantContext } from "../mastra/tenant-context";
 import type { ClassAverage, ExamSetup, MarkData, NewSmMarkStore, NewSmResultStore, ResultData, ScoreData } from "$lib/types/result-types";
 import { base64url } from "jose";
@@ -37,7 +37,7 @@ import { studentFileStorage } from "../storage/student-files";
 import { mistralOcrService } from "./mistral-ocr.service";
 import path from "path";
 import fs from "fs";
-import type { MySQLDrizzleClient } from "../db";
+import { getDatabase, type MySQLDrizzleClient } from "../db";
 
 export const GRADE_RANGES = {
   EYFS: [
@@ -84,50 +84,51 @@ export class AssessmentService {
     studentId: 0 as number | undefined,
   };
 
-  private readonly provider: ScopedRepositoryProvider | null;
-  private warnedFallback = false;
+  private readonly provider: ScopedRepositoryProvider;
 
-  constructor(provider: ScopedRepositoryProvider | null = null) {
+  /**
+   * Slice 10: the provider is required. Every callsite (API routes, page
+   * server, remote functions, workflow Steps) must construct a per-request
+   * AssessmentService via `createAssessmentServiceForRequest(tenant)`. The
+   * legacy module-level `assessment` singleton is removed; the global
+   * `studentRepo`/`resultRepo`/`timelineRepo`/`staffRepo` fallbacks are
+   * also gone, because they leaked the first-seen TenantContext across
+   * every subsequent request.
+   */
+  constructor(provider: ScopedRepositoryProvider) {
+    if (!provider) {
+      throw new Error(
+        "AssessmentService requires a ScopedRepositoryProvider. " +
+        "Use createAssessmentServiceForRequest(tenant) from API routes, page server, " +
+        "remote functions, and workflow Steps.",
+      );
+    }
     this.provider = provider;
   }
 
   /**
-   * Resolve a tenant-bound StudentRepository.
-   * Prefers the per-request `ScopedRepositoryProvider`. Falls back to the
-   * legacy module-level singleton with a one-shot deprecation warning so
-   * out-of-band callers (cron, workers) keep working during the Slice 10
-   * migration window.
+   * Resolve a tenant-bound StudentRepository. Throws if the provider is
+   * somehow unbound (defense in depth — constructor already enforces this).
    */
   protected student(): StudentRepository {
-    if (this.provider) return this.provider.getRepo(StudentRepository);
-    if (!this.warnedFallback) {
-      console.warn(
-        "[AssessmentService] No ScopedRepositoryProvider supplied — falling back to the legacy studentRepo singleton. " +
-        "This is unsafe for multi-tenant writes. Pass a provider from buildMastraToolContext() or wire Slice 10.",
-      );
-      this.warnedFallback = true;
-    }
-    return studentRepo;
+    return this.provider.getRepo(StudentRepository);
   }
 
   protected result(): ResultsRepository {
-    if (this.provider) return this.provider.getRepo(ResultsRepository);
-    return resultRepo;
+    return this.provider.getRepo(ResultsRepository);
   }
 
   protected timeline(): TimelineRepository {
-    if (this.provider) return this.provider.getRepo(TimelineRepository);
-    return timelineRepo;
+    return this.provider.getRepo(TimelineRepository);
   }
 
   protected staff(): StaffRepository {
-    if (this.provider) return this.provider.getRepo(StaffRepository);
-    return staffRepo;
+    return this.provider.getRepo(StaffRepository);
   }
 
-  /** The active tenant's schoolId, or 1 if no provider is attached. Used to drop the hard-coded `schoolId: 1` from B1. */
+  /** The active tenant's schoolId. Used to drop the hard-coded `schoolId: 1` from B1. */
   protected activeSchoolId(): number {
-    return this.provider?.getTenant().schoolId ?? 1;
+    return this.provider.getTenant().schoolId;
   }
 
   /**
@@ -1261,4 +1262,21 @@ export class AssessmentService {
   }
 }
 
-export const assessment = new AssessmentService();
+/**
+ * Slice 10: per-request factory. Use this from any caller that previously
+ * imported the module-level `assessment` singleton. The factory builds a
+ * fresh ScopedRepositoryProvider bound to the supplied tenant, then hands
+ * it to a new AssessmentService. The provider — and the cache it owns
+ * (see Slice 9) — dies with the request.
+ *
+ * Pass a fully-formed TenantContext (e.g. from createTenantContext or the
+ * `tenantContext` value already on a workflow Step input). If you have
+ * raw fields (schoolId, userId, ...), construct the tenant first.
+ */
+export async function createAssessmentServiceForRequest(
+  tenant: TenantContext,
+): Promise<AssessmentService> {
+  const db = await getDatabase();
+  const provider = new ScopedRepositoryProvider(db, tenant);
+  return new AssessmentService(provider);
+}

@@ -217,39 +217,28 @@ describe("Slice 1 — AssessmentService ScopedRepositoryProvider plumbing", () =
 		});
 	});
 
-	describe("globalFallback path", () => {
-		it("falls back to the legacy singleton when no provider is attached", () => {
-			const svc = new AssessmentService(null);
-
-			const student = (svc as unknown as { student: () => unknown }).student();
-			const result = (svc as unknown as { result: () => unknown }).result();
-			const timeline = (svc as unknown as { timeline: () => unknown }).timeline();
-			const staff = (svc as unknown as { staff: () => unknown }).staff();
-
-			expect(student).toBe(mockStudentRepo);
-			expect(result).toBe(mockResultRepo);
-			expect(timeline).toBe(mockTimelineRepo);
-			expect(staff).toBe(mockStaffRepo);
+	describe("Slice 10 — provider is required (no globalFallback)", () => {
+		it("AssessmentService can no longer be constructed without a provider", () => {
+			// After Slice 10, the constructor signature is (provider), not (provider | null).
+			// Calling `new AssessmentService(null)` is now a type error. The runtime
+			// check below guards against callers that bypass the type checker.
+			expect(() => {
+				new AssessmentService(null as unknown as ScopedRepositoryProvider);
+			}).toThrow();
 		});
 
-		it("logs a one-shot deprecation warning when no provider is attached", () => {
-			const svc = new AssessmentService(null);
-
-			(svc as unknown as { student: () => unknown }).student();
-			(svc as unknown as { result: () => unknown }).result();
-			(svc as unknown as { timeline: () => unknown }).timeline();
-			(svc as unknown as { staff: () => unknown }).staff();
-
-			expect(warnSpy).toHaveBeenCalledTimes(1);
-			expect(warnSpy.mock.calls[0]?.[0]).toContain("ScopedRepositoryProvider");
-		});
-
-		it("activeSchoolId() returns 1 in fallback mode", () => {
-			const svc = new AssessmentService(null);
-
+		it("AssessmentService(provider).activeSchoolId() returns the provider's schoolId (not a fallback 1)", () => {
+			const svc = new AssessmentService(makeProvider(7));
 			const schoolId = (svc as unknown as { activeSchoolId: () => number }).activeSchoolId();
+			expect(schoolId).toBe(7);
+		});
 
-			expect(schoolId).toBe(1);
+		it("createAssessmentServiceForRequest builds a service bound to the supplied tenant", async () => {
+			const { createAssessmentServiceForRequest } = await import("../assessment.service");
+			const tenant = createTenantContext({ schoolId: 5, userId: 12 });
+			const svc = await createAssessmentServiceForRequest(tenant);
+			const schoolId = (svc as unknown as { activeSchoolId: () => number }).activeSchoolId();
+			expect(schoolId).toBe(5);
 		});
 	});
 

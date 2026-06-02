@@ -1,7 +1,8 @@
 import { createWorkflow, createStep } from '@mastra/core/workflows';
 import { z } from 'zod';
 import { mistralOcrService } from '$lib/server/service/mistral-ocr.service';
-import { assessment } from '../../service/assessment.service';
+import { createAssessmentServiceForRequest } from '../../service/assessment.service';
+import { createTenantContext } from '../../mastra/tenant-context';
 import { resultOutputSchema } from '$lib/schema/result-output';
 import { mastra } from '$lib/server/mastra';
 
@@ -114,8 +115,14 @@ const constructPdfCardStep = createStep({
       examId = (resultOutput.student as any).examId;
     }
     const staffId = tenantContext?.userId || 1;
-    
-    // Commit to DB
+
+    // Commit to DB (Slice 10: per-request provider, no global singleton)
+    const assessment = await createAssessmentServiceForRequest(
+      createTenantContext({
+        schoolId: tenantContext?.schoolId ?? 1,
+        userId: staffId,
+      }),
+    );
     await assessment.upsertStudentResult(resultOutput as any, staffId);
 
     // Construct base64url token
