@@ -1,17 +1,13 @@
 import { SelectedModel, SelectedClass } from "$lib/context/sync.svelte";
-import { base } from "$lib/server/repository";
 import { error, redirect } from "@sveltejs/kit";
 import type { LayoutServerLoad } from "./$types";
 import { allowAnonymousChats, STORAGE_DIR, UPLOADS_DIR } from "$lib/constants";
-import { studentRepo } from "$lib/server/repository";
 import type { ClassStudent } from "$lib/server/repository/student.repo";
 import { readdir, stat } from "fs/promises";
 import { join } from "path";
 import type { ChatThread, UploadedData } from "$lib/types/chat-types";
 import { existsSync, rm, rmdirSync, type Dirent } from "fs";
 import type { ClassSection } from "$lib/types/result-types";
-import { resultRepo } from "$lib/server/repository";
-import { repo } from "$lib/server/repository";
 import { DESIGNATIONS, type Designation } from "$lib/types/sms-types";
 import { generateId } from "ai";
 import { createMastraDb } from "$lib/server/mastra/db";
@@ -20,6 +16,8 @@ import { SUPPORTED_PROVIDERS, SUPPORTED_PROVIDERS_META, getAvailableModels } fro
 import { env } from "$env/dynamic/private";
 import { getMemory, mastra } from "$lib/server/mastra";
 import type { StorageThreadType } from "@mastra/core/memory";
+import { createAssessmentServiceForRequest } from "$lib/server/service/assessment.service";
+import { createTenantContext } from "$lib/server/mastra/tenant-context";
 
 export const load: LayoutServerLoad = async ({ cookies, locals, url }) => {
   const { user, session } = locals;
@@ -37,9 +35,20 @@ export const load: LayoutServerLoad = async ({ cookies, locals, url }) => {
   let students: ClassStudent[] | null = null;
   let classes: ClassSection[] = [];
   let chats: any[] = [];
-  if (user) {
-    classes = await resultRepo.getClassSections();
-    students = await studentRepo.getStudentsByStaffId(user?.staffId);
+  // Slice 13c: per-request provider, hoisted so the class_teacher block below
+  // can also call assessment.getAssignedClassSection() without re-instantiating.
+  const assessment = user
+    ? await createAssessmentServiceForRequest(
+        createTenantContext({
+          schoolId: user.schoolId ?? 1,
+          userId: user.id,
+          staffId: user.staffId ?? undefined,
+        }),
+      )
+    : null;
+  if (user && assessment) {
+    classes = await assessment.getClassSections();
+    students = await assessment.getStudentsByStaffId(user?.staffId);
 
     // Load chat history from Mastra memory for the sidebar
     try {
@@ -90,8 +99,9 @@ export const load: LayoutServerLoad = async ({ cookies, locals, url }) => {
   }
 
   let assignedSection: ClassSection | null = null;
-  if (user?.designation === "class_teacher") {
-    assignedSection = (await resultRepo.getAssignedClassSection(user.staffId || 1)) as ClassSection | null;
+  if (user?.designation === "class_teacher" && assessment) {
+    // Slice 13c: per-request provider (built above)
+    assignedSection = (await assessment.getAssignedClassSection(user.staffId || 1)) as ClassSection | null;
     if (assignedSection && !token) {
       token = `${assignedSection.className}(${assignedSection.sectionName})`
         .toLowerCase()

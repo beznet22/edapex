@@ -9,6 +9,18 @@ import { getRequestEvent } from "$app/server";
 import { dev } from "$app/environment";
 import { DESIGNATIONS } from "$lib/types/sms-types";
 
+/**
+ * `authRepo` is intentionally a module-level singleton — the only one
+ * remaining in `src/lib/server/repository`. Auth is GLOBAL session data
+ * (refresh tokens, user accounts, brute-force counters), not tenant-scoped:
+ * it must resolve a user BEFORE the active TenantContext is established
+ * (the user is logging IN, after all), and a refresh-token lookup must
+ * succeed regardless of which school the caller is switching to. Migrating
+ * auth to a per-request provider would introduce a chicken-and-egg
+ * dependency between `createTenantContext` and `auth.findUser` with no
+ * isolation benefit. Keep it as-is. — Slice 13c.
+ */
+
 // Security constants
 const ACCESS_TTL = 15 * 60; // 15 minutes
 const BROWSER_REFRESH_TTL = 7 * 24 * 60 * 60; // 7 days for browser tabs

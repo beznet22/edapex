@@ -848,6 +848,33 @@ export class AssessmentService {
     return { records, overAll };
   }
 
+  /**
+   * Slice 13c: tenant-scoped passthroughs for the read-only accessors
+   * the layout server, remote functions, and publish workflow need.
+   * These are thin wrappers around the protected repo accessors so
+   * callers do not have to import the legacy `studentRepo`/`resultRepo`/
+   * `staffRepo` module-level singletons.
+   */
+  async getClassSections() {
+    return this.result().getClassSections();
+  }
+
+  async getAssignedClassSection(staffId: number) {
+    return this.result().getAssignedClassSection(staffId);
+  }
+
+  async getStaffByClassSection(params: { classId: number; sectionId: number }) {
+    return this.staff().getStaffByClassSection(params);
+  }
+
+  async getStudentsByStaffId(staffId?: number) {
+    return this.student().getStudentsByStaffId(staffId);
+  }
+
+  async getStudentsByClassSection(params: { classId: number; sectionId: number }) {
+    return this.student().getStudentsByClassSection(params);
+  }
+
   async getMappingData(staffId: number, classId?: number, sectionId?: number) {
     const [examTypes, studentCategories, subjects, classSection] = await Promise.all([
       this.result().getCurrentTerm(),

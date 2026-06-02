@@ -1,3 +1,13 @@
+/**
+ * `authRepo` is intentionally a module-level singleton. Auth is GLOBAL
+ * session data (refresh tokens, user accounts, password hashes) and is
+ * not tenant-scoped: the user is logging IN here, before any active
+ * TenantContext is established, and `updateUserPassword` must work
+ * regardless of which school the caller is switching to. Migrating auth
+ * to a per-request provider would introduce a chicken-and-egg dependency
+ * between `createTenantContext` and `auth.findUser` with no isolation
+ * benefit. Keep it as-is. — Slice 13c.
+ */
 import { command, form, getRequestEvent, query } from "$app/server";
 import { authUserSchema, signupSchema } from "$lib/schema/auth";
 import { auth } from "$lib/server/service/auth.service";

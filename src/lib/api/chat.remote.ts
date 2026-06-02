@@ -3,7 +3,8 @@ import { allowAnonymousChats, EXTRACTED_DIR } from "$lib/constants";
 import { chatVisibilitySchema, fileSchema, type ChatVisibility } from "$lib/schema/chat-schema";
 import { resultInputSchema } from "$lib/schema/result-input";
 import z from "zod";
-import { staffRepo, resultRepo, studentRepo } from "$lib/server/repository";
+import { createAssessmentServiceForRequest } from "$lib/server/service/assessment.service";
+import { createTenantContext } from "$lib/server/mastra/tenant-context";
 import { studentFileStorage } from "$lib/server/storage/student-files";
 import { readdir, stat } from "fs/promises";
 import { join } from "path";
@@ -228,7 +229,15 @@ export const getResources = query(
     if (className && sectionName) {
       allTokens.add(`${className}(${sectionName})`.toLowerCase().replaceAll(" ", "_"));
     } else if (user?.designation === "class_teacher") {
-      const classSection = await resultRepo.getAssignedClassSection(user.staffId || 1);
+      // Slice 13c: per-request provider, no module-level singleton
+      const assessment = await createAssessmentServiceForRequest(
+        createTenantContext({
+          schoolId: user.schoolId ?? 1,
+          userId: user.id,
+          staffId: user.staffId ?? undefined,
+        }),
+      );
+      const classSection = await assessment.getAssignedClassSection(user.staffId || 1);
       if (classSection) {
         allTokens.add(`${classSection.className}(${classSection.sectionName})`.toLowerCase().replaceAll(" ", "_"));
       }
@@ -305,9 +314,19 @@ export const getStudents = query(
 
     try {
       if (!classId || !sectionId) throw new Error("Class not selected")
-      const staff = await staffRepo.getStaffByClassSection({ classId, sectionId });
+      // Slice 13c: per-request provider, no module-level singleton
+      const assessment = await createAssessmentServiceForRequest(
+        createTenantContext({
+          schoolId: user.schoolId ?? 1,
+          userId: user.id,
+          staffId: user.staffId ?? undefined,
+          classId,
+          sectionId,
+        }),
+      );
+      const staff = await assessment.getStaffByClassSection({ classId, sectionId });
       if (!staff.teacherId) throw new Error("Class not assigned to any teacher")
-      const students = await studentRepo.getStudentsByStaffId(staff.teacherId);
+      const students = await assessment.getStudentsByStaffId(staff.teacherId);
       return { success: true, data: students }
     } catch (e: any) {
       return { success: false, message: e.message }

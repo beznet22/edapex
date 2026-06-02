@@ -2,7 +2,6 @@ import { createWorkflow, createStep } from "@mastra/core/workflows";
 import { z } from "zod";
 import { createAssessmentServiceForRequest } from "../../service/assessment.service";
 import { createTenantContext } from "../../mastra/tenant-context";
-import { studentRepo } from "$lib/server/repository";
 
 /**
  * Trigger schema for the publish-results workflow.
@@ -55,7 +54,16 @@ const resolveTargetsStep = createStep({
     if (explicitIds && explicitIds.length > 0) {
       resolvedIds = explicitIds;
     } else if (classId && sectionId) {
-      const students = await studentRepo.getStudentsByClassSection({ classId, sectionId });
+      // Slice 13c: per-request provider, no module-level studentRepo singleton
+      const assessment = await createAssessmentServiceForRequest(
+        createTenantContext({
+          schoolId: tenantContext?.schoolId ?? 1,
+          userId: 0,
+          classId,
+          sectionId,
+        }),
+      );
+      const students = await assessment.getStudentsByClassSection({ classId, sectionId });
       if (students && students.length > 0) {
         resolvedIds = students.map((s) => s.id).filter((id): id is number => id !== null && id !== undefined);
       } else {
