@@ -3,7 +3,7 @@ import { describe, it, expect, vi } from "vitest";
 vi.mock("$env/dynamic/private", () => ({
 	env: {
 		DATABASE_URL: "mysql://test:test@localhost:3306/test",
-		LIBSQL_URL: "file:test.db",
+		LIBSQL_URL: "file:tests/.tmp/test.db",
 		LIBSQL_AUTH_TOKEN: "test",
 	},
 }));

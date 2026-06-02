@@ -47,7 +47,7 @@ import { createTenantContext } from '../tenant-context';
 import { createMastraStorage } from '../storage';
 import { evaluateRouteGuard, type WorkspaceManifest } from '../route-guard';
 
-const TEST_DB_PATH = './test-gateway.db';
+const TEST_DB_PATH = './tests/.tmp/test-gateway.db';
 const TEST_DB_URL = `file:${TEST_DB_PATH}`;
 const TEST_ENCRYPTION_KEY = 'test-encryption-key-32-chars-ok!';
 
@@ -323,7 +323,7 @@ describe('Phase 1.2 — TenantContext Cache', () => {
 // ═══════════════════════════════════════════════════════════════════════
 
 describe('Phase 1.2 — Thread Metadata', () => {
-	const THREAD_DB_PATH = './test-thread-meta.db';
+	const THREAD_DB_PATH = './tests/.tmp/test-thread-meta.db';
 	const THREAD_DB_URL = `file:${THREAD_DB_PATH}`;
 
 	afterEach(() => {

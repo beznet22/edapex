@@ -40,6 +40,7 @@ hermes-webui/
 *.db-wal
 .workspaces
 temp_dir/
+tests/.tmp/
 basic-ai-editor/
 .kiro
 novel/

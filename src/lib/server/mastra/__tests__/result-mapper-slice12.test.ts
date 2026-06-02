@@ -5,7 +5,7 @@ import { join } from "node:path";
 vi.mock("$env/dynamic/private", () => ({
 	env: {
 		DATABASE_URL: "mysql://test:test@localhost:3306/test",
-		LIBSQL_URL: "file:test.db",
+		LIBSQL_URL: "file:tests/.tmp/test.db",
 		LIBSQL_AUTH_TOKEN: "test",
 		OPENGATEWAY_BASE_URL: "https://opengateway.gitlawb.com/v1",
 		GROQ_BASE_URL: "https://api.groq.com/openai/v1",

@@ -48,8 +48,8 @@ describe('Phase 1.1 — libSQL Initialization', () => {
 	let testDbUrl: string;
 
 	beforeEach(() => {
-		mkdirSync('./temp_dir', { recursive: true });
-		testDbPath = `./temp_dir/test-mastra-init-${randomUUID()}.db`;
+		mkdirSync('./tests/.tmp', { recursive: true });
+		testDbPath = `./tests/.tmp/test-mastra-init-${randomUUID()}.db`;
 		testDbUrl = `file:${testDbPath}`;
 	});
 
@@ -140,8 +140,8 @@ describe('Phase 1.1 — Singleton Guard', () => {
 	let dbBUrl: string;
 
 	beforeEach(() => {
-		dbAPath = `./test-singleton-a-${randomUUID()}.db`;
-		dbBPath = `./test-singleton-b-${randomUUID()}.db`;
+		dbAPath = `./tests/.tmp/test-singleton-a-${randomUUID()}.db`;
+		dbBPath = `./tests/.tmp/test-singleton-b-${randomUUID()}.db`;
 		dbAUrl = `file:${dbAPath}`;
 		dbBUrl = `file:${dbBPath}`;
 	});
@@ -201,7 +201,7 @@ describe('Phase 1.1 — Concurrent Isolation', () => {
 	let sharedDbUrl: string;
 
 	beforeEach(() => {
-		sharedDbPath = `./test-concurrent-${randomUUID()}.db`;
+		sharedDbPath = `./tests/.tmp/test-concurrent-${randomUUID()}.db`;
 		sharedDbUrl = `file:${sharedDbPath}`;
 	});
 
