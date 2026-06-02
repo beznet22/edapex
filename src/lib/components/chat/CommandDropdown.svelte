@@ -75,22 +75,28 @@
 
     // Onboarding
     {
-      id: "register",
-      label: "register",
-      icon: UserPlusIcon,
-      desc: "Register new student or staff",
-    },
-    {
       id: "enroll",
       label: "enroll",
       icon: UserPlusIcon,
       desc: "Enroll student in a class",
     },
     {
-      id: "assign",
-      label: "assign",
+      id: "admit",
+      label: "admit",
+      icon: UserPlusIcon,
+      desc: "Admit a new student to the school",
+    },
+    {
+      id: "transfer",
+      label: "transfer",
       icon: UserCheckIcon,
-      desc: "Assign teacher or role",
+      desc: "Transfer student to another class",
+    },
+    {
+      id: "register",
+      label: "register",
+      icon: UserPlusIcon,
+      desc: "Begin conversational registration",
     },
 
     // Governance
@@ -98,20 +104,7 @@
       id: "update",
       label: "update",
       icon: SettingsIcon,
-      desc: "Update system entity record",
-    },
-    { id: "edit", label: "edit", icon: PenIcon, desc: "Edit existing records" },
-    {
-      id: "rename",
-      label: "rename",
-      icon: TagIcon,
-      desc: "Rename class or subject",
-    },
-    {
-      id: "ban",
-      label: "ban",
-      icon: BanIcon,
-      desc: "Revoke active system access",
+      desc: "Update student or guardian record",
     },
     {
       id: "suspend",
@@ -120,10 +113,16 @@
       desc: "Suspend user workspace access",
     },
     {
-      id: "reset",
-      label: "reset",
+      id: "delete",
+      label: "delete",
+      icon: BanIcon,
+      desc: "Permanently remove a user account",
+    },
+    {
+      id: "password",
+      label: "password",
       icon: RefreshCwIcon,
-      desc: "Reset context or workspace state",
+      desc: "Reset a user's account password",
     },
 
     // Core/Default
@@ -131,25 +130,45 @@
       id: "search",
       label: "search",
       icon: SearchIcon,
-      desc: "Deep database entity search",
-    },
-    {
-      id: "find",
-      label: "find",
-      icon: SearchIcon,
-      desc: "Alias for entity lookup",
+      desc: "Search the school directory",
     },
     {
       id: "switch",
       label: "switch",
       icon: ShuffleIcon,
-      desc: "Switch active workspace/tenant",
+      desc: "Switch active class or section",
     },
     {
-      id: "status",
-      label: "status",
+      id: "context",
+      label: "context",
       icon: ActivityIcon,
-      desc: "Check health & active context",
+      desc: "Show the active academic context",
+    },
+
+    // Deprecated aliases (one minor version, remove in 0.5.0)
+    {
+      id: "ban",
+      label: "ban (deprecated)",
+      icon: BanIcon,
+      desc: "Use /suspend instead",
+    },
+    {
+      id: "edit",
+      label: "edit (deprecated)",
+      icon: PenIcon,
+      desc: "Use /update instead",
+    },
+    {
+      id: "rename",
+      label: "rename (deprecated)",
+      icon: TagIcon,
+      desc: "Use /update instead",
+    },
+    {
+      id: "find",
+      label: "find (deprecated)",
+      icon: SearchIcon,
+      desc: "Use /search instead",
     },
   ];
 

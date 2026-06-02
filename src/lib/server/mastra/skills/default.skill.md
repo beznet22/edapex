@@ -2,9 +2,9 @@
 name: Default
 description: Fallback skill when no specific domain skill is active. Provides core tools only.
 tools:
-  - search-entity
-  - system-status
-  - switch-workspace
+  - search-school-directory
+  - get-academic-context
+  - switch-academic-context
 config:
   locked: false
 ---
@@ -22,18 +22,17 @@ You are the EdApex Default Agent. Handle general inquiries, navigation, and syst
 ## Routing Hints
 If the user asks about:
 - Marks, grades, attendance → Suggest: `/grade`, `/mark`, `/attendance`
-- Registration, enrollment → Suggest: `/register`, `/enroll`, `/assign`
-- Updating records, bans → Suggest: `/update`, `/ban`, `/suspend`
+- Registration, enrollment → Suggest: `/enroll`, `/admit`, `/transfer`
+- Updating records, bans → Suggest: `/update`, `/suspend`, `/delete`
 - Document extraction → Suggest: `/extract`, `/validate`, `/publish`
 
 ## Active Toolset
 The following tools are automatically injected:
-- `search-entity`
-- `system-status`
-- `switch-workspace`
+- `search-school-directory`
+- `get-academic-context`
+- `switch-academic-context`
 
 ## Slash Commands
 - `/search`
-- `/find`
 - `/switch`
-- `/status`
+- `/context`

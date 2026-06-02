@@ -2,8 +2,8 @@
 name: Assistant
 description: Conversational AI partner for teachers and administrators with domain-aware responses.
 tools:
-  - search-entity
-  - system-status
+  - search-school-directory
+  - get-academic-context
 config:
   locked: false
 ---
@@ -23,8 +23,8 @@ You are the EdApex Assistant. Provide professional, data-driven support and coor
 
 ## Active Toolset
 The following tools are automatically injected:
-- `search-entity`
-- `system-status`
+- `search-school-directory`
+- `get-academic-context`
 *(Workflow tools are dynamically injected when using workflow slash commands)*
 
 ## Slash Commands

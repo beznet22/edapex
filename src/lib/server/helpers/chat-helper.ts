@@ -168,6 +168,12 @@ for (const tool of ALL_TOOLS) {
 export const skillRegistry = new SkillRegistry();
 let registryInitialized = false;
 
+/**
+ * Slice 8: per-process set of deprecated slash commands already warned about.
+ * Resets on process restart. Each command is announced at most once per session.
+ */
+const warnedDeprecatedCommands = new Set<string>();
+
 export async function ensureRegistry() {
   if (!registryInitialized) {
     const knownTools = new Set(Object.keys(TOOL_MAP));
@@ -192,23 +198,46 @@ export function resolveToolsForMessage(message: string, isSlashCommand: boolean)
 
     const skillCommandMap: Record<string, string> = {
       '/grade': 'grading', '/mark': 'grading', '/attendance': 'grading',
-      '/register': 'onboarding', '/enroll': 'onboarding', '/assign': 'onboarding',
-      '/update': 'gov', '/edit': 'gov', '/rename': 'gov',
-      '/ban': 'gov', '/suspend': 'gov', '/reset': 'gov',
+      '/enroll': 'onboarding', '/admit': 'onboarding', '/transfer': 'onboarding',
+      '/update': 'gov', '/suspend': 'gov', '/delete': 'gov', '/password': 'gov',
       '/extract': 'assistant', '/generate': 'assistant',
       '/validate': 'assistant', '/publish': 'assistant',
-      '/search': 'default', '/find': 'default',
-      '/switch': 'default', '/status': 'default',
+      '/search': 'default', '/switch': 'default', '/context': 'default',
     };
 
-    const skillName = skillCommandMap[command];
+    // Slice 8: deprecated slash-command aliases retained for one minor version.
+    // Each entry maps a legacy token to its canonical replacement and the
+    // target skill. The user sees a one-shot console warning per session.
+    const deprecatedAliasMap: Record<string, { canonical: string; skill: string }> = {
+      '/ban':     { canonical: '/suspend',  skill: 'gov' },
+      '/edit':    { canonical: '/update',   skill: 'gov' },
+      '/rename':  { canonical: '/update',   skill: 'gov' },
+      '/find':    { canonical: '/search',   skill: 'default' },
+      '/assign':  { canonical: '/transfer', skill: 'onboarding' },
+      '/reset':   { canonical: '/password', skill: 'gov' },
+      '/status':  { canonical: '/context',  skill: 'default' },
+    };
+
+    let resolvedCommand = command;
+    const alias = deprecatedAliasMap[command];
+    if (alias) {
+      resolvedCommand = alias.canonical;
+      if (!warnedDeprecatedCommands.has(command)) {
+        warnedDeprecatedCommands.add(command);
+        console.warn(
+          `[ChatHelper] Slash command "${command}" is deprecated; use "${alias.canonical}" instead.`,
+        );
+      }
+    }
+
+    const skillName = skillCommandMap[resolvedCommand];
     console.log(`[ChatHelper] Parsed command: "${command}" -> Skill name: "${skillName}"`);
-    
+
     if (skillName) {
       let toolIds = [];
       const skill = skillRegistry.getSkill(skillName);
       console.log(`[ChatHelper] skillRegistry.getSkill("${skillName}") -> `, skill ? 'Found' : 'Undefined');
-      
+
       if (skill) {
         const skillTools: Record<string, any> = {};
         for (const toolId of skill.tools) {
@@ -222,7 +251,7 @@ export function resolveToolsForMessage(message: string, isSlashCommand: boolean)
         }
 
         // For workflow commands, always inject workflow tools
-        if (['/extract', '/generate', '/validate', '/publish'].includes(command)) {
+        if (['/extract', '/generate', '/validate', '/publish'].includes(resolvedCommand)) {
           for (const tool of Object.values(workflowTools)) {
             if (tool && tool.id) {
               skillTools[tool.id] = tool;
@@ -230,9 +259,9 @@ export function resolveToolsForMessage(message: string, isSlashCommand: boolean)
           }
         }
 
-        // Always include search-entity for context discovery
-        if (!skillTools['search-entity']) {
-          skillTools['search-entity'] = searchEntityTool;
+        // Always include search-school-directory for context discovery
+        if (!skillTools['search-school-directory']) {
+          skillTools['search-school-directory'] = searchEntityTool;
         }
 
         const tools = { ...baseTools, ...skillTools, getContext: getContextTool };

@@ -78,16 +78,17 @@ const arbTenantContext: fc.Arbitrary<TenantContext> = fc.record({
 	studentId: fc.oneof(fc.constant(null), fc.integer({ min: 1, max: 50000 })),
 }).map((ctx) => Object.freeze(ctx) as TenantContext);
 
-/** The slash command map from gateway.ts */
+/** The slash command map from gateway.ts. Slice 8: aligned to §10.3. */
 const SLASH_COMMANDS = [
 	'/grade', '/mark', '/attendance',
-	'/register', '/enroll', '/assign',
-	'/update', '/edit', '/rename',
-	'/ban', '/suspend', '/reset',
+	'/enroll', '/admit', '/transfer',
+	'/update', '/suspend', '/delete', '/password',
 	'/extract', '/generate',
 	'/validate', '/publish',
-	'/search', '/find',
-	'/switch', '/status',
+	'/search', '/switch', '/context',
+	// Deprecated aliases (one minor version)
+	'/ban', '/edit', '/rename', '/find',
+	'/assign', '/reset', '/status',
 ] as const;
 
 /** Generator for slash commands */
