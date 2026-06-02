@@ -14,6 +14,8 @@ A SvelteKit-based school management platform with a built-in multi-agent AI assi
 - **Rich editor + PDF viewer** — Tiptap-based WYSIWYG editor with markdown round-trip, `@embedpdf` for in-browser PDF rendering.
 - **Progressive Web App** — `service-worker.ts` + `PWAContext` for offline-capable install, with a dismissible install prompt.
 
+For the full system design (request lifecycle, agent hierarchy, tool and workflow contracts, storage layout, deployment), see [**ARCHITECTURE.md**](./ARCHITECTURE.md).
+
 ## Tech Stack
 
 | Layer | Choice |
@@ -201,3 +203,5 @@ SKILL.md files in `src/lib/server/mastra/skills/` are watched by `skill-watcher.
 ## Contributing
 
 See [`AGENTS.md`](./AGENTS.md) for the full agent / contributor contract — package manager choice, file-scoped commands, the EdApex Mastra migration conventions, and the non-negotiable code quality rules. Project-specific design constraints live under [`docs/`](./docs/).
+
+For the detailed system architecture (tenant isolation model, agent hierarchy, tool/workflow contracts, storage layout, request lifecycle), see [`ARCHITECTURE.md`](./ARCHITECTURE.md).
