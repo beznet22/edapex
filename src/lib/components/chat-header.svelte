@@ -31,7 +31,7 @@
   <div class="flex flex-1 items-center gap-2 min-w-0">
     <Sidebar.Trigger
       variant="ghost"
-      class="h-8 w-8 shrink-0 text-muted-foreground hover:text-foreground"
+      class="h-12 w-12 min-h-12 min-w-12 shrink-0 text-muted-foreground hover:text-foreground"
     />
     <div class="flex items-center gap-2 min-w-0 overflow-hidden">
       <a
@@ -45,7 +45,7 @@
           >New conversation</span
         >
       {:else}
-        <span class="text-xs text-white/40 truncate ml-1">{chat.title}</span>
+        <span class="text-xs text-white/40 truncate ml-1 max-w-[200px] sm:max-w-none">{chat.title}</span>
       {/if}
     </div>
   </div>
@@ -53,8 +53,8 @@
   <div class="flex items-center gap-2 shrink-0">
     <Button
       variant="outline"
-      size="sm"
-      class="h-8 px-3 gap-2 border-white/10 bg-white/5 hover:bg-white/10 text-xs font-medium rounded-lg transition-all group"
+      size="icon"
+      class="h-12 w-12 min-h-12 min-w-12 border-white/10 bg-white/5 hover:bg-white/10 rounded-xl transition-all group"
       onclick={onToggleInspector}
     >
       <LayoutPanelLeftIcon class="size-4" />

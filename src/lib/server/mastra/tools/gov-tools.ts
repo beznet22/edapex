@@ -8,17 +8,14 @@ import { hashPwd } from "../../helpers/utils";
 import { smStaffs } from "../../db/sms-schema";
 import { eq } from "drizzle-orm";
 
-export const switchWorkspaceSchema = z.object({
-  newClassId: z.number().int().positive(),
-  newSectionId: z.number().int().positive(),
-});
+
 
 export const manageAccessSchema = z.object({
-  action: z.enum(["ban", "suspend", "reset", "delete"]),
-  targetType: z.enum(["student", "staff"]),
-  targetId: z.number().int().positive(),
-  confirmed: z.boolean().optional().default(false),
-  newPassword: z.string().optional(),
+  action: z.enum(["ban", "suspend", "reset", "delete"]).describe("The destructive action to perform"),
+  targetType: z.enum(["student", "staff"]).describe("The type of entity being targeted"),
+  targetId: z.number().int().positive().describe("Numeric ID of the student or staff member"),
+  confirmed: z.boolean().optional().default(false).describe("Set to true ONLY if the user has explicitly confirmed the action in the chat. DO NOT set to true on the first invocation."),
+  newPassword: z.string().optional().describe("Optional new password for the 'reset' action. If omitted, a random password will be generated."),
 });
 
 export type ManageAccessInput = z.infer<typeof manageAccessSchema>;
@@ -64,21 +61,7 @@ export const validateIntentConfidence = async (type: "mutation" | "read", confid
   };
 };
 
-export const switchWorkspaceLogic = async (context: any, newClassId: number, newSectionId: number) => {
-  const { createTenantContext } = await import("../tenant-context");
 
-  const newContext = createTenantContext({
-    ...context,
-    classId: newClassId,
-    sectionId: newSectionId,
-  });
-
-  return {
-    status: "SUCCESS",
-    message: `Switched to Class ${newClassId} - Section ${newSectionId}.`,
-    newContext,
-  };
-};
 
 export const manageAccessLogic = async (context: MastraToolContext, input: ManageAccessInput) => {
   const { tenantContext, getRepo, audit } = context;
@@ -209,5 +192,108 @@ export const manageAccessLogic = async (context: MastraToolContext, input: Manag
       };
     }
     return { status: "ERROR", errorCode: "UNKNOWN", message: `Failed to ${action}: ${errorMessage}` };
+  }
+};
+
+
+export const patchEntitySchema = z
+  .object({
+    id: z.number().describe("Internal entity ID (stripped out for security, but required by type)"),
+    schoolId: z.number().describe("School ID (stripped out for security)"),
+    role: z.string().describe("User role (stripped out for security)"),
+    studentId: z.number().optional().describe("The ID of the student to update"),
+    firstName: z.string().optional().describe("New first name"),
+    lastName: z.string().optional().describe("New last name"),
+    dateOfBirth: z.string().optional().describe("Date of birth in YYYY-MM-DD format"),
+    genderId: z.number().optional().describe("Numeric ID representing gender"),
+    studentCategoryId: z.number().optional().describe("Numeric ID representing student category"),
+    rollNo: z.number().optional().describe("Assigned roll number within the class"),
+  })
+  .omit({ id: true, schoolId: true, role: true });
+export type PatchEntityPayload = z.infer<typeof patchEntitySchema>;
+
+export const patchEntityLogic = async (context: MastraToolContext, input: PatchEntityPayload) => {
+  const { tenantContext, getRepo, audit } = context;
+
+  validateRoleWhitelist(tenantContext, [1, 5, 8]);
+
+  const studentRepo = getRepo(StudentRepository);
+  const timelineRepo = getRepo(TimelineRepository);
+
+  try {
+    if (input.studentId) {
+      const student = await studentRepo.getById(input.studentId);
+      if (!student) {
+        return {
+          status: "ERROR",
+          errorCode: "STUDENT_NOT_FOUND",
+          message: `Student with ID ${input.studentId} not found.`,
+        };
+      }
+
+      validateWorkspaceLock(tenantContext, student.classId, student.sectionId);
+
+      const updateData: Record<string, unknown> = {};
+      if (input.firstName !== undefined) updateData.firstName = input.firstName;
+      if (input.lastName !== undefined) updateData.lastName = input.lastName;
+      if (input.dateOfBirth !== undefined) updateData.dateOfBirth = input.dateOfBirth;
+      if (input.genderId !== undefined) updateData.genderId = input.genderId;
+      if (input.studentCategoryId !== undefined) updateData.studentCategoryId = input.studentCategoryId;
+      if (input.rollNo !== undefined) updateData.rollNo = input.rollNo;
+
+      if (input.firstName || input.lastName) {
+        const firstName = input.firstName ?? student.firstName ?? "";
+        const lastName = input.lastName ?? student.lastName ?? "";
+        updateData.fullName = `${firstName} ${lastName}`.trim();
+      }
+
+      if (Object.keys(updateData).length === 0) {
+        return {
+          status: "ERROR",
+          errorCode: "NO_CHANGES",
+          message: "No valid fields provided for update.",
+        };
+      }
+
+      await studentRepo.updateStudent({
+        studentId: input.studentId,
+        ...updateData,
+      });
+
+      const auditDescription = JSON.stringify({
+        action: "patch",
+        type: "patchEntity",
+        studentId: input.studentId,
+        threadId: audit?.threadId,
+        modelId: audit?.modelId,
+      });
+
+      await timelineRepo.createTimeline({
+        staffStudentId: input.studentId,
+        type: "behavioral",
+        description: auditDescription,
+        schoolId: tenantContext.schoolId,
+        academicId: tenantContext.academicId ?? 0,
+        createdBy: tenantContext.userId,
+      });
+
+      return {
+        status: "SUCCESS",
+        message: `Student ${input.studentId} profile updated successfully.`,
+      };
+    }
+
+    return {
+      status: "ERROR",
+      errorCode: "MISSING_ENTITY_ID",
+      message: "No studentId provided for patch operation.",
+    };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+    return {
+      status: "ERROR",
+      errorCode: "UNKNOWN",
+      message: `Failed to patch entity: ${errorMessage}`,
+    };
   }
 };

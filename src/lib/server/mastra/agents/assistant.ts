@@ -57,16 +57,15 @@ export const assistantAgent = new Agent({
 
 		return instructions.join('\n');
 	},
-	tools: ({ requestContext }) => {
+	tools: async ({ requestContext }) => {
 		const isSlashCommand = requestContext?.get('isSlashCommand') as boolean | undefined;
 		const message = requestContext?.get('lastMessage') as string | undefined;
 
-		// Ensure registry is loaded (fire-and-forget for first request, cached after)
-		ensureRegistry().catch(console.error);
+		// Ensure registry is loaded
+		await ensureRegistry();
 
-		const tools = resolveToolsForMessage(message || '', !!isSlashCommand) as ToolsInput;
-		console.log(tools);
-		return tools;
+		return resolveToolsForMessage(message || '', !!isSlashCommand) as ToolsInput;
+
 	},
 	memory: new Memory({
 		storage: createMastraStorage(),

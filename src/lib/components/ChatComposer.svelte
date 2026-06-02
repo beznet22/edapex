@@ -235,8 +235,7 @@
   let thinkingEnabled = $derived(chat.thinkingEnabled);
 </script>
 
-<div class="w-full flex justify-center px-4 pb-6">
-  <PromptInput 
+<PromptInput 
     class="composer-box relative w-full max-w-[780px] flex flex-col hermes-glass rounded-4xl shadow-[0_0_50px_-12px_rgba(0,0,0,0.5)] transition-all duration-500 focus-within:ring-1 focus-within:ring-primary/40 focus-within:border-primary/30 p-0 border-border/10 bg-[#09090b]/40 backdrop-blur-3xl ring-offset-background"
     value={input}
     onValueChange={(val) => {
@@ -298,7 +297,7 @@
         {/each}
 
         {#if file.references}
-          {#each file.references as ref (ref.key)}
+          {#each file.references.filter(ref => !ocrFiles.some(ocr => ocr.fileId === ref.key)) as ref (ref.key)}
             <div class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/60 border border-white/5 text-[11px] font-bold tracking-wide text-foreground/70 group shadow-sm">
               {#if ref.type === "dir"}
                 <FolderOpenIcon class="size-3.5 opacity-50" />
@@ -412,15 +411,15 @@
     {/if}
 
     <!-- Actions Tray (Footer Layer) -->
-    <PromptInputActions class="flex items-center justify-between p-2 pl-3 pb-3 rounded-b-4xl bg-transparent border-none">
+    <PromptInputActions class="flex items-center justify-between p-2 pl-2 sm:pl-3 pb-3 rounded-b-4xl bg-transparent border-none">
       
       <!-- Left Group: [Attach+Voice | Vertical Line | Context Chips] -->
-      <div class="flex items-center gap-1.5">
+      <div class="flex items-center gap-0.5 sm:gap-1.5">
         <div class="flex items-center gap-0.5">
           <DropdownMenu.Root>
             <DropdownMenu.Trigger>
               {#snippet child({ props })}
-                <Button {...props} variant="ghost" size="icon" class="size-8 rounded-lg hover:bg-white/5 text-muted-foreground hover:text-primary transition-colors" aria-label="Upload options">
+                <Button {...props} variant="ghost" size="icon" class="h-10 w-10 sm:min-h-12 sm:min-w-12 rounded-xl hover:bg-white/5 text-muted-foreground hover:text-primary transition-colors" aria-label="Upload options">
                   <PaperclipIcon class="size-4.5" />
                 </Button>
               {/snippet}
@@ -428,11 +427,11 @@
             <DropdownMenu.Content align="start" class="w-48 hermes-glass border-border/20 shadow-2xl">
               <DropdownMenu.Label class="text-xs font-semibold uppercase tracking-wider opacity-50">Attachments</DropdownMenu.Label>
               <DropdownMenu.Separator class="bg-border/10" />
-              <DropdownMenu.Item onSelect={handleNativeUpload} class="gap-2 focus:bg-primary/10 focus:text-primary">
+              <DropdownMenu.Item onSelect={handleNativeUpload} class="gap-2 min-h-12 focus:bg-primary/10 focus:text-primary">
                 <CloudUploadIcon class="size-4" />
                 <span>Native Upload</span>
               </DropdownMenu.Item>
-              <DropdownMenu.Item disabled class="gap-2">
+              <DropdownMenu.Item disabled class="gap-2 min-h-12">
                 <FilePlusIcon class="size-4" />
                 <span>Recents (Soon)</span>
               </DropdownMenu.Item>
@@ -442,7 +441,7 @@
           <Tooltip.Root>
             <Tooltip.Trigger>
               {#snippet child({ props })}
-                <Button {...props} variant="ghost" size="icon" class="size-8 rounded-lg hover:bg-white/5 text-muted-foreground hover:text-primary transition-colors" aria-label="Voice input">
+                <Button {...props} variant="ghost" size="icon" class="hidden sm:flex h-10 w-10 sm:min-h-12 sm:min-w-12 rounded-xl hover:bg-white/5 text-muted-foreground hover:text-primary transition-colors" aria-label="Voice input">
                   <MicIcon class="size-4.5" />
                 </Button>
               {/snippet}
@@ -450,7 +449,7 @@
             <Tooltip.Content>Voice Input</Tooltip.Content>
           </Tooltip.Root>
 
-          <div class="mx-2 h-4 w-px bg-white/10 shrink-0"></div>
+          <div class="hidden sm:block mx-1 sm:mx-2 h-4 w-px bg-white/10 shrink-0"></div>
         </div>
 
         <input
@@ -467,12 +466,12 @@
           <DropdownMenu.Root>
             <DropdownMenu.Trigger>
               {#snippet child({ props })}
-                <Button {...props} variant="ghost" size="sm" class="h-8 px-2 gap-1.5 text-xs font-medium rounded-lg hover:bg-white/5 text-muted-foreground hover:text-primary shrink-0 transition-colors">
+                <Button {...props} variant="ghost" size="sm" class="hidden sm:flex h-10 sm:min-h-12 px-1.5 sm:px-2 gap-1 sm:gap-1.5 text-xs font-medium rounded-xl hover:bg-white/5 text-muted-foreground hover:text-primary shrink-0 transition-colors">
                     {@const profile = profiles.find(p => p.id === chat.profile)}
                     {#if profile}
                       {@const Icon = profile.icon}
                       <Icon class="size-3.5" />
-                      <span class="text-primary font-bold">{profile.label}</span>
+                      <span class="text-primary font-bold hidden sm:inline">{profile.label}</span>
                     {/if}
                     <ChevronDownIcon class="size-3 opacity-50" />
                 </Button>
@@ -484,7 +483,7 @@
               {#each profiles as profile}
                 <DropdownMenu.Item 
                   class={cn(
-                    "gap-3 px-3 py-2.5 rounded-lg transition-all focus:bg-primary/10 focus:text-primary",
+                    "gap-3 px-3 py-2.5 min-h-12 rounded-lg transition-all focus:bg-primary/10 focus:text-primary",
                     selectedProfile === profile.id ? "text-primary bg-primary/5" : ""
                   )}
                   onclick={() => chat.profile = profile.id as "strong" | "balanced" | "simple"}
@@ -505,7 +504,7 @@
             variant="ghost" 
             size="sm" 
             class={cn(
-              "h-8 px-2.5 gap-1.5 text-[10px] font-black uppercase tracking-widest rounded-full border transition-all duration-300",
+              "hidden sm:flex h-10 sm:min-h-12 px-2 sm:px-2.5 gap-1 sm:gap-1.5 text-[10px] font-black uppercase tracking-widest rounded-full border transition-all duration-300",
               chat.thinkingEnabled 
                 ? "bg-primary/10 border-primary/40 text-primary shadow-[0_0_15px_rgba(212,175,55,0.1)]" 
                 : "bg-white/5 border-white/5 text-muted-foreground hover:border-white/10"
@@ -518,10 +517,10 @@
             }}
           >
             <BrainCircuitIcon class={cn("size-3.5", chat.thinkingEnabled ? "animate-pulse" : "opacity-50")} />
-            Thinking
+            <span class="hidden sm:inline">Thinking</span>
           </Button>
 
-          <ModelSelector class="h-8 rounded-lg border-none bg-transparent hover:bg-white/5 text-muted-foreground hover:text-primary shrink-0 transition-all" />
+          <ModelSelector class="h-10 sm:min-h-12 rounded-xl border-none bg-transparent hover:bg-white/5 text-muted-foreground hover:text-primary shrink-0 transition-all" />
         </div>
       </div>
 
@@ -530,7 +529,7 @@
           variant="default" 
           size="icon" 
           class={cn(
-            "size-10 rounded-full transition-all duration-300 relative group overflow-hidden shadow-2xl",
+            "min-h-12 min-w-12 rounded-full transition-all duration-300 relative group overflow-hidden shadow-2xl",
             chat.loading ? "bg-destructive hover:bg-destructive/90" : "bg-primary hover:bg-primary/90 text-primary-foreground",
             !input.trim() && !chat.loading && "opacity-50 grayscale cursor-not-allowed"
           )}
@@ -559,7 +558,6 @@
       onchange={file.onchange}
     />
   </PromptInput>
-</div>
 
 <style>
   :global(.composer-box .scrollbar-slick) {

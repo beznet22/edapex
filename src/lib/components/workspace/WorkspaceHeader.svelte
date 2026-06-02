@@ -15,6 +15,7 @@
   import UploadIcon from "@lucide/svelte/icons/upload";
   import SparklesIcon from "@lucide/svelte/icons/sparkles";
   import PanelLeftIcon from "@lucide/svelte/icons/panel-left";
+  import XIcon from "@lucide/svelte/icons/x";
   import { useWorkspace } from "./workspace-context.svelte.ts";
   import * as Tooltip from "$lib/components/ui/tooltip";
 
@@ -24,18 +25,22 @@
     onShare,
     onDownload,
     onUpload,
+    onClose,
   }: {
     onSave?: () => void;
     onCopy?: () => void;
     onShare?: () => void;
     onDownload?: () => void;
     onUpload?: () => void;
+    onClose?: () => void;
   } = $props();
 
   const ws = useWorkspace();
 </script>
 
-<div class="flex items-center justify-between h-12 px-2 sm:px-4 shrink-0 bg-transparent gap-2 min-w-0 w-full overflow-hidden">
+<div
+  class="flex items-center justify-between h-12 px-2 sm:px-4 shrink-0 bg-transparent gap-2 min-w-0 w-full overflow-hidden"
+>
   <!-- Left: Document Title Dropdown -->
   <div class="flex items-center min-w-0 flex-1 gap-1">
     <Tooltip.Root>
@@ -71,101 +76,103 @@
           >
             <FileIcon class="size-4 text-primary/80 shrink-0" />
             <span class="truncate text-left block min-w-0 shrink">
-              {ws.activeFileDef?.name.split('/').pop() || "Untitled"}
+              {ws.activeFileDef?.name.split("/").pop() || "Untitled"}
             </span>
             <ChevronDownIcon class="size-3.5 text-white/40 shrink-0" />
           </Button>
         {/snippet}
       </DropdownMenu.Trigger>
       <DropdownMenu.Content
-      align="start"
-      class="w-56 bg-slate-950/90 backdrop-blur-xl border-white/10 rounded-xl shadow-2xl"
-    >
-      <DropdownMenu.Group>
-        <DropdownMenu.Label
-          class="text-[10px] uppercase tracking-wider text-white/40 px-2 py-1.5"
-          >Open Files</DropdownMenu.Label
-        >
-        {#each ws.openedFiles as file}
-          <DropdownMenu.Item
-            class={cn(
-              "text-[12px] font-medium rounded-lg cursor-pointer my-0.5",
-              ws.activeFileKey === file.key
-                ? "bg-primary/20 text-white"
-                : "text-white/60 hover:text-white hover:bg-white/5",
-            )}
-            onclick={() => (ws.activeFileKey = file.key)}
+        align="start"
+        class="w-56 bg-slate-950/90 backdrop-blur-xl border-white/10 rounded-xl shadow-2xl"
+      >
+        <DropdownMenu.Group>
+          <DropdownMenu.Label class="text-[10px] uppercase tracking-wider text-white/40 px-2 py-1.5"
+            >Open Files</DropdownMenu.Label
           >
-            <FileIcon class="size-3 mr-2 shrink-0" />
-            <span class="truncate">{file.name.split('/').pop()}</span>
-            {#if ws.activeFileKey === file.key}
-              <CheckIcon class="size-3 ml-auto text-primary shrink-0" />
-            {/if}
-          </DropdownMenu.Item>
-        {/each}
-      </DropdownMenu.Group>
-    </DropdownMenu.Content>
-  </DropdownMenu.Root>
+          {#each ws.openedFiles as file}
+            <DropdownMenu.Item
+              class={cn(
+                "text-[12px] font-medium rounded-lg cursor-pointer my-0.5",
+                ws.activeFileKey === file.key
+                  ? "bg-primary/20 text-white"
+                  : "text-white/60 hover:text-white hover:bg-white/5",
+              )}
+              onclick={() => (ws.activeFileKey = file.key)}
+            >
+              <FileIcon class="size-3 mr-2 shrink-0" />
+              <span class="truncate">{file.name.split("/").pop()}</span>
+              {#if ws.activeFileKey === file.key}
+                <CheckIcon class="size-3 ml-auto text-primary shrink-0" />
+              {/if}
+            </DropdownMenu.Item>
+          {/each}
+        </DropdownMenu.Group>
+      </DropdownMenu.Content>
+    </DropdownMenu.Root>
   </div>
 
   <!-- Far Right: Actions & Workspace Mode Toggle -->
   <div class="flex items-center gap-1 shrink-0">
-    <Tooltip.Root>
-      <Tooltip.Trigger>
-        {#snippet child({ props })}
-          <Button
-            {...props}
-            variant="ghost"
-            size="icon"
-            class="size-8 rounded-lg text-white/60 hover:text-white hover:bg-white/5"
-            onclick={onSave}
-            disabled={!ws.activeFileDef}
-          >
-            <SaveIcon class="size-4" />
-          </Button>
-        {/snippet}
-      </Tooltip.Trigger>
-      <Tooltip.Content>Save File</Tooltip.Content>
-    </Tooltip.Root>
+    <!-- Desktop-only action buttons -->
+    <div class="hidden sm:flex items-center gap-1">
+      <Tooltip.Root>
+        <Tooltip.Trigger>
+          {#snippet child({ props })}
+            <Button
+              {...props}
+              variant="ghost"
+              size="icon"
+              class="size-8 rounded-lg text-white/60 hover:text-white hover:bg-white/5"
+              onclick={onSave}
+              disabled={!ws.activeFileDef}
+            >
+              <SaveIcon class="size-4" />
+            </Button>
+          {/snippet}
+        </Tooltip.Trigger>
+        <Tooltip.Content>Save File</Tooltip.Content>
+      </Tooltip.Root>
 
-    <Tooltip.Root>
-      <Tooltip.Trigger>
-        {#snippet child({ props })}
-          <Button
-            {...props}
-            variant="ghost"
-            size="icon"
-            class="size-8 rounded-lg text-white/60 hover:text-white hover:bg-white/5"
-            onclick={onCopy}
-            disabled={!ws.activeFileDef}
-          >
-            <CopyIcon class="size-4" />
-          </Button>
-        {/snippet}
-      </Tooltip.Trigger>
-      <Tooltip.Content>Copy Content</Tooltip.Content>
-    </Tooltip.Root>
+      <Tooltip.Root>
+        <Tooltip.Trigger>
+          {#snippet child({ props })}
+            <Button
+              {...props}
+              variant="ghost"
+              size="icon"
+              class="size-8 rounded-lg text-white/60 hover:text-white hover:bg-white/5"
+              onclick={onCopy}
+              disabled={!ws.activeFileDef}
+            >
+              <CopyIcon class="size-4" />
+            </Button>
+          {/snippet}
+        </Tooltip.Trigger>
+        <Tooltip.Content>Copy Content</Tooltip.Content>
+      </Tooltip.Root>
 
-    <Tooltip.Root>
-      <Tooltip.Trigger>
-        {#snippet child({ props })}
-          <Button
-            {...props}
-            variant="ghost"
-            size="icon"
-            class="size-8 rounded-lg text-white/60 hover:text-white hover:bg-white/5"
-            onclick={onUpload}
-          >
-            <UploadIcon class="size-4" />
-          </Button>
-        {/snippet}
-      </Tooltip.Trigger>
-      <Tooltip.Content>Upload File</Tooltip.Content>
-    </Tooltip.Root>
+      <Tooltip.Root>
+        <Tooltip.Trigger>
+          {#snippet child({ props })}
+            <Button
+              {...props}
+              variant="ghost"
+              size="icon"
+              class="size-8 rounded-lg text-white/60 hover:text-white hover:bg-white/5"
+              onclick={onUpload}
+            >
+              <UploadIcon class="size-4" />
+            </Button>
+          {/snippet}
+        </Tooltip.Trigger>
+        <Tooltip.Content>Upload File</Tooltip.Content>
+      </Tooltip.Root>
 
-    <div class="w-px h-4 bg-white/10 mx-1"></div>
+      <div class="w-px h-4 bg-white/10 mx-1"></div>
+    </div>
 
-    <!-- Workspace Options Menu -->
+    <!-- Workspace Options Menu (three-dot) -->
     <DropdownMenu.Root>
       <DropdownMenu.Trigger>
         {#snippet child({ props })}
@@ -177,12 +184,40 @@
           >
             <MoreVerticalIcon class="size-4" />
           </Button>
-        {/snippet}d
+        {/snippet}
       </DropdownMenu.Trigger>
       <DropdownMenu.Content
         align="end"
         class="w-48 bg-slate-950/90 backdrop-blur-xl border-white/10 rounded-xl shadow-2xl p-1 z-50"
       >
+        <!-- Mobile-only: Save, Copy, Upload actions -->
+        <div class="sm:hidden">
+          <DropdownMenu.Item
+            class="text-[12px] font-medium rounded-lg cursor-pointer my-0.5 text-white/70 hover:text-white hover:bg-white/5"
+            onclick={onSave}
+            disabled={!ws.activeFileDef}
+          >
+            <SaveIcon class="size-3.5 mr-2 shrink-0" />
+            Save
+          </DropdownMenu.Item>
+          <DropdownMenu.Item
+            class="text-[12px] font-medium rounded-lg cursor-pointer my-0.5 text-white/70 hover:text-white hover:bg-white/5"
+            onclick={onCopy}
+            disabled={!ws.activeFileDef}
+          >
+            <CopyIcon class="size-3.5 mr-2 shrink-0" />
+            Copy
+          </DropdownMenu.Item>
+          <DropdownMenu.Item
+            class="text-[12px] font-medium rounded-lg cursor-pointer my-0.5 text-white/70 hover:text-white hover:bg-white/5"
+            onclick={onUpload}
+          >
+            <UploadIcon class="size-3.5 mr-2 shrink-0" />
+            Upload
+          </DropdownMenu.Item>
+          <DropdownMenu.Separator class="bg-white/5" />
+        </div>
+
         <DropdownMenu.Item
           class="text-[12px] font-medium rounded-lg cursor-pointer my-0.5 text-white/70 hover:text-white hover:bg-white/5"
           onclick={onShare}
@@ -199,7 +234,7 @@
           <DownloadIcon class="size-3.5 mr-2 shrink-0" />
           Download
         </DropdownMenu.Item>
-        
+
         <DropdownMenu.Separator class="bg-white/5" />
 
         <DropdownMenu.Group>
@@ -217,9 +252,9 @@
             {/if}
           </DropdownMenu.Item>
         </DropdownMenu.Group>
-        
+
         <DropdownMenu.Separator class="bg-white/5" />
-        
+
         <DropdownMenu.Group>
           <DropdownMenu.Label class="text-[10px] uppercase tracking-widest text-white/40 px-2.5 py-2">
             Workspace Mode
@@ -247,5 +282,18 @@
         </DropdownMenu.Group>
       </DropdownMenu.Content>
     </DropdownMenu.Root>
+
+    <!-- Mobile Close Button -->
+    {#if onClose}
+      <Button
+        variant="ghost"
+        size="icon"
+        class="min-h-12 min-w-12 rounded-xl text-white/60 hover:text-white hover:bg-white/10 lg:hidden"
+        onclick={onClose}
+        aria-label="Close workspace"
+      >
+        <XIcon class="size-5" />
+      </Button>
+    {/if}
   </div>
 </div>

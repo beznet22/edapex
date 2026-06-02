@@ -85,7 +85,7 @@
                         <Button
                             variant="secondary"
                             size="icon"
-                            class="h-11 w-11 rounded-2xl bg-muted/30 border-none hover:bg-muted/50 transition-all"
+                            class="min-h-12 min-w-12 rounded-2xl bg-muted/30 border-none hover:bg-muted/50 transition-all"
                             onclick={() => store.loadResources()}
                         >
                             <RefreshCw
@@ -96,7 +96,7 @@
                         </Button>
 
                         <Button
-                            class="h-11 px-6 rounded-2xl bg-primary hover:bg-primary/90 text-primary-foreground font-black uppercase tracking-[0.2em] text-[10px] shadow-lg shadow-primary/20 transition-all"
+                            class="min-h-12 px-6 rounded-2xl bg-primary hover:bg-primary/90 text-primary-foreground font-black uppercase tracking-[0.2em] text-[10px] shadow-lg shadow-primary/20 transition-all"
                             onclick={handleAddNew}
                         >
                             <Plus class="h-4 w-4 sm:mr-2" />

@@ -30,8 +30,10 @@
   import MoonIcon from "@lucide/svelte/icons/moon";
   import SunIcon from "@lucide/svelte/icons/sun";
   import PlusIcon from "@lucide/svelte/icons/plus";
+  import ArchiveIcon from "@lucide/svelte/icons/archive";
   import { goto, invalidateAll, pushState } from "$app/navigation";
   import { UserContext } from "$lib/context/user-context.svelte";
+  import { mobileUiState } from "$lib/state/mobile-ui.svelte.ts";
 
   type SidebarProps = {
     user?: AuthUser;
@@ -58,10 +60,7 @@
 
 <Sidebar.Root bind:ref collapsible="icon" {...restProps}>
   <Sidebar.Header>
-    <WorkspaceSwitcher
-      items={workspaceNavItems}
-      bind:activeItem={activeWorkspaceNav}
-    />
+    <WorkspaceSwitcher items={workspaceNavItems} bind:activeItem={activeWorkspaceNav} />
   </Sidebar.Header>
 
   <Sidebar.Content class="scrollbar-hide">
@@ -93,6 +92,19 @@
               >
             </Sidebar.MenuButton>
           </Sidebar.MenuItem>
+          <Sidebar.MenuItem>
+            <Sidebar.MenuButton
+              tooltipContent="Artifacts"
+              onclick={() => {
+                sidebar.setOpenMobile(false);
+                mobileUiState.isArtifactBrowserOpen = true;
+              }}
+              class="text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent transition-colors font-medium"
+            >
+              <ArchiveIcon class="size-4 text-primary" />
+              <span>Artifacts</span>
+            </Sidebar.MenuButton>
+          </Sidebar.MenuItem>
         </Sidebar.Menu>
 
         <div class="relative group px-2 group-data-[collapsible=icon]:hidden">
@@ -103,7 +115,7 @@
             type="text"
             placeholder="Filter sessions..."
             bind:value={sessionFilter}
-            class="h-9 w-full rounded-lg border border-sidebar-border bg-background/50 pl-8 pr-3 text-xs text-sidebar-foreground/80 placeholder:text-sidebar-foreground/40 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/30 transition-all"
+            class="h-12 w-full rounded-lg border border-sidebar-border bg-background/50 pl-8 pr-3 text-xs text-sidebar-foreground/80 placeholder:text-sidebar-foreground/40 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/30 transition-all"
           />
         </div>
       </Sidebar.GroupContent>
@@ -127,8 +139,7 @@
           title: "Toggle Theme",
           icon: theme.resolvedTheme === "dark" ? MoonIcon : SunIcon,
           action: () => {
-            theme.selectedTheme =
-              theme.resolvedTheme === "dark" ? "light" : "dark";
+            theme.selectedTheme = theme.resolvedTheme === "dark" ? "light" : "dark";
           },
         },
       ]}

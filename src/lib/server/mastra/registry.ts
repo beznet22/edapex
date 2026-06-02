@@ -234,11 +234,11 @@ export const MODEL_REGISTRY: ModelDefinition[] = [
 
 	// ─── OpenCode Zen (Free — API Key Required) ──────────────────────────────
 	{
-		id: 'opencode:minimax-m2.5-free',
-		name: 'MiniMax M2.5 Free',
-		apiName: 'minimax-m2.5-free',
+		id: 'opencode:mimo-v2.5-free',
+		name: 'Mimo V2.5 Free',
+		apiName: 'mimo-v2.5-free',
 		provider: 'opencode',
-		description: 'MiniMax M2.5 free via OpenCode Zen',
+		description: 'Mimo V2.5 free via OpenCode Zen',
 		tier: 'mid',
 		classification: 'balanced',
 		contextWindow: 128_000,
@@ -328,44 +328,7 @@ export const SUPPORTED_PROVIDERS = [
 	'opengateway', 'nvidia', 'groq', 'deepseek', 'opencode', 'mistral'
 ] as const;
 
-export const SUPPORTED_PROVIDERS_META = [
-	{
-		id: 'opengateway',
-		name: 'OpenGateway',
-		description: 'Default platform AI gateway',
-		url: 'https://edapex.io',
-	},
-	{
-		id: 'nvidia',
-		name: 'NVIDIA NIM',
-		description: 'Diverse fallback architect with embeddings capabilities',
-		url: 'https://build.nvidia.com/settings/api-keys',
-	},
-	{
-		id: 'groq',
-		name: 'Groq',
-		description: 'Lightning fast utility execution',
-		url: 'https://console.groq.com/keys',
-	},
-	{
-		id: 'deepseek',
-		name: 'DeepSeek',
-		description: 'Deep reasoning and code intelligence',
-		url: 'https://platform.deepseek.com/api_keys',
-	},
-	{
-		id: 'opencode',
-		name: 'OpenCode Zen',
-		description: 'Curated model endpoint for low-latency reasoning',
-		url: 'https://opencode.ai/docs/zen/',
-	},
-	{
-		id: 'mistral',
-		name: 'Mistral SDK',
-		description: 'High-precision document intelligence layer',
-		url: 'https://console.mistral.ai/api-keys',
-	}
-];
+
 
 export type SupportedProvider = (typeof SUPPORTED_PROVIDERS)[number];
 

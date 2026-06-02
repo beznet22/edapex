@@ -7,40 +7,27 @@ import { eq, and, like } from "drizzle-orm";
 
 export const onboardEntitySchema = z.object({
   studentDetails: z.object({
-    firstName: z.string(),
-    lastName: z.string(),
-    gender: z.enum(["Male", "Female"]),
-    category: z.string(),
-  }),
+    firstName: z.string().describe("The student's first name"),
+    lastName: z.string().describe("The student's last name"),
+    gender: z.enum(["Male", "Female"]).describe("The student's gender"),
+    category: z.string().describe("Student category (e.g., DAYCARE, LOWER BASIC)"),
+  }).describe("Core student biographical information"),
   guardianDetails: z.object({
-    relation: z.enum(["Father", "Mother", "Other"]),
-    guardianName: z.string(),
-    phone: z.string(),
-    email: z.string().email(),
-  }),
+    relation: z.enum(["Father", "Mother", "Other"]).describe("Guardian's relationship to the student"),
+    guardianName: z.string().describe("Full name of the primary guardian"),
+    phone: z.string().describe("Guardian's primary phone number"),
+    email: z.string().email().describe("Guardian's email address"),
+  }).describe("Primary guardian contact details"),
   enrollmentDetails: z.object({
-    classId: z.number().int().positive(),
-    sectionId: z.number().int().positive(),
-  }),
+    classId: z.number().int().positive().describe("Numeric ID of the class to enroll in"),
+    sectionId: z.number().int().positive().describe("Numeric ID of the section to enroll in"),
+  }).describe("Target enrollment destination for the new student"),
 });
 
-export const patchEntitySchema = z
-  .object({
-    id: z.number(),
-    schoolId: z.number(),
-    role: z.string(),
-    studentId: z.number().optional(),
-    firstName: z.string().optional(),
-    lastName: z.string().optional(),
-    dateOfBirth: z.string().optional(),
-    genderId: z.number().optional(),
-    studentCategoryId: z.number().optional(),
-    rollNo: z.number().optional(),
-  })
-  .omit({ id: true, schoolId: true, role: true });
+
 
 export type OnboardEntityPayload = z.infer<typeof onboardEntitySchema>;
-export type PatchEntityPayload = z.infer<typeof patchEntitySchema>;
+
 
 export const getRegistrationOptions = async (context?: MastraToolContext) => {
   if (!context) {
@@ -189,88 +176,72 @@ export const onboardEntityLogic = async (
   }
 };
 
-export const patchEntityLogic = async (context: MastraToolContext, input: PatchEntityPayload) => {
+
+
+
+export const assignEntitySchema = z.object({
+  studentId: z.number().describe("The ID of the student to assign or transfer"),
+  targetClassId: z.number().describe("Numeric ID of the destination class"),
+  targetSectionId: z.number().describe("Numeric ID of the destination section"),
+  academicYearId: z.number().optional().describe("Numeric ID of the academic year (defaults to active term if omitted)"),
+  reason: z.string().optional().describe("Optional reason for the transfer/assignment for audit logs"),
+});
+export type AssignEntityInput = z.infer<typeof assignEntitySchema>;
+
+export const assignEntityLogic = async (context: MastraToolContext, input: AssignEntityInput) => {
   const { tenantContext, getRepo, audit } = context;
 
   validateRoleWhitelist(tenantContext, [1, 5, 8]);
+  validateWorkspaceLock(tenantContext, input.targetClassId, input.targetSectionId);
 
   const studentRepo = getRepo(StudentRepository);
   const timelineRepo = getRepo(TimelineRepository);
 
   try {
-    if (input.studentId) {
-      const student = await studentRepo.getById(input.studentId);
-      if (!student) {
-        return {
-          status: "ERROR",
-          errorCode: "STUDENT_NOT_FOUND",
-          message: `Student with ID ${input.studentId} not found.`,
-        };
-      }
-
-      validateWorkspaceLock(tenantContext, student.classId, student.sectionId);
-
-      const updateData: Record<string, unknown> = {};
-      if (input.firstName !== undefined) updateData.firstName = input.firstName;
-      if (input.lastName !== undefined) updateData.lastName = input.lastName;
-      if (input.dateOfBirth !== undefined) updateData.dateOfBirth = input.dateOfBirth;
-      if (input.genderId !== undefined) updateData.genderId = input.genderId;
-      if (input.studentCategoryId !== undefined) updateData.studentCategoryId = input.studentCategoryId;
-      if (input.rollNo !== undefined) updateData.rollNo = input.rollNo;
-
-      if (input.firstName || input.lastName) {
-        const firstName = input.firstName ?? student.firstName ?? "";
-        const lastName = input.lastName ?? student.lastName ?? "";
-        updateData.fullName = `${firstName} ${lastName}`.trim();
-      }
-
-      if (Object.keys(updateData).length === 0) {
-        return {
-          status: "ERROR",
-          errorCode: "NO_CHANGES",
-          message: "No valid fields provided for update.",
-        };
-      }
-
-      await studentRepo.updateStudent({
-        studentId: input.studentId,
-        ...updateData,
-      });
-
-      const auditDescription = JSON.stringify({
-        action: "patch",
-        type: "patchEntity",
-        studentId: input.studentId,
-        threadId: audit?.threadId,
-        modelId: audit?.modelId,
-      });
-
-      await timelineRepo.createTimeline({
-        staffStudentId: input.studentId,
-        type: "behavioral",
-        description: auditDescription,
-        schoolId: tenantContext.schoolId,
-        academicId: tenantContext.academicId ?? 0,
-        createdBy: tenantContext.userId,
-      });
-
+    const student = await studentRepo.getById(input.studentId);
+    if (!student) {
       return {
-        status: "SUCCESS",
-        message: `Student ${input.studentId} profile updated successfully.`,
+        status: "ERROR",
+        errorCode: "STUDENT_NOT_FOUND",
+        message: `Student with ID ${input.studentId} not found.`,
       };
     }
 
+    await studentRepo.assignClassSection({
+      studentId: input.studentId,
+      classId: input.targetClassId,
+      sectionId: input.targetSectionId,
+    });
+
+    const auditDescription = JSON.stringify({
+      action: "assign",
+      type: "assignEntity",
+      studentId: input.studentId,
+      classId: input.targetClassId,
+      sectionId: input.targetSectionId,
+      threadId: audit?.threadId,
+      modelId: audit?.modelId,
+    });
+
+    await timelineRepo.createTimeline({
+      staffStudentId: input.studentId,
+      type: "behavioral",
+      description: auditDescription,
+      schoolId: tenantContext.schoolId,
+      academicId: tenantContext.academicId ?? 0,
+      createdBy: tenantContext.userId,
+    });
+
     return {
-      status: "ERROR",
-      errorCode: "MISSING_ENTITY_ID",
-      message: "No studentId provided for patch operation.",
+      status: "SUCCESS",
+      message: `Student ${student.fullName ?? input.studentId} successfully assigned to Class ${input.targetClassId}, Section ${input.targetSectionId}.`,
     };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
     return {
       status: "ERROR",
       errorCode: "UNKNOWN",
-      message: `Failed to patch entity: ${errorMessage}`,
+      message: `Failed to assign student: ${errorMessage}`,
     };
   }
 };

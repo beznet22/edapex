@@ -99,6 +99,11 @@ export function normalizeGatewayRequest(provider: string, options: any): any {
 		if (normalized.apiKey) {
 			normalized.headers['api-key'] = normalized.apiKey;
 		}
+
+		// Map opencode provider to openai provider so Mastra's AI SDK adapter handles it
+		if (normalized.id && normalized.id.startsWith('opencode/')) {
+			normalized.id = normalized.id.replace('opencode/', 'openai/');
+		}
 	}
 
 	return normalized;

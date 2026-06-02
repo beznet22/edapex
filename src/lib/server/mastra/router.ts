@@ -183,14 +183,19 @@ export class ModelRouter {
 		let apiKey = '';
 		if (config) {
 			if (config.source === 'env') {
-				apiKey = envKeys[`${resolved.provider.toUpperCase()}_API_KEY`] || '';
+				const envKey = resolved.provider === 'nvidia' ? 'NVIDIA_NIM_API_KEY' : `${resolved.provider.toUpperCase()}_API_KEY`;
+				apiKey = envKeys[envKey] || '';
 			} else if (config.apiKeyEncrypted) {
 				apiKey = decrypt(config.apiKeyEncrypted, encryptionKey);
 			}
 		}
 
+		let fullModelId = resolved.model.startsWith(`${resolved.provider}/`) 
+			? resolved.model 
+			: `${resolved.provider}/${resolved.model}`;
+
 		const baseOptions = {
-			id: resolved.model as `${string}/${string}`,
+			id: fullModelId as `${string}/${string}`,
 			apiKey,
 			baseURL: config?.baseUrl || undefined,
 		};

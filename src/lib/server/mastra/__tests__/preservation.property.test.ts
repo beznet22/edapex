@@ -272,14 +272,14 @@ describe('Property 2: Preservation — Behavioral Contract Integrity', () => {
 					expect(toolKeys).toContain('web-search');
 					expect(toolKeys).toContain('web-fetch');
 
-					// All core tool keys present (variable names from the export)
-					for (const key of Object.keys(coreTools)) {
-						expect(toolKeys).toContain(key);
+					// All core tool keys present (actual tool IDs)
+					for (const tool of Object.values(coreTools)) {
+						if (tool && tool.id) expect(toolKeys).toContain(tool.id);
 					}
 
 					// All workflow tool keys present
-					for (const key of Object.keys(workflowTools)) {
-						expect(toolKeys).toContain(key);
+					for (const tool of Object.values(workflowTools)) {
+						if (tool && tool.id) expect(toolKeys).toContain(tool.id);
 					}
 
 					// Total tool count matches expected (deterministic for all non-slash messages)

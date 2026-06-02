@@ -44,7 +44,7 @@ export class ChatContext {
   openPanel = $state<boolean>(false);
   docPart = $state<CreateDocumentPart | undefined>(undefined);
   docState = $derived(this.docPart?.status);
-  error = $state<Error | undefined>(undefined);
+  get error() { return this.client?.error; }
   profile = $state<'strong' | 'balanced' | 'simple'>('strong');
   thinkingEnabled = $state<boolean>(false);
   get activeWorkflows() { return this.threadData.activeWorkflows; }
@@ -108,7 +108,7 @@ export class ChatContext {
   }
 
   get loading() {
-    return this.status === "ready" ? false : true;
+    return this.status === "streaming" || this.status === "submitted";
   }
 
   #prepareSendMessagesRequest = ({ messages, id }: { messages: xUIMessage[], id?: string }) => {

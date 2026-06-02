@@ -306,7 +306,7 @@ describe("Phase 3: Slash Commands & Governance", () => {
     });
 
     it("Test: Patch Zod Masking: Verify /update and /edit strictly strip protected fields (id, role, schoolId) via .omit()", async () => {
-      const { patchEntitySchema } = await import("../tools/onboard-tools").catch(() => ({
+      const { patchEntitySchema } = await import("../tools/gov-tools").catch(() => ({
         patchEntitySchema: null,
       }));
 
@@ -374,7 +374,7 @@ describe("Phase 3: Slash Commands & Governance", () => {
     });
 
     it("Test: Live Workspace Badge: Verify /switch triggers context update and returns success", async () => {
-      const { switchWorkspaceLogic } = await import("../tools/gov-tools").catch(() => ({
+      const { switchWorkspaceLogic } = await import("../tools/core-tools").catch(() => ({
         switchWorkspaceLogic: () => {
           throw new Error("Not implemented");
         },

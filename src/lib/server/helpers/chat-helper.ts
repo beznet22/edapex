@@ -148,11 +148,18 @@ export async function resolveThread(
  * Map of tool IDs to their Mastra createTool instances for dynamic injection.
  * Used by the skill-based routing to inject specific tool subsets.
  */
-const TOOL_MAP: Record<string, any> = {
-  'search-entity': searchEntityTool,
-  ...coreTools,
-  ...workflowTools,
-};
+const ALL_TOOLS = [
+  searchEntityTool,
+  ...Object.values(coreTools),
+  ...Object.values(workflowTools)
+];
+
+const TOOL_MAP: Record<string, any> = {};
+for (const tool of ALL_TOOLS) {
+  if (tool && tool.id) {
+    TOOL_MAP[tool.id] = tool;
+  }
+}
 
 /**
  * Module-level singleton skill registry.
@@ -185,7 +192,7 @@ export function resolveToolsForMessage(message: string, isSlashCommand: boolean)
 
     const skillCommandMap: Record<string, string> = {
       '/grade': 'grading', '/mark': 'grading', '/attendance': 'grading',
-      '/register': 'onboard', '/enroll': 'onboard', '/assign': 'onboard',
+      '/register': 'onboarding', '/enroll': 'onboarding', '/assign': 'onboarding',
       '/update': 'gov', '/edit': 'gov', '/rename': 'gov',
       '/ban': 'gov', '/suspend': 'gov', '/reset': 'gov',
       '/extract': 'assistant', '/generate': 'assistant',
@@ -195,18 +202,32 @@ export function resolveToolsForMessage(message: string, isSlashCommand: boolean)
     };
 
     const skillName = skillCommandMap[command];
+    console.log(`[ChatHelper] Parsed command: "${command}" -> Skill name: "${skillName}"`);
+    
     if (skillName) {
+      let toolIds = [];
       const skill = skillRegistry.getSkill(skillName);
+      console.log(`[ChatHelper] skillRegistry.getSkill("${skillName}") -> `, skill ? 'Found' : 'Undefined');
+      
       if (skill) {
         const skillTools: Record<string, any> = {};
         for (const toolId of skill.tools) {
           const tool = TOOL_MAP[toolId];
-          if (tool) skillTools[toolId] = tool;
+          if (tool) {
+            skillTools[toolId] = tool;
+            toolIds.push(toolId);
+          } else {
+            console.warn(`[ChatHelper] Tool "${toolId}" not found in TOOL_MAP`);
+          }
         }
 
         // For workflow commands, always inject workflow tools
         if (['/extract', '/generate', '/validate', '/publish'].includes(command)) {
-          Object.assign(skillTools, workflowTools);
+          for (const tool of Object.values(workflowTools)) {
+            if (tool && tool.id) {
+              skillTools[tool.id] = tool;
+            }
+          }
         }
 
         // Always include search-entity for context discovery
@@ -214,11 +235,15 @@ export function resolveToolsForMessage(message: string, isSlashCommand: boolean)
           skillTools['search-entity'] = searchEntityTool;
         }
 
-        return { ...baseTools, ...skillTools, getContext: getContextTool };
+        const tools = { ...baseTools, ...skillTools, getContext: getContextTool };
+        console.log('[ChatHelper] Resolved tool IDs (Slash Command):', Object.keys(tools));
+        return tools;
       }
     }
   }
 
-  // Default: inject all available tools
-  return { ...baseTools, ...coreTools, ...workflowTools, getContext: getContextTool };
+  // Default: inject all available tools, ensuring they are keyed by their actual ID
+  const tools = { ...baseTools, ...TOOL_MAP, getContext: getContextTool };
+  console.log('[ChatHelper] Resolved tool IDs (Default):', Object.keys(tools));
+  return tools;
 }

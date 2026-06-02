@@ -29,6 +29,8 @@
   import CalendarIcon from "@lucide/svelte/icons/calendar";
   import MapIcon from "@lucide/svelte/icons/map";
   import ChevronDownIcon from "@lucide/svelte/icons/chevron-down";
+  import TriangleAlertIcon from "@lucide/svelte/icons/triangle-alert";
+  import * as Alert from "$lib/components/ui/alert";
 
   import { cn } from "$lib/utils/shadcn";
 
@@ -183,7 +185,7 @@
                         <ReasoningTrigger>Thinking process...</ReasoningTrigger>
                         <ReasoningContent
                           class="border-l-2 border-primary/20 pl-4 py-1 my-2"
-                          contentClass="!text-foreground/40 dark:!text-foreground/35 prose-sm"
+                          contentClass="!text-muted prose-sm"
                         >
                           <Markdown
                             content={mergedReasoning}
@@ -236,7 +238,7 @@
               {/if}
 
               <!-- Actions for both user and assistant messages -->
-              {#if chat.status === "ready"}
+              {#if chat.status === "ready" || chat.status === "error"}
                 <MessageAction
                   {message}
                   {isAssistantCopied}
@@ -246,6 +248,13 @@
               {/if}
             </div>
           {/each}
+          {#if chat.error}
+            <Alert.Root variant="destructive" class="bg-destructive/10 border-dashed border-destructive/50 text-destructive">
+              <TriangleAlertIcon class="size-4" />
+              <Alert.Title>Error</Alert.Title>
+              <Alert.Description>{chat.error.message || "An error occurred during the conversation."}</Alert.Description>
+            </Alert.Root>
+          {/if}
         </div>
       </ConversationContent>
       <ConversationScrollButton class="bottom-36 sm:bottom-40 z-20" />
@@ -254,7 +263,7 @@
 
   <!-- Shared Floating Input at bottom -->
   <div
-    class="absolute bottom-0 left-0 w-full pt-10 pb-4 px-4 safe-area-bottom pointer-events-none z-50 flex justify-center"
+    class="absolute bottom-4 left-0 w-full pt-10 pb-4 px-2 sm:px-4 safe-area-bottom pointer-events-none z-50 flex justify-center"
   >
     <div class="pointer-events-auto w-full max-w-[780px]">
       <ChatComposer {user} {readonly} isInitial={false} />

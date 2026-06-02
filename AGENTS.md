@@ -7,12 +7,6 @@ Do not assume any package or script is installed globally.
 
 
 
-## Commit Attribution
-AI commits MUST include:
-```
-Co-Authored-By: Beznet AI <[EMAIL_ADDRESS]>
-```
-
 ## File-Scoped Commands
 | Task | Command |
 |------|---------|

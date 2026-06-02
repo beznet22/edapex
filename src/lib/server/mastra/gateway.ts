@@ -161,8 +161,26 @@ export class EdApexGateway extends MastraModelGateway {
             return provider.chatModel(bareModel) as unknown as GatewayLanguageModel;
         }
 
+        // For opencode: use createOpenAICompatible directly — resolveModelConfig
+        // rewrites opencode/ → openai/ which causes Mastra to route to api.openai.com
+        if (providerId === 'opencode') {
+            const bareModel = modelId.startsWith('opencode/')
+                ? modelId.slice('opencode/'.length)
+                : modelId;
+            const baseURL = this.buildUrl(modelId) || BASE_URLS.opencode;
+
+            const provider = createOpenAICompatible({
+                name: 'opencode',
+                apiKey,
+                baseURL,
+                headers: { 'Accept-Encoding': 'identity' },
+                supportsStructuredOutputs: false,
+            });
+            return provider.chatModel(bareModel) as unknown as GatewayLanguageModel;
+        }
+
         // For standard providers: use Mastra's resolveModelConfig
-        const fullModelId = modelId.includes('/') ? modelId : `${providerId}/${modelId}`;
+        const fullModelId = modelId.startsWith(`${providerId}/`) ? modelId : `${providerId}/${modelId}`;
         const baseOptions = {
             id: fullModelId as `${string}/${string}`,
             apiKey,
@@ -207,9 +225,14 @@ export class EdApexGateway extends MastraModelGateway {
      */
     extractProvider(modelId: string): string {
         const parts = modelId.split('/');
-        const model = MODEL_REGISTRY.find(m => m.apiName === parts[2]);
+        const lastPart = parts[parts.length - 1];
+        const model = MODEL_REGISTRY.find(m => m.apiName === lastPart);
         if (model) return model.provider;
 
-        return parts[1] || 'opengateway';
+        if (parts[0] === 'edapex' && parts.length > 1) {
+            return parts[1];
+        }
+
+        return parts[0] || 'opengateway';
     }
 }

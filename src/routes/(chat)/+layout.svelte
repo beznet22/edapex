@@ -90,7 +90,7 @@
 
 <Sidebar.Provider bind:open={sidebarOpen}>
   <AppSidebar user={data.user ?? undefined} />
-  <Sidebar.Inset>
+  <Sidebar.Inset class="overflow-hidden min-h-0">
     {@render children()}
   </Sidebar.Inset>
 </Sidebar.Provider>

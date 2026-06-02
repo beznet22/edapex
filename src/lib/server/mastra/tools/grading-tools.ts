@@ -40,17 +40,18 @@ export const behavioralRatingSchema = z.object({
 });
 
 export const manageResultsSchema = z.object({
-  type: z.enum(["academic", "attendance", "qualitative", "behavioral"]),
-  studentId: z.number(),
-  subjectId: z.number().optional(),
-  score: z.number().min(0).max(100).optional(),
-  examTypeId: z.number().optional(),
-  present: z.number().min(0).optional(),
-  absent: z.number().min(0).optional(),
-  daysOpened: z.number().optional(),
-  remark: z.string().min(1).optional(),
-  trait: z.string().optional(),
-  rating: z.number().min(1).max(5).optional(),
+  type: z.enum(["academic", "attendance", "qualitative", "behavioral"]).describe("The type of result mutation to perform. Dictates which optional fields are required."),
+  studentId: z.number().describe("The ID of the student receiving the mark/rating"),
+  subjectId: z.number().optional().describe("Numeric ID of the subject (Required for 'academic')"),
+  score: z.number().min(0).max(100).optional().describe("Numeric score from 0 to 100 (Required for 'academic')"),
+  examTypeId: z.number().optional().describe("Optional explicit exam type ID"),
+  present: z.number().min(0).optional().describe("Number of days present (Required for 'attendance')"),
+  absent: z.number().min(0).optional().describe("Number of days absent (Required for 'attendance')"),
+  daysOpened: z.number().optional().describe("Total number of school days opened (Optional for 'attendance')"),
+  remark: z.string().min(1).optional().describe("Free-text teacher remark or comment (Required for 'qualitative')"),
+  trait: z.string().optional().describe("Name of the behavioral or psychomotor trait being rated (Required for 'behavioral')"),
+  rating: z.number().min(1).max(5).optional().describe("Rating from 1 to 5 for the given trait (Required for 'behavioral')"),
+
 }).superRefine((data, ctx) => {
   if (data.type === "academic") {
     if (data.subjectId === undefined) {

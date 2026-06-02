@@ -72,7 +72,7 @@
         {...props}
         variant="outline"
         class={cn(
-          "data-[state=open]:bg-accent data-[state=open]:text-accent-foreground w-fit px-1.5 sm:px-2 md:h-[34px] group",
+          "data-[state=open]:bg-accent data-[state=open]:text-accent-foreground w-fit h-10 sm:min-h-12 px-1.5 sm:px-2 group",
           c,
         )}
       >
@@ -85,7 +85,7 @@
   </DropdownMenuTrigger>
   <DropdownMenuContent 
     align="start" 
-    class="min-w-[240px] h-[320px] hermes-glass p-0 shadow-2xl border-sidebar-border/30 rounded-xl overflow-hidden"
+    class="w-[calc(100vw-2rem)] sm:w-auto sm:min-w-[240px] h-[320px] hermes-glass p-0 shadow-2xl border-sidebar-border/30 rounded-xl overflow-hidden"
   >
     <div class="h-full w-full overflow-y-auto overflow-x-hidden p-2 flex flex-col gap-px">
         {#each groupedModels as group, i (group.label)}
@@ -103,7 +103,7 @@
                 open = false;
                 selectedChatModel.value = chatModel.id;
               }}
-              class="group/item flex flex-row items-center justify-between gap-1 px-3 py-3 rounded-lg transition-all hover:bg-primary/10 cursor-pointer data-[active=true]:bg-primary/10 relative overflow-hidden"
+              class="group/item flex flex-row items-center justify-between gap-1 px-3 py-3 min-h-12 rounded-lg transition-all hover:bg-primary/10 cursor-pointer data-[active=true]:bg-primary/10 relative overflow-hidden"
               data-active={chatModel.id === selectedChatModel.value}
             >
               <div class="flex items-center gap-2 relative z-10 w-full min-w-0">

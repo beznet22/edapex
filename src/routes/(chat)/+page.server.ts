@@ -17,7 +17,7 @@ export const load: PageServerLoad = async ({ url, locals }) => {
     return redirect(302, "/signin");
   }
 
-  return {};
+  return { user };
 };
 
 export const actions: Actions = {

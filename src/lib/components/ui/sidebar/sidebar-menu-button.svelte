@@ -10,8 +10,8 @@
           "bg-background hover:bg-sidebar-accent hover:text-sidebar-accent-foreground shadow-[0_0_0_1px_var(--sidebar-border)] hover:shadow-[0_0_0_1px_var(--sidebar-accent)]",
       },
       size: {
-        default: "h-8 text-sm",
-        sm: "h-7 text-xs",
+        default: "h-8 min-h-12 text-sm",
+        sm: "h-7 min-h-12 text-xs",
         lg: "group-data-[collapsible=icon]:p-0! h-12 text-sm",
       },
     },

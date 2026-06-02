@@ -214,7 +214,7 @@
                         <Button
                             variant="ghost"
                             size="icon"
-                            class="h-11 w-11 sm:h-8 sm:w-8 text-white hover:bg-white/10 active:bg-white/20"
+                            class="min-h-12 min-w-12 text-white hover:bg-white/10 active:bg-white/20"
                             aria-label="Zoom out"
                             onclick={() => (store.zoom = Math.max(store.zoom - 0.2, 0.5))}
                         >
@@ -226,7 +226,7 @@
                         <Button
                             variant="ghost"
                             size="icon"
-                            class="h-11 w-11 sm:h-8 sm:w-8 text-white hover:bg-white/10 active:bg-white/20"
+                            class="min-h-12 min-w-12 text-white hover:bg-white/10 active:bg-white/20"
                             aria-label="Zoom in"
                             onclick={() => (store.zoom = Math.min(store.zoom + 0.2, 3))}
                         >
@@ -236,7 +236,7 @@
                         <Button
                             variant="ghost"
                             size="icon"
-                            class="h-11 w-11 sm:h-8 sm:w-8 text-white hover:bg-white/10 active:bg-white/20"
+                            class="min-h-12 min-w-12 text-white hover:bg-white/10 active:bg-white/20"
                             aria-label="Rotate"
                             onclick={() => (store.rotation = (store.rotation + 90) % 360)}
                         >

@@ -3,18 +3,17 @@ import { createTool } from "@mastra/core/tools";
 import {
   onboardEntitySchema,
   onboardEntityLogic,
-  patchEntitySchema,
-  patchEntityLogic,
+  assignEntitySchema,
+  assignEntityLogic,
 } from "./onboard-tools";
 import { manageResultsSchema, manageResultsLogic } from "./grading-tools";
-import { assignEntitySchema, assignEntityLogic } from "./assign-tools";
 import {
-  switchWorkspaceSchema,
-  switchWorkspaceLogic,
   manageAccessSchema,
   manageAccessLogic,
+  patchEntitySchema,
+  patchEntityLogic,
 } from "./gov-tools";
-import { searchEntityLogic, systemStatusLogic, systemStatusSchema, type SearchCandidate } from "./core-tools";
+import { searchEntityLogic, systemStatusLogic, systemStatusSchema, switchWorkspaceSchema, switchWorkspaceLogic, type SearchCandidate } from "./core-tools";
 import {
   extractSchema,
   extractLogic,
@@ -35,6 +34,9 @@ export const onboardTool = createTool({
   execute: async (input: any, context: any) => {
     return onboardEntityLogic(context, input);
   },
+  toModelOutput: (output: any) => {
+    return output.message || JSON.stringify(output);
+  },
 });
 
 export const patchTool = createTool({
@@ -43,6 +45,9 @@ export const patchTool = createTool({
   inputSchema: patchEntitySchema,
   execute: async (input: any, context: any) => {
     return patchEntityLogic(context, input);
+  },
+  toModelOutput: (output: any) => {
+    return output.message || JSON.stringify(output);
   },
 });
 
@@ -53,6 +58,9 @@ export const gradingTool = createTool({
   execute: async (input: any, context: any) => {
     return manageResultsLogic(context, input);
   },
+  toModelOutput: (output: any) => {
+    return output.message || JSON.stringify(output);
+  },
 });
 
 export const assignTool = createTool({
@@ -61,6 +69,9 @@ export const assignTool = createTool({
   inputSchema: assignEntitySchema,
   execute: async (input: any, context: any) => {
     return assignEntityLogic(context, input);
+  },
+  toModelOutput: (output: any) => {
+    return output.message || JSON.stringify(output);
   },
 });
 
@@ -71,6 +82,9 @@ export const switchWorkspaceTool = createTool({
   execute: async (input: any, context: any) => {
     return switchWorkspaceLogic(context, input.newClassId, input.newSectionId);
   },
+  toModelOutput: (output: any) => {
+    return output.message || JSON.stringify(output);
+  },
 });
 
 export const manageAccessTool = createTool({
@@ -80,16 +94,19 @@ export const manageAccessTool = createTool({
   execute: async (input: any, context: any) => {
     return manageAccessLogic(context, input);
   },
+  toModelOutput: (output: any) => {
+    return output.message || JSON.stringify(output);
+  },
 });
 
 export const searchEntityTool = createTool({
   id: "search-entity",
   description: "Search for students or staff by name or admission number.",
   inputSchema: z.object({
-    query: z.string(),
-    entityType: z.enum(["student", "staff", "all"]).optional().default("all"),
-    classId: z.number().optional(),
-    sectionId: z.number().optional(),
+    query: z.string().describe("The search query. Can be a name, partial name, or admission number. If empty, returns all entities in the active class/section context."),
+    entityType: z.enum(["student", "staff", "all"]).optional().default("all").describe("Filter by entity type. Defaults to 'all'."),
+    classId: z.number().optional().describe("Optional explicit class ID to filter by. Defaults to the active context class."),
+    sectionId: z.number().optional().describe("Optional explicit section ID to filter by. Defaults to the active context section."),
   }),
   execute: async (input: any, context: any) => {
     const { tenantContext, getRepo } = context;
@@ -159,6 +176,16 @@ export const searchEntityTool = createTool({
       modelId: context.audit?.modelId,
     });
   },
+  toModelOutput: (output: any) => {
+    if (output.status === "SUCCESS" && output.entity) {
+      return `Exact match: ${output.entity.name} (ID: ${output.entity.id}, Class: ${output.entity.class || 'N/A'})`;
+    }
+    if (output.status === "NEEDS_CLARIFICATION" && output.candidates) {
+      const list = output.candidates.map((c: any) => `- ${c.name} (ID: ${c.id}, Class: ${c.class || 'N/A'})`).join('\n');
+      return `Multiple matches found. Please ask the user to clarify:\n${list}`;
+    }
+    return `Search status: ${output.status}`;
+  },
 });
 
 export const systemStatusTool = createTool({
@@ -167,6 +194,12 @@ export const systemStatusTool = createTool({
   inputSchema: systemStatusSchema,
   execute: async (_: any, context: any) => {
     return systemStatusLogic(context);
+  },
+  toModelOutput: (output: any) => {
+    if (output.tenant) {
+      return `Active Context - Class ID: ${output.tenant.classId}, Section ID: ${output.tenant.sectionId}, Academic Term ID: ${output.tenant.examId}`;
+    }
+    return JSON.stringify(output);
   },
 });
 
@@ -177,6 +210,9 @@ export const extractTool = createTool({
   execute: async (input: any, context: any) => {
     return extractLogic(context, input);
   },
+  toModelOutput: (output: any) => {
+    return output.message || JSON.stringify(output);
+  },
 });
 
 export const validateTool = createTool({
@@ -186,6 +222,9 @@ export const validateTool = createTool({
   execute: async (input: any, context: any) => {
     return validateLogic(context, input);
   },
+  toModelOutput: (output: any) => {
+    return output.message || JSON.stringify(output);
+  },
 });
 
 export const publishTool = createTool({
@@ -194,6 +233,9 @@ export const publishTool = createTool({
   inputSchema: publishSchema,
   execute: async (input: any, context: any) => {
     return publishLogic(context, input);
+  },
+  toModelOutput: (output: any) => {
+    return output.message || JSON.stringify(output);
   },
 });
 

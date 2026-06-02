@@ -112,7 +112,7 @@
       variant="ghost"
       size="sm"
       onclick={() => filesContext.clear()}
-      class="h-8 px-3 rounded-xl text-[10px] font-black uppercase tracking-widest text-destructive hover:text-destructive hover:bg-destructive/10"
+      class="min-h-12 px-3 rounded-xl text-[10px] font-black uppercase tracking-widest text-destructive hover:text-destructive hover:bg-destructive/10"
     >
       Clear All
     </Button>
@@ -305,7 +305,7 @@
                 </div>
 
                 <div class="flex items-center gap-2">
-                  <div class="flex items-center justify-center size-8">
+                  <div class="flex items-center justify-center min-h-12 min-w-12">
                     {#if uploads.some((u) => u.originalName === file.name && ["extracted", "approved", "published"].includes(u.status))}
                       <CheckIcon class="size-4 text-emerald-500" />
                     {:else if uploads.some((u) => u.originalName === file.name && u.status === "uploaded")}
@@ -319,7 +319,7 @@
                   <Button
                     variant="ghost"
                     size="icon"
-                    class="h-8 w-8 rounded-xl text-muted-foreground/40 hover:text-destructive hover:bg-destructive/10 transition-colors"
+                    class="min-h-12 min-w-12 rounded-xl text-muted-foreground/40 hover:text-destructive hover:bg-destructive/10 transition-colors"
                     aria-label="Remove {file.name}"
                     onclick={() => removeFile(i)}
                   >

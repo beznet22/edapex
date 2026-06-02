@@ -92,17 +92,22 @@
             />
             <Drawer.Content
                 bind:ref={drawerContentRef}
+                role="dialog"
+                aria-modal="true"
                 class={cn(
                     "fixed bottom-0 left-0 right-0 z-50 mt-24 flex max-h-[85vh] flex-col rounded-t-[2.5rem] bg-background/95 backdrop-blur-xl border-t border-white/10 outline-none transition-[bottom,max-height] duration-200",
                     className,
                 )}
             >
-                <div
-                    class="mx-auto mt-4 h-1.5 w-12 shrink-0 rounded-full bg-muted/40"
-                ></div>
+                <div class="flex items-center justify-center py-3 shrink-0 cursor-grab active:cursor-grabbing">
+                    <div
+                        class="h-1.5 w-12 rounded-full bg-muted/40"
+                    ></div>
+                </div>
 
                 <div class="flex flex-col flex-1 overflow-hidden">
-                    <div
+                    {#if header || title || description || prefix || extra}
+                        <div
                         class="shrink-0 px-4 pt-4 pb-4 border-b border-border/5 text-left flex items-center justify-between"
                     >
                         <div class="flex-1 flex flex-col min-w-0">
@@ -148,14 +153,16 @@
                                 <Button
                                     variant="ghost"
                                     size="icon"
-                                    class="h-10 w-10 rounded-2xl shrink-0"
+                                    class="h-12 w-12 min-h-12 min-w-12 rounded-2xl shrink-0"
                                     onclick={handleClose}
+                                    aria-label="Close"
                                 >
                                     <X class="h-5 w-5" />
                                 </Button>
                             {/if}
                         </div>
                     </div>
+                    {/if}
 
                     <div
                         data-vaul-no-drag
@@ -189,7 +196,8 @@
             )}
         >
             <div class="flex h-full flex-col overflow-hidden">
-                <div
+                {#if header || title || description || prefix || extra}
+                    <div
                     class="shrink-0 px-6 pt-8 pb-6 border-b border-border/5 text-left flex items-center justify-between"
                 >
                     <div class="flex-1 flex flex-col min-w-0">
@@ -235,14 +243,16 @@
                             <Button
                                 variant="ghost"
                                 size="icon"
-                                class="h-10 w-10 rounded-2xl shrink-0"
+                                class="h-12 w-12 min-h-12 min-w-12 rounded-2xl shrink-0"
                                 onclick={handleClose}
+                                aria-label="Close"
                             >
                                 <X class="h-5 w-5" />
                             </Button>
                         {/if}
+                        </div>
                     </div>
-                </div>
+                {/if}
 
                 <div
                     class={cn(

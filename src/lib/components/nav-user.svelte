@@ -134,18 +134,18 @@
 
   <DropdownMenu.Separator class="bg-primary/10 my-1" />
   <DropdownMenu.Group>
-    <DropdownMenu.Item class="flex items-center gap-2.5 px-2.5 py-2 rounded-xl cursor-pointer mb-0.5 last:mb-0 transition-all duration-200 hover:bg-primary/10 hover:text-primary text-[13px] font-semibold text-sidebar-foreground/80 focus:bg-primary/10 focus:text-primary focus-visible:outline-none focus:ring-0 focus-visible:ring-0 [&>svg]:size-4 [&>svg]:shrink-0 [&>svg]:opacity-60">
+    <DropdownMenu.Item class="flex items-center gap-2.5 px-2.5 py-2 min-h-12 rounded-xl cursor-pointer mb-0.5 last:mb-0 transition-all duration-200 hover:bg-primary/10 hover:text-primary text-[13px] font-semibold text-sidebar-foreground/80 focus:bg-primary/10 focus:text-primary focus-visible:outline-none focus:ring-0 focus-visible:ring-0 [&>svg]:size-4 [&>svg]:shrink-0 [&>svg]:opacity-60">
       <SparklesIcon />
       Try Plus free
     </DropdownMenu.Item>
   </DropdownMenu.Group>
   <DropdownMenu.Separator class="bg-primary/10 my-1" />
   <DropdownMenu.Group>
-    <DropdownMenu.Item class="flex items-center gap-2.5 px-2.5 py-2 rounded-xl cursor-pointer mb-0.5 last:mb-0 transition-all duration-200 hover:bg-primary/10 hover:text-primary text-[13px] font-semibold text-sidebar-foreground/80 focus:bg-primary/10 focus:text-primary focus-visible:outline-none focus:ring-0 focus-visible:ring-0 [&>svg]:size-4 [&>svg]:shrink-0 [&>svg]:opacity-60">
+    <DropdownMenu.Item class="flex items-center gap-2.5 px-2.5 py-2 min-h-12 rounded-xl cursor-pointer mb-0.5 last:mb-0 transition-all duration-200 hover:bg-primary/10 hover:text-primary text-[13px] font-semibold text-sidebar-foreground/80 focus:bg-primary/10 focus:text-primary focus-visible:outline-none focus:ring-0 focus-visible:ring-0 [&>svg]:size-4 [&>svg]:shrink-0 [&>svg]:opacity-60">
       <UserIcon />
       Profile
     </DropdownMenu.Item>
-    <DropdownMenu.Item onSelect={() => pwa.toggleFullscreen()} class="flex items-center gap-2.5 px-2.5 py-2 rounded-xl cursor-pointer mb-0.5 last:mb-0 transition-all duration-200 hover:bg-primary/10 hover:text-primary text-[13px] font-semibold text-sidebar-foreground/80 focus:bg-primary/10 focus:text-primary focus-visible:outline-none focus:ring-0 focus-visible:ring-0 [&>svg]:size-4 [&>svg]:shrink-0 [&>svg]:opacity-60">
+    <DropdownMenu.Item onSelect={() => pwa.toggleFullscreen()} class="flex items-center gap-2.5 px-2.5 py-2 min-h-12 rounded-xl cursor-pointer mb-0.5 last:mb-0 transition-all duration-200 hover:bg-primary/10 hover:text-primary text-[13px] font-semibold text-sidebar-foreground/80 focus:bg-primary/10 focus:text-primary focus-visible:outline-none focus:ring-0 focus-visible:ring-0 [&>svg]:size-4 [&>svg]:shrink-0 [&>svg]:opacity-60">
       {#if pwa.isFullscreen}
         <MinimizeIcon />
         Exit Focus Mode
@@ -157,7 +157,7 @@
   </DropdownMenu.Group>
   <DropdownMenu.Separator class="bg-primary/10 my-1" />
   <DropdownMenu.Group>
-    <DropdownMenu.Item class="flex items-center gap-2.5 px-2.5 py-2 rounded-xl cursor-pointer mb-0.5 last:mb-0 transition-all duration-200 hover:bg-primary/10 hover:text-primary text-[13px] font-semibold text-sidebar-foreground/80 focus:bg-primary/10 focus:text-primary focus-visible:outline-none focus:ring-0 focus-visible:ring-0 [&>svg]:size-4 [&>svg]:shrink-0 [&>svg]:opacity-60">
+    <DropdownMenu.Item class="flex items-center gap-2.5 px-2.5 py-2 min-h-12 rounded-xl cursor-pointer mb-0.5 last:mb-0 transition-all duration-200 hover:bg-primary/10 hover:text-primary text-[13px] font-semibold text-sidebar-foreground/80 focus:bg-primary/10 focus:text-primary focus-visible:outline-none focus:ring-0 focus-visible:ring-0 [&>svg]:size-4 [&>svg]:shrink-0 [&>svg]:opacity-60">
       <LifeBuoyIcon />
       Help
     </DropdownMenu.Item>
@@ -170,7 +170,7 @@
           goto("/signin");
         }
       }}
-      class="flex items-center gap-2.5 px-2.5 py-2 rounded-xl cursor-pointer mb-0.5 last:mb-0 transition-all duration-200 hover:bg-destructive/10 hover:text-destructive text-[13px] font-semibold text-sidebar-foreground/80 focus:bg-destructive/10 focus:text-destructive focus-visible:outline-none focus:ring-0 focus-visible:ring-0 [&>svg]:size-4 [&>svg]:shrink-0 [&>svg]:opacity-60"
+      class="flex items-center gap-2.5 px-2.5 py-2 min-h-12 rounded-xl cursor-pointer mb-0.5 last:mb-0 transition-all duration-200 hover:bg-destructive/10 hover:text-destructive text-[13px] font-semibold text-sidebar-foreground/80 focus:bg-destructive/10 focus:text-destructive focus-visible:outline-none focus:ring-0 focus-visible:ring-0 [&>svg]:size-4 [&>svg]:shrink-0 [&>svg]:opacity-60"
     >
       <LogOutIcon />
       Log out
@@ -185,14 +185,14 @@
         {#snippet child({ props })}
           <button
             {...props}
-            class="flex size-10 shrink-0 items-center justify-center rounded-full overflow-hidden transition-all hover:ring-2 hover:ring-primary/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+            class="flex size-12 min-h-12 min-w-12 shrink-0 items-center justify-center rounded-full overflow-hidden transition-all hover:ring-2 hover:ring-primary/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
           >
             <img
               src={`https://avatar.vercel.sh/${user?.email || "user"}`}
               alt={user?.email ?? "User Avatar"}
               width={40}
               height={40}
-              class="size-10 rounded-full object-cover"
+              class="size-12 rounded-full object-cover"
             />
           </button>
         {/snippet}

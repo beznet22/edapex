@@ -53,7 +53,7 @@
             <div class="flex items-center gap-2 shrink-0">
                 <Button 
                     size="sm" 
-                    class="h-9 px-4 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg hover:shadow-primary/20 transition-all active:scale-95"
+                    class="min-h-12 px-4 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg hover:shadow-primary/20 transition-all active:scale-95"
                     onclick={handleInstall}
                 >
                     Install
@@ -61,7 +61,7 @@
                 <Button 
                     variant="ghost" 
                     size="icon" 
-                    class="size-8 rounded-full hover:bg-muted/50 transition-colors"
+                    class="min-h-12 min-w-12 rounded-full hover:bg-muted/50 transition-colors"
                     onclick={pwa.dismiss}
                 >
                     <XIcon class="size-4 text-muted-foreground" />

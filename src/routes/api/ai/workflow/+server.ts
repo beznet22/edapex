@@ -22,7 +22,13 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 	};
 
 	const lastMessage = messages[messages.length - 1];
-	const text = typeof lastMessage?.content === 'string' ? lastMessage.content : '';
+	let text = '';
+	if (lastMessage?.parts) {
+		const textPart = lastMessage.parts.find((p) => p.type === 'text');
+		if (textPart && 'text' in textPart && typeof textPart.text === 'string') {
+			text = textPart.text;
+		}
+	}
 	const match = text.trim().match(/^\/(\w+)/);
 	const command = match ? match[1] : '';
 

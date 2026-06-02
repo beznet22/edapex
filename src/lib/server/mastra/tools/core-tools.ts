@@ -106,3 +106,25 @@ export const systemStatusLogic = async (context: MastraToolContext) => {
     },
   };
 };
+
+
+export const switchWorkspaceSchema = z.object({
+  newClassId: z.number().int().positive().describe("Numeric ID of the new class to switch context to"),
+  newSectionId: z.number().int().positive().describe("Numeric ID of the new section to switch context to"),
+});
+
+export const switchWorkspaceLogic = async (context: any, newClassId: number, newSectionId: number) => {
+  const { createTenantContext } = await import("../tenant-context");
+
+  const newContext = createTenantContext({
+    ...context,
+    classId: newClassId,
+    sectionId: newSectionId,
+  });
+
+  return {
+    status: "SUCCESS",
+    message: `Switched to Class ${newClassId} - Section ${newSectionId}.`,
+    newContext,
+  };
+};

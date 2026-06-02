@@ -91,7 +91,7 @@
             <SubmitButton
               {pending}
               {success}
-              class="h-11 rounded-xl font-bold uppercase tracking-widest shadow-xl shadow-primary/20"
+              class="h-12 rounded-xl font-bold uppercase tracking-widest shadow-xl shadow-primary/20"
             >
               {signInSignUp}
             </SubmitButton>

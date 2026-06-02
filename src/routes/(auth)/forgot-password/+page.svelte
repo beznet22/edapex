@@ -68,7 +68,7 @@
               <Input
                 {...requestReset.fields.email.as("email")}
                 placeholder="name@example.com"
-                class="pl-9 h-11 bg-muted/30 border-muted-foreground/10 focus:bg-background transition-all"
+                class="pl-9 h-12 bg-muted/30 border-muted-foreground/10 focus:bg-background transition-all"
               />
             </div>
             {#each requestReset.fields.email.issues() ?? [] as issue}
@@ -79,7 +79,7 @@
           <SubmitButton 
             pending={!!requestReset.pending} 
             success={false} 
-            class="h-11 rounded-xl font-bold uppercase tracking-widest shadow-xl shadow-primary/20 mt-2"
+            class="h-12 rounded-xl font-bold uppercase tracking-widest shadow-xl shadow-primary/20 mt-2"
           >
             Send Reset Link
           </SubmitButton>
@@ -91,7 +91,7 @@
             </div>
             <a 
                 href="/signin" 
-                class="flex items-center justify-center gap-2 h-11 rounded-xl bg-primary text-primary-foreground font-bold uppercase tracking-widest shadow-xl shadow-primary/20 hover:opacity-90 transition-opacity"
+                class="flex items-center justify-center gap-2 h-12 rounded-xl bg-primary text-primary-foreground font-bold uppercase tracking-widest shadow-xl shadow-primary/20 hover:opacity-90 transition-opacity"
             >
                 <ArrowLeft class="size-4" />
                 Back to Sign In

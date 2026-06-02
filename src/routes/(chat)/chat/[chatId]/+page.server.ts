@@ -59,6 +59,6 @@ export const load: PageServerLoad = async ({ params, locals }) => {
       throw err;
     }
     // On storage failure: return empty messages array and null chat (Requirement 23.7)
-    return { chat: null, messages: [] };
+    return { user, chat: null, messages: [] };
   }
 };
