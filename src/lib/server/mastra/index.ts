@@ -34,6 +34,7 @@ import { createMastraStorage } from './storage';
  */
 export const mastra = new Mastra({
   agents: {
+    supervisor: supervisorAgent,
     assistant: assistantAgent,
     title: titleAgent,
     editorEdit: editorEditAgent,
@@ -65,6 +66,36 @@ export const mastra = new Mastra({
  */
 export function getMastra(): Mastra {
   return mastra;
+}
+
+/**
+ * Creates a fresh Mastra instance that shares the singleton libSQL storage.
+ *
+ * Each call returns a NEW `Mastra` object, but both instances point at the
+ * same `LibSQLStore` connection (because SQLite does not support multiple
+ * concurrent writer connections in the same process). Tenant isolation is
+ * enforced at the query level (threadId, resourceId, requestContext) — not
+ * the connection level — so a shared storage connection is safe.
+ *
+ * The returned object shape is `{ mastra, storage }` so callers can
+ * independently verify that storage is shared while Mastra instances differ.
+ */
+export function createMastraInstance(params: { dbUrl: string }): {
+  mastra: Mastra;
+  storage: ReturnType<typeof createMastraStorage>;
+} {
+  const storage = createMastraStorage(params.dbUrl);
+  const mastraInstance = new Mastra({
+    storage,
+    server: {
+      middleware: [
+        async (context, next) => {
+          await next();
+        },
+      ],
+    },
+  });
+  return { mastra: mastraInstance, storage };
 }
 
 /**

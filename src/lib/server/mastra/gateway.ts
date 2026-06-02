@@ -45,23 +45,28 @@ const BASE_URLS: Record<string, string> = {
 export class EdApexGateway extends MastraModelGateway {
     readonly id = 'edapex';
     readonly name = 'EdApex Sovereign Gateway';
-    private readonly encryptionKey = env.ENCRYPTION_KEY || '';
-    private readonly envKeys: Record<string, string | undefined> = {
-        OPENAI_API_KEY: env.OPENAI_API_KEY,
-        ANTHROPIC_API_KEY: env.ANTHROPIC_API_KEY,
-        GOOGLE_API_KEY: env.GOOGLE_API_KEY,
-        DEEPSEEK_API_KEY: env.DEEPSEEK_API_KEY,
-        GROQ_API_KEY: env.GROQ_API_KEY,
-        NVIDIA_NIM_API_KEY: env.NVIDIA_NIM_API_KEY,
-        MISTRAL_API_KEY: env.MISTRAL_API_KEY,
-        OPENCODE_API_KEY: env.OPENCODE_API_KEY,
-    };
+    private readonly encryptionKey: string;
+    private readonly envKeys: Record<string, string | undefined>;
 
     constructor(
         private readonly db: LibSQLDatabase<typeof schema>,
-        private readonly userId: number
+        private readonly userId: number,
+        encryptionKey?: string,
+        envKeysOverride?: Record<string, string | undefined>
     ) {
         super();
+        this.encryptionKey = encryptionKey ?? env.TOKEN_ENCRYPTION_KEY ?? env.ENCRYPTION_KEY ?? '';
+        this.envKeys = {
+            OPENAI_API_KEY: env.OPENAI_API_KEY,
+            ANTHROPIC_API_KEY: env.ANTHROPIC_API_KEY,
+            GOOGLE_API_KEY: env.GOOGLE_API_KEY,
+            DEEPSEEK_API_KEY: env.DEEPSEEK_API_KEY,
+            GROQ_API_KEY: env.GROQ_API_KEY,
+            NVIDIA_NIM_API_KEY: env.NVIDIA_NIM_API_KEY,
+            MISTRAL_API_KEY: env.MISTRAL_API_KEY,
+            OPENCODE_API_KEY: env.OPENCODE_API_KEY,
+            ...envKeysOverride
+        };
     }
 
     /**

@@ -1,4 +1,12 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+
+vi.mock('$env/dynamic/private', () => ({
+	env: {
+		DATABASE_URL: 'mysql://test:test@localhost:3306/test',
+		TOKEN_ENCRYPTION_KEY: 'test-encryption-key-32-chars-ok!'
+	}
+}));
+
 import {
 	processMentions,
 	MENTION_FIELD_MAP,
