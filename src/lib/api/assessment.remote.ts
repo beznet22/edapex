@@ -142,7 +142,13 @@ export const doExtraction = command(
       return { success: false, status: "error", error: "Unauthorized" };
     }
     try {
-      return await assessment.runExtraction({ file, classId, sectionId });
+      return await assessment.runExtraction({
+        file,
+        classId,
+        sectionId,
+        userId: user.id,
+        teacherId: user.staffId ?? user.id,
+      });
     } catch (error: any) {
       console.error("Failed to upload file", error);
       return { success: false, status: "error", error: error.message };

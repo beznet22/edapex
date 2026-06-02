@@ -1,4 +1,6 @@
-import type { ScopedRepositoryProvider } from "./scoped-repository";
+import type { RequestContext } from "@mastra/core/request-context";
+import { ScopedRepositoryProvider } from "./scoped-repository";
+import { getDatabase } from "../db";
 
 /**
  * Immutable tenant context bound per-request.
@@ -42,6 +44,8 @@ export function createTenantContext(params: Partial<{
     designationId: params.designationId ?? 1,
   });
 }
+
+const DEFAULT_TENANT: TenantContext = createTenantContext({});
 
 export class WorkspaceMismatchError extends Error {
   constructor(message: string = "WORKSPACE_MISMATCH") {
@@ -92,8 +96,83 @@ export function validateRoleWhitelist(context: TenantContext, allowedRoles: numb
  * Context injected into every Mastra tool execute() call.
  * Provides tenant-scoped repositories and audit metadata.
  */
+export type RepositoryClass<T> = { name?: string; new(...args: any[]): T };
+export type ServiceClass<T> = { new(provider: ScopedRepositoryProvider): T };
+
 export interface MastraToolContext {
   tenantContext: TenantContext;
-  getRepo: <T>(RepoClass: { name?: string; new (...args: any[]): T }) => T;
+  getRepo: <T>(RepoClass: RepositoryClass<T>) => T;
+  getService: <T>(ServiceClass: ServiceClass<T>) => T;
+  getProvider?: () => ScopedRepositoryProvider;
   audit?: { threadId?: string; modelId?: string };
+  mastra?: unknown;
+}
+
+/**
+ * Single bridge between Mastra's `ToolExecutionContext` (which carries a
+ * `RequestContext`) and the `MastraToolContext` shape that every `*Logic`
+ * function in `src/lib/server/mastra/tools/*` consumes.
+ *
+ * Behavior:
+ * - If `requestContext` is `undefined`, returns a locked default whose
+ *   `getRepo`/`getService` throw on call. This lets unit tests hand-build a
+ *   `MastraToolContext` directly (see `__tests__/slash-commands.test.ts`'s
+ *   `makeToolContext`) and still type-check against the same interface.
+ * - Otherwise reads `tenantContext`, `threadId`, and `modelId` from the
+ *   request context, awaits the singleton Drizzle client via `getDatabase()`,
+ *   and constructs a `ScopedRepositoryProvider` bound to that tenant + db.
+ *
+ * The provider is created per-call, so each tool invocation gets a fresh
+ * cache. This is the boundary that turns Mastra's request-scoped
+ * `RequestContext` into a per-request tenant-bound repository factory.
+ *
+ * See `docs/slash_command_tool_hardening_plan.md` §2.2 (B2 fix) and §4
+ * Slice 0.
+ */
+export async function buildMastraToolContext(
+  requestContext: RequestContext | undefined,
+  mastra?: unknown,
+): Promise<MastraToolContext> {
+  if (!requestContext) {
+    return {
+      tenantContext: DEFAULT_TENANT,
+      getRepo: (() => {
+        throw new Error(
+          "MastraToolContext.getRepo() called without a request context. " +
+          "Use buildMastraToolContext(context.requestContext) at the tool " +
+          "bridge, or hand-build a MastraToolContext in tests.",
+        );
+      }) as MastraToolContext["getRepo"],
+      getService: (() => {
+        throw new Error(
+          "MastraToolContext.getService() called without a request context. " +
+          "Use buildMastraToolContext(context.requestContext) at the tool " +
+          "bridge, or hand-build a MastraToolContext in tests.",
+        );
+      }) as MastraToolContext["getService"],
+      audit: {},
+      mastra: undefined,
+    };
+  }
+
+  const tenant = (requestContext.get("tenantContext") as TenantContext | undefined) ?? DEFAULT_TENANT;
+  const threadId = requestContext.get("threadId") as string | undefined;
+  const modelId = requestContext.get("modelId") as string | undefined;
+
+  const db = await getDatabase();
+  const provider = new ScopedRepositoryProvider(db, tenant);
+
+  const getRepo: MastraToolContext["getRepo"] = (RepoClass) =>
+    provider.getRepo(RepoClass as never);
+  const getService: MastraToolContext["getService"] = (ServiceClass) =>
+    provider.getService(ServiceClass as never);
+
+  return {
+    tenantContext: tenant,
+    getRepo,
+    getService,
+    getProvider: () => provider,
+    audit: { threadId, modelId },
+    mastra,
+  };
 }

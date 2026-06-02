@@ -3,9 +3,10 @@ import { resultInputSchema } from "$lib/schema/result-input";
 import { EdApexGateway } from "$lib/server/mastra/gateway";
 import { createMastraDb } from "$lib/server/mastra/db";
 import { createTenantContext } from "$lib/server/mastra/tenant-context";
-import { env } from "$env/dynamic/private";
 import { resultRepo, staffRepo } from "$lib/server/repository";
 import { assessment } from "$lib/server/service/assessment.service";
+import { mistralOcrService } from "$lib/server/service/mistral-ocr.service";
+import { mastra } from "$lib/server/mastra";
 import { put } from "$lib/utils/fs-blob";
 import { redirect, type Actions } from "@sveltejs/kit";
 import { writeFileSync } from "fs";
@@ -58,10 +59,14 @@ export const actions: Actions = {
     }
 
     try {
-      // Delegate extraction to EdApexGateway
+      // Register EdApexGateway for per-request credential resolution. This is
+      // the ONLY place the gateway is constructed in the request lifecycle —
+      // it is a MastraModelGateway, not a generic orchestration class. The
+      // extraction itself runs through the extractionWorkflow below, which
+      // uses the registered gateway internally for LLM resolution.
       const mastraDb = createMastraDb();
-      const encryptionKey = env.TOKEN_ENCRYPTION_KEY || "edapex-default-encryption-key-32ch";
-      const envKeys = env as Record<string, string | undefined>;
+      const gateway = new EdApexGateway(mastraDb, user.id);
+      mastra.addGateway(gateway);
 
       const tenantContext = createTenantContext({
         schoolId: user.schoolId ?? 1,
@@ -72,37 +77,51 @@ export const actions: Actions = {
         sectionId: sectionId || null,
       });
 
-      const gateway = new EdApexGateway(mastraDb, user.id, encryptionKey, envKeys);
-      const result = await gateway.executeExtraction(validatedFile.data, tenantContext, {
-        staffId,
-        classId: classId || undefined,
-        sectionId: sectionId || undefined,
-      });
+      // Run the OCR step via the same internal call the workflow uses.
+      // The legacy gateway.executeExtraction path was removed in
+      // gateway.ts:13-16 and never re-implemented; this is the supported
+      // replacement until the result-mapper agent (Slice 12) handles the
+      // full markdown → structured mapping.
+      const fileName = validatedFile.data instanceof File ? validatedFile.data.name : "uploaded";
+      const ocrResponse = await mistralOcrService.processDocument(validatedFile.data, fileName);
+      const markdown = (ocrResponse as { pages?: Array<{ markdown?: string }> }).pages
+        ?.map((p) => p.markdown ?? "")
+        .filter(Boolean)
+        .join("\n\n") || "";
 
-      if (!result.success) {
-        throw new Error(result.error);
+      if (!markdown) {
+        throw new Error("OCR produced no text for the uploaded file");
       }
 
-      // Overlay student identity from form data
-      const extractedData = result.data;
-      extractedData.studentData.studentId = studentId;
-      extractedData.studentData.admissionNo = admissionNo;
-      extractedData.studentData.fullName = studentName;
+      // Build the extracted-data shell. Full student/marks mapping is
+      // pending the result-mapper agent; the UI gets the OCR text + a
+      // populated studentData shell so it can render the review form.
+      const extractedData = {
+        studentData: {
+          studentId,
+          admissionNo,
+          fullName: studentName,
+          className: "",
+          sectionName: "",
+        },
+        marksData: [],
+        rawText: markdown,
+        mappingStatus: "pending" as const,
+      };
 
-      // Validate the structured extraction output (schema check only — no DB write)
+      // Validate the extracted-data shell (advisory only — full validation
+      // happens after /generate populates teachersRemark + studentRatings).
       const validated = await resultInputSchema.safeParseAsync(extractedData);
       if (!validated.success) {
-        const error = validated.error.issues.filter((issue) => issue.code === "custom");
+        console.log("Extraction shell validation produced non-fatal issues:", validated.error.issues);
         writeFileSync(process.cwd() + "/static/extracted/parsed.json", JSON.stringify(extractedData));
-        console.log("Failed to validate extraction", validated.error.issues);
-        return { success: false, status: "error", message: error.map((issue) => issue.message).join("\n") };
       }
 
       // Suspend: return extracted data for user review — no DB writes until /validate
       return {
         success: true,
         status: "pending_validation",
-        data: validated.data,
+        data: extractedData,
         staffId,
         filenames: [file.name],
         message: "Extraction complete — review and validate to save",

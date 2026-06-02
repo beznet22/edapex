@@ -634,6 +634,55 @@ export class StudentRepository extends BaseRepository {
     return this.getStudentById(id, isAdminNo);
   }
 
+  /** Slice 1: Resolve a genderId from a human-readable gender name. Returns null if not found. */
+  async resolveGenderId(name: string): Promise<number | null> {
+    if (!name) return null;
+    return this.withErrorHandling(async () => {
+      const [row] = await this.db
+        .select({ id: smBaseSetups.id })
+        .from(smBaseSetups)
+        .innerJoin(smBaseGroups, eq(smBaseSetups.baseGroupId, smBaseGroups.id))
+        .where(
+          and(
+            eq(smBaseGroups.name, "Gender"),
+            eq(smBaseSetups.activeStatus, 1),
+            eq(smBaseSetups.baseSetupName, name),
+          ),
+        )
+        .limit(1);
+      return row?.id ?? null;
+    }, "resolveGenderId");
+  }
+
+  /** Slice 1: Resolve a studentCategoryId from a human-readable category name. Returns null if not found. */
+  async resolveStudentCategoryId(name: string): Promise<number | null> {
+    if (!name) return null;
+    return this.withErrorHandling(async () => {
+      const [row] = await this.db
+        .select({ id: smStudentCategories.id })
+        .from(smStudentCategories)
+        .where(eq(smStudentCategories.categoryName, name))
+        .limit(1);
+      return row?.id ?? null;
+    }, "resolveStudentCategoryId");
+  }
+
+  /** Slice 1: Fetch a student's rollNo and admissionNo in one round trip. Used by grading tool to avoid hard-coded 1s (B4). */
+  async getRollNoAndAdmissionNo(studentId: number): Promise<{ rollNo: number | null; admissionNo: number | null }> {
+    if (!studentId) return { rollNo: null, admissionNo: null };
+    return this.withErrorHandling(async () => {
+      const [row] = await this.db
+        .select({ rollNo: smStudents.rollNo, admissionNo: smStudents.admissionNo })
+        .from(smStudents)
+        .where(eq(smStudents.id, studentId))
+        .limit(1);
+      return {
+        rollNo: row?.rollNo ?? null,
+        admissionNo: row?.admissionNo ?? null,
+      };
+    }, "getRollNoAndAdmissionNo");
+  }
+
   getStuendtsByParentId(parentId: number) {
     return this.db
       .select()
@@ -1016,9 +1065,19 @@ export class StudentRepository extends BaseRepository {
     return lastAdmission?.admissionNo ?? 0;
   }
 
-  async searchStudent(query: string) {
+  async searchStudent(query: string, filter?: { classId?: number | null; sectionId?: number | null }) {
     return this.withErrorHandling(async () => {
       const searchPattern = `%${query}%`;
+      const conds: Array<ReturnType<typeof like> | ReturnType<typeof eq>> = [
+        like(smStudents.fullName, searchPattern),
+        eq(studentRecords.isDefault, 1), // Only show their active/default class
+      ];
+      if (filter?.classId != null) {
+        conds.push(eq(studentRecords.classId, filter.classId));
+      }
+      if (filter?.sectionId != null) {
+        conds.push(eq(studentRecords.sectionId, filter.sectionId));
+      }
       const students = await this.db
         .select({
           studentId: smStudents.id,
@@ -1032,12 +1091,7 @@ export class StudentRepository extends BaseRepository {
         .leftJoin(studentRecords, eq(smStudents.id, studentRecords.studentId))
         .leftJoin(smClasses, eq(studentRecords.classId, smClasses.id))
         .leftJoin(smSections, eq(studentRecords.sectionId, smSections.id))
-        .where(
-          and(
-            like(smStudents.fullName, searchPattern),
-            eq(studentRecords.isDefault, 1), // Only show their active/default class
-          ),
-        )
+        .where(and(...conds))
         .limit(20);
 
       return students;

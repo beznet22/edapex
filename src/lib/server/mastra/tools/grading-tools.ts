@@ -138,7 +138,14 @@ export const manageResultsLogic = async (
   // 3. Workspace Lock Check
   validateWorkspaceLock(tenantContext, student.classId, student.sectionId);
 
-  // 4. Branch by type
+  // 4. B7: every branch requires an active exam context. Centralised here so
+  // a single null-check covers all four mutations instead of four near-identical
+  // guards scattered through the switch.
+  if (tenantContext.examId === null) {
+    return { status: "ERROR", errorCode: "MISSING_EXAM_CONTEXT" };
+  }
+
+  // 5. Branch by type
   const resultRepo = getRepo(ResultsRepository);
   const timelineRepo = getRepo(TimelineRepository);
 
@@ -150,9 +157,10 @@ export const manageResultsLogic = async (
 
   switch (input.type) {
     case "academic": {
-      if (tenantContext.examId === null) {
-        return { status: "ERROR", errorCode: "MISSING_EXAM_CONTEXT" };
-      }
+      // B4: fetch the real rollNo and admissionNo instead of hard-coding 1.
+      // Convert null → undefined so the Drizzle column default (1) applies
+      // for students who have not been assigned a rollNo/admissionNo yet.
+      const { rollNo, admissionNo } = await studentRepo.getRollNoAndAdmissionNo(input.studentId);
 
       await resultRepo.batchUpsertMarkRecords([
         {
@@ -164,8 +172,8 @@ export const manageResultsLogic = async (
           sectionId: student.sectionId,
           schoolId: tenantContext.schoolId,
           academicId: tenantContext.academicId,
-          studentRollNo: 1,
-          studentAddmissionNo: 1,
+          studentRollNo: rollNo ?? undefined,
+          studentAddmissionNo: admissionNo ?? undefined,
           isAbsent: 0,
         },
       ]);
@@ -210,8 +218,11 @@ export const manageResultsLogic = async (
     }
 
     case "qualitative": {
+      // B5: teacherId was missing — the schema requires it and the DB column
+      // is non-null. Bind it to the active staff member in the tenant context.
       await resultRepo.upsertTeacherRemark({
         studentId: input.studentId,
+        teacherId: tenantContext.staffId,
         remark: input.remark,
         examTypeId: tenantContext.examId,
         academicId: tenantContext.academicId,
@@ -232,6 +243,7 @@ export const manageResultsLogic = async (
     }
 
     case "behavioral": {
+      // B6: schoolId was missing — required to scope the rating to the right tenant.
       await resultRepo.upsertStudentRatings([
         {
           studentId: input.studentId,
@@ -239,6 +251,7 @@ export const manageResultsLogic = async (
           rate: input.rating,
           examTypeId: tenantContext.examId,
           academicId: tenantContext.academicId,
+          schoolId: tenantContext.schoolId,
         } as any,
       ]);
 

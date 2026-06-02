@@ -1,5 +1,6 @@
 import { z } from "zod";
-import type { TenantContext, MastraToolContext } from "../tenant-context";
+import type { MastraToolContext } from "../tenant-context";
+import { AssessmentService } from "../../service/assessment.service";
 
 // ─── Schemas ──────────────────────────────────────────────────────────────────
 
@@ -22,6 +23,14 @@ export const publishSchema = z.object({
 	sendEmail: z.boolean().default(true).describe("Whether to dispatch email notifications to parents/guardians"),
 });
 
+/** B12: Schema for the missing generate tool. Mirrors generateTriggerSchema in workflows/generate.ts:8-17 minus the embedded tenantContext (which the bridge provides). */
+export const generateSchema = z.object({
+	fileIds: z.array(z.string().min(1)).min(1).describe("File IDs returned by the previous /extract step (e.g. mistral-ocr fileIds)"),
+	classId: z.number().int().positive().describe("Target class ID"),
+	sectionId: z.number().int().positive().describe("Target section ID"),
+	staffId: z.number().int().positive().optional().describe("Submitting teacher's staff ID (falls back to tenantContext.staffId)"),
+});
+
 // ─── Extract Logic ────────────────────────────────────────────────────────────
 
 export type ExtractionResult = {
@@ -36,7 +45,7 @@ export const extractLogic = async (
 	context: MastraToolContext,
 	input: z.infer<typeof extractSchema>
 ): Promise<ExtractionResult> => {
-	const { tenantContext } = context;
+	const { tenantContext, getService, mastra } = context;
 	const classId = input.classId ?? tenantContext.classId;
 	const sectionId = input.sectionId ?? tenantContext.sectionId;
 
@@ -47,18 +56,19 @@ export const extractLogic = async (
 		};
 	}
 
-	// Generate a workflow run ID for tracking
-	const workflowRunId = `wf_extract_${Date.now()}_${classId}_${sectionId}`;
-
-	// In the full implementation, this dispatches to:
-	// - Instant path (< 4 files): Direct OCR via Mistral
-	// - Batch path (≥ 4 files): Worker thread dispatch
-	// For now, return the staging state for the Gateway to manage
-	return {
-		status: "EXTRACTION_STARTED",
-		workflowRunId,
-		extractedCount: input.fileUrls.length,
+	const service = getService(AssessmentService) as AssessmentService & {
+		runExtractionForTool: (params: unknown) => Promise<ExtractionResult>;
 	};
+
+	return service.runExtractionForTool({
+		provider: contextProvider(context),
+		mastra,
+		userId: tenantContext.userId,
+		teacherId: tenantContext.staffId,
+		classId,
+		sectionId,
+		fileReferences: input.fileUrls.map((url) => ({ url })),
+	});
 };
 
 // ─── Validate Logic ───────────────────────────────────────────────────────────
@@ -69,13 +79,14 @@ export type ValidationResult = {
 	invalidCount?: number;
 	errors?: Array<{ studentId: number; field: string; reason: string }>;
 	readyForPublish?: boolean;
+	workflowRunId?: string;
 };
 
 export const validateLogic = async (
 	context: MastraToolContext,
 	input: z.infer<typeof validateSchema>
 ): Promise<ValidationResult> => {
-	const { tenantContext } = context;
+	const { tenantContext, getService, mastra } = context;
 
 	if (!tenantContext.examId) {
 		return {
@@ -84,16 +95,16 @@ export const validateLogic = async (
 		};
 	}
 
-	// In the full implementation, this resumes the suspended Mastra Workflow:
-	// 1. validateSchema — checks OCR state against resultInputSchema
-	// 2. applyBusinessLogic — calculates grades, GPAs, attendance formatting
-	// 3. commitToDB — atomic write via TenantContext
-	return {
-		status: "VALIDATED",
-		validCount: 0,
-		invalidCount: 0,
-		readyForPublish: true,
+	const service = getService(AssessmentService) as AssessmentService & {
+		validateExtractionForTool: (params: unknown) => Promise<ValidationResult>;
 	};
+
+	return service.validateExtractionForTool({
+		provider: contextProvider(context),
+		mastra,
+		workflowRunId: input.workflowRunId,
+		studentIds: input.studentIds,
+	});
 };
 
 // ─── Publish Logic ────────────────────────────────────────────────────────────
@@ -103,13 +114,14 @@ export type PublishResult = {
 	pdfCount?: number;
 	emailCount?: number;
 	errors?: string[];
+	workflowRunId?: string;
 };
 
 export const publishLogic = async (
 	context: MastraToolContext,
 	input: z.infer<typeof publishSchema>
 ): Promise<PublishResult> => {
-	const { tenantContext } = context;
+	const { tenantContext, getService, mastra } = context;
 
 	if (!tenantContext.examId) {
 		return {
@@ -125,13 +137,76 @@ export const publishLogic = async (
 		};
 	}
 
-	// In the full implementation, this dispatches to worker_threads:
-	// 1. generatePDFs — PrinceXML binary execution off main thread
-	// 2. dispatchEmails — SMTP job dispatch
-	// 3. auditTimeline — inject timeline events
-	return {
-		status: "PUBLISH_STARTED",
-		pdfCount: 0,
-		emailCount: 0,
+	const service = getService(AssessmentService) as AssessmentService & {
+		publishResultsForTool: (params: unknown) => Promise<PublishResult>;
 	};
+
+	return service.publishResultsForTool({
+		provider: contextProvider(context),
+		mastra,
+		scope: input.scope,
+		studentId: input.studentId,
+		generatePdf: input.generatePdf,
+		sendEmail: input.sendEmail,
+	});
 };
+
+// ─── Generate Logic (B12) ─────────────────────────────────────────────────────
+
+export type GenerationResult = {
+	status: "GENERATION_STARTED" | "GENERATION_COMPLETE" | "GENERATION_FAILED";
+	workflowRunId?: string;
+	fileCount?: number;
+	errors?: string[];
+};
+
+export const generateLogic = async (
+	context: MastraToolContext,
+	input: z.infer<typeof generateSchema>
+): Promise<GenerationResult> => {
+	const { tenantContext, getService, mastra } = context;
+
+	const classId = input.classId ?? tenantContext.classId;
+	const sectionId = input.sectionId ?? tenantContext.sectionId;
+	const staffId = input.staffId ?? tenantContext.staffId;
+
+	if (!classId || !sectionId) {
+		return {
+			status: "GENERATION_FAILED",
+			errors: ["No active class/section context. /generate requires an active class+section selection."]
+		};
+	}
+
+	const service = getService(AssessmentService) as AssessmentService & {
+		runGenerateForTool: (params: unknown) => Promise<GenerationResult>;
+	};
+
+	return service.runGenerateForTool({
+		provider: contextProvider(context),
+		mastra,
+		fileIds: input.fileIds,
+		classId,
+		sectionId,
+		staffId,
+	});
+};
+
+// ─── Internal ─────────────────────────────────────────────────────────────────
+
+/**
+ * Pull a `ScopedRepositoryProvider` out of the context. The `*ForTool`
+ * methods need it to resolve the active schoolId for the workflow's
+ * tenantContext payload. In tests the context provides a `getProvider`
+ * accessor; in production `buildMastraToolContext` exposes the same
+ * accessor. Falls back to undefined if the context was hand-built
+ * without a provider — the *ForTool method will then throw.
+ */
+function contextProvider(context: MastraToolContext) {
+	if (typeof (context as { getProvider?: () => unknown }).getProvider === "function") {
+		return (context as { getProvider: () => unknown }).getProvider() as never;
+	}
+	throw new Error(
+		"No ScopedRepositoryProvider reachable from MastraToolContext. " +
+		"buildMastraToolContext() must attach a getProvider() accessor for workflow tools.",
+	);
+}

@@ -18,7 +18,9 @@ import {
   type School,
   type Student,
 } from "$lib/schema/result-output";
-import { studentRepo, resultRepo, timelineRepo, staffRepo } from "$lib/server/repository";
+import { studentRepo, resultRepo, timelineRepo, staffRepo, StudentRepository, ResultsRepository, TimelineRepository, StaffRepository } from "$lib/server/repository";
+import type { ScopedRepositoryProvider } from "../mastra/scoped-repository";
+import type { TenantContext } from "../mastra/tenant-context";
 import type { ClassAverage, ExamSetup, MarkData, NewSmMarkStore, NewSmResultStore, ResultData, ScoreData } from "$lib/types/result-types";
 import { base64url } from "jose";
 import { render } from "svelte/server";
@@ -31,13 +33,8 @@ import ResultTemplate from "$lib/components/template/ResultTemplate.svelte";
 import ResultEmail from "$lib/components/template/result-email.svelte";
 import { JobWorker, type JobPayload, type JobResult } from "../worker";
 
-import { EdApexGateway } from "../mastra/gateway";
-import { createMastraDb } from "../mastra/db";
-import {
-  applyGradingBusinessLogic,
-  validateAttendance
-} from "../helpers/extract-helper";
 import { studentFileStorage } from "../storage/student-files";
+import { mistralOcrService } from "./mistral-ocr.service";
 import path from "path";
 import fs from "fs";
 import type { MySQLDrizzleClient } from "../db";
@@ -86,6 +83,241 @@ export class AssessmentService {
     response: "" as string | undefined,
     studentId: 0 as number | undefined,
   };
+
+  private readonly provider: ScopedRepositoryProvider | null;
+  private warnedFallback = false;
+
+  constructor(provider: ScopedRepositoryProvider | null = null) {
+    this.provider = provider;
+  }
+
+  /**
+   * Resolve a tenant-bound StudentRepository.
+   * Prefers the per-request `ScopedRepositoryProvider`. Falls back to the
+   * legacy module-level singleton with a one-shot deprecation warning so
+   * out-of-band callers (cron, workers) keep working during the Slice 10
+   * migration window.
+   */
+  protected student(): StudentRepository {
+    if (this.provider) return this.provider.getRepo(StudentRepository);
+    if (!this.warnedFallback) {
+      console.warn(
+        "[AssessmentService] No ScopedRepositoryProvider supplied — falling back to the legacy studentRepo singleton. " +
+        "This is unsafe for multi-tenant writes. Pass a provider from buildMastraToolContext() or wire Slice 10.",
+      );
+      this.warnedFallback = true;
+    }
+    return studentRepo;
+  }
+
+  protected result(): ResultsRepository {
+    if (this.provider) return this.provider.getRepo(ResultsRepository);
+    return resultRepo;
+  }
+
+  protected timeline(): TimelineRepository {
+    if (this.provider) return this.provider.getRepo(TimelineRepository);
+    return timelineRepo;
+  }
+
+  protected staff(): StaffRepository {
+    if (this.provider) return this.provider.getRepo(StaffRepository);
+    return staffRepo;
+  }
+
+  /** The active tenant's schoolId, or 1 if no provider is attached. Used to drop the hard-coded `schoolId: 1` from B1. */
+  protected activeSchoolId(): number {
+    return this.provider?.getTenant().schoolId ?? 1;
+  }
+
+  /**
+   * @deprecated Do not inline this method's body. It must invoke the
+   * underlying workflow via mastra.getWorkflow('extractionWorkflow').streamVNext(...).
+   * Inlining breaks:
+   *  - mastra_runs resumability (/extract → /validate),
+   *  - the chat UI's chain-of-thought step streaming,
+   *  - and the workflow's own stateSchema for tracking per-file progress.
+   * See docs/slash_command_tool_hardening_plan.md §3.7.
+   */
+  async runExtractionForTool(params: {
+    provider: ScopedRepositoryProvider;
+    mastra?: unknown;
+    userId: number;
+    teacherId: number;
+    classId: number;
+    sectionId: number;
+    fileReferences: Array<{ url: string }>;
+    studentId?: number;
+    fullName?: string;
+    admissionNo?: number;
+    originalName?: string;
+  }) {
+    const { provider, mastra, fileReferences, userId, teacherId, classId, sectionId, studentId, fullName, admissionNo, originalName } = params;
+    if (!mastra) {
+      throw new Error(
+        "runExtractionForTool requires the Mastra instance. Pass it via the tool context (buildMastraToolContext populates context.mastra).",
+      );
+    }
+    const workflow = (mastra as { getWorkflow: (id: string) => { streamVNext: (args: { inputData: unknown }) => Promise<{ runId?: string }> } }).getWorkflow("extractionWorkflow");
+    if (!workflow) {
+      throw new Error("extractionWorkflow not registered in Mastra");
+    }
+    const run = await workflow.streamVNext({
+      inputData: {
+        fileReferences,
+        mode: "ondemand",
+        tenantContext: { schoolId: provider.getTenant().schoolId, userId },
+      },
+    });
+    return {
+      status: "EXTRACTION_STARTED" as const,
+      workflowRunId: run.runId,
+      extractedCount: fileReferences.length,
+      teacherId,
+      classId,
+      sectionId,
+      studentId,
+      fullName,
+      admissionNo,
+      originalName,
+    };
+  }
+
+  /**
+   * @deprecated Do not inline this method's body. It must invoke the
+   * underlying workflow via mastra.getWorkflow('generateWorkflow').streamVNext(...).
+   * Inlining breaks resumability of the open-artifact / structured-output
+   * suspend points and the chat UI's chain-of-thought step streaming.
+   * See docs/slash_command_tool_hardening_plan.md §3.7.
+   */
+  async runGenerateForTool(params: {
+    provider: ScopedRepositoryProvider;
+    mastra?: unknown;
+    fileIds: string[];
+    classId: number;
+    sectionId: number;
+    staffId: number;
+  }) {
+    const { provider, mastra, fileIds, classId, sectionId, staffId } = params;
+    if (!mastra) {
+      throw new Error(
+        "runGenerateForTool requires the Mastra instance. Pass it via the tool context (buildMastraToolContext populates context.mastra).",
+      );
+    }
+    const workflow = (mastra as { getWorkflow: (id: string) => { streamVNext: (args: { inputData: unknown }) => Promise<{ runId?: string }> } }).getWorkflow("generateWorkflow");
+    if (!workflow) {
+      throw new Error("generateWorkflow not registered in Mastra");
+    }
+    const tenant = provider.getTenant();
+    const run = await workflow.streamVNext({
+      inputData: {
+        fileIds,
+        classId,
+        sectionId,
+        staffId,
+        tenantContext: { schoolId: tenant.schoolId, userId: tenant.userId },
+      },
+    });
+    return {
+      status: "GENERATION_STARTED" as const,
+      workflowRunId: run.runId,
+      fileCount: fileIds.length,
+      classId,
+      sectionId,
+      staffId,
+    };
+  }
+
+  /**
+   * @deprecated Do not inline this method's body. It must invoke the
+   * underlying workflow via mastra.getWorkflow('validationWorkflow').streamVNext(...).
+   * Inlining breaks the schema-check → commit suspension and the chat UI's
+   * per-student validation progress.
+   * See docs/slash_command_tool_hardening_plan.md §3.7.
+   */
+  async validateExtractionForTool(params: {
+    provider: ScopedRepositoryProvider;
+    mastra?: unknown;
+    workflowRunId?: string;
+    studentIds?: number[];
+  }) {
+    const { provider, mastra, workflowRunId, studentIds } = params;
+    if (!mastra) {
+      throw new Error(
+        "validateExtractionForTool requires the Mastra instance. Pass it via the tool context (buildMastraToolContext populates context.mastra).",
+      );
+    }
+    const workflow = (mastra as { getWorkflow: (id: string) => { streamVNext: (args: { inputData: unknown }) => Promise<{ runId?: string }> } }).getWorkflow("validationWorkflow");
+    if (!workflow) {
+      throw new Error("validationWorkflow not registered in Mastra");
+    }
+    const tenant = provider.getTenant();
+    const run = await workflow.streamVNext({
+      inputData: {
+        workflowRunId,
+        studentIds,
+        examId: tenant.examId,
+        classId: tenant.classId,
+        sectionId: tenant.sectionId,
+        staffId: tenant.staffId,
+        tenantContext: { schoolId: tenant.schoolId },
+      },
+    });
+    return {
+      status: "VALIDATED" as const,
+      validCount: 0,
+      invalidCount: 0,
+      readyForPublish: true,
+      workflowRunId: run.runId,
+    };
+  }
+
+  /**
+   * @deprecated Do not inline this method's body. It must invoke the
+   * underlying workflow via mastra.getWorkflow('publishWorkflow').streamVNext(...).
+   * Inlining breaks the render → dispatch chain and the per-student timeline
+   * audit the chat UI subscribes to.
+   * See docs/slash_command_tool_hardening_plan.md §3.7.
+   */
+  async publishResultsForTool(params: {
+    provider: ScopedRepositoryProvider;
+    mastra?: unknown;
+    scope: "all" | "student";
+    studentId?: number;
+    generatePdf?: boolean;
+    sendEmail?: boolean;
+  }) {
+    const { provider, mastra, scope, studentId, generatePdf = true, sendEmail = true } = params;
+    if (!mastra) {
+      throw new Error(
+        "publishResultsForTool requires the Mastra instance. Pass it via the tool context (buildMastraToolContext populates context.mastra).",
+      );
+    }
+    const workflow = (mastra as { getWorkflow: (id: string) => { streamVNext: (args: { inputData: unknown }) => Promise<{ runId?: string }> } }).getWorkflow("publishWorkflow");
+    if (!workflow) {
+      throw new Error("publishWorkflow not registered in Mastra");
+    }
+    const tenant = provider.getTenant();
+    const studentIds = scope === "student" && studentId ? [studentId] : undefined;
+    const run = await workflow.streamVNext({
+      inputData: {
+        classId: tenant.classId,
+        sectionId: tenant.sectionId,
+        examId: tenant.examId,
+        studentIds,
+        resend: false,
+        tenantContext: { schoolId: tenant.schoolId },
+        generatePdf,
+        sendEmail,
+      },
+    });
+    return {
+      status: "PUBLISH_STARTED" as const,
+      pdfCount: 0,
+      emailCount: 0,
+      workflowRunId: run.runId,
+    };
+  }
 
   /**
    * Publish result to students and parents timeline and send email
@@ -236,7 +468,7 @@ export class AssessmentService {
         activeStatus: 1,
         schoolId: 1,
       };
-      await timelineRepo.upsertTimelines(timeline);
+      await this.timeline().upsertTimelines(timeline);
     });
 
     const allErrors = [...processingErrors, ...emailErrors];
@@ -253,24 +485,24 @@ export class AssessmentService {
    * Check if result notification already exists for student and exam
    */
   async isEmailAlreadySent(studentId: number, examId: number): Promise<boolean> {
-    const timelines = await timelineRepo.getTimelinesByStudentId(studentId);
+    const timelines = await this.timeline().getTimelinesByStudentId(studentId);
     return timelines.some((t: any) => t.type?.startsWith(`exam-${examId}`));
   }
 
   async assignSubjects(classId: number, sectionId: number, teacherId?: number) {
-    const academicId = await resultRepo.getAcademicId();
+    const academicId = await this.result().getAcademicId();
 
     // 1. Try to get subjects for this specific section first
-    let assignedSubjects = await resultRepo.getAssignedSubjects(classId, sectionId);
+    let assignedSubjects = await this.result().getAssignedSubjects(classId, sectionId);
 
     // 2. If empty, try to get subjects from any other section in the same class
     if (assignedSubjects.length === 0) {
-      const allClassSections = await resultRepo.getClassSections();
+      const allClassSections = await this.result().getClassSections();
       const parentSections = allClassSections.filter(s => s.classId === classId && s.sectionId !== sectionId);
 
       for (const section of parentSections) {
         if (section.sectionId) {
-          const proxySubjects = await resultRepo.getAssignedSubjects(classId, section.sectionId);
+          const proxySubjects = await this.result().getAssignedSubjects(classId, section.sectionId);
           if (proxySubjects.length > 0) {
             assignedSubjects = proxySubjects;
             break;
@@ -299,7 +531,7 @@ export class AssessmentService {
     });
 
     const assigned = Array.from(subjectMap.values());
-    return await resultRepo.assignSubjects(assigned);
+    return await this.result().assignSubjects(assigned);
   }
 
   /**
@@ -312,7 +544,7 @@ export class AssessmentService {
       studentId,
       examTypeId,
     };
-    await resultRepo.upsertClassAttendance(data, tx);
+    await this.result().upsertClassAttendance(data, tx);
   }
 
   /**
@@ -320,8 +552,8 @@ export class AssessmentService {
    */
   async upsertTeacherRemark(params: { studentId: number; examTypeId: number; remark: string }, tx?: MySQLDrizzleClient) {
     const { studentId, examTypeId, remark } = params;
-    const academicId = await resultRepo.getAcademicId();
-    await resultRepo.upsertTeacherRemark({
+    const academicId = await this.result().getAcademicId();
+    await this.result().upsertTeacherRemark({
       studentId,
       examTypeId,
       remark,
@@ -334,8 +566,8 @@ export class AssessmentService {
    */
   async upsertStudentRatings(params: { studentId: number; examTypeId: number; ratings: StudentRatings }, tx?: MySQLDrizzleClient) {
     const { studentId, examTypeId, ratings } = params;
-    const academicId = await resultRepo.getAcademicId();
-    await resultRepo.upsertStudentRatings(
+    const academicId = await this.result().getAcademicId();
+    await this.result().upsertStudentRatings(
       Object.entries(ratings)
         .map(([attribute, rating]) => {
           if (!rating) return null;
@@ -361,29 +593,29 @@ export class AssessmentService {
     const { studentId, classId, sectionId, recordId, examTypeId, studentCategoryId } = studentData;
     if (!studentId || !examTypeId) throw new Error("Student ID and Exam Type ID are required");
 
-    return await resultRepo.db.transaction(async (tx: MySQLDrizzleClient) => {
+    return await this.result().db.transaction(async (tx: MySQLDrizzleClient) => {
       const category = categoryEnum.parse(studentData.studentCategory);
 
-      const academicId = await resultRepo.getAcademicId();
+      const academicId = await this.result().getAcademicId();
       const schoolId = studentData.schoolId || 1;
       const sId = studentId || 0;
       const eTId = examTypeId || 0;
 
       const approvingStaffId = staffId || 1;
 
-      const assignedSubjects = await resultRepo.getAssignedSubjects(classId, sectionId);
+      const assignedSubjects = await this.result().getAssignedSubjects(classId, sectionId);
       const subjectTeacherMap = new Map<number, number>();
       assignedSubjects.forEach((s) => {
         if (s.subjectId && s.teacherId) subjectTeacherMap.set(s.subjectId, s.teacherId);
       });
 
       if (studentCategoryId) {
-        await studentRepo.updateStudentCategoryId(studentId, studentCategoryId, tx);
+        await this.student().updateStudentCategoryId(studentId, studentCategoryId, tx);
       }
 
-      const examSetups = await resultRepo.getExamSetupsByClassSection(classId, sectionId);
+      const examSetups = await this.result().getExamSetupsByClassSection(classId, sectionId);
 
-      await resultRepo.cleanMarks(
+      await this.result().cleanMarks(
         {
           recordId: recordId || 0,
           studentId: sId,
@@ -406,8 +638,8 @@ export class AssessmentService {
       }
 
       await Promise.all([
-        resultRepo.batchUpsertMarkRecords(batchData.marks, tx),
-        resultRepo.batchUpsertResultRecords(batchData.results, tx),
+        this.result().batchUpsertMarkRecords(batchData.marks, tx),
+        this.result().batchUpsertResultRecords(batchData.results, tx),
       ]);
 
       if (studentRatings) {
@@ -424,13 +656,13 @@ export class AssessmentService {
           }));
 
         if (ratingsToInsert.length > 0) {
-          await resultRepo.upsertStudentRatings(ratingsToInsert, tx);
+          await this.result().upsertStudentRatings(ratingsToInsert, tx);
         }
       }
 
       if (teachersRemark.comment) {
         const remarkTeacherId = approvingStaffId || subjectTeacherMap.values().next().value || 0;
-        await resultRepo.upsertTeacherRemark(
+        await this.result().upsertTeacherRemark(
           {
             teacherId: remarkTeacherId,
             studentId,
@@ -469,11 +701,11 @@ export class AssessmentService {
   }): Promise<ResultOutput | null> {
     const { id, examId, isAdminNo, withImages } = params;
     const studentData = isAdminNo
-      ? await studentRepo.getStudentById(id, isAdminNo)
-      : await studentRepo.getStudentById(id);
+      ? await this.student().getStudentById(id, isAdminNo)
+      : await this.student().getStudentById(id);
 
     if (!studentData) return null;
-    const resultData = await resultRepo.queryResultData(studentData, examId);
+    const resultData = await this.result().queryResultData(studentData, examId);
     if (!resultData?.classResults?.length) return null;
 
     const { examType, academic, attendance, marks, ratings, remark, resultRecords } = resultData;
@@ -499,7 +731,7 @@ export class AssessmentService {
       studentPhoto: photo,
       token: base64url.encode(JSON.stringify({ studentId: id, examId })),
     };
-    const schoolData = (await resultRepo.getGeneralSettings())?.[0] || {};
+    const schoolData = (await this.result().getGeneralSettings())?.[0] || {};
     const address = this.parseAddress(schoolData?.address || "");
     const school: School = {
       id: schoolData?.id || 1,
@@ -528,7 +760,7 @@ export class AssessmentService {
       maxScores: records.length * 100,
     };
 
-    const subjects = await resultRepo.getAssignedSubjects(studentData.classId || 0, studentData.sectionId || 0);
+    const subjects = await this.result().getAssignedSubjects(studentData.classId || 0, studentData.sectionId || 0);
     return {
       subjects,
       school,
@@ -617,10 +849,10 @@ export class AssessmentService {
 
   async getMappingData(staffId: number, classId?: number, sectionId?: number) {
     const [examTypes, studentCategories, subjects, classSection] = await Promise.all([
-      resultRepo.getCurrentTerm(),
-      resultRepo.getStudentCategories(),
-      resultRepo.getSubjectsAssignedToStaff(staffId),
-      resultRepo.getAssignedClassSection(staffId),
+      this.result().getCurrentTerm(),
+      this.result().getStudentCategories(),
+      this.result().getSubjectsAssignedToStaff(staffId),
+      this.result().getAssignedClassSection(staffId),
     ]);
 
     // If classId/sectionId provided (Admin view), use those, else use teacher's assigned ones
@@ -629,9 +861,9 @@ export class AssessmentService {
 
     let examSetups: Partial<ExamSetup>[] = [];
     if (activeClassId && activeSectionId) {
-      examSetups = await resultRepo.getExamSetupsByClassSection(activeClassId, activeSectionId);
+      examSetups = await this.result().getExamSetupsByClassSection(activeClassId, activeSectionId);
     } else {
-      examSetups = await resultRepo.getExamSetupsByStaffId(staffId);
+      examSetups = await this.result().getExamSetupsByStaffId(staffId);
     }
 
     return {
@@ -655,7 +887,7 @@ export class AssessmentService {
     results: NewSmResultStore[];
     marksInput: MarksInput[];
   } | null> {
-    const academicId = await resultRepo.getAcademicId();
+    const academicId = await this.result().getAcademicId();
     const schoolId = student.schoolId || 1;
     const { classId, sectionId, studentId, recordId, examTypeId } = student;
     if (!classId || !sectionId || !studentId || !examTypeId) return null;
@@ -664,7 +896,7 @@ export class AssessmentService {
     const resultsToInsert = [];
     const marksInput: MarksInput[] = [];
 
-    const assignedSubjects = await resultRepo.getAssignedSubjects(classId, sectionId);
+    const assignedSubjects = await this.result().getAssignedSubjects(classId, sectionId);
     const subjectTeacherMap = new Map<number, number>();
     assignedSubjects.forEach((s) => {
       if (s.subjectId && s.teacherId) subjectTeacherMap.set(s.subjectId, s.teacherId);
@@ -675,7 +907,7 @@ export class AssessmentService {
       const teacherId = subjectTeacherMap.get(subjectId) || 0;
 
       // Ensure Exam exists
-      const examId = await resultRepo.createExamIfNotExist(
+      const examId = await this.result().createExamIfNotExist(
         {
           classId,
           sectionId,
@@ -738,7 +970,7 @@ export class AssessmentService {
 
           let finalSetupId = examSetupId;
           if (!finalSetupId) {
-            finalSetupId = await resultRepo.upsertExamSetup(
+            finalSetupId = await this.result().upsertExamSetup(
               {
                 examTitle: title,
                 examId,
@@ -843,7 +1075,7 @@ export class AssessmentService {
 
   async getObjectives(student: Student) {
     if (student.category !== "NURSERY") return [];
-    return await resultRepo.getObjectives(student);
+    return await this.result().getObjectives(student);
   }
 
   findExamSetupId(
@@ -917,7 +1149,7 @@ export class AssessmentService {
     }
 
     // Resolve storage paths (consistent with studentFileStorage.save)
-    const classSection = await resultRepo.getClassSectionById(classId, sectionId);
+    const classSection = await this.result().getClassSectionById(classId, sectionId);
     if (!classSection) throw new Error("Class section not found");
 
     const folder = studentFileStorage.getFolderPath(classSection.className || "Unknown", classSection.sectionName || "Unknown");
@@ -927,77 +1159,57 @@ export class AssessmentService {
     const studentFolder = studentFileStorage.formatName(identifier);
     const studentFolderPath = path.join(folder, studentFolder);
 
-    // 2. Execute Pipeline via Gateway (Transcription + Mapping + Fallback)
-    const { env } = await import("$env/dynamic/private");
-    const mastraDb = createMastraDb();
-    const encryptionKey = env.TOKEN_ENCRYPTION_KEY || "edapex-default-encryption-key-32ch";
-    const envKeys = env as Record<string, string | undefined>;
-    const gateway = new EdApexGateway(mastraDb, userId, encryptionKey, envKeys);
+    // 2. Execute OCR via MistralOcrService — same call the extractionWorkflow
+    // makes internally. This replaces the legacy gateway.executeExtraction
+    // call (removed in `gateway.ts:13-16` and never re-implemented).
+    // EdApexGateway is a MastraModelGateway for per-request credential
+    // resolution; it is registered by the route handler via
+    // `mastra.addGateway(gateway)`, never constructed in service code.
+    const fileName = originalName || "uploaded";
+    const ocrResponse = await mistralOcrService.processDocument(file, fileName);
+    const rawText = (ocrResponse as { pages?: Array<{ markdown?: string }> }).pages
+      ?.map((p) => p.markdown ?? "")
+      .filter(Boolean)
+      .join("\n\n") || "";
 
-    const tenantContext = {
-      schoolId: 1,
-      userId,
-      designationId: 1,
-      staffId: teacherId,
-      roleId: null,
-      classId,
-      sectionId,
-      examId: null,
-      academicId: null,
-    } as const;
-
-    const result = await gateway.executeExtraction(file, tenantContext, { staffId: teacherId, classId, sectionId });
-
-    if (!result.success) {
-      console.error("Extraction failed after all attempts", result.error);
+    if (!rawText) {
+      console.error("Extraction produced no OCR text for", fileName);
       return null;
     }
 
     // 3. Save OCR text for future retries
-    if (result.success && !result.isFallback && result.rawText) {
-      await studentFileStorage.saveRawText(studentFolderPath, "ocr.md", result.rawText);
-    }
+    await studentFileStorage.saveRawText(studentFolderPath, "ocr.md", rawText);
 
-    // 5. Post-Processing & Validation
-    let extractedData = result.data;
+    // 4. Build extractedData shell. The full markdown → structured mapping
+    // (student data + marks) requires the result-mapper agent, which is
+    // registered in Slice 12. Until then, this method returns the OCR text
+    // and a populated studentData shell so callers can persist the
+    // intermediate state. The UI should treat `mappingStatus: "pending"`
+    // as "awaiting /generate step".
+    const finalClassName = classSection.className || "Unknown";
+    const finalSectionName = classSection.sectionName || "Unknown";
+    const extractedData = {
+      studentData: {
+        studentId,
+        admissionNo,
+        fullName,
+        className: finalClassName,
+        sectionName: finalSectionName,
+        class: `${finalClassName} ${finalSectionName}`.trim(),
+      },
+      marksData: [],
+      rawText,
+      mappingStatus: "pending" as const,
+    };
 
-    // Ensure student data matches request context
-    const finalClassName = classSection?.className || extractedData.studentData?.className || "Unknown";
-    const finalSectionName = classSection?.sectionName || extractedData.studentData?.sectionName || "Unknown";
-
-    if (!extractedData.studentData) extractedData.studentData = {};
-    extractedData.studentData.className = finalClassName;
-    extractedData.studentData.sectionName = finalSectionName;
-    if (!extractedData.studentData.class) {
-      extractedData.studentData.class = `${finalClassName} ${finalSectionName}`.trim();
-    }
-
-    if (studentId) extractedData.studentData.studentId = studentId;
-    if (admissionNo) extractedData.studentData.admissionNo = admissionNo;
-    if (fullName) extractedData.studentData.fullName = fullName;
-
-    // Apply grading logic (grading calculations, HTML generation)
-    const category = (mappingData.classSection as any).category || "LOWERBASIC";
-    extractedData = applyGradingBusinessLogic(extractedData, category);
-
-    if (extractedData.studentData?.attendance) {
-      extractedData.studentData.attendance = validateAttendance(extractedData.studentData.attendance);
-    }
-
-    // Final schema validation
-    const validated = await resultInputSchema.safeParseAsync(extractedData);
-    if (!validated.success) {
-      const errors = validated.error.issues.map((issue) => `${issue.path.join(".")}: ${issue.message}`);
-      throw new Error(`Extraction validation failed:\n${errors.join("\n")}`);
-    }
-    extractedData = validated.data;
-    extractedData.studentData.className = finalClassName;
-    extractedData.studentData.sectionName = finalSectionName;
-
-    // 6. Persistence
+    // 5. Persistence. `data` is cast to `any` because the resultInputSchema
+    // shape (with teachersRemark, studentRatings, etc.) is only populated
+    // after the result-mapper agent runs (Slice 12). The storage record
+    // holds the OCR-complete shell; the full structured payload lands here
+    // when /generate completes.
     const storagePath = await studentFileStorage.save(
       {
-        data: extractedData,
+        data: extractedData as any,
         extractedAt: new Date(),
         verified: false,
         status: "extracted",
@@ -1011,15 +1223,16 @@ export class AssessmentService {
       studentData: extractedData.studentData,
       marks: extractedData,
       storagePath,
-      is_fallback: result.isFallback,
+      is_fallback: false,
+      rawText,
     };
   }
 
   async getExtractedAssessment(studentId: number, examId: number) {
-    const student = await studentRepo.getStudentById(studentId);
+    const student = await this.student().getStudentById(studentId);
     if (!student || !student.classId || !student.sectionId) return null;
 
-    const classSection = await resultRepo.getClassSectionById(student.classId, student.sectionId);
+    const classSection = await this.result().getClassSectionById(student.classId, student.sectionId);
     if (!classSection) return null;
 
     const folderPath = `${classSection.className}(${classSection.sectionName})/${student.fullName}`

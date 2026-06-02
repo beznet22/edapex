@@ -410,6 +410,7 @@ describe("Phase 3: Slash Commands & Governance", () => {
       };
       StudentRepository: {
         getById: ReturnType<typeof vi.fn>;
+        getRollNoAndAdmissionNo: ReturnType<typeof vi.fn>;
       };
       TimelineRepository: {
         createTimeline: ReturnType<typeof vi.fn>;
@@ -420,10 +421,11 @@ describe("Phase 3: Slash Commands & Governance", () => {
       opts: {
         tenant?: Partial<Parameters<typeof createTenantContext>[0]>;
         studentLookup?: { classId: number; sectionId: number; schoolId: number } | null;
+        rollNoAndAdmissionNo?: { rollNo: number | null; admissionNo: number | null };
         audit?: { threadId: string; modelId: string };
       } = {},
     ) {
-      const tenantContext = createTenantContext({ staffId: 1, roleId: 1, 
+      const tenantContext = createTenantContext({ staffId: 1, roleId: 1,
         schoolId: 1,
         classId: 10,
         sectionId: 5,
@@ -440,6 +442,8 @@ describe("Phase 3: Slash Commands & Governance", () => {
         schoolId: tenantContext.schoolId,
       };
 
+      const defaultRollNoAndAdmissionNo = { rollNo: 23, admissionNo: 1042 };
+
       const spies: RepoSpyMap = {
         ResultsRepository: {
           batchUpsertMarkRecords: vi.fn().mockResolvedValue(undefined),
@@ -451,6 +455,9 @@ describe("Phase 3: Slash Commands & Governance", () => {
           getById: vi
             .fn()
             .mockResolvedValue(opts.studentLookup === undefined ? defaultLookup : opts.studentLookup),
+          getRollNoAndAdmissionNo: vi
+            .fn()
+            .mockResolvedValue(opts.rollNoAndAdmissionNo ?? defaultRollNoAndAdmissionNo),
         },
         TimelineRepository: {
           createTimeline: vi.fn().mockResolvedValue(42),
@@ -505,8 +512,12 @@ describe("Phase 3: Slash Commands & Governance", () => {
           sectionId: 5,
           schoolId: 1,
           academicId: 2024,
+          studentRollNo: 23,
+          studentAddmissionNo: 1042,
         }),
       ]);
+
+      expect(spies.StudentRepository.getRollNoAndAdmissionNo).toHaveBeenCalledWith(501);
 
       expect(spies.ResultsRepository.upsertClassAttendance).not.toHaveBeenCalled();
       expect(spies.ResultsRepository.upsertTeacherRemark).not.toHaveBeenCalled();
@@ -671,6 +682,120 @@ describe("Phase 3: Slash Commands & Governance", () => {
 
       expect(spies.ResultsRepository.batchUpsertMarkRecords).not.toHaveBeenCalled();
       expect(spies.TimelineRepository.createTimeline).not.toHaveBeenCalled();
+    });
+
+    // B7 — Slice 3
+    it("B7: returns MISSING_EXAM_CONTEXT for attendance when examId is null", async () => {
+      const { context, spies } = makeToolContext({ tenant: { examId: null } });
+
+      const result = await manageResultsLogic(context as never, {
+        type: "attendance",
+        studentId: 501,
+        present: 50,
+        absent: 2,
+      });
+
+      expect(result.status).toBe("ERROR");
+      expect(result.errorCode).toBe("MISSING_EXAM_CONTEXT");
+      expect(spies.ResultsRepository.upsertClassAttendance).not.toHaveBeenCalled();
+      expect(spies.TimelineRepository.createTimeline).not.toHaveBeenCalled();
+    });
+
+    // B7 — Slice 3
+    it("B7: returns MISSING_EXAM_CONTEXT for qualitative when examId is null", async () => {
+      const { context, spies } = makeToolContext({ tenant: { examId: null } });
+
+      const result = await manageResultsLogic(context as never, {
+        type: "qualitative",
+        studentId: 501,
+        remark: "Excellent progress",
+      });
+
+      expect(result.status).toBe("ERROR");
+      expect(result.errorCode).toBe("MISSING_EXAM_CONTEXT");
+      expect(spies.ResultsRepository.upsertTeacherRemark).not.toHaveBeenCalled();
+      expect(spies.TimelineRepository.createTimeline).not.toHaveBeenCalled();
+    });
+
+    // B7 — Slice 3
+    it("B7: returns MISSING_EXAM_CONTEXT for behavioral when examId is null", async () => {
+      const { context, spies } = makeToolContext({ tenant: { examId: null } });
+
+      const result = await manageResultsLogic(context as never, {
+        type: "behavioral",
+        studentId: 501,
+        trait: "Punctuality",
+        rating: 5,
+      });
+
+      expect(result.status).toBe("ERROR");
+      expect(result.errorCode).toBe("MISSING_EXAM_CONTEXT");
+      expect(spies.ResultsRepository.upsertStudentRatings).not.toHaveBeenCalled();
+      expect(spies.TimelineRepository.createTimeline).not.toHaveBeenCalled();
+    });
+
+    // B5 — Slice 3
+    it("B5: passes teacherId from tenantContext.staffId to upsertTeacherRemark", async () => {
+      const { context, spies } = makeToolContext({ tenant: { staffId: 77 } });
+
+      const result = await manageResultsLogic(context as never, {
+        type: "qualitative",
+        studentId: 501,
+        remark: "Outstanding work this term",
+      });
+
+      expect(result.status).toBe("SUCCESS");
+      expect(spies.ResultsRepository.upsertTeacherRemark).toHaveBeenCalledTimes(1);
+      expect(spies.ResultsRepository.upsertTeacherRemark).toHaveBeenCalledWith(
+        expect.objectContaining({
+          studentId: 501,
+          teacherId: 77,
+          remark: "Outstanding work this term",
+        }),
+      );
+    });
+
+    // B6 — Slice 3
+    it("B6: passes schoolId from tenantContext.schoolId to upsertStudentRatings", async () => {
+      const { context, spies } = makeToolContext({ tenant: { schoolId: 42 } });
+
+      const result = await manageResultsLogic(context as never, {
+        type: "behavioral",
+        studentId: 501,
+        trait: "Leadership",
+        rating: 4,
+      });
+
+      expect(result.status).toBe("SUCCESS");
+      expect(spies.ResultsRepository.upsertStudentRatings).toHaveBeenCalledTimes(1);
+      const callArg = spies.ResultsRepository.upsertStudentRatings.mock.calls[0][0];
+      expect(callArg[0]).toEqual(
+        expect.objectContaining({
+          studentId: 501,
+          attribute: "Leadership",
+          rate: 4,
+          schoolId: 42,
+        }),
+      );
+    });
+
+    // B4 — Slice 3
+    it("B4: forwards undefined rollNo/admissionNo when the student has neither set (Drizzle column default then applies)", async () => {
+      const { context, spies } = makeToolContext({
+        rollNoAndAdmissionNo: { rollNo: null, admissionNo: null },
+      });
+
+      const result = await manageResultsLogic(context as never, {
+        type: "academic",
+        studentId: 501,
+        subjectId: 12,
+        score: 90,
+      });
+
+      expect(result.status).toBe("SUCCESS");
+      const callArg = spies.ResultsRepository.batchUpsertMarkRecords.mock.calls[0][0];
+      expect(callArg[0].studentRollNo).toBeUndefined();
+      expect(callArg[0].studentAddmissionNo).toBeUndefined();
     });
 
     it("returns STUDENT_NOT_FOUND when StudentRepository.getById resolves to null", async () => {

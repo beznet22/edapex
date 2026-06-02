@@ -56,6 +56,19 @@ export type StaffDepartment = {
 export type StaffRow = typeof smStaffs.$inferSelect;
 
 export class StaffRepository extends BaseRepository {
+  /** Slice 1: Fetch a staff row by id. Replaces raw `staffRepo.db.select(...).from(smStaffs)` in manageAccessLogic (B10). */
+  async getById(teacherId: number): Promise<StaffRow | null> {
+    if (!teacherId) return null;
+    return this.withErrorHandling(async () => {
+      const [staff] = await this.db
+        .select()
+        .from(smStaffs)
+        .where(eq(smStaffs.id, teacherId))
+        .limit(1);
+      return staff ?? null;
+    }, "getById");
+  }
+
   async getStaffRegistrationOptions() {
     return this.withErrorHandling(async () => {
       const designations = await this.db
@@ -200,7 +213,7 @@ export class StaffRepository extends BaseRepository {
           [user] = await this.db.select().from(users).where(eq(users.id, staff.userId)).limit(1);
         }
       }
-      
+
       if (!user) {
         throw new Error("USER_NOT_FOUND");
       }
@@ -236,7 +249,7 @@ export class StaffRepository extends BaseRepository {
           [user] = await this.db.select().from(users).where(eq(users.id, staff.userId)).limit(1);
         }
       }
-      
+
       if (!user) {
         throw new Error("USER_NOT_FOUND");
       }

@@ -1,9 +1,13 @@
 import { z } from "zod";
-import { validateRoleWhitelist, validateWorkspaceLock, type MastraToolContext } from "../tenant-context";
+import {
+  validateRoleWhitelist,
+  validateWorkspaceLock,
+  WorkspaceMismatchError,
+  ForbiddenError,
+  type MastraToolContext,
+} from "../tenant-context";
 import { StudentRepository } from "../../repository/student.repo";
 import { TimelineRepository } from "../../repository/timeline.repo";
-import { smBaseSetups, smBaseGroups, smStudentCategories } from "../../db/sms-schema";
-import { eq, and, like } from "drizzle-orm";
 
 export const onboardEntitySchema = z.object({
   studentDetails: z.object({
@@ -72,27 +76,7 @@ export const onboardEntityLogic = async (
   const timelineRepo = getRepo(TimelineRepository);
 
   try {
-    const genderGroup = await studentRepo.db
-      .select({ id: smBaseGroups.id })
-      .from(smBaseGroups)
-      .where(and(eq(smBaseGroups.name, "Gender"), eq(smBaseGroups.activeStatus, 1)))
-      .limit(1);
-
-    const genderId = genderGroup[0]?.id
-      ? (
-          await studentRepo.db
-            .select({ id: smBaseSetups.id })
-            .from(smBaseSetups)
-            .where(
-              and(
-                eq(smBaseSetups.baseGroupId, genderGroup[0].id),
-                like(smBaseSetups.baseSetupName, payload.studentDetails.gender),
-                eq(smBaseSetups.activeStatus, 1),
-              ),
-            )
-            .limit(1)
-        )[0]?.id
-      : undefined;
+    const genderId = await studentRepo.resolveGenderId(payload.studentDetails.gender);
 
     if (!genderId) {
       return {
@@ -102,13 +86,7 @@ export const onboardEntityLogic = async (
       };
     }
 
-    const categoryRow = await studentRepo.db
-      .select({ id: smStudentCategories.id })
-      .from(smStudentCategories)
-      .where(like(smStudentCategories.categoryName, payload.studentDetails.category))
-      .limit(1);
-
-    const studentCategoryId = categoryRow[0]?.id;
+    const studentCategoryId = await studentRepo.resolveStudentCategoryId(payload.studentDetails.category);
 
     if (!studentCategoryId) {
       return {
@@ -207,6 +185,15 @@ export const assignEntityLogic = async (context: MastraToolContext, input: Assig
       };
     }
 
+    // B9: source-class workspace lock. The destination check above validates
+    // that the caller is allowed to write to the target class; this validates
+    // that they are also allowed to *read* the student's current class.
+    // A Class Teacher locked to class 10 must not be able to fish students
+    // out of class 99 simply because the destination is their own class.
+    // Re-thrown rather than caught so the caller can distinguish
+    // permission errors from DB errors.
+    validateWorkspaceLock(tenantContext, student.classId, student.sectionId);
+
     await studentRepo.assignClassSection({
       studentId: input.studentId,
       classId: input.targetClassId,
@@ -237,6 +224,11 @@ export const assignEntityLogic = async (context: MastraToolContext, input: Assig
       message: `Student ${student.fullName ?? input.studentId} successfully assigned to Class ${input.targetClassId}, Section ${input.targetSectionId}.`,
     };
   } catch (error) {
+    // Re-throw validation errors so callers can distinguish permission failures
+    // from DB failures. The try/catch is for the assignClassSection path only.
+    if (error instanceof WorkspaceMismatchError || error instanceof ForbiddenError) {
+      throw error;
+    }
     const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
     return {
       status: "ERROR",

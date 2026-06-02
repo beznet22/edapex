@@ -1,12 +1,16 @@
 import { z } from "zod";
-import { validateRoleWhitelist, validateWorkspaceLock, type MastraToolContext } from "../tenant-context";
+import {
+  validateRoleWhitelist,
+  validateWorkspaceLock,
+  WorkspaceMismatchError,
+  ForbiddenError,
+  type MastraToolContext,
+} from "../tenant-context";
 import { StudentRepository } from "../../repository/student.repo";
 import { StaffRepository } from "../../repository/staff.repo";
 import { AuthRepository } from "../../repository/auth.repo";
 import { TimelineRepository } from "../../repository/timeline.repo";
 import { hashPwd } from "../../helpers/utils";
-import { smStaffs } from "../../db/sms-schema";
-import { eq } from "drizzle-orm";
 
 
 
@@ -120,7 +124,7 @@ export const manageAccessLogic = async (context: MastraToolContext, input: Manag
         result = { password: finalPassword };
       }
     } else if (targetType === "staff") {
-      const [staff] = await staffRepo.db.select().from(smStaffs).where(eq(smStaffs.id, targetId)).limit(1);
+      const staff = await staffRepo.getById(targetId);
       if (!staff) {
         return {
           status: "ERROR",
@@ -183,6 +187,9 @@ export const manageAccessLogic = async (context: MastraToolContext, input: Manag
       ...result,
     };
   } catch (error) {
+    if (error instanceof WorkspaceMismatchError || error instanceof ForbiddenError) {
+      throw error;
+    }
     const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
     if (errorMessage === "USER_NOT_FOUND") {
       return {
@@ -289,6 +296,9 @@ export const patchEntityLogic = async (context: MastraToolContext, input: PatchE
       message: "No studentId provided for patch operation.",
     };
   } catch (error) {
+    if (error instanceof WorkspaceMismatchError || error instanceof ForbiddenError) {
+      throw error;
+    }
     const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
     return {
       status: "ERROR",
