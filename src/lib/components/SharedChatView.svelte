@@ -3,13 +3,11 @@
   import { signout, updatePassword } from "$lib/api/auth.remote.js";
   import ChatHeader from "$lib/components/chat-header.svelte";
   import Chat from "$lib/components/chat.svelte";
-  import WorkspaceSidebar from "$lib/components/workspace/WorkspaceSidebar.svelte";
+  import ArtifactViewer from "$lib/components/workspace/ArtifactViewer.svelte";
+  import ArtifactsFab from "$lib/components/artifacts-fab.svelte";
 
-  import ResponsiveSheet from "$lib/components/shared/responsive-sheet.svelte";
   import * as AlertDialog from "$lib/components/ui/alert-dialog";
   import * as Select from "$lib/components/ui/select";
-  import * as Resizable from "$lib/components/ui/resizable";
-  import { cn } from "$lib/utils/shadcn";
   import { Input } from "$lib/components/ui/input";
   import { Button } from "$lib/components/ui/button";
   import { ChatContext } from "$lib/context/chat-context.svelte.js";
@@ -18,33 +16,33 @@
   import { toast } from "svelte-sonner";
 
   import { SelectedClass } from "$lib/context/sync.svelte";
+  import { useInspector } from "$lib/context/inspector-context.svelte";
   import EyeIcon from "@lucide/svelte/icons/eye";
   import EyeOffIcon from "@lucide/svelte/icons/eye-off";
-  import { IsMobile } from "$lib/hooks/is-mobile.svelte.js";
   import type { AuthUser } from "$lib/types/auth-types";
   import type { ChatThread, xUIMessage } from "$lib/types/chat-types";
-  import { createWorkspaceContext } from "$lib/components/workspace/workspace-context.svelte.js";
+  import type { Artifact } from "$lib/types/workspace-types";
+  import { deriveKind } from "$lib/utils/artifact-kind";
 
   let {
     user,
     messages = [],
     chatData = undefined,
+    examTypeId = null,
   } = $props<{
     user: AuthUser;
     messages?: xUIMessage[];
     chatData?: ChatThread;
+    examTypeId?: number | null;
   }>();
   let open = $state(false);
   let value = $state<string | undefined>();
   let newPassword = $state("");
   let showPassword = $state(false);
   let isUpdating = $state(false);
-  let inspectorOpen = $state(false);
-  let inspectorPane = $state<any>(undefined);
   let userContext = $derived(UserContext.fromContext());
   const selectedClass = SelectedClass.fromContext();
-  const isMobile = new IsMobile(1024);
-  let wasAutoCollapsed = $state(false);
+  const inspector = useInspector();
 
   // svelte-ignore state_referenced_locally
   const chatContext = new ChatContext({
@@ -52,27 +50,76 @@
     chatData,
     selectedClass,
   });
-  
+
   chatContext.setContext();
   const chat = $derived(ChatContext.fromContext());
 
-  const ws = createWorkspaceContext();
+  $effect(() => {
+    chat.threadData.setExamTypeId(examTypeId ?? null);
+  });
+
+  const chatArtifacts = $derived<Artifact[]>(
+    chat.messages
+      .flatMap((m) => m.parts ?? [])
+      .filter(
+        (p: any) =>
+          p.type === "data-createDocument" || p.type === "data-generatePDF",
+      )
+      .map((p: any) => {
+        const data = p.data ?? {};
+        const title = data.title ?? "untitled";
+        const examTypeId = chat.threadData.examTypeId;
+        const persistedUrl = examTypeId
+          ? `/api/file/exams/examType-${examTypeId}/${title}${p.type === "data-generatePDF" ? ".pdf" : ".md"}`
+          : undefined;
+        return {
+          id: data.id ?? p.id,
+          title,
+          kind: p.type === "data-generatePDF" ? "pdf" : deriveKind(title),
+          content: data.content,
+          url: persistedUrl,
+          saveUrl: persistedUrl,
+          status: data.status,
+        };
+      }),
+  );
 
   $effect(() => {
-    if (inspectorPane) {
-      if (inspectorOpen) {
-        if (inspectorPane.isCollapsed()) inspectorPane.expand();
-      } else {
-        if (inspectorPane.isExpanded()) inspectorPane.collapse();
-      }
+    inspector.setChatArtifacts(chatArtifacts);
+  });
+
+  $effect(() => {
+    // Hydrate pending file references from localStorage (set by
+    // /api/chat/start-with-files redirect) once the thread id is known.
+    if (!chat.chatData?.threadId) return;
+    if (typeof localStorage === "undefined") return;
+    const key = "pendingFileReferences";
+    const raw = localStorage.getItem(key);
+    if (!raw) return;
+    try {
+      const parsed = JSON.parse(raw) as Array<{
+        key: string;
+        name: string;
+        type: "file" | "dir";
+        mimeType?: string;
+        fileId?: string;
+        contentHash?: string;
+      }>;
+      chatContext.fileReferences = parsed;
+    } catch (err) {
+      console.error("[SharedChatView] Failed to parse pendingFileReferences", err);
+    } finally {
+      localStorage.removeItem(key);
     }
   });
 
   $effect(() => {
-    // If the user manually toggles the file browser back open, reset the auto-collapsed tracking flag
-    if (!ws.maxPreviewMode) {
-      wasAutoCollapsed = false;
+    function onOpen(e: Event) {
+      const detail = (e as CustomEvent).detail as { id: string };
+      inspector.openChatArtifact(detail.id);
     }
+    window.addEventListener("chat:openArtifact", onOpen);
+    return () => window.removeEventListener("chat:openArtifact", onOpen);
   });
 
   onMount(() => {
@@ -128,64 +175,10 @@
   };
 </script>
 
-<!-- Hermes 4-Panel Row: Panel 3 (Chat Stage) & Panel 4 (Workspace Inspector) -->
-<Resizable.PaneGroup direction="horizontal" class="flex flex-1 min-h-0 w-full">
-  <!-- Panel 3: Chat Stage -->
-  <Resizable.Pane
-    defaultSize={inspectorOpen && !isMobile.current ? 70 : 100}
-    minSize={30}
-    class="flex flex-col min-h-0 min-w-0 h-full relative"
-  >
-    <ChatHeader
-      {user}
-      onToggleInspector={() => (inspectorOpen = !inspectorOpen)}
-    />
-    <Chat class="border-none" readonly={false} {user} />
-  </Resizable.Pane>
-
-  <!-- Panel 4: Workspace Inspector (Desktop Resizable) -->
-  {#if !isMobile.current}
-    <!-- Glassmorphic divider -->
-    <Resizable.Handle
-      withHandle
-      class={cn(
-        "w-1 bg-transparent border-transparent hover:bg-muted/20 active:bg-muted/20 transition-colors z-10",
-        !inspectorOpen && "hidden",
-      )}
-    />
-    <Resizable.Pane
-      bind:this={inspectorPane}
-      collapsible={true}
-      collapsedSize={0}
-      defaultSize={inspectorOpen ? 40 : 0}
-      minSize={20}
-      maxSize={50}
-      class="transition-all duration-300 ease-out overflow-hidden"
-      onResize={(size) => {
-        if (size < 30 && !ws.maxPreviewMode) {
-          ws.maxPreviewMode = true;
-          wasAutoCollapsed = true;
-        } else if (size >= 30 && wasAutoCollapsed) {
-          ws.maxPreviewMode = false;
-          wasAutoCollapsed = false;
-        }
-      }}
-      onExpand={() => {
-        inspectorOpen = true;
-      }}
-      onCollapse={() => {
-        inspectorOpen = false;
-      }}
-    >
-      <WorkspaceSidebar bind:open={inspectorOpen} isMobile={false} />
-    </Resizable.Pane>
-  {/if}
-</Resizable.PaneGroup>
-
-<!-- Mobile Sheet Overlay -->
-{#if isMobile.current}
-  <WorkspaceSidebar bind:open={inspectorOpen} isMobile={true} />
-{/if}
+<!-- Chat Stage: inspector + sidebar are mounted by (chat)/+layout.svelte -->
+<ChatHeader {user} />
+<ArtifactsFab count={chatArtifacts.length} threadId={chat.chatData?.threadId ?? null} />
+<Chat class="border-none" readonly={false} {user} />
 
 <AlertDialog.Root bind:open>
   <AlertDialog.Content

@@ -29,6 +29,7 @@ export const requestContextSchema = z.object({
 	instructions: z.string().optional(),
 	isSlashCommand: z.boolean().optional(),
 	lastMessage: z.string().optional(),
+	fileManifest: z.string().optional(),
 });
 
 export type RequestContextValues = z.infer<typeof requestContextSchema>;
@@ -42,19 +43,19 @@ export type RequestContextValues = z.infer<typeof requestContextSchema>;
  * Using opengateway/mimo-v2.5-pro as the default — flagship model
  * always available (keyless opengateway provider).
  */
-const opengatewayProvider = createOpenAICompatible({
-	name: 'opengateway',
-	apiKey: 'keyless',
-	baseURL: env.OPENGATEWAY_BASE_URL || 'https://opengateway.gitlawb.com/v1',
+const groqProvider1 = createOpenAICompatible({
+	name: 'groq',
+	apiKey: env.GROQ_API_KEY,
+	baseURL: env.GROQ_BASE_URL || 'https://api.groq.com/openai/v1',
 	headers: { 'Accept-Encoding': 'identity' },
 	supportsStructuredOutputs: false,
 });
 
-export const DEFAULT_MODEL = opengatewayProvider.chatModel('mimo-v2.5-pro') as any;
+export const DEFAULT_MODEL = groqProvider1.chatModel('llama-3.1-8b-instant');
 
 
 const groqProvider = createOpenAICompatible({
-	name: 'opengateway',
+	name: 'groq',
 	apiKey: env.GROQ_API_KEY,
 	baseURL: env.GROQ_BASE_URL || 'https://api.groq.com/openai/v1',
 	headers: { 'Accept-Encoding': 'identity' },

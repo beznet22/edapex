@@ -205,3 +205,5 @@ SKILL.md files in `src/lib/server/mastra/skills/` are watched by `skill-watcher.
 See [`AGENTS.md`](./AGENTS.md) for the full agent / contributor contract — package manager choice, file-scoped commands, the EdApex Mastra migration conventions, and the non-negotiable code quality rules. Project-specific design constraints live under [`docs/`](./docs/).
 
 For the detailed system architecture (tenant isolation model, agent hierarchy, tool/workflow contracts, storage layout, request lifecycle), see [`ARCHITECTURE.md`](./ARCHITECTURE.md).
+
+<!-- The reported issues are pre-existing Tailwind lint suggestions -->

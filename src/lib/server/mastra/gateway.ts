@@ -18,7 +18,7 @@
 import { MastraModelGateway, type ProviderConfig, type GatewayLanguageModel } from '@mastra/core/llm';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import type { LibSQLDatabase } from 'drizzle-orm/libsql';
-import * as schema from './db/schema';
+import * as schema from '$lib/server/mastra/storage/libsql/app-db.schema';
 import {
     getProviderCredentialWithFallback,
     getAllActiveProviders,

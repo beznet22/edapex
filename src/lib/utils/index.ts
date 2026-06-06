@@ -1,6 +1,6 @@
-import type { DBMessage, xUIMessage } from "$lib/types/chat-types";
+import type { ChatMessage, xUIMessage } from "$lib/types/chat-types";
 
-export function convertToUIMessages(messages: Array<DBMessage>): Array<xUIMessage> {
+export function convertToUIMessages(messages: Array<ChatMessage>): Array<xUIMessage> {
   return messages.map((message) => ({
     id: message.id,
     parts: JSON.parse(message.parts as string),

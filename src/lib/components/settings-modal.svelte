@@ -50,7 +50,7 @@
     updateAgentSettings,
   } from "$lib/api/agent.remote.js";
   import type { CredentialType } from "$lib/schema/chat-schema";
-  import type { AgentSetting } from "$lib/server/mastra/db/schema";
+  import type { AgentSetting } from "$lib/server/mastra/storage/libsql/app-db.schema";
 
   const providerLogos: Record<string, string> = {
     groq: "https://cdn.jsdelivr.net/npm/@lobehub/icons-static-svg/icons/groq.svg",

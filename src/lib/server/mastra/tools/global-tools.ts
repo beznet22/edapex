@@ -223,6 +223,7 @@ export const webFetchTool = createTool({
 		maxChars: z.number().int().min(1).max(100000).default(20000)
 	}),
 	execute: async ({ url, extractMode, maxChars }) => {
+		const mode: 'markdown' | 'text' = extractMode ?? 'markdown';
 		// SSRF validation
 		const ssrfError = validateUrlForSSRF(url);
 		if (ssrfError) {
@@ -238,12 +239,13 @@ export const webFetchTool = createTool({
 		}
 
 		// Check cache
-		const cacheKey = `${url}:${extractMode}`;
+		const cacheKey = `${url}:${mode}`;
 		const cached = fetchCache.get(cacheKey);
 		if (cached) {
 			// Apply maxChars truncation to cached content
-			const truncated = cached.content.length > maxChars;
-			const content = truncated ? cached.content.slice(0, maxChars) : cached.content;
+			const cap = maxChars ?? 20000;
+			const truncated = cached.content.length > cap;
+			const content = truncated ? cached.content.slice(0, cap) : cached.content;
 			return {
 				status: 'SUCCESS' as const,
 				cached: true,
@@ -257,7 +259,7 @@ export const webFetchTool = createTool({
 
 		// Try TinyFish fetch first
 		try {
-			const result = await tinyfishFetch(url, { extractMode, maxChars });
+			const result = await tinyfishFetch(url, { extractMode: mode, maxChars: maxChars ?? 20000 });
 			// Cache the full result (before maxChars truncation applied by TinyFish)
 			fetchCache.set(cacheKey, result);
 			return {
@@ -277,7 +279,7 @@ export const webFetchTool = createTool({
 
 		// Fallback: HTTP GET with HTML-to-markdown extraction
 		try {
-			const result = await httpFetchFallback(url, extractMode, maxChars);
+			const result = await httpFetchFallback(url, mode, maxChars ?? 20000);
 			if (result.status === 'SUCCESS') {
 				fetchCache.set(cacheKey, {
 					content: result.content!,

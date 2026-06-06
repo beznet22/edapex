@@ -1,124 +1,129 @@
 <script lang="ts">
-  import { cn } from "$lib/utils/shadcn";
-  import { useWorkspace } from "./workspace-context.svelte.ts";
-  import FileTree from "./FileTree.svelte";
-  import MoreVerticalIcon from "@lucide/svelte/icons/more-vertical";
-  import FolderIcon from "@lucide/svelte/icons/folder";
-  import CloudIcon from "@lucide/svelte/icons/cloud";
-  import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
+	import { Button } from "$lib/components/ui/button";
+	import { ScrollArea } from "$lib/components/ui/scroll-area";
+	import FileIcon from "@lucide/svelte/icons/file";
+	import FileTextIcon from "@lucide/svelte/icons/file-text";
+	import FileImageIcon from "@lucide/svelte/icons/file-image";
+	import BookTextIcon from "@lucide/svelte/icons/book-text";
+	import FolderIcon from "@lucide/svelte/icons/folder";
+	import type { Artifact } from "$lib/types/workspace-types";
 
-  let {
-    onFileSelect,
-  }: {
-    onFileSelect: () => void;
-  } = $props();
+	let {
+		onSelect,
+	}: {
+		onSelect: (key: string, artifact: Artifact) => void;
+	} = $props();
 
-  let ws = useWorkspace();
-  let activeSource = $state<"explorer" | "cloud">("explorer");
+	type FileEntry = { name: string; type: "file" | "directory"; key: string; size?: number };
 
-  function handleFileClick(entry: any) {
-    ws.handleFileClick(entry);
-    onFileSelect();
-  }
+	let entries = $state<FileEntry[]>([]);
+	let loading = $state(true);
+	let error = $state<string | null>(null);
+	let termDirectory = $state<string | null>(null);
+
+	async function load() {
+		loading = true;
+		error = null;
+		try {
+			const res = await fetch("/api/file/exams/?action=list&recursive=true");
+			if (!res.ok) throw new Error(`HTTP ${res.status}`);
+			const data = await res.json();
+			const raw: FileEntry[] = data?.result?.items ?? [];
+			const termDirs = new Set<string>();
+			const files = raw.filter((entry) => {
+				if (entry.type === "file") return true;
+				if (entry.name.startsWith("examType-")) {
+					termDirs.add(entry.name);
+					return false;
+				}
+				return false;
+			});
+			termDirectory = Array.from(termDirs)[0] ?? null;
+			entries = files;
+		} catch (e) {
+			error = e instanceof Error ? e.message : String(e);
+		} finally {
+			loading = false;
+		}
+	}
+
+	$effect(() => {
+		load();
+	});
+
+	function fileIcon(name: string) {
+		const ext = name.split(".").pop()?.toLowerCase() ?? "";
+		if (["md", "markdown", "txt"].includes(ext)) return BookTextIcon;
+		if (["png", "jpg", "jpeg", "svg", "webp", "gif", "avif", "bmp"].includes(ext)) return FileImageIcon;
+		if (["pdf"].includes(ext)) return FileTextIcon;
+		return FileIcon;
+	}
+
+	function deriveKindFromName(name: string): Artifact["kind"] {
+		const ext = name.split(".").pop()?.toLowerCase() ?? "";
+		if (ext === "pdf") return "pdf";
+		if (["png", "jpg", "jpeg", "svg", "webp", "gif", "bmp", "avif"].includes(ext)) return "image";
+		if (["md", "markdown", "txt", "json", "csv", "xml", "yaml", "yml", "tsv", "log"].includes(ext))
+			return "document";
+		return "unsupported";
+	}
+
+	function handleSelect(entry: FileEntry) {
+		const key = entry.key;
+		const artifact: Artifact = {
+			id: key,
+			title: entry.name,
+			kind: deriveKindFromName(entry.name),
+			url: `/api/file/${key}`,
+			saveUrl: `/api/file/${key}`,
+			size: entry.size,
+		};
+		onSelect(key, artifact);
+	}
 </script>
 
 <div class="flex flex-col h-full bg-slate-950/90">
-  <div class="flex items-center justify-between px-4 py-3 border-b border-white/5 shrink-0">
-    <span class="text-[11px] font-bold text-white/70">
-      {activeSource === "explorer" ? "Explorer" : "Cloud Storage"}
-    </span>
+	<header class="flex items-center px-4 py-3 border-b border-white/5 shrink-0 gap-2">
+		<FolderIcon class="size-4 text-primary/80 shrink-0" />
+		<span class="text-[11px] font-bold text-white/70">
+			{termDirectory ?? "Thread artifacts"}
+		</span>
+	</header>
 
-    <DropdownMenu.Root>
-      <DropdownMenu.Trigger>
-        {#snippet child({ props })}
-          <button
-            {...props}
-            class="size-8 rounded-lg flex items-center justify-center text-white/50 hover:text-white hover:bg-white/5 transition-colors"
-          >
-            <MoreVerticalIcon class="size-4" />
-          </button>
-        {/snippet}
-      </DropdownMenu.Trigger>
-      <DropdownMenu.Content
-        align="end"
-        class="w-48 bg-slate-950/90 backdrop-blur-xl border-white/10 rounded-xl shadow-2xl p-1"
-      >
-        <DropdownMenu.Item
-          class={cn(
-            "text-[12px] font-medium rounded-lg cursor-pointer my-0.5 text-white/70 hover:text-white hover:bg-white/5",
-            activeSource === "explorer" && "bg-white/5 text-white",
-          )}
-          onclick={() => (activeSource = "explorer")}
-        >
-          <FolderIcon class="size-3.5 mr-2 shrink-0" />
-          Explorer
-          {#if activeSource === "explorer"}
-            <span class="ml-auto text-[9px] px-1.5 py-0.5 rounded bg-primary/20 text-primary">Active</span>
-          {/if}
-        </DropdownMenu.Item>
-        <DropdownMenu.Item
-          class="text-[12px] font-medium rounded-lg cursor-pointer my-0.5 text-white/40 hover:text-white/70 hover:bg-white/5 opacity-60"
-          onclick={() => (activeSource = "cloud")}
-          disabled
-        >
-          <CloudIcon class="size-3.5 mr-2 shrink-0" />
-          Cloud Storage
-          <span class="ml-auto text-[9px] px-1.5 py-0.5 rounded bg-white/10 text-white/40">Coming Soon</span>
-        </DropdownMenu.Item>
-      </DropdownMenu.Content>
-    </DropdownMenu.Root>
-  </div>
-
-  <div class="flex-1 min-h-0 overflow-y-auto custom-scrollbar">
-    {#if activeSource === "explorer"}
-      <FileTree
-        tree={ws.filteredFileTree}
-        expandedDirs={ws.expandedDirs}
-        activeFileKey={ws.activeFileKey}
-        activeDirKey={ws.activeDirKey}
-        workspaceId={ws.workspaceId}
-        nameInputState={ws.nameInputState}
-        bind:nameInputValue={ws.nameInputValue}
-        fileContext={ws.fileContext}
-        inlineError={ws.inlineError}
-        references={ws.fileContext.references}
-        onToggleDir={ws.toggleDir}
-        onFileClick={handleFileClick}
-        onToggleReference={ws.toggleReference}
-        onRenameFile={ws.renameFile}
-        onDeleteFile={ws.deleteFile}
-        onCopyPathToClipboard={ws.copyPathToClipboard}
-        onSubmitInlineAction={ws.submitInlineAction}
-        onCancelInlineAction={ws.cancelInlineAction}
-        onStartRename={ws.startRename}
-        onTriggerExtract={ws.triggerExtract}
-        onDownloadFile={ws.downloadFile}
-        onShareFile={ws.shareFile}
-        onStartCreate={ws.startCreate}
-      />
-    {:else}
-      <div class="flex flex-col items-center justify-center h-full text-center px-8 opacity-30">
-        <CloudIcon class="size-12 mb-4 text-white/40" />
-        <p class="text-[12px] font-black tracking-widest uppercase text-white mb-2">Cloud Storage</p>
-        <p class="text-[10px] font-bold text-white/60 leading-relaxed max-w-[200px]">
-          Connect cloud storage providers to access files remotely.
-        </p>
-        <span class="mt-3 text-[9px] px-2 py-1 rounded bg-white/10 text-white/40">Coming Soon</span>
-      </div>
-    {/if}
-  </div>
+	<ScrollArea class="flex-1">
+		{#if loading}
+			<div class="px-4 py-8 text-center text-[11px] text-white/40">Loading…</div>
+		{:else if error}
+			<div class="px-4 py-8 text-center text-[11px] text-rose-400">{error}</div>
+		{:else if entries.length === 0}
+			<div class="flex flex-col items-center justify-center h-full text-center px-8 opacity-30 py-12">
+				<FileTextIcon class="size-12 mb-4 text-white/40" />
+				<p class="text-[12px] font-black tracking-widest uppercase text-white mb-2">
+					No artifacts yet
+				</p>
+				<p class="text-[10px] font-bold text-white/60 leading-relaxed max-w-[200px]">
+					Thread artifacts saved from chat will appear here.
+				</p>
+			</div>
+		{:else}
+			<ul class="flex flex-col p-2 gap-1">
+				{#each entries as entry (entry.key)}
+					{@const Icon = fileIcon(entry.name)}
+					<li>
+						<Button
+							variant="ghost"
+							size="sm"
+							class="w-full justify-start text-left h-auto py-2 px-3 hover:bg-white/5"
+							onclick={() => handleSelect(entry)}
+						>
+							<Icon class="size-4 text-primary/80 shrink-0" />
+							<span class="truncate text-[12px] font-medium text-white/90 flex-1 ml-2">
+								{entry.name}
+							</span>
+						</Button>
+					</li>
+				{/each}
+			</ul>
+		{/if}
+	</ScrollArea>
 </div>
-
-<style>
-  :global(.custom-scrollbar::-webkit-scrollbar) {
-    width: 4px;
-    height: 4px;
-  }
-  :global(.custom-scrollbar::-webkit-scrollbar-track) {
-    background: transparent;
-  }
-  :global(.custom-scrollbar::-webkit-scrollbar-thumb) {
-    background: rgba(var(--primary), 0.1);
-    border-radius: 10px;
-  }
-</style>

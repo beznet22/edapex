@@ -1,7 +1,7 @@
 // Verified: no native Mastra API for file-as-context injection as of @mastra/core@0.10.x
 // Custom implementation per design spec — reads workspace files and formats them for agent context injection.
 
-import { workspaceFiles } from '$lib/server/storage/files';
+import { workspaceFiles } from '$lib/server/mastra/storage/files';
 
 const MAX_REFS = 5;
 const MAX_FILE_SIZE = 50 * 1024; // 50KB

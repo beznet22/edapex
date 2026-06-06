@@ -13,7 +13,7 @@
 import { Agent, type ToolsInput } from '@mastra/core/agent';
 import { Memory } from '@mastra/memory';
 import { z } from 'zod';
-import { createMastraStorage } from '../storage';
+import { createMastraStorage } from '$lib/server/mastra/storage/libsql/mastra-storage';
 import { createTool } from '@mastra/core/tools';
 import { ResultsRepository } from '../../repository/result.repo';
 import { StudentRepository } from '../../repository/student.repo';

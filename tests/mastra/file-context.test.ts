@@ -2,13 +2,13 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { injectFileContext, isBinaryMimeType, type FileReference } from '$lib/server/mastra/file-context';
 
 // Mock the storage module
-vi.mock('$lib/server/storage/files', () => ({
+vi.mock('$lib/server/mastra/storage/files', () => ({
 	workspaceFiles: {
 		download: vi.fn()
 	}
 }));
 
-import { workspaceFiles } from '$lib/server/storage/files';
+import { workspaceFiles } from '$lib/server/mastra/storage/files';
 
 const mockDownload = vi.mocked(workspaceFiles.download);
 

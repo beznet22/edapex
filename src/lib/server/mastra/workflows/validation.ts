@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { resultOutputSchema } from '$lib/schema/result-output';
 import { createAssessmentServiceForRequest } from '../../service/assessment.service';
 import { createTenantContext } from '../../mastra/tenant-context';
-import { applyGradingBusinessLogic, validateAttendance } from '../../helpers/extract-helper';
+import { applyGradingBusinessLogic, validateAttendance } from '../../service/assessment-ocr.service';
 import { mastra } from '$lib/server/mastra';
 
 const validationTriggerSchema = z.object({
@@ -44,7 +44,7 @@ const structuredOutputStep = createStep({
     const agent = mastra.getAgent('result-mapper');
     if (!agent) throw new Error('Agent result-mapper not found');
 
-    const response = await agent.generate(
+    const response = await (agent as any).generate(
       `Map this markdown to structured ResultOutput format:\n\n${inputData.markdown}`,
       { output: resultOutputSchema }
     );
@@ -73,7 +73,7 @@ const handleValidationStep = createStep({
     errors: z.array(z.string()),
     reason: z.string(),
   }),
-  execute: async ({ inputData, resumeData, suspend, suspendData, bail, context }) => {
+  execute: async ({ inputData, resumeData, suspend, bail, context }: any) => {
     const { approved, correctedMarkdown } = resumeData ?? {};
     
     // If validation failed originally or user sent corrections
@@ -96,21 +96,24 @@ const handleValidationStep = createStep({
     }
 
     // Apply business logic
-    applyGradingBusinessLogic(output);
+    applyGradingBusinessLogic(output, 'NURSERY');
     validateAttendance(output);
 
     // Commit to DB (Slice 10: per-request provider)
-    const { staffId, tenantContext, examId } = context.workflowState?.triggerData ?? {};
+    const ctx = context?.workflowState?.triggerData ?? {};
+    const staffId = ctx.staffId ?? 1;
+    const examId = ctx.examId ?? 1;
+    const schoolId = ctx.tenantContext?.schoolId ?? 1;
     const assessment = await createAssessmentServiceForRequest(
       createTenantContext({
-        schoolId: tenantContext?.schoolId ?? 1,
-        userId: staffId ?? 1,
+        schoolId,
+        userId: staffId,
       }),
     );
-    await assessment.upsertStudentResult(output, examId, tenantContext.schoolId);
+    await assessment.upsertStudentResult(output, examId);
 
     // Construct PDF token
-    const tokenPayload = JSON.stringify({ studentId: output.studentId, examId });
+    const tokenPayload = JSON.stringify({ studentId: (output as any).studentId, examId });
     const token = Buffer.from(tokenPayload).toString('base64url');
 
     return { fileId: inputData.fileId, success: true, token };

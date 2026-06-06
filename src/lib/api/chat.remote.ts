@@ -1,11 +1,11 @@
 import { command, getRequestEvent, query } from "$app/server";
-import { allowAnonymousChats, EXTRACTED_DIR } from "$lib/constants";
+import { allowAnonymousChats } from "$lib/constants";
 import { chatVisibilitySchema, fileSchema, type ChatVisibility } from "$lib/schema/chat-schema";
 import { resultInputSchema } from "$lib/schema/result-input";
 import z from "zod";
 import { createAssessmentServiceForRequest } from "$lib/server/service/assessment.service";
 import { createTenantContext } from "$lib/server/mastra/tenant-context";
-import { studentFileStorage } from "$lib/server/storage/student-files";
+import { createTenantFileStorage } from "$lib/server/mastra/storage/tenant-file-storage";
 import { readdir, stat } from "fs/promises";
 import { join } from "path";
 import type { ChatThread, UploadedData } from "$lib/types/chat-types";
@@ -56,7 +56,6 @@ export const getHistory = query(z.object({}), async () => {
 
     const resourceId = `user-${user.id}`;
     const result = await memory.listThreads({ filter: { resourceId } });
-
     // Map Mastra threads to the ChatThread shape the UI expects
     return result.threads.map((t: StorageThreadType) => ({
       id: t.id,
@@ -221,81 +220,77 @@ export const getResources = query(
   }),
   async ({ className, sectionName }) => {
     const { user } = getRequestEvent().locals;
+    if (!user) return { success: true, resources: [] };
 
-    const allTokens = new Set<string>();
-    const extractedBase = EXTRACTED_DIR;
+    let tenant = createTenantContext({
+      schoolId: user.schoolId ?? 1,
+      userId: user.id,
+      staffId: user.staffId ?? undefined,
+    });
 
-    // Determine which tokens to search for
     if (className && sectionName) {
-      allTokens.add(`${className}(${sectionName})`.toLowerCase().replaceAll(" ", "_"));
-    } else if (user?.designation === "class_teacher") {
-      // Slice 13c: per-request provider, no module-level singleton
-      const assessment = await createAssessmentServiceForRequest(
-        createTenantContext({
+      const assessment = await createAssessmentServiceForRequest(tenant);
+      const assigned = await assessment.getAssignedClassSection(user.staffId || 1);
+      if (assigned) {
+        tenant = createTenantContext({
           schoolId: user.schoolId ?? 1,
           userId: user.id,
           staffId: user.staffId ?? undefined,
-        }),
-      );
-      const classSection = await assessment.getAssignedClassSection(user.staffId || 1);
-      if (classSection) {
-        allTokens.add(`${classSection.className}(${classSection.sectionName})`.toLowerCase().replaceAll(" ", "_"));
+          classId: assigned.classId,
+          sectionId: assigned.sectionId,
+        });
       }
-    } else {
-      // Admin or no specific filter - find all available tokens in storage/extracted
-      if (existsSync(extractedBase)) {
-        const dirs = await readdir(extractedBase, { withFileTypes: true });
-        dirs.filter(d => d.isDirectory()).forEach(d => allTokens.add(d.name));
+    } else if (user.designation === "class_teacher") {
+      const assessment = await createAssessmentServiceForRequest(tenant);
+      const assigned = await assessment.getAssignedClassSection(user.staffId || 1);
+      if (assigned) {
+        tenant = createTenantContext({
+          schoolId: user.schoolId ?? 1,
+          userId: user.id,
+          staffId: user.staffId ?? undefined,
+          classId: assigned.classId,
+          sectionId: assigned.sectionId,
+        });
       }
     }
 
-    const tokens = Array.from(allTokens);
-    if (tokens.length === 0) {
+    const fileStorage = await createTenantFileStorage(tenant);
+    const studentFolders = await fileStorage.listStudentFolders();
+
+    if (studentFolders.length === 0) {
       return { success: true, resources: [] };
     }
 
+    const token = `${className ?? ""}(${sectionName ?? ""})`.toLowerCase().replaceAll(" ", "_");
+    const displayToken = token === "()" ? "" : token;
+
     const resources: UploadedData[] = [];
-
-    for (const token of tokens) {
-      // Get Extracted Files from Permanent Storage
+    for (const studentFolder of studentFolders) {
       try {
-        // We need to parse common token format: class(section)
-        const match = token.match(/^(.+)\((.+)\)$/);
-        if (match) {
-          const [, cName, sName] = match;
-          const studentFolders = await studentFileStorage.listByClass(cName, sName);
+        const assessmentData = await fileStorage.load(studentFolder);
+        if (!assessmentData) continue;
 
-          for (const folderPath of studentFolders) {
-            try {
-              const assessmentData = await studentFileStorage.load(folderPath);
-              if (!assessmentData) continue;
-
-              const resourceId = assessmentData.storagePath || folderPath;
-              resources.push({
-                id: resourceId,
-                filename: assessmentData.data?.studentData?.fullName || assessmentData.originalName || folderPath.split("/").pop() || "Unknown",
-                originalName: assessmentData.originalName || folderPath.split("/").pop(),
-                token,
-                status: assessmentData.status,
-                success: ["extracted", "approved", "published"].includes(assessmentData.status),
-                type: "image/jpeg",
-                url: `/api/uploads/${resourceId}/image.jpg?token=${token}`,
-                data: {
-                  studentId: assessmentData.data?.studentData?.studentId,
-                  examId: assessmentData.data?.studentData?.examTypeId,
-                  classId: assessmentData.data?.studentData?.classId,
-                  sectionId: assessmentData.data?.studentData?.sectionId,
-                  fullName: assessmentData.data?.studentData?.fullName
-                },
-                error: assessmentData.error
-              });
-            } catch (e) {
-              console.error("Failed to load assessment data for folder:", folderPath, e);
-            }
-          }
-        }
-      } catch (error) {
-        console.error("Error reading student file storage:", error);
+        const resourceId = assessmentData.storagePath || studentFolder;
+        resources.push({
+          id: resourceId,
+          filename: assessmentData.data?.studentData?.fullName || assessmentData.originalName || studentFolder,
+          originalName: assessmentData.originalName || studentFolder,
+          token: displayToken,
+          status: assessmentData.status,
+          success: ["extracted", "approved", "published"].includes(assessmentData.status),
+          type: "image/jpeg",
+          url: `/api/uploads/${resourceId}/image.jpg?token=${displayToken}`,
+          data: {
+            studentId: assessmentData.data?.studentData?.studentId,
+            examId: assessmentData.data?.studentData?.examTypeId,
+            classId: assessmentData.data?.studentData?.classId,
+            sectionId: assessmentData.data?.studentData?.sectionId,
+            fullName: assessmentData.data?.studentData?.fullName,
+          },
+          error: assessmentData.error,
+        });
+      } catch (e) {
+        console.error("Failed to load assessment data for folder:", studentFolder, e);
       }
     }
 

@@ -1,6 +1,8 @@
+import { desc, eq } from "drizzle-orm";
 import type { RequestContext } from "@mastra/core/request-context";
 import { ScopedRepositoryProvider } from "./scoped-repository";
-import { getDatabase } from "../db";
+import { getDatabase } from "$lib/server/db";
+import { smExamTypes } from "$lib/server/db/sms-schema";
 
 /**
  * Immutable tenant context bound per-request.
@@ -15,6 +17,7 @@ export interface TenantContext {
   readonly classId: number | null;
   readonly sectionId: number | null;
   readonly examId: number | null;
+  readonly examTypeId: number | null;
   readonly academicId: number | null;
   readonly studentId: number | null;
 }
@@ -24,6 +27,7 @@ export function createTenantContext(params: Partial<{
   classId: number | null;
   sectionId: number | null;
   examId: number | null;
+  examTypeId: number | null;
   academicId: number | null;
   studentId: number | null;
   userId: number;
@@ -36,6 +40,7 @@ export function createTenantContext(params: Partial<{
     classId: params.classId ?? null,
     sectionId: params.sectionId ?? null,
     examId: params.examId ?? null,
+    examTypeId: params.examTypeId ?? null,
     academicId: params.academicId ?? null,
     studentId: params.studentId ?? null,
     userId: params.userId ?? 1,
@@ -43,6 +48,28 @@ export function createTenantContext(params: Partial<{
     roleId: params.roleId ?? null,
     designationId: params.designationId ?? 1,
   });
+}
+
+export async function resolveExamTypeId(
+  schoolId: number,
+  examTypeId: number | null,
+): Promise<number | null> {
+  if (examTypeId !== null) return examTypeId;
+  const db = await getDatabase();
+  const [latest] = await db
+    .select({ id: smExamTypes.id })
+    .from(smExamTypes)
+    .where(eq(smExamTypes.schoolId, schoolId))
+    .orderBy(desc(smExamTypes.id))
+    .limit(1);
+  return latest?.id ?? null;
+}
+
+export function withExamTypeId(
+  tenant: TenantContext,
+  examTypeId: number | null,
+): TenantContext {
+  return Object.freeze({ ...tenant, examTypeId });
 }
 
 const DEFAULT_TENANT: TenantContext = createTenantContext({});

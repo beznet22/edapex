@@ -42,7 +42,7 @@ export class SkillWatcher {
 		this.watcher
 			.on('add', (path: string) => this.handleFileEvent(path))
 			.on('change', (path: string) => this.handleFileEvent(path))
-			.on('error', (error: Error) => this.handleError(error));
+			.on('error', (error: unknown) => this.handleError(error as Error));
 
 		this.state.status = 'running';
 	}

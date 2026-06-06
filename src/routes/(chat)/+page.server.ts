@@ -1,9 +1,8 @@
 import { fileSchema } from "$lib/schema/chat-schema";
 import { resultInputSchema } from "$lib/schema/result-input";
 import { EdApexGateway } from "$lib/server/mastra/gateway";
-import { createMastraDb } from "$lib/server/mastra/db";
+import { getAppDb } from "$lib/server/mastra/storage/libsql/app-db";
 import { createTenantContext } from "$lib/server/mastra/tenant-context";
-import { resultRepo, staffRepo } from "$lib/server/repository";
 import { createAssessmentServiceForRequest } from "$lib/server/service/assessment.service";
 import { mistralOcrService } from "$lib/server/service/mistral-ocr.service";
 import { mastra } from "$lib/server/mastra";
@@ -18,7 +17,7 @@ export const load: PageServerLoad = async ({ url, locals }) => {
     return redirect(302, "/signin");
   }
 
-  return { user };
+  return { user: user };
 };
 
 export const actions: Actions = {
@@ -39,14 +38,23 @@ export const actions: Actions = {
 
     let staffId: number = user.staffId || 1;
     let token = "";
+    const assessment = await createAssessmentServiceForRequest(
+      createTenantContext({
+        schoolId: user.schoolId ?? 1,
+        userId: user.id,
+        staffId: user.staffId ?? undefined,
+        classId: classId || null,
+        sectionId: sectionId || null,
+      }),
+    );
     if (classId && sectionId && user.designation === "coordinator") {
-      const staff = await staffRepo.getStaffByClassSection({ classId, sectionId });
+      const staff = await assessment.getStaffByClassSection({ classId, sectionId });
       if (!staff.teacherId)
         return { success: false, status: "error", message: "Class not assigned to any teacher" };
       staffId = staff.teacherId;
       token = `${className}(${sectionName})`.toLowerCase().replaceAll(" ", "_");
     } else {
-      const assigned = await resultRepo.getAssignedClassSection(staffId);
+      const assigned = await assessment.getAssignedClassSection(staffId);
       if (!assigned || !assigned.className || !assigned.sectionName)
         return { success: false, status: "error", message: "You have not been assigned a class" };
     }
@@ -64,7 +72,7 @@ export const actions: Actions = {
       // it is a MastraModelGateway, not a generic orchestration class. The
       // extraction itself runs through the extractionWorkflow below, which
       // uses the registered gateway internally for LLM resolution.
-      const mastraDb = createMastraDb();
+      const mastraDb = getAppDb();
       const gateway = new EdApexGateway(mastraDb, user.id);
       mastra.addGateway(gateway);
 

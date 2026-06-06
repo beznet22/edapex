@@ -47,6 +47,25 @@ export function connectMySQL(): MySQLDrizzleClient {
 }
 
 /**
+ * Returns the underlying mysql2 pool for callers that need raw query access
+ * (e.g., the workspace assignment verifier that runs SQL against legacy
+ * `sm_*` tables not in the Drizzle schema map).
+ *
+ * The pool is created lazily on first call to `getDatabase()` or `getPool()`.
+ */
+export function getPool(): mysql.Pool {
+  if (!pool) {
+    pool = mysql.createPool({
+      uri: env.DATABASE_URL,
+      waitForConnections: true,
+      connectionLimit: 10,
+      queueLimit: 0,
+    });
+  }
+  return pool;
+}
+
+/**
  * Gracefully close the MySQL pool (useful for tests, CLI, or HMR).
  */
 export async function closeDatabase(): Promise<void> {

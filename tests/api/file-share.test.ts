@@ -9,7 +9,7 @@ vi.mock('$env/dynamic/private', () => ({
 }));
 
 // Mock the storage module
-vi.mock('$lib/server/storage/files', () => ({
+vi.mock('$lib/server/mastra/storage/files', () => ({
 	workspaceFiles: {
 		download: vi.fn()
 	}
@@ -105,13 +105,13 @@ describe('File Share API', () => {
 	describe('POST /api/file/share handler logic', () => {
 		it('rejects request with missing key', async () => {
 			// Simulate the validation logic from the POST handler
-			const body = { workspace: 'ws-1' };
+			const body: any = { workspace: 'ws-1' };
 			const key = body.key as unknown;
 			expect(!key || typeof key !== 'string').toBe(true);
 		});
 
 		it('rejects request with missing workspace', async () => {
-			const body = { key: 'file.txt' };
+			const body: any = { key: 'file.txt' };
 			const workspace = body.workspace as unknown;
 			expect(!workspace || typeof workspace !== 'string').toBe(true);
 		});

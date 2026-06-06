@@ -4,25 +4,22 @@
   import { useSidebar } from "$lib/components/ui/sidebar/index.js";
   import type { AuthUser } from "$lib/types/auth-types";
   import { UserContext } from "$lib/context/user-context.svelte";
-  import PanelRightIcon from "@lucide/svelte/icons/panel-right";
+  import ActivityPopover from "$lib/components/activity-popover.svelte";
 
   let {
     user,
     chat,
     readonly = false,
-    onToggleInspector,
   }: {
     user?: AuthUser;
     chat?: any;
     readonly?: boolean;
-    onToggleInspector?: () => void;
   } = $props();
 
   const sidebar = useSidebar();
   const userContext = UserContext.fromContext();
 
   import FolderIcon from "@lucide/svelte/icons/folder";
-  import LayoutPanelLeftIcon from "@lucide/svelte/icons/layout-panel-left";
 </script>
 
 <header
@@ -51,13 +48,6 @@
   </div>
 
   <div class="flex items-center gap-2 shrink-0">
-    <Button
-      variant="outline"
-      size="icon"
-      class="h-12 w-12 min-h-12 min-w-12 border-white/10 bg-white/5 hover:bg-white/10 rounded-xl transition-all group"
-      onclick={onToggleInspector}
-    >
-      <LayoutPanelLeftIcon class="size-4" />
-    </Button>
+    <ActivityPopover />
   </div>
 </header>

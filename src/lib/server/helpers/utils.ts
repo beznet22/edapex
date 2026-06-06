@@ -83,23 +83,32 @@ import { readFileSync, existsSync } from "fs";
 import { join } from "path";
 
 /**
- * Convert an image file to base64 data URL
- * @param imagePath - Path to the image file (relative to project root or absolute)
- * @param fallbackPath - Optional fallback path if the main image doesn't exist
- * @returns Base64 data URL string or empty string if file not found
+ * Convert image URL or path to base64
+ * Handles both local files and already base64 encoded strings
+ * @param imageSource - Image path or existing base64 string
+ * @param fallbackPath - Optional fallback path
+ * @returns Base64 data URL string
  */
-export function imageToBase64(imagePath: string, fallbackPath?: string): string {
+export function ensureBase64Image(imageSource: string, fallbackPath?: string): string {
+  if (imageSource.startsWith("data:image/")) {
+    return imageSource;
+  }
+  if (imageSource.startsWith("http://") || imageSource.startsWith("https://")) {
+    console.warn(`Cannot convert remote URL to base64: ${imageSource}`);
+    return imageSource;
+  }
+
+  return readFileToBase64DataUrl(imageSource, fallbackPath);
+}
+
+function readFileToBase64DataUrl(imagePath: string, fallbackPath?: string): string {
   try {
-    // --- Path Resolution Strategy ---
     const resolvePath = (p: string) => {
-      // 1. Try as-is (absolute or already correct relative)
       if (existsSync(p)) return p;
 
-      // 2. Try relative to project root (process.cwd())
       const projectPath = join(process.cwd(), p.startsWith("/") ? p.substring(1) : p);
       if (existsSync(projectPath)) return projectPath;
 
-      // 3. Try relative to static directory
       const staticPath = join(process.cwd(), "static", p.startsWith("/") ? p.substring(1) : p);
       if (existsSync(staticPath)) return staticPath;
 
@@ -108,38 +117,26 @@ export function imageToBase64(imagePath: string, fallbackPath?: string): string 
 
     let fullPath = resolvePath(imagePath);
 
-    // If initial path fails, try fallback if provided
     if (!fullPath && fallbackPath) {
       console.log("Image not found, trying fallback:", fallbackPath);
       fullPath = resolvePath(fallbackPath);
     }
 
-    // If still doesn't exist, return empty string
     if (!fullPath) {
       console.warn(`Image not found: ${imagePath}`);
       return "";
     }
 
-    // Read the file
     const imageBuffer = readFileSync(fullPath);
-
-    // Determine MIME type from file extension
     const mimeType = getMimeType(fullPath);
 
-    // Convert to base64
-    const base64 = imageBuffer.toString("base64");
-
-    // Return data URL
-    return `data:${mimeType};base64,${base64}`;
+    return `data:${mimeType};base64,${imageBuffer.toString("base64")}`;
   } catch (error) {
     console.error(`Error converting image to base64: ${imagePath}`, error);
     return "";
   }
 }
 
-/**
- * Get MIME type from file extension
- */
 function getMimeType(filePath: string): string {
   const ext = filePath.toLowerCase().split(".").pop();
 
@@ -155,37 +152,6 @@ function getMimeType(filePath: string): string {
   };
 
   return mimeTypes[ext || ""] || "image/jpeg";
-}
-
-/**
- * Convert multiple images to base64 in parallel
- * @param imagePaths - Array of image paths
- * @returns Array of base64 data URLs
- */
-export function imagesToBase64(imagePaths: string[]): string[] {
-  return imagePaths.map((path) => imageToBase64(path));
-}
-
-/**
- * Convert image URL or path to base64
- * Handles both local files and already base64 encoded strings
- * @param imageSource - Image path or existing base64 string
- * @param fallbackPath - Optional fallback path
- * @returns Base64 data URL string
- */
-export function ensureBase64Image(imageSource: string, fallbackPath?: string): string {
-  // If already base64, return as is
-  if (imageSource.startsWith("data:image/")) {
-    return imageSource;
-  }
-  // If it's a URL (http/https), return as is (can't convert server-side)
-  if (imageSource.startsWith("http://") || imageSource.startsWith("https://")) {
-    console.warn(`Cannot convert remote URL to base64: ${imageSource}`);
-    return imageSource;
-  }
-
-  // Convert local file to base64
-  return imageToBase64(imageSource, fallbackPath);
 }
 
 /**

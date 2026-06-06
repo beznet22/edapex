@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { createTool } from "@mastra/core/tools";
+import type { TenantContext } from "../tenant-context";
 import {
   onboardEntitySchema,
   onboardEntityLogic,
@@ -14,6 +15,7 @@ import {
   patchEntityLogic,
 } from "./gov-tools";
 import { searchEntityLogic, systemStatusLogic, systemStatusSchema, switchWorkspaceSchema, switchWorkspaceLogic, type SearchCandidate, type SearchResult } from "./core-tools";
+import { carryForwardFilesLogic, carryForwardFilesSchema } from "./carry-forward";
 import {
   extractSchema,
   extractLogic,
@@ -224,6 +226,58 @@ export const systemStatusTool = createTool({
   },
 });
 
+export const searchWorkspaceSchema = z.object({
+  query: z.string().min(1).describe("Natural-language search query for workspace contents"),
+  topK: z.number().int().min(1).max(20).default(5).describe("Maximum number of results to return"),
+});
+
+export const searchWorkspaceTool = createTool({
+  id: "search-workspace",
+  description:
+    "Search the active tenant workspace's auto-indexed content roots " +
+    "(`extracted/`, `agentic-files/`, `docs/`) using BM25 keyword search. " +
+    "Use this to find OCR-extracted documents, agentic CLI outputs, or " +
+    "manually authored docs the teacher has saved.",
+  inputSchema: searchWorkspaceSchema,
+  execute: async (input: { query: string; topK?: number }, context: any) => {
+    const tenant = context.tenantContext as TenantContext | undefined;
+    if (!tenant) {
+      return { status: "ERROR", error: "No tenant context" };
+    }
+    const { mastra } = await import("../index");
+    const workspace = mastra.getWorkspaceById("tenant");
+    if (!workspace) {
+      return { status: "ERROR", error: "Tenant workspace not registered" };
+    }
+    try {
+      const results = await workspace.search(input.query, { topK: input.topK ?? 5 });
+      return {
+        status: "SUCCESS",
+        query: input.query,
+        count: results.length,
+        results: results.map((r) => ({
+          id: r.id,
+          score: r.score,
+          snippet: r.content.slice(0, 200),
+        })),
+      };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      return { status: "ERROR", error: message };
+    }
+  },
+  toModelOutput: (output: any) => {
+    if (output.status === "ERROR") return `Search failed: ${output.error}`;
+    if (!output.results || output.results.length === 0) {
+      return `No matches in workspace for "${output.query}".`;
+    }
+    const list = output.results
+      .map((r: { id: string; score: number }, i: number) => `  ${i + 1}. ${r.id} (score: ${r.score.toFixed(3)})`)
+      .join("\n");
+    return `Found ${output.count} match(es) for "${output.query}":\n${list}`;
+  },
+});
+
 export const extractTool = createTool({
   id: "extract-document",
   description: "Extract text and structure from a scanned result document for the active academic term.",
@@ -282,6 +336,7 @@ export const coreTools = {
   manageAccessTool,
   searchEntityTool,
   systemStatusTool,
+  searchWorkspaceTool,
 };
 
 export const workflowTools = {

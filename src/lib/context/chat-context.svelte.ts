@@ -44,17 +44,38 @@ export class ChatContext {
   openPanel = $state<boolean>(false);
   docPart = $state<CreateDocumentPart | undefined>(undefined);
   docState = $derived(this.docPart?.status);
-  get error() { return this.client?.error; }
-  profile = $state<'strong' | 'balanced' | 'simple'>('strong');
+  get error() {
+    return this.client?.error;
+  }
+  profile = $state<"strong" | "balanced" | "simple">("strong");
   thinkingEnabled = $state<boolean>(false);
-  get activeWorkflows() { return this.threadData.activeWorkflows; }
-  set activeWorkflows(v) { this.threadData.activeWorkflows = v; }
-  get pendingConfirmation() { return this.threadData.pendingConfirmation; }
-  set pendingConfirmation(v) { this.threadData.pendingConfirmation = v; }
+  get activeWorkflows() {
+    return this.threadData.activeWorkflows;
+  }
+  set activeWorkflows(v) {
+    this.threadData.activeWorkflows = v;
+  }
+  get pendingConfirmation() {
+    return this.threadData.pendingConfirmation;
+  }
+  set pendingConfirmation(v) {
+    this.threadData.pendingConfirmation = v;
+  }
   pendingMentions = $state<MentionPayload[]>([]);
-  fileReferences = $state<{ key: string; name: string; type: 'file' | 'dir'; mimeType?: string }[]>([]);
+  fileReferences = $state<
+    {
+      key: string;
+      name: string;
+      type: "file" | "dir";
+      mimeType?: string;
+      fileId?: string;
+      contentHash?: string;
+    }[]
+  >([]);
   #selectedModel = SelectedModel.fromContext();
-  get modelOverride() { return this.#selectedModel.value; }
+  get modelOverride() {
+    return this.#selectedModel.value;
+  }
 
   // Chat properties
   client: Chat<xUIMessage>;
@@ -63,19 +84,18 @@ export class ChatContext {
   parts?: xUIMessagePart[];
   status: ChatStatus;
   threadData: ThreadData;
-  get chatData() { return this.threadData.chatData; }
-  set chatData(v) { this.threadData.chatData = v; }
+  get chatData() {
+    return this.threadData.chatData;
+  }
+  set chatData(v) {
+    this.threadData.chatData = v;
+  }
   chatHistory = ChatHistory.fromContext();
 
   #selectedClass: SelectedClass;
   // #selectedAgent removed
 
-  constructor({
-    initialMessages,
-    api,
-    chatData,
-    selectedClass,
-  }: InitChat) {
+  constructor({ initialMessages, api, chatData, selectedClass }: InitChat) {
     this.client = $derived(
       new Chat<xUIMessage>({
         id: chatData?.threadId,
@@ -87,7 +107,7 @@ export class ChatContext {
         onFinish: this.#onFinish.bind(this),
         onData: this.#onData.bind(this),
         onError: this.#onError.bind(this),
-      })
+      }),
     );
 
     this.threadData = new ThreadData(chatData);
@@ -96,8 +116,6 @@ export class ChatContext {
     this.lastMessage = $derived(this.messages.at(-1));
     this.#selectedClass = selectedClass;
   }
-
-
 
   get selectedClass() {
     return this.#selectedClass.data;
@@ -111,23 +129,12 @@ export class ChatContext {
     return this.status === "streaming" || this.status === "submitted";
   }
 
-  #prepareSendMessagesRequest = ({ messages, id }: { messages: xUIMessage[], id?: string }) => {
+  #prepareSendMessagesRequest = ({ messages, id }: { messages: xUIMessage[]; id?: string }) => {
     // Reset the data-chat received flag at the start of each new stream
     this.threadData.resetReceived();
 
-    let api = '/api/chat';
+    const api = "/api/chat";
     const lastMessage = messages.at(-1);
-    if (lastMessage?.parts) {
-      const textPart = lastMessage.parts.find(p => p.type === 'text') as any;
-      if (textPart && textPart.text) {
-        if (textPart.text.startsWith('/extract') ||
-            textPart.text.startsWith('/generate') ||
-            textPart.text.startsWith('/validate') ||
-            textPart.text.startsWith('/publish')) {
-          api = '/api/ai/workflow';
-        }
-      }
-    }
 
     const body: Record<string, any> = {
       messages: this.user ? [lastMessage] : messages,
@@ -137,13 +144,18 @@ export class ChatContext {
       profile: this.profile,
       thinkingEnabled: this.thinkingEnabled,
       modelOverride: this.modelOverride,
-      fileReferences: this.fileReferences.length > 0 ? this.fileReferences : undefined,
+      fileReferences: this.fileReferences.length > 0 ? [...this.fileReferences] : undefined,
     };
 
     // Include @mention tags if any were selected for this message
     if (this.pendingMentions.length > 0) {
       body.mentions = this.pendingMentions;
       this.pendingMentions = [];
+    }
+
+    // Clear file references after capturing them in the payload
+    if (this.fileReferences.length > 0) {
+      this.fileReferences = [];
     }
 
     return { body, api };
@@ -185,12 +197,15 @@ export class ChatContext {
     try {
       const jsonError = JSON.parse(error.message);
       if (typeof jsonError === "object" && jsonError !== null && "message" in jsonError) {
-        toast.error(jsonError.message);
+        console.error("Error", jsonError.message);
+        toast.error("Error: Some error occured. Please try again.");
       } else {
-        toast.error(error.message);
+        console.error("Error", error.message);
+        toast.error("Error: Some error occured. Please try again.");
       }
     } catch {
-      toast.error(error.message);
+      console.error("Error", error.message);
+      toast.error("Error: Some error occured. Please try again.");
     }
   };
 

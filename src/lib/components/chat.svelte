@@ -32,7 +32,10 @@
   import TriangleAlertIcon from "@lucide/svelte/icons/triangle-alert";
   import * as Alert from "$lib/components/ui/alert";
 
+  import ShimmerArtifactCard from "./ShimmerArtifactCard.svelte";
+
   import { cn } from "$lib/utils/shadcn";
+  import { onMount } from "svelte";
 
   let {
     user,
@@ -69,6 +72,10 @@
       }
     }, 2000);
   };
+
+  $effect(() => {
+    console.log(chat.messages);
+  });
 </script>
 
 <div
@@ -198,6 +205,29 @@
 
                   <!-- Render all non-reasoning parts -->
                   {#each nonReasoningParts as part}
+                    {#if part.type === "data-createDocument"}
+                      <div class="my-2">
+                        <ShimmerArtifactCard
+                          id={part.id ?? `shimmer-${part.data?.title ?? "doc"}`}
+                          title={part.data?.title ?? "Document"}
+                          status={part.data?.status ?? "processing"}
+                          content={part.data?.content ?? ""}
+                        />
+                      </div>
+                    {/if}
+
+                    {#if part.type === "data-generatePDF"}
+                      <div class="my-2">
+                        <ShimmerArtifactCard
+                          id={part.id ?? `shimmer-${part.data?.title ?? "pdf"}`}
+                          title={part.data?.title ?? "PDF"}
+                          status={part.data?.status ?? "processing"}
+                          content={part.data?.data ?? ""}
+                          kind="pdf"
+                        />
+                      </div>
+                    {/if}
+
                     {#if part.type === "tool-invocation"}
                       <div class="flex">
                         <ToolMessage {part} />
@@ -206,7 +236,11 @@
 
                     {#if part.type === "text"}
                       {#if message.role === "assistant"}
-                        {@const pdfLinks = Array.from(part.text.matchAll(/\[([^\]]+)\]\(([^)]+\.pdf|[^)]+\/api\/results\/[^)]+)\)/g)).map(m => ({ text: m[1], url: m[2] }))}
+                        {@const pdfLinks = Array.from(
+                          part.text.matchAll(
+                            /\[([^\]]+)\]\(([^)]+\.pdf|[^)]+\/api\/results\/[^)]+)\)/g,
+                          ),
+                        ).map((m) => ({ text: m[1], url: m[2] }))}
                         <Markdown
                           content={part.text}
                           animation={{ enabled: true }}
@@ -214,7 +248,10 @@
                         {#if pdfLinks.length > 0}
                           <div class="mt-4 flex flex-col gap-2">
                             {#each pdfLinks as link}
-                              <PdfLinkCard filename={link.text} url={link.url} />
+                              <PdfLinkCard
+                                filename={link.text}
+                                url={link.url}
+                              />
                             {/each}
                           </div>
                         {/if}
@@ -229,7 +266,7 @@
                   {/each}
                 </MessageContent>
               </Message>
-              {#if chat.status === "submitted" && message.id === chat.lastMessage?.id && chat.lastMessage?.role === "user"}
+              {#if chat.status === "submitted" && message.id === chat.lastMessage?.id && chat.lastMessage?.role === "assistant"}
                 <Shimmer as="p" spread={3} duration={2} content_length={18}>
                   {#snippet children()}
                     Generating response...
@@ -237,6 +274,23 @@
                 </Shimmer>
               {/if}
 
+              {#if chat.error && message.id === chat.lastMessage?.id}
+                <Alert.Root
+                  variant="destructive"
+                  class="bg-destructive/10 border-dashed border-destructive/50 text-destructive"
+                >
+                  <TriangleAlertIcon class="size-4" />
+                  <Alert.Title>Error</Alert.Title>
+                  <Alert.Description>
+                    {(() => {
+                      const message = chat.error?.message ?? "";
+                      const retryInfo =
+                        "\n\nIf the issue persists, try clearing the conversation or contacting support for assistance.";
+                      return message + retryInfo;
+                    })()}
+                  </Alert.Description>
+                </Alert.Root>
+              {/if}
               <!-- Actions for both user and assistant messages -->
               {#if chat.status === "ready" || chat.status === "error"}
                 <MessageAction
@@ -248,13 +302,6 @@
               {/if}
             </div>
           {/each}
-          {#if chat.error}
-            <Alert.Root variant="destructive" class="bg-destructive/10 border-dashed border-destructive/50 text-destructive">
-              <TriangleAlertIcon class="size-4" />
-              <Alert.Title>Error</Alert.Title>
-              <Alert.Description>{chat.error.message || "An error occurred during the conversation."}</Alert.Description>
-            </Alert.Root>
-          {/if}
         </div>
       </ConversationContent>
       <ConversationScrollButton class="bottom-36 sm:bottom-40 z-20" />

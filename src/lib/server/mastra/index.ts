@@ -16,7 +16,10 @@ import { validationWorkflow } from './workflows/validation';
 import { publishWorkflow } from './workflows/publish';
 import { extractionWorkflow } from './workflows/extraction';
 import { generateWorkflow } from './workflows/generate';
-import { createMastraStorage } from './storage';
+import { chatWorkflow } from './workflows/chat';
+import { createMastraStorage } from '$lib/server/mastra/storage/libsql/mastra-storage';
+import { tenantWorkspace } from '$lib/server/mastra/storage/workspaces';
+import { testAgent, testWorkflow } from './agents/assistant';
 
 // ─── Singleton Mastra Instance ──────────────────────────────────────────────
 
@@ -34,13 +37,14 @@ import { createMastraStorage } from './storage';
  */
 export const mastra = new Mastra({
   agents: {
+    testAgent: testAgent,
     supervisor: supervisorAgent,
     assistant: assistantAgent,
     title: titleAgent,
     editorEdit: editorEditAgent,
     editorGenerate: editorGenerateAgent,
     editorCopilot: editorCopilotAgent,
-    'result-mapper': resultMapperAgent,
+    "result-mapper": resultMapperAgent,
   },
   workflows: {
     editorCommandWorkflow,
@@ -48,6 +52,8 @@ export const mastra = new Mastra({
     publishWorkflow,
     extractionWorkflow,
     generateWorkflow,
+    chatWorkflow,
+    testWorkflow
   },
   storage: createMastraStorage(),
   server: {
@@ -58,6 +64,9 @@ export const mastra = new Mastra({
     ],
   },
 });
+
+// Register the single per-tenant workspace.
+mastra.addWorkspace(tenantWorkspace, 'tenant');
 
 // ─── Convenience Accessors ──────────────────────────────────────────────────
 

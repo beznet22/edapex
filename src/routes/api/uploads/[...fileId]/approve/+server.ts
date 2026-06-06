@@ -1,8 +1,7 @@
 import { json } from "@sveltejs/kit";
-import { studentFileStorage } from "$lib/server/storage/student-files";
 import { createAssessmentServiceForRequest } from "$lib/server/service/assessment.service";
 import { createTenantContext } from "$lib/server/mastra/tenant-context";
-import { join } from "path";
+import { createTenantFileStorage } from "$lib/server/mastra/storage/tenant-file-storage";
 import type { RequestHandler } from "./$types";
 import type { ResultInput } from "$lib/schema/result-input";
 
@@ -20,21 +19,16 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
     }
 
     try {
-        // 1. Mark as verified in the data object
-        // studentFileStorage.save() expects this to be on the top level of data
         data.verified = true;
         data.status = "approved";
         data.extractedAt = new Date();
 
-        // 2. Map ExtractedAssessment data to ResultInput format for DB persistence
         if (!data.data) {
             return json({ success: false, message: "No data to approve" }, { status: 400 });
         }
         const resultInput = data.data as ResultInput;
 
-        // 3. Save to Database
         const teacherId = user.staffId || 1;
-        // Slice 10: per-request provider
         const assessment = await createAssessmentServiceForRequest(
             createTenantContext({
                 schoolId: user.schoolId ?? 1,
@@ -42,23 +36,21 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
                 staffId: teacherId,
             }),
         );
-        // Upsert returns the MarkResponse, we just need to ensure it doesn't throw
         const dbResult = await assessment.upsertStudentResult(resultInput, teacherId);
 
-        // 4. Save back to filesystem (permanent storage)
-        const storagePath = await studentFileStorage.save(data);
+        const tenant = createTenantContext({
+            schoolId: user.schoolId ?? 1,
+            userId: user.id,
+            staffId: teacherId,
+        });
+        const fileStorage = await createTenantFileStorage(tenant);
+        const storagePath = await fileStorage.save(data);
 
-        // 5. Cleanup old folder if the path has changed (e.g. name corrected)
-        // fileId is encoded folder path, e.g. "creche(b)/original_filename"
-        // storagePath is the new folder path, e.g. "creche(b)/student_name"
         const decodedFileId = decodeURIComponent(fileId);
-        if (decodedFileId !== storagePath) {
-            console.log(`Renaming/Cleaning up old storage path: ${decodedFileId} -> ${storagePath}`);
-            const oldPath = join(studentFileStorage.basePath, decodedFileId);
-            const { existsSync, rmSync } = await import("fs");
-            if (existsSync(oldPath)) {
-                rmSync(oldPath, { recursive: true });
-            }
+        const oldStudentFolder = fileStorage.formatName(decodedFileId.split("/").pop()?.replace(/\.[^.]+$/, "") || decodedFileId);
+        const newStudentFolder = fileStorage.formatName(data.data?.studentData?.fullName || "");
+        if (oldStudentFolder !== newStudentFolder) {
+            await fileStorage.deleteStudentFolder(oldStudentFolder);
         }
 
         return json({

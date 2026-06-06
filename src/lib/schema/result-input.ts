@@ -2,6 +2,7 @@
 import { z } from "zod";
 
 import { AttributeEnum, AttributeRemark } from "$lib/constants/assessment";
+import { StudentRepository } from "$lib/server/repository";
 
 // Helper function to match names
 const matchName = (fullName: string, targetName?: string): boolean => {
@@ -73,20 +74,17 @@ export const studentDataSchema = z.object({
   attendance: attendanceSchema.describe("Attendance details for the period"),
 }).superRefine(async (data, ctx) => {
   if (data.admissionNo) {
-    let studentRepo;
-    if (typeof window === "undefined") {
-      const mod = await import("$lib/server/repository");
-      studentRepo = mod.studentRepo;
-    } else {
+    if (typeof window !== "undefined") {
       // Running on the client: bypass server-side repo check
       return;
     }
+    const studentRepo = await StudentRepository.build();
 
     const student = await studentRepo.getStudentRecordByAdmissionNo(data.admissionNo);
     if (!student || !student.classId || !student.sectionId || !student.fullName) {
       ctx.addIssue({
         code: "custom",
-        message: `Student not found for admission number ${data.admissionNo} or disabled, 
+        message: `Student not found for admission number ${data.admissionNo} or disabled,
         please register student first or ask admin to enable student`,
         path: ["admissionNo"],
       });

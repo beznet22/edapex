@@ -1,7 +1,7 @@
 import { command, getRequestEvent } from "$app/server";
 import { allowAnonymousChats } from "$lib/constants";
 import { CredentialType } from "$lib/schema/chat-schema";
-import { createMastraDb } from "$lib/server/mastra/db";
+import { getAppDb } from "$lib/server/mastra/storage/libsql/app-db";
 import { 
   saveProviderCredential, 
   deleteProviderCredential, 
@@ -10,7 +10,7 @@ import {
   maskKey,
   ensureAgentTables
 } from "$lib/server/mastra/provider-config";
-import { agentRouting, agentSettings } from "$lib/server/mastra/db/schema";
+import { agentRouting, agentSettings } from "$lib/server/mastra/storage/libsql/app-db.schema";
 import { eq, and } from "drizzle-orm";
 import { env } from "$env/dynamic/private";
 import z from "zod";
@@ -35,7 +35,7 @@ export const addProvider = command(
     }
 
     try {
-      const db = createMastraDb();
+      const db = getAppDb();
       const encryptionKey = env.TOKEN_ENCRYPTION_KEY || "edapex-default-encryption-key-32ch";
       
       // Fetch existing to preserve key if not provided
@@ -80,7 +80,7 @@ export const removeProvider = command(
     }
 
     try {
-      const db = createMastraDb();
+      const db = getAppDb();
       await deleteProviderCredential(db, locals.user.id, provider);
       return { success: true, message: `${provider} API key removed` };
     } catch (error) {
@@ -103,7 +103,7 @@ export const getProviders = command(
     }
 
     try {
-      const db = createMastraDb();
+      const db = getAppDb();
       // Pass the actual env object for fallbacks
       const envKeys = env as Record<string, string | undefined>;
       const providers = await getAllActiveProviders(db, locals.user.id, envKeys, SUPPORTED_PROVIDERS);
@@ -138,7 +138,7 @@ export const toggleProvider = command(
     }
 
     try {
-      const db = createMastraDb();
+      const db = getAppDb();
       
       // To toggle without changing the key, we need to fetch existing or create empty
       const providers = await getAllActiveProviders(db, locals.user.id, env as Record<string, string | undefined>, SUPPORTED_PROVIDERS);
@@ -180,7 +180,7 @@ export const getAgentRouting = command(
     if (!locals.user) return { success: false, message: "Unauthorized", routing: [] };
 
     try {
-      const db = createMastraDb();
+      const db = getAppDb();
       await ensureAgentTables(db);
       const routing = await db.select().from(agentRouting).where(eq(agentRouting.userId, locals.user.id));
       return { success: true, routing };
@@ -202,7 +202,7 @@ export const updateAgentRouting = command(
     if (!locals.user) return { success: false, message: "Unauthorized" };
 
     try {
-      const db = createMastraDb();
+      const db = getAppDb();
       await ensureAgentTables(db);
       await db.insert(agentRouting).values({
         userId: locals.user.id,
@@ -229,7 +229,7 @@ export const getAgentSettings = command(
     if (!locals.user) return { success: false, message: "Unauthorized", settings: null };
 
     try {
-      const db = createMastraDb();
+      const db = getAppDb();
       await ensureAgentTables(db);
       const [settings] = await db.select().from(agentSettings).where(eq(agentSettings.userId, locals.user.id)).limit(1);
       return { success: true, settings: settings || { profile: 'balanced', globalToolsEnabled: 1 } };
@@ -250,7 +250,7 @@ export const updateAgentSettings = command(
     if (!locals.user) return { success: false, message: "Unauthorized" };
 
     try {
-      const db = createMastraDb();
+      const db = getAppDb();
       await ensureAgentTables(db);
       await db.insert(agentSettings).values({
         userId: locals.user.id,

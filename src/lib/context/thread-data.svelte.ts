@@ -1,22 +1,33 @@
 import { replaceState } from "$app/navigation";
 import type { ChatThread, StreamDataPart } from "$lib/types/chat-types";
+import { toast } from "svelte-sonner";
 import { ChatHistory } from "./chat-history.svelte";
 
 export class ThreadData {
   chatData = $state<ChatThread | undefined>(undefined);
   receivedDataChat = $state(false);
-  activeWorkflows = $state<{ tool: string, args: any }[]>([]);
+  activeWorkflows = $state<{ id: string; name: string; status: string; steps?: any; output?: any }[]>([]);
   pendingConfirmation = $state<{
-    type: 'mutation' | 'navigation';
+    type: "mutation" | "navigation";
     confidence: number;
     threshold: number;
     reasoning: string;
     originalMessage: string;
   } | null>(null);
   chatHistory = ChatHistory.fromContext();
+  #activeExamTypeId: number | null = null;
+  #persistedKeys = new Map<string, string>();
 
   constructor(initialData?: ChatThread) {
     this.chatData = initialData;
+  }
+
+  setExamTypeId(examTypeId: number | null): void {
+    this.#activeExamTypeId = examTypeId;
+  }
+
+  get examTypeId(): number | null {
+    return this.#activeExamTypeId;
   }
 
   resetReceived() {
@@ -33,11 +44,47 @@ export class ThreadData {
     }
 
     if (part.type === "data-workflow") {
-      this.#handleWorkflow(part.data);
+      this.#handleWorkflow((part as any).id, part.data);
     }
 
     if (part.type === "data-confirmation") {
       this.#handleConfirmation(part.data);
+    }
+
+    if (part.type === "data-createDocument") {
+      this.#handleCreateDocument(part.data);
+    }
+  }
+
+  #persistDocument(data: { id: string; title: string; content: string }) {
+    if (this.#activeExamTypeId === null) {
+      console.warn("ThreadData: no active examTypeId, skipping persist");
+      return;
+    }
+    if (this.#persistedKeys.has(data.id)) return;
+    const safeTitle = (data.title || "untitled").replace(/[^a-zA-Z0-9._-]/g, "_");
+    const key = `exams/examType-${this.#activeExamTypeId}/${safeTitle}.md`;
+    this.#persistedKeys.set(data.id, key);
+    void fetch(`/api/file/${key}`, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain" },
+      body: data.content,
+    }).catch((err) => {
+      console.error("Failed to persist document", err);
+      this.#persistedKeys.delete(data.id);
+    });
+  }
+
+  #handleCreateDocument(data: any) {
+    if (data.status === "success" && data.content) {
+      this.#persistDocument({ id: data.id, title: data.title, content: data.content });
+      toast.success(`Document "${data.title}" created`);
+      return;
+    }
+
+    if (data.status === "success" && !data.content) {
+      console.log("Received empty document:", data.title);
+      toast.success(`Document "${data.title}" created successfully`);
     }
   }
 
@@ -66,8 +113,21 @@ export class ThreadData {
     this.chatHistory.refetch();
   }
 
-  #handleWorkflow(data: any) {
-    this.activeWorkflows = [...this.activeWorkflows, data];
+  #handleWorkflow(id: string | undefined, data: any) {
+    const entry = {
+      id: id ?? data.name ?? crypto.randomUUID(),
+      name: data.name,
+      status: data.status,
+      steps: data.steps,
+      output: data.output,
+    };
+    const idx = this.activeWorkflows.findIndex((w) => w.id === entry.id);
+    if (idx !== -1) {
+      this.activeWorkflows[idx] = entry;
+      this.activeWorkflows = [...this.activeWorkflows];
+    } else {
+      this.activeWorkflows = [...this.activeWorkflows, entry];
+    }
   }
 
   #handleConfirmation(data: any) {

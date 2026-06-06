@@ -30,10 +30,9 @@
   import MoonIcon from "@lucide/svelte/icons/moon";
   import SunIcon from "@lucide/svelte/icons/sun";
   import PlusIcon from "@lucide/svelte/icons/plus";
-  import ArchiveIcon from "@lucide/svelte/icons/archive";
+  import LibraryIcon from "@lucide/svelte/icons/library";
   import { goto, invalidateAll, pushState } from "$app/navigation";
   import { UserContext } from "$lib/context/user-context.svelte";
-  import { mobileUiState } from "$lib/state/mobile-ui.svelte.ts";
 
   type SidebarProps = {
     user?: AuthUser;
@@ -94,15 +93,15 @@
           </Sidebar.MenuItem>
           <Sidebar.MenuItem>
             <Sidebar.MenuButton
-              tooltipContent="Artifacts"
+              tooltipContent="Library"
               onclick={() => {
                 sidebar.setOpenMobile(false);
-                mobileUiState.isArtifactBrowserOpen = true;
+                goto("/filestore");
               }}
               class="text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent transition-colors font-medium"
             >
-              <ArchiveIcon class="size-4 text-primary" />
-              <span>Artifacts</span>
+              <LibraryIcon class="size-4 text-primary" />
+              <span>Library</span>
             </Sidebar.MenuButton>
           </Sidebar.MenuItem>
         </Sidebar.Menu>

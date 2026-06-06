@@ -10,14 +10,14 @@ import { existsSync, rm, rmdirSync, type Dirent } from "fs";
 import type { ClassSection } from "$lib/types/result-types";
 import { DESIGNATIONS, type Designation } from "$lib/types/sms-types";
 import { generateId } from "ai";
-import { createMastraDb } from "$lib/server/mastra/db";
+import { getAppDb } from "$lib/server/mastra/storage/libsql/app-db";
 import { getUserProviderKeys } from "$lib/server/mastra/provider-config";
 import { SUPPORTED_PROVIDERS, SUPPORTED_PROVIDERS_META, getAvailableModels } from "$lib/server/mastra/registry";
 import { env } from "$env/dynamic/private";
 import { getMemory, mastra } from "$lib/server/mastra";
 import type { StorageThreadType } from "@mastra/core/memory";
 import { createAssessmentServiceForRequest } from "$lib/server/service/assessment.service";
-import { createTenantContext } from "$lib/server/mastra/tenant-context";
+import { createTenantContext, resolveExamTypeId } from "$lib/server/mastra/tenant-context";
 
 export const load: LayoutServerLoad = async ({ cookies, locals, url }) => {
   const { user, session } = locals;
@@ -57,7 +57,6 @@ export const load: LayoutServerLoad = async ({ cookies, locals, url }) => {
 
       const resourceId = `user-${user.id}`;
       const result = await memory.listThreads({ filter: { resourceId } });
-
       // Map Mastra threads to the ChatThread shape the UI expects
       chats = result.threads.map((t: StorageThreadType) => ({
         id: t.id,
@@ -145,7 +144,7 @@ export const load: LayoutServerLoad = async ({ cookies, locals, url }) => {
   let userPriority: string[] = [];
 
   if (user) {
-    const db = createMastraDb();
+    const db = getAppDb();
     const envKeys = env as Record<string, string | undefined>;
     const supportedList = [...SUPPORTED_PROVIDERS] as string[];
 
@@ -170,5 +169,6 @@ export const load: LayoutServerLoad = async ({ cookies, locals, url }) => {
     availableModels,
     supportedProviders: SUPPORTED_PROVIDERS_META,
     userPriority,
+    examTypeId: await resolveExamTypeId(user?.schoolId ?? 1, null),
   };
 };

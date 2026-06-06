@@ -1,12 +1,14 @@
-import { STATIC_DIR, EXTRACTED_DIR } from "$lib/constants";
+import { STATIC_DIR } from "$lib/constants";
 import { fileSchema } from "$lib/schema/chat-schema";
-import { resultRepo, staffRepo, studentRepo } from "$lib/server/repository";
-import { createAssessmentServiceForRequest } from "$lib/server/service/assessment.service";
+import { getDatabase } from "$lib/server/db";
+import { ScopedRepositoryProvider } from "$lib/server/mastra/scoped-repository";
+import { ResultsRepository, StaffRepository, StudentRepository } from "$lib/server/repository";
+import { createAssessmentOcrServiceForRequest } from "$lib/server/service/assessment-ocr.service";
 import { createTenantContext } from "$lib/server/mastra/tenant-context";
-import { studentFileStorage } from "$lib/server/storage/student-files";
+import { createTenantFileStorage } from "$lib/server/mastra/storage/tenant-file-storage";
 import type { RequestHandler } from "@sveltejs/kit";
 import { error, json } from "@sveltejs/kit";
-import { existsSync, mkdirSync, rmdirSync, writeFileSync, unlinkSync } from "fs";
+import { existsSync, mkdirSync, writeFileSync } from "fs";
 import { createHash } from "crypto";
 import { join } from "path";
 
@@ -52,7 +54,13 @@ export const POST: RequestHandler = async ({ request, locals }) => {
       mkdirSync(dir, { recursive: true });
       writeFileSync(fullPath, buffer);
 
-      await studentRepo.updateStudentPhoto(studentId, relativePath);
+      const photoTenant = createTenantContext({
+        schoolId: user.schoolId ?? 1,
+        userId: user.id,
+        staffId: user.staffId ?? undefined,
+      });
+      const photoProvider = new ScopedRepositoryProvider(await getDatabase(), photoTenant);
+      await photoProvider.getRepo(StudentRepository).updateStudentPhoto(studentId, relativePath);
       return json({ success: true, status: "uploaded", filename: photoFilename });
     }
 
@@ -62,7 +70,16 @@ export const POST: RequestHandler = async ({ request, locals }) => {
     // Handle re-extraction if only filename/fileId is provided
     if (filename && !file) {
       try {
-        const buffer = await studentFileStorage.getImage(fileId || filename);
+        const retryTenant = createTenantContext({
+          schoolId: user.schoolId ?? 1,
+          userId: user.id,
+          staffId: user.staffId ?? undefined,
+          classId: classId as number,
+          sectionId: sectionId as number,
+        });
+        const retryFileStorage = await createTenantFileStorage(retryTenant);
+        const studentFolder = retryFileStorage.formatName((fileId || filename).split("/").pop() || (fileId || filename));
+        const buffer = await retryFileStorage.getImage(studentFolder);
         if (buffer) {
           file = new Blob([new Uint8Array(buffer)], { type: "image/jpeg" });
         } else {
@@ -79,18 +96,23 @@ export const POST: RequestHandler = async ({ request, locals }) => {
       throw new Error(errorMessage);
     }
 
-    const staff = await staffRepo.getStaffByClassSection({ classId: classId as number, sectionId: sectionId as number });
+    const staffLookupTenant = createTenantContext({
+      schoolId: user.schoolId ?? 1,
+      userId: user.id,
+      staffId: user.staffId ?? undefined,
+    });
+    const staffLookupProvider = new ScopedRepositoryProvider(await getDatabase(), staffLookupTenant);
+    const staff = await staffLookupProvider.getRepo(StaffRepository).getStaffByClassSection({ classId: classId as number, sectionId: sectionId as number });
     // Slice 10: per-request provider
-    const assessment = await createAssessmentServiceForRequest(
-      createTenantContext({
-        schoolId: user.schoolId ?? 1,
-        userId: user.id,
-        staffId: staff.teacherId || undefined,
-        classId: classId as number,
-        sectionId: sectionId as number,
-      }),
-    );
-    const extractionResult = await assessment.runExtraction({
+    const tenant = createTenantContext({
+      schoolId: user.schoolId ?? 1,
+      userId: user.id,
+      staffId: staff.teacherId || undefined,
+      classId: classId as number,
+      sectionId: sectionId as number,
+    });
+    const ocrService = await createAssessmentOcrServiceForRequest(tenant);
+    const extractionResult = await ocrService.runExtraction({
       userId: user.id, // Authenticated user ID for AI provider resolution
       teacherId: staff.teacherId || 1, // Staff ID for domain data lookups
       file,
@@ -116,10 +138,15 @@ export const POST: RequestHandler = async ({ request, locals }) => {
   } catch (e) {
     console.error("Upload/Extraction error:", e);
 
-    // If extraction fails but we have a new file, save it as pending in unified storage
     if (!filename && file && className && sectionName) {
       try {
-        const storagePath = await studentFileStorage.savePending({
+        const pendingTenant = createTenantContext({
+          schoolId: user.schoolId ?? 1,
+          userId: user.id,
+          staffId: user.staffId ?? undefined,
+        });
+        const pendingFileStorage = await createTenantFileStorage(pendingTenant);
+        const storagePath = await pendingFileStorage.savePending({
           file,
           className,
           sectionName,
@@ -152,7 +179,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
   }
 };
 
-export const DELETE: RequestHandler = async ({ url, locals, cookies }) => {
+export const DELETE: RequestHandler = async ({ url, locals }) => {
   const { session, user } = locals;
   if (!user || !session) error(401, "Unauthorized");
 
@@ -163,78 +190,55 @@ export const DELETE: RequestHandler = async ({ url, locals, cookies }) => {
   const targetPath = fileId || filename;
   if (!targetPath) return json({ success: false, message: "No filename or fileId provided" });
 
-  let staffId: number = user.staffId || 1;
-  let token = "";
+  const deleteTenant = createTenantContext({
+    schoolId: user.schoolId ?? 1,
+    userId: user.id,
+    staffId: user.staffId ?? undefined,
+  });
+  const deleteFileStorage = await createTenantFileStorage(deleteTenant);
+  const deleteProvider = new ScopedRepositoryProvider(await getDatabase(), deleteTenant);
+  void deleteProvider;
 
-  const selectedClassRaw = cookies.get("selected-class");
-  if (selectedClassRaw) {
-    try {
-      const cls = JSON.parse(selectedClassRaw);
-      if (cls.className && cls.sectionName) {
-        token = `${cls.className}(${cls.sectionName})`.toLowerCase().replaceAll(" ", "_");
-      }
-    } catch (e) {
-      console.error("Error parsing selected-class cookie:", e);
-    }
-  }
-
-  if (!token) {
-    const classSection = await resultRepo.getAssignedClassSection(staffId);
-    if (classSection?.className && classSection?.sectionName) {
-      token = `${classSection.className}(${classSection.sectionName})`.toLowerCase().replaceAll(" ", "_");
-    }
-  }
-
-  if (clearAll && token) {
-    const uploadPath = join(EXTRACTED_DIR, token);
-    if (existsSync(uploadPath)) {
-      rmdirSync(uploadPath, { recursive: true });
-    }
+  if (clearAll) {
+    await deleteFileStorage.clearAll();
     return json({ success: true });
   }
 
-  const actualPath = targetPath.includes('/') ? targetPath : (token ? join(token, studentFileStorage.formatName(targetPath.split('.')[0] || targetPath)) : targetPath);
-  const fullPath = join(EXTRACTED_DIR, actualPath);
+  const studentFolder = (targetPath.includes('/') ? targetPath.split('/').pop() : targetPath.split('.')[0]) || targetPath;
+  const normalizedFolder = deleteFileStorage.formatName(studentFolder);
 
-  if (existsSync(fullPath)) {
-    try {
-      // 1. Load assessment data to check for DB record linkages
-      const assessmentData = await studentFileStorage.load(actualPath);
-
-      // 2. If it has DB records (marks/results), clean them up
-      if (assessmentData?.data?.studentData) {
-        const { studentId, classId, sectionId, recordId, examTypeId } = assessmentData.data.studentData;
-        if (studentId && classId && sectionId && recordId && examTypeId) {
-          const schoolId = assessmentData.data.studentData.schoolId || 1;
-          await resultRepo.cleanMarks({
-            recordId,
-            studentId,
-            classId,
-            sectionId,
-            examTermId: examTypeId,
-            schoolId
-          });
-        }
-      }
-
-      // 3. Delete the directory/file from the filesystem
-      rmdirSync(fullPath, { recursive: true });
-      return json({ success: true });
-    } catch (e) {
-      console.error("Deletion error:", e);
-      return json({ success: false, message: e instanceof Error ? e.message : "Internal deletion error" });
-    }
-  }
-
-  return json({ success: true, message: "Resource already removed or not found" });
-};
-
-function unlink_internal(path: string) {
   try {
-    unlinkSync(path);
+    const assessmentData = await deleteFileStorage.load(normalizedFolder);
+
+    if (assessmentData?.data?.studentData) {
+      const { studentId, classId, sectionId, recordId, examTypeId } = assessmentData.data.studentData;
+      if (studentId && classId && sectionId && recordId && examTypeId) {
+        const schoolId = assessmentData.data.studentData.schoolId || 1;
+        const cleanupTenant = createTenantContext({
+          schoolId,
+          userId: user.id,
+          staffId: user.staffId ?? undefined,
+          classId,
+          sectionId,
+        });
+        const cleanupProvider = new ScopedRepositoryProvider(await getDatabase(), cleanupTenant);
+        await cleanupProvider.getRepo(ResultsRepository).cleanMarks({
+          recordId,
+          studentId,
+          classId,
+          sectionId,
+          examTermId: examTypeId,
+          schoolId
+        });
+      }
+    }
+
+    await deleteFileStorage.deleteStudentFolder(normalizedFolder);
+    return json({ success: true });
   } catch (e) {
-    console.error("Failed to unlink", path, e);
+    console.error("Deletion error:", e);
+    return json({ success: false, message: e instanceof Error ? e.message : "Internal deletion error" });
   }
-}
+};
 
 

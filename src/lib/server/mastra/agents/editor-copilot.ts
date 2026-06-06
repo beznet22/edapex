@@ -13,6 +13,6 @@ export const editorCopilotAgent = new Agent({
 	description:
 		'Produces short inline writing continuations for editor ghost text suggestions.',
 	instructions:
-		'Continue the text naturally up to the next punctuation mark. Maintain tone and style. Do not repeat the given text. Do not start a new block. If there is not enough context, return "0".',
+		'Continue the text naturally in ≤15 words, ending at a clause break. Maintain tone and style. Do not repeat the given text. Do not start a new block. If there is not enough context, return "0".',
 	model: DEFAULT_COPILOT_MODEL, // Or override with a faster model if desired
 });

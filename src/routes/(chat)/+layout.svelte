@@ -4,14 +4,18 @@
   import * as Sidebar from "$lib/components/ui/sidebar";
   import { ChatHistory } from "$lib/context/chat-history.svelte.js";
   import { FilesContext } from "$lib/context/file-context.svelte.js";
-  import { UserContext } from "$lib/context/user-context.svelte.js";
+  import { UserContext } from "$lib/context/user-context.svelte";
   import { SelectedModel, SelectedClass } from "$lib/context/sync.svelte";
   import { ImageContext } from "$lib/context/image.context.svelte";
   import { useAI } from "$lib/context/ai-context.svelte";
-  import type { PageData } from "./$types.js";
+  import { IsMobile } from "$lib/hooks/is-mobile.svelte.js";
+  import InspectorProvider from "$lib/components/workspace/InspectorProvider.svelte";
+  import WorkspacePaneGroup from "$lib/components/workspace/WorkspacePaneGroup.svelte";
+  import WorkspaceSidebar from "$lib/components/workspace/WorkspaceSidebar.svelte";
+  import type { LayoutData } from "./$types.js";
 
   let { data, children } = $props<{
-    data: PageData;
+    data: LayoutData;
     children: any;
   }>();
 
@@ -77,6 +81,8 @@
   $effect(() => {
     filesContext.rehydrate(data.uploads);
   });
+
+  const isMobile = new IsMobile();
 </script>
 
 <svelte:head>
@@ -91,6 +97,15 @@
 <Sidebar.Provider bind:open={sidebarOpen}>
   <AppSidebar user={data.user ?? undefined} />
   <Sidebar.Inset class="overflow-hidden min-h-0">
-    {@render children()}
+    <InspectorProvider>
+      {#if isMobile.current}
+        {@render children()}
+        <WorkspaceSidebar />
+      {:else}
+        <WorkspacePaneGroup>
+          {@render children()}
+        </WorkspacePaneGroup>
+      {/if}
+    </InspectorProvider>
   </Sidebar.Inset>
 </Sidebar.Provider>

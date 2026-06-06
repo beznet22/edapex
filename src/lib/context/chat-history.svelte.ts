@@ -38,10 +38,10 @@ export class ChatHistory {
   rehydrate(chatsInput: ChatThread[] | Promise<ChatThread[]>) {
     this.#loading = true;
     this.#revalidating = true;
-    
+
     if (chatsInput && typeof (chatsInput as any).then === "function") {
       const fetchPromise = chatsInput as Promise<ChatThread[]>;
-      
+
       // 10s timeout — fall back to empty state on storage error or timeout (Req 24.7)
       const timeoutPromise = new Promise<null>((_, reject) =>
         setTimeout(() => reject(new Error('Storage timeout')), 10000)
@@ -59,7 +59,7 @@ export class ChatHistory {
           this.#loading = false;
           this.#revalidating = false;
         });
-    } else {  
+    } else {
       this.chats = (chatsInput as ChatThread[]) || [];
       this.#loading = false;
       this.#revalidating = false;
@@ -104,7 +104,7 @@ export class ChatHistory {
 
     // Optimistic UI update for immediate reactivity
     const previousChats = this.chats;
-    this.chats = this.chats.filter((chat) => chat.threadId !== threadId);   
+    this.chats = this.chats.filter((chat) => chat.threadId !== threadId);
     this.alertDialogOpen = false;
 
     if (threadId === page.params.chatId) {
@@ -158,7 +158,7 @@ export class ChatHistory {
         setTimeout(() => reject(new Error('Storage timeout')), 10000)
       );
       const threads = await Promise.race([getHistory({}).run(), timeoutPromise]);
-      console.log(threads)
+      console.log({ threads })
       if (!threads) return;
       this.chats = threads
     } catch (err) {

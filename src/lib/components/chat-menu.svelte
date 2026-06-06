@@ -17,7 +17,7 @@
 
   let open = $state(false);
   const filesContext = FilesContext.fromContext();
-  const chat = useChat();
+  const chat = useChat() as any;
   
   // Function to open the resource modal
   function openResourceModal() {
@@ -69,7 +69,7 @@
     <DropdownMenu.Separator class="mx-2" />
     <DropdownMenu.Group>
       {#each chat.agents as agent}
-        {@const Icon = iconRegistry[agent.iconName]}
+        {@const Icon = (iconRegistry as any)[agent.iconName]}
         <DropdownMenu.Item
           onSelect={() => {
             chat.activeAgent = agent;

@@ -1,6 +1,5 @@
 <script lang="ts">
   import { goto } from "$app/navigation";
-  import type { DBChat } from "$lib/types/chat-types";
   import {
     DropdownMenu,
     DropdownMenuContent,
@@ -23,13 +22,14 @@
   import Share2Icon from "@lucide/svelte/icons/share-2";
   import Trash2Icon from "@lucide/svelte/icons/trash-2";
   import { ChatHistory } from "$lib/context/chat-history.svelte";
+    import type { ChatThread } from "$lib/types/chat-types";
 
   let {
     chat,
     active,
     ondelete,
   }: {
-    chat: DBChat;
+    chat: ChatThread;
     active: boolean;
     ondelete: (chatId: string) => void;
   } = $props();
@@ -37,21 +37,21 @@
   const context = useSidebar();
 
   const chatHistory = ChatHistory.fromContext();
-  const chatFromHistory = $derived(chatHistory.getChatDetails(chat.id));
+  const chatFromHistory = $derived(chatHistory.getChatDetails(chat.threadId));
 </script>
 
 <SidebarMenuItem>
   <SidebarMenuButton>
     {#snippet child({ props })}
       <a
-        href={`/chat/${chat.id}`}
+        href={`/chat/${chat.threadId}`}
         {...props}
         onclick={(e) => {
           e.preventDefault();
           if (context.isMobile) {
             context.setOpenMobile(false);
           }
-          goto(`/chat/${chat.id}`);
+          goto(`/chat/${chat.threadId}`);
         }}
       >
         <span>{chat.title}</span>
@@ -83,28 +83,28 @@
           <DropdownMenuItem
             class="cursor-pointer flex-row justify-between"
             onclick={() => {
-              chatHistory.updateVisibility(chat.id, "private");
+              chatHistory.updateVisibility(chat.threadId, "PRIVATE");
             }}
           >
             <div class="flex flex-row items-center gap-2">
               <LockIcon size={12} />
               <span>Private</span>
             </div>
-            {#if chatFromHistory?.visibility === "private"}
+            {#if chatFromHistory?.visibility === "PRIVATE"}
               <CircleCheckIcon />
             {/if}
           </DropdownMenuItem>
           <DropdownMenuItem
             class="cursor-pointer flex-row justify-between"
             onclick={() => {
-              chatHistory.updateVisibility(chat.id, "public");
+              chatHistory.updateVisibility(chat.threadId, "PUBLIC");
             }}
           >
             <div class="flex flex-row items-center gap-2">
               <GlobeIcon />
               <span>Public</span>
             </div>
-            {#if chatFromHistory?.visibility === "public"}
+            {#if chatFromHistory?.visibility === "PUBLIC"}
               <CircleCheckIcon />
             {/if}
           </DropdownMenuItem>
@@ -113,7 +113,7 @@
 
       <DropdownMenuItem
         class="text-destructive focus:bg-destructive/15 focus:text-destructive cursor-pointer dark:text-red-500"
-        onclick={() => ondelete(chat.id)}
+        onclick={() => ondelete(chat.threadId)}
       >
         <Trash2Icon />
         <span>Delete</span>

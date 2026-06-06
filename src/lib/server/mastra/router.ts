@@ -1,7 +1,7 @@
 import { eq, and } from 'drizzle-orm';
 import type { LibSQLDatabase } from 'drizzle-orm/libsql';
-import * as schema from './db/schema';
-import { agentRouting, agentSettings, providerCredentials } from './db/schema';
+import * as schema from '$lib/server/mastra/storage/libsql/app-db.schema';
+import { agentRouting, agentSettings, providerCredentials } from '$lib/server/mastra/storage/libsql/app-db.schema';
 import { MODEL_REGISTRY, getModelById, getBareModelName, type ModelDefinition } from './registry';
 import { resolveModelConfig } from '@mastra/core/llm';
 import type { LanguageModel as MastraLanguageModel } from '@mastra/core/llm';

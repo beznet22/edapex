@@ -1,7 +1,7 @@
 import type { RequestHandler } from '@sveltejs/kit';
 import { json } from '@sveltejs/kit';
 import { verifyShareToken } from '../../share/share-utils';
-import { workspaceFiles } from '$lib/server/storage/files';
+import { workspaceFiles } from '$lib/server/mastra/storage/files';
 
 /**
  * GET /api/file/shared/[token]

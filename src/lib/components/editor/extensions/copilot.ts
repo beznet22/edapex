@@ -7,8 +7,14 @@ import CopilotWidget from '../CopilotWidget.svelte';
 export const copilotPluginKey = new PluginKey('copilot');
 
 export interface CopilotOptions {
-	debounceDelay: number;
 	api: string;
+}
+
+interface CopilotState {
+	decoration: Decoration | null;
+	text: string | null;
+	active: boolean;
+	thinking: boolean;
 }
 
 export const CopilotExtension = Extension.create<CopilotOptions>({
@@ -16,48 +22,37 @@ export const CopilotExtension = Extension.create<CopilotOptions>({
 
 	addOptions() {
 		return {
-			debounceDelay: 500,
-			api: '/api/ai/editor/copilot',
+			api: '/api/ai/editor/copilot'
 		};
 	},
 
 	addProseMirrorPlugins() {
 		return [
-			new Plugin<{ decoration: Decoration | null; text: string | null; active: boolean }>({
+			new Plugin<CopilotState>({
 				key: copilotPluginKey,
 				state: {
 					init() {
-						return { decoration: null as Decoration | null, text: null as string | null, active: false };
+						return { decoration: null, text: null, active: false, thinking: false };
 					},
 					apply(tr, value, oldState, newState) {
 						const meta = tr.getMeta(copilotPluginKey);
-						
+
 						if (meta) {
 							if (meta.action === 'set') {
-								const decoration = Decoration.widget(newState.selection.to, (view, getPos) => {
+								const decoration = Decoration.widget(newState.selection.to, (view) => {
 									const dom = document.createElement('span');
-									
 									const component = mount(CopilotWidget, {
 										target: dom,
 										props: {
 											text: meta.text,
+											thinking: false,
 											onAccept: () => {
-												const hasMarkdownSyntax = /[*_#`\[\]>-]/.test(meta.text);
-												
-												if (hasMarkdownSyntax) {
-													const { tr } = view.state;
-													tr.setMeta(copilotPluginKey, { action: 'clear' });
-													view.dispatch(tr);
-
-													const editor = (view as any).editor;
-													if (editor) {
-														editor.commands.insertContent(meta.text);
-													}
-												} else {
-													const { tr } = view.state;
-													tr.insertText(meta.text, view.state.selection.to);
-													tr.setMeta(copilotPluginKey, { action: 'clear' });
-													view.dispatch(tr);
+												const editor = (view as any).editor;
+												const { tr } = view.state;
+												tr.setMeta(copilotPluginKey, { action: 'clear' });
+												view.dispatch(tr);
+												if (editor) {
+													editor.commands.insertContent(meta.text);
 												}
 											},
 											onDiscard: () => {
@@ -67,11 +62,10 @@ export const CopilotExtension = Extension.create<CopilotOptions>({
 											}
 										}
 									});
-
 									(dom as any).__svelte_component = component;
 									return dom;
 								}, {
-									side: 1, // Render after cursor
+									side: 1,
 									ignoreSelection: true,
 									destroy: (dom) => {
 										if ((dom as any).__svelte_component) {
@@ -80,58 +74,51 @@ export const CopilotExtension = Extension.create<CopilotOptions>({
 									}
 								});
 
-								return { decoration, text: meta.text, active: true };
+								return { decoration, text: meta.text, active: true, thinking: false };
 							}
 							if (meta.action === 'clear') {
-								return { decoration: null, text: null, active: false };
+								return { decoration: null, text: null, active: false, thinking: false };
+							}
+							if (meta.action === 'thinking') {
+								return { ...value, thinking: true, active: true };
 							}
 						}
 
-						// Automatically clear ghost text if the user types or selection changes
+						// Any doc change or selection move clears the ghost text and thinking state.
 						if (tr.docChanged || tr.selectionSet) {
-							return { decoration: null, text: null, active: false };
+							return { decoration: null, text: null, active: false, thinking: false };
 						}
 
 						return value;
-					},
+					}
 				},
 				props: {
 					decorations(state) {
 						const { decoration } = this.getState(state) || {};
-						if (decoration) {
-							return DecorationSet.create(state.doc, [decoration]);
-						}
+						if (decoration) return DecorationSet.create(state.doc, [decoration]);
 						return DecorationSet.empty;
 					},
 					handleKeyDown(view, event) {
 						const state = this.getState(view.state);
-						if (state?.active && event.key === 'Tab') {
+						if (!state?.active) return false;
+
+						if (event.key === 'Tab') {
 							event.preventDefault();
 							event.stopPropagation();
 
 							const ghostText = state.text || '';
-							const hasMarkdownSyntax = /[*_#`\[\]>-]/.test(ghostText);
+							const { tr } = view.state;
+							tr.setMeta(copilotPluginKey, { action: 'clear' });
+							view.dispatch(tr);
 
-							if (hasMarkdownSyntax) {
-								const { tr } = view.state;
-								tr.setMeta(copilotPluginKey, { action: 'clear' });
-								view.dispatch(tr);
-
-								const editor = (view as any).editor;
-								if (editor) {
-									editor.commands.insertContent(ghostText);
-								}
-							} else {
-								const { tr } = view.state;
-								tr.insertText(ghostText, view.state.selection.to);
-								tr.setMeta(copilotPluginKey, { action: 'clear' });
-								view.dispatch(tr);
+							const editor = (view as any).editor;
+							if (editor) {
+								editor.commands.insertContent(ghostText);
 							}
 							return true;
 						}
-						
-						// If Escape is pressed, explicitly clear it
-						if (state?.active && event.key === 'Escape') {
+
+						if (event.key === 'Escape') {
 							event.preventDefault();
 							const { tr } = view.state;
 							tr.setMeta(copilotPluginKey, { action: 'clear' });
@@ -140,30 +127,21 @@ export const CopilotExtension = Extension.create<CopilotOptions>({
 						}
 
 						return false;
-					},
-				},
-			}),
+					}
+				}
+			})
 		];
 	},
 
 	addStorage() {
 		return {
-			timeout: null as ReturnType<typeof setTimeout> | null,
-			abortController: null as AbortController | null,
+			abortController: null as AbortController | null
 		};
-	},
-
-	onUpdate({ editor }) {
-		handleDebounce(editor, this.storage, this.options);
-	},
-
-	onSelectionUpdate({ editor }) {
-		handleDebounce(editor, this.storage, this.options);
 	},
 
 	addCommands() {
 		return {
-			clearCopilot: () => ({ tr, dispatch }: { tr: any, dispatch: any }) => {
+			clearCopilot: () => ({ tr, dispatch }: { tr: any; dispatch: any }) => {
 				if (dispatch) {
 					tr.setMeta(copilotPluginKey, { action: 'clear' });
 				}
@@ -178,46 +156,46 @@ export const CopilotExtension = Extension.create<CopilotOptions>({
 
 	addKeyboardShortcuts() {
 		return {
-			'Mod-Space': () => (this.editor.commands as any).triggerCopilot(),
+			'Mod-Space': () => (this.editor.commands as any).triggerCopilot()
 		};
-	},
+	}
 });
 
-function handleDebounce(editor: any, storage: any, options: any) {
-	// Clear existing ghost text on any change
-	editor.commands.clearCopilot();
-
-	if (storage.timeout) {
-		clearTimeout(storage.timeout);
-	}
-	if (storage.abortController) {
-		storage.abortController.abort();
-		storage.abortController = null;
-	}
-
-	storage.timeout = setTimeout(() => {
-		fetchCompletion(editor, storage, options);
-	}, options.debounceDelay);
+function isMenuOpen(editor: any): boolean {
+	if (!editor?.isFocused) return true;
+	const dom = editor.view?.dom as HTMLElement | undefined;
+	if (!dom) return false;
+	return Boolean(
+		dom.querySelector('[data-tiptap-slash-menu]') ||
+		dom.querySelector('[data-tiptap-mention-menu]') ||
+		dom.querySelector('.tippy-box[data-reference]') ||
+		dom.querySelector('[role="menu"][data-state="open"]')
+	);
 }
 
 async function fetchCompletion(editor: any, storage: any, options: any) {
-	// Only trigger if cursor is at the end of a block/line
+	if (!editor || isMenuOpen(editor)) return;
+
 	const { selection } = editor.state;
 	if (!selection.empty) return;
 
-	// Extract the text content of the current block
 	const $pos = selection.$anchor;
 	const nodeBefore = $pos.nodeBefore;
-	
-	// If there's no text before the cursor, don't auto-suggest
 	if (!nodeBefore || !nodeBefore.isText) return;
 
-	// Extract context (e.g. up to 1000 chars before cursor)
 	const startPos = Math.max(0, $pos.pos - 1000);
 	const textContext = editor.state.doc.textBetween(startPos, $pos.pos, '\n');
-
 	if (!textContext.trim()) return;
 
+	// Optimistic thinking state — replaced by the actual ghost text when the response lands.
+	{
+		const tr = editor.state.tr.setMeta(copilotPluginKey, { action: 'thinking' });
+		editor.view.dispatch(tr);
+	}
+
+	if (storage.abortController) {
+		storage.abortController.abort();
+	}
 	storage.abortController = new AbortController();
 
 	try {
@@ -225,49 +203,52 @@ async function fetchCompletion(editor: any, storage: any, options: any) {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({
-				prompt: `Continue the text naturally up to the next punctuation mark. Maintain tone and style. Do not repeat the given text. Do not start a new block. If there is not enough context, return "0".\n\n"""\n${textContext}\n"""`,
-				system: `You are an advanced writing assistant. Continue the text naturally up to the next punctuation mark. Maintain tone and style. Do not repeat the given text. Do not start a new block. If there is not enough context, return "0".`,
+				prompt: `Continue the text naturally in ≤15 words, ending at a clause break. Maintain tone. Do not repeat the given text. If context is insufficient, return "0".\n\n"""\n${textContext}\n"""`,
+				system: 'You are a concise writing assistant. Output ≤15 words ending at a clause break. Do not repeat input. If context is insufficient, return "0".'
 			}),
-			signal: storage.abortController.signal,
+			signal: storage.abortController.signal
 		});
 
-		if (!response.ok) return;
+		if (!response.ok) {
+			editor.commands.clearCopilot();
+			return;
+		}
 
 		let text = '';
 		try {
 			const data = await response.json();
 			text = data.text;
-		} catch (e) {
-			console.warn('Copilot completion returned invalid JSON', e);
+		} catch {
+			editor.commands.clearCopilot();
 			return;
 		}
-		
-		if (text && text !== "0") {
-			const prevChar = editor.state.doc.textBetween(Math.max(0, $pos.pos - 1), $pos.pos, ' ');
-			const hasSpaceBefore = prevChar ? !!prevChar.match(/\s/) : true;
 
-			let cleanText = text;
-			if (hasSpaceBefore) {
-				cleanText = text.trimStart();
-			} else {
-				if (text.match(/^\s/)) {
-					cleanText = text;
-				} else if (text.match(/^[a-zA-Z0-9]/)) {
-					cleanText = ' ' + text;
-				}
-			}
-			
-			// Dispatch a transaction to set the ghost text
-			const tr = editor.state.tr.setMeta(copilotPluginKey, { 
-				action: 'set', 
-				text: cleanText 
-			});
-			editor.view.dispatch(tr);
+		if (!text || text === '0') {
+			editor.commands.clearCopilot();
+			return;
 		}
 
+		const prevChar = editor.state.doc.textBetween(Math.max(0, $pos.pos - 1), $pos.pos, ' ');
+		const hasSpaceBefore = prevChar ? !!prevChar.match(/\s/) : true;
+
+		let cleanText = text;
+		if (hasSpaceBefore) {
+			cleanText = text.trimStart();
+		} else if (text.match(/^\s/)) {
+			cleanText = text;
+		} else if (text.match(/^[a-zA-Z0-9]/)) {
+			cleanText = ' ' + text;
+		}
+
+		const tr = editor.state.tr.setMeta(copilotPluginKey, {
+			action: 'set',
+			text: cleanText
+		});
+		editor.view.dispatch(tr);
 	} catch (error: any) {
 		if (error.name !== 'AbortError') {
 			console.error('Copilot completion failed:', error);
 		}
+		editor.commands.clearCopilot();
 	}
 }

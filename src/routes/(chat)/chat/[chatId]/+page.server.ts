@@ -9,7 +9,7 @@ export const load: PageServerLoad = async ({ params, locals }) => {
   if (!chatId || chatId.trim() === "undefined") {
     redirect(302, "/");
   }
-
+  
   const user = locals.user;
   const memory = await getMemory();
 

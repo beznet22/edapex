@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount, onDestroy } from "svelte";
+  import { onMount, onDestroy, untrack } from "svelte";
   import { createEditor } from "svelte-tiptap";
   import { EditorContent, BubbleMenu } from "svelte-tiptap";
   import StarterKit from "@tiptap/starter-kit";
@@ -20,10 +20,12 @@
     content = "",
     onUpdate,
     class: className = "",
+    copilotEnabled = false,
   }: {
     content?: string;
     onUpdate?: (markdown: string) => void;
     class?: string;
+    copilotEnabled?: boolean;
   } = $props();
 
   let isAiProcessing = $state(false);
@@ -31,6 +33,11 @@
   let accumulatedContent = $state("");
 
   let editorInstance = $state<Editor | null>(null);
+
+  // TipTap builds the editor once. The copilot extension set is captured at mount time;
+  // toggling the prop in the same editor instance would require a full rebuild, which
+  // the in-editor status pill does not trigger (it only swaps the visual state).
+  const shouldEnableCopilot = untrack(() => copilotEnabled);
 
   const editor = createEditor({
     extensions: [
@@ -69,10 +76,9 @@
         transformPastedText: true,
         transformCopiedText: true,
       }),
-      CopilotExtension.configure({
-        debounceDelay: 500,
-        api: "/api/ai/editor/copilot",
-      }),
+      ...(shouldEnableCopilot
+        ? [CopilotExtension.configure({ api: "/api/ai/editor/copilot" })]
+        : []),
       SlashMenuExtension,
       MentionExtension,
       AiStreamNode,

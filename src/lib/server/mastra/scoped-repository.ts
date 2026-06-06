@@ -1,5 +1,5 @@
 import type { TenantContext } from './tenant-context';
-import type { MySQLDrizzleClient } from '../db';
+import type { MySQLDrizzleClient } from '$lib/server/db';
 import type { ConfigurationCache } from '../repository/base.repo';
 
 type RepositoryClass<T> = new (db: MySQLDrizzleClient, tenant: TenantContext, provider?: ScopedRepositoryProvider) => T;

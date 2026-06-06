@@ -1,8 +1,8 @@
 import { createHash, createCipheriv, createDecipheriv, randomBytes } from 'crypto';
 import { eq, and, sql } from 'drizzle-orm';
-import { providerCredentials, type ProviderCredential } from './db/schema';
+import { providerCredentials, type ProviderCredential } from '$lib/server/mastra/storage/libsql/app-db.schema';
 import type { LibSQLDatabase } from 'drizzle-orm/libsql';
-import * as schema from './db/schema';
+import * as schema from '$lib/server/mastra/storage/libsql/app-db.schema';
 
 const ALGORITHM = 'aes-256-cbc';
 

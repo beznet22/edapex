@@ -13,7 +13,7 @@ import { editorCommandRequestSchema } from '$lib/server/mastra/editor/schemas';
 import { handleWorkflowStream } from '@mastra/ai-sdk';
 import { createUIMessageStreamResponse, type UIMessageChunk } from 'ai';
 import { EdApexGateway } from '$lib/server/mastra/gateway';
-import { createMastraDb } from '$lib/server/mastra/db';
+import { getAppDb } from '$lib/server/mastra/storage/libsql/app-db';
 
 export const POST: RequestHandler = async ({ request, locals: { user } }) => {
 	if (!user) error(401, 'Unauthorized');
@@ -25,7 +25,7 @@ export const POST: RequestHandler = async ({ request, locals: { user } }) => {
 		error(400, `Invalid request: ${parsed.error.message}`);
 	}
 
-	const mastraDb = createMastraDb();
+	const mastraDb = getAppDb();
 	const gateway = new EdApexGateway(mastraDb, user.id);
 	mastra.addGateway(gateway);
 

@@ -10,7 +10,6 @@ import {
 } from "$lib/schema/result-input";
 import { AttributeRemark, EXAM_MARK_MAXIMUMS } from "$lib/constants/assessment";
 import {
-  resultOutputSchema,
   categoryEnum,
   type Category,
   type MarksRecord,
@@ -23,20 +22,10 @@ import { ScopedRepositoryProvider } from "../mastra/scoped-repository";
 import type { TenantContext } from "../mastra/tenant-context";
 import type { ClassAverage, ExamSetup, MarkData, NewSmMarkStore, NewSmResultStore, ResultData, ScoreData } from "$lib/types/result-types";
 import { base64url } from "jose";
-import { render } from "svelte/server";
-import { ensureBase64Image, pageToHtml } from "../helpers";
-import { generate } from "../helpers/pdf-generator";
+import { ensureBase64Image } from "../helpers";
 
 import type { NewExamSetup } from "$lib/types/result-types";
 
-import ResultTemplate from "$lib/components/template/ResultTemplate.svelte";
-import ResultEmail from "$lib/components/template/result-email.svelte";
-import { JobWorker, type JobPayload, type JobResult } from "../worker";
-
-import { studentFileStorage } from "../storage/student-files";
-import { mistralOcrService } from "./mistral-ocr.service";
-import path from "path";
-import fs from "fs";
 import { getDatabase, type MySQLDrizzleClient } from "../db";
 
 export const GRADE_RANGES = {
@@ -321,173 +310,23 @@ export class AssessmentService {
   }
 
   /**
-   * Publish result to students and parents timeline and send email
+   * Publish result to students and parents timeline and send email.
+   * Now delegates to AssessmentPublisherService.
    */
-  async publishResults(params: { studentIds: number[]; examId: number; resend?: boolean }): Promise<{
-    success: boolean;
-    sent: number;
-    failed: number;
-    errors: string[];
-    results: Array<{
-      to?: string;
-      messageId?: string;
-      response?: string;
-      studentId?: number;
-    }>;
-  }> {
-    const { studentIds, examId, resend = false } = params;
-    const messages: any[] = [];
-    const CONCURRENCY_LIMIT = 5;
-    const processingErrors: string[] = [];
-
-    const processStudent = async (studentId: number) => {
-      try {
-        if (!resend) {
-          const alreadySent = await this.isEmailAlreadySent(studentId, examId);
-          if (alreadySent) {
-            processingErrors.push(`Student ${studentId}: Email already sent`);
-            return null;
-          }
-        }
-
-        const resultData = await this.getStudentResult({ id: studentId, examId, withImages: true });
-        const validatedResult = await resultOutputSchema.safeParseAsync(resultData);
-        if (!validatedResult.success || !resultData) {
-          processingErrors.push(`Student ${studentId}: Result validation failed`);
-          return null;
-        }
-        const { student, school } = validatedResult.data;
-
-        const pdfProps = { data: resultData };
-        let { body, head } = render(ResultTemplate, { props: pdfProps });
-        let html = pageToHtml(body, head);
-        const fileName = `res_${student.fullName}_a${student.adminNo}_e${examId}_${Date.now()}`;
-
-        const pdfResult = await generate({ htmlContent: html, fileName, returnPath: true });
-        if (!pdfResult.success) {
-          processingErrors.push(`Student ${studentId}: ${pdfResult.error || "Failed to generate PDF"}`);
-          return null;
-        }
-        if (!pdfResult.filePath) {
-          processingErrors.push(`Student ${studentId}: PDF path is missing`);
-          return null;
-        }
-
-        const logoPath = school.logo || "/school-logo.png";
-        let absoluteLogoPath = logoPath.startsWith("/")
-          ? path.join(process.cwd(), "static", logoPath.substring(1))
-          : path.join(process.cwd(), logoPath);
-
-        if (!fs.existsSync(absoluteLogoPath)) {
-          absoluteLogoPath = path.join(process.cwd(), "static", "school-logo.png");
-        }
-
-        const emailProps = {
-          term: student.term,
-          fullName: student.fullName,
-          receiverName: student.parentName,
-          schoolName: school.name,
-          principal: "Patience Okwube",
-          contact: school.phone,
-          support: "admin@llacademy.ng",
-        };
-
-        const content = render(ResultEmail as any, { props: emailProps });
-        html = pageToHtml(content.body, content.head);
-
-        return {
-          from: `"${school.name}" <${school.email}>`,
-          to: student.parentEmail,
-          subject: "Result Notification",
-          html,
-          attachments: [
-            { filename: `${student.fullName}_result.pdf`, path: pdfResult.filePath },
-            { filename: "logo.png", path: absoluteLogoPath, cid: "schoolLogo" },
-          ],
-          studentId: student.id,
-          studentName: student.fullName,
-        };
-      } catch (error: any) {
-        processingErrors.push(`Student ${studentId}: ${error.message || "Unknown error"}`);
-        return null;
-      }
-    };
-
-    // Process students in chunks to respect concurrency limit
-    for (let i = 0; i < studentIds.length; i += CONCURRENCY_LIMIT) {
-      const chunk = studentIds.slice(i, i + CONCURRENCY_LIMIT);
-      const results = await Promise.all(chunk.map((id) => processStudent(id)));
-      messages.push(...results.filter((m): m is any => m !== null));
-    }
-
-    if (messages.length === 0) {
-      return {
-        success: false,
-        sent: 0,
-        failed: studentIds.length,
-        errors: processingErrors.length > 0 ? processingErrors : ["No valid results to send"],
-        results: [],
-      };
-    }
-
-    const emailErrors: string[] = [];
-    const emailResults: Array<{
-      to?: string;
-      messageId?: string;
-      response?: string;
-      studentId?: number;
-    }> = [];
-    let sentCount = 0;
-
-    const payload: JobPayload = { type: "send-email", data: messages };
-    await JobWorker.runTask(payload, async (job: JobResult) => {
-      const { status, result: jobResult, error } = job;
-      if (status !== "success") {
-        emailErrors.push(error || "Email sending failed");
-        return;
-      }
-
-      sentCount++;
-      const { studentId, messageId, response, to } = jobResult;
-
-      // Capture full SMTP result
-      emailResults.push({
-        to: typeof to === "string" ? to : Array.isArray(to) ? String(to[0]) : undefined,
-        messageId,
-        response,
-        studentId,
-      });
-
-      const timeline = {
-        staffStudentId: studentId,
-        type: `exam-${examId}-${messageId}`,
-        title: "Result Notification",
-        description: "TERMLY SUMMARY OF PROGRESS REPORT",
-        visibleToStudent: 1,
-        file: `result/${base64url.encode(JSON.stringify({ studentId, messageId, examId }))}`,
-        date: new Date().toISOString().slice(0, 10),
-        activeStatus: 1,
-        schoolId: 1,
-      };
-      await this.timeline().upsertTimelines(timeline);
-    });
-
-    const allErrors = [...processingErrors, ...emailErrors];
-    return {
-      success: sentCount > 0,
-      sent: sentCount,
-      failed: studentIds.length - sentCount,
-      errors: allErrors,
-      results: emailResults,
-    };
+  async publishResults(params: { studentIds: number[]; examId: number; resend?: boolean }) {
+    const { createAssessmentPublisherServiceForRequest } = await import("./assessment-publisher.service");
+    const publisher = await createAssessmentPublisherServiceForRequest(this.provider.getTenant());
+    return publisher.publishResults(params);
   }
 
   /**
-   * Check if result notification already exists for student and exam
+   * Check if result notification already exists for student and exam.
+   * Now delegates to AssessmentPublisherService.
    */
   async isEmailAlreadySent(studentId: number, examId: number): Promise<boolean> {
-    const timelines = await this.timeline().getTimelinesByStudentId(studentId);
-    return timelines.some((t: any) => t.type?.startsWith(`exam-${examId}`));
+    const { createAssessmentPublisherServiceForRequest } = await import("./assessment-publisher.service");
+    const publisher = await createAssessmentPublisherServiceForRequest(this.provider.getTenant());
+    return publisher.isEmailAlreadySent(studentId, examId);
   }
 
   async assignSubjects(classId: number, sectionId: number, teacherId?: number) {
@@ -1156,136 +995,6 @@ export class AssessmentService {
     const street = parts.join(", ");
     const m = /No\.\s*(\d+)\s*(.+)/i.exec(street);
     return { street_number: m?.[1] || null, street_name: m?.[2] || street || null, city, state };
-  }
-
-  async runExtraction(params: {
-    userId: number; // Session User ID (for provider resolution)
-    teacherId: number; // Staff ID (for data lookup)
-    file: Blob;
-    classId: number;
-    sectionId: number;
-    studentId?: number;
-    fullName?: string;
-    admissionNo?: number;
-    originalName?: string;
-  }) {
-    const { userId, teacherId, file, classId, sectionId, studentId, fullName, admissionNo, originalName } = params;
-
-    const mappingData = await this.getMappingData(teacherId, classId, sectionId);
-    if (studentId) {
-      mappingData.studentData = { studentId, admissionNo, fullName };
-    }
-
-    // Resolve storage paths (consistent with studentFileStorage.save)
-    const classSection = await this.result().getClassSectionById(classId, sectionId);
-    if (!classSection) throw new Error("Class section not found");
-
-    const folder = studentFileStorage.getFolderPath(classSection.className || "Unknown", classSection.sectionName || "Unknown");
-
-    // Use studentId or fullName or admissionNo for unique folder name
-    const identifier = studentId?.toString() || admissionNo?.toString() || fullName || "Unknown";
-    const studentFolder = studentFileStorage.formatName(identifier);
-    const studentFolderPath = path.join(folder, studentFolder);
-
-    // 2. Execute OCR via MistralOcrService — same call the extractionWorkflow
-    // makes internally. This replaces the legacy gateway.executeExtraction
-    // call (removed in `gateway.ts:13-16` and never re-implemented).
-    // EdApexGateway is a MastraModelGateway for per-request credential
-    // resolution; it is registered by the route handler via
-    // `mastra.addGateway(gateway)`, never constructed in service code.
-    const fileName = originalName || "uploaded";
-    const ocrResponse = await mistralOcrService.processDocument(file, fileName);
-    const rawText = (ocrResponse as { pages?: Array<{ markdown?: string }> }).pages
-      ?.map((p) => p.markdown ?? "")
-      .filter(Boolean)
-      .join("\n\n") || "";
-
-    if (!rawText) {
-      console.error("Extraction produced no OCR text for", fileName);
-      return null;
-    }
-
-    // 3. Save OCR text for future retries
-    await studentFileStorage.saveRawText(studentFolderPath, "ocr.md", rawText);
-
-    // 4. Build extractedData shell. The full markdown → structured mapping
-    // (student data + marks) requires the result-mapper agent, which is
-    // registered in Slice 12. Until then, this method returns the OCR text
-    // and a populated studentData shell so callers can persist the
-    // intermediate state. The UI should treat `mappingStatus: "pending"`
-    // as "awaiting /generate step".
-    const finalClassName = classSection.className || "Unknown";
-    const finalSectionName = classSection.sectionName || "Unknown";
-    const extractedData = {
-      studentData: {
-        studentId,
-        admissionNo,
-        fullName,
-        className: finalClassName,
-        sectionName: finalSectionName,
-        class: `${finalClassName} ${finalSectionName}`.trim(),
-      },
-      marksData: [],
-      rawText,
-      mappingStatus: "pending" as const,
-    };
-
-    // 5. Persistence. `data` is cast to `any` because the resultInputSchema
-    // shape (with teachersRemark, studentRatings, etc.) is only populated
-    // after the result-mapper agent runs (Slice 12). The storage record
-    // holds the OCR-complete shell; the full structured payload lands here
-    // when /generate completes.
-    const storagePath = await studentFileStorage.save(
-      {
-        data: extractedData as any,
-        extractedAt: new Date(),
-        verified: false,
-        status: "extracted",
-        originalName: originalName || "file.json",
-      },
-      Buffer.from(await file.arrayBuffer())
-    );
-
-    return {
-      success: true,
-      studentData: extractedData.studentData,
-      marks: extractedData,
-      storagePath,
-      is_fallback: false,
-      rawText,
-    };
-  }
-
-  async getExtractedAssessment(studentId: number, examId: number) {
-    const student = await this.student().getStudentById(studentId);
-    if (!student || !student.classId || !student.sectionId) return null;
-
-    const classSection = await this.result().getClassSectionById(student.classId, student.sectionId);
-    if (!classSection) return null;
-
-    const folderPath = `${classSection.className}(${classSection.sectionName})/${student.fullName}`
-      .toLowerCase()
-      .replaceAll(" ", "_");
-
-    const extracted = await studentFileStorage.load(folderPath);
-    if (!extracted || !extracted.verified) return null;
-
-    return {
-      studentId: extracted.data?.studentData?.studentId,
-      examTypeId: extracted.data?.studentData?.examTypeId,
-      marksData: extracted.data?.marksData?.map((m: any) => ({
-        subjectCode: m.subjectCode,
-        marks: m.marks,
-        subjectName: m.subjectName,
-        subjectId: m.subjectId,
-        examTitles: m.examTitles,
-      })),
-      studentData: {
-        ...extracted.data?.studentData
-      },
-      teachersRemark: extracted.data?.teachersRemark,
-      studentRatings: extracted.data?.studentRatings,
-    } as any;
   }
 }
 

@@ -70,6 +70,8 @@ export const resultMapperAgent = new Agent({
 	model: ({ requestContext }) => {
 		return (requestContext?.get('modelId') as string) || DEFAULT_MODEL;
 	},
-	output: resultOutputSchema,
+	defaultOptions: {
+		structuredOutput: { schema: resultOutputSchema }
+	},
 	requestContextSchema,
 });

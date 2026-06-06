@@ -2,7 +2,6 @@ import { createWorkflow, createStep } from '@mastra/core/workflows';
 import { z } from 'zod';
 import { mistralOcrService } from '$lib/server/service/mistral-ocr.service';
 import { mastra } from '$lib/server/mastra';
-import { studentFileStorage } from '$lib/server/storage/student-files';
 
 export const extractionTriggerSchema = z.object({
   fileReferences: z.array(z.object({

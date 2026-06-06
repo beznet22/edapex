@@ -85,7 +85,7 @@ describe('Global Tools', () => {
 	});
 
 	describe('webSearchTool', () => {
-		let webSearchTool: typeof import('$lib/server/mastra/tools/global-tools').webSearchTool;
+		let webSearchTool: any;
 		let searchCache: typeof import('$lib/server/mastra/tools/global-tools').searchCache;
 
 		beforeEach(async () => {
@@ -208,7 +208,7 @@ describe('Global Tools', () => {
 	});
 
 	describe('webFetchTool', () => {
-		let webFetchTool: typeof import('$lib/server/mastra/tools/global-tools').webFetchTool;
+		let webFetchTool: any;
 		let fetchCache: typeof import('$lib/server/mastra/tools/global-tools').fetchCache;
 
 		beforeEach(async () => {
