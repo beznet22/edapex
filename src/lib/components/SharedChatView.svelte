@@ -89,9 +89,8 @@
   });
 
   $effect(() => {
-    // Hydrate pending file references from localStorage (set by
-    // /api/chat/start-with-files redirect) once the thread id is known.
-    if (!chat.chatData?.threadId) return;
+    // Hydrate pending file references from localStorage. Works on `/` (no
+    // thread) and on `/chat/{id}` (thread created by /api/chat/start-with-files).
     if (typeof localStorage === "undefined") return;
     const key = "pendingFileReferences";
     const raw = localStorage.getItem(key);

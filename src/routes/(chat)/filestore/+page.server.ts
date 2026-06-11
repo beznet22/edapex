@@ -7,6 +7,7 @@ import {
 	resolveExamTypeId,
 } from "$lib/server/mastra/tenant-context";
 import { buildWorkspaceRequestContext } from "$lib/server/helpers/chat-helper";
+import { resolveActiveClassScope } from "$lib/server/helpers/class-scope";
 import { tenantWorkspace } from "$lib/server/mastra/storage/workspaces";
 import { getMemory } from "$lib/server/mastra";
 import { toAISdkMessages } from "@mastra/ai-sdk/ui";
@@ -15,17 +16,27 @@ import type { PageServerLoad } from "./$types";
 import type { Artifact } from "$lib/types/workspace-types";
 import type { SerializedTenant } from "$lib/types/background-tasks";
 
-export const load: PageServerLoad = async ({ url, locals }) => {
+export const load: PageServerLoad = async ({ url, locals, cookies }) => {
 	if (!locals.user) throw error(401);
 
-	const schoolId = locals.user.schoolId ?? 1;
+	const user = locals.user;
+	const schoolId = user.schoolId ?? 1;
+
+	const scope = await resolveActiveClassScope({
+		schoolId,
+		staffId: user.staffId,
+		className: url.searchParams.get("className"),
+		sectionName: url.searchParams.get("sectionName"),
+		selectedClassCookie: cookies.get("selected-class"),
+	});
+
 	const baseTenant = createTenantContext({
 		schoolId,
-		userId: locals.user.id,
-		designationId: (locals.user as { designationId?: number }).designationId ?? 1,
-		staffId: (locals.user as { staffId?: number }).staffId ?? 1,
-		classId: (locals.user as { classId?: number | null }).classId ?? null,
-		sectionId: (locals.user as { sectionId?: number | null }).sectionId ?? null,
+		userId: user.id,
+		designationId: (user as { designationId?: number }).designationId ?? 1,
+		staffId: (user as { staffId?: number }).staffId ?? 1,
+		classId: scope?.classId ?? null,
+		sectionId: scope?.sectionId ?? null,
 		examId: null,
 		examTypeId: null,
 		academicId: null,
@@ -116,11 +127,15 @@ export const load: PageServerLoad = async ({ url, locals }) => {
 
 	const yearSeg = `AY${scopedTenant.academicId ?? 0}`;
 	const classSeg = `${scopedTenant.classId}_${scopedTenant.sectionId}_${yearSeg}`;
-	const prefix = `${scopedTenant.schoolId}/${classSeg}/exams/examType-${activeTermId}`;
+	// `resolveFilesystem` is already rooted at `${schoolId}/${classSeg}`, so
+	// pass only the term-relative subpath for fs operations. The full
+	// school/class-relative path is used as the file API URL key.
+	const termRelPath = `exams/examType-${activeTermId}`;
+	const fullPrefix = `${scopedTenant.schoolId}/${classSeg}/exams/examType-${activeTermId}`;
 
 	let entries: Array<{ name: string; type: "file" | "directory"; size?: number }> = [];
 	try {
-		entries = await fs.readdir(prefix, { recursive: true });
+		entries = await fs.readdir(termRelPath, { recursive: true });
 	} catch {
 		entries = [];
 	}
@@ -129,10 +144,11 @@ export const load: PageServerLoad = async ({ url, locals }) => {
 		entries
 			.filter((e) => e.name !== "." && e.name !== ".." && e.type === "file")
 			.map(async (e) => {
-				const key = `${prefix}/${e.name}`;
+				const relKey = `${termRelPath}/${e.name}`;
+				const key = `${fullPrefix}/${e.name}`;
 				let modifiedAt: number | undefined;
 				try {
-					const s = await fs.stat(key);
+					const s = await fs.stat(relKey);
 					modifiedAt = s.modifiedAt instanceof Date ? s.modifiedAt.getTime() : undefined;
 				} catch {
 					modifiedAt = undefined;
@@ -143,8 +159,8 @@ export const load: PageServerLoad = async ({ url, locals }) => {
 					kind: deriveKind(e.name),
 					category: deriveCategory(e.name),
 					source: deriveSource(key),
-					url: `/api/file/${key}`,
-					saveUrl: `/api/file/${key}`,
+					url: `/api/file/${relKey}`,
+					saveUrl: `/api/file/${relKey}`,
 					size: e.size,
 					modifiedAt,
 				};
@@ -176,7 +192,7 @@ export const load: PageServerLoad = async ({ url, locals }) => {
 							) {
 								const ext = part.type === "data-generatePDF" ? ".pdf" : ".md";
 								const safeTitle = part.data.title.replace(/[^a-zA-Z0-9._-]/g, "_");
-								threadFileKeys.add(`${prefix}/${safeTitle}${ext}`);
+								threadFileKeys.add(`${fullPrefix}/${safeTitle}${ext}`);
 							}
 						}
 					}
@@ -188,6 +204,15 @@ export const load: PageServerLoad = async ({ url, locals }) => {
 		files = files.filter((f) => threadFileKeys.has(f.id));
 	}
 
-	return { termOptions, activeTermId, activeAcademicTitle, files, threadId, tenant };
+	return {
+		termOptions,
+		activeTermId,
+		activeAcademicTitle,
+		files,
+		threadId,
+		tenant,
+		activeClassId: scope?.classId ?? null,
+		activeSectionId: scope?.sectionId ?? null,
+	};
 };
 

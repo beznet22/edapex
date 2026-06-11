@@ -1,19 +1,27 @@
 /**
- * @Mention entity categories available for autocomplete search.
+ * @Mention entity categories available in the editor's @mention popup.
+ *
+ * The editor's mentions are deliberately scoped to the document's content,
+ * NOT to tenant metadata. The downstream chat agent resolves class/section/
+ * exam/term at chat time from its own tenantContext, so the editor only
+ * needs to carry entities the LLM cannot infer from context:
+ *
+ *   students — a specific student referenced by name (and admission number
+ *              embedded in the display label). Scoped to the user's currently
+ *              selected class+section, or to all students in the school for
+ *              privileged roles.
+ *   date     — an explicit date token (today, tomorrow, or a YYYY-MM-DD value).
+ *   custom   — a free-form inline variable the user typed without picking a
+ *              structured entity. Pass-through placeholder; the LLM treats
+ *              it as literal text.
  */
-export type MentionCategory =
-	| 'schools'
-	| 'students'
-	| 'classes'
-	| 'sections'
-	| 'academic_year'
-	| 'term';
+export type MentionCategory = 'students' | 'date' | 'custom';
 
 /**
  * Result shape returned by the mention search endpoint.
  */
 export interface MentionSearchResult {
-	id: number;
+	id: number | string;
 	name: string;
 	category: string;
 	typeBadge: string;
@@ -21,19 +29,12 @@ export interface MentionSearchResult {
 }
 
 /**
- * Returns the list of entity categories a user is allowed to search,
- * based on their designation role.
+ * Returns the list of mention categories available to a user.
  *
- * - Coordinator (5) and IT (1): all 6 categories
- * - Class Teacher (8): students, academic_year, term
- * - All others: no categories (empty array)
+ * v1: all three categories are available to all authenticated users. The
+ * server still scopes `students` searches by the user's schoolId (and by
+ * class+section when the editor has those set).
  */
-export function getAllowedCategories(designationId: number): MentionCategory[] {
-	if (designationId === 1 || designationId === 5) {
-		return ['schools', 'students', 'classes', 'sections', 'academic_year', 'term'];
-	}
-	if (designationId === 8) {
-		return ['students', 'academic_year', 'term'];
-	}
-	return [];
+export function getAllowedCategories(_designationId: number): MentionCategory[] {
+	return ['students', 'date', 'custom'];
 }

@@ -34,6 +34,8 @@
 	import ScanSearch from "@lucide/svelte/icons/scan-search";
 	import MessageSquare from "@lucide/svelte/icons/message-square";
 	import { useInspector } from "$lib/context/inspector-context.svelte";
+	import { mobileUiState } from "$lib/state/mobile-ui.svelte";
+	import { IsMobile } from "$lib/hooks/is-mobile.svelte";
 	import { backgroundTasks, serializeTenant } from "$lib/state/background-tasks.svelte";
 	import { cn } from "$lib/utils/shadcn";
 	import { toast } from "svelte-sonner";
@@ -43,6 +45,7 @@
 	let { data }: { data: PageData } = $props();
 
 	const inspector = useInspector();
+	const isMobile = new IsMobile();
 	const isThreadScoped = $derived(typeof data.threadId === "string" && data.threadId.length > 0);
 
 	let activeTermId = $state(data.activeTermId);
@@ -212,6 +215,9 @@
 
 	function openFile(file: Artifact) {
 		inspector.openFilestoreArtifact(file);
+		if (isMobile.current) {
+			mobileUiState.viewerKey = file.id;
+		}
 	}
 
 	function downloadFile(file: Artifact) {
@@ -325,7 +331,7 @@
 				localStorage.setItem("pendingFileReferences", JSON.stringify(json.fileReferences));
 			}
 			clearSelection();
-			await goto(`/chat/${json.threadId}`);
+			await goto("/");
 		} catch (err) {
 			const message = err instanceof Error ? err.message : String(err);
 			toast.error(`Failed to start chat: ${message}`);
@@ -442,7 +448,7 @@
 						<Input
 							type="search"
 							placeholder="Search library"
-							class="pl-11 h-12 w-full sm:w-80 bg-muted/40 border border-border/40 rounded-full text-sm font-medium focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:bg-background transition-all"
+							class="pl-11 h-10 w-full sm:w-80 bg-muted/40 border border-border/40 rounded-full text-sm font-medium focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:bg-background transition-all"
 							bind:value={searchQuery}
 						/>
 					</div>
@@ -450,14 +456,14 @@
 					<DropdownMenu.Root>
 						<DropdownMenu.Trigger>
 							{#snippet child({ props })}
-								<button
-									{...props}
-									type="button"
-									class="h-12 px-5 rounded-full font-bold text-sm gap-1.5 shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-shadow bg-foreground text-background inline-flex items-center"
-								>
-									New
-									<ChevronDown class="h-4 w-4 opacity-80" />
-								</button>
+							<button
+								{...props}
+								type="button"
+								class="h-10 px-4 rounded-full font-bold text-sm gap-1.5 bg-primary text-primary-foreground hover:opacity-90 active:opacity-80 transition-opacity inline-flex items-center"
+							>
+								New
+								<ChevronDown class="h-4 w-4 opacity-80" />
+							</button>
 							{/snippet}
 						</DropdownMenu.Trigger>
 						<DropdownMenu.Content
@@ -532,26 +538,6 @@
 						<ScanSearch class="size-3.5" />
 						Extract
 					</Button>
-
-					<Button
-						variant="ghost"
-						size="sm"
-						class="h-9 px-3.5 rounded-full gap-1.5 text-xs font-bold"
-						onclick={downloadSelected}
-					>
-						<Download class="size-3.5" />
-						Download
-					</Button>
-
-					<Button
-						variant="ghost"
-						size="sm"
-						class="h-9 px-3.5 rounded-full gap-1.5 text-xs font-bold text-destructive hover:text-destructive"
-						onclick={() => (deleteDialogOpen = true)}
-					>
-						<Trash2 class="size-3.5" />
-						Delete
-					</Button>
 				</div>
 			{:else}
 				<div class="flex items-center justify-between gap-3 flex-wrap">
@@ -565,9 +551,9 @@
 								type="button"
 								onclick={() => (categoryFilter = tab.id as typeof categoryFilter)}
 								class={cn(
-									"h-10 px-5 rounded-full text-sm font-bold transition-colors",
+									"h-9 px-4 rounded-full text-sm font-bold transition-colors",
 									categoryFilter === tab.id
-										? "bg-foreground text-background"
+										? "bg-primary text-primary-foreground"
 										: "text-muted-foreground hover:text-foreground hover:bg-muted/40",
 								)}
 							>
@@ -585,8 +571,8 @@
 										type="button"
 										aria-label="Filter"
 										class={cn(
-											"h-10 px-3 sm:px-4 inline-flex items-center gap-1.5 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors text-xs font-bold uppercase tracking-wider",
-											activeFilterCount > 0 && "text-foreground bg-muted/40",
+											"h-9 px-3 sm:px-4 inline-flex items-center gap-1.5 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors text-xs font-bold uppercase tracking-wider",
+											activeFilterCount > 0 && "text-primary bg-primary/10",
 										)}
 									>
 										<Funnel class="h-4 w-4" />
@@ -689,34 +675,81 @@
 							</DropdownMenu.Content>
 						</DropdownMenu.Root>
 
-						<div class="h-6 w-px bg-border/60 mx-1" aria-hidden="true"></div>
+						<div class="h-5 w-px bg-border/60 mx-1" aria-hidden="true"></div>
 
-						<button
-							type="button"
-							aria-label="Grid view"
-							onclick={() => (viewMode = "grid")}
-							class={cn(
-								"h-10 w-10 grid place-items-center rounded-full transition-colors",
-								viewMode === "grid"
-									? "bg-foreground text-background"
-									: "text-muted-foreground hover:text-foreground hover:bg-muted/40",
-							)}
-						>
-							<LayoutGrid class="h-4 w-4" />
-						</button>
-						<button
-							type="button"
-							aria-label="List view"
-							onclick={() => (viewMode = "list")}
-							class={cn(
-								"h-10 w-10 grid place-items-center rounded-full transition-colors",
-								viewMode === "list"
-									? "bg-foreground text-background"
-									: "text-muted-foreground hover:text-foreground hover:bg-muted/40",
-							)}
-						>
-							<LayoutList class="h-4 w-4" />
-						</button>
+						<DropdownMenu.Root>
+							<DropdownMenu.Trigger>
+								{#snippet child({ props })}
+									<button
+										{...props}
+										type="button"
+										aria-label="View mode"
+										class="sm:hidden h-9 w-9 grid place-items-center rounded-full bg-primary text-primary-foreground transition-opacity hover:opacity-90 active:opacity-80"
+									>
+										{#if viewMode === "grid"}
+											<LayoutGrid class="h-4 w-4" />
+										{:else}
+											<LayoutList class="h-4 w-4" />
+										{/if}
+									</button>
+								{/snippet}
+							</DropdownMenu.Trigger>
+							<DropdownMenu.Content
+								align="end"
+								sideOffset={8}
+								class="w-44 rounded-2xl p-1 bg-popover border border-border/60 shadow-2xl"
+							>
+								<DropdownMenu.Item
+									onclick={() => (viewMode = "grid")}
+									class="px-3 py-2.5 rounded-lg text-sm font-medium cursor-pointer"
+								>
+									<LayoutGrid class="h-4 w-4 mr-3 text-muted-foreground" />
+									Grid
+									{#if viewMode === "grid"}
+										<Check class="h-4 w-4 ml-auto" strokeWidth={3} />
+									{/if}
+								</DropdownMenu.Item>
+								<DropdownMenu.Item
+									onclick={() => (viewMode = "list")}
+									class="px-3 py-2.5 rounded-lg text-sm font-medium cursor-pointer"
+								>
+									<LayoutList class="h-4 w-4 mr-3 text-muted-foreground" />
+									List
+									{#if viewMode === "list"}
+										<Check class="h-4 w-4 ml-auto" strokeWidth={3} />
+									{/if}
+								</DropdownMenu.Item>
+							</DropdownMenu.Content>
+						</DropdownMenu.Root>
+
+						<div class="hidden sm:flex items-center gap-1">
+							<button
+								type="button"
+								aria-label="Grid view"
+								onclick={() => (viewMode = "grid")}
+								class={cn(
+									"h-9 w-9 grid place-items-center rounded-full transition-colors",
+									viewMode === "grid"
+										? "bg-primary text-primary-foreground"
+										: "text-muted-foreground hover:text-foreground hover:bg-muted/40",
+								)}
+							>
+								<LayoutGrid class="h-4 w-4" />
+							</button>
+							<button
+								type="button"
+								aria-label="List view"
+								onclick={() => (viewMode = "list")}
+								class={cn(
+									"h-9 w-9 grid place-items-center rounded-full transition-colors",
+									viewMode === "list"
+										? "bg-primary text-primary-foreground"
+										: "text-muted-foreground hover:text-foreground hover:bg-muted/40",
+								)}
+							>
+								<LayoutList class="h-4 w-4" />
+							</button>
+						</div>
 					</div>
 				</div>
 			{/if}
@@ -754,7 +787,7 @@
 				</div>
 			{:else if viewMode === "grid"}
 				<div
-					class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5"
+					class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 sm:gap-6"
 				>
 					{#each filteredFiles as file (file.id)}
 						{@const Icon = categoryIcon(file.category)}
@@ -771,13 +804,13 @@
 								}
 							}}
 							class={cn(
-								"group relative aspect-[3/4] rounded-3xl border bg-card/40 overflow-hidden text-left transition-all cursor-pointer",
-								"hover:bg-card/70 hover:border-border/80 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-black/5",
+								"group relative aspect-square rounded-3xl overflow-hidden text-left transition-all duration-300 cursor-pointer bg-card",
+								"shadow-lg hover:shadow-[0_1px_3px_0px_oklch(0_0_0/0.1),0_12px_24px_-6px_oklch(0_0_0/0.25)] hover:-translate-y-1 hover:bg-muted/30",
 								isActive
-									? "border-primary ring-2 ring-primary/30"
+									? "ring-1 ring-primary"
 									: isSelected
-										? "border-foreground/70 ring-2 ring-foreground/70"
-										: "border-border/40",
+										? "ring-1 ring-foreground"
+										: "",
 							)}
 						>
 							<button
@@ -788,10 +821,10 @@
 									toggleSelect(file.id);
 								}}
 								class={cn(
-									"absolute top-3 right-3 z-10 size-6 grid place-items-center rounded-full border transition-all",
+									"absolute top-3 right-3 z-10 size-7 grid place-items-center rounded-full border transition-all",
 									isSelected
-										? "bg-foreground text-background border-foreground"
-										: "bg-background/80 backdrop-blur-sm border-border/60 opacity-0 group-hover:opacity-100",
+										? "bg-primary text-primary-foreground border-primary"
+										: "bg-background/85 backdrop-blur-sm border-foreground/30 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100",
 								)}
 							>
 								{#if isSelected}
@@ -799,56 +832,48 @@
 								{/if}
 							</button>
 
-							<div class="absolute inset-0 p-5 flex flex-col pointer-events-none">
-								<h3
-									class="text-[15px] font-bold text-foreground leading-tight line-clamp-2 pr-1"
-									title={file.title}
-								>
-									{file.title}
-								</h3>
-
-								<div class="flex-1 grid place-items-center my-4">
-									{#if file.kind === "image" && file.url}
-										<div
-											class="w-full h-full rounded-2xl overflow-hidden bg-muted/30 grid place-items-center"
-										>
-											<img
-												src={file.url}
-												alt={file.title}
-												loading="lazy"
-												class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-											/>
-										</div>
-									{:else}
-										<div
-											class="size-20 grid place-items-center rounded-2xl bg-foreground/5 border border-border/40 group-hover:bg-foreground/10 transition-colors"
-										>
-											<Icon class="size-10 text-foreground/80" />
-										</div>
-									{/if}
-								</div>
-
+							{#if file.kind === "image" && file.url}
+								<img
+									src={file.url}
+									alt={file.title}
+									loading="lazy"
+									class="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+								/>
+							{:else}
 								<div
-									class="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-muted-foreground"
+									class="absolute inset-0 grid place-items-center from-muted/30 via-background/10 to-muted/40"
 								>
-									<span class="text-foreground/80">{categoryLabel(file.category)}</span>
-									<span aria-hidden="true">·</span>
-									<span class="tabular-nums">{formatSize(file.size) || "—"}</span>
+									<Icon class="size-14 text-foreground/30" strokeWidth={1.25} />
 								</div>
+							{/if}
+
+							<h3
+								class="absolute text-white/65 top-3 left-3 right-12 text-base font-bol leading-tight line-clamp-2 mix-blend-difference pointer-events-none"
+								title={file.title}
+							>
+								{file.title}
+							</h3>
+							<div
+								class="absolute bottom-3 left-3 right-12 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest mix-blend-difference pointer-events-none"
+							>
+								<span class="text-white/40">{categoryLabel(file.category)}</span>
+								<span class="text-white/40" aria-hidden="true">·</span>
+								<span class="tabular-nums text-white/40">{formatSize(file.size) || "—"}</span>
 							</div>
 						</div>
 					{/each}
 				</div>
 			{:else}
-				<div class="rounded-2xl border border-border/40 overflow-hidden bg-card/20">
+				<div>
 					<div
-						class="grid grid-cols-[auto_1fr_140px_120px_60px] items-center gap-4 px-4 sm:px-6 py-3 text-[11px] font-black uppercase tracking-widest text-muted-foreground border-b border-border/40"
+						class="grid grid-cols-[1fr_auto] sm:grid-cols-[auto_1fr_140px_120px_60px] items-center gap-4 px-2 sm:px-4 py-2 text-[11px] font-black uppercase tracking-widest text-muted-foreground"
 					>
+						<span class="sm:hidden">Name</span>
 						<button
 							type="button"
 							aria-label="Select all"
 							onclick={toggleSelectAll}
-							class="grid place-items-center"
+							class="hidden sm:grid place-items-center"
 						>
 							{#if selectedIds.size > 0 && selectedIds.size === filteredFiles.length}
 								<span
@@ -869,14 +894,14 @@
 						<button
 							type="button"
 							onclick={() => toggleSort("name")}
-							class="text-left hover:text-foreground transition-colors"
+							class="hidden sm:inline text-left hover:text-foreground transition-colors"
 						>
 							Name
 						</button>
 						<button
 							type="button"
 							onclick={() => toggleSort("modified")}
-							class="text-left hover:text-foreground transition-colors flex items-center gap-1"
+							class="hidden sm:inline-flex text-left hover:text-foreground transition-colors items-center gap-1"
 						>
 							Modified
 							{#if sortBy === "modified"}
@@ -893,11 +918,11 @@
 						<button
 							type="button"
 							onclick={() => toggleSort("size")}
-							class="text-left hover:text-foreground transition-colors"
+							class="hidden sm:inline text-left hover:text-foreground transition-colors"
 						>
 							Size
 						</button>
-						<span aria-hidden="true"></span>
+						<span class="hidden sm:inline" aria-hidden="true"></span>
 					</div>
 
 					<ul class="divide-y divide-border/40">
@@ -907,7 +932,7 @@
 							{@const isSelected = selectedIds.has(file.id)}
 							<li
 								class={cn(
-									"group grid grid-cols-[auto_1fr_140px_120px_60px] items-center gap-4 px-4 sm:px-6 py-3 transition-colors",
+									"grid grid-cols-[1fr_auto] sm:grid-cols-[auto_1fr_140px_120px_60px] items-center gap-4 px-2 sm:px-4 py-2 transition-colors rounded-lg",
 									isActive
 										? "bg-foreground/10"
 										: isSelected
@@ -922,7 +947,7 @@
 										e.stopPropagation();
 										toggleSelect(file.id);
 									}}
-									class="grid place-items-center"
+									class="hidden sm:grid place-items-center"
 								>
 									{#if isSelected}
 										<span
@@ -944,7 +969,7 @@
 									class="flex items-center gap-3 min-w-0 text-left"
 								>
 									<div
-										class="size-10 rounded-xl overflow-hidden bg-muted/40 border border-border/40 grid place-items-center shrink-0"
+										class="size-12 rounded-lg overflow-hidden bg-muted/40 border border-border/40 grid place-items-center shrink-0"
 									>
 										{#if file.kind === "image" && file.url}
 											<img
@@ -957,15 +982,20 @@
 											<Icon class="size-5 text-foreground/70" />
 										{/if}
 									</div>
-									<span class="truncate text-sm font-medium text-foreground/90">
-										{file.title}
-									</span>
+									<div class="flex flex-col min-w-0">
+										<span class="truncate text-sm font-medium text-foreground/90">
+											{file.title}
+										</span>
+										<span class="truncate text-xs text-muted-foreground sm:hidden">
+											{formatDate(file.modifiedAt)}
+										</span>
+									</div>
 								</button>
 
-								<span class="text-sm text-muted-foreground truncate">
+								<span class="hidden sm:inline text-sm text-muted-foreground truncate">
 									{formatDate(file.modifiedAt)}
 								</span>
-								<span class="text-sm text-muted-foreground tabular-nums">
+								<span class="hidden sm:inline text-sm text-muted-foreground tabular-nums">
 									{formatSize(file.size) || "—"}
 								</span>
 
@@ -977,7 +1007,7 @@
 												type="button"
 												aria-label="More actions"
 												onclick={(e) => e.stopPropagation()}
-												class="size-8 grid place-items-center rounded-full text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
+												class="size-8 grid place-items-center rounded-full text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
 											>
 												<Ellipsis class="size-4" />
 											</button>
@@ -1026,7 +1056,7 @@
 </div>
 
 <Dialog.Root bind:open={noteDialogOpen}>
-	<Dialog.Content class="bg-background/95 backdrop-blur-3xl border border-white/10 rounded-3xl p-6 shadow-2xl max-w-md">
+	<Dialog.Content class="bg-background/95 backdrop-blur-3xl border border-border/60 rounded-3xl p-6 shadow-2xl max-w-md">
 		<Dialog.Header>
 			<Dialog.Title>New note</Dialog.Title>
 			<Dialog.Description>
@@ -1061,7 +1091,7 @@
 </Dialog.Root>
 
 <AlertDialog.Root bind:open={deleteDialogOpen}>
-	<AlertDialog.Content class="bg-background/95 backdrop-blur-3xl border border-white/10 rounded-3xl p-6 shadow-2xl max-w-sm">
+	<AlertDialog.Content class="bg-background/95 backdrop-blur-3xl border border-border/60 rounded-3xl p-6 shadow-2xl max-w-sm">
 		<AlertDialog.Header>
 			<AlertDialog.Title>Delete {selectedIds.size} file{selectedIds.size === 1 ? "" : "s"}?</AlertDialog.Title>
 			<AlertDialog.Description>

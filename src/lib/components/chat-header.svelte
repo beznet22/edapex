@@ -1,25 +1,20 @@
 <script lang="ts">
-  import { Button } from "$lib/components/ui/button/index.js";
-  import * as Sidebar from "$lib/components/ui/sidebar/index.js";
-  import { useSidebar } from "$lib/components/ui/sidebar/index.js";
-  import type { AuthUser } from "$lib/types/auth-types";
-  import { UserContext } from "$lib/context/user-context.svelte";
-  import ActivityPopover from "$lib/components/activity-popover.svelte";
+	import { Button } from "$lib/components/ui/button/index.js";
+	import * as Sidebar from "$lib/components/ui/sidebar/index.js";
+	import { useSidebar } from "$lib/components/ui/sidebar/index.js";
+	import type { AuthUser } from "$lib/types/auth-types";
+	import { UserContext } from "$lib/context/user-context.svelte";
+	import ActivityPopover from "$lib/components/activity-popover.svelte";
+	import ModelSelector from "$lib/components/model-selector.svelte";
 
-  let {
-    user,
-    chat,
-    readonly = false,
-  }: {
-    user?: AuthUser;
-    chat?: any;
-    readonly?: boolean;
-  } = $props();
+	let {
+		user,
+	}: {
+		user?: AuthUser;
+	} = $props();
 
-  const sidebar = useSidebar();
-  const userContext = UserContext.fromContext();
-
-  import FolderIcon from "@lucide/svelte/icons/folder";
+	const sidebar = useSidebar();
+	const userContext = UserContext.fromContext();
 </script>
 
 <header
@@ -28,26 +23,14 @@
   <div class="flex flex-1 items-center gap-2 min-w-0">
     <Sidebar.Trigger
       variant="ghost"
-      class="h-12 w-12 min-h-12 min-w-12 shrink-0 text-muted-foreground hover:text-foreground"
+      class="h-10 w-10 min-h-10 min-w-10 shrink-0 text-muted-foreground hover:text-foreground"
     />
-    <div class="flex items-center gap-2 min-w-0 overflow-hidden">
-      <a
-        href="/"
-        class="text-sm font-semibold tracking-tight text-white/90 hover:text-white transition-colors"
-        >Edapex AI</a
-      >
-      {#if !chat?.title}
-        <span
-          class="text-[10px] uppercase tracking-widest text-white/30 font-bold ml-1 hidden sm:inline"
-          >New conversation</span
-        >
-      {:else}
-        <span class="text-xs text-white/40 truncate ml-1 max-w-[200px] sm:max-w-none">{chat.title}</span>
-      {/if}
-    </div>
+    <ModelSelector
+      class="h-10 rounded-full border-none bg-transparent hover:bg-muted/40 text-muted-foreground hover:text-foreground shrink-0 transition-all data-[state=open]:bg-muted/40"
+    />
   </div>
 
-  <div class="flex items-center gap-2 shrink-0">
+  <div class="flex items-center gap-1 shrink-0">
     <ActivityPopover />
   </div>
 </header>

@@ -73,6 +73,8 @@ export const DEFAULT_TITLE_MODEL = groqProvider.chatModel('llama-3.1-8b-instant'
 export const DEFAULT_COPILOT_MODEL = groqProvider.chatModel('llama-3.1-8b-instant');
 
 /**
- * Default editor agent model — prefers Groq for fast inference.
+ * Default editor agent model — uses 70B for instruction-following on inline edits.
+ * The 8B instant model was too weak to reliably return ONLY the <Selection> replacement
+ * without leaking surrounding document content.
  */
-export const DEFAULT_EDITOR_MODEL = groqProvider.chatModel('llama-3.1-8b-instant');
+export const DEFAULT_EDITOR_MODEL = groqProvider.chatModel('llama-3.3-70b-versatile');

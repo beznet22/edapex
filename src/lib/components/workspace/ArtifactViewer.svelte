@@ -15,27 +15,41 @@
 	import PencilIcon from "@lucide/svelte/icons/pencil";
 	import EyeIcon from "@lucide/svelte/icons/eye";
 	import FileQuestionIcon from "@lucide/svelte/icons/file-question";
+	import ArrowLeftIcon from "@lucide/svelte/icons/arrow-left";
 	import EditorCanvas from "./editor-canvas.svelte";
 	import MarkdownPreview from "./markdown-preview.svelte";
+	import EditorModeToggle from "$lib/components/editor/EditorModeToggle.svelte";
+	import { useInspector } from "$lib/context/inspector-context.svelte";
 
 	let {
 		artifacts,
 		activeId,
 		mode,
+		user,
 	}: {
 		artifacts: Artifact[];
 		activeId?: string;
 		mode: "chat" | "filestore";
+		user?: { designation?: string };
 	} = $props();
+
+	const inspector = useInspector();
 
 	let editorRef = $state<{ save: () => Promise<boolean> | void; copy: () => void } | undefined>(
 		undefined,
 	);
 	let editing = $state(false);
+	let editorMode = $state<"wysiwyg" | "raw">("wysiwyg");
 
 	const viewingId = $derived(activeId ?? artifacts[0]?.id ?? null);
 	const current = $derived(artifacts.find((a) => a.id === viewingId) ?? null);
 	const isStreaming = $derived(current?.status === "processing" || current?.status === "streaming");
+	const isMarkdown = $derived(
+		current
+			? current.title.toLowerCase().endsWith(".md") ||
+				current.title.toLowerCase().endsWith(".markdown")
+			: false,
+	);
 	const showEditToggle = $derived(current?.kind === "document" && !isStreaming);
 	const effectiveEdit = $derived(showEditToggle && editing);
 
@@ -78,8 +92,26 @@
 
 <div class="flex flex-col h-full min-h-0 bg-background">
 	<header
-		class="flex items-center justify-between h-12 px-2 sm:px-4 shrink-0 gap-2 min-w-0 w-full border-b border-white/5"
+		class="flex items-center justify-between h-12 px-2 sm:px-4 shrink-0 gap-2 min-w-0 w-full"
 	>
+		<Tooltip.Root>
+			<Tooltip.Trigger>
+				{#snippet child({ props })}
+					<Button
+						{...props}
+						variant="ghost"
+						size="icon"
+						class="size-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/40 shrink-0"
+						onclick={() => inspector.close()}
+						aria-label="Close workspace"
+					>
+						<ArrowLeftIcon class="size-4" />
+					</Button>
+				{/snippet}
+			</Tooltip.Trigger>
+			<Tooltip.Content>Close workspace</Tooltip.Content>
+		</Tooltip.Root>
+
 		<div class="flex items-center min-w-0 flex-1 gap-1">
 			{#if artifacts.length > 1}
 				<DropdownMenu.Root>
@@ -89,19 +121,19 @@
 								{...props}
 								variant="ghost"
 								size="sm"
-								class="h-8 px-2 text-[13px] font-semibold text-white/90 hover:bg-white/5 hover:text-white flex items-center gap-2 min-w-0 max-w-full"
+								class="h-8 px-2 text-[13px] font-semibold text-foreground hover:bg-muted/40 hover:text-foreground flex items-center gap-2 min-w-0 max-w-full"
 							>
 								<FileIcon class="size-4 text-primary/80 shrink-0" />
 								<span class="truncate text-left block min-w-0">{current?.title ?? "Untitled"}</span>
-								<ChevronDownIcon class="size-3.5 text-white/40 shrink-0" />
+								<ChevronDownIcon class="size-3.5 text-muted-foreground shrink-0" />
 							</Button>
 						{/snippet}
 					</DropdownMenu.Trigger>
 					<DropdownMenu.Content
 						align="start"
-						class="w-64 bg-slate-950/95 backdrop-blur-xl border-white/10 rounded-xl shadow-2xl"
+						class="w-64 bg-popover backdrop-blur-xl border border-border/60 rounded-xl shadow-2xl"
 									>
-						<DropdownMenu.Label class="text-[10px] uppercase tracking-wider text-white/40 px-2 py-1.5">
+						<DropdownMenu.Label class="text-[10px] uppercase tracking-wider text-muted-foreground px-2 py-1.5">
 							{mode === "chat" ? "Artifacts in thread" : "Open file"}
 						</DropdownMenu.Label>
 						{#each artifacts as artifact (artifact.id)}
@@ -109,8 +141,8 @@
 								class={cn(
 									"text-[12px] font-medium rounded-lg cursor-pointer my-0.5",
 									viewingId === artifact.id
-										? "bg-primary/20 text-white"
-										: "text-white/60 hover:text-white hover:bg-white/5",
+										? "bg-primary/15 text-foreground"
+										: "text-muted-foreground hover:text-foreground hover:bg-muted/40",
 								)}
 								onclick={() => {
 									editing = false;
@@ -128,7 +160,7 @@
 			{:else}
 				<div class="flex items-center gap-2 min-w-0 px-2">
 					<FileIcon class="size-4 text-primary/80 shrink-0" />
-					<span class="truncate text-[13px] font-semibold text-white/90">
+					<span class="truncate text-[13px] font-semibold text-foreground">
 						{current?.title ?? "Untitled"}
 					</span>
 				</div>
@@ -144,7 +176,7 @@
 								{...props}
 								variant="ghost"
 								size="icon"
-								class="size-8 rounded-lg text-white/60 hover:text-white hover:bg-white/5"
+								class="size-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/40"
 								onclick={handleSave}
 								disabled={!effectiveEdit}
 							>
@@ -162,7 +194,7 @@
 								{...props}
 								variant="ghost"
 								size="icon"
-								class="size-8 rounded-lg text-white/60 hover:text-white hover:bg-white/5"
+								class="size-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/40"
 								onclick={handleCopy}
 							>
 								<CopyIcon class="size-4" />
@@ -180,7 +212,7 @@
 									{...props}
 									variant="ghost"
 									size="icon"
-									class="size-8 rounded-lg text-white/60 hover:text-white hover:bg-white/5"
+									class="size-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/40"
 									onclick={handleDownload}
 								>
 									<DownloadIcon class="size-4" />
@@ -192,50 +224,26 @@
 				{/if}
 			{/if}
 
-			{#if showEditToggle}
-				<Tooltip.Root>
-					<Tooltip.Trigger>
-						{#snippet child({ props })}
-							<Button
-								{...props}
-								variant="ghost"
-								size="icon"
-								class={cn(
-									"size-8 rounded-lg transition-colors",
-									editing
-										? "text-primary bg-primary/10"
-										: "text-white/60 hover:text-white hover:bg-white/5",
-								)}
-								onclick={() => (editing = !editing)}
-							>
-								{#if editing}
-									<EyeIcon class="size-4" />
-								{:else}
-									<PencilIcon class="size-4" />
-								{/if}
-							</Button>
-						{/snippet}
-					</Tooltip.Trigger>
-					<Tooltip.Content>{editing ? "Preview" : "Edit"}</Tooltip.Content>
-				</Tooltip.Root>
+			{#if effectiveEdit && isMarkdown}
+				<EditorModeToggle bind:mode={editorMode} />
 			{/if}
 		</div>
 	</header>
 
-	<div class="flex-1 min-h-0 relative">
+	<div class="flex-1 min-h-0 relative group">
 		{#if !current}
 			<div class="h-full flex flex-col items-center justify-center text-center px-8 opacity-50">
-				<FileQuestionIcon class="size-12 text-white/30 mb-3" />
-				<p class="text-[11px] font-semibold tracking-widest uppercase text-white/60">
+				<FileQuestionIcon class="size-12 text-muted-foreground/40 mb-3" />
+				<p class="text-[11px] font-semibold tracking-widest uppercase text-muted-foreground">
 					No artifact selected
 				</p>
 			</div>
 		{:else if current.kind === "unsupported"}
 			<div class="h-full flex flex-col items-center justify-center text-center px-8">
-				<FileQuestionIcon class="size-14 text-white/40 mb-4" />
-				<p class="text-[13px] font-semibold text-white/80 mb-1">{current.title}</p>
+				<FileQuestionIcon class="size-14 text-muted-foreground/50 mb-4" />
+				<p class="text-[13px] font-semibold text-foreground mb-1">{current.title}</p>
 				{#if current.size}
-					<p class="text-[10px] text-white/40 mb-4">{formatSize(current.size)}</p>
+					<p class="text-[10px] text-muted-foreground mb-4">{formatSize(current.size)}</p>
 				{/if}
 				{#if current.url}
 					<Button
@@ -253,17 +261,23 @@
 			{#if effectiveEdit}
 				<EditorCanvas
 					bind:this={editorRef}
+					bind:editorMode
 					filename={current.title}
 					url={current.url ?? ""}
 					saveUrl={current.saveUrl ?? current.url}
 					content={current.content ?? ""}
 					type="text"
 					streaming={isStreaming}
+					user={user}
 				/>
 			{:else}
 				<ScrollArea class="h-full">
 					<div class="p-4 sm:p-6 max-w-3xl mx-auto">
-						<MarkdownPreview content={current.content ?? ""} />
+						<MarkdownPreview
+							content={current.content ?? ""}
+							url={current.url ?? ""}
+							filename={current.title}
+						/>
 						{#if isStreaming}
 							<div class="mt-2 inline-flex items-center gap-2 text-[11px] text-primary">
 								<span class="size-1.5 rounded-full bg-primary animate-pulse"></span>
@@ -292,6 +306,34 @@
 					{/if}
 				</div>
 			</ScrollArea>
+		{/if}
+
+		{#if showEditToggle}
+			<Tooltip.Root>
+				<Tooltip.Trigger>
+					{#snippet child({ props })}
+						<button
+							{...props}
+							type="button"
+							onclick={() => (editing = !editing)}
+							aria-label={editing ? "Preview" : "Edit"}
+							class={cn(
+								"absolute bottom-4 right-4 z-30 size-12 rounded-full bg-primary text-primary-foreground shadow-2xl active:scale-95 flex items-center justify-center transition-all duration-200 ease-out",
+								editing
+									? "opacity-100 scale-100 translate-y-0 hover:opacity-90"
+									: "opacity-0 scale-90 translate-y-1 group-hover:opacity-100 group-hover:scale-100 group-hover:translate-y-0 group-focus-within:opacity-100 group-focus-within:scale-100 group-focus-within:translate-y-0 hover:opacity-90",
+							)}
+						>
+							{#if editing}
+								<EyeIcon class="size-5" />
+							{:else}
+								<PencilIcon class="size-5" />
+							{/if}
+						</button>
+					{/snippet}
+				</Tooltip.Trigger>
+				<Tooltip.Content side="left">{editing ? "Preview" : "Edit"}</Tooltip.Content>
+			</Tooltip.Root>
 		{/if}
 	</div>
 </div>

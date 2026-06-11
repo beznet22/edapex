@@ -21,6 +21,7 @@ import { auth } from '$lib/server/service/auth.service';
 import { createTenantContext, WorkspaceMismatchError } from '$lib/server/mastra/tenant-context';
 import { tenantWorkspace } from '$lib/server/mastra/storage/workspaces';
 import { buildWorkspaceRequestContext } from '$lib/server/helpers/chat-helper';
+import { resolveActiveClassScope } from '$lib/server/helpers/class-scope';
 import { ocrBatchService } from '$lib/server/service/ocr-batch.service';
 import type { SerializedTenant } from '$lib/types/background-tasks';
 import type { FileEntry } from '@mastra/core/workspace';
@@ -62,21 +63,40 @@ function entryToWire(entry: FileEntry): {
   };
 }
 
-export const GET: RequestHandler = async ({ params, url, locals }) => {
+async function resolveRequestTenant({
+  locals,
+  url,
+  cookies,
+}: {
+  locals: App.Locals;
+  url: URL;
+  cookies: { get: (name: string) => string | undefined };
+}) {
+  const scope = await resolveActiveClassScope({
+    schoolId: locals.user?.schoolId ?? 1,
+    staffId: locals.user?.staffId,
+    className: url.searchParams.get('className'),
+    sectionName: url.searchParams.get('sectionName'),
+    selectedClassCookie: cookies.get('selected-class'),
+  });
+  return createTenantContext({
+    schoolId: locals.user?.schoolId ?? 1,
+    userId: locals.user?.id ?? 1,
+    designationId: (locals.user as { designationId?: number } | undefined)?.designationId ?? 1,
+    staffId: (locals.user as { staffId?: number } | undefined)?.staffId ?? 1,
+    classId: scope?.classId ?? null,
+    sectionId: scope?.sectionId ?? null,
+    examId: null,
+    examTypeId: null,
+    academicId: scope?.academicId ?? null,
+  });
+}
+
+export const GET: RequestHandler = async ({ params, url, locals, cookies }) => {
   try {
     if (!locals.user) throw error(401, 'Unauthorized');
 
-    const tenant = createTenantContext({
-      schoolId: locals.user.schoolId ?? 1,
-      userId: locals.user.id,
-      designationId: (locals.user as { designationId?: number }).designationId ?? 1,
-      staffId: (locals.user as { staffId?: number }).staffId ?? 1,
-      classId: (locals.user as { classId?: number | null }).classId ?? null,
-      sectionId: (locals.user as { sectionId?: number | null }).sectionId ?? null,
-      examId: null,
-      examTypeId: null,
-      academicId: null,
-    });
+    const tenant = await resolveRequestTenant({ locals, url, cookies });
 
     const requestContext = buildWorkspaceRequestContext(tenant);
     const fs = await tenantWorkspace.resolveFilesystem({ requestContext: requestContext as never });
@@ -131,21 +151,11 @@ export const GET: RequestHandler = async ({ params, url, locals }) => {
   }
 };
 
-export const POST: RequestHandler = async ({ params, url, request, locals }) => {
+export const POST: RequestHandler = async ({ params, url, request, locals, cookies }) => {
   try {
     if (!locals.user) throw error(401, 'Unauthorized');
 
-    const tenant = createTenantContext({
-      schoolId: locals.user.schoolId ?? 1,
-      userId: locals.user.id,
-      designationId: (locals.user as { designationId?: number }).designationId ?? 1,
-      staffId: (locals.user as { staffId?: number }).staffId ?? 1,
-      classId: (locals.user as { classId?: number | null }).classId ?? null,
-      sectionId: (locals.user as { sectionId?: number | null }).sectionId ?? null,
-      examId: null,
-      examTypeId: null,
-      academicId: null,
-    });
+    const tenant = await resolveRequestTenant({ locals, url, cookies });
 
     const requestContext = buildWorkspaceRequestContext(tenant);
     const fs = await tenantWorkspace.resolveFilesystem({ requestContext: requestContext as never });
@@ -204,21 +214,11 @@ export const POST: RequestHandler = async ({ params, url, request, locals }) => 
   }
 };
 
-export const DELETE: RequestHandler = async ({ params, locals }) => {
+export const DELETE: RequestHandler = async ({ params, url, locals, cookies }) => {
   try {
     if (!locals.user) throw error(401, 'Unauthorized');
 
-    const tenant = createTenantContext({
-      schoolId: locals.user.schoolId ?? 1,
-      userId: locals.user.id,
-      designationId: (locals.user as { designationId?: number }).designationId ?? 1,
-      staffId: (locals.user as { staffId?: number }).staffId ?? 1,
-      classId: (locals.user as { classId?: number | null }).classId ?? null,
-      sectionId: (locals.user as { sectionId?: number | null }).sectionId ?? null,
-      examId: null,
-      examTypeId: null,
-      academicId: null,
-    });
+    const tenant = await resolveRequestTenant({ locals, url, cookies });
 
     const requestContext = buildWorkspaceRequestContext(tenant);
     const fs = await tenantWorkspace.resolveFilesystem({ requestContext: requestContext as never });
@@ -236,21 +236,11 @@ export const DELETE: RequestHandler = async ({ params, locals }) => {
   }
 };
 
-export const PUT: RequestHandler = async ({ params, request, locals }) => {
+export const PUT: RequestHandler = async ({ params, request, locals, cookies, url }) => {
   try {
     if (!locals.user) throw error(401, 'Unauthorized');
 
-    const tenant = createTenantContext({
-      schoolId: locals.user.schoolId ?? 1,
-      userId: locals.user.id,
-      designationId: (locals.user as { designationId?: number }).designationId ?? 1,
-      staffId: (locals.user as { staffId?: number }).staffId ?? 1,
-      classId: (locals.user as { classId?: number | null }).classId ?? null,
-      sectionId: (locals.user as { sectionId?: number | null }).sectionId ?? null,
-      examId: null,
-      examTypeId: null,
-      academicId: null,
-    });
+    const tenant = await resolveRequestTenant({ locals, url, cookies });
 
     const requestContext = buildWorkspaceRequestContext(tenant);
     const fs = await tenantWorkspace.resolveFilesystem({ requestContext: requestContext as never });

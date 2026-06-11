@@ -1,11 +1,14 @@
-
 <script lang="ts">
   import { NodeViewWrapper } from "svelte-tiptap";
-  import { Streamdown } from "svelte-streamdown";
   import type { NodeViewProps } from "@tiptap/core";
   import { Button } from "$lib/components/ui/button";
   import Check from "@lucide/svelte/icons/check";
   import X from "@lucide/svelte/icons/x";
+  import { Markdown } from "../prompt-kit/markdown";
+  import {
+    getCachedOriginalText,
+    deleteCachedOriginalText,
+  } from "./extensions/ai-stream-cache";
 
   let { node, editor, getPos, deleteNode }: NodeViewProps = $props();
 
@@ -14,19 +17,102 @@
 
   function handleAccept() {
     const pos = getPos();
-    if (typeof pos === "number") {
+    const streamId = node.attrs.streamId;
+
+    if (typeof pos !== "number") {
+      if (streamId) deleteCachedOriginalText(streamId);
+      editor.view.dom.dispatchEvent(
+        new CustomEvent("ai-stream-resolve", {
+          bubbles: true,
+          detail: { accepted: true, streamId },
+        }),
+      );
+      return;
+    }
+
+    const doc = editor.state.doc;
+    const charBefore =
+      pos > 0 ? doc.textBetween(Math.max(0, pos - 1), pos, "\n", "\n") : "";
+    const charAfter = doc.textBetween(
+      pos + node.nodeSize,
+      Math.min(doc.content.size, pos + node.nodeSize + 1),
+      "\n",
+      "\n",
+    );
+
+    const trimmed = content.trim();
+    if (streamId) deleteCachedOriginalText(streamId);
+
+    if (!trimmed) {
+      editor.chain().focus().deleteRange({ from: pos, to: pos + node.nodeSize }).run();
+      editor.view.dom.dispatchEvent(
+        new CustomEvent("ai-stream-resolve", {
+          bubbles: true,
+          detail: { accepted: true, streamId },
+        }),
+      );
+      return;
+    }
+
+    const firstChar = trimmed.charAt(0);
+    const lastChar = trimmed.charAt(trimmed.length - 1);
+    const alphaNum = /[a-zA-Z0-9]/;
+    const needsSpaceBefore =
+      charBefore && alphaNum.test(charBefore) && alphaNum.test(firstChar);
+    const needsSpaceAfter =
+      charAfter && alphaNum.test(lastChar) && alphaNum.test(charAfter);
+    const prefix = needsSpaceBefore ? " " : "";
+    const suffix = needsSpaceAfter ? " " : "";
+    const padded = prefix + trimmed + suffix;
+
+    const parser = (editor.storage as any).markdown?.parser;
+    const html = parser?.parse ? parser.parse(padded) : padded;
+
+    editor
+      .chain()
+      .focus()
+      .deleteRange({ from: pos, to: pos + node.nodeSize })
+      .insertContentAt(pos, html)
+      .run();
+
+    editor.view.dom.dispatchEvent(
+      new CustomEvent("ai-stream-resolve", {
+        bubbles: true,
+        detail: { accepted: true, streamId },
+      }),
+    );
+  }
+
+  function handleReject() {
+    const pos = getPos();
+    const streamId = node.attrs.streamId;
+    const toolName = node.attrs.toolName || "generate";
+
+    const cachedOriginal = streamId ? getCachedOriginalText(streamId) : null;
+    if (streamId) deleteCachedOriginalText(streamId);
+
+    if (
+      typeof pos === "number" &&
+      toolName === "edit" &&
+      cachedOriginal
+    ) {
       editor
         .chain()
         .focus()
         .deleteRange({ from: pos, to: pos + node.nodeSize })
-        .insertContentAt(pos, content)
+        .insertContentAt(pos, cachedOriginal)
         .run();
+    } else {
+      deleteNode();
+      editor.commands.focus();
     }
-  }
 
-  function handleReject() {
-    deleteNode();
-    editor.commands.focus();
+    editor.view.dom.dispatchEvent(
+      new CustomEvent("ai-stream-resolve", {
+        bubbles: true,
+        detail: { accepted: false, streamId },
+      }),
+    );
   }
 </script>
 
@@ -37,30 +123,30 @@
     </div>
     <div class="ai-stream-content">
       {#if content}
-        <Streamdown
-          {content}
-          baseTheme="shadcn"
-          animation={{
-            enabled: true,
-            type: "blur",
-            duration: 400,
-            timingFunction: "ease-out",
-            tokenize: "word",
-          }}
-        />
+        <Markdown {content} />
       {:else}
         <span class="ai-stream-placeholder">AI is thinking…</span>
       {/if}
     </div>
   </div>
-  
+
   {#if status === "finished"}
     <div class="ai-stream-actions">
-      <Button variant="ghost" size="sm" onclick={handleReject} class="h-7 px-2 text-muted-foreground hover:text-destructive">
+      <Button
+        variant="ghost"
+        size="sm"
+        onclick={handleReject}
+        class="h-7 px-2 text-muted-foreground hover:text-destructive"
+      >
         <X class="h-4 w-4 mr-1" />
         Discard
       </Button>
-      <Button variant="default" size="sm" onclick={handleAccept} class="h-7 px-3 bg-amber-500 hover:bg-amber-600 text-white dark:bg-amber-600 dark:hover:bg-amber-700">
+      <Button
+        variant="default"
+        size="sm"
+        onclick={handleAccept}
+        class="h-7 px-3 bg-primary hover:bg-primary/90 text-primary-foreground"
+      >
         <Check class="h-4 w-4 mr-1" />
         Accept
       </Button>
@@ -111,8 +197,6 @@
   .ai-stream-content {
     flex: 1;
     min-width: 0;
-    font-size: 14px;
-    line-height: 1.7;
   }
 
   .ai-stream-placeholder {
@@ -131,7 +215,13 @@
   }
 
   @keyframes fade-in {
-    from { opacity: 0; transform: translateY(-4px); }
-    to { opacity: 1; transform: translateY(0); }
+    from {
+      opacity: 0;
+      transform: translateY(-4px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
   }
 </style>

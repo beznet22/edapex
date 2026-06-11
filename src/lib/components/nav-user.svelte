@@ -235,8 +235,8 @@
         </DropdownMenu.Trigger>
         <DropdownMenu.Content
           class="hermes-glass border-primary/20 w-(--bits-dropdown-menu-anchor-width) min-w-56 p-1.5 shadow-2xl rounded-2xl"
-          side={sidebar.isMobile ? "bottom" : "right"}
-          align="end"
+          side="bottom"
+          align="start"
           sideOffset={4}
         >
           {@render menuContent()}

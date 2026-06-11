@@ -130,7 +130,12 @@ export const POST: RequestHandler = async ({ request, locals: { user, session },
 
 	const mastraDb = getAppDb();
 	const gateway = new EdApexGateway(mastraDb, user.id);
-	mastra.addGateway(gateway);
+	// Per-user gateway key — EdApexGateway.id is the constant 'edapex' so
+	// addGateway() is idempotent on that key and every request would otherwise
+	// share the FIRST user's captured credentials. Keying by userId gives each
+	// user their own gateway instance; Mastra's GatewayRegistry still resolves
+	// it by the gateway's own .id when agents look up by provider.
+	mastra.addGateway(gateway, `edapex-${user.id}`);
 
 	const requestContext = await buildRequestContext({
 		context: activeContext,

@@ -3,8 +3,11 @@
 	import ArtifactViewer from "./ArtifactViewer.svelte";
 	import { mobileUiState } from "$lib/state/mobile-ui.svelte";
 	import { useInspector } from "$lib/context/inspector-context.svelte";
+	import { UserContext } from "$lib/context/user-context.svelte";
 
 	const inspector = useInspector();
+	const userContext = UserContext.fromContext();
+	const user = $derived(userContext?.user ? { designation: (userContext.user as any).designation } : undefined);
 
 	const artifacts = $derived(
 		inspector.activeSource === "filestore" && inspector.filestoreArtifact
@@ -25,5 +28,5 @@
 </script>
 
 <ResponsiveSheet open={mobileUiState.viewerKey !== null} onOpenChange={handleOpenChange}>
-	<ArtifactViewer {artifacts} {activeId} {mode} />
+	<ArtifactViewer {artifacts} {activeId} {mode} {user} />
 </ResponsiveSheet>

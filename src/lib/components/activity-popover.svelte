@@ -60,7 +60,7 @@
         {...props}
         type="button"
         aria-label="Background activity"
-        class="relative h-12 w-12 min-h-12 min-w-12 shrink-0 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 transition-all text-muted-foreground hover:text-foreground flex items-center justify-center"
+        class="relative size-9 shrink-0 rounded-md transition-colors text-muted-foreground hover:text-foreground hover:bg-muted/40 flex items-center justify-center"
       >
         <ActivityIcon class="size-4 {isPulsing ? 'text-primary animate-pulse' : ''}" />
         {#if activeCount > 0}

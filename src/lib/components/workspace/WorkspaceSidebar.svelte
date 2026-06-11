@@ -6,9 +6,12 @@
 	import { IsMobile } from "$lib/hooks/is-mobile.svelte";
 	import { mobileUiState } from "$lib/state/mobile-ui.svelte";
 	import { useInspector } from "$lib/context/inspector-context.svelte";
+	import { UserContext } from "$lib/context/user-context.svelte";
 	import type { Artifact } from "$lib/types/workspace-types";
 
 	let { open = $bindable(false) }: { open?: boolean } = $props();
+	const userContext = UserContext.fromContext();
+	const user = $derived(userContext?.user);
 
 	const inspector = useInspector();
 	const isMobile = new IsMobile();
@@ -37,6 +40,7 @@
 		artifacts={desktopArtifacts}
 		activeId={desktopActiveId}
 		mode={desktopMode}
+		user={user ? { designation: (user as any).designation } : undefined}
 	/>
 {/if}
 
@@ -50,7 +54,7 @@
 	contentClass="h-full p-0 overflow-hidden bg-transparent border-none"
 >
 	<div
-		class="h-full w-full flex flex-col rounded-t-[2.5rem] bg-slate-950/95 backdrop-blur-xl border-t border-white/10 overflow-hidden shadow-2xl"
+		class="h-full w-full flex flex-col rounded-t-[2.5rem] bg-popover backdrop-blur-xl border-t border-border/60 overflow-hidden shadow-2xl"
 	>
 		<MobileArtifactBrowser onSelect={handleMobileSelect} />
 	</div>

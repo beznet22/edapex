@@ -3,9 +3,10 @@
  *
  * Streams AI-generated text for the editor's "Improve" and "Generate" commands.
  * Routes through the editorCommandWorkflow which uses agent.stream() + writer
- * for real-time token-by-token streaming back to the Tiptap editor.
+ * for real-time token streaming back to the Tiptap editor.
  *
- * Parity with: basic-ai-editor/app/api/ai/command/route.ts
+ * Per-request, builds a RequestContext populated with the user's TenantContext
+ * so the workflow's resolveMentionsStep can scope database lookups by schoolId.
  */
 import { error, type RequestHandler } from '@sveltejs/kit';
 import { mastra } from '$lib/server/mastra';
@@ -14,6 +15,22 @@ import { handleWorkflowStream } from '@mastra/ai-sdk';
 import { createUIMessageStreamResponse, type UIMessageChunk } from 'ai';
 import { EdApexGateway } from '$lib/server/mastra/gateway';
 import { getAppDb } from '$lib/server/mastra/storage/libsql/app-db';
+import { buildWorkspaceRequestContext } from '$lib/server/helpers/chat-helper';
+import {
+	createTenantContext,
+} from '$lib/server/mastra/tenant-context';
+import type { RequestContext } from '@mastra/core/request-context';
+
+// Hard cap on document markdown sent as backgroundData. The full doc is sent
+// on every AI request — uncapped this can OOM the server when streaming a 70B
+// model. 50 KB ≈ ~12k tokens, enough for substantial context, bounded heap.
+const MAX_MARKDOWN_CHARS = 50_000;
+
+function capMarkdown(md: string | undefined): string {
+	if (!md) return '';
+	if (md.length <= MAX_MARKDOWN_CHARS) return md;
+	return md.slice(0, MAX_MARKDOWN_CHARS) + '\n\n[…document truncated for AI context…]';
+}
 
 export const POST: RequestHandler = async ({ request, locals: { user } }) => {
 	if (!user) error(401, 'Unauthorized');
@@ -25,24 +42,47 @@ export const POST: RequestHandler = async ({ request, locals: { user } }) => {
 		error(400, `Invalid request: ${parsed.error.message}`);
 	}
 
+	if (parsed.data?.ctx?.markdown !== undefined) {
+		parsed.data.ctx.markdown = capMarkdown(parsed.data.ctx.markdown);
+	}
+
 	const mastraDb = getAppDb();
 	const gateway = new EdApexGateway(mastraDb, user.id);
-	mastra.addGateway(gateway);
+	// Per-user gateway key — EdApexGateway.id is the constant 'edapex' so
+	// addGateway() is idempotent on that key and every request would otherwise
+	// share the FIRST user's captured credentials. Keying by userId gives each
+	// user their own gateway instance; Mastra's GatewayRegistry still resolves
+	// it by the gateway's own .id when agents look up by provider.
+	mastra.addGateway(gateway, `edapex-${user.id}`);
+
+	const tenantContext = createTenantContext({
+		schoolId: user.schoolId ?? 1,
+		userId: user.id,
+		staffId: (user as any).staffId ?? 1,
+		designationId: (user as any).designationId ?? 1,
+		roleId: (user as any).roleId ?? null,
+		classId: (user as any).classId ?? null,
+		sectionId: (user as any).sectionId ?? null,
+		examId: null,
+		academicId: (user as any).academicId ?? null,
+	});
+	const requestContext = buildWorkspaceRequestContext(tenantContext);
 
 	try {
 		const stream = await handleWorkflowStream({
 			mastra,
 			params: {
 				inputData: parsed.data,
+				requestContext: requestContext as unknown as RequestContext<unknown>,
 			},
-			workflowId: "editorCommandWorkflow",
+			workflowId: 'editorCommandWorkflow',
 		});
 
 		return createUIMessageStreamResponse({ stream: stream as ReadableStream<UIMessageChunk> });
 	} catch (e) {
 		console.error('[editor-command]', e);
 		return Response.json({
-			error: "Failed to process AI request",
+			error: 'Failed to process AI request',
 		}, { status: 500 });
 	}
 };

@@ -44,9 +44,27 @@ export const derivedEditorCommandSchema = editorCommandRequestSchema.extend({
 });
 
 /**
+ * A single mention resolved from the markdown.
+ */
+export const resolvedMentionSchema = z.object({
+	category: z.string(),
+	id: z.union([z.number(), z.string()]),
+	label: z.string(),
+});
+
+/**
+ * Markdown with all @mentions resolved against tenant data, plus the
+ * list of mentions that were resolved.
+ */
+export const resolvedMentionsSchema = derivedEditorCommandSchema.extend({
+	resolvedMarkdown: z.string(),
+	mentions: z.array(resolvedMentionSchema),
+});
+
+/**
  * Resolved command after prompt building.
  */
-export const resolvedEditorCommandSchema = derivedEditorCommandSchema.extend({
+export const resolvedEditorCommandSchema = resolvedMentionsSchema.extend({
 	prompt: z.string(),
 });
 
@@ -78,6 +96,8 @@ export const copilotRequestSchema = z.object({
 export type EditorContext = z.infer<typeof editorContextSchema>;
 export type EditorCommandRequest = z.infer<typeof editorCommandRequestSchema>;
 export type DerivedEditorCommandRequest = z.infer<typeof derivedEditorCommandSchema>;
+export type ResolvedMention = z.infer<typeof resolvedMentionSchema>;
+export type ResolvedMentions = z.infer<typeof resolvedMentionsSchema>;
 export type ResolvedEditorCommand = z.infer<typeof resolvedEditorCommandSchema>;
 export type CopilotRequest = z.infer<typeof copilotRequestSchema>;
 export type EditorToolName = z.infer<typeof editorToolNameSchema>;

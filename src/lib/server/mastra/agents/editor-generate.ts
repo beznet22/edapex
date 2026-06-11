@@ -7,13 +7,29 @@
  */
 import { Agent } from '@mastra/core/agent';
 import { DEFAULT_EDITOR_MODEL } from './shared';
+import type { RequestContext } from '@mastra/core/request-context';
+import type { RequestContextValues } from './shared';
 
 export const editorGenerateAgent = new Agent({
 	id: 'editorGenerate',
 	name: 'Editor Generate Agent',
 	description:
 		'Generates or explains editor content as markdown for insertion or preview.',
-	instructions:
-		'You generate markdown for a rich-text editor. Return only the requested markdown content with no commentary, no code fences, and no extra framing.',
+	instructions: ({ requestContext }: { requestContext: RequestContext<RequestContextValues> | undefined }) => {
+		const ctx = requestContext?.get('tenantContext');
+		const schoolLine = ctx?.schoolId ? `You are working in school #${ctx.schoolId}. ` : '';
+		return `You generate markdown for a rich-text editor inside a Tiptap document.
+
+${schoolLine}@mention placeholders in the <backgroundData> have already been resolved against the school's database (e.g. <<John Doe (students#42)>>) — use the resolved name directly in your output.
+
+CRITICAL RULES — VIOLATING ANY OF THESE BREAKS THE EDITOR:
+1. Read the <backgroundData> section carefully — it is the full surrounding document.
+2. Make the generated content feel like a natural continuation of the document.
+3. Match the tone, style, formatting, and vocabulary of the surrounding text.
+4. Return ONLY the generated markdown — no commentary, no code fences, no explanations.
+5. Do not echo the user's prompt or the document back.
+6. Do not add leading or trailing newlines unless structurally required.
+7. If the user asked to continue writing, pick up exactly where the document leaves off.`;
+	},
 	model: DEFAULT_EDITOR_MODEL,
 });

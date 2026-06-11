@@ -6,6 +6,8 @@
   import Underline from "@tiptap/extension-underline";
   import Highlight from "@tiptap/extension-highlight";
   import Placeholder from "@tiptap/extension-placeholder";
+  import Subscript from "@tiptap/extension-subscript";
+  import Superscript from "@tiptap/extension-superscript";
   import { Markdown } from "tiptap-markdown";
   import WysiwygBubbleMenu from "./WysiwygBubbleMenu.svelte";
   import type { Editor } from "@tiptap/core";
@@ -15,22 +17,60 @@
   import { SlashMenuExtension } from "./extensions/slash-menu";
   import { MentionExtension } from "./extensions/mention-menu";
   import { AiStreamNode } from "./extensions/ai-stream-node";
+  import {
+    cacheOriginalText,
+    cleanupStaleCacheEntries,
+  } from "./extensions/ai-stream-cache";
+  import AiPromptPopover from "./AiPromptPopover.svelte";
+  import { Table } from "@tiptap/extension-table";
+  import { TableRow } from "@tiptap/extension-table-row";
+  import { TableHeader } from "@tiptap/extension-table-header";
+  import { TableCell } from "@tiptap/extension-table-cell";
+  import { TaskList } from "@tiptap/extension-task-list";
+  import { TaskItem } from "@tiptap/extension-task-item";
+  import { Callout } from "./extensions/callout";
+  import { CodeBlockHighlight } from "./extensions/code-block-lowlight";
 
   let {
     content = "",
     onUpdate,
     class: className = "",
-    copilotEnabled = false,
+    copilotEnabled = true,
+    designationId = 1,
+    selectedClassId = null,
+    selectedSectionId = null,
+    selectedClassName = '',
+    selectedSectionName = '',
   }: {
     content?: string;
     onUpdate?: (markdown: string) => void;
     class?: string;
     copilotEnabled?: boolean;
+    designationId?: number;
+    selectedClassId?: number | null;
+    selectedSectionId?: number | null;
+    selectedClassName?: string;
+    selectedSectionName?: string;
   } = $props();
+
+  $effect(() => {
+    (window as any).__editorMentionCtx = {
+      designationId,
+      selectedClassId,
+      selectedSectionId,
+      selectedClassName,
+      selectedSectionName,
+    };
+  });
 
   let isAiProcessing = $state(false);
   let aiStreamNodePos = $state<number | null>(null);
   let accumulatedContent = $state("");
+
+  // Floating AI prompt popover state
+  let aiPromptOpen = $state(false);
+  let aiPromptPos = $state<{ top: number; left: number } | null>(null);
+  let pendingSelection = $state<{ from: number; to: number; text: string; markdown: string } | null>(null);
 
   let editorInstance = $state<Editor | null>(null);
 
@@ -43,12 +83,7 @@
     extensions: [
       StarterKit.configure({
         heading: { levels: [1, 2, 3] },
-        codeBlock: {
-          HTMLAttributes: {
-            class:
-              "bg-card rounded-lg p-4 font-mono text-[12px] leading-relaxed border border-border/30 my-3",
-          },
-        },
+        codeBlock: false,
         blockquote: {
           HTMLAttributes: {
             class:
@@ -61,15 +96,17 @@
           },
         },
       }),
-      Underline,
       Highlight.configure({
         HTMLAttributes: {
           class: "bg-primary/15 text-primary rounded px-0.5",
         },
       }),
+      Subscript,
+      Superscript,
       Placeholder.configure({
-        placeholder: "Type '/' for commands, or start writing...",
+        placeholder: "Write or type '/' for commands…",
         emptyEditorClass: "is-editor-empty",
+        showOnlyCurrent: false,
       }),
       Markdown.configure({
         html: false,
@@ -82,16 +119,30 @@
       SlashMenuExtension,
       MentionExtension,
       AiStreamNode,
+      Table.configure({
+        resizable: false,
+        HTMLAttributes: { class: "tiptap-table" },
+      }),
+      TableRow,
+      TableHeader,
+      TableCell,
+      TaskList,
+      TaskItem.configure({ nested: true }),
+      Callout,
+      CodeBlockHighlight,
     ],
     content,
     editorProps: {
       attributes: {
         class: "outline-none min-h-[200px] px-6 py-4",
-        spellcheck: "true",
+        spellcheck: "false",
         lang: "en",
       },
     },
-    onUpdate: ({ editor: e }) => {
+    onUpdate: ({ editor: e, transaction }) => {
+      // Skip getMarkdown when an aiStreamBlock is in the document (it warns and
+      // is also pointless — the parent doesn't care about partial streaming state).
+      if (transaction.getMeta("aiStream")) return;
       const md = (e.storage as any).markdown?.getMarkdown?.() ?? e.getHTML();
       onUpdate?.(md);
     },
@@ -123,7 +174,7 @@
       prepareSendMessagesRequest: ({ messages }) => {
         return {
           body: {
-            messages,
+            messages: [],
             ctx: currentCtx,
           },
         };
@@ -132,6 +183,9 @@
     onError: (err) => {
       console.error("AI Improve Error:", err);
       isAiProcessing = false;
+      aiStreamNodePos = null;
+      accumulatedContent = "";
+      lastMessageId = "";
     },
   });
 
@@ -147,35 +201,10 @@
     const lastMessage = messages[messages.length - 1];
 
     if (lastMessage?.role === "assistant") {
-      // New message — insert the NodeView island
+      // New message — reset accumulator
       if (lastMessage.id !== lastMessageId) {
         lastMessageId = lastMessage.id;
         accumulatedContent = "";
-
-        if (currentCtx?.toolName === "edit") {
-          $editor.commands.deleteSelection();
-        }
-
-        // Insert the aiStreamBlock node at the current cursor position
-        const insertPos = $editor.state.selection.from;
-        $editor
-          .chain()
-          .focus()
-          .insertContentAt(insertPos, {
-            type: "aiStreamBlock",
-            attrs: { content: "" },
-          })
-          .run();
-
-        // Find the position of the node we just inserted
-        let foundPos: number | null = null;
-        $editor.state.doc.descendants((node, pos) => {
-          if (node.type.name === "aiStreamBlock" && foundPos === null) {
-            foundPos = pos;
-          }
-          return foundPos === null;
-        });
-        aiStreamNodePos = foundPos;
       }
 
       // Extract the full text content from the message
@@ -196,11 +225,14 @@
         // Verify the node still exists at the tracked position
         const nodeAtPos = $editor.state.doc.nodeAt(aiStreamNodePos);
         if (nodeAtPos?.type.name === "aiStreamBlock") {
+          // setNodeMarkup REPLACES attrs (does not merge) — preserve streamId/toolName
           const tr = $editor.state.tr.setNodeMarkup(
             aiStreamNodePos,
             undefined,
             {
+              ...nodeAtPos.attrs,
               content: accumulatedContent,
+              status: "streaming",
             },
           );
           tr.setMeta("aiStream", true);
@@ -218,6 +250,7 @@
             aiStreamNodePos,
             undefined,
             {
+              ...nodeAtPos.attrs,
               content: accumulatedContent,
               status: "finished",
             },
@@ -232,138 +265,571 @@
     }
   });
 
-  async function handleAiImprove() {
-    if (!$editor || isAiProcessing) return;
+  function handleAiImprove() {
+    if (!$editor || isAiProcessing || aiPromptOpen) return;
     const { from, to } = $editor.state.selection;
-    const selectedText = $editor.state.doc.textBetween(from, to, " ");
-    if (!selectedText) return;
-
-    isAiProcessing = true;
-    const markdown =
-      ($editor.storage as any).markdown?.getMarkdown?.() ?? $editor.getHTML();
-
-    currentCtx = { markdown, selectedText, toolName: "edit" };
-    chatClient.sendMessage({ text: "Improve this text" });
+    if (from === to) return;
+    const selectedText = $editor.state.doc.textBetween(from, to, "\n");
+    if (!selectedText.trim()) return;
+    runAiEdit(from, to, selectedText, "Improve the selected text to be clearer, more concise, and grammatically correct. Preserve the meaning and tone. Return only the improved text.");
   }
 
-  function handleAiGenerate() {
+  function runAiEdit(from: number, to: number, selectedText: string, prompt: string) {
     if (!$editor || isAiProcessing) return;
-    isAiProcessing = true;
+    const streamId = crypto.randomUUID();
+    cleanupStaleCacheEntries();
+    cacheOriginalText(streamId, selectedText);
+
     const markdown =
       ($editor.storage as any).markdown?.getMarkdown?.() ?? $editor.getHTML();
-    currentCtx = { markdown, selectedText: "", toolName: "generate" };
-    chatClient.sendMessage({ text: "Generate content here" });
+    currentCtx = { markdown, selectedText, toolName: "edit" };
+
+    $editor
+      .chain()
+      .focus()
+      .deleteRange({ from, to })
+      .insertContentAt(from, {
+        type: "aiStreamBlock",
+        attrs: { content: "", status: "streaming", toolName: "edit", streamId },
+      })
+      .run();
+
+    let foundPos: number | null = null;
+    $editor.state.doc.descendants((node, pos) => {
+      if (node.type.name === "aiStreamBlock" && foundPos === null) {
+        foundPos = pos;
+      }
+      return foundPos === null;
+    });
+    aiStreamNodePos = foundPos;
+    accumulatedContent = "";
+    lastMessageId = "";
+    isAiProcessing = true;
+    chatClient.messages = [];
+    chatClient.sendMessage({ text: prompt });
+  }
+
+  function handleAiPromptOpen(e: Event) {
+    if (!$editor || isAiProcessing || aiPromptOpen) return;
+    const detail = (e as CustomEvent<{ mode?: "edit" | "generate" }>).detail ?? { mode: "generate" };
+    const mode = detail.mode ?? "generate";
+
+    const { from, to } = $editor.state.selection;
+    const view = $editor.view;
+    const editorRect = view.dom.getBoundingClientRect();
+    const containerRect = container?.getBoundingClientRect() ?? editorRect;
+    if (!containerRect) return;
+
+    const pos = from;
+    const coords = view.coordsAtPos(pos);
+    const popoverWidth = 320;
+    const scrollTop = container?.scrollTop ?? 0;
+    const scrollLeft = container?.scrollLeft ?? 0;
+
+    const top = coords.bottom - containerRect.top + scrollTop + 8;
+    const left = Math.max(
+      8,
+      Math.min(
+        containerRect.width - popoverWidth - 8,
+        coords.left - containerRect.left + scrollLeft - popoverWidth / 2,
+      ),
+    );
+
+    const markdown =
+      ($editor.storage as any).markdown?.getMarkdown?.() ?? $editor.getHTML();
+    const selectedText =
+      from !== to ? $editor.state.doc.textBetween(from, to, "\n") : "";
+
+    pendingSelection = { from, to, text: selectedText, markdown };
+    currentCtx = {
+      markdown,
+      selectedText,
+      toolName: mode === "generate" ? "generate" : "edit",
+    };
+    aiPromptPos = { top, left };
+    aiPromptOpen = true;
+  }
+
+  function dismissAiPrompt() {
+    aiPromptOpen = false;
+    aiPromptPos = null;
+    pendingSelection = null;
+    $editor?.commands.focus();
+  }
+
+  function submitAiPrompt(prompt: string) {
+    if (!$editor || !pendingSelection) return;
+    const { from, to, text: selectedText, markdown } = pendingSelection;
+    const isEdit = currentCtx?.toolName === "edit";
+    const streamId = crypto.randomUUID();
+    cleanupStaleCacheEntries();
+
+    if (isEdit) {
+      cacheOriginalText(streamId, selectedText);
+      $editor
+        .chain()
+        .focus()
+        .deleteRange({ from, to })
+        .insertContentAt(from, {
+          type: "aiStreamBlock",
+          attrs: { content: "", status: "streaming", toolName: "edit", streamId },
+        })
+        .run();
+    } else {
+      $editor
+        .chain()
+        .focus()
+        .insertContentAt(from, {
+          type: "aiStreamBlock",
+          attrs: { content: "", status: "streaming", toolName: "generate", streamId },
+        })
+        .run();
+    }
+
+    let foundPos: number | null = null;
+    $editor.state.doc.descendants((node, pos) => {
+      if (node.type.name === "aiStreamBlock" && foundPos === null) {
+        foundPos = pos;
+      }
+      return foundPos === null;
+    });
+    aiStreamNodePos = foundPos;
+    accumulatedContent = "";
+    lastMessageId = "";
+    isAiProcessing = true;
+    chatClient.messages = [];
+    chatClient.sendMessage({ text: prompt });
+
+    aiPromptOpen = false;
+    aiPromptPos = null;
+    pendingSelection = null;
   }
 
   let container = $state<HTMLElement>();
 
+  function handleStreamResolve(e: Event) {
+    isAiProcessing = false;
+    aiStreamNodePos = null;
+    accumulatedContent = "";
+    lastMessageId = "";
+    try {
+      chatClient.messages = [];
+    } catch {
+      /* ignore */
+    }
+    try {
+      (chatClient as any).stop?.();
+    } catch {
+      /* ignore */
+    }
+  }
+
   $effect(() => {
     if (!container) return;
-    container.addEventListener("ai-generate", handleAiGenerate);
-    return () =>
-      container?.removeEventListener("ai-generate", handleAiGenerate);
+    container.addEventListener("ai-prompt-open", handleAiPromptOpen);
+    container.addEventListener("ai-stream-resolve", handleStreamResolve);
+    return () => {
+      container?.removeEventListener("ai-prompt-open", handleAiPromptOpen);
+      container?.removeEventListener("ai-stream-resolve", handleStreamResolve);
+    };
   });
 </script>
 
-<div bind:this={container} class="flex-1 overflow-y-auto {className}">
+<div bind:this={container} class="flex-1 overflow-y-auto relative {className}">
   {#if $editor}
     <BubbleMenu editor={$editor} class="z-50">
       <WysiwygBubbleMenu editor={$editor} onAiImprove={handleAiImprove} />
     </BubbleMenu>
   {/if}
 
-  <EditorContent editor={$editor} class="w-full" />
+  <div class="wysiwyg-editor-wrapper w-full">
+    <EditorContent editor={$editor} class="w-full" />
+  </div>
+
+  {#if aiPromptOpen && aiPromptPos}
+    <div
+      class="ai-prompt-anchor"
+      style="top: {aiPromptPos.top}px; left: {aiPromptPos.left}px;"
+    >
+      <AiPromptPopover
+        onSubmit={submitAiPrompt}
+        onDismiss={dismissAiPrompt}
+      />
+    </div>
+  {/if}
 </div>
 
 <style>
-  /* Tiptap prose styling — flat, borderless, integrated with Hermes theme */
-  :global(.tiptap) {
-    font-family: var(--font-sans);
-    font-size: 14px;
-    line-height: 1.7;
+  /* Tiptap content typography — mirrors svelte-streamdown shadcnTheme (node_modules/svelte-streamdown/dist/theme.js:157-309)
+     so WYSIWYG editor renders identically to <Markdown /> preview. */
+  :global(.wysiwyg-editor-wrapper .tiptap) {
     color: var(--foreground);
   }
 
-  :global(.tiptap h1) {
-    font-size: 1.75rem;
-    font-weight: 800;
-    letter-spacing: -0.02em;
+  :global(.wysiwyg-editor-wrapper .tiptap h1) {
     margin-top: 1.5rem;
-    margin-bottom: 0.75rem;
+    margin-bottom: 0.5rem;
+    font-size: 1.875rem;
+    line-height: 2.25rem;
+    font-weight: 600;
     color: var(--foreground);
   }
 
-  :global(.tiptap h2) {
-    font-size: 1.35rem;
-    font-weight: 700;
-    letter-spacing: -0.01em;
-    margin-top: 1.25rem;
+  :global(.wysiwyg-editor-wrapper .tiptap h2) {
+    margin-top: 1.5rem;
     margin-bottom: 0.5rem;
+    font-size: 1.5rem;
+    line-height: 2rem;
+    font-weight: 600;
     color: var(--foreground);
   }
 
-  :global(.tiptap h3) {
-    font-size: 1.1rem;
-    font-weight: 700;
-    margin-top: 1rem;
+  :global(.wysiwyg-editor-wrapper .tiptap h3) {
+    margin-top: 1.5rem;
     margin-bottom: 0.5rem;
+    font-size: 1.25rem;
+    line-height: 1.75rem;
+    font-weight: 600;
     color: var(--foreground);
   }
 
-  :global(.tiptap p) {
+  :global(.wysiwyg-editor-wrapper .tiptap h4) {
+    margin-top: 1.5rem;
     margin-bottom: 0.5rem;
+    font-size: 1.125rem;
+    line-height: 1.75rem;
+    font-weight: 600;
+    color: var(--foreground);
   }
 
-  :global(.tiptap ul),
-  :global(.tiptap ol) {
-    padding-left: 1.5rem;
+  :global(.wysiwyg-editor-wrapper .tiptap h5) {
+    margin-top: 1.5rem;
     margin-bottom: 0.5rem;
+    font-size: 1rem;
+    line-height: 1.5rem;
+    font-weight: 600;
+    color: var(--foreground);
   }
 
-  :global(.tiptap ul) {
+  :global(.wysiwyg-editor-wrapper .tiptap h6) {
+    margin-top: 1.5rem;
+    margin-bottom: 0.5rem;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    font-weight: 600;
+    color: var(--foreground);
+  }
+
+  :global(.wysiwyg-editor-wrapper .tiptap p) {
+    color: var(--foreground);
+  }
+
+  :global(.wysiwyg-editor-wrapper .tiptap ul) {
+    margin-left: 1rem;
+    list-style-position: outside;
     list-style-type: disc;
+    white-space: normal;
+    color: var(--foreground);
+    padding-left: 1.5rem;
   }
 
-  :global(.tiptap ol) {
-    list-style-type: decimal;
+  :global(.wysiwyg-editor-wrapper .tiptap ol) {
+    margin-left: 1rem;
+    list-style-position: outside;
+    white-space: normal;
+    color: var(--foreground);
+    padding-left: 1.5rem;
   }
 
-  :global(.tiptap li) {
-    margin-bottom: 0.15rem;
+  :global(.wysiwyg-editor-wrapper .tiptap li) {
+    padding-top: 0.25rem;
+    padding-bottom: 0.25rem;
   }
 
-  :global(.tiptap li p) {
+  /* Tiptap renders <li><p>…</p></li>. The browser's default <p> margin: 1em 0
+     collapses the inside marker, so neutralize the <p> inside <li>. */
+  :global(.wysiwyg-editor-wrapper .tiptap li > p) {
+    margin: 0;
+  }
+
+  :global(.wysiwyg-editor-wrapper .tiptap li::marker) {
+    color: var(--muted-foreground);
+  }
+
+  /* Task list — checkbox items. Tiptap renders <ul data-type="taskList"><li data-type="taskItem">
+     with a hidden checkbox + label. The Tiptap TaskItem wraps the content in <div><p>…</p></div>;
+     because <p> is block-level by default the checkbox ends up on a row ABOVE the text.
+     Setting <div> to display:flex and <p> to flex:1 puts the checkbox and the first line of
+     text on the same row while still allowing multi-line <p> content to wrap. */
+  :global(.wysiwyg-editor-wrapper .tiptap ul[data-type="taskList"]) {
+    list-style: none;
+    padding-left: 0.25rem;
+  }
+  :global(.wysiwyg-editor-wrapper .tiptap li[data-type="taskItem"]) {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+  :global(.wysiwyg-editor-wrapper .tiptap li[data-type="taskItem"] > label) {
+    flex: 0 0 auto;
+    margin-top: 0.35rem;
+    user-select: none;
+  }
+  :global(.wysiwyg-editor-wrapper .tiptap li[data-type="taskItem"] > div) {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    align-items: flex-start;
+  }
+  :global(.wysiwyg-editor-wrapper .tiptap li[data-type="taskItem"] > div > p) {
+    flex: 1 1 auto;
+    min-width: 0;
+    margin: 0;
+  }
+  :global(.wysiwyg-editor-wrapper .tiptap li[data-type="taskItem"] input[type="checkbox"]) {
+    accent-color: var(--primary);
+    cursor: pointer;
+  }
+
+  :global(.wysiwyg-editor-wrapper .tiptap code) {
+    background-color: var(--muted);
+    border-radius: 0.25rem;
+    padding-left: 0.375rem;
+    padding-right: 0.375rem;
+    padding-top: 0.125rem;
+    padding-bottom: 0.125rem;
+    font-family: var(--font-mono);
+    color: var(--foreground);
+    font-size: 0.9em;
+  }
+
+  /* Code block (Tiptap CodeBlock renders <pre><code class="language-xxx">…</code></pre>).
+     The svelte-streamdown shadcnTheme code.base + code.pre + code.container stack is too
+     complex to mirror 1:1 without the svelte-streamdown <Code /> component, so we render
+     a clean shiki-friendly container: rounded border, muted bg, mono font, preserved
+     whitespace, no phantom blank lines. */
+  :global(.wysiwyg-editor-wrapper .tiptap pre) {
+    margin-top: 1rem;
+    margin-bottom: 1rem;
+    width: 100%;
+    overflow-x: auto;
+    border-radius: 0.5rem;
+    border: 1px solid var(--border);
+    background-color: color-mix(in oklch, var(--muted), transparent 60%);
+    padding: 0.75rem 1rem;
+    font-family: var(--font-mono);
+    font-size: 0.8125rem;
+    line-height: 1.5;
+    color: var(--foreground);
+    white-space: pre;
+  }
+
+  :global(.wysiwyg-editor-wrapper .tiptap pre code) {
+    background-color: transparent;
+    border-radius: 0;
+    padding: 0;
+    color: inherit;
+    font-size: inherit;
+    font-family: inherit;
+    white-space: pre;
+  }
+
+  :global(.wysiwyg-editor-wrapper .tiptap strong) {
+    font-weight: 600;
+    color: var(--foreground);
+  }
+
+  :global(.wysiwyg-editor-wrapper .tiptap em) {
+    font-style: italic;
+  }
+
+  :global(.wysiwyg-editor-wrapper .tiptap a) {
+    color: var(--primary);
+    overflow-wrap: anywhere;
+    font-weight: 500;
+    text-decoration-line: underline;
+  }
+
+  :global(.wysiwyg-editor-wrapper .tiptap a:hover) {
+    color: color-mix(in oklch, var(--primary), transparent 20%);
+  }
+
+  :global(.wysiwyg-editor-wrapper .tiptap blockquote) {
+    border-color: color-mix(in oklch, var(--muted-foreground), transparent 70%);
+    color: var(--muted-foreground);
+    margin-top: 1rem;
+    margin-bottom: 1rem;
+    border-left-width: 4px;
+    padding-left: 1rem;
+    font-style: italic;
+  }
+
+  /* Tiptap renders <blockquote><p>…</p></blockquote>. The <p>'s 1em margin
+     doubles the blockquote's spacing — neutralize it. */
+  :global(.wysiwyg-editor-wrapper .tiptap blockquote > :first-child),
+  :global(.wysiwyg-editor-wrapper .tiptap blockquote > :last-child) {
+    margin-top: 0;
     margin-bottom: 0;
   }
 
-  :global(.tiptap code) {
-    font-family: var(--font-mono);
-    font-size: 0.85em;
-    background: var(--secondary);
-    border-radius: 4px;
-    padding: 0.15em 0.35em;
+  :global(.wysiwyg-editor-wrapper .tiptap hr) {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin-top: 1.5rem;
+    margin-bottom: 1.5rem;
+    height: 0;
+  }
+
+  :global(.wysiwyg-editor-wrapper .tiptap del) {
+    color: var(--muted-foreground);
+  }
+
+  /* Table — mirrors svelte-streamdown shadcnTheme table.* classes.
+     Requires @tiptap/extension-table to be added to the editor for live editing. */
+  :global(.wysiwyg-editor-wrapper .tiptap table) {
+    width: 100%;
+    max-width: 100%;
+    margin-top: 1rem;
+    margin-bottom: 1rem;
+    border-radius: 0.5rem;
+    border: 1px solid var(--border);
+    border-collapse: collapse;
+    min-width: 100%;
+    overflow-x: auto;
+  }
+  :global(.wysiwyg-editor-wrapper .tiptap thead) {
+    background: color-mix(in oklch, var(--muted), transparent 20%);
+  }
+  :global(.wysiwyg-editor-wrapper .tiptap tr) {
+    border-bottom: 1px solid var(--border);
+  }
+  :global(.wysiwyg-editor-wrapper .tiptap tr:last-child) {
+    border-bottom: none;
+  }
+  :global(.wysiwyg-editor-wrapper .tiptap th),
+  :global(.wysiwyg-editor-wrapper .tiptap td) {
+    padding: 0.75rem 1rem;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    color: var(--foreground);
+    min-width: 200px;
+    max-width: 400px;
+    overflow-wrap: break-word;
+  }
+  :global(.wysiwyg-editor-wrapper .tiptap th) {
+    font-weight: 600;
+    text-align: left;
+  }
+
+  /* Tiptap renders <td><p>…</p></td>. Neutralize the <p> margin so cell padding
+     is the only spacing. */
+  :global(.wysiwyg-editor-wrapper .tiptap th > p),
+  :global(.wysiwyg-editor-wrapper .tiptap td > p) {
+    margin: 0;
+  }
+
+  /* Callout — mirrors svelte-streamdown shadcnTheme alert.* classes.
+     <aside data-callout data-type="…"><div data-callout-title>…</div><div data-callout-content>…</div></aside> */
+  :global(.wysiwyg-editor-wrapper .tiptap aside[data-callout]) {
+    position: relative;
+    margin-top: 1rem;
+    margin-bottom: 1rem;
+    border-left-width: 4px;
+    padding: 1rem;
+    background-color: var(--card);
+    border-radius: 0 0.375rem 0.375rem 0;
+  }
+  :global(.wysiwyg-editor-wrapper .tiptap aside[data-callout] > [data-callout-title]) {
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+    text-transform: capitalize;
+  }
+  :global(.wysiwyg-editor-wrapper .tiptap aside[data-callout] > [data-callout-content] > p) {
+    margin: 0;
+  }
+  :global(.wysiwyg-editor-wrapper .tiptap aside[data-callout][data-type="note"]) {
+    border-color: oklch(0.6 0.18 240);
+  }
+  :global(.wysiwyg-editor-wrapper .tiptap aside[data-callout][data-type="note"] > [data-callout-title]) {
+    color: oklch(0.6 0.18 240);
+  }
+  :global(.wysiwyg-editor-wrapper .tiptap aside[data-callout][data-type="tip"]) {
+    border-color: oklch(0.65 0.18 145);
+  }
+  :global(.wysiwyg-editor-wrapper .tiptap aside[data-callout][data-type="tip"] > [data-callout-title]) {
+    color: oklch(0.55 0.18 145);
+  }
+  :global(.wysiwyg-editor-wrapper .tiptap aside[data-callout][data-type="warning"]) {
+    border-color: oklch(0.78 0.16 85);
+  }
+  :global(.wysiwyg-editor-wrapper .tiptap aside[data-callout][data-type="warning"] > [data-callout-title]) {
+    color: oklch(0.7 0.16 85);
+  }
+  :global(.wysiwyg-editor-wrapper .tiptap aside[data-callout][data-type="caution"]) {
+    border-color: var(--destructive);
+  }
+  :global(.wysiwyg-editor-wrapper .tiptap aside[data-callout][data-type="caution"] > [data-callout-title]) {
+    color: var(--destructive);
+  }
+  :global(.wysiwyg-editor-wrapper .tiptap aside[data-callout][data-type="important"]) {
+    border-color: oklch(0.58 0.2 300);
+  }
+  :global(.wysiwyg-editor-wrapper .tiptap aside[data-callout][data-type="important"] > [data-callout-title]) {
+    color: oklch(0.58 0.2 300);
+  }
+
+  /* Sup / sub — svelte-streamdown shadcnTheme uses text-sm. */
+  :global(.wysiwyg-editor-wrapper .tiptap sup),
+  :global(.wysiwyg-editor-wrapper .tiptap sub) {
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+  }
+
+  /* AiStreamNode — <NodeViewWrapper class="ai-stream-wrapper"> renders
+     <p><Markdown /></p> indirectly through ProseMirror. Neutralize the
+     trailing <p>'s default margin so the Accept/Discard row sits flush. */
+  :global(.wysiwyg-editor-wrapper .tiptap [data-ai-stream] > p) {
+    margin: 0;
+  }
+
+  /* Mention — inline pill rendered by @tiptap/extension-mention. The Node
+     itself is an inline atom; styling here ensures it reads as a
+     structured variable without breaking the line baseline. */
+  :global(.wysiwyg-editor-wrapper .tiptap .mention) {
+    display: inline-block;
+    padding: 0.0625rem 0.375rem;
+    margin: 0 0.0625rem;
+    background: color-mix(in oklch, var(--primary), transparent 88%);
     color: var(--primary);
+    border: 1px solid color-mix(in oklch, var(--primary), transparent 70%);
+    border-radius: 0.375rem;
+    font-weight: 500;
+    font-size: 0.95em;
+    line-height: 1.2;
+    user-select: all;
+    cursor: default;
   }
 
-  :global(.tiptap pre code) {
-    background: transparent;
-    padding: 0;
-    border-radius: 0;
-    color: inherit;
+  :global(.wysiwyg-editor-wrapper .tiptap .mention::before) {
+    content: "@";
+    opacity: 0.6;
+    margin-right: 0.125rem;
   }
 
-  :global(.tiptap strong) {
-    font-weight: 700;
-  }
-
-  :global(.tiptap a) {
-    color: var(--primary);
-    text-decoration: underline;
-    text-underline-offset: 2px;
+  /* Mention suggestion popup — positioned absolutely, anchored to the caret
+     by the suggestion plugin's clientRect. The popup itself is teleported
+     to <body> so it escapes any overflow:hidden ancestor. */
+  :global(.mention-suggestion-popup) {
+    font-family: inherit;
   }
 
   /* Placeholder styling */
-  :global(.tiptap p.is-editor-empty:first-child::before) {
+  :global(.wysiwyg-editor-wrapper .tiptap p.is-editor-empty:first-child::before) {
     content: attr(data-placeholder);
     float: left;
     color: var(--muted-foreground);
@@ -374,7 +840,83 @@
   }
 
   /* Selection styling */
-  :global(.tiptap ::selection) {
+  :global(.wysiwyg-editor-wrapper .tiptap ::selection) {
     background: oklch(0.65 0.15 40 / 0.2);
+  }
+
+  /* First/last-child margin reset — mirrors <Markdown />'s [&>*:first-child]:mt-0 [&>*:last-child]:mb-0
+     so WYSIWYG edges match the preview exactly. */
+  :global(.wysiwyg-editor-wrapper .tiptap > :first-child) {
+    margin-top: 0 !important;
+  }
+  :global(.wysiwyg-editor-wrapper .tiptap > :last-child) {
+    margin-bottom: 0 !important;
+  }
+
+  /* Syntax highlighting — lowlight emits <span class="hljs-xxx"> tokens. Uses design-token
+     oklch hues so highlighting reads correctly in both light and dark modes. */
+  :global(.wysiwyg-editor-wrapper .tiptap .hljs-keyword),
+  :global(.wysiwyg-editor-wrapper .tiptap .hljs-selector-tag),
+  :global(.wysiwyg-editor-wrapper .tiptap .hljs-built_in),
+  :global(.wysiwyg-editor-wrapper .tiptap .hljs-name),
+  :global(.wysiwyg-editor-wrapper .tiptap .hljs-tag) {
+    color: oklch(0.55 0.18 280);
+  }
+  :global(.wysiwyg-editor-wrapper .tiptap .hljs-string),
+  :global(.wysiwyg-editor-wrapper .tiptap .hljs-attr),
+  :global(.wysiwyg-editor-wrapper .tiptap .hljs-symbol),
+  :global(.wysiwyg-editor-wrapper .tiptap .hljs-bullet),
+  :global(.wysiwyg-editor-wrapper .tiptap .hljs-addition) {
+    color: oklch(0.55 0.16 145);
+  }
+  :global(.wysiwyg-editor-wrapper .tiptap .hljs-number),
+  :global(.wysiwyg-editor-wrapper .tiptap .hljs-literal),
+  :global(.wysiwyg-editor-wrapper .tiptap .hljs-meta) {
+    color: oklch(0.6 0.18 40);
+  }
+  :global(.wysiwyg-editor-wrapper .tiptap .hljs-comment),
+  :global(.wysiwyg-editor-wrapper .tiptap .hljs-quote),
+  :global(.wysiwyg-editor-wrapper .tiptap .hljs-deletion) {
+    color: var(--muted-foreground);
+    font-style: italic;
+  }
+  :global(.wysiwyg-editor-wrapper .tiptap .hljs-function),
+  :global(.wysiwyg-editor-wrapper .tiptap .hljs-title),
+  :global(.wysiwyg-editor-wrapper .tiptap .hljs-class .hljs-title),
+  :global(.wysiwyg-editor-wrapper .tiptap .hljs-attribute) {
+    color: oklch(0.55 0.2 240);
+  }
+  :global(.wysiwyg-editor-wrapper .tiptap .hljs-variable),
+  :global(.wysiwyg-editor-wrapper .tiptap .hljs-template-variable),
+  :global(.wysiwyg-editor-wrapper .tiptap .hljs-regexp) {
+    color: oklch(0.55 0.2 25);
+  }
+  :global(.wysiwyg-editor-wrapper .tiptap .hljs-emphasis) {
+    font-style: italic;
+  }
+  :global(.wysiwyg-editor-wrapper .tiptap .hljs-strong) {
+    font-weight: 700;
+  }
+
+  /* Floating AI prompt popover anchor — positioned absolutely within the scroll container
+     so the popover stays visible while the user scrolls. z-[60] sits above the
+     BubbleMenu (z-50) and the slash/mention suggestion popups. */
+  .ai-prompt-anchor {
+    position: absolute;
+    z-index: 60;
+  }
+
+  /* Placeholder text — Tiptap's Placeholder extension sets data-placeholder on the
+     first empty paragraph and the `is-empty` class. The editor element gets
+     `is-editor-empty` when the entire document is empty. showOnlyCurrent: false
+     means the placeholder also appears on every empty paragraph after ENTER. */
+  :global(.wysiwyg-editor-wrapper .tiptap p.is-editor-empty:first-child::before),
+  :global(.wysiwyg-editor-wrapper .tiptap p.is-empty::before) {
+    content: attr(data-placeholder);
+    float: left;
+    color: var(--muted-foreground);
+    pointer-events: none;
+    height: 0;
+    width: 100%;
   }
 </style>

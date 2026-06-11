@@ -28,7 +28,7 @@
       class="hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
     >
       <div class="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm">
-        <img src="/logo.svg" alt="Hermes" class="size-5 dark:invert" />
+        <img src="/logo.svg" alt="Hermes" class="size-5" />
       </div>
       <div class="grid flex-1 text-left text-sm leading-tight">
         <span class="truncate font-bold tracking-tight text-sidebar-foreground">EdApex Workspace</span>

@@ -95,7 +95,7 @@
                 role="dialog"
                 aria-modal="true"
                 class={cn(
-                    "fixed bottom-0 left-0 right-0 z-50 mt-24 flex max-h-[85vh] flex-col rounded-t-[2.5rem] bg-background/95 backdrop-blur-xl border-t border-white/10 outline-none transition-[bottom,max-height] duration-200",
+                    "fixed bottom-0 left-0 right-0 z-50 mt-24 flex max-h-[85vh] flex-col rounded-t-[2.5rem] bg-background/95 backdrop-blur-xl border-t border-border/60 outline-none transition-[bottom,max-height] duration-200",
                     className,
                 )}
             >
@@ -191,7 +191,7 @@
         <Sheet.Content
             side="right"
             class={cn(
-                "transition-all duration-500 w-full border-l border-white/5 sm:max-w-[30vw]",
+                "transition-all duration-500 w-full border-l border-border/60 sm:max-w-[30vw]",
                 className,
             )}
         >

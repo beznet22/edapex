@@ -3,7 +3,7 @@
   import type { ComponentProps } from "svelte";
   import type { Component } from "svelte";
   import ClassSelector from "./class-selector.svelte";
-  
+
   let {
     ref = $bindable(null),
     items,

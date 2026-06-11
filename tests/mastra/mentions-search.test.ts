@@ -3,59 +3,39 @@ import { getAllowedCategories, type MentionCategory } from '../../src/routes/api
 
 describe('@Mention Search API', () => {
 	describe('getAllowedCategories', () => {
-		const ALL_CATEGORIES: MentionCategory[] = [
-			'schools',
-			'students',
-			'classes',
-			'sections',
-			'academic_year',
-			'term'
-		];
+		const ALL_CATEGORIES: MentionCategory[] = ['students', 'date', 'custom'];
 
-		const CLASS_TEACHER_CATEGORIES: MentionCategory[] = ['students', 'academic_year', 'term'];
-
-		it('returns all 6 categories for IT user (designationId 1)', () => {
+		it('returns all 3 categories for IT user (designationId 1)', () => {
 			const result = getAllowedCategories(1);
 			expect(result).toEqual(ALL_CATEGORIES);
 		});
 
-		it('returns all 6 categories for Coordinator (designationId 5)', () => {
+		it('returns all 3 categories for Coordinator (designationId 5)', () => {
 			const result = getAllowedCategories(5);
 			expect(result).toEqual(ALL_CATEGORIES);
 		});
 
-		it('returns restricted 3 categories for Class Teacher (designationId 8)', () => {
+		it('returns the same 3 categories for Class Teacher (designationId 8)', () => {
 			const result = getAllowedCategories(8);
-			expect(result).toEqual(CLASS_TEACHER_CATEGORIES);
+			expect(result).toEqual(ALL_CATEGORIES);
 		});
 
-		it('returns empty array for unknown designation', () => {
-			expect(getAllowedCategories(0)).toEqual([]);
-			expect(getAllowedCategories(3)).toEqual([]);
-			expect(getAllowedCategories(10)).toEqual([]);
-			expect(getAllowedCategories(99)).toEqual([]);
+		it('returns the same 3 categories for any designation (v1 has no role gating)', () => {
+			expect(getAllowedCategories(0)).toEqual(ALL_CATEGORIES);
+			expect(getAllowedCategories(3)).toEqual(ALL_CATEGORIES);
+			expect(getAllowedCategories(10)).toEqual(ALL_CATEGORIES);
+			expect(getAllowedCategories(99)).toEqual(ALL_CATEGORIES);
 		});
 
-		it('Class Teacher cannot access schools, classes, or sections', () => {
-			const result = getAllowedCategories(8);
-			expect(result).not.toContain('schools');
-			expect(result).not.toContain('classes');
-			expect(result).not.toContain('sections');
+		it('includes students category for all roles', () => {
+			expect(getAllowedCategories(1)).toContain('students');
+			expect(getAllowedCategories(5)).toContain('students');
+			expect(getAllowedCategories(8)).toContain('students');
 		});
 
-		it('Coordinator has access to students category', () => {
-			const result = getAllowedCategories(5);
-			expect(result).toContain('students');
-		});
-
-		it('IT user has access to all categories including schools', () => {
-			const result = getAllowedCategories(1);
-			expect(result).toContain('schools');
-			expect(result).toContain('students');
-			expect(result).toContain('classes');
-			expect(result).toContain('sections');
-			expect(result).toContain('academic_year');
-			expect(result).toContain('term');
+		it('includes date and custom categories for all roles', () => {
+			expect(getAllowedCategories(1)).toContain('date');
+			expect(getAllowedCategories(1)).toContain('custom');
 		});
 	});
 });

@@ -2,9 +2,7 @@
  * Editor Prompt Builders — EdApex
  *
  * Builds structured prompts for the edit and generate agents.
- * Ported from basic-ai-editor/mastra/editor/prompt-builders.ts:
- * - Removed all PlateJS dependencies (createEditorFromRequest, addSelection, getMarkdown)
- * - Now operates on plain markdown strings with selection injection via utils
+ * Operates on plain markdown strings with selection injection via utils.
  *
  * The prompt structure uses XML tags (<context>, <backgroundData>, <Selection>, <rules>, <history>)
  * following the pattern established in the basic-ai-editor reference implementation.
@@ -17,19 +15,26 @@ import {
 } from './utils';
 
 /**
+ * Prepares the backgroundData string for the prompt by injecting <Selection> tags
+ * around the selected text when present. Centralizes the selection-vs-no-selection
+ * branching so the generate and edit builders stay symmetric.
+ */
+function prepareBackgroundData(
+	markdown: string,
+	selectedText: string | undefined
+): string {
+	if (!selectedText) return markdown;
+	return injectSelectionMarkers(markdown, selectedText);
+}
+
+/**
  * Builds a prompt for the generate agent.
- *
- * If the user has selected text, it's wrapped in <Selection> tags within the
- * full markdown to give the agent positional context. Otherwise the full
- * document markdown is provided as background data.
  */
 export function buildGeneratePrompt(request: DerivedEditorCommandRequest): string {
 	const { ctx, hasSelection, messages } = request;
 	const { markdown, selectedText } = ctx;
 
-	const backgroundData = hasSelection && selectedText
-		? injectSelectionMarkers(markdown, selectedText)
-		: markdown;
+	const backgroundData = prepareBackgroundData(markdown, hasSelection ? selectedText : undefined);
 
 	return buildStructuredPrompt({
 		backgroundData,
@@ -93,9 +98,9 @@ export function buildEditPrompt(request: DerivedEditorCommandRequest): string {
 				'- Do not include commentary.',
 				'- Do not include code fences.',
 				'- Only modify text inside <Selection>.',
-				'- Do not include the <Selection> tags in the output.',
+				'- Do not include the <Selection> tags in your output.',
 			].join('\n'),
-			task: 'Edit the selected markdown content according to the user\'s request.',
+			task: "Edit the selected markdown content according to the user's request.",
 		});
 	}
 
@@ -113,7 +118,7 @@ export function buildEditPrompt(request: DerivedEditorCommandRequest): string {
 			'- Only modify text inside <Selection>.',
 			'- Return only the replacement text for <Selection>.',
 			'- Keep the output natural and grammatically correct.',
-			'- Do not include the <Selection> tags.',
+			'- Do not include the <Selection> tags in your output.',
 		].join('\n'),
 		task: [
 			'The background data contains a selected fragment marked with <Selection>.',

@@ -33,7 +33,6 @@
   import { cn } from "$lib/utils/shadcn";
   import CommandDropdown from "./chat/CommandDropdown.svelte";
   import MentionDropdown from "./chat/MentionDropdown.svelte";
-  import ModelSelector from "./model-selector.svelte";
   import { PromptInput, PromptInputActions, PromptInputTextarea } from "./prompt-kit/prompt-input";
   import { onMount } from "svelte";
 
@@ -636,9 +635,6 @@
           <span class="hidden sm:inline">Thinking</span>
         </Button>
 
-        <ModelSelector
-          class="h-10 sm:min-h-12 rounded-xl border-none bg-transparent hover:bg-white/5 text-muted-foreground hover:text-primary shrink-0 transition-all"
-        />
       </div>
     </div>
 

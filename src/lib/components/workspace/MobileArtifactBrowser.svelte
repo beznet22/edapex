@@ -82,26 +82,26 @@
 	}
 </script>
 
-<div class="flex flex-col h-full bg-slate-950/90">
-	<header class="flex items-center px-4 py-3 border-b border-white/5 shrink-0 gap-2">
+<div class="flex flex-col h-full bg-popover">
+	<header class="flex items-center px-4 py-3 border-b border-border/60 shrink-0 gap-2">
 		<FolderIcon class="size-4 text-primary/80 shrink-0" />
-		<span class="text-[11px] font-bold text-white/70">
+		<span class="text-[11px] font-bold text-foreground/70">
 			{termDirectory ?? "Thread artifacts"}
 		</span>
 	</header>
 
 	<ScrollArea class="flex-1">
 		{#if loading}
-			<div class="px-4 py-8 text-center text-[11px] text-white/40">Loading…</div>
+			<div class="px-4 py-8 text-center text-[11px] text-muted-foreground">Loading…</div>
 		{:else if error}
 			<div class="px-4 py-8 text-center text-[11px] text-rose-400">{error}</div>
 		{:else if entries.length === 0}
 			<div class="flex flex-col items-center justify-center h-full text-center px-8 opacity-30 py-12">
-				<FileTextIcon class="size-12 mb-4 text-white/40" />
-				<p class="text-[12px] font-black tracking-widest uppercase text-white mb-2">
+				<FileTextIcon class="size-12 mb-4 text-muted-foreground/50" />
+				<p class="text-[12px] font-black tracking-widest uppercase text-foreground mb-2">
 					No artifacts yet
 				</p>
-				<p class="text-[10px] font-bold text-white/60 leading-relaxed max-w-[200px]">
+				<p class="text-[10px] font-bold text-muted-foreground leading-relaxed max-w-[200px]">
 					Thread artifacts saved from chat will appear here.
 				</p>
 			</div>
@@ -113,11 +113,11 @@
 						<Button
 							variant="ghost"
 							size="sm"
-							class="w-full justify-start text-left h-auto py-2 px-3 hover:bg-white/5"
+							class="w-full justify-start text-left h-auto py-2 px-3 hover:bg-muted/40"
 							onclick={() => handleSelect(entry)}
 						>
 							<Icon class="size-4 text-primary/80 shrink-0" />
-							<span class="truncate text-[12px] font-medium text-white/90 flex-1 ml-2">
+							<span class="truncate text-[12px] font-medium text-foreground flex-1 ml-2">
 								{entry.name}
 							</span>
 						</Button>

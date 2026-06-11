@@ -1,8 +1,10 @@
 <script lang="ts">
 	import { ScrollArea } from "$lib/components/ui/scroll-area";
 	import WysiwygEditor from "$lib/components/editor/WysiwygEditor.svelte";
-	import EditorModeToggle from "$lib/components/editor/EditorModeToggle.svelte";
+	import LoadingState from "./loading-state.svelte";
 	import { toast } from "svelte-sonner";
+	import { SelectedClass } from "$lib/context/sync.svelte";
+	import { DESIGNATIONS } from "$lib/types/sms-types";
 
 	import { usePdfiumEngine } from "@embedpdf/engines/svelte";
 	import { EmbedPDF } from "@embedpdf/core/svelte";
@@ -34,6 +36,7 @@
 		editorMode = $bindable("wysiwyg"),
 		isSaving = $bindable(false),
 		streaming = false,
+		user,
 	}: {
 		filename?: string;
 		url?: string;
@@ -43,12 +46,22 @@
 		editorMode?: "wysiwyg" | "raw";
 		isSaving?: boolean;
 		streaming?: boolean;
+		user?: { designation?: string };
 	} = $props();
 
 	let textContent = $state("Loading...");
 	let editContent = $state("");
 	let containerWidth = $state(0);
 	let containerRef = $state<HTMLDivElement | null>(null);
+
+	const selectedClass = SelectedClass.fromContext();
+	const designationId = $derived(
+		(DESIGNATIONS.indexOf((user?.designation as any) ?? 'it') || 1)
+	);
+  const selectedClassId = $derived(selectedClass?.data?.classId ?? null);
+  const selectedSectionId = $derived(selectedClass?.data?.sectionId ?? null);
+  const selectedClassName = $derived(selectedClass?.data?.className ?? '');
+  const selectedSectionName = $derived(selectedClass?.data?.sectionName ?? '');
 
 	const isMarkdownFile = $derived(
 		filename.endsWith(".md") || filename.endsWith(".markdown"),
@@ -116,18 +129,38 @@
 				textContent = content ?? "";
 				editContent = content ?? "";
 			} else if (url) {
+				const targetUrl = url;
 				textContent = "Loading...";
 				editContent = "";
-				fetch(url)
-					.then((r) => r.text())
+				let cancelled = false;
+				const timeoutId = setTimeout(() => {
+					if (!cancelled) {
+						textContent = "Error: Request timed out after 10s";
+						editContent = textContent;
+					}
+				}, 10000);
+				fetch(targetUrl)
+					.then((r) => {
+						if (!r.ok) throw new Error(`HTTP ${r.status}`);
+						return r.text();
+					})
 					.then((t) => {
+						clearTimeout(timeoutId);
+						if (cancelled) return;
 						textContent = t;
 						editContent = t;
 					})
 					.catch((e) => {
-						textContent = `Error loading file: ${e.message}`;
+						clearTimeout(timeoutId);
+						if (cancelled) return;
+						const msg = e instanceof Error ? e.message : String(e);
+						textContent = `Error loading file: ${msg}`;
 						editContent = textContent;
 					});
+				return () => {
+					cancelled = true;
+					clearTimeout(timeoutId);
+				};
 			} else if (content) {
 				textContent = content;
 				editContent = content;
@@ -149,29 +182,20 @@
 {#if filename}
 	<div class="flex flex-col w-full h-full relative pb-4 group">
 		{#if type === "text"}
-			{#if isMarkdownFile}
-				<div
-					class="absolute top-4 left-1/2 -translate-x-1/2 z-50 opacity-0 group-hover:opacity-100 transition-all duration-300 shadow-2xl rounded-full pointer-events-auto"
-				>
-					<EditorModeToggle bind:mode={editorMode} />
-				</div>
-			{/if}
-
-			{#if isMarkdownFile && editorMode === "wysiwyg"}
+			{#if textContent === "Loading..." || textContent.startsWith("Error loading")}
+				<LoadingState label={textContent === "Loading..." ? "Loading file content" : textContent} />
+			{:else if isMarkdownFile && editorMode === "wysiwyg"}
 				<div class="flex-1 min-h-0 overflow-hidden">
-					{#if textContent !== "Loading..."}
-						<WysiwygEditor
-							content={textContent}
-							onUpdate={handleWysiwygUpdate}
-							class="h-full"
-						/>
-					{:else}
-						<div
-							class="flex items-center justify-center h-full text-muted-foreground text-sm"
-						>
-							Loading editor...
-						</div>
-					{/if}
+					<WysiwygEditor
+						content={textContent}
+						onUpdate={handleWysiwygUpdate}
+						class="h-full"
+						designationId={designationId}
+						selectedClassId={selectedClassId}
+						selectedSectionId={selectedSectionId}
+						selectedClassName={selectedClassName}
+						selectedSectionName={selectedSectionName}
+					/>
 				</div>
 			{:else}
 				<ScrollArea class="flex-1 w-full bg-background overflow-hidden relative">
@@ -198,11 +222,7 @@
 				bind:this={containerRef}
 			>
 				{#if pdfEngine.isLoading || !pdfEngine.engine}
-					<div
-						class="absolute inset-0 flex justify-center items-center text-sm font-medium text-muted-foreground"
-					>
-						Loading PDF Engine...
-					</div>
+					<LoadingState label="Loading PDF engine" />
 				{:else}
 					<EmbedPDF engine={pdfEngine.engine} {plugins}>
 						{#snippet children({ activeDocumentId })}

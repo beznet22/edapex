@@ -74,7 +74,10 @@ export const actions: Actions = {
       // uses the registered gateway internally for LLM resolution.
       const mastraDb = getAppDb();
       const gateway = new EdApexGateway(mastraDb, user.id);
-      mastra.addGateway(gateway);
+      // Per-user gateway key — EdApexGateway.id is the constant 'edapex' so
+      // addGateway() is idempotent on that key and every request would otherwise
+      // share the FIRST user's captured credentials.
+      mastra.addGateway(gateway, `edapex-${user.id}`);
 
       const tenantContext = createTenantContext({
         schoolId: user.schoolId ?? 1,
