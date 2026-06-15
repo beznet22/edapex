@@ -8,6 +8,7 @@
   import ClockIcon from "@lucide/svelte/icons/clock";
   import LoaderCircleIcon from "@lucide/svelte/icons/loader-circle";
   import AlertCircleIcon from "@lucide/svelte/icons/alert-circle";
+  import { ALLOWED_DESIGNATIONS } from "$lib/types/sms-types";
 
   /**
    * Entity result from /api/mentions/search
@@ -54,9 +55,9 @@
 
   // Role-based category filtering
   const allowedCategories = $derived(
-    (designationId === 1 || designationId === 5)
+    (designationId === ALLOWED_DESIGNATIONS.IT || designationId === ALLOWED_DESIGNATIONS.COORDINATOR)
       ? ALL_CATEGORIES
-      : designationId === 8
+      : designationId === ALLOWED_DESIGNATIONS.CLASS_TEACHER
         ? ALL_CATEGORIES.filter(c => ['students', 'academic_year', 'term'].includes(c.id))
         : []
   );

@@ -30,7 +30,9 @@
  */
 import { Agent } from '@mastra/core/agent';
 import { resultOutputSchema } from '$lib/schema/result-output';
+import { StreamErrorRetryProcessor } from '@mastra/core/processors';
 import type { TenantContext } from '../tenant-context';
+import type { MastraModelConfig } from '@mastra/core/llm';
 import { requestContextSchema, DEFAULT_MODEL } from './shared';
 
 export const resultMapperAgent = new Agent({
@@ -68,10 +70,13 @@ export const resultMapperAgent = new Agent({
 		return lines.join('\n');
 	},
 	model: ({ requestContext }) => {
+		const v2Config = requestContext?.get('modelConfig') as MastraModelConfig | undefined;
+		if (v2Config) return v2Config;
 		return (requestContext?.get('modelId') as string) || DEFAULT_MODEL;
 	},
 	defaultOptions: {
 		structuredOutput: { schema: resultOutputSchema }
 	},
+	errorProcessors: [new StreamErrorRetryProcessor()],
 	requestContextSchema,
 });

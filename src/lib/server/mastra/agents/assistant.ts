@@ -11,6 +11,11 @@
  * - `tenantContext`: Tenant isolation boundaries
  */
 import { Agent, type ToolsInput } from '@mastra/core/agent';
+import type { MastraModelConfig } from '@mastra/core/llm';
+import {
+	StreamErrorRetryProcessor,
+	TokenLimiterProcessor
+} from '@mastra/core/processors';
 import type { TenantContext } from '../tenant-context';
 import { requestContextSchema, DEFAULT_MODEL, DEFAULT_TITLE_MODEL } from './shared';
 import { createMastraStorage } from '$lib/server/mastra/storage/libsql/mastra-storage';
@@ -94,6 +99,8 @@ export const assistantAgent = new Agent({
 	name: 'Assistant',
 	description: 'Handles user queries, executes tools, and provides educational support.',
 	model: ({ requestContext }) => {
+		const v2Config = requestContext?.get('modelConfig') as MastraModelConfig | undefined;
+		if (v2Config) return v2Config;
 		return (requestContext?.get('modelId') as string) || DEFAULT_MODEL;
 	},
 	instructions: ({ requestContext }) => {
@@ -157,6 +164,22 @@ export const assistantAgent = new Agent({
 			// },
 		},
 	}),
+	// `TokenLimiterProcessor` enforces a hard cap on input tokens (truncates
+	// the oldest messages to fit). 100_000 leaves ~28_000 for system prompt
+	// + output across all builtin models (smallest context = 128_000).
+	inputProcessors: [
+		new TokenLimiterProcessor({
+			limit: 100_000,
+			strategy: 'truncate',
+			countMode: 'cumulative',
+			trimMode: 'contiguous'
+		})
+	],
+	// `StreamErrorRetryProcessor` retries transient stream errors (OpenAI 5xx,
+	// Anthropic overloaded, etc.) that fire AFTER the first chunk — our
+	// `streamWithAutoRetry` only handles pre-stream 429s, so the two are
+	// complementary.
+	errorProcessors: [new StreamErrorRetryProcessor()],
 	requestContextSchema,
 });
 

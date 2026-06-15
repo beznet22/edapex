@@ -5,7 +5,7 @@
   import { ChatHistory } from "$lib/context/chat-history.svelte.js";
   import { FilesContext } from "$lib/context/file-context.svelte.js";
   import { UserContext } from "$lib/context/user-context.svelte";
-  import { SelectedModel, SelectedClass } from "$lib/context/sync.svelte";
+  import { SelectedModel, SelectedClass, ResolvedModelHolder, AvailableModelsHolder } from "$lib/context/sync.svelte";
   import { ImageContext } from "$lib/context/image.context.svelte";
   import { useAI } from "$lib/context/ai-context.svelte";
   import { IsMobile } from "$lib/hooks/is-mobile.svelte.js";
@@ -28,6 +28,9 @@
     assignedSection,
     chats,
     modelId,
+    resolvedModel,
+    availableModels,
+    visibleModelIds,
     selectedClassRaw,
     uploads,
     sidebarCollapsed,
@@ -40,15 +43,20 @@
   const selectedChatModel = new SelectedModel(modelId!);
   selectedChatModel.setContext();
 
+  const resolvedModelHolder = new ResolvedModelHolder(resolvedModel ?? null);
+  resolvedModelHolder.setContext();
+
+  const availableModelsHolder = new AvailableModelsHolder(
+    availableModels ?? [],
+    visibleModelIds ?? []
+  );
+  availableModelsHolder.setContext();
+
   const selectedClass = new SelectedClass(selectedClassRaw || "");
   selectedClass.setContext();
 
   $effect(() => {
     chatHistory.rehydrate(data.chats);
-  });
-
-  $effect(() => {
-    selectedChatModel.rehydrate(data.modelId!);
   });
 
   $effect(() => {

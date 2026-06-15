@@ -4,6 +4,7 @@ import { createTenantContext, type TenantContext } from '$lib/server/mastra/tena
 import { getAllowedCategories, type MentionCategory, type MentionSearchResult } from './mention-utils';
 import { getDatabase } from '$lib/server/db';
 import { smStudents, studentRecords } from '$lib/server/db/sms-schema';
+import { ALLOWED_DESIGNATIONS } from "$lib/types/sms-types";
 import { BaseRepository } from '$lib/server/repository/base.repo';
 
 /**
@@ -173,7 +174,7 @@ export const GET: RequestHandler = async ({ url, locals }) => {
 	const sectionIdParam = url.searchParams.get('sectionId');
 	const classId = classIdParam ? Number(classIdParam) : null;
 	const sectionId = sectionIdParam ? Number(sectionIdParam) : null;
-	const designationId: number = (user as any).designationId ?? 1;
+	const designationId: number = (user as any).designationId ?? ALLOWED_DESIGNATIONS.IT;
 
 	const allowedCategories = getAllowedCategories(designationId);
 	if (category && !allowedCategories.includes(category)) {

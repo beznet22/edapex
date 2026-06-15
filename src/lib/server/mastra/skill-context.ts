@@ -2,18 +2,7 @@ import type { Client } from '@libsql/client';
 import type { SkillWatcher } from './skill-watcher';
 import type { SkillRegistry } from './skill-registry';
 import type { SkillStateManager } from './skill-state';
-
-/**
- * Designation IDs from the whitelist (spec: mastra_migration_specs.md §3.2 L166-169).
- * Only these roles may access AI orchestration.
- */
-export const ALLOWED_DESIGNATIONS = {
-	IT: 1,
-	COORDINATOR: 5,
-	CLASS_TEACHER: 8
-} as const;
-
-type DesignationId = (typeof ALLOWED_DESIGNATIONS)[keyof typeof ALLOWED_DESIGNATIONS];
+import { ALLOWED_DESIGNATIONS, type AllowedDesignationId } from "$lib/types/sms-types";
 
 /**
  * Resolved @mention context injected into the agent's lookup index.
@@ -34,7 +23,7 @@ export interface MentionResolution {
 export async function hydrateClassMention(
 	classId: number,
 	sectionId: number,
-	callerDesignation: DesignationId,
+	callerDesignation: AllowedDesignationId,
 	callerClassId: number | null,
 	fetchStudentIds: (classId: number, sectionId: number) => Promise<number[]>
 ): Promise<MentionResolution> {

@@ -5,6 +5,7 @@ import {
   smAssignClassTeachers,
 } from "$lib/server/db/sms-schema";
 import { WorkspaceMismatchError, type TenantContext } from "$lib/server/mastra/tenant-context";
+import { ALLOWED_DESIGNATIONS } from "$lib/types/sms-types";
 
 /**
  * Confirms that the staff member bound to the active tenant context is
@@ -20,6 +21,10 @@ import { WorkspaceMismatchError, type TenantContext } from "$lib/server/mastra/t
  */
 export async function verifyTeacherAssignment(ctx: TenantContext): Promise<void> {
   if (ctx.classId === null || ctx.sectionId === null || ctx.academicId === null) {
+    return;
+  }
+
+  if (ctx.designationId !== ALLOWED_DESIGNATIONS.CLASS_TEACHER) {
     return;
   }
 

@@ -112,7 +112,7 @@ describe("Slice 12: result-mapper agent registration", () => {
 		});
 
 		it("'result-mapper' is added to the getAgent() id union (compile-time safety)", () => {
-			expect(mastraIndexSrc).toMatch(/'result-mapper'\s*\|\s*'editorCopilot'|getAgent\(\s*id:\s*'supervisor'\s*\|\s*'assistant'\s*\|\s*'title'\s*\|\s*'editorEdit'\s*\|\s*'editorGenerate'\s*\|\s*'editorCopilot'\s*\|\s*'result-mapper'\s*\)/);
+			expect(mastraIndexSrc).toMatch(/getAgent\(\s*id:\s*'supervisor'\s*\|\s*'assistant'\s*\|\s*'title'\s*\|\s*'editorEdit'\s*\|\s*'editorGenerate'\s*\|\s*'editorCopilot'\s*\|\s*'result-mapper'/);
 		});
 	});
 

@@ -1,0 +1,228 @@
+/**
+ * Model resolver — V2.
+ *
+ * The single entry point between the cookie value (`<provider>/<model>@<variant>`)
+ * and the agent's `model` callback. Resolves a model into one of three
+ * `MastraModelConfig` shapes (all accepted by `agent.model`):
+ *
+ *   1. `OpenAICompatibleConfig` object — for Groq and OpenCode Zen. The
+ *      native Mastra router resolves this against `provider.api.url`,
+ *      `provider.api.apiKey`, and a `customFetch` that captures rate-limit
+ *      headers uniformly.
+ *
+ *   2. `LanguageModelV2` instance — for DeepSeek, built via
+ *      `createDeepSeek({...}).chatModel(modelName)`. The special case is
+ *      driven by `provider.api.package === '@ai-sdk/deepseek'` (data, not
+ *      control flow) and preserves the `messages[N]: missing field content`
+ *      bug fix that V1 had at `gateway.ts:238-246`.
+ *
+ *   3. `ModelRouterModelId` string (env-keyed fallback) — returned by
+ *      `pickDefaultModelId` when the cookie is empty and no user credential
+ *      is configured.
+ *
+ * The variant suffix is a UI label; the resolver extracts it and returns
+ * the variant's `options` as `providerOptions[providerId]` for the caller
+ * to pass as `agent.stream(..., { providerOptions })`.
+ */
+import { createDeepSeek } from '@ai-sdk/deepseek';
+import type { LibSQLDatabase } from 'drizzle-orm/libsql';
+import { env as svelteEnv } from '$env/dynamic/private';
+import type { MastraModelConfig } from '@mastra/core/llm';
+import { BUILTIN_PROVIDERS, BUILTIN_MODELS, DEFAULT_MODEL_ID, getModelById, getChatRoutableModels } from './catalog';
+import {
+	NoCredentialError,
+	NoProvidersError,
+	ProviderDisabledError,
+	ProviderNotFoundError,
+	ModelNotFoundError
+} from './errors';
+import { resolveProviderKey } from './credentials';
+import { createRateLimitFetch } from './rate-limit';
+import type { ProviderId, ModelId, VariantId } from './types';
+import { parseModelId } from './types';
+import type { ModelInfo, Capabilities } from './spec';
+
+function getEnv(): Record<string, string | undefined> {
+	return svelteEnv as Record<string, string | undefined>;
+}
+
+export interface ResolvedRequestModel {
+	/** Pass directly as `agent.model`. */
+	config: MastraModelConfig;
+	/** Variant options for `agent.stream(..., { providerOptions })`. */
+	providerOptions?: Record<string, Record<string, unknown>>;
+	/** UI fields (not used by the agent). */
+	providerId: ProviderId;
+	modelName: string;
+	variantId: VariantId | null;
+	capabilities: Capabilities;
+	limit: ModelInfo['limit'];
+	/** Where the API key came from. */
+	keySource: 'user' | 'env' | null;
+}
+
+/**
+ * Build the model for a given provider id. Provider-specific factory is
+ * picked from `provider.api.package` (data, not control flow) so future
+ * providers slot in without resolver changes.
+ */
+function buildModel(
+	providerId: ProviderId,
+	provider: (typeof BUILTIN_PROVIDERS)[ProviderId],
+	modelName: string,
+	apiKey: string,
+	customFetch: typeof fetch
+): MastraModelConfig {
+	const api = provider.api;
+	if (api.type === 'native') {
+		// No catalog entry should ever have a native API today; the catalog
+		// only contains AI-SDK-backed providers. Defensive fallback: build
+		// an openai-compatible config so the agent at least gets a model.
+		return {
+			id: `${providerId}/${modelName}`,
+			url: api.url,
+			apiKey,
+			headers: {},
+			fetch: customFetch
+		} as unknown as MastraModelConfig;
+	}
+	if (api.package === '@ai-sdk/deepseek') {
+		const deepseek = createDeepSeek({
+			apiKey,
+			baseURL: api.url,
+			fetch: customFetch
+		});
+		return deepseek(modelName) as unknown as MastraModelConfig;
+	}
+	// Default: openai-compatible (groq, opencode, future providers).
+	return {
+		id: `${providerId}/${modelName}`,
+		url: api.url,
+		apiKey,
+		headers: {},
+		fetch: customFetch
+	} as unknown as MastraModelConfig;
+}
+
+export async function resolveModelForRequest(
+	userId: number,
+	modelIdWithVariant: string,
+	db: LibSQLDatabase<any>
+): Promise<ResolvedRequestModel> {
+	if (!modelIdWithVariant) {
+		throw new NoProvidersError();
+	}
+
+	const { modelId, variantId } = parseModelId(modelIdWithVariant);
+	const providerId = extractProviderId(modelId);
+	if (!providerId) {
+		throw new ModelNotFoundError('unknown' as ProviderId, modelId as ModelId);
+	}
+
+	const provider = BUILTIN_PROVIDERS[providerId];
+	if (!provider) {
+		throw new ProviderNotFoundError(providerId);
+	}
+
+	const modelName = stripProviderPrefix(modelId, providerId);
+	if (!modelName) {
+		throw new ModelNotFoundError(providerId, modelId as ModelId);
+	}
+
+	const modelInfo = getModelById(modelId as ModelId);
+	if (!modelInfo) {
+		throw new ModelNotFoundError(providerId, modelId as ModelId);
+	}
+
+	const resolved = await resolveProviderKey(db, getEnv(), userId, providerId);
+	if (!resolved) {
+		throw new NoCredentialError(providerId);
+	}
+	if (resolved.credentialEnabled === false) {
+		throw new ProviderDisabledError(providerId);
+	}
+
+	const customFetch = createRateLimitFetch(userId, providerId);
+	const config = buildModel(providerId, provider, modelName, resolved.apiKey, customFetch);
+
+	const providerOptions = resolveProviderOptions(modelInfo, variantId);
+
+	return {
+		config,
+		providerOptions,
+		providerId,
+		modelName,
+		variantId,
+		capabilities: modelInfo.capabilities,
+		limit: modelInfo.limit,
+		keySource: resolved.source
+	};
+}
+
+/**
+ * Pick a sensible default model id when the cookie is empty. Used by the
+ * SSR layout's auto-pick to render the chat composer with a real model
+ * on first paint. Returns `<provider>/<model>@<variant>` format (or
+ * `<provider>/<model>` if no variants).
+ *
+ * Resolution order:
+ *   1. If `DEFAULT_MODEL_ID` (in the catalog) is connected, return it
+ *      with its first variant (if any). The default is the OpenAI-OSS
+ *      120B model on Groq.
+ *   2. Otherwise iterate `BUILTIN_MODELS` in catalog order, returning
+ *      the first model whose provider has a connected credential.
+ *   3. If no candidates, return `null`.
+ */
+export async function pickDefaultModelId(
+	db: LibSQLDatabase<any>,
+	env: Record<string, string | undefined>,
+	userId: number
+): Promise<string | null> {
+	const preferred = BUILTIN_MODELS[DEFAULT_MODEL_ID];
+	if (preferred) {
+		const resolved = await resolveProviderKey(db, env, userId, preferred.providerId);
+		if (resolved) {
+			const firstVariantId = preferred.variants[0]?.id;
+			const variantSuffix = firstVariantId ? `@${firstVariantId}` : '';
+			return `${preferred.id}${variantSuffix}`;
+		}
+	}
+	for (const model of getChatRoutableModels()) {
+		if (model.id === DEFAULT_MODEL_ID) continue;
+		const resolved = await resolveProviderKey(db, env, userId, model.providerId);
+		if (!resolved) continue;
+		const firstVariantId = model.variants[0]?.id;
+		const variantSuffix = firstVariantId ? `@${firstVariantId}` : '';
+		return `${model.id}${variantSuffix}`;
+	}
+	return null;
+}
+
+function resolveProviderOptions(
+	model: ModelInfo,
+	variantId: VariantId | null
+): Record<string, Record<string, unknown>> | undefined {
+	if (!variantId) return undefined;
+	const variant = model.variants.find((v) => v.id === variantId);
+	if (!variant || !variant.options || Object.keys(variant.options).length === 0) return undefined;
+	return { [model.providerId]: variant.options };
+}
+
+/**
+ * Extract the provider segment from a `provider/...` model id. Returns
+ * the leading path segment (everything before the first `/`). For the
+ * groq catalog id `groq/qwen/qwen3-32b` this returns `groq` and the
+ * model name is `qwen/qwen3-32b` (correctly nested for the OpenAI-compat
+ * factory).
+ */
+function extractProviderId(modelId: string): ProviderId | null {
+	const slashIdx = modelId.indexOf('/');
+	if (slashIdx <= 0) return null;
+	return modelId.slice(0, slashIdx) as ProviderId;
+}
+
+function stripProviderPrefix(modelId: string, providerId: ProviderId): string {
+	const prefix = `${providerId}/`;
+	if (!modelId.startsWith(prefix)) return '';
+	return modelId.slice(prefix.length);
+}

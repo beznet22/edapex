@@ -52,16 +52,14 @@ export const Callout = Node.create({
 
   renderHTML({ HTMLAttributes, node }) {
     const type = (node.attrs.type as CalloutType) ?? DEFAULT_TYPE;
-    const title = (node.attrs.title as string) ?? "";
+    const title = (node.attrs.title as string) || type;
     return [
       "aside",
       mergeAttributes(HTMLAttributes, {
         "data-callout": "",
         class: `tiptap-callout tiptap-callout--${type}`,
       }),
-      ...(title
-        ? [["div", { "data-callout-title": "", class: "tiptap-callout-title" }, title.toUpperCase()]]
-        : []),
+      ["div", { "data-callout-title": "", class: "tiptap-callout-title" }, title],
       ["div", { "data-callout-content": "", class: "tiptap-callout-content" }, 0],
     ];
   },
@@ -122,7 +120,7 @@ export const Callout = Node.create({
               }
 
               state.line = line;
-              let content = `<aside data-callout data-type="${type}"><div data-callout-content>`;
+              let content = `<aside data-callout data-type="${type}"><div data-callout-title>${type}</div><div data-callout-content>`;
               const esc = md.utils.escapeHtml;
               for (let i = 0; i < lines.length; i++) {
                 const l = lines[i];

@@ -3,6 +3,7 @@
 	import { Button } from "$lib/components/ui/button";
 	import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
 	import * as Tooltip from "$lib/components/ui/tooltip";
+	import * as AlertDialog from "$lib/components/ui/alert-dialog";
 	import { ScrollArea } from "$lib/components/ui/scroll-area";
 	import { cn } from "$lib/utils/shadcn";
 	import FileIcon from "@lucide/svelte/icons/file";
@@ -12,13 +13,13 @@
 	import SaveIcon from "@lucide/svelte/icons/save";
 	import CopyIcon from "@lucide/svelte/icons/copy";
 	import DownloadIcon from "@lucide/svelte/icons/download";
-	import PencilIcon from "@lucide/svelte/icons/pencil";
-	import EyeIcon from "@lucide/svelte/icons/eye";
+	import MoreHorizontalIcon from "@lucide/svelte/icons/more-horizontal";
+	import Share2Icon from "@lucide/svelte/icons/share-2";
+	import PrinterIcon from "@lucide/svelte/icons/printer";
+	import Trash2Icon from "@lucide/svelte/icons/trash-2";
 	import FileQuestionIcon from "@lucide/svelte/icons/file-question";
 	import ArrowLeftIcon from "@lucide/svelte/icons/arrow-left";
 	import EditorCanvas from "./editor-canvas.svelte";
-	import MarkdownPreview from "./markdown-preview.svelte";
-	import EditorModeToggle from "$lib/components/editor/EditorModeToggle.svelte";
 	import { useInspector } from "$lib/context/inspector-context.svelte";
 
 	let {
@@ -38,24 +39,10 @@
 	let editorRef = $state<{ save: () => Promise<boolean> | void; copy: () => void } | undefined>(
 		undefined,
 	);
-	let editing = $state(false);
-	let editorMode = $state<"wysiwyg" | "raw">("wysiwyg");
 
 	const viewingId = $derived(activeId ?? artifacts[0]?.id ?? null);
 	const current = $derived(artifacts.find((a) => a.id === viewingId) ?? null);
 	const isStreaming = $derived(current?.status === "processing" || current?.status === "streaming");
-	const isMarkdown = $derived(
-		current
-			? current.title.toLowerCase().endsWith(".md") ||
-				current.title.toLowerCase().endsWith(".markdown")
-			: false,
-	);
-	const showEditToggle = $derived(current?.kind === "document" && !isStreaming);
-	const effectiveEdit = $derived(showEditToggle && editing);
-
-	$effect(() => {
-		if (!showEditToggle && editing) editing = false;
-	});
 
 	async function handleSave() {
 		if (editorRef) {
@@ -87,6 +74,51 @@
 		if (bytes < k) return bytes + " B";
 		if (bytes < k * k) return (bytes / k).toFixed(1) + " KB";
 		return (bytes / (k * k)).toFixed(1) + " MB";
+	}
+
+	async function handleShare() {
+		if (!current?.url) return;
+		const relPath = current.url.replace("/api/file/", "");
+		const wsIdx = (current.id ?? "").indexOf("exams/");
+		const workspace = wsIdx !== -1 ? (current.id ?? "").slice(0, wsIdx - 1) : "";
+		try {
+			const res = await fetch("/api/file/share", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ key: relPath, workspace }),
+			});
+			if (!res.ok) throw new Error("Share failed");
+			const data = await res.json();
+			if (data.url) {
+				await navigator.clipboard.writeText(data.url);
+				import("svelte-sonner").then((m) => m.toast.success("Share link copied to clipboard"));
+			}
+		} catch {
+			import("svelte-sonner").then((m) => m.toast.error("Failed to generate share link"));
+		}
+	}
+
+	function handlePrint() {
+		if (!current?.content) return;
+		const win = window.open("", "_blank");
+		if (!win) return;
+		win.document.write(`<!DOCTYPE html><html><head><title>${current.title}</title></head><body>${current.content}</body></html>`);
+		win.document.close();
+		win.focus();
+		win.print();
+	}
+
+	let deleteOpen = $state(false);
+
+	async function handleDelete() {
+		if (!current?.url) return;
+		try {
+			const res = await fetch(current.url, { method: "DELETE" });
+			if (!res.ok) throw new Error("Delete failed");
+			inspector.close();
+		} catch {
+			import("svelte-sonner").then((m) => m.toast.error("Failed to delete file"));
+		}
 	}
 </script>
 
@@ -144,9 +176,7 @@
 										? "bg-primary/15 text-foreground"
 										: "text-muted-foreground hover:text-foreground hover:bg-muted/40",
 								)}
-								onclick={() => {
-									editing = false;
-								}}
+								onclick={() => inspector.openChatArtifact(artifact.id)}
 							>
 								<FileTextIcon class="size-3 mr-2 shrink-0" />
 								<span class="truncate">{artifact.title}</span>
@@ -169,24 +199,6 @@
 
 		<div class="flex items-center gap-1 shrink-0">
 			{#if current && !isStreaming}
-				<Tooltip.Root>
-					<Tooltip.Trigger>
-						{#snippet child({ props })}
-							<Button
-								{...props}
-								variant="ghost"
-								size="icon"
-								class="size-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/40"
-								onclick={handleSave}
-								disabled={!effectiveEdit}
-							>
-								<SaveIcon class="size-4" />
-							</Button>
-						{/snippet}
-					</Tooltip.Trigger>
-					<Tooltip.Content>Save</Tooltip.Content>
-				</Tooltip.Root>
-
 				<Tooltip.Root>
 					<Tooltip.Trigger>
 						{#snippet child({ props })}
@@ -222,10 +234,40 @@
 						<Tooltip.Content>Download</Tooltip.Content>
 					</Tooltip.Root>
 				{/if}
-			{/if}
 
-			{#if effectiveEdit && isMarkdown}
-				<EditorModeToggle bind:mode={editorMode} />
+				<DropdownMenu.Root>
+					<DropdownMenu.Trigger>
+						{#snippet child({ props })}
+							<Button
+								{...props}
+								variant="ghost"
+								size="icon"
+								class="size-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/40"
+							>
+								<MoreHorizontalIcon class="size-4" />
+							</Button>
+						{/snippet}
+					</DropdownMenu.Trigger>
+					<DropdownMenu.Content align="end" class="w-44 bg-popover backdrop-blur-xl border border-border/60 rounded-xl shadow-2xl">
+						<DropdownMenu.Item onclick={handleSave}>
+							<SaveIcon class="size-3.5 mr-2" />
+							Save
+						</DropdownMenu.Item>
+						<DropdownMenu.Item onclick={handleShare}>
+							<Share2Icon class="size-3.5 mr-2" />
+							Share
+						</DropdownMenu.Item>
+						<DropdownMenu.Item onclick={handlePrint}>
+							<PrinterIcon class="size-3.5 mr-2" />
+							Print
+						</DropdownMenu.Item>
+						<DropdownMenu.Separator />
+						<DropdownMenu.Item onclick={() => (deleteOpen = true)} class="text-destructive focus:text-destructive">
+							<Trash2Icon class="size-3.5 mr-2" />
+							Delete
+						</DropdownMenu.Item>
+					</DropdownMenu.Content>
+				</DropdownMenu.Root>
 			{/if}
 		</div>
 	</header>
@@ -258,35 +300,17 @@
 				{/if}
 			</div>
 		{:else if current.kind === "document"}
-			{#if effectiveEdit}
-				<EditorCanvas
-					bind:this={editorRef}
-					bind:editorMode
-					filename={current.title}
-					url={current.url ?? ""}
-					saveUrl={current.saveUrl ?? current.url}
-					content={current.content ?? ""}
-					type="text"
-					streaming={isStreaming}
-					user={user}
-				/>
-			{:else}
-				<ScrollArea class="h-full">
-					<div class="p-4 sm:p-6 max-w-3xl mx-auto">
-						<MarkdownPreview
-							content={current.content ?? ""}
-							url={current.url ?? ""}
-							filename={current.title}
-						/>
-						{#if isStreaming}
-							<div class="mt-2 inline-flex items-center gap-2 text-[11px] text-primary">
-								<span class="size-1.5 rounded-full bg-primary animate-pulse"></span>
-								<span class="font-semibold uppercase tracking-wider">Streaming…</span>
-							</div>
-						{/if}
-					</div>
-				</ScrollArea>
-			{/if}
+			<EditorCanvas
+				bind:this={editorRef}
+				editorMode="wysiwyg"
+				filename={current.title}
+				url={current.url ?? ""}
+				saveUrl={current.saveUrl ?? current.url}
+				content={current.content ?? ""}
+				type="text"
+				streaming={isStreaming}
+				user={user}
+			/>
 		{:else if current.kind === "pdf"}
 			<EditorCanvas
 				filename={current.title}
@@ -307,33 +331,20 @@
 				</div>
 			</ScrollArea>
 		{/if}
-
-		{#if showEditToggle}
-			<Tooltip.Root>
-				<Tooltip.Trigger>
-					{#snippet child({ props })}
-						<button
-							{...props}
-							type="button"
-							onclick={() => (editing = !editing)}
-							aria-label={editing ? "Preview" : "Edit"}
-							class={cn(
-								"absolute bottom-4 right-4 z-30 size-12 rounded-full bg-primary text-primary-foreground shadow-2xl active:scale-95 flex items-center justify-center transition-all duration-200 ease-out",
-								editing
-									? "opacity-100 scale-100 translate-y-0 hover:opacity-90"
-									: "opacity-0 scale-90 translate-y-1 group-hover:opacity-100 group-hover:scale-100 group-hover:translate-y-0 group-focus-within:opacity-100 group-focus-within:scale-100 group-focus-within:translate-y-0 hover:opacity-90",
-							)}
-						>
-							{#if editing}
-								<EyeIcon class="size-5" />
-							{:else}
-								<PencilIcon class="size-5" />
-							{/if}
-						</button>
-					{/snippet}
-				</Tooltip.Trigger>
-				<Tooltip.Content side="left">{editing ? "Preview" : "Edit"}</Tooltip.Content>
-			</Tooltip.Root>
-		{/if}
 	</div>
 </div>
+
+<AlertDialog.Root bind:open={deleteOpen}>
+	<AlertDialog.Content>
+		<AlertDialog.Header>
+			<AlertDialog.Title>Delete this file?</AlertDialog.Title>
+			<AlertDialog.Description>
+				This action cannot be undone.
+			</AlertDialog.Description>
+		</AlertDialog.Header>
+		<AlertDialog.Footer>
+			<AlertDialog.Cancel>Cancel</AlertDialog.Cancel>
+			<AlertDialog.Action onclick={handleDelete}>Delete</AlertDialog.Action>
+		</AlertDialog.Footer>
+	</AlertDialog.Content>
+</AlertDialog.Root>

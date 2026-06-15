@@ -34,11 +34,160 @@
  */
 import { createWorkflow, createStep } from '@mastra/core/workflows';
 import { z } from 'zod';
+import {
+	APICallError,
+	NoSuchModelError,
+	LoadAPIKeyError,
+	InvalidPromptError,
+	NoContentGeneratedError
+} from '@ai-sdk/provider';
+import {
+	NoCredentialError,
+	ProviderDisabledError,
+	ModelNotFoundError,
+	NoProvidersError
+} from '$lib/provider/errors';
+import { categorizeAIError } from '$lib/errors/friendly-ai-error';
 import { mastra } from '../index';
+import { streamWithAutoRetry } from '../agent-stream-retry';
 import { OcrWorkspaceStore } from '$lib/server/mastra/storage/ocr/ocr-workspace-store';
 import { generateThreadTitle, resolveThread } from '$lib/server/helpers/chat-helper';
 import { DEFAULT_TITLE_MODEL } from '../agents/shared';
 import type { TenantContext } from '../tenant-context';
+
+interface FriendlyError {
+	message: string;
+	action?: { label: string; href: string };
+	retryable: boolean;
+	variant: 'info' | 'warning' | 'error';
+}
+
+function parseApiCallError(err: APICallError): FriendlyError {
+	const code = err.statusCode ?? 0;
+	const upstream = (err.data as { error?: { message?: string } } | undefined)?.error?.message;
+	if (code === 401 || code === 403) {
+		return {
+			message: `Authentication failed (HTTP ${code}). Check that the API key is valid and has access to the model.`,
+			action: { label: 'Manage API keys', href: '/settings/providers' },
+			retryable: false,
+			variant: 'error'
+		};
+	}
+	if (code === 404) {
+		return {
+			message: 'Model not found on provider (HTTP 404). The provider may have renamed or removed the model.',
+			retryable: false,
+			variant: 'error'
+		};
+	}
+	if (code === 429) {
+		return {
+			message: 'Rate limit reached. Please wait a moment and try again.',
+			retryable: true,
+			variant: 'warning'
+		};
+	}
+	if (code >= 500) {
+		return {
+			message: 'The AI service is currently unavailable. Please try again in a moment.',
+			retryable: true,
+			variant: 'warning'
+		};
+	}
+	if (err.isRetryable) {
+		return {
+			message: upstream || 'A temporary error occurred. Please try again.',
+			retryable: true,
+			variant: 'warning'
+		};
+	}
+	return {
+		message: upstream || err.message || 'Request was rejected by the API.',
+		retryable: false,
+		variant: 'error'
+	};
+}
+
+function parseFallback(err: unknown): FriendlyError {
+	const msg = err instanceof Error ? err.message : String(err);
+	if (msg.includes('File not found') || msg.includes('No OCR metadata')) {
+		return { message: 'Could not read the file content. The file may still be processing.', retryable: false, variant: 'error' };
+	}
+	if (msg.includes('missing field') || msg.includes('Failed to deserialize')) {
+		return { message: 'A data formatting issue occurred. Please try again or start a new conversation.', retryable: true, variant: 'warning' };
+	}
+	if (msg.includes('AbortError') || msg.includes('aborted')) {
+		return { message: 'Request cancelled.', retryable: false, variant: 'info' };
+	}
+	const truncated = msg.length > 200 ? msg.slice(0, 200) + '…' : msg;
+	return { message: truncated, retryable: false, variant: 'error' };
+}
+
+function parseFriendlyError(err: unknown): FriendlyError {
+	if (err instanceof NoCredentialError) {
+		return {
+			message: `No API key is configured for "${err.providerId}". Connect this provider in Settings → Providers.`,
+			action: { label: 'Open Settings', href: '/settings/providers' },
+			retryable: false,
+			variant: 'error'
+		};
+	}
+	if (err instanceof ProviderDisabledError) {
+		return {
+			message: `The "${err.providerId}" provider is disabled. Re-enable it in Settings → Providers.`,
+			action: { label: 'Open Settings', href: '/settings/providers' },
+			retryable: false,
+			variant: 'error'
+		};
+	}
+	if (err instanceof ModelNotFoundError) {
+		return {
+			message: `Model "${err.modelId}" wasn't found on "${err.providerId}". Try a different model from the selector.`,
+			retryable: false,
+			variant: 'error'
+		};
+	}
+	if (err instanceof NoProvidersError) {
+		return {
+			message: 'No providers configured. Add at least one provider in Settings → Providers.',
+			action: { label: 'Open Settings', href: '/settings/providers' },
+			retryable: false,
+			variant: 'error'
+		};
+	}
+	if (APICallError.isInstance(err)) {
+		return parseApiCallError(err);
+	}
+	if (NoSuchModelError.isInstance(err)) {
+		return {
+			message: 'The selected model is not available. Try a different model from the selector.',
+			retryable: false,
+			variant: 'error'
+		};
+	}
+	if (LoadAPIKeyError.isInstance(err)) {
+		return {
+			message: 'The platform default model has no API key configured. Contact your administrator.',
+			retryable: false,
+			variant: 'error'
+		};
+	}
+	if (InvalidPromptError.isInstance(err)) {
+		return {
+			message: 'Your message could not be sent. Please try a different prompt.',
+			retryable: false,
+			variant: 'warning'
+		};
+	}
+	if (NoContentGeneratedError.isInstance(err)) {
+		return {
+			message: 'The model did not generate a response. This is usually a temporary issue — try again.',
+			retryable: true,
+			variant: 'warning'
+		};
+	}
+	return parseFallback(err);
+}
 
 // ─── Schemas ────────────────────────────────────────────────────────────────
 
@@ -126,7 +275,7 @@ const streamDocumentStep = createStep({
 	inputSchema: fileStreamItemSchema,
 	outputSchema: fileStreamItemSchema,
 	retries: 3,
-	execute: async ({ inputData, requestContext, writer }) => {
+	execute: async ({ inputData, requestContext, writer, mastra: m }) => {
 		console.log("STREAMING HIT");
 		const ctx = (requestContext as { get?: (k: string) => unknown } | undefined)?.get?.('tenantContext') as
 			| TenantContext
@@ -175,10 +324,29 @@ const streamDocumentStep = createStep({
 				data: { status: 'processing', content: '', title: inputData.fileName }
 			} as never);
 
-			const CHUNK = 4096;
+			// Stream through the document formatting agent instead of raw 4KB chunks.
+			// The agent transforms raw OCR text into clean, well-structured markdown
+			// and streams it token-by-token for a smooth progressive-reveal UX.
+			const agent = m?.getAgent('document');
+			if (!agent) {
+				throw new Error('Document agent not registered on Mastra instance');
+			}
+
+			const stream = await streamWithAutoRetry({
+				stream: () =>
+					agent.stream(
+						`Transform the following raw document titled "${inputData.fileName}" into clean, well-structured markdown. Preserve all factual content. Fix OCR artifacts. Use proper headings, lists, and formatting.\n\n${markdown}`
+					),
+				abortSignal: undefined,
+				writer
+			});
+
+			const reader = stream.textStream.getReader();
 			let content = '';
-			for (let i = 0; i < markdown.length; i += CHUNK) {
-				content = markdown.slice(0, i + CHUNK);
+			while (true) {
+				const { done, value } = await reader.read();
+				if (done) break;
+				content += value;
 				await writer.write({
 					type: 'data-createDocument',
 					id,
@@ -189,7 +357,7 @@ const streamDocumentStep = createStep({
 			await writer.write({
 				type: 'data-createDocument',
 				id,
-				data: { status: 'success', content: markdown, title: inputData.fileName }
+				data: { status: 'success', content, title: inputData.fileName }
 			} as never);
 
 			return {
@@ -198,7 +366,19 @@ const streamDocumentStep = createStep({
 				content: ''
 			};
 		} catch (err) {
-			const message = err instanceof Error ? err.message : String(err);
+			const friendly = parseFriendlyError(err);
+			const message = friendly.message;
+			// Also emit the error to the stream so the document card shows it
+			try {
+				const id = `doc-${inputData.toolCallId}`;
+				await writer.write({
+					type: 'data-createDocument',
+					id,
+					data: { status: 'error', content: '', title: inputData.fileName, error: message }
+				} as never);
+			} catch {
+				// writer may already be closed
+			}
 			return {
 				...inputData,
 				status: 'error' as const,
@@ -319,23 +499,96 @@ const assistantStep = createStep({
 		// Resolve (get or create) thread — emits data-new-thread-created if new
 		const assistant = m?.getAgent('assistant');
 		const memory = assistant ? await assistant.getMemory() : undefined;
-		const stream = await agent.stream(inputData.promptText, {
-			...(abortSignal ? { abortSignal: abortSignal } : {}),
-			...(requestContext ? { requestContext: requestContext } : {}),
-			memory: {
-				thread: inputData.threadId,
-				resource: inputData.resourceId
-			},
-			maxSteps: 30,
-			onError: ({ error }) => {
-				const msg = error instanceof Error ? error.message : String(error);
-				if (msg.includes('AbortError') || msg.includes('aborted')) {
-					console.info('[api/chat] Generation stopped.');
-					return;
+		let stream;
+		try {
+			stream = await streamWithAutoRetry({
+				stream: () =>
+					agent.stream(inputData.promptText, {
+						...(abortSignal ? { abortSignal: abortSignal } : {}),
+						...(requestContext ? { requestContext: requestContext } : {}),
+						// Variant options (e.g. `{ deepseek: { thinking, reasoningEffort } }`)
+						// from the V2 resolver flow through `requestContext.providerOptions`.
+						// Passing them at the stream call makes the thinking-mode toggles
+						// actually take effect on the upstream (was a UI-only label
+						// before the V2 refactor). The cast widens the inner value
+						// type from `unknown` to `JSONValue`; in practice the resolver
+						// only puts JSON-serializable values into providerOptions.
+						...(requestContext?.get('providerOptions')
+							? { providerOptions: requestContext.get('providerOptions') as Record<string, Record<string, unknown>> as never }
+							: {}),
+						memory: {
+							thread: inputData.threadId,
+							resource: inputData.resourceId
+						},
+						maxSteps: 30,
+						onError: ({ error }) => {
+							const msg = error instanceof Error ? error.message : String(error);
+							if (msg.includes('AbortError') || msg.includes('aborted')) {
+								console.info('[api/chat] Generation stopped.');
+								return;
+							}
+							console.error(`[api/chat] Error: ${msg}`);
+						},
+						onFinish: ({ usage }) => {
+							// Emit a data-usage stream part carrying the final usage for
+							// this step. The chat-context accumulates these end-of-message
+							// totals and the ContextUsageIndicator renders the cumulative
+							// value against the model's context window.
+							const simple = {
+								inputTokens: usage.inputTokens ?? 0,
+								outputTokens: usage.outputTokens ?? 0,
+								reasoningTokens: usage.reasoningTokens ?? 0,
+								cachedInputTokens: usage.cachedInputTokens ?? 0
+							};
+							writer
+								.write({
+									type: 'data-usage',
+									id: `usage-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+									data: simple
+								} as never)
+								.catch(() => {
+									// writer may already be closed
+								});
+						}
+					}),
+				abortSignal,
+				writer
+			});
+		} catch (err) {
+			const friendly = parseFriendlyError(err);
+			const friendlyMsg = friendly.message;
+			console.error(`[api/chat] Agent stream failed: ${friendlyMsg}`);
+			// Emit a structured data-error part alongside the human-readable
+			// text-delta so the client-side ErrorAlert can render the right
+			// action button (regenerate / clear_context / open_settings).
+			const categorized = categorizeAIError(err);
+			const errorPart = writer
+				.write({
+					type: 'data-error',
+					id: `err-${Date.now()}`,
+					data: categorized
+				} as never)
+				.catch(() => {
+					// writer may already be closed
+				});
+			void errorPart;
+			const fallbackStream = new ReadableStream({
+				start(controller) {
+					controller.enqueue({ type: 'text-delta', text: `⚠️ ${friendlyMsg}` });
+					controller.enqueue({
+						type: 'finish',
+						finishReason: 'error',
+						usage: { inputTokens: 0, outputTokens: 0 }
+					});
+					controller.close();
 				}
-				console.error(`[api/chat] Error: ${msg}`);
-			}
-		});
+			});
+			await fallbackStream.pipeTo(writer);
+			return {
+				text: friendlyMsg,
+				resolvedFiles: inputData.fileItems
+			};
+		}
 
 		await stream.fullStream.pipeTo(writer);
 		return {

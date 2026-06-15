@@ -19,6 +19,7 @@
  * final `text` field is sanitized.
  */
 import { createWorkflow, createStep } from '@mastra/core/workflows';
+import { streamWithAutoRetry } from '../agent-stream-retry';
 import {
 	buildEditPrompt,
 	buildGeneratePrompt,
@@ -114,10 +115,15 @@ const runEditAgentStep = createStep({
 		writer,
 	}) => {
 		const agent = mastra.getAgent('editorEdit');
-		const stream = await agent.stream(inputData.prompt, {
+		const stream = await streamWithAutoRetry({
+			stream: () =>
+				agent.stream(inputData.prompt, {
+					abortSignal,
+					modelSettings: { temperature: 0.0, maxOutputTokens: 2000 },
+					requestContext,
+				}),
 			abortSignal,
-			modelSettings: { temperature: 0.0, maxOutputTokens: 2000 },
-			requestContext,
+			writer
 		});
 
 		await stream.fullStream.pipeTo(writer);
@@ -141,10 +147,15 @@ const runGenerateAgentStep = createStep({
 		writer,
 	}) => {
 		const agent = mastra.getAgent('editorGenerate');
-		const stream = await agent.stream(inputData.prompt, {
+		const stream = await streamWithAutoRetry({
+			stream: () =>
+				agent.stream(inputData.prompt, {
+					abortSignal,
+					modelSettings: { temperature: 0.4, maxOutputTokens: 2000 },
+					requestContext,
+				}),
 			abortSignal,
-			modelSettings: { temperature: 0.4, maxOutputTokens: 2000 },
-			requestContext,
+			writer
 		});
 
 		await stream.fullStream.pipeTo(writer);

@@ -30,17 +30,18 @@
   import { TaskItem } from "@tiptap/extension-task-item";
   import { Callout } from "./extensions/callout";
   import { CodeBlockHighlight } from "./extensions/code-block-lowlight";
+  import { ALLOWED_DESIGNATIONS } from "$lib/types/sms-types";
 
   let {
     content = "",
     onUpdate,
     class: className = "",
     copilotEnabled = true,
-    designationId = 1,
+    designationId = ALLOWED_DESIGNATIONS.IT,
     selectedClassId = null,
     selectedSectionId = null,
-    selectedClassName = '',
-    selectedSectionName = '',
+    selectedClassName = "",
+    selectedSectionName = "",
   }: {
     content?: string;
     onUpdate?: (markdown: string) => void;
@@ -70,7 +71,12 @@
   // Floating AI prompt popover state
   let aiPromptOpen = $state(false);
   let aiPromptPos = $state<{ top: number; left: number } | null>(null);
-  let pendingSelection = $state<{ from: number; to: number; text: string; markdown: string } | null>(null);
+  let pendingSelection = $state<{
+    from: number;
+    to: number;
+    text: string;
+    markdown: string;
+  } | null>(null);
 
   let editorInstance = $state<Editor | null>(null);
 
@@ -106,7 +112,7 @@
       Placeholder.configure({
         placeholder: "Write or type '/' for commands…",
         emptyEditorClass: "is-editor-empty",
-        showOnlyCurrent: false,
+        showOnlyCurrent: true,
       }),
       Markdown.configure({
         html: false,
@@ -174,7 +180,7 @@
       prepareSendMessagesRequest: ({ messages }) => {
         return {
           body: {
-            messages: [],
+            messages: messages,
             ctx: currentCtx,
           },
         };
@@ -182,6 +188,48 @@
     }),
     onError: (err) => {
       console.error("AI Improve Error:", err);
+      if ($editor && aiStreamNodePos !== null) {
+        const nodeAtPos = $editor.state.doc.nodeAt(aiStreamNodePos);
+        if (nodeAtPos?.type.name === "aiStreamBlock") {
+          const rawText = err?.message || "";
+          console.error("AI Improve Error (raw):", rawText);
+
+          let displayMsg;
+
+          const retryMatch = rawText.match(/try again in ([\d.]+)s/);
+          if (retryMatch) {
+            const seconds = Math.ceil(parseFloat(retryMatch[1]));
+            displayMsg = `⚠️ Rate limit reached. Auto-retrying in ${seconds}s…`;
+          } else if (rawText.startsWith("{")) {
+            try {
+              const parsed = JSON.parse(rawText);
+              displayMsg = parsed.error || "AI service error";
+            } catch {
+              displayMsg = "AI service encountered an error. Please try again.";
+            }
+          } else if (rawText.includes("does not support")) {
+            displayMsg = `⚠️ ${rawText.replace(/^ERROR:\s*/i, "")}`;
+          } else if (
+            ["Cannot connect", "ETIMEDOUT", "ECONNREFUSED", "ENOTFOUND", "EAI_AGAIN", "ECONNRESET", "socket", "fetch failed", "network", "unreachable", "timeout", "retries exhausted"].some((kw) =>
+              rawText.toLowerCase().includes(kw)
+            )
+          ) {
+            displayMsg = "⚠️ Connection timed out. Please check your internet connection and try again.";
+          } else {
+            displayMsg = "⚠️ AI service encountered an error. Please try again.";
+          }
+
+          const retryAfter = retryMatch ? Math.ceil(parseFloat(retryMatch[1])) : null;
+          const tr = $editor.state.tr.setNodeMarkup(aiStreamNodePos, undefined, {
+            ...nodeAtPos.attrs,
+            content: displayMsg || "An error occurred",
+            status: "error",
+            retryAfter,
+          });
+          tr.setMeta("aiStream", true);
+          $editor.view.dispatch(tr);
+        }
+      }
       isAiProcessing = false;
       aiStreamNodePos = null;
       accumulatedContent = "";
@@ -271,10 +319,20 @@
     if (from === to) return;
     const selectedText = $editor.state.doc.textBetween(from, to, "\n");
     if (!selectedText.trim()) return;
-    runAiEdit(from, to, selectedText, "Improve the selected text to be clearer, more concise, and grammatically correct. Preserve the meaning and tone. Return only the improved text.");
+    runAiEdit(
+      from,
+      to,
+      selectedText,
+      "Improve the selected text to be clearer, more concise, and grammatically correct. Preserve the meaning and tone. Return only the improved text.",
+    );
   }
 
-  function runAiEdit(from: number, to: number, selectedText: string, prompt: string) {
+  function runAiEdit(
+    from: number,
+    to: number,
+    selectedText: string,
+    prompt: string,
+  ) {
     if (!$editor || isAiProcessing) return;
     const streamId = crypto.randomUUID();
     cleanupStaleCacheEntries();
@@ -311,7 +369,8 @@
 
   function handleAiPromptOpen(e: Event) {
     if (!$editor || isAiProcessing || aiPromptOpen) return;
-    const detail = (e as CustomEvent<{ mode?: "edit" | "generate" }>).detail ?? { mode: "generate" };
+    const detail = (e as CustomEvent<{ mode?: "edit" | "generate" }>)
+      .detail ?? { mode: "generate" };
     const mode = detail.mode ?? "generate";
 
     const { from, to } = $editor.state.selection;
@@ -372,7 +431,12 @@
         .deleteRange({ from, to })
         .insertContentAt(from, {
           type: "aiStreamBlock",
-          attrs: { content: "", status: "streaming", toolName: "edit", streamId },
+          attrs: {
+            content: "",
+            status: "streaming",
+            toolName: "edit",
+            streamId,
+          },
         })
         .run();
     } else {
@@ -381,7 +445,12 @@
         .focus()
         .insertContentAt(from, {
           type: "aiStreamBlock",
-          attrs: { content: "", status: "streaming", toolName: "generate", streamId },
+          attrs: {
+            content: "",
+            status: "streaming",
+            toolName: "generate",
+            streamId,
+          },
         })
         .run();
     }
@@ -451,10 +520,7 @@
       class="ai-prompt-anchor"
       style="top: {aiPromptPos.top}px; left: {aiPromptPos.left}px;"
     >
-      <AiPromptPopover
-        onSubmit={submitAiPrompt}
-        onDismiss={dismissAiPrompt}
-      />
+      <AiPromptPopover onSubmit={submitAiPrompt} onDismiss={dismissAiPrompt} />
     </div>
   {/if}
 </div>
@@ -586,7 +652,12 @@
     min-width: 0;
     margin: 0;
   }
-  :global(.wysiwyg-editor-wrapper .tiptap li[data-type="taskItem"] input[type="checkbox"]) {
+  :global(
+      .wysiwyg-editor-wrapper
+        .tiptap
+        li[data-type="taskItem"]
+        input[type="checkbox"]
+    ) {
     accent-color: var(--primary);
     cursor: pointer;
   }
@@ -739,7 +810,9 @@
     background-color: var(--card);
     border-radius: 0 0.375rem 0.375rem 0;
   }
-  :global(.wysiwyg-editor-wrapper .tiptap aside[data-callout] > [data-callout-title]) {
+  :global(
+      .wysiwyg-editor-wrapper .tiptap aside[data-callout] > [data-callout-title]
+    ) {
     font-size: 0.875rem;
     line-height: 1.25rem;
     font-weight: 600;
@@ -749,37 +822,110 @@
     margin-bottom: 0.5rem;
     text-transform: capitalize;
   }
-  :global(.wysiwyg-editor-wrapper .tiptap aside[data-callout] > [data-callout-content] > p) {
+  :global(.wysiwyg-editor-wrapper .tiptap aside[data-callout] > [data-callout-title]::before) {
+    content: "";
+    display: inline-block;
+    width: 1rem;
+    height: 1rem;
+    flex-shrink: 0;
+    background: currentColor;
+    mask-size: contain;
+    mask-repeat: no-repeat;
+    -webkit-mask-size: contain;
+    -webkit-mask-repeat: no-repeat;
+  }
+  :global(.wysiwyg-editor-wrapper .tiptap aside[data-callout][data-type="note"] > [data-callout-title]::before) {
+    mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='10' fill='none' stroke='%23000' stroke-width='2'/%3E%3Cpath d='M12 16v-4' fill='none' stroke='%23000' stroke-width='2'/%3E%3Cpath d='M12 8h.01' fill='none' stroke='%23000' stroke-width='2'/%3E%3C/svg%3E");
+    -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='10' fill='none' stroke='%23000' stroke-width='2'/%3E%3Cpath d='M12 16v-4' fill='none' stroke='%23000' stroke-width='2'/%3E%3Cpath d='M12 8h.01' fill='none' stroke='%23000' stroke-width='2'/%3E%3C/svg%3E");
+  }
+  :global(.wysiwyg-editor-wrapper .tiptap aside[data-callout][data-type="tip"] > [data-callout-title]::before) {
+    mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5' fill='none' stroke='%23000' stroke-width='2'/%3E%3Cpath d='M9 18h6' fill='none' stroke='%23000' stroke-width='2'/%3E%3Cpath d='M10 22h4' fill='none' stroke='%23000' stroke-width='2'/%3E%3C/svg%3E");
+    -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5' fill='none' stroke='%23000' stroke-width='2'/%3E%3Cpath d='M9 18h6' fill='none' stroke='%23000' stroke-width='2'/%3E%3Cpath d='M10 22h4' fill='none' stroke='%23000' stroke-width='2'/%3E%3C/svg%3E");
+  }
+  :global(.wysiwyg-editor-wrapper .tiptap aside[data-callout][data-type="warning"] > [data-callout-title]::before) {
+    mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3' fill='none' stroke='%23000' stroke-width='2'/%3E%3Cpath d='M12 9v4' fill='none' stroke='%23000' stroke-width='2'/%3E%3Cpath d='M12 17h.01' fill='none' stroke='%23000' stroke-width='2'/%3E%3C/svg%3E");
+    -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3' fill='none' stroke='%23000' stroke-width='2'/%3E%3Cpath d='M12 9v4' fill='none' stroke='%23000' stroke-width='2'/%3E%3Cpath d='M12 17h.01' fill='none' stroke='%23000' stroke-width='2'/%3E%3C/svg%3E");
+  }
+  :global(.wysiwyg-editor-wrapper .tiptap aside[data-callout][data-type="caution"] > [data-callout-title]::before) {
+    mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='10' fill='none' stroke='%23000' stroke-width='2'/%3E%3Cline x1='12' y1='8' x2='12' y2='12' stroke='%23000' stroke-width='2'/%3E%3Cline x1='12' y1='16' x2='12.01' y2='16' stroke='%23000' stroke-width='2'/%3E%3C/svg%3E");
+    -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='10' fill='none' stroke='%23000' stroke-width='2'/%3E%3Cline x1='12' y1='8' x2='12' y2='12' stroke='%23000' stroke-width='2'/%3E%3Cline x1='12' y1='16' x2='12.01' y2='16' stroke='%23000' stroke-width='2'/%3E%3C/svg%3E");
+  }
+  :global(.wysiwyg-editor-wrapper .tiptap aside[data-callout][data-type="important"] > [data-callout-title]::before) {
+    mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z' fill='none' stroke='%23000' stroke-width='2'/%3E%3Cpath d='M7 11h10' fill='none' stroke='%23000' stroke-width='2'/%3E%3Cpath d='M7 15h6' fill='none' stroke='%23000' stroke-width='2'/%3E%3Cpath d='M7 7h8' fill='none' stroke='%23000' stroke-width='2'/%3E%3C/svg%3E");
+    -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z' fill='none' stroke='%23000' stroke-width='2'/%3E%3Cpath d='M7 11h10' fill='none' stroke='%23000' stroke-width='2'/%3E%3Cpath d='M7 15h6' fill='none' stroke='%23000' stroke-width='2'/%3E%3Cpath d='M7 7h8' fill='none' stroke='%23000' stroke-width='2'/%3E%3C/svg%3E");
+  }
+  :global(
+      .wysiwyg-editor-wrapper
+        .tiptap
+        aside[data-callout]
+        > [data-callout-content]
+        > p
+    ) {
     margin: 0;
   }
-  :global(.wysiwyg-editor-wrapper .tiptap aside[data-callout][data-type="note"]) {
+  :global(
+      .wysiwyg-editor-wrapper .tiptap aside[data-callout][data-type="note"]
+    ) {
     border-color: oklch(0.6 0.18 240);
   }
-  :global(.wysiwyg-editor-wrapper .tiptap aside[data-callout][data-type="note"] > [data-callout-title]) {
+  :global(
+      .wysiwyg-editor-wrapper
+        .tiptap
+        aside[data-callout][data-type="note"]
+        > [data-callout-title]
+    ) {
     color: oklch(0.6 0.18 240);
   }
-  :global(.wysiwyg-editor-wrapper .tiptap aside[data-callout][data-type="tip"]) {
+  :global(
+      .wysiwyg-editor-wrapper .tiptap aside[data-callout][data-type="tip"]
+    ) {
     border-color: oklch(0.65 0.18 145);
   }
-  :global(.wysiwyg-editor-wrapper .tiptap aside[data-callout][data-type="tip"] > [data-callout-title]) {
+  :global(
+      .wysiwyg-editor-wrapper
+        .tiptap
+        aside[data-callout][data-type="tip"]
+        > [data-callout-title]
+    ) {
     color: oklch(0.55 0.18 145);
   }
-  :global(.wysiwyg-editor-wrapper .tiptap aside[data-callout][data-type="warning"]) {
+  :global(
+      .wysiwyg-editor-wrapper .tiptap aside[data-callout][data-type="warning"]
+    ) {
     border-color: oklch(0.78 0.16 85);
   }
-  :global(.wysiwyg-editor-wrapper .tiptap aside[data-callout][data-type="warning"] > [data-callout-title]) {
+  :global(
+      .wysiwyg-editor-wrapper
+        .tiptap
+        aside[data-callout][data-type="warning"]
+        > [data-callout-title]
+    ) {
     color: oklch(0.7 0.16 85);
   }
-  :global(.wysiwyg-editor-wrapper .tiptap aside[data-callout][data-type="caution"]) {
+  :global(
+      .wysiwyg-editor-wrapper .tiptap aside[data-callout][data-type="caution"]
+    ) {
     border-color: var(--destructive);
   }
-  :global(.wysiwyg-editor-wrapper .tiptap aside[data-callout][data-type="caution"] > [data-callout-title]) {
+  :global(
+      .wysiwyg-editor-wrapper
+        .tiptap
+        aside[data-callout][data-type="caution"]
+        > [data-callout-title]
+    ) {
     color: var(--destructive);
   }
-  :global(.wysiwyg-editor-wrapper .tiptap aside[data-callout][data-type="important"]) {
+  :global(
+      .wysiwyg-editor-wrapper .tiptap aside[data-callout][data-type="important"]
+    ) {
     border-color: oklch(0.58 0.2 300);
   }
-  :global(.wysiwyg-editor-wrapper .tiptap aside[data-callout][data-type="important"] > [data-callout-title]) {
+  :global(
+      .wysiwyg-editor-wrapper
+        .tiptap
+        aside[data-callout][data-type="important"]
+        > [data-callout-title]
+    ) {
     color: oklch(0.58 0.2 300);
   }
 
@@ -829,7 +975,10 @@
   }
 
   /* Placeholder styling */
-  :global(.wysiwyg-editor-wrapper .tiptap p.is-editor-empty:first-child::before) {
+  :global(
+      .wysiwyg-editor-wrapper .tiptap p.is-editor-empty:first-child::before
+    ),
+  :global(.wysiwyg-editor-wrapper .tiptap p.is-empty::before) {
     content: attr(data-placeholder);
     float: left;
     color: var(--muted-foreground);
@@ -906,17 +1055,4 @@
     z-index: 60;
   }
 
-  /* Placeholder text — Tiptap's Placeholder extension sets data-placeholder on the
-     first empty paragraph and the `is-empty` class. The editor element gets
-     `is-editor-empty` when the entire document is empty. showOnlyCurrent: false
-     means the placeholder also appears on every empty paragraph after ENTER. */
-  :global(.wysiwyg-editor-wrapper .tiptap p.is-editor-empty:first-child::before),
-  :global(.wysiwyg-editor-wrapper .tiptap p.is-empty::before) {
-    content: attr(data-placeholder);
-    float: left;
-    color: var(--muted-foreground);
-    pointer-events: none;
-    height: 0;
-    width: 100%;
-  }
 </style>

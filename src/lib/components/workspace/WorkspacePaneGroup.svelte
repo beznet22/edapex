@@ -40,7 +40,7 @@
   <Resizable.Handle
     withHandle
     class={cn(
-      "w-1 bg-transparent border-transparent hover:bg-muted/20 active:bg-muted/20 transition-colors z-10",
+      "w-4 bg-sidebar border-transparent flex items-center justify-center hover:bg-muted/20 transition-colors z-10",
       !inspector.inspectorOpen && "hidden",
     )}
   />
@@ -51,7 +51,7 @@
     defaultSize={inspector.inspectorOpen ? 40 : 0}
     minSize={20}
     maxSize={50}
-    class="transition-all duration-300 ease-out overflow-hidden"
+    class="transition-all duration-1000 ease-[cubic-bezier(0.34,1.56,0.64,1)] overflow-hidden"
     onExpand={() => {
       inspector.inspectorOpen = true;
     }}

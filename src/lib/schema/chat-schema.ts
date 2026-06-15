@@ -16,22 +16,6 @@ export const fileSchema = z
     message: "File type should be JPEG or PNG",
   });
 
-export enum CredentialType {
-  DEEPSEEK = "deepseek",
-  NVIDIA_NIM = "nvidia_nim",
-  GROQ = "groq",
-  MISTRAL = "mistral",
-  OPENCODE = "opencode",
-}
-
-export const CREDENTIAL_LABELS: Record<CredentialType, string> = {
-  [CredentialType.DEEPSEEK]: "DeepSeek",
-  [CredentialType.NVIDIA_NIM]: "NVIDIA NIM",
-  [CredentialType.GROQ]: "Groq",
-  [CredentialType.MISTRAL]: "Mistral",
-  [CredentialType.OPENCODE]: "OpenCode",
-};
-
 export type OpenAICompatibleCompletionModelId = string;
 
 export const openaiCompatibleCompletionProviderOptions = z.object({

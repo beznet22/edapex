@@ -110,6 +110,17 @@ export function formatTextFromMessages(
 }
 
 /**
+ * Removes markdown image `![alt](url)` and HTML `<img>` references from the text,
+ * preventing non-vision models from rejecting the request when the document
+ * contains embedded image references.
+ */
+export function stripImageRefs(markdown: string): string {
+	return markdown
+		.replace(/!\[([^\]]*)\]\([^)]+\)/g, '$1')
+		.replace(/<img[^>]*>/gi, '');
+}
+
+/**
  * Wraps `selectedText` in <Selection> tags within the full markdown document.
  * If the selectedText appears in the markdown, it's replaced with the tagged version.
  * If not found (edge case), the selection is appended at the end.

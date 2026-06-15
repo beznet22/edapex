@@ -1,7 +1,6 @@
 import { fileSchema } from "$lib/schema/chat-schema";
 import { resultInputSchema } from "$lib/schema/result-input";
-import { EdApexGateway } from "$lib/server/mastra/gateway";
-import { getAppDb } from "$lib/server/mastra/storage/libsql/app-db";
+import { ALLOWED_DESIGNATIONS } from "$lib/types/sms-types";
 import { createTenantContext } from "$lib/server/mastra/tenant-context";
 import { createAssessmentServiceForRequest } from "$lib/server/service/assessment.service";
 import { mistralOcrService } from "$lib/server/service/mistral-ocr.service";
@@ -67,22 +66,10 @@ export const actions: Actions = {
     }
 
     try {
-      // Register EdApexGateway for per-request credential resolution. This is
-      // the ONLY place the gateway is constructed in the request lifecycle —
-      // it is a MastraModelGateway, not a generic orchestration class. The
-      // extraction itself runs through the extractionWorkflow below, which
-      // uses the registered gateway internally for LLM resolution.
-      const mastraDb = getAppDb();
-      const gateway = new EdApexGateway(mastraDb, user.id);
-      // Per-user gateway key — EdApexGateway.id is the constant 'edapex' so
-      // addGateway() is idempotent on that key and every request would otherwise
-      // share the FIRST user's captured credentials.
-      mastra.addGateway(gateway, `edapex-${user.id}`);
-
       const tenantContext = createTenantContext({
         schoolId: user.schoolId ?? 1,
         userId: user.id,
-        designationId: 1,
+        designationId: (user as { designationId?: number }).designationId ?? ALLOWED_DESIGNATIONS.IT,
         staffId,
         classId: classId || null,
         sectionId: sectionId || null,

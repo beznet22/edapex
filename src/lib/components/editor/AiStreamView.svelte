@@ -14,6 +14,22 @@
 
   const content = $derived(node.attrs.content || "");
   const status = $derived(node.attrs.status || "streaming");
+  const retryAfter = $derived(node.attrs.retryAfter as number | null);
+
+  let remainingSeconds = $state(0);
+
+  $effect(() => {
+    if (retryAfter == null || retryAfter <= 0) return;
+    remainingSeconds = retryAfter;
+    const interval = setInterval(() => {
+      remainingSeconds--;
+      if (remainingSeconds <= 0) {
+        clearInterval(interval);
+        handleReject();
+      }
+    }, 1000);
+    return () => clearInterval(interval);
+  });
 
   function handleAccept() {
     const pos = getPos();
@@ -65,14 +81,11 @@
     const suffix = needsSpaceAfter ? " " : "";
     const padded = prefix + trimmed + suffix;
 
-    const parser = (editor.storage as any).markdown?.parser;
-    const html = parser?.parse ? parser.parse(padded) : padded;
-
     editor
       .chain()
       .focus()
       .deleteRange({ from: pos, to: pos + node.nodeSize })
-      .insertContentAt(pos, html)
+      .insertContentAt(pos, padded)
       .run();
 
     editor.view.dom.dispatchEvent(
@@ -122,7 +135,15 @@
       <span class="ai-stream-dot"></span>
     </div>
     <div class="ai-stream-content">
-      {#if content}
+      {#if status === "error"}
+        {#if retryAfter != null}
+          <div class="ai-stream-error-text">
+            ⚠️ Rate limit reached. Auto-retrying in {remainingSeconds}s…
+          </div>
+        {:else}
+          <div class="ai-stream-error-text">{content}</div>
+        {/if}
+      {:else if content}
         <Markdown {content} />
       {:else}
         <span class="ai-stream-placeholder">AI is thinking…</span>
@@ -149,6 +170,18 @@
       >
         <Check class="h-4 w-4 mr-1" />
         Accept
+      </Button>
+    </div>
+  {:else if status === "error"}
+    <div class="ai-stream-actions">
+      <Button
+        variant="ghost"
+        size="sm"
+        onclick={handleReject}
+        class="h-7 px-2 text-muted-foreground hover:text-destructive"
+      >
+        <X class="h-4 w-4 mr-1" />
+        Dismiss
       </Button>
     </div>
   {/if}
@@ -203,6 +236,13 @@
     color: var(--muted-foreground);
     font-style: italic;
     opacity: 0.6;
+  }
+
+  .ai-stream-error-text {
+    color: oklch(0.6 0.2 30);
+    font-size: 0.875rem;
+    line-height: 1.5;
+    padding: 0.25rem 0;
   }
 
   .ai-stream-actions {

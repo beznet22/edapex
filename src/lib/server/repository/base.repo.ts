@@ -3,6 +3,7 @@ import type { MySql2Database } from "drizzle-orm/mysql2/driver";
 import { smAcademicYears, smExamTypes, smGeneralSettings } from "../db/sms-schema";
 import { eq, and, desc, type SQL } from "drizzle-orm";
 import type { ExamType } from "$lib/schema/result-output";
+import { ALLOWED_DESIGNATIONS } from "$lib/types/sms-types";
 import { DbInternalError } from "../helpers/errors";
 
 import { type MySQLDrizzleClient } from "../db";
@@ -37,7 +38,7 @@ export class BaseRepository {
   static async build<T extends BaseRepository>(this: new (db: MySQLDrizzleClient, tenant: TenantContext, provider?: ScopedRepositoryProvider) => T, db?: MySQLDrizzleClient, tenant?: TenantContext, provider?: ScopedRepositoryProvider): Promise<T> {
     const finalDb = db || await getDatabase();
     // Default tenant for singleton fallback (though we should avoid it)
-    const finalTenant = tenant || { schoolId: 1, userId: 1, designationId: 1, classId: null, sectionId: null, examId: null, academicId: null };
+    const finalTenant = tenant || { schoolId: 1, userId: 1, designationId: ALLOWED_DESIGNATIONS.IT, classId: null, sectionId: null, examId: null, academicId: null };
     return new this(finalDb, finalTenant as TenantContext, provider);
   }
 

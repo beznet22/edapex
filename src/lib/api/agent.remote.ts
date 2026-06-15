@@ -1,274 +1,469 @@
 import { command, getRequestEvent } from "$app/server";
 import { allowAnonymousChats } from "$lib/constants";
-import { CredentialType } from "$lib/schema/chat-schema";
 import { getAppDb } from "$lib/server/mastra/storage/libsql/app-db";
-import { 
-  saveProviderCredential, 
-  deleteProviderCredential, 
-  getAllActiveProviders,
-  encrypt,
-  maskKey,
-  ensureAgentTables
-} from "$lib/server/mastra/provider-config";
-import { agentRouting, agentSettings } from "$lib/server/mastra/storage/libsql/app-db.schema";
-import { eq, and } from "drizzle-orm";
 import { env } from "$env/dynamic/private";
-import z from "zod";
+import { z } from "zod";
+import { eq } from "drizzle-orm";
+import {
+  saveUserCredential as saveUserCredentialFn,
+  deleteUserCredential as deleteUserCredentialFn,
+  getAllUserCredentials,
+  getUserCredential,
+  decryptCustomProvider
+} from "$lib/server/mastra/provider/credentials";
+import {
+  setModelVisibility,
+  setAllModelVisibility as setAllModelVisibilityFn,
+  getVisibleModelIdsForUser
+} from "$lib/server/mastra/provider/visibility";
+import { getAvailableModelsForUser, type AugmentedModelInfo } from "$lib/server/mastra/provider/availability";
+import { CustomProviderEncryptedDataSchema } from "$lib/server/mastra/provider/spec";
+import { SUPPORTED_PROVIDER_IDS } from "$lib/server/mastra/provider/catalog";
+import { agentSettings } from "$lib/server/mastra/storage/libsql/app-db.schema";
+import type { ProviderId } from "$lib/provider/types";
 
-const SUPPORTED_PROVIDERS = ['groq', 'deepseek', 'mistral', 'nvidia_nim', 'opencode'];
+const envKeys: Record<string, string | undefined> = env;
 
-export const addProvider = command(
-  z.object({
-    provider: z.enum(CredentialType),
-    apiKey: z.string().optional(),
-    priority: z.number().optional(),
-    baseUrl: z.string().optional(),
-  }),
-  async ({ provider, apiKey, priority, baseUrl }) => {
-    const { locals } = getRequestEvent();
-    if (!locals.user && !allowAnonymousChats) {
-      return { success: false, message: "Unauthorized" };
-    }
+const credentialTypeSchema = z.enum(['env', 'credential', 'custom']);
+const providerIdSchema = z.string().min(1).regex(/^[a-z0-9_-]+$/, 'Invalid provider id');
+const modelSchema = z.object({
+  id: z.string().min(1),
+  displayName: z.string().min(1)
+});
+const headerSchema = z.object({
+  name: z.string().min(1),
+  value: z.string().min(1)
+});
 
-    if (!locals.user) {
-      return { success: false, message: "User session required to store API keys" };
+type AuthSuccess = { user: { id: number } };
+type AuthFailure = { error: string };
+type AuthResult = AuthSuccess | AuthFailure;
+
+function getAuthenticatedUserId(errorMessage: string): AuthResult {
+  const { locals } = getRequestEvent();
+  if (!locals.user && !allowAnonymousChats) {
+    return { error: "Unauthorized" };
+  }
+  if (!locals.user) {
+    return { error: errorMessage };
+  }
+  return { user: { id: locals.user.id } };
+}
+
+function getStrictUserId(): AuthResult {
+  const { locals } = getRequestEvent();
+  if (!locals.user) {
+    return { error: "Unauthorized" };
+  }
+  return { user: { id: locals.user.id } };
+}
+
+function isAuthFailure(result: AuthResult): result is AuthFailure {
+  return 'error' in result;
+}
+
+function isKnownCredentialType(value: string): value is 'env' | 'credential' | 'custom' {
+  return value === 'env' || value === 'credential' || value === 'custom';
+}
+
+interface ProviderSummary {
+  provider: string;
+  name: string;
+  enabled: boolean;
+  source: 'db' | 'env' | 'platform';
+  priority: number;
+  baseUrl: string;
+  credentialType: string;
+}
+
+type SaveCredentialResult =
+  | { success: true; message: string }
+  | { success: false; message: string };
+
+type SimpleResult =
+  | { success: true }
+  | { success: false; message: string };
+
+type GetUserCredentialsResult =
+  | { success: true; providers: ProviderSummary[] }
+  | { success: false; message: string; providers: [] };
+
+type GetModelVisibilityResult =
+  | { success: true; visibleModelIds: string[] }
+  | { success: false; message: string };
+
+type GetAgentSettingsResult =
+  | { success: true; globalToolsEnabled: boolean }
+  | { success: false; message: string };
+
+type GetAvailableModelsResult =
+  | { success: true; models: AugmentedModelInfo[] }
+  | { success: false; message: string };
+
+const saveUserCredentialInputSchema = z.object({
+  providerId: providerIdSchema,
+  credentialType: credentialTypeSchema,
+  apiKey: z.string().optional(),
+  baseUrl: z.string().optional(),
+  priority: z.number().int().optional(),
+  enabled: z.boolean().optional(),
+  models: z.array(modelSchema).optional(),
+  headers: z.array(headerSchema).optional(),
+  displayName: z.string().optional()
+});
+
+type SaveUserCredentialInput = z.infer<typeof saveUserCredentialInputSchema>;
+
+export const saveUserCredential = command(
+  saveUserCredentialInputSchema,
+  async (input: SaveUserCredentialInput): Promise<SaveCredentialResult> => {
+    const auth = getAuthenticatedUserId("User session required to store API keys");
+    if (isAuthFailure(auth)) {
+      return { success: false, message: auth.error };
     }
 
     try {
       const db = getAppDb();
-      const encryptionKey = env.TOKEN_ENCRYPTION_KEY || "edapex-default-encryption-key-32ch";
-      
-      // Fetch existing to preserve key if not provided
-      const envKeys = env as Record<string, string | undefined>;
-      const existing = await getAllActiveProviders(db, locals.user.id, envKeys, SUPPORTED_PROVIDERS);
-      const current = existing.find(p => p.provider === provider);
 
-      let encryptedKey = current?.apiKeyEncrypted || '';
-      if (apiKey) {
-        encryptedKey = encrypt(apiKey, encryptionKey);
+      if (input.credentialType === 'custom') {
+        CustomProviderEncryptedDataSchema.parse({
+          displayName: input.displayName ?? input.providerId,
+          baseUrl: input.baseUrl ?? '',
+          apiKey: input.apiKey,
+          models: input.models ?? [],
+          headers: input.headers ?? []
+        });
       }
 
-      await saveProviderCredential(db, {
-        provider,
-        userId: locals.user.id,
-        apiKeyEncrypted: encryptedKey,
-        priority: priority ?? current?.priority ?? 1,
-        baseUrl: baseUrl ?? current?.baseUrl ?? '',
-        enabled: current?.enabled ?? 1
+      await saveUserCredentialFn(db, envKeys, {
+        userId: auth.user.id,
+        providerId: input.providerId,
+        credentialType: input.credentialType,
+        apiKey: input.apiKey,
+        baseUrl: input.baseUrl,
+        priority: input.priority,
+        enabled: input.enabled,
+        models: input.models,
+        headers: input.headers,
+        displayName: input.displayName
       });
 
-      return { success: true, message: `${provider} configuration updated` };
-    } catch (error) {
-      console.error(`[addProvider:${provider}] Failed to update provider:`, error);
-      return { success: false, message: "Failed to save configuration" };
-    }
-  },
-);
-
-export const removeProvider = command(
-  z.object({
-    provider: z.enum(CredentialType),
-  }),
-  async ({ provider }) => {
-    const { locals } = getRequestEvent();
-    if (!locals.user && !allowAnonymousChats) {
-      return { success: false, message: "Unauthorized" };
-    }
-
-    if (!locals.user) {
-      return { success: false, message: "User session required" };
-    }
-
-    try {
-      const db = getAppDb();
-      await deleteProviderCredential(db, locals.user.id, provider);
-      return { success: true, message: `${provider} API key removed` };
-    } catch (error) {
-      console.error(`[removeProvider:${provider}] Failed to remove API key:`, error);
-      return { success: false, message: "Failed to remove API key" };
-    }
-  },
-);
-
-export const getProviders = command(
-  z.object({}),
-  async () => {
-    const { locals } = getRequestEvent();
-    if (!locals.user && !allowAnonymousChats) {
-      return { success: false, message: "Unauthorized", providers: [] };
-    }
-
-    if (!locals.user) {
-      return { success: true, message: "No user session", providers: [] };
-    }
-
-    try {
-      const db = getAppDb();
-      // Pass the actual env object for fallbacks
-      const envKeys = env as Record<string, string | undefined>;
-      const providers = await getAllActiveProviders(db, locals.user.id, envKeys, SUPPORTED_PROVIDERS);
-      
-      // Map to the simple format expected by the frontend
-      const mappedProviders = providers.map(p => ({
-        provider: p.provider,
-        name: p.apiKeyMasked,
-        enabled: p.enabled === 1,
-        source: p.source,
-        priority: p.priority,
-        baseUrl: p.baseUrl
-      }));
-
-      return { success: true, providers: mappedProviders };
-    } catch (error) {
-      console.error("[getProviders] Failed to fetch providers:", error);
-      return { success: false, message: "Failed to fetch providers", providers: [] };
-    }
-  },
-);
-
-export const toggleProvider = command(
-  z.object({
-    provider: z.enum(CredentialType),
-    enabled: z.boolean(),
-  }),
-  async ({ provider, enabled }) => {
-    const { locals } = getRequestEvent();
-    if (!locals.user) {
-      return { success: false, message: "Unauthorized" };
-    }
-
-    try {
-      const db = getAppDb();
-      
-      // To toggle without changing the key, we need to fetch existing or create empty
-      const providers = await getAllActiveProviders(db, locals.user.id, env as Record<string, string | undefined>, SUPPORTED_PROVIDERS);
-      const existing = providers.find(p => p.provider === provider);
-
-      if (existing && existing.source === 'db') {
-          await saveProviderCredential(db, {
-              provider,
-              userId: locals.user.id,
-              apiKeyEncrypted: existing.apiKeyEncrypted,
-              priority: existing.priority,
-              baseUrl: existing.baseUrl,
-              enabled: enabled ? 1 : 0
-          });
-      } else {
-          // If it was an env fallback, we create a DB entry to override it as disabled (or enabled)
-          await saveProviderCredential(db, {
-              provider,
-              userId: locals.user.id,
-              apiKeyEncrypted: '', // Override but keep empty key (system will use fallback or fail gracefully)
-              priority: 99,
-              baseUrl: existing?.baseUrl || '',
-              enabled: enabled ? 1 : 0
-          });
+      return { success: true, message: 'Provider saved' };
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        const issues = err.issues.map(i => i.message).join(', ');
+        return { success: false, message: `Invalid custom provider data: ${issues}` };
       }
-
-      return { success: true, message: `${provider} ${enabled ? "enabled" : "disabled"}` };
-    } catch (error) {
-      console.error(`[toggleProvider] Failed to toggle ${provider}:`, error);
-      return { success: false, message: "Failed to update provider status" };
-    }
-  },
-);
-
-export const getAgentRouting = command(
-  z.object({}),
-  async () => {
-    const { locals } = getRequestEvent();
-    if (!locals.user) return { success: false, message: "Unauthorized", routing: [] };
-
-    try {
-      const db = getAppDb();
-      await ensureAgentTables(db);
-      const routing = await db.select().from(agentRouting).where(eq(agentRouting.userId, locals.user.id));
-      return { success: true, routing };
-    } catch (error) {
-      console.error("[getAgentRouting] Failed:", error);
-      return { success: false, message: "Failed to fetch routing", routing: [] };
+      console.error(`[saveUserCredential:${input.providerId}] Failed to save:`, err);
+      return { success: false, message: 'Failed to save' };
     }
   }
 );
 
-export const updateAgentRouting = command(
-  z.object({
-    role: z.string(),
-    provider: z.string(),
-    model: z.string(),
-  }),
-  async ({ role, provider, model }) => {
-    const { locals } = getRequestEvent();
-    if (!locals.user) return { success: false, message: "Unauthorized" };
+const deleteUserCredentialInputSchema = z.object({
+  providerId: providerIdSchema
+});
+
+export const deleteUserCredential = command(
+  deleteUserCredentialInputSchema,
+  async ({ providerId }): Promise<SimpleResult> => {
+    const auth = getStrictUserId();
+    if (isAuthFailure(auth)) {
+      return { success: false, message: auth.error };
+    }
 
     try {
       const db = getAppDb();
-      await ensureAgentTables(db);
-      await db.insert(agentRouting).values({
-        userId: locals.user.id,
-        role,
-        provider,
-        model,
-        updatedAt: new Date().toISOString()
-      }).onConflictDoUpdate({
-        target: [agentRouting.userId, agentRouting.role],
-        set: { provider, model, updatedAt: new Date().toISOString() }
-      });
-      return { success: true, message: `Routing for ${role} updated` };
-    } catch (error) {
-      console.error("[updateAgentRouting] Failed:", error);
-      return { success: false, message: "Failed to update routing" };
+      await deleteUserCredentialFn(db, auth.user.id, providerId);
+      return { success: true };
+    } catch (err) {
+      console.error(`[deleteUserCredential:${providerId}] Failed to delete:`, err);
+      return { success: false, message: 'Failed to delete' };
     }
   }
 );
+
+export const getUserCredentials = command(
+  z.object({}),
+  async (): Promise<GetUserCredentialsResult> => {
+    const auth = getAuthenticatedUserId("No user session");
+    if (isAuthFailure(auth)) {
+      if (auth.error === "Unauthorized") {
+        return { success: false, message: auth.error, providers: [] };
+      }
+      return { success: true, providers: [] };
+    }
+
+    try {
+      const db = getAppDb();
+      const credentials = await getAllUserCredentials(
+        db,
+        envKeys,
+        auth.user.id,
+        [...SUPPORTED_PROVIDER_IDS]
+      );
+
+      const providers: ProviderSummary[] = credentials.map(c => {
+        let baseUrl = '';
+        if (c.credentialType === 'custom' && c.encryptedData) {
+          const customData = decryptCustomProvider(c.encryptedData, envKeys);
+          baseUrl = customData?.baseUrl ?? '';
+        }
+        return {
+          provider: c.providerId,
+          name: c.apiKeyMasked,
+          enabled: c.enabled === 1,
+          source: c.source,
+          priority: c.priority,
+          baseUrl,
+          credentialType: c.credentialType
+        };
+      });
+
+      return { success: true, providers };
+    } catch (err) {
+      console.error("[getUserCredentials] Failed to fetch providers:", err);
+      return { success: false, message: 'Failed to fetch providers', providers: [] };
+    }
+  }
+);
+
+const updateUserCredentialInputSchema = z.object({
+  providerId: providerIdSchema,
+  enabled: z.boolean().optional(),
+  priority: z.number().int().optional(),
+  apiKey: z.string().optional(),
+  baseUrl: z.string().optional(),
+  models: z.array(modelSchema).optional(),
+  headers: z.array(headerSchema).optional(),
+  displayName: z.string().optional(),
+  credentialType: credentialTypeSchema.optional()
+});
+
+type UpdateUserCredentialInput = z.infer<typeof updateUserCredentialInputSchema>;
+
+export const updateUserCredential = command(
+  updateUserCredentialInputSchema,
+  async (input: UpdateUserCredentialInput): Promise<SimpleResult> => {
+    const auth = getStrictUserId();
+    if (isAuthFailure(auth)) {
+      return { success: false, message: auth.error };
+    }
+
+    try {
+      const db = getAppDb();
+      const existing = await getUserCredential(db, envKeys, auth.user.id, input.providerId);
+
+      if (!existing) {
+        return { success: false, message: 'Provider not found' };
+      }
+
+      const credentialType = isKnownCredentialType(existing.credentialType)
+        ? existing.credentialType
+        : 'credential';
+
+      await saveUserCredentialFn(db, envKeys, {
+        userId: auth.user.id,
+        providerId: input.providerId,
+        credentialType: input.credentialType ?? credentialType,
+        apiKey: input.apiKey,
+        baseUrl: input.baseUrl,
+        priority: input.priority ?? existing.priority,
+        enabled: input.enabled ?? (existing.enabled === 1),
+        models: input.models,
+        headers: input.headers,
+        displayName: input.displayName
+      });
+
+      return { success: true };
+    } catch (err) {
+      console.error(`[updateUserCredential:${input.providerId}] Failed to update:`, err);
+      return { success: false, message: 'Failed to update' };
+    }
+  }
+);
+
+const updateModelVisibilityInputSchema = z.object({
+  modelId: z.string().min(1),
+  visible: z.boolean()
+});
+
+export const updateModelVisibility = command(
+  updateModelVisibilityInputSchema,
+  async ({ modelId, visible }): Promise<SimpleResult> => {
+    const auth = getStrictUserId();
+    if (isAuthFailure(auth)) {
+      return { success: false, message: auth.error };
+    }
+
+    try {
+      const db = getAppDb();
+      await setModelVisibility(db, auth.user.id, modelId, visible);
+      return { success: true };
+    } catch (err) {
+      console.error(`[updateModelVisibility:${modelId}] Failed:`, err);
+      return { success: false, message: 'Failed to update model visibility' };
+    }
+  }
+);
+
+const setAllModelVisibilityInputSchema = z.object({
+  modelIds: z.array(z.string().min(1)),
+  visible: z.boolean()
+});
+
+export const setAllModelVisibility = command(
+  setAllModelVisibilityInputSchema,
+  async ({ modelIds, visible }): Promise<SimpleResult> => {
+    const auth = getStrictUserId();
+    if (isAuthFailure(auth)) {
+      return { success: false, message: auth.error };
+    }
+
+    try {
+      const db = getAppDb();
+      await setAllModelVisibilityFn(db, auth.user.id, modelIds, visible);
+      return { success: true };
+    } catch (err) {
+      console.error("[setAllModelVisibility] Failed:", err);
+      return { success: false, message: 'Failed to update model visibility' };
+    }
+  }
+);
+
+export const getModelVisibility = command(
+  z.object({}),
+  async (): Promise<GetModelVisibilityResult> => {
+    const auth = getStrictUserId();
+    if (isAuthFailure(auth)) {
+      return { success: false, message: auth.error };
+    }
+
+    try {
+      const db = getAppDb();
+      const visible = await getVisibleModelIdsForUser(db, auth.user.id);
+      return { success: true, visibleModelIds: [...visible] };
+    } catch (err) {
+      console.error("[getModelVisibility] Failed:", err);
+      return { success: false, message: 'Failed to fetch model visibility' };
+    }
+  }
+);
+
+const getAgentSettingsInputSchema = z.object({});
 
 export const getAgentSettings = command(
-  z.object({}),
-  async () => {
-    const { locals } = getRequestEvent();
-    if (!locals.user) return { success: false, message: "Unauthorized", settings: null };
+  getAgentSettingsInputSchema,
+  async (): Promise<GetAgentSettingsResult> => {
+    const auth = getStrictUserId();
+    if (isAuthFailure(auth)) {
+      return { success: false, message: auth.error };
+    }
 
     try {
       const db = getAppDb();
-      await ensureAgentTables(db);
-      const [settings] = await db.select().from(agentSettings).where(eq(agentSettings.userId, locals.user.id)).limit(1);
-      return { success: true, settings: settings || { profile: 'balanced', globalToolsEnabled: 1 } };
-    } catch (error) {
-      console.error("[getAgentSettings] Failed:", error);
-      return { success: false, message: "Failed to fetch settings", settings: null };
+      const [settings] = await db
+        .select()
+        .from(agentSettings)
+        .where(eq(agentSettings.userId, auth.user.id))
+        .limit(1);
+      const globalToolsEnabled = settings ? settings.globalToolsEnabled === 1 : true;
+      return { success: true, globalToolsEnabled };
+    } catch (err) {
+      console.error("[getAgentSettings] Failed:", err);
+      return { success: false, message: 'Failed to fetch settings' };
     }
   }
 );
 
+const updateAgentSettingsInputSchema = z.object({
+  globalToolsEnabled: z.boolean().optional()
+});
+
 export const updateAgentSettings = command(
-  z.object({
-    profile: z.string().optional(),
-    globalToolsEnabled: z.boolean().optional(),
-  }),
-  async ({ profile, globalToolsEnabled }) => {
-    const { locals } = getRequestEvent();
-    if (!locals.user) return { success: false, message: "Unauthorized" };
+  updateAgentSettingsInputSchema,
+  async ({ globalToolsEnabled }): Promise<SimpleResult> => {
+    const auth = getStrictUserId();
+    if (isAuthFailure(auth)) {
+      return { success: false, message: auth.error };
+    }
 
     try {
       const db = getAppDb();
-      await ensureAgentTables(db);
-      await db.insert(agentSettings).values({
-        userId: locals.user.id,
-        profile: profile ?? 'balanced',
-        globalToolsEnabled: globalToolsEnabled !== undefined ? (globalToolsEnabled ? 1 : 0) : 1,
-        updatedAt: new Date().toISOString()
-      }).onConflictDoUpdate({
-        target: [agentSettings.userId],
-        set: { 
-          profile: profile ?? undefined, 
-          globalToolsEnabled: globalToolsEnabled !== undefined ? (globalToolsEnabled ? 1 : 0) : undefined,
-          updatedAt: new Date().toISOString()
-        }
-      });
-      return { success: true, message: "Settings updated" };
-    } catch (error) {
-      console.error("[updateAgentSettings] Failed:", error);
-      return { success: false, message: "Failed to update settings" };
+      const now = new Date().toISOString();
+      await db
+        .insert(agentSettings)
+        .values({
+          userId: auth.user.id,
+          globalToolsEnabled: globalToolsEnabled !== undefined ? (globalToolsEnabled ? 1 : 0) : 1,
+          updatedAt: now
+        })
+        .onConflictDoUpdate({
+          target: [agentSettings.userId],
+          set: {
+            globalToolsEnabled:
+              globalToolsEnabled !== undefined ? (globalToolsEnabled ? 1 : 0) : undefined,
+            updatedAt: now
+          }
+        });
+      return { success: true };
+    } catch (err) {
+      console.error("[updateAgentSettings] Failed:", err);
+      return { success: false, message: 'Failed to update settings' };
     }
+  }
+);
+
+export const getAvailableModels = command(
+  z.object({}),
+  async (): Promise<GetAvailableModelsResult> => {
+    const auth = getStrictUserId();
+    if (isAuthFailure(auth)) {
+      return { success: false, message: auth.error };
+    }
+
+    try {
+      const db = getAppDb();
+      const models = await getAvailableModelsForUser(db, envKeys, auth.user.id);
+      return { success: true, models };
+    } catch (err) {
+      console.error("[getAvailableModels] Failed to resolve models:", err);
+      return { success: false, message: 'Failed to fetch models' };
+    }
+  }
+);
+
+interface PlatformDefault {
+  providerId: ProviderId;
+  envKey: string;
+  hasEnvKey: boolean;
+}
+
+type GetPlatformDefaultsResult = {
+  success: true;
+  defaults: PlatformDefault[];
+};
+
+const PLATFORM_PROVIDER_ENV_KEYS: ReadonlyArray<{ providerId: ProviderId; envKey: string }> = [
+  { providerId: 'groq' as ProviderId, envKey: 'GROQ_API_KEY' },
+  { providerId: 'deepseek' as ProviderId, envKey: 'DEEPSEEK_API_KEY' },
+  { providerId: 'opencode' as ProviderId, envKey: 'OPENCODE_API_KEY' }
+];
+
+export const getPlatformDefaults = command(
+  z.object({}),
+  async (): Promise<GetPlatformDefaultsResult> => {
+    const auth = getStrictUserId();
+    if (isAuthFailure(auth)) {
+      return { success: true, defaults: [] };
+    }
+
+    const defaults: PlatformDefault[] = PLATFORM_PROVIDER_ENV_KEYS.map((p) => ({
+      providerId: p.providerId,
+      envKey: p.envKey,
+      hasEnvKey: Boolean(envKeys[p.envKey])
+    })).filter((d) => d.hasEnvKey);
+
+    return { success: true, defaults };
   }
 );

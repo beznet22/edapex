@@ -49,3 +49,12 @@ export const CATEGORY = [
 
 export type Designation = Exclude<(typeof DESIGNATIONS)[number], undefined>;
 export type Category = Exclude<(typeof CATEGORY)[number], undefined>;
+
+export const ALLOWED_DESIGNATIONS = {
+	IT: 1,
+	COORDINATOR: 5,
+	CLASS_TEACHER: 8
+} as const;
+
+export type AllowedDesignationId =
+	(typeof ALLOWED_DESIGNATIONS)[keyof typeof ALLOWED_DESIGNATIONS];

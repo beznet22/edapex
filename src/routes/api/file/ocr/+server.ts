@@ -1,7 +1,8 @@
 import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { OcrWorkspaceStore } from '$lib/server/mastra/storage/ocr/ocr-workspace-store';
-import { createTenantContext } from '$lib/server/mastra/tenant-context';
+import { ALLOWED_DESIGNATIONS } from "$lib/types/sms-types";
+import { createTenantContext, resolveExamTypeId } from '$lib/server/mastra/tenant-context';
 import { HTTPValidationError, SDKError } from '@mistralai/mistralai/models/errors';
 
 export const POST: RequestHandler = async ({ request, locals }) => {
@@ -21,13 +22,16 @@ export const POST: RequestHandler = async ({ request, locals }) => {
       error(400, 'Missing file or filename in form data');
     }
 
+    const examTypeId = await resolveExamTypeId(user.schoolId ?? 1, null);
+
     const tenant = createTenantContext({
       schoolId: user.schoolId ?? 1,
       userId: user.id,
-      designationId: (user as { designationId?: number }).designationId ?? 1,
+      designationId: (user as { designationId?: number }).designationId ?? ALLOWED_DESIGNATIONS.IT,
       staffId: (user as { staffId?: number }).staffId ?? 1,
       classId: (user as { classId?: number | null }).classId ?? null,
       sectionId: (user as { sectionId?: number | null }).sectionId ?? null,
+      examTypeId,
       examId: null,
       academicId: null
     });

@@ -70,6 +70,7 @@
 		"zod": "^4.1.13"
 	},
 	"dependencies": {
+		"@ai-sdk/deepseek": "^2.0.38",
 		"@ai-sdk/mistral": "^3.0.32",
 		"@ai-sdk/openai-compatible": "^2.0.19",
 		"@ai-sdk/provider": "3.0.5",
@@ -119,5 +120,10 @@
 		"svelte-toolbelt": "^0.10.6",
 		"tiptap-markdown": "^0.9.0",
 		"vaul-svelte": "^0.3.2"
+	},
+	"pnpm": {
+		"patchedDependencies": {
+			"@ai-sdk/openai-compatible@2.0.47": "patches/@ai-sdk__openai-compatible@2.0.47.patch"
+		}
 	}
 }

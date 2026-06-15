@@ -7,6 +7,7 @@ import {
 	WorkspaceMismatchError
 } from './tenant-context';
 import type { TenantContextCache } from './context-cache';
+import { ALLOWED_DESIGNATIONS } from "$lib/types/sms-types";
 
 /**
  * Represents a parsed @mention tag from the chat message.
@@ -29,9 +30,6 @@ export const MENTION_FIELD_MAP: Record<string, keyof TenantContext> = {
 	academic_year: 'academicId',
 	term: 'examId'
 };
-
-/** Class Teacher designation ID */
-const CLASS_TEACHER_DESIGNATION = 8;
 
 /**
  * Entity resolution result from database lookup.
@@ -120,7 +118,7 @@ export async function processMentions(
 		designationId: tenantContext.designationId
 	};
 
-	const isClassTeacher = designationId === CLASS_TEACHER_DESIGNATION;
+	const isClassTeacher = designationId === ALLOWED_DESIGNATIONS.CLASS_TEACHER;
 
 	// Fields that Class Teachers are NOT allowed to modify
 	const classTeacherBlockedFields: Set<keyof TenantContext> = new Set([

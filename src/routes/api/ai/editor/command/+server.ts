@@ -13,12 +13,11 @@ import { mastra } from '$lib/server/mastra';
 import { editorCommandRequestSchema } from '$lib/server/mastra/editor/schemas';
 import { handleWorkflowStream } from '@mastra/ai-sdk';
 import { createUIMessageStreamResponse, type UIMessageChunk } from 'ai';
-import { EdApexGateway } from '$lib/server/mastra/gateway';
-import { getAppDb } from '$lib/server/mastra/storage/libsql/app-db';
 import { buildWorkspaceRequestContext } from '$lib/server/helpers/chat-helper';
 import {
 	createTenantContext,
 } from '$lib/server/mastra/tenant-context';
+import { ALLOWED_DESIGNATIONS } from "$lib/types/sms-types";
 import type { RequestContext } from '@mastra/core/request-context';
 
 // Hard cap on document markdown sent as backgroundData. The full doc is sent
@@ -46,20 +45,11 @@ export const POST: RequestHandler = async ({ request, locals: { user } }) => {
 		parsed.data.ctx.markdown = capMarkdown(parsed.data.ctx.markdown);
 	}
 
-	const mastraDb = getAppDb();
-	const gateway = new EdApexGateway(mastraDb, user.id);
-	// Per-user gateway key — EdApexGateway.id is the constant 'edapex' so
-	// addGateway() is idempotent on that key and every request would otherwise
-	// share the FIRST user's captured credentials. Keying by userId gives each
-	// user their own gateway instance; Mastra's GatewayRegistry still resolves
-	// it by the gateway's own .id when agents look up by provider.
-	mastra.addGateway(gateway, `edapex-${user.id}`);
-
 	const tenantContext = createTenantContext({
 		schoolId: user.schoolId ?? 1,
 		userId: user.id,
 		staffId: (user as any).staffId ?? 1,
-		designationId: (user as any).designationId ?? 1,
+		designationId: (user as any).designationId ?? ALLOWED_DESIGNATIONS.IT,
 		roleId: (user as any).roleId ?? null,
 		classId: (user as any).classId ?? null,
 		sectionId: (user as any).sectionId ?? null,

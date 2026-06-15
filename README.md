@@ -206,4 +206,9 @@ See [`AGENTS.md`](./AGENTS.md) for the full agent / contributor contract — pac
 
 For the detailed system architecture (tenant isolation model, agent hierarchy, tool/workflow contracts, storage layout, request lifecycle), see [`ARCHITECTURE.md`](./ARCHITECTURE.md).
 
-<!-- The reported issues are pre-existing Tailwind lint suggestions -->
+<!-- We need to research and fix the remaining 26 items are all Svelte 5 reactivity warnings (e.g., "captures initial value") and CSS warnings — not errors.
+
+Note for Svelte 5 reactivity warnings we should research only. -->
+
+<!-- For the Document Streaming to the Editor 
+ 4KB chunk updates is too much, streaming should feel natural. Maybe we should consider creating a document mastra agent (very fast model, consider groq) responsible of transforming the input file into a more better and well structured readable markdown, then in the streamDocumentStep we can call agent.stream(), the we loop over the stream and emits data-createDocument parts to the editor via the workflow SSE -->

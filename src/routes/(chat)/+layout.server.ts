@@ -11,8 +11,15 @@ import type { ClassSection } from "$lib/types/result-types";
 import { DESIGNATIONS, type Designation } from "$lib/types/sms-types";
 import { generateId } from "ai";
 import { getAppDb } from "$lib/server/mastra/storage/libsql/app-db";
-import { getUserProviderKeys } from "$lib/server/mastra/provider-config";
-import { SUPPORTED_PROVIDERS, SUPPORTED_PROVIDERS_META, getAvailableModels } from "$lib/server/mastra/registry";
+import { getAllUserCredentials } from "$lib/server/mastra/provider/credentials";
+import { BUILTIN_PROVIDERS } from "$lib/server/mastra/provider/catalog";
+import {
+	getAvailableModelsForUser,
+	type AugmentedModelInfo
+} from "$lib/server/mastra/provider/availability";
+import { getExplicitlyHiddenModelIdsForUser } from "$lib/server/mastra/provider/visibility";
+import { pickDefaultModelId } from "$lib/server/mastra/provider";
+import { getModelById } from "$lib/server/mastra/provider/catalog";
 import { env } from "$env/dynamic/private";
 import { getMemory, mastra } from "$lib/server/mastra";
 import type { StorageThreadType } from "@mastra/core/memory";
@@ -27,7 +34,37 @@ export const load: LayoutServerLoad = async ({ cookies, locals, url }) => {
 
   const sidebarCookie = cookies.get("sidebar:state");
   const sidebarCollapsed = sidebarCookie ? sidebarCookie === "false" : true;
-  let modelId = cookies.get("selected-model") || "auto";
+  let modelId = cookies.get("selected-model") || "";
+
+  // SSR: auto-pick a model when the cookie is empty, so the chat composer
+  // and model selector trigger render with a real model name + variant list
+  // on the very first paint. The cookie is persisted here so subsequent
+  // navigations skip this code path entirely.
+  let resolvedModel = null;
+  const db = getAppDb();
+  if (!modelId && user) {
+    try {
+      const autoPicked = await pickDefaultModelId(db, env as Record<string, string | undefined>, user.id);
+      if (autoPicked) {
+        modelId = autoPicked;
+        cookies.set("selected-model", modelId, {
+          path: "/",
+          maxAge: 60 * 60 * 24 * 365,
+          httpOnly: false,
+          sameSite: "lax"
+        });
+        resolvedModel = getModelById(modelId as Parameters<typeof getModelById>[0]) ?? null;
+      }
+    } catch (err) {
+      console.warn("[layout] SSR auto-pick failed:", err);
+    }
+  } else if (modelId && user) {
+    try {
+      resolvedModel = getModelById(modelId as Parameters<typeof getModelById>[0]) ?? null;
+    } catch (err) {
+      console.warn("[layout] SSR model resolve failed:", err);
+    }
+  }
 
   const selectedClassRaw = cookies.get("selected-class");
   const selectedAgentId = cookies.get("selected-agent") || "";
@@ -64,7 +101,7 @@ export const load: LayoutServerLoad = async ({ cookies, locals, url }) => {
         resourceId: t.resourceId,
         userId: user.id,
         title: t.title || 'New Chat',
-        model: t.metadata?.model || 'auto' as any,
+        model: t.metadata?.model,
         visibility: t.metadata?.visibility || 'PRIVATE' as any,
         createdAt: new Date(t.createdAt).toISOString(),
         updatedAt: new Date(t.updatedAt).toISOString(),
@@ -140,17 +177,27 @@ export const load: LayoutServerLoad = async ({ cookies, locals, url }) => {
 
   // ─── Mastra-Native Provider & Model Resolution ────────────────────────────
   let connectedProviders: any[] = [];
-  let availableModels: any[] = [];
+  let availableModels: AugmentedModelInfo[] = [];
+  let visibleModelIds: string[] = [];
   let userPriority: string[] = [];
 
   if (user) {
-    const db = getAppDb();
     const envKeys = env as Record<string, string | undefined>;
-    const supportedList = [...SUPPORTED_PROVIDERS] as string[];
+    const supportedList = Object.keys(BUILTIN_PROVIDERS) as string[];
 
-    connectedProviders = await getUserProviderKeys(db, user.id, envKeys, supportedList);
-    userPriority = connectedProviders.filter(p => p.enabled).map(p => p.provider);
-    availableModels = getAvailableModels(connectedProviders);
+    // Same data the getAvailableModels remote command + getModelVisibility
+    // return. SSR loaded so the model selector + settings modal render
+    // instantly on first paint (no flash, no spinner).
+    const [models, hiddenIds, creds] = await Promise.all([
+      getAvailableModelsForUser(db, envKeys, user.id),
+      getExplicitlyHiddenModelIdsForUser(db, user.id),
+      getAllUserCredentials(db, envKeys, user.id, supportedList as any)
+    ]);
+
+    availableModels = models;
+    visibleModelIds = [...hiddenIds]; // hidden IDs = NOT visible by default
+    userPriority = creds.filter((p) => p.enabled === 1).map((p) => p.providerId);
+    connectedProviders = creds;
   }
 
   return {
@@ -160,6 +207,7 @@ export const load: LayoutServerLoad = async ({ cookies, locals, url }) => {
     chats,
     sidebarCollapsed,
     modelId,
+    resolvedModel,
     selectedClassRaw,
     selectedAgentId,
     uploads,
@@ -167,7 +215,13 @@ export const load: LayoutServerLoad = async ({ cookies, locals, url }) => {
     defaultProvider,
     connectedProviders,
     availableModels,
-    supportedProviders: SUPPORTED_PROVIDERS_META,
+    visibleModelIds,
+    supportedProviders: Object.values(BUILTIN_PROVIDERS).map((p) => ({
+      id: p.id,
+      name: p.name,
+      description: p.description,
+      url: p.docUrl ?? ''
+    })),
     userPriority,
     examTypeId: await resolveExamTypeId(user?.schoolId ?? 1, null),
   };

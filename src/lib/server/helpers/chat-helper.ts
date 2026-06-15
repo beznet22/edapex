@@ -3,10 +3,11 @@ import { RequestContext } from "@mastra/core/request-context";
 import type { RequestContextValues } from "$lib/server/mastra/agents";
 import type { TenantContext } from "$lib/server/mastra/tenant-context";
 import type { MastraMemory, StorageThreadType } from "@mastra/core/memory";
+import type { MastraModelConfig } from "@mastra/core/llm";
 import { mastra } from "$lib/server/mastra";
-import { ModelRouter } from "$lib/server/mastra/router";
-import type { LibSQLDatabase } from "drizzle-orm/libsql";
-import * as schema from '$lib/server/mastra/storage/libsql/app-db.schema';
+import { resolveModelForRequest, pickDefaultModelId } from "$lib/server/mastra/provider";
+import { getAppDb } from "$lib/server/mastra/storage/libsql/app-db";
+import { env } from "$env/dynamic/private";
 
 import type { ToolStream } from "@mastra/core/tools";
 
@@ -23,35 +24,50 @@ export function convertToUIMessages(messages: Array<ChatMessage>): Array<xUIMess
 // ─── Context Composition ────────────────────────────────────────────────────
 
 /**
- * Builds the per-request RequestContext for the supervisor.
- * This is the single entry point for composing all per-request context.
+ * Builds the per-request RequestContext.
  *
- * The supervisor's own `instructions` callback reads tenantContext
- * directly from requestContext, so we don't need to pre-build instructions here.
+ * Calls `resolveModelForRequest` to build a pre-resolved `MastraModelConfig`
+ * (string, `OpenAICompatibleConfig`, or `LanguageModelV2` instance) and
+ * stores it in `modelConfig`. Optional `providerOptions` (variant
+ * options keyed by providerId) are also stored for the agent's
+ * `stream(..., { providerOptions })` call to apply.
  */
 export async function buildRequestContext(params: {
   context: TenantContext;
-  userId: number,
+  userId: number;
   modelId: string;
   isSlashCommand: boolean;
   lastMessage: string;
-  mastraDb: LibSQLDatabase<typeof schema>;
 }): Promise<RequestContext<RequestContextValues>> {
-  const { context, userId, modelId, isSlashCommand, lastMessage, mastraDb } = params;
-
-  const router = new ModelRouter(mastraDb, userId);
-  const resolvedModel = await router.resolveModel(
-    'supervisor',
-    modelId,
-    false,
-    undefined
-  );
+  const { context, userId, modelId, isSlashCommand, lastMessage } = params;
   const requestContext = new RequestContext<RequestContextValues>();
 
   requestContext.set('tenantContext', context);
-  requestContext.set('modelId', `edapex/${resolvedModel.provider}/${resolvedModel.model}`);
   requestContext.set('isSlashCommand', isSlashCommand);
   requestContext.set('lastMessage', lastMessage);
+
+  const db = getAppDb();
+  const envKeys = env as Record<string, string | undefined>;
+
+  if (modelId) {
+    const resolved = await resolveModelForRequest(userId, modelId, db);
+    requestContext.set('modelConfig', resolved.config as MastraModelConfig);
+    if (resolved.providerOptions) {
+      requestContext.set('providerOptions', resolved.providerOptions);
+    }
+  } else {
+    const defaultId = await pickDefaultModelId(db, envKeys, userId);
+    if (!defaultId) {
+      throw new Error(
+        'No model available. Connect a provider in Settings → Providers.'
+      );
+    }
+    const resolved = await resolveModelForRequest(userId, defaultId, db);
+    requestContext.set('modelConfig', resolved.config as MastraModelConfig);
+    if (resolved.providerOptions) {
+      requestContext.set('providerOptions', resolved.providerOptions);
+    }
+  }
 
   return requestContext;
 }

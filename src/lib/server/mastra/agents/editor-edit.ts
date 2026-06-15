@@ -6,6 +6,7 @@
  * Temperature is set per-request in the workflow step (0.0 for precise edits).
  */
 import { Agent } from '@mastra/core/agent';
+import { StreamErrorRetryProcessor } from '@mastra/core/processors';
 import { DEFAULT_EDITOR_MODEL } from './shared';
 import type { RequestContext } from '@mastra/core/request-context';
 import type { RequestContextValues } from './shared';
@@ -34,4 +35,5 @@ CRITICAL RULES — VIOLATING ANY OF THESE BREAKS THE EDITOR:
 Your entire output is inserted back into the document in place of the original <Selection>. Anything outside the replacement text will appear as duplicated content.`;
 	},
 	model: DEFAULT_EDITOR_MODEL,
+	errorProcessors: [new StreamErrorRetryProcessor()]
 });

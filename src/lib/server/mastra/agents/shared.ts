@@ -11,6 +11,16 @@ import { env } from '$env/dynamic/private';
 
 /**
  * Shared Zod schema for requestContext across all agents.
+ *
+ * V1 path populates `modelId` (a `<gateway>/<provider>/<model>@<variant>`
+ * string) and the agent's `model` callback hands it to Mastra's native
+ * router + the registered `EdApexGateway`.
+ *
+ * V2 path populates `modelConfig` (a pre-resolved `MastraModelConfig` —
+ * either a string, an `OpenAICompatibleConfig` object, or a
+ * `LanguageModelV2` instance) and optional `providerOptions` (variant
+ * options keyed by providerId, e.g. `{ deepseek: { thinking: {...} } }`).
+ * The agent's `model` callback reads V2 first, V1 second.
  */
 export const requestContextSchema = z.object({
 	tenantContext: z.object({
@@ -26,6 +36,11 @@ export const requestContextSchema = z.object({
 		studentId: z.number().nullable(),
 	}),
 	modelId: z.string().optional(),
+	/** V2: pre-resolved MastraModelConfig. z.unknown() because the shape is
+	 *  a discriminated union of three types the agent passes through. */
+	modelConfig: z.unknown().optional(),
+	/** V2: variant options keyed by providerId. */
+	providerOptions: z.record(z.string(), z.record(z.string(), z.unknown())).optional(),
 	instructions: z.string().optional(),
 	isSlashCommand: z.boolean().optional(),
 	lastMessage: z.string().optional(),
@@ -38,10 +53,11 @@ export type RequestContextValues = z.infer<typeof requestContextSchema>;
 
 /**
  * Default model used on static agent definitions.
- * Overridden at stream time via requestContext modelId.
  *
- * Using opengateway/mimo-v2.5-pro as the default — flagship model
- * always available (keyless opengateway provider).
+ * Overridden at stream time via requestContext modelId.
+ * Defaults to a platform-provided model that is always available via
+ * env-keyed fallback (see provider/credentials.ts for the platform-default
+ * synthesis and provider/router.ts for defaultModelForRole).
  */
 const groqProvider1 = createOpenAICompatible({
 	name: 'groq',

@@ -29,10 +29,10 @@
   import CalendarIcon from "@lucide/svelte/icons/calendar";
   import MapIcon from "@lucide/svelte/icons/map";
   import ChevronDownIcon from "@lucide/svelte/icons/chevron-down";
-  import TriangleAlertIcon from "@lucide/svelte/icons/triangle-alert";
-  import * as Alert from "$lib/components/ui/alert";
 
   import ShimmerArtifactCard from "./ShimmerArtifactCard.svelte";
+
+  import ErrorAlert from "./shared/ErrorAlert.svelte";
 
   import { cn } from "$lib/utils/shadcn";
   import { onMount } from "svelte";
@@ -72,10 +72,6 @@
       }
     }, 2000);
   };
-
-  $effect(() => {
-    console.log(chat.messages);
-  });
 </script>
 
 <div
@@ -274,22 +270,15 @@
                 </Shimmer>
               {/if}
 
-              {#if chat.error && message.id === chat.lastMessage?.id}
-                <Alert.Root
-                  variant="destructive"
-                  class="bg-destructive/10 border-dashed border-destructive/50 text-destructive"
-                >
-                  <TriangleAlertIcon class="size-4" />
-                  <Alert.Title>Error</Alert.Title>
-                  <Alert.Description>
-                    {(() => {
-                      const message = chat.error?.message ?? "";
-                      const retryInfo =
-                        "\n\nIf the issue persists, try clearing the conversation or contacting support for assistance.";
-                      return message + retryInfo;
-                    })()}
-                  </Alert.Description>
-                </Alert.Root>
+              {#if chat.lastError && message.id === chat.lastMessage?.id}
+                <ErrorAlert
+                  error={chat.lastError}
+                  onRegenerate={() => chat.client.regenerate({ messageId: message.id })}
+                  onClearContext={() => {
+                    chat.client.messages = chat.messages.slice(0, -1);
+                    chat.client.clearError();
+                  }}
+                />
               {/if}
               <!-- Actions for both user and assistant messages -->
               {#if chat.status === "ready" || chat.status === "error"}

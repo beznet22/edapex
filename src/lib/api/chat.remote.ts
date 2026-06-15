@@ -63,7 +63,7 @@ export const getHistory = query(z.object({}), async () => {
       resourceId: t.resourceId,
       userId: user.id,
       title: t.title || 'New Chat',
-      model: t.metadata?.model || 'auto' as any,
+      model: t.metadata?.model,
       visibility: t.metadata?.visibility || 'PRIVATE' as any,
       createdAt: new Date(t.createdAt).toISOString(),
       updatedAt: new Date(t.updatedAt).toISOString(),

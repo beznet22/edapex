@@ -8,6 +8,7 @@ import {
 } from "$lib/server/mastra/tenant-context";
 import { buildWorkspaceRequestContext } from "$lib/server/helpers/chat-helper";
 import { resolveActiveClassScope } from "$lib/server/helpers/class-scope";
+import { ALLOWED_DESIGNATIONS } from "$lib/types/sms-types";
 import { tenantWorkspace } from "$lib/server/mastra/storage/workspaces";
 import { getMemory } from "$lib/server/mastra";
 import { toAISdkMessages } from "@mastra/ai-sdk/ui";
@@ -33,7 +34,7 @@ export const load: PageServerLoad = async ({ url, locals, cookies }) => {
 	const baseTenant = createTenantContext({
 		schoolId,
 		userId: user.id,
-		designationId: (user as { designationId?: number }).designationId ?? 1,
+		designationId: (user as { designationId?: number }).designationId ?? ALLOWED_DESIGNATIONS.IT,
 		staffId: (user as { staffId?: number }).staffId ?? 1,
 		classId: scope?.classId ?? null,
 		sectionId: scope?.sectionId ?? null,

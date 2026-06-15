@@ -21,11 +21,7 @@
 			? [inspector.filestoreArtifact]
 			: inspector.chatArtifacts,
 	);
-	const desktopActiveId = $derived(
-		inspector.activeSource === "chat"
-			? inspector.activeChatArtifactId ?? undefined
-			: undefined,
-	);
+	const desktopActiveId = $derived(inspector.activeChatArtifactId ?? undefined);
 	const desktopMode = $derived(inspector.activeSource ?? "chat");
 
 	function handleMobileSelect(key: string, artifact: Artifact) {

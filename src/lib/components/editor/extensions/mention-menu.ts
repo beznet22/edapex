@@ -19,6 +19,7 @@
  */
 import { Mention } from '@tiptap/extension-mention';
 import { mount, unmount } from 'svelte';
+import { ALLOWED_DESIGNATIONS } from "$lib/types/sms-types";
 import MentionSuggestionList from './mention-suggestion-list.svelte';
 
 export interface MentionSearchResult {
@@ -53,7 +54,7 @@ function getMentionCtx(): { designationId: number; selectedClassId: number | nul
 		? `${className ?? ''}${className && sectionName ? ' ' : ''}${sectionName ?? ''}`.trim()
 		: '';
 	return {
-		designationId: ctx?.designationId ?? 1,
+		designationId: ctx?.designationId ?? ALLOWED_DESIGNATIONS.IT,
 		selectedClassId: classId ?? null,
 		selectedSectionId: sectionId ?? null,
 		filterLabel,
@@ -156,7 +157,7 @@ const baseExtension = Mention.extend({
 				'data-category': attrs.category,
 				class: 'mention',
 			},
-			`@${label}`,
+			label,
 		];
 	},
 

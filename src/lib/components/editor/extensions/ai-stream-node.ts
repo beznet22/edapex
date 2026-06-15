@@ -17,13 +17,16 @@ export const AiStreamNode = Node.create({
 				default: '',
 			},
 			status: {
-				default: 'streaming', // 'streaming' | 'finished'
+				default: 'streaming', // 'streaming' | 'finished' | 'error'
 			},
 			toolName: {
 				default: 'generate', // 'edit' | 'generate'
 			},
 			streamId: {
 				default: '',
+			},
+			retryAfter: {
+				default: null,
 			},
 		};
 	},

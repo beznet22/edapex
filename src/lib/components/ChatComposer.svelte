@@ -1,40 +1,54 @@
 <script lang="ts">
-  import { Badge } from "$lib/components/ui/badge";
-  import { Button } from "$lib/components/ui/button";
-  import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
-  import * as Tooltip from "$lib/components/ui/tooltip";
-  import ActivityIcon from "@lucide/svelte/icons/activity";
   import ArrowUpIcon from "@lucide/svelte/icons/arrow-up";
-  import BrainCircuitIcon from "@lucide/svelte/icons/brain-circuit";
-  import ChevronDownIcon from "@lucide/svelte/icons/chevron-down";
-  import CloudUploadIcon from "@lucide/svelte/icons/cloud-upload";
-  import FilePlusIcon from "@lucide/svelte/icons/file-plus";
+  import BookOpenIcon from "@lucide/svelte/icons/book-open";
+  import CheckCircleIcon from "@lucide/svelte/icons/check-circle";
+  import ChevronRightIcon from "@lucide/svelte/icons/chevron-right";
+  import ChevronsUpDownIcon from "@lucide/svelte/icons/chevrons-up-down";
+  import FileTextIcon from "@lucide/svelte/icons/file-text";
+  import FolderIcon from "@lucide/svelte/icons/folder";
   import FolderOpenIcon from "@lucide/svelte/icons/folder-open";
+  import GlobeIcon from "@lucide/svelte/icons/globe";
   import GraduationCapIcon from "@lucide/svelte/icons/graduation-cap";
+  import ImageIcon from "@lucide/svelte/icons/image";
+  import LanguagesIcon from "@lucide/svelte/icons/languages";
+  import LibraryIcon from "@lucide/svelte/icons/library";
+  import LoaderCircleIcon from "@lucide/svelte/icons/loader-circle";
   import MicIcon from "@lucide/svelte/icons/mic";
+  import MoreHorizontalIcon from "@lucide/svelte/icons/more-horizontal";
+  import PaletteIcon from "@lucide/svelte/icons/palette";
   import PaperclipIcon from "@lucide/svelte/icons/paperclip";
+  import PlusIcon from "@lucide/svelte/icons/plus";
   import ShieldAlertIcon from "@lucide/svelte/icons/shield-alert";
   import SquareIcon from "@lucide/svelte/icons/square";
-  import WindIcon from "@lucide/svelte/icons/wind";
+  import TelescopeIcon from "@lucide/svelte/icons/telescope";
   import XIcon from "@lucide/svelte/icons/x";
-  import ZapIcon from "@lucide/svelte/icons/zap";
-  import LoaderCircleIcon from "@lucide/svelte/icons/loader-circle";
-  import CheckCircleIcon from "@lucide/svelte/icons/check-circle";
   import XCircleIcon from "@lucide/svelte/icons/x-circle";
   import { generateId } from "ai";
+  import { toast } from "svelte-sonner";
 
   import type { MentionPayload } from "$lib/context/chat-context.svelte";
-  import { useChat } from "$lib/context/chat-context.svelte";
+  import { useChat, chatUsage } from "$lib/context/chat-context.svelte";
   import { useFileActions } from "$lib/context/file-context.svelte";
-  import { SelectedModel } from "$lib/context/sync.svelte";
   import { UserContext } from "$lib/context/user-context.svelte";
+  import { SelectedModel, ResolvedModelHolder } from "$lib/context/sync.svelte";
+  import { BUILTIN_PROVIDERS, getModelById } from "$lib/provider/catalog";
+  import type { ModelId } from "$lib/provider/types";
+  import type { ModelInfo, Variant } from "$lib/provider/spec";
   import type { AuthUser } from "$lib/types/auth-types";
   import { DESIGNATIONS } from "$lib/types/sms-types";
   import { cn } from "$lib/utils/shadcn";
+  import { Badge } from "$lib/components/ui/badge";
+  import { Button } from "$lib/components/ui/button";
+  import * as Popover from "$lib/components/ui/popover";
+  import { Separator } from "$lib/components/ui/separator";
+  import { Switch } from "$lib/components/ui/switch";
+  import * as Tooltip from "$lib/components/ui/tooltip";
+  import ContextUsageIndicator from "./ContextUsageIndicator.svelte";
+  import ContextWarningBanner from "./ContextWarningBanner.svelte";
+  import RateLimitBanner from "./RateLimitBanner.svelte";
   import CommandDropdown from "./chat/CommandDropdown.svelte";
   import MentionDropdown from "./chat/MentionDropdown.svelte";
   import { PromptInput, PromptInputActions, PromptInputTextarea } from "./prompt-kit/prompt-input";
-  import { onMount } from "svelte";
 
   let {
     user,
@@ -65,10 +79,83 @@
   };
   let ocrFiles = $state<OcrFile[]>([]);
 
+  let webSearchEnabled = $state(false);
+  // TODO: pass webSearchEnabled to chat request body when web search tool is integrated
+  let mainMenuOpen = $state(false);
+  let recentMenuOpen = $state(false);
+  let moreMenuOpen = $state(false);
+  let recentCloseTimer: ReturnType<typeof setTimeout> | null = null;
+  let moreCloseTimer: ReturnType<typeof setTimeout> | null = null;
+
   const chat = useChat();
   const file = useFileActions();
   const userContext = UserContext.fromContext();
   const selectedChatModel = SelectedModel.fromContext();
+  const resolvedModelHolder = ResolvedModelHolder.fromContext();
+
+  // Current model: try the SSR-resolved model first, then fall back to the
+  // catalog lookup. The SSR-resolved model handles custom-provider discovered
+  // models whose ids aren't in BUILTIN_MODELS.
+  const currentModel = $derived.by(() => {
+    const raw = selectedChatModel.value;
+    if (!raw) return resolvedModelHolder.value;
+    const modelId = raw.includes("@") ? raw.slice(0, raw.indexOf("@")) : raw;
+    const resolved = resolvedModelHolder.value;
+    if (resolved && (resolved.id === modelId || raw.startsWith(`${resolved.id}@`))) {
+      return resolved;
+    }
+    return getModelById(modelId as ModelId) ?? null;
+  });
+
+  const currentVariantId = $derived.by<string | null>(() => {
+    const raw = selectedChatModel.value;
+    if (!raw || !raw.includes("@")) return null;
+    return raw.slice(raw.indexOf("@") + 1);
+  });
+
+  let variantPopoverOpen = $state(false);
+  const currentVariantLabel = $derived.by(() => {
+    if (!currentModel) return null;
+    const variants = currentModel.variants ?? [];
+    if (variants.length === 0) return null;
+    const found = variants.find((v) => v.id === currentVariantId);
+    if (found) return found.label;
+    // No variant in the cookie yet (legacy cookie, or first paint before
+    // auto-init). Fall back to the first variant's label — the model
+    // selector / SSR auto-pick auto-attach the first variant, so thinking
+    // mode is on by default.
+    return variants[0]?.label ?? null;
+  });
+
+  // Map the selected variant to AI SDK `providerOptions`. The AI SDK reads
+  // `providerOptions[providerName]` where `providerName` is the value passed
+  // as `name` to the AI SDK factory — in the gateway that's `providerId`
+  // (e.g., 'opencode', 'deepseek'). Reasoning effort / thinking type are
+  // defined as `variant.options` in the catalog and intended to be passed
+  // this way; encoding them in the model-id `@variant` suffix is purely a
+  // client-side tracking label that the upstream API never sees.
+  const currentProviderOptions = $derived.by(() => {
+    if (!currentModel || !currentVariantId) return {};
+    const variant = (currentModel.variants ?? []).find((v) => v.id === currentVariantId);
+    if (!variant || !variant.options || Object.keys(variant.options).length === 0) return {};
+    return { [currentModel.providerId]: variant.options };
+  });
+
+  // Token-usage context indicator. Cumulative across the conversation.
+  const totalUsed = $derived.by(() => {
+    const u = chatUsage.value;
+    return (u.inputTokens ?? 0) + (u.outputTokens ?? 0) + (u.reasoningTokens ?? 0);
+  });
+  const maxContext = $derived(currentModel?.limit.context ?? 128_000);
+  const usagePercent = $derived(maxContext > 0 ? totalUsed / maxContext : 0);
+
+  function selectVariant(variantId: string | null): void {
+    if (!currentModel) return;
+    selectedChatModel.value = variantId
+      ? `${currentModel.id}@${variantId}`
+      : currentModel.id;
+    variantPopoverOpen = false;
+  }
 
   // Phase 4: input is locked while the chat workflow is streaming per-file
   // markdown (data-createDocument parts in `processing` or `streaming`).
@@ -136,7 +223,12 @@
       // Pass file references to chat context before sending (Requirement 9.4)
       chat.fileReferences = file.references ? [...file.references] : [];
 
-      chat.client.sendMessage({ text: input });
+      chat.client.sendMessage({
+        text: input,
+        ...(Object.keys(currentProviderOptions).length > 0
+          ? { providerOptions: currentProviderOptions }
+          : {})
+      });
       input = "";
       selectedMentions = [];
       // Clear file references after submission
@@ -271,31 +363,107 @@
     ocrFiles = ocrFiles.filter((o) => o.id !== id);
   }
 
-  // Profile selection logic
-  const profiles = [
-    {
-      id: "strong",
-      label: "Strong",
-      icon: ZapIcon,
-      description: "Pro models for complex tasks",
-    },
-    {
-      id: "balanced",
-      label: "Balanced",
-      icon: ActivityIcon,
-      description: "Speed & intelligence mix",
-    },
-    {
-      id: "simple",
-      label: "Simple",
-      icon: WindIcon,
-      description: "Fast, efficient responses",
-    },
-  ];
+  function closeAllMenus(): void {
+    mainMenuOpen = false;
+    recentMenuOpen = false;
+    moreMenuOpen = false;
+  }
 
-  let selectedProfile = $derived(chat.profile);
-  let thinkingEnabled = $derived(chat.thinkingEnabled);
+  function triggerNativeUpload(): void {
+    handleNativeUpload();
+    closeAllMenus();
+  }
+
+  function stubCreateImage(): void {
+    toast.info("Image generation coming soon");
+    closeAllMenus();
+  }
+
+  function stubDeepResearch(): void {
+    toast.info("Deep research coming soon");
+    closeAllMenus();
+  }
+
+  function stubProjects(): void {
+    toast.info("Projects coming soon");
+    closeAllMenus();
+  }
+
+  function stubMoreTool(label: string): void {
+    toast.info(`${label} coming soon`);
+    closeAllMenus();
+  }
+
+  function openRecentSubmenu(): void {
+    if (recentCloseTimer !== null) {
+      clearTimeout(recentCloseTimer);
+      recentCloseTimer = null;
+    }
+    recentMenuOpen = true;
+  }
+
+  function scheduleCloseRecentSubmenu(): void {
+    if (recentCloseTimer !== null) clearTimeout(recentCloseTimer);
+    recentCloseTimer = setTimeout(() => {
+      recentMenuOpen = false;
+      recentCloseTimer = null;
+    }, 120);
+  }
+
+  function cancelCloseRecentSubmenu(): void {
+    if (recentCloseTimer !== null) {
+      clearTimeout(recentCloseTimer);
+      recentCloseTimer = null;
+    }
+  }
+
+  function openMoreSubmenu(): void {
+    if (moreCloseTimer !== null) {
+      clearTimeout(moreCloseTimer);
+      moreCloseTimer = null;
+    }
+    moreMenuOpen = true;
+  }
+
+  function scheduleCloseMoreSubmenu(): void {
+    if (moreCloseTimer !== null) clearTimeout(moreCloseTimer);
+    moreCloseTimer = setTimeout(() => {
+      moreMenuOpen = false;
+      moreCloseTimer = null;
+    }, 120);
+  }
+
+  function cancelCloseMoreSubmenu(): void {
+    if (moreCloseTimer !== null) {
+      clearTimeout(moreCloseTimer);
+      moreCloseTimer = null;
+    }
+  }
+
+  $effect(() => {
+    if (mainMenuOpen) return;
+    recentMenuOpen = false;
+    moreMenuOpen = false;
+  });
+
+  $effect(() => {
+    return () => {
+      if (recentCloseTimer !== null) clearTimeout(recentCloseTimer);
+      if (moreCloseTimer !== null) clearTimeout(moreCloseTimer);
+    };
+  });
 </script>
+
+{#if currentModel && usagePercent > 0.7}
+  <ContextWarningBanner
+    usedPercent={usagePercent}
+    usedTokens={totalUsed}
+    maxTokens={maxContext}
+    modelName={currentModel.name}
+  />
+{/if}
+
+<RateLimitBanner />
 
 <PromptInput
   class="composer-box relative w-full max-w-[780px] flex flex-col hermes-glass rounded-4xl shadow-[0_0_50px_-12px_rgba(0,0,0,0.5)] transition-all duration-500 focus-within:ring-1 focus-within:ring-primary/40 focus-within:border-primary/30 p-0 border-border/10 bg-[#09090b]/40 backdrop-blur-3xl ring-offset-background"
@@ -513,38 +681,188 @@
     <!-- Left Group: [Attach+Voice | Vertical Line | Context Chips] -->
     <div class="flex items-center gap-0.5 sm:gap-1.5">
       <div class="flex items-center gap-0.5">
-        <DropdownMenu.Root>
-          <DropdownMenu.Trigger>
+        <Popover.Root bind:open={mainMenuOpen}>
+          <Popover.Trigger>
             {#snippet child({ props })}
               <Button
                 {...props}
                 variant="ghost"
                 size="icon"
                 class="h-10 w-10 sm:min-h-12 sm:min-w-12 rounded-xl hover:bg-white/5 text-muted-foreground hover:text-primary transition-colors"
-                aria-label="Upload options"
+                aria-label="Add"
               >
-                <PaperclipIcon class="size-4.5" />
+                <PlusIcon class="size-4.5" />
               </Button>
             {/snippet}
-          </DropdownMenu.Trigger>
-          <DropdownMenu.Content align="start" class="w-48 hermes-glass border-border/20 shadow-2xl">
-            <DropdownMenu.Label class="text-xs font-semibold uppercase tracking-wider opacity-50"
-              >Attachments</DropdownMenu.Label
+          </Popover.Trigger>
+          <Popover.Content
+            align="start"
+            side="top"
+            sideOffset={8}
+            class="w-64 p-1 hermes-glass border-border/20 shadow-2xl rounded-xl"
+          >
+            <Button
+              variant="ghost"
+              onclick={triggerNativeUpload}
+              class="w-full justify-start gap-2.5 px-3 py-2 min-h-9 rounded-md text-[11px] font-bold tracking-tight text-foreground/80 hover:text-primary hover:bg-white/5"
             >
-            <DropdownMenu.Separator class="bg-border/10" />
-            <DropdownMenu.Item
-              onSelect={handleNativeUpload}
-              class="gap-2 min-h-12 focus:bg-primary/10 focus:text-primary"
+              <PaperclipIcon class="size-3.5 opacity-70 shrink-0" />
+              <span class="truncate">Add photos & files</span>
+            </Button>
+
+            <Popover.Root bind:open={recentMenuOpen}>
+              <Popover.Trigger>
+                {#snippet child({ props })}
+                  <Button
+                    {...props}
+                    variant="ghost"
+                    onmouseenter={openRecentSubmenu}
+                    onmouseleave={scheduleCloseRecentSubmenu}
+                    class="w-full justify-between gap-2.5 px-3 py-2 min-h-9 rounded-md text-[11px] font-bold tracking-tight text-foreground/80 hover:text-primary hover:bg-white/5"
+                  >
+                    <span class="flex items-center gap-2.5 min-w-0">
+                      <FileTextIcon class="size-3.5 opacity-70 shrink-0" />
+                      <span class="truncate">Recent files</span>
+                    </span>
+                    <ChevronRightIcon class="size-3 opacity-50 shrink-0" />
+                  </Button>
+                {/snippet}
+              </Popover.Trigger>
+              <Popover.Content
+                side="right"
+                align="start"
+                sideOffset={6}
+                class="w-56 p-1 hermes-glass border-border/20 shadow-2xl rounded-xl"
+                onmouseenter={cancelCloseRecentSubmenu}
+                onmouseleave={scheduleCloseRecentSubmenu}
+              >
+                <Button
+                  variant="ghost"
+                  onclick={triggerNativeUpload}
+                  class="w-full justify-start gap-2.5 px-3 py-2 min-h-9 rounded-md text-[11px] font-bold tracking-tight text-foreground/80 hover:text-primary hover:bg-white/5"
+                >
+                  <LibraryIcon class="size-3.5 opacity-70 shrink-0" />
+                  <span class="truncate">Add from library</span>
+                </Button>
+                <Separator class="my-1" />
+                <div
+                  class="px-2 py-1 text-[9px] font-black uppercase tracking-widest text-muted-foreground/50"
+                >
+                  Recents
+                </div>
+                <!-- TODO: render recent files list once chat history API exposes last attachments -->
+                <div class="px-2 py-2 text-[11px] text-muted-foreground/50 italic">
+                  (no recent files)
+                </div>
+              </Popover.Content>
+            </Popover.Root>
+
+            <Button
+              variant="ghost"
+              onclick={stubCreateImage}
+              class="w-full justify-start gap-2.5 px-3 py-2 min-h-9 rounded-md text-[11px] font-bold tracking-tight text-foreground/80 hover:text-primary hover:bg-white/5"
             >
-              <CloudUploadIcon class="size-4" />
-              <span>Native Upload</span>
-            </DropdownMenu.Item>
-            <DropdownMenu.Item disabled class="gap-2 min-h-12">
-              <FilePlusIcon class="size-4" />
-              <span>Recents (Soon)</span>
-            </DropdownMenu.Item>
-          </DropdownMenu.Content>
-        </DropdownMenu.Root>
+              <ImageIcon class="size-3.5 opacity-70 shrink-0" />
+              <span class="truncate">Create image</span>
+            </Button>
+
+            <Button
+              variant="ghost"
+              onclick={stubDeepResearch}
+              class="w-full justify-start gap-2.5 px-3 py-2 min-h-9 rounded-md text-[11px] font-bold tracking-tight text-foreground/80 hover:text-primary hover:bg-white/5"
+            >
+              <TelescopeIcon class="size-3.5 opacity-70 shrink-0" />
+              <span class="truncate">Deep research</span>
+            </Button>
+
+            <div
+              class="flex items-center justify-between gap-2.5 px-3 py-2 min-h-9 rounded-md hover:bg-white/5"
+            >
+              <div class="flex items-center gap-2.5 min-w-0">
+                <GlobeIcon class="size-3.5 opacity-70 shrink-0" />
+                <span class="text-[11px] font-bold tracking-tight text-foreground/80 truncate"
+                  >Web search</span
+                >
+              </div>
+              <Switch bind:checked={webSearchEnabled} />
+            </div>
+
+            <Popover.Root bind:open={moreMenuOpen}>
+              <Popover.Trigger>
+                {#snippet child({ props })}
+                  <Button
+                    {...props}
+                    variant="ghost"
+                    onmouseenter={openMoreSubmenu}
+                    onmouseleave={scheduleCloseMoreSubmenu}
+                    class="w-full justify-between gap-2.5 px-3 py-2 min-h-9 rounded-md text-[11px] font-bold tracking-tight text-foreground/80 hover:text-primary hover:bg-white/5"
+                  >
+                    <span class="flex items-center gap-2.5 min-w-0">
+                      <MoreHorizontalIcon class="size-3.5 opacity-70 shrink-0" />
+                      <span class="truncate">More</span>
+                    </span>
+                    <ChevronRightIcon class="size-3 opacity-50 shrink-0" />
+                  </Button>
+                {/snippet}
+              </Popover.Trigger>
+              <Popover.Content
+                side="right"
+                align="start"
+                sideOffset={6}
+                class="w-56 p-1 hermes-glass border-border/20 shadow-2xl rounded-xl"
+                onmouseenter={cancelCloseMoreSubmenu}
+                onmouseleave={scheduleCloseMoreSubmenu}
+              >
+                <Button
+                  variant="ghost"
+                  onclick={() => stubMoreTool("Dictation")}
+                  class="w-full justify-start gap-2.5 px-3 py-2 min-h-9 rounded-md text-[11px] font-bold tracking-tight text-foreground/80 hover:text-primary hover:bg-white/5"
+                >
+                  <MicIcon class="size-3.5 opacity-70 shrink-0" />
+                  <span class="truncate">Dictation</span>
+                </Button>
+                <Button
+                  variant="ghost"
+                  onclick={() => stubMoreTool("Translate")}
+                  class="w-full justify-start gap-2.5 px-3 py-2 min-h-9 rounded-md text-[11px] font-bold tracking-tight text-foreground/80 hover:text-primary hover:bg-white/5"
+                >
+                  <LanguagesIcon class="size-3.5 opacity-70 shrink-0" />
+                  <span class="truncate">Translate</span>
+                </Button>
+                <Button
+                  variant="ghost"
+                  onclick={() => stubMoreTool("Study / Learn")}
+                  class="w-full justify-start gap-2.5 px-3 py-2 min-h-9 rounded-md text-[11px] font-bold tracking-tight text-foreground/80 hover:text-primary hover:bg-white/5"
+                >
+                  <BookOpenIcon class="size-3.5 opacity-70 shrink-0" />
+                  <span class="truncate">Study / Learn</span>
+                </Button>
+                <Button
+                  variant="ghost"
+                  onclick={() => stubMoreTool("Canvas")}
+                  class="w-full justify-start gap-2.5 px-3 py-2 min-h-9 rounded-md text-[11px] font-bold tracking-tight text-foreground/80 hover:text-primary hover:bg-white/5"
+                >
+                  <PaletteIcon class="size-3.5 opacity-70 shrink-0" />
+                  <span class="truncate">Canvas</span>
+                </Button>
+              </Popover.Content>
+            </Popover.Root>
+
+            <Separator class="my-1" />
+
+            <Button
+              variant="ghost"
+              onclick={stubProjects}
+              class="w-full justify-between gap-2.5 px-3 py-2 min-h-9 rounded-md text-[11px] font-bold tracking-tight text-foreground/80 hover:text-primary hover:bg-white/5"
+            >
+              <span class="flex items-center gap-2.5 min-w-0">
+                <FolderIcon class="size-3.5 opacity-70 shrink-0" />
+                <span class="truncate">Projects</span>
+              </span>
+              <ChevronRightIcon class="size-3 opacity-50 shrink-0" />
+            </Button>
+          </Popover.Content>
+        </Popover.Root>
 
         <Tooltip.Root>
           <Tooltip.Trigger>
@@ -567,78 +885,57 @@
       </div>
 
       <input type="file" multiple class="hidden" bind:this={ocrFileInput} onchange={handleOcrChange} />
+    </div>
 
-      <!-- Dynamic Context Chips -->
-      <div class="flex items-center gap-1 font-sans overflow-x-auto scrollbar-hide">
-        <!-- Profile Selector -->
-        <DropdownMenu.Root>
-          <DropdownMenu.Trigger>
+    <div class="flex items-center px-1 gap-1">
+      {#if currentModel && (currentModel.variants?.length ?? 0) > 0}
+        <Popover.Root bind:open={variantPopoverOpen}>
+          <Popover.Trigger>
             {#snippet child({ props })}
               <Button
                 {...props}
                 variant="ghost"
-                size="sm"
-                class="hidden sm:flex h-10 sm:min-h-12 px-1.5 sm:px-2 gap-1 sm:gap-1.5 text-xs font-medium rounded-xl hover:bg-white/5 text-muted-foreground hover:text-primary shrink-0 transition-colors"
+                class="text-[10px] rounded-4xl sm:text-xs font-bold tracking-widest text-muted-foreground transition-colors gap-1.5"
+                aria-label="Select thinking mode"
               >
-                {@const profile = profiles.find((p) => p.id === chat.profile)}
-                {#if profile}
-                  {@const Icon = profile.icon}
-                  <Icon class="size-3.5" />
-                  <span class="text-primary font-bold hidden sm:inline">{profile.label}</span>
-                {/if}
-                <ChevronDownIcon class="size-3 opacity-50" />
+                <span class="hidden sm:inline truncate max-w-[120px]">{currentVariantLabel}</span>
+                <ChevronsUpDownIcon class="size-3 opacity-60" />
               </Button>
             {/snippet}
-          </DropdownMenu.Trigger>
-          <DropdownMenu.Content align="start" class="w-56 hermes-glass border-white/5 shadow-2xl">
-            <DropdownMenu.Label class="text-[10px] font-bold uppercase tracking-widest opacity-40 px-2 py-2"
-              >Agent Profile</DropdownMenu.Label
-            >
-            <DropdownMenu.Separator class="bg-white/5" />
-            {#each profiles as profile}
-              <DropdownMenu.Item
-                class={cn(
-                  "gap-3 px-3 py-2.5 min-h-12 rounded-lg transition-all focus:bg-primary/10 focus:text-primary",
-                  selectedProfile === profile.id ? "text-primary bg-primary/5" : "",
-                )}
-                onclick={() => (chat.profile = profile.id as "strong" | "balanced" | "simple")}
+          </Popover.Trigger>
+          <Popover.Content
+            class="w-72 p-1 rounded-xl border-sidebar-border/40 shadow-2xl"
+            side="top"
+            align="end"
+            sideOffset={6}
+          >
+            <div class="px-2 py-1.5 text-[9px] font-black uppercase tracking-widest text-muted-foreground/60">
+              {currentModel.name} — Thinking Mode
+            </div>
+            {#each (currentModel.variants ?? []) as variant (variant.id)}
+              <button
+                onclick={() => selectVariant(variant.id)}
+                class="w-full flex items-start gap-2 px-2 py-2 rounded-lg hover:bg-muted/40 transition-colors text-left {currentVariantId === variant.id ? 'bg-primary/10 text-primary' : ''}"
               >
-                {@const Icon = profile.icon}
-                <Icon class="size-4" />
-                <div class="flex flex-col">
-                  <span class="text-[11px] font-bold uppercase tracking-tight">{profile.label}</span>
-                  <span class="text-[9px] opacity-40 leading-none">{profile.description}</span>
+                <div class="flex flex-col min-w-0 flex-1">
+                  <span class="text-xs font-bold truncate">{variant.label}</span>
+                  {#if variant.description}
+                    <span class="text-[10px] text-muted-foreground/60 leading-tight">{variant.description}</span>
+                  {/if}
                 </div>
-              </DropdownMenu.Item>
+              </button>
             {/each}
-          </DropdownMenu.Content>
-        </DropdownMenu.Root>
+          </Popover.Content>
+        </Popover.Root>
+      {/if}
 
-        <!-- Thinking Toggle -->
-        <Button
-          variant="ghost"
-          size="sm"
-          class={cn(
-            "hidden sm:flex h-10 sm:min-h-12 px-2 sm:px-2.5 gap-1 sm:gap-1.5 text-[10px] font-black uppercase tracking-widest rounded-full border transition-all duration-300",
-            chat.thinkingEnabled
-              ? "bg-primary/10 border-primary/40 text-primary shadow-[0_0_15px_rgba(212,175,55,0.1)]"
-              : "bg-white/5 border-white/5 text-muted-foreground hover:border-white/10",
-          )}
-          onclick={() => {
-            chat.thinkingEnabled = !chat.thinkingEnabled;
-            if (chat.thinkingEnabled) {
-              selectedChatModel.value = "auto";
-            }
-          }}
-        >
-          <BrainCircuitIcon class={cn("size-3.5", chat.thinkingEnabled ? "animate-pulse" : "opacity-50")} />
-          <span class="hidden sm:inline">Thinking</span>
-        </Button>
+      {#if currentModel}
+        <ContextUsageIndicator
+          modelId={currentModel.id}
+          maxTokens={maxContext}
+        />
+      {/if}
 
-      </div>
-    </div>
-
-    <div class="flex items-center px-1">
       <Button
         variant="default"
         size="icon"

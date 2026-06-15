@@ -4,16 +4,24 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+patchedDependencies:
+  '@ai-sdk/openai-compatible@2.0.47':
+    hash: wx7xp4jsbvbgf5g6hgrtx2ygna
+    path: patches/@ai-sdk__openai-compatible@2.0.47.patch
+
 importers:
 
   .:
     dependencies:
+      '@ai-sdk/deepseek':
+        specifier: ^2.0.38
+        version: 2.0.38(zod@4.4.3)
       '@ai-sdk/mistral':
         specifier: ^3.0.32
         version: 3.0.36(zod@4.4.3)
       '@ai-sdk/openai-compatible':
         specifier: ^2.0.19
-        version: 2.0.47(zod@4.4.3)
+        version: 2.0.47(patch_hash=wx7xp4jsbvbgf5g6hgrtx2ygna)(zod@4.4.3)
       '@ai-sdk/provider':
         specifier: 3.0.5
         version: 3.0.5
@@ -318,6 +326,12 @@ packages:
   '@acemir/cssom@0.9.31':
     resolution: {integrity: sha512-ZnR3GSaH+/vJ0YlHau21FjfLYjMpYVIzTD8M8vIEQvIGxeOXyXdzCI140rrCY862p/C/BbzWsjc1dgnM9mkoTA==}
 
+  '@ai-sdk/deepseek@2.0.38':
+    resolution: {integrity: sha512-IkBQPEfRUbPEcWzigT76KttqoDqM4FR8H8cp5pgAw5RdDN++nUoJa0uZan3LuOp4IC8BKGZABJCqB97CMIYLdQ==}
+    engines: {node: '>=18'}
+    peerDependencies:
+      zod: ^3.25.76 || ^4.1.8
+
   '@ai-sdk/gateway@3.0.114':
     resolution: {integrity: sha512-MqkZ5sd+qiq6RgIxELkoFQXg2/JwK+WCMaot7U+rtrZpWJl3fSyYvc28SC03b256o4F7OXjQtdjTqs81B2w+dA==}
     engines: {node: '>=18'}
@@ -356,6 +370,12 @@ packages:
 
   '@ai-sdk/provider-utils@4.0.27':
     resolution: {integrity: sha512-ubkAJ+xODouwtmN1tYlvTPphH1hPOBfZaEQe8U7skGvFAnIRs9PPpsq57bC2+Ky/MB4yzhd6YOsxTAx9sGpazw==}
+    engines: {node: '>=18'}
+    peerDependencies:
+      zod: ^3.25.76 || ^4.1.8
+
+  '@ai-sdk/provider-utils@4.0.29':
+    resolution: {integrity: sha512-uhukHaCBvqkwBHkT8C2PrnqKTCoLn3pdHXqtcR9I8ErH+flbzgW4o7VHSNIup9LRu+WBvZIZDQLsx6rwl2tiOA==}
     engines: {node: '>=18'}
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
@@ -6386,6 +6406,12 @@ snapshots:
 
   '@acemir/cssom@0.9.31': {}
 
+  '@ai-sdk/deepseek@2.0.38(zod@4.4.3)':
+    dependencies:
+      '@ai-sdk/provider': 3.0.10
+      '@ai-sdk/provider-utils': 4.0.29(zod@4.4.3)
+      zod: 4.4.3
+
   '@ai-sdk/gateway@3.0.114(zod@4.4.3)':
     dependencies:
       '@ai-sdk/provider': 3.0.10
@@ -6399,7 +6425,7 @@ snapshots:
       '@ai-sdk/provider-utils': 4.0.27(zod@4.4.3)
       zod: 4.4.3
 
-  '@ai-sdk/openai-compatible@2.0.47(zod@4.4.3)':
+  '@ai-sdk/openai-compatible@2.0.47(patch_hash=wx7xp4jsbvbgf5g6hgrtx2ygna)(zod@4.4.3)':
     dependencies:
       '@ai-sdk/provider': 3.0.10
       '@ai-sdk/provider-utils': 4.0.27(zod@4.4.3)
@@ -6427,6 +6453,13 @@ snapshots:
       zod: 4.4.3
 
   '@ai-sdk/provider-utils@4.0.27(zod@4.4.3)':
+    dependencies:
+      '@ai-sdk/provider': 3.0.10
+      '@standard-schema/spec': 1.1.0
+      eventsource-parser: 3.0.8
+      zod: 4.4.3
+
+  '@ai-sdk/provider-utils@4.0.29(zod@4.4.3)':
     dependencies:
       '@ai-sdk/provider': 3.0.10
       '@standard-schema/spec': 1.1.0

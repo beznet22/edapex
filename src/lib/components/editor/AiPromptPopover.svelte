@@ -12,7 +12,7 @@
 
   let promptDraft = $state("");
   let inputEl = $state<HTMLInputElement | null>(null);
-  let containerEl = $state<HTMLDivElement | null>(null);
+  let containerEl = $state<HTMLFormElement | null>(null);
 
   $effect(() => {
     if (inputEl) {

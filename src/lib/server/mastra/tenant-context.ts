@@ -2,6 +2,7 @@ import { desc, eq } from "drizzle-orm";
 import type { RequestContext } from "@mastra/core/request-context";
 import { ScopedRepositoryProvider } from "./scoped-repository";
 import { getDatabase } from "$lib/server/db";
+import { ALLOWED_DESIGNATIONS } from "$lib/types/sms-types";
 import { smExamTypes } from "$lib/server/db/sms-schema";
 
 /**
@@ -46,7 +47,7 @@ export function createTenantContext(params: Partial<{
     userId: params.userId ?? 1,
     staffId: params.staffId ?? 1,
     roleId: params.roleId ?? null,
-    designationId: params.designationId ?? 1,
+    designationId: params.designationId ?? ALLOWED_DESIGNATIONS.IT,
   });
 }
 

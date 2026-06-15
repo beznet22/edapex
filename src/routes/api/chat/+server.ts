@@ -45,9 +45,8 @@ import { processMentions, type MentionTag } from "$lib/server/mastra/mention-pro
 import { TenantContextCache } from "$lib/server/mastra/context-cache";
 import type { FileReference } from "$lib/server/mastra/file-context";
 import { mastra } from "$lib/server/mastra";
-import { EdApexGateway } from "$lib/server/mastra/gateway";
 import { buildRequestContext, resolveThread } from "$lib/server/helpers/chat-helper";
-import { getAppDb } from "$lib/server/mastra/storage/libsql/app-db";
+import { ALLOWED_DESIGNATIONS } from "$lib/types/sms-types";
 import { chatWorkflowInputSchema } from "$lib/server/mastra/workflows/chat";
 import type { z } from "zod";
 import type { RequestContext } from "@mastra/core/request-context";
@@ -74,8 +73,11 @@ export const POST: RequestHandler = async ({ request, locals: { user, session },
 	if ((!user || !session) && !allowAnonymousChats) error(401, "Unauthorized");
 	if (!user) error(401, "User session required for provider resolution");
 
-	const selectedChatModel = cookies.get("selected-model");
-	if (!selectedChatModel) error(400, "No chat model selected");
+	const selectedChatModel = cookies.get("selected-model") ?? "";
+	if (selectedChatModel === 'auto' || selectedChatModel === 'deep-reasoning') {
+		error(400, "Invalid model selection");
+	}
+	// Empty cookie is OK — chat-helper will auto-pick from platform defaults.
 
 	const resourceId = `user-${user.id}`;
 
@@ -84,7 +86,7 @@ export const POST: RequestHandler = async ({ request, locals: { user, session },
 	const tenantContext = createTenantContext({
 		schoolId: user.schoolId ?? 1,
 		userId: user.id ?? 1,
-		designationId: (user as any).designationId ?? 1,
+		designationId: (user as any).designationId ?? ALLOWED_DESIGNATIONS.IT,
 		staffId: (user as any).staffId ?? 1,
 		roleId: (user as any).roleId ?? null,
 		classId: selectedClass?.id ?? null,
@@ -98,7 +100,7 @@ export const POST: RequestHandler = async ({ request, locals: { user, session },
 	if (mentions && mentions.length > 0) {
 		try {
 			const sessionId = session?.id ?? `anon-${user.id}`;
-			const designationId = (user as any).designationId ?? 1;
+			const designationId = (user as any).designationId ?? ALLOWED_DESIGNATIONS.IT;
 			activeContext = await processMentions(
 				mentions,
 				tenantContext,
@@ -128,22 +130,12 @@ export const POST: RequestHandler = async ({ request, locals: { user, session },
 		activeContext = withExamTypeId(activeContext, resolved);
 	}
 
-	const mastraDb = getAppDb();
-	const gateway = new EdApexGateway(mastraDb, user.id);
-	// Per-user gateway key — EdApexGateway.id is the constant 'edapex' so
-	// addGateway() is idempotent on that key and every request would otherwise
-	// share the FIRST user's captured credentials. Keying by userId gives each
-	// user their own gateway instance; Mastra's GatewayRegistry still resolves
-	// it by the gateway's own .id when agents look up by provider.
-	mastra.addGateway(gateway, `edapex-${user.id}`);
-
 	const requestContext = await buildRequestContext({
 		context: activeContext,
 		userId: user.id,
 		modelId: selectedChatModel,
 		isSlashCommand,
-		lastMessage: promptText,
-		mastraDb
+		lastMessage: promptText
 	});
 	
 	const assistant = mastra.getAgent('assistant');

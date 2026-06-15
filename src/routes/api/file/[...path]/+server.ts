@@ -22,6 +22,7 @@ import { createTenantContext, WorkspaceMismatchError } from '$lib/server/mastra/
 import { tenantWorkspace } from '$lib/server/mastra/storage/workspaces';
 import { buildWorkspaceRequestContext } from '$lib/server/helpers/chat-helper';
 import { resolveActiveClassScope } from '$lib/server/helpers/class-scope';
+import { ALLOWED_DESIGNATIONS } from "$lib/types/sms-types";
 import { ocrBatchService } from '$lib/server/service/ocr-batch.service';
 import type { SerializedTenant } from '$lib/types/background-tasks';
 import type { FileEntry } from '@mastra/core/workspace';
@@ -82,7 +83,7 @@ async function resolveRequestTenant({
   return createTenantContext({
     schoolId: locals.user?.schoolId ?? 1,
     userId: locals.user?.id ?? 1,
-    designationId: (locals.user as { designationId?: number } | undefined)?.designationId ?? 1,
+    designationId: (locals.user as { designationId?: number } | undefined)?.designationId ?? ALLOWED_DESIGNATIONS.IT,
     staffId: (locals.user as { staffId?: number } | undefined)?.staffId ?? 1,
     classId: scope?.classId ?? null,
     sectionId: scope?.sectionId ?? null,

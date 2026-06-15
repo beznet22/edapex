@@ -1,9 +1,8 @@
 import { error, type RequestHandler } from '@sveltejs/kit';
 import { mastra } from '$lib/server/mastra';
-import { EdApexGateway } from '$lib/server/mastra/gateway';
-import { getAppDb } from '$lib/server/mastra/storage/libsql/app-db';
 import { copilotRequestSchema } from '$lib/server/mastra/editor/schemas';
 import { buildWorkspaceRequestContext } from '$lib/server/helpers/chat-helper';
+import { ALLOWED_DESIGNATIONS } from "$lib/types/sms-types";
 import { createTenantContext } from '$lib/server/mastra/tenant-context';
 
 export const POST: RequestHandler = async ({ request, locals: { user } }) => {
@@ -17,18 +16,11 @@ export const POST: RequestHandler = async ({ request, locals: { user } }) => {
 			return new Response(`Invalid request: ${parsed.error.message}`, { status: 400 });
 		}
 
-		const mastraDb = getAppDb();
-		const gateway = new EdApexGateway(mastraDb, user.id);
-		// Per-user gateway key — EdApexGateway.id is the constant 'edapex' so
-		// addGateway() is idempotent on that key and every request would otherwise
-		// share the FIRST user's captured credentials.
-		mastra.addGateway(gateway, `edapex-${user.id}`);
-
 		const tenantContext = createTenantContext({
 			schoolId: user.schoolId ?? 1,
 			userId: user.id,
 			staffId: (user as any).staffId ?? 1,
-			designationId: (user as any).designationId ?? 1,
+			designationId: (user as any).designationId ?? ALLOWED_DESIGNATIONS.IT,
 			roleId: (user as any).roleId ?? null,
 			classId: (user as any).classId ?? null,
 			sectionId: (user as any).sectionId ?? null,

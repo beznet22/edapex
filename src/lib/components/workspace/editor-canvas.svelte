@@ -2,6 +2,7 @@
 	import { ScrollArea } from "$lib/components/ui/scroll-area";
 	import WysiwygEditor from "$lib/components/editor/WysiwygEditor.svelte";
 	import LoadingState from "./loading-state.svelte";
+	import { Markdown } from "$lib/components/prompt-kit/markdown";
 	import { toast } from "svelte-sonner";
 	import { SelectedClass } from "$lib/context/sync.svelte";
 	import { DESIGNATIONS } from "$lib/types/sms-types";
@@ -182,7 +183,13 @@
 {#if filename}
 	<div class="flex flex-col w-full h-full relative pb-4 group">
 		{#if type === "text"}
-			{#if textContent === "Loading..." || textContent.startsWith("Error loading")}
+			{#if streaming && isMarkdownFile && editorMode === "wysiwyg"}
+				<ScrollArea class="flex-1 w-full bg-background overflow-hidden p-4">
+					<div class="prose prose-sm max-w-none dark:prose-invert">
+						<Markdown content={textContent} />
+					</div>
+				</ScrollArea>
+			{:else if textContent === "Loading..." || textContent.startsWith("Error loading")}
 				<LoadingState label={textContent === "Loading..." ? "Loading file content" : textContent} />
 			{:else if isMarkdownFile && editorMode === "wysiwyg"}
 				<div class="flex-1 min-h-0 overflow-hidden">

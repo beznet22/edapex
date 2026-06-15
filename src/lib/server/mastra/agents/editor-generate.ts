@@ -6,6 +6,7 @@
  * Temperature is set per-request in the workflow step (0.4 for varied generation).
  */
 import { Agent } from '@mastra/core/agent';
+import { StreamErrorRetryProcessor } from '@mastra/core/processors';
 import { DEFAULT_EDITOR_MODEL } from './shared';
 import type { RequestContext } from '@mastra/core/request-context';
 import type { RequestContextValues } from './shared';
@@ -32,4 +33,5 @@ CRITICAL RULES — VIOLATING ANY OF THESE BREAKS THE EDITOR:
 7. If the user asked to continue writing, pick up exactly where the document leaves off.`;
 	},
 	model: DEFAULT_EDITOR_MODEL,
+	errorProcessors: [new StreamErrorRetryProcessor()]
 });

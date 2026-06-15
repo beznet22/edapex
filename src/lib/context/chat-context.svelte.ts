@@ -12,15 +12,130 @@ import type {
 import { Chat } from "@ai-sdk/svelte";
 import { DefaultChatTransport, type ChatStatus } from "ai";
 import { getContext, setContext } from "svelte";
-import { toast } from "svelte-sonner";
 import { ChatHistory } from "./chat-history.svelte";
 import type { ClassSection } from "$lib/types/result-types";
 import type { ClassStudent } from "$lib/server/repository/student.repo";
 
 import { SelectedClass, SelectedModel } from "./sync.svelte";
 import { ThreadData } from "./thread-data.svelte";
+import type { LanguageModelUsage } from "$lib/components/ai-elements/context/context-context.svelte.js";
+import { categorizeAIError, type FriendlyAiError } from "$lib/errors/friendly-ai-error";
 
 const CHAT_CONTEXT_KEY = Symbol("chat-context");
+const CHAT_USAGE_KEY = Symbol("chat-usage-state");
+const CHAT_RATELIMIT_KEY = Symbol("chat-ratelimit-state");
+
+/**
+ * Tracks cumulative token usage across the conversation. Updated from the
+ * stream's `onFinish` callback (end-of-message) and from `data-usage` parts.
+ * Exposed via context so the ChatComposer can render the context indicator.
+ */
+export class ChatUsageState {
+	#value = $state<LanguageModelUsage>({
+		inputTokens: 0,
+		outputTokens: 0,
+		reasoningTokens: 0,
+		cachedInputTokens: 0
+	});
+
+	get value(): LanguageModelUsage {
+		return this.#value;
+	}
+
+	accumulate(usage: Partial<LanguageModelUsage> | null | undefined): void {
+		if (!usage) return;
+		this.#value = {
+			inputTokens: (this.#value.inputTokens ?? 0) + (usage.inputTokens ?? 0),
+			outputTokens: (this.#value.outputTokens ?? 0) + (usage.outputTokens ?? 0),
+			reasoningTokens: (this.#value.reasoningTokens ?? 0) + (usage.reasoningTokens ?? 0),
+			cachedInputTokens: (this.#value.cachedInputTokens ?? 0) + (usage.cachedInputTokens ?? 0)
+		};
+	}
+
+	reset(): void {
+		this.#value = {
+			inputTokens: 0,
+			outputTokens: 0,
+			reasoningTokens: 0,
+			cachedInputTokens: 0
+		};
+	}
+
+	setContext(): void {
+		setContext(CHAT_USAGE_KEY, this);
+	}
+
+	static fromContext(): ChatUsageState {
+		const existing = getContext<ChatUsageState>(CHAT_USAGE_KEY);
+		if (existing) return existing;
+		// Fallback for components rendered outside the chat layout (e.g. the
+		// root +layout.svelte that mounts the settings modal). Returns a
+		// zero-state holder; the consumer should not rely on it being the
+		// shared instance.
+		return new ChatUsageState();
+	}
+}
+
+/** Shared singleton used by the indicator + accumulator without a context lookup. */
+export const chatUsage = new ChatUsageState();
+
+/**
+ * Tracks the active rate limit surfaced by the workflow's auto-retry loop.
+ * Updated from the stream's `data-rateLimit` parts and cleared on
+ * `#onFinish` so the banner only persists for the in-flight message.
+ * Per-chat-context (see `setContext` in the chat context constructor), with
+ * a module-level singleton kept for symmetry with `chatUsage` — components
+ * should prefer `RateLimitState.fromContext()` so they read the active
+ * chat's state.
+ */
+export interface ActiveRateLimit {
+	providerId: string;
+	retryAfterSeconds: number;
+	resetAt: string;
+	startedAt: number;
+}
+
+export class RateLimitState {
+	#active = $state<ActiveRateLimit | null>(null);
+
+	get active(): ActiveRateLimit | null {
+		return this.#active;
+	}
+
+	set active(v: ActiveRateLimit | null) {
+		this.#active = v;
+	}
+
+	start(providerId: string, retryAfterSeconds: number, resetAt: string): void {
+		this.#active = {
+			providerId,
+			retryAfterSeconds,
+			resetAt,
+			startedAt: Date.now()
+		};
+	}
+
+	clear(): void {
+		this.#active = null;
+	}
+
+	setContext(): void {
+		setContext(CHAT_RATELIMIT_KEY, this);
+	}
+
+	static fromContext(): RateLimitState {
+		const existing = getContext<RateLimitState>(CHAT_RATELIMIT_KEY);
+		if (existing) return existing;
+		// Fallback for components rendered outside the chat layout (e.g. the
+		// root +layout.svelte that mounts the settings modal). Returns a
+		// zero-state holder; the consumer should not rely on it being the
+		// shared instance.
+		return new RateLimitState();
+	}
+}
+
+/** Shared singleton — kept for symmetry with `chatUsage`. */
+export const rateLimit = new RateLimitState();
 
 export type MentionPayload = {
   category: string;
@@ -40,6 +155,11 @@ export class ChatContext {
   // Reactive state using Svelte 5 runes
   user = $state<AuthUser | undefined>(undefined);
   studentData = $state<ClassStudent | undefined>(undefined);
+  usage: ChatUsageState | undefined = undefined;
+  rateLimit: RateLimitState | undefined = undefined;
+  /** Structured, UI-ready error from the last failed turn. Drives the
+   *  inline `<ErrorAlert>` rendered next to the failed assistant message. */
+  lastError = $state<FriendlyAiError | null>(null);
   openedDocumentId = $state<string | undefined>(undefined);
   openPanel = $state<boolean>(false);
   docPart = $state<CreateDocumentPart | undefined>(undefined);
@@ -47,8 +167,6 @@ export class ChatContext {
   get error() {
     return this.client?.error;
   }
-  profile = $state<"strong" | "balanced" | "simple">("strong");
-  thinkingEnabled = $state<boolean>(false);
   get activeWorkflows() {
     return this.threadData.activeWorkflows;
   }
@@ -96,6 +214,17 @@ export class ChatContext {
   // #selectedAgent removed
 
   constructor({ initialMessages, api, chatData, selectedClass }: InitChat) {
+    this.usage = new ChatUsageState();
+    this.usage.setContext();
+    // Reset cumulative usage when (re)constructing the chat context
+    chatUsage.reset();
+
+    this.rateLimit = new RateLimitState();
+    this.rateLimit.setContext();
+    // Wipe any active rate limit from a previous chat context so the banner
+    // doesn't bleed across chat switches.
+    rateLimit.clear();
+
     this.client = $derived(
       new Chat<xUIMessage>({
         id: chatData?.threadId,
@@ -132,6 +261,8 @@ export class ChatContext {
   #prepareSendMessagesRequest = ({ messages, id }: { messages: xUIMessage[]; id?: string }) => {
     // Reset the data-chat received flag at the start of each new stream
     this.threadData.resetReceived();
+    // Clear any prior turn's error so a new send doesn't render the old alert
+    this.lastError = null;
 
     const api = "/api/chat";
     const lastMessage = messages.at(-1);
@@ -141,8 +272,6 @@ export class ChatContext {
       threadId: id,
       data: this.studentData as any,
       selectedClass: this.selectedClass,
-      profile: this.profile,
-      thinkingEnabled: this.thinkingEnabled,
       modelOverride: this.modelOverride,
       fileReferences: this.fileReferences.length > 0 ? [...this.fileReferences] : undefined,
     };
@@ -161,7 +290,15 @@ export class ChatContext {
     return { body, api };
   };
 
-  #onFinish = async () => {
+  #onFinish = async (msg: { message: { metadata?: Record<string, unknown> } } | undefined) => {
+    // Accumulate token usage from the finished message's metadata
+    if (msg?.message?.metadata) {
+      chatUsage.accumulate(msg.message.metadata as Partial<LanguageModelUsage>);
+    }
+
+    this.rateLimit?.clear();
+    this.lastError = null;
+
     this.activeWorkflows = [];
     this.pendingConfirmation = null;
 
@@ -191,22 +328,50 @@ export class ChatContext {
 
   #onData = (part: StreamDataPart) => {
     this.threadData.handlePart(part);
+    // Accumulate usage from streamed `data-usage` parts emitted by the
+    // workflow's assistant-step onFinish. End-of-message guarantee matches
+    // the user's preference (no live-streaming counts).
+    if (part.type === "data-usage") {
+      const data = (part as { data?: LanguageModelUsage }).data;
+      chatUsage.accumulate(data);
+    } else if (part.type === "data-rateLimit") {
+      const data = (part as {
+        data?: { providerId: string; retryAfterSeconds: number; resetAt?: string };
+      }).data;
+      if (data?.providerId && typeof data.retryAfterSeconds === "number") {
+        const resetAt =
+          data.resetAt ?? new Date(Date.now() + data.retryAfterSeconds * 1000).toISOString();
+        this.rateLimit?.start(data.providerId, data.retryAfterSeconds, resetAt);
+        rateLimit.start(data.providerId, data.retryAfterSeconds, resetAt);
+      }
+    } else if (part.type === "data-error") {
+      // Server-categorized error. Trust the discriminator; only re-categorize
+      // if the data isn't a FriendlyAiError (defense-in-depth).
+      const data = (part as { data?: FriendlyAiError | { kind: string } }).data;
+      if (data && typeof data === "object" && "kind" in data) {
+        this.lastError = data as FriendlyAiError;
+      }
+    }
   };
 
   #onError = (error: Error) => {
-    try {
-      const jsonError = JSON.parse(error.message);
-      if (typeof jsonError === "object" && jsonError !== null && "message" in jsonError) {
-        console.error("Error", jsonError.message);
-        toast.error("Error: Some error occured. Please try again.");
-      } else {
-        console.error("Error", error.message);
-        toast.error("Error: Some error occured. Please try again.");
+    // Categorize server-side / transport errors that didn't come through
+    // a `data-error` stream part (initial connection failure, abort,
+    // network drop). `chat.error` is also exposed for components that
+    // prefer to read it directly.
+    const target: unknown = (() => {
+      try {
+        return JSON.parse(error.message);
+      } catch {
+        return error;
       }
-    } catch {
-      console.error("Error", error.message);
-      toast.error("Error: Some error occured. Please try again.");
-    }
+    })();
+    this.lastError = categorizeAIError(target);
+    console.error("[chat] error categorized", {
+      kind: this.lastError.kind,
+      name: (target as Error | null)?.name,
+      message: (target as Error | null)?.message
+    });
   };
 
   getDocumentPart = () => {

@@ -14,11 +14,11 @@ import { SkillWatcher, transactionalWrite } from "$lib/server/mastra/skill-watch
 import { SkillStateManager, type SwitchResult, type InterruptionResult } from "$lib/server/mastra/skill-state";
 import {
   hydrateClassMention,
-  ALLOWED_DESIGNATIONS,
   getHealthStatus,
   type MentionResolution,
   type HealthStatus,
 } from "$lib/server/mastra/skill-context";
+import { ALLOWED_DESIGNATIONS } from "$lib/types/sms-types";
 
 const FIXTURES_DIR = join(__dirname, "fixtures", "skills");
 const TMP_DIR = join(__dirname, "fixtures", "tmp-discovery");

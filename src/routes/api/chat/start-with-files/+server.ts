@@ -20,6 +20,7 @@ import { createTenantContext } from '$lib/server/mastra/tenant-context';
 import { tenantWorkspace } from '$lib/server/mastra/storage/workspaces';
 import { buildWorkspaceRequestContext } from '$lib/server/helpers/chat-helper';
 import { OcrWorkspaceStore } from '$lib/server/mastra/storage/ocr/ocr-workspace-store';
+import { ALLOWED_DESIGNATIONS } from "$lib/types/sms-types";
 import { resolveExamTypeId } from '$lib/server/mastra/tenant-context';
 
 type StartFile = {
@@ -58,7 +59,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
   const tenant = createTenantContext({
     schoolId,
     userId: locals.user.id,
-    designationId: (locals.user as { designationId?: number }).designationId ?? 1,
+    designationId: (locals.user as { designationId?: number }).designationId ?? ALLOWED_DESIGNATIONS.IT,
     staffId: (locals.user as { staffId?: number }).staffId ?? 1,
     classId: (locals.user as { classId?: number | null }).classId ?? null,
     sectionId: (locals.user as { sectionId?: number | null }).sectionId ?? null,

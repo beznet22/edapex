@@ -11,24 +11,30 @@ import type { DerivedEditorCommandRequest } from './schemas';
 import {
 	buildStructuredPrompt,
 	formatTextFromMessages,
+	getTextFromMessage,
 	injectSelectionMarkers,
+	stripImageRefs,
 } from './utils';
 
 /**
- * Prepares the backgroundData string for the prompt by injecting <Selection> tags
- * around the selected text when present. Centralizes the selection-vs-no-selection
- * branching so the generate and edit builders stay symmetric.
+ * Prepares the backgroundData string for the prompt by stripping image references
+ * and injecting <Selection> tags around the selected text when present. Centralizes
+ * the selection-vs-no-selection branching so the generate and edit builders stay symmetric.
  */
 function prepareBackgroundData(
 	markdown: string,
 	selectedText: string | undefined
 ): string {
-	if (!selectedText) return markdown;
-	return injectSelectionMarkers(markdown, selectedText);
+	const cleaned = stripImageRefs(markdown);
+	if (!selectedText) return cleaned;
+	return injectSelectionMarkers(cleaned, selectedText);
 }
 
 /**
  * Builds a prompt for the generate agent.
+ *
+ * Extracts the user's request from the last UI message so the AI has
+ * an explicit instruction. Rules enforce context-awareness and brevity.
  */
 export function buildGeneratePrompt(request: DerivedEditorCommandRequest): string {
 	const { ctx, hasSelection, messages } = request;
@@ -36,25 +42,32 @@ export function buildGeneratePrompt(request: DerivedEditorCommandRequest): strin
 
 	const backgroundData = prepareBackgroundData(markdown, hasSelection ? selectedText : undefined);
 
+	const userRequest = messages?.length
+		? getTextFromMessage(messages[messages.length - 1]).trim()
+		: '';
+
 	return buildStructuredPrompt({
 		backgroundData,
-		examples: [
-			'USER: Summarize the selected text. -> Return a concise summary.',
-			'USER: Explain this paragraph. -> Return a plain-language explanation.',
-			'USER: Continue writing. -> Return the next fitting markdown content only.',
-		],
 		history: formatTextFromMessages(messages),
 		rules: [
 			'- Use the background data as the source of truth.',
-			'- If <Selection> is present, prioritize it.',
+			'- Make generated content feel like a natural continuation of the document.',
+			'- Match the tone, style, formatting, and vocabulary of surrounding text.',
+			'- Be concise — communicate the intent without verbosity.',
 			'- Return markdown only.',
 			'- Do not wrap the result in code fences.',
 			'- Do not add explanations before or after the result.',
 		].join('\n'),
-		task: [
-			'You are an AI writing assistant inside a rich-text editor.',
-			'Generate the result requested in the latest user message using the background data.',
-		].join('\n'),
+		task: userRequest
+			? [
+				'You are an AI writing assistant inside a rich-text editor.',
+				`The user asks: "${userRequest}"`,
+				'Generate befitting content based on the surrounding text. Keep it brief.',
+			].join('\n')
+			: [
+				'You are an AI writing assistant inside a rich-text editor.',
+				'Continue the document naturally with concise, relevant content.',
+			].join('\n'),
 	});
 }
 
@@ -71,7 +84,7 @@ export function buildEditPrompt(request: DerivedEditorCommandRequest): string {
 
 	if (!selectedText) {
 		return buildStructuredPrompt({
-			backgroundData: markdown,
+			backgroundData: stripImageRefs(markdown),
 			history: formatTextFromMessages(messages),
 			outputFormatting: 'markdown',
 			rules: [
@@ -84,7 +97,7 @@ export function buildEditPrompt(request: DerivedEditorCommandRequest): string {
 		});
 	}
 
-	const backgroundData = injectSelectionMarkers(markdown, selectedText);
+	const backgroundData = injectSelectionMarkers(stripImageRefs(markdown), selectedText);
 	const isMultiBlocks = selectedText.includes('\n');
 
 	if (isMultiBlocks) {

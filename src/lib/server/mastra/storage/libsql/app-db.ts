@@ -2,7 +2,7 @@
  * App-level Mastra Database — EdApex
  *
  * Drizzle-typed libSQL client owning the **application's** tables:
- *   - provider_credentials, agent_routing, agent_settings,
+ *   - user_credentials, user_model_visibility, agent_settings,
  *     mastra_runs, mastra_run_steps
  *
  * These are NOT the same as the Mastra framework's tables (mastra_threads,

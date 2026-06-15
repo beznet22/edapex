@@ -10,38 +10,44 @@ import { sqliteTable, text, integer, unique } from 'drizzle-orm/sqlite-core';
 import { sql } from 'drizzle-orm';
 
 /**
- * AI Provider Credentials Table
+ * Sovereign User Credentials Table
  *
- * Stores user-specific API keys and custom base URLs.
- * Strict multi-tenant isolation via userId.
+ * Stores user-specific provider credentials keyed by `ProviderId` (branded string).
+ * Supports three credential sources:
+ * - 'env'         — resolved at request time from process env
+ * - 'credential' — encrypted API key stored in `encryptedData.apiKey`
+ * - 'custom'      — full custom provider config (baseUrl, apiKey, models, headers)
  */
-export const providerCredentials = sqliteTable('provider_credentials', {
+export const userCredentials = sqliteTable('user_credentials', {
 	id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
 	userId: integer('user_id').notNull(),
-	provider: text('provider').notNull(), // 'anthropic' | 'openai' | 'deepseek' | 'groq'
-	apiKeyEncrypted: text('api_key_encrypted'),
-	baseUrl: text('base_url').notNull().default(''),
+	providerId: text('provider_id').notNull(),
+	credentialType: text('credential_type').notNull(), // 'env' | 'credential' | 'custom'
+	encryptedData: text('encrypted_data'),
 	priority: integer('priority').notNull().default(1),
 	enabled: integer('enabled').notNull().default(1),
-	updatedAt: text('updated_at').notNull().default(sql`(datetime('now'))`)
+	createdAt: text('created_at').notNull().default(sql`(datetime('now'))`),
+	updatedAt: text('updated_at').notNull().default(sql`(datetime('now'))`),
+	// Snapshot of models discovered by calling the provider's /models endpoint
+	// at connect time. Encrypted JSON of ModelInfo[]. Falls back to
+	// BUILTIN_MODELS filtered by providerId when this is null.
+	discoveredModels: text('discovered_models'),
+	discoveredAt: text('discovered_at')
 }, (table) => ({
-	unq: unique().on(table.userId, table.provider)
+	unq: unique().on(table.userId, table.providerId)
 }));
 
 /**
- * Agent Routing Table
- *
- * Maps agent roles (Supervisor, Assistant, Default) to specific models.
+ * Per-user model visibility (Settings → Models tab toggles).
  */
-export const agentRouting = sqliteTable('agent_routing', {
+export const userModelVisibility = sqliteTable('user_model_visibility', {
 	id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
 	userId: integer('user_id').notNull(),
-	role: text('role').notNull(), // 'supervisor' | 'assistant' | 'default'
-	provider: text('provider').notNull(),
-	model: text('model').notNull(),
+	modelId: text('model_id').notNull(),
+	visible: integer('visible').notNull().default(1),
 	updatedAt: text('updated_at').notNull().default(sql`(datetime('now'))`)
 }, (table) => ({
-	unq: unique().on(table.userId, table.role)
+	unq: unique().on(table.userId, table.modelId)
 }));
 
 /**
@@ -51,10 +57,30 @@ export const agentRouting = sqliteTable('agent_routing', {
  */
 export const agentSettings = sqliteTable('agent_settings', {
 	userId: integer('user_id').primaryKey(),
-	profile: text('profile').notNull().default('balanced'), // 'strong' | 'balanced' | 'simple'
 	globalToolsEnabled: integer('global_tools_enabled').notNull().default(1),
 	updatedAt: text('updated_at').notNull().default(sql`(datetime('now'))`)
 });
+
+/**
+ * Per-user, per-provider rate limit snapshot.
+ *
+ * Persists the most recent rate limit state we observed from upstream
+ * response headers (`x-ratelimit-*`, `retry-after`). Used for cross-session
+ * usage display and proactive warnings.
+ */
+export const rateLimitState = sqliteTable('rate_limit_state', {
+	id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
+	userId: integer('user_id').notNull(),
+	providerId: text('provider_id').notNull(),
+	modelId: text('model_id'),
+	window: text('window').notNull(), // 'requests_per_minute' | 'tokens_per_minute' | ...
+	limitValue: integer('limit_value'),
+	remaining: integer('remaining'),
+	resetAt: text('reset_at').notNull(),
+	recordedAt: text('recorded_at').notNull().default(sql`(datetime('now'))`)
+}, (table) => ({
+	unq: unique().on(table.userId, table.providerId, table.modelId, table.window)
+}));
 
 /**
  * Mastra Workflow Runs Table
@@ -101,8 +127,9 @@ export const mastraRunSteps = sqliteTable('mastra_run_steps', {
 	createdAt: text('created_at').notNull().default(sql`(datetime('now'))`),
 });
 
-export type ProviderCredential = typeof providerCredentials.$inferSelect;
-export type AgentRoute = typeof agentRouting.$inferSelect;
+export type UserCredential = typeof userCredentials.$inferSelect;
+export type UserModelVisibility = typeof userModelVisibility.$inferSelect;
 export type AgentSetting = typeof agentSettings.$inferSelect;
+export type RateLimitStateRow = typeof rateLimitState.$inferSelect;
 export type MastraRun = typeof mastraRuns.$inferSelect;
 export type MastraRunStep = typeof mastraRunSteps.$inferSelect;

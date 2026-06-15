@@ -15,10 +15,12 @@ import { Memory } from '@mastra/memory';
 import { z } from 'zod';
 import { createMastraStorage } from '$lib/server/mastra/storage/libsql/mastra-storage';
 import { createTool } from '@mastra/core/tools';
+import { StreamErrorRetryProcessor } from '@mastra/core/processors';
 import { ResultsRepository } from '../../repository/result.repo';
 import { StudentRepository } from '../../repository/student.repo';
 import { getDatabase } from '$lib/server/db';
 import type { TenantContext } from '../tenant-context';
+import type { MastraModelConfig } from '@mastra/core/llm';
 import { requestContextSchema, DEFAULT_MODEL } from './shared';
 import { getContextTool } from '../tools/context-tool';
 
@@ -28,6 +30,8 @@ export const supervisorAgent = new Agent({
 	id: 'supervisor',
 	name: 'EdApex Supervisor',
 	model: ({ requestContext }) => {
+		const v2Config = requestContext?.get('modelConfig') as MastraModelConfig | undefined;
+		if (v2Config) return v2Config;
 		return (requestContext?.get('modelId') as string) || DEFAULT_MODEL;
 	},
 	instructions: ({ requestContext }) => {
@@ -76,5 +80,9 @@ export const supervisorAgent = new Agent({
 	tools: {
 		getContext: getContextTool,
 	},
+	// Retries transient stream errors (OpenAI 5xx, Anthropic overloaded, etc.)
+	// that fire AFTER the first chunk. Pairs with `streamWithAutoRetry` for
+	// pre-stream 429s.
+	errorProcessors: [new StreamErrorRetryProcessor()],
 	requestContextSchema,
 });

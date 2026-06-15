@@ -5,6 +5,7 @@
  * Standalone agent — no memory.
  */
 import { Agent } from '@mastra/core/agent';
+import { StreamErrorRetryProcessor } from '@mastra/core/processors';
 import { DEFAULT_COPILOT_MODEL } from './shared';
 import type { RequestContext } from '@mastra/core/request-context';
 import type { RequestContextValues } from './shared';
@@ -20,4 +21,5 @@ export const editorCopilotAgent = new Agent({
 		return `${schoolLine}Continue the text naturally in ≤15 words, ending at a clause break. Maintain tone and style. Do not repeat the given text. Do not start a new block. If there is not enough context, return "0".`;
 	},
 	model: DEFAULT_COPILOT_MODEL,
+	errorProcessors: [new StreamErrorRetryProcessor()]
 });

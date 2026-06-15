@@ -66,13 +66,20 @@ export type Notification = {
 };
 
 export type xDataPart = {
-  createDocument: CreateDocumentPart;
-  generatePDF: GeneratePDFPart;
-  notification: Notification;
-  threadCreated: ChatThread;
-  threadTitle: {
-    title: string;
-  };
+	createDocument: CreateDocumentPart;
+	generatePDF: GeneratePDFPart;
+	notification: Notification;
+	threadCreated: ChatThread;
+	threadTitle: {
+		title: string;
+	};
+	rateLimit: {
+		providerId: string;
+		retryAfterSeconds: number;
+		resetAt: string;
+		attempt: number;
+		maxAttempts: number;
+	};
 };
 
 export type StreamDataPart = {
