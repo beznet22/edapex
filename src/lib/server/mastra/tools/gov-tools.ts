@@ -67,8 +67,25 @@ export const validateIntentConfidence = async (type: "mutation" | "read", confid
 
 
 
-export const manageAccessLogic = async (context: MastraToolContext, input: ManageAccessInput) => {
+export type ManageAccessLogicResult =
+  | { status: "NEEDS_CONFIRMATION"; message: string; action?: string; targetType?: string; targetId?: number; type?: "mutation" | "read"; confidence?: number }
+  | { status: "ERROR"; errorCode: string; message: string }
+  | { status: "SUCCESS"; message: string; action?: string; entityType?: string; targetId?: number; password?: string };
+
+export const manageAccessLogic = async (context: MastraToolContext, input: ManageAccessInput): Promise<ManageAccessLogicResult> => {
   const { tenantContext, getRepo, audit } = context;
+
+  // TODO(phase-3): pipe LLM structured-output confidence into this gate once ActionBar/Workflow suspend/resume lands; defaulting to 1.0 keeps the safety net inert today.
+  const confidence = 1.0;
+  const confidenceCheck = await validateIntentConfidence("mutation", confidence);
+  if (confidenceCheck.status === "NEEDS_CONFIRMATION") {
+    return {
+      status: "NEEDS_CONFIRMATION",
+      message: confidenceCheck.message ?? "Low-confidence intent requires confirmation.",
+      type: confidenceCheck.type,
+      confidence: confidenceCheck.confidence,
+    };
+  }
 
   validateRoleWhitelist(tenantContext, [1, 5]);
 

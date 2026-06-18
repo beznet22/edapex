@@ -1,0 +1,423 @@
+import { z } from "zod";
+import { createTool, type ToolExecutionContext } from "@mastra/core/tools";
+import { and, desc, eq, like } from "drizzle-orm";
+import { getDatabase } from "$lib/server/db";
+import {
+  smStudents,
+  smStudentPromotions,
+  studentRecords,
+} from "$lib/server/db/sms-schema";
+import { StudentRepository } from "../../repository/student.repo";
+import { TimelineRepository } from "../../repository/timeline.repo";
+import {
+  validateRoleWhitelist,
+  validateWorkspaceLock,
+  WorkspaceMismatchError,
+  ForbiddenError,
+  type MastraToolContext,
+} from "../tenant-context";
+
+function assertMastraToolContext(
+  context: ToolExecutionContext,
+): asserts context is MastraToolContext & ToolExecutionContext {
+  if (!("tenantContext" in context) || !("getRepo" in context)) {
+    throw new Error("Invalid tool execution context: expected MastraToolContext");
+  }
+}
+
+export const promoteStudentSchema = z.object({
+  studentId: z.number().describe("Numeric ID of the student to promote"),
+  classId: z.number().describe("Numeric ID of the destination class"),
+  sectionId: z.number().describe("Numeric ID of the destination section"),
+  rollNo: z.number().optional().describe("Optional roll number in the destination class"),
+  resultStatus: z.string().default("PASSED").describe("Promotion result status (defaults to PASSED)"),
+});
+
+export type PromoteStudentInput = {
+  studentId: number;
+  classId: number;
+  sectionId: number;
+  rollNo?: number;
+  resultStatus?: string;
+};
+
+type PromotionResult =
+  | { status: "SUCCESS"; studentId: number; classId: number; sectionId: number; message: string }
+  | { status: "ERROR"; errorCode: string; message: string };
+
+function isPromotionResult(value: unknown): value is PromotionResult {
+  if (typeof value !== "object" || value === null) return false;
+  if (!("status" in value)) return false;
+  const status = value.status;
+  if (status !== "SUCCESS" && status !== "ERROR") return false;
+  if (status === "ERROR") {
+    return (
+      "errorCode" in value && typeof value.errorCode === "string" &&
+      "message" in value && typeof value.message === "string"
+    );
+  }
+  return (
+    "studentId" in value && typeof value.studentId === "number" &&
+    "classId" in value && typeof value.classId === "number" &&
+    "sectionId" in value && typeof value.sectionId === "number" &&
+    "message" in value && typeof value.message === "string"
+  );
+}
+
+type DemotionResult =
+  | { status: "SUCCESS"; studentId: number; message: string }
+  | { status: "ERROR"; errorCode: string; message: string };
+
+function isDemotionResult(value: unknown): value is DemotionResult {
+  if (typeof value !== "object" || value === null) return false;
+  if (!("status" in value)) return false;
+  const status = value.status;
+  if (status !== "SUCCESS" && status !== "ERROR") return false;
+  if (status === "ERROR") {
+    return (
+      "errorCode" in value && typeof value.errorCode === "string" &&
+      "message" in value && typeof value.message === "string"
+    );
+  }
+  return (
+    "studentId" in value && typeof value.studentId === "number" &&
+    "message" in value && typeof value.message === "string"
+  );
+}
+
+async function resolveStudentIdentifier(
+  identifier: { studentId?: number; admissionNo?: number; name?: string },
+): Promise<{ id: number; fullName: string | null; classId: number | null; sectionId: number | null } | null> {
+  const db = await getDatabase();
+
+  if (identifier.studentId != null) {
+    const [student] = await db
+      .select({
+        id: smStudents.id,
+        fullName: smStudents.fullName,
+        classId: smStudents.classId,
+        sectionId: smStudents.sectionId,
+      })
+      .from(smStudents)
+      .where(eq(smStudents.id, identifier.studentId))
+      .limit(1);
+    return student ?? null;
+  }
+
+  if (identifier.admissionNo != null) {
+    const [student] = await db
+      .select({
+        id: smStudents.id,
+        fullName: smStudents.fullName,
+        classId: smStudents.classId,
+        sectionId: smStudents.sectionId,
+      })
+      .from(smStudents)
+      .where(eq(smStudents.admissionNo, identifier.admissionNo))
+      .limit(1);
+    return student ?? null;
+  }
+
+  if (identifier.name != null && identifier.name.trim() !== "") {
+    const [student] = await db
+      .select({
+        id: smStudents.id,
+        fullName: smStudents.fullName,
+        classId: smStudents.classId,
+        sectionId: smStudents.sectionId,
+      })
+      .from(smStudents)
+      .where(like(smStudents.fullName, `%${identifier.name}%`))
+      .limit(1);
+    return student ?? null;
+  }
+
+  return null;
+}
+
+export const promoteStudentLogic = async (
+  context: MastraToolContext,
+  input: PromoteStudentInput,
+): Promise<PromotionResult> => {
+  const { tenantContext, getRepo, audit } = context;
+
+  validateRoleWhitelist(tenantContext, [1, 5, 8]);
+  validateWorkspaceLock(tenantContext, input.classId, input.sectionId);
+
+  const studentRepo = getRepo(StudentRepository);
+  const timelineRepo = getRepo(TimelineRepository);
+
+  try {
+    const student = await resolveStudentIdentifier({ studentId: input.studentId });
+    if (!student) {
+      return {
+        status: "ERROR",
+        errorCode: "STUDENT_NOT_FOUND",
+        message: `Student with ID ${input.studentId} not found.`,
+      };
+    }
+
+    validateWorkspaceLock(tenantContext, student.classId, student.sectionId);
+
+    const resultStatus = input.resultStatus ?? "PASSED";
+
+    await studentRepo.promoteStudent({
+      studentId: input.studentId,
+      classId: input.classId,
+      sectionId: input.sectionId,
+      rollNo: input.rollNo,
+      resultStatus,
+    });
+
+    const auditDescription = JSON.stringify({
+      action: "promote",
+      type: "promoteStudent",
+      studentId: input.studentId,
+      classId: input.classId,
+      sectionId: input.sectionId,
+      rollNo: input.rollNo,
+      resultStatus,
+      threadId: audit?.threadId,
+      modelId: audit?.modelId,
+    });
+
+    await timelineRepo.createTimeline({
+      staffStudentId: input.studentId,
+      type: "behavioral",
+      description: auditDescription,
+      schoolId: tenantContext.schoolId,
+      academicId: tenantContext.academicId ?? 0,
+      createdBy: tenantContext.userId,
+    });
+
+    return {
+      status: "SUCCESS",
+      studentId: input.studentId,
+      classId: input.classId,
+      sectionId: input.sectionId,
+      message: `Student ${student.fullName ?? input.studentId} promoted to Class ${input.classId}, Section ${input.sectionId}.`,
+    };
+  } catch (error) {
+    if (error instanceof WorkspaceMismatchError || error instanceof ForbiddenError) {
+      throw error;
+    }
+    const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+    return {
+      status: "ERROR",
+      errorCode: "UNKNOWN",
+      message: `Failed to promote student: ${errorMessage}`,
+    };
+  }
+};
+
+export const demoteStudentSchema = z.object({
+  studentId: z.number().describe("Numeric ID of the student to demote/revert promotion"),
+});
+
+export type DemoteStudentInput = z.infer<typeof demoteStudentSchema>;
+
+export const demoteStudentLogic = async (
+  context: MastraToolContext,
+  input: DemoteStudentInput,
+): Promise<DemotionResult> => {
+  const { tenantContext, getRepo, audit } = context;
+
+  validateRoleWhitelist(tenantContext, [1, 5, 8]);
+
+  const db = await getDatabase();
+  const timelineRepo = getRepo(TimelineRepository);
+
+  try {
+    const [student] = await db
+      .select({
+        id: smStudents.id,
+        classId: smStudents.classId,
+        sectionId: smStudents.sectionId,
+        sessionId: smStudents.sessionId,
+        academicId: smStudents.academicId,
+        rollNo: smStudents.rollNo,
+      })
+      .from(smStudents)
+      .where(eq(smStudents.id, input.studentId))
+      .limit(1);
+
+    if (!student) {
+      return {
+        status: "ERROR",
+        errorCode: "STUDENT_NOT_FOUND",
+        message: `Student with ID ${input.studentId} not found.`,
+      };
+    }
+
+    validateWorkspaceLock(tenantContext, student.classId, student.sectionId);
+
+    const [latestPromotion] = await db
+      .select()
+      .from(smStudentPromotions)
+      .where(eq(smStudentPromotions.studentId, input.studentId))
+      .orderBy(desc(smStudentPromotions.id))
+      .limit(1);
+
+    if (!latestPromotion) {
+      return {
+        status: "ERROR",
+        errorCode: "NO_PROMOTION_RECORD",
+        message: `No promotion record found for student ${input.studentId}.`,
+      };
+    }
+
+    const currentClassId = latestPromotion.currentClassId;
+    const currentSectionId = latestPromotion.currentSectionId;
+    const currentSessionId = latestPromotion.currentSessionId;
+    const previousClassId = latestPromotion.previousClassId;
+    const previousSectionId = latestPromotion.previousSectionId;
+    const previousSessionId = latestPromotion.previousSessionId;
+
+    if (
+      currentClassId == null ||
+      currentSectionId == null ||
+      currentSessionId == null ||
+      previousClassId == null ||
+      previousSectionId == null ||
+      previousSessionId == null
+    ) {
+      return {
+        status: "ERROR",
+        errorCode: "INVALID_PROMOTION_RECORD",
+        message: `The latest promotion record for student ${input.studentId} is missing class/section/session values.`,
+      };
+    }
+
+    await db.transaction(async (tx) => {
+      const [currentRecord] = await tx
+        .select({ id: studentRecords.id })
+        .from(studentRecords)
+        .where(
+          and(
+            eq(studentRecords.studentId, input.studentId),
+            eq(studentRecords.classId, currentClassId),
+            eq(studentRecords.sectionId, currentSectionId),
+            eq(studentRecords.academicId, currentSessionId),
+            eq(studentRecords.isDefault, 1),
+          ),
+        )
+        .limit(1);
+
+      const [previousRecord] = await tx
+        .select({ id: studentRecords.id })
+        .from(studentRecords)
+        .where(
+          and(
+            eq(studentRecords.studentId, input.studentId),
+            eq(studentRecords.classId, previousClassId),
+            eq(studentRecords.sectionId, previousSectionId),
+            eq(studentRecords.academicId, previousSessionId),
+          ),
+        )
+        .limit(1);
+
+      if (currentRecord) {
+        await tx
+          .update(studentRecords)
+          .set({ isDefault: 0, activeStatus: 0 })
+          .where(eq(studentRecords.id, currentRecord.id));
+      }
+
+      if (previousRecord) {
+        await tx
+          .update(studentRecords)
+          .set({ isDefault: 1, isPromote: 0, activeStatus: 1 })
+          .where(eq(studentRecords.id, previousRecord.id));
+      }
+
+      await tx
+        .update(smStudents)
+        .set({
+          classId: previousClassId,
+          sectionId: previousSectionId,
+          sessionId: previousSessionId,
+          academicId: previousSessionId,
+          rollNo: latestPromotion.previousRollNumber,
+        })
+        .where(eq(smStudents.id, input.studentId));
+
+      await tx
+        .delete(smStudentPromotions)
+        .where(eq(smStudentPromotions.id, latestPromotion.id));
+    });
+
+    const auditDescription = JSON.stringify({
+      action: "demote",
+      type: "demoteStudent",
+      studentId: input.studentId,
+      previousClassId,
+      previousSectionId,
+      previousSessionId,
+      threadId: audit?.threadId,
+      modelId: audit?.modelId,
+    });
+
+    await timelineRepo.createTimeline({
+      staffStudentId: input.studentId,
+      type: "behavioral",
+      description: auditDescription,
+      schoolId: tenantContext.schoolId,
+      academicId: tenantContext.academicId ?? 0,
+      createdBy: tenantContext.userId,
+    });
+
+    return {
+      status: "SUCCESS",
+      studentId: input.studentId,
+      message: `Student ${input.studentId} demoted to previous class/section successfully.`,
+    };
+  } catch (error) {
+    if (error instanceof WorkspaceMismatchError || error instanceof ForbiddenError) {
+      throw error;
+    }
+    const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+    return {
+      status: "ERROR",
+      errorCode: "UNKNOWN",
+      message: `Failed to demote student: ${errorMessage}`,
+    };
+  }
+};
+
+export const promoteStudentTool = createTool({
+  id: "promote-student",
+  description: "Promote a student to a new class and section for the active academic session, preserving history and assigning fees.",
+  inputSchema: promoteStudentSchema,
+  execute: async (input: PromoteStudentInput, context: ToolExecutionContext) => {
+    assertMastraToolContext(context);
+    return promoteStudentLogic(context, input);
+  },
+  toModelOutput: (output: unknown) => {
+    if (!isPromotionResult(output)) {
+      return "Invalid promotion result.";
+    }
+    if (output.status === "ERROR") {
+      return `Promotion failed: ${output.message}`;
+    }
+    return output.message ?? `Student ${output.studentId} promoted to Class ${output.classId}, Section ${output.sectionId}.`;
+  },
+});
+
+export const demoteStudentTool = createTool({
+  id: "demote-student",
+  description: "Revert the most recent promotion for a student, restoring their previous class, section, and active student record.",
+  inputSchema: demoteStudentSchema,
+  execute: async (input: DemoteStudentInput, context: ToolExecutionContext) => {
+    assertMastraToolContext(context);
+    return demoteStudentLogic(context, input);
+  },
+  toModelOutput: (output: unknown) => {
+    if (!isDemotionResult(output)) {
+      return "Invalid demotion result.";
+    }
+    if (output.status === "ERROR") {
+      return `Demotion failed: ${output.message}`;
+    }
+    return output.message ?? `Student ${output.studentId} demoted successfully.`;
+  },
+});

@@ -13,10 +13,10 @@ import {
   categoryEnum,
   type Category,
   type MarksRecord,
-  type ResultOutput,
   type School,
   type Student,
 } from "$lib/schema/result-output";
+import type { Marksheet } from "$lib/schema/marksheet";
 import { StudentRepository, ResultsRepository, TimelineRepository, StaffRepository } from "$lib/server/repository";
 import { ScopedRepositoryProvider } from "../mastra/scoped-repository";
 import type { TenantContext } from "../mastra/tenant-context";
@@ -527,18 +527,187 @@ export class AssessmentService {
   }
 
   /**
+   * Persist a fully-validated Marksheet artifact to the academic record. The
+   * marksheet shape (school/student/records/ratings/remark) is unwrapped into
+   * the same primitive write-set that {@link upsertStudentResult} produces:
+   * cleanMarks → doProcessMarks → batchUpsertMarkRecords/Results, plus
+   * ratings, teacher remark, attendance, and an sm_student_timelines audit.
+   * The input `marksheet` is mutated so callers can read the resolved
+   * `recordId` directly off the response.
+   */
+  async upsertMarksheet(marksheet: Marksheet, staffId: number): Promise<Marksheet> {
+    const studentId = marksheet.student.id;
+    const examTypeId = marksheet.examType?.id ?? marksheet.student.examId;
+    if (!studentId || !examTypeId) {
+      throw new Error("Student ID and Exam Type ID are required");
+    }
+
+    const studentRecord = await this.student().getStudentById(studentId);
+    if (!studentRecord) {
+      throw new Error(`Student ${studentId} not found`);
+    }
+
+    const recordId = studentRecord.studentRecordId ?? 0;
+    const classId = studentRecord.classId ?? 0;
+    const sectionId = studentRecord.sectionId ?? 0;
+    const schoolId = studentRecord.schoolId ?? this.activeSchoolId();
+    const studentCategoryId = studentRecord.studentCategoryId ?? 0;
+
+    if (!recordId || !classId || !sectionId || !studentCategoryId) {
+      throw new Error(
+        `Student ${studentId} is missing required class/section/record/category linkage`,
+      );
+    }
+
+    return await this.result().db.transaction(async (tx: MySQLDrizzleClient) => {
+      const category = categoryEnum.parse(marksheet.student.category);
+      const academicId = await this.result().getAcademicId();
+      const approvingStaffId = staffId || 1;
+
+      const examSetups = await this.result().getExamSetupsByClassSection(classId, sectionId);
+
+      await this.result().cleanMarks(
+        {
+          recordId,
+          studentId,
+          classId,
+          sectionId,
+          examTermId: examTypeId,
+          schoolId,
+        },
+        tx,
+      );
+
+      const marksData: MarksData = marksheet.records.map((r) => ({
+        subjectCode: r.subjectCode,
+        subjectName: r.subject,
+        subjectId: r.subjectId,
+        learningOutcome: r.learningOutcome ?? null,
+        examTitles: r.titles,
+        marks: r.marks,
+        total: r.totalScore,
+        grade: r.grade,
+      }));
+
+      const studentData: StudentInput = {
+        studentId,
+        recordId,
+        schoolId,
+        admissionNo: studentRecord.admissionNo ?? marksheet.student.adminNo,
+        fullName: marksheet.student.fullName,
+        class: marksheet.student.className,
+        classId,
+        className: studentRecord.className ?? marksheet.student.className,
+        sectionId,
+        sectionName: studentRecord.sectionName ?? marksheet.student.sectionName,
+        studentCategory: marksheet.student.category,
+        studentCategoryId,
+        term: marksheet.student.term,
+        examTypeId,
+        attendance: {
+          daysOpened: marksheet.student.daysOpened,
+          daysAbsent: marksheet.student.daysAbsent,
+          daysPresent: marksheet.student.daysPresent,
+        },
+      };
+
+      const batchData = await this.doProcessMarks(
+        studentData,
+        category,
+        marksData,
+        examSetups as ExamSetup[],
+        tx,
+      );
+
+      if (!batchData) {
+        throw new Error("Failed to process marks.");
+      }
+
+      if (!batchData.marks.length && !batchData.results.length) {
+        throw new Error("No marks or results were processed.");
+      }
+
+      await Promise.all([
+        this.result().batchUpsertMarkRecords(batchData.marks, tx),
+        this.result().batchUpsertResultRecords(batchData.results, tx),
+      ]);
+
+      const ratingsToInsert = marksheet.ratings
+        .filter(
+          (r): r is { attribute: string; rate: number; remark: string | null; color: string | null } =>
+            r.attribute !== null && r.rate !== null,
+        )
+        .map((r) => ({
+          studentId,
+          examTypeId,
+          attribute: r.attribute,
+          rate: r.rate,
+          remark: r.remark,
+          color: r.color,
+          academicId,
+        }));
+
+      if (ratingsToInsert.length > 0) {
+        await this.result().upsertStudentRatings(ratingsToInsert, tx);
+      }
+
+      if (marksheet.remark?.remark) {
+        await this.result().upsertTeacherRemark(
+          {
+            teacherId: approvingStaffId,
+            studentId,
+            examTypeId,
+            remark: marksheet.remark.remark,
+            academicId,
+          },
+          tx,
+        );
+      }
+
+      await this.result().upsertClassAttendance(
+        {
+          studentId,
+          examTypeId,
+          daysOpened: marksheet.student.daysOpened,
+          daysAbsent: marksheet.student.daysAbsent,
+          daysPresent: marksheet.student.daysPresent,
+          schoolId,
+          academicId,
+        },
+        tx,
+      );
+
+      await this.timeline().createTimelineIfNotExist({
+        staffStudentId: studentId,
+        title: "Marksheet committed",
+        description: `Marksheet for ${marksheet.student.fullName} committed`,
+        type: `exam-${examTypeId}`,
+        visibleToStudent: 0,
+        activeStatus: 1,
+        createdBy: approvingStaffId,
+        updatedBy: approvingStaffId,
+        schoolId,
+        date: new Date().toISOString().slice(0, 10),
+      });
+
+      marksheet.recordId = recordId;
+      return marksheet;
+    });
+  }
+
+  /**
    * @param id id of the student
    * @param examId  exam term id
    * @param adminNo admission number of the student
    * @param withImages whether to include images in the response
-   * @returns ResultOutput
+   * @returns Marksheet
    */
   async getStudentResult(params: {
     id?: number;
     examId: number;
     isAdminNo?: boolean;
     withImages?: boolean;
-  }): Promise<ResultOutput | null> {
+  }): Promise<Marksheet | null> {
     const { id, examId, isAdminNo, withImages } = params;
     const studentData = isAdminNo
       ? await this.student().getStudentById(id, isAdminNo)
@@ -610,6 +779,7 @@ export class AssessmentService {
       ratings,
       remark,
       examType,
+      recordId: studentData.studentRecordId ?? null,
     };
   }
 

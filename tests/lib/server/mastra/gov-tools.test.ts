@@ -181,9 +181,11 @@ describe("Slice 6: manageAccessLogic raw Drizzle removal (B10)", () => {
     });
 
     expect(result.status).toBe("ERROR");
-    expect(result.errorCode).toBe("STAFF_NOT_FOUND");
-    expect(spies.StaffRepository.updateStaffStatus).not.toHaveBeenCalled();
-    expect(spies.StaffRepository.deleteStaff).not.toHaveBeenCalled();
+    if (result.status === "ERROR") {
+      expect(result.errorCode).toBe("STAFF_NOT_FOUND");
+      expect(spies.StaffRepository.updateStaffStatus).not.toHaveBeenCalled();
+      expect(spies.StaffRepository.deleteStaff).not.toHaveBeenCalled();
+    }
   });
 
   it("B10: staff delete uses getById + deleteStaff (no raw Drizzle)", async () => {
