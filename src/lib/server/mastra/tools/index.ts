@@ -16,6 +16,7 @@ import {
 } from "./gov-tools";
 import { searchEntityLogic, systemStatusLogic, systemStatusSchema, switchWorkspaceSchema, switchWorkspaceLogic, type SearchCandidate, type SearchResult } from "./core-tools";
 import { carryForwardFilesLogic, carryForwardFilesSchema } from "./carry-forward";
+import { requestSelectionTool } from "./selection-tools";
 import {
   extractSchema,
   extractLogic,
@@ -337,6 +338,7 @@ export const coreTools = {
   searchEntityTool,
   systemStatusTool,
   searchWorkspaceTool,
+  requestSelectionTool,
 };
 
 export const workflowTools = {
