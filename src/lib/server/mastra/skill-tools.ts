@@ -40,21 +40,25 @@ export function resolveToolsForMessage(message: string, isSlashCommand: boolean)
     const command = message.trim().split(/\s+/)[0].toLowerCase();
 
     const skillCommandMap: Record<string, string> = {
-      '/grade': 'grading', '/mark': 'grading', '/attendance': 'grading',
-      '/enroll': 'onboarding', '/admit': 'onboarding', '/transfer': 'onboarding',
-      '/update': 'gov', '/suspend': 'gov', '/delete': 'gov', '/password': 'gov',
-      '/extract': 'assistant', '/generate': 'assistant',
-      '/validate': 'assistant', '/publish': 'assistant',
+      '/grade': 'academic', '/mark': 'academic', '/attendance': 'academic',
+      '/enroll': 'write', '/admit': 'write', '/transfer': 'write',
+      '/promote': 'write', '/demote': 'write',
+      '/update': 'write', '/staff': 'write', '/staff update': 'write',
+      '/assign': 'write', '/self-assign': 'write',
+      '/suspend': 'destructive', '/delete': 'destructive',
+      '/password': 'destructive', '/reactivate': 'destructive',
+      '/extract': 'reporting', '/generate': 'reporting', '/validate': 'reporting',
+      '/publish': 'reporting', '/marksheet': 'reporting',
+      '/result': 'reporting', '/view': 'reporting',
       '/search': 'default', '/switch': 'default', '/context': 'default',
     };
 
     const deprecatedAliasMap: Record<string, { canonical: string; skill: string }> = {
-      '/ban': { canonical: '/suspend', skill: 'gov' },
-      '/edit': { canonical: '/update', skill: 'gov' },
-      '/rename': { canonical: '/update', skill: 'gov' },
+      '/ban': { canonical: '/suspend', skill: 'destructive' },
+      '/edit': { canonical: '/update', skill: 'write' },
+      '/rename': { canonical: '/update', skill: 'write' },
       '/find': { canonical: '/search', skill: 'default' },
-      '/assign': { canonical: '/transfer', skill: 'onboarding' },
-      '/reset': { canonical: '/password', skill: 'gov' },
+      '/reset': { canonical: '/password', skill: 'destructive' },
       '/status': { canonical: '/context', skill: 'default' },
     };
 
