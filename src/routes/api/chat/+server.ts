@@ -62,12 +62,15 @@ const tenantContextCache = new TenantContextCache();
 
 export const POST: RequestHandler = async ({ request, locals: { user, session }, cookies }) => {
 
-	let { threadId, messages, selectedClass, fileReferences, mentions }: {
+	let { threadId, messages, selectedClass, fileReferences, mentions, runId: bodyRunId, step: bodyStep, resumeData: bodyResumeData }: {
 		threadId: string;
 		messages: xUIMessage[];
 		selectedClass?: ClassSection;
 		fileReferences?: FileReference[];
 		mentions?: MentionTag[];
+		runId?: string;
+		step?: string;
+		resumeData?: Record<string, any>;
 	} = await request.json();
 
 	if ((!user || !session) && !allowAnonymousChats) error(401, "Unauthorized");
@@ -147,6 +150,9 @@ export const POST: RequestHandler = async ({ request, locals: { user, session },
 	let stream;
 	try {
 		const params: ChatWorkflowParams = {
+			...(bodyRunId ? { runId: bodyRunId } : {}),
+			...(bodyResumeData ? { resumeData: bodyResumeData } : {}),
+			...(bodyStep ? { step: bodyStep } : {}),
 			inputData: {
 				threadId,
 				resourceId,
