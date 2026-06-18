@@ -55,6 +55,18 @@ import { generateThreadTitle, resolveThread } from '$lib/server/helpers/chat-hel
 import { DEFAULT_TITLE_MODEL } from '../agents/shared';
 import type { TenantContext } from '../tenant-context';
 
+const optionItemSchema = z.object({
+	id: z.string(),
+	label: z.string(),
+	icon: z.string().optional()
+});
+
+const pendingSelectionSchema = z.object({
+	options: z.array(optionItemSchema),
+	prompt: z.string(),
+	contextKey: z.string()
+});
+
 interface FriendlyError {
 	message: string;
 	action?: { label: string; href: string };
@@ -598,6 +610,113 @@ const assistantStep = createStep({
 	}
 });
 
+const selectionGateStep = createStep({
+	id: 'selectionGate',
+	description: 'Reads pendingSelection from requestContext and suspends for user choice; on resume, persists the selection.',
+	inputSchema: z.object({
+		text: z.string(),
+		resolvedFiles: z.array(fileStreamItemSchema).optional()
+	}),
+	outputSchema: z.object({
+		selectedOptionId: z.string(),
+		contextKey: z.string().nullable(),
+		text: z.string(),
+		resolvedFiles: z.array(fileStreamItemSchema).default([])
+	}),
+	suspendSchema: z.object({
+		options: z.array(optionItemSchema),
+		promptText: z.string(),
+		contextKey: z.string()
+	}),
+	resumeSchema: z.object({
+		selectedOptionId: z.string()
+	}),
+	execute: async ({ inputData, requestContext, resumeData, suspend }) => {
+		const rawPending = requestContext?.get('pendingSelection');
+		const parsed = pendingSelectionSchema.safeParse(rawPending);
+
+		if (!parsed.success) {
+			return { selectedOptionId: '', contextKey: null, text: inputData.text, resolvedFiles: inputData.resolvedFiles ?? [] };
+		}
+
+		const pending = parsed.data;
+
+		if (!resumeData) {
+			await suspend({
+				options: pending.options,
+				promptText: pending.prompt,
+				contextKey: pending.contextKey
+			});
+			return { selectedOptionId: '', contextKey: pending.contextKey, text: inputData.text, resolvedFiles: inputData.resolvedFiles ?? [] };
+		}
+
+		const selectedOption = pending.options.find((o) => o.id === resumeData.selectedOptionId);
+		const label = selectedOption?.label ?? resumeData.selectedOptionId;
+		requestContext?.set(pending.contextKey, resumeData.selectedOptionId);
+		requestContext?.set(`${pending.contextKey}Label`, label);
+
+		return {
+			selectedOptionId: resumeData.selectedOptionId,
+			contextKey: pending.contextKey,
+			text: inputData.text,
+			resolvedFiles: inputData.resolvedFiles ?? []
+		};
+	}
+});
+
+const continuationAssistantStep = createStep({
+	id: 'continuationAssistant',
+	description: 'Re-streams the assistant with the user-selected option embedded in the prompt.',
+	inputSchema: z.object({
+		selectedOptionId: z.string(),
+		contextKey: z.string().nullable(),
+		text: z.string(),
+		resolvedFiles: z.array(fileStreamItemSchema).default([])
+	}),
+	outputSchema: chatWorkflowOutputSchema,
+	execute: async ({ inputData, getInitData, mastra: m, requestContext, writer, abortSignal }) => {
+		if (inputData.contextKey === null || inputData.selectedOptionId === '') {
+			return { text: '', resolvedFiles: [] };
+		}
+
+		const agent = m?.getAgent('assistant');
+		if (!agent) throw new Error('Assistant agent not registered on Mastra instance');
+
+		const init = getInitData() as z.infer<typeof chatWorkflowInputSchema>;
+		const label = (requestContext?.get(`${inputData.contextKey}Label`) as string | undefined) ?? inputData.selectedOptionId;
+
+		const continuationPrompt = [
+			`The user originally asked: "${init.promptText}".`,
+			`They selected: "${label}" (id: ${inputData.selectedOptionId}).`,
+			'Continue your response based on their selection.'
+		].join('\n\n');
+
+		const stream = await streamWithAutoRetry({
+			stream: () =>
+				agent.stream(continuationPrompt, {
+					...(abortSignal ? { abortSignal: abortSignal } : {}),
+					...(requestContext ? { requestContext: requestContext } : {}),
+					...(requestContext?.get('providerOptions')
+						? { providerOptions: requestContext.get('providerOptions') as Record<string, Record<string, unknown>> as never }
+						: {}),
+					memory: {
+						thread: init.threadId,
+						resource: init.resourceId
+					},
+					maxSteps: 30
+				}),
+			abortSignal,
+			writer
+		});
+
+		await stream.fullStream.pipeTo(writer);
+		return {
+			text: await stream.text,
+			resolvedFiles: inputData.resolvedFiles
+		};
+	}
+});
+
 const titleStep = createStep({
 	id: 'title',
 	inputSchema: chatWorkflowInputSchema,
@@ -702,6 +821,8 @@ export const chatWorkflow = createWorkflow({
 	.then(collapseStep)
 	.then(hitlVerifyStep)
 	.then(assistantStep)
+	.then(selectionGateStep)
+	.then(continuationAssistantStep)
 	.commit();
 
 /**
@@ -709,3 +830,5 @@ export const chatWorkflow = createWorkflow({
  * `step:` argument off this id so the workflow ID and step ID stay in sync.
  */
 export const HITL_VERIFY_STEP_ID = hitlVerifyStep.id as 'hitl-verify';
+
+export const SELECTION_GATE_STEP_ID = selectionGateStep.id as 'selectionGate';

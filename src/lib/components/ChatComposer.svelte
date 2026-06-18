@@ -601,7 +601,7 @@
     <PromptInputTextarea
       bind:ref={textareaRef}
       onkeydown={handleKeydown}
-      placeholder="Message Hermes..."
+      placeholder="Ask anything, / for commands @ for context..."
       readonly={inputDisabled}
       class="resize-none border-none bg-transparent focus-visible:ring-0 text-base leading-relaxed scrollbar-slick min-h-[48px] w-full px-4 py-3 placeholder:text-muted-foreground/30 transition-all duration-300"
     />
