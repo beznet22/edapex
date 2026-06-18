@@ -631,7 +631,7 @@ const selectionGateStep = createStep({
 	resumeSchema: z.object({
 		selectedOptionId: z.string()
 	}),
-	execute: async ({ inputData, requestContext, resumeData, suspend }) => {
+	execute: async ({ inputData, requestContext, resumeData, suspend, writer, runId }) => {
 		const rawPending = requestContext?.get('pendingSelection');
 		const parsed = pendingSelectionSchema.safeParse(rawPending);
 
@@ -642,6 +642,19 @@ const selectionGateStep = createStep({
 		const pending = parsed.data;
 
 		if (!resumeData) {
+			const gateId = `gate-${runId}-${Date.now()}`;
+			if (writer) {
+				await writer.write({
+					type: 'data-selectOption',
+					id: gateId,
+					data: {
+						options: pending.options,
+						promptText: pending.prompt,
+						runId: runId ?? '',
+						stepId: 'selectionGate'
+					}
+				} as never);
+			}
 			await suspend({
 				options: pending.options,
 				promptText: pending.prompt,

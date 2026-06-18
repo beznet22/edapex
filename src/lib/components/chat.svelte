@@ -36,6 +36,7 @@
 
   import { cn } from "$lib/utils/shadcn";
   import { onMount } from "svelte";
+  import ActionBar from "./ai-elements/ActionBar.svelte";
 
   let {
     user,
@@ -299,8 +300,20 @@
 
   <!-- Shared Floating Input at bottom -->
   <div
-    class="absolute bottom-4 left-0 w-full pt-10 pb-4 px-2 sm:px-4 safe-area-bottom pointer-events-none z-50 flex justify-center"
+    class="absolute bottom-4 left-0 w-full pt-10 pb-4 px-2 sm:px-4 safe-area-bottom pointer-events-none z-50 flex flex-col items-center gap-2"
   >
+    {#if chat.pendingGate}
+      <div class="pointer-events-auto w-full max-w-[780px]">
+        <ActionBar
+          question={chat.pendingGate.question}
+          options={chat.pendingGate.options}
+          runId={chat.pendingGate.runId}
+          stepId={chat.pendingGate.stepId}
+          allowFreeText={chat.pendingGate.allowFreeText}
+          onSelect={(selection) => chat.resumePendingGate(selection)}
+        />
+      </div>
+    {/if}
     <div class="pointer-events-auto w-full max-w-[780px]">
       <ChatComposer {user} {readonly} isInitial={false} />
     </div>

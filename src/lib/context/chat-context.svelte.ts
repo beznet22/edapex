@@ -144,6 +144,20 @@ export type MentionPayload = {
   parentContext?: string;
 };
 
+export type PendingGateOption = {
+  id: string;
+  label: string;
+  icon?: string;
+};
+
+export type PendingGate = {
+  runId: string;
+  stepId: string;
+  question: string;
+  options: PendingGateOption[];
+  allowFreeText: boolean;
+};
+
 export type InitChat = {
   initialMessages?: xUIMessage[];
   api?: string;
@@ -180,6 +194,7 @@ export class ChatContext {
     this.threadData.pendingConfirmation = v;
   }
   pendingMentions = $state<MentionPayload[]>([]);
+  pendingGate = $state<PendingGate | null>(null);
   fileReferences = $state<
     {
       key: string;
@@ -263,6 +278,9 @@ export class ChatContext {
     this.threadData.resetReceived();
     // Clear any prior turn's error so a new send doesn't render the old alert
     this.lastError = null;
+    // Clear any pending gate from a prior turn so the ActionBar doesn't
+    // linger on the new stream (it represents a previous suspended workflow).
+    this.pendingGate = null;
 
     const api = "/api/chat";
     const lastMessage = messages.at(-1);
@@ -301,6 +319,7 @@ export class ChatContext {
 
     this.activeWorkflows = [];
     this.pendingConfirmation = null;
+    this.pendingGate = null;
 
     // Only navigate if we have a valid chatId AND conditions require it:
     // - Skip goto() if no data-chat event was received during stream (URL was already correct)
@@ -350,6 +369,17 @@ export class ChatContext {
       const data = (part as { data?: FriendlyAiError | { kind: string } }).data;
       if (data && typeof data === "object" && "kind" in data) {
         this.lastError = data as FriendlyAiError;
+      }
+    } else if (part.type === "data-selectOption") {
+      const data = (part as { data?: { options?: PendingGateOption[]; promptText?: string; runId?: string; stepId?: string } }).data;
+      if (data?.options && data.promptText && data.runId && data.stepId) {
+        this.pendingGate = {
+          runId: data.runId,
+          stepId: data.stepId,
+          question: data.promptText,
+          options: data.options,
+          allowFreeText: true
+        };
       }
     }
   };
@@ -405,6 +435,29 @@ export class ChatContext {
         behavior: "smooth",
       });
     }
+  };
+
+  setPendingGate = (gate: PendingGate | null): void => {
+    this.pendingGate = gate;
+  };
+
+  resumePendingGate = (selection: { selectedOptionId: string; freeTextAnswer?: string }): void => {
+    const gate = this.pendingGate;
+    if (!gate) return;
+    this.client.sendMessage(
+      { text: "" },
+      {
+        body: {
+          runId: gate.runId,
+          stepId: gate.stepId,
+          resumeData: {
+            selectedOptionId: selection.selectedOptionId,
+            freeTextAnswer: selection.freeTextAnswer,
+          },
+        },
+      },
+    );
+    this.pendingGate = null;
   };
 
   setContext = () => {
