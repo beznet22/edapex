@@ -1,12 +1,11 @@
 <script lang="ts">
-  import type { PageData } from "./$types.js";
-  import type { AuthUser } from "$lib/types/auth-types";
   import SharedChatView from "$lib/components/SharedChatView.svelte";
-  let { data }: { data: PageData } = $props();
+  import { useUser } from "$lib/context/user-context.svelte.js";
+  const userContext = useUser();
 </script>
 
 <SharedChatView
-  user={data.user as AuthUser}
+  user={userContext.user!}
   messages={[]}
   chatData={undefined}
   examTypeId={null}

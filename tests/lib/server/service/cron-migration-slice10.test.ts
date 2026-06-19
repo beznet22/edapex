@@ -55,7 +55,7 @@ const WORKFLOW_STEPS = [
 	"src/lib/server/mastra/workflows/publish.ts",
 ];
 
-const PAGE_SERVERS = ["src/routes/(chat)/+page.server.ts"];
+const PAGE_SERVERS: string[] = [];
 
 const REMOTE_FILES = ["src/lib/api/assessment.remote.ts"];
 
