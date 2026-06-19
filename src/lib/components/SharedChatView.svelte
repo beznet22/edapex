@@ -12,6 +12,7 @@
   import { Button } from "$lib/components/ui/button";
   import { ChatContext } from "$lib/context/chat-context.svelte.js";
   import { UserContext } from "$lib/context/user-context.svelte.js";
+  import { FilesContext } from "$lib/context/file-context.svelte";
   import { onMount } from "svelte";
   import { toast } from "svelte-sonner";
 
@@ -89,26 +90,10 @@
   });
 
   $effect(() => {
-    // Hydrate pending file references from localStorage. Works on `/` (no
-    // thread) and on `/chat/{id}` (thread created by /api/chat/start-with-files).
-    if (typeof localStorage === "undefined") return;
-    const key = "pendingFileReferences";
-    const raw = localStorage.getItem(key);
-    if (!raw) return;
-    try {
-      const parsed = JSON.parse(raw) as Array<{
-        key: string;
-        name: string;
-        type: "file" | "dir";
-        mimeType?: string;
-        fileId?: string;
-        contentHash?: string;
-      }>;
-      chatContext.fileReferences = parsed;
-    } catch (err) {
-      console.error("[SharedChatView] Failed to parse pendingFileReferences", err);
-    } finally {
-      localStorage.removeItem(key);
+    const filesContext = FilesContext.fromContext();
+    if (filesContext.references.length > 0) {
+      chatContext.fileReferences = [...filesContext.references];
+      filesContext.references = [];
     }
   });
 

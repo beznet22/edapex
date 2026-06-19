@@ -47,6 +47,7 @@ import type { FileReference } from "$lib/server/mastra/file-context";
 import { mastra } from "$lib/server/mastra";
 import { buildRequestContext, resolveThread } from "$lib/server/helpers/chat-helper";
 import { ALLOWED_DESIGNATIONS } from "$lib/types/sms-types";
+import { warmUpFileReferences } from "$lib/server/mastra/file-reference-warmup";
 import { chatWorkflowInputSchema } from "$lib/server/mastra/workflows/chat";
 import type { z } from "zod";
 import type { RequestContext } from "@mastra/core/request-context";
@@ -131,6 +132,15 @@ export const POST: RequestHandler = async ({ request, locals: { user, session },
 	if (activeContext.examTypeId === null) {
 		const resolved = await resolveExamTypeId(activeContext.schoolId, null);
 		activeContext = withExamTypeId(activeContext, resolved);
+	}
+
+	if (!bodyRunId && fileReferences && fileReferences.length > 0) {
+		try {
+			fileReferences = await warmUpFileReferences(activeContext, fileReferences);
+		} catch (err) {
+			const msg = err instanceof Error ? err.message : String(err);
+			console.warn(`[api/chat] File reference warm-up failed: ${msg}`);
+		}
 	}
 
 	const requestContext = await buildRequestContext({

@@ -34,6 +34,7 @@
 	import ScanSearch from "@lucide/svelte/icons/scan-search";
 	import MessageSquare from "@lucide/svelte/icons/message-square";
 	import { useInspector } from "$lib/context/inspector-context.svelte";
+	import { FilesContext } from "$lib/context/file-context.svelte";
 	import { mobileUiState } from "$lib/state/mobile-ui.svelte";
 	import { IsMobile } from "$lib/hooks/is-mobile.svelte";
 	import { backgroundTasks, serializeTenant } from "$lib/state/background-tasks.svelte";
@@ -311,27 +312,18 @@
 		if (!file) return;
 		isStartingChat = true;
 		try {
-			const res = await fetch("/api/chat/start-with-files", {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({
-					files: [
-						{
-							key: file.id,
-							name: file.title,
-							mimeType: mimeForKind(file.kind),
-							kind: file.kind,
-						},
-					],
-				}),
-			});
-			if (!res.ok) throw new Error(`HTTP ${res.status}`);
-			const json = (await res.json()) as { threadId: string; fileReferences: unknown[] };
-			if (typeof localStorage !== "undefined") {
-				localStorage.setItem("pendingFileReferences", JSON.stringify(json.fileReferences));
-			}
+			const threadId = crypto.randomUUID();
+			const filesContext = FilesContext.fromContext();
+			filesContext.references = [
+				{
+					key: file.id,
+					name: file.title,
+					type: "file",
+					mimeType: mimeForKind(file.kind),
+				},
+			];
 			clearSelection();
-			await goto("/");
+			await goto(`/chat/${threadId}`);
 		} catch (err) {
 			const message = err instanceof Error ? err.message : String(err);
 			toast.error(`Failed to start chat: ${message}`);
