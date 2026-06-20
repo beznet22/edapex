@@ -12,7 +12,7 @@ vi.mock("$app/server", () => ({
   getRequestEvent: () => ({}),
 }));
 
-import { createTenantContext, validateWorkspaceLock, WorkspaceMismatchError } from "$lib/server/mastra/tenant-context";
+import { createTenantContext, validateWorkspaceLock, WorkspaceMismatchError, type RepositoryClass, type ServiceClass } from "$lib/server/mastra/tenant-context";
 
 describe("Phase 3: Slash Commands & Governance", () => {
   describe("3.2 Secure Multi-Agent Execution & Disambiguation", () => {
@@ -281,50 +281,57 @@ describe("Phase 3: Slash Commands & Governance", () => {
     });
 
     it("Test: Destructive Confirmation: Verify explicit confirmation prompt for /ban, /suspend, and /reset password", async () => {
-      const { destructiveActionLogic } = await import("$lib/server/mastra/tools/gov-tools").catch(() => ({
-        destructiveActionLogic: () => {
+      const { manageAccessLogic } = await import("$lib/server/mastra/tools/operations/destructive/manage-account-access").catch(() => ({
+        manageAccessLogic: () => {
           throw new Error("Not implemented");
         },
       }));
 
-      const mockContext = createTenantContext({ staffId: 1, roleId: 1, classId: null, sectionId: null, examId: null, academicId: null, 
+      const mockContext = createTenantContext({ staffId: 1, roleId: 1, classId: null, sectionId: null, examId: null, academicId: null,
         schoolId: 1,
         userId: 1,
         designationId: 1, // IT
       });
 
-      // 1. Test /ban
-      const banResult = await destructiveActionLogic(mockContext, "ban", { targetId: 101 });
+      const toolContext = {
+        tenantContext: mockContext,
+        getRepo: <T>(_Repo: RepositoryClass<T>): T => {
+          throw new Error("getRepo not stubbed");
+        },
+        getService: <T>(_Svc: ServiceClass<T>): T => {
+          throw new Error("getService not stubbed");
+        },
+      };
+
+      const banResult = await manageAccessLogic(toolContext, { action: "ban", targetType: "staff", targetId: 101 });
       expect(banResult.status).toBe("NEEDS_CONFIRMATION");
       expect(banResult.message).toContain("Are you sure you want to ban");
 
-      // 2. Test /suspend
-      const suspendResult = await destructiveActionLogic(mockContext, "suspend", { targetId: 101 });
+      const suspendResult = await manageAccessLogic(toolContext, { action: "suspend", targetType: "staff", targetId: 101 });
       expect(suspendResult.status).toBe("NEEDS_CONFIRMATION");
 
-      // 3. Test /reset password
-      const resetResult = await destructiveActionLogic(mockContext, "reset password", { targetId: 101 });
+      const resetResult = await manageAccessLogic(toolContext, { action: "reset", targetType: "staff", targetId: 101 });
       expect(resetResult.status).toBe("NEEDS_CONFIRMATION");
     });
 
     it("Test: Patch Zod Masking: Verify /update and /edit strictly strip protected fields (id, role, schoolId) via .omit()", async () => {
-      const { patchEntitySchema } = await import("$lib/server/mastra/tools/gov-tools").catch(() => ({
-        patchEntitySchema: null,
+      const { updateRecordSchema } = await import("$lib/server/mastra/tools/operations/write/update-record").catch(() => ({
+        updateRecordSchema: null,
       }));
 
-      expect(patchEntitySchema).toBeDefined();
+      expect(updateRecordSchema).toBeDefined();
 
-      if (patchEntitySchema) {
+      if (updateRecordSchema) {
         const payloadWithProtectedFields = {
+          entityType: "student" as const,
+          entityId: 501,
           firstName: "Alice",
-          id: 999, // Should be stripped
-          role: "admin", // Should be stripped
-          schoolId: 1, // Should be stripped
+          id: 999,
+          role: "admin",
+          schoolId: 1,
         };
 
-        // Zod's .omit() or strict schemas should handle this.
-        // If we use .omit() on the base schema, the resulting schema will not have those fields.
-        const result = patchEntitySchema.safeParse(payloadWithProtectedFields);
+        const result = updateRecordSchema.safeParse(payloadWithProtectedFields);
         expect(result.success).toBe(true);
 
         if (result.success) {
@@ -337,7 +344,7 @@ describe("Phase 3: Slash Commands & Governance", () => {
     });
 
     it("Test: Intent Confidence Gate: Verify Gateway limits mutations at <90% and reads at <70% confidence", async () => {
-      const { validateIntentConfidence } = await import("$lib/server/mastra/tools/gov-tools").catch(() => ({
+      const { validateIntentConfidence } = await import("$lib/server/mastra/tools/operations/destructive/manage-account-access").catch(() => ({
         validateIntentConfidence: () => {
           throw new Error("Not implemented");
         },
@@ -362,7 +369,7 @@ describe("Phase 3: Slash Commands & Governance", () => {
     });
 
     it("Test: Explicit Command Override: Verify literal slash commands bypass intent scoring and assume 100% confidence", async () => {
-      const { validateIntentConfidence } = await import("$lib/server/mastra/tools/gov-tools");
+      const { validateIntentConfidence } = await import("$lib/server/mastra/tools/operations/destructive/manage-account-access");
 
       // If the prompt starts with a slash command, it's treated as 100% confidence
       const prompt = "/extract data from this image";

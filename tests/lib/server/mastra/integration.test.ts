@@ -206,8 +206,8 @@ describe("Slice 7: end-to-end bridge integration", () => {
     let manageResultsLogic: typeof import("$lib/server/mastra/tools/operations/academic/manage-academic-records").manageResultsLogic;
     let onboardEntityLogic: typeof import("$lib/server/mastra/tools/operations/write/enroll-student").onboardEntityLogic;
     let assignEntityLogic: typeof import("$lib/server/mastra/tools/operations/write/transfer-student").assignEntityLogic;
-    let patchEntityLogic: typeof import("$lib/server/mastra/tools/gov-tools").patchEntityLogic;
-    let manageAccessLogic: typeof import("$lib/server/mastra/tools/gov-tools").manageAccessLogic;
+    let patchEntityLogic: typeof import("$lib/server/mastra/tools/operations/write/update-record").updateRecordLogic;
+    let manageAccessLogic: typeof import("$lib/server/mastra/tools/operations/destructive/manage-account-access").manageAccessLogic;
 
     beforeEach(async () => {
       await import("$lib/server/repository/student.repo");
@@ -221,15 +221,16 @@ describe("Slice 7: end-to-end bridge integration", () => {
       const grading = await import("$lib/server/mastra/tools/operations/academic/manage-academic-records");
       const onboard = await import("$lib/server/mastra/tools/operations/write/enroll-student");
       const transfer = await import("$lib/server/mastra/tools/operations/write/transfer-student");
-      const gov = await import("$lib/server/mastra/tools/gov-tools");
+      const update = await import("$lib/server/mastra/tools/operations/write/update-record");
+      const access = await import("$lib/server/mastra/tools/operations/destructive/manage-account-access");
       searchEntityLogic = core.searchEntityLogic;
       systemStatusLogic = status.systemStatusLogic;
       switchWorkspaceLogic = sw.switchWorkspaceLogic;
       manageResultsLogic = grading.manageResultsLogic;
       onboardEntityLogic = onboard.onboardEntityLogic;
       assignEntityLogic = transfer.assignEntityLogic;
-      patchEntityLogic = gov.patchEntityLogic;
-      manageAccessLogic = gov.manageAccessLogic;
+      patchEntityLogic = update.updateRecordLogic;
+      manageAccessLogic = access.manageAccessLogic;
     });
 
     it("[1/8] searchEntityLogic: returns SUCCESS when single match found", async () => {
@@ -316,7 +317,7 @@ describe("Slice 7: end-to-end bridge integration", () => {
       stubs.StudentRepository.getById.mockResolvedValue({ id: 501, classId: 99, sectionId: 1, schoolId: 1, firstName: "X", lastName: "Y" });
       const ctx = makeContextWithStubs(tenantA, stubs);
       await expect(
-        patchEntityLogic(ctx as never, { studentId: 501, firstName: "New" } as never),
+        patchEntityLogic(ctx as never, { entityType: "student", entityId: 501, firstName: "New" }),
       ).rejects.toBeInstanceOf(WorkspaceMismatchError);
     });
 
@@ -338,7 +339,7 @@ describe("Slice 7: end-to-end bridge integration", () => {
     let manageResultsLogic: typeof import("$lib/server/mastra/tools/operations/academic/manage-academic-records").manageResultsLogic;
     let assignEntityLogic: typeof import("$lib/server/mastra/tools/operations/write/transfer-student").assignEntityLogic;
     let onboardEntityLogic: typeof import("$lib/server/mastra/tools/operations/write/enroll-student").onboardEntityLogic;
-    let manageAccessLogic: typeof import("$lib/server/mastra/tools/gov-tools").manageAccessLogic;
+    let manageAccessLogic: typeof import("$lib/server/mastra/tools/operations/destructive/manage-account-access").manageAccessLogic;
 
     beforeEach(async () => {
       await import("$lib/server/repository/student.repo");
@@ -349,11 +350,11 @@ describe("Slice 7: end-to-end bridge integration", () => {
       const grading = await import("$lib/server/mastra/tools/operations/academic/manage-academic-records");
       const onboard = await import("$lib/server/mastra/tools/operations/write/enroll-student");
       const transfer = await import("$lib/server/mastra/tools/operations/write/transfer-student");
-      const gov = await import("$lib/server/mastra/tools/gov-tools");
+      const access = await import("$lib/server/mastra/tools/operations/destructive/manage-account-access");
       manageResultsLogic = grading.manageResultsLogic;
       assignEntityLogic = transfer.assignEntityLogic;
       onboardEntityLogic = onboard.onboardEntityLogic;
-      manageAccessLogic = gov.manageAccessLogic;
+      manageAccessLogic = access.manageAccessLogic;
     });
 
     it("STUDENT_NOT_FOUND: assignEntityLogic returns errorCode when getById resolves to null", async () => {

@@ -136,7 +136,7 @@ describe("Slice 6: manageAccessLogic raw Drizzle removal (B10)", () => {
     };
   }
 
-  let manageAccessLogic: typeof import("$lib/server/mastra/tools/gov-tools").manageAccessLogic;
+  let manageAccessLogic: typeof import("$lib/server/mastra/tools/operations/destructive/manage-account-access").manageAccessLogic;
 
   beforeEach(async () => {
     const staffMod = await import("$lib/server/repository/staff.repo");
@@ -147,7 +147,7 @@ describe("Slice 6: manageAccessLogic raw Drizzle removal (B10)", () => {
     void studentMod.StudentRepository;
     void authMod.AuthRepository;
     void timelineMod.TimelineRepository;
-    const mod = await import("$lib/server/mastra/tools/gov-tools");
+    const mod = await import("$lib/server/mastra/tools/operations/destructive/manage-account-access");
     manageAccessLogic = mod.manageAccessLogic;
   });
 
