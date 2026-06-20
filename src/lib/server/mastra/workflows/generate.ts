@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { mistralOcrService } from '$lib/server/service/mistral-ocr.service';
 import { createAssessmentServiceForRequest } from '../../service/assessment.service';
 import { createTenantContext } from '../../mastra/tenant-context';
-import { resultOutputSchema } from '$lib/schema/result-output';
+import { marksheetSchema } from '$lib/schema/marksheet';
 import { mastra } from '$lib/server/mastra';
 
 export const generateTriggerSchema = z.object({
@@ -74,7 +74,7 @@ const openArtifactStep = createStep({
 const structuredOutputStep = createStep({
   id: 'structured-output',
   inputSchema: z.object({ fileId: z.string(), finalMarkdown: z.string(), tenantContext: z.any() }),
-  outputSchema: z.object({ fileId: z.string(), studentId: z.number(), resultOutput: resultOutputSchema, tenantContext: z.any() }),
+  outputSchema: z.object({ fileId: z.string(), studentId: z.number(), resultOutput: marksheetSchema, tenantContext: z.any() }),
   execute: async ({ inputData }) => {
     const { fileId, finalMarkdown, tenantContext } = inputData;
 
@@ -88,7 +88,7 @@ const structuredOutputStep = createStep({
       `Map this markdown to structured ResultOutput format in JSON:\n\n${finalMarkdown}`
     );
 
-    const parsed = resultOutputSchema.safeParse(response.object || JSON.parse(response.text));
+    const parsed = marksheetSchema.safeParse(response.object || JSON.parse(response.text));
     if (!parsed.success) {
       throw new Error('Failed to generate structured output');
     }
@@ -105,7 +105,7 @@ const structuredOutputStep = createStep({
 
 const constructPdfCardStep = createStep({
   id: 'construct-pdf-card',
-  inputSchema: z.object({ fileId: z.string(), studentId: z.number(), resultOutput: resultOutputSchema, tenantContext: z.any() }),
+  inputSchema: z.object({ fileId: z.string(), studentId: z.number(), resultOutput: marksheetSchema, tenantContext: z.any() }),
   outputSchema: z.object({ fileId: z.string(), success: z.boolean(), token: z.string().optional() }),
   execute: async ({ inputData }) => {
     const { fileId, studentId, resultOutput, tenantContext } = inputData;

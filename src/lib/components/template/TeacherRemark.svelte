@@ -1,8 +1,8 @@
 <script lang="ts">
-	import type { ResultOutput } from "$lib/schema/result-output";
+	import type { Marksheet } from "$lib/schema/marksheet";
 
 	interface Props {
-		remark: ResultOutput["remark"];
+		remark: Marksheet["remark"];
 	}
 
 	let { remark }: Props = $props();

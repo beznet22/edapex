@@ -1,8 +1,8 @@
 <script lang="ts">
-  import type { ResultOutput, Student } from "$lib/schema/result-output";
+  import type { Marksheet, Student } from "$lib/schema/marksheet";
 
   interface Props {
-    records: ResultOutput["records"];
+    records: Marksheet["records"];
     student: Student;
   }
 
@@ -10,7 +10,7 @@
   const { category, fullName } = student;
 
   function getMarkByTitle(
-    record: ResultOutput["records"][0],
+    record: Marksheet["records"][0],
     title: string,
   ): number | undefined {
     const index = record.titles.findIndex(
@@ -19,7 +19,7 @@
     return index !== -1 ? record.marks[index] : undefined;
   }
 
-  function getCA(record: ResultOutput["records"][0]): number | string {
+  function getCA(record: Marksheet["records"][0]): number | string {
     let caTotal = 0;
     let hasCA = false;
     record.titles.forEach((title, index) => {

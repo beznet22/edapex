@@ -64,9 +64,9 @@ describe("Slice 12: result-mapper agent registration", () => {
 			expect(agentSrc).toMatch(/id:\s*['"]result-mapper['"]/);
 		});
 
-		it("binds the output schema to resultOutputSchema (B12: structured-output step)", () => {
-			expect(agentSrc).toMatch(/import\s+\{\s*resultOutputSchema\s*\}\s+from\s+['"]\$lib\/schema\/result-output['"]/);
-			expect(agentSrc).toMatch(/(?:output|structuredOutput[^}]*schema):\s*resultOutputSchema/);
+		it("binds the output schema to marksheetSchema (B12: structured-output step)", () => {
+			expect(agentSrc).toMatch(/import\s+\{\s*marksheetSchema\s*\}\s+from\s+['"]\$lib\/schema\/marksheet['"]/);
+			expect(agentSrc).toMatch(/(?:output|structuredOutput[^}]*schema):\s*marksheetSchema/);
 		});
 
 		it("reads modelId from requestContext (per-tenant model resolution)", () => {

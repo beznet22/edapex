@@ -28,7 +28,7 @@ import type { TenantContext } from "$lib/server/mastra/tenant-context";
 import { ResultsRepository, StudentRepository } from "$lib/server/repository";
 import { createTenantFileStorage, TenantFileStorage } from "$lib/server/mastra/storage/tenant-file-storage";
 import { mistralOcrService } from "./mistral-ocr.service";
-import type { Category } from "$lib/schema/result-output";
+import type { Category } from "$lib/schema/marksheet";
 import { GRADE_RANGES } from "$lib/server/service/assessment.service";
 
 export interface ExtractionResult {

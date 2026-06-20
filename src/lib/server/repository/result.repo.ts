@@ -23,7 +23,7 @@ import type {
   Subject,
 } from "$lib/types/result-types";
 import { jsonArrayAgg } from "../helpers";
-import type { Rating, Remark, Student, SubjectAssigned } from "$lib/schema/result-output";
+import type { Rating, Remark, Student, SubjectAssigned } from "$lib/schema/marksheet";
 
 export class ResultsRepository extends BaseRepository {
   async assignSubjects(assigned: Partial<AssignedSubject>[]) {

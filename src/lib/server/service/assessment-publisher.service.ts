@@ -24,7 +24,7 @@ import { pageToHtml } from "$lib/server/helpers";
 import { generate } from "$lib/server/helpers/pdf-generator";
 import { SMTPClient } from "$lib/server/helpers/smtp";
 import { TimelineRepository, ResultsRepository, StudentRepository } from "$lib/server/repository";
-import { resultOutputSchema } from "$lib/schema/result-output";
+import { marksheetSchema } from "$lib/schema/marksheet";
 import ResultTemplate from "$lib/components/template/ResultTemplate.svelte";
 import ResultEmail from "$lib/components/template/result-email.svelte";
 
@@ -96,7 +96,7 @@ export class AssessmentPublisherService {
           (await this.student().getStudentById(studentId)) as never,
           examId,
         );
-        const validatedResult = await resultOutputSchema.safeParseAsync(resultData);
+        const validatedResult = await marksheetSchema.safeParseAsync(resultData);
         if (!validatedResult.success || !resultData) {
           processingErrors.push(`Student ${studentId}: Result validation failed`);
           return null;

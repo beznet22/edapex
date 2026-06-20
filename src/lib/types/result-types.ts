@@ -1,4 +1,4 @@
-import type { Category, ExamType, Rating, Remark } from "$lib/schema/result-output";
+import type { Category, ExamType, Rating, Remark } from "$lib/schema/marksheet";
 import * as schema from "$lib/server/db/schema";
 
 export type ResultData = typeof schema.smResultStores.$inferSelect;

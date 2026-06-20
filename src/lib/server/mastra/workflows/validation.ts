@@ -1,6 +1,6 @@
 import { createWorkflow, createStep } from '@mastra/core/workflows';
 import { z } from 'zod';
-import { resultOutputSchema } from '$lib/schema/result-output';
+import { marksheetSchema } from '$lib/schema/marksheet';
 import { createAssessmentServiceForRequest } from '../../service/assessment.service';
 import { createTenantContext } from '../../mastra/tenant-context';
 import { applyGradingBusinessLogic, validateAttendance } from '../../service/assessment-ocr.service';
@@ -39,17 +39,17 @@ const resolveMarkdownStep = createStep({
 const structuredOutputStep = createStep({
   id: 'structured-output',
   inputSchema: z.object({ fileId: z.string(), studentId: z.number().optional(), markdown: z.string() }),
-  outputSchema: z.object({ fileId: z.string(), studentId: z.number().optional(), resultOutput: resultOutputSchema.optional(), validationErrors: z.array(z.string()).optional() }),
+  outputSchema: z.object({ fileId: z.string(), studentId: z.number().optional(), resultOutput: marksheetSchema.optional(), validationErrors: z.array(z.string()).optional() }),
   execute: async ({ inputData }) => {
     const agent = mastra.getAgent('result-mapper');
     if (!agent) throw new Error('Agent result-mapper not found');
 
     const response = await (agent as any).generate(
       `Map this markdown to structured ResultOutput format:\n\n${inputData.markdown}`,
-      { output: resultOutputSchema }
+      { output: marksheetSchema }
     );
 
-    const parsed = await resultOutputSchema.safeParseAsync(response.object);
+    const parsed = await marksheetSchema.safeParseAsync(response.object);
     if (!parsed.success) {
       const errors = parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`);
       return { fileId: inputData.fileId, studentId: inputData.studentId, validationErrors: errors };
@@ -61,7 +61,7 @@ const structuredOutputStep = createStep({
 
 const handleValidationStep = createStep({
   id: 'handle-validation',
-  inputSchema: z.object({ fileId: z.string(), studentId: z.number().optional(), resultOutput: resultOutputSchema.optional(), validationErrors: z.array(z.string()).optional(), markdown: z.string().optional() }),
+  inputSchema: z.object({ fileId: z.string(), studentId: z.number().optional(), resultOutput: marksheetSchema.optional(), validationErrors: z.array(z.string()).optional(), markdown: z.string().optional() }),
   outputSchema: z.object({ fileId: z.string(), success: z.boolean(), token: z.string().optional(), errors: z.array(z.string()).optional() }),
   resumeSchema: z.object({
     approved: z.boolean(),

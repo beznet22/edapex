@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { Student } from "$lib/schema/result-output";
+  import type { Student } from "$lib/schema/marksheet";
 
 
   interface Props {

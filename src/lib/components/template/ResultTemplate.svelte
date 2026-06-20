@@ -5,10 +5,10 @@
   import ScoreSummary from "./ScoreSummary.svelte";
   import StudentRatings from "./StudentRatings.svelte";
   import TeacherRemark from "./TeacherRemark.svelte";
-  import type { ResultOutput } from "$lib/schema/result-output";
+  import type { Marksheet } from "$lib/schema/marksheet";
 
   interface Props {
-    data: ResultOutput;
+    data: Marksheet;
   }
 
   let { data }: Props = $props();

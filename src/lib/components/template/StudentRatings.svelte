@@ -1,5 +1,5 @@
 <script lang="ts">
-    import type { ResultOutput } from "$lib/schema/result-output";
+    import type { Marksheet } from "$lib/schema/marksheet";
 
 
   const badgeColors = [
@@ -22,7 +22,7 @@
   ];
 
   interface Props {
-    ratings: ResultOutput["ratings"];
+    ratings: Marksheet["ratings"];
   }
 
   let { ratings }: Props = $props();

@@ -15,7 +15,7 @@ import {
   type MarksRecord,
   type School,
   type Student,
-} from "$lib/schema/result-output";
+} from "$lib/schema/marksheet";
 import type { Marksheet } from "$lib/schema/marksheet";
 import { StudentRepository, ResultsRepository, TimelineRepository, StaffRepository } from "$lib/server/repository";
 import { ScopedRepositoryProvider } from "../mastra/scoped-repository";

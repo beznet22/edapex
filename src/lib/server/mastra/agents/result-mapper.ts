@@ -1,8 +1,8 @@
 /**
  * Result Mapper Agent — EdApex Structured-Output Pipeline
  *
- * Reads OCR'd transcript markdown and emits a structured `ResultOutput`
- * JSON object that conforms to `$lib/schema/result-output`. This is the
+ * Reads OCR'd transcript markdown and emits a structured `Marksheet`
+ * JSON object that conforms to `$lib/schema/marksheet`. This is the
  * missing piece in the `/generate` workflow (`workflows/generate.ts:80-90`),
  * which previously failed with `MISSING_AGENT` per the B12 audit.
  *
@@ -11,9 +11,9 @@
  * falling back to `DEFAULT_MODEL` from `agents/shared.ts`.
  *
  * ## Output
- * The `output` property binds the agent to `resultOutputSchema` so
+ * The `output` property binds the agent to `marksheetSchema` so
  * `agent.generate()` returns `{ object, text }` where `object` is a
- * validated `ResultOutput`. The downstream Step in `generate.ts` reads
+ * validated `Marksheet`. The downstream Step in `generate.ts` reads
  * `response.object || JSON.parse(response.text)` as a safety net.
  *
  * ## Tenant Isolation
@@ -29,7 +29,7 @@
  * and emits `null` for ambiguous fields rather than guessing.
  */
 import { Agent } from '@mastra/core/agent';
-import { resultOutputSchema } from '$lib/schema/result-output';
+import { marksheetSchema } from '$lib/schema/marksheet';
 import { StreamErrorRetryProcessor } from '@mastra/core/processors';
 import type { TenantContext } from '../tenant-context';
 import type { MastraModelConfig } from '@mastra/core/llm';
@@ -75,7 +75,7 @@ export const resultMapperAgent = new Agent({
 		return (requestContext?.get('modelId') as string) || DEFAULT_MODEL;
 	},
 	defaultOptions: {
-		structuredOutput: { schema: resultOutputSchema }
+		structuredOutput: { schema: marksheetSchema }
 	},
 	errorProcessors: [new StreamErrorRetryProcessor()],
 	requestContextSchema,

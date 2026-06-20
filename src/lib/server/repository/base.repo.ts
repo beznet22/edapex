@@ -2,7 +2,7 @@ import { getDatabase } from "../db";
 import type { MySql2Database } from "drizzle-orm/mysql2/driver";
 import { smAcademicYears, smExamTypes, smGeneralSettings } from "../db/sms-schema";
 import { eq, and, desc, type SQL } from "drizzle-orm";
-import type { ExamType } from "$lib/schema/result-output";
+import type { ExamType } from "$lib/schema/marksheet";
 import { ALLOWED_DESIGNATIONS } from "$lib/types/sms-types";
 import { DbInternalError } from "../helpers/errors";
 
