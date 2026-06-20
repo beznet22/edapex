@@ -294,7 +294,7 @@
   {open}
   {onOpenChange}
   class="sm:max-w-fit"
-  contentClass="p-0 bg-[#111]"
+  contentClass="p-0 bg-card"
   title={title || "Document"}
   description={ctx.preview?.pdfName ?? undefined}
   {extra}
@@ -336,7 +336,7 @@
             <img
               src={ctx.preview.images[ctx.currentIndex]}
               alt="Page {ctx.currentIndex + 1}"
-              class="shadow-[0_30px_60px_-15px_rgba(0,0,0,0.8)] rounded-sm select-none bg-white ring-1 ring-white/20 border-t border-white max-w-full max-h-[80vh] object-contain"
+              class="shadow-[0_30px_60px_-15px_oklch(0_0_0_/_0.8)] rounded-sm select-none bg-white ring-1 ring-white/20 border-t border-white max-w-full max-h-[80vh] object-contain"
               draggable="false"
             />
           {/key}
@@ -366,12 +366,12 @@
   }
 
   :global(.custom-scrollbar::-webkit-scrollbar-thumb) {
-    background: rgba(255, 255, 255, 0.1);
+    background: color-mix(in oklch, var(--foreground), transparent 90%);
     border-radius: 10px;
   }
 
   :global(.custom-scrollbar::-webkit-scrollbar-thumb:hover) {
-    background: rgba(255, 255, 255, 0.2);
+    background: color-mix(in oklch, var(--foreground), transparent 80%);
   }
 
 </style>

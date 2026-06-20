@@ -244,7 +244,7 @@
         <img
           src={`/api/uploads/${selectedUpload.id}.pdf?token=${selectedUpload.token}`}
           alt={selectedUpload.filename}
-          class="max-w-full max-h-[70vh] object-contain rounded-2xl shadow-[0_0_50px_rgba(0,0,0,0.5)] bg-white"
+          class="max-w-full max-h-[70vh] object-contain rounded-2xl shadow-[0_0_50px_oklch(0_0_0_/_0.5)] bg-white"
         />
       {:else}
         <div

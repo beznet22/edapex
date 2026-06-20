@@ -102,7 +102,7 @@
         <img
           src="/logo.svg"
           alt="Hermes Logo"
-          class="size-20 dark:invert opacity-90 relative z-10 drop-shadow-[0_0_15px_rgba(251,191,36,0.3)] transition-all duration-700 group-hover:opacity-100"
+          class="size-20 dark:invert opacity-90 relative z-10 drop-shadow-[0_0_15px_color-mix(in_oklch,var(--primary),transparent_70%)] transition-all duration-700 group-hover:opacity-100"
         />
       </div>
 

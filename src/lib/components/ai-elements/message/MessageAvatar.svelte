@@ -18,6 +18,6 @@
 </script>
 
 <Avatar class={avatarClasses} data-avatar-id={id} {...restProps}>
-  <AvatarImage alt="" class="mt-0 mb-0" {src} />
-  <AvatarFallback>{fallbackText}</AvatarFallback>
+  <AvatarImage alt={name ?? ""} class="mt-0 mb-0" {src} />
+  <AvatarFallback aria-label={name ?? undefined}>{fallbackText}</AvatarFallback>
 </Avatar>

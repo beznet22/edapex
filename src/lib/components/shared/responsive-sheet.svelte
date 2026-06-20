@@ -287,12 +287,12 @@
     }
 
     :global(.custom-scrollbar::-webkit-scrollbar-thumb) {
-        background: rgba(var(--primary), 0.1);
+        background: color-mix(in oklch, var(--primary), transparent 90%);
         border-radius: 10px;
     }
 
     :global(.custom-scrollbar::-webkit-scrollbar-thumb:hover) {
-        background: rgba(var(--primary), 0.2);
+        background: color-mix(in oklch, var(--primary), transparent 80%);
     }
 
     /* Hide default close buttons from Sheet/Drawer primitives globally when using ResponsiveSheet */

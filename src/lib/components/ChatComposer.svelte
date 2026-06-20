@@ -485,7 +485,7 @@
           <span class="max-w-[120px] truncate">{chat.studentData.name}</span>
           <button
             onclick={() => (chat.studentData = undefined)}
-            class="hover:text-foreground/80 transition-colors"
+            class="hover:text-foreground/80 transition-colors min-h-12 min-w-12 sm:min-h-8 sm:min-w-8 flex items-center justify-center"
             aria-label="Remove student"
           >
             <XIcon class="size-3" />
@@ -501,7 +501,7 @@
           <span class="max-w-[150px] truncate uppercase tracking-tighter">{f.name}</span>
           <button
             onclick={() => file.remove(i)}
-            class="opacity-40 group-hover:opacity-100 hover:text-foreground transition-all ml-1"
+            class="opacity-40 group-hover:opacity-100 hover:text-foreground transition-all ml-1 min-h-12 min-w-12 sm:min-h-8 sm:min-w-8 flex items-center justify-center"
             aria-label={`Remove ${f.name}`}
           >
             <XIcon class="size-3" />
@@ -524,7 +524,7 @@
           <span class="max-w-[150px] truncate uppercase tracking-tighter">{ocr.name}</span>
           <button
             onclick={() => removeOcrFile(ocr.id)}
-            class="opacity-40 group-hover:opacity-100 hover:text-foreground transition-all ml-1"
+            class="opacity-40 group-hover:opacity-100 hover:text-foreground transition-all ml-1 min-h-12 min-w-12 sm:min-h-8 sm:min-w-8 flex items-center justify-center"
             aria-label={`Remove ${ocr.name}`}
           >
             <XIcon class="size-3" />
@@ -545,7 +545,7 @@
             <span class="max-w-[150px] truncate uppercase tracking-tighter">{ref.name}</span>
             <button
               onclick={() => file.removeReference(ref.key)}
-              class="opacity-40 group-hover:opacity-100 hover:text-destructive transition-all ml-1"
+              class="opacity-40 group-hover:opacity-100 hover:text-destructive transition-all ml-1 min-h-12 min-w-12 sm:min-h-8 sm:min-w-8 flex items-center justify-center"
               aria-label={`Remove reference ${ref.name}`}
             >
               <XIcon class="size-3" />
@@ -688,7 +688,7 @@
                 {...props}
                 variant="ghost"
                 size="icon"
-                class="h-10 w-10 sm:min-h-12 sm:min-w-12 rounded-xl hover:bg-white/5 text-muted-foreground hover:text-primary transition-colors"
+                class="min-h-12 min-w-12 rounded-xl hover:bg-white/5 text-muted-foreground hover:text-primary transition-colors"
                 aria-label="Add"
               >
                 <PlusIcon class="size-4.5" />
@@ -895,7 +895,7 @@
               <Button
                 {...props}
                 variant="ghost"
-                class="text-[10px] rounded-4xl sm:text-xs font-bold tracking-widest text-muted-foreground transition-colors gap-1.5"
+                class="text-[10px] rounded-4xl sm:text-xs font-bold tracking-widest text-muted-foreground transition-colors gap-1.5 min-h-12 min-w-12 sm:min-h-8"
                 aria-label="Select thinking mode"
               >
                 <span class="hidden sm:inline truncate max-w-[120px]">{currentVariantLabel}</span>

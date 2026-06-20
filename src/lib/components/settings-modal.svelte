@@ -652,7 +652,7 @@
                       ? 'border-primary ring-4 ring-primary/10 shadow-2xl'
                       : 'border-sidebar-border/50 hover:border-sidebar-border grayscale hover:grayscale-0'}"
                   >
-                    <div class="absolute inset-0 bg-[#F9FAFB] p-3">
+                    <div class="absolute inset-0 bg-background p-3">
                       <div
                         class="w-full h-2 bg-sidebar-border/20 rounded-full mb-2"
                       ></div>
@@ -684,7 +684,7 @@
                       ? 'border-primary ring-4 ring-primary/10 shadow-2xl'
                       : 'border-sidebar-border/50 hover:border-sidebar-border grayscale hover:grayscale-0'}"
                   >
-                    <div class="absolute inset-0 bg-[#0A0A0A] p-3">
+                    <div class="absolute inset-0 bg-background p-3">
                       <div
                         class="w-full h-2 bg-sidebar-border/20 rounded-full mb-2"
                       ></div>
@@ -696,7 +696,7 @@
                       class="absolute bottom-3 left-3 flex items-center gap-2"
                     >
                       <div
-                        class="size-6 rounded-lg bg-[#111] border border-sidebar-border/50 flex items-center justify-center text-slate-500"
+                        class="size-6 rounded-lg bg-card border border-sidebar-border/50 flex items-center justify-center text-slate-500"
                       >
                         <MoonIcon class="size-3.5" />
                       </div>

@@ -74,7 +74,7 @@
     border: 1px solid var(--border);
     padding: 2px;
     border-radius: 6px;
-    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+    box-shadow: 0 4px 6px -1px oklch(0 0 0 / 0.1), 0 2px 4px -2px oklch(0 0 0 / 0.1);
     animation: delayed-fade-in 0.4s ease-out forwards;
     opacity: 0;
     z-index: 50;
