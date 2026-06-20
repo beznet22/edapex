@@ -23,13 +23,6 @@ vi.mock("$app/environment", () => ({
   browser: false,
 }));
 
-// `@ai-sdk/deepseek` is missing from the local node_modules in this environment.
-// The package is transitively imported through `$lib/server/helpers/chat-helper`
-// → `$lib/server/mastra` → provider resolver. Stub it so the module graph loads.
-vi.mock("@ai-sdk/deepseek", () => ({
-  createDeepSeek: () => ({}),
-}));
-
 import { LocalFilesystem } from "@mastra/core/workspace";
 import { warmUpFileReferences } from "$lib/server/mastra/file-reference-warmup";
 import { tenantWorkspace } from "$lib/server/mastra/storage/workspaces";

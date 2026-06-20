@@ -74,9 +74,9 @@ export const BUILTIN_PROVIDERS: Record<ProviderId, ProviderInfo> = {
 		name: 'DeepSeek',
 		enabled: false,
 		env: ['DEEPSEEK_API_KEY'],
-		// `package` is read by resolver.ts to decide between the native
-		// Mastra router and a direct createDeepSeek() factory.
-		api: { type: 'aisdk', package: '@ai-sdk/deepseek', url: 'https://api.deepseek.com' },
+		// `package` is read by resolver.ts to decide which AI-SDK
+		// factory (if any) to wrap the request in.
+		api: { type: 'aisdk', package: '@ai-sdk/openai-compatible', url: 'https://api.deepseek.com' },
 		request: { headers: {}, body: {} },
 		description: 'Deep reasoning and code intelligence',
 		docUrl: 'https://platform.deepseek.com/api_keys'

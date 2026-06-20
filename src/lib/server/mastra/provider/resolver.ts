@@ -2,21 +2,17 @@
  * Model resolver — V2.
  *
  * The single entry point between the cookie value (`<provider>/<model>@<variant>`)
- * and the agent's `model` callback. Resolves a model into one of three
- * `MastraModelConfig` shapes (all accepted by `agent.model`):
+ * and the agent's `model` callback. Resolves a model into one of two
+ * `MastraModelConfig` shapes (both accepted by `agent.model`):
  *
- *   1. `OpenAICompatibleConfig` object — for Groq and OpenCode Zen. The
+ *   1. `OpenAICompatibleConfig` object — for any provider whose catalog entry
+ *      declares `provider.api.package === '@ai-sdk/openai-compatible'` (Groq,
+ *      OpenCode Zen, DeepSeek via the OpenAI-compatible DeepSeek API). The
  *      native Mastra router resolves this against `provider.api.url`,
  *      `provider.api.apiKey`, and a `customFetch` that captures rate-limit
  *      headers uniformly.
  *
- *   2. `LanguageModelV2` instance — for DeepSeek, built via
- *      `createDeepSeek({...}).chatModel(modelName)`. The special case is
- *      driven by `provider.api.package === '@ai-sdk/deepseek'` (data, not
- *      control flow) and preserves the `messages[N]: missing field content`
- *      bug fix that V1 had at `gateway.ts:238-246`.
- *
- *   3. `ModelRouterModelId` string (env-keyed fallback) — returned by
+ *   2. `ModelRouterModelId` string (env-keyed fallback) — returned by
  *      `pickDefaultModelId` when the cookie is empty and no user credential
  *      is configured.
  *
@@ -24,7 +20,6 @@
  * the variant's `options` as `providerOptions[providerId]` for the caller
  * to pass as `agent.stream(..., { providerOptions })`.
  */
-import { createDeepSeek } from '@ai-sdk/deepseek';
 import type { LibSQLDatabase } from 'drizzle-orm/libsql';
 import { env as svelteEnv } from '$env/dynamic/private';
 import type { MastraModelConfig } from '@mastra/core/llm';
@@ -86,15 +81,6 @@ function buildModel(
 			fetch: customFetch
 		} as unknown as MastraModelConfig;
 	}
-	if (api.package === '@ai-sdk/deepseek') {
-		const deepseek = createDeepSeek({
-			apiKey,
-			baseURL: api.url,
-			fetch: customFetch
-		});
-		return deepseek(modelName) as unknown as MastraModelConfig;
-	}
-	// Default: openai-compatible (groq, opencode, future providers).
 	return {
 		id: `${providerId}/${modelName}`,
 		url: api.url,

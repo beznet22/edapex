@@ -3,9 +3,9 @@
  *
  * Walks the JSON request body that is about to be sent to an LLM provider and
  * ensures every message with `role: "tool"` has a string `content` field. This
- * works around SDK bugs (e.g. `@ai-sdk/deepseek` and unpatched
- * `@ai-sdk/openai-compatible`) that leave `content` undefined when a tool
- * result has an unhandled or empty output type.
+ * works around SDK bugs in unpatched `@ai-sdk/openai-compatible`
+ * providers (e.g. DeepSeek, Groq, OpenCode Zen) that leave `content`
+ * undefined when a tool result has an unhandled or empty output type.
  */
 
 function coerceToString(value: unknown): string {
