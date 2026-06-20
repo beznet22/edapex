@@ -90,17 +90,19 @@ describe("Assignment tools", () => {
     };
   }
 
-  let assignStaffToClassLogic: typeof import("$lib/server/mastra/tools/assignment-tools").assignStaffToClassLogic;
-  let assignStaffToSubjectLogic: typeof import("$lib/server/mastra/tools/assignment-tools").assignStaffToSubjectLogic;
-  let teacherSelfAssignClassLogic: typeof import("$lib/server/mastra/tools/assignment-tools").teacherSelfAssignClassLogic;
+  let assignStaffToClassLogic: typeof import("$lib/server/mastra/tools/operations/write/assign-staff-to-class").assignStaffToClassLogic;
+  let assignStaffToSubjectLogic: typeof import("$lib/server/mastra/tools/operations/write/assign-staff-to-subject").assignStaffToSubjectLogic;
+  let teacherSelfAssignClassLogic: typeof import("$lib/server/mastra/tools/operations/write/teacher-self-assign-class").teacherSelfAssignClassLogic;
 
   beforeEach(async () => {
     const assignmentMod = await import("$lib/server/repository/assignment.repo");
     void assignmentMod.AssignmentRepository;
-    const mod = await import("$lib/server/mastra/tools/assignment-tools");
-    assignStaffToClassLogic = mod.assignStaffToClassLogic;
-    assignStaffToSubjectLogic = mod.assignStaffToSubjectLogic;
-    teacherSelfAssignClassLogic = mod.teacherSelfAssignClassLogic;
+    const classMod = await import("$lib/server/mastra/tools/operations/write/assign-staff-to-class");
+    const subjectMod = await import("$lib/server/mastra/tools/operations/write/assign-staff-to-subject");
+    const selfMod = await import("$lib/server/mastra/tools/operations/write/teacher-self-assign-class");
+    assignStaffToClassLogic = classMod.assignStaffToClassLogic;
+    assignStaffToSubjectLogic = subjectMod.assignStaffToSubjectLogic;
+    teacherSelfAssignClassLogic = selfMod.teacherSelfAssignClassLogic;
   });
 
   describe("assignStaffToClassLogic", () => {

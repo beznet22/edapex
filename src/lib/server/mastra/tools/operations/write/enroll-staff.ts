@@ -10,8 +10,6 @@ import { StaffRepository } from "../../../../repository/staff.repo";
 import { StudentRepository } from "../../../../repository/student.repo";
 import { smStaffs, smDesignations, smHumanDepartments } from "../../../../db/sms-schema";
 
-const SCHOOL_ID = 1 as const;
-
 const DESIGNATION_SLUG_TO_ID: Record<string, number> = {
   it: 1,
   coordinator: 5,
@@ -142,7 +140,7 @@ export const enrollStaffLogic = async (
       genderId,
       qualification: params.qualification,
       experience: params.experience,
-      schoolId: SCHOOL_ID,
+      schoolId: context.tenantContext.schoolId,
     });
 
     const dob = parseDateOfBirth(params.dateOfBirth);

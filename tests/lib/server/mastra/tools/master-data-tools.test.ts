@@ -37,7 +37,7 @@ import { createTenantContext } from '$lib/server/mastra/tenant-context';
 import {
 	listMasterDataLogic,
 	type ListMasterDataInput
-} from '$lib/server/mastra/tools/master-data-tools';
+} from '$lib/server/mastra/tools/operations/read/list-master-data';
 
 describe('listMasterDataLogic', () => {
 	function makeToolContext(repoSpies: {

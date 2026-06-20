@@ -149,17 +149,18 @@ describe("Staff tools", () => {
     };
   }
 
-  let enrollStaffLogic: typeof import("$lib/server/mastra/tools/staff-tools").enrollStaffLogic;
-  let updateStaffBiodataLogic: typeof import("$lib/server/mastra/tools/staff-tools").updateStaffBiodataLogic;
+  let enrollStaffLogic: typeof import("$lib/server/mastra/tools/operations/write/enroll-staff").enrollStaffLogic;
+  let updateStaffBiodataLogic: typeof import("$lib/server/mastra/tools/operations/write/update-staff-biodata").updateStaffBiodataLogic;
 
   beforeEach(async () => {
     const staffMod = await import("$lib/server/repository/staff.repo");
     const studentMod = await import("$lib/server/repository/student.repo");
     void staffMod.StaffRepository;
     void studentMod.StudentRepository;
-    const mod = await import("$lib/server/mastra/tools/staff-tools");
-    enrollStaffLogic = mod.enrollStaffLogic;
-    updateStaffBiodataLogic = mod.updateStaffBiodataLogic;
+    const enrollMod = await import("$lib/server/mastra/tools/operations/write/enroll-staff");
+    const biodataMod = await import("$lib/server/mastra/tools/operations/write/update-staff-biodata");
+    enrollStaffLogic = enrollMod.enrollStaffLogic;
+    updateStaffBiodataLogic = biodataMod.updateStaffBiodataLogic;
   });
 
   describe("enrollStaffLogic", () => {
