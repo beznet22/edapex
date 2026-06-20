@@ -22,7 +22,7 @@ import { getDatabase } from '$lib/server/db';
 import type { TenantContext } from '../tenant-context';
 import type { MastraModelConfig } from '@mastra/core/llm';
 import { requestContextSchema, DEFAULT_MODEL } from './shared';
-import { getContextTool } from '../tools/context-tool';
+import { getContextTool } from '../tools/internal/context-tool';
 
 // ─── Supervisor Agent ───────────────────────────────────────────────────────
 

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { htmlToMarkdown, parseSearchResults } from '$lib/server/mastra/tools/html-to-markdown';
+import { htmlToMarkdown, parseSearchResults } from '$lib/server/mastra/tools/internal/html-to-markdown';
 
 describe('htmlToMarkdown', () => {
 	describe('empty/null/invalid input', () => {

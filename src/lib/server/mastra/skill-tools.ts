@@ -3,9 +3,9 @@ import {
   workflowTools,
   searchEntityTool,
 } from '$lib/server/mastra/tools/index';
-import { globalTools } from '$lib/server/mastra/tools/global-tools';
+import { globalTools } from '$lib/server/mastra/tools/internal/global-tools';
 import { SkillRegistry } from '$lib/server/mastra/skill-registry';
-import { getContextTool } from '$lib/server/mastra/tools/context-tool';
+import { getContextTool } from '$lib/server/mastra/tools/internal/context-tool';
 
 const ALL_TOOLS = [
   searchEntityTool,

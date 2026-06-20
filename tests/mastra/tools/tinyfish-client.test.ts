@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
 	SlidingWindowRateLimiter,
 	TinyfishUnavailableError
-} from '$lib/server/mastra/tools/tinyfish-client';
+} from '$lib/server/mastra/tools/internal/tinyfish-client';
 
 // Mock $env/dynamic/private
 vi.mock('$env/dynamic/private', () => ({
@@ -130,12 +130,12 @@ describe('TinyFish Client', () => {
 	});
 
 	describe('tinyfishSearch', () => {
-		let tinyfishSearch: typeof import('$lib/server/mastra/tools/tinyfish-client').tinyfishSearch;
-		let searchRateLimiter: typeof import('$lib/server/mastra/tools/tinyfish-client').searchRateLimiter;
+		let tinyfishSearch: typeof import('$lib/server/mastra/tools/internal/tinyfish-client').tinyfishSearch;
+		let searchRateLimiter: typeof import('$lib/server/mastra/tools/internal/tinyfish-client').searchRateLimiter;
 
 		beforeEach(async () => {
 			vi.stubGlobal('fetch', vi.fn());
-			const mod = await import('$lib/server/mastra/tools/tinyfish-client');
+			const mod = await import('$lib/server/mastra/tools/internal/tinyfish-client');
 			tinyfishSearch = mod.tinyfishSearch;
 			searchRateLimiter = mod.searchRateLimiter;
 			searchRateLimiter.reset();
@@ -330,12 +330,12 @@ describe('TinyFish Client', () => {
 	});
 
 	describe('tinyfishFetch', () => {
-		let tinyfishFetch: typeof import('$lib/server/mastra/tools/tinyfish-client').tinyfishFetch;
-		let fetchRateLimiter: typeof import('$lib/server/mastra/tools/tinyfish-client').fetchRateLimiter;
+		let tinyfishFetch: typeof import('$lib/server/mastra/tools/internal/tinyfish-client').tinyfishFetch;
+		let fetchRateLimiter: typeof import('$lib/server/mastra/tools/internal/tinyfish-client').fetchRateLimiter;
 
 		beforeEach(async () => {
 			vi.stubGlobal('fetch', vi.fn());
-			const mod = await import('$lib/server/mastra/tools/tinyfish-client');
+			const mod = await import('$lib/server/mastra/tools/internal/tinyfish-client');
 			tinyfishFetch = mod.tinyfishFetch;
 			fetchRateLimiter = mod.fetchRateLimiter;
 			fetchRateLimiter.reset();
@@ -521,7 +521,7 @@ describe('TinyFish Client', () => {
 			}));
 
 			// Re-import to get the module with the new mock
-			const mod = await import('$lib/server/mastra/tools/tinyfish-client');
+			const mod = await import('$lib/server/mastra/tools/internal/tinyfish-client');
 
 			await expect(mod.tinyfishSearch('test')).rejects.toThrow(TinyfishUnavailableError);
 			await expect(mod.tinyfishFetch('https://example.com')).rejects.toThrow(

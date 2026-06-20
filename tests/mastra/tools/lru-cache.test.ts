@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { LRUCache } from '$lib/server/mastra/tools/lru-cache';
+import { LRUCache } from '$lib/server/mastra/tools/internal/lru-cache';
 
 describe('LRUCache', () => {
 	beforeEach(() => {

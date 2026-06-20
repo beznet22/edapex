@@ -33,7 +33,7 @@ vi.mock("$lib/components/template/result-email.svelte", () => ({
   default: {},
 }));
 
-import { requestSelectionLogic } from "$lib/server/mastra/tools/selection-tools";
+import { requestSelectionLogic } from "$lib/server/mastra/tools/internal/selection-tools";
 
 describe("requestSelectionLogic", () => {
   function makeContext() {

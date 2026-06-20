@@ -8,7 +8,7 @@ vi.mock('$env/dynamic/private', () => ({
 
 import { SkillRegistry } from '$lib/server/mastra/skill-registry';
 import { RESERVED_GLOBAL_TOOL_IDS } from '$lib/server/mastra/skill-schema';
-import { globalTools } from '$lib/server/mastra/tools/global-tools';
+import { globalTools } from '$lib/server/mastra/tools/internal/global-tools';
 import { writeFile, mkdir, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 

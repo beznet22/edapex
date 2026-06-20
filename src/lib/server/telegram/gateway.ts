@@ -4,7 +4,7 @@ import { mastra } from "$lib/server/mastra";
 import { getDatabase } from "$lib/server/db";
 import { sendMessage, type TelegramUpdate } from "./bot";
 import { ConnectTokenStore } from "./connect-tokens";
-import { ParentContext } from "$lib/server/mastra/tools/parent-permissions";
+import { ParentContext } from "$lib/server/mastra/tools/internal/parent-permissions";
 
 interface ParentRow {
   id: number;

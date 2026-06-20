@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { validateUrlForSSRF } from '$lib/server/mastra/tools/global-tools';
+import { validateUrlForSSRF } from '$lib/server/mastra/tools/internal/global-tools';
 
 // Mock $env/dynamic/private
 vi.mock('$env/dynamic/private', () => ({
@@ -86,17 +86,17 @@ describe('Global Tools', () => {
 
 	describe('webSearchTool', () => {
 		let webSearchTool: any;
-		let searchCache: typeof import('$lib/server/mastra/tools/global-tools').searchCache;
+		let searchCache: typeof import('$lib/server/mastra/tools/internal/global-tools').searchCache;
 
 		beforeEach(async () => {
 			vi.stubGlobal('fetch', vi.fn());
-			const mod = await import('$lib/server/mastra/tools/global-tools');
+			const mod = await import('$lib/server/mastra/tools/internal/global-tools');
 			webSearchTool = mod.webSearchTool;
 			searchCache = mod.searchCache;
 			searchCache.clear();
 
 			// Reset rate limiters
-			const tinyfishMod = await import('$lib/server/mastra/tools/tinyfish-client');
+			const tinyfishMod = await import('$lib/server/mastra/tools/internal/tinyfish-client');
 			tinyfishMod.searchRateLimiter.reset();
 		});
 
@@ -209,17 +209,17 @@ describe('Global Tools', () => {
 
 	describe('webFetchTool', () => {
 		let webFetchTool: any;
-		let fetchCache: typeof import('$lib/server/mastra/tools/global-tools').fetchCache;
+		let fetchCache: typeof import('$lib/server/mastra/tools/internal/global-tools').fetchCache;
 
 		beforeEach(async () => {
 			vi.stubGlobal('fetch', vi.fn());
-			const mod = await import('$lib/server/mastra/tools/global-tools');
+			const mod = await import('$lib/server/mastra/tools/internal/global-tools');
 			webFetchTool = mod.webFetchTool;
 			fetchCache = mod.fetchCache;
 			fetchCache.clear();
 
 			// Reset rate limiters
-			const tinyfishMod = await import('$lib/server/mastra/tools/tinyfish-client');
+			const tinyfishMod = await import('$lib/server/mastra/tools/internal/tinyfish-client');
 			tinyfishMod.fetchRateLimiter.reset();
 		});
 

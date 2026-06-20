@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { ddgSearch, DDGBotChallengeError } from '$lib/server/mastra/tools/ddg-scraper';
+import { ddgSearch, DDGBotChallengeError } from '$lib/server/mastra/tools/internal/ddg-scraper';
 
 // Mock global fetch
 const mockFetch = vi.fn();

@@ -229,11 +229,11 @@ describe("Slice 8: tool and slash-command rename contract", () => {
  */
 describe("Slice 11: read-only tools contract", () => {
   const globalToolsSrc = readFileSync(
-    join(process.cwd(), "src/lib/server/mastra/tools/global-tools.ts"),
+    join(process.cwd(), "src/lib/server/mastra/tools/internal/global-tools.ts"),
     "utf-8",
   );
   const contextToolSrc = readFileSync(
-    join(process.cwd(), "src/lib/server/mastra/tools/context-tool.ts"),
+    join(process.cwd(), "src/lib/server/mastra/tools/internal/context-tool.ts"),
     "utf-8",
   );
   const coreToolsSrc = readFileSync(
