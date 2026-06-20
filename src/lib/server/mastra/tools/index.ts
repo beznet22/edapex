@@ -15,7 +15,7 @@ import {
   publishLogic,
   generateSchema,
   generateLogic,
-} from "./workflow-tools";
+} from "./operations/reporting/workflow-tools";
 import type { MastraToolContext } from "../tenant-context";
 
 export { searchSchoolDirectoryTool as searchEntityTool };

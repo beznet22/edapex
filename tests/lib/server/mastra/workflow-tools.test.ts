@@ -94,7 +94,7 @@ import {
 	validateSchema,
 	publishSchema,
 	generateSchema,
-} from "$lib/server/mastra/tools/workflow-tools";
+} from "$lib/server/mastra/tools/operations/reporting/workflow-tools";
 import { extractTool, validateTool, publishTool, generateTool, workflowTools } from "$lib/server/mastra/tools";
 import { createTenantContext, type MastraToolContext } from "$lib/server/mastra/tenant-context";
 import { AssessmentService } from "$lib/server/service/assessment.service";

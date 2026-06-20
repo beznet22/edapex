@@ -1,8 +1,7 @@
 import { z } from "zod";
-import type { MastraToolContext } from "../tenant-context";
-import { AssessmentService } from "../../service/assessment.service";
-
-// ─── Schemas ──────────────────────────────────────────────────────────────────
+import type { MastraToolContext } from "../../../tenant-context";
+import { ScopedRepositoryProvider } from "../../../scoped-repository";
+import { AssessmentService } from "../../../../service/assessment.service";
 
 export const extractSchema = z.object({
 	fileUrls: z.array(z.string().url()).min(1).describe("URLs of uploaded documents/images to extract data from"),
@@ -23,7 +22,6 @@ export const publishSchema = z.object({
 	sendEmail: z.boolean().default(true).describe("Whether to dispatch email notifications to parents/guardians"),
 });
 
-/** B12: Schema for the missing generate tool. Mirrors generateTriggerSchema in workflows/generate.ts:8-17 minus the embedded tenantContext (which the bridge provides). */
 export const generateSchema = z.object({
 	fileIds: z.array(z.string().min(1)).min(1).describe("File IDs returned by the previous /extract step (e.g. mistral-ocr fileIds)"),
 	classId: z.number().int().positive().describe("Target class ID"),
@@ -31,14 +29,12 @@ export const generateSchema = z.object({
 	staffId: z.number().int().positive().optional().describe("Submitting teacher's staff ID (falls back to tenantContext.staffId)"),
 });
 
-// ─── Extract Logic ────────────────────────────────────────────────────────────
-
 export type ExtractionResult = {
 	status: "EXTRACTION_STARTED" | "EXTRACTION_COMPLETE" | "EXTRACTION_FAILED";
 	workflowRunId?: string;
 	extractedCount?: number;
 	errors?: string[];
-	stagingData?: Record<string, any>[];
+	stagingData?: Record<string, unknown>[];
 };
 
 export const extractLogic = async (
@@ -70,8 +66,6 @@ export const extractLogic = async (
 		fileReferences: input.fileUrls.map((url) => ({ url })),
 	});
 };
-
-// ─── Validate Logic ───────────────────────────────────────────────────────────
 
 export type ValidationResult = {
 	status: "VALIDATED" | "VALIDATION_FAILED" | "PARTIALLY_VALIDATED";
@@ -106,8 +100,6 @@ export const validateLogic = async (
 		studentIds: input.studentIds,
 	});
 };
-
-// ─── Publish Logic ────────────────────────────────────────────────────────────
 
 export type PublishResult = {
 	status: "PUBLISH_STARTED" | "PUBLISH_COMPLETE" | "PUBLISH_FAILED";
@@ -151,8 +143,6 @@ export const publishLogic = async (
 	});
 };
 
-// ─── Generate Logic (B12) ─────────────────────────────────────────────────────
-
 export type GenerationResult = {
 	status: "GENERATION_STARTED" | "GENERATION_COMPLETE" | "GENERATION_FAILED";
 	workflowRunId?: string;
@@ -191,22 +181,13 @@ export const generateLogic = async (
 	});
 };
 
-// ─── Internal ─────────────────────────────────────────────────────────────────
-
-/**
- * Pull a `ScopedRepositoryProvider` out of the context. The `*ForTool`
- * methods need it to resolve the active schoolId for the workflow's
- * tenantContext payload. In tests the context provides a `getProvider`
- * accessor; in production `buildMastraToolContext` exposes the same
- * accessor. Falls back to undefined if the context was hand-built
- * without a provider — the *ForTool method will then throw.
- */
-function contextProvider(context: MastraToolContext) {
-	if (typeof (context as { getProvider?: () => unknown }).getProvider === "function") {
-		return (context as { getProvider: () => unknown }).getProvider() as never;
+function contextProvider(context: MastraToolContext): ScopedRepositoryProvider {
+	const getter = context.getProvider;
+	if (typeof getter !== "function") {
+		throw new Error(
+			"No ScopedRepositoryProvider reachable from MastraToolContext. " +
+			"buildMastraToolContext() must attach a getProvider() accessor for workflow tools.",
+		);
 	}
-	throw new Error(
-		"No ScopedRepositoryProvider reachable from MastraToolContext. " +
-		"buildMastraToolContext() must attach a getProvider() accessor for workflow tools.",
-	);
+	return getter();
 }
