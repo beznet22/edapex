@@ -12,7 +12,7 @@ import { DEFAULT_TITLE_MODEL } from './shared';
 export const titleAgent = new Agent({
 	id: 'title',
 	name: 'Title Generator',
-	instructions: 'Generate a very short title at most 3 words summarizing the user message. Return ONLY the title text, no quotes, colons, or explanation.',
+	instructions: 'Generate a very short title at most 4-6 words summarizing the user message. Return ONLY the title text, no quotes, colons, or explanation.',
 	model: ({ requestContext }) => {
 		const v2Config = requestContext?.get('modelConfig') as MastraModelConfig | undefined;
 		if (v2Config) return v2Config;
