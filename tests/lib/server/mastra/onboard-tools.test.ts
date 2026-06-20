@@ -110,14 +110,14 @@ describe("Slice 5: assignEntityLogic workspace lock (B9)", () => {
     };
   }
 
-  let assignEntityLogic: typeof import("$lib/server/mastra/tools/onboard-tools").assignEntityLogic;
+  let assignEntityLogic: typeof import("$lib/server/mastra/tools/operations/write/transfer-student").assignEntityLogic;
 
   beforeEach(async () => {
     const studentMod = await import("$lib/server/repository/student.repo");
     const timelineMod = await import("$lib/server/repository/timeline.repo");
     void studentMod.StudentRepository;
     void timelineMod.TimelineRepository;
-    const mod = await import("$lib/server/mastra/tools/onboard-tools");
+    const mod = await import("$lib/server/mastra/tools/operations/write/transfer-student");
     assignEntityLogic = mod.assignEntityLogic;
   });
 
@@ -190,7 +190,9 @@ describe("Slice 5: assignEntityLogic workspace lock (B9)", () => {
     });
 
     expect(result.status).toBe("ERROR");
-    expect(result.errorCode).toBe("STUDENT_NOT_FOUND");
+    if (result.status === "ERROR") {
+      expect(result.errorCode).toBe("STUDENT_NOT_FOUND");
+    }
     expect(spies.StudentRepository.assignClassSection).not.toHaveBeenCalled();
   });
 });
@@ -262,12 +264,12 @@ describe("Slice 6: onboardEntityLogic raw Drizzle removal (B11)", () => {
     };
   }
 
-  let onboardEntityLogic: typeof import("$lib/server/mastra/tools/onboard-tools").onboardEntityLogic;
+  let onboardEntityLogic: typeof import("$lib/server/mastra/tools/operations/write/enroll-student").onboardEntityLogic;
 
   beforeEach(async () => {
     const studentMod = await import("$lib/server/repository/student.repo");
     void studentMod.StudentRepository;
-    const mod = await import("$lib/server/mastra/tools/onboard-tools");
+    const mod = await import("$lib/server/mastra/tools/operations/write/enroll-student");
     onboardEntityLogic = mod.onboardEntityLogic;
   });
 
@@ -326,7 +328,9 @@ describe("Slice 6: onboardEntityLogic raw Drizzle removal (B11)", () => {
     });
 
     expect(result.status).toBe("ERROR");
-    expect(result.errorCode).toBe("GENDER_NOT_FOUND");
+    if (result.status === "ERROR") {
+      expect(result.errorCode).toBe("GENDER_NOT_FOUND");
+    }
   });
 
   it("B11: returns CATEGORY_NOT_FOUND when resolveStudentCategoryId returns null", async () => {
@@ -352,6 +356,8 @@ describe("Slice 6: onboardEntityLogic raw Drizzle removal (B11)", () => {
     });
 
     expect(result.status).toBe("ERROR");
-    expect(result.errorCode).toBe("CATEGORY_NOT_FOUND");
+    if (result.status === "ERROR") {
+      expect(result.errorCode).toBe("CATEGORY_NOT_FOUND");
+    }
   });
 });

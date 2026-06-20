@@ -204,8 +204,8 @@ describe("Slice 7: end-to-end bridge integration", () => {
     let systemStatusLogic: typeof import("$lib/server/mastra/tools/operations/context/get-academic-context").systemStatusLogic;
     let switchWorkspaceLogic: typeof import("$lib/server/mastra/tools/operations/context/switch-academic-context").switchWorkspaceLogic;
     let manageResultsLogic: typeof import("$lib/server/mastra/tools/operations/academic/manage-academic-records").manageResultsLogic;
-    let onboardEntityLogic: typeof import("$lib/server/mastra/tools/onboard-tools").onboardEntityLogic;
-    let assignEntityLogic: typeof import("$lib/server/mastra/tools/onboard-tools").assignEntityLogic;
+    let onboardEntityLogic: typeof import("$lib/server/mastra/tools/operations/write/enroll-student").onboardEntityLogic;
+    let assignEntityLogic: typeof import("$lib/server/mastra/tools/operations/write/transfer-student").assignEntityLogic;
     let patchEntityLogic: typeof import("$lib/server/mastra/tools/gov-tools").patchEntityLogic;
     let manageAccessLogic: typeof import("$lib/server/mastra/tools/gov-tools").manageAccessLogic;
 
@@ -219,14 +219,15 @@ describe("Slice 7: end-to-end bridge integration", () => {
       const status = await import("$lib/server/mastra/tools/operations/context/get-academic-context");
       const sw = await import("$lib/server/mastra/tools/operations/context/switch-academic-context");
       const grading = await import("$lib/server/mastra/tools/operations/academic/manage-academic-records");
-      const onboard = await import("$lib/server/mastra/tools/onboard-tools");
+      const onboard = await import("$lib/server/mastra/tools/operations/write/enroll-student");
+      const transfer = await import("$lib/server/mastra/tools/operations/write/transfer-student");
       const gov = await import("$lib/server/mastra/tools/gov-tools");
       searchEntityLogic = core.searchEntityLogic;
       systemStatusLogic = status.systemStatusLogic;
       switchWorkspaceLogic = sw.switchWorkspaceLogic;
       manageResultsLogic = grading.manageResultsLogic;
       onboardEntityLogic = onboard.onboardEntityLogic;
-      assignEntityLogic = onboard.assignEntityLogic;
+      assignEntityLogic = transfer.assignEntityLogic;
       patchEntityLogic = gov.patchEntityLogic;
       manageAccessLogic = gov.manageAccessLogic;
     });
@@ -335,8 +336,8 @@ describe("Slice 7: end-to-end bridge integration", () => {
 
   describe("error code coverage", () => {
     let manageResultsLogic: typeof import("$lib/server/mastra/tools/operations/academic/manage-academic-records").manageResultsLogic;
-    let assignEntityLogic: typeof import("$lib/server/mastra/tools/onboard-tools").assignEntityLogic;
-    let onboardEntityLogic: typeof import("$lib/server/mastra/tools/onboard-tools").onboardEntityLogic;
+    let assignEntityLogic: typeof import("$lib/server/mastra/tools/operations/write/transfer-student").assignEntityLogic;
+    let onboardEntityLogic: typeof import("$lib/server/mastra/tools/operations/write/enroll-student").onboardEntityLogic;
     let manageAccessLogic: typeof import("$lib/server/mastra/tools/gov-tools").manageAccessLogic;
 
     beforeEach(async () => {
@@ -346,10 +347,11 @@ describe("Slice 7: end-to-end bridge integration", () => {
       await import("$lib/server/repository/auth.repo");
       await import("$lib/server/repository/result.repo");
       const grading = await import("$lib/server/mastra/tools/operations/academic/manage-academic-records");
-      const onboard = await import("$lib/server/mastra/tools/onboard-tools");
+      const onboard = await import("$lib/server/mastra/tools/operations/write/enroll-student");
+      const transfer = await import("$lib/server/mastra/tools/operations/write/transfer-student");
       const gov = await import("$lib/server/mastra/tools/gov-tools");
       manageResultsLogic = grading.manageResultsLogic;
-      assignEntityLogic = onboard.assignEntityLogic;
+      assignEntityLogic = transfer.assignEntityLogic;
       onboardEntityLogic = onboard.onboardEntityLogic;
       manageAccessLogic = gov.manageAccessLogic;
     });
@@ -364,7 +366,9 @@ describe("Slice 7: end-to-end bridge integration", () => {
         targetSectionId: 5,
       });
       expect(result.status).toBe("ERROR");
-      expect(result.errorCode).toBe("STUDENT_NOT_FOUND");
+      if (result.status === "ERROR") {
+        expect(result.errorCode).toBe("STUDENT_NOT_FOUND");
+      }
     });
 
     it("WORKSPACE_MISMATCH: assignEntityLogic throws when source classId != tenant classId", async () => {
@@ -414,7 +418,9 @@ describe("Slice 7: end-to-end bridge integration", () => {
         { simulateUserExists: true },
       );
       expect(result.status).toBe("ERROR");
-      expect(result.errorCode).toBe("USER_EXISTS");
+      if (result.status === "ERROR") {
+        expect(result.errorCode).toBe("USER_EXISTS");
+      }
     });
 
     it("NEEDS_CONFIRMATION: manageAccessLogic returns errorCode for destructive action without confirmed flag", async () => {

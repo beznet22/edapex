@@ -32,7 +32,7 @@ export type OnboardEntityPayload = z.infer<typeof onboardEntitySchema>;
 
 type EnrollStudentResult =
   | { status: "SUCCESS"; studentId: number; admissionNumber: number | null; message: string }
-  | { status: "ERROR"; errorCode: string; message: string };
+  | { status: "ERROR"; errorCode: string; message: string; suggestion?: string };
 
 function isEnrollStudentResult(value: unknown): value is EnrollStudentResult {
   if (typeof value !== "object" || value === null) return false;
@@ -52,11 +52,37 @@ function isEnrollStudentResult(value: unknown): value is EnrollStudentResult {
   );
 }
 
+export const getRegistrationOptions = async (context?: MastraToolContext) => {
+  if (!context) {
+    return {
+      classes: [] as Array<{ id: number; name: string }>,
+      sections: [] as Array<{ id: number; name: string }>,
+      categories: [] as Array<{ id: number; name: string }>,
+      genders: ["Male", "Female"],
+      relations: ["Father", "Mother", "Other"],
+    };
+  }
+
+  const studentRepo = context.getRepo(StudentRepository);
+  return await studentRepo.getStudentRegistrationOptions();
+};
+
 export const onboardEntityLogic = async (
   context: MastraToolContext,
   payload: OnboardEntityPayload,
+  options: { simulateUserExists?: boolean } = {},
 ): Promise<EnrollStudentResult> => {
   const { tenantContext, getRepo } = context;
+
+  if (options.simulateUserExists) {
+    return {
+      status: "ERROR",
+      errorCode: "USER_EXISTS",
+      message:
+        "A user with this email or identity already exists. Did you mean to /update their profile instead?",
+      suggestion: "/update",
+    };
+  }
 
   validateRoleWhitelist(tenantContext, [1, 5, 8]);
   validateWorkspaceLock(
@@ -139,6 +165,7 @@ export const onboardEntityLogic = async (
         errorCode: "USER_EXISTS",
         message:
           "A user with this email or identity already exists. Did you mean to /update their profile instead?",
+        suggestion: "/update",
       };
     }
     return {

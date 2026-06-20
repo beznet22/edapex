@@ -123,7 +123,7 @@ describe("Promotion tools", () => {
     };
   }
 
-  let promoteStudentLogic: typeof import("$lib/server/mastra/tools/promotion-tools").promoteStudentLogic;
+  let promoteStudentLogic: typeof import("$lib/server/mastra/tools/operations/write/promote-student").promoteStudentLogic;
 
   beforeEach(async () => {
     vi.clearAllMocks();
@@ -131,7 +131,7 @@ describe("Promotion tools", () => {
     const timelineMod = await import("$lib/server/repository/timeline.repo");
     void studentMod.StudentRepository;
     void timelineMod.TimelineRepository;
-    const mod = await import("$lib/server/mastra/tools/promotion-tools");
+    const mod = await import("$lib/server/mastra/tools/operations/write/promote-student");
     promoteStudentLogic = mod.promoteStudentLogic;
   });
 

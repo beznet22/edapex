@@ -163,7 +163,7 @@ describe("Phase 3: Slash Commands & Governance", () => {
 
   describe("3.3 Onboard & Identity Flows", () => {
     it("Test: Onboarding Schema Verification: Verify /register iterative chunking (Student -> Guardian -> Class) and dropdown pre-fetching", async () => {
-      const { onboardEntitySchema, getRegistrationOptions } = await import("$lib/server/mastra/tools/onboard-tools").catch(
+      const { onboardEntitySchema, getRegistrationOptions } = await import("$lib/server/mastra/tools/operations/write/enroll-student").catch(
         () => ({
           onboardEntitySchema: null,
           getRegistrationOptions: () => {
@@ -245,7 +245,7 @@ describe("Phase 3: Slash Commands & Governance", () => {
     });
 
     it("Test: Onboarding Error Recovery: Intercept USER_EXISTS and suggested /update transition", async () => {
-      const { onboardEntityLogic } = await import("$lib/server/mastra/tools/onboard-tools").catch(() => ({
+      const { onboardEntityLogic } = await import("$lib/server/mastra/tools/operations/write/enroll-student").catch(() => ({
         onboardEntityLogic: () => {
           throw new Error("Not implemented");
         },
@@ -273,9 +273,11 @@ describe("Phase 3: Slash Commands & Governance", () => {
 
       expect(result).toBeDefined();
       expect(result.status).toBe("ERROR");
-      expect(result.errorCode).toBe("USER_EXISTS");
-      expect(result.message).toContain("already exists");
-      expect(result.suggestion).toBe("/update");
+      if (result.status === "ERROR") {
+        expect(result.errorCode).toBe("USER_EXISTS");
+        expect(result.message).toContain("already exists");
+        expect(result.suggestion).toBe("/update");
+      }
     });
 
     it("Test: Destructive Confirmation: Verify explicit confirmation prompt for /ban, /suspend, and /reset password", async () => {
