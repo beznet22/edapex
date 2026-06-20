@@ -237,7 +237,7 @@ describe("Slice 11: read-only tools contract", () => {
     "utf-8",
   );
   const coreToolsSrc = readFileSync(
-    join(process.cwd(), "src/lib/server/mastra/tools/core-tools.ts"),
+    join(process.cwd(), "src/lib/server/mastra/tools/operations/context/get-academic-context.ts"),
     "utf-8",
   );
 

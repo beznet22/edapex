@@ -200,9 +200,9 @@ describe("Slice 7: end-to-end bridge integration", () => {
   });
 
   describe("per-tool happy-path", () => {
-    let searchEntityLogic: typeof import("$lib/server/mastra/tools/core-tools").searchEntityLogic;
-    let systemStatusLogic: typeof import("$lib/server/mastra/tools/core-tools").systemStatusLogic;
-    let switchWorkspaceLogic: typeof import("$lib/server/mastra/tools/core-tools").switchWorkspaceLogic;
+    let searchEntityLogic: typeof import("$lib/server/mastra/tools/operations/read/search-school-directory").searchEntityLogic;
+    let systemStatusLogic: typeof import("$lib/server/mastra/tools/operations/context/get-academic-context").systemStatusLogic;
+    let switchWorkspaceLogic: typeof import("$lib/server/mastra/tools/operations/context/switch-academic-context").switchWorkspaceLogic;
     let manageResultsLogic: typeof import("$lib/server/mastra/tools/grading-tools").manageResultsLogic;
     let onboardEntityLogic: typeof import("$lib/server/mastra/tools/onboard-tools").onboardEntityLogic;
     let assignEntityLogic: typeof import("$lib/server/mastra/tools/onboard-tools").assignEntityLogic;
@@ -215,13 +215,15 @@ describe("Slice 7: end-to-end bridge integration", () => {
       await import("$lib/server/repository/timeline.repo");
       await import("$lib/server/repository/auth.repo");
       await import("$lib/server/repository/result.repo");
-      const core = await import("$lib/server/mastra/tools/core-tools");
+      const core = await import("$lib/server/mastra/tools/operations/read/search-school-directory");
+      const status = await import("$lib/server/mastra/tools/operations/context/get-academic-context");
+      const sw = await import("$lib/server/mastra/tools/operations/context/switch-academic-context");
       const grading = await import("$lib/server/mastra/tools/grading-tools");
       const onboard = await import("$lib/server/mastra/tools/onboard-tools");
       const gov = await import("$lib/server/mastra/tools/gov-tools");
       searchEntityLogic = core.searchEntityLogic;
-      systemStatusLogic = core.systemStatusLogic;
-      switchWorkspaceLogic = core.switchWorkspaceLogic;
+      systemStatusLogic = status.systemStatusLogic;
+      switchWorkspaceLogic = sw.switchWorkspaceLogic;
       manageResultsLogic = grading.manageResultsLogic;
       onboardEntityLogic = onboard.onboardEntityLogic;
       assignEntityLogic = onboard.assignEntityLogic;

@@ -45,7 +45,7 @@ describe("Phase 3: Slash Commands & Governance", () => {
       // Currently importing a mock or the actual function (which will fail until implemented)
 
       // Dynamically importing to allow test failure before implementation
-      const { searchEntityLogic } = await import("$lib/server/mastra/tools/core-tools").catch(() => ({
+      const { searchEntityLogic } = await import("$lib/server/mastra/tools/operations/read/search-school-directory").catch(() => ({
         searchEntityLogic: () => {
           throw new Error("Not implemented");
         },
@@ -75,9 +75,9 @@ describe("Phase 3: Slash Commands & Governance", () => {
     });
 
     it("Test: Scope-Bound Search Fallback: Verify /search with empty query inside an active @Class context correctly yields the complete student list", async () => {
-      const { searchEntityLogic } = await import("$lib/server/mastra/tools/core-tools");
+      const { searchEntityLogic } = await import("$lib/server/mastra/tools/operations/read/search-school-directory");
 
-      const mockContext = createTenantContext({ staffId: 1, roleId: 1, examId: null, academicId: null, 
+      const mockContext = createTenantContext({ staffId: 1, roleId: 1, examId: null, academicId: null,
         schoolId: 1,
         classId: 10, // Class Teacher context
         sectionId: 5,
@@ -107,7 +107,7 @@ describe("Phase 3: Slash Commands & Governance", () => {
     });
 
     it("Test: Admission Priority: Verify exact Admission Number match bypasses fuzzy candidate list and resolves immediately", async () => {
-      const { searchEntityLogic } = await import("$lib/server/mastra/tools/core-tools");
+      const { searchEntityLogic } = await import("$lib/server/mastra/tools/operations/read/search-school-directory");
 
       const mockContext = createTenantContext({ staffId: 1, roleId: 1, examId: null, academicId: null, 
         schoolId: 1,
@@ -134,7 +134,7 @@ describe("Phase 3: Slash Commands & Governance", () => {
     });
 
     it('Test: Audit Traceability: Verify source: "fuzzy_match" tag and threadId/modelId attribution in timeline/runs', async () => {
-      const { searchEntityLogic } = await import("$lib/server/mastra/tools/core-tools");
+      const { searchEntityLogic } = await import("$lib/server/mastra/tools/operations/read/search-school-directory");
 
       const mockContext = createTenantContext({ staffId: 1, roleId: 1, classId: null, sectionId: null, examId: null, academicId: null, 
         schoolId: 1,
@@ -374,7 +374,7 @@ describe("Phase 3: Slash Commands & Governance", () => {
     });
 
     it("Test: Live Workspace Badge: Verify /switch triggers context update and returns success", async () => {
-      const { switchWorkspaceLogic } = await import("$lib/server/mastra/tools/core-tools").catch(() => ({
+      const { switchWorkspaceLogic } = await import("$lib/server/mastra/tools/operations/context/switch-academic-context").catch(() => ({
         switchWorkspaceLogic: () => {
           throw new Error("Not implemented");
         },

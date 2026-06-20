@@ -123,7 +123,7 @@ describe("Slice 4: searchEntityTool input filter (B8)", () => {
   }
 
   let searchEntityTool: typeof import("$lib/server/mastra/tools/index").searchEntityTool;
-  let searchEntityLogic: typeof import("$lib/server/mastra/tools/core-tools").searchEntityLogic;
+  let searchEntityLogic: typeof import("$lib/server/mastra/tools/operations/read/search-school-directory").searchEntityLogic;
   let StudentRepository: unknown;
   let StaffRepository: unknown;
 
@@ -134,7 +134,7 @@ describe("Slice 4: searchEntityTool input filter (B8)", () => {
     StaffRepository = staffMod.StaffRepository;
     const indexMod = await import("$lib/server/mastra/tools/index");
     searchEntityTool = indexMod.searchEntityTool;
-    const coreMod = await import("$lib/server/mastra/tools/core-tools");
+    const coreMod = await import("$lib/server/mastra/tools/operations/read/search-school-directory");
     searchEntityLogic = coreMod.searchEntityLogic;
   });
 
