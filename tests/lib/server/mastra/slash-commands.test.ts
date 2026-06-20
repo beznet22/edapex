@@ -482,10 +482,10 @@ describe("Phase 3: Slash Commands & Governance", () => {
       };
     }
 
-    let manageResultsLogic: typeof import("$lib/server/mastra/tools/grading-tools").manageResultsLogic;
+    let manageResultsLogic: typeof import("$lib/server/mastra/tools/operations/academic/manage-academic-records").manageResultsLogic;
 
     beforeEach(async () => {
-      const mod = await import("$lib/server/mastra/tools/grading-tools");
+      const mod = await import("$lib/server/mastra/tools/operations/academic/manage-academic-records");
       manageResultsLogic = mod.manageResultsLogic;
     });
 

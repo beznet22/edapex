@@ -203,7 +203,7 @@ describe("Slice 7: end-to-end bridge integration", () => {
     let searchEntityLogic: typeof import("$lib/server/mastra/tools/operations/read/search-school-directory").searchEntityLogic;
     let systemStatusLogic: typeof import("$lib/server/mastra/tools/operations/context/get-academic-context").systemStatusLogic;
     let switchWorkspaceLogic: typeof import("$lib/server/mastra/tools/operations/context/switch-academic-context").switchWorkspaceLogic;
-    let manageResultsLogic: typeof import("$lib/server/mastra/tools/grading-tools").manageResultsLogic;
+    let manageResultsLogic: typeof import("$lib/server/mastra/tools/operations/academic/manage-academic-records").manageResultsLogic;
     let onboardEntityLogic: typeof import("$lib/server/mastra/tools/onboard-tools").onboardEntityLogic;
     let assignEntityLogic: typeof import("$lib/server/mastra/tools/onboard-tools").assignEntityLogic;
     let patchEntityLogic: typeof import("$lib/server/mastra/tools/gov-tools").patchEntityLogic;
@@ -218,7 +218,7 @@ describe("Slice 7: end-to-end bridge integration", () => {
       const core = await import("$lib/server/mastra/tools/operations/read/search-school-directory");
       const status = await import("$lib/server/mastra/tools/operations/context/get-academic-context");
       const sw = await import("$lib/server/mastra/tools/operations/context/switch-academic-context");
-      const grading = await import("$lib/server/mastra/tools/grading-tools");
+      const grading = await import("$lib/server/mastra/tools/operations/academic/manage-academic-records");
       const onboard = await import("$lib/server/mastra/tools/onboard-tools");
       const gov = await import("$lib/server/mastra/tools/gov-tools");
       searchEntityLogic = core.searchEntityLogic;
@@ -334,7 +334,7 @@ describe("Slice 7: end-to-end bridge integration", () => {
   });
 
   describe("error code coverage", () => {
-    let manageResultsLogic: typeof import("$lib/server/mastra/tools/grading-tools").manageResultsLogic;
+    let manageResultsLogic: typeof import("$lib/server/mastra/tools/operations/academic/manage-academic-records").manageResultsLogic;
     let assignEntityLogic: typeof import("$lib/server/mastra/tools/onboard-tools").assignEntityLogic;
     let onboardEntityLogic: typeof import("$lib/server/mastra/tools/onboard-tools").onboardEntityLogic;
     let manageAccessLogic: typeof import("$lib/server/mastra/tools/gov-tools").manageAccessLogic;
@@ -345,7 +345,7 @@ describe("Slice 7: end-to-end bridge integration", () => {
       await import("$lib/server/repository/timeline.repo");
       await import("$lib/server/repository/auth.repo");
       await import("$lib/server/repository/result.repo");
-      const grading = await import("$lib/server/mastra/tools/grading-tools");
+      const grading = await import("$lib/server/mastra/tools/operations/academic/manage-academic-records");
       const onboard = await import("$lib/server/mastra/tools/onboard-tools");
       const gov = await import("$lib/server/mastra/tools/gov-tools");
       manageResultsLogic = grading.manageResultsLogic;
@@ -431,14 +431,14 @@ describe("Slice 7: end-to-end bridge integration", () => {
   });
 
   describe("cross-tenant isolation", () => {
-    let manageResultsLogic: typeof import("$lib/server/mastra/tools/grading-tools").manageResultsLogic;
+    let manageResultsLogic: typeof import("$lib/server/mastra/tools/operations/academic/manage-academic-records").manageResultsLogic;
 
     beforeEach(async () => {
       await import("$lib/server/repository/student.repo");
       await import("$lib/server/repository/staff.repo");
       await import("$lib/server/repository/timeline.repo");
       await import("$lib/server/repository/result.repo");
-      const grading = await import("$lib/server/mastra/tools/grading-tools");
+      const grading = await import("$lib/server/mastra/tools/operations/academic/manage-academic-records");
       manageResultsLogic = grading.manageResultsLogic;
     });
 
