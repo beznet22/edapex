@@ -1,33 +1,4 @@
-/**
- * Report PDF Tools — EdApex Chat Workflow
- *
- * Two tools the assistant agent invokes when the user types `/generate` or
- * `/publish`:
- *
- *  - `generate-result-pdf`  — resolve a student within the active class/section,
- *    render their report-card PDF via the existing html2pdf helper, write it to
- *    `exams/examType-<examTypeId>/pdfs/<studentId>.pdf` on the tenant workspace,
- *    and emit a single `data-generatePDF` shimmer (processing → success).
- *
- *  - `publish-result-pdf`  — render the PDF if missing (or when `forceRegenerate`
- *    is true), then call `AssessmentPublisherService.publishResults` to send the
- *    parent email and write the `smStudentTimelines` row. The publish flow
- *    itself emits one `data-generatePDF` shimmer — the user sees the same
- *    card re-completing rather than a separate regen card.
- *
- * The full `ResultTemplate` Svelte renderer is intentionally not wired in here;
- * the html2pdf helper needs a self-contained HTML string. The placeholder body
- * is sufficient to drive the chat flow (resolve → render → store → preview) and
- * is a deliberately small follow-up to swap in the Svelte template once the
- * full renderer can run inside the tool context. See `docs/chat-workflow-refactor/ledger.md` M-RPT.
- *
- * `data-createDocument` / `data-generatePDF` / `data-notification` part types
- * are emitted via `writer.write(... as never)` because the canonical
- * `xDataPart` union lives in another subagent's scope (chat-types.ts, M-DP).
- * The UI filters on `part.type` and reads `part.data?.title/status/data`, so
- * the shape here matches what the chat workflow already consumes.
- */
-import { createTool, isValidationError } from "@mastra/core/tools";
+import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 import { getDatabase } from "$lib/server/db";
 import { smExamTypes, smResultStores, smStudents } from "$lib/server/db/sms-schema";
@@ -35,16 +6,11 @@ import { and, eq, like, or, type SQL } from "drizzle-orm";
 import { tenantWorkspace } from "$lib/server/mastra/storage/workspaces";
 import { buildWorkspaceRequestContext } from "$lib/server/helpers/chat-helper";
 import { createAssessmentServiceForRequest } from "$lib/server/service/assessment.service";
-import { createAssessmentPublisherServiceForRequest } from "$lib/server/service/assessment-publisher.service";
 import { generate as generatePdf } from "$lib/server/helpers/pdf-generator";
 import type { StreamWriterLike } from "$lib/server/mastra/agent-stream-retry";
-import { resolveExamTypeId } from "$lib/server/mastra/tenant-context";
-import type { TenantContext } from "$lib/server/mastra/tenant-context";
+import { resolveExamTypeId, type TenantContext } from "$lib/server/mastra/tenant-context";
 import type { WorkspaceFilesystem } from "@mastra/core/workspace";
 import type { StudentDetails } from "$lib/server/repository/student.repo";
-import type { Marksheet } from "$lib/schema/marksheet";
-
-// ─── Context Helpers ────────────────────────────────────────────────────────
 
 interface ReportPdfToolContext {
   requestContext?: {
@@ -83,15 +49,9 @@ function base64url(input: string): string {
     .replace(/\//g, "_");
 }
 
-function safeTitle(value: string | null | undefined): string {
-  return (value || "untitled").replace(/[^a-zA-Z0-9._-]/g, "_");
-}
-
 function sanitizeForFilename(value: string | null | undefined): string {
   return (value || "student").replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 80);
 }
-
-// ─── Student Resolution ─────────────────────────────────────────────────────
 
 type StudentCriteria = {
   studentId?: number | null;
@@ -248,8 +208,6 @@ function mapRowToStudentDetails(row: typeof smStudents.$inferSelect): StudentDet
   };
 }
 
-// ─── Result Lookup ───────────────────────────────────────────────────────────
-
 async function loadExamTypeTitle(examTypeId: number): Promise<string | null> {
   const db = await getDatabase();
   const [row] = await db
@@ -296,8 +254,6 @@ async function loadTotalMarksSummary(
   };
 }
 
-// ─── PDF Rendering (minimal placeholder) ────────────────────────────────────
-
 type PdfRenderInput = {
   student: StudentDetails;
   examTypeTitle: string | null;
@@ -308,15 +264,6 @@ type PdfRenderInput = {
   fileBase: string;
 };
 
-/**
- * Minimal placeholder PDF renderer. The full `ResultTemplate` Svelte renderer
- * is a deliberate follow-up — the html2pdf helper needs a self-contained HTML
- * string, and the Svelte SSR pipeline is not wired into the tool context.
- *
- * Produces a single-page PDF with the student name, admission number, class
- * context, exam type, and (if present) total mark / subject count. Layout
- * uses inline styles so html2pdf does not need the result-template stylesheet.
- */
 async function renderMinimalPdf(input: PdfRenderInput): Promise<Buffer> {
   const fullName = input.student.fullName ?? "Student";
   const classLine = [input.student.className, input.student.sectionName]
@@ -372,8 +319,6 @@ async function renderMinimalPdf(input: PdfRenderInput): Promise<Buffer> {
   return generated.pdfBuffer;
 }
 
-// ─── Stream Part Emitter ────────────────────────────────────────────────────
-
 type PdfArtifactData = {
   status: "processing" | "streaming" | "success" | "error";
   data?: string;
@@ -398,21 +343,6 @@ async function emitPdfPart(
   } as never);
 }
 
-async function emitNotification(
-  writer: StreamWriterLike | undefined,
-  message: string,
-  level: "info" | "warning" | "error",
-): Promise<void> {
-  if (!writer) return;
-  await writer.write({
-    type: "data-notification",
-    id: `notif-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-    data: { message, level },
-  } as never);
-}
-
-// ─── Schemas ────────────────────────────────────────────────────────────────
-
 const studentCriteriaBase = {
   schoolId: z.number().optional(),
   academicYear: z.string().optional(),
@@ -430,11 +360,6 @@ const reportPdfInputSchema = z.object({
   republish: z.boolean().optional(),
 });
 
-const reportPdfPublishInputSchema = z.object({
-  ...studentCriteriaBase,
-  forceRegenerate: z.boolean().optional(),
-});
-
 const reportPdfOutputSchema = z.object({
   artifactId: z.string(),
   kind: z.literal("pdf"),
@@ -445,146 +370,6 @@ const reportPdfOutputSchema = z.object({
   thumbnailUrl: z.string().optional(),
   error: z.string().optional(),
 });
-
-const reportPdfPublishOutputSchema = z.object({
-  status: z.enum([
-    "published",
-    "regenerated_and_published",
-    "skipped_already_published",
-    "failed",
-  ]),
-  artifactId: z.string(),
-  publicationUrl: z.string().optional(),
-  messageId: z.string().optional(),
-  timelineEntryId: z.number().optional(),
-  error: z.string().optional(),
-});
-
-// ─── View Student Result ────────────────────────────────────────────────────
-
-const viewStudentResultSchema = z
-  .object({
-    studentId: z.number().optional(),
-    admissionNo: z.number().optional(),
-    fullName: z.string().optional(),
-    examTypeId: z.number().optional(),
-    academicYearId: z.number().optional(),
-  })
-  .refine(
-    (data) =>
-      data.studentId !== undefined ||
-      data.admissionNo !== undefined ||
-      data.fullName !== undefined,
-    {
-      message: "At least one of studentId, admissionNo, or fullName is required",
-      path: ["studentId"],
-    },
-  );
-
-type ViewStudentResultInput = z.infer<typeof viewStudentResultSchema>;
-
-const viewStudentResultOutputSchema = z.object({
-  status: z.enum(["SUCCESS", "NOT_FOUND"]),
-  studentId: z.number().optional(),
-  examTypeId: z.number().optional(),
-});
-
-type ViewStudentResultResult =
-  | { status: "SUCCESS"; studentId: number; examTypeId: number }
-  | { status: "NOT_FOUND" };
-
-function escapeMarkdownCell(value: string): string {
-  return value.replace(/\|/g, "\\|").replace(/\n/g, " ");
-}
-
-function formatMarksheetMarkdown(result: Marksheet): string {
-  const student = result.student;
-  const examTitle = result.examType?.title ?? student.term ?? "Exam";
-  const academicYear = student.sessionYear || "—";
-  const rows = result.records
-    .map(
-      (record) =>
-        `| ${escapeMarkdownCell(record.subject)} | ${record.totalScore} | ${record.grade || "—"} |`,
-    )
-    .join("\n");
-
-  const remarkText = result.remark?.remark || "—";
-
-  return [
-    `# Result: ${student.fullName}`,
-    `**Exam:** ${examTitle}  `,
-    `**Academic Year:** ${academicYear}`,
-    "",
-    "| Subject | Marks | Grade |",
-    "|---------|-------|-------|",
-    rows,
-    "",
-    `**Total:** ${result.score.total} / ${result.score.maxScores}`,
-    `**Average:** ${result.score.average}%`,
-    `**Remark:** ${remarkText}`,
-  ].join("\n");
-}
-
-async function viewStudentResultLogic(
-  context: ReportPdfToolContext,
-  params: ViewStudentResultInput,
-  writer: StreamWriterLike | undefined,
-): Promise<ViewStudentResultResult> {
-  const tenant = getTenant(context);
-
-  const student = await resolveStudent(
-    {
-      studentId: params.studentId,
-      admissionNo: params.admissionNo,
-      fullName: params.fullName,
-    },
-    tenant.classId,
-    tenant.sectionId,
-  );
-
-  const explicitExamTypeId = params.examTypeId ?? tenant.examTypeId;
-  const examTypeId = await resolveExamTypeId(tenant.schoolId, explicitExamTypeId ?? null);
-  if (examTypeId === null) {
-    throw new Error("EXAM_TYPE_REQUIRED: no examTypeId in input or active tenant context");
-  }
-
-  const assessment = await createAssessmentServiceForRequest(tenant);
-  const result: Marksheet | null = await assessment.getStudentResult({
-    id: student.studentId,
-    examId: examTypeId,
-    isAdminNo: false,
-    withImages: false,
-  });
-
-  if (result === null) {
-    return { status: "NOT_FOUND" };
-  }
-
-  const markdown = formatMarksheetMarkdown(result);
-  const artifactId = `result-${student.studentId}-${examTypeId}`;
-  const title = `Result - ${student.fullName ?? "Student"}`;
-
-  if (writer) {
-    await writer.write({
-      type: "data-createDocument",
-      id: artifactId,
-      data: {
-        id: artifactId,
-        title,
-        content: markdown,
-        status: "success",
-      },
-    } as never);
-  }
-
-  return {
-    status: "SUCCESS",
-    studentId: student.studentId,
-    examTypeId,
-  };
-}
-
-// ─── Core Render-and-Write Logic ────────────────────────────────────────────
 
 type CoreRenderArgs = {
   tenant: TenantContext;
@@ -603,6 +388,12 @@ type CoreRenderResult = {
   pdfExists: boolean;
   error?: string;
 };
+
+const PLACEHOLDER_THUMBNAIL_WEBP: Uint8Array = new Uint8Array([
+  0x52, 0x49, 0x46, 0x46, 0x1a, 0x00, 0x00, 0x00, 0x57, 0x45, 0x42, 0x50,
+  0x56, 0x50, 0x38, 0x4c, 0x0d, 0x00, 0x00, 0x00, 0x2f, 0x00, 0x00, 0x00,
+  0x10, 0x07, 0x10, 0x11, 0x11, 0x88, 0x88, 0x08,
+]);
 
 async function renderAndWriteResultPdf(args: CoreRenderArgs): Promise<CoreRenderResult> {
   const { tenant, writer, input, republish } = args;
@@ -728,17 +519,6 @@ async function renderAndWriteResultPdf(args: CoreRenderArgs): Promise<CoreRender
   };
 }
 
-// 200px transparent webp; the full PDF first-page rasterizer is a follow-up.
-// This unblocks the UI thumbnail contract (the data-generatePDF card always
-// finds a thumbnail at the same path) without pulling in an image pipeline.
-const PLACEHOLDER_THUMBNAIL_WEBP: Uint8Array = new Uint8Array([
-  0x52, 0x49, 0x46, 0x46, 0x1a, 0x00, 0x00, 0x00, 0x57, 0x45, 0x42, 0x50,
-  0x56, 0x50, 0x38, 0x4c, 0x0d, 0x00, 0x00, 0x00, 0x2f, 0x00, 0x00, 0x00,
-  0x10, 0x07, 0x10, 0x11, 0x11, 0x88, 0x88, 0x08,
-]);
-
-// ─── Tool 1: generate-result-pdf ────────────────────────────────────────────
-
 export const generateResultPdfTool = createTool({
   id: "generate-result-pdf",
   description:
@@ -791,198 +571,3 @@ export const generateResultPdfTool = createTool({
     }
   },
 });
-
-// ─── Tool 2: publish-result-pdf ─────────────────────────────────────────────
-
-export const publishResultPdfTool = createTool({
-  id: "publish-result-pdf",
-  description:
-    "Generate the PDF (if missing) and publish to parent email + write StudentTimeline row. One shimmer total via the republish flag.",
-  inputSchema: reportPdfPublishInputSchema,
-  outputSchema: reportPdfPublishOutputSchema,
-  execute: async (input, ctx) => {
-    const context = ctx as ReportPdfToolContext;
-    const tenant = getTenant(context);
-    const writer = getWriter(context);
-
-    const examTypeId = input.examTypeId ?? tenant.examTypeId;
-    if (examTypeId === null || examTypeId === undefined) {
-      throw new Error("EXAM_TYPE_REQUIRED: no examTypeId in input or active tenant");
-    }
-
-    const assessment = await createAssessmentServiceForRequest(tenant);
-
-    const student = await resolveStudent(
-      {
-        studentId: input.studentId,
-        admissionNo: input.admissionNo,
-        fullName: input.fullName,
-        partialName: input.partialName,
-        classId: input.classId,
-        sectionId: input.sectionId,
-      },
-      tenant.classId,
-      tenant.sectionId,
-    );
-
-    const fullName = student.fullName ?? "student";
-    const title = `${sanitizeForFilename(fullName)}.pdf`;
-    const artifactId = `pdf-${student.studentId}-${examTypeId}`;
-    const storagePath = `exams/examType-${examTypeId}/pdfs/${student.studentId}.pdf`;
-    const thumbnailPath = `exams/examType-${examTypeId}/pdfs/${student.studentId}.thumb.webp`;
-    const fs = await resolveFilesystem(tenant);
-    const pdfExists = await fs.exists(storagePath);
-
-    let regenerated = false;
-    let previewUrl = "";
-    let thumbnailUrl = `/api/file/${thumbnailPath}`;
-
-    if (!pdfExists || input.forceRegenerate) {
-      await emitNotification(
-        writer,
-        input.forceRegenerate
-          ? "Re-rendering PDF (forceRegenerate=true)…"
-          : "PDF not found; rendering now…",
-        "info",
-      );
-      const generateInput = {
-        schoolId: input.schoolId,
-        academicYear: input.academicYear,
-        examTypeId,
-        classId: input.classId,
-        sectionId: input.sectionId,
-        studentId: student.studentId,
-        admissionNo: undefined,
-        fullName: undefined,
-        partialName: undefined,
-        republish: true,
-      } as z.infer<typeof reportPdfInputSchema>;
-      const inner = generateResultPdfTool.execute;
-      if (typeof inner !== "function") {
-        throw new Error("INNER_TOOL_UNAVAILABLE: generateResultPdfTool.execute is not bound");
-      }
-      const innerResult = await inner(generateInput, ctx as never);
-      if (isValidationError(innerResult)) {
-        return {
-          status: "failed" as const,
-          artifactId,
-          error: innerResult.message || "PDF regeneration failed validation",
-        };
-      }
-      if (innerResult.status !== "success") {
-        const errMsg =
-          typeof innerResult.error === "string"
-            ? innerResult.error
-            : "PDF regeneration failed";
-        return {
-          status: "failed" as const,
-          artifactId,
-          error: errMsg,
-        };
-      }
-      regenerated = true;
-      previewUrl = innerResult.previewUrl ?? "";
-      thumbnailUrl = innerResult.thumbnailUrl ?? thumbnailUrl;
-    } else {
-      const token = base64url(
-        JSON.stringify({ studentId: student.studentId, examTypeId }),
-      );
-      previewUrl = `/api/results/${token}`;
-    }
-
-    const alreadySent = await assessment.isEmailAlreadySent(student.studentId, examTypeId);
-    if (alreadySent) {
-      await emitPdfPart(writer, artifactId, {
-        status: "success",
-        data: previewUrl,
-        title,
-        id: artifactId,
-        storagePath,
-        previewUrl,
-        thumbnailUrl,
-      });
-      return {
-        status: "skipped_already_published" as const,
-        artifactId,
-        publicationUrl: previewUrl,
-      };
-    }
-
-    const publisher = await createAssessmentPublisherServiceForRequest(tenant);
-    const publishResult = await publisher.publishResults({
-      studentIds: [student.studentId],
-      examId: examTypeId,
-      resend: false,
-    });
-
-    if (!publishResult.success) {
-      const message =
-        publishResult.errors.length > 0
-          ? publishResult.errors.join("; ")
-          : "Publisher did not report success";
-      await emitPdfPart(writer, artifactId, {
-        status: "error",
-        data: "",
-        title,
-        id: artifactId,
-        storagePath,
-        previewUrl,
-        thumbnailUrl,
-        error: message,
-      });
-      return {
-        status: "failed" as const,
-        artifactId,
-        publicationUrl: previewUrl,
-        error: message,
-      };
-    }
-
-    const firstResult = publishResult.results[0];
-
-    await emitPdfPart(writer, artifactId, {
-      status: "success",
-      data: previewUrl,
-      title,
-      id: artifactId,
-      storagePath,
-      previewUrl,
-      thumbnailUrl,
-    });
-
-    return {
-      status: (regenerated ? "regenerated_and_published" : "published") as
-        | "regenerated_and_published"
-        | "published",
-      artifactId,
-      publicationUrl: previewUrl,
-      messageId: firstResult?.messageId,
-    };
-  },
-});
-
-// ─── Tool 3: view-student-result ────────────────────────────────────────────
-
-export const viewStudentResultTool = createTool({
-  id: "view-student-result",
-  description:
-    "Fetch a student's result for the active exam type and open it as a markdown document in the editor panel. " +
-    "Resolves the student by id/admissionNo/fullName within the active class/section. Emits data-createDocument parts.",
-  inputSchema: viewStudentResultSchema,
-  outputSchema: viewStudentResultOutputSchema,
-  execute: async (input, ctx) => {
-    const context = ctx as ReportPdfToolContext;
-    const writer = getWriter(context);
-    return viewStudentResultLogic(context, input, writer);
-  },
-});
-
-// ─── Aggregate Export ───────────────────────────────────────────────────────
-
-export const reportPdfTools = {
-  generateResultPdfTool,
-  publishResultPdfTool,
-  viewStudentResultTool,
-};
-
-export type ReportPdfTool = (typeof reportPdfTools)[keyof typeof reportPdfTools];
