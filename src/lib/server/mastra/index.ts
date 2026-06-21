@@ -10,12 +10,8 @@
  */
 import { Mastra } from '@mastra/core';
 import { supervisorAgent, assistantAgent, titleAgent, documentAgent } from './agents';
-import { editorEditAgent, editorGenerateAgent, editorCopilotAgent, resultMapperAgent } from './agents';
+import { editorEditAgent, editorGenerateAgent, editorCopilotAgent } from './agents';
 import { editorCommandWorkflow } from './workflows/editor-command';
-import { validationWorkflow } from './workflows/validation';
-import { publishWorkflow } from './workflows/publish';
-import { extractionWorkflow } from './workflows/extraction';
-import { generateWorkflow } from './workflows/generate';
 import { chatWorkflow } from './workflows/chat';
 import { createMastraStorage } from '$lib/server/mastra/storage/libsql/mastra-storage';
 import { tenantWorkspace } from '$lib/server/mastra/storage/workspaces';
@@ -44,15 +40,10 @@ export const mastra = new Mastra({
     editorEdit: editorEditAgent,
     editorGenerate: editorGenerateAgent,
     editorCopilot: editorCopilotAgent,
-    "result-mapper": resultMapperAgent,
     document: documentAgent,
   },
   workflows: {
     editorCommandWorkflow,
-    validationWorkflow,
-    publishWorkflow,
-    extractionWorkflow,
-    generateWorkflow,
     chatWorkflow,
     testWorkflow
   },
@@ -111,7 +102,7 @@ export function createMastraInstance(params: { dbUrl: string }): {
 /**
  * Retrieves a registered agent by ID from the singleton Mastra instance.
  */
-export function getAgent(id: 'supervisor' | 'assistant' | 'title' | 'editorEdit' | 'editorGenerate' | 'editorCopilot' | 'result-mapper' | 'document') {
+export function getAgent(id: 'supervisor' | 'assistant' | 'title' | 'editorEdit' | 'editorGenerate' | 'editorCopilot' | 'document') {
   return mastra.getAgent(id);
 }
 

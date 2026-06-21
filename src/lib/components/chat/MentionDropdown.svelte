@@ -1,11 +1,13 @@
 <script lang="ts">
   import { cn } from "$lib/utils/shadcn";
+  import { untrack } from "svelte";
   import SchoolIcon from "@lucide/svelte/icons/school";
   import GraduationCapIcon from "@lucide/svelte/icons/graduation-cap";
   import LayoutGridIcon from "@lucide/svelte/icons/layout-grid";
   import TableIcon from "@lucide/svelte/icons/table";
   import CalendarIcon from "@lucide/svelte/icons/calendar";
   import ClockIcon from "@lucide/svelte/icons/clock";
+  import FolderIcon from "@lucide/svelte/icons/folder";
   import LoaderCircleIcon from "@lucide/svelte/icons/loader-circle";
   import AlertCircleIcon from "@lucide/svelte/icons/alert-circle";
   import { ALLOWED_DESIGNATIONS } from "$lib/types/sms-types";
@@ -21,7 +23,7 @@
     parentContext?: string;
   }
 
-  type MentionCategory = 'schools' | 'students' | 'classes' | 'sections' | 'academic_year' | 'term';
+  type MentionCategory = 'schools' | 'students' | 'class_section' | 'academic_year' | 'exam' | 'file';
 
   interface CategoryDef {
     id: MentionCategory;
@@ -47,10 +49,10 @@
   const ALL_CATEGORIES: CategoryDef[] = [
     { id: 'schools', label: 'Schools', icon: SchoolIcon },
     { id: 'students', label: 'Students', icon: GraduationCapIcon },
-    { id: 'classes', label: 'Classes', icon: LayoutGridIcon },
-    { id: 'sections', label: 'Sections', icon: TableIcon },
+    { id: 'class_section', label: 'Class & Section', icon: LayoutGridIcon },
     { id: 'academic_year', label: 'Academic Year', icon: CalendarIcon },
-    { id: 'term', label: 'Term', icon: ClockIcon },
+    { id: 'exam', label: 'Exam Term', icon: ClockIcon },
+    { id: 'file', label: 'Workspace Files', icon: FolderIcon },
   ];
 
   // Role-based category filtering
@@ -58,7 +60,7 @@
     (designationId === ALLOWED_DESIGNATIONS.IT || designationId === ALLOWED_DESIGNATIONS.COORDINATOR)
       ? ALL_CATEGORIES
       : designationId === ALLOWED_DESIGNATIONS.CLASS_TEACHER
-        ? ALL_CATEGORIES.filter(c => ['students', 'academic_year', 'term'].includes(c.id))
+        ? ALL_CATEGORIES.filter(c => ['students', 'class_section', 'academic_year', 'exam', 'file'].includes(c.id))
         : []
   );
 
@@ -68,12 +70,28 @@
   let loading = $state(false);
   let errorMessage = $state<string | null>(null);
   let highlightedIndex = $state(0);
-  let debounceTimer = $state<ReturnType<typeof setTimeout> | null>(null);
-  let abortController = $state<AbortController | null>(null);
+  let debounceTimer = $state.raw<ReturnType<typeof setTimeout> | null>(null);
+  let abortController = $state.raw<AbortController | null>(null);
   let dropdownRef = $state<HTMLDivElement | null>(null);
 
   // Derived: the categories to show
   const categories = $derived(allowedCategories);
+
+  // Derived: category inferred from the typed @prefix (e.g. @class → class_section)
+  const inferredCategory = $derived.by<MentionCategory | null>(() => {
+    if (!visible) return null;
+    if (query.startsWith("class ")) return "class_section";
+    if (query.startsWith("year ")) return "academic_year";
+    if (query.startsWith("term ")) return "exam";  // alias for exam
+    if (query.startsWith("exam ")) return "exam";
+    if (query.startsWith("file ")) return "file";
+    return null;
+  });
+
+  // Effective category: typed prefix wins over user-clicked tab
+  const effectiveCategory = $derived<MentionCategory | null>(
+    inferredCategory ?? activeCategory,
+  );
 
   // Derived: the flat list of items for keyboard navigation
   const flatItems = $derived(results);
@@ -87,9 +105,25 @@
   }
 
   /**
+   * Build a unique key for each result item.
+   *
+   * For `class_section` results the id is an OBJECT `{ classId, sectionId }`,
+   * which JS stringifies to `"[object Object]"` — that caused
+   * `each_key_duplicate` because every class_section row shared the same key.
+   * JSON.stringify the object so the (classId, sectionId) tuple is encoded.
+   */
+  function keyFor(item: MentionSearchResult): string {
+    const idPart =
+      item.id !== null && typeof item.id === 'object'
+        ? JSON.stringify(item.id)
+        : String(item.id);
+    return `${idPart}-${item.category}`;
+  }
+
+  /**
    * Fetch results from the search API with debounce
    */
-  function fetchResults(searchQuery: string, category: MentionCategory | null) {
+  function fetchResults(rawQuery: string, category: MentionCategory | null) {
     // Clear previous debounce
     if (debounceTimer) {
       clearTimeout(debounceTimer);
@@ -103,13 +137,12 @@
     // Reset state
     errorMessage = null;
 
-    // If no query, clear results
-    if (!searchQuery.trim()) {
-      results = [];
-      loading = false;
-      return;
-    }
+    // Strip typed @category prefix (e.g. "class foo" → "foo") so the search API
+    // receives just the entity-name fragment.
+    const searchQuery = rawQuery.replace(/^(?:class|year|exam|term|file)\s+/, "");
 
+    // Empty query is allowed — the backend returns the default tab
+    // (students + class_section). Only bail on hidden state.
     loading = true;
 
     debounceTimer = setTimeout(async () => {
@@ -156,28 +189,28 @@
     }, 200); // 200ms debounce
   }
 
-  // React to query changes
-  $effect(() => {
-    if (visible && query) {
-      fetchResults(query, activeCategory);
-    } else if (!visible) {
-      // Reset when hidden
-      results = [];
-      errorMessage = null;
-      loading = false;
-      highlightedIndex = 0;
-    }
-  });
-
-  // React to category changes
-  $effect(() => {
-    if (visible && activeCategory !== undefined) {
-      // Re-fetch when category changes (if there's a query)
-      if (query) {
-        fetchResults(query, activeCategory);
+  /**
+   * Imperatively refresh the suggestion list. Called by ChatComposer via
+   * bind:this when mentionQuery or showMentions change.
+   *
+   * Wrapped in `untrack()` so the inner reads (debounceTimer, abortController,
+   * effectiveCategory, results, loading, etc.) do NOT register as
+   * dependencies of the calling $effect. Without untrack, Svelte 5 detects
+   * the read+write on debounceTimer inside fetchResults as a self-loop and
+   * trips `effect_update_depth_exceeded` after ~50 iterations.
+   */
+  export function refresh(rawQuery: string, v: boolean): void {
+    untrack(() => {
+      if (v) {
+        fetchResults(rawQuery, effectiveCategory);
+      } else {
+        results = [];
+        errorMessage = null;
+        loading = false;
+        highlightedIndex = 0;
       }
-    }
-  });
+    });
+  }
 
   /**
    * Handle keyboard navigation
@@ -274,7 +307,7 @@
         <button
           class={cn(
             "shrink-0 px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider transition-colors cursor-pointer",
-            activeCategory === null
+            effectiveCategory === null
               ? "bg-primary/15 text-primary border border-primary/20"
               : "text-muted-foreground/60 hover:text-muted-foreground hover:bg-sidebar-accent/30"
           )}
@@ -286,12 +319,12 @@
           <button
             class={cn(
               "shrink-0 flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider transition-colors cursor-pointer",
-              activeCategory === cat.id
+              effectiveCategory === cat.id
                 ? "bg-primary/15 text-primary border border-primary/20"
                 : "text-muted-foreground/60 hover:text-muted-foreground hover:bg-sidebar-accent/30"
             )}
             onclick={() => selectCategory(cat.id)}
-          >
+            >
             <cat.icon class="size-3" />
             {cat.label}
           </button>
@@ -321,7 +354,7 @@
         </div>
       <!-- Results List -->
       {:else}
-        {#each results as item, index (item.id + '-' + item.category)}
+        {#each results as item, index (keyFor(item))}
           <button
             data-index={index}
             class={cn(
@@ -346,14 +379,14 @@
                 <SchoolIcon class={cn("size-4", highlightedIndex === index ? "text-primary" : "text-muted-foreground group-hover:text-primary")} />
               {:else if item.category === 'students'}
                 <GraduationCapIcon class={cn("size-4", highlightedIndex === index ? "text-primary" : "text-muted-foreground group-hover:text-primary")} />
-              {:else if item.category === 'classes'}
+              {:else if item.category === 'class_section'}
                 <LayoutGridIcon class={cn("size-4", highlightedIndex === index ? "text-primary" : "text-muted-foreground group-hover:text-primary")} />
-              {:else if item.category === 'sections'}
-                <TableIcon class={cn("size-4", highlightedIndex === index ? "text-primary" : "text-muted-foreground group-hover:text-primary")} />
               {:else if item.category === 'academic_year'}
                 <CalendarIcon class={cn("size-4", highlightedIndex === index ? "text-primary" : "text-muted-foreground group-hover:text-primary")} />
-              {:else if item.category === 'term'}
+              {:else if item.category === 'exam'}
                 <ClockIcon class={cn("size-4", highlightedIndex === index ? "text-primary" : "text-muted-foreground group-hover:text-primary")} />
+              {:else if item.category === 'file'}
+                <FolderIcon class={cn("size-4", highlightedIndex === index ? "text-primary" : "text-muted-foreground group-hover:text-primary")} />
               {:else}
                 <GraduationCapIcon class={cn("size-4", highlightedIndex === index ? "text-primary" : "text-muted-foreground group-hover:text-primary")} />
               {/if}

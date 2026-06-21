@@ -5,6 +5,7 @@
 	import { Markdown } from "$lib/components/prompt-kit/markdown";
 	import { toast } from "svelte-sonner";
 	import { SelectedClass } from "$lib/context/sync.svelte";
+	import { useChat } from "$lib/context/chat-context.svelte";
 	import { DESIGNATIONS } from "$lib/types/sms-types";
 
 	import { usePdfiumEngine } from "@embedpdf/engines/svelte";
@@ -38,6 +39,9 @@
 		isSaving = $bindable(false),
 		streaming = false,
 		user,
+		artifactId = "",
+		title = "",
+		examTypeId = null,
 	}: {
 		filename?: string;
 		url?: string;
@@ -48,6 +52,9 @@
 		isSaving?: boolean;
 		streaming?: boolean;
 		user?: { designation?: string };
+		artifactId?: string;
+		title?: string;
+		examTypeId?: number | null;
 	} = $props();
 
 	let textContent = $state("Loading...");
@@ -56,6 +63,7 @@
 	let containerRef = $state<HTMLDivElement | null>(null);
 
 	const selectedClass = SelectedClass.fromContext();
+	const chat = useChat();
 	const designationId = $derived(
 		(DESIGNATIONS.indexOf((user?.designation as any) ?? 'it') || 1)
 	);
@@ -64,10 +72,19 @@
   const selectedClassName = $derived(selectedClass?.data?.className ?? '');
   const selectedSectionName = $derived(selectedClass?.data?.sectionName ?? '');
 
+	const editable = $derived.by(() => {
+		if (!artifactId) return true;
+		if (chat?.lastCommittedArtifactId === artifactId) return true;
+		if (chat?.pendingValidationArtifactId === artifactId) return false;
+		return true;
+	});
+
 	const isMarkdownFile = $derived(
 		filename.endsWith(".md") || filename.endsWith(".markdown"),
 	);
 	let wysiwygContent = $state("");
+	let lastSavedContent = $state<string>("");
+	let saveDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 
 	function handleWysiwygUpdate(markdown: string) {
 		wysiwygContent = markdown;
@@ -150,6 +167,7 @@
 						if (cancelled) return;
 						textContent = t;
 						editContent = t;
+						lastSavedContent = t;
 					})
 					.catch((e) => {
 						clearTimeout(timeoutId);
@@ -165,8 +183,42 @@
 			} else if (content) {
 				textContent = content;
 				editContent = content;
+				lastSavedContent = content;
 			}
 		}
+	});
+
+	$effect(() => {
+		const md = wysiwygContent;
+		if (!md || md === lastSavedContent) return;
+		if (streaming) return;
+		if (!artifactId) return;
+
+		if (saveDebounceTimer) clearTimeout(saveDebounceTimer);
+		saveDebounceTimer = setTimeout(async () => {
+			const safeTitle = title.replace(/[^a-zA-Z0-9._-]/g, "_");
+			const path = examTypeId
+				? `exams/examType-${examTypeId}/${safeTitle}.md`
+				: null;
+			if (!path) return;
+			try {
+				const res = await fetch(`/api/file/${path}`, {
+					method: "PUT",
+					body: new Blob([md], { type: "text/markdown" }),
+				});
+				if (res.ok) lastSavedContent = md;
+			} catch (err) {
+				const msg = err instanceof Error ? err.message : String(err);
+				console.error("Auto-save failed:", msg);
+			}
+		}, 2000);
+
+		return () => {
+			if (saveDebounceTimer) {
+				clearTimeout(saveDebounceTimer);
+				saveDebounceTimer = null;
+			}
+		};
 	});
 
 	$effect(() => {
@@ -193,16 +245,17 @@
 				<LoadingState label={textContent === "Loading..." ? "Loading file content" : textContent} />
 			{:else if isMarkdownFile && editorMode === "wysiwyg"}
 				<div class="flex-1 min-h-0 overflow-hidden">
-					<WysiwygEditor
-						content={textContent}
-						onUpdate={handleWysiwygUpdate}
-						class="h-full"
-						designationId={designationId}
-						selectedClassId={selectedClassId}
-						selectedSectionId={selectedSectionId}
-						selectedClassName={selectedClassName}
-						selectedSectionName={selectedSectionName}
-					/>
+				<WysiwygEditor
+					content={textContent}
+					onUpdate={handleWysiwygUpdate}
+					class="h-full"
+					designationId={designationId}
+					selectedClassId={selectedClassId}
+					selectedSectionId={selectedSectionId}
+					selectedClassName={selectedClassName}
+					selectedSectionName={selectedSectionName}
+					editable={editable}
+				/>
 				</div>
 			{:else}
 				<ScrollArea class="flex-1 w-full bg-background overflow-hidden relative">

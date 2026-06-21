@@ -27,6 +27,7 @@
 import { allowAnonymousChats } from "$lib/constants";
 import type { xUIMessage } from "$lib/types/chat-types";
 import { error, type RequestHandler } from "@sveltejs/kit";
+import { randomUUID } from "node:crypto";
 import {
 	createUIMessageStream,
 	createUIMessageStreamResponse
@@ -37,9 +38,13 @@ import { toAISdkV5Messages } from "@mastra/ai-sdk/ui";
 import {
 	createTenantContext,
 	resolveExamTypeId,
+	withAcademicId,
 	withExamTypeId,
 	WorkspaceMismatchError
 } from "$lib/server/mastra/tenant-context";
+import { resolveActiveClassScope } from "$lib/server/helpers/class-scope";
+import { getDatabase } from "$lib/server/db";
+import { BaseRepository } from "$lib/server/repository/base.repo";
 import type { ClassSection } from "$lib/types/result-types";
 import { processMentions, type MentionTag } from "$lib/server/mastra/mention-processor";
 import { TenantContextCache } from "$lib/server/mastra/context-cache";
@@ -134,6 +139,31 @@ export const POST: RequestHandler = async ({ request, locals: { user, session },
 		activeContext = withExamTypeId(activeContext, resolved);
 	}
 
+	if (activeContext.academicId === null) {
+		const db = await getDatabase();
+		const baseRepo = await BaseRepository.build(db, activeContext);
+		const academicId = await baseRepo.getAcademicId();
+		activeContext = withAcademicId(activeContext, academicId);
+	}
+
+	if (
+		activeContext.classId === null &&
+		activeContext.sectionId === null &&
+		(user as { staffId?: number }).staffId
+	) {
+		const resolved = await resolveActiveClassScope({
+			schoolId: activeContext.schoolId,
+			staffId: (user as { staffId?: number }).staffId
+		});
+		if (resolved) {
+			activeContext = Object.freeze({
+				...activeContext,
+				classId: resolved.classId,
+				sectionId: resolved.sectionId
+			});
+		}
+	}
+
 	if (!bodyRunId && fileReferences && fileReferences.length > 0) {
 		try {
 			fileReferences = await warmUpFileReferences(activeContext, fileReferences);
@@ -157,10 +187,11 @@ export const POST: RequestHandler = async ({ request, locals: { user, session },
 		throw new Error('Assistant agent has no memory configured.');
 	}
 
+	const runId = bodyRunId ?? randomUUID();
 	let stream;
 	try {
 		const params: ChatWorkflowParams = {
-			...(bodyRunId ? { runId: bodyRunId } : {}),
+			runId,
 			...(bodyResumeData ? { resumeData: bodyResumeData } : {}),
 			...(bodyStep ? { step: bodyStep } : {}),
 			inputData: {
@@ -190,8 +221,21 @@ export const POST: RequestHandler = async ({ request, locals: { user, session },
 		}
 		throw e;
 	}
-	
-	return createUIMessageStreamResponse({ stream });
+
+	const wrappedStream = createUIMessageStream({
+		execute: async ({ writer }) => {
+			writer.write({
+				type: 'data-runInfo',
+				id: `ri-${runId}`,
+				data: { runId }
+			} as never);
+			for await (const part of stream) {
+				writer.write(part);
+			}
+		}
+	});
+
+	return createUIMessageStreamResponse({ stream: wrappedStream });
 };
 
 /**

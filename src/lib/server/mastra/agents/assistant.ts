@@ -94,6 +94,23 @@ export const testWorkflow = createWorkflow({
 	.then(step1)
 	.commit()
 
+export interface ParsedSlashCommand {
+	command: string;
+	subcommand?: string;
+	args: string[];
+}
+
+export function parseSlashCommand(text: string): ParsedSlashCommand | null {
+	const match = text.trim().match(/^\/(\w+)(?:\s+(\w+))?(.*)$/);
+	if (!match) return null;
+	const [, command, subcommand, rest] = match;
+	return {
+		command,
+		...(subcommand ? { subcommand } : {}),
+		args: rest.trim().split(/\s+/).filter(Boolean),
+	};
+}
+
 export const assistantAgent = new Agent({
 	id: 'assistant',
 	name: 'Assistant',
@@ -104,6 +121,10 @@ export const assistantAgent = new Agent({
 		return (requestContext?.get('modelId') as string) || DEFAULT_MODEL;
 	},
 	instructions: ({ requestContext }) => {
+		// The agent may inspect requestContext.lastMessage via parseSlashCommand
+		// to detect slash commands and their subcommands. Skills already
+		// document each command's subcommands, so no system prompt text is
+		// appended here.
 		const ctx = requestContext?.get('tenantContext') as TenantContext | undefined;
 		const fileManifest = requestContext?.get('fileManifest') as string | undefined;
 
@@ -122,12 +143,18 @@ export const assistantAgent = new Agent({
 				`- Active Class ID: ${ctx.classId || 'None'}`,
 				`- Active Section ID: ${ctx.sectionId || 'None'}`,
 				`- Active Exam ID: ${ctx.examId || 'None'}`,
+				`- Active Exam Type ID: ${ctx.examTypeId || 'None'}`,
+				`- Active Academic Year ID: ${ctx.academicId || 'None'}`,
+				`- Active Student ID (if @mention resolved): ${ctx.studentId || 'None'}`,
+				`- Active Role ID: ${ctx.roleId || 'None'}`,
 				'',
 				'BEHAVIORAL GUIDELINES:',
 				'1. Use the provided domain data to answer accurately.',
 				'2. If data is missing but expected, inform the user politely.',
 				'3. Maintain a premium, helpful, and professional tone.',
 				'4. Never suggest actions that would bypass tenant isolation or school safety rules.',
+				'5. Before executing /marksheet commands, verify that examTypeId and academicId are resolved. If either is null, call get-academic-context first to populate them.',
+				'6. Before executing student-specific commands (/enroll, /admit, /promote, etc.), verify that studentId is resolved. If null, the @mention was not applied — ask the user to @mention the target student.',
 				'',
 				"DO NOT hallucinate data. If you don't know the assessment setups for a class or the names of the students, use getContext(types: ['assessment', 'students']).",
 				'',

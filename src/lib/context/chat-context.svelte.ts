@@ -193,8 +193,26 @@ export class ChatContext {
   set pendingConfirmation(v) {
     this.threadData.pendingConfirmation = v;
   }
+  get runInfo(): { runId: string } | null {
+    return this.threadData.runInfo;
+  }
+  get awaitingValidation(): string | null {
+    return this.threadData.pendingAwaitingValidation;
+  }
   pendingMentions = $state<MentionPayload[]>([]);
   pendingGate = $state<PendingGate | null>(null);
+  /** workflow runId from data-runInfo (set by chat route prepend) */
+  activeRunId = $state<string | null>(null);
+  /** artifactId currently in validation flow (set by data-awaitValidation) */
+  pendingValidationArtifactId = $state<string | null>(null);
+  /** validation errors (set by data-validationErrors) */
+  pendingValidationErrors = $state<{ artifactId: string; errors: Array<{ path: string; message: string }> } | null>(null);
+  /** last validation outcome (set by data-validationResult) */
+  lastValidationOutcome = $state<{ artifactId: string; status: 'success' | 'errors' } | null>(null);
+  /** last committed artifact (set by data-committed) — persists for chat lifetime per D15 */
+  lastCommittedArtifactId = $state<string | null>(null);
+  /** per-keystroke edit tracking for ValidateFab mode derivation */
+  editContent = $state<string>('');
   fileReferences = $state<
     {
       key: string;
@@ -459,6 +477,33 @@ export class ChatContext {
     );
     this.pendingGate = null;
   };
+
+  resumeWorkflow(artifactId: string): void {
+    if (!this.activeRunId) {
+      console.warn('[ChatContext] resumeWorkflow called but activeRunId is not set');
+      return;
+    }
+    if (!artifactId) {
+      console.warn('[ChatContext] resumeWorkflow called with empty artifactId');
+      return;
+    }
+    this.pendingValidationArtifactId = artifactId;
+
+    this.client.sendMessage(
+      { text: '' },
+      {
+        body: {
+          threadId: this.chatData?.threadId,
+          runId: this.activeRunId,
+          step: 'awaitValidation',
+          resumeData: { artifactId },
+          selectedClass: this.selectedClass,
+          mentions: [],
+          fileReferences: []
+        }
+      }
+    );
+  }
 
   setContext = () => {
     setContext(CHAT_CONTEXT_KEY, this);

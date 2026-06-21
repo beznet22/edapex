@@ -1,11 +1,70 @@
 import { error, json, type RequestHandler } from '@sveltejs/kit';
-import { eq, and, or, like, sql, asc } from 'drizzle-orm';
+import { eq, and, or, like, sql, asc, type SQL } from 'drizzle-orm';
 import { createTenantContext, type TenantContext } from '$lib/server/mastra/tenant-context';
-import { getAllowedCategories, type MentionCategory, type MentionSearchResult } from './mention-utils';
+import type { MentionCategory, MentionSearchResult } from './mention-utils';
 import { getDatabase } from '$lib/server/db';
-import { smStudents, studentRecords } from '$lib/server/db/sms-schema';
+import {
+  smStudents,
+  studentRecords,
+  smClasses,
+  smSections,
+} from '$lib/server/db/sms-schema';
 import { ALLOWED_DESIGNATIONS } from "$lib/types/sms-types";
 import { BaseRepository } from '$lib/server/repository/base.repo';
+import { tenantWorkspace } from '$lib/server/mastra/storage/workspaces';
+import { buildWorkspaceRequestContext } from '$lib/server/helpers/chat-helper';
+import type { FileEntry } from '@mastra/core/workspace';
+
+/**
+ * Extended mention category set recognized by the search endpoint.
+ *
+ * M-EDIT-04.1 added `class_section`, `term`, and `file` to the `MentionTag`
+ * taxonomy; this alias type keeps the v1 editor categories (`date`,
+ * `custom`) for callers that haven't migrated, and adds the v2 categories
+ * plus `academic_year` / `staff` / `schools` (which are part of the
+ * `MentionTag` union and therefore in the role allowlist, but have no
+ * editor-side search implementation yet — `processMentions` resolves them
+ * via `MENTION_FIELD_MAP`).
+ */
+type ExtendedMentionCategory =
+  | MentionCategory
+  | 'class_section'
+  | 'academic_year'
+  | 'exam'
+  | 'file'
+  | 'staff'
+  | 'schools';
+
+type ClassSectionId = { classId: number; sectionId: number };
+
+type ExtendedMentionSearchResult = Omit<MentionSearchResult, 'id'> & {
+  id: number | string | ClassSectionId;
+};
+
+/**
+ * Role-based allowlist for the v2 mention taxonomy.
+ *
+ *   - IT / Coordinator: all categories
+ *   - Class Teacher: students, class_section, academic_year, exam, file
+ *   - Other: empty
+ *
+ * The shared helper `getAllowedCategories` in `mention-utils.ts` still
+ * returns the v1 set (`students`, `date`, `custom`) and is therefore
+ * stale. A follow-up microtask should align that helper with this
+ * derivation; this route computes the allowlist locally until then.
+ */
+function computeAllowedCategories(designationId: number): ExtendedMentionCategory[] {
+  if (
+    designationId === ALLOWED_DESIGNATIONS.IT ||
+    designationId === ALLOWED_DESIGNATIONS.COORDINATOR
+  ) {
+    return ['students', 'staff', 'schools', 'class_section', 'academic_year', 'exam', 'file'];
+  }
+  if (designationId === ALLOWED_DESIGNATIONS.CLASS_TEACHER) {
+    return ['students', 'class_section', 'academic_year', 'exam', 'file'];
+  }
+  return [];
+}
 
 /**
  * Searches entities in the school database scoped to the user's tenant.
@@ -25,7 +84,7 @@ async function searchStudents(
 	limit: number,
 	classId: number | null,
 	sectionId: number | null
-): Promise<MentionSearchResult[]> {
+): Promise<ExtendedMentionSearchResult[]> {
 	const db = await getDatabase();
 	const baseRepo = new BaseRepository(db as never, tenant);
 	const academicId = await baseRepo.getAcademicId();
@@ -87,99 +146,262 @@ async function searchStudents(
 	}));
 }
 
-async function searchDate(
+/**
+ * Returns pre-combined (class × section) rows scoped to the active tenant.
+ *
+ * Query: cross-join `smClasses` × `smSections` on `schoolId`, optionally
+ * filtered by `classId` and a case-insensitive `LIKE` against either
+ * `className` or `sectionName`. Each row yields a `class_section` mention
+ * whose `id` is the `{ classId, sectionId }` tuple (consumed by
+ * `processMentions` to update both `classId` and `sectionId` on the
+ * `TenantContext`).
+ */
+async function searchClassSection(
 	query: string,
-	_tenant: TenantContext,
-	_limit: number
-): Promise<MentionSearchResult[]> {
-	const trimmed = query.trim().toLowerCase();
-	const now = new Date();
-	const candidates: Array<{ id: string; name: string; badge: string }> = [
-		{ id: 'today', name: 'Today', badge: now.toLocaleDateString() },
-		{ id: 'tomorrow', name: 'Tomorrow', badge: relativeDay(now, 1) },
-		{ id: 'yesterday', name: 'Yesterday', badge: relativeDay(now, -1) },
-		{ id: 'next-week', name: 'Next week', badge: relativeDay(now, 7) },
-		{ id: 'next-month', name: 'Next month', badge: relativeDay(now, 30) },
+	tenant: TenantContext,
+	limit: number,
+	classIdFilter: number | null
+): Promise<ExtendedMentionSearchResult[]> {
+	const db = await getDatabase();
+	const trimmed = query.trim();
+	const filters: SQL[] = [
+		eq(smClasses.schoolId, tenant.schoolId),
+		eq(smClasses.activeStatus, 1),
+		eq(smSections.activeStatus, 1),
 	];
+	if (classIdFilter != null) {
+		filters.push(eq(smClasses.id, classIdFilter));
+	}
+	if (trimmed) {
+		const pattern = `%${trimmed}%`;
+		const nameMatch = or(
+			like(smClasses.className, pattern),
+			like(smSections.sectionName, pattern)
+		);
+		if (nameMatch) filters.push(nameMatch);
+	}
 
-	const filtered = trimmed
-		? candidates.filter((c) => c.name.toLowerCase().includes(trimmed) || c.id.includes(trimmed))
-		: candidates;
+	const rows = await db
+		.select({
+			classId: smClasses.id,
+			className: smClasses.className,
+			sectionId: smSections.id,
+			sectionName: smSections.sectionName,
+		})
+		.from(smClasses)
+		.innerJoin(smSections, eq(smClasses.schoolId, smSections.schoolId))
+		.where(and(...filters))
+		.limit(limit);
 
-	return filtered.map((c) => ({
-		id: c.id,
-		name: c.name,
-		category: 'date',
-		typeBadge: c.badge,
+	return rows.map((row) => ({
+		id: { classId: row.classId!, sectionId: row.sectionId! },
+		name: `${row.className} - ${row.sectionName}`,
+		category: 'class_section',
+		typeBadge: row.className,
 	}));
 }
 
-function relativeDay(base: Date, days: number): string {
-	const d = new Date(base);
-	d.setDate(d.getDate() + days);
-	return d.toLocaleDateString();
+/**
+ * Returns exam types scoped to the active academic year.
+ *
+ * `BaseRepository.getExamTypes()` already filters by the active academic
+ * year and `activeStatus = 1`, so we just narrow by `q` (case-insensitive
+ * substring match on `title`) and cap the result at `limit`.
+ */
+async function searchExam(
+	query: string,
+	tenant: TenantContext,
+	limit: number
+): Promise<ExtendedMentionSearchResult[]> {
+	const db = await getDatabase();
+	const baseRepo = new BaseRepository(db as never, tenant);
+	const examTypes = await baseRepo.getExamTypes();
+	const trimmed = query.trim().toLowerCase();
+	const filtered = trimmed
+		? examTypes.filter((t) => (t.title ?? '').toLowerCase().includes(trimmed))
+		: examTypes;
+	return filtered.slice(0, limit).map((t) => {
+		const title = t.title?.trim() || `Exam #${t.id}`;
+		return {
+			id: t.id,
+			name: title,
+			category: 'exam',
+			typeBadge: 'Exam',
+			parentContext: title,
+		};
+	});
 }
 
-async function searchCustom(
+/**
+ * Returns academic years scoped to the active school.
+ *
+ * `BaseRepository.getAcademicYears()` already filters to the active
+ * `schoolId`, so we just narrow by `q` (case-insensitive substring match
+ * on `year` or `title`) and cap the result at `limit`.
+ */
+async function searchAcademicYear(
 	query: string,
-	_tenant: TenantContext,
-	_limit: number
-): Promise<MentionSearchResult[]> {
-	const trimmed = query.trim();
-	if (!trimmed) return [];
-	return [
-		{
-			id: trimmed,
-			name: `Use "${trimmed}" as inline value`,
-			category: 'custom',
-			typeBadge: 'Custom',
-			parentContext: 'Free-form inline variable; not resolved server-side',
-		},
-	];
+	tenant: TenantContext,
+	limit: number
+): Promise<ExtendedMentionSearchResult[]> {
+	const db = await getDatabase();
+	const baseRepo = new BaseRepository(db as never, tenant);
+	const academicYears = await baseRepo.getAcademicYears();
+	const trimmed = query.trim().toLowerCase();
+	const filtered = trimmed
+		? academicYears.filter((y) =>
+				(y.year ?? '').toLowerCase().includes(trimmed) ||
+				(y.title ?? '').toLowerCase().includes(trimmed)
+			)
+		: academicYears;
+	return filtered.slice(0, limit).map((y) => {
+		const label = y.year?.trim() || `Year #${y.id}`;
+		return {
+			id: y.id,
+			name: label,
+			category: 'academic_year',
+			typeBadge: 'AY',
+		};
+	});
+}
+
+/**
+ * Lists files in the active tenant's workspace.
+ *
+ * Uses `tenantWorkspace.resolveFilesystem` so tenant isolation (the
+ * `LocalFilesystem({ contained: true })` sandbox and the teacher-assignment
+ * check) is enforced identically to other workspace-aware endpoints.
+ * Recursive `readdir` flattens nested entries into relative paths; we
+ * filter to `type === 'file'` and optionally narrow by `q`.
+ */
+async function searchFile(
+	query: string,
+	tenant: TenantContext,
+	limit: number
+): Promise<ExtendedMentionSearchResult[]> {
+	try {
+		const requestContext = buildWorkspaceRequestContext(tenant);
+		const fs = await tenantWorkspace.resolveFilesystem({
+			requestContext: requestContext as never
+		});
+		if (!fs) return [];
+		const entries: FileEntry[] = await fs.readdir('.', { recursive: true });
+		const trimmed = query.trim().toLowerCase();
+		const files = entries.filter((e) => {
+			if (e.type !== 'file') return false;
+			if (e.name === '.' || e.name === '..') return false;
+			if (!trimmed) return true;
+			return e.name.toLowerCase().includes(trimmed);
+		});
+		return files.slice(0, limit).map((e) => {
+			const lastSlash = e.name.lastIndexOf('/');
+			const parentContext = lastSlash > 0 ? e.name.slice(0, lastSlash) : '';
+			const basename = lastSlash >= 0 ? e.name.slice(lastSlash + 1) : e.name;
+			return {
+				id: e.name,
+				name: basename,
+				category: 'file',
+				typeBadge: 'File',
+				parentContext,
+			};
+		});
+	} catch {
+		return [];
+	}
 }
 
 async function searchEntities(
 	query: string,
-	category: MentionCategory | null,
+	category: ExtendedMentionCategory | null,
 	tenant: TenantContext,
 	limit: number,
 	classId: number | null,
 	sectionId: number | null
-): Promise<MentionSearchResult[]> {
+): Promise<ExtendedMentionSearchResult[]> {
 	const clampedLimit = Math.min(limit, 10);
 	if (category === 'students') return searchStudents(query, tenant, clampedLimit, classId, sectionId);
-	if (category === 'date') return searchDate(query, tenant, clampedLimit);
-	if (category === 'custom') return searchCustom(query, tenant, clampedLimit);
-	const [students, dates, customs] = await Promise.all([
+	if (category === 'class_section') return searchClassSection(query, tenant, clampedLimit, classId);
+	if (category === 'exam') return searchExam(query, tenant, clampedLimit);
+	if (category === 'academic_year') return searchAcademicYear(query, tenant, clampedLimit);
+	if (category === 'file') return searchFile(query, tenant, clampedLimit);
+	if (category === 'staff' || category === 'schools') {
+		return [];
+	}
+
+	// Default tab (no `category` param): students + class_section.
+	// `date` and `custom` were placeholder-only stubs and have been removed.
+	const trimmed = query.trim();
+	const [students, classSections] = await Promise.all([
 		searchStudents(query, tenant, Math.min(5, clampedLimit), classId, sectionId),
-		searchDate(query, tenant, Math.min(3, clampedLimit)),
-		searchCustom(query, tenant, Math.min(2, clampedLimit)),
+		trimmed
+			? searchClassSection(query, tenant, Math.min(5, clampedLimit), classId)
+			: Promise.resolve<ExtendedMentionSearchResult[]>([]),
 	]);
-	return [...students, ...dates, ...customs].slice(0, clampedLimit);
+	return [...students, ...classSections].slice(0, clampedLimit);
 }
 
 /**
  * GET /api/mentions/search?q=john&category=students&classId=5&sectionId=7&limit=10
+ *
+ * Privacy contract (per user spec):
+ *   @<studentName>  → same-school + active class OR assigned class
+ *   @file           → same-school + active class OR assigned class (workspace sandbox)
+ *
+ * The active class comes from the `selected-class` cookie (written by
+ * class-selector.svelte). The assigned class comes from user.classId /
+ * user.sectionId (set during on-boarding for class teachers).
+ *
+ * For class teachers these are identical. For admins/IT/coordinators
+ * the active class is whichever class they have selected via class-selector.
+ *
+ * Query params `classId` / `sectionId` are NOT honored as a privacy
+ * override — they would let any client widen the scope. The only way
+ * to change scope is via the user/session/cookie path.
  */
-export const GET: RequestHandler = async ({ url, locals }) => {
+export const GET: RequestHandler = async ({ url, locals, cookies }) => {
 	const { user } = locals;
 	if (!user) {
 		error(401, 'Authentication required');
 	}
 
 	const query = url.searchParams.get('q') || '';
-	const category = url.searchParams.get('category') as MentionCategory | null;
+	const category = url.searchParams.get('category') as ExtendedMentionCategory | null;
 	const limit = Math.min(parseInt(url.searchParams.get('limit') || '10', 10) || 10, 10);
-	const classIdParam = url.searchParams.get('classId');
-	const sectionIdParam = url.searchParams.get('sectionId');
-	const classId = classIdParam ? Number(classIdParam) : null;
-	const sectionId = sectionIdParam ? Number(sectionIdParam) : null;
 	const designationId: number = (user as any).designationId ?? ALLOWED_DESIGNATIONS.IT;
 
-	const allowedCategories = getAllowedCategories(designationId);
+	const allowedCategories = computeAllowedCategories(designationId);
 	if (category && !allowedCategories.includes(category)) {
 		return json({ error: 'FORBIDDEN' }, { status: 403 });
 	}
+
+	// Privacy: compute effective class scope from server-side authoritative sources.
+	// Active class (from class-selector cookie):
+	let activeClassId: number | null = null;
+	let activeSectionId: number | null = null;
+	try {
+		const cookieValue = cookies.get('selected-class');
+		if (cookieValue) {
+			const parsed = JSON.parse(cookieValue) as {
+				classId?: number | null;
+				sectionId?: number | null;
+			} | null;
+			if (parsed) {
+				activeClassId = parsed.classId ?? null;
+				activeSectionId = parsed.sectionId ?? null;
+			}
+		}
+	} catch {
+		// Ignore cookie parse errors — fall through to assigned class.
+	}
+
+	// Assigned class (from on-boarding):
+	const assignedClassId = (user as any).classId ?? null;
+	const assignedSectionId = (user as any).sectionId ?? null;
+
+	// Active takes precedence; assigned is the fallback. For class teachers
+	// these are identical; for admins/IT/coordinators only active applies.
+	const effectiveClassId = activeClassId ?? assignedClassId;
+	const effectiveSectionId = activeSectionId ?? assignedSectionId;
 
 	const tenantContext = createTenantContext({
 		schoolId: user.schoolId ?? 1,
@@ -187,12 +409,12 @@ export const GET: RequestHandler = async ({ url, locals }) => {
 		designationId,
 		staffId: (user as any).staffId ?? 1,
 		roleId: (user as any).roleId ?? null,
-		classId: (user as any).classId ?? null,
-		sectionId: (user as any).sectionId ?? null,
+		classId: effectiveClassId,
+		sectionId: effectiveSectionId,
 		examId: null,
 		academicId: user.academicId ?? null
 	});
 
-	const results = await searchEntities(query, category, tenantContext, limit, classId, sectionId);
+	const results = await searchEntities(query, category, tenantContext, limit, effectiveClassId, effectiveSectionId);
 	return json({ results });
 };

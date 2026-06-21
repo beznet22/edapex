@@ -1,6 +1,32 @@
 import type { RequestContextValues } from './shared';
 import { RequestContext } from '@mastra/core/request-context';
-import { ensureRegistry, resolveSkillName, skillRegistry } from '$lib/server/mastra/skill-tools';
+import { ensureRegistry, skillRegistry } from '$lib/server/mastra/skill-tools';
+
+const SKILL_COMMAND_MAP: Record<string, string> = {
+	'/marksheet': 'reporting',
+	'/enroll': 'write',
+	'/admit': 'write',
+	'/transfer': 'write',
+	'/promote': 'write',
+	'/demote': 'write',
+	'/update': 'write',
+	'/self-assign': 'write',
+	'/staff': 'write',
+	'/grade': 'academic',
+	'/mark': 'academic',
+	'/attendance': 'academic',
+	'/suspend': 'destructive',
+	'/reactivate': 'destructive',
+	'/password': 'destructive',
+	'/search': 'default',
+	'/switch': 'default',
+	'/context': 'default',
+};
+
+function resolveSkillName(message: string): string | undefined {
+	const command = message.trim().split(/\s+/)[0]?.toLowerCase();
+	return command ? SKILL_COMMAND_MAP[command] : undefined;
+}
 
 export async function buildAssistantInstructions(
 	requestContext: Pick<RequestContext<RequestContextValues>, 'get'>
@@ -51,7 +77,7 @@ export async function buildAssistantInstructions(
 
 	if (isSlashCommand && lastMessage) {
 		await ensureRegistry();
-		const skillName = resolveSkillName(lastMessage, true);
+		const skillName = resolveSkillName(lastMessage);
 		if (skillName) {
 			const skill = skillRegistry.getSkill(skillName);
 			if (skill?.instructions) {

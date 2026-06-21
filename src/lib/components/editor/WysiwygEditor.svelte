@@ -42,6 +42,7 @@
     selectedSectionId = null,
     selectedClassName = "",
     selectedSectionName = "",
+    editable = true,
   }: {
     content?: string;
     onUpdate?: (markdown: string) => void;
@@ -52,6 +53,7 @@
     selectedSectionId?: number | null;
     selectedClassName?: string;
     selectedSectionName?: string;
+    editable?: boolean;
   } = $props();
 
   $effect(() => {
@@ -138,6 +140,7 @@
       CodeBlockHighlight,
     ],
     content,
+    editable,
     editorProps: {
       attributes: {
         class: "outline-none min-h-[200px] px-6 py-4",
@@ -158,6 +161,13 @@
   $effect(() => {
     if ($editor) {
       editorInstance = $editor;
+    }
+  });
+
+  $effect(() => {
+    const ed = editorInstance;
+    if (ed) {
+      ed.setEditable(editable);
     }
   });
 

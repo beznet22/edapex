@@ -20,6 +20,7 @@ import { json, error, type RequestHandler } from '@sveltejs/kit';
 import { auth } from '$lib/server/service/auth.service';
 import { createTenantContext, WorkspaceMismatchError } from '$lib/server/mastra/tenant-context';
 import { tenantWorkspace } from '$lib/server/mastra/storage/workspaces';
+import { assertPathAgentVisible, WorkspaceScopeError } from '$lib/server/workspace/scope';
 import { buildWorkspaceRequestContext } from '$lib/server/helpers/chat-helper';
 import { resolveActiveClassScope } from '$lib/server/helpers/class-scope';
 import { ALLOWED_DESIGNATIONS } from "$lib/types/sms-types";
@@ -48,6 +49,20 @@ function contentTypeFor(filename: string): string {
 
 function safeRelPath(rawPath: string | undefined): string {
   return (rawPath ?? '').replace(/^\/+/, '');
+}
+
+function resolveScopedPath(
+  tenant: ReturnType<typeof createTenantContext>,
+  paramsPath: string | undefined,
+): string {
+  const relPath = safeRelPath(paramsPath);
+  if (relPath === '') return '.';
+  try {
+    return assertPathAgentVisible(tenant, paramsPath ?? '');
+  } catch (err) {
+    if (!(err instanceof WorkspaceScopeError)) throw err;
+    throw new WorkspaceScopeError(`WORKSPACE_SCOPE_VIOLATION: ${err.message}`);
+  }
 }
 
 function entryToWire(entry: FileEntry): {
@@ -99,16 +114,16 @@ export const GET: RequestHandler = async ({ params, url, locals, cookies }) => {
 
     const tenant = await resolveRequestTenant({ locals, url, cookies });
 
+    const resolvedPath = resolveScopedPath(tenant, params.path);
+
     const requestContext = buildWorkspaceRequestContext(tenant);
     const fs = await tenantWorkspace.resolveFilesystem({ requestContext: requestContext as never });
     if (!fs) throw error(500, 'Workspace filesystem unavailable');
 
     const action = url.searchParams.get('action');
-    const relPath = safeRelPath(params.path);
 
     if (action === 'list') {
-      const listPath = relPath;
-      const entries = await fs.readdir(listPath === '' ? '.' : listPath, { recursive: true });
+      const entries = await fs.readdir(resolvedPath, { recursive: true });
       const items = entries
         .filter((e) => e.name !== '.' && e.name !== '..')
         .map(entryToWire);
@@ -123,22 +138,22 @@ export const GET: RequestHandler = async ({ params, url, locals, cookies }) => {
     }
 
     if (action === 'download') {
-      const content = await fs.readFile(relPath);
+      const content = await fs.readFile(resolvedPath);
       const buffer = typeof content === 'string' ? new TextEncoder().encode(content) : new Uint8Array(content);
       return new Response(buffer, {
         headers: {
-          'Content-Type': contentTypeFor(relPath),
+          'Content-Type': contentTypeFor(resolvedPath),
           'Content-Length': buffer.length.toString(),
-          'Content-Disposition': `attachment; filename="${relPath.split('/').pop() ?? 'download'}"`,
+          'Content-Disposition': `attachment; filename="${resolvedPath.split('/').pop() ?? 'download'}"`,
         },
       });
     }
 
-    const content = await fs.readFile(relPath);
+    const content = await fs.readFile(resolvedPath);
     const buffer = typeof content === 'string' ? new TextEncoder().encode(content) : new Uint8Array(content);
     return new Response(buffer, {
       headers: {
-        'Content-Type': contentTypeFor(relPath),
+        'Content-Type': contentTypeFor(resolvedPath),
         'Content-Length': buffer.length.toString(),
         'Cache-Control': 'public, max-age=3600',
       },
@@ -146,6 +161,9 @@ export const GET: RequestHandler = async ({ params, url, locals, cookies }) => {
   } catch (e: unknown) {
     if (e instanceof WorkspaceMismatchError) {
       return json({ success: false, error: 'WORKSPACE_MISMATCH', message: e.message }, { status: 403 });
+    }
+    if (e instanceof WorkspaceScopeError) {
+      return json({ success: false, error: 'WORKSPACE_SCOPE_VIOLATION', message: e.message }, { status: 403 });
     }
     const message = e instanceof Error ? e.message : String(e);
     return json({ success: false, error: message }, { status: 400 });
@@ -158,19 +176,20 @@ export const POST: RequestHandler = async ({ params, url, request, locals, cooki
 
     const tenant = await resolveRequestTenant({ locals, url, cookies });
 
+    const resolvedPath = resolveScopedPath(tenant, params.path);
+
     const requestContext = buildWorkspaceRequestContext(tenant);
     const fs = await tenantWorkspace.resolveFilesystem({ requestContext: requestContext as never });
     if (!fs) throw error(500, 'Workspace filesystem unavailable');
 
     const action = url.searchParams.get('action');
-    const relPath = safeRelPath(params.path);
 
     if (action === 'rename') {
       const toParam = url.searchParams.get('to');
       if (!toParam) throw new Error("Missing 'to' parameter for rename");
-      const toRel = toParam.replace(/^\/+/, '');
-      await fs.moveFile(relPath, toRel, { overwrite: true });
-      return json({ success: true, path: toRel });
+      const toResolved = resolveScopedPath(tenant, toParam);
+      await fs.moveFile(resolvedPath, toResolved, { overwrite: true });
+      return json({ success: true, path: toResolved });
     }
 
     if (action === 'batch-extract') {
@@ -204,11 +223,14 @@ export const POST: RequestHandler = async ({ params, url, request, locals, cooki
       bytes = new Uint8Array(await blob.arrayBuffer());
     }
 
-    await fs.writeFile(relPath, bytes, { recursive: true, overwrite: true });
-    return json({ success: true, path: relPath });
+    await fs.writeFile(resolvedPath, bytes, { recursive: true, overwrite: true });
+    return json({ success: true, path: resolvedPath });
   } catch (e: unknown) {
     if (e instanceof WorkspaceMismatchError) {
       return json({ success: false, error: 'WORKSPACE_MISMATCH', message: e.message }, { status: 403 });
+    }
+    if (e instanceof WorkspaceScopeError) {
+      return json({ success: false, error: 'WORKSPACE_SCOPE_VIOLATION', message: e.message }, { status: 403 });
     }
     const message = e instanceof Error ? e.message : String(e);
     return json({ success: false, error: message }, { status: 400 });
@@ -221,16 +243,20 @@ export const DELETE: RequestHandler = async ({ params, url, locals, cookies }) =
 
     const tenant = await resolveRequestTenant({ locals, url, cookies });
 
+    const resolvedPath = resolveScopedPath(tenant, params.path);
+
     const requestContext = buildWorkspaceRequestContext(tenant);
     const fs = await tenantWorkspace.resolveFilesystem({ requestContext: requestContext as never });
     if (!fs) throw error(500, 'Workspace filesystem unavailable');
 
-    const relPath = safeRelPath(params.path);
-    await fs.deleteFile(relPath);
+    await fs.deleteFile(resolvedPath);
     return json({ success: true });
   } catch (e: unknown) {
     if (e instanceof WorkspaceMismatchError) {
       return json({ success: false, error: 'WORKSPACE_MISMATCH', message: e.message }, { status: 403 });
+    }
+    if (e instanceof WorkspaceScopeError) {
+      return json({ success: false, error: 'WORKSPACE_SCOPE_VIOLATION', message: e.message }, { status: 403 });
     }
     const message = e instanceof Error ? e.message : String(e);
     return json({ success: false, error: message }, { status: 400 });
@@ -243,18 +269,22 @@ export const PUT: RequestHandler = async ({ params, request, locals, cookies, ur
 
     const tenant = await resolveRequestTenant({ locals, url, cookies });
 
+    const resolvedPath = resolveScopedPath(tenant, params.path);
+
     const requestContext = buildWorkspaceRequestContext(tenant);
     const fs = await tenantWorkspace.resolveFilesystem({ requestContext: requestContext as never });
     if (!fs) throw error(500, 'Workspace filesystem unavailable');
 
-    const relPath = safeRelPath(params.path);
     const blob = await request.blob();
     const bytes = new Uint8Array(await blob.arrayBuffer());
-    await fs.writeFile(relPath, bytes, { recursive: true, overwrite: true });
-    return json({ success: true, path: relPath });
+    await fs.writeFile(resolvedPath, bytes, { recursive: true, overwrite: true });
+    return json({ success: true, path: resolvedPath });
   } catch (e: unknown) {
     if (e instanceof WorkspaceMismatchError) {
       return json({ success: false, error: 'WORKSPACE_MISMATCH', message: e.message }, { status: 403 });
+    }
+    if (e instanceof WorkspaceScopeError) {
+      return json({ success: false, error: 'WORKSPACE_SCOPE_VIOLATION', message: e.message }, { status: 403 });
     }
     const message = e instanceof Error ? e.message : String(e);
     return json({ success: false, error: message }, { status: 400 });

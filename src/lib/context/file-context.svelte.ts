@@ -2,7 +2,6 @@ import type { UploadedData } from "$lib/types/chat-types";
 import { generateId } from "ai";
 import { getContext, setContext } from "svelte";
 import { toast } from "svelte-sonner";
-import UploadWorker from "$lib/chat/upload-worker.ts?worker";
 import type { index } from "drizzle-orm/gel-core";
 import { doExtraction } from "$lib/api/assessment.remote";
 import type { ClassSection } from "$lib/types/result-types";
@@ -95,7 +94,7 @@ export class FilesContext {
     this.files = [...this.files, ...incoming];
   };
 
-  // Upload files with optional student data (used by drop-zone)
+  // Upload files with optional student data
   uploadWithStudentData = (
     files: File[],
     studentData?: {
@@ -153,20 +152,17 @@ export class FilesContext {
 
       // Important: Use upload.id here as it might have been reassigned to the existing ID
       const activeId = upload.id;
-      const worker = this.#initWoeker(activeId, upload.filename);
-      const { classId, sectionId, className, sectionName } = this.selectedClass || {};
-      worker.postMessage({
+      const activeName = upload.filename;
+      const { classId, sectionId } = this.selectedClass || {};
+      void this.#performUpload({
         fileId: activeId,
         file,
+        filename,
         classId,
         sectionId,
-        className,
-        sectionName,
-        studentId: studentData?.studentId,
-        studentName: studentData?.studentName,
-        admissionNo: studentData?.admissionNo,
-        isStudentPhoto: studentData?.isStudentPhoto,
+        studentData,
         originalName: file.name,
+        displayName: activeName,
       });
     }
   };
@@ -178,20 +174,20 @@ export class FilesContext {
     toast.info(`Retrying extraction for ${upload.filename}...`);
     console.log("Retrying upload: ", upload);
 
-    // If it's a permanent file, we might not have the original File object
-    // but the backend handles "retry by filename" if it exists in UPLOADS_DIR.
-    // However, if it was already "done", we might not need to retry unless we want to re-extract.
+    const { classId, sectionId } = selectedClass || this.selectedClass || {};
+    const studentData = upload.data?.fullName
+      ? { studentName: String(upload.data.fullName), isStudentPhoto: false }
+      : undefined;
 
-    const worker = this.#initWoeker(upload.id, upload.filename);
-    const { classId, sectionId, className, sectionName } = selectedClass || this.selectedClass || {};
-    worker.postMessage({
+    void this.#performUpload({
       fileId: upload.id,
+      file: undefined,
       filename: upload.filename,
       classId,
       sectionId,
-      className,
-      sectionName,
-      originalName: upload.originalName,
+      studentData,
+      originalName: upload.originalName ?? upload.filename,
+      displayName: upload.filename,
     });
   };
 
@@ -234,53 +230,92 @@ export class FilesContext {
     }
   };
 
-  #initWoeker = (fileId: string, name: string) => {
-    const worker = new UploadWorker({ name: `upload-worker-${generateId()}` });
-    worker.onmessage = ({ data }: MessageEvent<UploadedData>) => {
-      // Always update the upload state to ensure UI stops the loading spinner
-      // We explicitly map only the new fields so that we don't destructively overwrite
-      // optimistic properties like filename, data, and url if the worker returns an error or empty
+  #performUpload = async (params: {
+    fileId: string;
+    file: File | undefined;
+    filename: string;
+    classId: number | null | undefined;
+    sectionId: number | null | undefined;
+    studentData?: {
+      studentId?: number;
+      studentName?: string;
+      admissionNo?: number;
+      isStudentPhoto?: boolean;
+    };
+    originalName: string;
+    displayName: string;
+  }) => {
+    const { fileId, file, filename, classId, sectionId, studentData, originalName, displayName } = params;
+    try {
+      if (!file) {
+        throw new Error("Cannot retry: original file is no longer available. Re-select the file.");
+      }
+
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("filename", filename);
+      formData.append("kind", studentData?.isStudentPhoto ? "studentPhoto" : "document");
+      if (classId != null) formData.append("classId", String(classId));
+      if (sectionId != null) formData.append("sectionId", String(sectionId));
+      if (studentData?.studentId) formData.append("studentId", String(studentData.studentId));
+      if (studentData?.admissionNo) formData.append("admissionNo", String(studentData.admissionNo));
+
+      const response = await fetch("/api/uploads", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        let errMsg = `Upload failed: HTTP ${response.status}`;
+        try {
+          const errData = await response.json();
+          if (errData.message) errMsg = errData.message;
+          else if (errData.error) errMsg = errData.error;
+        } catch (e) {
+          void e;
+        }
+        throw new Error(errMsg);
+      }
+
+      const result = await response.json();
+      if (!result.success) {
+        throw new Error(result.error || result.message || "Upload failed");
+      }
+
+      const ext = filename.split(".").pop() ?? file.name.split(".").pop() ?? "bin";
+      const resolvedUrl: string = studentData?.isStudentPhoto
+        ? result.photoUrl ?? `/uploads/students/${result.contentHash ?? fileId}.${ext}`
+        : `/api/file/photos/${result.contentHash ?? fileId}.${ext}`;
+
+      const resolvedId: string = result.documentId ?? result.fileId ?? fileId;
+
       this.uploads = this.uploads.map((u) =>
-        u.id === fileId ? { 
-          ...u, 
-          id: data.id || u.id, 
-          status: data.status,
-          success: data.success,
-          error: data.error,
-          filename: data.filename || u.filename,
-          url: data.url || u.url,
-          data: data.data || u.data,
-          originalName: data.originalName || u.originalName,
-          token: data.token || u.token
-        } : u
+        u.id === fileId
+          ? {
+              ...u,
+              id: resolvedId,
+              status: "uploaded",
+              success: true,
+              url: resolvedUrl,
+              filename,
+              data: { ...(u.data ?? {}), ...result },
+              originalName,
+              token: result.token,
+            }
+          : u,
       );
 
-      if (!data.success) {
-        // If HTTP request failed or pure error from worker
-        toast.error(data.error || "Upload failed");
-        return;
-      }
-
-      if (data.status === "error") {
-        toast.error(data.error || "Failed to extract file. File saved, pending extraction.");
-      } else if (data.status === "uploaded") {
-        toast.info("File saved, pending extraction");
-      } else if (["extracted", "approved", "published"].includes(data.status)) {
-        toast.success("File uploaded successfully");
-        console.log(`Upload success for ${name}:`, data);
-      }
-    };
-
-    worker.onerror = (error) => {
-      console.error(`Upload error for ${name}:`, error);
+      toast.info("File saved, pending extraction");
+      console.log(`Upload success for ${displayName}:`, result);
+    } catch (error) {
+      const errMsg = error instanceof Error ? error.message : "Unknown error occurred during upload";
       const existing = this.uploads.find((u) => u.id === fileId);
       if (existing) {
-        this.updateUpload({ ...existing, status: "error", success: false });
+        this.updateUpload({ ...existing, status: "error", success: false, error: errMsg });
       }
-      toast.error(`Failed to upload ${name}`);
-    };
-
-    return worker;
+      toast.error(errMsg);
+      console.error(`Upload error for ${displayName}:`, error);
+    }
   };
 
   removeAll = () => {

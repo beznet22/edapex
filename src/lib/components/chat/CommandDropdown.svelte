@@ -10,8 +10,11 @@
   import UserPlusIcon from "@lucide/svelte/icons/user-plus";
   import UserCheckIcon from "@lucide/svelte/icons/user-check";
   import SettingsIcon from "@lucide/svelte/icons/settings";
-  import PenIcon from "@lucide/svelte/icons/pen";
-  import TagIcon from "@lucide/svelte/icons/tag";
+  import CameraIcon from "@lucide/svelte/icons/camera";
+  import EyeIcon from "@lucide/svelte/icons/eye";
+  import ArrowUpIcon from "@lucide/svelte/icons/arrow-up";
+  import ArrowDownIcon from "@lucide/svelte/icons/arrow-down";
+  import HandIcon from "@lucide/svelte/icons/hand";
   import BanIcon from "@lucide/svelte/icons/ban";
   import RefreshCwIcon from "@lucide/svelte/icons/refresh-cw";
   import SearchIcon from "@lucide/svelte/icons/search";
@@ -26,155 +29,184 @@
     onSelect: (cmd: string) => void;
   } = $props();
 
-  const commands = [
-    // Workflows (Assistant)
-    {
-      id: "extract",
-      label: "extract",
-      icon: ScanLineIcon,
-      desc: "Extract data via Mistral OCR",
-    },
-    {
-      id: "validate",
-      label: "validate",
-      icon: ShieldCheckIcon,
-      desc: "Human-in-the-loop review",
-    },
-    {
-      id: "generate",
-      label: "generate",
-      icon: FileSignatureIcon,
-      desc: "Upsert student results",
-    },
-    {
-      id: "publish",
-      label: "publish",
-      icon: SendIcon,
-      desc: "Publish final grade reports",
-    },
-
-    // Grading
-    {
-      id: "grade",
-      label: "grade",
-      icon: GraduationCapIcon,
-      desc: "Submit academic grade",
-    },
-    {
-      id: "mark",
-      label: "mark",
-      icon: GraduationCapIcon,
-      desc: "Add exam marks",
-    },
-    {
-      id: "attendance",
-      label: "attendance",
-      icon: CalendarCheckIcon,
-      desc: "Record attendance status",
-    },
-
-    // Onboarding
-    {
-      id: "enroll",
-      label: "enroll",
-      icon: UserPlusIcon,
-      desc: "Enroll student in a class",
-    },
-    {
-      id: "admit",
-      label: "admit",
-      icon: UserPlusIcon,
-      desc: "Admit a new student to the school",
-    },
-    {
-      id: "transfer",
-      label: "transfer",
-      icon: UserCheckIcon,
-      desc: "Transfer student to another class",
-    },
-    {
-      id: "register",
-      label: "register",
-      icon: UserPlusIcon,
-      desc: "Begin conversational registration",
-    },
-
-    // Governance
-    {
-      id: "update",
-      label: "update",
-      icon: SettingsIcon,
-      desc: "Update student or guardian record",
-    },
-    {
-      id: "suspend",
-      label: "suspend",
-      icon: BanIcon,
-      desc: "Suspend user workspace access",
-    },
-    {
-      id: "delete",
-      label: "delete",
-      icon: BanIcon,
-      desc: "Permanently remove a user account",
-    },
-    {
-      id: "password",
-      label: "password",
-      icon: RefreshCwIcon,
-      desc: "Reset a user's account password",
-    },
-
-    // Core/Default
-    {
-      id: "search",
-      label: "search",
-      icon: SearchIcon,
-      desc: "Search the school directory",
-    },
-    {
-      id: "switch",
-      label: "switch",
-      icon: ShuffleIcon,
-      desc: "Switch active class or section",
-    },
-    {
-      id: "context",
-      label: "context",
-      icon: ActivityIcon,
-      desc: "Show the active academic context",
-    },
-
-    // Deprecated aliases (one minor version, remove in 0.5.0)
-    {
-      id: "ban",
-      label: "ban (deprecated)",
-      icon: BanIcon,
-      desc: "Use /suspend instead",
-    },
-    {
-      id: "edit",
-      label: "edit (deprecated)",
-      icon: PenIcon,
-      desc: "Use /update instead",
-    },
-    {
-      id: "rename",
-      label: "rename (deprecated)",
-      icon: TagIcon,
-      desc: "Use /update instead",
-    },
-    {
-      id: "find",
-      label: "find (deprecated)",
-      icon: SearchIcon,
-      desc: "Use /search instead",
-    },
-  ];
+  const commands = $derived.by(() => {
+    // Subcommand pickers when user has typed a command prefix
+    if (query.startsWith("marksheet")) {
+      return [
+        {
+          id: "marksheet generate",
+          label: "marksheet generate",
+          icon: FileSignatureIcon,
+          desc: "Generate PDF report card from a committed marksheet",
+        },
+        {
+          id: "marksheet publish",
+          label: "marksheet publish",
+          icon: SendIcon,
+          desc: "Publish PDF + email parents",
+        },
+        {
+          id: "marksheet result",
+          label: "marksheet result",
+          icon: SearchIcon,
+          desc: "View a committed marksheet result",
+        },
+        {
+          id: "marksheet view",
+          label: "marksheet view",
+          icon: EyeIcon,
+          desc: "View a marksheet artifact",
+        },
+      ];
+    }
+    if (query.startsWith("staff")) {
+      return [
+        {
+          id: "staff register",
+          label: "staff register",
+          icon: UserPlusIcon,
+          desc: "Register a new staff member",
+        },
+        {
+          id: "staff update",
+          label: "staff update",
+          icon: SettingsIcon,
+          desc: "Update staff record",
+        },
+        {
+          id: "staff assign",
+          label: "staff assign",
+          icon: UserCheckIcon,
+          desc: "Assign class/subject to staff",
+        },
+      ];
+    }
+    if (query.startsWith("update")) {
+      return [
+        {
+          id: "update photo",
+          label: "update photo",
+          icon: CameraIcon,
+          desc: "Attach the last photo upload to a student profile",
+        },
+      ];
+    }
+    // Top-level commands (no subcommand prefix)
+    return [
+      {
+        id: "marksheet",
+        label: "marksheet",
+        icon: ScanLineIcon,
+        desc: "Marksheet pipeline (generate, publish, result, view)",
+      },
+      {
+        id: "staff",
+        label: "staff",
+        icon: UserPlusIcon,
+        desc: "Staff operations (register, update, assign)",
+      },
+      {
+        id: "update",
+        label: "update",
+        icon: SettingsIcon,
+        desc: "Update student or guardian record",
+      },
+      {
+        id: "enroll",
+        label: "enroll",
+        icon: UserPlusIcon,
+        desc: "Enroll student in a class",
+      },
+      {
+        id: "admit",
+        label: "admit",
+        icon: UserPlusIcon,
+        desc: "Admit a new student to the school",
+      },
+      {
+        id: "transfer",
+        label: "transfer",
+        icon: UserCheckIcon,
+        desc: "Transfer student to another class",
+      },
+      {
+        id: "promote",
+        label: "promote",
+        icon: ArrowUpIcon,
+        desc: "Promote student to next class",
+      },
+      {
+        id: "demote",
+        label: "demote",
+        icon: ArrowDownIcon,
+        desc: "Demote student to previous class",
+      },
+      {
+        id: "self-assign",
+        label: "self-assign",
+        icon: HandIcon,
+        desc: "Teacher self-assigns a class",
+      },
+      {
+        id: "grade",
+        label: "grade",
+        icon: GraduationCapIcon,
+        desc: "Submit academic grade",
+      },
+      {
+        id: "mark",
+        label: "mark",
+        icon: GraduationCapIcon,
+        desc: "Add exam marks",
+      },
+      {
+        id: "attendance",
+        label: "attendance",
+        icon: CalendarCheckIcon,
+        desc: "Record attendance status",
+      },
+      {
+        id: "suspend",
+        label: "suspend",
+        icon: BanIcon,
+        desc: "Suspend user workspace access",
+      },
+      {
+        id: "reactivate",
+        label: "reactivate",
+        icon: ShieldCheckIcon,
+        desc: "Reactivate suspended account",
+      },
+      {
+        id: "password",
+        label: "password",
+        icon: RefreshCwIcon,
+        desc: "Reset a user's account password",
+      },
+      {
+        id: "search",
+        label: "search",
+        icon: SearchIcon,
+        desc: "Search the school directory",
+      },
+      {
+        id: "switch",
+        label: "switch",
+        icon: ShuffleIcon,
+        desc: "Switch active class or section",
+      },
+      {
+        id: "context",
+        label: "context",
+        icon: ActivityIcon,
+        desc: "Show the active academic context",
+      },
+    ];
+  });
 
   const filtered = $derived(
     query
-      ? commands.filter((c) => c.id.includes(query.toLowerCase()))
+      ? commands.filter((c) => c.id.toLowerCase().includes(query.toLowerCase()))
       : commands,
   );
 </script>

@@ -279,7 +279,7 @@ export const getResources = query(
           status: assessmentData.status,
           success: ["extracted", "approved", "published"].includes(assessmentData.status),
           type: "image/jpeg",
-          url: `/api/uploads/${resourceId}/image.jpg?token=${displayToken}`,
+          url: `/api/file/${resourceId}/image.jpg?token=${displayToken}`,
           data: {
             studentId: assessmentData.data?.studentData?.studentId,
             examId: assessmentData.data?.studentData?.examTypeId,

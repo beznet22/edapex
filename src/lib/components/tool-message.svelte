@@ -208,7 +208,7 @@
         {/if}
 
         {#if getState(part) === "output-available" || getState(part) === "output-error"}
-          {#if part.type === "tool-validate-extraction"}
+          {#if part.type === "tool-validate-marksheet"}
             {@render validateClassResults(part)}
           {:else if part.type === "tool-manage-results"}
             {@render upsertStudentResult(part)}

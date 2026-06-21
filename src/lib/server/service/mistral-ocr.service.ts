@@ -122,6 +122,51 @@ export class MistralOcrService {
   }
 
   /**
+   * Run OCR with structured output: returns a normalized JSON payload
+   * extracted from the document. Uses Mistral's documentAnnotationFormat
+   * parameter to enforce a JSON schema on the OCR response.
+   *
+   * Used by the upload route to write a normalized JSON to the workspace's
+   * `extracted/<documentId>.json` without requiring a second LLM pass.
+   */
+  public async processStructured(
+    fileContent: Blob | Buffer | Uint8Array,
+    fileName: string,
+    jsonSchema: Record<string, unknown>,
+  ): Promise<unknown> {
+    await this.enforceCooldown();
+
+    return this.withRetry(async () => {
+      const client = this.getClient();
+
+      const uploadPayload = fileContent instanceof Blob
+        ? fileContent
+        : new Blob([fileContent as BlobPart]);
+
+      const uploadedFile = await client.files.upload({
+        file: {
+          fileName: fileName,
+          content: uploadPayload,
+        },
+        purpose: 'ocr',
+      });
+
+      const ocrResponse = await client.ocr.process({
+        model: 'mistral-ocr-latest',
+        document: {
+          type: 'file',
+          fileId: uploadedFile.id,
+        },
+        includeImageBase64: false,
+        documentAnnotationFormat: jsonSchema,
+      } as never);
+
+      const result = { ...ocrResponse, fileId: uploadedFile.id };
+      return result;
+    });
+  }
+
+  /**
    * Get OCR markdown for a file that was previously uploaded (has a fileId).
    * Downloads processed OCR markdown on-demand from Mistral.
    */

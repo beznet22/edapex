@@ -3,7 +3,7 @@ import { getAllowedCategories, type MentionCategory } from '../../src/routes/api
 
 describe('@Mention Search API', () => {
 	describe('getAllowedCategories', () => {
-		const ALL_CATEGORIES: MentionCategory[] = ['students', 'date', 'custom'];
+		const ALL_CATEGORIES: MentionCategory[] = ['students', 'class_section', 'academic_year'];
 
 		it('returns all 3 categories for IT user (designationId 1)', () => {
 			const result = getAllowedCategories(1);
@@ -31,11 +31,6 @@ describe('@Mention Search API', () => {
 			expect(getAllowedCategories(1)).toContain('students');
 			expect(getAllowedCategories(5)).toContain('students');
 			expect(getAllowedCategories(8)).toContain('students');
-		});
-
-		it('includes date and custom categories for all roles', () => {
-			expect(getAllowedCategories(1)).toContain('date');
-			expect(getAllowedCategories(1)).toContain('custom');
 		});
 	});
 });

@@ -29,6 +29,10 @@
   import CalendarIcon from "@lucide/svelte/icons/calendar";
   import MapIcon from "@lucide/svelte/icons/map";
   import ChevronDownIcon from "@lucide/svelte/icons/chevron-down";
+  import ShieldAlertIcon from "@lucide/svelte/icons/shield-alert";
+  import CheckCircleIcon from "@lucide/svelte/icons/check-circle";
+  import AlertCircleIcon from "@lucide/svelte/icons/alert-circle";
+  import FileWarningIcon from "@lucide/svelte/icons/file-warning";
 
   import ShimmerArtifactCard from "./ShimmerArtifactCard.svelte";
 
@@ -222,6 +226,56 @@
                           content={part.data?.data ?? ""}
                           kind="pdf"
                         />
+                      </div>
+                    {/if}
+
+                    {#if part.type === "data-runInfo"}
+                      <div class="text-[10px] text-muted-foreground/40 font-mono px-3 py-1" data-run-id={part.data.runId}>
+                        run {part.data.runId.slice(0, 8)}
+                      </div>
+                    {/if}
+
+                    {#if part.type === "data-awaitValidation"}
+                      <div class="flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-[11px] font-medium text-amber-700 dark:text-amber-300" data-await-validation={part.data.artifactId}>
+                        <ShieldAlertIcon class="size-3.5" />
+                        <span>Click <strong>Validate</strong> to check this marksheet.</span>
+                      </div>
+                    {/if}
+
+                    {#if part.type === "data-validationResult"}
+                      <div class="flex items-center gap-2 px-3 py-2 rounded-lg bg-{part.data.status === 'success' ? 'emerald' : 'amber'}-500/10 border border-{part.data.status === 'success' ? 'emerald' : 'amber'}-500/20 text-[11px] font-medium" data-validation-result={part.data.artifactId}>
+                        {#if part.data.status === "success"}
+                          <CheckCircleIcon class="size-3.5" />
+                          <span>Validation passed.</span>
+                        {:else}
+                          <AlertCircleIcon class="size-3.5" />
+                          <span>Validation found {part.data.errorCount ?? 'multiple'} issue(s).</span>
+                        {/if}
+                      </div>
+                    {/if}
+
+                    {#if part.type === "data-validationErrors"}
+                      <details class="px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-[11px]" data-validation-errors={part.data.artifactId}>
+                        <summary class="font-medium text-amber-700 dark:text-amber-300 cursor-pointer">{part.data.errors.length} validation issue(s)</summary>
+                        <ul class="mt-2 space-y-1 list-disc list-inside text-amber-700 dark:text-amber-300">
+                          {#each part.data.errors as err}
+                            <li><code class="font-mono">{err.path}</code>: {err.message}</li>
+                          {/each}
+                        </ul>
+                      </details>
+                    {/if}
+
+                    {#if part.type === "data-committed"}
+                      <div class="flex items-center gap-2 px-3 py-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-[11px] font-medium text-emerald-700 dark:text-emerald-300" data-committed={part.data.artifactId}>
+                        <CheckCircleIcon class="size-3.5" />
+                        <span>Saved <strong>{part.data.studentName}</strong> (record #{part.data.recordId}) in {part.data.className} — {part.data.term}.</span>
+                      </div>
+                    {/if}
+
+                    {#if part.type === "data-noDocuments"}
+                      <div class="flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/50 border border-border/10 text-[11px] font-medium text-muted-foreground" data-no-documents>
+                        <FileWarningIcon class="size-3.5" />
+                        <span>{part.data.message}</span>
                       </div>
                     {/if}
 

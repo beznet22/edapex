@@ -8,6 +8,7 @@ export { updateStaffBiodataTool } from "./update-staff-biodata";
 export { assignStaffToClassTool } from "./assign-staff-to-class";
 export { assignStaffToSubjectTool } from "./assign-staff-to-subject";
 export { teacherSelfAssignClassTool } from "./teacher-self-assign-class";
+export { updatePhotoTool } from "./update-photo";
 
 import { enrollStudentTool } from "./enroll-student";
 import { transferStudentTool } from "./transfer-student";
@@ -19,6 +20,7 @@ import { updateStaffBiodataTool } from "./update-staff-biodata";
 import { assignStaffToClassTool } from "./assign-staff-to-class";
 import { assignStaffToSubjectTool } from "./assign-staff-to-subject";
 import { teacherSelfAssignClassTool } from "./teacher-self-assign-class";
+import { updatePhotoTool } from "./update-photo";
 
 export const writeTools = {
   enrollStudentTool,
@@ -30,5 +32,6 @@ export const writeTools = {
   updateStaffBiodataTool,
   assignStaffToClassTool,
   assignStaffToSubjectTool,
-  teacherSelfAssignClassTool
+  teacherSelfAssignClassTool,
+  updatePhotoTool
 };

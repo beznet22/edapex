@@ -143,7 +143,12 @@
       }
 
       const { classId, sectionId } = chat.selectedClass;
-      if (!classId || !sectionId || !user || !user.staffId) return;
+      if (!classId || !sectionId || !user || !user.staffId) {
+        toast.error(
+          "Cannot complete onboarding: missing class, section, or staff assignment. Please contact your administrator.",
+        );
+        return;
+      }
       const res = await assignSubjects({ classId, sectionId });
       if ((!res.success && res.message) || !res.assigned) {
         toast.error(res.message);
@@ -153,6 +158,9 @@
       userContext.students = res.assigned;
       userContext.assignedSection = chat.selectedClass;
       open = false;
+    } catch (err) {
+      toast.error("Failed to complete onboarding. Please try again.");
+      throw err;
     } finally {
       isUpdating = false;
     }

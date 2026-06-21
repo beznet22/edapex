@@ -13,22 +13,38 @@ import { ALLOWED_DESIGNATIONS } from "$lib/types/sms-types";
  * Represents a parsed @mention tag from the chat message.
  */
 export interface MentionTag {
-	category: 'schools' | 'students' | 'classes' | 'sections' | 'academic_year' | 'term';
-	id: number;
+	category:
+		| 'students'
+		| 'staff'
+		| 'schools'
+		| 'class_section'
+		| 'academic_year'
+		| 'exam'
+		| 'file';
+	id: number | string | { classId: number; sectionId: number };
 	name: string;
 	parentContext?: string;
+	/** For photo fileReferences attached to the message */
+	fileRef?: {
+		kind: 'photo';
+		url: string;
+		contentHash: string;
+		mimeType: string;
+		size: number;
+	};
 }
 
 /**
  * Maps mention categories to their corresponding TenantContext field.
  */
-export const MENTION_FIELD_MAP: Record<string, keyof TenantContext> = {
+export const MENTION_FIELD_MAP: Record<string, keyof TenantContext | 'fileRef'> = {
 	schools: 'schoolId',
+	staff: 'staffId',
 	students: 'studentId',
-	classes: 'classId',
-	sections: 'sectionId',
+	class_section: 'classId',
 	academic_year: 'academicId',
-	term: 'examId'
+	exam: 'examTypeId',
+	file: 'fileRef',
 };
 
 /**
@@ -67,8 +83,19 @@ export async function defaultEntityResolver(
 	// - classes: query classes table
 	// - sections: query sections table
 	// - academic_year: query academic_years table
-	// - term: query exam_types table
+	// - exam: query exam_types table
 	return { id, schoolId: 1, classId: null, sectionId: null };
+}
+
+function isClassSectionId(
+	id: MentionTag['id']
+): id is { classId: number; sectionId: number } {
+	return (
+		typeof id === 'object' &&
+		id !== null &&
+		'classId' in id &&
+		'sectionId' in id
+	);
 }
 
 /**
@@ -82,6 +109,11 @@ export async function defaultEntityResolver(
  * 4. If class changes → busts context cache via cache.bustCache(sessionId)
  * 5. For Class Teachers (designationId 8): only updates studentId, academicId, examId — never classId/sectionId
  * 6. For Class Teachers: validates student is in their assigned class/section
+ *
+ * TODO(M-EDIT-04.2): file category plumbing requires `requestContext` to be threaded through this
+ * function's signature. File mentions should route via `requestContext.set('fileRef', mention)`
+ * rather than mutating TenantContext. Until the signature is extended, file mentions are skipped
+ * (validation placeholder carries the active schoolId, application loop drops them).
  *
  * @param mentions - Array of MentionTag objects parsed from the message
  * @param tenantContext - Current immutable TenantContext
@@ -110,6 +142,7 @@ export async function processMentions(
 		classId: tenantContext.classId,
 		sectionId: tenantContext.sectionId,
 		examId: tenantContext.examId,
+		examTypeId: tenantContext.examTypeId,
 		academicId: tenantContext.academicId,
 		studentId: tenantContext.studentId,
 		userId: tenantContext.userId,
@@ -132,6 +165,26 @@ export async function processMentions(
 	const resolvedEntities: ResolvedEntity[] = [];
 
 	for (const mention of mentions) {
+		// TODO(M-EDIT-04.2): file category requires requestContext for workspace-scope validation.
+		if (mention.category === 'file') {
+			resolvedEntities.push({ id: 0, schoolId: tenantContext.schoolId });
+			continue;
+		}
+
+		// class_section: id is a {classId, sectionId} object — placeholder until M-EDIT-04.2 wires
+		// a real class/section ownership lookup against the schoolId.
+		if (isClassSectionId(mention.id)) {
+			resolvedEntities.push({
+				id: 0,
+				schoolId: tenantContext.schoolId,
+				classId: mention.id.classId,
+				sectionId: mention.id.sectionId
+			});
+			continue;
+		}
+
+		if (typeof mention.id !== 'number') continue;
+
 		const entity = await resolveEntity(mention.category, mention.id);
 
 		// Validate entity belongs to user's school
@@ -162,14 +215,35 @@ export async function processMentions(
 	// All validations passed — now apply updates left-to-right
 	for (let i = 0; i < mentions.length; i++) {
 		const mention = mentions[i];
-		const field = MENTION_FIELD_MAP[mention.category];
 
-		if (!field) continue;
+		// TODO(M-EDIT-04.2): file category plumbing routes via requestContext.set('fileRef', mention).
+		if (mention.category === 'file') continue;
+
+		const field = MENTION_FIELD_MAP[mention.category];
+		if (!field || field === 'fileRef') continue;
 
 		// For Class Teachers: skip blocked fields (schoolId, classId, sectionId)
 		if (isClassTeacher && classTeacherBlockedFields.has(field)) {
 			continue;
 		}
+
+		// class_section sets BOTH classId and sectionId from the id object.
+		if (mention.category === 'class_section') {
+			if (!isClassSectionId(mention.id)) continue;
+			updatedFields.classId = mention.id.classId;
+			updatedFields.sectionId = mention.id.sectionId;
+			continue;
+		}
+
+		// exam routes to examTypeId (the generic field assignment below would also handle this
+		// via MENTION_FIELD_MAP, but the explicit branch mirrors class_section and documents intent).
+		if (mention.category === 'exam') {
+			if (typeof mention.id !== 'number') continue;
+			updatedFields.examTypeId = mention.id as number;
+			continue;
+		}
+
+		if (typeof mention.id !== 'number') continue;
 
 		// Apply the mention: override the corresponding context field
 		updatedFields[field] = mention.id;
@@ -183,12 +257,17 @@ export async function processMentions(
 		cache.bustCache(sessionId);
 	}
 
+	// TODO(M-EDIT-04.5 or follow-up): plumb `requestContext` through processMentions so the
+	// `file` category can set fileRef on requestContext (rather than being skipped here).
+	// The current signature intentionally omits requestContext to avoid breaking callers;
+	// file mentions remain a no-op until the signature is extended.
 	// Create new immutable TenantContext
 	return createTenantContext({
 		schoolId: updatedFields.schoolId as number,
 		classId: updatedFields.classId as number | null,
 		sectionId: updatedFields.sectionId as number | null,
 		examId: updatedFields.examId as number | null,
+		examTypeId: updatedFields.examTypeId as number | null,
 		academicId: updatedFields.academicId as number | null,
 		studentId: updatedFields.studentId as number | null,
 		userId: updatedFields.userId as number,

@@ -14,6 +14,12 @@ export class ThreadData {
     reasoning: string;
     originalMessage: string;
   } | null>(null);
+  runInfo = $state<{ runId: string } | null>(null);
+  pendingAwaitingValidation = $state<string | null>(null);
+  pendingValidationErrors = $state<{ artifactId: string; errors: Array<{ path: string; message: string }> } | null>(null);
+  lastValidationOutcome = $state<{ artifactId: string; status: 'success' | 'errors' } | null>(null);
+  lastCommitted = $state<{ artifactId: string; recordId: number; studentName: string; className: string; term: string } | null>(null);
+  noDocumentsMessage = $state<string | null>(null);
   chatHistory = ChatHistory.fromContext();
   #activeExamTypeId: number | null = null;
   #persistedKeys = new Map<string, string>();
@@ -53,6 +59,38 @@ export class ThreadData {
 
     if (part.type === "data-createDocument") {
       this.#handleCreateDocument(part.data);
+    }
+
+    if (part.type === "data-runInfo") {
+      this.runInfo = part.data;
+    }
+
+    if (part.type === "data-awaitValidation") {
+      this.pendingAwaitingValidation = part.data.artifactId;
+    }
+
+    if (part.type === "data-validationResult") {
+      this.lastValidationOutcome = {
+        artifactId: part.data.artifactId,
+        status: part.data.status,
+      };
+    }
+
+    if (part.type === "data-validationErrors") {
+      this.pendingValidationErrors = {
+        artifactId: part.data.artifactId,
+        errors: part.data.errors,
+      };
+    }
+
+    if (part.type === "data-committed") {
+      this.lastCommitted = part.data;
+      this.pendingAwaitingValidation = null;
+      this.pendingValidationErrors = null;
+    }
+
+    if (part.type === "data-noDocuments") {
+      this.noDocumentsMessage = part.data.message;
     }
   }
 

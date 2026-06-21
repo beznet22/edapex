@@ -1,6 +1,8 @@
 <script lang="ts">
+  import { onDestroy, onMount } from "svelte";
   import ArrowUpIcon from "@lucide/svelte/icons/arrow-up";
   import BookOpenIcon from "@lucide/svelte/icons/book-open";
+  import CameraIcon from "@lucide/svelte/icons/camera";
   import CheckCircleIcon from "@lucide/svelte/icons/check-circle";
   import ChevronRightIcon from "@lucide/svelte/icons/chevron-right";
   import ChevronsUpDownIcon from "@lucide/svelte/icons/chevrons-up-down";
@@ -18,6 +20,7 @@
   import PaletteIcon from "@lucide/svelte/icons/palette";
   import PaperclipIcon from "@lucide/svelte/icons/paperclip";
   import PlusIcon from "@lucide/svelte/icons/plus";
+  import ScanLineIcon from "@lucide/svelte/icons/scan-line";
   import ShieldAlertIcon from "@lucide/svelte/icons/shield-alert";
   import SquareIcon from "@lucide/svelte/icons/square";
   import TelescopeIcon from "@lucide/svelte/icons/telescope";
@@ -62,22 +65,15 @@
 
   let input = $state("");
   let textareaRef = $state<HTMLTextAreaElement | null>(null);
+  let photoFileInput = $state<HTMLInputElement | null>(null);
+  let documentFileInput = $state<HTMLInputElement | null>(null);
   let showCommands = $state(false);
   let showMentions = $state(false);
   let mentionQuery = $state("");
   let commandQuery = $state("");
   let blockedWorkflowMessage = $state<string | null>(null);
   let selectedMentions = $state<MentionPayload[]>([]);
-
-  let ocrFileInput = $state<HTMLInputElement | null>(null);
-  type OcrFile = {
-    id: string;
-    name: string;
-    status: "uploading" | "extracted" | "error";
-    fileId?: string;
-    markdown?: string;
-  };
-  let ocrFiles = $state<OcrFile[]>([]);
+  let mentionDropdownRef = $state<MentionDropdown | null>(null);
 
   let webSearchEnabled = $state(false);
   // TODO: pass webSearchEnabled to chat request body when web search tool is integrated
@@ -235,7 +231,6 @@
       if (file.references?.length) {
         file.references = [];
       }
-      ocrFiles = []; // Clear OCR chips on submit
       chat.scrollToBottom();
     }
   }
@@ -262,10 +257,14 @@
       showMentions = false;
     } else {
       showCommands = false;
-      const mentionMatch = beforeCursor.match(/@(\w*)$/);
+      // Detect @category prefix (class, year, exam, term, file) or bare @ (students)
+      const mentionMatch = beforeCursor.match(/@(class|year|exam|term|file)?\s*(\w*)$/);
       if (mentionMatch) {
         showMentions = true;
-        mentionQuery = mentionMatch[1];
+        const prefix = mentionMatch[1] || "";
+        const query = mentionMatch[2] || "";
+        // Encode the prefix in mentionQuery so MentionDropdown can derive category
+        mentionQuery = prefix ? `${prefix} ${query}` : query;
       } else {
         showMentions = false;
       }
@@ -286,8 +285,10 @@
     const cursor = textareaRef?.selectionStart || 0;
     const beforeCursor = input.substring(0, cursor);
     const afterCursor = input.substring(cursor);
-    const displayName = mention.name.length > 40 ? mention.name.slice(0, 40) : mention.name;
-    const newBefore = beforeCursor.replace(/@(\w*)$/, `@${displayName} `);
+    // Strip category prefix from displayed name (e.g. "class LOWERBASIC 1 - B" → "LOWERBASIC 1 - B")
+    const cleanedName = mention.name.replace(/^(?:class|year|exam|term|file)\s+/, "");
+    const displayName = cleanedName.length > 40 ? cleanedName.slice(0, 40) : cleanedName;
+    const newBefore = beforeCursor.replace(/@(?:class|year|exam|term|file)?\s*\w*$/, `@${displayName} `);
     input = newBefore + afterCursor;
     showMentions = false;
     // Track the structured mention for submission
@@ -303,75 +304,10 @@
     textareaRef?.focus();
   }
 
-  function handleNativeUpload() {
-    ocrFileInput?.click();
-  }
-
-  async function handleOcrChange(e: Event) {
-    const input = e.target as HTMLInputElement;
-    if (!input.files?.length) return;
-
-    for (const f of Array.from(input.files)) {
-      const id = generateId();
-      ocrFiles.push({ id, name: f.name, status: "uploading" });
-
-      const formData = new FormData();
-      formData.append("file", f);
-      formData.append("filename", f.name);
-
-      try {
-        const res = await fetch("/api/file/ocr", {
-          method: "POST",
-          body: formData,
-        });
-        const json = await res.json();
-
-        const idx = ocrFiles.findIndex((o) => o.id === id);
-        if (json.success && idx !== -1) {
-          const validFileId = json.fileId || json.contentHash || id;
-          ocrFiles[idx] = {
-            ...ocrFiles[idx],
-            status: "extracted",
-            fileId: validFileId,
-            markdown: json.markdown,
-          };
-          // Add to file references so it gets sent in payload
-          file.addReference({
-            key: validFileId,
-            name: f.name,
-            type: "file",
-            fileId: json.fileId,
-            contentHash: json.contentHash,
-          });
-        } else if (idx !== -1) {
-          ocrFiles[idx] = { ...ocrFiles[idx], status: "error" };
-        }
-      } catch (err) {
-        const idx = ocrFiles.findIndex((o) => o.id === id);
-        if (idx !== -1) ocrFiles[idx] = { ...ocrFiles[idx], status: "error" };
-      }
-    }
-
-    input.value = ""; // Reset input
-  }
-
-  function removeOcrFile(id: string) {
-    const f = ocrFiles.find((o) => o.id === id);
-    if (f?.fileId) {
-      file.removeReference(f.fileId);
-    }
-    ocrFiles = ocrFiles.filter((o) => o.id !== id);
-  }
-
   function closeAllMenus(): void {
     mainMenuOpen = false;
     recentMenuOpen = false;
     moreMenuOpen = false;
-  }
-
-  function triggerNativeUpload(): void {
-    handleNativeUpload();
-    closeAllMenus();
   }
 
   function stubCreateImage(): void {
@@ -392,6 +328,107 @@
   function stubMoreTool(label: string): void {
     toast.info(`${label} coming soon`);
     closeAllMenus();
+  }
+
+  function triggerPhotoUpload(): void {
+    photoFileInput?.click();
+    closeAllMenus();
+  }
+
+  async function handlePhotoUpload(e: Event) {
+    const input = e.target as HTMLInputElement;
+    if (!input.files?.length) return;
+
+    for (const f of Array.from(input.files)) {
+      try {
+        const formData = new FormData();
+        formData.append("file", f);
+        formData.append("filename", f.name);
+        formData.append("kind", "photo");
+
+        const res = await fetch("/api/uploads", {
+          method: "POST",
+          body: formData,
+        });
+
+        if (!res.ok) {
+          toast.error(`Failed to upload ${f.name}`);
+          continue;
+        }
+        const json = await res.json();
+        if (json.kind !== "photo") {
+          toast.error(`Unexpected response for ${f.name}`);
+          continue;
+        }
+
+        const photoRef = {
+          kind: "photo" as const,
+          contentHash: json.contentHash,
+          url: json.url,
+          mimeType: json.mimeType,
+          size: json.size,
+          name: f.name,
+        };
+        file.addReference({
+          key: json.contentHash,
+          name: f.name,
+          type: "file" as const,
+          mimeType: json.mimeType,
+        });
+        // Photo fileReference stored — chat composer will render chip; user can later type /update photo @student to commit
+      } catch (err) {
+        toast.error(`Failed to upload ${f.name}`);
+      }
+    }
+
+    input.value = "";
+  }
+
+  function triggerDocumentUpload(): void {
+    documentFileInput?.click();
+    closeAllMenus();
+  }
+
+  async function handleDocumentUpload(e: Event) {
+    const input = e.target as HTMLInputElement;
+    if (!input.files?.length) return;
+
+    for (const f of Array.from(input.files)) {
+      try {
+        const formData = new FormData();
+        formData.append("file", f);
+        formData.append("filename", f.name);
+        formData.append("kind", "document");
+
+        const res = await fetch("/api/uploads", {
+          method: "POST",
+          body: formData,
+        });
+
+        if (!res.ok) {
+          toast.error(`Failed to upload ${f.name}`);
+          continue;
+        }
+        const json = await res.json();
+        if (json.kind !== "document") {
+          toast.error(`Unexpected response for ${f.name}`);
+          continue;
+        }
+
+        file.addReference({
+          key: json.contentHash,
+          name: f.name,
+          type: "file" as const,
+          fileId: json.fileId,
+          contentHash: json.contentHash,
+        });
+        toast.success(`Uploaded ${f.name} — type /marksheet to process.`);
+      } catch (err) {
+        toast.error(`Failed to upload ${f.name}`);
+      }
+    }
+
+    input.value = "";
   }
 
   function openRecentSubmenu(): void {
@@ -440,6 +477,12 @@
     }
   }
 
+  function handleRequestValidation(e: Event): void {
+    const detail = (e as CustomEvent<{ artifactId: string; mode: string }>).detail;
+    if (!detail?.artifactId) return;
+    chat.resumeWorkflow(detail.artifactId);
+  }
+
   $effect(() => {
     if (mainMenuOpen) return;
     recentMenuOpen = false;
@@ -451,6 +494,28 @@
       if (recentCloseTimer !== null) clearTimeout(recentCloseTimer);
       if (moreCloseTimer !== null) clearTimeout(moreCloseTimer);
     };
+  });
+
+  // Drive MentionDropdown's suggestion refresh imperatively (avoids the
+  // $state.raw self-loop that previously broke the @ dropdown).
+  $effect(() => {
+    const q = mentionQuery;
+    const v = showMentions;
+    // Read mentionDropdownRef via the state-tracked field (initial null is OK;
+    // when the component mounts, the ref binds and the effect re-fires).
+    const ref = mentionDropdownRef;
+    if (ref) {
+      ref.refresh(q, v);
+    }
+  });
+
+  onMount(() => {
+    window.addEventListener("chat:requestValidation", handleRequestValidation);
+  });
+  onDestroy(() => {
+    if (typeof window !== "undefined") {
+      window.removeEventListener("chat:requestValidation", handleRequestValidation);
+    }
   });
 </script>
 
@@ -475,7 +540,7 @@
   {onSubmit}
 >
   <!-- Attachment Tray (Top Layer) -->
-  {#if file.files.length > 0 || chat.studentData || (file.references && file.references.length > 0) || ocrFiles.length > 0}
+  {#if file.files.length > 0 || chat.studentData || (file.references && file.references.length > 0)}
     <div class="flex flex-wrap gap-2 px-4 pt-4 pb-2 transition-all duration-500 ease-out">
       {#if chat.studentData}
         <div
@@ -509,31 +574,8 @@
         </div>
       {/each}
 
-      <!-- OCR Attachment Chips -->
-      {#each ocrFiles as ocr (ocr.id)}
-        <div
-          class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary/10 border border-primary/20 text-[11px] font-bold tracking-wide text-primary group shadow-sm"
-        >
-          {#if ocr.status === "uploading"}
-            <LoaderCircleIcon class="size-3.5 opacity-70 animate-spin" />
-          {:else if ocr.status === "extracted"}
-            <CheckCircleIcon class="size-3.5 text-green-500 opacity-90" />
-          {:else}
-            <XCircleIcon class="size-3.5 text-destructive opacity-90" />
-          {/if}
-          <span class="max-w-[150px] truncate uppercase tracking-tighter">{ocr.name}</span>
-          <button
-            onclick={() => removeOcrFile(ocr.id)}
-            class="opacity-40 group-hover:opacity-100 hover:text-foreground transition-all ml-1 min-h-12 min-w-12 sm:min-h-8 sm:min-w-8 flex items-center justify-center"
-            aria-label={`Remove ${ocr.name}`}
-          >
-            <XIcon class="size-3" />
-          </button>
-        </div>
-      {/each}
-
       {#if file.references}
-        {#each file.references.filter((ref) => !ocrFiles.some((ocr) => ocr.fileId === ref.key)) as ref (ref.key)}
+        {#each file.references as ref (ref.key)}
           <div
             class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/60 border border-white/5 text-[11px] font-bold tracking-wide text-foreground/70 group shadow-sm"
           >
@@ -617,6 +659,7 @@
   {#if showMentions}
     <div class="absolute bottom-full left-4 right-4 mb-4 z-50">
       <MentionDropdown
+        bind:this={mentionDropdownRef}
         query={mentionQuery}
         designationId={DESIGNATIONS.indexOf(userContext.user?.designation ?? "it")}
         visible={showMentions}
@@ -703,12 +746,29 @@
           >
             <Button
               variant="ghost"
-              onclick={triggerNativeUpload}
+              onclick={triggerPhotoUpload}
               class="w-full justify-start gap-2.5 px-3 py-2 min-h-9 rounded-md text-[11px] font-bold tracking-tight text-foreground/80 hover:text-primary hover:bg-white/5"
             >
-              <PaperclipIcon class="size-3.5 opacity-70 shrink-0" />
-              <span class="truncate">Add photos & files</span>
+              <CameraIcon class="size-3.5 opacity-70 shrink-0" />
+              <div class="flex flex-col items-start min-w-0">
+                <span class="truncate">Upload Photo</span>
+                <span class="text-[9px] text-muted-foreground/60">Workspace asset. Use /update photo @student to attach.</span>
+              </div>
             </Button>
+
+            <Button
+              variant="ghost"
+              onclick={triggerDocumentUpload}
+              class="w-full justify-start gap-2.5 px-3 py-2 min-h-9 rounded-md text-[11px] font-bold tracking-tight text-foreground/80 hover:text-primary hover:bg-white/5"
+            >
+              <ScanLineIcon class="size-3.5 opacity-70 shrink-0" />
+              <div class="flex flex-col items-start min-w-0">
+                <span class="truncate">Upload Document</span>
+                <span class="text-[9px] text-muted-foreground/60">OCR + structured extraction (PDF/image).</span>
+              </div>
+            </Button>
+
+            <Separator class="my-1" />
 
             <Popover.Root bind:open={recentMenuOpen}>
               <Popover.Trigger>
@@ -738,7 +798,6 @@
               >
                 <Button
                   variant="ghost"
-                  onclick={triggerNativeUpload}
                   class="w-full justify-start gap-2.5 px-3 py-2 min-h-9 rounded-md text-[11px] font-bold tracking-tight text-foreground/80 hover:text-primary hover:bg-white/5"
                 >
                   <LibraryIcon class="size-3.5 opacity-70 shrink-0" />
@@ -764,15 +823,6 @@
             >
               <ImageIcon class="size-3.5 opacity-70 shrink-0" />
               <span class="truncate">Create image</span>
-            </Button>
-
-            <Button
-              variant="ghost"
-              onclick={stubDeepResearch}
-              class="w-full justify-start gap-2.5 px-3 py-2 min-h-9 rounded-md text-[11px] font-bold tracking-tight text-foreground/80 hover:text-primary hover:bg-white/5"
-            >
-              <TelescopeIcon class="size-3.5 opacity-70 shrink-0" />
-              <span class="truncate">Deep research</span>
             </Button>
 
             <div
@@ -847,20 +897,6 @@
                 </Button>
               </Popover.Content>
             </Popover.Root>
-
-            <Separator class="my-1" />
-
-            <Button
-              variant="ghost"
-              onclick={stubProjects}
-              class="w-full justify-between gap-2.5 px-3 py-2 min-h-9 rounded-md text-[11px] font-bold tracking-tight text-foreground/80 hover:text-primary hover:bg-white/5"
-            >
-              <span class="flex items-center gap-2.5 min-w-0">
-                <FolderIcon class="size-3.5 opacity-70 shrink-0" />
-                <span class="truncate">Projects</span>
-              </span>
-              <ChevronRightIcon class="size-3 opacity-50 shrink-0" />
-            </Button>
           </Popover.Content>
         </Popover.Root>
 
@@ -883,8 +919,6 @@
 
         <div class="hidden sm:block mx-1 sm:mx-2 h-4 w-px bg-white/10 shrink-0"></div>
       </div>
-
-      <input type="file" multiple class="hidden" bind:this={ocrFileInput} onchange={handleOcrChange} />
     </div>
 
     <div class="flex items-center px-1 gap-1">
@@ -974,6 +1008,22 @@
 
   <!-- Hidden native file input -->
   <input type="file" multiple class="hidden" bind:this={file.fileInputRef} onchange={file.onchange} />
+  <input
+    type="file"
+    multiple
+    accept="image/*"
+    class="hidden"
+    bind:this={photoFileInput}
+    onchange={handlePhotoUpload}
+  />
+  <input
+    type="file"
+    multiple
+    accept="application/pdf,image/*"
+    class="hidden"
+    bind:this={documentFileInput}
+    onchange={handleDocumentUpload}
+  />
 </PromptInput>
 
 <style>

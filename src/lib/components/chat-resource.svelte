@@ -168,7 +168,7 @@
                   >
                     {#if ["uploaded", "extracted", "approved", "published"].includes(upload.status) && upload.token}
                       <img
-                        src={`/api/uploads/${upload.filename}?token=${upload.token}`}
+                        src={`/api/file/${upload.id}/image.jpg?token=${upload.token}`}
                         alt={upload.filename}
                         class="h-full w-full object-cover group-hover:scale-110 transition-transform duration-700"
                       />
@@ -242,7 +242,7 @@
     >
       {#if ["uploaded", "extracted", "approved", "published"].includes(selectedUpload.status) && selectedUpload.token}
         <img
-          src={`/api/uploads/${selectedUpload.id}.pdf?token=${selectedUpload.token}`}
+          src={`/api/file/${selectedUpload.id}.pdf?token=${selectedUpload.token}`}
           alt={selectedUpload.filename}
           class="max-w-full max-h-[70vh] object-contain rounded-2xl shadow-[0_0_50px_oklch(0_0_0_/_0.5)] bg-white"
         />

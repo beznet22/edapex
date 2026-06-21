@@ -175,6 +175,35 @@ export class OcrWorkspaceStore {
     const fs = await resolveFilesystem(params.tenant);
     return readMarkdownViaFs(fs, params.tenant, params.contentHash);
   }
+
+  static async writeNormalizedJson(
+    tenant: TenantContext,
+    documentId: string,
+    json: unknown,
+  ): Promise<string> {
+    const fs = await resolveFilesystem(tenant);
+    const path = `extracted/${documentId}.json`;
+    await fs.writeFile(
+      path,
+      JSON.stringify(json, null, 2),
+      { recursive: true },
+    );
+    return path;
+  }
+
+  static async readNormalizedJson(
+    tenant: TenantContext,
+    documentId: string,
+  ): Promise<unknown> {
+    const fs = await resolveFilesystem(tenant);
+    const path = `extracted/${documentId}.json`;
+    if (!(await fs.exists(path))) {
+      return null;
+    }
+    const raw = await fs.readFile(path, { encoding: 'utf-8' });
+    const text = typeof raw === 'string' ? raw : raw.toString('utf-8');
+    return JSON.parse(text);
+  }
 }
 
 async function readMarkdownViaFs(

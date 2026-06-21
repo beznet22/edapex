@@ -51,7 +51,8 @@ import { categorizeAIError } from '$lib/errors/friendly-ai-error';
 import { mastra } from '../index';
 import { streamWithAutoRetry } from '../agent-stream-retry';
 import { OcrWorkspaceStore } from '$lib/server/mastra/storage/ocr/ocr-workspace-store';
-import { generateThreadTitle, resolveThread } from '$lib/server/helpers/chat-helper';
+import { tenantWorkspace } from '$lib/server/mastra/storage/workspaces';
+import { generateThreadTitle, resolveThread, buildWorkspaceRequestContext } from '$lib/server/helpers/chat-helper';
 import { DEFAULT_TITLE_MODEL } from '../agents/shared';
 import type { TenantContext } from '../tenant-context';
 
@@ -730,6 +731,137 @@ const continuationAssistantStep = createStep({
 	}
 });
 
+const awaitValidationStep = createStep({
+	id: 'awaitValidation',
+	description: 'Suspends awaiting teacher click on Validate FAB; on resume, validates the marksheet and commits or auto-fixes.',
+	inputSchema: z.object({
+		text: z.string(),
+		resolvedFiles: z.array(fileStreamItemSchema).default([])
+	}),
+	outputSchema: z.object({
+		text: z.string(),
+		resolvedFiles: z.array(fileStreamItemSchema).default([]),
+		validationStatus: z.enum(['committed', 'autofixed', 'awaiting-user']).default('awaiting-user')
+	}),
+	resumeSchema: z.object({
+		artifactId: z.string()
+	}),
+	suspendSchema: z.object({
+		artifactId: z.string()
+	}),
+	execute: async ({ inputData, requestContext, resumeData, suspend, writer, mastra: m, runId }) => {
+		const tenant = (requestContext?.get('tenantContext') as TenantContext | undefined);
+		const lastFormattedId = (requestContext?.get('lastFormattedDocumentId') as string | undefined);
+		const artifactId = (resumeData?.artifactId as string | undefined)
+			?? `doc-format-${lastFormattedId ?? 'unknown'}`;
+
+		// First-run path: emit data-awaitValidation, then suspend
+		if (!resumeData) {
+			if (writer) {
+				await writer.write({
+					type: 'data-awaitValidation',
+					id: `await-${artifactId}`,
+					data: { artifactId, runId: runId ?? '' }
+				} as never);
+			}
+			await suspend({ artifactId });
+			return {
+				text: inputData.text,
+				resolvedFiles: inputData.resolvedFiles,
+				validationStatus: 'awaiting-user' as const
+			};
+		}
+
+		// Resume path: orchestrate validate → commit OR auto-fix
+		if (!tenant || !lastFormattedId) {
+			throw new Error('TENANT_OR_DOCUMENT_MISSING: resume requires tenantContext and lastFormattedDocumentId in requestContext');
+		}
+
+		// Read the latest markdown from workspace
+		const fs = await tenantWorkspace.resolveFilesystem({
+			requestContext: buildWorkspaceRequestContext(tenant) as never
+		});
+		if (!fs) throw new Error('WORKSPACE_UNAVAILABLE: tenant workspace filesystem not configured');
+		const safeTitle = lastFormattedId.replace(/[^a-zA-Z0-9._-]/g, '_');
+		const markdownPath = `exams/examType-${tenant.examTypeId ?? 'unknown'}/${safeTitle}.md`;
+		let currentMarkdown = '';
+		try {
+			const raw = await fs.readFile(markdownPath);
+			currentMarkdown = typeof raw === 'string' ? raw : (raw as { toString(encoding?: BufferEncoding): string }).toString('utf-8');
+		} catch {
+			// File may not exist yet; pass empty string
+		}
+
+		// Invoke validate-marksheet tool via mastra
+		const validateTool = m?.getTool('validate-marksheet');
+		if (!validateTool) throw new Error('TOOL_NOT_REGISTERED: validate-marksheet');
+		const validateResult = await validateTool.execute!(
+			{ documentId: lastFormattedId, correctedMarkdown: currentMarkdown },
+			{ requestContext, writer, mastra: m } as never
+		);
+
+		if (validateResult.ok) {
+			// Success: commit
+			const commitTool = m?.getTool('commit-marksheet');
+			if (!commitTool) throw new Error('TOOL_NOT_REGISTERED: commit-marksheet');
+			await commitTool.execute!(
+				{ documentId: lastFormattedId },
+				{ requestContext, writer, mastra: m } as never
+			);
+			return {
+				text: inputData.text,
+				resolvedFiles: inputData.resolvedFiles,
+				validationStatus: 'committed' as const
+			};
+		}
+
+		// Failure: auto-fix, then re-suspend
+		const autoFixTool = m?.getTool('auto-fix-marksheet');
+		if (!autoFixTool) throw new Error('TOOL_NOT_REGISTERED: auto-fix-marksheet');
+		const fixResult = await autoFixTool.execute!(
+			{
+				documentId: lastFormattedId,
+				errors: validateResult.errors,
+				currentMarkdown
+			},
+			{ requestContext, writer, mastra: m } as never
+		);
+
+		// Emit data-validationErrors if there are unresolved issues
+		if (fixResult.unresolvedErrors && fixResult.unresolvedErrors.length > 0) {
+			if (writer) {
+				await writer.write({
+					type: 'data-validationErrors',
+					id: `ve-${artifactId}`,
+					data: {
+						artifactId,
+						errors: fixResult.unresolvedErrors
+					}
+				} as never);
+			}
+			await suspend({ artifactId });
+			return {
+				text: inputData.text,
+				resolvedFiles: inputData.resolvedFiles,
+				validationStatus: 'autofixed' as const
+			};
+		}
+
+		// All errors auto-fixed; try to commit
+		const commitTool2 = m?.getTool('commit-marksheet');
+		if (!commitTool2) throw new Error('TOOL_NOT_REGISTERED: commit-marksheet');
+		await commitTool2.execute!(
+			{ documentId: lastFormattedId },
+			{ requestContext, writer, mastra: m } as never
+		);
+		return {
+			text: inputData.text,
+			resolvedFiles: inputData.resolvedFiles,
+			validationStatus: 'committed' as const
+		};
+	}
+});
+
 const titleStep = createStep({
 	id: 'title',
 	inputSchema: chatWorkflowInputSchema,
@@ -836,6 +968,7 @@ export const chatWorkflow = createWorkflow({
 	.then(assistantStep)
 	.then(selectionGateStep)
 	.then(continuationAssistantStep)
+	.then(awaitValidationStep)
 	.commit();
 
 /**
@@ -845,3 +978,9 @@ export const chatWorkflow = createWorkflow({
 export const HITL_VERIFY_STEP_ID = hitlVerifyStep.id as 'hitl-verify';
 
 export const SELECTION_GATE_STEP_ID = selectionGateStep.id as 'selectionGate';
+
+/**
+ * Sentinel export for the resume route — the resume endpoint keys its
+ * `step:` argument off this id so the workflow ID and step ID stay in sync.
+ */
+export const AWAIT_VALIDATION_STEP_ID = awaitValidationStep.id as 'awaitValidation';

@@ -70,13 +70,12 @@ describe('mention-processor', () => {
 	});
 
 	describe('MENTION_FIELD_MAP', () => {
-		it('maps all 6 categories to correct TenantContext fields', () => {
+		it('maps v2 taxonomy categories to correct TenantContext fields', () => {
 			expect(MENTION_FIELD_MAP.schools).toBe('schoolId');
 			expect(MENTION_FIELD_MAP.students).toBe('studentId');
-			expect(MENTION_FIELD_MAP.classes).toBe('classId');
-			expect(MENTION_FIELD_MAP.sections).toBe('sectionId');
+			expect(MENTION_FIELD_MAP.class_section).toBe('classId');
 			expect(MENTION_FIELD_MAP.academic_year).toBe('academicId');
-			expect(MENTION_FIELD_MAP.term).toBe('examId');
+			expect(MENTION_FIELD_MAP.term).toBe('examTypeId');
 		});
 	});
 
@@ -99,21 +98,13 @@ describe('mention-processor', () => {
 			expect(result.sectionId).toBe(20);
 		});
 
-		it('updates classId when a class mention is provided', async () => {
+		it('updates classId and sectionId when a class_section mention is provided', async () => {
 			const mentions: MentionTag[] = [
-				{ category: 'classes', id: 15, name: 'Class 10A' }
+				{ category: 'class_section', id: { classId: 15, sectionId: 25 }, name: 'Class 10A Section B' }
 			];
 
 			const result = await processMentions(mentions, baseContext, cache, sessionId, 5, mockResolver);
 			expect(result.classId).toBe(15);
-		});
-
-		it('updates sectionId when a section mention is provided', async () => {
-			const mentions: MentionTag[] = [
-				{ category: 'sections', id: 25, name: 'Section B' }
-			];
-
-			const result = await processMentions(mentions, baseContext, cache, sessionId, 5, mockResolver);
 			expect(result.sectionId).toBe(25);
 		});
 
@@ -149,8 +140,7 @@ describe('mention-processor', () => {
 
 		it('applies multiple different category mentions correctly', async () => {
 			const mentions: MentionTag[] = [
-				{ category: 'classes', id: 15, name: 'Class 10A' },
-				{ category: 'sections', id: 25, name: 'Section B' },
+				{ category: 'class_section', id: { classId: 15, sectionId: 25 }, name: 'Class 10A Section B' },
 				{ category: 'students', id: 501, name: 'John Doe' }
 			];
 
@@ -210,7 +200,7 @@ describe('mention-processor', () => {
 
 			const mentions: MentionTag[] = [
 				{ category: 'students', id: 501, name: 'Valid Student' },
-				{ category: 'classes', id: 15, name: 'Foreign Class' }
+				{ category: 'class_section', id: { classId: 15, sectionId: 25 }, name: 'Foreign Class' }
 			];
 
 			await expect(
@@ -240,7 +230,7 @@ describe('mention-processor', () => {
 			expect(cache.has(sessionId)).toBe(true);
 
 			const mentions: MentionTag[] = [
-				{ category: 'classes', id: 15, name: 'New Class' }
+				{ category: 'class_section', id: { classId: 15, sectionId: 20 }, name: 'New Class' }
 			];
 
 			await processMentions(mentions, baseContext, cache, sessionId, 5, mockResolver);
@@ -252,7 +242,7 @@ describe('mention-processor', () => {
 			expect(cache.has(sessionId)).toBe(true);
 
 			const mentions: MentionTag[] = [
-				{ category: 'classes', id: 10, name: 'Same Class' } // same as baseContext.classId
+				{ category: 'class_section', id: { classId: 10, sectionId: 20 }, name: 'Same Class' } // same as baseContext.classId
 			];
 
 			await processMentions(mentions, baseContext, cache, sessionId, 5, mockResolver);
@@ -306,27 +296,15 @@ describe('mention-processor', () => {
 			expect(result.examId).toBe(35);
 		});
 
-		it('Class Teacher cannot update classId — field is silently skipped', async () => {
+		it('Class Teacher cannot update classId or sectionId from a class_section mention', async () => {
 			const mentions: MentionTag[] = [
-				{ category: 'classes', id: 15, name: 'Other Class' }
+				{ category: 'class_section', id: { classId: 15, sectionId: 25 }, name: 'Other Class' }
 			];
 
 			const result = await processMentions(
 				mentions, classTeacherContext, cache, sessionId, 8, mockResolver
 			);
-			// classId should remain unchanged
 			expect(result.classId).toBe(10);
-		});
-
-		it('Class Teacher cannot update sectionId — field is silently skipped', async () => {
-			const mentions: MentionTag[] = [
-				{ category: 'sections', id: 25, name: 'Other Section' }
-			];
-
-			const result = await processMentions(
-				mentions, classTeacherContext, cache, sessionId, 8, mockResolver
-			);
-			// sectionId should remain unchanged
 			expect(result.sectionId).toBe(20);
 		});
 
@@ -390,7 +368,7 @@ describe('mention-processor', () => {
 
 		it('does not mutate the original context', async () => {
 			const mentions: MentionTag[] = [
-				{ category: 'classes', id: 15, name: 'New Class' }
+				{ category: 'class_section', id: { classId: 15, sectionId: 25 }, name: 'New Class' }
 			];
 
 			await processMentions(mentions, baseContext, cache, sessionId, 5, mockResolver);

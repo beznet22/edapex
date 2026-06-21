@@ -1,182 +1,140 @@
 import { STATIC_DIR } from "$lib/constants";
-import { fileSchema } from "$lib/schema/chat-schema";
+import { eq } from "drizzle-orm";
+import { smStudents } from "$lib/server/db/sms-schema";
 import { getDatabase } from "$lib/server/db";
-import { ScopedRepositoryProvider } from "$lib/server/mastra/scoped-repository";
-import { ResultsRepository, StaffRepository, StudentRepository } from "$lib/server/repository";
-import { createAssessmentOcrServiceForRequest } from "$lib/server/service/assessment-ocr.service";
 import { createTenantContext } from "$lib/server/mastra/tenant-context";
+import { OcrWorkspaceStore } from "$lib/server/mastra/storage/ocr/ocr-workspace-store";
+import { addDocument } from "$lib/server/mastra/storage/ocr/manifest-store";
+import { mistralOcrService } from "$lib/server/service/mistral-ocr.service";
+import { ResultsRepository } from "$lib/server/repository";
+import { ScopedRepositoryProvider } from "$lib/server/mastra/scoped-repository";
 import { createTenantFileStorage } from "$lib/server/mastra/storage/tenant-file-storage";
+import { ALLOWED_DESIGNATIONS } from "$lib/types/sms-types";
 import type { RequestHandler } from "@sveltejs/kit";
 import { error, json } from "@sveltejs/kit";
-import { existsSync, mkdirSync, writeFileSync } from "fs";
-import { createHash } from "crypto";
+import { mkdirSync, writeFileSync } from "fs";
+import { createHash, randomUUID } from "crypto";
 import { join } from "path";
+
+type UploadKind = "document" | "photo" | "studentPhoto";
+
+function getFormString(formData: FormData, key: string): string | null {
+  const value = formData.get(key);
+  return typeof value === "string" && value.length > 0 ? value : null;
+}
+
+function getFormNumber(formData: FormData, key: string): number | null {
+  const raw = getFormString(formData, key);
+  if (raw === null) return null;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function getFormFile(formData: FormData, key: string): File | null {
+  const value = formData.get(key);
+  return value instanceof File ? value : null;
+}
+
+function normalizeKind(raw: string | null): UploadKind {
+  if (raw === "photo" || raw === "studentPhoto") return raw;
+  return "document";
+}
+
+const STRUCTURED_OCR_SCHEMA: Record<string, unknown> = {
+  type: "object",
+  properties: {
+    school: { type: "object" },
+    student: { type: "object" },
+    subjects: { type: "array" },
+    records: { type: "array" },
+    score: { type: "object" },
+  },
+};
 
 export const POST: RequestHandler = async ({ request, locals }) => {
   const { session, user } = locals;
   if (!user || !session) error(401, "Unauthorized");
   if (request.body === null) error(400, "Empty request received");
 
-  let file: any = null;
-  let filename: string | null = null;
-  let token = "";
-  let className = "";
-  let sectionName = "";
-  let fullName: string | null = null;
+  const formData = await request.formData();
+  const file = getFormFile(formData, "file");
+  const filename = getFormString(formData, "filename") ?? file?.name ?? null;
+  const kind = normalizeKind(getFormString(formData, "kind"));
+  const studentId = getFormNumber(formData, "studentId");
+  const classId = getFormNumber(formData, "classId");
+  const sectionId = getFormNumber(formData, "sectionId");
 
-  try {
-    const formData = await request.formData();
-    file = formData.get("file") as File;
-    filename = formData.get("filename") as string;
-    const classId = formData.get("classId") ? Number(formData.get("classId")) : null;
-    const sectionId = formData.get("sectionId") ? Number(formData.get("sectionId")) : null;
-    className = formData.get("className") as string;
-    sectionName = formData.get("sectionName") as string;
-    const studentId = formData.get("studentId") ? Number(formData.get("studentId")) : null;
-    fullName = formData.get("studentName") as string | null;
-    const admissionNo = formData.get("admissionNo") ? Number(formData.get("admissionNo")) : null;
-    const isStudentPhoto = formData.get("isStudentPhoto") === "true";
-    const fileId = formData.get("fileId") as string | null;
+  if (!file || !filename) error(400, "Missing file or filename");
 
-    if (!file && !filename) throw new Error("No file or filename provided");
+  const tenant = createTenantContext({
+    schoolId: user.schoolId ?? 1,
+    userId: user.id,
+    staffId: user.staffId ?? 1,
+    designationId: (user as { designationId?: number }).designationId ?? ALLOWED_DESIGNATIONS.IT,
+    classId,
+    sectionId,
+    examTypeId: null,
+    examId: null,
+    academicId: null,
+  });
 
-    if (isStudentPhoto) {
-      if (!studentId) throw new Error("Student ID is required for photo upload");
-      const buff = await file.arrayBuffer();
-      const buffer = Buffer.from(buff);
-      const hash = createHash("md5").update(buffer).digest("hex");
-      const ext = file.name.split(".").pop();
-      const photoFilename = `${hash}.${ext}`;
-      const relativePath = `public/uploads/student/${photoFilename}`;
-      const fullPath = join(STATIC_DIR, relativePath);
+  const buffer = Buffer.from(await file.arrayBuffer());
+  const contentHash = createHash("md5").update(buffer).digest("hex");
+  const ext = filename.split(".").pop() ?? "bin";
 
-      const dir = join(STATIC_DIR, "public/uploads/student");
-      mkdirSync(dir, { recursive: true });
-      writeFileSync(fullPath, buffer);
-
-      const photoTenant = createTenantContext({
-        schoolId: user.schoolId ?? 1,
-        userId: user.id,
-        staffId: user.staffId ?? undefined,
-      });
-      const photoProvider = new ScopedRepositoryProvider(await getDatabase(), photoTenant);
-      await photoProvider.getRepo(StudentRepository).updateStudentPhoto(studentId, relativePath);
-      return json({ success: true, status: "uploaded", filename: photoFilename });
-    }
-
-    if (!classId || !sectionId) throw new Error("Missing class or section information");
-    token = `${className}(${sectionName})`.toLowerCase().replaceAll(" ", "_");
-
-    // Handle re-extraction if only filename/fileId is provided
-    if (filename && !file) {
-      try {
-        const retryTenant = createTenantContext({
-          schoolId: user.schoolId ?? 1,
-          userId: user.id,
-          staffId: user.staffId ?? undefined,
-          classId: classId as number,
-          sectionId: sectionId as number,
-        });
-        const retryFileStorage = await createTenantFileStorage(retryTenant);
-        const studentFolder = retryFileStorage.formatName((fileId || filename).split("/").pop() || (fileId || filename));
-        const buffer = await retryFileStorage.getImage(studentFolder);
-        if (buffer) {
-          file = new Blob([new Uint8Array(buffer)], { type: "image/jpeg" });
-        } else {
-          throw new Error("File not found in storage");
-        }
-      } catch (err) {
-        throw err;
-      }
-    }
-
-    const validatedFile = fileSchema.safeParse(file);
-    if (!validatedFile.success) {
-      const errorMessage = validatedFile.error.issues.map((issue) => issue.message).join(", ");
-      throw new Error(errorMessage);
-    }
-
-    const staffLookupTenant = createTenantContext({
-      schoolId: user.schoolId ?? 1,
-      userId: user.id,
-      staffId: user.staffId ?? undefined,
-    });
-    const staffLookupProvider = new ScopedRepositoryProvider(await getDatabase(), staffLookupTenant);
-    const staff = await staffLookupProvider.getRepo(StaffRepository).getStaffByClassSection({ classId: classId as number, sectionId: sectionId as number });
-    // Slice 10: per-request provider
-    const tenant = createTenantContext({
-      schoolId: user.schoolId ?? 1,
-      userId: user.id,
-      staffId: staff.teacherId || undefined,
-      classId: classId as number,
-      sectionId: sectionId as number,
-    });
-    const ocrService = await createAssessmentOcrServiceForRequest(tenant);
-    const extractionResult = await ocrService.runExtraction({
-      userId: user.id, // Authenticated user ID for AI provider resolution
-      teacherId: staff.teacherId || 1, // Staff ID for domain data lookups
-      file,
-      classId: classId as number,
-      sectionId: sectionId as number,
-      studentId: studentId ?? undefined,
-      fullName: fullName || undefined,
-      admissionNo: admissionNo ?? undefined,
-      originalName: file.name
-    });
-
-    if (!extractionResult) throw new Error("Extraction failed to return results");
-
+  if (kind === "studentPhoto") {
+    if (!studentId) error(400, "studentId required for studentPhoto kind");
+    const relativePath = `public/uploads/students/${contentHash}.${ext}`;
+    const fullPath = join(STATIC_DIR, relativePath);
+    mkdirSync(join(STATIC_DIR, "public/uploads/students"), { recursive: true });
+    writeFileSync(fullPath, buffer);
+    const photoUrl = `/uploads/students/${contentHash}.${ext}`;
+    const db = await getDatabase();
+    await db
+      .update(smStudents)
+      .set({ studentPhoto: photoUrl })
+      .where(eq(smStudents.id, studentId));
     return json({
-      ...extractionResult,
-      id: extractionResult.storagePath,
-      url: `/api/uploads/${extractionResult.storagePath}/image.jpg?token=${token}`,
-      status: "extracted",
-      filename: fullName || (filename ?? file.name),
-      token
-    });
-
-  } catch (e) {
-    console.error("Upload/Extraction error:", e);
-
-    if (!filename && file && className && sectionName) {
-      try {
-        const pendingTenant = createTenantContext({
-          schoolId: user.schoolId ?? 1,
-          userId: user.id,
-          staffId: user.staffId ?? undefined,
-        });
-        const pendingFileStorage = await createTenantFileStorage(pendingTenant);
-        const storagePath = await pendingFileStorage.savePending({
-          file,
-          className,
-          sectionName,
-          fileName: file.name,
-          fullName: fullName ?? undefined,
-          status: "error",
-          error: e instanceof Error ? e.message : "Extraction failed"
-        });
-
-        return json({
-          success: true,
-          status: "error",
-          error: e instanceof Error ? e.message : "Extraction failed",
-          storagePath,
-          filename: fullName || filename || file.name,
-          id: storagePath,
-          url: `/api/uploads/${storagePath}/image.jpg?token=${token}`,
-          token
-        });
-      } catch (err) {
-        console.error("Failed to save pending file:", err);
-      }
-    }
-
-    return json({
-      success: false,
-      status: "error",
-      error: e instanceof Error ? e.message : "Failed to upload file, try again",
+      success: true,
+      kind: "studentPhoto" as const,
+      photoUrl,
     });
   }
+
+  if (kind === "photo") {
+    return json({
+      success: true,
+      kind: "photo" as const,
+      contentHash,
+      url: `/api/file/photos/${contentHash}.${ext}`,
+      mimeType: file.type,
+      size: file.size,
+    });
+  }
+
+  const documentId = randomUUID();
+  const normalizedJson = await mistralOcrService.processStructured(
+    file,
+    filename,
+    STRUCTURED_OCR_SCHEMA,
+  );
+  await OcrWorkspaceStore.writeNormalizedJson(tenant, documentId, normalizedJson);
+  await addDocument(tenant, {
+    documentId,
+    contentHash,
+    fileName: filename,
+    mimeType: file.type,
+    size: file.size,
+    uploadedAt: new Date().toISOString(),
+    status: "pending",
+  });
+  return json({
+    success: true,
+    kind: "document" as const,
+    documentId,
+    contentHash,
+    fileId: contentHash,
+  });
 };
 
 export const DELETE: RequestHandler = async ({ url, locals }) => {
@@ -193,7 +151,7 @@ export const DELETE: RequestHandler = async ({ url, locals }) => {
   const deleteTenant = createTenantContext({
     schoolId: user.schoolId ?? 1,
     userId: user.id,
-    staffId: user.staffId ?? undefined,
+    staffId: user.staffId ?? 1,
   });
   const deleteFileStorage = await createTenantFileStorage(deleteTenant);
   const deleteProvider = new ScopedRepositoryProvider(await getDatabase(), deleteTenant);
@@ -217,7 +175,7 @@ export const DELETE: RequestHandler = async ({ url, locals }) => {
         const cleanupTenant = createTenantContext({
           schoolId,
           userId: user.id,
-          staffId: user.staffId ?? undefined,
+          staffId: user.staffId ?? 1,
           classId,
           sectionId,
         });
@@ -228,7 +186,7 @@ export const DELETE: RequestHandler = async ({ url, locals }) => {
           classId,
           sectionId,
           examTermId: examTypeId,
-          schoolId
+          schoolId,
         });
       }
     }
@@ -240,5 +198,3 @@ export const DELETE: RequestHandler = async ({ url, locals }) => {
     return json({ success: false, message: e instanceof Error ? e.message : "Internal deletion error" });
   }
 };
-
-

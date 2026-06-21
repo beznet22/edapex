@@ -7,8 +7,7 @@
  *
  * Pipeline (per file):
  *  1. Look up class/section names for storage path resolution
- *  2. Call `MistralOcrService.processDocument` — the same call the
- *     `extractionWorkflow` uses internally
+ *  2. Call `MistralOcrService.processDocument` to OCR the file
  *  3. Persist OCR markdown via `TenantFileStorage` (per-tenant workspace)
  *  4. Build a partially-populated `ExtractedAssessment` shell. The
  *     full markdown → structured mapping requires the result-mapper agent;

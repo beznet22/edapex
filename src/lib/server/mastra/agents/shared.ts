@@ -32,6 +32,7 @@ export const requestContextSchema = z.object({
 		classId: z.number().nullable(),
 		sectionId: z.number().nullable(),
 		examId: z.number().nullable(),
+		examTypeId: z.number().nullable(),
 		academicId: z.number().nullable(),
 		studentId: z.number().nullable(),
 	}),

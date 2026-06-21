@@ -73,6 +73,13 @@ export function withExamTypeId(
   return Object.freeze({ ...tenant, examTypeId });
 }
 
+export function withAcademicId(
+  tenant: TenantContext,
+  academicId: number | null,
+): TenantContext {
+  return Object.freeze({ ...tenant, academicId });
+}
+
 const DEFAULT_TENANT: TenantContext = createTenantContext({});
 
 export class WorkspaceMismatchError extends Error {

@@ -65,6 +65,14 @@ export type Notification = {
   level: "info" | "warning" | "error";
 };
 
+export interface OptionItem {
+  id: string;
+  label: string;
+  icon?: string;
+  description?: string;
+  disabled?: boolean;
+}
+
 export type xDataPart = {
 	createDocument: CreateDocumentPart;
 	generatePDF: GeneratePDFPart;
@@ -79,6 +87,32 @@ export type xDataPart = {
 		resetAt: string;
 		attempt: number;
 		maxAttempts: number;
+	};
+	runInfo: {
+		runId: string;
+	};
+	validationResult: {
+		artifactId: string;
+		status: 'success' | 'errors';
+		errorCount?: number;
+	};
+	validationErrors: {
+		artifactId: string;
+		errors: Array<{ path: string; message: string }>;
+	};
+	committed: {
+		artifactId: string;
+		recordId: number;
+		studentName: string;
+		className: string;
+		term: string;
+	};
+	awaitValidation: {
+		artifactId: string;
+		runId: string;
+	};
+	noDocuments: {
+		message: string;
 	};
 };
 
