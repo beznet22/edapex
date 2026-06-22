@@ -20,6 +20,7 @@
   import SearchIcon from "@lucide/svelte/icons/search";
   import ShuffleIcon from "@lucide/svelte/icons/shuffle";
   import ActivityIcon from "@lucide/svelte/icons/activity";
+  import ScrollTextIcon from "@lucide/svelte/icons/scroll-text";
 
   let {
     query,
@@ -31,6 +32,28 @@
 
   const commands = $derived.by(() => {
     // Subcommand pickers when user has typed a command prefix
+    if (query.startsWith("transcript")) {
+      return [
+        {
+          id: "transcript generate",
+          label: "transcript generate",
+          icon: ScrollTextIcon,
+          desc: "Compute transcript and render preview PDF for the active student",
+        },
+        {
+          id: "transcript publish",
+          label: "transcript publish",
+          icon: SendIcon,
+          desc: "Render transcript PDF and email parent — no StudentTimeline row",
+        },
+        {
+          id: "transcript report",
+          label: "transcript report",
+          icon: ScrollTextIcon,
+          desc: "Stream a markdown transcript summary into the editor panel",
+        },
+      ];
+    }
     if (query.startsWith("marksheet")) {
       return [
         {
@@ -200,6 +223,12 @@
         label: "context",
         icon: ActivityIcon,
         desc: "Show the active academic context",
+      },
+      {
+        id: "transcript",
+        label: "transcript",
+        icon: ScrollTextIcon,
+        desc: "Multi-term transcript (generate, publish, report)",
       },
     ];
   });
