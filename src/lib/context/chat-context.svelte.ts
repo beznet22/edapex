@@ -5,6 +5,7 @@ import type { AuthUser } from "$lib/types/auth-types";
 import type {
   AgentWorkflow,
   CreateDocumentPart,
+  GeneratePDFPart,
   xUIMessage,
   xUIMessagePart,
   StreamDataPart,
@@ -176,7 +177,7 @@ export class ChatContext {
   lastError = $state<FriendlyAiError | null>(null);
   openedDocumentId = $state<string | undefined>(undefined);
   openPanel = $state<boolean>(false);
-  docPart = $state<CreateDocumentPart | undefined>(undefined);
+  docPart = $state<CreateDocumentPart | GeneratePDFPart | undefined>(undefined);
   docState = $derived(this.docPart?.status);
   get error() {
     return this.client?.error;
