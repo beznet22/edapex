@@ -69,17 +69,20 @@
       .map((p: any) => {
         const data = p.data ?? {};
         const title = data.title ?? "untitled";
-        const examTypeId = chat.threadData.examTypeId;
-        const persistedUrl = examTypeId
-          ? `/api/file/exams/examType-${examTypeId}/${title}${p.type === "data-generatePDF" ? ".pdf" : ".md"}`
-          : undefined;
+        const isPdf = p.type === "data-generatePDF";
+        const url: string | undefined = isPdf
+          ? (typeof data.data === "string" ? data.data : undefined) ??
+            data.previewUrl
+          : chat.threadData.examTypeId
+            ? `/api/file/exams/examType-${chat.threadData.examTypeId}/${title}.md`
+            : undefined;
         return {
           id: data.id ?? p.id,
           title,
-          kind: p.type === "data-generatePDF" ? "pdf" : deriveKind(title),
-          content: data.content,
-          url: persistedUrl,
-          saveUrl: persistedUrl,
+          kind: isPdf ? "pdf" : deriveKind(title),
+          content: isPdf ? undefined : data.content,
+          url,
+          saveUrl: url,
           status: data.status,
         };
       }),
