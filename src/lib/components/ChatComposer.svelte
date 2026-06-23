@@ -188,6 +188,20 @@
   }
 
   /**
+   * Normalize a bare `/transcript` command to `/transcript report` so that
+   * clients always send an explicit subcommand. Matches `/transcript`
+   * optionally followed by any number of `@<category> <name>` mention tokens,
+   * with no subcommand. Case-insensitive.
+   */
+  function normalizeTranscriptCommand(text: string): string {
+    const trimmed = text.trim();
+    if (/^\/transcript(?:\s+@(?:class|year|exam|term|file)?\s*\S+)*\s*$/i.test(trimmed)) {
+      return trimmed.replace(/^\/transcript/i, "/transcript report");
+    }
+    return text;
+  }
+
+  /**
    * Check if a workflow of the same type is already active.
    * Blocks duplicate workflow slash commands per Requirement 14.6.
    */
@@ -218,6 +232,9 @@
       chat.pendingMentions = [...selectedMentions];
       // Pass file references to chat context before sending (Requirement 9.4)
       chat.fileReferences = file.references ? [...file.references] : [];
+
+      // Default a bare `/transcript` to `/transcript report` (design decision B1).
+      input = normalizeTranscriptCommand(input);
 
       chat.client.sendMessage({
         text: input,

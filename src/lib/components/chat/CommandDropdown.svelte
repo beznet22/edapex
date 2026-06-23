@@ -20,6 +20,7 @@
   import SearchIcon from "@lucide/svelte/icons/search";
   import ShuffleIcon from "@lucide/svelte/icons/shuffle";
   import ActivityIcon from "@lucide/svelte/icons/activity";
+  import ScrollTextIcon from "@lucide/svelte/icons/scroll-text";
 
   let {
     query,
@@ -31,31 +32,53 @@
 
   const commands = $derived.by(() => {
     // Subcommand pickers when user has typed a command prefix
+    if (query.startsWith("transcript")) {
+      return [
+        {
+          id: "transcript generate",
+          label: "transcript generate",
+          icon: ScrollTextIcon,
+          desc: "Compute transcript and render preview PDF (any synonym: create, make, render, build)",
+        },
+        {
+          id: "transcript publish",
+          label: "transcript publish",
+          icon: SendIcon,
+          desc: "Render transcript PDF and email parent — no StudentTimeline row (any synonym: send, email, share)",
+        },
+        {
+          id: "transcript report",
+          label: "transcript report",
+          icon: ScrollTextIcon,
+          desc: "Stream a markdown transcript summary into the editor panel (any synonym: summarize, draft)",
+        },
+      ];
+    }
     if (query.startsWith("marksheet")) {
       return [
         {
           id: "marksheet generate",
           label: "marksheet generate",
           icon: FileSignatureIcon,
-          desc: "Generate PDF report card from a committed marksheet",
+          desc: "Generate PDF report card from a committed marksheet (any synonym: create, make, render, preview)",
         },
         {
           id: "marksheet publish",
           label: "marksheet publish",
           icon: SendIcon,
-          desc: "Publish PDF + email parents",
+          desc: "Publish PDF + email parents (any synonym: send, email, share, dispatch)",
         },
         {
           id: "marksheet result",
           label: "marksheet result",
           icon: SearchIcon,
-          desc: "View a committed marksheet result",
+          desc: "View a committed marksheet result (any synonym: show, display, inspect)",
         },
         {
           id: "marksheet view",
           label: "marksheet view",
           icon: EyeIcon,
-          desc: "View a marksheet artifact",
+          desc: "View a marksheet artifact (any synonym: open, show, inspect)",
         },
       ];
     }
@@ -201,14 +224,43 @@
         icon: ActivityIcon,
         desc: "Show the active academic context",
       },
+      {
+        id: "transcript",
+        label: "transcript",
+        icon: ScrollTextIcon,
+        desc: "Multi-term transcript (generate, publish, report)",
+      },
     ];
   });
 
-  const filtered = $derived(
-    query
-      ? commands.filter((c) => c.id.toLowerCase().includes(query.toLowerCase()))
-      : commands,
-  );
+  const fuzzyIntentsByPrefix: Record<string, string[]> = {
+    transcript: ["generate", "publish", "report"],
+    marksheet: ["generate", "publish", "result", "view"],
+  };
+
+  const filtered = $derived.by(() => {
+    if (!query) return commands;
+
+    const q = query.toLowerCase();
+    const exactOrPrefix = commands.filter((c) => c.id.toLowerCase().includes(q));
+
+    for (const [prefix, knownVerbs] of Object.entries(fuzzyIntentsByPrefix)) {
+      if (query.startsWith(`${prefix} `)) {
+        const secondWord = query.slice(`${prefix} `.length).trim().toLowerCase();
+        const knownVerbsLower = knownVerbs.map((v) => v.toLowerCase());
+        const isKnownPrefix = knownVerbsLower.some((v) => secondWord.startsWith(v));
+        const samePrefix = commands.filter((c) => c.id.toLowerCase().startsWith(prefix));
+
+        if (!isKnownPrefix) return samePrefix;
+        return samePrefix.filter((c) => {
+          const verb = c.id.slice(`${prefix} `.length).toLowerCase();
+          return exactOrPrefix.includes(c) || knownVerbsLower.includes(verb);
+        });
+      }
+    }
+
+    return exactOrPrefix;
+  });
 </script>
 
 <div

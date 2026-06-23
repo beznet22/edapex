@@ -3,6 +3,10 @@
 	import WysiwygEditor from "$lib/components/editor/WysiwygEditor.svelte";
 	import LoadingState from "./loading-state.svelte";
 	import { Markdown } from "$lib/components/prompt-kit/markdown";
+	import { Spinner } from "$lib/components/ui/spinner/index.js";
+	import AlertCircleIcon from "@lucide/svelte/icons/alert-circle";
+	import RefreshCwIcon from "@lucide/svelte/icons/refresh-cw";
+	import { Button } from "$lib/components/ui/button/index.js";
 	import { toast } from "svelte-sonner";
 	import { SelectedClass } from "$lib/context/sync.svelte";
 	import { useChat } from "$lib/context/chat-context.svelte";
@@ -61,6 +65,12 @@
 	let editContent = $state("");
 	let containerWidth = $state(0);
 	let containerRef = $state<HTMLDivElement | null>(null);
+	let pdfFetchState = $state<"idle" | "fetching" | "ready" | "error">("idle");
+	let pdfFetchError = $state<string | null>(null);
+	let editorSkeletonVisible = $state(false);
+	let pdfUrlReady = $state(false);
+	let pdfUrlError = $state<string | null>(null);
+	let skeletonVisible = $state(true);
 
 	const selectedClass = SelectedClass.fromContext();
 	const chat = useChat();
@@ -230,17 +240,96 @@
 			return () => observer.disconnect();
 		}
 	});
+
+	$effect(() => {
+		if (!streaming) {
+			skeletonVisible = false;
+			return;
+		}
+		if (textContent && textContent.length > 0) {
+			skeletonVisible = false;
+			return;
+		}
+		skeletonVisible = true;
+		const t = setTimeout(() => {
+			skeletonVisible = false;
+		}, 200);
+		return () => clearTimeout(t);
+	});
+
+	$effect(() => {
+		if (type !== "pdf" || !url) {
+			pdfUrlReady = false;
+			pdfUrlError = null;
+			return;
+		}
+		let cancelled = false;
+		pdfUrlReady = false;
+		pdfUrlError = null;
+		const controller = new AbortController();
+		const timeout = setTimeout(() => controller.abort(), 8000);
+		fetch(url, { method: "HEAD", signal: controller.signal })
+			.then((r) => {
+				if (cancelled) return;
+				if (!r.ok) {
+					pdfUrlError = `HTTP ${r.status}`;
+					pdfUrlReady = false;
+				} else {
+					pdfUrlReady = true;
+					pdfUrlError = null;
+				}
+			})
+			.catch((e) => {
+				if (cancelled) return;
+				pdfUrlError = e instanceof Error ? e.message : String(e);
+				pdfUrlReady = false;
+			})
+			.finally(() => clearTimeout(timeout));
+		return () => {
+			cancelled = true;
+			clearTimeout(timeout);
+			controller.abort();
+		};
+	});
 </script>
 
 {#if filename}
 	<div class="flex flex-col w-full h-full relative pb-4 group">
+		<header
+			class="flex items-center justify-between h-11 px-3 sm:px-4 border-b border-border/30 bg-background/60 backdrop-blur-sm shrink-0"
+		>
+			<span class="text-[12px] font-semibold text-foreground truncate">
+				{filename || "Untitled"}
+			</span>
+			{#if streaming}
+				<span
+					class="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-primary/10 border border-primary/20 text-[10px] font-bold text-primary uppercase tracking-widest"
+				>
+					<span class="size-1.5 rounded-full bg-primary animate-pulse"></span>
+					Streaming…
+				</span>
+			{/if}
+		</header>
 		{#if type === "text"}
 			{#if streaming && isMarkdownFile && editorMode === "wysiwyg"}
-				<ScrollArea class="flex-1 w-full bg-background overflow-hidden p-4">
-					<div class="prose prose-sm max-w-none dark:prose-invert">
-						<Markdown content={textContent} />
-					</div>
-				</ScrollArea>
+				{#if skeletonVisible}
+					<ScrollArea class="flex-1 w-full bg-background overflow-hidden p-4">
+						<div class="space-y-2 max-w-3xl">
+							{#each [60, 80, 45, 75, 55, 70, 40] as w, i (i)}
+								<div
+									class="h-3 rounded-md bg-muted-foreground/15"
+									style:width="{w}%"
+								></div>
+							{/each}
+						</div>
+					</ScrollArea>
+				{:else}
+					<ScrollArea class="flex-1 w-full bg-background overflow-hidden p-4">
+						<div class="prose prose-sm max-w-none dark:prose-invert">
+							<Markdown content={textContent} />
+						</div>
+					</ScrollArea>
+				{/if}
 			{:else if textContent === "Loading..." || textContent.startsWith("Error loading")}
 				<LoadingState label={textContent === "Loading..." ? "Loading file content" : textContent} />
 			{:else if isMarkdownFile && editorMode === "wysiwyg"}
@@ -283,6 +372,26 @@
 			>
 				{#if pdfEngine.isLoading || !pdfEngine.engine}
 					<LoadingState label="Loading PDF engine" />
+				{:else if pdfUrlError}
+					<div
+						class="h-full flex flex-col items-center justify-center gap-3 text-center px-6"
+					>
+						<AlertCircleIcon class="size-10 text-destructive/70" />
+						<p class="text-sm font-semibold text-foreground">PDF not ready</p>
+						<p class="text-[11px] text-muted-foreground max-w-xs">{pdfUrlError}</p>
+						<Button size="sm" variant="outline" onclick={() => location.reload()}>
+							<RefreshCwIcon class="size-3.5 mr-1" /> Retry
+						</Button>
+					</div>
+				{:else if !pdfUrlReady}
+					<div class="h-full flex flex-col items-center justify-center gap-3">
+						<Spinner class="size-8 text-primary" />
+						<p
+							class="text-[10px] font-bold uppercase tracking-widest text-muted-foreground"
+						>
+							Loading PDF…
+						</p>
+					</div>
 				{:else}
 					<EmbedPDF engine={pdfEngine.engine} {plugins}>
 						{#snippet children({ activeDocumentId })}

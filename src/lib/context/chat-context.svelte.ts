@@ -5,6 +5,7 @@ import type { AuthUser } from "$lib/types/auth-types";
 import type {
   AgentWorkflow,
   CreateDocumentPart,
+  GeneratePDFPart,
   xUIMessage,
   xUIMessagePart,
   StreamDataPart,
@@ -176,7 +177,7 @@ export class ChatContext {
   lastError = $state<FriendlyAiError | null>(null);
   openedDocumentId = $state<string | undefined>(undefined);
   openPanel = $state<boolean>(false);
-  docPart = $state<CreateDocumentPart | undefined>(undefined);
+  docPart = $state<CreateDocumentPart | GeneratePDFPart | undefined>(undefined);
   docState = $derived(this.docPart?.status);
   get error() {
     return this.client?.error;
@@ -426,8 +427,14 @@ export class ChatContext {
     if (this.docPart) return this.docPart;
     this.docPart = this.messages
       .flatMap((m) => m.parts ?? [])
-      .filter((p) => p.type === "data-createDocument" && p.id === this.openedDocumentId)
-      .findLast((p) => p.type === "data-createDocument")?.data;
+      .filter(
+        (p) =>
+          (p.type === "data-createDocument" || p.type === "data-generatePDF") &&
+          p.id === this.openedDocumentId,
+      )
+      .findLast(
+        (p) => p.type === "data-createDocument" || p.type === "data-generatePDF",
+      )?.data;
 
     return this.docPart;
   };
@@ -438,8 +445,14 @@ export class ChatContext {
       e.preventDefault();
       this.docPart = this.messages
         .flatMap((m) => m.parts ?? [])
-        .filter((p) => p.type === "data-createDocument" && p.id === id)
-        .findLast((p) => p.type === "data-createDocument")?.data;
+        .filter(
+          (p) =>
+            (p.type === "data-createDocument" || p.type === "data-generatePDF") &&
+            p.id === id,
+        )
+        .findLast(
+          (p) => p.type === "data-createDocument" || p.type === "data-generatePDF",
+        )?.data;
       this.openedDocumentId = id;
     };
   };

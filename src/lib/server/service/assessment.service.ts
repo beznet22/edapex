@@ -17,6 +17,7 @@ import {
   type Student,
 } from "$lib/schema/marksheet";
 import type { Marksheet } from "$lib/schema/marksheet";
+import { transcriptSchema, type Transcript } from "$lib/schema/transcript";
 import { StudentRepository, ResultsRepository, TimelineRepository, StaffRepository } from "$lib/server/repository";
 import { ScopedRepositoryProvider } from "../mastra/scoped-repository";
 import type { TenantContext } from "../mastra/tenant-context";
@@ -592,6 +593,166 @@ export class AssessmentService {
       examType,
       recordId: studentData.studentRecordId ?? null,
     };
+  }
+
+  /**
+   * Compute a multi-term academic transcript for a student across every active,
+   * non-averaged term of the given academic year. The result is a Zod-validated
+   * Transcript payload that the Svelte template renders.
+   */
+  async getTranscript(params: {
+    studentId: number;
+    academicId: number;
+    withImages?: boolean;
+  }): Promise<Transcript | null> {
+    const student = await this.student().getStudentById(params.studentId);
+    if (!student) return null;
+
+    const data = await this.result().getTranscriptData({
+      student,
+      academicId: params.academicId,
+    });
+    if (!data) return null;
+
+    if (data.terms.length === 0) return null;
+
+    const category = categoryEnum.parse(student.categoryName ?? "MIDDLEBASIC");
+
+    type RawRecord = {
+      studentId: number | null;
+      examTypeId: number | null;
+      subjectId: number | null;
+      subjectName: string | null;
+      subjectCode: string | null;
+      totalMarks: number | null;
+      totalGpaGrade: string | null;
+    };
+
+    const subjectMap = new Map<number, {
+      subjectId: number;
+      subject: string;
+      subjectCode: string;
+      marks: Array<number | null>;
+      total: number;
+      percentage: number;
+    }>();
+
+    for (const rec of data.records as RawRecord[]) {
+      if (rec.subjectId === null) continue;
+      const slot = subjectMap.get(rec.subjectId) ?? {
+        subjectId: rec.subjectId,
+        subject: rec.subjectName ?? "Unknown",
+        subjectCode: rec.subjectCode ?? "",
+        marks: data.terms.map(() => null as number | null),
+        total: 0,
+        percentage: 0,
+      };
+      const termIndex = data.terms.findIndex((t) => t.id === rec.examTypeId);
+      if (termIndex >= 0) {
+        slot.marks[termIndex] = rec.totalMarks !== null ? Number(rec.totalMarks) : null;
+      }
+      subjectMap.set(rec.subjectId, slot);
+    }
+
+    const subjects = Array.from(subjectMap.values()).map((s) => {
+      const numericMarks = s.marks.filter((m): m is number => m !== null);
+      const total = numericMarks.reduce((sum, m) => sum + m, 0);
+      const termCount = numericMarks.length;
+      const percentage = termCount > 0 ? Math.round((total / termCount) * 100) / 100 : 0;
+      const grade = this.getGrade(percentage, category);
+      return {
+        subjectId: s.subjectId,
+        subject: s.subject,
+        subjectCode: s.subjectCode,
+        marks: s.marks,
+        total: Math.round(total * 100) / 100,
+        percentage: Math.round(percentage * 100) / 100,
+        grade: grade.grade,
+        color: grade.color,
+      };
+    });
+
+    const yearlyTotal = subjects.reduce((sum, s) => sum + s.total, 0);
+    const yearlyAverage = subjects.length > 0 ? yearlyTotal / subjects.length : 0;
+    const maxPossibleTotal = subjects.length * 100 * data.terms.length;
+
+    const studentAverage = subjects.length > 0
+      ? subjects.reduce((sum, s) => sum + s.percentage, 0) / subjects.length
+      : 0;
+
+    const termMeans: number[] = [];
+    for (const term of data.terms) {
+      const perTermAverages = await this.result().getClassAverages({
+        classId: student.classId ?? 0,
+        sectionId: student.sectionId ?? 0,
+        examId: term.id,
+      });
+      if (perTermAverages.length > 0) {
+        const sum = perTermAverages.reduce((s, r) => s + Number(r.average ?? 0), 0);
+        termMeans.push(sum / perTermAverages.length);
+      }
+    }
+    const classAverage = termMeans.length > 0
+      ? Math.round((termMeans.reduce((a, b) => a + b, 0) / termMeans.length) * 100) / 100
+      : 0;
+
+    const generalSettings = await this.result().getGeneralSettings();
+    const schoolRow = generalSettings[0];
+    const school = {
+      id: schoolRow?.id ?? 1,
+      name: schoolRow?.siteTitle ?? "School Name",
+      email: schoolRow?.email ?? "",
+      phone: schoolRow?.phone ?? "",
+      logo: params.withImages
+        ? ensureBase64Image(schoolRow?.favicon ?? schoolRow?.logo ?? "", "/school-logo.png")
+        : undefined,
+      city: "",
+      state: "",
+      title: data.academicYear?.title ?? "",
+      vacation_date: new Date().toLocaleDateString("en-US", {
+        month: "long",
+        day: "numeric",
+        year: "numeric",
+      }),
+    };
+
+    const studentPayload = {
+      id: student.studentId,
+      examId: data.terms[0]?.id ?? 0,
+      fullName: student.fullName ?? "",
+      gender: student.genderName ?? "",
+      parentEmail: student.email ?? "",
+      parentName: student.guardiansName ?? "Unknown Parent",
+      term: data.terms.map((t) => t.title).join(" / "),
+      title: "ANNUAL SUMMARY OF PROGRESS REPORT",
+      category: student.categoryName ?? "MIDDLEBASIC",
+      className: student.className ?? "",
+      sectionName: student.sectionName ?? "",
+      adminNo: student.admissionNo ?? 0,
+      sessionYear: data.academicYear ? `${data.academicYear.year}-[${data.academicYear.title}]` : "",
+      daysOpened: 0,
+      daysAbsent: 0,
+      daysPresent: 0,
+      studentPhoto: params.withImages
+        ? ensureBase64Image(student.studentPhoto ?? "", "/avatar.jpg")
+        : undefined,
+      token: base64url.encode(JSON.stringify({ studentId: student.studentId, academicId: params.academicId })),
+    };
+
+    const transcript = transcriptSchema.parse({
+      school,
+      student: studentPayload,
+      academicYear: data.academicYear ?? { id: params.academicId, title: "", year: "" },
+      terms: data.terms.map((t) => ({ examTypeId: t.id, title: t.title ?? "", isAverage: Boolean(t.isAverage) })),
+      subjects,
+      classAverage,
+      studentAverage: Math.round(studentAverage * 100) / 100,
+      yearlyTotal: Math.round(yearlyTotal * 100) / 100,
+      yearlyAverage: Math.round(yearlyAverage * 100) / 100,
+      maxPossibleTotal,
+    });
+
+    return transcript;
   }
 
   private buildMarksRecords(

@@ -45,6 +45,7 @@ export function resolveToolsForMessage(message: string, isSlashCommand: boolean)
       '/update': 'write',
       '/self-assign': 'write',
       '/staff': 'write',
+      '/transcript': 'transcript',
       '/grade': 'academic',
       '/mark': 'academic',
       '/attendance': 'academic',

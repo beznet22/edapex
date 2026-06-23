@@ -468,6 +468,106 @@ export class ResultsRepository extends BaseRepository {
     );
   }
 
+  async getTranscriptData(p: {
+    student: StudentDetails;
+    academicId: number;
+  }) {
+    return this.withErrorHandling(async () => {
+      const termRows = await this.db
+        .select({
+          id: schema.smExamTypes.id,
+          title: schema.smExamTypes.title,
+          isAverage: schema.smExamTypes.isAverage,
+        })
+        .from(schema.smExamTypes)
+        .where(
+          and(
+            eq(schema.smExamTypes.academicId, p.academicId),
+            eq(schema.smExamTypes.activeStatus, 1),
+            eq(schema.smExamTypes.isAverage, 0),
+          ),
+        )
+        .orderBy(asc(schema.smExamTypes.id));
+
+      const [academicRow] = await this.db
+        .select({
+          id: schema.smAcademicYears.id,
+          title: schema.smAcademicYears.title,
+          year: schema.smAcademicYears.year,
+        })
+        .from(schema.smAcademicYears)
+        .where(eq(schema.smAcademicYears.id, p.academicId))
+        .limit(1);
+
+      const schoolRows = await this.getGeneralSettings();
+      const schoolRow = schoolRows[0] ?? null;
+
+      if (termRows.length === 0) {
+        return {
+          student: p.student,
+          academicYear: academicRow ?? null,
+          terms: [],
+          records: [],
+          classResults: [],
+          school: schoolRow,
+        };
+      }
+
+      const termIds = termRows.map((t) => t.id);
+
+      const records = await this.db
+        .select({
+          studentId: schema.smResultStores.studentId,
+          examTypeId: schema.smResultStores.examTypeId,
+          subjectId: schema.smResultStores.subjectId,
+          subjectName: schema.smSubjects.subjectName,
+          subjectCode: schema.smSubjects.subjectCode,
+          totalMarks: schema.smResultStores.totalMarks,
+          totalGpaGrade: schema.smResultStores.totalGpaGrade,
+        })
+        .from(schema.smResultStores)
+        .leftJoin(schema.smSubjects, eq(schema.smResultStores.subjectId, schema.smSubjects.id))
+        .where(
+          and(
+            eq(schema.smResultStores.studentId, p.student.studentId),
+            eq(schema.smResultStores.academicId, p.academicId),
+            eq(schema.smResultStores.activeStatus, 1),
+            inArray(schema.smResultStores.examTypeId, termIds),
+          ),
+        );
+
+      const classResults =
+        p.student.classId !== null && p.student.classId !== undefined &&
+        p.student.sectionId !== null && p.student.sectionId !== undefined
+          ? await this.db
+              .select({
+                studentId: schema.smResultStores.studentId,
+                examTypeId: schema.smResultStores.examTypeId,
+                totalMarks: schema.smResultStores.totalMarks,
+              })
+              .from(schema.smResultStores)
+              .where(
+                and(
+                  eq(schema.smResultStores.classId, p.student.classId),
+                  eq(schema.smResultStores.sectionId, p.student.sectionId),
+                  eq(schema.smResultStores.academicId, p.academicId),
+                  eq(schema.smResultStores.activeStatus, 1),
+                  inArray(schema.smResultStores.examTypeId, termIds),
+                ),
+              )
+          : [];
+
+      return {
+        student: p.student,
+        academicYear: academicRow ?? null,
+        terms: termRows,
+        records,
+        classResults,
+        school: schoolRow,
+      };
+    }, "getTranscriptData");
+  }
+
   async getMarksData(p: { studentId: number; examId: number }) {
     const examMarks = jsonArrayAgg(schema.smMarkStores.totalMarks)
       .orderBy(schema.smExamSetups.id)

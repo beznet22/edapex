@@ -7,6 +7,7 @@
 	import FileTextIcon from "@lucide/svelte/icons/file-text";
 	import FileIcon from "@lucide/svelte/icons/file";
 	import { cn } from "$lib/utils/shadcn";
+	import { Shimmer } from "$lib/components/ai-elements/shimmer";
 
 	type Status = "processing" | "streaming" | "success" | "error";
 
@@ -37,6 +38,7 @@
 	let isWorking = $derived(status === "processing" || status === "streaming");
 	let byteCount = $derived(content?.length ?? 0);
 	let displayTitle = $derived(title ?? (kind === "pdf" ? "PDF" : "Document"));
+	const skeletonLength = $derived(kind === "pdf" ? 14 : 18);
 
 	function open(e: MouseEvent | KeyboardEvent) {
 		e.preventDefault();
@@ -77,26 +79,49 @@
 	</div>
 
 	<div class="flex-1 min-w-0">
-		<div class="text-[12px] font-bold tracking-tight text-foreground truncate">
-			{displayTitle}
-		</div>
-		<div class="flex items-center gap-1.5 mt-0.5">
-			{#if isWorking}
-				<LoaderCircleIcon class={cn("size-3 animate-spin", meta.tone)} />
-			{:else if status === "success"}
-				<CheckCircleIcon class={cn("size-3", meta.tone)} />
-			{:else if status === "error"}
-				<XCircleIcon class={cn("size-3", meta.tone)} />
-			{/if}
-			<span class={cn("text-[10px] font-semibold tracking-wide uppercase", meta.tone)}>
-				{meta.label}
-			</span>
-			{#if isWorking && byteCount > 0}
-				<span class="text-[9px] text-muted-foreground/60 font-mono">
-					· {byteCount.toLocaleString()} chars
+		{#if status === "processing"}
+			<Shimmer
+				as="div"
+				class="text-[12px] font-bold tracking-tight text-foreground"
+				spread={2}
+				duration={1.4}
+				content_length={skeletonLength}
+			>
+				{#snippet children()}{/snippet}
+			</Shimmer>
+			<div class="flex items-center gap-1.5 mt-1.5">
+				<Shimmer
+					as="span"
+					class="text-[10px] font-semibold uppercase"
+					spread={2}
+					duration={1.4}
+					content_length={10}
+				>
+					{#snippet children()}{/snippet}
+				</Shimmer>
+			</div>
+		{:else}
+			<div class="text-[12px] font-bold tracking-tight text-foreground truncate">
+				{displayTitle}
+			</div>
+			<div class="flex items-center gap-1.5 mt-0.5">
+				{#if isWorking}
+					<LoaderCircleIcon class={cn("size-3 animate-spin", meta.tone)} />
+				{:else if status === "success"}
+					<CheckCircleIcon class={cn("size-3", meta.tone)} />
+				{:else if status === "error"}
+					<XCircleIcon class={cn("size-3", meta.tone)} />
+				{/if}
+				<span class={cn("text-[10px] font-semibold tracking-wide uppercase", meta.tone)}>
+					{meta.label}
 				</span>
-			{/if}
-		</div>
+				{#if isWorking && byteCount > 0}
+					<span class="text-[9px] text-muted-foreground/60 font-mono">
+						· {byteCount.toLocaleString()} chars
+					</span>
+				{/if}
+			</div>
+		{/if}
 	</div>
 
 	<div
