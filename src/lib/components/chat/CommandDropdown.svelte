@@ -38,19 +38,19 @@
           id: "transcript generate",
           label: "transcript generate",
           icon: ScrollTextIcon,
-          desc: "Compute transcript and render preview PDF for the active student",
+          desc: "Compute transcript and render preview PDF (any synonym: create, make, render, build)",
         },
         {
           id: "transcript publish",
           label: "transcript publish",
           icon: SendIcon,
-          desc: "Render transcript PDF and email parent — no StudentTimeline row",
+          desc: "Render transcript PDF and email parent — no StudentTimeline row (any synonym: send, email, share)",
         },
         {
           id: "transcript report",
           label: "transcript report",
           icon: ScrollTextIcon,
-          desc: "Stream a markdown transcript summary into the editor panel",
+          desc: "Stream a markdown transcript summary into the editor panel (any synonym: summarize, draft)",
         },
       ];
     }
@@ -233,11 +233,29 @@
     ];
   });
 
-  const filtered = $derived(
-    query
-      ? commands.filter((c) => c.id.toLowerCase().includes(query.toLowerCase()))
-      : commands,
-  );
+  const filtered = $derived.by(() => {
+    if (!query) return commands;
+
+    const q = query.toLowerCase();
+    const exactOrPrefix = commands.filter((c) => c.id.toLowerCase().includes(q));
+
+    if (query.startsWith("transcript ")) {
+      const secondWord = query.slice("transcript ".length).trim().toLowerCase();
+      const knownVerbs = ["generate", "publish", "report"];
+      const isKnownPrefix = knownVerbs.some((v) => secondWord.startsWith(v));
+      const isKnownExact = knownVerbs.includes(secondWord);
+
+      if (!isKnownPrefix) {
+        return commands.filter((c) => c.id.toLowerCase().startsWith("transcript"));
+      }
+      if (isKnownExact) {
+        return exactOrPrefix.filter((c) => c.id.toLowerCase().startsWith("transcript"));
+      }
+      return exactOrPrefix.filter((c) => c.id.toLowerCase().startsWith("transcript"));
+    }
+
+    return exactOrPrefix;
+  });
 </script>
 
 <div
