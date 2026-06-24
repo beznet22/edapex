@@ -11,7 +11,6 @@ Do not assume any package or script is installed globally.
 |------|---------|
 | Typecheck | `pnpm run svelte-check --workspace path/to/file.svelte` |
 | Lint | `pnpm run lint path/to/file.ts` |
-| Test | `pnpm test path/to/file.test.ts` |
 
 ## Key Conventions (EdApex Mastra Migration)
 - **Architecture**: Modular monolith using Svelte 5 and Mastra AI Framework. Never create global singletons.

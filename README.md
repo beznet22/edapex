@@ -31,7 +31,6 @@ For the full system design (request lifecycle, agent hierarchy, tool and workflo
 | PDF | `@embedpdf/*` 2.14 |
 | UI | shadcn-svelte (`bits-ui`, `tailwind-variants`) + bespoke "Gold on Slate" `oklch` tokens in `src/routes/layout.css` |
 | Email | `nodemailer` (SMTP) |
-| Testing | Vitest 4 + `fast-check` for property tests |
 | Adapter | `@sveltejs/adapter-node` (standalone Bun/Node server) |
 | Runtime | Bun (build/start) |
 
@@ -72,7 +71,6 @@ src/
         scoped-repository.ts # per-request repo factory
         storage.ts           # singleton libSQL storage
     workers/                 # web-worker entry points
-tests/                       # end-to-end test suite
 docs/                        # responsive_design, agent migration prompt, plans
 drizzle/                     # generated MySQL migrations
 storage/                     # runtime uploads + mastra.db (gitignored)
@@ -150,35 +148,10 @@ A production-ready `Dockerfile` and `compose.yml` are included — the image is 
 | `pnpm start` | Run the built Node/Bun server |
 | `pnpm check` | `svelte-kit sync` + `svelte-check` (TypeScript) |
 | `pnpm check:watch` | Same, in watch mode |
-| `pnpm test` | Vitest single-run (CI) |
 | `pnpm db:generate` | Generate a Drizzle migration from schema changes |
 | `pnpm db:migrate` | Apply pending migrations |
 | `pnpm db:push` | Push schema directly (dev only) |
 | `pnpm db:studio` | Open Drizzle Studio |
-
-## Testing
-
-The project has **606 passing tests** organised by concern:
-
-```sh
-pnpm test src/lib/server/mastra/__tests__/gateway.test.ts   # one suite
-pnpm test tests/sidebar-threads.test.ts                      # another suite
-pnpm test                                                    # all 35 suites
-```
-
-Test DB files are written to `tests/.tmp/` (gitignored) — see [Test directories](#test-directories) below.
-
-### Test layout
-
-- `src/lib/server/mastra/__tests__/` — bridge, gateway, workflows, tools, agents
-- `src/lib/server/__tests__/` — singleton / migration regressions
-- `src/lib/server/service/__tests__/` — service-layer contracts
-- `src/lib/server/repository/__tests__/` — repository contracts
-- `tests/` — cross-cutting integration and module-shape tests
-
-### Test directories
-
-Auto-generated test artifacts land in `tests/.tmp/` (gitignored). This includes SQLite `.db`, `.db-shm`, and `.db-wal` files produced by libSQL-backed suites. The directory is created on first test run.
 
 ## Architecture Notes
 
