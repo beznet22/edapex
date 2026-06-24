@@ -12,18 +12,16 @@
  */
 import { eq, and, sql } from 'drizzle-orm';
 import type { LibSQLDatabase } from 'drizzle-orm/libsql';
-import { z } from 'zod';
-import { env as svelteEnv } from '$env/dynamic/private';
 import {
 	userCredentials,
 	type UserCredential
 } from '$lib/server/mastra/storage/libsql/app-db.schema';
-import type { ProviderId, ModelId } from './types';
+import type { ProviderId } from './types';
 import { encrypt as encryptText, decrypt as decryptText, maskKey } from './crypto';
-import { CustomProviderEncryptedDataSchema, ModelInfoSchema, type ModelInfo } from './spec';
+import { CustomProviderEncryptedDataSchema } from './spec';
 
 export interface UserCredentialState extends UserCredential {
-	source: 'db' | 'env' | 'platform';
+	source: 'db' | 'platform';
 	apiKeyMasked: string;
 }
 
@@ -81,7 +79,7 @@ export async function saveUserCredential(
 	db: LibSQLDatabase<any>,
 	env: Record<string, string | undefined>,
 	input: SaveUserCredentialInput
-): Promise<void> {
+): Promise<UserCredential> {
 	await ensureUserCredentialsSchema(db);
 
 	const encryptionKey = getEncryptionKey(env);
@@ -96,7 +94,7 @@ export async function saveUserCredential(
 			encryptedData = existing.encryptedData;
 		}
 	} else if (input.credentialType === 'custom') {
-		const prior = safeParseCustom(existing?.encryptedData ?? null);
+		const prior = safeParseCustom(existing?.encryptedData ?? null, env);
 		const payload = CustomProviderEncryptedDataSchema.parse({
 			displayName: input.displayName ?? prior?.displayName ?? input.providerId,
 			baseUrl: input.baseUrl ?? prior?.baseUrl ?? '',
@@ -107,48 +105,63 @@ export async function saveUserCredential(
 		encryptedData = encryptText(JSON.stringify(payload), encryptionKey);
 	}
 
+	const now = new Date().toISOString();
+	const priority = input.priority ?? existing?.priority ?? 1;
+	const enabled = input.enabled !== undefined ? (input.enabled ? 1 : 0) : (existing?.enabled ?? 1);
+
+	const written: UserCredential = {
+		id: existing?.id ?? crypto.randomUUID(),
+		userId: input.userId,
+		providerId: input.providerId,
+		credentialType: input.credentialType,
+		encryptedData,
+		priority,
+		enabled,
+		createdAt: existing?.createdAt ?? now,
+		updatedAt: now,
+		discoveredModels: existing?.discoveredModels ?? null,
+		discoveredAt: existing?.discoveredAt ?? null
+	};
+
 	await db
 		.insert(userCredentials)
-		.values({
-			userId: input.userId,
-			providerId: input.providerId,
-			credentialType: input.credentialType,
-			encryptedData,
-			priority: input.priority ?? existing?.priority ?? 1,
-			enabled: input.enabled !== undefined ? (input.enabled ? 1 : 0) : (existing?.enabled ?? 1),
-			createdAt: existing?.createdAt ?? new Date().toISOString(),
-			updatedAt: new Date().toISOString()
-		})
+		.values(written)
 		.onConflictDoUpdate({
 			target: [userCredentials.userId, userCredentials.providerId],
 			set: {
 				credentialType: input.credentialType,
 				encryptedData,
-				priority: input.priority ?? existing?.priority ?? 1,
-				enabled: input.enabled !== undefined ? (input.enabled ? 1 : 0) : (existing?.enabled ?? 1),
-				updatedAt: new Date().toISOString()
+				priority,
+				enabled,
+				updatedAt: now
 			}
 		});
 
-	void discoverAndPersistInBackground(db, env, input).catch((err: unknown) => {
+	// Pass the just-written row directly so discovery doesn't race the
+	// INSERT/UPDATE returning. Previously this re-read the row, which could
+	// observe a stale value if the DB session hadn't yet seen its own write.
+	void discoverAndPersistInBackground(db, env, written).catch((err: unknown) => {
 		console.error(`[credentials] model discovery failed for ${input.providerId}:`, err);
 	});
+
+	return written;
 }
 
 async function discoverAndPersistInBackground(
 	db: LibSQLDatabase<any>,
 	env: Record<string, string | undefined>,
-	input: SaveUserCredentialInput
+	credential: UserCredential
 ): Promise<void> {
 	const { discoverProviderModels, persistDiscoveredModels } = await import('./discovery');
-	const credential = await getUserCredential(db, env, input.userId, input.providerId);
-	if (!credential) return;
 	const models = await discoverProviderModels(credential, env);
 	if (models.length === 0) return;
-	await persistDiscoveredModels(db, input.userId, input.providerId, models);
+	await persistDiscoveredModels(db, env, credential.userId, credential.providerId, models);
 }
 
-function safeParseCustom(encryptedData: string | null): {
+function safeParseCustom(
+	encryptedData: string | null,
+	env: Record<string, string | undefined>
+): {
 	displayName: string;
 	baseUrl: string;
 	apiKey?: string;
@@ -157,7 +170,7 @@ function safeParseCustom(encryptedData: string | null): {
 } | null {
 	if (!encryptedData) return null;
 	try {
-		const decrypted = decryptText(encryptedData, getEncryptionKey((process.env as any) ?? {}));
+		const decrypted = decryptText(encryptedData, getEncryptionKey(env));
 		return JSON.parse(decrypted);
 	} catch {
 		return null;
@@ -173,7 +186,7 @@ export function decryptCustomProvider(encryptedData: string, env: Record<string,
 			headers: Array<{ name: string; value: string }>;
 	  }
 	| null {
-	return safeParseCustom(encryptedData);
+	return safeParseCustom(encryptedData, env);
 }
 
 export async function getUserCredential(
@@ -273,7 +286,7 @@ export async function getAllUserCredentials(
 			discoveredModels: null,
 			discoveredAt: null,
 			source: 'platform',
-			apiKeyMasked: 'platform'
+			apiKeyMasked: ''
 		});
 		seen.add(p.providerId);
 	}
@@ -335,39 +348,4 @@ export function resolveApiKeyForCredential(
 	return null;
 }
 
-const ModelInfoListSchema = z.array(ModelInfoSchema);
 
-/**
- * Aggregate all discovered_models across a user's credentials into a flat
- * lookup map. Used by the resolver to find custom-provider models SSR-side
- * without an extra roundtrip.
- */
-export async function getDiscoveredModelsForUser(
-	db: LibSQLDatabase<any>,
-	userId: number
-): Promise<Map<ModelId, ModelInfo>> {
-	const rows = await db
-		.select({ discoveredModels: userCredentials.discoveredModels })
-		.from(userCredentials)
-		.where(and(eq(userCredentials.userId, userId), sql`${userCredentials.discoveredModels} IS NOT NULL`));
-
-	const out = new Map<ModelId, ModelInfo>();
-	const env = getEncryptionKey(svelteEnv as Record<string, string | undefined>);
-
-	for (const row of rows) {
-		const encrypted = row.discoveredModels;
-		if (!encrypted) continue;
-		try {
-			const decrypted = decryptText(encrypted, env);
-			const parsed = ModelInfoListSchema.safeParse(JSON.parse(decrypted));
-			if (!parsed.success) continue;
-			for (const model of parsed.data) {
-				out.set(model.id, model);
-			}
-		} catch (err) {
-			console.warn('[getDiscoveredModelsForUser] Failed to parse a credential:', err);
-		}
-	}
-
-	return out;
-}

@@ -14,11 +14,11 @@ import {
 import {
   setModelVisibility,
   setAllModelVisibility as setAllModelVisibilityFn,
-  getVisibleModelIdsForUser
+  getHiddenModelIdsForUser
 } from "$lib/server/mastra/provider/visibility";
 import { getAvailableModelsForUser, type AugmentedModelInfo } from "$lib/server/mastra/provider/availability";
 import { CustomProviderEncryptedDataSchema } from "$lib/server/mastra/provider/spec";
-import { SUPPORTED_PROVIDER_IDS } from "$lib/server/mastra/provider/catalog";
+import { SUPPORTED_PROVIDER_IDS } from "$lib/provider/catalog";
 import { agentSettings } from "$lib/server/mastra/storage/libsql/app-db.schema";
 import type { ProviderId } from "$lib/provider/types";
 
@@ -70,10 +70,10 @@ interface ProviderSummary {
   provider: string;
   name: string;
   enabled: boolean;
-  source: 'db' | 'env' | 'platform';
+  source: 'db' | 'platform';
   priority: number;
   baseUrl: string;
-  credentialType: string;
+  credentialType: 'credential' | 'custom';
 }
 
 type SaveCredentialResult =
@@ -89,7 +89,7 @@ type GetUserCredentialsResult =
   | { success: false; message: string; providers: [] };
 
 type GetModelVisibilityResult =
-  | { success: true; visibleModelIds: string[] }
+  | { success: true; hiddenModelIds: string[] }
   | { success: false; message: string };
 
 type GetAgentSettingsResult =
@@ -188,10 +188,7 @@ export const getUserCredentials = command(
   async (): Promise<GetUserCredentialsResult> => {
     const auth = getAuthenticatedUserId("No user session");
     if (isAuthFailure(auth)) {
-      if (auth.error === "Unauthorized") {
-        return { success: false, message: auth.error, providers: [] };
-      }
-      return { success: true, providers: [] };
+      return { success: false, message: auth.error, providers: [] };
     }
 
     try {
@@ -209,6 +206,8 @@ export const getUserCredentials = command(
           const customData = decryptCustomProvider(c.encryptedData, envKeys);
           baseUrl = customData?.baseUrl ?? '';
         }
+        const credentialType: 'credential' | 'custom' =
+          c.credentialType === 'custom' ? 'custom' : 'credential';
         return {
           provider: c.providerId,
           name: c.apiKeyMasked,
@@ -216,7 +215,7 @@ export const getUserCredentials = command(
           source: c.source,
           priority: c.priority,
           baseUrl,
-          credentialType: c.credentialType
+          credentialType
         };
       });
 
@@ -341,8 +340,8 @@ export const getModelVisibility = command(
 
     try {
       const db = getAppDb();
-      const visible = await getVisibleModelIdsForUser(db, auth.user.id);
-      return { success: true, visibleModelIds: [...visible] };
+      const hidden = await getHiddenModelIdsForUser(db, auth.user.id);
+      return { success: true, hiddenModelIds: [...hidden] };
     } catch (err) {
       console.error("[getModelVisibility] Failed:", err);
       return { success: false, message: 'Failed to fetch model visibility' };
@@ -435,7 +434,6 @@ export const getAvailableModels = command(
 
 interface PlatformDefault {
   providerId: ProviderId;
-  envKey: string;
   hasEnvKey: boolean;
 }
 
@@ -460,7 +458,6 @@ export const getPlatformDefaults = command(
 
     const defaults: PlatformDefault[] = PLATFORM_PROVIDER_ENV_KEYS.map((p) => ({
       providerId: p.providerId,
-      envKey: p.envKey,
       hasEnvKey: Boolean(envKeys[p.envKey])
     })).filter((d) => d.hasEnvKey);
 

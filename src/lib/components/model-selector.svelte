@@ -33,7 +33,6 @@
   // Models are SSR-loaded via the layout into the context. No initial
   // fetch needed — first paint of the popover shows the full list.
   let models = $state<AugmentedModelInfo[]>(availableModelsHolder.models);
-  let hiddenIds = $state<Set<string>>(availableModelsHolder.hiddenIds);
   let isLoading = $state(false);
 
   let open = $state(false);
@@ -112,13 +111,9 @@
    */
   function selectModel(model: ModelInfo): void {
     const firstVariantId = model.variants[0]?.id;
-    // V2 cookie format: `provider/model@variant`. The catalog id is
-    // colon-formatted (`provider:model`); convert the first `:` to `/` for
-    // the wire. Nested model names (e.g. `groq:qwen/qwen3-32b`) keep
-    // their inner `/` unchanged — only the leading provider separator
-    // changes.
-    const v2Id = model.id.replace(/^([^:]+):/, '$1/');
-    const value = firstVariantId ? `${v2Id}@${firstVariantId}` : v2Id;
+    // V2 cookie format: `provider/model@variant`. Catalog ids are already
+    // slash-formatted, so the wire value is the catalog id verbatim.
+    const value = firstVariantId ? `${model.id}@${firstVariantId}` : model.id;
     selectedChatModel.value = value;
     open = false;
     searchQuery = "";

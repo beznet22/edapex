@@ -23,24 +23,7 @@ export async function ensureVisibilitySchema(db: LibSQLDatabase<any>): Promise<v
 	`);
 }
 
-export async function getVisibleModelIdsForUser(
-	db: LibSQLDatabase<any>,
-	userId: number
-): Promise<Set<ModelId>> {
-	await ensureVisibilitySchema(db);
-	const rows = await db
-		.select()
-		.from(userModelVisibility)
-		.where(eq(userModelVisibility.userId, userId));
-
-	const explicit = new Set<ModelId>();
-	for (const row of rows) {
-		if (row.visible === 1) explicit.add(row.modelId as ModelId);
-	}
-	return explicit;
-}
-
-export async function getExplicitlyHiddenModelIdsForUser(
+export async function getHiddenModelIdsForUser(
 	db: LibSQLDatabase<any>,
 	userId: number
 ): Promise<Set<ModelId>> {

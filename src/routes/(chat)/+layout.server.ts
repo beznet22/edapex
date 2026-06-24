@@ -12,14 +12,14 @@ import { DESIGNATIONS, type Designation } from "$lib/types/sms-types";
 import { generateId } from "ai";
 import { getAppDb } from "$lib/server/mastra/storage/libsql/app-db";
 import { getAllUserCredentials } from "$lib/server/mastra/provider/credentials";
-import { BUILTIN_PROVIDERS } from "$lib/server/mastra/provider/catalog";
+import { BUILTIN_PROVIDERS } from "$lib/provider/catalog";
 import {
 	getAvailableModelsForUser,
 	type AugmentedModelInfo
 } from "$lib/server/mastra/provider/availability";
-import { getExplicitlyHiddenModelIdsForUser } from "$lib/server/mastra/provider/visibility";
+import { getHiddenModelIdsForUser } from "$lib/server/mastra/provider/visibility";
 import { pickDefaultModelId } from "$lib/server/mastra/provider";
-import { getModelById } from "$lib/server/mastra/provider/catalog";
+import { getModelById } from "$lib/provider/catalog";
 import { env } from "$env/dynamic/private";
 import { getMemory, mastra } from "$lib/server/mastra";
 import type { StorageThreadType } from "@mastra/core/memory";
@@ -35,6 +35,28 @@ export const load: LayoutServerLoad = async ({ cookies, locals, url }) => {
   const sidebarCookie = cookies.get("sidebar:state");
   const sidebarCollapsed = sidebarCookie ? sidebarCookie === "false" : true;
   let modelId = cookies.get("selected-model") || "";
+
+  // V2 cookie migration: legacy cookies carry colon-format model ids
+  // (`groq:llama-…`). The canonical slash format (`groq/llama-…`) is what
+  // the resolver and the Mastra native router expect. If the cookie
+  // value uses a colon and resolves via `getModelById`'s legacy alias,
+  // rewrite it to slash and persist. Unknown colon ids are left alone
+  // so we never silently destroy user state.
+  if (modelId.includes(":")) {
+    const migrated = getModelById(modelId as Parameters<typeof getModelById>[0]);
+    if (migrated && migrated.id !== modelId) {
+      const atIdx = modelId.indexOf("@");
+      const variantSuffix = atIdx >= 0 ? modelId.slice(atIdx) : "";
+      modelId = `${migrated.id}${variantSuffix}`;
+      cookies.set("selected-model", modelId, {
+        path: "/",
+        maxAge: 60 * 60 * 24 * 365,
+        httpOnly: false,
+        sameSite: "lax"
+      });
+      console.info(`[layout] migrated legacy colon cookie to slash: ${migrated.id}`);
+    }
+  }
 
   // SSR: auto-pick a model when the cookie is empty, so the chat composer
   // and model selector trigger render with a real model name + variant list
@@ -178,7 +200,7 @@ export const load: LayoutServerLoad = async ({ cookies, locals, url }) => {
   // ─── Mastra-Native Provider & Model Resolution ────────────────────────────
   let connectedProviders: any[] = [];
   let availableModels: AugmentedModelInfo[] = [];
-  let visibleModelIds: string[] = [];
+  let hiddenIds: string[] = [];
   let userPriority: string[] = [];
 
   if (user) {
@@ -187,15 +209,17 @@ export const load: LayoutServerLoad = async ({ cookies, locals, url }) => {
 
     // Same data the getAvailableModels remote command + getModelVisibility
     // return. SSR loaded so the model selector + settings modal render
-    // instantly on first paint (no flash, no spinner).
-    const [models, hiddenIds, creds] = await Promise.all([
+    // instantly on first paint (no flash, no spinner). The holder keeps
+    // hiddenIds as the source of truth; consumers derive visibleModelIds
+    // as `models - hiddenIds`.
+    const [models, hidden, creds] = await Promise.all([
       getAvailableModelsForUser(db, envKeys, user.id),
-      getExplicitlyHiddenModelIdsForUser(db, user.id),
+      getHiddenModelIdsForUser(db, user.id),
       getAllUserCredentials(db, envKeys, user.id, supportedList as any)
     ]);
 
     availableModels = models;
-    visibleModelIds = [...hiddenIds]; // hidden IDs = NOT visible by default
+    hiddenIds = [...hidden];
     userPriority = creds.filter((p) => p.enabled === 1).map((p) => p.providerId);
     connectedProviders = creds;
   }
@@ -215,7 +239,7 @@ export const load: LayoutServerLoad = async ({ cookies, locals, url }) => {
     defaultProvider,
     connectedProviders,
     availableModels,
-    visibleModelIds,
+    hiddenIds,
     supportedProviders: Object.values(BUILTIN_PROVIDERS).map((p) => ({
       id: p.id,
       name: p.name,

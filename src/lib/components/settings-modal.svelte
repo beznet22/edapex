@@ -25,7 +25,6 @@
   import PlusIcon from "@lucide/svelte/icons/plus";
   import Trash2Icon from "@lucide/svelte/icons/trash-2";
   import SparklesIcon from "@lucide/svelte/icons/sparkles";
-  import CogIcon from "@lucide/svelte/icons/cog";
   import Settings2Icon from "@lucide/svelte/icons/settings-2";
 
   import { page } from "$app/state";
@@ -51,18 +50,14 @@
 
   const providerLogos: Record<string, string> = {
     groq: "https://cdn.jsdelivr.net/npm/@lobehub/icons-static-svg/icons/groq.svg",
-    nvidia_nim:
-      "https://cdn.jsdelivr.net/npm/@lobehub/icons-static-svg/icons/nvidia.svg",
-    mistral:
-      "https://cdn.jsdelivr.net/npm/@lobehub/icons-static-svg/icons/mistral.svg",
     deepseek:
       "https://cdn.jsdelivr.net/npm/@lobehub/icons-static-svg/icons/deepseek.svg",
     opencode:
       "https://cdn.jsdelivr.net/npm/@lobehub/icons-static-svg/icons/opencode.svg"
   };
 
-  type CredentialKind = "env" | "credential" | "custom";
-  type ProviderSource = "db" | "env";
+  type CredentialKind = "credential" | "custom";
+  type ProviderSource = "db" | "platform";
 
   interface ProviderSummary {
     provider: string;
@@ -129,7 +124,7 @@
   let connectingProvider = $state<ProviderInfo | null>(null);
   let isCustomFlow = $state(false);
   let platformDefaults = $state<
-    Array<{ providerId: string; envKey: string; hasEnvKey: boolean }>
+    Array<{ providerId: string; hasEnvKey: boolean }>
   >([]);
   let apiKeyInput = $state("");
   let isSavingApiKey = $state(false);
@@ -150,7 +145,6 @@
   let customModels = $state<Array<{ id: string; displayName: string }>>([]);
   let customHeaders = $state<Array<{ name: string; value: string }>>([]);
   let customErrors = $state<Partial<Record<keyof CustomFormValues, string>>>({});
-  let customSubmitError = $state<string | null>(null);
   let isSubmittingCustom = $state(false);
 
   async function loadProviders() {
@@ -161,7 +155,7 @@
         getPlatformDefaults({})
       ]);
       if (credsResult.success) {
-        connectedProviders = credsResult.providers as ProviderSummary[];
+        connectedProviders = credsResult.providers;
       } else {
         connectedProviders = [];
         toast.error(credsResult.message ?? "Failed to load providers");
@@ -214,10 +208,21 @@
   }
 
   function exitConnectForm() {
+    const wasCustom = isCustomFlow;
     connectingProvider = null;
     isCustomFlow = false;
     apiKeyInput = "";
     apiKeyError = null;
+    if (wasCustom) {
+      // Re-entering the custom flow must start from a clean slate.
+      customProviderId = "";
+      customDisplayName = "";
+      customBaseUrl = "";
+      customApiKey = "";
+      customModels = [];
+      customHeaders = [];
+      customErrors = {};
+    }
   }
 
   async function submitApiKey() {
@@ -326,24 +331,25 @@
     if (cred.credentialType === "custom") {
       return { label: "Custom", classes: "bg-primary/20 text-primary" };
     }
-    if (cred.credentialType === "credential") {
-      return { label: "API key", classes: "bg-primary/20 text-primary" };
-    }
-    if (cred.source === "env" && cred.name === "keyless") {
-      return { label: "keyless", classes: "bg-muted-foreground/10 text-muted-foreground/60" };
-    }
-    if (cred.source === "env") {
-      return { label: "Config", classes: "bg-muted-foreground/10 text-muted-foreground/60" };
+    if (cred.source === "platform") {
+      return { label: "Platform", classes: "bg-blue-500/20 text-blue-300 border-blue-500/30" };
     }
     return { label: "API key", classes: "bg-primary/20 text-primary" };
   }
 
-  async function disconnectProvider(providerId: string) {
-    removingProviderId = providerId;
+  async function disconnectProvider(cred: ProviderSummary) {
+    if (cred.source === "platform") {
+      // Platform defaults are virtual rows synthesised from env keys — they
+      // have no entry in `user_credentials` to delete. Tell the user to
+      // connect their own key to override.
+      toast.info("Platform default cannot be disconnected — connect your own key to override.");
+      return;
+    }
+    removingProviderId = cred.provider;
     try {
-      const result = await deleteUserCredential({ providerId });
+      const result = await deleteUserCredential({ providerId: cred.provider });
       if (result.success) {
-        toast.success(`${providerId} disconnected`);
+        toast.success(`${cred.provider} disconnected`);
         await loadProviders();
       } else {
         toast.error(result.message ?? "Failed to disconnect");
@@ -360,10 +366,12 @@
 
   const availableModelsHolder = AvailableModelsHolder.fromContext();
 
-  // Models are SSR loaded via the layout into the context. No initial
-  // fetch needed — first paint of the Models tab shows the full list.
-  let availableModels = $state<ModelInfo[]>(availableModelsHolder.models);
-  let visibleModelIds = $state<string[]>(
+  // The holder is the single source of truth for models + hidden IDs.
+  // Derive local views directly from it so we never have to mirror state
+  // across an `$effect`. Updates from `replace()` flow through Svelte's
+  // $state reactivity and re-derive automatically.
+  const availableModels = $derived(availableModelsHolder.models);
+  const visibleModelIds = $derived(
     availableModelsHolder.models
       .map((m) => m.id)
       .filter((id) => !availableModelsHolder.hiddenIds.has(id))
@@ -371,15 +379,6 @@
   let isLoadingModels = $state(false);
   let modelSearch = $state("");
   let togglingModelId = $state<string | null>(null);
-
-  // Re-sync local state from the context when the context updates (e.g. after
-  // a remote refresh from the model selector or after a toggle).
-  $effect(() => {
-    availableModels = availableModelsHolder.models;
-    visibleModelIds = availableModelsHolder.models
-      .map((m) => m.id)
-      .filter((id) => !availableModelsHolder.hiddenIds.has(id));
-  });
 
   async function loadModels(): Promise<void> {
     isLoadingModels = true;
@@ -389,14 +388,13 @@
         getModelVisibility({})
       ]);
       if (modelsResult.success) {
-        availableModelsHolder.replace(modelsResult.models, visibilityResult.success ? visibilityResult.visibleModelIds ?? [] : []);
-        availableModels = modelsResult.models;
+        const hiddenIds = visibilityResult.success ? visibilityResult.hiddenModelIds ?? [] : [];
+        availableModelsHolder.replace(modelsResult.models, hiddenIds);
       } else {
         toast.error(modelsResult.message ?? "Failed to load models");
       }
-      if (visibilityResult.success) {
-        visibleModelIds = visibilityResult.visibleModelIds ?? [];
-      }
+      // `availableModels` and `visibleModelIds` are derived from the holder,
+      // so no local-state assignment is needed here.
     } catch (err) {
       console.error("Failed to load models:", err);
     } finally {
@@ -427,14 +425,23 @@
     return Object.entries(modelsByProvider)
       .map(([id, models]) => {
         const info = BUILTIN_PROVIDERS[id as ProviderId];
+        const providerLabel = (info?.name ?? id).toLowerCase();
         const filteredModels =
           search.length === 0
             ? models
-            : models.filter((m) => m.name.toLowerCase().includes(search));
+            : models.filter(
+                (m) =>
+                  m.name.toLowerCase().includes(search) ||
+                  providerLabel.includes(search)
+              );
         return { id, info, models: filteredModels };
       })
       .filter((g) => g.models.length > 0);
   });
+
+  function isModelFree(m: ModelInfo): boolean {
+    return m.cost !== undefined && m.cost.input === 0 && m.cost.output === 0;
+  }
 
   function isModelVisible(modelId: string): boolean {
     return visibleModelIds.includes(modelId);
@@ -442,19 +449,22 @@
 
   async function toggleModelVisibility(modelId: string, nextVisible: boolean) {
     togglingModelId = modelId;
-    const previous = visibleModelIds;
-    visibleModelIds = nextVisible
-      ? [...visibleModelIds, modelId]
-      : visibleModelIds.filter((id) => id !== modelId);
+    // Optimistic local mirror so the Switch flips immediately. The holder is
+    // the canonical state — we sync to it after the remote call resolves.
+    const nextHidden = nextVisible
+      ? new Set([...availableModelsHolder.hiddenIds].filter((id) => id !== modelId))
+      : new Set([...availableModelsHolder.hiddenIds, modelId]);
+    const previous = availableModelsHolder.hiddenIds;
+    availableModelsHolder.replace(availableModelsHolder.models, [...nextHidden]);
     try {
       const result = await updateModelVisibility({ modelId, visible: nextVisible });
       if (!result.success) {
-        visibleModelIds = previous;
+        availableModelsHolder.replace(availableModelsHolder.models, [...previous]);
         toast.error(result.message ?? "Failed to update visibility");
       }
     } catch (err) {
       console.error(err);
-      visibleModelIds = previous;
+      availableModelsHolder.replace(availableModelsHolder.models, [...previous]);
       toast.error("Unexpected error");
     } finally {
       togglingModelId = null;
@@ -824,8 +834,8 @@
                               variant="ghost"
                               size="sm"
                               disabled={removingProviderId === cred.provider ||
-                                cred.source === "env"}
-                              onclick={() => disconnectProvider(cred.provider)}
+                                cred.source === "platform"}
+                              onclick={() => disconnectProvider(cred)}
                               class="min-h-12 rounded-xl text-[11px] font-black uppercase tracking-widest text-muted-foreground/60 hover:text-destructive hover:bg-destructive/10"
                             >
                               {#if removingProviderId === cred.provider}
@@ -1374,12 +1384,6 @@
                       </button>
                     </div>
 
-                    {#if customSubmitError}
-                      <p class="text-[11px] font-bold text-destructive ml-1">
-                        {customSubmitError}
-                      </p>
-                    {/if}
-
                     <div class="flex items-center gap-2">
                       <Button
                         onclick={submitCustomProvider}
@@ -1438,18 +1442,10 @@
                     variant="outline"
                     size="icon"
                     onclick={() => changeTab("Providers")}
-                    aria-label="Add provider"
+                    aria-label="Add or manage providers"
                     class="min-h-12 min-w-12 rounded-xl border-sidebar-border/50"
                   >
                     <PlusIcon class="size-4" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    aria-label="Provider settings"
-                    class="min-h-12 min-w-12 rounded-xl border-sidebar-border/50"
-                  >
-                    <CogIcon class="size-4" />
                   </Button>
                 </div>
 
@@ -1550,10 +1546,12 @@
                                     class="text-sm font-black tracking-tight truncate"
                                     >{model.name}</span
                                   >
-                                  <Badge
-                                    class="bg-primary/10 text-primary border-none text-[9px] font-black px-1.5 py-0 rounded-md"
-                                    >Free</Badge
-                                  >
+                                  {#if isModelFree(model)}
+                                    <Badge
+                                      class="bg-primary/10 text-primary border-none text-[9px] font-black px-1.5 py-0 rounded-md"
+                                      >Free</Badge
+                                    >
+                                  {/if}
                                 </div>
                                 <p
                                   class="text-[10px] text-muted-foreground/60 truncate"

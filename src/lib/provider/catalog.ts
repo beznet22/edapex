@@ -1,10 +1,16 @@
 /**
- * Built-in provider and model catalog (client-safe).
+ * Built-in provider and model catalog — single source of truth.
  *
  * Pure data — safe to import in client and server contexts.
  * Source of truth for which providers and models the platform natively supports.
  * Custom providers (user-defined) are NOT in this catalog; they are loaded at
  * runtime from `user_credentials` and merged into a per-request registry.
+ *
+ * ID format: slash (e.g. `groq/llama-3.3-70b-versatile`). This matches the
+ * Mastra native router's expected `<provider>/<model>` shape and the V2
+ * `selected-model` cookie. Colon format (`groq:llama-3.3-70b-versatile`) is
+ * read-only for legacy cookies, threads.metadata.model, and orphaned DB rows
+ * via the `COLON_TO_SLASH_ALIAS` map below.
  *
  * Note: Mistral is NOT in this catalog. The Mistral SDK is used directly by
  * the extraction workflow for OCR — it is not part of the gateway routing.
@@ -76,6 +82,8 @@ export const BUILTIN_PROVIDERS: Record<ProviderId, ProviderInfo> = {
 		name: 'DeepSeek',
 		enabled: false,
 		env: ['DEEPSEEK_API_KEY'],
+		// `package` is read by resolver.ts to decide which AI-SDK
+		// factory (if any) to wrap the request in.
 		api: { type: 'aisdk', package: '@ai-sdk/openai-compatible', url: 'https://api.deepseek.com' },
 		request: { headers: {}, body: {} },
 		description: 'Deep reasoning and code intelligence',
@@ -94,8 +102,8 @@ export const BUILTIN_PROVIDERS: Record<ProviderId, ProviderInfo> = {
 };
 
 export const BUILTIN_MODELS: Record<ModelId, ModelInfo> = {
-	'groq:openai/gpt-oss-120b': {
-		id: 'groq:openai/gpt-oss-120b' as ModelId,
+	'groq/openai/gpt-oss-120b': {
+		id: 'groq/openai/gpt-oss-120b' as ModelId,
 		providerId: 'groq' as ProviderId,
 		name: 'GPT-OSS 120B',
 		capabilities: { tools: true, input: ['text/*'], output: ['text/*'], reasoning: false, vision: false },
@@ -108,8 +116,8 @@ export const BUILTIN_MODELS: Record<ModelId, ModelInfo> = {
 		cost: { input: 0, output: 0, cache: { read: 0, write: 0 } },
 		description: 'OpenAI open-source model on Groq'
 	},
-	'groq:llama-3.3-70b-versatile': {
-		id: 'groq:llama-3.3-70b-versatile' as ModelId,
+	'groq/llama-3.3-70b-versatile': {
+		id: 'groq/llama-3.3-70b-versatile' as ModelId,
 		providerId: 'groq' as ProviderId,
 		name: 'Llama 3.3 70B',
 		capabilities: { tools: true, input: ['text/*'], output: ['text/*'], reasoning: false, vision: false },
@@ -122,9 +130,8 @@ export const BUILTIN_MODELS: Record<ModelId, ModelInfo> = {
 		cost: { input: 0, output: 0, cache: { read: 0, write: 0 } },
 		description: 'Meta open model on Groq inference'
 	},
-
-	'groq:llama-3.1-8b-instant': {
-		id: 'groq:llama-3.1-8b-instant' as ModelId,
+	'groq/llama-3.1-8b-instant': {
+		id: 'groq/llama-3.1-8b-instant' as ModelId,
 		providerId: 'groq' as ProviderId,
 		name: 'Llama 3.1 8B Instant',
 		capabilities: { tools: true, input: ['text/*'], output: ['text/*'], reasoning: false, vision: false },
@@ -137,8 +144,8 @@ export const BUILTIN_MODELS: Record<ModelId, ModelInfo> = {
 		cost: { input: 0, output: 0, cache: { read: 0, write: 0 } },
 		description: 'Llama 3.1 8B Instant on Groq'
 	},
-	'groq:qwen/qwen3-32b': {
-		id: 'groq:qwen/qwen3-32b' as ModelId,
+	'groq/qwen/qwen3-32b': {
+		id: 'groq/qwen/qwen3-32b' as ModelId,
 		providerId: 'groq' as ProviderId,
 		name: 'Qwen3 32B',
 		capabilities: { tools: true, input: ['text/*'], output: ['text/*'], reasoning: true, vision: false },
@@ -151,8 +158,8 @@ export const BUILTIN_MODELS: Record<ModelId, ModelInfo> = {
 		cost: { input: 0, output: 0, cache: { read: 0, write: 0 } },
 		description: 'Qwen mid-tier model on Groq'
 	},
-	'deepseek:deepseek-v4-flash': {
-		id: 'deepseek:deepseek-v4-flash' as ModelId,
+	'deepseek/deepseek-v4-flash': {
+		id: 'deepseek/deepseek-v4-flash' as ModelId,
 		providerId: 'deepseek' as ProviderId,
 		name: 'DeepSeek V4 Flash',
 		capabilities: { tools: true, input: ['text/*'], output: ['text/*'], reasoning: true, vision: false },
@@ -170,8 +177,8 @@ export const BUILTIN_MODELS: Record<ModelId, ModelInfo> = {
 		cost: { input: 0, output: 0, cache: { read: 0, write: 0 } },
 		description: 'Fast inference with strong reasoning'
 	},
-	'deepseek:deepseek-v4-pro': {
-		id: 'deepseek:deepseek-v4-pro' as ModelId,
+	'deepseek/deepseek-v4-pro': {
+		id: 'deepseek/deepseek-v4-pro' as ModelId,
 		providerId: 'deepseek' as ProviderId,
 		name: 'DeepSeek V4 Pro',
 		capabilities: { tools: true, input: ['text/*'], output: ['text/*'], reasoning: true, vision: false },
@@ -189,13 +196,13 @@ export const BUILTIN_MODELS: Record<ModelId, ModelInfo> = {
 		cost: { input: 0, output: 0, cache: { read: 0, write: 0 } },
 		description: 'DeepSeek flagship reasoning model'
 	},
-	// TODO(mastra-registry): `opencode:mimo-v2.5-free` is not in the Mastra
-	// bundled registry as of @mastra/core@1.32.1. The V2 resolver will hand
-	// it to the native router unchanged; if Mastra throws NoSuchModelError,
-	// the new error handler surfaces a "try a different model" alert.
-	// Revisit when the Mastra registry catches up.
-	'opencode:mimo-v2.5-free': {
-		id: 'opencode:mimo-v2.5-free' as ModelId,
+	// TODO(mastra-registry): `opencode/mimo-v2.5-free` is not in the Mastra
+	// bundled registry as of @mastra/core@1.32.1. The resolver will hand it
+	// to the native router unchanged; if Mastra throws NoSuchModelError, the
+	// new error handler surfaces a "try a different model" alert. Revisit
+	// when the Mastra registry catches up.
+	'opencode/mimo-v2.5-free': {
+		id: 'opencode/mimo-v2.5-free' as ModelId,
 		providerId: 'opencode' as ProviderId,
 		name: 'Mimo V2.5 Free',
 		capabilities: { tools: true, input: ['text/*'], output: ['text/*'], reasoning: true, vision: false },
@@ -209,8 +216,8 @@ export const BUILTIN_MODELS: Record<ModelId, ModelInfo> = {
 		description: 'Mimo V2.5 free via OpenCode Zen'
 	},
 	// TODO(mastra-registry): see above.
-	'opencode:deepseek-v4-flash-free': {
-		id: 'opencode:deepseek-v4-flash-free' as ModelId,
+	'opencode/deepseek-v4-flash-free': {
+		id: 'opencode/deepseek-v4-flash-free' as ModelId,
 		providerId: 'opencode' as ProviderId,
 		name: 'DeepSeek V4 Flash Free',
 		capabilities: { tools: true, input: ['text/*'], output: ['text/*'], reasoning: true, vision: false },
@@ -223,8 +230,8 @@ export const BUILTIN_MODELS: Record<ModelId, ModelInfo> = {
 		cost: { input: 0, output: 0, cache: { read: 0, write: 0 } },
 		description: 'DeepSeek V4 Flash free via OpenCode Zen'
 	},
-	'opencode:nemotron-3-super-free': {
-		id: 'opencode:nemotron-3-super-free' as ModelId,
+	'opencode/nemotron-3-super-free': {
+		id: 'opencode/nemotron-3-super-free' as ModelId,
 		providerId: 'opencode' as ProviderId,
 		name: 'Nemotron 3 Super Free',
 		capabilities: { tools: true, input: ['text/*'], output: ['text/*'], reasoning: true, vision: false },
@@ -238,8 +245,8 @@ export const BUILTIN_MODELS: Record<ModelId, ModelInfo> = {
 		description: 'NVIDIA Nemotron 3 Super free via OpenCode Zen'
 	},
 	// TODO(mastra-registry): see above.
-	'opencode:ring-2.6-1t-free': {
-		id: 'opencode:ring-2.6-1t-free' as ModelId,
+	'opencode/ring-2.6-1t-free': {
+		id: 'opencode/ring-2.6-1t-free' as ModelId,
 		providerId: 'opencode' as ProviderId,
 		name: 'Ring 2.6 1T Free',
 		capabilities: { tools: true, input: ['text/*'], output: ['text/*'], reasoning: true, vision: false },
@@ -254,27 +261,29 @@ export const BUILTIN_MODELS: Record<ModelId, ModelInfo> = {
 	}
 };
 
+/**
+ * Legacy colon → canonical slash alias map. Built once at module load from
+ * the canonical `BUILTIN_MODELS` keys. `getModelById` consults this map
+ * after a direct slash lookup misses, so legacy cookies and orphaned DB
+ * rows continue to resolve. Never write colon-format ids back to storage
+ * or the cookie — the SSR layout rewrites them on read.
+ */
+const COLON_TO_SLASH_ALIAS: ReadonlyMap<string, ModelId> = new Map(
+	Object.keys(BUILTIN_MODELS).map((slashId) => {
+		const colonId = slashId.replace(/^([^/]+)\//, '$1:');
+		return [colonId, slashId as ModelId];
+	})
+);
+
 export function getProviderById(id: ProviderId): ProviderInfo | undefined {
 	return BUILTIN_PROVIDERS[id];
 }
 
-/**
- * Build a `slashId → colonId` alias map once at module load. Used by
- * `getModelById` to accept either format (V1: `groq:llama-…`, V2: `groq/llama-…`).
- * Additive — V1 callers using the colon format are unaffected.
- */
-const SLASH_TO_COLON_ALIAS: ReadonlyMap<string, ModelId> = new Map(
-	Object.keys(BUILTIN_MODELS).map((colonId) => {
-		const slashId = colonId.replace(/^([^:]+):/, '$1/');
-		return [slashId, colonId as ModelId];
-	})
-);
-
 export function getModelById(id: ModelId): ModelInfo | undefined {
 	const direct = BUILTIN_MODELS[id];
 	if (direct) return direct;
-	const colonAlias = SLASH_TO_COLON_ALIAS.get(id);
-	if (colonAlias) return BUILTIN_MODELS[colonAlias];
+	const slashAlias = COLON_TO_SLASH_ALIAS.get(id);
+	if (slashAlias) return BUILTIN_MODELS[slashAlias];
 	return undefined;
 }
 
@@ -289,6 +298,14 @@ export function getChatRoutableModels(): ModelInfo[] {
 export const SUPPORTED_PROVIDER_IDS = Object.keys(BUILTIN_PROVIDERS) as ProviderId[];
 
 export const POPULAR_PROVIDER_IDS: ProviderId[] = ['groq', 'deepseek', 'opencode'];
+
+/**
+ * Default model id used by `pickDefaultModelId` when the cookie is empty.
+ * Pinned to `groq/openai/gpt-oss-120b` — a 120B-parameter OpenAI-OSS
+ * model served via Groq at low cost, suitable as a first-paint default
+ * before the user picks a preferred model.
+ */
+export const DEFAULT_MODEL_ID: ModelId = 'groq/openai/gpt-oss-120b' as ModelId;
 
 /**
  * Platform-provided providers and models.
@@ -352,10 +369,10 @@ export async function resolveModelInfo(
 	if (fast) return fast;
 
 	if (opts.userId && opts.db) {
-		const { getDiscoveredModelsForUser } = await import(
-			'$lib/server/mastra/provider/credentials'
+		const { getAllDiscoveredModelsForUser } = await import(
+			'$lib/server/mastra/provider/discovery'
 		);
-		const discovered = await getDiscoveredModelsForUser(opts.db, opts.userId);
+		const discovered = await getAllDiscoveredModelsForUser(opts.db, opts.userId);
 		const found = discovered.get(id as ModelId);
 		if (found) return found;
 	}

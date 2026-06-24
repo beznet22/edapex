@@ -30,7 +30,7 @@
     modelId,
     resolvedModel,
     availableModels,
-    visibleModelIds,
+    hiddenIds,
     selectedClassRaw,
     uploads,
     sidebarCollapsed,
@@ -48,7 +48,7 @@
 
   const availableModelsHolder = new AvailableModelsHolder(
     availableModels ?? [],
-    visibleModelIds ?? []
+    hiddenIds ?? []
   );
   availableModelsHolder.setContext();
 

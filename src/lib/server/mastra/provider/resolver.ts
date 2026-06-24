@@ -23,7 +23,7 @@
 import type { LibSQLDatabase } from 'drizzle-orm/libsql';
 import { env as svelteEnv } from '$env/dynamic/private';
 import type { MastraModelConfig } from '@mastra/core/llm';
-import { BUILTIN_PROVIDERS, BUILTIN_MODELS, DEFAULT_MODEL_ID, getModelById, getChatRoutableModels } from './catalog';
+import { BUILTIN_PROVIDERS, BUILTIN_MODELS, DEFAULT_MODEL_ID, getModelById, getChatRoutableModels } from '$lib/provider/catalog';
 import {
 	NoCredentialError,
 	NoProvidersError,
@@ -195,20 +195,26 @@ function resolveProviderOptions(
 }
 
 /**
- * Extract the provider segment from a `provider/...` model id. Returns
- * the leading path segment (everything before the first `/`). For the
- * groq catalog id `groq/qwen/qwen3-32b` this returns `groq` and the
- * model name is `qwen/qwen3-32b` (correctly nested for the OpenAI-compat
- * factory).
+ * Extract the provider segment from a model id. Accepts both canonical
+ * slash (`groq/llama-3.3-70b-versatile`) and legacy colon
+ * (`groq:llama-3.3-70b-versatile`). Slash is tried first; colon is the
+ * fallback for legacy cookies, threads.metadata.model, and orphaned DB
+ * rows that pre-date the V2 cutover. For nested model names like
+ * `groq/qwen/qwen3-32b` the model name keeps its inner `/` (correctly
+ * nested for the OpenAI-compat factory).
  */
 function extractProviderId(modelId: string): ProviderId | null {
 	const slashIdx = modelId.indexOf('/');
-	if (slashIdx <= 0) return null;
-	return modelId.slice(0, slashIdx) as ProviderId;
+	if (slashIdx > 0) return modelId.slice(0, slashIdx) as ProviderId;
+	const colonIdx = modelId.indexOf(':');
+	if (colonIdx > 0) return modelId.slice(0, colonIdx) as ProviderId;
+	return null;
 }
 
 function stripProviderPrefix(modelId: string, providerId: ProviderId): string {
-	const prefix = `${providerId}/`;
-	if (!modelId.startsWith(prefix)) return '';
-	return modelId.slice(prefix.length);
+	const slashPrefix = `${providerId}/`;
+	if (modelId.startsWith(slashPrefix)) return modelId.slice(slashPrefix.length);
+	const colonPrefix = `${providerId}:`;
+	if (modelId.startsWith(colonPrefix)) return modelId.slice(colonPrefix.length);
+	return '';
 }

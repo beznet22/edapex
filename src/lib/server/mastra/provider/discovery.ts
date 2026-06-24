@@ -124,7 +124,7 @@ function buildModelInfo(raw: RawModel, providerId: ProviderId): ModelInfo | null
 	const vision = inputModalities.includes('image') || inputModalities.includes('file');
 
 	const candidate = {
-		id: `${providerId}:${raw.id}`,
+		id: `${providerId}/${raw.id}`,
 		providerId,
 		name: raw.name ?? raw.id,
 		capabilities: {
@@ -233,11 +233,12 @@ export async function discoverProviderModels(
 
 export async function persistDiscoveredModels(
 	db: LibSQLDatabase<any>,
+	env: Record<string, string | undefined>,
 	userId: number,
 	providerId: ProviderId,
 	models: ModelInfo[]
 ): Promise<void> {
-	const encryptionKey = getEncryptionKey(process.env as Record<string, string | undefined>);
+	const encryptionKey = getEncryptionKey(env);
 	const encrypted = encryptText(JSON.stringify(models), encryptionKey);
 	await db
 		.update(userCredentials)
@@ -252,6 +253,7 @@ const ModelInfoListSchema = z.array(ModelInfoSchema);
 
 export async function getDiscoveredModelsForUser(
 	db: LibSQLDatabase<any>,
+	env: Record<string, string | undefined>,
 	userId: number,
 	providerId: ProviderId
 ): Promise<ModelInfo[]> {
@@ -264,7 +266,7 @@ export async function getDiscoveredModelsForUser(
 	const encrypted = rows[0]?.discoveredModels;
 	if (!encrypted) return [];
 
-	const encryptionKey = getEncryptionKey(process.env as Record<string, string | undefined>);
+	const encryptionKey = getEncryptionKey(env);
 	const decrypted = decryptText(encrypted, encryptionKey);
 	if (!decrypted) return [];
 
@@ -281,3 +283,45 @@ export async function getDiscoveredModelsForUser(
 }
 
 export type { ModelId };
+
+/**
+ * Aggregate all `discovered_models` snapshots across a user's credentials
+ * into a single lookup map. Used by `catalog.ts:resolveModelInfo` to find
+ * custom-provider models SSR-side without an extra roundtrip per provider.
+ *
+ * Iterates the user's credential rows and decrypts each one's
+ * `discovered_models` JSON. Uses `$env/dynamic/private` so encryption and
+ * decryption resolve to the same env source (Chunks 4 hardening later
+ * moves this to a passed-in `env` parameter).
+ */
+export async function getAllDiscoveredModelsForUser(
+	db: LibSQLDatabase<any>,
+	userId: number
+): Promise<Map<ModelId, ModelInfo>> {
+	const { env: svelteEnv } = await import('$env/dynamic/private');
+	const encryptionKey = getEncryptionKey(svelteEnv as Record<string, string | undefined>);
+
+	const rows = await db
+		.select({ discoveredModels: userCredentials.discoveredModels, providerId: userCredentials.providerId })
+		.from(userCredentials)
+		.where(and(eq(userCredentials.userId, userId), sql`${userCredentials.discoveredModels} IS NOT NULL`));
+
+	const out = new Map<ModelId, ModelInfo>();
+	for (const row of rows) {
+		if (!row.discoveredModels) continue;
+		try {
+			const decrypted = decryptText(row.discoveredModels, encryptionKey);
+			const parsed = ModelInfoListSchema.safeParse(JSON.parse(decrypted));
+			if (!parsed.success) continue;
+			for (const model of parsed.data) {
+				out.set(model.id, model);
+			}
+		} catch (err) {
+			console.warn(
+				`[getAllDiscoveredModelsForUser:${row.providerId}] Failed to parse discovered models:`,
+				err
+			);
+		}
+	}
+	return out;
+}

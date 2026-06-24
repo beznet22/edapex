@@ -102,8 +102,12 @@ export class AvailableModelsHolder {
 		return this.#models;
 	}
 
-	get hiddenIds(): Set<string> {
+	get hiddenIds(): ReadonlySet<string> {
 		return this.#hiddenIds;
+	}
+
+	hasHidden(modelId: string): boolean {
+		return this.#hiddenIds.has(modelId);
 	}
 
 	replace(models: AugmentedModelInfo[], hiddenIds: string[]): void {
@@ -119,13 +123,12 @@ export class AvailableModelsHolder {
 		const existing = getContext(Symbol.for("AvailableModelsHolder")) as
 			| AvailableModelsHolder
 			| undefined;
-		if (existing) return existing;
-		// Fallback for components rendered outside the chat layout (e.g. the
-		// root +layout.svelte that mounts the settings modal globally).
-		// Returns an empty holder; the modal will trigger a fresh fetch on open.
-		const fallback = new AvailableModelsHolder([], []);
-		fallback.setContext();
-		return fallback;
+		if (!existing) {
+			throw new Error(
+				"AvailableModelsHolder not found in context. The chat layout is the single producer."
+			);
+		}
+		return existing;
 	}
 }
 

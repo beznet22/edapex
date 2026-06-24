@@ -25,7 +25,7 @@ export {
 	POPULAR_PROVIDER_IDS,
 	PLATFORM_PROVIDERS,
 	PLATFORM_MODELS
-} from './catalog';
+} from '$lib/provider/catalog';
 
 export {
 	saveUserCredential,
@@ -36,7 +36,6 @@ export {
 	decryptCustomProvider,
 	resolveApiKeyForCredential,
 	resolveProviderKey,
-	getDiscoveredModelsForUser,
 	ensureUserCredentialsSchema,
 	type UserCredentialState,
 	type SaveUserCredentialInput,
@@ -44,8 +43,7 @@ export {
 } from './credentials';
 
 export {
-	getVisibleModelIdsForUser,
-	getExplicitlyHiddenModelIdsForUser,
+	getHiddenModelIdsForUser,
 	setModelVisibility,
 	setAllModelVisibility,
 	ensureVisibilitySchema

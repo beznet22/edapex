@@ -15,9 +15,9 @@ import { userCredentials } from '$lib/server/mastra/storage/libsql/app-db.schema
 import type { AugmentedModelInfo } from '$lib/provider/spec';
 import type { ModelInfo } from '$lib/provider/spec';
 import type { ProviderId } from '$lib/provider/types';
-import { BUILTIN_MODELS, getModelsByProvider } from './catalog';
+import { BUILTIN_MODELS, getModelsByProvider } from '$lib/provider/catalog';
 import { getDiscoveredModelsForUser } from './discovery';
-import { getExplicitlyHiddenModelIdsForUser } from './visibility';
+import { getHiddenModelIdsForUser } from './visibility';
 
 export type { AugmentedModelInfo } from '$lib/provider/spec';
 
@@ -35,7 +35,7 @@ export async function getAvailableModelsForUser(
 		.from(userCredentials)
 		.where(eq(userCredentials.userId, userId));
 
-	const hiddenIds = await getExplicitlyHiddenModelIdsForUser(db, userId);
+	const hiddenIds = await getHiddenModelIdsForUser(db, userId);
 
 	const result: AugmentedModelInfo[] = [];
 	const seenIds = new Set<string>();
@@ -45,7 +45,7 @@ export async function getAvailableModelsForUser(
 		if (row.enabled !== 1) continue;
 		const providerId = row.providerId as ProviderId;
 
-		const discovered = await getDiscoveredModelsForUser(db, userId, providerId);
+		const discovered = await getDiscoveredModelsForUser(db, env, userId, providerId);
 		const credentialModels = discovered.length > 0 ? discovered : getModelsByProvider(providerId);
 
 		for (const model of credentialModels) {
