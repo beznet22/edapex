@@ -17,7 +17,8 @@
 		"db:generate": "drizzle-kit generate",
 		"db:migrate": "drizzle-kit migrate",
 		"db:studio": "drizzle-kit studio",
-		"migrate:ocr-memory": "tsx scripts/migration/ocr-memory-to-workspace.ts"
+		"migrate:ocr-memory": "tsx scripts/migration/ocr-memory-to-workspace.ts",
+		"migrate:telegram-links": "tsx scripts/migrate-telegram-links.ts"
 	},
 	"devDependencies": {
 		"@ai-sdk/provider-utils": "^4.0.9",
