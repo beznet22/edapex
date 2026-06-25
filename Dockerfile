@@ -22,6 +22,8 @@ FROM oven/bun:slim AS production
 # Set working directory and environment
 WORKDIR /app
 ENV NODE_ENV=production
+ENV TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+ENV TELEGRAM_BOT_USERNAME=${TELEGRAM_BOT_USERNAME}
 
 # Install necessary libraries for html2pdf and rendering in one layer
 RUN apt-get update && apt-get install -y --no-install-recommends \
