@@ -17,7 +17,6 @@
 		"db:generate": "drizzle-kit generate",
 		"db:migrate": "drizzle-kit migrate",
 		"db:studio": "drizzle-kit studio",
-
 		"migrate:ocr-memory": "tsx scripts/migration/ocr-memory-to-workspace.ts"
 	},
 	"devDependencies": {
@@ -63,6 +62,7 @@
 		"tailwind-merge": "^3.5.0",
 		"tailwind-variants": "^3.2.2",
 		"tailwindcss": "^4.1.17",
+		"tsx": "^4.22.4",
 		"tw-animate-css": "^1.4.0",
 		"typescript": "^5.9.3",
 		"vite": "^7.2.2",
@@ -75,6 +75,8 @@
 		"@ai-sdk/openai-compatible": "^2.0.19",
 		"@ai-sdk/provider": "3.0.5",
 		"@ai-sdk/svelte": "^4.0.50",
+		"@chat-adapter/state-memory": "^4.31.0",
+		"@chat-adapter/telegram": "^4.31.0",
 		"@embedpdf/core": "^2.14.2",
 		"@embedpdf/engines": "^2.14.2",
 		"@embedpdf/plugin-document-manager": "^2.14.2",
@@ -108,6 +110,7 @@
 		"@tiptap/starter-kit": "^3.23.6",
 		"@tiptap/suggestion": "^3.23.6",
 		"ai": "^6.0.50",
+		"chat": "^4.31.0",
 		"dotenv": "^17.2.3",
 		"files-sdk": "^1.2.0",
 		"highlight.js": "^11.11.1",
@@ -120,10 +123,5 @@
 		"svelte-toolbelt": "^0.10.6",
 		"tiptap-markdown": "^0.9.0",
 		"vaul-svelte": "^0.3.2"
-	},
-	"pnpm": {
-		"patchedDependencies": {
-			"@ai-sdk/openai-compatible@2.0.47": "patches/@ai-sdk__openai-compatible@2.0.47.patch"
-		}
 	}
 }
