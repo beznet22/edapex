@@ -87,7 +87,7 @@ export function todayIso(): string {
 
 export { listMyChildrenTool } from "./list-my-children";
 export { viewChildResultTool } from "./view-child-result";
-export { downloadChildPdfTool } from "./download-child-pdf";
+export { generateResultPdfTool } from "../reporting/generate-result-pdf";
 export { childAttendanceTool } from "./child-attendance";
 export { childRankingTool } from "./child-ranking";
 export { childPerformanceTrendTool } from "./child-performance-trend";
@@ -101,7 +101,7 @@ export { viewHolidaysTool } from "./view-holidays";
 
 import { listMyChildrenTool } from "./list-my-children";
 import { viewChildResultTool } from "./view-child-result";
-import { downloadChildPdfTool } from "./download-child-pdf";
+import { generateResultPdfTool } from "../reporting/generate-result-pdf";
 import { childAttendanceTool } from "./child-attendance";
 import { childRankingTool } from "./child-ranking";
 import { childPerformanceTrendTool } from "./child-performance-trend";
@@ -116,7 +116,7 @@ import { viewHolidaysTool } from "./view-holidays";
 export const parentTools = {
   listMyChildrenTool,
   viewChildResultTool,
-  downloadChildPdfTool,
+  generateResultPdfTool,
   childAttendanceTool,
   childRankingTool,
   childPerformanceTrendTool,

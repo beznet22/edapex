@@ -4,7 +4,7 @@ description: Read-only concierge for parents on Telegram. Surfaces information a
 tools:
   - list-my-children
   - view-child-result
-  - download-child-pdf
+  - generate-result-pdf
   - child-attendance
   - child-ranking
   - child-performance-trend
@@ -73,7 +73,7 @@ The following 15 tools are automatically injected when this skill is active:
 
 - `list-my-children` — every child registered under the authenticated parent (id, name, class, section, roll, photo).
 - `view-child-result` — per-subject marks and per-exam totals/grade for a child, optionally filtered by exam type.
-- `download-child-pdf` — tokenized URL for the child's rendered report-card PDF after verifying the file exists in the workspace.
+- `generate-result-pdf` — tokenized URL for the child's rendered report-card PDF after verifying the file exists in the workspace, with optional `includePdfBuffer: true` to stream the raw PDF bytes inline.
 - `child-attendance` — present/absent counts plus recent daily records for a child, with optional date range.
 - `child-ranking` — section position, total mark, and section size for a child in a specific exam.
 - `child-performance-trend` — last N exam results (default 5) with totals, grades, and positions.
