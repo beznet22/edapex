@@ -127,9 +127,47 @@ export const mastraRunSteps = sqliteTable('mastra_run_steps', {
 	createdAt: text('created_at').notNull().default(sql`(datetime('now'))`),
 });
 
+/**
+ * Telegram Parent Link Table
+ *
+ * Maps a Telegram chat_id to a parent record with denormalized school contact
+ * info and JSON-encoded child lists. Eliminates runtime joins to sm_parents,
+ * sm_students, and sm_schools on every incoming Telegram message.
+ */
+export const telegramParentLink = sqliteTable('telegram_parent_link', {
+	chatId: text('chat_id').primaryKey(), // Telegram chat_id stored as text
+	parentId: integer('parent_id').notNull(), // logical FK to sm_parents.id
+	userId: integer('user_id').notNull(), // sm_parents.user_id
+	schoolId: integer('school_id').notNull(), // sm_parents.school_id
+	schoolName: text('school_name'), // denormalized from sm_schools.school_name
+	schoolPhone: text('school_phone'), // denormalized from sm_schools.phone
+	schoolEmail: text('school_email'), // denormalized from sm_schools.email
+	childIds: text('child_ids').notNull(), // JSON array of sm_students.id e.g. '[101,102]'
+	childNames: text('child_names').notNull(), // JSON array of sm_students.full_name
+	linkedAt: text('linked_at').notNull().default(sql`(datetime('now'))`), // when parent linked Telegram
+});
+
+/**
+ * Connect Tokens Table
+ *
+ * One-time deep-link tokens for the /connect <token> flow. Token is looked up
+ * directly (no parentId scan) and consumed atomically to prevent replay.
+ */
+export const connectTokens = sqliteTable('connect_tokens', {
+	id: integer('id').primaryKey({ autoIncrement: true }),
+	parentId: integer('parent_id').notNull(),
+	token: text('token').notNull().unique(), // random hex string, the lookup key
+	expiresAt: text('expires_at').notNull(), // ISO 8601 datetime string
+	usedAt: text('used_at'), // null until consumed; ISO 8601 datetime when set
+	schoolId: integer('school_id').notNull().default(1),
+	createdAt: text('created_at').notNull().default(sql`(datetime('now'))`),
+});
+
 export type UserCredential = typeof userCredentials.$inferSelect;
 export type UserModelVisibility = typeof userModelVisibility.$inferSelect;
 export type AgentSetting = typeof agentSettings.$inferSelect;
 export type RateLimitStateRow = typeof rateLimitState.$inferSelect;
 export type MastraRun = typeof mastraRuns.$inferSelect;
 export type MastraRunStep = typeof mastraRunSteps.$inferSelect;
+export type TelegramParentLink = typeof telegramParentLink.$inferSelect;
+export type ConnectToken = typeof connectTokens.$inferSelect;
