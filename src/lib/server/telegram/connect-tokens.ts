@@ -1,12 +1,7 @@
 import { randomBytes } from "node:crypto";
-import { getDatabase } from "$lib/server/db";
-import { sql } from "drizzle-orm";
-
-interface ConnectTokenRow {
-	parent_id: number;
-	school_id: number;
-	expires_at: string;
-}
+import { and, eq, gt, isNull, sql } from "drizzle-orm";
+import { getAppDb } from "$lib/server/mastra/storage/libsql/app-db";
+import { connectTokens } from "$lib/server/mastra/storage/libsql/app-db.schema";
 
 interface ConnectTokenResult {
 	parentId: number;
@@ -37,36 +32,50 @@ export class ConnectTokenStore {
 		ttlHours: number = 24,
 	): Promise<string> {
 		const token = randomBytes(32).toString("hex");
-		const db = await getDatabase();
-		const expiresAt = new Date(Date.now() + ttlHours * 60 * 60 * 1000);
+		const db = getAppDb();
+		const expiresAt = new Date(
+			Date.now() + ttlHours * 60 * 60 * 1000,
+		).toISOString();
 
-		await db.execute(
-			sql`INSERT INTO connect_tokens (parent_id, token, expires_at, school_id) VALUES (${parentId}, ${token}, ${expiresAt}, ${schoolId})`,
-		);
+		db.insert(connectTokens).values({
+			parentId,
+			token,
+			expiresAt,
+			schoolId,
+		}).run();
 
 		return token;
 	}
 
-	private async fetchValidToken(token: string): Promise<ConnectTokenRow | null> {
-		const db = await getDatabase();
-		const result = (await db.execute(
-			sql<ConnectTokenRow>`SELECT parent_id, school_id, expires_at FROM connect_tokens WHERE token = ${token} AND used_at IS NULL AND expires_at > NOW() LIMIT 1`,
-		)) as unknown;
+	private async fetchValidToken(token: string) {
+		const db = getAppDb();
+		const row = await db
+			.select({
+				parentId: connectTokens.parentId,
+				schoolId: connectTokens.schoolId,
+				expiresAt: connectTokens.expiresAt,
+			})
+			.from(connectTokens)
+			.where(
+				and(
+					eq(connectTokens.token, token),
+					isNull(connectTokens.usedAt),
+					gt(connectTokens.expiresAt, sql`(datetime('now'))`),
+				),
+			)
+			.limit(1)
+			.get();
 
-		if (Array.isArray(result)) {
-			return (result[0] as ConnectTokenRow | undefined) ?? null;
-		}
-		const rows = (result as { rows?: ConnectTokenRow[] }).rows;
-		return rows?.[0] ?? null;
+		return row ?? null;
 	}
 
 	async lookupToken(token: string): Promise<ConnectTokenLookup | null> {
 		const row = await this.fetchValidToken(token);
 		if (!row) return null;
 		return {
-			parentId: row.parent_id,
-			schoolId: row.school_id,
-			expiresAt: row.expires_at,
+			parentId: row.parentId,
+			schoolId: row.schoolId,
+			expiresAt: row.expiresAt,
 		};
 	}
 
@@ -74,16 +83,18 @@ export class ConnectTokenStore {
 		const row = await this.fetchValidToken(token);
 		if (!row) return null;
 
-		const db = await getDatabase();
-		await db.execute(
-			sql`UPDATE connect_tokens SET used_at = NOW() WHERE token = ${token} AND used_at IS NULL`,
-		);
+		const db = getAppDb();
+		db.update(connectTokens)
+			.set({ usedAt: sql`(datetime('now'))` })
+			.where(and(eq(connectTokens.token, token), isNull(connectTokens.usedAt)))
+			.run();
 
 		return {
-			parentId: row.parent_id,
-			schoolId: row.school_id,
+			parentId: row.parentId,
+			schoolId: row.schoolId,
 		};
 	}
 }
 
-export const connectTokenStore: ConnectTokenStore = ConnectTokenStore.getInstance();
+export const connectTokenStore: ConnectTokenStore =
+	ConnectTokenStore.getInstance();
