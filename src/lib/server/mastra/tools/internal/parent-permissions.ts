@@ -13,6 +13,9 @@ export class ParentContext {
   telegramChatId?: string;
   phoneNumber?: string;
   verifiedAt?: string;
+  schoolName?: string;
+  schoolPhone?: string;
+  schoolEmail?: string;
 }
 
 export function assertParent(parentContext: ParentContext | null | undefined): void {
