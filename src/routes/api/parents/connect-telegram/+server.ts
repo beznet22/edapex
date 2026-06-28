@@ -19,17 +19,17 @@ export const POST: RequestHandler = async ({ request, locals }) => {
   const db = await getDatabase();
   const parent = body.parentId
     ? await db
-        .select({ id: smParents.id, schoolId: smParents.schoolId })
-        .from(smParents)
-        .where(and(eq(smParents.id, body.parentId), eq(smParents.activeStatus, 1)))
-        .limit(1)
-        .then((rows) => rows[0] ?? null)
+      .select({ id: smParents.id, schoolId: smParents.schoolId })
+      .from(smParents)
+      .where(and(eq(smParents.id, body.parentId), eq(smParents.activeStatus, 1)))
+      .limit(1)
+      .then((rows) => rows[0] ?? null)
     : await db
-        .select({ id: smParents.id, schoolId: smParents.schoolId })
-        .from(smParents)
-        .where(and(eq(smParents.userId, locals.user.id), eq(smParents.activeStatus, 1)))
-        .limit(1)
-        .then((rows) => rows[0] ?? null);
+      .select({ id: smParents.id, schoolId: smParents.schoolId })
+      .from(smParents)
+      .where(and(eq(smParents.userId, locals.user.id), eq(smParents.activeStatus, 1)))
+      .limit(1)
+      .then((rows) => rows[0] ?? null);
 
   if (!parent) {
     error(404, "Parent record not found");

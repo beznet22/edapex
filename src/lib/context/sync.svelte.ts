@@ -119,14 +119,23 @@ export class AvailableModelsHolder {
 		setContext(this.#contextKey, this);
 	}
 
+	/**
+	 * Module-level sentinel returned by `fromContext()` when the context
+	 * isn't in scope. SSR renders the settings modal from the root layout,
+	 * so non-chat routes (e.g. `/signin`) call `fromContext()` before the
+	 * `(chat)` group layout has a chance to set the holder. Returning a
+	 * stable empty instance keeps those routes renderable instead of 500'ing
+	 * on the throw; the chat layout remains the single producer of real
+	 * data and replaces this sentinel with a populated one inside chat routes.
+	 */
+	static #empty = new AvailableModelsHolder();
+
 	static fromContext(): AvailableModelsHolder {
 		const existing = getContext(Symbol.for("AvailableModelsHolder")) as
 			| AvailableModelsHolder
 			| undefined;
 		if (!existing) {
-			throw new Error(
-				"AvailableModelsHolder not found in context. The chat layout is the single producer."
-			);
+			return AvailableModelsHolder.#empty;
 		}
 		return existing;
 	}

@@ -207,7 +207,8 @@ export async function getUserCredential(
 const PLATFORM_ENV_KEYS: Partial<Record<ProviderId, string>> = {
 	groq: 'GROQ_API_KEY',
 	deepseek: 'DEEPSEEK_API_KEY',
-	opencode: 'OPENCODE_API_KEY'
+	opencode: 'OPENCODE_API_KEY',
+	kimchi: 'KIMCHI_API_KEY'
 };
 
 /**
@@ -267,7 +268,8 @@ export async function getAllUserCredentials(
 	const platformDefaults: Array<{ providerId: ProviderId; envKey: string }> = [
 		{ providerId: 'groq' as ProviderId, envKey: 'GROQ_API_KEY' },
 		{ providerId: 'deepseek' as ProviderId, envKey: 'DEEPSEEK_API_KEY' },
-		{ providerId: 'opencode' as ProviderId, envKey: 'OPENCODE_API_KEY' }
+		{ providerId: 'opencode' as ProviderId, envKey: 'OPENCODE_API_KEY' },
+		{ providerId: 'kimchi' as ProviderId, envKey: 'KIMCHI_API_KEY' }
 	];
 	for (const p of platformDefaults) {
 		if (!supportedProviderIds.includes(p.providerId)) continue;

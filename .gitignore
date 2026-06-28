@@ -38,9 +38,10 @@ hermes-webui/
 *.db
 *.db-shm
 *.db-wal
-.workspaces
 temp_dir/
 tests/.tmp/
 basic-ai-editor/
 .kiro
 novel/
+reference/
+.kimchi/

@@ -574,19 +574,22 @@ const assistantStep = createStep({
 			// Emit a structured data-error part alongside the human-readable
 			// text-delta so the client-side ErrorAlert can render the right
 			// action button (regenerate / clear_context / open_settings).
+			//
+			// The data-error is enqueued INSIDE the fallback stream rather than
+			// via a separate `writer.write()` call so all parts share the same
+			// `pipeTo(writer)` lifecycle. Previously the data-error write was
+			// fire-and-forget (`void errorPart`) and could race the writer
+			// closing, causing the client to receive only the fallback
+			// text-delta with no ErrorAlert rendered.
 			const categorized = categorizeAIError(err);
-			const errorPart = writer
-				.write({
-					type: 'data-error',
-					id: `err-${Date.now()}`,
-					data: categorized
-				} as never)
-				.catch(() => {
-					// writer may already be closed
-				});
-			void errorPart;
+			const errorId = `err-${Date.now()}`;
 			const fallbackStream = new ReadableStream({
 				start(controller) {
+					controller.enqueue({
+						type: 'data-error',
+						id: errorId,
+						data: categorized
+					} as never);
 					controller.enqueue({ type: 'text-delta', text: `⚠️ ${friendlyMsg}` });
 					controller.enqueue({
 						type: 'finish',

@@ -2,7 +2,7 @@
  * Assessment Publisher Service — EdApex
  *
  * Owns the per-request publishing pipeline that:
- *  1. Renders each student's `ResultData` into a PDF (Puppeteer-backed)
+ *  1. Renders each student's `ResultData` into a PDF (via `bin/html2pdf`)
  *  2. Builds an HTML email body with the school logo as a CID attachment
  *  3. Sends each email via `SMTPClient` (nodemailer) directly — no worker
  *  4. Writes a `smStudentTimelines` row per successful send so the
@@ -13,17 +13,24 @@
  * `isEmailAlreadySent` check prevents duplicate timeline rows.
  *
  * Slice 10: tenant-scoped via `ScopedRepositoryProvider` (no module singletons).
+ *
+ * Both `publishResults` (term-by-term result PDFs) and `publishTranscript`
+ * (multi-term transcript PDFs) share the same SMTP pipeline — only one
+ * `nodemailer.createTransport` call site exists in the project, owned here.
  */
 import path from "path";
 import fs from "fs";
 import { render } from "svelte/server";
 import { base64url } from "jose";
+import { eq } from "drizzle-orm";
 import { ScopedRepositoryProvider } from "$lib/server/mastra/scoped-repository";
 import type { TenantContext } from "$lib/server/mastra/tenant-context";
 import { pageToHtml } from "$lib/server/helpers";
 import { generate } from "$lib/server/helpers/pdf-generator";
 import { SMTPClient } from "$lib/server/helpers/smtp";
 import { TimelineRepository, ResultsRepository, StudentRepository } from "$lib/server/repository";
+import { smSchools } from "$lib/server/db/sms-schema";
+import { getDatabase } from "$lib/server/db";
 import { marksheetSchema } from "$lib/schema/marksheet";
 import ResultTemplate from "$lib/components/template/ResultTemplate.svelte";
 import ResultEmail from "$lib/components/template/result-email.svelte";
@@ -40,6 +47,34 @@ export interface PublishResultsResult {
   failed: number;
   errors: string[];
   results: Array<{ to?: string; messageId?: string; response?: string; studentId?: number }>;
+}
+
+export interface PublishTranscriptParams {
+  studentId: number;
+  academicId: number;
+  parentName: string;
+  parentEmail: string;
+  studentName: string;
+  pdfFilename: string;
+  pdfBytes: Buffer;
+  html: string;
+}
+
+export interface PublishTranscriptResult {
+  success: boolean;
+  message: string;
+  messageId?: string;
+}
+
+function resolveSchoolLogoAbsolutePath(): string | null {
+  const candidates = [
+    path.join(process.cwd(), "static", "school-logo.png"),
+    path.join(process.cwd(), "static", "logo.png"),
+  ];
+  for (const candidate of candidates) {
+    if (fs.existsSync(candidate)) return candidate;
+  }
+  return null;
 }
 
 export class AssessmentPublisherService {
@@ -59,6 +94,60 @@ export class AssessmentPublisherService {
 
   private student(): StudentRepository {
     return this.provider.getRepo(StudentRepository);
+  }
+
+  async resolveSchoolIdentity(schoolId: number): Promise<{
+    name: string;
+    email: string;
+    phone: string;
+  }> {
+    const db = await getDatabase();
+    const [row] = await db
+      .select({
+        name: smSchools.schoolName,
+        email: smSchools.email,
+        phone: smSchools.phone,
+      })
+      .from(smSchools)
+      .where(eq(smSchools.id, schoolId))
+      .limit(1);
+    return {
+      name: row?.name ?? "Your School",
+      email: row?.email ?? "noreply@school.local",
+      phone: row?.phone ?? "",
+    };
+  }
+
+  private async sendViaSmtp(args: {
+    fromAddress: string;
+    schoolName: string;
+    toAddress: string;
+    subject: string;
+    html: string;
+    text: string;
+    attachments: Array<{ filename: string; content: Buffer }>;
+  }): Promise<PublishTranscriptResult> {
+    const smtp = new SMTPClient({
+      host: process.env.SMTP_HOST,
+      port: Number(process.env.SMTP_PORT || 587),
+      secure: Number(process.env.SMTP_PORT || 587) === 465,
+      auth: { user: process.env.SMTP_USER || "", pass: process.env.SMTP_PASS || "" },
+    });
+
+    try {
+      const info = await smtp
+        .from(`"${args.schoolName}" <${args.fromAddress}>`)
+        .to(args.toAddress)
+        .subject(args.subject)
+        .html(args.html)
+        .send();
+      if (!info.success) {
+        return { success: false, message: info.message };
+      }
+      return { success: true, message: "Email sent successfully", messageId: info.messageId };
+    } catch (err) {
+      return { success: false, message: err instanceof Error ? err.message : String(err) };
+    }
   }
 
   async isEmailAlreadySent(studentId: number, examId: number): Promise<boolean> {
@@ -181,15 +270,14 @@ export class AssessmentPublisherService {
     const emailResults: PublishResultsResult["results"] = [];
     let sentCount = 0;
 
-    const smtp = new SMTPClient({
-      host: process.env.SMTP_HOST,
-      port: Number(process.env.SMTP_PORT || 587),
-      secure: Number(process.env.SMTP_PORT || 587) === 465,
-      auth: { user: process.env.SMTP_USER || "", pass: process.env.SMTP_PASS || "" },
-    });
-
     for (const message of messages) {
       try {
+        const smtp = new SMTPClient({
+          host: process.env.SMTP_HOST,
+          port: Number(process.env.SMTP_PORT || 587),
+          secure: Number(process.env.SMTP_PORT || 587) === 465,
+          auth: { user: process.env.SMTP_USER || "", pass: process.env.SMTP_PASS || "" },
+        });
         const result = await smtp.from(message.from).to(message.to).subject(message.subject).html(message.html).send();
         if (!result.success) {
           emailErrors.push(result.message);
@@ -230,12 +318,37 @@ export class AssessmentPublisherService {
       results: emailResults,
     };
   }
+
+  async publishTranscript(params: PublishTranscriptParams): Promise<PublishTranscriptResult> {
+    const assessment = this.provider.getTenant();
+    const school = await this.resolveSchoolIdentity(assessment.schoolId);
+
+    const attachments: Array<{ filename: string; content: Buffer }> = [
+      { filename: params.pdfFilename, content: params.pdfBytes },
+    ];
+    const logoPath = resolveSchoolLogoAbsolutePath();
+    if (logoPath) {
+      attachments.push({ filename: "logo.png", content: fs.readFileSync(logoPath) });
+    }
+
+    return this.sendViaSmtp({
+      fromAddress: process.env.SMTP_FROM || school.email,
+      schoolName: school.name,
+      toAddress: params.parentEmail,
+      subject: `Academic Transcript — ${params.studentName} — Academic Year ${params.academicId}`,
+      html: params.html,
+      text:
+        `Dear ${params.parentName},\n\n` +
+        `The academic transcript for ${params.studentName} (Academic Year ${params.academicId}) is attached.\n\n` +
+        `Regards,\n${school.name}`,
+      attachments,
+    });
+  }
 }
 
 export async function createAssessmentPublisherServiceForRequest(
   tenant: TenantContext,
 ): Promise<AssessmentPublisherService> {
-  const { getDatabase } = await import("$lib/server/db");
   const db = await getDatabase();
   const provider = new ScopedRepositoryProvider(db, tenant);
   return new AssessmentPublisherService(provider);

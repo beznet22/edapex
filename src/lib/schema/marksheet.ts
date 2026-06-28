@@ -233,4 +233,4 @@ export const marksheetSchema = z
     }
   });
 
-export type Marksheet = z.infer<typeof marksheetSchema> & { extra?: any };
+export type Marksheet = z.infer<typeof marksheetSchema>;

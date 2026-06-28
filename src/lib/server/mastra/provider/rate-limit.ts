@@ -24,6 +24,8 @@ import {
 import { rateLimitState, type RateLimitStateRow } from '$lib/server/mastra/storage/libsql/app-db.schema';
 import { RateLimitError } from '$lib/provider/errors';
 import type { ProviderId } from '$lib/provider/types';
+import { resolveDynamicHeaders } from './dynamic-headers';
+import { sanitizeRequestInit } from './sanitize-request';
 
 type AnyDb = LibSQLDatabase<any>;
 
@@ -137,10 +139,33 @@ export class RateLimit {
 	 * headers (rate-limit-aware). The wrapped fetch is a transparent
 	 * pass-through; the AI SDK's response handlers will still throw
 	 * APICallError on non-2xx responses with the headers attached.
+	 *
+	 * When `providerId` and `env` are supplied, the wrapper additionally:
+	 *   - Merges dynamic headers from `HEADER_RESOLVERS[providerId](env)`
+	 *     into every outbound request (init.headers wins per-key).
+	 *   - Runs `sanitizeRequestInit` over the body to coerce tool-message
+	 *     `content` to a string and replace assistant tool-call `content: null`
+	 *     with `''`. Defends against SDK regressions independent of the
+	 *     `@ai-sdk/openai-compatible` pnpm patch.
 	 */
-	static createFetchWrapper(onResponse: (state: FetchResponse) => void): typeof fetch {
+	static async createFetchWrapper(
+		onResponse: (state: FetchResponse) => void,
+		providerId?: ProviderId,
+		env?: Record<string, string | undefined>
+	): Promise<typeof fetch> {
+		const dynamicHeaders =
+			providerId && env ? await resolveDynamicHeaders(providerId, env) : {};
+
 		return async (input, init) => {
-			const response = await globalThis.fetch(input, init);
+			let enrichedInit: RequestInit | undefined = init;
+			if (Object.keys(dynamicHeaders).length > 0) {
+				enrichedInit = {
+					...init,
+					headers: { ...dynamicHeaders, ...(init?.headers as Record<string, string> | undefined) }
+				};
+			}
+			enrichedInit = sanitizeRequestInit(enrichedInit) ?? enrichedInit;
+			const response = await globalThis.fetch(input, enrichedInit);
 			const headers: Record<string, string> = {};
 			response.headers.forEach((v, k) => (headers[k.toLowerCase()] = v));
 			onResponse({
@@ -298,6 +323,13 @@ export class RateLimit {
  *    (success or error) and updates the per-(user, provider) in-memory
  *    cache.
  *
+ * When `env` is supplied the wrapper additionally injects dynamic per-request
+ * headers (e.g. versioned `User-Agent` for the kimchi provider) and runs
+ * `sanitizeRequestInit` to coerce malformed tool-message and assistant
+ * tool-call bodies. Both run inside `RateLimit.createFetchWrapper` so the
+ * ordering — dynamic headers → body sanitize → upstream fetch — is consistent
+ * with the planned multi-layer header/body model.
+ *
  * The cache is consulted by `RateLimit.requireOrThrow` (in
  * `agent-stream-retry.ts`) to decide whether to wait inline (short
  * cooldown) or surface a `RateLimitError` to the auto-retry loop
@@ -310,13 +342,18 @@ export class RateLimit {
  */
 export function createRateLimitFetch(
 	userId: number,
-	providerId: string
-): typeof fetch {
-	return RateLimit.createFetchWrapper((state) => {
-		try {
-			captureToCache(userId, providerId, state.statusCode, state.headers);
-		} catch (err) {
-			console.warn('[createRateLimitFetch] capture failed:', err);
-		}
-	});
+	providerId: ProviderId,
+	env?: Record<string, string | undefined>
+): Promise<typeof fetch> {
+	return RateLimit.createFetchWrapper(
+		(state) => {
+			try {
+				captureToCache(userId, providerId, state.statusCode, state.headers);
+			} catch (err) {
+				console.warn('[createRateLimitFetch] capture failed:', err);
+			}
+		},
+		providerId,
+		env
+	);
 }

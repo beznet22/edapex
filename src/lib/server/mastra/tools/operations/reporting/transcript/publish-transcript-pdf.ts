@@ -1,30 +1,30 @@
 import { createTool, isValidationError } from "@mastra/core/tools";
 import { z } from "zod";
 import { render } from "svelte/server";
-import path from "path";
-import fs from "fs";
-import nodemailer from "nodemailer";
 import { getDatabase } from "$lib/server/db";
-import { smParents, smSchools, smStudents } from "$lib/server/db/sms-schema";
-import { and, eq, like, or, type SQL } from "drizzle-orm";
-import { tenantWorkspace } from "$lib/server/mastra/storage/workspaces";
-import { buildWorkspaceRequestContext } from "$lib/server/helpers/chat-helper";
+import { smParents } from "$lib/server/db/sms-schema";
+import { and, eq } from "drizzle-orm";
 import { pageToHtml } from "$lib/server/helpers";
-import type { StreamWriterLike } from "$lib/server/mastra/agent-stream-retry";
+import { createAssessmentPublisherServiceForRequest } from "$lib/server/service/assessment-publisher.service";
 import type { TenantContext } from "$lib/server/mastra/tenant-context";
-import type { WorkspaceFilesystem } from "@mastra/core/workspace";
+import type { StreamWriterLike } from "$lib/server/mastra/agent-stream-retry";
 import type { StudentDetails } from "$lib/server/repository/student.repo";
 import ResultEmail from "$lib/components/template/result-email.svelte";
 import { generateTranscriptPdfTool } from "./generate-transcript-pdf";
-
-interface ReportPdfToolContext {
-  requestContext?: {
-    get<T = unknown>(key: string): T | undefined;
-    set?(key: string, value: unknown): void;
-  };
-  writer?: StreamWriterLike;
-  abortSignal?: AbortSignal;
-}
+import {
+  base64url,
+  buildTranscriptStoragePath,
+  emitNotification,
+  emitPdfPart,
+  emitSelectOption,
+  generateConfirmationToken,
+  getRequestContext,
+  getTenant,
+  getWriter,
+  resolveFilesystem,
+  resolveStudent,
+  sanitizeForFilename,
+} from "../_shared";
 
 const CONFIRM_CONTEXT_KEY = "transcriptPublishConfirm";
 
@@ -41,72 +41,9 @@ type TranscriptConfirmState = {
   confirmationToken: string;
   storagePath: string;
   previewUrl: string;
-  thumbnailUrl: string;
   title: string;
   pdfBytes: Buffer;
 };
-
-type PdfArtifactData = {
-  status: "processing" | "streaming" | "success" | "error";
-  data?: string;
-  title?: string;
-  id?: string;
-  storagePath?: string;
-  previewUrl?: string;
-  thumbnailUrl?: string;
-  error?: string;
-};
-
-type SelectOptionItem = { id: string; label: string; icon?: string };
-
-function getTenant(ctx: ReportPdfToolContext): TenantContext {
-  const tenant = ctx.requestContext?.get("tenantContext") as TenantContext | undefined;
-  if (!tenant) {
-    throw new Error("TENANT_CONTEXT_REQUIRED: transcript-pdf tools require an active tenantContext");
-  }
-  return tenant;
-}
-
-function getWriter(ctx: ReportPdfToolContext): StreamWriterLike | undefined {
-  return ctx.writer;
-}
-
-function getRequestContext(
-  ctx: ReportPdfToolContext,
-): NonNullable<ReportPdfToolContext["requestContext"]> {
-  const rc = ctx.requestContext;
-  if (!rc) {
-    throw new Error("REQUEST_CONTEXT_REQUIRED: transcript-pdf tools require an active request context");
-  }
-  return rc;
-}
-
-async function resolveFilesystem(tenant: TenantContext): Promise<WorkspaceFilesystem> {
-  const requestContext = buildWorkspaceRequestContext(tenant);
-  const fs = await tenantWorkspace.resolveFilesystem({ requestContext: requestContext as never });
-  if (!fs) {
-    throw new Error("WORKSPACE_UNAVAILABLE: tenant workspace filesystem is not configured");
-  }
-  return fs;
-}
-
-function base64url(input: string): string {
-  return Buffer.from(input, "utf8")
-    .toString("base64")
-    .replace(/=+$/g, "")
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_");
-}
-
-function sanitizeForFilename(value: string | null | undefined): string {
-  return (value || "student").replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 80);
-}
-
-function generateConfirmationToken(): string {
-  return base64url(
-    `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
-  );
-}
 
 function isConfirmState(value: unknown): value is TranscriptConfirmState {
   if (!value || typeof value !== "object") return false;
@@ -119,208 +56,6 @@ function isConfirmState(value: unknown): value is TranscriptConfirmState {
     typeof v.artifactId === "string" &&
     (v.status === "pending" || v.status === "sent" || v.status === "cancelled")
   );
-}
-
-async function emitPdfPart(
-  writer: StreamWriterLike | undefined,
-  artifactId: string,
-  payload: PdfArtifactData,
-): Promise<void> {
-  if (!writer) return;
-  await writer.write({
-    type: "data-generatePDF",
-    id: artifactId,
-    data: payload,
-  } as never);
-}
-
-async function emitNotification(
-  writer: StreamWriterLike | undefined,
-  message: string,
-  level: "info" | "warning" | "error" | "success",
-): Promise<void> {
-  if (!writer) return;
-  await writer.write({
-    type: "data-notification",
-    id: `notif-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-    data: { message, level },
-  } as never);
-}
-
-async function emitSelectOption(
-  writer: StreamWriterLike | undefined,
-  options: SelectOptionItem[],
-  prompt: string,
-  contextKey: string,
-): Promise<void> {
-  if (!writer) return;
-  const gateId = `transcript-publish-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-  await writer.write({
-    type: "data-selectOption",
-    id: gateId,
-    data: {
-      options,
-      promptText: prompt,
-      runId: gateId,
-      stepId: "publishTranscriptConfirm",
-      contextKey,
-    },
-  } as never);
-}
-
-type StudentCriteria = {
-  studentId?: number | null;
-  admissionNo?: number | null;
-  fullName?: string | null;
-  partialName?: string | null;
-  classId?: number | null;
-  sectionId?: number | null;
-};
-
-async function resolveStudent(
-  criteria: StudentCriteria,
-  activeClassId: number | null,
-  activeSectionId: number | null,
-): Promise<StudentDetails> {
-  const db = await getDatabase();
-  const classId = criteria.classId ?? activeClassId;
-  const sectionId = criteria.sectionId ?? activeSectionId;
-
-  if (criteria.studentId !== undefined && criteria.studentId !== null) {
-    const student = await db
-      .select()
-      .from(smStudents)
-      .where(and(eq(smStudents.id, criteria.studentId), eq(smStudents.activeStatus, 1)))
-      .limit(1)
-      .then((rows) => rows[0] ?? null);
-    if (!student) {
-      throw new Error(
-        `STUDENT_NOT_FOUND: no active student with id=${criteria.studentId}`,
-      );
-    }
-    if (classId !== null && student.classId !== classId) {
-      throw new Error(
-        `WORKSPACE_MISMATCH: studentId=${criteria.studentId} is enrolled in classId=${student.classId ?? "?"}, not the active classId=${classId}`,
-      );
-    }
-    if (sectionId !== null && student.sectionId !== sectionId) {
-      throw new Error(
-        `WORKSPACE_MISMATCH: studentId=${criteria.studentId} is enrolled in sectionId=${student.sectionId ?? "?"}, not the active sectionId=${sectionId}`,
-      );
-    }
-    return mapRowToStudentDetails(student);
-  }
-
-  if (criteria.admissionNo !== undefined && criteria.admissionNo !== null) {
-    const student = await db
-      .select()
-      .from(smStudents)
-      .where(and(eq(smStudents.admissionNo, criteria.admissionNo), eq(smStudents.activeStatus, 1)))
-      .limit(1)
-      .then((rows) => rows[0] ?? null);
-    if (!student) {
-      throw new Error(
-        `STUDENT_NOT_FOUND: no active student with admissionNo=${criteria.admissionNo}`,
-      );
-    }
-    if (classId !== null && student.classId !== classId) {
-      throw new Error(
-        `WORKSPACE_MISMATCH: admissionNo=${criteria.admissionNo} belongs to classId=${student.classId ?? "?"}, not the active classId=${classId}`,
-      );
-    }
-    if (sectionId !== null && student.sectionId !== sectionId) {
-      throw new Error(
-        `WORKSPACE_MISMATCH: admissionNo=${criteria.admissionNo} belongs to sectionId=${student.sectionId ?? "?"}, not the active sectionId=${sectionId}`,
-      );
-    }
-    return mapRowToStudentDetails(student);
-  }
-
-  const conditions: Array<SQL<unknown> | undefined> = [eq(smStudents.activeStatus, 1)];
-  const nameQuery = criteria.fullName ?? criteria.partialName;
-  if (nameQuery) {
-    const searchPattern = `%${nameQuery}%`;
-    const nameCondition = or(
-      like(smStudents.fullName, searchPattern),
-      like(smStudents.firstName, searchPattern),
-      like(smStudents.lastName, searchPattern),
-    );
-    if (nameCondition) {
-      conditions.push(nameCondition);
-    }
-  }
-  if (classId !== null) {
-    conditions.push(eq(smStudents.classId, classId));
-  }
-  if (sectionId !== null) {
-    conditions.push(eq(smStudents.sectionId, sectionId));
-  }
-
-  const candidates = await db
-    .select()
-    .from(smStudents)
-    .where(and(...conditions))
-    .limit(50);
-
-  if (candidates.length === 0) {
-    const label = criteria.fullName ?? criteria.partialName ?? "";
-    throw new Error(
-      `STUDENT_NOT_FOUND: no active student matching "${label}" in classId=${classId ?? "?"}/sectionId=${sectionId ?? "?"}`,
-    );
-  }
-
-  const matches = criteria.fullName
-    ? candidates.filter(
-        (row) =>
-          (row.fullName ?? "").trim().toLowerCase() ===
-          criteria.fullName!.trim().toLowerCase(),
-      )
-    : candidates;
-
-  if (matches.length === 0) {
-    throw new Error(
-      `STUDENT_AMBIGUOUS_NO_EXACT: ${candidates.length} candidate(s) match the partial query; none have the exact fullName "${criteria.fullName}"`,
-    );
-  }
-  if (matches.length > 1) {
-    const ids = matches.map((m) => m.id).join(", ");
-    throw new Error(
-      `STUDENT_AMBIGUOUS: ${matches.length} students share fullName "${criteria.fullName}": ids=[${ids}]. Provide studentId or admissionNo to disambiguate.`,
-    );
-  }
-
-  return mapRowToStudentDetails(matches[0]);
-}
-
-function mapRowToStudentDetails(row: typeof smStudents.$inferSelect): StudentDetails {
-  return {
-    studentId: row.id,
-    admissionNo: row.admissionNo,
-    fullName: row.fullName,
-    firstName: row.firstName,
-    lastName: row.lastName,
-    email: row.email,
-    mobile: row.mobile,
-    studentPhoto: row.studentPhoto,
-    dateOfBirth: row.dateOfBirth,
-    genderName: null,
-    genderId: row.genderId,
-    categoryName: null,
-    studentCategoryId: row.studentCategoryId,
-    parentId: row.parentId,
-    guardiansName: null,
-    guardiansMobile: null,
-    guardiansEmail: null,
-    classId: row.classId,
-    sectionId: row.sectionId,
-    className: null,
-    sectionName: null,
-    studentRecordId: null,
-    schoolId: row.schoolId,
-    academicId: row.academicId,
-    rollNo: row.rollNo,
-    userId: row.userId,
-  };
 }
 
 type ParentLookup = {
@@ -344,98 +79,6 @@ async function resolveParentForStudent(student: StudentDetails): Promise<ParentL
   return row ?? null;
 }
 
-type SchoolIdentity = {
-  name: string;
-  email: string;
-  phone: string;
-};
-
-async function resolveSchoolIdentity(schoolId: number): Promise<SchoolIdentity> {
-  const db = await getDatabase();
-  const [row] = await db
-    .select({
-      name: smSchools.schoolName,
-      email: smSchools.email,
-      phone: smSchools.phone,
-    })
-    .from(smSchools)
-    .where(eq(smSchools.id, schoolId))
-    .limit(1);
-  return {
-    name: row?.name ?? "Your School",
-    email: row?.email ?? "noreply@school.local",
-    phone: row?.phone ?? "",
-  };
-}
-
-function resolveSchoolLogoAbsolutePath(): string | null {
-  const candidates = [
-    path.join(process.cwd(), "static", "school-logo.png"),
-    path.join(process.cwd(), "static", "logo.png"),
-  ];
-  for (const candidate of candidates) {
-    if (fs.existsSync(candidate)) return candidate;
-  }
-  return null;
-}
-
-type SmtpSendResult = { success: boolean; message: string; messageId?: string };
-
-async function sendTranscriptEmail(args: {
-  schoolName: string;
-  fromAddress: string;
-  toAddress: string;
-  parentName: string;
-  studentName: string;
-  academicId: number;
-  pdfFilename: string;
-  pdfBytes: Buffer;
-  logoPath: string | null;
-  html: string;
-}): Promise<SmtpSendResult> {
-  const host = process.env.SMTP_HOST;
-  const port = Number(process.env.SMTP_PORT || 587);
-  const user = process.env.SMTP_USER || "";
-  const pass = process.env.SMTP_PASS || "";
-  const secure = port === 465;
-
-  const transporter = nodemailer.createTransport({
-    host,
-    port,
-    secure,
-    auth: user ? { user, pass } : undefined,
-  });
-
-  const attachments: Array<{ filename: string; content: Buffer }> = [
-    { filename: args.pdfFilename, content: args.pdfBytes },
-  ];
-  if (args.logoPath && fs.existsSync(args.logoPath)) {
-    attachments.push({
-      filename: "logo.png",
-      content: fs.readFileSync(args.logoPath),
-    });
-  }
-
-  const subject = `Academic Transcript — ${args.studentName} — Academic Year ${args.academicId}`;
-
-  try {
-    const info = await transporter.sendMail({
-      from: `"${args.schoolName}" <${args.fromAddress}>`,
-      to: args.toAddress,
-      subject,
-      text:
-        `Dear ${args.parentName},\n\n` +
-        `The academic transcript for ${args.studentName} (Academic Year ${args.academicId}) is attached.\n\n` +
-        `Regards,\n${args.schoolName}`,
-      html: args.html,
-      attachments,
-    });
-    return { success: true, message: "Email sent successfully", messageId: info.messageId };
-  } catch (err) {
-    return { success: false, message: (err as Error).message };
-  }
-}
-
 type RenderArgs = {
   tenant: TenantContext;
   writer: StreamWriterLike | undefined;
@@ -448,7 +91,6 @@ type RenderResult = {
   title: string;
   storagePath: string;
   previewUrl: string;
-  thumbnailUrl: string;
   pdfBytes: Buffer;
 };
 
@@ -475,12 +117,11 @@ async function ensureTranscriptPdf(args: RenderArgs): Promise<RenderResult> {
   const fullName = student.fullName ?? "student";
   const title = `${sanitizeForFilename(fullName)}.pdf`;
   const artifactId = `pdf-transcript-${student.studentId}-${academicId}`;
-  const storagePath = `exams/transcripts/ay-${academicId}/${student.studentId}.pdf`;
+  const storagePath = buildTranscriptStoragePath(academicId, student.admissionNo, student.fullName);
   const fsHandle = await resolveFilesystem(tenant);
   const pdfExists = await fsHandle.exists(storagePath);
 
   let previewUrl = "";
-  let thumbnailUrl = "";
   let pdfBytes: Buffer = Buffer.alloc(0);
 
   if (!pdfExists || input.forceRegenerate) {
@@ -514,7 +155,6 @@ async function ensureTranscriptPdf(args: RenderArgs): Promise<RenderResult> {
           title?: string;
           storagePath?: string;
           previewUrl?: string;
-          thumbnailUrl?: string;
         }
       | {
           artifactId: string;
@@ -550,13 +190,11 @@ async function ensureTranscriptPdf(args: RenderArgs): Promise<RenderResult> {
       throw new Error(errMsg);
     }
     previewUrl = innerResult.previewUrl ?? "";
-    thumbnailUrl = innerResult.thumbnailUrl ?? "";
   } else {
     const token = base64url(
       JSON.stringify({ studentId: student.studentId, academicId, kind: "transcript" as const }),
     );
     previewUrl = `/api/results/${token}`;
-    thumbnailUrl = "";
   }
 
   const readResult = await fsHandle.readFile(storagePath);
@@ -571,7 +209,6 @@ async function ensureTranscriptPdf(args: RenderArgs): Promise<RenderResult> {
     id: artifactId,
     storagePath,
     previewUrl,
-    thumbnailUrl,
   });
 
   return {
@@ -579,7 +216,6 @@ async function ensureTranscriptPdf(args: RenderArgs): Promise<RenderResult> {
     title,
     storagePath,
     previewUrl,
-    thumbnailUrl,
     pdfBytes,
   };
 }
@@ -622,7 +258,7 @@ export const publishTranscriptPdfTool = createTool({
   inputSchema: reportPdfPublishInputSchema,
   outputSchema: reportPdfPublishOutputSchema,
   execute: async (input, ctx) => {
-    const context = ctx as ReportPdfToolContext;
+    const context = ctx as Parameters<typeof getTenant>[0];
     const tenant = getTenant(context);
     const writer = getWriter(context);
     const requestContext = getRequestContext(context);
@@ -688,8 +324,8 @@ export const publishTranscriptPdfTool = createTool({
         tenant.sectionId,
       );
 
-      const schoolIdentity = await resolveSchoolIdentity(tenant.schoolId);
-      const logoPath = resolveSchoolLogoAbsolutePath();
+      const publisher = await createAssessmentPublisherServiceForRequest(tenant);
+      const schoolIdentity = await publisher.resolveSchoolIdentity(tenant.schoolId);
       const pdfFilename = `${sanitizeForFilename(student.fullName ?? "student")}_transcript.pdf`;
 
       const emailProps = {
@@ -704,16 +340,14 @@ export const publishTranscriptPdfTool = createTool({
       const { body, head } = render(ResultEmail, { props: emailProps });
       const html = pageToHtml(body, head);
 
-      const sendResult = await sendTranscriptEmail({
-        schoolName: schoolIdentity.name,
-        fromAddress: process.env.SMTP_FROM || schoolIdentity.email,
-        toAddress: stored.parentEmail,
-        parentName: stored.parentName,
-        studentName: student.fullName ?? "Student",
+      const sendResult = await publisher.publishTranscript({
+        studentId: stored.studentId,
         academicId,
+        parentName: stored.parentName,
+        parentEmail: stored.parentEmail,
+        studentName: student.fullName ?? "Student",
         pdfFilename,
         pdfBytes: stored.pdfBytes,
-        logoPath,
         html,
       });
 
@@ -730,7 +364,6 @@ export const publishTranscriptPdfTool = createTool({
           id: stored.artifactId,
           storagePath: stored.storagePath,
           previewUrl: stored.previewUrl,
-          thumbnailUrl: stored.thumbnailUrl,
           error: sendResult.message,
         });
         return {
@@ -761,7 +394,6 @@ export const publishTranscriptPdfTool = createTool({
         id: stored.artifactId,
         storagePath: stored.storagePath,
         previewUrl: stored.previewUrl,
-        thumbnailUrl: stored.thumbnailUrl,
       });
 
       return {
@@ -842,7 +474,6 @@ export const publishTranscriptPdfTool = createTool({
       confirmationToken,
       storagePath: rendered.storagePath,
       previewUrl: rendered.previewUrl,
-      thumbnailUrl: rendered.thumbnailUrl,
       title: rendered.title,
       pdfBytes: rendered.pdfBytes,
     };
@@ -856,6 +487,7 @@ export const publishTranscriptPdfTool = createTool({
       ],
       `Publish transcript for ${student.fullName ?? "student"} to ${parentEmail}?`,
       CONFIRM_CONTEXT_KEY,
+      "publishTranscriptConfirm",
     );
 
     return {

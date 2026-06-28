@@ -1,13 +1,20 @@
-import { writeFile, readFile, mkdir, unlink, readdir, rm } from "fs/promises";
-import { readFileSync, existsSync, mkdirSync, writeFileSync, unlinkSync, readdirSync } from "fs";
+import { writeFile, mkdir, readdir, rm, stat } from "fs/promises";
+import { readFileSync, existsSync, readdirSync } from "fs";
 import { join } from "path";
-import { exec } from "child_process";
+import { fileURLToPath } from "url";
+import { execFile } from "child_process";
 import { promisify } from "util";
-import { render } from "svelte/server";
 import { randomUUID } from "crypto";
 import JSZip from "jszip";
 
-const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
+
+// Resolve filesystem paths relative to this module's location so the helper
+// works regardless of the working directory it is invoked from.
+const html2pdfPath = fileURLToPath(new URL("../../../../bin/html2pdf", import.meta.url));
+const baseTempDir = fileURLToPath(new URL("../../../../temp", import.meta.url));
+const TEMP_DIR_TTL_MS = 60 * 60 * 1000;
+let sweepPerformed = false;
 
 interface GenerationResult {
   success: boolean;
@@ -16,6 +23,37 @@ interface GenerationResult {
   zipBuffer?: Buffer; // Add support for ZIP buffer when previewing
   filePath?: string; // Add support for returning absolute filepath
   error?: string;
+}
+
+/**
+ * Lazy, idempotent TTL sweep: removes `temp/<uuid>/` directories older than 1
+ * hour on first invocation. Subsequent calls within the same process are no-ops.
+ */
+async function sweepStaleTempDirs(): Promise<void> {
+  if (sweepPerformed) return;
+  sweepPerformed = true;
+  if (!existsSync(baseTempDir)) return;
+  try {
+    const entries = await readdir(baseTempDir, { withFileTypes: true });
+    const now = Date.now();
+    await Promise.all(
+      entries
+        .filter((entry) => entry.isDirectory())
+        .map(async (entry) => {
+          const dirPath = join(baseTempDir, entry.name);
+          try {
+            const stats = await stat(dirPath);
+            if (now - stats.mtimeMs > TEMP_DIR_TTL_MS) {
+              await rm(dirPath, { recursive: true, force: true });
+            }
+          } catch {
+            // best-effort cleanup; ignore individual failures
+          }
+        }),
+    );
+  } catch {
+    // best-effort cleanup; ignore sweep failures
+  }
 }
 
 /**
@@ -97,12 +135,10 @@ export async function generate(
   }
 
   // Create unique temp directory using a random UUID to prevent race conditions
-  const baseTempDir = join(process.cwd(), "temp");
+  await sweepStaleTempDirs();
   const uniqueTempDir = join(baseTempDir, randomUUID());
 
   try {
-    // Path to html2pdf binary
-    const html2pdfPath = join(process.cwd(), "bin/html2pdf");
     if (!existsSync(html2pdfPath)) {
       return {
         success: false,
@@ -122,7 +158,8 @@ export async function generate(
     // We can't predefine output filenames for "all pages" rasterization easily,
     // so we'll rely on reading the directory after execution.
     let expectedExtension = "";
-    let command = "";
+    let commandArgs: string[] = [];
+    let lastStderr = "";
 
     if (preview) {
       expectedExtension = ".jpeg";
@@ -130,28 +167,34 @@ export async function generate(
       const outputTemplate = join(uniqueTempDir, `${sanitizedFileName}_page_%02d${expectedExtension}`);
 
       // Command for ALL pages: remove --raster-pages=first
-      const commandArgs = [
-        `"${html2pdfPath}"`,
-        '--page-margin "4mm 2mm 2mm 2mm"',
-        `--raster-output="${outputTemplate}"`,
-        "--raster-dpi 150",
-        `"${tempHtmlFile}"`,
+      commandArgs = [
+        "--page-margin",
+        "4mm 2mm 2mm 2mm",
+        "--raster-output",
+        outputTemplate,
+        "--raster-dpi",
+        "150",
+        tempHtmlFile,
       ];
-      command = commandArgs.join(" ");
     } else {
       expectedExtension = ".pdf";
       const tempPdfFile = join(uniqueTempDir, `${sanitizedFileName}${expectedExtension}`);
-      const commandArgs = [
-        `"${html2pdfPath}"`,
-        '--page-margin "4mm 2mm 2mm 2mm"',
-        `-o "${tempPdfFile}"`,
-        `"${tempHtmlFile}"`,
+      commandArgs = [
+        "--page-margin",
+        "4mm 2mm 2mm 2mm",
+        "-o",
+        tempPdfFile,
+        tempHtmlFile,
       ];
-      command = commandArgs.join(" ");
     }
 
     try {
-      await execAsync(command);
+      const { stderr } = await execFileAsync(html2pdfPath, commandArgs, {
+        shell: false,
+        timeout: 30_000,
+        maxBuffer: 64 * 1024 * 1024,
+      });
+      lastStderr = Buffer.isBuffer(stderr) ? stderr.toString("utf-8") : stderr;
 
       // After execution, find the relevant files in the temp directory
       const createdFiles = readdirSync(uniqueTempDir)
@@ -206,17 +249,30 @@ export async function generate(
         await cleanup(uniqueTempDir);
         return {
           success: false,
-          error: `Output file(s) were not created. Stderr usually contains more info, but was not captured here.`,
+          error: lastStderr
+            ? `html2pdf produced no output. stderr: ${lastStderr.trim()}`
+            : `html2pdf produced no output (no stderr captured).`,
         };
       }
-    } catch (execError: any) {
+    } catch (execError: unknown) {
       // Cleanup the entire unique temp directory on execution error
       await cleanup(uniqueTempDir);
       // A more robust cleanup might involve searching for all generated files again
-
+      const stderr =
+        typeof execError === "object" && execError !== null && "stderr" in execError
+          ? Buffer.isBuffer((execError as { stderr?: unknown }).stderr)
+            ? ((execError as { stderr: Buffer }).stderr.toString("utf-8"))
+            : typeof (execError as { stderr?: unknown }).stderr === "string"
+              ? ((execError as { stderr: string }).stderr)
+              : ""
+          : "";
+      const message =
+        execError instanceof Error ? execError.message : String(execError);
       return {
         success: false,
-        error: `html2pdf execution failed: ${execError.message}`,
+        error: stderr
+          ? `html2pdf execution failed: ${message} | stderr: ${stderr.trim()}`
+          : `html2pdf execution failed: ${message}`,
       };
     }
   } catch (error: any) {

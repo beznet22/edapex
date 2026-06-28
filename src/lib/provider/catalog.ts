@@ -98,6 +98,21 @@ export const BUILTIN_PROVIDERS: Record<ProviderId, ProviderInfo> = {
 		request: { headers: {}, body: {} },
 		description: 'Curated model endpoint for low-latency reasoning',
 		docUrl: 'https://opencode.ai/docs/zen/'
+	},
+	kimchi: {
+		id: 'kimchi' as ProviderId,
+		name: 'Kimchi',
+		enabled: false,
+		env: ['KIMCHI_API_KEY'],
+		api: { type: 'aisdk', package: '@ai-sdk/openai-compatible', url: 'https://llm.kimchi.dev/openai/v1' },
+		// `User-Agent: kimchi/dev` is the safety-net static value. The dynamic
+		// resolver in `provider/dynamic-headers.ts` overrides it at request
+		// time with `kimchi/<semver>` once the version cache warms up.
+		// Without the dynamic layer, the upstream rejects requests with a
+		// misleading "credits exhausted" error body (verified live).
+		request: { headers: { 'User-Agent': 'kimchi/dev' }, body: {} },
+		description: 'Cast AI proxy — multi-model router with reasoning + vision',
+		docUrl: 'https://llm.kimchi.dev'
 	}
 };
 
@@ -258,6 +273,84 @@ export const BUILTIN_MODELS: Record<ModelId, ModelInfo> = {
 		tier: 'pro',
 		cost: { input: 0, output: 0, cache: { read: 0, write: 0 } },
 		description: 'Ring 2.6 1T free via OpenCode Zen'
+	},
+	// ────────────────────────────────────────────────────────────────────
+	// Kimchi — models surfaced from the upstream metadata endpoint
+	// (llm.kimchi.dev/v1/models/metadata?include_in_cli=true). The hardcoded
+	// values here are a snapshot taken at provisioning time; if the upstream
+	// adds or retires models, refresh this block. Capabilities mirror the
+	// `tool_call`, `reasoning`, `supports_images`, and `input_modalities`
+	// fields from the metadata response.
+	// ────────────────────────────────────────────────────────────────────
+	'kimchi/minimax-m3': {
+		id: 'kimchi/minimax-m3' as ModelId,
+		providerId: 'kimchi' as ProviderId,
+		name: 'Minimax M3',
+		capabilities: { tools: true, input: ['text/*', 'image/*'], output: ['text/*'], reasoning: true, vision: true },
+		request: { headers: {}, body: {}, generation: {}, options: {} },
+		variants: [],
+		status: 'active',
+		enabled: true,
+		limit: { context: 1_048_576, output: 1_048_576 },
+		tier: 'pro',
+		cost: { input: 0, output: 0, cache: { read: 0, write: 0 } },
+		description: 'Minimax M3 via Kimchi — 1M context, multimodal, reasoning'
+	},
+	'kimchi/kimi-k2.7': {
+		id: 'kimchi/kimi-k2.7' as ModelId,
+		providerId: 'kimchi' as ProviderId,
+		name: 'Kimi K2.7',
+		capabilities: { tools: true, input: ['text/*', 'image/*'], output: ['text/*'], reasoning: true, vision: true },
+		request: { headers: {}, body: {}, generation: {}, options: {} },
+		variants: [],
+		status: 'active',
+		enabled: true,
+		limit: { context: 262_144, output: 262_144 },
+		tier: 'pro',
+		cost: { input: 0, output: 0, cache: { read: 0, write: 0 } },
+		description: 'Kimi K2.7 via Kimchi — 256K context, multimodal, reasoning'
+	},
+	'kimchi/kimi-k2.6': {
+		id: 'kimchi/kimi-k2.6' as ModelId,
+		providerId: 'kimchi' as ProviderId,
+		name: 'Kimi K2.6',
+		capabilities: { tools: true, input: ['text/*', 'image/*'], output: ['text/*'], reasoning: true, vision: true },
+		request: { headers: {}, body: {}, generation: {}, options: {} },
+		variants: [],
+		status: 'active',
+		enabled: true,
+		limit: { context: 262_144, output: 262_144 },
+		tier: 'pro',
+		cost: { input: 0, output: 0, cache: { read: 0, write: 0 } },
+		description: 'Kimi K2.6 via Kimchi — 256K context, multimodal, reasoning'
+	},
+	'kimchi/minimax-m2.7': {
+		id: 'kimchi/minimax-m2.7' as ModelId,
+		providerId: 'kimchi' as ProviderId,
+		name: 'MiniMax M2.7',
+		capabilities: { tools: true, input: ['text/*'], output: ['text/*'], reasoning: true, vision: false },
+		request: { headers: {}, body: {}, generation: {}, options: {} },
+		variants: [],
+		status: 'active',
+		enabled: true,
+		limit: { context: 196_608, output: 196_608 },
+		tier: 'mid',
+		cost: { input: 0, output: 0, cache: { read: 0, write: 0 } },
+		description: 'Secondary subagent for code generation and debugging.'
+	},
+	'kimchi/nemotron-3-ultra-fp4': {
+		id: 'kimchi/nemotron-3-ultra-fp4' as ModelId,
+		providerId: 'kimchi' as ProviderId,
+		name: 'Nemotron 3 Ultra FP4',
+		capabilities: { tools: true, input: ['text/*'], output: ['text/*'], reasoning: true, vision: false },
+		request: { headers: {}, body: {}, generation: {}, options: {} },
+		variants: [],
+		status: 'active',
+		enabled: true,
+		limit: { context: 1_048_576, output: 1_048_576 },
+		tier: 'pro',
+		cost: { input: 0, output: 0, cache: { read: 0, write: 0 } },
+		description: 'Nemotron 3 Ultra FP4 via Kimchi — 1M context, text, reasoning'
 	}
 };
 
@@ -322,60 +415,4 @@ export const DEFAULT_MODEL_ID: ModelId = 'groq/openai/gpt-oss-120b' as ModelId;
 export const PLATFORM_PROVIDERS: Record<ProviderId, ProviderInfo> = BUILTIN_PROVIDERS;
 export const PLATFORM_MODELS: Record<ModelId, ModelInfo> = BUILTIN_MODELS;
 
-/**
- * Community-curated overlay of well-known model metadata.
- *
- * When a user connects a CUSTOM provider (e.g. a self-hosted OpenAI-compatible
- * endpoint), their model ids won't be in BUILTIN_MODELS. To still render
- * the model name + variant list in the model selector trigger and the
- * chat composer variant dropdown SSR-side, we look the id up here first.
- *
- * For v1 this is seeded with the BUILTIN_MODELS only. Future versions can
- * add cross-provider ids (e.g. `openai/gpt-4o`, `anthropic/claude-sonnet-4-5`)
- * so a user connecting a custom OpenAI-compatible endpoint and selecting
- * one of these models gets full metadata.
- *
- * Lookup order for `resolveModelInfo`:
- *   1. BUILTIN_MODELS   (curated by us, fastest, full metadata)
- *   2. WELL_KNOWN_MODELS (community-curated overlay)
- *   3. user.discovered_models (per-user snapshot from the provider's own /models)
- */
-export const WELL_KNOWN_MODELS: Record<ModelId, ModelInfo> = BUILTIN_MODELS;
 
-import type { LibSQLDatabase } from 'drizzle-orm/libsql';
-
-export interface ResolveModelInfoOptions {
-	userId?: number;
-	db?: LibSQLDatabase<any>;
-}
-
-/**
- * Resolve a model id to its full ModelInfo. Pure function, SSR-safe.
- *
- * - Synchronous fast path: BUILTIN_MODELS + WELL_KNOWN_MODELS (both are
- *   pure data, so SSR can call this without DB access)
- * - Async extension: when `opts.userId` and `opts.db` are provided,
- *   also searches the user's `discovered_models` JSON snapshots
- *
- * Returns `null` if the model id is not in any of the three sources.
- */
-export async function resolveModelInfo(
-	id: string,
-	opts: ResolveModelInfoOptions = {}
-): Promise<ModelInfo | null> {
-	if (!id) return null;
-
-	const fast = BUILTIN_MODELS[id as ModelId] ?? WELL_KNOWN_MODELS[id as ModelId];
-	if (fast) return fast;
-
-	if (opts.userId && opts.db) {
-		const { getAllDiscoveredModelsForUser } = await import(
-			'$lib/server/mastra/provider/discovery'
-		);
-		const discovered = await getAllDiscoveredModelsForUser(opts.db, opts.userId);
-		const found = discovered.get(id as ModelId);
-		if (found) return found;
-	}
-
-	return null;
-}

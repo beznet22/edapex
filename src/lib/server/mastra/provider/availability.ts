@@ -80,4 +80,4 @@ export async function getAvailableModelsForUser(
 	return result;
 }
 
-const SUPPORTED_PROVIDER_IDS: ProviderId[] = ['groq', 'deepseek', 'opencode'];
+const SUPPORTED_PROVIDER_IDS: ProviderId[] = ['groq', 'deepseek', 'opencode', 'kimchi'];

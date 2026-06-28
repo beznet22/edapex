@@ -60,15 +60,25 @@ export interface ResolvedRequestModel {
  * Build the model for a given provider id. Provider-specific factory is
  * picked from `provider.api.package` (data, not control flow) so future
  * providers slot in without resolver changes.
+ *
+ * Static, provider-wide headers come from `provider.request.headers` and
+ * `modelInfo.request.headers` (model-level overrides provider-level).
+ * Dynamic per-request headers (e.g. versioned `User-Agent`) are layered on
+ * top inside `createRateLimitFetch` via the `HEADER_RESOLVERS` registry.
  */
 function buildModel(
 	providerId: ProviderId,
 	provider: (typeof BUILTIN_PROVIDERS)[ProviderId],
 	modelName: string,
 	apiKey: string,
-	customFetch: typeof fetch
+	customFetch: typeof fetch,
+	modelInfo?: ModelInfo
 ): MastraModelConfig {
 	const api = provider.api;
+	const headers = {
+		...provider.request.headers,
+		...(modelInfo?.request.headers ?? {})
+	};
 	if (api.type === 'native') {
 		// No catalog entry should ever have a native API today; the catalog
 		// only contains AI-SDK-backed providers. Defensive fallback: build
@@ -77,7 +87,7 @@ function buildModel(
 			id: `${providerId}/${modelName}`,
 			url: api.url,
 			apiKey,
-			headers: {},
+			headers,
 			fetch: customFetch
 		} as unknown as MastraModelConfig;
 	}
@@ -85,7 +95,7 @@ function buildModel(
 		id: `${providerId}/${modelName}`,
 		url: api.url,
 		apiKey,
-		headers: {},
+		headers,
 		fetch: customFetch
 	} as unknown as MastraModelConfig;
 }
@@ -128,8 +138,8 @@ export async function resolveModelForRequest(
 		throw new ProviderDisabledError(providerId);
 	}
 
-	const customFetch = createRateLimitFetch(userId, providerId);
-	const config = buildModel(providerId, provider, modelName, resolved.apiKey, customFetch);
+	const customFetch = await createRateLimitFetch(userId, providerId, getEnv());
+	const config = buildModel(providerId, provider, modelName, resolved.apiKey, customFetch, modelInfo);
 
 	const providerOptions = resolveProviderOptions(modelInfo, variantId);
 

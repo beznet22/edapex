@@ -4,6 +4,33 @@ export type SMTPResult = { success: boolean; message: string; messageId?: string
 type SMTPAuth = { user: string; pass: string };
 type Recipient = string | string[];
 
+/**
+ * Build a nodemailer transporter from raw host/port/secure/auth values.
+ *
+ * Single source of truth for the SMTP transport configuration — both
+ * `SMTPClient.testConnection` and `SMTPClient.send` route through this
+ * helper so any future change (TLS options, pool size, debug logging)
+ * is applied uniformly.
+ */
+function createTransporter(
+  host: string,
+  port: number,
+  secure: boolean,
+  auth: SMTPAuth | undefined,
+): nodemailer.Transporter {
+  return nodemailer.createTransport({
+    host,
+    port,
+    secure: port === 465 || secure,
+    auth: auth
+      ? {
+          user: auth.user,
+          pass: auth.pass,
+        }
+      : undefined,
+  });
+}
+
 export type SMTPMessage = {
   from: string;
   to: Recipient;
@@ -52,20 +79,7 @@ export class SMTPClient {
 
   async testConnection(): Promise<SMTPResult> {
     try {
-      // Create a temporary transporter to test the connection
-      const transporter = nodemailer.createTransport({
-        host: this.#host,
-        port: this.#port,
-        secure: this.#port === 465 || this.#secure, // true for 465, false for other ports like 587
-        auth: this.#auth
-          ? {
-              user: this.#auth.user,
-              pass: this.#auth.pass,
-            }
-          : undefined,
-      });
-
-      // Verify the connection
+      const transporter = createTransporter(this.#host, this.#port, this.#secure, this.#auth);
       await transporter.verify();
       return { success: true, message: "Connection successful" };
     } catch (error) {
@@ -134,18 +148,7 @@ export class SMTPClient {
       if (!this.#to || (Array.isArray(this.#to) && this.#to.length === 0))
         throw new SMTPError("No recipients specified");
 
-      // Create transporter
-      const transporter = nodemailer.createTransport({
-        host: this.#host,
-        port: this.#port,
-        secure: this.#port === 465 || this.#secure, // true for 465, false for other ports like 587
-        auth: this.#auth
-          ? {
-              user: this.#auth.user,
-              pass: this.#auth.pass,
-            }
-          : undefined,
-      });
+      const transporter = createTransporter(this.#host, this.#port, this.#secure, this.#auth);
 
       // Prepare mail options
       const mailOptions: any = {

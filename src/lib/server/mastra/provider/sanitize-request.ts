@@ -2,10 +2,20 @@
  * Provider-agnostic request-body sanitizer.
  *
  * Walks the JSON request body that is about to be sent to an LLM provider and
- * ensures every message with `role: "tool"` has a string `content` field. This
- * works around SDK bugs in unpatched `@ai-sdk/openai-compatible`
- * providers (e.g. DeepSeek, Groq, OpenCode Zen) that leave `content`
- * undefined when a tool result has an unhandled or empty output type.
+ * ensures:
+ *   1. Every `role: "tool"` message has a string `content` field — works
+ *      around SDK bugs in unpatched `@ai-sdk/openai-compatible` providers
+ *      (DeepSeek, Groq, OpenCode Zen, Kimchi) that leave `content` undefined
+ *      when a tool result has an unhandled or empty output type.
+ *   2. Every `role: "assistant"` message that carries `tool_calls` has a
+ *      string `content` field — works around the upstream SDK emitting
+ *      `content: null` when the assistant turn is purely tool calls with
+ *      no preceding text. Some providers (notably DeepSeek) reject the
+ *      request with a 400 on `content: null`.
+ *
+ * Previously these workarounds lived in `patches/@ai-sdk__openai-compatible@2.0.47.patch`,
+ * a pnpm patch that broke on every upstream SDK version bump. In-tree code
+ * is version-stable.
  */
 
 function coerceToString(value: unknown): string {
@@ -18,7 +28,9 @@ function coerceToString(value: unknown): string {
  * Sanitize a provider chat-completion request body.
  *
  * - Returns the original body if it is not an object or has no `messages` array.
- * - Only mutates tool messages where `content` is missing or not a string.
+ * - Mutates tool messages where `content` is missing or not a string.
+ * - Mutates assistant messages carrying `tool_calls` where `content` is
+ *   null/missing (replaces with `''`).
  */
 export function sanitizeProviderRequestBody(body: unknown): unknown {
 	if (typeof body !== 'object' || body === null || Array.isArray(body)) {
@@ -37,17 +49,27 @@ export function sanitizeProviderRequestBody(body: unknown): unknown {
 		}
 
 		const msg = message as Record<string, unknown>;
-		if (msg.role !== 'tool') {
-			return message;
+
+		if (msg.role === 'tool') {
+			const coerced = coerceToString(msg.content);
+			if (coerced === msg.content) {
+				return message;
+			}
+			changed = true;
+			return { ...msg, content: coerced };
 		}
 
-		const coerced = coerceToString(msg.content);
-		if (coerced === msg.content) {
-			return message;
+		if (
+			msg.role === 'assistant' &&
+			Array.isArray(msg.tool_calls) &&
+			msg.tool_calls.length > 0 &&
+			typeof msg.content !== 'string'
+		) {
+			changed = true;
+			return { ...msg, content: '' };
 		}
 
-		changed = true;
-		return { ...msg, content: coerced };
+		return message;
 	});
 
 	if (!changed) {
