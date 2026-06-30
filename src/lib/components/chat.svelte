@@ -346,18 +346,18 @@
   {/if}
 
   <!-- Shared Floating Input at bottom.
-       Two identical cards (same corner-radius, same width) stacked
-       vertically. ChatComposer is the TOP card (fully visible).
-       ActionBar is the BOTTOM card (same height, but only the top
-       peek-out band shows — bottom is clipped by container overflow).
-       Visually reads as "two stacked cards, one peeking out from below". -->
+       Two identical cards (same corner-radius, same width, same
+       height) stacked together via z-index. ChatComposer is the TOP
+       card (fully visible, higher z-index). ActionBar is the BOTTOM
+       card (same height, lower z-index) with negative margin-bottom
+       that pulls its bottom edge UNDER the ChatComposer's top edge.
+       Result: only the TOP of the ActionBar shows — the buttons sit
+       at the top of the card so they're in the visible band. Visually
+       reads as "the composer has a context bar peeking out from
+       behind it". -->
   <div
-    class="absolute bottom-0 left-0 w-full overflow-hidden pointer-events-none z-50 flex flex-col items-center"
+    class="absolute bottom-4 left-0 w-full pt-10 pb-4 px-2 sm:px-4 safe-area-bottom pointer-events-none z-50 flex flex-col items-center gap-0"
   >
-    <div class="pointer-events-auto w-full max-w-[780px] relative z-20">
-      <ChatComposer {user} {readonly} isInitial={false} />
-    </div>
-
     {#if chat.awaitingValidation || chat.pendingGate}
       <div
         class="pointer-events-auto w-full max-w-[780px] relative z-10 h-[var(--composer-card-h,8.5rem)] -mb-[calc(var(--composer-card-h,8.5rem)-2.25rem)]"
@@ -391,6 +391,9 @@
         {/if}
       </div>
     {/if}
+    <div class="pointer-events-auto w-full max-w-[780px] relative z-20">
+      <ChatComposer {user} {readonly} isInitial={false} />
+    </div>
   </div>
 </div>
 
