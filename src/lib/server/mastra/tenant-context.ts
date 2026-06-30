@@ -21,6 +21,12 @@ export interface TenantContext {
   readonly examTypeId: number | null;
   readonly academicId: number | null;
   readonly studentId: number | null;
+  // Display fields (used by paths.ts for human-readable workspace paths).
+  // Populated at TenantContext construction time so slug generation never
+  // needs a DB round-trip.
+  readonly className: string | null;
+  readonly sectionName: string | null;
+  readonly academicYearTitle: string | null;
 }
 
 export function createTenantContext(params: Partial<{
@@ -35,6 +41,9 @@ export function createTenantContext(params: Partial<{
   staffId: number;
   roleId: number | null;
   designationId: number;
+  className: string | null;
+  sectionName: string | null;
+  academicYearTitle: string | null;
 }>): TenantContext {
   return Object.freeze({
     schoolId: params.schoolId ?? 1,
@@ -48,6 +57,9 @@ export function createTenantContext(params: Partial<{
     staffId: params.staffId ?? 1,
     roleId: params.roleId ?? null,
     designationId: params.designationId ?? ALLOWED_DESIGNATIONS.IT,
+    className: params.className ?? null,
+    sectionName: params.sectionName ?? null,
+    academicYearTitle: params.academicYearTitle ?? null,
   });
 }
 
