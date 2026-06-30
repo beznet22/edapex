@@ -76,9 +76,12 @@ export class FilesContext {
   };
 
   onchange = async (event: Event) => {
+    // The file pill renders from this.files regardless of class selection.
+    // The server falls back to _system/ when no class is active, so we
+    // allow the upload to proceed and surface a hint to the user instead
+    // of silently swallowing the file.
     if (!this.selectedClass || !this.selectedClass.classId || !this.selectedClass.sectionId) {
-      toast.error("Please select a class");
-      return;
+      toast.warning("No class selected — file will land in _system/. Pick a class to scope it.");
     }
 
     let files = (event.target as HTMLInputElement).files;
