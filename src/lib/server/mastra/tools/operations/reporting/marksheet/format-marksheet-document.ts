@@ -164,6 +164,20 @@ export const formatMarksheetDocumentTool = createTool({
       const fs = await resolveTenantFilesystem(tenant);
       const persistPath = `exams/examType-${tenant.examTypeId}/${safeTitle(title)}.md`;
       await fs.writeFile(persistPath, markdown, { recursive: true });
+
+      // Bug 1 fix: persist the actual artifact path on the request context so
+      // the downstream awaitValidationStep can read the EXACT file on resume.
+      // Without this, every resume failed with TENANT_OR_DOCUMENT_MISSING.
+      const requestContext = context.requestContext;
+      if (requestContext && typeof requestContext.set === 'function') {
+        requestContext.set('formatArtifactState', {
+          documentId: input.documentId,
+          artifactId,
+          persistPath,
+          title,
+          studentHint: entry.studentHint ?? null
+        });
+      }
     }
 
     return { artifactId, title, markdown, status: 'success' as const };

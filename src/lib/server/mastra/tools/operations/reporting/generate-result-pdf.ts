@@ -77,7 +77,8 @@ async function renderAndWriteResultPdf(args: CoreRenderArgs): Promise<CoreRender
   }
 
   const student = await resolveStudent(
-    {
+    tenant,
+{
       studentId: input.studentId,
       admissionNo: input.admissionNo,
       fullName: input.fullName,
@@ -109,10 +110,30 @@ async function renderAndWriteResultPdf(args: CoreRenderArgs): Promise<CoreRender
         );
       }
     } else {
-      console.warn(
-        `[generate-result-pdf] no active student_records row for studentId=${student.studentId}, ` +
-          `academicId=${tenant.academicId ?? "?"}; falling back to _system/`,
-      );
+      // Bug 3 fix: emit NO_STUDENT_SESSION error event instead of silently
+      // writing the PDF to the _system/ fallback sandbox.
+      const fullName = student.fullName ?? "student";
+      const title = `${sanitizeForFilename(fullName)}.pdf`;
+      const artifactId = `pdf-${student.studentId}-${examTypeId}`;
+      const msg = `NO_STUDENT_SESSION: no active student_records row for studentId=${student.studentId}, academicId=${tenant.academicId ?? "?"}`;
+      console.warn(`[generate-result-pdf] ${msg}`);
+      await emitPdfPart(writer, artifactId, {
+        status: "error",
+        data: "",
+        title,
+        id: artifactId,
+        storagePath: "",
+        error: msg,
+      } as PdfArtifactData);
+      return {
+        ok: false,
+        artifactId,
+        title,
+        storagePath: "",
+        previewUrl: "",
+        pdfExists: false,
+        error: msg,
+      };
     }
   }
 

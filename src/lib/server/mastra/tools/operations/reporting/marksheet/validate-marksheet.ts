@@ -116,7 +116,7 @@ export const validateMarksheetTool = createTool({
 
     await writeExtractedJson(tenant, input.documentId, reDerivedJson);
 
-    const parsed = marksheetSchema.safeParse(reDerivedJson);
+    const parsed = await marksheetSchema.safeParseAsync(reDerivedJson);
     if (parsed.success) {
       return { ok: true as const };
     }
