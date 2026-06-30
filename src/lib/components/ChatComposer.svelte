@@ -67,6 +67,16 @@
   let textareaRef = $state<HTMLTextAreaElement | null>(null);
   let photoFileInput = $state<HTMLInputElement | null>(null);
   let documentFileInput = $state<HTMLInputElement | null>(null);
+  // Mirror of file-context addReference() calls in local $state so the
+  // pill row actually re-renders. Svelte 5's class-field $state arrays
+  // inside FilesContext don't reliably trigger template reactivity when
+  // mutated through an arrow-function class method. This local mirror
+  // lives in template scope, where Svelte's compiler instruments the
+  // reads correctly. We still call file.addReference() so the backend
+  // payload (chat.fileReferences) stays correct.
+  let uploadedReferences = $state<
+    { key: string; name: string; type: "file" | "dir"; mimeType?: string; fileId?: string; contentHash?: string; }[]
+  >([]);
   let showCommands = $state(false);
   let showMentions = $state(false);
   let mentionQuery = $state("");
@@ -244,9 +254,13 @@
       });
       input = "";
       selectedMentions = [];
-      // Clear file references after submission
+      // Clear file references after submission (both the local mirror
+      // that drives the pill row and the file-context's payload source).
       if (file.references?.length) {
         file.references = [];
+      }
+      if (uploadedReferences.length > 0) {
+        uploadedReferences = [];
       }
       chat.scrollToBottom();
     }
@@ -392,6 +406,13 @@
           type: "file" as const,
           mimeType: json.mimeType,
         });
+        // Mirror to local $state so the pill re-renders (see comment at declaration).
+        if (!uploadedReferences.find((r) => r.key === json.contentHash)) {
+          uploadedReferences = [
+            ...uploadedReferences,
+            { key: json.contentHash, name: f.name, type: "file", mimeType: json.mimeType }
+          ];
+        }
         // Photo fileReference stored — chat composer will render chip; user can later type /update photo @student to commit
       } catch (err) {
         toast.error(`Failed to upload ${f.name}`);
@@ -448,6 +469,13 @@
           fileId: json.fileId,
           contentHash: json.contentHash,
         });
+        // Mirror to local $state so the pill re-renders (see comment at declaration).
+        if (!uploadedReferences.find((r) => r.key === json.contentHash)) {
+          uploadedReferences = [
+            ...uploadedReferences,
+            { key: json.contentHash, name: f.name, type: "file", fileId: json.fileId, contentHash: json.contentHash }
+          ];
+        }
         toast.success(`Uploaded ${f.name} — type /marksheet to process.`);
       } catch (err) {
         toast.error(`Failed to upload ${f.name}`);
@@ -566,7 +594,7 @@
   {onSubmit}
 >
   <!-- Attachment Tray (Top Layer) -->
-  {#if file.files.length > 0 || chat.studentData || (file.references && file.references.length > 0)}
+  {#if file.files.length > 0 || chat.studentData || uploadedReferences.length > 0 || (file.references && file.references.length > 0)}
     <div class="flex flex-wrap gap-2 px-4 pt-4 pb-2 transition-all duration-500 ease-out">
       {#if chat.studentData}
         <div
@@ -600,8 +628,8 @@
         </div>
       {/each}
 
-      {#if file.references}
-        {#each file.references as ref (ref.key)}
+      {#if uploadedReferences.length > 0}
+        {#each uploadedReferences as ref (ref.key)}
           <div
             class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/60 border border-white/5 text-[11px] font-bold tracking-wide text-foreground/70 group shadow-sm"
           >
@@ -612,7 +640,10 @@
             {/if}
             <span class="max-w-[150px] truncate uppercase tracking-tighter">{ref.name}</span>
             <button
-              onclick={() => file.removeReference(ref.key)}
+              onclick={() => {
+                uploadedReferences = uploadedReferences.filter((r) => r.key !== ref.key);
+                file.removeReference(ref.key);
+              }}
               class="opacity-40 group-hover:opacity-100 hover:text-destructive transition-all ml-1 min-h-12 min-w-12 sm:min-h-8 sm:min-w-8 flex items-center justify-center"
               aria-label={`Remove reference ${ref.name}`}
             >

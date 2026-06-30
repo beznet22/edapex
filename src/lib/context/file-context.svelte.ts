@@ -13,24 +13,63 @@ import { getResources } from "$lib/api/chat.remote";
 import { SelectedClass } from "./sync.svelte";
 const FILES_CONTEXT_KEY = Symbol("attachments-context");
 
+export type FileReference = {
+  key: string;
+  name: string;
+  type: "file" | "dir";
+  mimeType?: string;
+  fileId?: string;
+  contentHash?: string;
+};
+
 export class FilesContext {
-  files = $state<File[]>([]);
+  // Svelte 5 reactivity gotcha: $state arrays directly on class fields
+  // can fail to re-render the template when mutated through an arrow
+  // function class field (the compiler only instruments top-level field
+  // reads in templates, not nested array reassignments). Using a single
+  // $state object container is the documented workaround.
+  #state = $state<{
+    files: File[];
+    references: FileReference[];
+  }>({
+    files: [],
+    references: []
+  });
+
   uploads = $state<UploadedData[]>([]);
   fileInputRef = $state<HTMLInputElement | null>(null);
   openModal = $state(false);
   openResourceModal = $state(false);
   openFileStoreModal = $state(false);
 
-  references = $state<{ key: string; name: string; type: "file" | "dir"; mimeType?: string; fileId?: string; contentHash?: string; }[]>([]);
+  get files(): File[] {
+    return this.#state.files;
+  }
 
-  addReference = (ref: { key: string; name: string; type: "file" | "dir"; mimeType?: string; fileId?: string; contentHash?: string; }) => {
-    if (!this.references.find(r => r.key === ref.key)) {
-      this.references = [...this.references, ref];
+  set files(v: File[]) {
+    this.#state.files = v;
+  }
+
+  get references(): FileReference[] {
+    return this.#state.references;
+  }
+
+  set references(v: FileReference[]) {
+    this.#state.references = v;
+  }
+
+  addReference = (ref: FileReference) => {
+    console.log('[file-context] addReference called:', ref.key, ref.name);
+    if (!this.#state.references.find((r) => r.key === ref.key)) {
+      this.#state.references = [...this.#state.references, ref];
+      console.log('[file-context] references now:', this.#state.references.length);
+    } else {
+      console.log('[file-context] duplicate ref ignored:', ref.key);
     }
   };
 
   removeReference = (key: string) => {
-    this.references = this.references.filter((r) => r.key !== key);
+    this.#state.references = this.#state.references.filter((r) => r.key !== key);
   };
 
   #selectedContext: SelectedClass;
@@ -80,13 +119,18 @@ export class FilesContext {
     // The server falls back to _system/ when no class is active, so we
     // allow the upload to proceed and surface a hint to the user instead
     // of silently swallowing the file.
+    console.log('[file-context] onchange fired, selectedClass:', this.selectedClass?.classId, this.selectedClass?.sectionId);
     if (!this.selectedClass || !this.selectedClass.classId || !this.selectedClass.sectionId) {
       toast.warning("No class selected — file will land in _system/. Pick a class to scope it.");
     }
 
     let files = (event.target as HTMLInputElement).files;
-    if (!files?.length) return;
+    if (!files?.length) {
+      console.log('[file-context] onchange: no files in event target');
+      return;
+    }
     const incoming = Array.from(files);
+    console.log('[file-context] onchange: adding', incoming.length, 'file(s)');
     this.files = [...this.files, ...incoming];
     this.#upload(incoming);
   };
