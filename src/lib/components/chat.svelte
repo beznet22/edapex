@@ -235,13 +235,6 @@
                       </div>
                     {/if}
 
-                    {#if part.type === "data-awaitValidation"}
-                      <div class="flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-[11px] font-medium text-amber-700 dark:text-amber-300" data-await-validation={part.data.artifactId}>
-                        <ShieldAlertIcon class="size-3.5" />
-                        <span>Click <strong>Validate</strong> to check this marksheet.</span>
-                      </div>
-                    {/if}
-
                     {#if part.type === "data-validationResult"}
                       <div class="flex items-center gap-2 px-3 py-2 rounded-lg bg-{part.data.status === 'success' ? 'emerald' : 'amber'}-500/10 border border-{part.data.status === 'success' ? 'emerald' : 'amber'}-500/20 text-[11px] font-medium" data-validation-result={part.data.artifactId}>
                         {#if part.data.status === "success"}
@@ -356,6 +349,16 @@
   <div
     class="absolute bottom-4 left-0 w-full pt-10 pb-4 px-2 sm:px-4 safe-area-bottom pointer-events-none z-50 flex flex-col items-center gap-2"
   >
+    {#if chat.awaitingValidation}
+      <div class="pointer-events-auto w-full max-w-[780px]">
+        <ActionBar
+          mode="validation"
+          artifactId={chat.awaitingValidation}
+          validating={chat.pendingValidationArtifactId === chat.awaitingValidation}
+          onValidate={(id) => chat.resumeWorkflow(id)}
+        />
+      </div>
+    {/if}
     {#if chat.pendingGate}
       <div class="pointer-events-auto w-full max-w-[780px]">
         <ActionBar

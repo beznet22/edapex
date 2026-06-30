@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { ShieldCheck, X } from "@lucide/svelte";
+	import { ShieldCheck, X, LoaderCircle, CheckCircle2 } from "@lucide/svelte";
 
 	type OptionItem = {
 		id: string;
@@ -8,29 +8,48 @@
 	};
 
 	type Props = {
-		question: string;
-		options: OptionItem[];
-		runId: string;
-		stepId: string;
+		mode?: "options" | "validation";
+		question?: string;
+		options?: OptionItem[];
+		runId?: string;
+		stepId?: string;
 		allowFreeText?: boolean;
-		onSelect: (payload: { selectedOptionId: string; freeTextAnswer?: string }) => void;
+		onSelect?: (payload: { selectedOptionId: string; freeTextAnswer?: string }) => void;
+		artifactId?: string;
+		onValidate?: (artifactId: string) => void;
+		validating?: boolean;
 	};
 
-	let { question, options, runId, stepId, allowFreeText = true, onSelect }: Props = $props();
+	let {
+		mode = "options",
+		question = "",
+		options = [],
+		runId = "",
+		stepId = "",
+		allowFreeText = true,
+		onSelect,
+		artifactId = "",
+		onValidate,
+		validating = false
+	}: Props = $props();
 
 	let freeTextValue = $state("");
 	let showFreeText = $state(false);
 
 	function handlePillClick(option: OptionItem) {
-		onSelect({ selectedOptionId: option.id });
+		onSelect?.({ selectedOptionId: option.id });
 	}
 
 	function handleFreeTextSubmit() {
 		const trimmed = freeTextValue.trim();
 		if (trimmed.length === 0) return;
-		onSelect({ selectedOptionId: `free_text_${Date.now()}`, freeTextAnswer: trimmed });
+		onSelect?.({ selectedOptionId: `free_text_${Date.now()}`, freeTextAnswer: trimmed });
 		freeTextValue = "";
 		showFreeText = false;
+	}
+
+	function handleValidateClick() {
+		onValidate?.(artifactId);
 	}
 </script>
 
@@ -40,79 +59,104 @@
 	aria-label="Action required"
 	data-run-id={runId}
 	data-step-id={stepId}
+	data-mode={mode}
 >
 	<div class="action-bar-header">
 		<ShieldCheck class="action-bar-icon" aria-hidden="true" />
-		<p class="action-bar-question">{question}</p>
+		<p class="action-bar-question">
+			{mode === "validation"
+				? "Review the generated document, then click Validate to check it and commit to the database."
+				: question}
+		</p>
 	</div>
 
-	<div class="action-bar-options" role="group" aria-label="Choices">
-		{#each options as option (option.id)}
+	{#if mode === "validation"}
+		<div class="action-bar-options" role="group" aria-label="Validation">
 			<button
 				type="button"
-				class="action-bar-pill"
-				onclick={() => handlePillClick(option)}
-				aria-label={option.label}
+				class="action-bar-pill action-bar-pill-primary"
+				onclick={handleValidateClick}
+				disabled={validating || !artifactId}
+				aria-label="Validate and commit to database"
+				data-testid="action-bar-validate"
 			>
-				{#if option.icon}
-					<span class="action-bar-pill-icon" aria-hidden="true">{option.icon}</span>
+				{#if validating}
+					<LoaderCircle class="action-bar-pill-icon animate-spin" aria-hidden="true" />
+				{:else}
+					<CheckCircle2 class="action-bar-pill-icon" aria-hidden="true" />
 				{/if}
-				<span class="action-bar-pill-label">{option.label}</span>
+				<span class="action-bar-pill-label">{validating ? "Validating…" : "Validate"}</span>
 			</button>
-		{/each}
-
-		{#if allowFreeText && !showFreeText}
-			<button
-				type="button"
-				class="action-bar-pill action-bar-pill-secondary"
-				onclick={() => (showFreeText = true)}
-				aria-label="Type your own answer"
-			>
-				Type your own answer
-			</button>
-		{/if}
-	</div>
-
-	{#if showFreeText}
-		<form
-			class="action-bar-form"
-			onsubmit={(e) => {
-				e.preventDefault();
-				handleFreeTextSubmit();
-			}}
-		>
-			<label class="action-bar-form-label" for="action-bar-freetext">
-				Or type your own answer
-			</label>
-			<div class="action-bar-form-row">
-				<input
-					id="action-bar-freetext"
-					type="text"
-					bind:value={freeTextValue}
-					class="action-bar-form-input"
-					placeholder="Type here..."
-					autocomplete="off"
-				/>
-				<button
-					type="submit"
-					class="action-bar-form-submit"
-					disabled={freeTextValue.trim().length === 0}
-				>
-					Send
-				</button>
+		</div>
+	{:else}
+		<div class="action-bar-options" role="group" aria-label="Choices">
+			{#each options as option (option.id)}
 				<button
 					type="button"
-					class="action-bar-form-cancel"
-					onclick={() => {
-						showFreeText = false;
-						freeTextValue = "";
-					}}
-					aria-label="Cancel"
+					class="action-bar-pill"
+					onclick={() => handlePillClick(option)}
+					aria-label={option.label}
 				>
-					<X aria-hidden="true" />
+					{#if option.icon}
+						<span class="action-bar-pill-icon" aria-hidden="true">{option.icon}</span>
+					{/if}
+					<span class="action-bar-pill-label">{option.label}</span>
 				</button>
-			</div>
-		</form>
+			{/each}
+
+			{#if allowFreeText && !showFreeText}
+				<button
+					type="button"
+					class="action-bar-pill action-bar-pill-secondary"
+					onclick={() => (showFreeText = true)}
+					aria-label="Type your own answer"
+				>
+					Type your own answer
+				</button>
+			{/if}
+		</div>
+
+		{#if showFreeText}
+			<form
+				class="action-bar-form"
+				onsubmit={(e) => {
+					e.preventDefault();
+					handleFreeTextSubmit();
+				}}
+			>
+				<label class="action-bar-form-label" for="action-bar-freetext">
+					Or type your own answer
+				</label>
+				<div class="action-bar-form-row">
+					<input
+						id="action-bar-freetext"
+						type="text"
+						bind:value={freeTextValue}
+						class="action-bar-form-input"
+						placeholder="Type here..."
+						autocomplete="off"
+					/>
+					<button
+						type="submit"
+						class="action-bar-form-submit"
+						disabled={freeTextValue.trim().length === 0}
+					>
+						Send
+					</button>
+					<button
+						type="button"
+						class="action-bar-form-cancel"
+						onclick={() => {
+							showFreeText = false;
+							freeTextValue = "";
+						}}
+						aria-label="Cancel"
+					>
+						<X aria-hidden="true" />
+					</button>
+				</div>
+			</form>
+		{/if}
 	{/if}
 </div>
 
@@ -185,6 +229,26 @@
 	.action-bar-pill-secondary {
 		background: transparent;
 		font-style: italic;
+	}
+
+	.action-bar-pill-primary {
+		background: var(--color-primary, oklch(0.7 0.15 60));
+		color: var(--color-primary-foreground, oklch(0.98 0.01 60));
+		border-color: var(--color-primary, oklch(0.7 0.15 60));
+		font-weight: 600;
+		padding-left: 1rem;
+		padding-right: 1rem;
+	}
+
+	.action-bar-pill-primary:hover:not(:disabled) {
+		background: var(--color-primary, oklch(0.7 0.15 60));
+		filter: brightness(1.08);
+		border-color: var(--color-primary, oklch(0.7 0.15 60));
+	}
+
+	.action-bar-pill-primary:disabled {
+		opacity: 0.6;
+		cursor: not-allowed;
 	}
 
 	.action-bar-pill-icon {
