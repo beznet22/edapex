@@ -210,6 +210,8 @@ export class ChatContext {
   pendingValidationErrors = $state<{ artifactId: string; errors: Array<{ path: string; message: string }> } | null>(null);
   /** last validation outcome (set by data-validationResult) */
   lastValidationOutcome = $state<{ artifactId: string; status: 'success' | 'errors' } | null>(null);
+  /** Guard flag: prevents auto-continuation re-firing on the same validation */
+  multiFileContinuationInFlight = $state(false);
   /** last committed artifact (set by data-committed) — persists for chat lifetime per D15 */
   lastCommittedArtifactId = $state<string | null>(null);
   /** per-keystroke edit tracking for ValidateFab mode derivation */
@@ -400,8 +402,71 @@ export class ChatContext {
           allowFreeText: true
         };
       }
+    } else if (part.type === "data-validationResult") {
+      // Multi-file auto-continuation: after a successful commit, check if
+      // there are more unprocessed data-createDocument parts and fire a
+      // continuation message so the assistant processes the next file
+      // through its own validate/commit turn (per user requirement:
+      // "agent must go through multiple validate/commit turns for each
+      // document"). Guarded by multiFileContinuationInFlight so a
+      // success event only triggers one continuation.
+      const data = (part as { data?: { artifactId?: string; status?: string } }).data;
+      if (data?.status === "success" && !this.multiFileContinuationInFlight) {
+        this.runMultiFileContinuation();
+      }
+    } else if (part.type === "data-awaitValidation") {
+      // Reset the auto-continuation guard: a new file is being validated,
+      // so the next data-validationResult (if success) can trigger another
+      // continuation pass for the file after it.
+      this.multiFileContinuationInFlight = false;
     }
   };
+
+  /**
+   * Multi-file continuation: scans the chat history for data-createDocument
+   * parts that don't yet have a matching data-validationResult { status:
+   * "success" }. If any exist, sends a short continuation message that
+   * triggers a new workflow run; the assistant will call
+   * format-marksheet-document for the next file, which then suspends for
+   * its own validate/commit turn via awaitValidationStep.
+   */
+  runMultiFileContinuation(): void {
+    if (this.multiFileContinuationInFlight) return;
+    const allDocs = this.messages
+      .flatMap((m) => m.parts ?? [])
+      .filter((p) => (p as { type?: string }).type === "data-createDocument") as Array<{
+        type: "data-createDocument";
+        id?: string;
+        data?: { id?: string; status?: string; title?: string };
+      }>;
+    if (allDocs.length === 0) return;
+    const validatedIds = new Set(
+      this.messages
+        .flatMap((m) => m.parts ?? [])
+        .filter(
+          (p) =>
+            (p as { type?: string }).type === "data-validationResult" &&
+            (p as { data?: { status?: string } }).data?.status === "success"
+        )
+        .map((p) => (p as { data?: { artifactId?: string } }).data?.artifactId ?? "")
+    );
+    const nextFile = allDocs.find(
+      (p) => !validatedIds.has(p.data?.id ?? p.id ?? "")
+    );
+    if (!nextFile) return;
+    this.multiFileContinuationInFlight = true;
+    void this.client.sendMessage(
+      { text: `Continue processing the remaining marksheet: "${nextFile.data?.title ?? "next file"}".` },
+      {
+        body: {
+          threadId: this.chatData?.threadId,
+          selectedClass: this.selectedClass,
+          mentions: [],
+          fileReferences: []
+        }
+      }
+    );
+  }
 
   #onError = (error: Error) => {
     // Categorize server-side / transport errors that didn't come through

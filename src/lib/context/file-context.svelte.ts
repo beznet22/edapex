@@ -352,6 +352,23 @@ export class FilesContext {
           : u,
       );
 
+      // Auto-add to references so the chat submit's fileReferences payload
+      // includes this file. Without this, files uploaded via the paperclip
+      // path (file.onchange → #upload → #performUpload) never get a
+      // reference — the agent then thinks no file was attached. Photos
+      // and student photos are intentionally excluded; they have their
+      // own commit path (update-photo) and shouldn't trigger OCR /
+      // marksheet processing.
+      if (kind !== "photo" && kind !== "studentPhoto") {
+        this.addReference({
+          key: result.contentHash ?? resolvedId,
+          name: filename,
+          type: "file",
+          fileId: resolvedId,
+          contentHash: result.contentHash
+        });
+      }
+
       toast.info("File saved, pending extraction");
       console.log(`Upload success for ${displayName}:`, result);
     } catch (error) {

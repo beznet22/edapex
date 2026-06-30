@@ -157,46 +157,58 @@ export const POST: RequestHandler = async ({ request, locals }) => {
     const isImage = (file.type ?? '').startsWith('image/') ||
       /\.(jpe?g|png|gif|webp|bmp|tiff?)$/i.test(filename);
     if (isImage) {
-      const ocrResult = await mistralOcrService.processDocument(buffer, filename);
-      const markdown = ((ocrResult as { pages?: Array<{ markdown?: string }> }).pages ?? [])
-        .map((p) => p.markdown ?? '')
-        .filter(Boolean)
-        .join('\n\n');
-      await fs.writeFile(ocrMarkdownPath(filename), markdown, { recursive: true });
-      await fs.writeFile(
-        ocrMetaPath(filename),
-        JSON.stringify(
-          {
-            fileName: filename,
-            contentHash,
-            pages: (ocrResult as { pages?: unknown }).pages ?? null,
-            model: (ocrResult as { model?: string }).model ?? null,
-            extractedAt: new Date().toISOString()
-          },
-          null,
-          2
-        ),
-        { recursive: true }
-      );
-      await addWorkspaceEntry(tenant, {
-        path: ocrMarkdownPath(filename),
-        kind: 'ocr-markdown',
-        fileName: filename,
-        contentHash,
-        uploadedAt: new Date().toISOString(),
-        modifiedAt: new Date().toISOString(),
-        mimeType: 'text/markdown'
-      });
-      await addWorkspaceEntry(tenant, {
-        path: ocrMetaPath(filename),
-        kind: 'ocr-meta',
-        fileName: filename,
-        contentHash,
-        uploadedAt: new Date().toISOString(),
-        modifiedAt: new Date().toISOString(),
-        mimeType: 'application/json'
-      });
-      ocrStatus = 'ready';
+      // Skip Mistral OCR if the canonical ocr/<fileName>.md already exists
+      // — saves the monthly Mistral trial quota when the user re-uploads
+      // the same marksheet. format-marksheet-document reads from this same
+      // path, so a cached OCR is consumed normally downstream.
+      const ocrPath = ocrMarkdownPath(filename);
+      if (await fs.exists(ocrPath)) {
+        ocrStatus = 'ready';
+        console.info(`[uploads] OCR cache hit for ${filename}, skipping Mistral call`);
+      } else {
+        const ocrResult = await mistralOcrService.processDocument(buffer, filename);
+        const markdown = ((ocrResult as { pages?: Array<{ markdown?: string }> }).pages ?? [])
+          .map((p) => p.markdown ?? '')
+          .filter(Boolean)
+          .join('\n\n');
+        await fs.writeFile(ocrPath, markdown, { recursive: true });
+        await fs.writeFile(
+          ocrMetaPath(filename),
+          JSON.stringify(
+            {
+              fileName: filename,
+              contentHash,
+              pages: (ocrResult as { pages?: unknown }).pages ?? null,
+              model: (ocrResult as { model?: string }).model ?? null,
+              extractedAt: new Date().toISOString()
+            },
+            null,
+            2
+          ),
+          { recursive: true }
+        );
+        // Register both entries (only on fresh OCR; cache hits already
+        // have them from the first upload's manifest).
+        await addWorkspaceEntry(tenant, {
+          path: ocrPath,
+          kind: 'ocr-markdown',
+          fileName: filename,
+          contentHash,
+          uploadedAt: new Date().toISOString(),
+          modifiedAt: new Date().toISOString(),
+          mimeType: 'text/markdown'
+        });
+        await addWorkspaceEntry(tenant, {
+          path: ocrMetaPath(filename),
+          kind: 'ocr-meta',
+          fileName: filename,
+          contentHash,
+          uploadedAt: new Date().toISOString(),
+          modifiedAt: new Date().toISOString(),
+          mimeType: 'application/json'
+        });
+        ocrStatus = 'ready';
+      }
     }
   } catch (err) {
     ocrStatus = 'error';
