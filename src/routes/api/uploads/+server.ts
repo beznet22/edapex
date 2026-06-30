@@ -8,6 +8,7 @@ import { addEntry as addWorkspaceEntry } from "$lib/server/mastra/storage/worksp
 import { uploadPath } from "$lib/server/mastra/storage/workspaces/paths";
 import { resolveTenantFilesystem } from "$lib/server/mastra/storage/workspaces/resolve-tenant-filesystem";
 import { mistralOcrService } from "$lib/server/service/mistral-ocr.service";
+import { ocrMarkdownPath, ocrMetaPath } from "$lib/server/mastra/storage/workspaces/paths";
 import { ResultsRepository, BaseRepository } from "$lib/server/repository";
 import { ScopedRepositoryProvider } from "$lib/server/mastra/scoped-repository";
 import { createTenantFileStorage } from "$lib/server/mastra/storage/tenant-file-storage";
@@ -144,12 +145,73 @@ export const POST: RequestHandler = async ({ request, locals }) => {
     mimeType: file.type,
     sizeBytes: file.size
   });
+
+  // Trigger Mistral OCR on the uploaded image. Writes the canonical
+  // ocr/<fileName>.md + ocr/<fileName>.meta.json so format-marksheet-
+  // document can pick it up immediately. OCR failures are non-fatal
+  // for the upload itself — we just surface the status in the response
+  // so the client pill can show a retry/errror indicator.
+  let ocrStatus: 'ready' | 'error' | 'skipped' = 'skipped';
+  let ocrError: string | null = null;
+  try {
+    const isImage = (file.type ?? '').startsWith('image/') ||
+      /\.(jpe?g|png|gif|webp|bmp|tiff?)$/i.test(filename);
+    if (isImage) {
+      const ocrResult = await mistralOcrService.processDocument(buffer, filename);
+      const markdown = ((ocrResult as { pages?: Array<{ markdown?: string }> }).pages ?? [])
+        .map((p) => p.markdown ?? '')
+        .filter(Boolean)
+        .join('\n\n');
+      await fs.writeFile(ocrMarkdownPath(filename), markdown, { recursive: true });
+      await fs.writeFile(
+        ocrMetaPath(filename),
+        JSON.stringify(
+          {
+            fileName: filename,
+            contentHash,
+            pages: (ocrResult as { pages?: unknown }).pages ?? null,
+            model: (ocrResult as { model?: string }).model ?? null,
+            extractedAt: new Date().toISOString()
+          },
+          null,
+          2
+        ),
+        { recursive: true }
+      );
+      await addWorkspaceEntry(tenant, {
+        path: ocrMarkdownPath(filename),
+        kind: 'ocr-markdown',
+        fileName: filename,
+        contentHash,
+        uploadedAt: new Date().toISOString(),
+        modifiedAt: new Date().toISOString(),
+        mimeType: 'text/markdown'
+      });
+      await addWorkspaceEntry(tenant, {
+        path: ocrMetaPath(filename),
+        kind: 'ocr-meta',
+        fileName: filename,
+        contentHash,
+        uploadedAt: new Date().toISOString(),
+        modifiedAt: new Date().toISOString(),
+        mimeType: 'application/json'
+      });
+      ocrStatus = 'ready';
+    }
+  } catch (err) {
+    ocrStatus = 'error';
+    ocrError = err instanceof Error ? err.message : String(err);
+    console.error('[uploads] OCR failed for', filename, err);
+  }
+
   return json({
     success: true,
     kind: "document" as const,
     documentId,
     contentHash,
     fileId: contentHash,
+    ocrStatus,
+    ocrError
   });
 };
 

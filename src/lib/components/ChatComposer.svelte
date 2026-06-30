@@ -4,6 +4,7 @@
   import BookOpenIcon from "@lucide/svelte/icons/book-open";
   import CameraIcon from "@lucide/svelte/icons/camera";
   import CheckCircleIcon from "@lucide/svelte/icons/check-circle";
+  import AlertCircleIcon from "@lucide/svelte/icons/alert-circle";
   import ChevronRightIcon from "@lucide/svelte/icons/chevron-right";
   import ChevronsUpDownIcon from "@lucide/svelte/icons/chevrons-up-down";
   import FileTextIcon from "@lucide/svelte/icons/file-text";
@@ -74,9 +75,17 @@
   // lives in template scope, where Svelte's compiler instruments the
   // reads correctly. We still call file.addReference() so the backend
   // payload (chat.fileReferences) stays correct.
-  let uploadedReferences = $state<
-    { key: string; name: string; type: "file" | "dir"; mimeType?: string; fileId?: string; contentHash?: string; }[]
-  >([]);
+  type UploadedRef = {
+    key: string;
+    name: string;
+    type: "file" | "dir";
+    mimeType?: string;
+    fileId?: string;
+    contentHash?: string;
+    status: "uploading" | "ready" | "error" | "skipped";
+    error?: string;
+  };
+  let uploadedReferences = $state<UploadedRef[]>([]);
   let showCommands = $state(false);
   let showMentions = $state(false);
   let mentionQuery = $state("");
@@ -410,7 +419,7 @@
         if (!uploadedReferences.find((r) => r.key === json.contentHash)) {
           uploadedReferences = [
             ...uploadedReferences,
-            { key: json.contentHash, name: f.name, type: "file", mimeType: json.mimeType }
+            { key: json.contentHash, name: f.name, type: "file", mimeType: json.mimeType, status: "ready" }
           ];
         }
         // Photo fileReference stored — chat composer will render chip; user can later type /update photo @student to commit
@@ -439,6 +448,15 @@
     const sectionId = selectedClass?.sectionId ?? null;
 
     for (const f of Array.from(input.files)) {
+      // Optimistic pill: add with status='uploading' immediately so the
+      // indicator shows up before the fetch resolves.
+      const tempKey = `pending-${f.name}-${Date.now()}-${Math.random()}`;
+      if (!uploadedReferences.find((r) => r.key === tempKey)) {
+        uploadedReferences = [
+          ...uploadedReferences,
+          { key: tempKey, name: f.name, type: "file", status: "uploading" }
+        ];
+      }
       try {
         const formData = new FormData();
         formData.append("file", f);
@@ -453,11 +471,17 @@
         });
 
         if (!res.ok) {
+          uploadedReferences = uploadedReferences.map((r) =>
+            r.key === tempKey ? { ...r, status: "error", error: `HTTP ${res.status}` } : r
+          );
           toast.error(`Failed to upload ${f.name}`);
           continue;
         }
         const json = await res.json();
         if (json.kind !== "document") {
+          uploadedReferences = uploadedReferences.map((r) =>
+            r.key === tempKey ? { ...r, status: "error", error: "Unexpected response kind" } : r
+          );
           toast.error(`Unexpected response for ${f.name}`);
           continue;
         }
@@ -469,15 +493,35 @@
           fileId: json.fileId,
           contentHash: json.contentHash,
         });
-        // Mirror to local $state so the pill re-renders (see comment at declaration).
-        if (!uploadedReferences.find((r) => r.key === json.contentHash)) {
-          uploadedReferences = [
-            ...uploadedReferences,
-            { key: json.contentHash, name: f.name, type: "file", fileId: json.fileId, contentHash: json.contentHash }
-          ];
-        }
-        toast.success(`Uploaded ${f.name} — type /marksheet to process.`);
+        // Replace the optimistic pill with the real one keyed by contentHash,
+        // carrying the OCR status from the server.
+        const finalStatus: UploadedRef["status"] =
+          json.ocrStatus === "ready" ? "ready"
+          : json.ocrStatus === "error" ? "error"
+          : json.ocrStatus === "skipped" ? "skipped"
+          : "ready";
+        uploadedReferences = uploadedReferences
+          .filter((r) => r.key !== tempKey)
+          .concat({
+            key: json.contentHash,
+            name: f.name,
+            type: "file",
+            fileId: json.fileId,
+            contentHash: json.contentHash,
+            status: finalStatus,
+            error: json.ocrError ?? undefined
+          });
+        toast.success(
+          finalStatus === "ready"
+            ? `Uploaded ${f.name} — OCR complete.`
+            : finalStatus === "error"
+            ? `Uploaded ${f.name} — OCR failed: ${json.ocrError ?? "unknown"}.`
+            : `Uploaded ${f.name}.`
+        );
       } catch (err) {
+        uploadedReferences = uploadedReferences.map((r) =>
+          r.key === tempKey ? { ...r, status: "error", error: err instanceof Error ? err.message : String(err) } : r
+        );
         toast.error(`Failed to upload ${f.name}`);
       }
     }
@@ -632,10 +676,21 @@
         {#each uploadedReferences as ref (ref.key)}
           <div
             class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/60 border border-white/5 text-[11px] font-bold tracking-wide text-foreground/70 group shadow-sm"
+            data-status={ref.status}
+            title={ref.error ?? ref.status}
           >
+            {#if ref.status === "uploading"}
+              <span class="size-3 rounded-full border-2 border-primary/40 border-t-primary animate-spin" aria-label="uploading"></span>
+            {:else if ref.status === "ready"}
+              <CheckCircleIcon class="size-3.5 text-emerald-400" />
+            {:else if ref.status === "error"}
+              <AlertCircleIcon class="size-3.5 text-destructive" />
+            {:else}
+              <PaperclipIcon class="size-3.5 opacity-50" />
+            {/if}
             {#if ref.type === "dir"}
               <FolderOpenIcon class="size-3.5 opacity-50" />
-            {:else}
+            {:else if ref.status !== "uploading"}
               <PaperclipIcon class="size-3.5 opacity-50" />
             {/if}
             <span class="max-w-[150px] truncate uppercase tracking-tighter">{ref.name}</span>
