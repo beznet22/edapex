@@ -786,15 +786,17 @@ const awaitValidationStep = createStep({
 		});
 		if (!fs) throw new Error('WORKSPACE_UNAVAILABLE: tenant workspace filesystem not configured');
 		// Bug 1 fix: read the EXACT persistPath recorded by
-		// format-marksheet-document on the request context. The two paths
-		// diverge because the file is named after the student, not the
-		// documentId (which is a UUID). Fall back to a synthesized path
-		// only when formatArtifactState is missing (legacy/migrated data).
+		// format-marksheet-document on the request context. The path is
+		// canonical: marksheets/<studentId>-<studentName>.md. If
+		// formatArtifactState is missing (legacy), throw — legacy data
+		// should be migrated to canonical paths via the migration script.
 		const formatState = requestContext?.get('formatArtifactState') as
-			| { persistPath?: string; artifactId?: string; studentHint?: { fullName?: string; admissionNo?: number } | null }
+			| { persistPath?: string; artifactId?: string; studentId?: number | null; studentHint?: { fullName?: string; admissionNo?: number; studentId?: number } | null }
 			| undefined;
-		const markdownPath = formatState?.persistPath
-			?? `exams/examType-${tenant.examTypeId ?? 'unknown'}/${lastFormattedId.replace(/[^a-zA-Z0-9._-]/g, '_')}.md`;
+		const markdownPath = formatState?.persistPath;
+		if (!markdownPath) {
+			throw new Error('PERSIST_PATH_MISSING: formatArtifactState.persistPath is required. Run format-marksheet-document first or migrate legacy data.');
+		}
 		let currentMarkdown = '';
 		try {
 			const raw = await fs.readFile(markdownPath);
@@ -803,11 +805,18 @@ const awaitValidationStep = createStep({
 			// File may not exist yet; pass empty string
 		}
 
+		// Resolve studentId from formatArtifactState (set by format-marksheet-document).
+		// If missing, the marksheet hasn't been linked to a student yet — fail fast.
+		const studentId = formatState?.studentId ?? formatState?.studentHint?.studentId ?? null;
+		if (studentId === null) {
+			throw new Error('STUDENT_ID_MISSING: formatArtifactState.studentId is required. Call link-marksheet-student first to link this marksheet to a DB student.');
+		}
+
 		// Invoke validate-marksheet tool via mastra
 		const validateTool = m?.getTool('validate-marksheet');
 		if (!validateTool) throw new Error('TOOL_NOT_REGISTERED: validate-marksheet');
 		const validateResult = await validateTool.execute!(
-			{ documentId: lastFormattedId, correctedMarkdown: currentMarkdown },
+			{ studentId, correctedMarkdown: currentMarkdown },
 			{ requestContext, writer, mastra: m } as never
 		);
 
@@ -816,7 +825,7 @@ const awaitValidationStep = createStep({
 			const commitTool = m?.getTool('commit-marksheet');
 			if (!commitTool) throw new Error('TOOL_NOT_REGISTERED: commit-marksheet');
 			await commitTool.execute!(
-				{ documentId: lastFormattedId },
+				{ studentId },
 				{ requestContext, writer, mastra: m } as never
 			);
 			return {
@@ -831,7 +840,7 @@ const awaitValidationStep = createStep({
 		if (!autoFixTool) throw new Error('TOOL_NOT_REGISTERED: auto-fix-marksheet');
 		const fixResult = await autoFixTool.execute!(
 			{
-				documentId: lastFormattedId,
+				studentId,
 				errors: validateResult.errors,
 				currentMarkdown
 			},
@@ -862,7 +871,7 @@ const awaitValidationStep = createStep({
 		const commitTool2 = m?.getTool('commit-marksheet');
 		if (!commitTool2) throw new Error('TOOL_NOT_REGISTERED: commit-marksheet');
 		await commitTool2.execute!(
-			{ documentId: lastFormattedId },
+			{ studentId },
 			{ requestContext, writer, mastra: m } as never
 		);
 		return {

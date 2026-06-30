@@ -1,22 +1,22 @@
 /**
  * OCR Workspace Store — EdApex
  *
- * Replaces the legacy `OcrMemoryCache` (which persisted Mistral OCR results
- * in the assistant agent's working memory on a per-user thread) with a
- * workspace-backed store. The OCR markdown is written to
- * `extracted/${contentHash}.md` and a `.meta.json` sidecar holds the
- * lookup metadata.
+ * Persists Mistral OCR results to the tenant workspace at canonical paths:
+ *   `ocr/<fileName>.md` — OCR markdown output
+ *   `ocr/<fileName>.meta.json` — Mistral file id, size, content hash sidecar
  *
- * When the tenant carries an `examTypeId`, the cache is namespaced one
- * level deeper at `exams/examType-<examTypeId>/extracted/` so OCR results
- * stay aligned with the term they were generated for. Otherwise the
- * year-level `extracted/` path is used.
+ * The OCR JSON pipeline has been removed (Mistral structured output is
+ * unreliable; the document agent re-derives JSON from the markdown via
+ * marksheetSchema). Use `format-marksheet-document` to convert the OCR
+ * markdown into a polished marksheet report.
  */
 import { createHash } from 'node:crypto';
 import { tenantWorkspace } from '$lib/server/mastra/storage/workspaces';
 import { buildWorkspaceRequestContext } from '$lib/server/helpers/chat-helper';
 import type { TenantContext } from '$lib/server/mastra/tenant-context';
 import { mistralOcrService } from '$lib/server/service/mistral-ocr.service';
+import { ocrMarkdownPath, ocrMetaPath } from '$lib/server/mastra/storage/workspaces/paths';
+import { addEntry } from '$lib/server/mastra/storage/workspaces/manifest-store';
 
 export interface OcrMeta {
   contentHash: string;
@@ -26,22 +26,6 @@ export interface OcrMeta {
   sizeBytes?: number;
   pagesProcessed?: number;
   createdAt: string;
-}
-
-const EXTRACTED_DIR = 'extracted';
-
-function rootDir(tenant: TenantContext): string {
-  return tenant.examTypeId !== null
-    ? `exams/examType-${tenant.examTypeId}/${EXTRACTED_DIR}`
-    : EXTRACTED_DIR;
-}
-
-function metaPath(tenant: TenantContext, contentHash: string): string {
-  return `${rootDir(tenant)}/${contentHash}.meta.json`;
-}
-
-function markdownPath(tenant: TenantContext, contentHash: string): string {
-  return `${rootDir(tenant)}/${contentHash}.md`;
 }
 
 async function sha256Hex(input: ArrayBuffer | Uint8Array | string): Promise<string> {
@@ -63,8 +47,6 @@ async function resolveFilesystem(tenant: TenantContext) {
   return fs;
 }
 
-
-
 async function bytesFromFile(
   file: Blob | Buffer | Uint8Array,
 ): Promise<{ bytes: Uint8Array; sizeBytes: number }> {
@@ -81,20 +63,30 @@ async function bytesFromFile(
 async function readMeta(
   fs: { readFile: (p: string, o?: { encoding?: BufferEncoding }) => Promise<string | Buffer> },
   tenant: TenantContext,
-  contentHash: string,
+  fileName: string,
 ): Promise<OcrMeta | null> {
   try {
-    const raw = await fs.readFile(metaPath(tenant, contentHash), { encoding: 'utf-8' });
+    const raw = await fs.readFile(ocrMetaPath(fileName), { encoding: 'utf-8' });
     return JSON.parse(raw as string) as OcrMeta;
   } catch {
     return null;
   }
 }
 
+async function readMarkdownViaFs(
+  fs: { readFile: (p: string, o?: { encoding?: BufferEncoding }) => Promise<string | Buffer> },
+  fileName: string,
+): Promise<string> {
+  const content = await fs.readFile(ocrMarkdownPath(fileName), { encoding: 'utf-8' });
+  return typeof content === 'string' ? content : content.toString('utf-8');
+}
+
 export class OcrWorkspaceStore {
   /**
-   * Returns the OCR result for a file's content hash, invoking Mistral OCR
-   * and persisting both the markdown and the meta sidecar on cache miss.
+   * Returns the OCR result for a file, invoking Mistral OCR and persisting
+   * both the markdown and the meta sidecar on cache miss. Cache key is the
+   * fileName (after sanitizeForFilename), not a content hash, so that
+   * re-uploads with the same filename re-use the cached OCR.
    */
   static async getOrCreate(params: {
     tenant: TenantContext;
@@ -107,10 +99,10 @@ export class OcrWorkspaceStore {
 
     const fs = await resolveFilesystem(params.tenant);
 
-    if (await fs.exists(markdownPath(params.tenant, contentHash))) {
-      const existing = await readMeta(fs, params.tenant, contentHash);
+    if (await fs.exists(ocrMarkdownPath(params.fileName))) {
+      const existing = await readMeta(fs, params.tenant, params.fileName);
       if (existing) {
-        const markdown = await readMarkdownViaFs(fs, params.tenant, contentHash);
+        const markdown = await readMarkdownViaFs(fs, params.fileName);
         return { ...existing, markdown };
       }
     }
@@ -129,8 +121,28 @@ export class OcrWorkspaceStore {
       createdAt: new Date().toISOString(),
     };
 
-    await fs.writeFile(markdownPath(params.tenant, contentHash), markdown, { recursive: true });
-    await fs.writeFile(metaPath(params.tenant, contentHash), JSON.stringify(meta), { recursive: true });
+    const mdPath = ocrMarkdownPath(params.fileName);
+    const metaPath = ocrMetaPath(params.fileName);
+    await fs.writeFile(mdPath, markdown, { recursive: true });
+    await fs.writeFile(metaPath, JSON.stringify(meta), { recursive: true });
+    await addEntry(params.tenant, {
+      path: mdPath,
+      kind: 'ocr-markdown',
+      fileName: params.fileName,
+      contentHash,
+      uploadedAt: meta.createdAt,
+      modifiedAt: meta.createdAt,
+      mimeType: 'text/markdown'
+    });
+    await addEntry(params.tenant, {
+      path: metaPath,
+      kind: 'ocr-meta',
+      fileName: params.fileName,
+      contentHash,
+      uploadedAt: meta.createdAt,
+      modifiedAt: meta.createdAt,
+      mimeType: 'application/json'
+    });
 
     return { ...meta, markdown };
   }
@@ -140,7 +152,19 @@ export class OcrWorkspaceStore {
     contentHash: string;
   }): Promise<OcrMeta | null> {
     const fs = await resolveFilesystem(params.tenant);
-    return readMeta(fs, params.tenant, params.contentHash);
+    // Search the canonical ocr/ directory for a meta with matching hash
+    try {
+      const entries = await fs.readdir('ocr');
+      for (const entry of entries) {
+        if (!entry.name.endsWith('.meta.json')) continue;
+        const raw = await fs.readFile(`ocr/${entry.name}`, { encoding: 'utf-8' });
+        const meta = JSON.parse(raw as string) as OcrMeta;
+        if (meta.contentHash === params.contentHash) return meta;
+      }
+    } catch {
+      return null;
+    }
+    return null;
   }
 
   static async getByFileId(params: {
@@ -148,69 +172,25 @@ export class OcrWorkspaceStore {
     mistralFileId: string;
   }): Promise<OcrMeta | null> {
     const fs = await resolveFilesystem(params.tenant);
-    const dir = rootDir(params.tenant);
-    let entries: Array<{ name: string }>;
     try {
-      entries = await fs.readdir(dir);
-    } catch {
-      return null;
-    }
-    for (const entry of entries) {
-      if (!entry.name.endsWith('.meta.json')) continue;
-      try {
-        const raw = await fs.readFile(`${dir}/${entry.name}`, { encoding: 'utf-8' });
+      const entries = await fs.readdir('ocr');
+      for (const entry of entries) {
+        if (!entry.name.endsWith('.meta.json')) continue;
+        const raw = await fs.readFile(`ocr/${entry.name}`, { encoding: 'utf-8' });
         const meta = JSON.parse(raw as string) as OcrMeta;
         if (meta.mistralFileId === params.mistralFileId) return meta;
-      } catch {
-        // skip corrupt meta
       }
+    } catch {
+      return null;
     }
     return null;
   }
 
   static async readMarkdown(params: {
     tenant: TenantContext;
-    contentHash: string;
+    fileName: string;
   }): Promise<string> {
     const fs = await resolveFilesystem(params.tenant);
-    return readMarkdownViaFs(fs, params.tenant, params.contentHash);
+    return readMarkdownViaFs(fs, params.fileName);
   }
-
-  static async writeNormalizedJson(
-    tenant: TenantContext,
-    documentId: string,
-    json: unknown,
-  ): Promise<string> {
-    const fs = await resolveFilesystem(tenant);
-    const path = `extracted/${documentId}.json`;
-    await fs.writeFile(
-      path,
-      JSON.stringify(json, null, 2),
-      { recursive: true },
-    );
-    return path;
-  }
-
-  static async readNormalizedJson(
-    tenant: TenantContext,
-    documentId: string,
-  ): Promise<unknown> {
-    const fs = await resolveFilesystem(tenant);
-    const path = `extracted/${documentId}.json`;
-    if (!(await fs.exists(path))) {
-      return null;
-    }
-    const raw = await fs.readFile(path, { encoding: 'utf-8' });
-    const text = typeof raw === 'string' ? raw : raw.toString('utf-8');
-    return JSON.parse(text);
-  }
-}
-
-async function readMarkdownViaFs(
-  fs: { readFile: (p: string, o?: { encoding?: BufferEncoding }) => Promise<string | Buffer> },
-  tenant: TenantContext,
-  contentHash: string,
-): Promise<string> {
-  const content = await fs.readFile(markdownPath(tenant, contentHash), { encoding: 'utf-8' });
-  return typeof content === 'string' ? content : content.toString('utf-8');
 }

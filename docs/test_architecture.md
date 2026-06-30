@@ -283,3 +283,85 @@ describe('Mastra (LibSQL Memory) & App (Drizzle MySQL) Multi-Tenant Engine', () 
     );
   });
 });
+---
+
+## Canonical Workspace Paths (Phase B)
+
+**Added 2025-01**: All tenant artifacts land at canonical paths via helpers in `src/lib/server/mastra/storage/workspaces/paths.ts`. This eliminates path fragmentation (e.g. `exams/examType-X/<studentName>.md` vs `pdfs/<admissionNo>_<name>.pdf`).
+
+### Layout
+
+```
+.workspaces/<schoolId>/AY<academicId>-<year-slug>/<classId>-<classSlug>_<sectionId>-<sectionSlug>/
+  manifest.json                   ← single source of truth, byKind indexed
+  ocr/<fileName>.md               ← raw OCR markdown (one per upload)
+  ocr/<fileName>.meta.json        ← Mistral fileId + sha256 sidecar
+  marksheets/<studentId>.json     ← validated Marksheet JSON (LLM-derived)
+  marksheets/<studentId>-<slug>.md ← formatted academic report markdown
+  transcripts/<studentId>.md      ← multi-term transcript markdown
+  transcripts/<studentId>.json    ← transcript data
+  pdfs/marksheet-<studentId>.pdf  ← rendered marksheet PDF
+  pdfs/transcript-<studentId>.pdf ← rendered transcript PDF
+  notes/, shared/, scratch/       ← user storage
+```
+
+### Slug rules
+
+| Input | Output | Source |
+|---|---|---|
+| "LOWER BASIC 2" | `lb2` | first-letter of each word + trailing digit |
+| "MIDDLE BASIC 1" | `mb1` | |
+| "PRE-NURSERY" | `pn` | hyphens split words |
+| "PRÉ-NURSERY" | `pn` | diacritics stripped via NFKD |
+| "B" (section) | `b` | single letter preserved |
+| "" (empty) | `<id>` | numeric fallback (collision-safe) |
+
+### Key invariants
+
+1. **`studentId` is the only identifier in artifact paths** — never `admissionNo`, never `studentName`. ID is collision-safe; names can collide across classes.
+2. **Single `manifest.json` at workspace root** — replaces per-kind manifests (`extracted/manifest.json`, `pdfs/manifest.json`). Tracks every artifact by relative path + byKind indexes.
+3. **OCR JSON pipeline dropped** — Mistral structured output was unreliable; the document agent re-derives JSON from markdown via `marksheetSchema` at validation time. Only markdown + meta persist from OCR.
+4. **PDF idempotency works** — `marksheetPdfPath(studentId)` is deterministic, so `pdfExists()` returns the right answer.
+5. **`studentHint` lives in the upload manifest** — when the teacher clicks "link to student X" at HITL, `link-marksheet-student` updates `manifest.entries[*].studentHint.studentId`. The next `validate-marksheet` call seeds its re-derivation prompt with this hint.
+
+### Path helpers
+
+| Helper | Path | Use site |
+|---|---|---|
+| `classDir(tenant)` | full workspace root | resolve-tenant-filesystem.ts |
+| `marksheetJsonPath(studentId)` | `marksheets/<id>.json` | validate, auto-fix, commit |
+| `marksheetMarkdownPath(studentId, name?)` | `marksheets/<id>[-<name>].md` | format-marksheet-document |
+| `marksheetPdfPath(studentId)` | `pdfs/marksheet-<id>.pdf` | generate-result-pdf, publish-result-pdf |
+| `transcriptJsonPath(studentId)` | `transcripts/<id>.json` | transcript-report |
+| `transcriptMarkdownPath(studentId)` | `transcripts/<id>.md` | transcript-report |
+| `transcriptPdfPath(studentId)` | `pdfs/transcript-<id>.pdf` | generate-transcript-pdf, publish-transcript-pdf |
+| `ocrMarkdownPath(fileName)` | `ocr/<sanitized-fileName>.md` | OcrWorkspaceStore |
+| `ocrMetaPath(fileName)` | `ocr/<sanitized-fileName>.meta.json` | OcrWorkspaceStore |
+
+### Tool input schema changes
+
+| Tool | Old input | New input |
+|---|---|---|
+| `validate-marksheet` | `{ documentId, correctedMarkdown }` | `{ studentId, correctedMarkdown }` |
+| `auto-fix-marksheet` | `{ documentId, errors, currentMarkdown }` | `{ studentId, errors, currentMarkdown }` |
+| `commit-marksheet` | `{ documentId }` | `{ studentId }` |
+| `link-marksheet-student` | `{ documentId, studentId }` | unchanged (manifest update only) |
+| `get-active-marksheet` | `{ documentId? }` | `{ studentId }` |
+
+The `documentId` is still tracked in the upload manifest for OCR lookup (`format-marksheet-document(documentId)`), but marksheet JSON/markdown/PDF operations all key on `studentId`.
+
+### Migration
+
+Run once per environment after deploying:
+```bash
+pnpm tsx scripts/migrations/workspace-paths-2025-01.ts --dry-run   # preview
+pnpm tsx scripts/migrations/workspace-paths-2025-01.ts              # execute
+```
+
+PDFs keyed by `<admissionNo>_<name>.pdf` need a manual studentId lookup and are flagged `REVIEW` during the dry run.
+
+### Deprecations
+
+- `tenant-file-storage.ts` — kept for now (still imported by 4 files), but superseded by `paths.ts` + `tenantWorkspace`. Future PR will migrate callers and delete this file.
+- `OcrWorkspaceStore.writeNormalizedJson` / `readNormalizedJson` — REMOVED. OCR JSON pipeline dropped; use `validate-marksheet(studentId, markdown)` instead.
+- `buildResultStoragePath` / `buildTranscriptStoragePath` in `_shared.ts` — REMOVED. Use `paths.marksheetPdfPath(studentId)` / `paths.transcriptPdfPath(studentId)` directly.

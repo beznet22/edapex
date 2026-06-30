@@ -12,6 +12,8 @@ import { and, eq, like, or, type SQL } from "drizzle-orm";
 import type { StudentDetails } from "$lib/server/repository/student.repo";
 import { StudentRepository } from "$lib/server/repository/student.repo";
 import { ScopedRepositoryProvider } from "$lib/server/mastra/scoped-repository";
+import { transcriptMarkdownPath } from "$lib/server/mastra/storage/workspaces/paths";
+import { addEntry } from "$lib/server/mastra/storage/workspaces/manifest-store";
 
 interface ReportToolContext {
   requestContext?: {
@@ -279,8 +281,17 @@ export const transcriptReportTool = createTool({
     }
 
     const fs = await resolveFilesystem(tenant);
-    const persistPath = `exams/transcripts/ay-${academicId}/${student.studentId}.md`;
+    const persistPath = transcriptMarkdownPath(student.studentId);
     await fs.writeFile(persistPath, markdown, { recursive: true });
+    await addEntry(tenant, {
+      path: persistPath,
+      kind: 'transcript-markdown',
+      studentId: student.studentId,
+      academicId,
+      uploadedAt: new Date().toISOString(),
+      modifiedAt: new Date().toISOString(),
+      mimeType: 'text/markdown'
+    });
 
     if (writer) {
       await writer.write({

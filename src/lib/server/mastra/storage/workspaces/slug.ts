@@ -21,8 +21,10 @@ function nfkdLower(s: string): string {
 export function classSlug(className: string | null | undefined, classId: number): string {
   if (!className || className.trim() === "") return String(classId);
   const normalized = nfkdLower(className).replace(/[^a-z0-9\s-]/g, "");
-  // Take first letter of each word + trailing digits (if any).
-  const words = normalized.split(/\s+/).filter(Boolean);
+  // Take first letter of each word (splitting on whitespace AND hyphens, and
+  // skipping words that are pure digits so the trailing digit is not
+  // double-counted). Then append any trailing digits from the original.
+  const words = normalized.split(/[\s-]+/).filter(Boolean).filter((w) => !/^\d+$/.test(w));
   const letters = words.map((w) => w[0] ?? "").join("");
   const digits = (normalized.match(/\d+/) ?? [""])[0];
   const slug = letters + digits;

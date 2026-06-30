@@ -72,9 +72,7 @@ export function generateConfirmationToken(): string {
   return base64url(`${Date.now()}-${Math.random().toString(36).slice(2, 10)}`);
 }
 
-export function sanitizeForFilename(value: string | null | undefined): string {
-  return (value || "student").replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 80);
-}
+export { sanitizeForFilename } from "$lib/server/mastra/storage/workspaces/slug";
 
 export type StudentCriteria = {
   studentId?: number | null;
@@ -281,21 +279,11 @@ export async function emitSelectOption(
   } as never);
 }
 
-export function buildResultStoragePath(
-  examTypeId: number,
-  admissionNo: number | null,
-  fullName: string | null,
-): string {
-  return `exams/examType-${examTypeId}/pdfs/${admissionNo ?? 0}_${sanitizeForFilename(fullName)}.pdf`;
-}
-
-export function buildTranscriptStoragePath(
-  academicId: number,
-  admissionNo: number | null,
-  fullName: string | null,
-): string {
-  return `exams/transcripts/ay-${academicId}/${admissionNo ?? 0}_${sanitizeForFilename(fullName)}.pdf`;
-}
+// PDF storage paths now live in `$lib/server/mastra/storage/workspaces/paths.ts`
+// as `marksheetPdfPath(studentId)` and `transcriptPdfPath(studentId)`. The
+// admissionNo-based path builders are gone — they collided when two students
+// in the same class shared an admission sequence. Use the studentId-keyed
+// canonical helpers.
 
 export type StudentSession = {
   classId: number | null;

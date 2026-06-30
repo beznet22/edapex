@@ -1,24 +1,21 @@
 import { createTool } from '@mastra/core/tools';
 import { z } from 'zod';
-import { streamWithAutoRetry, type StreamWriterLike } from '../../../../agent-stream-retry';
-import { tenantWorkspace } from '../../../../storage/workspaces';
+import { tenantWorkspace } from '$lib/server/mastra/storage/workspaces';
 import { buildWorkspaceRequestContext } from '$lib/server/helpers/chat-helper';
-import { readManifest, type ManifestEntry } from '../../../../storage/ocr/manifest-store';
-import type { TenantContext } from '../../../../tenant-context';
+import { readManifest as readOcrManifest } from '$lib/server/mastra/storage/ocr/manifest-store';
+import { ocrMarkdownPath, marksheetMarkdownPath } from '$lib/server/mastra/storage/workspaces/paths';
+import { addEntry } from '$lib/server/mastra/storage/workspaces/manifest-store';
+import type { TenantContext } from '$lib/server/mastra/tenant-context';
+import { streamWithAutoRetry, type StreamWriterLike } from '$lib/server/mastra/agent-stream-retry';
 import type { WorkspaceFilesystem } from '@mastra/core/workspace';
-
-const EXTRACTED_JSON_PATH = (documentId: string): string => `extracted/${documentId}.json`;
 
 interface MarksheetToolContext {
   requestContext?: {
     get<T = unknown>(key: string): T | undefined;
+    set<T = unknown>(key: string, value: T): void;
   };
   writer?: StreamWriterLike;
   abortSignal?: AbortSignal;
-}
-
-function getWriter(ctx: MarksheetToolContext): StreamWriterLike | undefined {
-  return ctx.writer;
 }
 
 function getTenant(ctx: MarksheetToolContext): TenantContext {
@@ -47,96 +44,83 @@ async function resolveTenantFilesystem(tenant: TenantContext): Promise<Workspace
   return fs;
 }
 
-function safeTitle(title: string | null | undefined): string {
-  return (title || 'untitled').replace(/[^a-zA-Z0-9._-]/g, '_');
-}
-
-async function readExtractedJson(tenant: TenantContext, documentId: string): Promise<unknown> {
-  const fs = await resolveTenantFilesystem(tenant);
-  const path = EXTRACTED_JSON_PATH(documentId);
-  if (!(await fs.exists(path))) {
-    throw new Error(`EXTRACTED_NOT_FOUND: no extracted JSON at ${path} for documentId=${documentId}`);
-  }
-  const raw = await fs.readFile(path, { encoding: 'utf-8' });
-  const text = typeof raw === 'string' ? raw : raw.toString('utf-8');
-  return JSON.parse(text);
-}
-
-async function findManifestEntry(
-  tenant: TenantContext,
-  documentId: string,
-): Promise<ManifestEntry> {
-  const manifest = await readManifest(tenant);
-  const entry = manifest.documents.find((doc) => doc.documentId === documentId);
-  if (!entry) {
-    throw new Error(`MANIFEST_ENTRY_NOT_FOUND: documentId=${documentId} is not in the upload manifest`);
-  }
-  return entry;
-}
-
-function studentFullName(json: Record<string, unknown>): string | undefined {
-  const student = json.student as { fullName?: unknown } | undefined;
-  if (student && typeof student.fullName === 'string') {
-    return student.fullName;
-  }
-  return undefined;
-}
-
 export const formatMarksheetDocumentTool = createTool({
   id: 'format-marksheet-document',
   description:
-    'Transform the extracted JSON into clean academic markdown. ' +
-    'Emits data-createDocument stream parts (processing → streaming → success).',
+    'Transform OCR markdown into clean academic report markdown. ' +
+    'Reads ocr/<fileName>.md, re-formats via document agent, persists to marksheets/<studentId>-<slug>.md ' +
+    '(or marksheets/ocr-<documentId>.md if no studentHint yet). Emits data-createDocument stream parts.',
   inputSchema: z.object({
-    documentId: z.string().describe('The documentId of the marksheet to format.'),
+    documentId: z.string().describe('The documentId of the marksheet to format.')
   }),
   outputSchema: z.object({
     artifactId: z.string(),
     title: z.string(),
     markdown: z.string(),
-    status: z.literal('success'),
+    persistPath: z.string(),
+    studentId: z.number().nullable(),
+    status: z.literal('success')
   }),
   execute: async (input, ctx) => {
     const context = ctx as MarksheetToolContext;
     const tenant = getTenant(context);
-    const writer = getWriter(context);
+    const writer = context.writer;
 
-    const entry = await findManifestEntry(tenant, input.documentId);
-    const raw = await readExtractedJson(tenant, input.documentId);
-    const json = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
+    // 1. Find manifest entry by documentId
+    const manifest = await readOcrManifest(tenant);
+    const entry = manifest.documents.find((doc) => doc.documentId === input.documentId);
+    if (!entry) {
+      throw new Error(`MANIFEST_ENTRY_NOT_FOUND: documentId=${input.documentId} is not in the upload manifest`);
+    }
 
-    const studentName = studentFullName(json);
+    // 2. Read OCR markdown from canonical path
+    const fs = await resolveTenantFilesystem(tenant);
+    const mdRelPath = ocrMarkdownPath(entry.fileName);
+    if (!(await fs.exists(mdRelPath))) {
+      throw new Error(`OCR_MARKDOWN_NOT_FOUND: no markdown at ${mdRelPath}`);
+    }
+    const raw = await fs.readFile(mdRelPath, { encoding: 'utf-8' });
+    const ocrMarkdown = typeof raw === 'string' ? raw : raw.toString('utf-8');
+
+    // 3. Resolve student identity from hint
+    const hint = entry.studentHint;
+    const studentId = hint?.studentId ?? null;
+    const studentName =
+      hint?.fullName ??
+      (await guessStudentNameFromMarkdown(ocrMarkdown)) ??
+      entry.fileName;
+
     const artifactId = `artifact-${input.documentId}`;
-    const title = studentName ?? entry.fileName;
+    const title = studentName;
 
     if (writer) {
       await writer.write({
         type: 'data-createDocument',
         id: artifactId,
-        data: { status: 'processing', content: '', title, id: artifactId },
+        data: { status: 'processing', content: '', title, id: artifactId }
       } as never);
     }
 
+    // 4. Re-format via document agent
     const documentAgent = await getDocumentAgent();
-
     const prompt = [
-      `Format this structured academic result for ${studentName ?? 'the student'} into clean, well-structured markdown.`,
-      'Preserve every factual value, subject name, score, and grade from the JSON below.',
+      `Format the following OCR-extracted academic result for ${studentName} into clean, well-structured markdown.`,
+      'Preserve every factual value, subject name, score, and grade from the input.',
       'Render it as an academic report card that a parent can read at a glance.',
       '',
-      '```json',
-      JSON.stringify(json, null, 2),
-      '```',
+      '```markdown',
+      ocrMarkdown,
+      '```'
     ].join('\n');
 
     const stream = await streamWithAutoRetry({
       stream: () =>
         documentAgent.stream(prompt, {
           ...(context.abortSignal ? { abortSignal: context.abortSignal } : {}),
-          ...(context.requestContext ? { requestContext: context.requestContext as never } : {}),
+          ...(context.requestContext ? { requestContext: context.requestContext as never } : {})
         }),
       abortSignal: context.abortSignal,
-      writer: writer ?? { write: async () => {} },
+      writer: writer ?? { write: async () => {} }
     });
 
     let markdown = '';
@@ -147,7 +131,7 @@ export const formatMarksheetDocumentTool = createTool({
         await writer.write({
           type: 'data-createDocument',
           id: artifactId,
-          data: { status: 'streaming', content: markdown, title, id: artifactId },
+          data: { status: 'streaming', content: markdown, title, id: artifactId }
         } as never);
       }
     }
@@ -156,30 +140,61 @@ export const formatMarksheetDocumentTool = createTool({
       await writer.write({
         type: 'data-createDocument',
         id: artifactId,
-        data: { status: 'success', content: markdown, title, id: artifactId },
+        data: { status: 'success', content: markdown, title, id: artifactId }
       } as never);
     }
 
-    if (tenant.examTypeId !== null) {
-      const fs = await resolveTenantFilesystem(tenant);
-      const persistPath = `exams/examType-${tenant.examTypeId}/${safeTitle(title)}.md`;
-      await fs.writeFile(persistPath, markdown, { recursive: true });
+    // 5. Persist to canonical path
+    const persistPath =
+      studentId !== null
+        ? marksheetMarkdownPath(studentId, studentName)
+        : `marksheets/ocr-${input.documentId}.md`;
+    await fs.writeFile(persistPath, markdown, { recursive: true });
 
-      // Bug 1 fix: persist the actual artifact path on the request context so
-      // the downstream awaitValidationStep can read the EXACT file on resume.
-      // Without this, every resume failed with TENANT_OR_DOCUMENT_MISSING.
-      const requestContext = context.requestContext;
-      if (requestContext && typeof requestContext.set === 'function') {
-        requestContext.set('formatArtifactState', {
-          documentId: input.documentId,
-          artifactId,
-          persistPath,
-          title,
-          studentHint: entry.studentHint ?? null
-        });
-      }
+    // 6. Register in new manifest
+    await addEntry(tenant, {
+      path: persistPath,
+      kind: 'marksheet-markdown',
+      studentId: studentId ?? undefined,
+      uploadedAt: new Date().toISOString(),
+      modifiedAt: new Date().toISOString(),
+      mimeType: 'text/markdown'
+    });
+
+    // 7. Set formatArtifactState for awaitValidationStep resume
+    if (context.requestContext) {
+      context.requestContext.set('formatArtifactState', {
+        documentId: input.documentId,
+        artifactId,
+        persistPath,
+        title,
+        studentHint: hint ?? null
+      });
     }
 
-    return { artifactId, title, markdown, status: 'success' as const };
-  },
+    return {
+      artifactId,
+      title,
+      markdown,
+      persistPath,
+      studentId,
+      status: 'success' as const
+    };
+  }
 });
+
+/**
+ * Best-effort guess at the student's name from OCR markdown.
+ * Looks for lines starting with "Student:", "Name:", or containing a capitalized name in the first 10 lines.
+ */
+async function guessStudentNameFromMarkdown(md: string): Promise<string | null> {
+  const lines = md.split('\n').slice(0, 10);
+  for (const line of lines) {
+    const match = line.match(/^\s*(?:Student|Name)\s*:\s*(.+)/i);
+    if (match && match[1]) {
+      const name = match[1].trim();
+      if (name.length > 0 && name.length < 100) return name;
+    }
+  }
+  return null;
+}

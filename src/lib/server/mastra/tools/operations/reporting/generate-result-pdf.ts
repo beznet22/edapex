@@ -11,7 +11,6 @@ import ResultTemplate from "$lib/components/template/ResultTemplate.svelte";
 import {
   _resolveStudentSession,
   base64url,
-  buildResultStoragePath,
   emitPdfPart,
   getTenant,
   getWriter,
@@ -20,6 +19,8 @@ import {
   sanitizeForFilename,
   studentCriteriaBase,
 } from "./_shared";
+import { marksheetPdfPath } from "$lib/server/mastra/storage/workspaces/paths";
+import { addEntry } from "$lib/server/mastra/storage/workspaces/manifest-store";
 import type { WorkspaceFilesystem } from "@mastra/core/workspace";
 
 const reportPdfInputSchema = z.object({
@@ -140,7 +141,7 @@ async function renderAndWriteResultPdf(args: CoreRenderArgs): Promise<CoreRender
   const fullName = student.fullName ?? "student";
   const title = `${sanitizeForFilename(fullName)}.pdf`;
   const artifactId = `pdf-${student.studentId}-${examTypeId}`;
-  const storagePath = buildResultStoragePath(examTypeId, student.admissionNo, student.fullName);
+  const storagePath = marksheetPdfPath(student.studentId);
   const fs = await resolveFilesystem(resolvedTenant);
 
   const pdfExists = await fs.exists(storagePath);
@@ -212,6 +213,15 @@ async function renderAndWriteResultPdf(args: CoreRenderArgs): Promise<CoreRender
   await fs.writeFile(storagePath, new Uint8Array(pdfBuffer), {
     recursive: true,
     overwrite: true,
+  });
+  await addEntry(resolvedTenant, {
+    path: storagePath,
+    kind: 'marksheet-pdf',
+    studentId: student.studentId,
+    examTypeId,
+    uploadedAt: new Date().toISOString(),
+    modifiedAt: new Date().toISOString(),
+    mimeType: 'application/pdf'
   });
 
   const token = base64url(JSON.stringify({ studentId: student.studentId, examTypeId }));

@@ -12,7 +12,7 @@ import path from "node:path";
 import { classDir } from "./paths";
 import type { TenantContext } from "$lib/server/mastra/tenant-context";
 import { buildWorkspaceRequestContext } from "$lib/server/helpers/chat-helper";
-import { tenantWorkspace } from "$lib/server/workspaces";
+import { tenantWorkspace } from "$lib/server/mastra/storage/workspaces";
 
 export type ArtifactKind =
   | "ocr-markdown"

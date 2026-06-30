@@ -4,10 +4,10 @@ import { type StreamWriterLike } from '$lib/server/mastra/agent-stream-retry';
 import { tenantWorkspace } from '$lib/server/mastra/storage/workspaces';
 import { buildWorkspaceRequestContext } from '$lib/server/helpers/chat-helper';
 import { marksheetSchema } from '$lib/schema/marksheet';
+import { marksheetJsonPath } from '$lib/server/mastra/storage/workspaces/paths';
+import { addEntry } from '$lib/server/mastra/storage/workspaces/manifest-store';
 import type { TenantContext } from '$lib/server/mastra/tenant-context';
 import type { WorkspaceFilesystem } from '@mastra/core/workspace';
-
-const EXTRACTED_JSON_PATH = (documentId: string): string => `extracted/${documentId}.json`;
 
 interface MarksheetToolContext {
   requestContext?: {
@@ -43,19 +43,6 @@ async function resolveTenantFilesystem(tenant: TenantContext): Promise<Workspace
   return fs;
 }
 
-async function writeExtractedJson(
-  tenant: TenantContext,
-  documentId: string,
-  json: unknown,
-): Promise<void> {
-  const fs = await resolveTenantFilesystem(tenant);
-  await fs.writeFile(
-    EXTRACTED_JSON_PATH(documentId),
-    JSON.stringify(json, null, 2),
-    { recursive: true },
-  );
-}
-
 const marksheetErrorSchema = z.object({
   path: z.string(),
   message: z.string(),
@@ -65,23 +52,27 @@ const marksheetErrorSchema = z.object({
 export const validateMarksheetTool = createTool({
   id: 'validate-marksheet',
   description:
-    'Re-derive the JSON from the current markdown via the document agent, ' +
-    'then run marksheetSchema.safeParse. The correctedMarkdown is read from the workspace.',
+    'Re-derive the JSON from the corrected markdown via the document agent, ' +
+    'then run marksheetSchema.safeParseAsync. Persists the validated JSON to marksheets/<studentId>.json.',
   inputSchema: z.object({
-    documentId: z.string().describe('The documentId whose JSON should be re-derived and validated.'),
+    studentId: z
+      .number()
+      .int()
+      .positive()
+      .describe('The studentId whose marksheet JSON should be re-derived and validated.'),
     correctedMarkdown: z.string().describe('The user-corrected markdown to re-derive JSON from.'),
   }),
   outputSchema: z.discriminatedUnion('ok', [
-    z.object({ ok: z.literal(true) }),
+    z.object({ ok: z.literal(true), json: z.unknown() }),
     z.object({
       ok: z.literal(false),
       errors: z.array(marksheetErrorSchema),
+      unresolvedErrors: z.array(marksheetErrorSchema),
     }),
   ]),
   execute: async (input, ctx) => {
     const context = ctx as MarksheetToolContext;
     const tenant = getTenant(context);
-    void tenant;
 
     const documentAgent = await getDocumentAgent();
 
@@ -94,40 +85,69 @@ export const validateMarksheetTool = createTool({
       '```',
     ].join('\n');
 
-    const response = await documentAgent.generate(prompt, {
-      ...(context.abortSignal ? { abortSignal: context.abortSignal } : {}),
-      ...(context.requestContext ? { requestContext: context.requestContext as never } : {}),
-      structuredOutput: { schema: marksheetSchema },
-    });
-
-    const reDerivedJson: unknown =
-      (response as { object?: unknown }).object ?? (() => {
-        const text = (response as { text?: string }).text ?? '';
-        try {
-          return JSON.parse(text);
-        } catch {
-          return null;
-        }
-      })();
-
-    if (reDerivedJson === null || reDerivedJson === undefined) {
-      throw new Error('STRUCTURED_OUTPUT_EMPTY: document agent returned neither object nor parseable text');
+    let reDerivedJson: unknown = null;
+    let lastError: unknown = null;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const response = await documentAgent.generate(prompt, {
+        ...(context.abortSignal ? { abortSignal: context.abortSignal } : {}),
+        ...(context.requestContext ? { requestContext: context.requestContext as never } : {}),
+        structuredOutput: { schema: marksheetSchema },
+      });
+      reDerivedJson =
+        (response as { object?: unknown }).object ??
+        (() => {
+          const text = (response as { text?: string }).text ?? '';
+          try {
+            return JSON.parse(text);
+          } catch {
+            return null;
+          }
+        })();
+      if (reDerivedJson !== null && reDerivedJson !== undefined) break;
+      lastError = new Error('STRUCTURED_OUTPUT_EMPTY');
     }
 
-    await writeExtractedJson(tenant, input.documentId, reDerivedJson);
+    if (reDerivedJson === null || reDerivedJson === undefined) {
+      void lastError;
+      return {
+        ok: false as const,
+        errors: [
+          {
+            path: '$',
+            message: 'STRUCTURED_OUTPUT_EMPTY: document agent returned neither object nor parseable text after 3 attempts',
+            code: 'empty_output',
+          }
+        ],
+        unresolvedErrors: []
+      };
+    }
+
+    // Persist JSON to canonical path: marksheets/<studentId>.json
+    const fs = await resolveTenantFilesystem(tenant);
+    const jsonPath = marksheetJsonPath(input.studentId);
+    await fs.writeFile(jsonPath, JSON.stringify(reDerivedJson, null, 2), { recursive: true });
+    await addEntry(tenant, {
+      path: jsonPath,
+      kind: 'marksheet-json',
+      studentId: input.studentId,
+      uploadedAt: new Date().toISOString(),
+      modifiedAt: new Date().toISOString(),
+      mimeType: 'application/json'
+    });
 
     const parsed = await marksheetSchema.safeParseAsync(reDerivedJson);
     if (parsed.success) {
-      return { ok: true as const };
+      return { ok: true as const, json: reDerivedJson };
     }
 
     return {
       ok: false as const,
-      errors: parsed.error.issues.map((issue) => ({
+      errors: [],
+      unresolvedErrors: parsed.error.issues.map((issue) => ({
         path: issue.path.join('.'),
         message: issue.message,
         code: issue.code,
-      })),
+      }))
     };
-  },
+  }
 });

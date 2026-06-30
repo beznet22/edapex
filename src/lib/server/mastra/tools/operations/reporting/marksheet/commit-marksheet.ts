@@ -3,14 +3,12 @@ import { z } from 'zod';
 import { type StreamWriterLike } from '../../../../agent-stream-retry';
 import { tenantWorkspace } from '../../../../storage/workspaces';
 import { buildWorkspaceRequestContext } from '$lib/server/helpers/chat-helper';
-import { readManifest, type ManifestEntry } from '../../../../storage/ocr/manifest-store';
-import { removeCommittedDocument } from '../../../../storage/ocr/extracted-cleanup';
+import { marksheetJsonPath } from '../../../../storage/workspaces/paths';
+import { addEntry } from '../../../../storage/workspaces/manifest-store';
 import { createAssessmentServiceForRequest } from '$lib/server/service/assessment.service';
 import { marksheetSchema, type Marksheet } from '$lib/schema/marksheet';
 import type { TenantContext } from '../../../../tenant-context';
 import type { WorkspaceFilesystem } from '@mastra/core/workspace';
-
-const EXTRACTED_JSON_PATH = (documentId: string): string => `extracted/${documentId}.json`;
 
 interface MarksheetToolContext {
   requestContext?: {
@@ -41,36 +39,13 @@ async function resolveTenantFilesystem(tenant: TenantContext): Promise<Workspace
   return fs;
 }
 
-async function readExtractedJson(tenant: TenantContext, documentId: string): Promise<unknown> {
-  const fs = await resolveTenantFilesystem(tenant);
-  const path = EXTRACTED_JSON_PATH(documentId);
-  if (!(await fs.exists(path))) {
-    throw new Error(`EXTRACTED_NOT_FOUND: no extracted JSON at ${path} for documentId=${documentId}`);
-  }
-  const raw = await fs.readFile(path, { encoding: 'utf-8' });
-  const text = typeof raw === 'string' ? raw : raw.toString('utf-8');
-  return JSON.parse(text);
-}
-
-async function findManifestEntry(
-  tenant: TenantContext,
-  documentId: string,
-): Promise<ManifestEntry> {
-  const manifest = await readManifest(tenant);
-  const entry = manifest.documents.find((doc) => doc.documentId === documentId);
-  if (!entry) {
-    throw new Error(`MANIFEST_ENTRY_NOT_FOUND: documentId=${documentId} is not in the upload manifest`);
-  }
-  return entry;
-}
-
 export const commitMarksheetTool = createTool({
   id: 'commit-marksheet',
   description:
-    'Write the JSON to the academic record via AssessmentService.upsertMarksheet. ' +
-    'Removes the document from the manifest. Emits data-committed { artifactId, recordId, studentName, status: "committed" }.',
+    'Read marksheets/<studentId>.json, validate via marksheetSchema, write to the academic record via ' +
+    'AssessmentService.upsertMarksheet. Emits data-committed { artifactId, recordId, studentName, status: "committed" }.',
   inputSchema: z.object({
-    documentId: z.string().describe('The documentId of the marksheet to commit.'),
+    studentId: z.number().int().positive().describe('The studentId whose marksheet should be committed.'),
   }),
   outputSchema: z.object({
     artifactId: z.string(),
@@ -82,21 +57,35 @@ export const commitMarksheetTool = createTool({
     const tenant = getTenant(context);
     const writer = getWriter(context);
 
-    const entry = await findManifestEntry(tenant, input.documentId);
-    const raw = await readExtractedJson(tenant, input.documentId);
-    const validated: Marksheet = await marksheetSchema.parseAsync(raw);
+    if (tenant.staffId <= 0) {
+      throw new Error('STAFF_ID_REQUIRED: committing a marksheet requires a valid staffId in TenantContext');
+    }
 
-    const artifactId = `artifact-${input.documentId}`;
-    const ext = (entry.fileName.split('.').pop() ?? 'bin').toLowerCase();
+    const fs = await resolveTenantFilesystem(tenant);
+    const jsonPath = marksheetJsonPath(input.studentId);
+    if (!(await fs.exists(jsonPath))) {
+      throw new Error(`MARKSHEET_JSON_NOT_FOUND: no JSON at ${jsonPath} for studentId=${input.studentId}`);
+    }
+    const raw = await fs.readFile(jsonPath, { encoding: 'utf-8' });
+    const text = typeof raw === 'string' ? raw : raw.toString('utf-8');
+    const validated: Marksheet = await marksheetSchema.parseAsync(JSON.parse(text));
+
+    const artifactId = `artifact-student-${input.studentId}`;
 
     const service = await createAssessmentServiceForRequest(tenant);
-    const response = await service.upsertMarksheet(
-      validated,
-      tenant.staffId,
-    );
-    const recordId = response.recordId ?? response.student.id;
+    const response = await service.upsertMarksheet(validated, tenant.staffId);
+    const recordId = response.recordId ?? validated.student?.id ?? input.studentId;
 
-    await removeCommittedDocument(tenant, input.documentId, entry.contentHash, ext);
+    // Update manifest with committed recordId
+    await addEntry(tenant, {
+      path: jsonPath,
+      kind: 'marksheet-json',
+      studentId: input.studentId,
+      recordId,
+      uploadedAt: new Date().toISOString(),
+      modifiedAt: new Date().toISOString(),
+      mimeType: 'application/json'
+    });
 
     const studentName = validated.student?.fullName ?? 'Unknown';
 

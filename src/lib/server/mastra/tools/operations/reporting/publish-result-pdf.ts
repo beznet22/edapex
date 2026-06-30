@@ -10,7 +10,6 @@ import type { StreamWriterLike } from "$lib/server/mastra/agent-stream-retry";
 import { generateResultPdfTool } from "./generate-result-pdf";
 import {
   base64url,
-  buildResultStoragePath,
   emitNotification,
   emitPdfPart,
   emitSelectOption,
@@ -23,6 +22,8 @@ import {
   sanitizeForFilename,
   studentCriteriaBase,
 } from "./_shared";
+import { marksheetPdfPath } from "$lib/server/mastra/storage/workspaces/paths";
+import { addEntry } from "$lib/server/mastra/storage/workspaces/manifest-store";
 
 const CONFIRM_CONTEXT_KEY = "resultPublishConfirm";
 
@@ -358,7 +359,7 @@ export const publishResultPdfTool = createTool({
     const fullName = student.fullName ?? "student";
     const title = `${sanitizeForFilename(fullName)}.pdf`;
     const artifactId = `pdf-${student.studentId}-${examTypeId}`;
-    const storagePath = buildResultStoragePath(examTypeId, student.admissionNo, student.fullName);
+    const storagePath = marksheetPdfPath(student.studentId);
 
     const preview = await ensureResultPdf(tenant, writer, input, student, examTypeId, artifactId, title, storagePath, ctx);
 

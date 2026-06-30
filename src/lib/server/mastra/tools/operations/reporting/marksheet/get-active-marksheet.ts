@@ -3,11 +3,10 @@ import { z } from 'zod';
 import { type StreamWriterLike } from '../../../../agent-stream-retry';
 import { tenantWorkspace } from '../../../../storage/workspaces';
 import { buildWorkspaceRequestContext } from '$lib/server/helpers/chat-helper';
-import { readManifest, type ManifestEntry } from '../../../../storage/ocr/manifest-store';
+import { readManifest as readNewManifest } from '../../../../storage/workspaces/manifest-store';
+import { marksheetJsonPath } from '../../../../storage/workspaces/paths';
 import type { TenantContext } from '../../../../tenant-context';
 import type { WorkspaceFilesystem } from '@mastra/core/workspace';
-
-const EXTRACTED_JSON_PATH = (documentId: string): string => `extracted/${documentId}.json`;
 
 interface MarksheetToolContext {
   requestContext?: {
@@ -34,78 +33,50 @@ async function resolveTenantFilesystem(tenant: TenantContext): Promise<Workspace
   return fs;
 }
 
-async function readExtractedJson(tenant: TenantContext, documentId: string): Promise<unknown> {
-  const fs = await resolveTenantFilesystem(tenant);
-  const path = EXTRACTED_JSON_PATH(documentId);
-  if (!(await fs.exists(path))) {
-    throw new Error(`EXTRACTED_NOT_FOUND: no extracted JSON at ${path} for documentId=${documentId}`);
-  }
-  const raw = await fs.readFile(path, { encoding: 'utf-8' });
-  const text = typeof raw === 'string' ? raw : raw.toString('utf-8');
-  return JSON.parse(text);
-}
-
-async function findManifestEntry(
-  tenant: TenantContext,
-  documentId: string,
-): Promise<ManifestEntry> {
-  const manifest = await readManifest(tenant);
-  const entry = manifest.documents.find((doc) => doc.documentId === documentId);
-  if (!entry) {
-    throw new Error(`MANIFEST_ENTRY_NOT_FOUND: documentId=${documentId} is not in the upload manifest`);
-  }
-  return entry;
-}
-
 export const getActiveMarksheetTool = createTool({
   id: 'get-active-marksheet',
   description:
-    'Read the extracted JSON for the most recently referenced marksheet. ' +
-    'Returns the JSON, fileName, and contentHash.',
+    'Read the current validated JSON for a student at marksheets/<studentId>.json. ' +
+    'Returns the JSON plus manifest entry info.',
   inputSchema: z.object({
-    documentId: z
-      .string()
-      .optional()
-      .describe('Optional explicit documentId. Falls back to the request context defaultDocumentId.'),
+    studentId: z.number().int().positive().describe('The studentId whose marksheet should be read.'),
   }),
   outputSchema: z.object({
-    documentId: z.string(),
-    fileName: z.string(),
-    contentHash: z.string(),
-    json: z.record(z.string(), z.unknown()),
+    studentId: z.number(),
+    json: z.record(z.string(), z.unknown()).nullable(),
     examTypeId: z.number().nullable(),
-    studentHint: z
-      .object({
-        fullName: z.string().optional(),
-        admissionNo: z.number().optional(),
-      })
-      .optional(),
+    committedAt: z.string().nullable(),
+    recordId: z.number().nullable(),
   }),
   execute: async (input, ctx) => {
     const context = ctx as MarksheetToolContext;
     const tenant = getTenant(context);
 
-    const inputDocumentId = input.documentId;
-    const fallbackDocumentId = context.requestContext?.get('defaultDocumentId') as string | undefined;
-    const documentId = inputDocumentId ?? fallbackDocumentId;
-    if (!documentId) {
-      throw new Error('DOCUMENT_ID_REQUIRED: provide input.documentId or set defaultDocumentId on the request context');
+    const fs = await resolveTenantFilesystem(tenant);
+    const jsonPath = marksheetJsonPath(input.studentId);
+    if (!(await fs.exists(jsonPath))) {
+      return {
+        studentId: input.studentId,
+        json: null,
+        examTypeId: tenant.examTypeId,
+        committedAt: null,
+        recordId: null
+      };
     }
+    const raw = await fs.readFile(jsonPath, { encoding: 'utf-8' });
+    const text = typeof raw === 'string' ? raw : raw.toString('utf-8');
+    const json = JSON.parse(text) as Record<string, unknown>;
 
-    const entry = await findManifestEntry(tenant, documentId);
-    const raw = await readExtractedJson(tenant, documentId);
-    const json = (raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {}) as Record<
-      string,
-      unknown
-    >;
+    // Look up manifest entry for recordId + committedAt
+    const manifest = await readNewManifest(tenant);
+    const entry = manifest.entries[jsonPath];
 
     return {
-      documentId,
-      fileName: entry.fileName,
-      contentHash: entry.contentHash,
+      studentId: input.studentId,
       json,
       examTypeId: tenant.examTypeId,
-      studentHint: entry.studentHint,
+      committedAt: entry?.uploadedAt ?? null,
+      recordId: entry?.recordId ?? null
     };
   },
 });

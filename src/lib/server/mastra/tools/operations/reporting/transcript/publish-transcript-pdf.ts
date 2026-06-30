@@ -13,7 +13,6 @@ import ResultEmail from "$lib/components/template/result-email.svelte";
 import { generateTranscriptPdfTool } from "./generate-transcript-pdf";
 import {
   base64url,
-  buildTranscriptStoragePath,
   emitNotification,
   emitPdfPart,
   emitSelectOption,
@@ -25,6 +24,8 @@ import {
   resolveStudent,
   sanitizeForFilename,
 } from "../_shared";
+import { transcriptPdfPath } from "$lib/server/mastra/storage/workspaces/paths";
+import { addEntry } from "$lib/server/mastra/storage/workspaces/manifest-store";
 
 const CONFIRM_CONTEXT_KEY = "transcriptPublishConfirm";
 
@@ -118,7 +119,7 @@ async function ensureTranscriptPdf(args: RenderArgs): Promise<RenderResult> {
   const fullName = student.fullName ?? "student";
   const title = `${sanitizeForFilename(fullName)}.pdf`;
   const artifactId = `pdf-transcript-${student.studentId}-${academicId}`;
-  const storagePath = buildTranscriptStoragePath(academicId, student.admissionNo, student.fullName);
+  const storagePath = transcriptPdfPath(student.studentId);
   const fsHandle = await resolveFilesystem(tenant);
   const pdfExists = await fsHandle.exists(storagePath);
 

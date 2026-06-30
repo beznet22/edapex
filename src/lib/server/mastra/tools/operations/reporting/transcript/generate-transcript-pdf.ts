@@ -9,7 +9,6 @@ import type { StreamWriterLike } from "$lib/server/mastra/agent-stream-retry";
 import TranscriptTemplate from "$lib/components/template/TranscriptTemplate.svelte";
 import {
   base64url,
-  buildTranscriptStoragePath,
   emitPdfPart,
   getTenant,
   getWriter,
@@ -18,6 +17,8 @@ import {
   sanitizeForFilename,
   studentCriteriaBase,
 } from "../_shared";
+import { transcriptPdfPath } from "$lib/server/mastra/storage/workspaces/paths";
+import { addEntry } from "$lib/server/mastra/storage/workspaces/manifest-store";
 
 const reportPdfInputSchema = z.object({
   ...studentCriteriaBase,
@@ -76,7 +77,7 @@ async function renderAndWriteTranscriptPdf(args: CoreRenderArgs): Promise<CoreRe
   const fullName = student.fullName ?? "student";
   const title = `${sanitizeForFilename(fullName)}.pdf`;
   const artifactId = `pdf-transcript-${student.studentId}-${academicId}`;
-  const storagePath = buildTranscriptStoragePath(academicId, student.admissionNo, student.fullName);
+  const storagePath = transcriptPdfPath(student.studentId);
 
   const fs = await resolveFilesystem(tenant);
   const pdfExists = await fs.exists(storagePath);
@@ -143,6 +144,15 @@ async function renderAndWriteTranscriptPdf(args: CoreRenderArgs): Promise<CoreRe
   await fs.writeFile(storagePath, new Uint8Array(pdfBuffer), {
     recursive: true,
     overwrite: true,
+  });
+  await addEntry(tenant, {
+    path: storagePath,
+    kind: 'transcript-pdf',
+    studentId: student.studentId,
+    academicId,
+    uploadedAt: new Date().toISOString(),
+    modifiedAt: new Date().toISOString(),
+    mimeType: 'application/pdf'
   });
 
   const tokenPayload = { studentId: student.studentId, academicId, kind: "transcript" as const };

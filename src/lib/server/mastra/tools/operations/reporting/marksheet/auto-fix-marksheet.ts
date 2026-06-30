@@ -3,10 +3,10 @@ import { z } from 'zod';
 import { streamWithAutoRetry, type StreamWriterLike } from '../../../../agent-stream-retry';
 import { tenantWorkspace } from '../../../../storage/workspaces';
 import { buildWorkspaceRequestContext } from '$lib/server/helpers/chat-helper';
+import { marksheetJsonPath, marksheetMarkdownPath } from '../../../../storage/workspaces/paths';
+import { addEntry } from '../../../../storage/workspaces/manifest-store';
 import type { TenantContext } from '../../../../tenant-context';
 import type { WorkspaceFilesystem } from '@mastra/core/workspace';
-
-const EXTRACTED_JSON_PATH = (documentId: string): string => `extracted/${documentId}.json`;
 
 interface MarksheetToolContext {
   requestContext?: {
@@ -46,34 +46,18 @@ async function resolveTenantFilesystem(tenant: TenantContext): Promise<Workspace
   return fs;
 }
 
-async function readExtractedJson(tenant: TenantContext, documentId: string): Promise<unknown> {
-  const fs = await resolveTenantFilesystem(tenant);
-  const path = EXTRACTED_JSON_PATH(documentId);
-  if (!(await fs.exists(path))) {
-    throw new Error(`EXTRACTED_NOT_FOUND: no extracted JSON at ${path} for documentId=${documentId}`);
-  }
-  const raw = await fs.readFile(path, { encoding: 'utf-8' });
-  const text = typeof raw === 'string' ? raw : raw.toString('utf-8');
-  return JSON.parse(text);
-}
-
-async function writeExtractedJson(
-  tenant: TenantContext,
-  documentId: string,
-  json: unknown,
-): Promise<void> {
-  const fs = await resolveTenantFilesystem(tenant);
-  await fs.writeFile(
-    EXTRACTED_JSON_PATH(documentId),
-    JSON.stringify(json, null, 2),
-    { recursive: true },
-  );
-}
-
 function studentFullName(json: Record<string, unknown>): string | undefined {
   const student = json.student as { fullName?: unknown } | undefined;
   if (student && typeof student.fullName === 'string') {
     return student.fullName;
+  }
+  return undefined;
+}
+
+function studentIdFromJson(json: Record<string, unknown>): number | undefined {
+  const student = json.student as { id?: unknown } | undefined;
+  if (student && typeof student.id === 'number') {
+    return student.id;
   }
   return undefined;
 }
@@ -107,10 +91,10 @@ const fixOutputSchema = z.object({
 export const autoFixMarksheetTool = createTool({
   id: 'auto-fix-marksheet',
   description:
-    'Apply mechanical fixes to the JSON at ≥80% confidence. Writes the fixed JSON to disk ' +
-    'and re-emits the document via data-createDocument (processing → streaming → success).',
+    'Apply mechanical fixes to the JSON at ≥80% confidence. Writes the fixed JSON to ' +
+    'marksheets/<studentId>.json and re-streams the markdown via data-createDocument.',
   inputSchema: z.object({
-    documentId: z.string().describe('The documentId whose JSON should be auto-fixed.'),
+    studentId: z.number().int().positive().describe('The studentId whose marksheet JSON should be auto-fixed.'),
     errors: z.array(marksheetErrorSchema).describe('Validation errors that need fixing.'),
     currentMarkdown: z.string().describe('The markdown the user has been reviewing.'),
   }),
@@ -124,7 +108,13 @@ export const autoFixMarksheetTool = createTool({
     const tenant = getTenant(context);
     const writer = getWriter(context);
 
-    const currentJson = (await readExtractedJson(tenant, input.documentId)) as Record<string, unknown>;
+    const fs = await resolveTenantFilesystem(tenant);
+    const jsonPath = marksheetJsonPath(input.studentId);
+    if (!(await fs.exists(jsonPath))) {
+      throw new Error(`MARKSHEET_JSON_NOT_FOUND: no JSON at ${jsonPath} for studentId=${input.studentId}`);
+    }
+    const rawJson = await fs.readFile(jsonPath, { encoding: 'utf-8' });
+    const currentJson = JSON.parse(typeof rawJson === 'string' ? rawJson : rawJson.toString('utf-8'));
 
     const documentAgent = await getDocumentAgent();
 
@@ -170,7 +160,15 @@ export const autoFixMarksheetTool = createTool({
     }
     const fix = parsedFix.data;
 
-    await writeExtractedJson(tenant, input.documentId, fix.fixedJson);
+    await fs.writeFile(jsonPath, JSON.stringify(fix.fixedJson, null, 2), { recursive: true });
+    await addEntry(tenant, {
+      path: jsonPath,
+      kind: 'marksheet-json',
+      studentId: input.studentId,
+      uploadedAt: new Date().toISOString(),
+      modifiedAt: new Date().toISOString(),
+      mimeType: 'application/json'
+    });
 
     if (fix.appliedFixes.length === 0) {
       return {
@@ -180,9 +178,9 @@ export const autoFixMarksheetTool = createTool({
       };
     }
 
-    const artifactId = `artifact-${input.documentId}`;
-    const title =
-      studentFullName(fix.fixedJson as Record<string, unknown>) ?? 'Document';
+    const artifactId = `artifact-student-${input.studentId}`;
+    const studentName = studentFullName(fix.fixedJson);
+    const title = studentName ?? 'Document';
 
     if (writer) {
       await writer.write({
@@ -230,6 +228,20 @@ export const autoFixMarksheetTool = createTool({
         id: artifactId,
         data: { status: 'success', content: markdown, title, id: artifactId },
       } as never);
+    }
+
+    const sid = studentIdFromJson(fix.fixedJson);
+    if (sid !== undefined) {
+      const mdPath = marksheetMarkdownPath(sid, studentName ?? null);
+      await fs.writeFile(mdPath, markdown, { recursive: true });
+      await addEntry(tenant, {
+        path: mdPath,
+        kind: 'marksheet-markdown',
+        studentId: sid,
+        uploadedAt: new Date().toISOString(),
+        modifiedAt: new Date().toISOString(),
+        mimeType: 'text/markdown'
+      });
     }
 
     return {
