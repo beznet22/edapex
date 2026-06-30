@@ -556,7 +556,7 @@ export class ChatContext {
     this.pendingGate = null;
   };
 
-  resumeWorkflow(artifactId: string): void {
+  resumeWorkflow(artifactId: string, dropdownOptionId?: string): void {
     if (!this.activeRunId) {
       console.warn('[ChatContext] resumeWorkflow called but activeRunId is not set');
       return;
@@ -567,6 +567,11 @@ export class ChatContext {
     }
     this.pendingValidationArtifactId = artifactId;
 
+    const resumeData: Record<string, unknown> = { artifactId };
+    if (dropdownOptionId) {
+      resumeData.dropdownOptionId = dropdownOptionId;
+    }
+
     this.client.sendMessage(
       { text: '' },
       {
@@ -574,13 +579,19 @@ export class ChatContext {
           threadId: this.chatData?.threadId,
           runId: this.activeRunId,
           step: 'awaitValidation',
-          resumeData: { artifactId },
+          resumeData,
           selectedClass: this.selectedClass,
           mentions: [],
           fileReferences: []
         }
       }
     );
+  }
+
+  /** Dismiss the validation HITL without resuming the workflow. */
+  cancelValidation(): void {
+    this.pendingValidationArtifactId = null;
+    this.threadData.pendingAwaitingValidation = null;
   }
 
   setContext = () => {
