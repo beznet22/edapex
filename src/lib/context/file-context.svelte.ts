@@ -91,18 +91,6 @@ export class FilesContext {
     this.#selectedContext.data = v;
   }
 
-  openFileDialog = () => {
-    if (!this.fileInputRef) {
-      toast.error("File input ref is not set");
-      return;
-    }
-    this.fileInputRef?.click();
-  };
-
-  openFileDropZone = () => {
-    this.openModal = true;
-  };
-
   toDataURL = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();

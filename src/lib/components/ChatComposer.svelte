@@ -249,14 +249,29 @@
       blockedWorkflowMessage = null;
       // Pass selected mentions to the chat context for inclusion in request body
       chat.pendingMentions = [...selectedMentions];
-      // Build fileReferences from BOTH sources for reliability:
-      //  - file.references: set by addReference() inside file-context's
-      //    #performUpload (Upload Document + paperclip paths)
-      //  - file.uploads with status='uploaded': the paperclip path's
-      //    authoritative state. Reading only file.references fails when
-      //    Svelte 5's class-field $state doesn't propagate to template
-      //    scope, so we union both and dedupe by key.
-      const fromRefs = file.references ?? [];
+      // Build fileReferences by unioning THREE sources for reliability:
+      //  1. uploadedReferences (local $state in ChatComposer — populated
+      //     by handleDocumentUpload / handlePhotoUpload on success)
+      //  2. file.references (file-context class-field $state — set by
+      //     addReference() inside #performUpload; Svelte 5 propagation
+      //     to template scope is unreliable)
+      //  3. file.uploads filtered to terminal statuses (file-context —
+      //     the paperclip path's authoritative state)
+      // Dedup by key so duplicates from any source collapse to one entry.
+      const fromLocal = uploadedReferences.map((u) => ({
+        key: u.key,
+        name: u.name,
+        type: u.type,
+        fileId: u.fileId,
+        contentHash: u.contentHash
+      }));
+      const fromRefs = (file.references ?? []).map((r) => ({
+        key: r.key,
+        name: r.name,
+        type: r.type,
+        fileId: r.fileId,
+        contentHash: r.contentHash
+      }));
       const fromUploads = (file.uploads ?? [])
         .filter((u) => u.status === 'uploaded' || u.status === 'extracted' || u.status === 'approved' || u.status === 'published')
         .map((u) => ({
@@ -267,13 +282,14 @@
           contentHash: u.data?.contentHash as string | undefined
         }));
       const seen = new Set<string>();
-      const merged: typeof fromRefs = [];
-      for (const r of [...fromRefs, ...fromUploads]) {
-        if (!seen.has(r.key)) {
+      const merged: typeof fromLocal = [];
+      for (const r of [...fromLocal, ...fromRefs, ...fromUploads]) {
+        if (r.key && !seen.has(r.key)) {
           seen.add(r.key);
           merged.push(r);
         }
       }
+      console.log('[ChatComposer.submit] fileReferences merged:', merged.length, 'from local:', fromLocal.length, 'refs:', fromRefs.length, 'uploads:', fromUploads.length);
       chat.fileReferences = merged;
 
       // Default a bare `/transcript` to `/transcript report` (design decision B1).
@@ -1142,8 +1158,11 @@
     </div>
   </PromptInputActions>
 
-  <!-- Hidden native file input -->
-  <input type="file" multiple class="hidden" bind:this={file.fileInputRef} onchange={file.onchange} />
+  <!-- Hidden native file inputs.
+       Paperclip path (file.onchange) was removed — uploads now go
+       exclusively through the Upload Photo and Upload Document menu
+       buttons in the + menu, which trigger handlePhotoUpload and
+       handleDocumentUpload respectively. -->
   <input
     type="file"
     multiple
