@@ -4,7 +4,9 @@ import { smStudents } from "$lib/server/db/sms-schema";
 import { getDatabase } from "$lib/server/db";
 import { createTenantContext } from "$lib/server/mastra/tenant-context";
 import { OcrWorkspaceStore } from "$lib/server/mastra/storage/ocr/ocr-workspace-store";
-import { addDocument } from "$lib/server/mastra/storage/ocr/manifest-store";
+import { addEntry as addWorkspaceEntry } from "$lib/server/mastra/storage/workspaces/manifest-store";
+import { uploadPath } from "$lib/server/mastra/storage/workspaces/paths";
+import { resolveTenantFilesystem } from "$lib/server/mastra/storage/workspaces/resolve-tenant-filesystem";
 import { mistralOcrService } from "$lib/server/service/mistral-ocr.service";
 import { ResultsRepository } from "$lib/server/repository";
 import { ScopedRepositoryProvider } from "$lib/server/mastra/scoped-repository";
@@ -113,20 +115,24 @@ export const POST: RequestHandler = async ({ request, locals }) => {
   }
 
   const documentId = randomUUID();
-  const normalizedJson = await mistralOcrService.processStructured(
-    file,
-    filename,
-    STRUCTURED_OCR_SCHEMA,
-  );
-  await OcrWorkspaceStore.writeNormalizedJson(tenant, documentId, normalizedJson);
-  await addDocument(tenant, {
+
+  // Save the original upload to the workspace at the canonical uploads/
+  // path so it can be re-extracted later and discovered via @file mention.
+  const fs = await resolveTenantFilesystem(tenant);
+  await fs.writeFile(uploadPath(filename), fileBuffer, { recursive: true });
+
+  // Register the upload in the single workspace manifest.json (kind:
+  // user-file). The legacy `extracted/manifest.json` is gone.
+  await addWorkspaceEntry(tenant, {
+    path: uploadPath(filename),
+    kind: "user-file",
     documentId,
-    contentHash,
     fileName: filename,
-    mimeType: file.type,
-    size: file.size,
+    contentHash,
     uploadedAt: new Date().toISOString(),
-    status: "pending",
+    modifiedAt: new Date().toISOString(),
+    mimeType: file.type,
+    sizeBytes: file.size
   });
   return json({
     success: true,

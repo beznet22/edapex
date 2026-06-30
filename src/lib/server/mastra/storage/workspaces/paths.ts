@@ -50,6 +50,15 @@ export function ocrMarkdownPath(fileName: string): string {
   return `ocr/${sanitizeForFilename(fileName)}.md`;
 }
 
+/**
+ * Original uploaded image path. Used by the @file mention ChatComposer
+ * and by re-extraction flows. The image lives alongside the OCR markdown
+ * so the user can always re-run OCR on the same source bytes.
+ */
+export function uploadPath(fileName: string): string {
+  return `uploads/${sanitizeForFilename(fileName)}`;
+}
+
 export function ocrMetaPath(fileName: string): string {
   return `ocr/${sanitizeForFilename(fileName)}.meta.json`;
 }

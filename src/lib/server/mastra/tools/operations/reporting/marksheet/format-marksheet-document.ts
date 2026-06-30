@@ -2,7 +2,7 @@ import { createTool } from '@mastra/core/tools';
 import { z } from 'zod';
 import { tenantWorkspace } from '$lib/server/mastra/storage/workspaces';
 import { buildWorkspaceRequestContext } from '$lib/server/helpers/chat-helper';
-import { readManifest as readOcrManifest } from '$lib/server/mastra/storage/ocr/manifest-store';
+import { readManifest as readWorkspaceManifest } from '$lib/server/mastra/storage/workspaces/manifest-store';
 import { ocrMarkdownPath, marksheetMarkdownPath } from '$lib/server/mastra/storage/workspaces/paths';
 import { addEntry } from '$lib/server/mastra/storage/workspaces/manifest-store';
 import type { TenantContext } from '$lib/server/mastra/tenant-context';
@@ -66,11 +66,15 @@ export const formatMarksheetDocumentTool = createTool({
     const tenant = getTenant(context);
     const writer = context.writer;
 
-    // 1. Find manifest entry by documentId
-    const manifest = await readOcrManifest(tenant);
-    const entry = manifest.documents.find((doc) => doc.documentId === input.documentId);
-    if (!entry) {
-      throw new Error(`MANIFEST_ENTRY_NOT_FOUND: documentId=${input.documentId} is not in the upload manifest`);
+    // 1. Find manifest entry by documentId in the single workspace manifest.
+    // The legacy `extracted/manifest.json` is no longer used; all upload
+    // metadata lives in the single manifest.json at workspace root.
+    const manifest = await readWorkspaceManifest(tenant);
+    const entry = Object.values(manifest.entries).find((e) => e.documentId === input.documentId);
+    if (!entry || !entry.fileName) {
+      throw new Error(
+        `MANIFEST_ENTRY_NOT_FOUND: documentId=${input.documentId} is not in the workspace manifest`
+      );
     }
 
     // 2. Read OCR markdown from canonical path

@@ -7,9 +7,9 @@ import { StudentRepository } from '$lib/server/repository/student.repo';
 import { ScopedRepositoryProvider } from '$lib/server/mastra/scoped-repository';
 import { WorkspaceMismatchError, type TenantContext } from '$lib/server/mastra/tenant-context';
 import {
-  readManifest as readOcrManifest,
-  addDocument as addOcrDocument
-} from '$lib/server/mastra/storage/ocr/manifest-store';
+  readManifest as readWorkspaceManifest,
+  addEntry as addWorkspaceEntry
+} from '$lib/server/mastra/storage/workspaces/manifest-store';
 import type { WorkspaceFilesystem } from '@mastra/core/workspace';
 
 interface LinkStudentToolContext {
@@ -82,21 +82,25 @@ export const linkMarksheetStudentTool = createTool({
 			);
 		}
 
-		// Locate the manifest entry by documentId
-		const manifest = await readOcrManifest(tenant);
-		const entry = manifest.documents.find((doc) => doc.documentId === input.documentId);
+		// Locate the upload entry in the single workspace manifest by documentId.
+		// The legacy `extracted/manifest.json` is no longer used; all upload
+		// metadata lives in the single manifest.json at workspace root.
+		const manifest = await readWorkspaceManifest(tenant);
+		const entry = Object.values(manifest.entries).find((e) => e.documentId === input.documentId);
 		if (!entry) {
 			throw new Error(
-				`MANIFEST_ENTRY_NOT_FOUND: documentId=${input.documentId} is not in the upload manifest`
+				`MANIFEST_ENTRY_NOT_FOUND: documentId=${input.documentId} is not in the workspace manifest`
 			);
 		}
 
-		// Update the manifest entry's studentHint with DB-resolved student info
-		await addOcrDocument(tenant, {
+		// Update the manifest entry with DB-resolved student info. We keep
+		// studentHint on the upload entry so format-marksheet-document can
+		// surface it to validate-marksheet.
+		await addWorkspaceEntry(tenant, {
 			...entry,
 			studentHint: {
-				fullName: student.fullName ?? entry.studentHint?.fullName,
-				admissionNo: student.admissionNo ?? entry.studentHint?.admissionNo,
+				fullName: student.fullName ?? entry.fileName,
+				admissionNo: student.admissionNo,
 				studentId: student.studentId,
 				classId: student.classId ?? undefined,
 				sectionId: student.sectionId ?? undefined

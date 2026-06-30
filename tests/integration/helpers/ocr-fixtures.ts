@@ -5,7 +5,7 @@
  *
  *   1. POST /api/uploads?kind=document
  *      - Persists raw screenshot + mime type to disk; mints a documentId
- *      - Adds manifest entry via `addDocument(tenant, { documentId, ... })`
+ *      - Registers upload in single workspace manifest.json with 
  *      - Returns `{ documentId, contentHash, fileId: contentHash }`
  *
  *   2. POST /api/uploads/batch/finalize
@@ -36,7 +36,7 @@ import { readFile, writeFile, mkdir, stat } from 'node:fs/promises';
 import path from 'node:path';
 import type { TenantContext } from '$lib/server/mastra/tenant-context';
 import { OcrWorkspaceStore } from '$lib/server/mastra/storage/ocr/ocr-workspace-store';
-import { addDocument } from '$lib/server/mastra/storage/ocr/manifest-store';
+import { addEntry as addWorkspaceEntry } from '$lib/server/mastra/storage/workspaces/manifest-store';
 import { tenantWorkspace } from '$lib/server/mastra/storage/workspaces';
 import { buildWorkspaceRequestContext } from '$lib/server/helpers/chat-helper';
 import {
@@ -66,8 +66,10 @@ export interface MarksheetFixture {
 export async function seedMarksheetFixture(params: {
 	tenant: TenantContext;
 	fileName: string;
+	/** Defaults to `'LB2B'` per the test scope. Pass '' for the root. */
+	subdir?: string;
 }): Promise<MarksheetFixture> {
-	const sourcePath = path.join(MARKSHEET_FIXTURE_DIR, params.fileName);
+	const sourcePath = path.join(MARKSHEET_FIXTURE_DIR, params.subdir ?? 'LB2B', params.fileName);
 	const bytes = await readFile(sourcePath);
 	const uint8 = new Uint8Array(bytes);
 	const mimeType = params.fileName.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg';
@@ -103,6 +105,41 @@ export async function seedMarksheetFixture(params: {
 		const metaPath = ocrMetaPath(params.fileName);
 		await fs.writeFile(mdPath, cachedMarkdown.markdown, { recursive: true });
 		await fs.writeFile(metaPath, JSON.stringify(cachedMarkdown.meta), { recursive: true });
+		// Always copy the original image into uploads/ so @file mention and
+		// re-extraction flows can find the source bytes. Register in
+		// single manifest.json (kind: user-file).
+		const uploadRel = `uploads/${params.fileName}`;
+		await fs.writeFile(uploadRel, uint8, { recursive: true });
+		await addWorkspaceEntry(params.tenant, {
+			path: uploadRel,
+			kind: 'user-file',
+			fileName: params.fileName,
+			contentHash: cachedMarkdown.meta.contentHash,
+			uploadedAt: new Date().toISOString(),
+			modifiedAt: new Date().toISOString(),
+			mimeType,
+			sizeBytes: bytes.byteLength
+		});
+		// Mirror the live OcrWorkspaceStore behavior — register OCR entries
+		// in the single manifest.json so they're discoverable.
+		await addWorkspaceEntry(params.tenant, {
+			path: mdPath,
+			kind: 'ocr-markdown',
+			fileName: params.fileName,
+			contentHash: cachedMarkdown.meta.contentHash,
+			uploadedAt: cachedMarkdown.meta.createdAt,
+			modifiedAt: cachedMarkdown.meta.createdAt,
+			mimeType: 'text/markdown'
+		});
+		await addWorkspaceEntry(params.tenant, {
+			path: metaPath,
+			kind: 'ocr-meta',
+			fileName: params.fileName,
+			contentHash: cachedMarkdown.meta.contentHash,
+			uploadedAt: cachedMarkdown.meta.createdAt,
+			modifiedAt: cachedMarkdown.meta.createdAt,
+			mimeType: 'application/json'
+		});
 		persisted = { ...cachedMarkdown.meta, markdown: cachedMarkdown.markdown };
 	} else {
 		persisted = await OcrWorkspaceStore.getOrCreate({
@@ -123,18 +160,44 @@ export async function seedMarksheetFixture(params: {
 				createdAt: persisted.createdAt
 			}
 		});
+		// Copy the original image into uploads/ so @file mention and
+		// re-extraction flows can find the source bytes. Register in
+		// single manifest.json (kind: user-file).
+		const liveFs = await (
+			await import('$lib/server/mastra/storage/workspaces/resolve-tenant-filesystem')
+		).resolveTenantFilesystem({
+			requestContext: buildWorkspaceRequestContext(params.tenant) as never
+		});
+		if (liveFs) {
+			const uploadRel = `uploads/${params.fileName}`;
+			await liveFs.writeFile(uploadRel, uint8, { recursive: true });
+			await addWorkspaceEntry(params.tenant, {
+				path: uploadRel,
+				kind: 'user-file',
+				fileName: params.fileName,
+				contentHash: persisted.contentHash,
+				uploadedAt: new Date().toISOString(),
+				modifiedAt: new Date().toISOString(),
+				mimeType,
+				sizeBytes: bytes.byteLength
+			});
+		}
 	}
 
-	// Step 2: manifest entry. `format-marksheet-document` looks up the entry
-	// by `documentId` to find the original filename + contentHash.
-	await addDocument(params.tenant, {
+	// Step 2: register the upload in the single workspace manifest.json.
+	// `format-marksheet-document` and `link-marksheet-student` look up by
+	// `documentId` (the UUID we minted above). The legacy
+	// `extracted/manifest.json` is gone — everything lives here.
+	await addWorkspaceEntry(params.tenant, {
+		path: `uploads/${params.fileName}`,
+		kind: 'user-file',
 		documentId,
-		contentHash: persisted.contentHash,
 		fileName: params.fileName,
-		mimeType,
-		size: bytes.byteLength,
+		contentHash: persisted.contentHash,
 		uploadedAt: new Date().toISOString(),
-		status: 'pending'
+		modifiedAt: new Date().toISOString(),
+		mimeType,
+		sizeBytes: bytes.byteLength
 	});
 
 	return {
@@ -151,13 +214,17 @@ export async function seedMarksheetFixture(params: {
  * Calls `seedMarksheetFixture` for every `.jpeg` / `.jpg` / `.png` file in
  * `static/marksheets/` and returns the resulting array.
  */
-export async function seedAllMarksheetFixtures(tenant: TenantContext): Promise<MarksheetFixture[]> {
+export async function seedAllMarksheetFixtures(
+	tenant: TenantContext,
+	subdir: string = 'LB2B'
+): Promise<MarksheetFixture[]> {
 	const { readdir } = await import('node:fs/promises');
-	const entries = await readdir(MARKSHEET_FIXTURE_DIR);
+	const targetDir = path.join(MARKSHEET_FIXTURE_DIR, subdir);
+	const entries = await readdir(targetDir).catch(() => []);
 	const marksheets = entries.filter((f) => /\.(jpe?g|png)$/i.test(f));
 	const fixtures: MarksheetFixture[] = [];
 	for (const fileName of marksheets) {
-		fixtures.push(await seedMarksheetFixture({ tenant, fileName }));
+		fixtures.push(await seedMarksheetFixture({ tenant, fileName, subdir }));
 	}
 	return fixtures;
 }
