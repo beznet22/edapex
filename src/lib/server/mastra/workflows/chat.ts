@@ -324,9 +324,16 @@ const streamDocumentStep = createStep({
 				throw new Error('Missing contentHash and fileId for stream lookup');
 			}
 
+			// Bug 7: readMarkdown signature is { tenant, fileName } — the
+			// canonical OCR path is ocr/<fileName>.md (keyed by filename, not
+			// contentHash, so re-uploads with the same filename re-use the
+			// cached OCR). Pass inputData.fileName here.
+			if (!inputData.fileName) {
+				throw new Error('Missing fileName for stream lookup');
+			}
 			const markdown = await OcrWorkspaceStore.readMarkdown({
 				tenant: ctx,
-				contentHash
+				fileName: inputData.fileName
 			});
 
 			const id = `doc-${inputData.toolCallId}`;

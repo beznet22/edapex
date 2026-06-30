@@ -78,6 +78,27 @@ export const POST: RequestHandler = async ({ request, locals }) => {
   const activeYear = await baseRepo.getActiveAcademicYear().catch(() => null);
   const currentTerm = await baseRepo.getCurrentTerm().catch(() => null);
 
+  // Resolve className/sectionName so the workspace path slug uses
+  // readable names instead of bare IDs (e.g. `12-LOWER-BASIC-1_5-B`
+  // instead of `12-12_5-5`). ResultsRepository.getClassSectionById
+  // returns the joined ClassSection row.
+  let className: string | null = null;
+  let sectionName: string | null = null;
+  if (classId !== null && sectionId !== null) {
+    const resultsRepo = await ResultsRepository.build(db, createTenantContext({
+      schoolId: user.schoolId ?? 1,
+      userId: user.id,
+      staffId: user.staffId ?? 1
+    }));
+    const classSection = await resultsRepo
+      .getClassSectionById(classId, sectionId)
+      .catch(() => null);
+    if (classSection) {
+      className = classSection.className ?? null;
+      sectionName = classSection.sectionName ?? null;
+    }
+  }
+
   const tenant = createTenantContext({
     schoolId: user.schoolId ?? 1,
     userId: user.id,
@@ -85,6 +106,8 @@ export const POST: RequestHandler = async ({ request, locals }) => {
     designationId: (user as { designationId?: number }).designationId ?? ALLOWED_DESIGNATIONS.IT,
     classId,
     sectionId,
+    className,
+    sectionName,
     examTypeId: currentTerm?.id ?? null,
     examId: currentTerm?.id ?? null,
     academicId: activeYear?.id ?? null,
