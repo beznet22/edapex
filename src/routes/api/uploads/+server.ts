@@ -8,9 +8,10 @@ import { addEntry as addWorkspaceEntry } from "$lib/server/mastra/storage/worksp
 import { uploadPath } from "$lib/server/mastra/storage/workspaces/paths";
 import { resolveTenantFilesystem } from "$lib/server/mastra/storage/workspaces/resolve-tenant-filesystem";
 import { mistralOcrService } from "$lib/server/service/mistral-ocr.service";
-import { ResultsRepository } from "$lib/server/repository";
+import { ResultsRepository, BaseRepository } from "$lib/server/repository";
 import { ScopedRepositoryProvider } from "$lib/server/mastra/scoped-repository";
 import { createTenantFileStorage } from "$lib/server/mastra/storage/tenant-file-storage";
+import { buildWorkspaceRequestContext } from "$lib/server/helpers/chat-helper";
 import { ALLOWED_DESIGNATIONS } from "$lib/types/sms-types";
 import type { RequestHandler } from "@sveltejs/kit";
 import { error, json } from "@sveltejs/kit";
@@ -68,6 +69,14 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 
   if (!file || !filename) error(400, "Missing file or filename");
 
+  // Resolve the active academic year + current term from the DB so the
+  // workspace lands at .workspaces/<school>/AY<academicId>-<slug>/...
+  // instead of AY0-0 (which would collide across students).
+  const db = await getDatabase();
+  const baseRepo = await BaseRepository.build(db);
+  const activeYear = await baseRepo.getActiveAcademicYear().catch(() => null);
+  const currentTerm = await baseRepo.getCurrentTerm().catch(() => null);
+
   const tenant = createTenantContext({
     schoolId: user.schoolId ?? 1,
     userId: user.id,
@@ -75,9 +84,10 @@ export const POST: RequestHandler = async ({ request, locals }) => {
     designationId: (user as { designationId?: number }).designationId ?? ALLOWED_DESIGNATIONS.IT,
     classId,
     sectionId,
-    examTypeId: null,
-    examId: null,
-    academicId: null,
+    examTypeId: currentTerm?.id ?? null,
+    examId: currentTerm?.id ?? null,
+    academicId: activeYear?.id ?? null,
+    academicYearTitle: activeYear?.title ?? null,
   });
 
   const buffer = Buffer.from(await file.arrayBuffer());
@@ -91,7 +101,6 @@ export const POST: RequestHandler = async ({ request, locals }) => {
     mkdirSync(join(STATIC_DIR, "public/uploads/students"), { recursive: true });
     writeFileSync(fullPath, buffer);
     const photoUrl = `/uploads/students/${contentHash}.${ext}`;
-    const db = await getDatabase();
     await db
       .update(smStudents)
       .set({ studentPhoto: photoUrl })
@@ -118,8 +127,9 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 
   // Save the original upload to the workspace at the canonical uploads/
   // path so it can be re-extracted later and discovered via @file mention.
-  const fs = await resolveTenantFilesystem(tenant);
-  await fs.writeFile(uploadPath(filename), fileBuffer, { recursive: true });
+  const requestContext = buildWorkspaceRequestContext(tenant);
+  const fs = await resolveTenantFilesystem({ requestContext: requestContext as never });
+  await fs.writeFile(uploadPath(filename), buffer, { recursive: true });
 
   // Register the upload in the single workspace manifest.json (kind:
   // user-file). The legacy `extracted/manifest.json` is gone.
@@ -154,13 +164,21 @@ export const DELETE: RequestHandler = async ({ url, locals }) => {
   const targetPath = fileId || filename;
   if (!targetPath) return json({ success: false, message: "No filename or fileId provided" });
 
+  // Resolve active academic year so the workspace lookup lands on the
+  // canonical AY<a>-<slug>/... path instead of AY0-0.
+  const deleteDb = await getDatabase();
+  const deleteBaseRepo = await BaseRepository.build(deleteDb);
+  const deleteActiveYear = await deleteBaseRepo.getActiveAcademicYear().catch(() => null);
+
   const deleteTenant = createTenantContext({
     schoolId: user.schoolId ?? 1,
     userId: user.id,
     staffId: user.staffId ?? 1,
+    academicId: deleteActiveYear?.id ?? null,
+    academicYearTitle: deleteActiveYear?.title ?? null,
   });
   const deleteFileStorage = await createTenantFileStorage(deleteTenant);
-  const deleteProvider = new ScopedRepositoryProvider(await getDatabase(), deleteTenant);
+  const deleteProvider = new ScopedRepositoryProvider(deleteDb, deleteTenant);
   void deleteProvider;
 
   if (clearAll) {
@@ -184,6 +202,8 @@ export const DELETE: RequestHandler = async ({ url, locals }) => {
           staffId: user.staffId ?? 1,
           classId,
           sectionId,
+          academicId: deleteActiveYear?.id ?? null,
+          academicYearTitle: deleteActiveYear?.title ?? null,
         });
         const cleanupProvider = new ScopedRepositoryProvider(await getDatabase(), cleanupTenant);
         await cleanupProvider.getRepo(ResultsRepository).cleanMarks({
