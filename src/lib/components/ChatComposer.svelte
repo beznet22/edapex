@@ -249,8 +249,32 @@
       blockedWorkflowMessage = null;
       // Pass selected mentions to the chat context for inclusion in request body
       chat.pendingMentions = [...selectedMentions];
-      // Pass file references to chat context before sending (Requirement 9.4)
-      chat.fileReferences = file.references ? [...file.references] : [];
+      // Build fileReferences from BOTH sources for reliability:
+      //  - file.references: set by addReference() inside file-context's
+      //    #performUpload (Upload Document + paperclip paths)
+      //  - file.uploads with status='uploaded': the paperclip path's
+      //    authoritative state. Reading only file.references fails when
+      //    Svelte 5's class-field $state doesn't propagate to template
+      //    scope, so we union both and dedupe by key.
+      const fromRefs = file.references ?? [];
+      const fromUploads = (file.uploads ?? [])
+        .filter((u) => u.status === 'uploaded' || u.status === 'extracted' || u.status === 'approved' || u.status === 'published')
+        .map((u) => ({
+          key: (u.data?.contentHash as string | undefined) ?? u.id,
+          name: u.originalName ?? u.filename,
+          type: 'file' as const,
+          fileId: u.id,
+          contentHash: u.data?.contentHash as string | undefined
+        }));
+      const seen = new Set<string>();
+      const merged: typeof fromRefs = [];
+      for (const r of [...fromRefs, ...fromUploads]) {
+        if (!seen.has(r.key)) {
+          seen.add(r.key);
+          merged.push(r);
+        }
+      }
+      chat.fileReferences = merged;
 
       // Default a bare `/transcript` to `/transcript report` (design decision B1).
       input = normalizeTranscriptCommand(input);

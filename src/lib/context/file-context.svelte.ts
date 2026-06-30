@@ -355,11 +355,11 @@ export class FilesContext {
       // Auto-add to references so the chat submit's fileReferences payload
       // includes this file. Without this, files uploaded via the paperclip
       // path (file.onchange → #upload → #performUpload) never get a
-      // reference — the agent then thinks no file was attached. Photos
-      // and student photos are intentionally excluded; they have their
-      // own commit path (update-photo) and shouldn't trigger OCR /
-      // marksheet processing.
-      if (kind !== "photo" && kind !== "studentPhoto") {
+      // reference — the agent then thinks no file was attached. Student
+      // photos are intentionally excluded; they have their own commit
+      // path (update-photo) and shouldn't trigger OCR/marksheet processing.
+      if (!studentData?.isStudentPhoto) {
+        console.log('[file-context] auto-adding reference for', filename, '→', result.contentHash);
         this.addReference({
           key: result.contentHash ?? resolvedId,
           name: filename,
