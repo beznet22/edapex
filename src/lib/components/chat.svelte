@@ -346,52 +346,51 @@
   {/if}
 
   <!-- Shared Floating Input at bottom.
-       ActionBars render ABOVE the ChatComposer with negative margin-bottom
-       so their bottom portion slides UNDER the ChatComposer (higher
-       z-index). Only the top peek-out band is visible — like an IDE
-       permission badge popping out from behind the editor. -->
+       Two identical cards (same corner-radius, same width) stacked
+       vertically. ChatComposer is the TOP card (fully visible).
+       ActionBar is the BOTTOM card (same height, but only the top
+       peek-out band shows — bottom is clipped by container overflow).
+       Visually reads as "two stacked cards, one peeking out from below". -->
   <div
-    class="absolute bottom-4 left-0 w-full pt-10 pb-4 px-2 sm:px-4 safe-area-bottom pointer-events-none z-50 flex flex-col items-center gap-0"
+    class="absolute bottom-0 left-0 w-full overflow-hidden pointer-events-none z-50 flex flex-col items-center"
   >
-    {#if chat.awaitingValidation}
-      <div
-        class="pointer-events-auto w-full max-w-[780px] mb-[-0.625rem] relative z-10"
-        data-mode="validation"
-      >
-        <ActionBar
-          mode="validation"
-          artifactId={chat.awaitingValidation}
-          validating={chat.pendingValidationArtifactId === chat.awaitingValidation}
-          context="Marksheet validation required"
-          subContext={`marksheets/${chat.selectedClass?.classId ?? '?'} · 2nd term`}
-          secondaryLabel="Skip"
-          onSecondary={() => chat.cancelValidation()}
-          dropdownOptions={[
-            { id: 'force-commit', label: 'Force commit (skip auto-fix)' },
-            { id: 'save-only', label: 'Save without committing' }
-          ]}
-          onValidate={(id, dropdownId) => chat.resumeWorkflow(id, dropdownId)}
-        />
-      </div>
-    {/if}
-    {#if chat.pendingGate}
-      <div
-        class="pointer-events-auto w-full max-w-[780px] mb-[-0.625rem] relative z-10"
-        data-mode="options"
-      >
-        <ActionBar
-          question={chat.pendingGate.question}
-          options={chat.pendingGate.options}
-          runId={chat.pendingGate.runId}
-          stepId={chat.pendingGate.stepId}
-          allowFreeText={chat.pendingGate.allowFreeText}
-          onSelect={(selection) => chat.resumePendingGate(selection)}
-        />
-      </div>
-    {/if}
     <div class="pointer-events-auto w-full max-w-[780px] relative z-20">
       <ChatComposer {user} {readonly} isInitial={false} />
     </div>
+
+    {#if chat.awaitingValidation || chat.pendingGate}
+      <div
+        class="pointer-events-auto w-full max-w-[780px] relative z-10 h-[var(--composer-card-h,8.5rem)] -mb-[calc(var(--composer-card-h,8.5rem)-2.25rem)]"
+        data-mode={chat.awaitingValidation ? 'validation' : 'options'}
+        style="--composer-card-h: 8.5rem;"
+      >
+        {#if chat.awaitingValidation}
+          <ActionBar
+            mode="validation"
+            artifactId={chat.awaitingValidation}
+            validating={chat.pendingValidationArtifactId === chat.awaitingValidation}
+            context="Marksheet validation required"
+            subContext={`marksheets/${chat.selectedClass?.classId ?? '?'} · 2nd term`}
+            secondaryLabel="Skip"
+            onSecondary={() => chat.cancelValidation()}
+            dropdownOptions={[
+              { id: 'force-commit', label: 'Force commit (skip auto-fix)' },
+              { id: 'save-only', label: 'Save without committing' }
+            ]}
+            onValidate={(id, dropdownId) => chat.resumeWorkflow(id, dropdownId)}
+          />
+        {:else if chat.pendingGate}
+          <ActionBar
+            question={chat.pendingGate.question}
+            options={chat.pendingGate.options}
+            runId={chat.pendingGate.runId}
+            stepId={chat.pendingGate.stepId}
+            allowFreeText={chat.pendingGate.allowFreeText}
+            onSelect={(selection) => chat.resumePendingGate(selection)}
+          />
+        {/if}
+      </div>
+    {/if}
   </div>
 </div>
 
