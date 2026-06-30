@@ -55,7 +55,7 @@ const STRUCTURED_OCR_SCHEMA: Record<string, unknown> = {
   },
 };
 
-export const POST: RequestHandler = async ({ request, locals }) => {
+export const POST: RequestHandler = async ({ request, locals, cookies }) => {
   const { session, user } = locals;
   if (!user || !session) error(401, "Unauthorized");
   if (request.body === null) error(400, "Empty request received");
@@ -65,8 +65,29 @@ export const POST: RequestHandler = async ({ request, locals }) => {
   const filename = getFormString(formData, "filename") ?? file?.name ?? null;
   const kind = normalizeKind(getFormString(formData, "kind"));
   const studentId = getFormNumber(formData, "studentId");
-  const classId = getFormNumber(formData, "classId");
-  const sectionId = getFormNumber(formData, "sectionId");
+  const formClassId = getFormNumber(formData, "classId");
+  const formSectionId = getFormNumber(formData, "sectionId");
+
+  // Workspace scoping must follow the SESSION's authoritative active
+  // class, not the form data — the form data can be stale (cached
+  // before a class switch) but the selected-class cookie is what the
+  // workflow will read from when processing the file. If they diverge
+  // the upload lands in workspace A and the workflow reads from
+  // workspace B and reports "could not read the file".
+  let classId: number | null = null;
+  let sectionId: number | null = null;
+  const cookieRaw = cookies.get("selected-class");
+  if (cookieRaw) {
+    try {
+      const parsed = JSON.parse(cookieRaw) as { id?: number; sectionId?: number };
+      classId = typeof parsed.id === "number" ? parsed.id : null;
+      sectionId = typeof parsed.sectionId === "number" ? parsed.sectionId : null;
+    } catch {
+      // ignore parse error, fall back to form data
+    }
+  }
+  if (classId === null) classId = formClassId;
+  if (sectionId === null) sectionId = formSectionId;
 
   if (!file || !filename) error(400, "Missing file or filename");
 
