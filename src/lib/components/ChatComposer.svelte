@@ -410,12 +410,21 @@
     const input = e.target as HTMLInputElement;
     if (!input.files?.length) return;
 
+    // Pull classId/sectionId from the active selected class so the
+    // server can scope the upload to the right workspace (instead of
+    // falling back to _system/).
+    const selectedClass = file.selectedClass;
+    const classId = selectedClass?.classId ?? null;
+    const sectionId = selectedClass?.sectionId ?? null;
+
     for (const f of Array.from(input.files)) {
       try {
         const formData = new FormData();
         formData.append("file", f);
         formData.append("filename", f.name);
         formData.append("kind", "document");
+        if (classId !== null) formData.append("classId", String(classId));
+        if (sectionId !== null) formData.append("sectionId", String(sectionId));
 
         const res = await fetch("/api/uploads", {
           method: "POST",
