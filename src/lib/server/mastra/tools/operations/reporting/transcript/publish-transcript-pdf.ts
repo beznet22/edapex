@@ -102,7 +102,8 @@ async function ensureTranscriptPdf(args: RenderArgs): Promise<RenderResult> {
   }
 
   const student = await resolveStudent(
-    {
+    tenant,
+{
       studentId: input.studentId,
       admissionNo: input.admissionNo,
       fullName: input.fullName,
@@ -312,7 +313,8 @@ export const publishTranscriptPdfTool = createTool({
       }
 
       const student = await resolveStudent(
-        {
+        tenant,
+{
           studentId: input.studentId ?? stored.studentId,
           admissionNo: input.admissionNo,
           fullName: input.fullName,
@@ -431,7 +433,8 @@ export const publishTranscriptPdfTool = createTool({
     });
 
     const student = await resolveStudent(
-      {
+      tenant,
+{
         studentId: input.studentId,
         admissionNo: input.admissionNo,
         fullName: input.fullName,

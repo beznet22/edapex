@@ -342,7 +342,8 @@ export const publishResultPdfTool = createTool({
     }
 
     const student = await resolveStudent(
-      {
+      tenant,
+{
         studentId: input.studentId,
         admissionNo: input.admissionNo,
         fullName: input.fullName,

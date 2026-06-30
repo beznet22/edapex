@@ -785,8 +785,16 @@ const awaitValidationStep = createStep({
 			requestContext: buildWorkspaceRequestContext(tenant) as never
 		});
 		if (!fs) throw new Error('WORKSPACE_UNAVAILABLE: tenant workspace filesystem not configured');
-		const safeTitle = lastFormattedId.replace(/[^a-zA-Z0-9._-]/g, '_');
-		const markdownPath = `exams/examType-${tenant.examTypeId ?? 'unknown'}/${safeTitle}.md`;
+		// Bug 1 fix: read the EXACT persistPath recorded by
+		// format-marksheet-document on the request context. The two paths
+		// diverge because the file is named after the student, not the
+		// documentId (which is a UUID). Fall back to a synthesized path
+		// only when formatArtifactState is missing (legacy/migrated data).
+		const formatState = requestContext?.get('formatArtifactState') as
+			| { persistPath?: string; artifactId?: string; studentHint?: { fullName?: string; admissionNo?: number } | null }
+			| undefined;
+		const markdownPath = formatState?.persistPath
+			?? `exams/examType-${tenant.examTypeId ?? 'unknown'}/${lastFormattedId.replace(/[^a-zA-Z0-9._-]/g, '_')}.md`;
 		let currentMarkdown = '';
 		try {
 			const raw = await fs.readFile(markdownPath);

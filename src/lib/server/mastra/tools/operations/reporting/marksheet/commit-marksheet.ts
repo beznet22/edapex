@@ -84,7 +84,7 @@ export const commitMarksheetTool = createTool({
 
     const entry = await findManifestEntry(tenant, input.documentId);
     const raw = await readExtractedJson(tenant, input.documentId);
-    const validated: Marksheet = marksheetSchema.parse(raw);
+    const validated: Marksheet = await marksheetSchema.parseAsync(raw);
 
     const artifactId = `artifact-${input.documentId}`;
     const ext = (entry.fileName.split('.').pop() ?? 'bin').toLowerCase();

@@ -253,7 +253,16 @@ export class AssessmentService {
       const sId = studentId || 0;
       const eTId = examTypeId || 0;
 
-      const approvingStaffId = staffId || 1;
+      if (!Number.isInteger(staffId) || staffId <= 0) {
+
+
+        throw new Error("STAFF_ID_REQUIRED: requires a positive staffId (got " + String(staffId) + ")");
+
+
+      }
+
+
+      const approvingStaffId = staffId;
 
       const assignedSubjects = await this.result().getAssignedSubjects(classId, sectionId);
       const subjectTeacherMap = new Map<number, number>();
@@ -374,7 +383,13 @@ export class AssessmentService {
     return await this.result().db.transaction(async (tx: MySQLDrizzleClient) => {
       const category = categoryEnum.parse(marksheet.student.category);
       const academicId = await this.result().getAcademicId();
-      const approvingStaffId = staffId || 1;
+      if (!Number.isInteger(staffId) || staffId <= 0) {
+
+        throw new Error("STAFF_ID_REQUIRED: requires a positive staffId (got " + String(staffId) + ")");
+
+      }
+
+      const approvingStaffId = staffId;
 
       const examSetups = await this.result().getExamSetupsByClassSection(classId, sectionId);
 

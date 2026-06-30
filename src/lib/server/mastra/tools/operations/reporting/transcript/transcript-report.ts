@@ -10,6 +10,8 @@ import { getDatabase } from "$lib/server/db";
 import { smStudents } from "$lib/server/db/sms-schema";
 import { and, eq, like, or, type SQL } from "drizzle-orm";
 import type { StudentDetails } from "$lib/server/repository/student.repo";
+import { StudentRepository } from "$lib/server/repository/student.repo";
+import { ScopedRepositoryProvider } from "$lib/server/mastra/scoped-repository";
 
 interface ReportToolContext {
   requestContext?: {
@@ -49,6 +51,7 @@ type StudentCriteria = {
 };
 
 async function resolveStudent(
+  tenant: TenantContext,
   criteria: StudentCriteria,
   activeClassId: number | null,
   activeSectionId: number | null,
@@ -56,111 +59,66 @@ async function resolveStudent(
   const db = await getDatabase();
   const classId = criteria.classId ?? activeClassId;
   const sectionId = criteria.sectionId ?? activeSectionId;
+  // Bug 6 fix: use StudentRepository which JOINS sm_students with
+  // student_records (sm_students.classId is NULL for most rows).
+  const provider = new ScopedRepositoryProvider(db, tenant);
+  const studentRepo = new StudentRepository(db, tenant, provider);
 
   if (criteria.studentId !== undefined && criteria.studentId !== null) {
-    const student = await db
-      .select()
-      .from(smStudents)
-      .where(and(eq(smStudents.id, criteria.studentId), eq(smStudents.activeStatus, 1)))
-      .limit(1)
-      .then((rows) => rows[0] ?? null);
+    const student = await studentRepo.getStudentById(criteria.studentId);
     if (!student) {
-      throw new Error(
-        `STUDENT_NOT_FOUND: no active student with id=${criteria.studentId}`,
-      );
+      throw new Error(`STUDENT_NOT_FOUND: no active student with id=${criteria.studentId}`);
     }
-    if (classId !== null && student.classId !== classId) {
-      throw new Error(
-        `WORKSPACE_MISMATCH: studentId=${criteria.studentId} is enrolled in classId=${student.classId ?? "?"}, not the active classId=${classId}`,
-      );
+    if (classId !== null && student.classId !== null && student.classId !== classId) {
+      throw new Error(`WORKSPACE_MISMATCH: studentId=${criteria.studentId} is enrolled in classId=${student.classId ?? "?"}, not the active classId=${classId}`);
     }
-    if (sectionId !== null && student.sectionId !== sectionId) {
-      throw new Error(
-        `WORKSPACE_MISMATCH: studentId=${criteria.studentId} is enrolled in sectionId=${student.sectionId ?? "?"}, not the active sectionId=${sectionId}`,
-      );
+    if (sectionId !== null && student.sectionId !== null && student.sectionId !== sectionId) {
+      throw new Error(`WORKSPACE_MISMATCH: studentId=${criteria.studentId} is enrolled in sectionId=${student.sectionId ?? "?"}, not the active sectionId=${sectionId}`);
     }
-    return mapRowToStudentDetails(student);
+    return student;
   }
 
   if (criteria.admissionNo !== undefined && criteria.admissionNo !== null) {
-    const student = await db
-      .select()
-      .from(smStudents)
-      .where(and(eq(smStudents.admissionNo, criteria.admissionNo), eq(smStudents.activeStatus, 1)))
-      .limit(1)
-      .then((rows) => rows[0] ?? null);
+    const student = await studentRepo.getStudentById(criteria.admissionNo, true);
     if (!student) {
-      throw new Error(
-        `STUDENT_NOT_FOUND: no active student with admissionNo=${criteria.admissionNo}`,
-      );
+      throw new Error(`STUDENT_NOT_FOUND: no active student with admissionNo=${criteria.admissionNo}`);
     }
-    if (classId !== null && student.classId !== classId) {
-      throw new Error(
-        `WORKSPACE_MISMATCH: admissionNo=${criteria.admissionNo} belongs to classId=${student.classId ?? "?"}, not the active classId=${classId}`,
-      );
+    if (classId !== null && student.classId !== null && student.classId !== classId) {
+      throw new Error(`WORKSPACE_MISMATCH: admissionNo=${criteria.admissionNo} belongs to classId=${student.classId ?? "?"}, not the active classId=${classId}`);
     }
-    if (sectionId !== null && student.sectionId !== sectionId) {
-      throw new Error(
-        `WORKSPACE_MISMATCH: admissionNo=${criteria.admissionNo} belongs to sectionId=${student.sectionId ?? "?"}, not the active sectionId=${sectionId}`,
-      );
+    if (sectionId !== null && student.sectionId !== null && student.sectionId !== sectionId) {
+      throw new Error(`WORKSPACE_MISMATCH: admissionNo=${criteria.admissionNo} belongs to sectionId=${student.sectionId ?? "?"}, not the active sectionId=${sectionId}`);
     }
-    return mapRowToStudentDetails(student);
+    return student;
   }
 
-  const conditions: Array<SQL<unknown> | undefined> = [eq(smStudents.activeStatus, 1)];
-  const nameQuery = criteria.fullName;
-  if (nameQuery) {
-    const searchPattern = `%${nameQuery}%`;
-    const nameCondition = or(
-      like(smStudents.fullName, searchPattern),
-      like(smStudents.firstName, searchPattern),
-      like(smStudents.lastName, searchPattern),
-    );
-    if (nameCondition) {
-      conditions.push(nameCondition);
+  // Name-based fallback uses StudentRepository.getStudentsByClassSection (Bug 6 fix).
+  if (criteria.fullName !== null || criteria.classId !== null || criteria.sectionId !== null) {
+    if (classId === null || sectionId === null) {
+      throw new Error("STUDENT_NOT_FOUND: name-based lookup requires classId and sectionId");
     }
-  }
-  if (classId !== null) {
-    conditions.push(eq(smStudents.classId, classId));
-  }
-  if (sectionId !== null) {
-    conditions.push(eq(smStudents.sectionId, sectionId));
-  }
-
-  const candidates = await db
-    .select()
-    .from(smStudents)
-    .where(and(...conditions))
-    .limit(50);
-
-  if (candidates.length === 0) {
-    const label = criteria.fullName ?? "";
-    throw new Error(
-      `STUDENT_NOT_FOUND: no active student matching "${label}" in classId=${classId ?? "?"}/sectionId=${sectionId ?? "?"}`,
-    );
-  }
-
-  const matches = criteria.fullName
-    ? candidates.filter(
-        (row) =>
-          (row.fullName ?? "").trim().toLowerCase() ===
-          criteria.fullName!.trim().toLowerCase(),
-      )
-    : candidates;
-
-  if (matches.length === 0) {
-    throw new Error(
-      `STUDENT_AMBIGUOUS_NO_EXACT: ${candidates.length} candidate(s) match the partial query; none have the exact fullName "${criteria.fullName}"`,
-    );
-  }
-  if (matches.length > 1) {
-    const ids = matches.map((m) => m.id).join(", ");
-    throw new Error(
-      `STUDENT_AMBIGUOUS: ${matches.length} students share fullName "${criteria.fullName}": ids=[${ids}]. Provide studentId or admissionNo to disambiguate.`,
-    );
+    const matches = (await studentRepo.getStudentsByClassSection(
+      { classId, sectionId },
+      criteria.fullName ?? undefined
+    )) as Array<{ id: number; fullName: string | null }>;
+    if (!matches || matches.length === 0) {
+      const label = criteria.fullName ?? "";
+      throw new Error(`STUDENT_NOT_FOUND: no active student matching "${label}" in classId=${classId}/sectionId=${sectionId}`);
+    }
+    const exact = criteria.fullName
+      ? matches.filter((row) => (row.fullName ?? "").trim().toLowerCase() === criteria.fullName!.trim().toLowerCase())
+      : matches;
+    if (exact.length === 0) {
+      throw new Error(`STUDENT_AMBIGUOUS_NO_EXACT: ${matches.length} candidate(s) match; none have exact fullName "${criteria.fullName}"`);
+    }
+    if (exact.length > 1) {
+      const ids = exact.map((m) => m.id).join(", ");
+      throw new Error(`STUDENT_AMBIGUOUS: ${exact.length} students share fullName "${criteria.fullName}": ids=[${ids}]`);
+    }
+    return mapRowToStudentDetails(exact[0] as never);
   }
 
-  return mapRowToStudentDetails(matches[0]);
+  throw new Error("STUDENT_NOT_FOUND: no criteria provided (need studentId, admissionNo, or fullName)");
 }
 
 function mapRowToStudentDetails(row: typeof smStudents.$inferSelect): StudentDetails {
@@ -217,6 +175,11 @@ const transcriptReportOutputSchema = z.object({
   title: z.string(),
   markdown: z.string(),
   status: z.literal("success"),
+  // Audit fields: downstream publish-transcript-pdf uses these to record
+  // the actor (Bug 4 fix). studentId is the canonical DB id resolved from
+  // the @mention, not the OCR-extracted fullName string.
+  studentId: z.number(),
+  staffId: z.number().nullable(),
 });
 
 type TranscriptReportInput = z.infer<typeof transcriptReportInputSchema>;
@@ -234,6 +197,7 @@ export const transcriptReportTool = createTool({
     const writer = getWriter(context);
 
     const student = await resolveStudent(
+      tenant,
       {
         studentId: input.studentId,
         admissionNo: input.admissionNo,
@@ -326,6 +290,13 @@ export const transcriptReportTool = createTool({
       } as never);
     }
 
-    return { artifactId, title, markdown, status: "success" as const };
+    return {
+      artifactId,
+      title,
+      markdown,
+      status: "success" as const,
+      studentId: student.studentId,
+      staffId: tenant.staffId
+    };
   },
 });

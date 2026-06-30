@@ -60,7 +60,8 @@ async function renderAndWriteTranscriptPdf(args: CoreRenderArgs): Promise<CoreRe
   }
 
   const student = await resolveStudent(
-    {
+    tenant,
+{
       studentId: input.studentId,
       admissionNo: input.admissionNo,
       fullName: input.fullName,
