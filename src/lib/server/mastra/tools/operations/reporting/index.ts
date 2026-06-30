@@ -3,6 +3,7 @@ export { formatMarksheetDocumentTool } from "./marksheet/format-marksheet-docume
 export { validateMarksheetTool } from "./marksheet/validate-marksheet";
 export { autoFixMarksheetTool } from "./marksheet/auto-fix-marksheet";
 export { commitMarksheetTool } from "./marksheet/commit-marksheet";
+export { linkMarksheetStudentTool } from "./marksheet/link-marksheet-student";
 export { generateResultPdfTool } from "./generate-result-pdf";
 export { publishResultPdfTool } from "./publish-result-pdf";
 export { generateTranscriptPdfTool } from "./transcript/generate-transcript-pdf";
@@ -14,6 +15,7 @@ import { formatMarksheetDocumentTool } from "./marksheet/format-marksheet-docume
 import { validateMarksheetTool } from "./marksheet/validate-marksheet";
 import { autoFixMarksheetTool } from "./marksheet/auto-fix-marksheet";
 import { commitMarksheetTool } from "./marksheet/commit-marksheet";
+import { linkMarksheetStudentTool } from "./marksheet/link-marksheet-student";
 import { generateResultPdfTool } from "./generate-result-pdf";
 import { publishResultPdfTool } from "./publish-result-pdf";
 import { generateTranscriptPdfTool } from "./transcript/generate-transcript-pdf";
@@ -26,9 +28,10 @@ export const reportingTools = {
   validateMarksheetTool,
   autoFixMarksheetTool,
   commitMarksheetTool,
+  linkMarksheetStudentTool,
   generateResultPdfTool,
   publishResultPdfTool,
   generateTranscriptPdfTool,
   publishTranscriptPdfTool,
-  transcriptReportTool,
+  transcriptReportTool
 };

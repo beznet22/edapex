@@ -222,14 +222,20 @@ export async function processMentions(
 		const field = MENTION_FIELD_MAP[mention.category];
 		if (!field || field === 'fileRef') continue;
 
-		// For Class Teachers: skip blocked fields (schoolId, classId, sectionId)
-		if (isClassTeacher && classTeacherBlockedFields.has(field)) {
-			continue;
-		}
-
 		// class_section sets BOTH classId and sectionId from the id object.
+		// Handle BEFORE the generic Class-Teacher field-block check so the
+		// explicit WorkspaceMismatchError below can fire (otherwise the
+		// classTeacherBlockedFields branch above silently no-ops and the
+		// teacher stays at their assigned class without any error).
 		if (mention.category === 'class_section') {
 			if (!isClassSectionId(mention.id)) continue;
+			// Class Teachers are locked to their assigned class/section. Refuse
+			// any mention that would change either field.
+			if (isClassTeacher) {
+				throw new WorkspaceMismatchError(
+					`Class Teachers cannot switch class/section via @class. Mention targeted (${mention.id.classId}/${mention.id.sectionId}) but you are assigned to (${tenantContext.classId}/${tenantContext.sectionId}).`
+				);
+			}
 			updatedFields.classId = mention.id.classId;
 			updatedFields.sectionId = mention.id.sectionId;
 			continue;

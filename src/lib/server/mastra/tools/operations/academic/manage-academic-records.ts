@@ -260,3 +260,24 @@ export const manageResultsLogic = async (
       throw new Error("Invalid grading type");
   }
 };
+import { createTool } from "@mastra/core/tools";
+
+export const manageAcademicRecordsTool = createTool({
+	id: "manage-academic-records",
+	description:
+		"Record and edit marks, attendance, teacher remarks, and behavioral ratings for the active academic term. Use this tool whenever a user wants to submit a grade, log attendance, write a teacher remark, or add a personality/behavior rating for a student.",
+	inputSchema: manageResultsSchema,
+	outputSchema: z.object({
+		status: z.enum(["SUCCESS", "FAILED"]),
+		message: z.string()
+	}),
+	execute: async (input, ctx) => {
+		const tenantContext = (ctx.requestContext as { get?: (k: string) => unknown } | undefined)?.get?.(
+			"tenantContext"
+		) as Parameters<typeof manageResultsLogic>[1] | undefined;
+		if (!tenantContext) {
+			throw new Error("TENANT_CONTEXT_REQUIRED: manage-academic-records requires an active tenantContext");
+		}
+		return manageResultsLogic(input as ManageResultsInput, tenantContext, { audit: undefined });
+	}
+});
