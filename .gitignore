@@ -13,6 +13,13 @@ node_modules
 /temp
 /cache
 
+# Runtime workspace (per-tenant OCR + marksheet artifacts)
+/.workspaces/
+
+# Temp screenshots / drag-drop artefacts (not part of the codebase)
+/image.png
+/tmp-actionbar-ref.png
+
 # System
 .system
 
