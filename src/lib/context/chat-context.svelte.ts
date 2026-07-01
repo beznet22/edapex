@@ -367,8 +367,6 @@ export class ChatContext {
   };
 
   #onData = (part: StreamDataPart) => {
-    // DEBUG: log every data part the client receives from the workflow
-    console.log('[chat-context] #onData part:', part.type, part);
     this.threadData.handlePart(part);
     // Accumulate usage from streamed `data-usage` parts emitted by the
     // workflow's assistant-step onFinish. End-of-message guarantee matches
@@ -438,7 +436,7 @@ export class ChatContext {
         id?: string;
         data?: { status?: string; title?: string; content?: string; id?: string };
       }).data;
-      console.log('[chat-context] data-createDocument received:', { id: data?.id, status: data?.status, contentLength: data?.content?.length });
+      console.log('[chat-context] data-createDocument', { ts: performance.now(), id: data?.id, status: data?.status, contentLength: data?.content?.length });
       const partId = (part as { id?: string }).id;
       const artifactId = data?.id ?? partId;
       if (

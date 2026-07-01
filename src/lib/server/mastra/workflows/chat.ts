@@ -404,7 +404,6 @@ const assistantStep = createStep({
 			inputData.promptText
 		);
 		const forceStreamDocument = hasStreamingFiles && hasMarksheetIntent;
-		console.log('[assistantStep] forceStreamDocument:', forceStreamDocument, { hasStreamingFiles, hasMarksheetIntent });
 
 		// Stash the workflow writer in requestContext so tools invoked by the
 		// assistant agent (e.g. stream-document) can emit stream parts to the
@@ -412,9 +411,6 @@ const assistantStep = createStep({
 		// not the step's writer.
 		if (writer && requestContext) {
 			requestContext.set('writer', writer);
-			console.log('[assistantStep] writer stashed in requestContext');
-		} else {
-			console.log('[assistantStep] writer NOT stashed', { hasWriter: !!writer, hasRequestContext: !!requestContext });
 		}
 
 		if (inputData.fileItems.length > 0) {

@@ -154,6 +154,7 @@
 	$effect(() => {
 		if (type === "text") {
 			if (streaming) {
+				console.log('[editor-canvas] streaming content update', { ts: performance.now(), contentLength: content?.length });
 				textContent = content ?? "";
 				editContent = content ?? "";
 			} else if (url) {

@@ -60,13 +60,23 @@
   });
 
   const chatArtifacts = $derived<Artifact[]>(
-    chat.messages
-      .flatMap((m) => m.parts ?? [])
-      .filter(
-        (p: any) =>
-          p.type === "data-createDocument" || p.type === "data-generatePDF",
-      )
-      .map((p: any) => {
+    (() => {
+      const parts = chat.messages
+        .flatMap((m) => m.parts ?? [])
+        .filter(
+          (p: any) =>
+            p.type === "data-createDocument" || p.type === "data-generatePDF",
+        );
+      // Keep only the LATEST part per artifact id so streaming chunks
+      // replace earlier ones instead of creating duplicates.
+      const latestById = new Map<string, any>();
+      for (const raw of parts) {
+        const p = raw as any;
+        const data = p.data ?? {};
+        const id = data.id ?? p.id;
+        if (id) latestById.set(id, p);
+      }
+      return Array.from(latestById.values()).map((p: any) => {
         const data = p.data ?? {};
         const title = data.title ?? "untitled";
         const isPdf = p.type === "data-generatePDF";
@@ -85,11 +95,13 @@
           saveUrl: url,
           status: data.status,
         };
-      }),
+      });
+    })(),
   );
 
   $effect(() => {
     inspector.setChatArtifacts(chatArtifacts);
+    console.log('[SharedChatView] chatArtifacts updated', { count: chatArtifacts.length, artifacts: chatArtifacts.map((a) => ({ id: a.id, status: a.status, contentLength: a.content?.length })) });
   });
 
   $effect(() => {

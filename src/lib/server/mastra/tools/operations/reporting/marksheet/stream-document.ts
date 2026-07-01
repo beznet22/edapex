@@ -117,7 +117,6 @@ export const streamDocumentTool = createTool({
   }),
   execute: async (input, ctx) => {
     const context = ctx as MarksheetToolContext;
-    console.log('[stream-document] execute called', { contentHash: input.contentHash, hasWriter: !!context.writer, hasReqCtxWriter: !!context.requestContext?.get('writer') });
     const tenant = getTenant(context);
     // The workflow step passes writer directly when calling tool.execute();
     // when the assistant agent invokes the tool, Mastra forwards
@@ -163,14 +162,11 @@ export const streamDocumentTool = createTool({
     const artifactId = `artifact-${formattedDocumentId}`;
     const title = studentName;
 
-    if (writer) {
-      console.log('[stream-document] emitting processing', { artifactId, title });
-      await emitDataPart(writer, {
-        type: 'data-createDocument',
-        id: artifactId,
-        data: { status: 'processing', content: '', title, id: artifactId }
-      });
-    }
+    await emitDataPart(writer, {
+      type: 'data-createDocument',
+      id: artifactId,
+      data: { status: 'processing', content: '', title, id: artifactId }
+    });
     // 4. Re-format via document agent
     const documentAgent = await getDocumentAgent();
     const prompt = [
@@ -194,20 +190,23 @@ export const streamDocumentTool = createTool({
     });
 
     let markdown = '';
+    let chunkCount = 0;
     for await (const chunk of stream.textStream) {
+      chunkCount++;
       if (typeof chunk !== 'string' || chunk.length === 0) continue;
       markdown += chunk;
-      if (writer) {
-        await emitDataPart(writer, {
-          type: 'data-createDocument',
-          id: artifactId,
-          data: { status: 'streaming', content: markdown, title, id: artifactId }
-        });
+      await emitDataPart(writer, {
+        type: 'data-createDocument',
+        id: artifactId,
+        data: { status: 'streaming', content: markdown, title, id: artifactId }
+      });
+      if (chunkCount % 5 === 0) {
+        console.log('[stream-document] streaming chunk', { ts: Date.now(), artifactId, chunkCount, contentLength: markdown.length });
       }
     }
 
     if (writer) {
-      console.log('[stream-document] emitting success', { artifactId, title, contentLength: markdown.length });
+      console.log('[stream-document] success', { ts: Date.now(), artifactId, contentLength: markdown.length });
       await emitDataPart(writer, {
         type: 'data-createDocument',
         id: artifactId,

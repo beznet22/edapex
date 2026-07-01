@@ -44,6 +44,10 @@
 	const current = $derived(artifacts.find((a) => a.id === viewingId) ?? null);
 	const isStreaming = $derived(current?.status === "processing" || current?.status === "streaming");
 
+	$effect(() => {
+		console.log('[ArtifactViewer] current artifact', { ts: performance.now(), id: current?.id, status: current?.status, contentLength: current?.content?.length });
+	});
+
 	async function handleSave() {
 		if (editorRef) {
 			await editorRef.save();
