@@ -44,12 +44,46 @@ async function resolveTenantFilesystem(tenant: TenantContext): Promise<Workspace
   return fs;
 }
 
-export const formatMarksheetDocumentTool = createTool({
-  id: 'format-marksheet-document',
+export const streamDocumentTool = createTool({
+  id: 'stream-document',
   description:
-    'Transform OCR markdown into clean academic report markdown. ' +
-    'Reads ocr/<fileName>.md, re-formats via document agent, persists to marksheets/<studentId>-<slug>.md ' +
-    '(or marksheets/ocr-<documentId>.md if no studentHint yet). Emits data-createDocument stream parts.',
+    'CENTRAL ARTIFACT GENERATOR. Transforms raw OCR markdown into clean, ' +
+    'human-readable, structured markdown and streams it token-by-token to ' +
+    'the workspace panel. ' +
+    '\n\n' +
+    'WHEN TO CALL: ' +
+    'After an OCR upload produces a marksheet, transcript, or other ' +
+    'academic document that needs to be cleaned up and rendered to the ' +
+    'user. The user typically asks "process this marksheet", "extract the ' +
+    'marks", "show me the formatted document", etc. ' +
+    '\n\n' +
+    'WHAT IT DOES: ' +
+    '1. Resolves the documentId against the workspace manifest (single ' +
+    '   manifest.json at workspace root). ' +
+    '2. Reads the OCR markdown from ocr/<fileName>.md. ' +
+    '3. Calls the document sub-agent which streams formatted markdown ' +
+    '   token-by-token. ' +
+    '4. Emits `data-createDocument` stream parts (status: processing ' +
+    '   \u2192 streaming \u2192 success) which auto-open the workspace panel ' +
+    '   and render the content via <Markdown>. ' +
+    '5. Persists the formatted markdown to the canonical workspace path ' +
+    '   (e.g. marksheets/<studentId>-<slug>.md or ' +
+    '   marksheets/ocr-<documentId>.md if student identity is unknown). ' +
+    '6. Registers the artifact in the workspace manifest. ' +
+    '\n\n' +
+    'RETURNS: ' +
+    '{ artifactId, title, markdown, persistPath, studentId, status }. ' +
+    '\n\n' +
+    'FOLLOW-UP: ' +
+    'After this tool returns, the workflow auto-suspends for validation ' +
+    '(awaitValidationStep). The user clicks the Validate pill in the ' +
+    'ActionBar to commit the marksheet or apply auto-fix. ' +
+    '\n\n' +
+    'NOTE: This tool is the SINGLE source of truth for streaming ' +
+    'document content. Do not call any other tool that streams the same ' +
+    'content\u2014that would cause duplicate data-createDocument parts. ' +
+    'For PDFs and transcripts, the equivalent tool is publish-result-pdf ' +
+    'or generate-transcript-pdf respectively.',
   inputSchema: z.object({
     documentId: z.string().describe('The documentId of the marksheet to format.')
   }),
@@ -86,13 +120,12 @@ export const formatMarksheetDocumentTool = createTool({
     const raw = await fs.readFile(mdRelPath, { encoding: 'utf-8' });
     const ocrMarkdown = typeof raw === 'string' ? raw : raw.toString('utf-8');
 
-    // 3. Resolve student identity from hint
-    const hint = entry.studentHint;
-    const studentId = hint?.studentId ?? null;
+    // 3. Resolve student identity from manifest entry (single source of truth).
+    // The manifest entry only carries studentId (linked via link-marksheet-student);
+    // student name is best-effort from OCR markdown or the file name.
+    const studentId = entry.studentId ?? null;
     const studentName =
-      hint?.fullName ??
-      (await guessStudentNameFromMarkdown(ocrMarkdown)) ??
-      entry.fileName;
+      (await guessStudentNameFromMarkdown(ocrMarkdown)) ?? entry.fileName;
 
     const artifactId = `artifact-${input.documentId}`;
     const title = studentName;
@@ -124,7 +157,7 @@ export const formatMarksheetDocumentTool = createTool({
           ...(context.requestContext ? { requestContext: context.requestContext as never } : {})
         }),
       abortSignal: context.abortSignal,
-      writer: writer ?? { write: async () => {} }
+      writer: writer ?? { write: async () => { } }
     });
 
     let markdown = '';
@@ -172,7 +205,7 @@ export const formatMarksheetDocumentTool = createTool({
         artifactId,
         persistPath,
         title,
-        studentHint: hint ?? null
+        studentId
       });
     }
 

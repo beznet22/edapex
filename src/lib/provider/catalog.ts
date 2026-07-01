@@ -324,6 +324,20 @@ export const BUILTIN_MODELS: Record<ModelId, ModelInfo> = {
 		cost: { input: 0, output: 0, cache: { read: 0, write: 0 } },
 		description: 'Kimi K2.6 via Kimchi — 256K context, multimodal, reasoning'
 	},
+	'kimchi/deepseek-v4-flash': {
+		id: 'kimchi/deepseek-v4-flash' as ModelId,
+		providerId: 'kimchi' as ProviderId,
+		name: 'DeepSeek V4 Flash',
+		capabilities: { tools: true, input: ['text/*'], output: ['text/*'], reasoning: true, vision: false },
+		request: { headers: {}, body: {}, generation: {}, options: {} },
+		variants: [],
+		status: 'active',
+		enabled: true,
+		limit: { context: 1_048_576, output: 1_048_576 },
+		tier: 'pro',
+		cost: { input: 0, output: 0, cache: { read: 0, write: 0 } },
+		description: 'DeepSeek V4 Flash via Kimchi — 1M context, text, reasoning'
+	},
 	'kimchi/minimax-m2.7': {
 		id: 'kimchi/minimax-m2.7' as ModelId,
 		providerId: 'kimchi' as ProviderId,

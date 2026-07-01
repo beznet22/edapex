@@ -288,131 +288,18 @@ const streamDocumentStep = createStep({
 	inputSchema: fileStreamItemSchema,
 	outputSchema: fileStreamItemSchema,
 	retries: 3,
-	execute: async ({ inputData, requestContext, writer, mastra: m }) => {
-		console.log("STREAMING HIT");
-		const ctx = (requestContext as { get?: (k: string) => unknown } | undefined)?.get?.('tenantContext') as
-			| TenantContext
-			| undefined;
-		if (!ctx) {
-			return {
-				...inputData,
-				status: 'error' as const,
-				error: 'No tenant context resolved from request context'
-			};
-		}
-		if (!writer) {
-			return {
-				...inputData,
-				status: 'error' as const,
-				error: 'No workflow writer available for streaming'
-			};
-		}
-
-		try {
-			let contentHash = inputData.contentHash;
-			if (!contentHash && inputData.fileId) {
-				const meta = await OcrWorkspaceStore.getByFileId({
-					tenant: ctx,
-					mistralFileId: inputData.fileId
-				});
-				if (!meta) {
-					throw new Error(`No OCR metadata for fileId ${inputData.fileId}`);
-				}
-				contentHash = meta.contentHash;
-			}
-			if (!contentHash) {
-				throw new Error('Missing contentHash and fileId for stream lookup');
-			}
-
-			// Bug 7: readMarkdown signature is { tenant, fileName } — the
-			// canonical OCR path is ocr/<fileName>.md (keyed by filename, not
-			// contentHash, so re-uploads with the same filename re-use the
-			// cached OCR). Pass inputData.fileName here.
-			if (!inputData.fileName) {
-				throw new Error('Missing fileName for stream lookup');
-			}
-			const markdown = await OcrWorkspaceStore.readMarkdown({
-				tenant: ctx,
-				fileName: inputData.fileName
-			});
-
-			const id = `doc-${inputData.toolCallId}`;
-
-			// Don't emit a `processing` placeholder before streaming starts
-			// — the Shimmer card would appear before the documentAgent has
-			// produced anything, which confuses the user. The first chunk
-			// read inside the loop below emits `status: 'streaming'`, which
-			// is the correct entry point for the Shimmer card and the
-			// workspace panel auto-open.
-
-			// Stream through the document formatting agent instead of raw 4KB chunks.
-			// The agent transforms raw OCR text into clean, well-structured markdown
-			// and streams it token-by-token for a smooth progressive-reveal UX.
-			const agent = m?.getAgent('document');
-			if (!agent) {
-				throw new Error('Document agent not registered on Mastra instance');
-			}
-
-			const stream = await streamWithAutoRetry({
-				stream: () =>
-					agent.stream(
-						`Transform the following raw document titled "${inputData.fileName}" into clean, well-structured markdown. Preserve all factual content. Fix OCR artifacts. Use proper headings, lists, and formatting.\n\n${markdown}`,
-						{
-							// Variant options (e.g. `{ deepseek: { thinking, reasoningEffort } }`)
-							// from the V2 resolver flow through `requestContext.providerOptions`.
-							...(requestContext?.get('providerOptions')
-								? { providerOptions: requestContext.get('providerOptions') as Record<string, Record<string, unknown>> as never }
-								: {})
-						}
-					),
-				abortSignal: undefined,
-				writer
-			});
-
-			const reader = stream.textStream.getReader();
-			let content = '';
-			while (true) {
-				const { done, value } = await reader.read();
-				if (done) break;
-				content += value;
-				await writer.write({
-					type: 'data-createDocument',
-					id,
-					data: { status: 'streaming', content, title: inputData.fileName }
-				} as never);
-			}
-
-			await writer.write({
-				type: 'data-createDocument',
-				id,
-				data: { status: 'success', content, title: inputData.fileName }
-			} as never);
-
-			return {
-				...inputData,
-				status: 'complete' as const,
-				content: ''
-			};
-		} catch (err) {
-			const friendly = parseFriendlyError(err);
-			const message = friendly.message;
-			// Also emit the error to the stream so the document card shows it
-			try {
-				const id = `doc-${inputData.toolCallId}`;
-				await writer.write({
-					type: 'data-createDocument',
-					id,
-					data: { status: 'error', content: '', title: inputData.fileName, error: message }
-				} as never);
-			} catch {
-				// writer may already be closed
-			}
-			return {
-				...inputData,
-				status: 'error' as const,
-				error: message
-			};
-		}
+	execute: async ({ inputData }) => {
+		// Pass-through. Document streaming is now driven by the
+		// `stream-document` tool (formerly format-marksheet-document)
+		// inside the assistant agent's turn. That tool calls
+		// documentAgent.stream() and emits `data-createDocument`
+		// events that auto-open the workspace panel.
+		//
+		// We deliberately do NOT stream here so the chat doesn't show
+		// duplicate document content (once from this parallel branch
+		// and once from the assistant's tool call). The tool is the
+		// single source of truth for `data-createDocument` events.
+		return inputData;
 	}
 });
 

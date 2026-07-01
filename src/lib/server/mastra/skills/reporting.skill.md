@@ -3,7 +3,7 @@ name: Reporting
 description: Marksheet ingestion, validation, result-document generation, and parent-facing PDF publication.
 tools:
   - get-active-marksheet
-  - format-marksheet-document
+  - stream-document
   - validate-marksheet
   - auto-fix-marksheet
   - commit-marksheet
@@ -26,7 +26,7 @@ The user can express their intent with ANY verb that semantically maps to one of
 
 - generate / create / make / render / build / produce / preview  → run the full pipeline, end with `generate-result-pdf` (renders a PDF preview)
 - publish / email / send / share / notify / dispatch / deliver     → run the full pipeline, end with `publish-result-pdf` (renders + emails parents)
-- result / view / show / display / inspect / see / open              → call `get-active-marksheet` (or `format-marksheet-document` if the user wants a fresh re-render) for the committed marksheet
+- result / view / show / display / inspect / see / open              → call `get-active-marksheet` (or `stream-document` if the user wants a fresh re-render) for the committed marksheet
 - view / open / show / inspect (artifact)                            → call `choose-document` + view the existing artifact
 
 Do NOT refuse a request just because the verb is not in the list above — read the user's intent and pick the closest tool. If the user types only `/marksheet` with no verb, ask whether they want to generate, publish, view a result, or open an existing artifact.
@@ -54,7 +54,7 @@ else { /* Branch B */ }
 
 1. **Select the marksheet** — `request-selection` asks the user to pick when more than one is attached; `choose-document` records the choice for the rest of the session.
 2. **Load it** — `get-active-marksheet` returns the currently selected document.
-3. **Format it** — `format-marksheet-document` converts the raw marksheet into structured records.
+3. **Format it** — `stream-document` (the central artifact generator) reads the raw OCR markdown, streams a clean structured version into the workspace panel, and persists it to the canonical marksheet path.
 4. **Link it (if needed)** — `link-marksheet-student` patches the JSON's `student` block from the DB row when the OCR's extracted name does not match a DB student.
 5. **Check it** — `validate-marksheet` runs the business rules; `auto-fix-marksheet` corrects what can be corrected automatically.
 6. **Lock it** — `commit-marksheet` freezes the structured records so they can be reported.
@@ -83,7 +83,7 @@ When the manifest has more than one pending document, the workflow processes the
 ## Active toolset
 
 - `get-active-marksheet` — return the marksheet currently selected for this session.
-- `format-marksheet-document` — convert the raw marksheet into structured per-student records.
+- `stream-document` — **CENTRAL ARTIFACT GENERATOR**. Reads raw OCR markdown, calls the document sub-agent which streams a clean, structured version token-by-token into the workspace panel, and persists the formatted markdown to `marksheets/<studentId>-<slug>.md` (or `marksheets/ocr-<documentId>.md` if student identity is still unknown). Emits `data-createDocument` events that auto-open the workspace panel — the user sees the markdown stream live via the `<Markdown>` component. After this tool returns, the workflow auto-suspends for validation; the user clicks the Validate pill in the ActionBar to commit or auto-fix. Call this whenever the user asks to "process", "format", "extract", "show me", "render", or otherwise work with a freshly uploaded marksheet.
 - `link-marksheet-student` — patch the JSON's `student` block with a DB student's canonical identity (used at HITL when the OCR's name does not match a DB row).
 - `validate-marksheet` — run business rules against the structured records.
 - `auto-fix-marksheet` — correct common validation issues automatically.

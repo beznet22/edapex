@@ -30,7 +30,7 @@
  */
 import { describe, it, expect, beforeAll } from 'vitest';
 import './helpers/mastra-instance';
-import { formatMarksheetDocumentTool } from '$lib/server/mastra/tools/operations/reporting/marksheet/format-marksheet-document';
+import { streamDocumentTool } from '$lib/server/mastra/tools/operations/reporting/marksheet/stream-document';
 import { linkMarksheetStudentTool } from '$lib/server/mastra/tools/operations/reporting/marksheet/link-marksheet-student';
 import { getDatabase } from '$lib/server/db';
 import { ResultsRepository } from '$lib/server/repository/result.repo';
@@ -100,8 +100,8 @@ describe('LB2B direct tool-call lifecycle — Al-Azeem YUSUFF (sid=188)', () => 
 	it(
 		'Step 1 — formatMarksheetDocument writes marksheets/<sid>-<slug>.md',
 		async () => {
-			const tool = formatMarksheetDocumentTool;
-			if (!tool) throw new Error('TOOL_NOT_REGISTERED: format-marksheet-document');
+			const tool = streamDocumentTool;
+			if (!tool) throw new Error('TOOL_NOT_REGISTERED: stream-document');
 			const result = (await tool.execute(
 				{ documentId },
 				{
