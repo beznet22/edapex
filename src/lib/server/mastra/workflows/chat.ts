@@ -404,14 +404,21 @@ const assistantStep = createStep({
 			inputData.promptText
 		);
 		const forceStreamDocument = hasStreamingFiles && hasMarksheetIntent;
+		console.log('[assistantStep] forceStreamDocument:', forceStreamDocument, { hasStreamingFiles, hasMarksheetIntent });
 
 		if (inputData.fileItems.length > 0) {
 			const manifestText = inputData.fileItems
 				.map((f) => {
+					// The assistant MUST call stream-document with the raw OCR
+					// upload's contentHash, which equals the fileId shown here.
+					// documentId is only created AFTER stream-document produces
+					// the formatted marksheet; it must not be used for the first
+					// call.
+					const contentHash = f.fileId ?? f.contentHash ?? f.toolCallId;
 					if ('error' in f) {
-						return `- ${f.fileName} (ID: ${f.fileId}) — Error: ${f.error}`;
+						return `- ${f.fileName} (contentHash: ${contentHash}) — Error: ${f.error}`;
 					}
-					return `- ${f.fileName} (ID: ${f.fileId})`;
+					return `- ${f.fileName} (contentHash: ${contentHash})`;
 				})
 				.join('\n');
 			requestContext?.set('fileManifest', manifestText);
@@ -430,12 +437,11 @@ const assistantStep = createStep({
 						...(requestContext?.get('providerOptions')
 							? { providerOptions: requestContext.get('providerOptions') as Record<string, Record<string, unknown>> as never }
 							: {}),
-						// FORCE tool call when the user uploaded marksheet files and the
-						// message contains marksheet verbs. The assistant was responding
-						// with inline formatted text instead of calling stream-document.
-						// toolChoice: 'required' guarantees at least one tool call; the
-						// ABSOLUTE RULES in the system prompt tell it which tool.
-						...(forceStreamDocument ? { toolChoice: 'required' as const } : {}),
+						// FORCE the stream-document tool call when the user uploaded
+						// marksheet files and the message contains marksheet verbs.
+						// The assistant was responding with inline formatted text
+						// instead of calling stream-document. toolChoice locks it in.
+						...(forceStreamDocument ? { toolChoice: { type: 'tool' as const, toolName: 'stream-document' as const } } : {}),
 						memory: {
 							thread: inputData.threadId,
 							resource: inputData.resourceId
@@ -716,7 +722,7 @@ const awaitValidationStep = createStep({
 		// If missing, the marksheet hasn't been linked to a student yet — fail fast.
 		const studentId = formatState?.studentId ?? formatState?.studentHint?.studentId ?? null;
 		if (studentId === null) {
-			throw new Error('STUDENT_ID_MISSING: formatArtifactState.studentId is required. Call link-marksheet-student first to link this marksheet to a DB student.');
+			throw new Error('STUDENT_ID_MISSING: formatArtifactState.studentId is required. The marksheet must be linked to a DB student before validation. Use @mention in the chat or resolve identity during HITL.');
 		}
 
 		// Invoke validate-marksheet tool via mastra

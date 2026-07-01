@@ -31,7 +31,6 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import './helpers/mastra-instance';
 import { streamDocumentTool } from '$lib/server/mastra/tools/operations/reporting/marksheet/stream-document';
-import { linkMarksheetStudentTool } from '$lib/server/mastra/tools/operations/reporting/marksheet/link-marksheet-student';
 import { getDatabase } from '$lib/server/db';
 import { ResultsRepository } from '$lib/server/repository/result.repo';
 import { ScopedRepositoryProvider } from '$lib/server/mastra/scoped-repository';
@@ -43,6 +42,8 @@ import { buildRequestContext } from '$lib/server/helpers/chat-helper';
 import { getModelForTest, TEST_MODEL_ID } from './helpers/tenant';
 import { addEntry as addWorkspaceEntry } from '$lib/server/mastra/storage/workspaces/manifest-store';
 import { validateMarksheetTool } from '$lib/server/mastra/tools/operations/reporting/marksheet/validate-marksheet';
+import { generateResultPdfTool } from '$lib/server/mastra/tools/operations/reporting/generate-result-pdf';
+import { publishResultPdfTool } from '$lib/server/mastra/tools/operations/reporting/publish-result-pdf';
 import { promises as fs } from 'node:fs';
 import type { TenantContext } from '$lib/server/mastra/tenant-context';
 
@@ -50,7 +51,7 @@ const SID = 188; // Al-Azeem YUSUFF
 const EXAM_TYPE_ID = 6; // SECOND TERM EXAMINATION - MCH/2026
 
 let tenant: TenantContext;
-let documentId: string;
+let contentHash: string;
 let formatArtifactId: string | null = null;
 let sharedRequestContext: Awaited<ReturnType<typeof buildRequestContext>> | null = null;
 
@@ -75,7 +76,7 @@ beforeAll(async () => {
 		fileName: 'Al-Azeem.jpg.jpeg',
 		subdir: 'LB2B'
 	});
-	documentId = fx.documentId;
+	contentHash = fx.contentHash;
 }, 240_000);
 
 describe('LB2B direct tool-call lifecycle — Al-Azeem YUSUFF (sid=188)', () => {
@@ -103,7 +104,7 @@ describe('LB2B direct tool-call lifecycle — Al-Azeem YUSUFF (sid=188)', () => 
 			const tool = streamDocumentTool;
 			if (!tool) throw new Error('TOOL_NOT_REGISTERED: stream-document');
 			const result = (await tool.execute(
-				{ documentId },
+				{ contentHash },
 				{
 					requestContext: await getRequestContext()
 				} as never
@@ -125,19 +126,7 @@ describe('LB2B direct tool-call lifecycle — Al-Azeem YUSUFF (sid=188)', () => 
 		120_000
 	);
 
-	it(
-		'Step 1b — linkMarksheetStudent updates manifest.studentHint.studentId',
-		async () => {
-			const tool = linkMarksheetStudentTool;
-			const result = (await tool.execute(
-				{ documentId, studentId: SID },
-				{ requestContext: await getRequestContext() } as never
-			)) as { documentId: string; studentId: number; studentName: string };
-			expect(result.studentId).toBe(SID);
-			expect(result.studentName).toMatch(/YUSUFF/i);
-		},
-		30_000
-	);
+
 
 	it(
 		'Step 2 — pre-stage marksheets/<sid>.json from the formatted markdown',

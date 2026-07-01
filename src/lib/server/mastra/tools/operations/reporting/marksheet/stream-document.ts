@@ -1,5 +1,6 @@
 import { createTool } from '@mastra/core/tools';
 import { z } from 'zod';
+import { randomUUID } from 'crypto';
 import { tenantWorkspace } from '$lib/server/mastra/storage/workspaces';
 import { buildWorkspaceRequestContext } from '$lib/server/helpers/chat-helper';
 import { readManifest as readWorkspaceManifest } from '$lib/server/mastra/storage/workspaces/manifest-store';
@@ -58,7 +59,7 @@ export const streamDocumentTool = createTool({
     'marks", "show me the formatted document", etc. ' +
     '\n\n' +
     'WHAT IT DOES: ' +
-    '1. Resolves the documentId against the workspace manifest (single ' +
+    '1. Resolves the contentHash (OCR upload id) against the workspace ' +
     '   manifest.json at workspace root). ' +
     '2. Reads the OCR markdown from ocr/<fileName>.md. ' +
     '3. Calls the document sub-agent which streams formatted markdown ' +
@@ -85,7 +86,7 @@ export const streamDocumentTool = createTool({
     'For PDFs and transcripts, the equivalent tool is publish-result-pdf ' +
     'or generate-transcript-pdf respectively.',
   inputSchema: z.object({
-    documentId: z.string().describe('The documentId of the marksheet to format.')
+    contentHash: z.string().describe('The contentHash / fileId of the OCR upload to format. This is the ID shown in the FILE MANIFEST (e.g. 0adbef757d8c14d65e873f54d0fbd049), NOT the doc-... documentId which is created only after the formatted marksheet exists.')
   }),
   outputSchema: z.object({
     artifactId: z.string(),
@@ -96,22 +97,25 @@ export const streamDocumentTool = createTool({
     status: z.literal('success')
   }),
   execute: async (input, ctx) => {
-    console.log('stream-document called for doc: ', input);
     const context = ctx as MarksheetToolContext;
     const tenant = getTenant(context);
     const writer = context.writer;
 
-    // 1. Find manifest entry by documentId in the single workspace manifest.
-    // The legacy `extracted/manifest.json` is no longer used; all upload
-    // metadata lives in the single manifest.json at workspace root.
+    // 1. Find the OCR upload entry by contentHash in the single workspace
+    // manifest. The legacy `extracted/manifest.json` is no longer used.
+    // contentHash is the upload's stable fingerprint and is what the
+    // FILE MANIFEST exposes to the assistant. documentId is minted later
+    // for the formatted marksheet, not the raw upload.
     const manifest = await readWorkspaceManifest(tenant);
-    const entry = Object.values(manifest.entries).find((e) => e.documentId === input.documentId);
+    const entry = Object.values(manifest.entries).find(
+      (e) => e.contentHash === input.contentHash && e.kind === 'user-file'
+    );
     if (!entry || !entry.fileName) {
+      console.log('MANIFEST_ENTRY_NOT_FOUND: contentHash=', input.contentHash);
       throw new Error(
-        `MANIFEST_ENTRY_NOT_FOUND: documentId=${input.documentId} is not in the workspace manifest`
+        `MANIFEST_ENTRY_NOT_FOUND: contentHash=${input.contentHash} is not a raw OCR upload in the workspace manifest`
       );
     }
-
     // 2. Read OCR markdown from canonical path
     const fs = await resolveTenantFilesystem(tenant);
     const mdRelPath = ocrMarkdownPath(entry.fileName);
@@ -122,14 +126,20 @@ export const streamDocumentTool = createTool({
     const ocrMarkdown = typeof raw === 'string' ? raw : raw.toString('utf-8');
 
     // 3. Resolve student identity from manifest entry (single source of truth).
-    // The manifest entry only carries studentId (linked via link-marksheet-student);
-    // student name is best-effort from OCR markdown or the file name.
+    // The manifest entry carries studentId when the user @mentioned a student;
+    // otherwise student identity is resolved later during validation HITL.
     const studentId = entry.studentId ?? null;
     const studentName =
       (await guessStudentNameFromMarkdown(ocrMarkdown)) ?? entry.fileName;
 
-    const artifactId = `artifact-${input.documentId}`;
+    // Mint a documentId for the formatted marksheet. This id is created
+    // AFTER the first clean document is saved and is used for later edits
+    // (validate/auto-fix/link) when the student is still unknown.
+    const formattedDocumentId = entry.documentId ?? randomUUID();
+    const artifactId = `artifact-${formattedDocumentId}`;
     const title = studentName;
+
+
 
     if (writer) {
       await writer.write({
@@ -138,9 +148,10 @@ export const streamDocumentTool = createTool({
         data: { status: 'processing', content: '', title, id: artifactId }
       } as never);
     }
-
+    console.log('processing - start - 1');
     // 4. Re-format via document agent
     const documentAgent = await getDocumentAgent();
+    console.log('processing - start - 2');
     const prompt = [
       `Format the following OCR-extracted academic result for ${studentName} into clean, well-structured markdown.`,
       'Preserve every factual value, subject name, score, and grade from the input.',
@@ -165,6 +176,7 @@ export const streamDocumentTool = createTool({
     for await (const chunk of stream.textStream) {
       if (typeof chunk !== 'string' || chunk.length === 0) continue;
       markdown += chunk;
+      console.log('markdown: ', markdown);
       if (writer) {
         await writer.write({
           type: 'data-createDocument',
@@ -186,14 +198,17 @@ export const streamDocumentTool = createTool({
     const persistPath =
       studentId !== null
         ? marksheetMarkdownPath(studentId, studentName)
-        : `marksheets/ocr-${input.documentId}.md`;
+        : `marksheets/ocr-${formattedDocumentId}.md`;
     await fs.writeFile(persistPath, markdown, { recursive: true });
 
-    // 6. Register in new manifest
+    // 6. Register the formatted marksheet in the manifest with its own
+    // documentId. This is the id that later editing tools target.
     await addEntry(tenant, {
       path: persistPath,
       kind: 'marksheet-markdown',
+      documentId: formattedDocumentId,
       studentId: studentId ?? undefined,
+      contentHash: input.contentHash,
       uploadedAt: new Date().toISOString(),
       modifiedAt: new Date().toISOString(),
       mimeType: 'text/markdown'
@@ -202,7 +217,8 @@ export const streamDocumentTool = createTool({
     // 7. Set formatArtifactState for awaitValidationStep resume
     if (context.requestContext) {
       context.requestContext.set('formatArtifactState', {
-        documentId: input.documentId,
+        documentId: formattedDocumentId,
+        contentHash: input.contentHash,
         artifactId,
         persistPath,
         title,

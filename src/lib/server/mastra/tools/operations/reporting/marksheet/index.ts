@@ -3,14 +3,12 @@ export { streamDocumentTool } from "./stream-document";
 export { validateMarksheetTool } from "./validate-marksheet";
 export { autoFixMarksheetTool } from "./auto-fix-marksheet";
 export { commitMarksheetTool } from "./commit-marksheet";
-export { linkMarksheetStudentTool } from "./link-marksheet-student";
 
 import { getActiveMarksheetTool } from "./get-active-marksheet";
 import { streamDocumentTool } from "./stream-document";
 import { validateMarksheetTool } from "./validate-marksheet";
 import { autoFixMarksheetTool } from "./auto-fix-marksheet";
 import { commitMarksheetTool } from "./commit-marksheet";
-import { linkMarksheetStudentTool } from "./link-marksheet-student";
 
 /**
  * Marksheet reporting tools — centered on `streamDocumentTool`, the
@@ -23,8 +21,7 @@ export const marksheetReportingTools = {
   streamDocumentTool,
   validateMarksheetTool,
   autoFixMarksheetTool,
-  commitMarksheetTool,
-  linkMarksheetStudentTool
+  commitMarksheetTool
 };
 
 /**

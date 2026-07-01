@@ -31,9 +31,9 @@ export type ArtifactKind =
 export interface ManifestEntry {
   path: string;
   kind: ArtifactKind;
-  /** UUID minted per upload (toolCallId); enables format-marksheet-document
-   *  and link-marksheet-student to look up uploads without a separate
-   *  `extracted/manifest.json`. */
+  /** UUID minted per upload (toolCallId); used as the formatted marksheet's
+   *  documentId after stream-document runs. Enables tools to look up uploads
+   *  without a separate `extracted/manifest.json`. */
   documentId?: string;
   fileName?: string;
   contentHash?: string;
