@@ -169,6 +169,18 @@ export async function resolveModelForRequest(
  *      the first model whose provider has a connected credential.
  *   3. If no candidates, return `null`.
  */
+/**
+ * Pick the variant id to use when no explicit variant is requested.
+ * Prefers `low` reasoning effort over `high` (which is the first item
+ * in the variant arrays) — the agent is a tool-calling chat assistant,
+ * not a deep-research model, so we want fast, cheap responses.
+ */
+function pickDefaultVariantId(model: { variants: Array<{ id: string }> }): string | null {
+	if (model.variants.length === 0) return null;
+	const low = model.variants.find((v) => v.id === 'low');
+	return low ? low.id : (model.variants[0]?.id ?? null);
+}
+
 export async function pickDefaultModelId(
 	db: LibSQLDatabase<any>,
 	env: Record<string, string | undefined>,
@@ -178,8 +190,8 @@ export async function pickDefaultModelId(
 	if (preferred) {
 		const resolved = await resolveProviderKey(db, env, userId, preferred.providerId);
 		if (resolved) {
-			const firstVariantId = preferred.variants[0]?.id;
-			const variantSuffix = firstVariantId ? `@${firstVariantId}` : '';
+			const variantId = pickDefaultVariantId(preferred);
+			const variantSuffix = variantId ? `@${variantId}` : '';
 			return `${preferred.id}${variantSuffix}`;
 		}
 	}
@@ -187,8 +199,8 @@ export async function pickDefaultModelId(
 		if (model.id === DEFAULT_MODEL_ID) continue;
 		const resolved = await resolveProviderKey(db, env, userId, model.providerId);
 		if (!resolved) continue;
-		const firstVariantId = model.variants[0]?.id;
-		const variantSuffix = firstVariantId ? `@${firstVariantId}` : '';
+		const variantId = pickDefaultVariantId(model);
+		const variantSuffix = variantId ? `@${variantId}` : '';
 		return `${model.id}${variantSuffix}`;
 	}
 	return null;

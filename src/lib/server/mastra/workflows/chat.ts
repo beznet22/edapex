@@ -355,7 +355,14 @@ const streamDocumentStep = createStep({
 			const stream = await streamWithAutoRetry({
 				stream: () =>
 					agent.stream(
-						`Transform the following raw document titled "${inputData.fileName}" into clean, well-structured markdown. Preserve all factual content. Fix OCR artifacts. Use proper headings, lists, and formatting.\n\n${markdown}`
+						`Transform the following raw document titled "${inputData.fileName}" into clean, well-structured markdown. Preserve all factual content. Fix OCR artifacts. Use proper headings, lists, and formatting.\n\n${markdown}`,
+						{
+							// Variant options (e.g. `{ deepseek: { thinking, reasoningEffort } }`)
+							// from the V2 resolver flow through `requestContext.providerOptions`.
+							...(requestContext?.get('providerOptions')
+								? { providerOptions: requestContext.get('providerOptions') as Record<string, Record<string, unknown>> as never }
+								: {})
+						}
 					),
 				abortSignal: undefined,
 				writer
