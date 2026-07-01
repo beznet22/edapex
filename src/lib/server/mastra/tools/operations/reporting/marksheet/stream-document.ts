@@ -1,4 +1,5 @@
 import { createTool } from '@mastra/core/tools';
+import type { ToolStream } from '@mastra/core/tools';
 import { z } from 'zod';
 import { randomUUID } from 'crypto';
 import { tenantWorkspace } from '$lib/server/mastra/storage/workspaces';
@@ -15,8 +16,26 @@ interface MarksheetToolContext {
     get<T = unknown>(key: string): T | undefined;
     set<T = unknown>(key: string, value: T): void;
   };
-  writer?: StreamWriterLike;
+  writer?: ToolStream | StreamWriterLike;
   abortSignal?: AbortSignal;
+}
+
+/**
+ * Emit a data-* stream part. When the tool is invoked by an agent, the
+ * writer is a ToolStream and we MUST use writer.custom(). When the tool is
+ * called directly from a workflow step, the writer is a StreamChunkWriter
+ * and we use writer.write().
+ */
+async function emitDataPart(
+  writer: ToolStream | StreamWriterLike | undefined,
+  part: { type: `data-${string}`; id?: string; data: unknown }
+): Promise<void> {
+  if (!writer) return;
+  if ('custom' in writer && typeof (writer as ToolStream).custom === 'function') {
+    await (writer as ToolStream).custom(part);
+  } else {
+    await (writer as StreamWriterLike).write(part as never);
+  }
 }
 
 function getTenant(ctx: MarksheetToolContext): TenantContext {
@@ -146,11 +165,11 @@ export const streamDocumentTool = createTool({
 
     if (writer) {
       console.log('[stream-document] emitting processing', { artifactId, title });
-      await writer.write({
+      await emitDataPart(writer, {
         type: 'data-createDocument',
         id: artifactId,
         data: { status: 'processing', content: '', title, id: artifactId }
-      } as never);
+      });
     }
     // 4. Re-format via document agent
     const documentAgent = await getDocumentAgent();
@@ -179,21 +198,21 @@ export const streamDocumentTool = createTool({
       if (typeof chunk !== 'string' || chunk.length === 0) continue;
       markdown += chunk;
       if (writer) {
-        await writer.write({
+        await emitDataPart(writer, {
           type: 'data-createDocument',
           id: artifactId,
           data: { status: 'streaming', content: markdown, title, id: artifactId }
-        } as never);
+        });
       }
     }
 
     if (writer) {
       console.log('[stream-document] emitting success', { artifactId, title, contentLength: markdown.length });
-      await writer.write({
+      await emitDataPart(writer, {
         type: 'data-createDocument',
         id: artifactId,
         data: { status: 'success', content: markdown, title, id: artifactId }
-      } as never);
+      });
     }
 
     // 5. Persist to canonical path
