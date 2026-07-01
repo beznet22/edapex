@@ -454,7 +454,12 @@ const assistantStep = createStep({
 							thread: inputData.threadId,
 							resource: inputData.resourceId
 						},
-						maxSteps: 30,
+						// When forcing stream-document, limit the assistant to a single
+						// generation step (the tool call). This prevents the model from
+						// emitting a wrap-up text response after the document finishes
+						// streaming; instead the workflow moves immediately to
+						// awaitValidationStep, which suspends and shows the ActionBar.
+						maxSteps: forceStreamDocument ? 1 : 30,
 						onError: ({ error }) => {
 							const msg = error instanceof Error ? error.message : String(error);
 							if (msg.includes('AbortError') || msg.includes('aborted')) {

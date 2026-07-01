@@ -143,8 +143,6 @@ export const streamDocumentTool = createTool({
     const artifactId = `artifact-${formattedDocumentId}`;
     const title = studentName;
 
-
-
     if (writer) {
       await writer.write({
         type: 'data-createDocument',
@@ -193,17 +191,6 @@ export const streamDocumentTool = createTool({
         type: 'data-createDocument',
         id: artifactId,
         data: { status: 'success', content: markdown, title, id: artifactId }
-      } as never);
-
-      // Signal validation HITL immediately as the document finishes streaming.
-      // Previously the ActionBar only appeared after the entire assistant turn
-      // completed (awaitValidationStep), which felt late. Emitting here puts
-      // the Validate pill up while the assistant's text wrap-up is still in
-      // flight.
-      await writer.write({
-        type: 'data-awaitValidation',
-        id: `await-${artifactId}`,
-        data: { artifactId }
       } as never);
     }
 
