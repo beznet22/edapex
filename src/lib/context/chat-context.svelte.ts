@@ -430,16 +430,30 @@ export class ChatContext {
         (this.threadData as { pendingAwaitingValidation?: string | null }).pendingAwaitingValidation = data.artifactId;
       }
     } else if (part.type === "data-createDocument") {
-      // DEBUG: keep this branch visible in logs; auto-open is disabled for
-      // now per user request (editor panel should not auto-open).
+      // AUTO-OPEN: on the FIRST `data-createDocument` part with content
+      // (i.e. the first streaming chunk from the documentAgent), open the
+      // workspace panel so the user sees the markdown being tokenized
+      // into the <Markdown> component.
       const data = (part as {
         id?: string;
         data?: { status?: string; title?: string; content?: string; id?: string };
       }).data;
       console.log('[chat-context] data-createDocument received:', { id: data?.id, status: data?.status, contentLength: data?.content?.length });
-      // AUTO-OPEN DISABLED: the workspace panel should only open when the
-      // user clicks the Shimmer card. Do not dispatch chat:openArtifact here.
-      void data;
+      const partId = (part as { id?: string }).id;
+      const artifactId = data?.id ?? partId;
+      if (
+        typeof window !== "undefined" &&
+        data?.status === "streaming" &&
+        typeof data.content === "string" &&
+        data.content.length > 0 &&
+        artifactId
+      ) {
+        window.dispatchEvent(
+          new CustomEvent("chat:openArtifact", {
+            detail: { id: artifactId, content: data.content, title: data.title ?? "", status: data.status, kind: "document" }
+          })
+        );
+      }
     }
   };
 
