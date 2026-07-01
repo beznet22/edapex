@@ -352,7 +352,10 @@ export class FilesContext {
           key: result.contentHash ?? resolvedId,
           name: filename,
           type: "file",
-          fileId: resolvedId,
+          // Use contentHash as the canonical fileId for OCR uploads. documentId
+          // is minted only after stream-document formats the marksheet; it must
+          // not be exposed to the assistant as the upload identifier.
+          fileId: result.contentHash ?? resolvedId,
           contentHash: result.contentHash
         });
       }
