@@ -399,6 +399,12 @@ const assistantStep = createStep({
 
 		console.log("fileItems", inputData.fileItems);
 
+		const hasStreamingFiles = inputData.fileItems.some((f) => f.status === 'streaming' || f.status === 'complete');
+		const hasMarksheetIntent = /\bmarksheet\b|\bmark\s*sheet\b|\bprocess\b|\bformat\b|\bextract\b|\brender\b|\bshow\b|\breview\b|\bpublish\b/i.test(
+			inputData.promptText
+		);
+		const forceStreamDocument = hasStreamingFiles && hasMarksheetIntent;
+
 		if (inputData.fileItems.length > 0) {
 			const manifestText = inputData.fileItems
 				.map((f) => {
@@ -421,16 +427,15 @@ const assistantStep = createStep({
 					agent.stream(inputData.promptText, {
 						...(abortSignal ? { abortSignal: abortSignal } : {}),
 						...(requestContext ? { requestContext: requestContext } : {}),
-						// Variant options (e.g. `{ deepseek: { thinking, reasoningEffort } }`)
-						// from the V2 resolver flow through `requestContext.providerOptions`.
-						// Passing them at the stream call makes the thinking-mode toggles
-						// actually take effect on the upstream (was a UI-only label
-						// before the V2 refactor). The cast widens the inner value
-						// type from `unknown` to `JSONValue`; in practice the resolver
-						// only puts JSON-serializable values into providerOptions.
 						...(requestContext?.get('providerOptions')
 							? { providerOptions: requestContext.get('providerOptions') as Record<string, Record<string, unknown>> as never }
 							: {}),
+						// FORCE tool call when the user uploaded marksheet files and the
+						// message contains marksheet verbs. The assistant was responding
+						// with inline formatted text instead of calling stream-document.
+						// toolChoice: 'required' guarantees at least one tool call; the
+						// ABSOLUTE RULES in the system prompt tell it which tool.
+						...(forceStreamDocument ? { toolChoice: 'required' as const } : {}),
 						memory: {
 							thread: inputData.threadId,
 							resource: inputData.resourceId

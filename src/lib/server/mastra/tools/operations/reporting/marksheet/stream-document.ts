@@ -96,6 +96,7 @@ export const streamDocumentTool = createTool({
     status: z.literal('success')
   }),
   execute: async (input, ctx) => {
+    console.log('stream-document called for doc: ', input);
     const context = ctx as MarksheetToolContext;
     const tenant = getTenant(context);
     const writer = context.writer;
