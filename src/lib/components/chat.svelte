@@ -182,6 +182,13 @@
                   {@const nonReasoningParts = message.parts.filter(
                     (p) => p.type !== "reasoning",
                   )}
+                  {@const __debugParts = (() => {
+                    const createDocParts = nonReasoningParts.filter((p) => p.type === "data-createDocument");
+                    if (createDocParts.length > 0) {
+                      console.log('[chat.svelte] message has data-createDocument parts:', createDocParts.map((p) => ({ id: p.id, status: (p as any).data?.status, contentLength: (p as any).data?.content?.length })));
+                    }
+                    return null;
+                  })()}
 
                   <!-- Render single merged reasoning block at the top -->
                   {#if mergedReasoning}

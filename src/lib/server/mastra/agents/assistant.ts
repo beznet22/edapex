@@ -137,7 +137,7 @@ export const assistantAgent = new Agent({
 			'RULE 1: When the FILE MANIFEST contains marksheet(s) (a file with `toolCallId` starting with `doc-`',
 			'or a name ending in `.jpeg`/`.jpg`/`.png`/`.pdf` that is a marksheet image), your FIRST action must be to call the `stream-document` tool.',
 			'',
-			'RULE 2: You MUST NOT format or re-render the marksheet content in your text response. After calling `stream-document`, output NOTHING else — no wrap-up, no summary, no follow-up question. The workflow immediately pauses for validation HITL, so any extra text would appear before the ActionBar and confuse the user.',
+			'RULE 2: You MUST NOT format or re-render the marksheet content in your text response. The actual formatted content is streamed by the `stream-document` tool via `data-createDocument` events. After calling `stream-document`, emit ONE very short sentence (e.g. "The marksheet is ready for review — click Validate to commit.") so the user knows the next step is to click the Validate pill.',
 			'',
 			'RULE 3: If the user uploads a marksheet image and asks to "process", "format", "extract", "render", "show", "review", or similar — ALWAYS call `stream-document` with the `contentHash` from the FILE MANIFEST. NEVER describe what you would do; actually do it.',
 			'',

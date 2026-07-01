@@ -98,6 +98,7 @@ export const streamDocumentTool = createTool({
   }),
   execute: async (input, ctx) => {
     const context = ctx as MarksheetToolContext;
+    console.log('[stream-document] execute called', { contentHash: input.contentHash, hasWriter: !!context.writer, hasReqCtxWriter: !!context.requestContext?.get('writer') });
     const tenant = getTenant(context);
     // The workflow step passes writer directly when calling tool.execute();
     // when the assistant agent invokes the tool, Mastra forwards
@@ -144,6 +145,7 @@ export const streamDocumentTool = createTool({
     const title = studentName;
 
     if (writer) {
+      console.log('[stream-document] emitting processing', { artifactId, title });
       await writer.write({
         type: 'data-createDocument',
         id: artifactId,
@@ -176,7 +178,6 @@ export const streamDocumentTool = createTool({
     for await (const chunk of stream.textStream) {
       if (typeof chunk !== 'string' || chunk.length === 0) continue;
       markdown += chunk;
-      console.log('markdown: ', markdown);
       if (writer) {
         await writer.write({
           type: 'data-createDocument',
@@ -187,6 +188,7 @@ export const streamDocumentTool = createTool({
     }
 
     if (writer) {
+      console.log('[stream-document] emitting success', { artifactId, title, contentLength: markdown.length });
       await writer.write({
         type: 'data-createDocument',
         id: artifactId,
