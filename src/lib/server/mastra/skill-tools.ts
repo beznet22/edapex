@@ -36,22 +36,34 @@ export async function ensureRegistry() {
  *   - Slash command -> look up the corresponding skill -> return ONLY the tools
  *     that skill declares, plus baseTools (web search/fetch),
  *     search-school-directory (entity resolution), and getContext.
- *   - Plain chat  -> return ONLY baseTools + getContext + search-school-directory.
- *     We deliberately do NOT inject the full TOOL_MAP here. Loading all
- *     ~50 tools blows up the agent's system prompt and inflates every LLM
- *     turn's reasoning, even for trivial prompts like "Say hello".
+ *   - Plain chat  -> ALSO inspect the message for domain keywords
+ *     (marksheet/transcript/academic) and load the corresponding skill's
+ *     tools when matched. Per project requirement, all marksheet and
+ *     transcript actions are natural-language intents — the LLM deduces
+ *     which tool to call from freeform prompt, NOT a sub-command.
  *
- *     If a plain-chat user needs a domain tool (e.g. /search), they have to
- *     invoke it as a slash command -- the chatWorkflow has separate skills
- *     for that path. The runtime cost of being explicit is much lower than
- *     the latency cost of always-on 50-tool prompts.
+ *     Without this, a plain chat message like "process the marksheet for
+ *     AL-azeem" only sees baseTools + search-school-directory + getContext
+ *     and the assistant falls back to formatting the marksheet inline in
+ *     its text response (causing duplicate content in the chat). With
+ *     natural-language skill loading, the assistant has access to
+ *     `stream-document`, `validate-marksheet`, etc. and can emit the
+ *     proper data-createDocument events that auto-open the workspace
+ *     panel.
+ *
+ *     We deliberately do NOT inject the full TOOL_MAP for plain chat.
+ *     Loading all ~50 tools blows up the agent's system prompt and
+ *     inflates every LLM turn's reasoning. The keyword match is narrow
+ *     enough that trivial prompts ("Say hello") don't get the full set.
  *
  * Parsing rule: ONLY the first whitespace-separated token of the message is
- * inspected. Tokens after the command name (e.g. `generate`, `publish`,
- * `result`, `view` in `/marksheet generate ...`) are NOT parsed subcommands
- * -- they are freeform natural language the LLM uses to pick a tool. The
- * `CommandDropdown.svelte` UI surfaces a curated verb list for discoverability
- * but the server does not parse it. Examples:
+ * inspected for slash commands. For plain chat, the FULL message is
+ * scanned for skill keywords. Tokens after the command name (e.g.
+ * `generate`, `publish`, `result`, `view` in `/marksheet generate ...`)
+ * are NOT parsed subcommands — they are freeform natural language the
+ * LLM uses to pick a tool. The `CommandDropdown.svelte` UI surfaces a
+ * curated verb list for discoverability but the server does not parse
+ * it. Examples:
  *
  *     '/marksheet i want you to generate exam report for @AL-azeem'
  *      ^^^^^^^^                                  -> reporting skill
@@ -60,62 +72,113 @@ export async function ensureRegistry() {
  *     '/transcript show me a draft of @Alice over @year 2024'
  *      ^^^^^^^^^^                                  -> transcript skill
  *                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ -> freeform LLM context
+ *
+ *     'process the marksheet for AL-azeem'       -> reporting skill (NL)
+ *     'generate transcript for Alice'             -> transcript skill (NL)
  */
+const SKILL_KEYWORDS: Array<{ skill: string; patterns: RegExp[] }> = [
+  {
+    skill: 'reporting',
+    patterns: [
+      /\bmarksheet\b/i,
+      /\bmark\s*sheet\b/i,
+      /\bresult\s*card\b/i,
+      /\breport\s*card\b/i,
+      /\bprocess\s+(?:the\s+)?(?:marksheet|mark\s*sheets?)\b/i,
+      /\bformat\s+(?:the\s+)?(?:marksheet|mark\s*sheets?)\b/i,
+      /\bextract\s+(?:the\s+)?(?:marks?|scores?|grades?)\b/i,
+      /\bvalidate\s+(?:the\s+)?(?:marksheet|mark\s*sheets?)\b/i,
+      /\bpublish\s+(?:the\s+)?(?:result|marksheet)/i
+    ]
+  },
+  {
+    skill: 'transcript',
+    patterns: [
+      /\btranscript\b/i,
+      /\bacademic\s+report\b/i
+    ]
+  },
+  {
+    skill: 'academic',
+    patterns: [
+      /\battendance\b/i,
+      /\benter\s+(?:the\s+)?marks?\b/i,
+      /\brecord\s+(?:the\s+)?marks?\b/i,
+      /\bgrade\s+(?:a\s+)?student\b/i
+    ]
+  }
+];
+
+function detectNaturalLanguageSkill(message: string): string | null {
+  for (const { skill, patterns } of SKILL_KEYWORDS) {
+    for (const pattern of patterns) {
+      if (pattern.test(message)) return skill;
+    }
+  }
+  return null;
+}
+
 export function resolveToolsForMessage(message: string, isSlashCommand: boolean): Record<string, any> {
   const baseTools: Record<string, any> = { ...globalTools };
 
+  const skillCommandMap: Record<string, string> = {
+    '/marksheet': 'reporting',
+    '/enroll': 'write',
+    '/admit': 'write',
+    '/transfer': 'write',
+    '/promote': 'write',
+    '/demote': 'write',
+    '/update': 'write',
+    '/self-assign': 'write',
+    '/staff': 'write',
+    '/transcript': 'transcript',
+    '/grade': 'academic',
+    '/mark': 'academic',
+    '/attendance': 'academic',
+    '/suspend': 'destructive',
+    '/reactivate': 'destructive',
+    '/password': 'destructive',
+    '/search': 'default',
+    '/switch': 'default',
+    '/context': 'default',
+  };
+
+  let skillName: string | null = null;
   if (isSlashCommand) {
     const command = message.trim().split(/\s+/)[0].toLowerCase();
+    skillName = skillCommandMap[command] ?? null;
+  } else {
+    // Plain chat: detect natural-language skill intent from the full message.
+    skillName = detectNaturalLanguageSkill(message);
+  }
 
-    const skillCommandMap: Record<string, string> = {
-      '/marksheet': 'reporting',
-      '/enroll': 'write',
-      '/admit': 'write',
-      '/transfer': 'write',
-      '/promote': 'write',
-      '/demote': 'write',
-      '/update': 'write',
-      '/self-assign': 'write',
-      '/staff': 'write',
-      '/transcript': 'transcript',
-      '/grade': 'academic',
-      '/mark': 'academic',
-      '/attendance': 'academic',
-      '/suspend': 'destructive',
-      '/reactivate': 'destructive',
-      '/password': 'destructive',
-      '/search': 'default',
-      '/switch': 'default',
-      '/context': 'default',
-    };
+  if (skillName) {
+    const skill = skillRegistry.getSkill(skillName);
+    console.log(`[SkillTools] skillRegistry.getSkill("${skillName}") -> `, skill ? 'Found' : 'Undefined');
 
-    const skillName = skillCommandMap[command];
-    if (skillName) {
-      const skill = skillRegistry.getSkill(skillName);
-      console.log(`[SkillTools] skillRegistry.getSkill("${skillName}") -> `, skill ? 'Found' : 'Undefined');
-
-      if (skill) {
-        const skillTools: Record<string, any> = {};
-        for (const toolId of skill.tools) {
-          const tool = TOOL_MAP[toolId];
-          if (tool) {
-            skillTools[toolId] = tool;
-          } else {
-            console.warn(`[SkillTools] Tool "${toolId}" not found in TOOL_MAP`);
-          }
+    if (skill) {
+      const skillTools: Record<string, any> = {};
+      for (const toolId of skill.tools) {
+        const tool = TOOL_MAP[toolId];
+        if (tool) {
+          skillTools[toolId] = tool;
+        } else {
+          console.warn(`[SkillTools] Tool "${toolId}" not found in TOOL_MAP`);
         }
-
-        if (!skillTools['search-school-directory']) {
-          skillTools['search-school-directory'] = searchEntityTool;
-        }
-
-        return { ...baseTools, ...skillTools, getContext: getContextTool };
       }
+
+      if (!skillTools['search-school-directory']) {
+        skillTools['search-school-directory'] = searchEntityTool;
+      }
+
+      return { ...baseTools, ...skillTools, getContext: getContextTool };
     }
   }
 
-  // Plain chat: minimal toolset. The agent should respond conversationally
-  // and ask the user to use a slash command for any domain operation.
+  // Plain chat with no detected skill intent: minimal toolset. The agent
+  // responds conversationally and only the base tools + getContext are
+  // available. (For trivial prompts like "Say hello" this avoids
+  // injecting all 50 domain tools.)
   return {
     ...baseTools,
     'search-school-directory': searchEntityTool,
