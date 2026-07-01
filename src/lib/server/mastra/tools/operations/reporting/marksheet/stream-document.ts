@@ -191,10 +191,15 @@ export const streamDocumentTool = createTool({
 
     let markdown = '';
     let chunkCount = 0;
+    let finishReason: string | undefined;
     // Use fullStream and filter text-deltas; some providers populate
     // fullStream but leave textStream empty.
     for await (const chunk of stream.fullStream) {
       const type = (chunk as { type?: string }).type;
+      console.log('[stream-document] fullStream chunk', { ts: Date.now(), type, artifactId, keys: Object.keys(chunk as object) });
+      if (type === 'finish') {
+        finishReason = (chunk as { finishReason?: string }).finishReason;
+      }
       if (type !== 'text-delta') continue;
       const text = (chunk as { text?: string }).text ?? '';
       if (text.length === 0) continue;
@@ -209,6 +214,7 @@ export const streamDocumentTool = createTool({
         console.log('[stream-document] streaming chunk', { ts: Date.now(), artifactId, chunkCount, contentLength: markdown.length });
       }
     }
+    console.log('[stream-document] fullStream done', { ts: Date.now(), artifactId, chunkCount, finishReason, contentLength: markdown.length });
 
     if (writer) {
       console.log('[stream-document] success', { ts: Date.now(), artifactId, contentLength: markdown.length });
