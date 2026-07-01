@@ -99,7 +99,11 @@ export const streamDocumentTool = createTool({
   execute: async (input, ctx) => {
     const context = ctx as MarksheetToolContext;
     const tenant = getTenant(context);
-    const writer = context.writer;
+    // The workflow step passes writer directly when calling tool.execute();
+    // when the assistant agent invokes the tool, Mastra forwards
+    // requestContext but not the step's writer. We stash it in
+    // requestContext in assistantStep so streaming still reaches the client.
+    const writer = context.writer ?? context.requestContext?.get('writer') as StreamWriterLike | undefined;
 
     // 1. Find the OCR upload entry by contentHash in the single workspace
     // manifest. The legacy `extracted/manifest.json` is no longer used.
@@ -148,10 +152,8 @@ export const streamDocumentTool = createTool({
         data: { status: 'processing', content: '', title, id: artifactId }
       } as never);
     }
-    console.log('processing - start - 1');
     // 4. Re-format via document agent
     const documentAgent = await getDocumentAgent();
-    console.log('processing - start - 2');
     const prompt = [
       `Format the following OCR-extracted academic result for ${studentName} into clean, well-structured markdown.`,
       'Preserve every factual value, subject name, score, and grade from the input.',
@@ -192,6 +194,17 @@ export const streamDocumentTool = createTool({
         id: artifactId,
         data: { status: 'success', content: markdown, title, id: artifactId }
       } as never);
+
+      // Signal validation HITL immediately as the document finishes streaming.
+      // Previously the ActionBar only appeared after the entire assistant turn
+      // completed (awaitValidationStep), which felt late. Emitting here puts
+      // the Validate pill up while the assistant's text wrap-up is still in
+      // flight.
+      await writer.write({
+        type: 'data-awaitValidation',
+        id: `await-${artifactId}`,
+        data: { artifactId }
+      } as never);
     }
 
     // 5. Persist to canonical path
@@ -214,7 +227,9 @@ export const streamDocumentTool = createTool({
       mimeType: 'text/markdown'
     });
 
-    // 7. Set formatArtifactState for awaitValidationStep resume
+    // 7. Set formatArtifactState + lastFormattedDocumentId for
+    // awaitValidationStep resume. The workflow reads lastFormattedDocumentId
+    // to build the artifactId in data-awaitValidation.
     if (context.requestContext) {
       context.requestContext.set('formatArtifactState', {
         documentId: formattedDocumentId,
@@ -224,6 +239,7 @@ export const streamDocumentTool = createTool({
         title,
         studentId
       });
+      context.requestContext.set('lastFormattedDocumentId', formattedDocumentId);
     }
 
     return {

@@ -406,6 +406,14 @@ const assistantStep = createStep({
 		const forceStreamDocument = hasStreamingFiles && hasMarksheetIntent;
 		console.log('[assistantStep] forceStreamDocument:', forceStreamDocument, { hasStreamingFiles, hasMarksheetIntent });
 
+		// Stash the workflow writer in requestContext so tools invoked by the
+		// assistant agent (e.g. stream-document) can emit stream parts to the
+		// client. Mastra forwards requestContext to tool execute() contexts but
+		// not the step's writer.
+		if (writer && requestContext) {
+			requestContext.set('writer', writer);
+		}
+
 		if (inputData.fileItems.length > 0) {
 			const manifestText = inputData.fileItems
 				.map((f) => {
