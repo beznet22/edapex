@@ -68,7 +68,7 @@ const tenantContextCache = new TenantContextCache();
 
 export const POST: RequestHandler = async ({ request, locals: { user, session }, cookies }) => {
 
-	let { threadId, messages, selectedClass, fileReferences, mentions, runId: bodyRunId, step: bodyStep, resumeData: bodyResumeData }: {
+	let { threadId, messages, selectedClass: bodySelectedClass, fileReferences, mentions, runId: bodyRunId, step: bodyStep, resumeData: bodyResumeData }: {
 		threadId: string;
 		messages: xUIMessage[];
 		selectedClass?: ClassSection;
@@ -81,6 +81,30 @@ export const POST: RequestHandler = async ({ request, locals: { user, session },
 
 	if ((!user || !session) && !allowAnonymousChats) error(401, "Unauthorized");
 	if (!user) error(401, "User session required for provider resolution");
+
+	// Workspace scoping is sourced from the SESSION cookie (authoritative),
+	// not the request body. class-selector.svelte is the SOLE UI for class
+	// selection and syncs into the selected-class cookie. Trusting the
+	// cookie here (instead of body selectedClass, which can be stale from
+	// a cached ChatComposer) guarantees the chat route and the upload
+	// endpoint write to the same workspace the workflow will read from.
+	const cookieClass = cookies.get("selected-class");
+	let selectedClass: ClassSection | undefined = bodySelectedClass;
+	if (cookieClass) {
+		try {
+			const parsed = JSON.parse(cookieClass) as { id?: number; sectionId?: number; className?: string; sectionName?: string };
+			if (typeof parsed.id === "number") {
+				selectedClass = {
+					id: parsed.id,
+					sectionId: typeof parsed.sectionId === "number" ? parsed.sectionId : 0,
+					className: parsed.className ?? bodySelectedClass?.className ?? "",
+					sectionName: parsed.sectionName ?? bodySelectedClass?.sectionName ?? ""
+				} as ClassSection;
+			}
+		} catch {
+			// ignore parse error, fall back to body
+		}
+	}
 
 	const selectedChatModel = cookies.get("selected-model") ?? "";
 	if (selectedChatModel === 'auto' || selectedChatModel === 'deep-reasoning') {
