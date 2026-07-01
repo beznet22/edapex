@@ -50,7 +50,7 @@ import { processMentions, type MentionTag } from "$lib/server/mastra/mention-pro
 import { TenantContextCache } from "$lib/server/mastra/context-cache";
 import type { FileReference } from "$lib/server/mastra/file-context";
 import { mastra } from "$lib/server/mastra";
-import { buildRequestContext, resolveThread } from "$lib/server/helpers/chat-helper";
+import { buildRequestContext, resolveThread, resolveWorkspaceContext } from "$lib/server/helpers/chat-helper";
 import { ALLOWED_DESIGNATIONS } from "$lib/types/sms-types";
 import { warmUpFileReferences } from "$lib/server/mastra/file-reference-warmup";
 import { chatWorkflowInputSchema } from "$lib/server/mastra/workflows/chat";
@@ -108,6 +108,8 @@ export const POST: RequestHandler = async ({ request, locals: { user, session },
 			if (typeof effectiveClassId === "number") {
 				selectedClass = {
 					id: parsed.id ?? effectiveClassId,
+					classId: parsed.classId,  // KEEP classId — without this the
+					//                          chat route falls back to .id (= 100)
 					sectionId: typeof parsed.sectionId === "number" ? parsed.sectionId : 0,
 					className: parsed.className ?? bodySelectedClass?.className ?? "",
 					sectionName: parsed.sectionName ?? bodySelectedClass?.sectionName ?? ""
@@ -128,18 +130,31 @@ export const POST: RequestHandler = async ({ request, locals: { user, session },
 
 	// ─── Build Tenant Context ─────────────────────────────────────────────────
 
-	const tenantContext = createTenantContext({
-		schoolId: user.schoolId ?? 1,
-		userId: user.id ?? 1,
-		designationId: (user as any).designationId ?? ALLOWED_DESIGNATIONS.IT,
-		staffId: (user as any).staffId ?? 1,
-		roleId: (user as any).roleId ?? null,
-		classId: selectedClass?.id ?? null,
-		sectionId: selectedClass?.sectionId ?? null,
-		examId: null,
-		examTypeId: null,
-		academicId: null
+	// Use the SINGLE SOURCE OF TRUTH helper that builds the workspace
+	// tenant context. It reads the selected-class cookie, fetches the
+	// active academic year + current term from DB, and returns a fully-
+	// populated context (className/sectionName/academicYearTitle all set).
+	// This is the only place workspace scoping is computed for the chat
+	// route — the helper is also used by /api/uploads so both endpoints
+	// ALWAYS agree on the same workspace path.
+	const { tenant: tenantContext } = await resolveWorkspaceContext(cookies, {
+		id: user.id,
+		schoolId: user.schoolId ?? null,
+		staffId: (user as any).staffId ?? null,
+		designationId: (user as any).designationId ?? null,
+		roleId: (user as any).roleId ?? null
 	});
+	// Override classId/sectionId with the body's selectedClass IF the
+	// cookie was missing AND the body has them (legacy form-data fallback).
+	if (tenantContext.classId === null && selectedClass) {
+		(tenantContext as { classId: number | null }).classId =
+			(selectedClass as { classId?: number } | undefined)?.classId
+			?? (selectedClass as { id?: number } | undefined)?.id ?? null;
+	}
+	if (tenantContext.sectionId === null && selectedClass) {
+		(tenantContext as { sectionId: number | null }).sectionId =
+			selectedClass?.sectionId ?? null;
+	}
 
 	let activeContext = tenantContext;
 	if (mentions && mentions.length > 0) {
