@@ -412,6 +412,9 @@ const assistantStep = createStep({
 		// not the step's writer.
 		if (writer && requestContext) {
 			requestContext.set('writer', writer);
+			console.log('[assistantStep] writer stashed in requestContext');
+		} else {
+			console.log('[assistantStep] writer NOT stashed', { hasWriter: !!writer, hasRequestContext: !!requestContext });
 		}
 
 		if (inputData.fileItems.length > 0) {
