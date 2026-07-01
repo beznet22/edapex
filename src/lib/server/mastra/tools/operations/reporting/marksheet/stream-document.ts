@@ -191,10 +191,15 @@ export const streamDocumentTool = createTool({
 
     let markdown = '';
     let chunkCount = 0;
-    for await (const chunk of stream.textStream) {
+    // Use fullStream and filter text-deltas; some providers populate
+    // fullStream but leave textStream empty.
+    for await (const chunk of stream.fullStream) {
+      const type = (chunk as { type?: string }).type;
+      if (type !== 'text-delta') continue;
+      const text = (chunk as { text?: string }).text ?? '';
+      if (text.length === 0) continue;
       chunkCount++;
-      if (typeof chunk !== 'string' || chunk.length === 0) continue;
-      markdown += chunk;
+      markdown += text;
       await emitDataPart(writer, {
         type: 'data-createDocument',
         id: artifactId,
