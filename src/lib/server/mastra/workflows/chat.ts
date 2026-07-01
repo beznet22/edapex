@@ -338,11 +338,12 @@ const streamDocumentStep = createStep({
 
 			const id = `doc-${inputData.toolCallId}`;
 
-			await writer.write({
-				type: 'data-createDocument',
-				id,
-				data: { status: 'processing', content: '', title: inputData.fileName }
-			} as never);
+			// Don't emit a `processing` placeholder before streaming starts
+			// — the Shimmer card would appear before the documentAgent has
+			// produced anything, which confuses the user. The first chunk
+			// read inside the loop below emits `status: 'streaming'`, which
+			// is the correct entry point for the Shimmer card and the
+			// workspace panel auto-open.
 
 			// Stream through the document formatting agent instead of raw 4KB chunks.
 			// The agent transforms raw OCR text into clean, well-structured markdown

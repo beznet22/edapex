@@ -419,6 +419,40 @@ export class ChatContext {
       // so the next data-validationResult (if success) can trigger another
       // continuation pass for the file after it.
       this.multiFileContinuationInFlight = false;
+      // Mirror to legacy alias consumed by ActionBar:
+      // chat.awaitingValidation reads threadData.pendingAwaitingValidation.
+      // The thread-data handler already sets it; this is a belt-and-braces
+      // mirror in case the part fires before threadData is wired up.
+      const data = (part as { data?: { artifactId?: string } }).data;
+      if (data?.artifactId) {
+        (this.threadData as { pendingAwaitingValidation?: string | null }).pendingAwaitingValidation = data.artifactId;
+      }
+    } else if (part.type === "data-createDocument") {
+      // AUTO-OPEN: on the FIRST `data-createDocument` part with content
+      // (i.e. the first streaming chunk from the documentAgent), open the
+      // workspace panel so the user sees the markdown being tokenized
+      // into the <Markdown> component. Without this, the panel only opens
+      // when the user clicks the Shimmer card, which breaks the
+      // streaming experience.
+      const data = (part as {
+        id?: string;
+        data?: { status?: string; title?: string; content?: string; id?: string };
+      }).data;
+      const partId = (part as { id?: string }).id;
+      const artifactId = data?.id ?? partId;
+      if (
+        typeof window !== "undefined" &&
+        data?.status === "streaming" &&
+        typeof data.content === "string" &&
+        data.content.length > 0 &&
+        artifactId
+      ) {
+        window.dispatchEvent(
+          new CustomEvent("chat:openArtifact", {
+            detail: { id: artifactId, content: data.content, title: data.title ?? "", status: data.status, kind: "document" }
+          })
+        );
+      }
     }
   };
 
