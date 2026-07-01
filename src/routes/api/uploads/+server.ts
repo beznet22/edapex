@@ -12,7 +12,7 @@ import { ocrMarkdownPath, ocrMetaPath } from "$lib/server/mastra/storage/workspa
 import { ResultsRepository, BaseRepository } from "$lib/server/repository";
 import { ScopedRepositoryProvider } from "$lib/server/mastra/scoped-repository";
 import { createTenantFileStorage } from "$lib/server/mastra/storage/tenant-file-storage";
-import { buildWorkspaceRequestContext } from "$lib/server/helpers/chat-helper";
+import { buildWorkspaceRequestContext, resolveWorkspaceContext } from "$lib/server/helpers/chat-helper";
 import { ALLOWED_DESIGNATIONS } from "$lib/types/sms-types";
 import type { RequestHandler } from "@sveltejs/kit";
 import { error, json } from "@sveltejs/kit";
@@ -68,93 +68,31 @@ export const POST: RequestHandler = async ({ request, locals, cookies }) => {
   const formClassId = getFormNumber(formData, "classId");
   const formSectionId = getFormNumber(formData, "sectionId");
 
-  // Workspace scoping must follow the SESSION's authoritative active
-  // class, not the form data — the form data can be stale (cached
-  // before a class switch) but the selected-class cookie is what the
-  // workflow will read from when processing the file. If they diverge
-  // the upload lands in workspace A and the workflow reads from
-  // workspace B and reports "could not read the file".
-  let classId: number | null = null;
-  let sectionId: number | null = null;
-  let className: string | null = null;
-  let sectionName: string | null = null;
-  const cookieRaw = cookies.get("selected-class");
-  console.log('[uploads] cookie raw:', cookieRaw);
-  if (cookieRaw) {
-    try {
-      // Cookie shape: { id, classId, className, sectionId, sectionName }
-      // `id` is the ClassSection row id; `classId` is the actual class id.
-      // We want `classId` for workspace scoping — `id` collides across
-      // different class-section pairings of the same class.
-      const parsed = JSON.parse(cookieRaw) as {
-        id?: number;
-        classId?: number;
-        sectionId?: number;
-        className?: string;
-        sectionName?: string;
-      };
-      classId = typeof parsed.classId === "number" ? parsed.classId
-              : typeof parsed.id === "number" ? parsed.id
-              : null;
-      sectionId = typeof parsed.sectionId === "number" ? parsed.sectionId : null;
-      className = typeof parsed.className === "string" ? parsed.className : null;
-      sectionName = typeof parsed.sectionName === "string" ? parsed.sectionName : null;
-      console.log('[uploads] cookie parsed:', { classId, sectionId, className, sectionName });
-    } catch (err) {
-      console.warn('[uploads] cookie parse error, falling back to form data:', err);
-    }
-  }
-  if (classId === null) classId = formClassId;
-  if (sectionId === null) sectionId = formSectionId;
-  console.log('[uploads] final workspace scoping:', { classId, sectionId, formClassId, formSectionId });
-
   if (!file || !filename) error(400, "Missing file or filename");
 
-  // Resolve the active academic year + current term from the DB so the
-  // workspace lands at .workspaces/<school>/AY<academicId>-<slug>/...
-  // instead of AY0-0 (which would collide across students).
+  // SINGLE SOURCE OF TRUTH for workspace scoping. Reads the
+  // selected-class cookie (canonical), fetches the active academic
+  // year + current term from DB, and returns a fully-built TenantContext.
+  // Form data classId/sectionId are passed as fallback (used only if
+  // the cookie is missing). Both endpoints and the workflow read from
+  // the same helper, so workspace paths always agree.
   const db = await getDatabase();
-  const baseRepo = await BaseRepository.build(db);
-  const activeYear = await baseRepo.getActiveAcademicYear().catch(() => null);
-  const currentTerm = await baseRepo.getCurrentTerm().catch(() => null);
-
-  // Resolve className/sectionName so the workspace path slug uses
-  // readable names instead of bare IDs (e.g. `12-LOWER-BASIC-1_5-B`
-  // instead of `12-12_5-5`). ResultsRepository.getClassSectionById
-  // returns the joined ClassSection row.
-  // Resolve className/sectionName. Prefer the cookie's values (the
-  // class-selector already set them when the user picked a class); fall
-  // back to the DB lookup only when the cookie names are missing.
-  if (!className || !sectionName) {
-    if (classId !== null && sectionId !== null) {
-      const resultsRepo = await ResultsRepository.build(db, createTenantContext({
-        schoolId: user.schoolId ?? 1,
-        userId: user.id,
-        staffId: user.staffId ?? 1
-      }));
-      const classSection = await resultsRepo
-        .getClassSectionById(classId, sectionId)
-        .catch(() => null);
-      if (classSection) {
-        if (!className) className = classSection.className ?? null;
-        if (!sectionName) sectionName = classSection.sectionName ?? null;
-      }
-    }
-  }
-
-  const tenant = createTenantContext({
-    schoolId: user.schoolId ?? 1,
-    userId: user.id,
-    staffId: user.staffId ?? 1,
-    designationId: (user as { designationId?: number }).designationId ?? ALLOWED_DESIGNATIONS.IT,
-    classId,
-    sectionId,
-    className,
-    sectionName,
-    examTypeId: currentTerm?.id ?? null,
-    examId: currentTerm?.id ?? null,
-    academicId: activeYear?.id ?? null,
-    academicYearTitle: activeYear?.title ?? null,
+  const { tenant } = await resolveWorkspaceContext(cookies, {
+    id: user.id,
+    schoolId: user.schoolId ?? null,
+    staffId: user.staffId ?? null,
+    designationId: (user as { designationId?: number } | undefined)?.designationId ?? null,
+    roleId: (user as { roleId?: number | null } | undefined)?.roleId ?? null
+  });
+  // Form data overrides cookie only when cookie didn't provide them
+  // (the helper already returns nulls in that case).
+  if (tenant.classId === null && formClassId !== null) (tenant as { classId: number | null }).classId = formClassId;
+  if (tenant.sectionId === null && formSectionId !== null) (tenant as { sectionId: number | null }).sectionId = formSectionId;
+  console.log('[uploads] workspace scoping:', {
+    classId: tenant.classId,
+    sectionId: tenant.sectionId,
+    academicId: tenant.academicId,
+    academicYearTitle: tenant.academicYearTitle
   });
 
   const buffer = Buffer.from(await file.arrayBuffer());
