@@ -76,18 +76,37 @@ export const POST: RequestHandler = async ({ request, locals, cookies }) => {
   // workspace B and reports "could not read the file".
   let classId: number | null = null;
   let sectionId: number | null = null;
+  let className: string | null = null;
+  let sectionName: string | null = null;
   const cookieRaw = cookies.get("selected-class");
+  console.log('[uploads] cookie raw:', cookieRaw);
   if (cookieRaw) {
     try {
-      const parsed = JSON.parse(cookieRaw) as { id?: number; sectionId?: number };
-      classId = typeof parsed.id === "number" ? parsed.id : null;
+      // Cookie shape: { id, classId, className, sectionId, sectionName }
+      // `id` is the ClassSection row id; `classId` is the actual class id.
+      // We want `classId` for workspace scoping — `id` collides across
+      // different class-section pairings of the same class.
+      const parsed = JSON.parse(cookieRaw) as {
+        id?: number;
+        classId?: number;
+        sectionId?: number;
+        className?: string;
+        sectionName?: string;
+      };
+      classId = typeof parsed.classId === "number" ? parsed.classId
+              : typeof parsed.id === "number" ? parsed.id
+              : null;
       sectionId = typeof parsed.sectionId === "number" ? parsed.sectionId : null;
-    } catch {
-      // ignore parse error, fall back to form data
+      className = typeof parsed.className === "string" ? parsed.className : null;
+      sectionName = typeof parsed.sectionName === "string" ? parsed.sectionName : null;
+      console.log('[uploads] cookie parsed:', { classId, sectionId, className, sectionName });
+    } catch (err) {
+      console.warn('[uploads] cookie parse error, falling back to form data:', err);
     }
   }
   if (classId === null) classId = formClassId;
   if (sectionId === null) sectionId = formSectionId;
+  console.log('[uploads] final workspace scoping:', { classId, sectionId, formClassId, formSectionId });
 
   if (!file || !filename) error(400, "Missing file or filename");
 
@@ -103,20 +122,23 @@ export const POST: RequestHandler = async ({ request, locals, cookies }) => {
   // readable names instead of bare IDs (e.g. `12-LOWER-BASIC-1_5-B`
   // instead of `12-12_5-5`). ResultsRepository.getClassSectionById
   // returns the joined ClassSection row.
-  let className: string | null = null;
-  let sectionName: string | null = null;
-  if (classId !== null && sectionId !== null) {
-    const resultsRepo = await ResultsRepository.build(db, createTenantContext({
-      schoolId: user.schoolId ?? 1,
-      userId: user.id,
-      staffId: user.staffId ?? 1
-    }));
-    const classSection = await resultsRepo
-      .getClassSectionById(classId, sectionId)
-      .catch(() => null);
-    if (classSection) {
-      className = classSection.className ?? null;
-      sectionName = classSection.sectionName ?? null;
+  // Resolve className/sectionName. Prefer the cookie's values (the
+  // class-selector already set them when the user picked a class); fall
+  // back to the DB lookup only when the cookie names are missing.
+  if (!className || !sectionName) {
+    if (classId !== null && sectionId !== null) {
+      const resultsRepo = await ResultsRepository.build(db, createTenantContext({
+        schoolId: user.schoolId ?? 1,
+        userId: user.id,
+        staffId: user.staffId ?? 1
+      }));
+      const classSection = await resultsRepo
+        .getClassSectionById(classId, sectionId)
+        .catch(() => null);
+      if (classSection) {
+        if (!className) className = classSection.className ?? null;
+        if (!sectionName) sectionName = classSection.sectionName ?? null;
+      }
     }
   }
 

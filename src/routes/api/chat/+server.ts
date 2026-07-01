@@ -92,10 +92,22 @@ export const POST: RequestHandler = async ({ request, locals: { user, session },
 	let selectedClass: ClassSection | undefined = bodySelectedClass;
 	if (cookieClass) {
 		try {
-			const parsed = JSON.parse(cookieClass) as { id?: number; sectionId?: number; className?: string; sectionName?: string };
-			if (typeof parsed.id === "number") {
+			// Cookie shape: { id, classId, className, sectionId, sectionName }
+			// `id` is the ClassSection row id; `classId` is the actual
+			// class id. Workspace scoping must use `classId` — using `id`
+			// collides across different class-section pairings of the
+			// same class.
+			const parsed = JSON.parse(cookieClass) as {
+				id?: number;
+				classId?: number;
+				sectionId?: number;
+				className?: string;
+				sectionName?: string;
+			};
+			const effectiveClassId = parsed.classId ?? parsed.id;
+			if (typeof effectiveClassId === "number") {
 				selectedClass = {
-					id: parsed.id,
+					id: parsed.id ?? effectiveClassId,
 					sectionId: typeof parsed.sectionId === "number" ? parsed.sectionId : 0,
 					className: parsed.className ?? bodySelectedClass?.className ?? "",
 					sectionName: parsed.sectionName ?? bodySelectedClass?.sectionName ?? ""
