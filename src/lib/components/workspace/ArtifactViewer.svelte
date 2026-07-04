@@ -21,6 +21,9 @@
 	import ArrowLeftIcon from "@lucide/svelte/icons/arrow-left";
 	import EditorCanvas from "./editor-canvas.svelte";
 	import { useInspector } from "$lib/context/inspector-context.svelte";
+	import { useChat } from "$lib/context/chat-context.svelte";
+	import ShimmerArtifactCard from "$lib/components/ShimmerArtifactCard.svelte";
+	import Markdown from "$lib/components/prompt-kit/markdown/Markdown.svelte";
 
 	let {
 		artifacts,
@@ -35,6 +38,45 @@
 	} = $props();
 
 	const inspector = useInspector();
+	const chat = useChat();
+
+	// The tool part for prepareDocumentStream lives in the main chat's
+	// last assistant message. chat.documentChat (created in chat-context's
+	// onToolCall) streams the document via /api/chat?step=stream-document-agent.
+	const toolPart = $derived(chat?.documentToolPart);
+	const documentChat = $derived(chat?.documentChat);
+
+	// True while the tool call is still awaiting output (input-streaming or
+	// input-available). Drives the Shimmer card and streaming Markdown view.
+	const isToolStreaming = $derived(
+		!!toolPart &&
+		(toolPart.state === "input-streaming" || toolPart.state === "input-available")
+	);
+
+	// Final tool result (output-available). Drives the EditorCanvas switch.
+	const toolResult = $derived(
+		toolPart?.state === "output-available" ? toolPart.output : null
+	);
+
+	// Diagnostic + auto-open: when the prepareDocumentStream tool part appears
+	// in input-available/input-streaming state, auto-open the workspace panel
+	// via the chat:openArtifact event that SharedChatView listens for.
+	$effect(() => {
+		console.log('[ArtifactViewer] toolPart', { toolCallId: toolPart?.toolCallId, state: toolPart?.state });
+		if (
+			toolPart &&
+			(toolPart.state === "input-available" || toolPart.state === "input-streaming") &&
+			toolPart.toolCallId &&
+			typeof window !== "undefined"
+		) {
+			window.dispatchEvent(
+				new CustomEvent("chat:openArtifact", { detail: { id: toolPart.toolCallId } })
+			);
+		}
+	});
+	$effect(() => {
+		console.log('[ArtifactViewer] documentChat', { exists: !!documentChat, msgCount: documentChat?.messages?.length });
+	});
 
 	let editorRef = $state<{ save: () => Promise<boolean> | void; copy: () => void } | undefined>(
 		undefined,
@@ -127,6 +169,16 @@
 </script>
 
 <div class="flex flex-col h-full min-h-0 bg-background">
+	{#if isToolStreaming && toolPart && toolPart.toolCallId}
+		<div class="px-3 pt-3 pb-1 shrink-0">
+			<ShimmerArtifactCard
+				id={toolPart.toolCallId}
+				title={toolPart.input?.fileName ?? "Document"}
+				status="processing"
+				kind="document"
+			/>
+		</div>
+	{/if}
 	<header
 		class="flex items-center justify-between h-12 px-2 sm:px-4 shrink-0 gap-2 min-w-0 w-full"
 	>
@@ -277,7 +329,34 @@
 	</header>
 
 	<div class="flex-1 min-h-0 relative group">
-		{#if !current}
+		{#if toolResult && toolResult.filePath}
+			<EditorCanvas
+				bind:this={editorRef}
+				editorMode="wysiwyg"
+				filename={toolResult.fileName ?? "Document"}
+				url={toolResult.filePath}
+				saveUrl={toolResult.filePath}
+				content=""
+				type="text"
+				streaming={false}
+				user={user}
+			/>
+		{:else if isToolStreaming && documentChat}
+			<ScrollArea class="h-full">
+				<div class="p-6 max-w-3xl mx-auto">
+					{#each documentChat.messages as message}
+						{#each message.parts as part}
+							{#if part.type === "text"}
+								<Markdown
+									content={part.text}
+									animation={{ enabled: true }}
+								/>
+							{/if}
+						{/each}
+					{/each}
+				</div>
+			</ScrollArea>
+		{:else if !current}
 			<div class="h-full flex flex-col items-center justify-center text-center px-8 opacity-50">
 				<FileQuestionIcon class="size-12 text-muted-foreground/40 mb-3" />
 				<p class="text-[11px] font-semibold tracking-widest uppercase text-muted-foreground">

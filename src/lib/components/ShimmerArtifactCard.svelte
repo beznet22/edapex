@@ -42,7 +42,6 @@
 
 	function open(e: MouseEvent | KeyboardEvent) {
 		e.preventDefault();
-		chat.setDocumentPart(id)?.(e as MouseEvent);
 		if (typeof window !== "undefined") {
 			window.dispatchEvent(
 				new CustomEvent("chat:openArtifact", {

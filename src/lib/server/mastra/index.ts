@@ -14,6 +14,7 @@ import { editorEditAgent, editorGenerateAgent, editorCopilotAgent } from './agen
 import { parentAssistantAgent } from './agents/parent-assistant';
 import { editorCommandWorkflow } from './workflows/editor-command';
 import { chatWorkflow } from './workflows/chat';
+import { documentStreamWorkflow } from './workflows/document-stream';
 import { createMastraStorage } from '$lib/server/mastra/storage/libsql/mastra-storage';
 import { tenantWorkspace } from '$lib/server/mastra/storage/workspaces';
 import { testAgent, testWorkflow } from './agents/assistant';
@@ -47,6 +48,7 @@ export const mastra = new Mastra({
   workflows: {
     editorCommandWorkflow,
     chatWorkflow,
+    documentStreamWorkflow,
     testWorkflow
   },
   storage: createMastraStorage(),

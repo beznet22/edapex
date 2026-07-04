@@ -211,38 +211,6 @@ type ViewStudentResultResult =
   | { status: "SUCCESS"; studentId: number; examTypeId: number }
   | { status: "NOT_FOUND" };
 
-function escapeMarkdownCell(value: string): string {
-  return value.replace(/\|/g, "\\|").replace(/\n/g, " ");
-}
-
-function formatMarksheetMarkdown(result: Marksheet): string {
-  const student = result.student;
-  const examTitle = result.examType?.title ?? student.term ?? "Exam";
-  const academicYear = student.sessionYear || "—";
-  const rows = result.records
-    .map(
-      (record: MarksRecord) =>
-        `| ${escapeMarkdownCell(record.subject)} | ${record.totalScore} | ${record.grade || "—"} |`,
-    )
-    .join("\n");
-
-  const remarkText = result.remark?.remark || "—";
-
-  return [
-    `# Result: ${student.fullName}`,
-    `**Exam:** ${examTitle}  `,
-    `**Academic Year:** ${academicYear}`,
-    "",
-    "| Subject | Marks | Grade |",
-    "|---------|-------|-------|",
-    rows,
-    "",
-    `**Total:** ${result.score.total} / ${result.score.maxScores}`,
-    `**Average:** ${result.score.average}%`,
-    `**Remark:** ${remarkText}`,
-  ].join("\n");
-}
-
 async function viewStudentResultLogic(
   context: ReportPdfToolContext,
   params: ViewStudentResultInput,
@@ -278,23 +246,6 @@ async function viewStudentResultLogic(
     return { status: "NOT_FOUND" };
   }
 
-  const markdown = formatMarksheetMarkdown(result);
-  const artifactId = `result-${student.studentId}-${examTypeId}`;
-  const title = `Result - ${student.fullName ?? "Student"}`;
-
-  if (writer) {
-    await writer.write({
-      type: "data-createDocument",
-      id: artifactId,
-      data: {
-        id: artifactId,
-        title,
-        content: markdown,
-        status: "success",
-      },
-    } as never);
-  }
-
   return {
     status: "SUCCESS",
     studentId: student.studentId,
@@ -306,7 +257,7 @@ export const viewStudentResultTool = createTool({
   id: "view-student-result",
   description:
     "Fetch a student's result for the active exam type and open it as a markdown document in the editor panel. " +
-    "Resolves the student by id/admissionNo/fullName within the active class/section. Emits data-createDocument parts.",
+    "Resolves the student by id/admissionNo/fullName within the active class/section and returns the formatted marksheet markdown.",
   inputSchema: viewStudentResultSchema,
   outputSchema: viewStudentResultOutputSchema,
   execute: async (input, ctx) => {

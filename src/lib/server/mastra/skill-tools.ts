@@ -47,9 +47,8 @@ export async function ensureRegistry() {
  *     and the assistant falls back to formatting the marksheet inline in
  *     its text response (causing duplicate content in the chat). With
  *     natural-language skill loading, the assistant has access to
- *     `stream-document`, `validate-marksheet`, etc. and can emit the
- *     proper data-createDocument events that auto-open the workspace
- *     panel.
+ *     `prepareDocumentStream`, `validate-marksheet`, etc. The client-side
+ *     tool call drives the workspace panel streaming.
  *
  *     We deliberately do NOT inject the full TOOL_MAP for plain chat.
  *     Loading all ~50 tools blows up the agent's system prompt and

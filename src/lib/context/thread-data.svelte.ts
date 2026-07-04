@@ -57,10 +57,6 @@ export class ThreadData {
       this.#handleConfirmation(part.data);
     }
 
-    if (part.type === "data-createDocument") {
-      this.#handleCreateDocument(part.data);
-    }
-
     if (part.type === "data-runInfo") {
       this.runInfo = part.data;
     }

@@ -172,30 +172,12 @@
     variantPopoverOpen = false;
   }
 
-  // Phase 4: input is locked while the chat workflow is streaming per-file
-  // markdown (data-createDocument parts in `processing` or `streaming`).
-  // This is stronger than `chat.loading` alone because extraction can still be
-  // in flight after the assistant agent has begun its own stream.
-  const inputDisabled = $derived(
-    chat.loading ||
-      chat.messages.some((m) =>
-        m.parts.some(
-          (p) =>
-            p.type === "data-createDocument" &&
-            (p.data?.status === "processing" || p.data?.status === "streaming"),
-        ),
-      ),
-  );
+  // Input is locked while the chat workflow is streaming. Document
+  // extraction is now driven client-side via the prepareDocumentStream
+  // tool call rather than legacy server-streamed parts.
+  const inputDisabled = $derived(chat.loading);
 
-  const extractingCount = $derived(
-    chat.messages
-      .flatMap((m) => m.parts)
-      .filter(
-        (p) =>
-          p.type === "data-createDocument" &&
-          (p.data?.status === "processing" || p.data?.status === "streaming"),
-      ).length,
-  );
+  const extractingCount = $derived(chat.loading ? 1 : 0);
 
   /**
    * Extract the slash command type from input text.
@@ -777,18 +759,6 @@
         class="mx-4 mt-2 px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-[11px] font-medium text-amber-300 animate-in fade-in slide-in-from-bottom-1 duration-200"
       >
         {blockedWorkflowMessage}
-      </div>
-    {/if}
-
-    <!-- Phase 4: extracting banner while data-createDocument parts stream -->
-    {#if inputDisabled && !chat.loading && extractingCount > 0}
-      <div
-        class="mx-4 mt-2 px-3 py-2 rounded-lg bg-primary/10 border border-primary/20 text-[11px] font-medium text-primary flex items-center gap-2 animate-in fade-in slide-in-from-bottom-1 duration-200"
-      >
-        <LoaderCircleIcon class="size-3 animate-spin" />
-        <span>
-          Extracting {extractingCount === 1 ? "document" : `${extractingCount} documents`}…
-        </span>
       </div>
     {/if}
 

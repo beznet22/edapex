@@ -92,7 +92,7 @@ export const autoFixMarksheetTool = createTool({
   id: 'auto-fix-marksheet',
   description:
     'Apply mechanical fixes to the JSON at ≥80% confidence. Writes the fixed JSON to ' +
-    'marksheets/<studentId>.json and re-streams the markdown via data-createDocument.',
+    'marksheets/<studentId>.json and re-renders the markdown via the document agent.',
   inputSchema: z.object({
     studentId: z.number().int().positive().describe('The studentId whose marksheet JSON should be auto-fixed.'),
     errors: z.array(marksheetErrorSchema).describe('Validation errors that need fixing.'),
@@ -182,14 +182,6 @@ export const autoFixMarksheetTool = createTool({
     const studentName = studentFullName(fix.fixedJson);
     const title = studentName ?? 'Document';
 
-    if (writer) {
-      await writer.write({
-        type: 'data-createDocument',
-        id: artifactId,
-        data: { status: 'processing', content: '', title, id: artifactId },
-      } as never);
-    }
-
     const reRenderPrompt = [
       `Format the corrected structured academic result for ${title} into clean, well-structured markdown.`,
       'Preserve every factual value, subject name, score, and grade from the JSON below.',
@@ -213,21 +205,6 @@ export const autoFixMarksheetTool = createTool({
     for await (const chunk of reStream.textStream) {
       if (typeof chunk !== 'string' || chunk.length === 0) continue;
       markdown += chunk;
-      if (writer) {
-        await writer.write({
-          type: 'data-createDocument',
-          id: artifactId,
-          data: { status: 'streaming', content: markdown, title, id: artifactId },
-        } as never);
-      }
-    }
-
-    if (writer) {
-      await writer.write({
-        type: 'data-createDocument',
-        id: artifactId,
-        data: { status: 'success', content: markdown, title, id: artifactId },
-      } as never);
     }
 
     const sid = studentIdFromJson(fix.fixedJson);

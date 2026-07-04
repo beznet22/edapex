@@ -48,12 +48,6 @@ export interface AgentWorkflow {
   assistants: readonly Assistant[];
 }
 
-export type CreateDocumentPart = {
-  status: "processing" | "streaming" | "success" | "error";
-  content: string | undefined;
-  title: string | undefined;
-};
-
 export type GeneratePDFPart = {
   status: "processing" | "streaming" | "success" | "error";
   data: string | undefined;
@@ -74,7 +68,6 @@ export interface OptionItem {
 }
 
 export type xDataPart = {
-	createDocument: CreateDocumentPart;
 	generatePDF: GeneratePDFPart;
 	notification: Notification;
 	threadCreated: ChatThread;

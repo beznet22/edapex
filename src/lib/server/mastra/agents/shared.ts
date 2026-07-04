@@ -62,13 +62,13 @@ export type RequestContextValues = z.infer<typeof requestContextSchema>;
  */
 const groqProvider1 = createOpenAICompatible({
 	name: 'groq',
-	apiKey: env.GROQ_API_KEY,
-	baseURL: env.GROQ_BASE_URL || 'https://api.groq.com/openai/v1',
+	apiKey: env.KIMCHI_API_KEY,
+	baseURL: 'https://llm.kimchi.dev/openai/v1',
 	headers: { 'Accept-Encoding': 'identity' },
-	supportsStructuredOutputs: false,
+	supportsStructuredOutputs: true,
 });
 
-export const DEFAULT_MODEL = groqProvider1.chatModel('llama-3.1-8b-instant');
+export const DEFAULT_MODEL = groqProvider1.chatModel('deepseek-v4-flash');
 
 
 const groqProvider = createOpenAICompatible({

@@ -41,6 +41,7 @@
   import { cn } from "$lib/utils/shadcn";
   import { onMount } from "svelte";
   import ActionBar from "./ai-elements/ActionBar.svelte";
+  import Loader from "./prompt-kit/loader/loader.svelte";
 
   let {
     user,
@@ -77,6 +78,24 @@
       }
     }, 2000);
   };
+
+  const lastAssistantMessage = $derived(
+    [...chat.messages].reverse().find((m) => m.role === "assistant"),
+  );
+
+  const hasVisibleContent = $derived(
+    !!lastAssistantMessage?.parts?.some(
+      (p) => p.type === "reasoning" || p.type === "text",
+    ),
+  );
+
+  const reasoningIsStreaming = $derived.by(() => {
+    if (chat.status !== "streaming") return false;
+    if (chat.lastMessage?.id !== lastAssistantMessage?.id) return false;
+    return lastAssistantMessage?.parts?.at(-1)?.type === "reasoning";
+  });
+
+  $inspect(["LAST ASSISTANT MESSAGE"], lastAssistantMessage);
 </script>
 
 <div
@@ -164,164 +183,54 @@
       >
         <!-- Add padding bottom so messages don't hide behind floating input -->
         <div class="space-y-6 py-4 mx-auto max-w-3xl px-4 pb-32 sm:pb-36">
-          {#each chat.messages as message}
+          {#each chat.messages as message, index}
             <div class="group relative">
               <Message from={message.role} class="py-0">
                 <MessageContent
                   variant="flat"
                   class="pb-2 {message.role === 'user' ? 'bg-accent!' : ''}"
                 >
-                  {@const mergedReasoning = (() => {
-                    // Collect ALL reasoning parts regardless of position
-                    return message.parts
-                      .filter((p) => p.type === "reasoning")
-                      .map((p) => (p as any).text || "")
-                      .filter(Boolean)
-                      .join("\n\n");
-                  })()}
-                  {@const nonReasoningParts = message.parts.filter(
-                    (p) => p.type !== "reasoning",
-                  )}
-
-                  <!-- Render single merged reasoning block at the top -->
-                  {#if mergedReasoning}
-                    <div class="mb-2">
+                  {#each message.parts as part}
+                    {#if part.type === "reasoning"}
                       <Reasoning
-                        isStreaming={chat.status === "streaming" &&
-                          message.id === chat.lastMessage?.id}
+                        open={reasoningIsStreaming}
+                        class="w-full mb-2"
+                        isStreaming={reasoningIsStreaming}
                       >
-                        <ReasoningTrigger>Thinking process...</ReasoningTrigger>
-                        <ReasoningContent
-                          class="border-l-2 border-primary/20 pl-4 py-1 my-2"
-                          contentClass="!text-muted prose-sm"
-                        >
+                        <ReasoningTrigger>
+                          <span class="text-primary">Thinking...</span>
+                        </ReasoningTrigger>
+                        <ReasoningContent>
                           <Markdown
-                            content={mergedReasoning}
-                            animation={{ enabled: false }}
+                            class="**:text-muted-foreground prose prose-sm dark:prose-invert max-w-none"
+                            content={part.text}
+                            animation={{ enabled: true }}
                           />
                         </ReasoningContent>
                       </Reasoning>
-                    </div>
-                  {/if}
-
-                  <!-- Render all non-reasoning parts -->
-                  {#each nonReasoningParts as part}
-                    {#if part.type === "data-createDocument"}
-                      <div class="my-2">
-                        <ShimmerArtifactCard
-                          id={part.id ?? `shimmer-${part.data?.title ?? "doc"}`}
-                          title={part.data?.title ?? "Document"}
-                          status={part.data?.status ?? "processing"}
-                          content={part.data?.content ?? ""}
-                        />
-                      </div>
                     {/if}
-
-                    {#if part.type === "data-generatePDF"}
-                      <div class="my-2">
-                        <ShimmerArtifactCard
-                          id={part.id ?? `shimmer-${part.data?.title ?? "pdf"}`}
-                          title={part.data?.title ?? "PDF"}
-                          status={part.data?.status ?? "processing"}
-                          content={part.data?.data ?? ""}
-                          kind="pdf"
-                        />
-                      </div>
-                    {/if}
-
-                    {#if part.type === "data-runInfo"}
-                      <div class="text-[10px] text-muted-foreground/40 font-mono px-3 py-1" data-run-id={part.data.runId}>
-                        run {part.data.runId.slice(0, 8)}
-                      </div>
-                    {/if}
-
-                    {#if part.type === "data-validationResult"}
-                      <div class="flex items-center gap-2 px-3 py-2 rounded-lg bg-{part.data.status === 'success' ? 'emerald' : 'amber'}-500/10 border border-{part.data.status === 'success' ? 'emerald' : 'amber'}-500/20 text-[11px] font-medium" data-validation-result={part.data.artifactId}>
-                        {#if part.data.status === "success"}
-                          <CheckCircleIcon class="size-3.5" />
-                          <span>Validation passed.</span>
-                        {:else}
-                          <AlertCircleIcon class="size-3.5" />
-                          <span>Validation found {part.data.errorCount ?? 'multiple'} issue(s).</span>
-                        {/if}
-                      </div>
-                    {/if}
-
-                    {#if part.type === "data-validationErrors"}
-                      <details class="px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-[11px]" data-validation-errors={part.data.artifactId}>
-                        <summary class="font-medium text-amber-700 dark:text-amber-300 cursor-pointer">{part.data.errors.length} validation issue(s)</summary>
-                        <ul class="mt-2 space-y-1 list-disc list-inside text-amber-700 dark:text-amber-300">
-                          {#each part.data.errors as err}
-                            <li><code class="font-mono">{err.path}</code>: {err.message}</li>
-                          {/each}
-                        </ul>
-                      </details>
-                    {/if}
-
-                    {#if part.type === "data-committed"}
-                      <div class="flex items-center gap-2 px-3 py-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-[11px] font-medium text-emerald-700 dark:text-emerald-300" data-committed={part.data.artifactId}>
-                        <CheckCircleIcon class="size-3.5" />
-                        <span>Saved <strong>{part.data.studentName}</strong> (record #{part.data.recordId}) in {part.data.className} — {part.data.term}.</span>
-                      </div>
-                    {/if}
-
-                    {#if part.type === "data-noDocuments"}
-                      <div class="flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/50 border border-border/10 text-[11px] font-medium text-muted-foreground" data-no-documents>
-                        <FileWarningIcon class="size-3.5" />
-                        <span>{part.data.message}</span>
-                      </div>
-                    {/if}
-
-                    {#if part.type === "tool-invocation"}
-                      <div class="flex">
-                        <ToolMessage {part} />
-                      </div>
-                    {/if}
-
                     {#if part.type === "text"}
-                      {#if message.role === "assistant"}
-                        {@const pdfLinks = Array.from(
-                          part.text.matchAll(
-                            /\[([^\]]+)\]\(([^)]+\.pdf|[^)]+\/api\/results\/[^)]+)\)/g,
-                          ),
-                        ).map((m) => ({ text: m[1], url: m[2] }))}
-                        <Markdown
-                          content={part.text}
-                          animation={{ enabled: true }}
-                        />
-                        {#if pdfLinks.length > 0}
-                          <div class="mt-4 flex flex-col gap-2">
-                            {#each pdfLinks as link}
-                              <PdfLinkCard
-                                filename={link.text}
-                                url={link.url}
-                              />
-                            {/each}
-                          </div>
-                        {/if}
-                      {:else}
-                        <div
-                          class="prose prose-sm dark:prose-invert max-w-none"
-                        >
-                          {part.text}
-                        </div>
-                      {/if}
+                      <Markdown
+                        class="prose prose-sm dark:prose-invert max-w-none"
+                        content={part.text}
+                        animation={{ enabled: true }}
+                      />
                     {/if}
                   {/each}
                 </MessageContent>
               </Message>
-              {#if chat.status === "submitted" && message.id === chat.lastMessage?.id && chat.lastMessage?.role === "assistant"}
-                <Shimmer as="p" spread={3} duration={2} content_length={18}>
-                  {#snippet children()}
-                    Generating response...
-                  {/snippet}
+
+              {#if message.role === "assistant" && message.id === lastAssistantMessage?.id && chat.status === "streaming" && !hasVisibleContent}
+                <Shimmer as="p" spread={3} duration={2} content_length={20}>
+                  <span>Generating response...</span>
                 </Shimmer>
               {/if}
 
               {#if chat.lastError && message.id === chat.lastMessage?.id}
                 <ErrorAlert
                   error={chat.lastError}
-                  onRegenerate={() => chat.client.regenerate({ messageId: message.id })}
+                  onRegenerate={() =>
+                    chat.client.regenerate({ messageId: message.id })}
                   onClearContext={() => {
                     chat.client.messages = chat.messages.slice(0, -1);
                     chat.client.clearError();
@@ -345,28 +254,28 @@
     </Conversation>
   {/if}
 
-
   <div
     class="absolute bottom-4 left-0 w-full pt-10 pb-4 px-2 sm:px-4 safe-area-bottom pointer-events-none z-50 flex flex-col items-center gap-0"
   >
     {#if chat.awaitingValidation || chat.pendingGate}
       <div
         class="pointer-events-auto w-full max-w-[780px] relative z-10 h-[var(--composer-card-h,8.5rem)] -mb-[calc(var(--composer-card-h,8.5rem)-2.25rem)]"
-        data-mode={chat.awaitingValidation ? 'validation' : 'options'}
+        data-mode={chat.awaitingValidation ? "validation" : "options"}
         style="--composer-card-h: 8.5rem;"
       >
         {#if chat.awaitingValidation}
           <ActionBar
             mode="validation"
             artifactId={chat.awaitingValidation}
-            validating={chat.pendingValidationArtifactId === chat.awaitingValidation}
+            validating={chat.pendingValidationArtifactId ===
+              chat.awaitingValidation}
             context="Marksheet validation required"
-            subContext={`marksheets/${chat.selectedClass?.classId ?? '?'} · 2nd term`}
+            subContext={`marksheets/${chat.selectedClass?.classId ?? "?"} · 2nd term`}
             secondaryLabel="Skip"
             onSecondary={() => chat.cancelValidation()}
             dropdownOptions={[
-              { id: 'force-commit', label: 'Force commit (skip auto-fix)' },
-              { id: 'save-only', label: 'Save without committing' }
+              { id: "force-commit", label: "Force commit (skip auto-fix)" },
+              { id: "save-only", label: "Save without committing" },
             ]}
             onValidate={(id, dropdownId) => chat.resumeWorkflow(id, dropdownId)}
           />

@@ -12,8 +12,8 @@
  *         a. `classifyStep`        — collapses file references into stream items
  *         b. `streamDocumentStep`  — runs in `.foreach(concurrency: 4)`;
  *            resolves each file's markdown from the OCR working-memory cache
- *            and emits `data-createDocument` parts to the chat stream
- *            (append-only `content` chunks, statuses `processing` → `streaming`
+ *            (document streaming now happens client-side via the
+ *            prepareDocumentStream tool call; this step is a pass-through).
  *            → `success` | `error`)
  *    3. `titleStep`               — generates the thread title from the
  *            user's first prompt and emits `data-threadCreated` to the stream
@@ -289,16 +289,11 @@ const streamDocumentStep = createStep({
 	outputSchema: fileStreamItemSchema,
 	retries: 3,
 	execute: async ({ inputData }) => {
-		// Pass-through. Document streaming is now driven by the
-		// `stream-document` tool (formerly format-marksheet-document)
-		// inside the assistant agent's turn. That tool calls
-		// documentAgent.stream() and emits `data-createDocument`
-		// events that auto-open the workspace panel.
-		//
-		// We deliberately do NOT stream here so the chat doesn't show
-		// duplicate document content (once from this parallel branch
-		// and once from the assistant's tool call). The tool is the
-		// single source of truth for `data-createDocument` events.
+		// Pass-through. Document streaming is now driven client-side by the
+		// prepareDocumentStream tool call inside the assistant agent's turn.
+		// The workspace panel renders the streamed markdown from a separate
+		// Chat instance that runs streamDocumentAgentStep directly via
+		// /api/chat?step=stream-document-agent.
 		return inputData;
 	}
 });
@@ -399,16 +394,6 @@ const assistantStep = createStep({
 
 		console.log("fileItems", inputData.fileItems);
 
-		const hasStreamingFiles = inputData.fileItems.some((f) => f.status === 'streaming' || f.status === 'complete');
-		const hasMarksheetIntent = /\bmarksheet\b|\bmark\s*sheet\b|\bprocess\b|\bformat\b|\bextract\b|\brender\b|\bshow\b|\breview\b|\bpublish\b/i.test(
-			inputData.promptText
-		);
-		const forceStreamDocument = hasStreamingFiles && hasMarksheetIntent;
-
-		// Stash the workflow writer in requestContext so tools invoked by the
-		// assistant agent (e.g. stream-document) can emit stream parts to the
-		// client. Mastra forwards requestContext to tool execute() contexts but
-		// not the step's writer.
 		if (writer && requestContext) {
 			requestContext.set('writer', writer);
 		}
@@ -416,11 +401,6 @@ const assistantStep = createStep({
 		if (inputData.fileItems.length > 0) {
 			const manifestText = inputData.fileItems
 				.map((f) => {
-					// The assistant MUST call stream-document with the raw OCR
-					// upload's contentHash, which equals the fileId shown here.
-					// documentId is only created AFTER stream-document produces
-					// the formatted marksheet; it must not be used for the first
-					// call.
 					const contentHash = f.fileId ?? f.contentHash ?? f.toolCallId;
 					if ('error' in f) {
 						return `- ${f.fileName} (contentHash: ${contentHash}) — Error: ${f.error}`;
@@ -431,107 +411,48 @@ const assistantStep = createStep({
 			requestContext?.set('fileManifest', manifestText);
 		}
 
-		// Resolve (get or create) thread — emits data-new-thread-created if new
-		const assistant = m?.getAgent('assistant');
-		const memory = assistant ? await assistant.getMemory() : undefined;
-		let stream;
-		try {
-			stream = await streamWithAutoRetry({
-				stream: () =>
-					agent.stream(inputData.promptText, {
-						...(abortSignal ? { abortSignal: abortSignal } : {}),
-						...(requestContext ? { requestContext: requestContext } : {}),
-						...(requestContext?.get('providerOptions')
-							? { providerOptions: requestContext.get('providerOptions') as Record<string, Record<string, unknown>> as never }
-							: {}),
-						// FORCE the stream-document tool call when the user uploaded
-						// marksheet files and the message contains marksheet verbs.
-						// The assistant was responding with inline formatted text
-						// instead of calling stream-document. toolChoice locks it in.
-						...(forceStreamDocument ? { toolChoice: { type: 'tool' as const, toolName: 'stream-document' as const } } : {}),
-						memory: {
-							thread: inputData.threadId,
-							resource: inputData.resourceId
-						},
-						// When forcing stream-document, limit the assistant to a single
-						// generation step (the tool call). This prevents the model from
-						// emitting a wrap-up text response after the document finishes
-						// streaming; instead the workflow moves immediately to
-						// awaitValidationStep, which suspends and shows the ActionBar.
-						maxSteps: forceStreamDocument ? 1 : 30,
-						onError: ({ error }) => {
-							const msg = error instanceof Error ? error.message : String(error);
-							if (msg.includes('AbortError') || msg.includes('aborted')) {
-								console.info('[api/chat] Generation stopped.');
-								return;
-							}
-							console.error(`[api/chat] Error: ${msg}`);
-						},
-						onFinish: ({ usage }) => {
-							// Emit a data-usage stream part carrying the final usage for
-							// this step. The chat-context accumulates these end-of-message
-							// totals and the ContextUsageIndicator renders the cumulative
-							// value against the model's context window.
-							const simple = {
-								inputTokens: usage.inputTokens ?? 0,
-								outputTokens: usage.outputTokens ?? 0,
-								reasoningTokens: usage.reasoningTokens ?? 0,
-								cachedInputTokens: usage.cachedInputTokens ?? 0
-							};
-							writer
-								.write({
-									type: 'data-usage',
-									id: `usage-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-									data: simple
-								} as never)
-								.catch(() => {
-									// writer may already be closed
-								});
+		const stream = await streamWithAutoRetry({
+			stream: () =>
+				agent.stream(inputData.promptText, {
+					...(abortSignal ? { abortSignal: abortSignal } : {}),
+					...(requestContext ? { requestContext: requestContext } : {}),
+					...(requestContext?.get('providerOptions')
+						? { providerOptions: requestContext.get('providerOptions') as Record<string, Record<string, unknown>> as never }
+						: {}),
+					memory: {
+						thread: inputData.threadId,
+						resource: inputData.resourceId
+					},
+					maxSteps: 30,
+					onError: ({ error }) => {
+						const msg = error instanceof Error ? error.message : String(error);
+						if (msg.includes('AbortError') || msg.includes('aborted')) {
+							console.info('[api/chat] Generation stopped.');
+							return;
 						}
-					}),
-				abortSignal,
-				writer
-			});
-		} catch (err) {
-			const friendly = parseFriendlyError(err);
-			const friendlyMsg = friendly.message;
-			console.error(`[api/chat] Agent stream failed: ${friendlyMsg}`);
-			// Emit a structured data-error part alongside the human-readable
-			// text-delta so the client-side ErrorAlert can render the right
-			// action button (regenerate / clear_context / open_settings).
-			//
-			// The data-error is enqueued INSIDE the fallback stream rather than
-			// via a separate `writer.write()` call so all parts share the same
-			// `pipeTo(writer)` lifecycle. Previously the data-error write was
-			// fire-and-forget (`void errorPart`) and could race the writer
-			// closing, causing the client to receive only the fallback
-			// text-delta with no ErrorAlert rendered.
-			const categorized = categorizeAIError(err);
-			const errorId = `err-${Date.now()}`;
-			const fallbackStream = new ReadableStream({
-				start(controller) {
-					controller.enqueue({
-						type: 'data-error',
-						id: errorId,
-						data: categorized
-					} as never);
-					controller.enqueue({ type: 'text-delta', text: `⚠️ ${friendlyMsg}` });
-					controller.enqueue({
-						type: 'finish',
-						finishReason: 'error',
-						usage: { inputTokens: 0, outputTokens: 0 }
-					});
-					controller.close();
-				}
-			});
-			await fallbackStream.pipeTo(writer);
-			return {
-				text: friendlyMsg,
-				resolvedFiles: inputData.fileItems
-			};
-		}
+						console.error(`[api/chat] Error: ${msg}`);
+					},
+					onFinish: ({ usage }) => {
+						const simple = {
+							inputTokens: usage.inputTokens ?? 0,
+							outputTokenfallbackStreams: usage.outputTokens ?? 0,
+							reasoningTokens: usage.reasoningTokens ?? 0,
+							cachedInputTokens: usage.cachedInputTokens ?? 0
+						};
+						writer
+							.write({
+								type: 'data-usage',
+								id: `usage-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+								data: simple
+							} as never)
+							.catch(() => { });
+					}
+				}),
+			abortSignal,
+			writer
+		});
 
-		await stream.fullStream.pipeTo(writer);
+		await stream.fullStream.pipeTo(writer);	
 		return {
 			text: await stream.text,
 			resolvedFiles: inputData.fileItems

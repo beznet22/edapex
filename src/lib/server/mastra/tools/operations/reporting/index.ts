@@ -1,5 +1,4 @@
 export { getActiveMarksheetTool } from "./marksheet/get-active-marksheet";
-export { streamDocumentTool } from "./marksheet/stream-document";
 export { validateMarksheetTool } from "./marksheet/validate-marksheet";
 export { autoFixMarksheetTool } from "./marksheet/auto-fix-marksheet";
 export { commitMarksheetTool } from "./marksheet/commit-marksheet";
@@ -10,7 +9,6 @@ export { publishTranscriptPdfTool } from "./transcript/publish-transcript-pdf";
 export { transcriptReportTool } from "./transcript/transcript-report";
 
 import { getActiveMarksheetTool } from "./marksheet/get-active-marksheet";
-import { streamDocumentTool } from "./marksheet/stream-document";
 import { validateMarksheetTool } from "./marksheet/validate-marksheet";
 import { autoFixMarksheetTool } from "./marksheet/auto-fix-marksheet";
 import { commitMarksheetTool } from "./marksheet/commit-marksheet";
@@ -21,14 +19,10 @@ import { publishTranscriptPdfTool } from "./transcript/publish-transcript-pdf";
 import { transcriptReportTool } from "./transcript/transcript-report";
 
 /**
- * Reporting tools — `streamDocumentTool` is the central artifact
- * generator (formerly `formatMarksheetDocumentTool`). It transforms
- * raw OCR markdown into formatted output and emits data-createDocument
- * events that drive the workspace panel streaming experience.
+ * Reporting tools. Document streaming is handled client-side.
  */
 export const reportingTools = {
   getActiveMarksheetTool,
-  streamDocumentTool,
   validateMarksheetTool,
   autoFixMarksheetTool,
   commitMarksheetTool,
@@ -38,10 +32,3 @@ export const reportingTools = {
   publishTranscriptPdfTool,
   transcriptReportTool
 };
-
-/**
- * Back-compat aliases for the renamed `streamDocumentTool`. Existing
- * callers may still import the old name; new code MUST use
- * `streamDocumentTool` / `stream-document`.
- */
-export { streamDocumentTool as formatMarksheetDocumentTool };

@@ -38,6 +38,9 @@
 				break;
 		}
 	}
+	$effect(()=>{
+		console.log(presentation.message, error)
+	})
 </script>
 
 <Alert.Root

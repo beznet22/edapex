@@ -239,6 +239,7 @@ export const POST: RequestHandler = async ({ request, locals: { user, session },
 	}
 
 	const runId = bodyRunId ?? randomUUID();
+
 	let stream;
 	try {
 		const params: ChatWorkflowParams = {

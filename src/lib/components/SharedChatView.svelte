@@ -23,7 +23,6 @@
   import type { AuthUser } from "$lib/types/auth-types";
   import type { ChatThread, xUIMessage } from "$lib/types/chat-types";
   import type { Artifact } from "$lib/types/workspace-types";
-  import { deriveKind } from "$lib/utils/artifact-kind";
 
   let {
     user,
@@ -61,14 +60,12 @@
 
   const chatArtifacts = $derived<Artifact[]>(
     (() => {
+      // Only data-generatePDF artifacts are surfaced from the main chat
+      // stream. Document streaming artifacts are managed by the workspace
+      // panel's separate Chat instance (see ArtifactViewer).
       const parts = chat.messages
         .flatMap((m) => m.parts ?? [])
-        .filter(
-          (p: any) =>
-            p.type === "data-createDocument" || p.type === "data-generatePDF",
-        );
-      // Keep only the LATEST part per artifact id so streaming chunks
-      // replace earlier ones instead of creating duplicates.
+        .filter((p: any) => p.type === "data-generatePDF");
       const latestById = new Map<string, any>();
       for (const raw of parts) {
         const p = raw as any;
@@ -79,21 +76,16 @@
       return Array.from(latestById.values()).map((p: any) => {
         const data = p.data ?? {};
         const title = data.title ?? "untitled";
-        const isPdf = p.type === "data-generatePDF";
-        const url: string | undefined = isPdf
-          ? (typeof data.data === "string" ? data.data : undefined) ??
-            data.previewUrl
-          : chat.threadData.examTypeId
-            ? `/api/file/exams/examType-${chat.threadData.examTypeId}/${title}.md`
-            : undefined;
+        const url: string | undefined =
+          (typeof data.data === "string" ? data.data : undefined) ?? data.previewUrl;
         return {
           id: data.id ?? p.id,
           title,
-          kind: isPdf ? "pdf" : deriveKind(title),
-          content: isPdf ? undefined : data.content,
+          kind: "pdf" as const,
+          content: undefined,
           url,
           saveUrl: url,
-          status: data.status,
+          status: data.status
         };
       });
     })(),
@@ -101,7 +93,7 @@
 
   $effect(() => {
     inspector.setChatArtifacts(chatArtifacts);
-    console.log('[SharedChatView] chatArtifacts updated', { count: chatArtifacts.length, artifacts: chatArtifacts.map((a) => ({ id: a.id, status: a.status, contentLength: a.content?.length })) });
+    // console.log('[SharedChatView] chatArtifacts updated', { count: chatArtifacts.length, artifacts: chatArtifacts.map((a) => ({ id: a.id, status: a.status, contentLength: a.content?.length })) });
   });
 
   $effect(() => {

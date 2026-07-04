@@ -190,7 +190,7 @@ export const transcriptReportTool = createTool({
   id: "transcript-report",
   description:
     "Compute the multi-term transcript for a student and render it as a markdown document via the document agent. " +
-    "Emits data-createDocument stream parts (processing → streaming → success) and persists the final markdown to exams/transcripts/ay-<academicId>/<studentId>.md.",
+    "Persists the formatted transcript markdown to exams/transcripts/ay-<academicId>/<studentId>.md.",
   inputSchema: transcriptReportInputSchema,
   outputSchema: transcriptReportOutputSchema,
   execute: async (input: TranscriptReportInput, ctx) => {
@@ -233,14 +233,6 @@ export const transcriptReportTool = createTool({
     const artifactId = `report-transcript-${student.studentId}-${academicId}`;
     const title = `${studentName} — Transcript ${academicYearTitle}`;
 
-    if (writer) {
-      await writer.write({
-        type: "data-createDocument",
-        id: artifactId,
-        data: { status: "processing", content: "", title, id: artifactId },
-      } as never);
-    }
-
     const documentAgent = await getDocumentAgent();
 
     const prompt = [
@@ -271,13 +263,6 @@ export const transcriptReportTool = createTool({
     for await (const chunk of stream.textStream) {
       if (typeof chunk !== "string" || chunk.length === 0) continue;
       markdown += chunk;
-      if (writer) {
-        await writer.write({
-          type: "data-createDocument",
-          id: artifactId,
-          data: { status: "streaming", content: markdown, title, id: artifactId },
-        } as never);
-      }
     }
 
     const fs = await resolveFilesystem(tenant);
@@ -292,14 +277,6 @@ export const transcriptReportTool = createTool({
       modifiedAt: new Date().toISOString(),
       mimeType: 'text/markdown'
     });
-
-    if (writer) {
-      await writer.write({
-        type: "data-createDocument",
-        id: artifactId,
-        data: { status: "success", content: markdown, title, id: artifactId },
-      } as never);
-    }
 
     return {
       artifactId,

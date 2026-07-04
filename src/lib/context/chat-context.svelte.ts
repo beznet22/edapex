@@ -4,14 +4,12 @@ import type { ChatThread } from "$lib/types/chat-types";
 import type { AuthUser } from "$lib/types/auth-types";
 import type {
   AgentWorkflow,
-  CreateDocumentPart,
-  GeneratePDFPart,
   xUIMessage,
   xUIMessagePart,
   StreamDataPart,
 } from "$lib/types/chat-types";
 import { Chat } from "@ai-sdk/svelte";
-import { DefaultChatTransport, type ChatStatus } from "ai";
+import { DefaultChatTransport, lastAssistantMessageIsCompleteWithToolCalls, type ChatStatus } from "ai";
 import { getContext, setContext } from "svelte";
 import { ChatHistory } from "./chat-history.svelte";
 import type { ClassSection } from "$lib/types/result-types";
@@ -175,10 +173,22 @@ export class ChatContext {
   /** Structured, UI-ready error from the last failed turn. Drives the
    *  inline `<ErrorAlert>` rendered next to the failed assistant message. */
   lastError = $state<FriendlyAiError | null>(null);
-  openedDocumentId = $state<string | undefined>(undefined);
   openPanel = $state<boolean>(false);
-  docPart = $state<CreateDocumentPart | GeneratePDFPart | undefined>(undefined);
-  docState = $derived(this.docPart?.status);
+  /** Separate Chat instance that streams a single document via the
+   *  `documentStreamWorkflow` via `/api/artifact`. Created on `onToolCall` when
+   *  the assistant invokes the prepareDocumentStream client-side tool. */
+  documentChat: Chat<xUIMessage> | undefined = $state();
+  /** Tool part from the main chat's last message matching prepareDocumentStream. */
+  documentToolPart = $derived.by(() => {
+    for (const message of this.messages) {
+      for (const part of message.parts ?? []) {
+        const p = part as { type?: string; toolCallId?: string; state?: string; input?: { contentHash?: string; fileName?: string }; output?: { artifactId?: string; contentHash?: string; fileName?: string; filePath?: string } };
+        if (p?.type === "tool-prepare-document-stream") return p;
+      }
+    }
+    return null;
+  });
+  
   get error() {
     return this.client?.error;
   }
@@ -210,8 +220,6 @@ export class ChatContext {
   pendingValidationErrors = $state<{ artifactId: string; errors: Array<{ path: string; message: string }> } | null>(null);
   /** last validation outcome (set by data-validationResult) */
   lastValidationOutcome = $state<{ artifactId: string; status: 'success' | 'errors' } | null>(null);
-  /** Guard flag: prevents auto-continuation re-firing on the same validation */
-  multiFileContinuationInFlight = $state(false);
   /** last committed artifact (set by data-committed) — persists for chat lifetime per D15 */
   lastCommittedArtifactId = $state<string | null>(null);
   /** per-keystroke edit tracking for ValidateFab mode derivation */
@@ -272,6 +280,7 @@ export class ChatContext {
         onFinish: this.#onFinish.bind(this),
         onData: this.#onData.bind(this),
         onError: this.#onError.bind(this),
+        onToolCall: this.#onToolCall.bind(this),
       }),
     );
 
@@ -403,22 +412,10 @@ export class ChatContext {
         };
       }
     } else if (part.type === "data-validationResult") {
-      // Multi-file auto-continuation: after a successful commit, check if
-      // there are more unprocessed data-createDocument parts and fire a
-      // continuation message so the assistant processes the next file
-      // through its own validate/commit turn (per user requirement:
-      // "agent must go through multiple validate/commit turns for each
-      // document"). Guarded by multiFileContinuationInFlight so a
-      // success event only triggers one continuation.
-      const data = (part as { data?: { artifactId?: string; status?: string } }).data;
-      if (data?.status === "success" && !this.multiFileContinuationInFlight) {
-        this.runMultiFileContinuation();
-      }
+      // No-op: the previous multi-file auto-continuation logic has been
+      // removed. Client-side document streaming and the assistant's own
+      // FILE MANIFEST context drive per-file processing now.
     } else if (part.type === "data-awaitValidation") {
-      // Reset the auto-continuation guard: a new file is being validated,
-      // so the next data-validationResult (if success) can trigger another
-      // continuation pass for the file after it.
-      this.multiFileContinuationInFlight = false;
       // Mirror to legacy alias consumed by ActionBar:
       // chat.awaitingValidation reads threadData.pendingAwaitingValidation.
       // The thread-data handler already sets it; this is a belt-and-braces
@@ -427,79 +424,8 @@ export class ChatContext {
       if (data?.artifactId) {
         (this.threadData as { pendingAwaitingValidation?: string | null }).pendingAwaitingValidation = data.artifactId;
       }
-    } else if (part.type === "data-createDocument") {
-      // AUTO-OPEN: on the FIRST `data-createDocument` part with content
-      // (i.e. the first streaming chunk from the documentAgent), open the
-      // workspace panel so the user sees the markdown being tokenized
-      // into the <Markdown> component.
-      const data = (part as {
-        id?: string;
-        data?: { status?: string; title?: string; content?: string; id?: string };
-      }).data;
-      console.log('[chat-context] data-createDocument', { ts: performance.now(), id: data?.id, status: data?.status, contentLength: data?.content?.length });
-      const partId = (part as { id?: string }).id;
-      const artifactId = data?.id ?? partId;
-      if (
-        typeof window !== "undefined" &&
-        data?.status === "streaming" &&
-        typeof data.content === "string" &&
-        data.content.length > 0 &&
-        artifactId
-      ) {
-        window.dispatchEvent(
-          new CustomEvent("chat:openArtifact", {
-            detail: { id: artifactId, content: data.content, title: data.title ?? "", status: data.status, kind: "document" }
-          })
-        );
-      }
     }
   };
-
-  /**
-   * Multi-file continuation: scans the chat history for data-createDocument
-   * parts that don't yet have a matching data-validationResult { status:
-   * "success" }. If any exist, sends a short continuation message that
-   * triggers a new workflow run; the assistant will call
-   * format-marksheet-document for the next file, which then suspends for
-   * its own validate/commit turn via awaitValidationStep.
-   */
-  runMultiFileContinuation(): void {
-    if (this.multiFileContinuationInFlight) return;
-    const allDocs = this.messages
-      .flatMap((m) => m.parts ?? [])
-      .filter((p) => (p as { type?: string }).type === "data-createDocument") as Array<{
-        type: "data-createDocument";
-        id?: string;
-        data?: { id?: string; status?: string; title?: string };
-      }>;
-    if (allDocs.length === 0) return;
-    const validatedIds = new Set(
-      this.messages
-        .flatMap((m) => m.parts ?? [])
-        .filter(
-          (p) =>
-            (p as { type?: string }).type === "data-validationResult" &&
-            (p as { data?: { status?: string } }).data?.status === "success"
-        )
-        .map((p) => (p as { data?: { artifactId?: string } }).data?.artifactId ?? "")
-    );
-    const nextFile = allDocs.find(
-      (p) => !validatedIds.has(p.data?.id ?? p.id ?? "")
-    );
-    if (!nextFile) return;
-    this.multiFileContinuationInFlight = true;
-    void this.client.sendMessage(
-      { text: `Continue processing the remaining marksheet: "${nextFile.data?.title ?? "next file"}".` },
-      {
-        body: {
-          threadId: this.chatData?.threadId,
-          selectedClass: this.selectedClass,
-          mentions: [],
-          fileReferences: []
-        }
-      }
-    );
-  }
 
   #onError = (error: Error) => {
     // Categorize server-side / transport errors that didn't come through
@@ -521,39 +447,117 @@ export class ChatContext {
     });
   };
 
-  getDocumentPart = () => {
-    if (this.docPart) return this.docPart;
-    this.docPart = this.messages
-      .flatMap((m) => m.parts ?? [])
-      .filter(
-        (p) =>
-          (p.type === "data-createDocument" || p.type === "data-generatePDF") &&
-          p.id === this.openedDocumentId,
-      )
-      .findLast(
-        (p) => p.type === "data-createDocument" || p.type === "data-generatePDF",
-      )?.data;
-
-    return this.docPart;
-  };
-
-  setDocumentPart = (id?: string) => {
-    if (!id) return;
-    return (e: MouseEvent) => {
-      e.preventDefault();
-      this.docPart = this.messages
-        .flatMap((m) => m.parts ?? [])
-        .filter(
-          (p) =>
-            (p.type === "data-createDocument" || p.type === "data-generatePDF") &&
-            p.id === id,
-        )
-        .findLast(
-          (p) => p.type === "data-createDocument" || p.type === "data-generatePDF",
-        )?.data;
-      this.openedDocumentId = id;
+  /**
+   * Canonical AI SDK client-side tool handler. When the assistant agent
+   * calls the prepareDocumentStream tool (no execute on the server), we
+   * spin up a separate Chat that posts to /api/chat with
+   * step: 'stream-document-agent'. When that stream finishes, we call
+   * addToolOutput on the main chat so the assistant turn resumes.
+   *
+   * The ArtifactViewer reads `documentChat.messages` to render the
+   * streaming markdown token-by-token and switches to EditorCanvas once
+   * the tool part transitions to output-available.
+   */
+  #onToolCall = ({ toolCall }: { toolCall: { dynamic?: boolean; toolName: string; toolCallId: string; input?: unknown } }) => {
+    console.log('[chat] onToolCall fired', { toolName: toolCall.toolName, toolCallId: toolCall.toolCallId, dynamic: toolCall.dynamic, input: toolCall.input });
+    if (toolCall.dynamic) return;
+    if (toolCall.toolName !== "prepare-document-stream") { console.log('[chat] onToolCall ignored: toolName mismatch'); return; }
+    console.log('[chat] onToolCall matched prepare-document-stream');
+    const input = (toolCall.input ?? {}) as {
+      format?: "marksheet" | "transcript";
+      contentHash?: string;
+      fileName?: string;
+      studentId?: number;
+      academicId?: number;
     };
+    const format: "marksheet" | "transcript" = input.format ?? "marksheet";
+    if (format === "marksheet" && !input.contentHash) return;
+    if (format === "transcript" && !input.studentId) return;
+    this.#startDocumentStream({
+      toolCallId: toolCall.toolCallId,
+      format,
+      contentHash: input.contentHash,
+      fileName: input.fileName,
+      studentId: input.studentId,
+      academicId: input.academicId
+    });
   };
+
+  #startDocumentStream(args: {
+    toolCallId: string;
+    format: "marksheet" | "transcript";
+    contentHash?: string;
+    fileName?: string;
+    studentId?: number;
+    academicId?: number;
+  }) {
+    if (this.documentChat) return; // already streaming
+    const { toolCallId, format, contentHash, fileName, studentId, academicId } = args;
+    const threadId = this.chatData?.threadId ?? `thread-${Date.now()}`;
+    const selectedClass = this.selectedClass;
+
+    // Deterministic artifactId and filePath derived from the tool input —
+    // the server uses the same conventions so the client can call
+    // addToolOutput with the correct metadata without waiting for a
+    // data-* part from the stream.
+    const artifactId =
+      format === "transcript" && studentId && academicId
+        ? `artifact-transcript-${studentId}-${academicId}`
+        : `artifact-${contentHash}`;
+    const filePath =
+      format === "transcript" && studentId
+        ? `transcripts/${studentId}.md`
+        : `marksheets/${contentHash}.md`;
+    const resolvedFileName = format === "transcript" ? "Transcript" : (fileName ?? "document");
+
+    const dc = new Chat<xUIMessage>({
+      id: threadId,
+      transport: new DefaultChatTransport({
+        api: "/api/artifact",
+        prepareSendMessagesRequest: ({ messages }) => ({
+          body: {
+            messages,
+            threadId,
+            format,
+            contentHash,
+            fileName,
+            studentId,
+            academicId,
+            selectedClass
+          }
+        })
+      }),
+      onFinish: () => {
+        console.log('[chat] documentChat onFinish', { artifactId, filePath, fileName: resolvedFileName });
+        try {
+          this.client?.addToolOutput({
+            tool: "prepare-document-stream",
+            toolCallId,
+            output: { artifactId, contentHash: contentHash ?? "", fileName: resolvedFileName, filePath }
+          });
+          console.log('[chat] addToolOutput called', { artifactId, contentHash: contentHash ?? "", fileName: resolvedFileName, filePath });
+        } catch (err) {
+          console.error("[chat] addToolOutput failed", err);
+        }
+      },
+      onError: (err: Error) => {
+        try {
+          this.client?.addToolOutput({
+            tool: "prepare-document-stream",
+            toolCallId,
+            state: "output-error",
+            errorText: err instanceof Error ? err.message : String(err)
+          });
+        } catch (e) {
+          console.error("[chat] addToolOutput error-fallback failed", e);
+        }
+      }
+    });
+
+    this.documentChat = dc;
+    console.log('[chat] documentChat created', { format, contentHash, fileName, studentId, academicId, threadId });
+    void dc.sendMessage({ text: `Format the uploaded marksheet for ${fileName}.` });
+  }
 
   scrollToBottom = () => {
     // implement smooth scroll to bottom
