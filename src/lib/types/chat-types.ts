@@ -107,6 +107,12 @@ export type xDataPart = {
 	noDocuments: {
 		message: string;
 	};
+	streamDocument: {
+		documentId: string;
+		format: 'marksheet' | 'transcript';
+		phase?: 'start' | 'delta' | 'end';
+		delta: string;
+	};
 };
 
 export type StreamDataPart = {

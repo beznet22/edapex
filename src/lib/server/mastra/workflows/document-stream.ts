@@ -1,9 +1,16 @@
 /**
  * Document Stream Workflow — EdApex
  *
- * Dedicated workflow for client-side document artifact generation. Invoked
- * by `/api/artifact` after the assistant agent emits a `prepareDocumentStream`
- * client-side tool call. Supports two formats via the `format` param:
+ * Server-side workflow that formats a marksheet OCR upload or a student
+ * transcript into structured markdown. Registered on `assistantAgent` via
+ * `workflows: { streamDocument: documentStreamWorkflow }` so Mastra exposes
+ * it as a tool named `workflow-streamDocument`. The assistant calls it as
+ * a regular tool; the step runs server-side, emits each LLM text-delta
+ * chunk as a `data-streamDocument` data part via `writer.custom` for the
+ * client to render token-by-token, persists the final markdown to the
+ * workspace, and returns the artifact metadata via the output schema.
+ *
+ * Supports two formats via the `format` input param:
  *
  *   - `marksheet`: stream formatted markdown for an OCR upload (contentHash).
  *     Reads `ocr/<fileName>.md`, calls the document agent, persists to
@@ -49,6 +56,18 @@ export const documentStreamOutputSchema = z.object({
   title: z.string(),
   studentId: z.number().nullable()
 });
+
+/**
+ * Derives a deterministic documentId from the workflow input. The client
+ * uses the same derivation to match `data-streamDocument` deltas to entries
+ * in `threadData.documentStreams` without needing access to a `toolCallId`.
+ */
+function deriveDocumentId(input: z.infer<typeof documentStreamInputSchema>): string {
+  if (input.format === 'transcript') {
+    return `transcript-${input.studentId}-${input.academicId ?? 'active'}`;
+  }
+  return `marksheet-${input.contentHash}`;
+}
 
 export const streamDocumentAgentStep = createStep({
   id: 'stream-document-agent',
@@ -123,10 +142,23 @@ export const streamDocumentAgentStep = createStep({
             ...(requestContext ? { requestContext: requestContext as never } : {})
           }),
         abortSignal: abortSignal as AbortSignal | undefined,
-        writer: (writer as unknown as { write: (chunk: unknown) => Promise<void> }) ?? { write: async () => {} }
+        writer: writer as unknown as { write: (chunk: unknown) => Promise<void> }
       });
 
-      await stream.fullStream.pipeTo(writer as unknown as WritableStream<unknown>);
+      for await (const chunk of stream.fullStream) {
+        if (chunk.type === 'text-delta' && typeof chunk.payload?.text === 'string') {
+          await writer.custom({
+            type: 'data-streamDocument',
+            data: {
+              documentId: deriveDocumentId(inputData),
+              format: 'transcript',
+              phase: 'delta',
+              delta: chunk.payload.text
+            },
+            transient: true
+          });
+        }
+      }
       const finalText = await stream.text;
 
       await fs.writeFile(persistPath, finalText, { recursive: true });
@@ -200,10 +232,23 @@ export const streamDocumentAgentStep = createStep({
           ...(requestContext ? { requestContext: requestContext as never } : {})
         }),
       abortSignal: abortSignal as AbortSignal | undefined,
-      writer: (writer as unknown as { write: (chunk: unknown) => Promise<void> }) ?? { write: async () => {} }
+      writer: writer as unknown as { write: (chunk: unknown) => Promise<void> }
     });
 
-    await stream.fullStream.pipeTo(writer as unknown as WritableStream<unknown>);
+    for await (const chunk of stream.fullStream) {
+      if (chunk.type === 'text-delta' && typeof chunk.payload?.text === 'string') {
+        await writer.custom({
+          type: 'data-streamDocument',
+          data: {
+            documentId: deriveDocumentId(inputData),
+            format: 'marksheet',
+            phase: 'delta',
+            delta: chunk.payload.text
+          },
+          transient: true
+        });
+      }
+    }
     const finalText = await stream.text;
 
     await fs.writeFile(persistPath, finalText, { recursive: true });
@@ -233,7 +278,8 @@ export const streamDocumentAgentStep = createStep({
 
 export const documentStreamWorkflow = createWorkflow({
   id: 'documentStreamWorkflow',
-  description: 'Client-side triggered document artifact generation (marksheet or transcript).',
+  description:
+    "Format a marksheet OCR upload or transcript into structured markdown and stream it token-by-token to the workspace panel. ALWAYS call this tool — never format marksheets in your text response. Required inputs: format (marksheet|transcript); for marksheet pass contentHash + fileName; for transcript pass studentId + academicId (academicId defaults to the active academic year).",
   inputSchema: documentStreamInputSchema,
   outputSchema: documentStreamOutputSchema,
   retryConfig: { attempts: 2, delay: 1000 }

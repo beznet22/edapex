@@ -22,6 +22,7 @@
 	import EditorCanvas from "./editor-canvas.svelte";
 	import { useInspector } from "$lib/context/inspector-context.svelte";
 	import { useChat } from "$lib/context/chat-context.svelte";
+	import { deriveDocumentId } from "$lib/context/thread-data.svelte";
 	import ShimmerArtifactCard from "$lib/components/ShimmerArtifactCard.svelte";
 	import Markdown from "$lib/components/prompt-kit/markdown/Markdown.svelte";
 
@@ -40,43 +41,89 @@
 	const inspector = useInspector();
 	const chat = useChat();
 
-	// The tool part for prepareDocumentStream lives in the main chat's
-	// last assistant message. chat.documentChat (created in chat-context's
-	// onToolCall) streams the document via /api/chat?step=stream-document-agent.
-	const toolPart = $derived(chat?.documentToolPart);
-	const documentChat = $derived(chat?.documentChat);
+	/**
+	 * Active document-stream tool part. Walks chat.messages for the
+	 * tool-workflow-streamDocument part whose derived `documentId`
+	 * matches the inspector's active chat artifact id. The inspector
+	 * sets activeChatArtifactId via openChatArtifact (called from
+	 * chat-context.svelte.ts's #onData on first streaming chunk AND from
+	 * ShimmerArtifactCard.svelte's click handler for user-initiated
+	 * re-opens). When activeId is null (workspace closed), this returns
+	 * null and the render block falls through to the empty state.
+	 *
+	 * The documentId comparison (not toolCallId) reconciles the server's
+	 * workflow-as-tool output with the AI SDK's tool part. Both client
+	 * and server compute the same key from the input via
+	 * `deriveDocumentId`, so we don't need to round-trip a toolCallId
+	 * to match. See `deriveDocumentId` in thread-data.svelte.ts.
+	 *
+	 * Guard: `chat` can be undefined if WorkspaceSidebar mounts before
+	 * SharedChatView provides ChatContext (both are siblings inside
+	 * WorkspacePaneGroup — mount order depends on Svelte's reactive
+	 * traversal). Without the guard, `chat.messages` throws at line 61.
+	 *
+	 * Final metadata (artifactId, filePath, etc.) lives on the tool
+	 * part's `output` field — read directly here via `finalOutput`. No
+	 * patching into threadData.documentStreams; the dual-source-of-truth
+	 * pattern means transient state lives in threadData and final state
+	 * lives on the tool part.
+	 */
+	const toolPart = $derived.by(() => {
+		if (!inspector.activeChatArtifactId || !chat) return null;
+		for (const message of chat.messages) {
+			for (const part of message.parts ?? []) {
+			 const p = part as {
+                  type?: string;
+                  toolCallId?: string;
+                  state?: string;
+                  input?: { format?: 'marksheet' | 'transcript'; contentHash?: string; fileName?: string; studentId?: number; academicId?: number };
+                  output?: {
+                    artifactId?: string;
+                    filePath?: string;
+                    contentHash?: string;
+                    fileName?: string;
+                    format?: 'marksheet' | 'transcript';
+                    studentId?: number | null;
+                    title?: string;
+                  };
+                  errorText?: string;
+                };
+                if (p.type === 'tool-workflow-streamDocument' && deriveDocumentId(p.input ?? {}) === inspector.activeChatArtifactId) {
+                  return p;
+                }
+              }
+            }
+          return null;
+        });
 
-	// True while the tool call is still awaiting output (input-streaming or
-	// input-available). Drives the Shimmer card and streaming Markdown view.
-	const isToolStreaming = $derived(
-		!!toolPart &&
-		(toolPart.state === "input-streaming" || toolPart.state === "input-available")
+	/**
+	 * Effective status for the active document stream. Final states
+	 * (success/error) come from toolPart.state; transient states
+	 * (processing/streaming) come from threadData.documentStreams[activeId]
+	 * (where #onToolCall initializes to 'processing' and #onData
+	 * accumulates deltas + transitions to 'streaming').
+	 */
+	const entry = $derived(
+		inspector.activeChatArtifactId && chat
+			? chat.threadData.getDocumentStream(inspector.activeChatArtifactId)
+			: null
 	);
 
-	// Final tool result (output-available). Drives the EditorCanvas switch.
-	const toolResult = $derived(
-		toolPart?.state === "output-available" ? toolPart.output : null
-	);
+	// $inspect("entry", entry);
+	const effectiveStatus = $derived.by(() => {
+		if (toolPart?.state === 'output-available') return 'success';
+		if (toolPart?.state === 'output-error') return 'error';
+		return entry?.status ?? 'processing';
+	});
 
-	// Diagnostic + auto-open: when the prepareDocumentStream tool part appears
-	// in input-available/input-streaming state, auto-open the workspace panel
-	// via the chat:openArtifact event that SharedChatView listens for.
-	$effect(() => {
-		console.log('[ArtifactViewer] toolPart', { toolCallId: toolPart?.toolCallId, state: toolPart?.state });
-		if (
-			toolPart &&
-			(toolPart.state === "input-available" || toolPart.state === "input-streaming") &&
-			toolPart.toolCallId &&
-			typeof window !== "undefined"
-		) {
-			window.dispatchEvent(
-				new CustomEvent("chat:openArtifact", { detail: { id: toolPart.toolCallId } })
-			);
-		}
-	});
-	$effect(() => {
-		console.log('[ArtifactViewer] documentChat', { exists: !!documentChat, msgCount: documentChat?.messages?.length });
-	});
+	/**
+	 * Final output from the tool result (artifactId, filePath, etc.).
+	 * Read directly from the tool part's `output` field — this is the
+	 * authoritative source for post-completion metadata.
+	 */
+	const finalOutput = $derived(
+		toolPart?.state === 'output-available' ? toolPart.output : null
+	);
 
 	let editorRef = $state<{ save: () => Promise<boolean> | void; copy: () => void } | undefined>(
 		undefined,
@@ -85,10 +132,6 @@
 	const viewingId = $derived(activeId ?? artifacts[0]?.id ?? null);
 	const current = $derived(artifacts.find((a) => a.id === viewingId) ?? null);
 	const isStreaming = $derived(current?.status === "processing" || current?.status === "streaming");
-
-	$effect(() => {
-		console.log('[ArtifactViewer] current artifact', { ts: performance.now(), id: current?.id, status: current?.status, contentLength: current?.content?.length });
-	});
 
 	async function handleSave() {
 		if (editorRef) {
@@ -169,16 +212,6 @@
 </script>
 
 <div class="flex flex-col h-full min-h-0 bg-background">
-	{#if isToolStreaming && toolPart && toolPart.toolCallId}
-		<div class="px-3 pt-3 pb-1 shrink-0">
-			<ShimmerArtifactCard
-				id={toolPart.toolCallId}
-				title={toolPart.input?.fileName ?? "Document"}
-				status="processing"
-				kind="document"
-			/>
-		</div>
-	{/if}
 	<header
 		class="flex items-center justify-between h-12 px-2 sm:px-4 shrink-0 gap-2 min-w-0 w-full"
 	>
@@ -329,31 +362,25 @@
 	</header>
 
 	<div class="flex-1 min-h-0 relative group">
-		{#if toolResult && toolResult.filePath}
+		{#if finalOutput && finalOutput.filePath}
 			<EditorCanvas
 				bind:this={editorRef}
 				editorMode="wysiwyg"
-				filename={toolResult.fileName ?? "Document"}
-				url={toolResult.filePath}
-				saveUrl={toolResult.filePath}
-				content=""
+				filename={finalOutput.fileName ?? finalOutput.title ?? "Document"}
+				url={finalOutput.filePath}
+				saveUrl={finalOutput.filePath}
+				content={entry?.content ?? ""}
 				type="text"
 				streaming={false}
 				user={user}
 			/>
-		{:else if isToolStreaming && documentChat}
+		{:else if entry?.content}
 			<ScrollArea class="h-full">
 				<div class="p-6 max-w-3xl mx-auto">
-					{#each documentChat.messages as message}
-						{#each message.parts as part}
-							{#if part.type === "text"}
-								<Markdown
-									content={part.text}
-									animation={{ enabled: true }}
-								/>
-							{/if}
-						{/each}
-					{/each}
+					<Markdown
+						content={entry.content}
+						animation={{ enabled: true }}
+					/>
 				</div>
 			</ScrollArea>
 		{:else if !current}

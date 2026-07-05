@@ -16,9 +16,10 @@ import type { ClassSection } from "$lib/types/result-types";
 import type { ClassStudent } from "$lib/server/repository/student.repo";
 
 import { SelectedClass, SelectedModel } from "./sync.svelte";
-import { ThreadData } from "./thread-data.svelte";
+import { ThreadData, deriveDocumentId } from "./thread-data.svelte";
 import type { LanguageModelUsage } from "$lib/components/ai-elements/context/context-context.svelte.js";
 import { categorizeAIError, type FriendlyAiError } from "$lib/errors/friendly-ai-error";
+import { InspectorContext } from "./inspector-context.svelte";
 
 const CHAT_CONTEXT_KEY = Symbol("chat-context");
 const CHAT_USAGE_KEY = Symbol("chat-usage-state");
@@ -174,21 +175,7 @@ export class ChatContext {
    *  inline `<ErrorAlert>` rendered next to the failed assistant message. */
   lastError = $state<FriendlyAiError | null>(null);
   openPanel = $state<boolean>(false);
-  /** Separate Chat instance that streams a single document via the
-   *  `documentStreamWorkflow` via `/api/artifact`. Created on `onToolCall` when
-   *  the assistant invokes the prepareDocumentStream client-side tool. */
-  documentChat: Chat<xUIMessage> | undefined = $state();
-  /** Tool part from the main chat's last message matching prepareDocumentStream. */
-  documentToolPart = $derived.by(() => {
-    for (const message of this.messages) {
-      for (const part of message.parts ?? []) {
-        const p = part as { type?: string; toolCallId?: string; state?: string; input?: { contentHash?: string; fileName?: string }; output?: { artifactId?: string; contentHash?: string; fileName?: string; filePath?: string } };
-        if (p?.type === "tool-prepare-document-stream") return p;
-      }
-    }
-    return null;
-  });
-  
+
   get error() {
     return this.client?.error;
   }
@@ -255,9 +242,38 @@ export class ChatContext {
   chatHistory = ChatHistory.fromContext();
 
   #selectedClass: SelectedClass;
+  /**
+   * Inspector context for auto-opening the workspace panel when document
+   * streaming begins. Resolved in the constructor via
+   * InspectorContext.fromContext() — InspectorProvider is set up by
+   * (chat)/+layout.svelte BEFORE SharedChatView constructs ChatContext,
+   * so this resolves successfully inside the chat layout. The try/catch
+   * degrades gracefully: if ChatContext is somehow rendered outside the
+   * inspector provider, #inspector stays undefined and the auto-open
+   * path becomes a no-op (the inline Shimmer card still appears in the
+   * chat thread; only the auto-open-of-workspace-panel behavior is lost).
+   */
+  #inspector: InspectorContext | undefined;
+  /**
+   * Tracks which document toolCalls have already triggered the workspace
+   * panel auto-open, so the inspector.openChatArtifact call fires
+   * exactly once per toolCallId. Survives component remounts within
+   * the same session because it lives on the ChatContext instance
+   * which is created once per chat route mount.
+   */
+  #autoOpenedToolCallIds = new Set<string>();
   // #selectedAgent removed
 
   constructor({ initialMessages, api, chatData, selectedClass }: InitChat) {
+    try {
+      this.#inspector = InspectorContext.fromContext();
+    } catch {
+      // Inspector not available — ChatContext rendered outside the chat layout.
+      // Auto-open degrades to no-op; everything else (inline Shimmer card,
+      // streaming Markdown render, EditorCanvas) keeps working because they
+      // read from threadData.documentStreams + chat.messages, not the inspector.
+    }
+
     this.usage = new ChatUsageState();
     this.usage.setContext();
     // Reset cumulative usage when (re)constructing the chat context
@@ -313,10 +329,16 @@ export class ChatContext {
     this.pendingGate = null;
 
     const api = "/api/chat";
-    const lastMessage = messages.at(-1);
 
+    // Always send the full messages array. The previous
+    // `this.user ? [lastMessage] : messages` ternary was wrong on both
+    // branches: `sendMessage` doesn't need single-message optimization
+    // (AI SDK already passes the full array), and `addToolOutput` resume
+    // NEEDS the full array — including the user prompt, prior turns, and
+    // the assistant message with the tool result — so the server-side
+    // agent has context to continue.
     const body: Record<string, any> = {
-      messages: this.user ? [lastMessage] : messages,
+      messages,
       threadId: id,
       data: this.studentData as any,
       selectedClass: this.selectedClass,
@@ -424,6 +446,36 @@ export class ChatContext {
       if (data?.artifactId) {
         (this.threadData as { pendingAwaitingValidation?: string | null }).pendingAwaitingValidation = data.artifactId;
       }
+    } else if (part.type === "data-streamDocument") {
+      // Document-stream deltas from documentStreamWorkflow (workflow-as-tool).
+      // The server stamps `documentId` deterministically from the input
+      // (see deriveDocumentId in document-stream.ts); the client matches
+      // deltas to threadData.documentStreams entries by that same key.
+      //
+      // `phase: 'delta'` appends to entry.content + transitions status
+      // 'processing' → 'streaming' on the first delta. The first delta
+      // also triggers inspector.openChatArtifact (Set-guarded) so the
+      // workspace panel auto-opens with content already streaming —
+      // users see the inline Shimmer card transition to 'Extracting'
+      // BEFORE the panel opens, not after.
+      //
+      // `phase: 'start'` and `phase: 'end'` are no-ops: the entry is
+      // initialized by #onToolCall, and the final status transition comes
+      // from `toolPart.state` (read directly in ArtifactViewer's
+      // $derived.by — not patched here).
+      const d = (part as { data?: { documentId?: string; format?: 'marksheet' | 'transcript'; phase?: 'start' | 'delta' | 'end'; delta?: string } }).data;
+      if (!d?.documentId) return;
+      if (d.phase !== 'delta' || typeof d.delta !== 'string') return;
+      const prev = this.threadData.getDocumentStream(d.documentId);
+      this.threadData.patchDocumentStream(d.documentId, {
+        status: prev?.status === 'processing' ? 'streaming' : (prev?.status ?? 'streaming'),
+        content: (prev?.content ?? '') + d.delta,
+        deltaCount: (prev?.deltaCount ?? 0) + 1
+      });
+      if (!this.#autoOpenedToolCallIds.has(d.documentId)) {
+        this.#autoOpenedToolCallIds.add(d.documentId);
+        this.#inspector?.openChatArtifact(d.documentId);
+      }
     }
   };
 
@@ -448,21 +500,37 @@ export class ChatContext {
   };
 
   /**
-   * Canonical AI SDK client-side tool handler. When the assistant agent
-   * calls the prepareDocumentStream tool (no execute on the server), we
-   * spin up a separate Chat that posts to /api/chat with
-   * step: 'stream-document-agent'. When that stream finishes, we call
-   * addToolOutput on the main chat so the assistant turn resumes.
+   * AI SDK v5 fires `onToolCall` for every tool call the model makes that
+   * is NOT provider-executed (i.e. for custom tools defined in our
+   * application, including the workflow-as-tool `workflow-streamDocument`).
+   * Verified empirically: Mastra's tool-input-available chunk omits
+   * `providerExecuted` for custom tools (see
+   * `@mastra/core/dist/chunk-QPZ35KK2.cjs:208`), and the client's
+   * `processUIMessageStream` in `ai/dist/index.js:5752` calls
+   * `onToolCall` when `!chunk.providerExecuted` (which is true for our
+   * workflow-as-tool because the field is absent).
    *
-   * The ArtifactViewer reads `documentChat.messages` to render the
-   * streaming markdown token-by-token and switches to EditorCanvas once
-   * the tool part transitions to output-available.
+   * When the LLM calls `workflow-streamDocument`, this handler
+   * initializes the transient streaming state in
+   * `threadData.documentStreams`. The inline ShimmerArtifactCard in
+   * chat.svelte's `inlineDocumentStreams` derivation picks up the entry
+   * immediately and renders with `status: 'processing'`.
+   *
+   * NO auto-open happens here — the workspace panel opens on the FIRST
+   * `data-streamDocument` chunk arrival (in `#onData`, step 3) so the
+   * user sees the inline Shimmer transition to 'Extracting' before the
+   * panel opens with content already streaming.
+   *
+   * The server-side execution happens entirely in
+   * `documentStreamWorkflow.streamDocumentAgentStep.execute`. When it
+   * returns, its outputSchema result lands as a
+   * `tool-workflow-streamDocument` part on the assistant message with
+   * `state: 'output-available'` — ArtifactViewer reads that part's
+   * `output` field directly via `$derived.by` to render the EditorCanvas.
    */
   #onToolCall = ({ toolCall }: { toolCall: { dynamic?: boolean; toolName: string; toolCallId: string; input?: unknown } }) => {
-    console.log('[chat] onToolCall fired', { toolName: toolCall.toolName, toolCallId: toolCall.toolCallId, dynamic: toolCall.dynamic, input: toolCall.input });
-    if (toolCall.dynamic) return;
-    if (toolCall.toolName !== "prepare-document-stream") { console.log('[chat] onToolCall ignored: toolName mismatch'); return; }
-    console.log('[chat] onToolCall matched prepare-document-stream');
+    if (toolCall.toolName !== "workflow-streamDocument") return;
+
     const input = (toolCall.input ?? {}) as {
       format?: "marksheet" | "transcript";
       contentHash?: string;
@@ -470,94 +538,25 @@ export class ChatContext {
       studentId?: number;
       academicId?: number;
     };
-    const format: "marksheet" | "transcript" = input.format ?? "marksheet";
-    if (format === "marksheet" && !input.contentHash) return;
-    if (format === "transcript" && !input.studentId) return;
-    this.#startDocumentStream({
-      toolCallId: toolCall.toolCallId,
-      format,
-      contentHash: input.contentHash,
-      fileName: input.fileName,
-      studentId: input.studentId,
-      academicId: input.academicId
+
+    // Key by documentId (server-derived from input) so the entry matches
+    // what #onData patches on the first delta. Both client-side handlers
+    // share the same key via deriveDocumentId; the AI SDK's toolCallId
+    // stays on the tool part in chat.messages as a separate identifier
+    // (used by ArtifactViewer to find the corresponding tool part).
+    const documentId = deriveDocumentId(input);
+
+    this.threadData.patchDocumentStream(documentId, {
+      format: input.format ?? "marksheet",
+      title: input.format === "transcript"
+        ? "Transcript"
+        : (input.fileName ?? "Document"),
+      ...(input.fileName !== undefined ? { fileName: input.fileName } : {}),
+      status: "processing",
+      content: "",
+      deltaCount: 0
     });
   };
-
-  #startDocumentStream(args: {
-    toolCallId: string;
-    format: "marksheet" | "transcript";
-    contentHash?: string;
-    fileName?: string;
-    studentId?: number;
-    academicId?: number;
-  }) {
-    if (this.documentChat) return; // already streaming
-    const { toolCallId, format, contentHash, fileName, studentId, academicId } = args;
-    const threadId = this.chatData?.threadId ?? `thread-${Date.now()}`;
-    const selectedClass = this.selectedClass;
-
-    // Deterministic artifactId and filePath derived from the tool input —
-    // the server uses the same conventions so the client can call
-    // addToolOutput with the correct metadata without waiting for a
-    // data-* part from the stream.
-    const artifactId =
-      format === "transcript" && studentId && academicId
-        ? `artifact-transcript-${studentId}-${academicId}`
-        : `artifact-${contentHash}`;
-    const filePath =
-      format === "transcript" && studentId
-        ? `transcripts/${studentId}.md`
-        : `marksheets/${contentHash}.md`;
-    const resolvedFileName = format === "transcript" ? "Transcript" : (fileName ?? "document");
-
-    const dc = new Chat<xUIMessage>({
-      id: threadId,
-      transport: new DefaultChatTransport({
-        api: "/api/artifact",
-        prepareSendMessagesRequest: ({ messages }) => ({
-          body: {
-            messages,
-            threadId,
-            format,
-            contentHash,
-            fileName,
-            studentId,
-            academicId,
-            selectedClass
-          }
-        })
-      }),
-      onFinish: () => {
-        console.log('[chat] documentChat onFinish', { artifactId, filePath, fileName: resolvedFileName });
-        try {
-          this.client?.addToolOutput({
-            tool: "prepare-document-stream",
-            toolCallId,
-            output: { artifactId, contentHash: contentHash ?? "", fileName: resolvedFileName, filePath }
-          });
-          console.log('[chat] addToolOutput called', { artifactId, contentHash: contentHash ?? "", fileName: resolvedFileName, filePath });
-        } catch (err) {
-          console.error("[chat] addToolOutput failed", err);
-        }
-      },
-      onError: (err: Error) => {
-        try {
-          this.client?.addToolOutput({
-            tool: "prepare-document-stream",
-            toolCallId,
-            state: "output-error",
-            errorText: err instanceof Error ? err.message : String(err)
-          });
-        } catch (e) {
-          console.error("[chat] addToolOutput error-fallback failed", e);
-        }
-      }
-    });
-
-    this.documentChat = dc;
-    console.log('[chat] documentChat created', { format, contentHash, fileName, studentId, academicId, threadId });
-    void dc.sendMessage({ text: `Format the uploaded marksheet for ${fileName}.` });
-  }
 
   scrollToBottom = () => {
     // implement smooth scroll to bottom

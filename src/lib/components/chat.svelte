@@ -5,6 +5,7 @@
     ConversationScrollButton,
   } from "$lib/components/ai-elements/conversation";
   import { useChat } from "$lib/context/chat-context.svelte";
+  import { deriveDocumentId } from "$lib/context/thread-data.svelte";
   import { UserContext } from "$lib/context/user-context.svelte";
   import type { AuthUser } from "$lib/types/auth-types";
   import { toast } from "svelte-sonner";
@@ -95,7 +96,62 @@
     return lastAssistantMessage?.parts?.at(-1)?.type === "reasoning";
   });
 
-  $inspect(["LAST ASSISTANT MESSAGE"], lastAssistantMessage);
+  /**
+   * Walks chat.messages for assistant messages whose parts include a
+   * `tool-workflow-streamDocument` part (produced by the workflow-as-tool
+   * registration on assistantAgent — Mastra converts documentStreamWorkflow
+   * to a tool with that exact name). For each match, derives the effective
+   * status from two sources:
+   *   - Final status (success/error) comes from toolPart.state
+   *     (`output-available` → 'success', `output-error` → 'error')
+   *   - Transient status (processing/streaming) + accumulated content
+   *     come from threadData.documentStreams[documentId] (written by
+   *     chat-context.svelte.ts's #onToolCall and #onData)
+   *
+   * The documentId key matches the server's `deriveDocumentId(input)`
+   * output — we recompute it client-side from the tool part's input so
+   * the lookup stays correct without the AI SDK's toolCallId round-trip.
+   *
+   * The array is re-derived reactively whenever chat.messages changes
+   * (new tool part appears, state transitions) OR threadData.documentStreams
+   * changes (delta accumulated, status patched).
+   */
+  const inlineDocumentStreams = $derived.by(() => {
+    const result: Array<{
+      documentId: string;
+      toolCallId: string;
+      status: 'processing' | 'streaming' | 'success' | 'error';
+      title: string;
+      content: string;
+    }> = [];
+    for (const message of chat.messages) {
+      if (message.role !== "assistant") continue;
+      for (const part of message.parts ?? []) {
+        const p = part as {
+          type?: string;
+          toolCallId?: string;
+          state?: 'input-streaming' | 'input-available' | 'output-available' | 'output-error';
+          input?: { format?: 'marksheet' | 'transcript'; contentHash?: string; fileName?: string; studentId?: number; academicId?: number };
+          output?: { fileName?: string; title?: string };
+        };
+        if (p.type !== "tool-workflow-streamDocument" || !p.toolCallId) continue;
+        const documentId = deriveDocumentId(p.input ?? {});
+        const entry = chat.threadData.getDocumentStream(documentId);
+        const status: 'processing' | 'streaming' | 'success' | 'error' =
+          p.state === 'output-available' ? 'success'
+          : p.state === 'output-error' ? 'error'
+          : entry?.status ?? 'processing';
+        result.push({
+          documentId,
+          toolCallId: p.toolCallId,
+          status,
+          title: p.output?.fileName ?? p.output?.title ?? p.input?.fileName ?? entry?.title ?? 'Document',
+          content: entry?.content ?? ''
+        });
+      }
+    }
+    return result;
+  });
 </script>
 
 <div
@@ -225,6 +281,33 @@
                   <span>Generating response...</span>
                 </Shimmer>
               {/if}
+
+              <!--
+                Inline ShimmerArtifactCard for active document streams.
+                Renders one card per tool-workflow-streamDocument tool part on
+                this message. Status transitions:
+                  'processing' — tool called, no deltas yet (Preparing label)
+                  'streaming'  — at least one delta landed (Extracting + byte count)
+                  'success'    — tool returned output-available (Ready, green check)
+                  'error'      — tool returned output-error (red state)
+                Click handler (built into ShimmerArtifactCard.svelte) dispatches
+                'chat:openArtifact' which SharedChatView's listener routes to
+                inspector.openChatArtifact — so user-initiated clicks re-open
+                the workspace panel for any state.
+              -->
+              {#each inlineDocumentStreams as stream (stream.documentId)}
+                {#if message.parts?.some((p) => (p as { type?: string; toolCallId?: string }).type === 'tool-workflow-streamDocument' && (p as { toolCallId?: string }).toolCallId === stream.toolCallId)}
+                  <div class="ml-0 sm:ml-12 mt-2 mb-2">
+                    <ShimmerArtifactCard
+                      id={stream.documentId}
+                      title={stream.title}
+                      status={stream.status}
+                      content={stream.content}
+                      kind="document"
+                    />
+                  </div>
+                {/if}
+              {/each}
 
               {#if chat.lastError && message.id === chat.lastMessage?.id}
                 <ErrorAlert
