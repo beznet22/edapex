@@ -22,7 +22,7 @@ import { createTenantContext, WorkspaceMismatchError } from '$lib/server/mastra/
 import { tenantWorkspace } from '$lib/server/mastra/storage/workspaces';
 import { assertPathAgentVisible, WorkspaceScopeError } from '$lib/server/workspace/scope';
 import { buildWorkspaceRequestContext } from '$lib/server/helpers/chat-helper';
-import { resolveActiveClassScope } from '$lib/server/helpers/class-scope';
+import { resolveActiveClassScope, resolveClassNamesByIds } from '$lib/server/helpers/class-scope';
 import { ALLOWED_DESIGNATIONS } from "$lib/types/sms-types";
 import { ocrBatchService } from '$lib/server/service/ocr-batch.service';
 import type { SerializedTenant } from '$lib/types/background-tasks';
@@ -95,6 +95,14 @@ async function resolveRequestTenant({
     sectionName: url.searchParams.get('sectionName'),
     selectedClassCookie: cookies.get('selected-class'),
   });
+  const displayNames = scope
+    ? await resolveClassNamesByIds({
+        schoolId: locals.user?.schoolId ?? 1,
+        classId: scope.classId,
+        sectionId: scope.sectionId,
+        academicId: scope.academicId
+      })
+    : { className: null, sectionName: null, academicYearTitle: null };
   return createTenantContext({
     schoolId: locals.user?.schoolId ?? 1,
     userId: locals.user?.id ?? 1,
@@ -105,6 +113,9 @@ async function resolveRequestTenant({
     examId: null,
     examTypeId: null,
     academicId: scope?.academicId ?? null,
+    className: displayNames.className,
+    sectionName: displayNames.sectionName,
+    academicYearTitle: displayNames.academicYearTitle
   });
 }
 
@@ -119,7 +130,6 @@ export const GET: RequestHandler = async ({ params, url, locals, cookies }) => {
     const requestContext = buildWorkspaceRequestContext(tenant);
     const fs = await tenantWorkspace.resolveFilesystem({ requestContext: requestContext as never });
     if (!fs) throw error(500, 'Workspace filesystem unavailable');
-
     const action = url.searchParams.get('action');
 
     if (action === 'list') {

@@ -141,8 +141,8 @@ export async function resolveWorkspaceContext(
         sectionName?: string;
       };
       classId = typeof parsed.classId === 'number' ? parsed.classId
-              : typeof parsed.id === 'number' ? parsed.id
-              : null;
+        : typeof parsed.id === 'number' ? parsed.id
+          : null;
       sectionId = typeof parsed.sectionId === 'number' ? parsed.sectionId : null;
       className = typeof parsed.className === 'string' ? parsed.className : null;
       sectionName = typeof parsed.sectionName === 'string' ? parsed.sectionName : null;
@@ -280,6 +280,7 @@ export async function resolveThread({
       createdAt: created.createdAt.toISOString(),
       updatedAt: created.updatedAt.toISOString(),
     },
+    transient: true,
   } as any);
 
   return { thread: created, isNew: true };

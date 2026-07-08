@@ -158,7 +158,6 @@ export class ChatHistory {
         setTimeout(() => reject(new Error('Storage timeout')), 10000)
       );
       const threads = await Promise.race([getHistory({}).run(), timeoutPromise]);
-      console.log({ threads })
       if (!threads) return;
       this.chats = threads
     } catch (err) {

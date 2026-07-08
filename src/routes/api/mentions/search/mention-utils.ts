@@ -38,6 +38,14 @@ export interface MentionSearchResult {
 	category: MentionCategory;
 	typeBadge: string;
 	parentContext?: string;
+	/**
+	 * Structured fields for `students` mentions — embedded in the markdown
+	 * as `{{student:<studentId>|<admissionNo>}}` so the backend workflow can
+	 * resolve the document to a `sm_students` row without an extra lookup.
+	 * Only populated when `category === 'students'`.
+	 */
+	admissionNo?: string;
+	studentId?: number;
 }
 
 /**

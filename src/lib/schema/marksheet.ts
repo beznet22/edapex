@@ -27,7 +27,7 @@ export type School = z.infer<typeof schoolSchema>;
 
 export const studentSchema = z.object({
   id: z.number().describe("The ID of the student"),
-  examId: z.number().describe("The ID of the exam"),
+  examTypeId: z.number().describe("The ID of the examType"),
   fullName: z.string().describe("The full name of the student"),
   gender: z.string().describe("The gender of the student"),
   parentEmail: z.string().describe("The parent email of the student"),

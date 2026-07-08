@@ -1,0 +1,97 @@
+[
+  {
+    "id": "38a4094c-9175-4e0b-85cc-213cdde0ecde",
+    "content": {
+      "format": 2,
+      "parts": [
+        {
+          "type": "text",
+          "text": "/marksheet please process this document",
+          "createdAt": 1783437348828
+        }
+      ],
+      "content": "/marksheet please process this document"
+    },
+    "role": "user",
+    "createdAt": "2026-07-07T15:15:48.828Z",
+    "threadId": "Ho9QZb1SA7pBQi20",
+    "resourceId": "user-1"
+  },
+  {
+    "id": "9e2f166d-66ca-4951-8058-44cb61480e3c",
+    "content": {
+      "format": 2,
+      "parts": [
+        {
+          "type": "tool-invocation",
+          "toolInvocation": {
+            "state": "result",
+            "toolCallId": "call_85cbcccf689a4e7ca0bf79bc",
+            "toolName": "streamDocument",
+            "args": {
+              "contentHash": "0adbef757d8c14d65e873f54d0fbd049",
+              "fileName": "adakole.jpg.jpeg"
+            },
+            "result": {
+              "artifactId": "artifact-marksheet-0adbef757d8c14d65e873f54d0fbd049",
+              "contentHash": "0adbef757d8c14d65e873f54d0fbd049",
+              "fileName": "adakole.jpg.jpeg",
+              "initialMarkdownPath": "marksheets/adakole_jpg-0adbef75.md",
+              "title": "adakole_jpg",
+              "studentId": null,
+              "documentId": "marksheet-0adbef757d8c14d65e873f54d0fbd049",
+              "examTypeId": 6,
+              "academicId": 4,
+              "studentFullName": null,
+              "adminNo": null
+            }
+          }
+        },
+        {
+          "type": "step-start",
+          "createdAt": 1783437352446,
+          "model": "kimchi/deepseek-v4-flash"
+        },
+        {
+          "type": "text",
+          "text": "I see you've uploaded a marksheet image (`adakole.jpg.jpeg`). Let me process it right away.\n\nFirst, let me check what's in the file manifest — there's one pending document. Let me stream it for you",
+          "createdAt": 1783437352446
+        },
+        {
+          "type": "step-start",
+          "createdAt": 1783437356956,
+          "model": "kimchi/deepseek-v4-flash"
+        },
+        {
+          "type": "text",
+          "text": "I've formatted the **adakole** marksheet and it's now streaming into the workspace panel for your review. \n\nHere's what I can see:\n- **Exam Type**: already detected\n- **Academic Year**: already set\n- **Student**: The OCR didn't extract a clear student name yet\n\nPlease take a look at the formatted marksheet in the panel above. You'll need to **@mention a student** (e.g., `@John Doe`) or link the student name in the editor, then click the **Validate** pill to confirm and proceed.",
+          "createdAt": 1783437359660
+        },
+        {
+          "type": "data-runInfo",
+          "id": "ri-883e3d3b-340c-4129-a1fe-e5d608dba56e",
+          "data": {
+            "runId": "883e3d3b-340c-4129-a1fe-e5d608dba56e"
+          }
+        },
+        {
+          "type": "data-awaitValidation",
+          "id": "await-doc-format-unknown",
+          "data": {
+            "artifactId": "doc-format-unknown",
+            "runId": "883e3d3b-340c-4129-a1fe-e5d608dba56e"
+          }
+        }
+      ],
+      "content": "I've formatted the **adakole** marksheet and it's now streaming into the workspace panel for your review. \n\nHere's what I can see:\n- **Exam Type**: already detected\n- **Academic Year**: already set\n- **Student**: The OCR didn't extract a clear student name yet\n\nPlease take a look at the formatted marksheet in the panel above. You'll need to **@mention a student** (e.g., `@John Doe`) or link the student name in the editor, then click the **Validate** pill to confirm and proceed.",
+      "metadata": {
+        "modelId": "deepseek-v4-flash",
+        "provider": "kimchi"
+      }
+    },
+    "role": "assistant",
+    "createdAt": "2026-07-07T15:15:59.660Z",
+    "threadId": "Ho9QZb1SA7pBQi20",
+    "resourceId": "user-1"
+  }
+]

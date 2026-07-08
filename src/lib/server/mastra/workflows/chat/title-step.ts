@@ -1,0 +1,31 @@
+import { createStep } from '@mastra/core/workflows';
+import { z } from 'zod';
+import { chatWorkflowInputSchema } from '../../utils/chat-schemas';
+import { generateThreadTitle } from '$lib/server/helpers/chat-helper';
+
+export const titleStep = createStep({
+	id: 'title',
+	inputSchema: chatWorkflowInputSchema,
+	outputSchema: z.object({}),
+	execute: async ({ inputData, writer, mastra: m }) => {
+		console.log("TITLE HIT");
+
+		const agent = m?.getAgent('assistant');
+		const memory = agent ? await agent.getMemory() : undefined;
+		try {
+			await generateThreadTitle({
+				resourceId: inputData.resourceId,
+				memory,
+				threadId: inputData.threadId,
+				prompt: inputData.promptText,
+				writer,
+			});
+
+		} catch (err) {
+			console.error('Failed to generate thread title:', err);
+		}
+
+		return {};
+	}
+});
+

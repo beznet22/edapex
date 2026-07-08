@@ -10,7 +10,15 @@
 import type { UIMessage } from 'ai';
 import { z } from 'zod';
 
-export const editorToolNameSchema = z.enum(['edit', 'generate']);
+export const editorToolNameSchema = z.enum([
+	'improve',
+	'fix',
+	'shorter',
+	'longer',
+	'continue',
+	'edit',
+	'generate',
+]);
 
 const uiMessageSchema = z.custom<UIMessage>();
 
@@ -49,6 +57,21 @@ export const derivedEditorCommandSchema = editorCommandRequestSchema.extend({
 export const resolvedMentionSchema = z.object({
 	category: z.string(),
 	id: z.union([z.number(), z.string()]),
+	/**
+	 * Populated for `students` mentions only — the admissionNo embedded
+	 * in the markdown as `{{studentName:<fullName>|student:<id>|
+	 * admissionNo:<num>}}` so downstream workflow steps can link the
+	 * document to the sm_students row. admissionNo is the raw DB column
+	 * value (a number) — no `Adm#` prefix.
+	 */
+	admissionNo: z.string().optional(),
+	/**
+	 * Populated for `students` mentions — the human-readable student name
+	 * embedded in the markdown as `{{studentName:<fullName>|...}}`. The
+	 * resolver prefers the DB row's fullName but falls back to this
+	 * embedded value when the DB lookup is skipped.
+	 */
+	studentName: z.string().optional(),
 	label: z.string(),
 });
 
@@ -85,12 +108,45 @@ export const finalizedEditorCommandSchema = z.object({
 });
 
 /**
+ * Cursor semantic position relative to the surrounding text. Used by the
+ * editor's copilot and AI command workflows to choose context-aware system
+ * prompts.
+ */
+export const editorCursorPositionSchema = z.enum([
+	'paragraph-start',
+	'sentence-mid',
+	'sentence-end',
+	'paragraph-end',
+]);
+
+export type EditorCursorPosition = z.infer<typeof editorCursorPositionSchema>;
+
+/**
+ * Context payload sent from the Tiptap frontend alongside copilot
+ * requests. The workflow uses these fields to build richer system prompts
+ * (e.g. "You are continuing a marksheet for student: Adakole Yusuf…").
+ */
+export const editorCopilotContextSchema = z.object({
+	cursorText: z.string(),
+	documentTitle: z.string().optional(),
+	documentHeaders: z.array(z.string()).optional(),
+	studentName: z.string().optional(),
+	examType: z.string().optional(),
+	subject: z.string().optional(),
+	recentEdits: z.array(z.string()).optional(),
+	cursorPosition: editorCursorPositionSchema,
+});
+
+export type EditorCopilotContext = z.infer<typeof editorCopilotContextSchema>;
+
+/**
  * Request payload for the /api/ai/editor/copilot endpoint.
  */
 export const copilotRequestSchema = z.object({
 	model: z.string().optional(),
 	prompt: z.string(),
 	system: z.string().optional(),
+	context: editorCopilotContextSchema.optional(),
 });
 
 export type EditorContext = z.infer<typeof editorContextSchema>;

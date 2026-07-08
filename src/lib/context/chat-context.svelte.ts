@@ -16,7 +16,7 @@ import type { ClassSection } from "$lib/types/result-types";
 import type { ClassStudent } from "$lib/server/repository/student.repo";
 
 import { SelectedClass, SelectedModel } from "./sync.svelte";
-import { ThreadData, deriveDocumentId } from "./thread-data.svelte";
+import { ThreadData, deriveDocumentId, deriveInitialTitle, getDocumentStream, patchDocumentStream, type DocumentStreamEntry } from "./thread-data.svelte";
 import type { LanguageModelUsage } from "$lib/components/ai-elements/context/context-context.svelte.js";
 import { categorizeAIError, type FriendlyAiError } from "$lib/errors/friendly-ai-error";
 import { InspectorContext } from "./inspector-context.svelte";
@@ -31,49 +31,49 @@ const CHAT_RATELIMIT_KEY = Symbol("chat-ratelimit-state");
  * Exposed via context so the ChatComposer can render the context indicator.
  */
 export class ChatUsageState {
-	#value = $state<LanguageModelUsage>({
-		inputTokens: 0,
-		outputTokens: 0,
-		reasoningTokens: 0,
-		cachedInputTokens: 0
-	});
+  #value = $state<LanguageModelUsage>({
+    inputTokens: 0,
+    outputTokens: 0,
+    reasoningTokens: 0,
+    cachedInputTokens: 0
+  });
 
-	get value(): LanguageModelUsage {
-		return this.#value;
-	}
+  get value(): LanguageModelUsage {
+    return this.#value;
+  }
 
-	accumulate(usage: Partial<LanguageModelUsage> | null | undefined): void {
-		if (!usage) return;
-		this.#value = {
-			inputTokens: (this.#value.inputTokens ?? 0) + (usage.inputTokens ?? 0),
-			outputTokens: (this.#value.outputTokens ?? 0) + (usage.outputTokens ?? 0),
-			reasoningTokens: (this.#value.reasoningTokens ?? 0) + (usage.reasoningTokens ?? 0),
-			cachedInputTokens: (this.#value.cachedInputTokens ?? 0) + (usage.cachedInputTokens ?? 0)
-		};
-	}
+  accumulate(usage: Partial<LanguageModelUsage> | null | undefined): void {
+    if (!usage) return;
+    this.#value = {
+      inputTokens: (this.#value.inputTokens ?? 0) + (usage.inputTokens ?? 0),
+      outputTokens: (this.#value.outputTokens ?? 0) + (usage.outputTokens ?? 0),
+      reasoningTokens: (this.#value.reasoningTokens ?? 0) + (usage.reasoningTokens ?? 0),
+      cachedInputTokens: (this.#value.cachedInputTokens ?? 0) + (usage.cachedInputTokens ?? 0)
+    };
+  }
 
-	reset(): void {
-		this.#value = {
-			inputTokens: 0,
-			outputTokens: 0,
-			reasoningTokens: 0,
-			cachedInputTokens: 0
-		};
-	}
+  reset(): void {
+    this.#value = {
+      inputTokens: 0,
+      outputTokens: 0,
+      reasoningTokens: 0,
+      cachedInputTokens: 0
+    };
+  }
 
-	setContext(): void {
-		setContext(CHAT_USAGE_KEY, this);
-	}
+  setContext(): void {
+    setContext(CHAT_USAGE_KEY, this);
+  }
 
-	static fromContext(): ChatUsageState {
-		const existing = getContext<ChatUsageState>(CHAT_USAGE_KEY);
-		if (existing) return existing;
-		// Fallback for components rendered outside the chat layout (e.g. the
-		// root +layout.svelte that mounts the settings modal). Returns a
-		// zero-state holder; the consumer should not rely on it being the
-		// shared instance.
-		return new ChatUsageState();
-	}
+  static fromContext(): ChatUsageState {
+    const existing = getContext<ChatUsageState>(CHAT_USAGE_KEY);
+    if (existing) return existing;
+    // Fallback for components rendered outside the chat layout (e.g. the
+    // root +layout.svelte that mounts the settings modal). Returns a
+    // zero-state holder; the consumer should not rely on it being the
+    // shared instance.
+    return new ChatUsageState();
+  }
 }
 
 /** Shared singleton used by the indicator + accumulator without a context lookup. */
@@ -89,49 +89,49 @@ export const chatUsage = new ChatUsageState();
  * chat's state.
  */
 export interface ActiveRateLimit {
-	providerId: string;
-	retryAfterSeconds: number;
-	resetAt: string;
-	startedAt: number;
+  providerId: string;
+  retryAfterSeconds: number;
+  resetAt: string;
+  startedAt: number;
 }
 
 export class RateLimitState {
-	#active = $state<ActiveRateLimit | null>(null);
+  #active = $state<ActiveRateLimit | null>(null);
 
-	get active(): ActiveRateLimit | null {
-		return this.#active;
-	}
+  get active(): ActiveRateLimit | null {
+    return this.#active;
+  }
 
-	set active(v: ActiveRateLimit | null) {
-		this.#active = v;
-	}
+  set active(v: ActiveRateLimit | null) {
+    this.#active = v;
+  }
 
-	start(providerId: string, retryAfterSeconds: number, resetAt: string): void {
-		this.#active = {
-			providerId,
-			retryAfterSeconds,
-			resetAt,
-			startedAt: Date.now()
-		};
-	}
+  start(providerId: string, retryAfterSeconds: number, resetAt: string): void {
+    this.#active = {
+      providerId,
+      retryAfterSeconds,
+      resetAt,
+      startedAt: Date.now()
+    };
+  }
 
-	clear(): void {
-		this.#active = null;
-	}
+  clear(): void {
+    this.#active = null;
+  }
 
-	setContext(): void {
-		setContext(CHAT_RATELIMIT_KEY, this);
-	}
+  setContext(): void {
+    setContext(CHAT_RATELIMIT_KEY, this);
+  }
 
-	static fromContext(): RateLimitState {
-		const existing = getContext<RateLimitState>(CHAT_RATELIMIT_KEY);
-		if (existing) return existing;
-		// Fallback for components rendered outside the chat layout (e.g. the
-		// root +layout.svelte that mounts the settings modal). Returns a
-		// zero-state holder; the consumer should not rely on it being the
-		// shared instance.
-		return new RateLimitState();
-	}
+  static fromContext(): RateLimitState {
+    const existing = getContext<RateLimitState>(CHAT_RATELIMIT_KEY);
+    if (existing) return existing;
+    // Fallback for components rendered outside the chat layout (e.g. the
+    // root +layout.svelte that mounts the settings modal). Returns a
+    // zero-state holder; the consumer should not rely on it being the
+    // shared instance.
+    return new RateLimitState();
+  }
 }
 
 /** Shared singleton — kept for symmetry with `chatUsage`. */
@@ -240,8 +240,8 @@ export class ChatContext {
     this.threadData.chatData = v;
   }
   chatHistory = ChatHistory.fromContext();
-
   #selectedClass: SelectedClass;
+
   /**
    * Inspector context for auto-opening the workspace panel when document
    * streaming begins. Resolved in the constructor via
@@ -271,7 +271,8 @@ export class ChatContext {
       // Inspector not available — ChatContext rendered outside the chat layout.
       // Auto-open degrades to no-op; everything else (inline Shimmer card,
       // streaming Markdown render, EditorCanvas) keeps working because they
-      // read from threadData.documentStreams + chat.messages, not the inspector.
+      // read from the module-level `documentStreams` export in
+      // `thread-data.svelte.ts` plus `chat.messages`, not the inspector.
     }
 
     this.usage = new ChatUsageState();
@@ -300,7 +301,7 @@ export class ChatContext {
       }),
     );
 
-    this.threadData = new ThreadData(chatData);
+    this.threadData = $state(new ThreadData(chatData));
     this.status = $derived(this.client.status);
     this.messages = $derived(this.client?.messages ?? []);
     this.lastMessage = $derived(this.messages.at(-1));
@@ -399,8 +400,9 @@ export class ChatContext {
 
   #onData = (part: StreamDataPart) => {
     this.threadData.handlePart(part);
+    // console.log("part type", part.type);
     // Accumulate usage from streamed `data-usage` parts emitted by the
-    // workflow's assistant-step onFinish. End-of-message guarantee matches
+    // workflow's assistant-step onFinish. End-of-message guar/marksheet please process this documentantee matches
     // the user's preference (no live-streaming counts).
     if (part.type === "data-usage") {
       const data = (part as { data?: LanguageModelUsage }).data;
@@ -434,40 +436,17 @@ export class ChatContext {
         };
       }
     } else if (part.type === "data-validationResult") {
-      // No-op: the previous multi-file auto-continuation logic has been
-      // removed. Client-side document streaming and the assistant's own
-      // FILE MANIFEST context drive per-file processing now.
     } else if (part.type === "data-awaitValidation") {
-      // Mirror to legacy alias consumed by ActionBar:
-      // chat.awaitingValidation reads threadData.pendingAwaitingValidation.
-      // The thread-data handler already sets it; this is a belt-and-braces
-      // mirror in case the part fires before threadData is wired up.
       const data = (part as { data?: { artifactId?: string } }).data;
       if (data?.artifactId) {
         (this.threadData as { pendingAwaitingValidation?: string | null }).pendingAwaitingValidation = data.artifactId;
       }
     } else if (part.type === "data-streamDocument") {
-      // Document-stream deltas from documentStreamWorkflow (workflow-as-tool).
-      // The server stamps `documentId` deterministically from the input
-      // (see deriveDocumentId in document-stream.ts); the client matches
-      // deltas to threadData.documentStreams entries by that same key.
-      //
-      // `phase: 'delta'` appends to entry.content + transitions status
-      // 'processing' → 'streaming' on the first delta. The first delta
-      // also triggers inspector.openChatArtifact (Set-guarded) so the
-      // workspace panel auto-opens with content already streaming —
-      // users see the inline Shimmer card transition to 'Extracting'
-      // BEFORE the panel opens, not after.
-      //
-      // `phase: 'start'` and `phase: 'end'` are no-ops: the entry is
-      // initialized by #onToolCall, and the final status transition comes
-      // from `toolPart.state` (read directly in ArtifactViewer's
-      // $derived.by — not patched here).
-      const d = (part as { data?: { documentId?: string; format?: 'marksheet' | 'transcript'; phase?: 'start' | 'delta' | 'end'; delta?: string } }).data;
+      const d = (part as { data?: { documentId?: string; phase?: 'start' | 'delta' | 'end'; delta?: string } }).data;
       if (!d?.documentId) return;
       if (d.phase !== 'delta' || typeof d.delta !== 'string') return;
-      const prev = this.threadData.getDocumentStream(d.documentId);
-      this.threadData.patchDocumentStream(d.documentId, {
+      const prev = getDocumentStream(d.documentId);
+      patchDocumentStream(d.documentId, {
         status: prev?.status === 'processing' ? 'streaming' : (prev?.status ?? 'streaming'),
         content: (prev?.content ?? '') + d.delta,
         deltaCount: (prev?.deltaCount ?? 0) + 1
@@ -502,7 +481,7 @@ export class ChatContext {
   /**
    * AI SDK v5 fires `onToolCall` for every tool call the model makes that
    * is NOT provider-executed (i.e. for custom tools defined in our
-   * application, including the workflow-as-tool `workflow-streamDocument`).
+   * application, including the workflow-as-tool `streamDocument` (formerly streamDocument)).
    * Verified empirically: Mastra's tool-input-available chunk omits
    * `providerExecuted` for custom tools (see
    * `@mastra/core/dist/chunk-QPZ35KK2.cjs:208`), and the client's
@@ -510,11 +489,12 @@ export class ChatContext {
    * `onToolCall` when `!chunk.providerExecuted` (which is true for our
    * workflow-as-tool because the field is absent).
    *
-   * When the LLM calls `workflow-streamDocument`, this handler
-   * initializes the transient streaming state in
-   * `threadData.documentStreams`. The inline ShimmerArtifactCard in
-   * chat.svelte's `inlineDocumentStreams` derivation picks up the entry
-   * immediately and renders with `status: 'processing'`.
+   * When the LLM calls `streamDocument`, this handler
+   * initializes the transient streaming state in the module-level
+   * `documentStreams` export in `thread-data.svelte.ts`. The inline
+   * ShimmerArtifactCard in chat.svelte's `inlineDocumentStreams`
+   * derivation picks up the entry immediately and renders with
+   * `status: 'processing'`.
    *
    * NO auto-open happens here — the workspace panel opens on the FIRST
    * `data-streamDocument` chunk arrival (in `#onData`, step 3) so the
@@ -522,38 +502,26 @@ export class ChatContext {
    * panel opens with content already streaming.
    *
    * The server-side execution happens entirely in
-   * `documentStreamWorkflow.streamDocumentAgentStep.execute`. When it
+   * `the streamDocument tool`. When it
    * returns, its outputSchema result lands as a
-   * `tool-workflow-streamDocument` part on the assistant message with
+   * `tool-streamDocument` part on the assistant message with
    * `state: 'output-available'` — ArtifactViewer reads that part's
    * `output` field directly via `$derived.by` to render the EditorCanvas.
    */
   #onToolCall = ({ toolCall }: { toolCall: { dynamic?: boolean; toolName: string; toolCallId: string; input?: unknown } }) => {
-    if (toolCall.toolName !== "workflow-streamDocument") return;
-
+    if (toolCall.toolName !== "streamDocument") return;
     const input = (toolCall.input ?? {}) as {
-      format?: "marksheet" | "transcript";
       contentHash?: string;
       fileName?: string;
-      studentId?: number;
-      academicId?: number;
     };
-
-    // Key by documentId (server-derived from input) so the entry matches
-    // what #onData patches on the first delta. Both client-side handlers
-    // share the same key via deriveDocumentId; the AI SDK's toolCallId
-    // stays on the tool part in chat.messages as a separate identifier
-    // (used by ArtifactViewer to find the corresponding tool part).
+    console.log("TOOL_NAME", toolCall.toolName);
     const documentId = deriveDocumentId(input);
-
-    this.threadData.patchDocumentStream(documentId, {
-      format: input.format ?? "marksheet",
-      title: input.format === "transcript"
-        ? "Transcript"
-        : (input.fileName ?? "Document"),
+    patchDocumentStream(documentId, {
+      format: 'marksheet',
+      title: input.fileName ? deriveInitialTitle(input.fileName) : 'Document',
       ...(input.fileName !== undefined ? { fileName: input.fileName } : {}),
-      status: "processing",
-      content: "",
+      status: 'processing',
+      content: '',
       deltaCount: 0
     });
   };

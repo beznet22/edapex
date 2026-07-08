@@ -104,12 +104,17 @@ export type xDataPart = {
 		artifactId: string;
 		runId: string;
 	};
+  selectOptions: {
+    artifactId: string;
+    promptText: string;
+    runId: string;
+    options: OptionItem[];
+  };
 	noDocuments: {
 		message: string;
 	};
 	streamDocument: {
 		documentId: string;
-		format: 'marksheet' | 'transcript';
 		phase?: 'start' | 'delta' | 'end';
 		delta: string;
 	};

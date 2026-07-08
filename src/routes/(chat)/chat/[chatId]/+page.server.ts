@@ -2,14 +2,14 @@ import { error, redirect } from "@sveltejs/kit";
 import type { PageServerLoad } from "./$types";
 import { getMemory, mastra } from "$lib/server/mastra";
 import { toAISdkMessages } from "@mastra/ai-sdk/ui";
+import { writeFileSync } from "fs";
 
 export const load: PageServerLoad = async ({ params, locals }) => {
   const { chatId } = params;
-  // redirect to home if chat is not found
   if (!chatId || chatId.trim() === "undefined") {
     redirect(302, "/");
   }
-  
+
   const user = locals.user;
   const memory = await getMemory();
 
@@ -23,33 +23,23 @@ export const load: PageServerLoad = async ({ params, locals }) => {
       redirect(302, "/");
     }
 
-    // Enforce ownership for private threads
     if (thread.metadata?.visibility === "private") {
       if (!user || thread.resourceId !== `user-${user.id}`) {
         error(404, "Not found");
       }
     }
 
-    // Recall messages using the static Memory instance
-    const resourceId = user ? `user-${user.id}` : thread.resourceId;
-    let recallResponse = null;
-    try {
-      recallResponse = await memory.recall({
-        threadId: chatId,
-        resourceId,
-      });
-    } catch {
-      console.log('No previous messages found.');
-    }
+    const { messages } = await memory.recall({
+      threadId: thread.id,
+      resourceId: thread.resourceId,
+    });
 
-    // Convert Mastra messages to AI SDK v5 UI format
-    const uiMessages = toAISdkMessages(recallResponse?.messages || []);
+    const uiMessages = toAISdkMessages(messages, { version: "v6" });
 
-    // Map thread to the ChatThread compatible shape the UI expects
     const chat = {
       threadId: thread.id,
       resourceId: thread.resourceId,
-      title: thread.title || 'New Chat',
+      title: thread.title,
       model: (thread.metadata?.model as string),
       userId: user?.id ?? null,
       visibility: thread.metadata?.visibility as string,
@@ -59,11 +49,9 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 
     return { chat, messages: uiMessages };
   } catch (err: unknown) {
-    // Re-throw SvelteKit HTTP errors (from error() calls above)
     if (err && typeof err === 'object' && 'status' in err) {
       throw err;
     }
-    // On storage failure: return empty messages array and null chat (Requirement 23.7)
     return { user, chat: null, messages: [] };
   }
 };

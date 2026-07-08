@@ -34,6 +34,8 @@ const ICON_PATHS: Record<string, string> = {
 		'M3 21c3 0 7-1 7-8V5c0-1.25-.756-2.017-2-2H4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2 1 0 1 0 1 1v1c0 1-1 2-2 2s-1 .008-1 1.031V20c0 1 0 1 1 1zM15 21c3 0 7-1 7-8V5c0-1.25-.757-2.017-2-2h-4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2h.75c0 2.25.25 4-2.75 4v3c0 1 0 1 1 1z',
 	'code':
 		'M16 18l6-6-6-6M8 6l-6 6 6 6',
+	'link':
+		'M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71',
 };
 
 const defaultItems: SlashMenuItem[] = [
@@ -83,6 +85,35 @@ const defaultItems: SlashMenuItem[] = [
 	{
 		label: 'Code Block', description: 'Syntax highlighted', icon: 'code',
 		command: ({ editor, range }) => editor.chain().focus().deleteRange(range).toggleCodeBlock().run(),
+	},
+	{
+		label: 'Link', description: 'Wrap selection in a link', icon: 'link',
+		command: ({ editor, range }) => {
+			editor.chain().focus().deleteRange(range).run();
+			const existing = (editor.getAttributes('link').href as string | undefined) ?? '';
+			const url = window.prompt('URL (leave empty to remove)', existing || 'https://');
+			if (url === null) return;
+			const { from, to } = editor.state.selection;
+			if (url === '') {
+				editor.chain().focus().extendMarkRange('link').unsetLink().run();
+				return;
+			}
+			if (from === to) {
+				const text = window.prompt('Link text', url);
+				if (!text) return;
+				editor
+					.chain()
+					.focus()
+					.insertContent({
+						type: 'text',
+						text,
+						marks: [{ type: 'link', attrs: { href: url } }],
+					})
+					.run();
+			} else {
+				editor.chain().focus().extendMarkRange('link').setLink({ href: url }).run();
+			}
+		},
 	},
 ];
 

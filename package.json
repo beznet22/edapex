@@ -28,8 +28,10 @@
 	"devDependencies": {
 		"@ai-sdk/provider-utils": "^4.0.9",
 		"@internationalized/date": "^3.12.0",
+		"@libsql/client": "^0.17.4",
 		"@lucia-auth/adapter-drizzle": "^1.1.0",
 		"@lucide/svelte": "^1.17.0",
+		"@mastra/evals": "^1.5.0",
 		"@oslojs/crypto": "^1.0.1",
 		"@oslojs/encoding": "^1.1.0",
 		"@sejohnson/svelte-themes": "^0.0.6",
@@ -73,9 +75,7 @@
 		"typescript": "^5.9.3",
 		"vite": "^7.2.2",
 		"vitest": "^4.1.5",
-		"zod": "^4.1.13",
-		"@libsql/client": "^0.17.4",
-		"@mastra/evals": "^1.5.0"
+		"zod": "^4.1.13"
 	},
 	"dependencies": {
 		"@ai-sdk/deepseek": "^2.0.38",
@@ -103,6 +103,7 @@
 		"@tiptap/core": "^3.23.6",
 		"@tiptap/extension-code-block-lowlight": "^3.23.6",
 		"@tiptap/extension-highlight": "^3.23.6",
+		"@tiptap/extension-link": "^3.27.3",
 		"@tiptap/extension-mention": "^3.26.0",
 		"@tiptap/extension-placeholder": "^3.23.6",
 		"@tiptap/extension-subscript": "^3.23.6",
@@ -129,6 +130,7 @@
 		"streamdown-svelte": "^3.0.6",
 		"svelte-tiptap": "^3.0.1",
 		"svelte-toolbelt": "^0.10.6",
+		"tiptap-extension-global-drag-handle": "^0.1.16",
 		"tiptap-markdown": "^0.9.0",
 		"vaul-svelte": "^0.3.2"
 	}

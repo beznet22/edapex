@@ -2,6 +2,10 @@
  * Editor Edit Agent — EdApex
  *
  * Rewrites selected markdown content while preserving structure and intent.
+ * Supports multiple toolName variants (edit, improve, fix, shorter, longer)
+ * each producing a different system prompt via the option-specific prompt
+ * template below. Mirrors Novel.sh's `match(option)` pattern.
+ *
  * Standalone agent — not part of the supervisor hierarchy, no memory, no tenant isolation.
  * Temperature is set per-request in the workflow step (0.0 for precise edits).
  */
@@ -11,11 +15,33 @@ import { DEFAULT_EDITOR_MODEL } from './shared';
 import type { RequestContext } from '@mastra/core/request-context';
 import type { RequestContextValues } from './shared';
 
+export type EditorEditOption = 'edit' | 'improve' | 'fix' | 'shorter' | 'longer';
+
+/**
+ * Builds the option-specific system prompt fragment for the editor edit agent.
+ * Mirrors Novel.sh's `match(option)` branch in `/api/generate/route.ts`.
+ */
+export function buildEditOptionInstruction(option: EditorEditOption): string {
+	switch (option) {
+		case 'improve':
+			return 'You are improving existing text. Limit your response to no more than 200 characters, but make sure to construct complete sentences. Use Markdown formatting when appropriate.';
+		case 'fix':
+			return 'You are an AI writing assistant that fixes grammar and spelling errors in existing text. Limit your response to no more than 200 characters, but make sure to construct complete sentences. Use Markdown formatting when appropriate.';
+		case 'shorter':
+			return 'You are an AI writing assistant that shortens existing text. Use Markdown formatting when appropriate.';
+		case 'longer':
+			return 'You are an AI writing assistant that lengthens existing text. Limit your response to no more than 200 characters, but make sure to construct complete sentences. Use Markdown formatting when appropriate.';
+		case 'edit':
+		default:
+			return 'You are rewriting existing text according to the user\'s instructions.';
+	}
+}
+
 export const editorEditAgent = new Agent({
 	id: 'editorEdit',
 	name: 'Editor Edit Agent',
 	description:
-		'Rewrites selected editor content while preserving markdown structure and the user\'s intent.',
+		'Rewrites selected editor content while preserving markdown structure and the user\'s intent. Supports improve, fix, shorter, longer, and generic edit.',
 	instructions: ({ requestContext }: { requestContext: RequestContext<RequestContextValues> | undefined }) => {
 		const ctx = requestContext?.get('tenantContext');
 		const schoolLine = ctx?.schoolId ? `You are working in school #${ctx.schoolId}. ` : '';

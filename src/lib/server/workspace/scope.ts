@@ -4,12 +4,18 @@
  * Validates that a file path is within the active tenant's workspace root
  * before allowing read/write operations. Prevents cross-tenant file access.
  *
- * Workspace root format:
- *   .workspaces/<schoolId>/<classId>_<sectionId>_AY<academicId>/
+ * Workspace root format (see `classDir` in paths.ts for the canonical builder):
+ *   <WORKSPACE_ROOT>/<schoolId>/AY<academicId>-<year-slug>/<classId>-<class-slug>_<sectionId>-<section-slug>/
  *
- * Example: .workspaces/1/12_6_AY4/ for school 1, class 12, section 6, AY 4.
+ * Example: /abs/.workspaces/1/AY4-2025-2026/12-c_5-a/ for school 1, AY 4 (year
+ * "2025/2026"), class 12 (slug "c"), section 5 (slug "a").
+ *
+ * `buildWorkspaceRoot` delegates to `classDir` so the file API's path
+ * validation matches the actual filesystem layout produced by stream-document
+ * and other write paths.
  */
 import type { TenantContext } from '$lib/server/mastra/tenant-context';
+import { classDir } from '$lib/server/mastra/storage/workspaces/paths';
 
 export class WorkspaceScopeError extends Error {
   constructor(message: string = 'WORKSPACE_SCOPE_VIOLATION') {
@@ -24,7 +30,7 @@ export function buildWorkspaceRoot(tenant: TenantContext): string {
       `Cannot build workspace root: missing classId (${tenant.classId}), sectionId (${tenant.sectionId}), or academicId (${tenant.academicId})`,
     );
   }
-  return `.workspaces/${tenant.schoolId}/${tenant.classId}_${tenant.sectionId}_AY${tenant.academicId}`;
+  return classDir(tenant);
 }
 
 /**

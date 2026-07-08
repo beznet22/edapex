@@ -9,6 +9,7 @@
   import { ImageContext } from "$lib/context/image.context.svelte";
   import { useAI } from "$lib/context/ai-context.svelte";
   import { IsMobile } from "$lib/hooks/is-mobile.svelte.js";
+  import { page } from "$app/state";
   import InspectorProvider from "$lib/components/workspace/InspectorProvider.svelte";
   import WorkspacePaneGroup from "$lib/components/workspace/WorkspacePaneGroup.svelte";
   import WorkspaceSidebar from "$lib/components/workspace/WorkspaceSidebar.svelte";
@@ -91,6 +92,16 @@
   });
 
   const isMobile = new IsMobile();
+
+  // Chat pages render <SharedChatView>, which carries its own
+  // <WorkspacePaneGroup><WorkspaceSidebar /></WorkspacePaneGroup> so
+  // ArtifactViewer inside WorkspaceSidebar can resolve useChat(). Filestore
+  // and any other non-chat routes in this group get the layout-level
+  // WorkspacePaneGroup/WorkspaceSidebar (no chat access needed there).
+  let isChatRoute = $derived(
+    page.url.pathname === '/' ||
+      page.url.pathname.startsWith('/chat')
+  );
 </script>
 
 <svelte:head>
@@ -106,7 +117,9 @@
   <AppSidebar user={data.user ?? undefined} />
   <Sidebar.Inset class="overflow-hidden min-h-0">
     <InspectorProvider>
-      {#if isMobile.current}
+      {#if isChatRoute}
+        {@render children()}
+      {:else if isMobile.current}
         {@render children()}
         <WorkspaceSidebar />
       {:else}

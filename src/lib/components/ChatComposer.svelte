@@ -52,6 +52,7 @@
   import RateLimitBanner from "./RateLimitBanner.svelte";
   import CommandDropdown from "./chat/CommandDropdown.svelte";
   import MentionDropdown from "./chat/MentionDropdown.svelte";
+  import OptionDropdown from "./chat/OptionDropdown.svelte";
   import { PromptInput, PromptInputActions, PromptInputTextarea } from "./prompt-kit/prompt-input";
 
   let {
@@ -179,6 +180,37 @@
 
   const extractingCount = $derived(chat.loading ? 1 : 0);
 
+  // Selection-gate popover follows the same lifecycle as chat.pendingGate —
+  // populated by `data-selectOptions` stream events (see chat-context).
+  const pendingGate = $derived(chat.pendingGate);
+
+  // When validation is awaiting, chat.svelte mounts an ActionBar above the
+  // composer inside a shared rounded-4xl parent. We derive this from
+  // `chat.messages` (not `chat.pendingAwaitingValidation`) because the
+  // message stream is re-hydrated from the server on page reload while the
+  // context state is not — otherwise the composer's top seam would disappear
+  // after a reload even though the ActionBar is still showing.
+  const hasAwaitingValidation = $derived.by(() => {
+    const lastAssistant = [...chat.messages]
+      .reverse()
+      .find((m) => m.role === "assistant");
+    return !!lastAssistant?.parts?.some(
+      (p) => (p as { type?: string }).type === "data-awaitValidation",
+    );
+  });
+
+  // The composer always keeps `rounded-4xl` on all four corners. When an
+  // ActionBar mounts above it inside the shared parent, the parent's
+  // `rounded-4xl overflow-hidden` mask clips the composer's top corners —
+  // its own rounding coincides with the mask and remains visible as the
+  // card's outer shape. The hairline `border-t` only appears when the
+  // ActionBar is mounted above, marking the seam between the two sections.
+  const composerClass = $derived(
+    cn(
+      "composer-box relative w-full max-w-[780px] flex flex-col hermes-glass rounded-4xl shadow-[0_0_50px_-12px_rgba(0,0,0,0.5)] transition-all duration-500 focus-within:ring-1 focus-within:ring-primary/40 focus-within:border-primary/30 p-0 border-border/10 bg-[#09090b]/40 backdrop-blur-3xl ring-offset-background",
+      hasAwaitingValidation && "border-t border-border/30",
+    ),
+  );
   /**
    * Extract the slash command type from input text.
    * Returns the command name (e.g., generate "extract", "validate", "publish") or null.
@@ -651,7 +683,7 @@
 <RateLimitBanner />
 
 <PromptInput
-  class="composer-box relative w-full max-w-[780px] flex flex-col hermes-glass rounded-4xl shadow-[0_0_50px_-12px_rgba(0,0,0,0.5)] transition-all duration-500 focus-within:ring-1 focus-within:ring-primary/40 focus-within:border-primary/30 p-0 border-border/10 bg-[#09090b]/40 backdrop-blur-3xl ring-offset-background"
+  class="composer-box relative w-full max-w-[780px] flex flex-col hermes-glass rounded-4xl shadow-[0_0_50px_-12px_rgba(0,0,0,0.5)] transition-all duration-500 focus-within:ring-1 focus-within:ring-primary/40 focus-within:border-primary/30 p-0 border-border/10"
   value={input}
   onValueChange={(val) => {
     input = val;
@@ -787,6 +819,22 @@
         visible={showMentions}
         onSelect={selectMention}
         onDismiss={() => (showMentions = false)}
+      />
+    </div>
+  {/if}
+
+  <!-- Selection Gate Popover (data-selectOptions workflow event).
+       Positioned identically to CommandDropdown / MentionDropdown so all
+       composer popovers share the same vertical anchor. ResponsiveSheet
+       portals the chrome out, so this wrapper is just a positioning slot. -->
+  {#if pendingGate}
+    <div class="absolute bottom-full left-4 right-4 mb-4 z-50">
+      <OptionDropdown
+        open={true}
+        question={pendingGate.question}
+        options={pendingGate.options}
+        onSelect={(selection) => chat.resumePendingGate(selection)}
+        onCancel={() => chat.setPendingGate(null)}
       />
     </div>
   {/if}

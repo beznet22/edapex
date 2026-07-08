@@ -5,7 +5,10 @@
     ConversationScrollButton,
   } from "$lib/components/ai-elements/conversation";
   import { useChat } from "$lib/context/chat-context.svelte";
-  import { deriveDocumentId } from "$lib/context/thread-data.svelte";
+  import {
+    deriveDocumentId,
+    getDocumentStream,
+  } from "$lib/context/thread-data.svelte";
   import { UserContext } from "$lib/context/user-context.svelte";
   import type { AuthUser } from "$lib/types/auth-types";
   import { toast } from "svelte-sonner";
@@ -41,7 +44,7 @@
 
   import { cn } from "$lib/utils/shadcn";
   import { onMount } from "svelte";
-  import ActionBar from "./ai-elements/ActionBar.svelte";
+  import ActionBar from "./chat/ActionBar.svelte";
   import Loader from "./prompt-kit/loader/loader.svelte";
 
   let {
@@ -84,6 +87,23 @@
     [...chat.messages].reverse().find((m) => m.role === "assistant"),
   );
 
+  const lastValidationMessage = $derived(
+    chat.messages.find((m) => {
+      if (m.role !== "assistant") return false;
+      return m.parts.some((p) => p.type === "data-awaitValidation");
+    }),
+  );
+
+  let awaitValidation = $derived(
+    lastValidationMessage?.parts.find((p) => p.type === "data-awaitValidation"),
+  );
+
+  const hasDataFields = $derived(
+    !!lastAssistantMessage?.parts?.some(
+      (p) => p.type === "data-awaitValidation",
+    ),
+  );
+
   const hasVisibleContent = $derived(
     !!lastAssistantMessage?.parts?.some(
       (p) => p.type === "reasoning" || p.type === "text",
@@ -96,31 +116,11 @@
     return lastAssistantMessage?.parts?.at(-1)?.type === "reasoning";
   });
 
-  /**
-   * Walks chat.messages for assistant messages whose parts include a
-   * `tool-workflow-streamDocument` part (produced by the workflow-as-tool
-   * registration on assistantAgent — Mastra converts documentStreamWorkflow
-   * to a tool with that exact name). For each match, derives the effective
-   * status from two sources:
-   *   - Final status (success/error) comes from toolPart.state
-   *     (`output-available` → 'success', `output-error` → 'error')
-   *   - Transient status (processing/streaming) + accumulated content
-   *     come from threadData.documentStreams[documentId] (written by
-   *     chat-context.svelte.ts's #onToolCall and #onData)
-   *
-   * The documentId key matches the server's `deriveDocumentId(input)`
-   * output — we recompute it client-side from the tool part's input so
-   * the lookup stays correct without the AI SDK's toolCallId round-trip.
-   *
-   * The array is re-derived reactively whenever chat.messages changes
-   * (new tool part appears, state transitions) OR threadData.documentStreams
-   * changes (delta accumulated, status patched).
-   */
   const inlineDocumentStreams = $derived.by(() => {
     const result: Array<{
       documentId: string;
       toolCallId: string;
-      status: 'processing' | 'streaming' | 'success' | 'error';
+      status: "processing" | "streaming" | "success" | "error";
       title: string;
       content: string;
     }> = [];
@@ -130,23 +130,34 @@
         const p = part as {
           type?: string;
           toolCallId?: string;
-          state?: 'input-streaming' | 'input-available' | 'output-available' | 'output-error';
-          input?: { format?: 'marksheet' | 'transcript'; contentHash?: string; fileName?: string; studentId?: number; academicId?: number };
+          state?:
+            | "input-streaming"
+            | "input-available"
+            | "output-available"
+            | "output-error";
+          input?: { contentHash?: string; fileName?: string };
           output?: { fileName?: string; title?: string };
         };
-        if (p.type !== "tool-workflow-streamDocument" || !p.toolCallId) continue;
+        if (p.type !== "tool-streamDocument" || !p.toolCallId) continue;
         const documentId = deriveDocumentId(p.input ?? {});
-        const entry = chat.threadData.getDocumentStream(documentId);
-        const status: 'processing' | 'streaming' | 'success' | 'error' =
-          p.state === 'output-available' ? 'success'
-          : p.state === 'output-error' ? 'error'
-          : entry?.status ?? 'processing';
+        const entry = getDocumentStream(documentId);
+        const status: "processing" | "streaming" | "success" | "error" =
+          p.state === "output-available"
+            ? "success"
+            : p.state === "output-error"
+              ? "error"
+              : (entry?.status ?? "processing");
         result.push({
           documentId,
           toolCallId: p.toolCallId,
           status,
-          title: p.output?.fileName ?? p.output?.title ?? p.input?.fileName ?? entry?.title ?? 'Document',
-          content: entry?.content ?? ''
+          title:
+            p.output?.fileName ??
+            p.output?.title ??
+            p.input?.fileName ??
+            entry?.title ??
+            "Document",
+          content: entry?.content ?? "",
         });
       }
     }
@@ -238,7 +249,7 @@
         class="w-full overscroll-contain touch-pan-y pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]"
       >
         <!-- Add padding bottom so messages don't hide behind floating input -->
-        <div class="space-y-6 py-4 mx-auto max-w-3xl px-4 pb-32 sm:pb-36">
+        <div class="space-y-6 py-4 mx-auto max-w-3xl px-4 pb-52 sm:pb-56">
           {#each chat.messages as message, index}
             <div class="group relative">
               <Message from={message.role} class="py-0">
@@ -249,7 +260,6 @@
                   {#each message.parts as part}
                     {#if part.type === "reasoning"}
                       <Reasoning
-                        open={reasoningIsStreaming}
                         class="w-full mb-2"
                         isStreaming={reasoningIsStreaming}
                       >
@@ -282,22 +292,9 @@
                 </Shimmer>
               {/if}
 
-              <!--
-                Inline ShimmerArtifactCard for active document streams.
-                Renders one card per tool-workflow-streamDocument tool part on
-                this message. Status transitions:
-                  'processing' — tool called, no deltas yet (Preparing label)
-                  'streaming'  — at least one delta landed (Extracting + byte count)
-                  'success'    — tool returned output-available (Ready, green check)
-                  'error'      — tool returned output-error (red state)
-                Click handler (built into ShimmerArtifactCard.svelte) dispatches
-                'chat:openArtifact' which SharedChatView's listener routes to
-                inspector.openChatArtifact — so user-initiated clicks re-open
-                the workspace panel for any state.
-              -->
-              {#each inlineDocumentStreams as stream (stream.documentId)}
-                {#if message.parts?.some((p) => (p as { type?: string; toolCallId?: string }).type === 'tool-workflow-streamDocument' && (p as { toolCallId?: string }).toolCallId === stream.toolCallId)}
-                  <div class="ml-0 sm:ml-12 mt-2 mb-2">
+              {#each inlineDocumentStreams as stream (stream.toolCallId)}
+                {#if message.parts?.some((p) => (p as { type?: string; toolCallId?: string }).type === "tool-streamDocument" && (p as { toolCallId?: string }).toolCallId === stream.toolCallId)}
+                  <div class="mt-2 mb-2 w-full">
                     <ShimmerArtifactCard
                       id={stream.documentId}
                       title={stream.title}
@@ -340,41 +337,26 @@
   <div
     class="absolute bottom-4 left-0 w-full pt-10 pb-4 px-2 sm:px-4 safe-area-bottom pointer-events-none z-50 flex flex-col items-center gap-0"
   >
-    {#if chat.awaitingValidation || chat.pendingGate}
-      <div
-        class="pointer-events-auto w-full max-w-[780px] relative z-10 h-[var(--composer-card-h,8.5rem)] -mb-[calc(var(--composer-card-h,8.5rem)-2.25rem)]"
-        data-mode={chat.awaitingValidation ? "validation" : "options"}
-        style="--composer-card-h: 8.5rem;"
-      >
-        {#if chat.awaitingValidation}
-          <ActionBar
-            mode="validation"
-            artifactId={chat.awaitingValidation}
-            validating={chat.pendingValidationArtifactId ===
-              chat.awaitingValidation}
-            context="Marksheet validation required"
-            subContext={`marksheets/${chat.selectedClass?.classId ?? "?"} · 2nd term`}
-            secondaryLabel="Skip"
-            onSecondary={() => chat.cancelValidation()}
-            dropdownOptions={[
-              { id: "force-commit", label: "Force commit (skip auto-fix)" },
-              { id: "save-only", label: "Save without committing" },
-            ]}
-            onValidate={(id, dropdownId) => chat.resumeWorkflow(id, dropdownId)}
-          />
-        {:else if chat.pendingGate}
-          <ActionBar
-            question={chat.pendingGate.question}
-            options={chat.pendingGate.options}
-            runId={chat.pendingGate.runId}
-            stepId={chat.pendingGate.stepId}
-            allowFreeText={chat.pendingGate.allowFreeText}
-            onSelect={(selection) => chat.resumePendingGate(selection)}
-          />
-        {/if}
-      </div>
-    {/if}
-    <div class="pointer-events-auto w-full max-w-[780px] relative z-20">
+    <div
+      class="pointer-events-auto w-full max-w-[780px] relative z-20 flex flex-col rounded-4xl overflow-hidden border border-border/10"
+    >
+      {#if awaitValidation?.type === "data-awaitValidation"}
+        <ActionBar
+          mode="validation"
+          artifactId={awaitValidation.data.artifactId}
+          validating={chat.pendingValidationArtifactId ===
+            awaitValidation.data.artifactId}
+          context="Marksheet validation required"
+          subContext={`marksheets/${chat.selectedClass?.classId ?? "?"} · 2nd term`}
+          secondaryLabel="Skip"
+          onSecondary={() => chat.cancelValidation()}
+          dropdownOptions={[
+            { id: "force-commit", label: "Force commit (skip auto-fix)" },
+            { id: "save-only", label: "Save without committing" },
+          ]}
+          onValidate={(id, dropdownId) => chat.resumeWorkflow(id, dropdownId)}
+        />
+      {/if}
       <ChatComposer {user} {readonly} isInitial={false} />
     </div>
   </div>

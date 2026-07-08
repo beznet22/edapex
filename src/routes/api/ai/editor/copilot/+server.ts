@@ -4,6 +4,7 @@ import { copilotRequestSchema } from '$lib/server/mastra/editor/schemas';
 import { buildWorkspaceRequestContext } from '$lib/server/helpers/chat-helper';
 import { ALLOWED_DESIGNATIONS } from "$lib/types/sms-types";
 import { createTenantContext } from '$lib/server/mastra/tenant-context';
+import { buildCopilotSystemPrompt } from '$lib/server/mastra/agents/editor-copilot';
 
 export const POST: RequestHandler = async ({ request, locals: { user } }) => {
 	if (!user) error(401, 'Unauthorized');
@@ -31,11 +32,18 @@ export const POST: RequestHandler = async ({ request, locals: { user } }) => {
 
 		const agent = mastra.getAgent('editorCopilot');
 
+		// Prefer the explicit `system` from the client; fall back to a
+		// context-aware prompt built from `parsed.data.context` so the
+		// auto-debounce path (which sends no system) still gets rich
+		// instructions derived from tenant metadata + cursorPosition.
+		const instructions =
+			parsed.data.system ?? buildCopilotSystemPrompt(parsed.data.context);
+
 		const result = await agent.generate(parsed.data.prompt, {
 			abortSignal: request.signal,
-			instructions: parsed.data.system,
+			instructions,
 			modelSettings: {
-				maxOutputTokens: 20,
+				maxOutputTokens: 64,
 				temperature: 0.7,
 			},
 			requestContext,

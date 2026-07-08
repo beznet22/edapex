@@ -2,15 +2,18 @@
   import { Button } from "$lib/components/ui/button";
   import Check from "@lucide/svelte/icons/check";
   import X from "@lucide/svelte/icons/x";
+  import Timer from "@lucide/svelte/icons/timer";
 
   let {
     text,
     thinking = false,
+    debouncing = false,
     onAccept,
     onDiscard
   }: {
     text: string;
     thinking?: boolean;
+    debouncing?: boolean;
     onAccept: () => void;
     onDiscard: () => void;
   } = $props();
@@ -24,8 +27,13 @@
   }
 </script>
 
-<span class="copilot-ghost-text">
-  {#if thinking}
+<span class="copilot-ghost-text" class:copilot-debouncing={debouncing}>
+  {#if debouncing}
+    <span class="copilot-debouncing-indicator" aria-label="Copilot auto-trigger pending">
+      <Timer class="h-3 w-3" />
+      <span>drafting…</span>
+    </span>
+  {:else if thinking}
     <span class="copilot-thinking-dots" aria-label="Copilot is thinking">
       <span></span><span></span><span></span>
     </span>
@@ -102,6 +110,19 @@
       opacity: 1;
       transform: translateY(0);
     }
+  }
+
+  .copilot-debouncing {
+    opacity: 0.35;
+  }
+
+  .copilot-debouncing-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-style: italic;
+    font-size: 0.85em;
+    color: var(--muted-foreground);
   }
 
   .copilot-thinking-dots {

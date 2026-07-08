@@ -143,6 +143,15 @@ async function searchStudents(
 		name: row.fullName?.trim() || `Student #${row.id}`,
 		category: 'students',
 		typeBadge: row.admissionNo != null ? `Adm#${row.admissionNo}` : 'Student',
+		// Structured fields embedded in the markdown mention so the editor
+		// workflow can resolve the document to the correct `sm_students`
+		// row without an extra lookup. Serialized as
+		// `{{studentName:<fullName>|student:<id>|admissionNo:<adm>}}`.
+		// Coerced to string so the MentionSearchResult type (which uses
+		// `admissionNo?: string`) accepts the value — sm_students.admissionNo
+		// is stored as a numeric ID in the DB but serialized as a string.
+		admissionNo: row.admissionNo != null ? String(row.admissionNo) : undefined,
+		studentId: row.id,
 	}));
 }
 
@@ -316,7 +325,8 @@ async function searchEntities(
 	tenant: TenantContext,
 	limit: number,
 	classId: number | null,
-	sectionId: number | null
+	sectionId: number | null,
+	designationId: number
 ): Promise<ExtendedMentionSearchResult[]> {
 	const clampedLimit = Math.min(limit, 10);
 	if (category === 'students') return searchStudents(query, tenant, clampedLimit, classId, sectionId);
@@ -328,16 +338,37 @@ async function searchEntities(
 		return [];
 	}
 
-	// Default tab (no `category` param): students + class_section.
-	// `date` and `custom` were placeholder-only stubs and have been removed.
+	// Default tab (no `category` param): search ALL allowed categories in
+	// parallel and merge the results. The frontend `mention-menu.ts` sends
+	// no `category` param, so typing `@year` or `@term` previously only
+	// matched against students + class_section — now every allowed category
+	// contributes results so the suggestion list reflects what's available.
+	// Each category is capped at a small share of the overall limit so a
+	// single dominant category can't crowd out the others.
 	const trimmed = query.trim();
-	const [students, classSections] = await Promise.all([
-		searchStudents(query, tenant, Math.min(5, clampedLimit), classId, sectionId),
-		trimmed
-			? searchClassSection(query, tenant, Math.min(5, clampedLimit), classId)
-			: Promise.resolve<ExtendedMentionSearchResult[]>([]),
-	]);
-	return [...students, ...classSections].slice(0, clampedLimit);
+	const cats = category ? [category] : computeAllowedCategories(designationId);
+	const perCategory = Math.max(2, Math.ceil(clampedLimit / Math.max(1, cats.length)));
+	const searches: Array<Promise<ExtendedMentionSearchResult[]>> = [];
+	if (cats.includes('students')) searches.push(searchStudents(query, tenant, perCategory, classId, sectionId));
+	if (cats.includes('class_section')) {
+		searches.push(
+			trimmed
+				? searchClassSection(query, tenant, perCategory, classId)
+				: Promise.resolve<ExtendedMentionSearchResult[]>([]),
+		);
+	}
+	if (cats.includes('academic_year')) searches.push(searchAcademicYear(query, tenant, perCategory));
+	if (cats.includes('exam')) searches.push(searchExam(query, tenant, perCategory));
+	if (cats.includes('file')) searches.push(searchFile(query, tenant, perCategory));
+	const merged = (await Promise.all(searches)).flat();
+	// Re-rank: exact-prefix matches first, then alphabetical.
+	merged.sort((a, b) => {
+		const aPrefix = trimmed && a.name.toLowerCase().startsWith(trimmed) ? 0 : 1;
+		const bPrefix = trimmed && b.name.toLowerCase().startsWith(trimmed) ? 0 : 1;
+		if (aPrefix !== bPrefix) return aPrefix - bPrefix;
+		return a.name.localeCompare(b.name);
+	});
+	return merged.slice(0, clampedLimit);
 }
 
 /**
@@ -415,6 +446,6 @@ export const GET: RequestHandler = async ({ url, locals, cookies }) => {
 		academicId: user.academicId ?? null
 	});
 
-	const results = await searchEntities(query, category, tenantContext, limit, effectiveClassId, effectiveSectionId);
+	const results = await searchEntities(query, category, tenantContext, limit, effectiveClassId, effectiveSectionId, designationId);
 	return json({ results });
 };

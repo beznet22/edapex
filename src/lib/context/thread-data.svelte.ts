@@ -35,25 +35,83 @@ export type DocumentStreamEntry = {
 };
 
 /**
- * Derives a deterministic documentId from the workflow input. Mirrors
- * `deriveDocumentId` in src/lib/server/mastra/workflows/document-stream.ts
- * — both client and server produce the same key for the same input, so
- * `data-streamDocument` chunks (server) and tool-part inputs (client)
+ * Derives a deterministic documentId from the marksheet tool input. Mirrors
+ * `deriveDocumentId` in src/lib/server/mastra/tools/operations/reporting/stream-document.ts
+ * — both client and server produce the same key for the same contentHash,
+ * so `data-streamDocument` chunks (server) and tool-part inputs (client)
  * reconcile without needing a toolCallId round-trip.
- *
- * Marksheet key is contentHash-based (one OCR upload → one document).
- * Transcript key is studentId + academicId (one student × term → one document).
  */
-export function deriveDocumentId(input: {
-  format?: 'marksheet' | 'transcript';
-  contentHash?: string;
-  studentId?: number;
-  academicId?: number;
-}): string {
-  if (input.format === 'transcript') {
-    return `transcript-${input.studentId ?? 'unknown'}-${input.academicId ?? 'active'}`;
-  }
+export function deriveDocumentId(input: { contentHash?: string }): string {
   return `marksheet-${input.contentHash ?? 'unknown'}`;
+}
+
+/**
+ * Derives the working title from the uploaded filename. Strips the last
+ * extension and sanitizes special characters to produce a filesystem-safe
+ * display name (e.g., "adakole.jpg.jpeg" → "adakole"). Mirrors the title
+ * derivation in `stream-document.ts`'s `deriveInitialFilename` so the
+ * streaming entry's title (set in `#onToolCall`) matches the tool output's
+ * `title` field — important so ShimmerArtifactCard shows the same title
+ * during streaming as ArtifactViewer does after streaming completes.
+ */
+export function deriveInitialTitle(fileName: string): string {
+  const baseName = fileName.replace(/\.[^.]+$/, '');
+  return baseName.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 40);
+}
+
+/**
+ * Module-level reactive document-stream store, keyed by toolCallId (= the
+ * server's `documentId` from `data-streamDocument` parts).
+ *
+ * Lives at module scope — NOT on ChatContext, NOT on ThreadData — because
+ * ArtifactViewer is mounted in WorkspaceSidebar (a sibling of SharedChatView,
+ * both rendered by `(chat)/+layout.svelte`). Svelte's `setContext()` only
+ * propagates down, so `useChat()` in ArtifactViewer returns undefined and
+ * any state held on a context-provided instance is unreachable. A module-
+ * level `$state` is a free export: any importer sees the same reactive
+ * proxy regardless of component tree position.
+ *
+ * Write paths: `ChatContext.#onToolCall` (initial entry on tool-call),
+ *              `ChatContext.#onData` (delta accumulation, status transition)
+ * Read paths:  `chat.svelte`'s `inlineDocumentStreams` (Shimmer card),
+ *              `ArtifactViewer`'s `entry` $derived.by (workspace panel)
+ */
+export const documentStreams = $state<Record<string, DocumentStreamEntry>>({});
+
+/**
+ * Read access for the streaming entry. Tracked via the module-level
+ * `$state` proxy above; returns null when no stream is registered for
+ * the given toolCallId.
+ */
+export function getDocumentStream(toolCallId: string): DocumentStreamEntry | null {
+  return documentStreams[toolCallId] ?? null;
+}
+
+/**
+ * Patch the streaming entry for `toolCallId`. Inserts a fresh entry
+ * (status 'processing', empty content) when none exists; otherwise
+ * merges the patch into the existing entry. The mutation targets the
+ * proxy in place — Svelte 5's deep-reactive proxy tracks per-key reads
+ * and triggers per-key writes.
+ */
+export function patchDocumentStream(
+  toolCallId: string,
+  patch: Partial<DocumentStreamEntry>
+): void {
+  const prev = documentStreams[toolCallId];
+  if (prev) {
+    documentStreams[toolCallId] = { ...prev, ...patch };
+  } else {
+    documentStreams[toolCallId] = {
+      toolCallId,
+      format: patch.format ?? 'marksheet',
+      title: patch.title ?? 'Document',
+      status: patch.status ?? 'processing',
+      content: patch.content ?? '',
+      deltaCount: patch.deltaCount ?? 0,
+      ...(patch.fileName !== undefined ? { fileName: patch.fileName } : {})
+    };
+  }
 }
 
 export class ThreadData {
@@ -73,14 +131,6 @@ export class ThreadData {
   lastValidationOutcome = $state<{ artifactId: string; status: 'success' | 'errors' } | null>(null);
   lastCommitted = $state<{ artifactId: string; recordId: number; studentName: string; className: string; term: string } | null>(null);
   noDocumentsMessage = $state<string | null>(null);
-  /**
-   * Per-document transient streaming state, keyed by toolCallId (the
-   * same id used as `documentId` in `data-streamDocument` parts — the
-   * server stamps it deterministically from the workflow input).
-   * Holds only streaming transient state; final metadata lives on the
-   * tool part in chat.messages. See `DocumentStreamEntry` for shape.
-   */
-  documentStreams = $state<Record<string, DocumentStreamEntry>>({});
   chatHistory = ChatHistory.fromContext();
   #activeExamTypeId: number | null = null;
   #persistedKeys = new Map<string, string>();
@@ -99,46 +149,6 @@ export class ThreadData {
 
   resetReceived() {
     this.receivedDataChat = false;
-  }
-
-  /**
-   * Returns the streaming entry for a given toolCallId, or null if no
-   * stream is registered for that id. Consumers (chat.svelte's inline
-   * Shimmer card, ArtifactViewer's streaming Markdown) read this through
-   * $derived so they react to content accumulation and status transitions.
-   */
-  getDocumentStream(toolCallId: string): DocumentStreamEntry | null {
-    return this.documentStreams[toolCallId] ?? null;
-  }
-
-  /**
-   * Idempotent patch — merges with the previous entry (or a sensible
-   * default) and reassigns the $state so Svelte 5 reactivity fires.
-   * Use for accumulating streaming content, transitioning status,
-   * and setting initial title/format/fileName.
-   */
-  patchDocumentStream(toolCallId: string, patch: Partial<DocumentStreamEntry>): void {
-    const prev = this.documentStreams[toolCallId];
-    if (prev) {
-      this.documentStreams = {
-        ...this.documentStreams,
-        [toolCallId]: { ...prev, ...patch }
-      };
-      return;
-    }
-    const fallback: DocumentStreamEntry = {
-      toolCallId,
-      format: patch.format ?? 'marksheet',
-      title: patch.title ?? 'Document',
-      status: patch.status ?? 'processing',
-      content: patch.content ?? '',
-      deltaCount: patch.deltaCount ?? 0,
-      ...(patch.fileName !== undefined ? { fileName: patch.fileName } : {})
-    };
-    this.documentStreams = {
-      ...this.documentStreams,
-      [toolCallId]: fallback
-    };
   }
 
   handlePart(part: StreamDataPart) {
@@ -189,31 +199,6 @@ export class ThreadData {
     if (part.type === "data-noDocuments") {
       this.noDocumentsMessage = part.data.message;
     }
-
-    if (part.type === "data-streamDocument") {
-      this.#handleStreamDocument(part.data);
-    }
-  }
-
-  /**
-   * Accumulates `data-streamDocument` deltas into `documentStreams`.
-   * `phase: 'delta'` appends the delta text and increments deltaCount.
-   * `phase: 'start'` and `phase: 'end'` are no-ops — the entry is
-   * initialized by chat-context.svelte.ts's `#onToolCall`, and the final
-   * status transition comes from `toolPart.state` (read directly in
-   * ArtifactViewer's $derived.by). The auto-open of the workspace panel
-   * fires from chat-context.svelte.ts's `#onData` on the first 'delta'
-   * arrival — not from here — so this handler only mutates state.
-   */
-  #handleStreamDocument(data: { documentId: string; format: 'marksheet' | 'transcript'; phase?: 'start' | 'delta' | 'end'; delta: string }): void {
-    if (!data?.documentId || typeof data.delta !== 'string') return;
-    if (data.phase !== 'delta') return;
-    const prev = this.documentStreams[data.documentId];
-    this.patchDocumentStream(data.documentId, {
-      status: prev?.status === 'processing' ? 'streaming' : (prev?.status ?? 'streaming'),
-      content: (prev?.content ?? '') + data.delta,
-      deltaCount: (prev?.deltaCount ?? 0) + 1
-    });
   }
 
   #persistDocument(data: { id: string; title: string; content: string }) {

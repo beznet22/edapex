@@ -28,6 +28,48 @@ export type ClassScope = {
 	academicId: number;
 };
 
+/**
+ * Resolves the display names + academic-year title for a known
+ * (classId, sectionId, academicId) tuple. Used by the file API's tenant
+ * resolution to populate the `className`, `sectionName`, and
+ * `academicYearTitle` fields on TenantContext so `classDir` produces the
+ * correct human-readable workspace path (e.g. `AY4-2025/2026/12-c_5-a`)
+ * rather than the ID-only fallback (`AY4-4/12-12_5-5`).
+ */
+export async function resolveClassNamesByIds({
+	schoolId,
+	classId,
+	sectionId,
+	academicId,
+}: {
+	schoolId: number;
+	classId: number;
+	sectionId: number;
+	academicId: number;
+}): Promise<{ className: string | null; sectionName: string | null; academicYearTitle: string | null }> {
+	const db = await getDatabase();
+	const [cls] = await db
+		.select({ className: smClasses.className })
+		.from(smClasses)
+		.where(and(eq(smClasses.schoolId, schoolId), eq(smClasses.id, classId)))
+		.limit(1);
+	const [sec] = await db
+		.select({ sectionName: smSections.sectionName })
+		.from(smSections)
+		.where(and(eq(smSections.schoolId, schoolId), eq(smSections.id, sectionId)))
+		.limit(1);
+	const [yr] = await db
+		.select({ title: smAcademicYears.title })
+		.from(smAcademicYears)
+		.where(and(eq(smAcademicYears.schoolId, schoolId), eq(smAcademicYears.id, academicId)))
+		.limit(1);
+	return {
+		className: cls?.className ?? null,
+		sectionName: sec?.sectionName ?? null,
+		academicYearTitle: yr?.title ?? null,
+	};
+}
+
 export async function resolveActiveClassScope({
 	schoolId,
 	staffId,

@@ -20,7 +20,7 @@
 import { Mention } from '@tiptap/extension-mention';
 import { mount, unmount } from 'svelte';
 import { ALLOWED_DESIGNATIONS } from "$lib/types/sms-types";
-import MentionSuggestionList from './mention-suggestion-list.svelte';
+import MentionSuggestionList from '../MentionSuggestions.svelte';
 
 export interface MentionSearchResult {
 	id: number | string;
@@ -28,6 +28,16 @@ export interface MentionSearchResult {
 	category: string;
 	typeBadge: string;
 	parentContext?: string;
+	/**
+	 * Structured fields for `students` mentions. Populated by the backend
+	 * /api/mentions/search endpoint and threaded through to the mention
+	 * node attrs so the markdown serialization can write the MAPPED format
+	 * `{{studentName:<fullName>|student:<id>|admissionNo:<num>}}` directly
+	 * without an extra lookup round-trip.
+	 */
+	admissionNo?: string;
+	studentId?: number;
+	studentName?: string;
 }
 
 export interface MentionExtensionOptions {
@@ -126,6 +136,35 @@ const baseExtension = Mention.extend({
 				renderHTML: (attrs: { category: string | null }) =>
 					attrs.category ? { 'data-category': attrs.category } : {},
 			},
+			// Structured fields for `students` mentions — embedded in the markdown
+			// as `{{studentName:<fullName>|student:<id>|admissionNo:<num>}}` so
+			// the backend workflow can resolve the document to a `sm_students`
+			// row without an extra lookup round-trip, AND so the markdown stays
+			// human-readable when viewed outside the editor. Populated by the
+			// mention-menu command when a student row is picked from the list.
+			studentName: {
+				default: null,
+				parseHTML: (el: HTMLElement) => el.getAttribute('data-student-name'),
+				renderHTML: (attrs: { studentName: string | null }) =>
+					attrs.studentName ? { 'data-student-name': attrs.studentName } : {},
+			},
+			admissionNo: {
+				default: null,
+				parseHTML: (el: HTMLElement) => el.getAttribute('data-admission-no'),
+				renderHTML: (attrs: { admissionNo: string | number | null }) =>
+					attrs.admissionNo != null && attrs.admissionNo !== ''
+						? { 'data-admission-no': String(attrs.admissionNo) }
+						: {},
+			},
+			studentId: {
+				default: null,
+				parseHTML: (el: HTMLElement) => {
+					const raw = el.getAttribute('data-student-id');
+					return raw == null ? null : Number(raw);
+				},
+				renderHTML: (attrs: { studentId: number | null }) =>
+					attrs.studentId != null ? { 'data-student-id': String(attrs.studentId) } : {},
+			},
 		};
 	},
 
@@ -138,61 +177,136 @@ const baseExtension = Mention.extend({
 	},
 
 	renderText({ node }: any) {
-		const attrs = node.attrs as { id: string | null; category: string | null };
-		const id = attrs.id ?? '';
-		const category = attrs.category ?? '';
-		return `{{${category}:${id}}}`;
+		const attrs = node.attrs as {
+			id: string | null;
+			label: string | null;
+			category: string | null;
+			studentName: string | null;
+		};
+		// Render the mention as plain text `@<label>` so the markdown the user
+		// sees reads naturally: `@John Doe`, `@2026`, `@First term`. The
+		// structured data (id, category, admissionNo, studentName) is preserved
+		// in the editor's internal attrs and used by the backend resolver for
+		// entity lookups — the markdown text is purely for human consumption.
+		const label = attrs.label ?? attrs.studentName ?? attrs.id ?? '';
+		return label ? `@${label}` : '';
 	},
 
 	renderHTML({ node, HTMLAttributes }: any) {
-		const attrs = node.attrs as { id: string | null; label: string | null; category: string | null };
+		const attrs = node.attrs as {
+			id: string | null;
+			label: string | null;
+			category: string | null;
+			admissionNo: string | number | null;
+			studentId: number | null;
+			studentName: string | null;
+		};
 		const label = attrs.label ?? attrs.id ?? '';
-		return [
-			'span',
-			{
-				...HTMLAttributes,
-				'data-type': 'mention',
-				'data-id': attrs.id,
-				'data-label': attrs.label,
-				'data-category': attrs.category,
-				class: 'mention',
-			},
-			label,
-		];
+		const htmlAttrs: Record<string, string> = {
+			...HTMLAttributes,
+			'data-type': 'mention',
+			'data-id': attrs.id ?? '',
+			'data-label': attrs.label ?? '',
+			'data-category': attrs.category ?? '',
+			class: 'mention',
+		};
+		if (attrs.admissionNo != null && attrs.admissionNo !== '') {
+			htmlAttrs['data-admission-no'] = String(attrs.admissionNo);
+		}
+		if (attrs.studentId != null) htmlAttrs['data-student-id'] = String(attrs.studentId);
+		if (attrs.studentName) htmlAttrs['data-student-name'] = attrs.studentName;
+		return ['span', htmlAttrs, label];
 	},
 
 	addStorage() {
 		return {
 			markdown: {
-				serialize(state: { write: (s: string) => void }, node: { attrs: { id: string | null; label: string | null; category: string | null } }) {
+				serialize(state: { write: (s: string) => void }, node: { attrs: { id: string | null; label: string | null; category: string | null; admissionNo: string | number | null; studentId: number | null; studentName: string | null } }) {
 					const attrs = node.attrs;
-					const id = attrs.id ?? '';
-					const category = attrs.category ?? '';
-					if (!id) {
-						state.write(`@${escapeHtml(attrs.label ?? '')}`);
-						return;
+					const label = attrs.label ?? attrs.studentName ?? attrs.id ?? '';
+					if (!label) return;
+					// Serialize as an HTML inline `<span>` with the structured
+					// data as data-* attributes. Tiptap preserves the span
+					// during markdown round-trips so the backend resolver can
+					// extract id/category/admissionNo/studentName without a
+					// name-based lookup. The span content is `@<label>` so the
+					// user sees plain text when the markdown is rendered.
+					const spanAttrs = [
+						`data-type="mention"`,
+						`data-id="${escapeHtml(attrs.id ?? label)}"`,
+						`data-label="${escapeHtml(label)}"`,
+						`data-category="${escapeHtml(attrs.category ?? 'custom')}"`,
+					];
+					if (attrs.admissionNo != null && attrs.admissionNo !== '') {
+						spanAttrs.push(`data-admission-no="${escapeHtml(String(attrs.admissionNo))}"`);
 					}
-					state.write(`{{${category}:${id}}}`);
+					if (attrs.studentId != null) {
+						spanAttrs.push(`data-student-id="${escapeHtml(String(attrs.studentId))}"`);
+					}
+					if (attrs.studentName) {
+						spanAttrs.push(`data-student-name="${escapeHtml(attrs.studentName)}"`);
+					}
+					state.write(`<span ${spanAttrs.join(' ')}>@${escapeHtml(label)}</span>`);
 				},
 				parse: {
 					setup(md: { inline: { ruler: { after: (name: string, ruleName: string, fn: (state: any, silent: boolean) => boolean) => void } } }) {
 						md.inline.ruler.after('emphasis', 'mention_inline', (state: any, silent: boolean) => {
 							const start = state.pos;
 							const src = state.src;
-							if (src.charAt(start) !== '{' || src.charAt(start + 1) !== '{') return false;
-							const end = src.indexOf('}}', start + 2);
-							if (end === -1) return false;
-							const content = src.slice(start + 2, end);
-							const colon = content.indexOf(':');
-							if (colon < 1) return false;
-							const category = content.slice(0, colon).trim();
-							const id = content.slice(colon + 1).trim();
-							if (!category || !id) return false;
-							if (silent) return true;
+							// Match the structured `<span data-type="mention" ...>@<label></span>`
+							// form first — this is the round-tripped output of our
+							// serialize function and carries the full structured
+							// context (id, category, admissionNo, studentName).
+							const spanMatch = src.slice(start).match(/^<span\s+([^>]*data-type="mention"[^>]*)>@([^<]+)<\/span>/);
+							if (spanMatch) {
+								const attrString = spanMatch[1];
+								const label = spanMatch[2];
+								const get = (key: string): string | null => {
+									const m = attrString.match(new RegExp(`data-${key}="([^"]*)"`));
+									return m ? m[1] : null;
+								};
+								const id = get('id') ?? label;
+								const category = get('category') ?? 'custom';
+								const admissionNo = get('admission-no');
+								const studentNameRaw = get('student-name');
+								const studentIdRaw = get('student-id');
+								const studentId = studentIdRaw != null ? Number(studentIdRaw) : null;
+								if (silent) return true;
+								const token = state.push('html_inline', '', 0);
+								const spanAttrs = [
+									`data-type="mention"`,
+									`data-id="${escapeHtml(id)}"`,
+									`data-label="${escapeHtml(label)}"`,
+									`data-category="${escapeHtml(category)}"`,
+								];
+								if (admissionNo) spanAttrs.push(`data-admission-no="${escapeHtml(admissionNo)}"`);
+								if (studentId != null && Number.isFinite(studentId)) spanAttrs.push(`data-student-id="${escapeHtml(String(studentId))}"`);
+								if (studentNameRaw) spanAttrs.push(`data-student-name="${escapeHtml(studentNameRaw)}"`);
+								token.content = `<span ${spanAttrs.join(' ')}>@${escapeHtml(label)}</span>`;
+								state.pos = start + spanMatch[0].length;
+								return true;
+							}
 
+							// Legacy fallback: match plain `@<label>` for backward
+							// compat with documents written before the HTML span
+							// format was introduced. The backend resolver upgrades
+							// these via name-based lookup.
+							if (src.charAt(start) !== '@') return false;
+							if (start > 0) {
+								const prev = src.charAt(start - 1);
+								if (prev !== ' ' && prev !== '\t' && prev !== '\n' && prev !== '\r') {
+									return false;
+								}
+							}
+							const rest = src.slice(start + 1);
+							const labelMatch = rest.match(/^[^\s@]+/);
+							if (!labelMatch) return false;
+							const label = labelMatch[0];
+							if (!label) return false;
+							if (silent) return true;
 							const token = state.push('html_inline', '', 0);
-							token.content = `<span data-type="mention" data-id="${escapeHtml(id)}" data-label="" data-category="${escapeHtml(category)}">@${escapeHtml(id)}</span>`;
-							state.pos = end + 2;
+							token.content = `<span data-type="mention" data-id="${escapeHtml(label)}" data-label="${escapeHtml(label)}" data-category="custom">@${escapeHtml(label)}</span>`;
+							state.pos = start + 1 + label.length;
 							return true;
 						});
 					},
@@ -210,7 +324,21 @@ export const MentionExtension = baseExtension.configure({
 	suggestion: {
 		char: '@',
 		allowSpaces: false,
-		allowedPrefixes: [' '],
+		// Set to `null` (the whole option, not an array containing null) so
+		// the `@` trigger fires anywhere — including at the start of a line
+		// or right after deleting an existing student name / term / year.
+		// Previously restricted to `[' ']`, which silently failed: the popup
+		// never opened and the user was forced to keep the original text in
+		// the document alongside the mention. Tiptap's check is
+		// `allowedPrefixes === null` (whole value), so `[' ', null]` is
+		// equivalent to `[' ']` — the null element is ignored.
+		//
+		// Trade-off: `@` also fires inside email addresses (e.g. typing
+		// `@example` in `john@example.com` opens the popup). The user can
+		// press Escape to dismiss. The parse.setup already guards against
+		// email false positives in the markdown itself by requiring the
+		// previous char to be whitespace or start-of-document.
+		allowedPrefixes: null,
 		startOfLine: false,
 		items: async ({ query }: { query: string }) => {
 			try {
@@ -218,6 +346,41 @@ export const MentionExtension = baseExtension.configure({
 				const ctx = getMentionCtx();
 				if (ctx.selectedClassId != null) params.set('classId', String(ctx.selectedClassId));
 				if (ctx.selectedSectionId != null) params.set('sectionId', String(ctx.selectedSectionId));
+
+				// Smart category routing — strip the keyword prefix from the search
+				// query and send it as a routing directive, otherwise the backend
+				// filter rejects every result (e.g. "year" doesn't appear in "2024-2025",
+				// so `academic_year` filter `includes("year")` matches nothing).
+				//
+				// Behavior:
+				//   @               -> q='', category='students'        → all students
+				//   @year           -> q='', category='academic_year'   → all academic years
+				//   @year 2025      -> q='2025', category='academic_year' → years matching "2025"
+				//   @term           -> q='', category='exam'            → all exam types
+				//   @term mid       -> q='mid', category='exam'         → exam types matching "mid"
+				//   @anything else  -> q=<original>, no category        → default multi-category search
+				const trimmedQuery = query.trim().toLowerCase();
+				let actualQuery = query;
+				let categoryToSend: string | null = null;
+
+				if (trimmedQuery === '') {
+					categoryToSend = 'students';
+					actualQuery = '';
+				} else if (trimmedQuery === 'year' || trimmedQuery.startsWith('year ')) {
+					categoryToSend = 'academic_year';
+					actualQuery = trimmedQuery.startsWith('year ')
+						? trimmedQuery.slice('year '.length).trim()
+						: '';
+				} else if (trimmedQuery === 'term' || trimmedQuery.startsWith('term ')) {
+					categoryToSend = 'exam';
+					actualQuery = trimmedQuery.startsWith('term ')
+						? trimmedQuery.slice('term '.length).trim()
+						: '';
+				}
+
+				params.set('q', actualQuery);
+				if (categoryToSend != null) params.set('category', categoryToSend);
+
 				const res = await fetch(`/api/mentions/search?${params.toString()}`);
 				if (!res.ok) return [];
 				const data = await res.json();
@@ -228,22 +391,72 @@ export const MentionExtension = baseExtension.configure({
 		},
 		command: ({ editor, range, props }: any) => {
 			const mention = props as MentionSearchResult;
+			const isStudent = mention.category === 'students';
+			// The Tiptap suggestion plugin sometimes passes a range that
+			// doesn't include the `@` trigger character — e.g. when the user
+			// types `@` (empty query), opens the popup, and selects a
+			// suggestion. The suggested-plugin's `range.from` can land on the
+			// cursor position *after* the `@`, leaving the `@` behind in the
+			// document and causing the mention span to serialize with a stray
+			// `@` prefix. Extend the range backwards to explicitly include the
+			// `@` if it's the character immediately before `range.from` so
+			// the deletion is always clean regardless of what the plugin
+			// passes.
+			const { state } = editor;
+			const charBefore = state.doc.textBetween(Math.max(0, range.from - 1), range.from);
+			const effectiveRange = charBefore === '@'
+				? { from: Math.max(0, range.from - 1), to: range.to }
+				: range;
 			editor
 				.chain()
 				.focus()
-				.deleteRange(range)
-				.insertContentAt(range.from, [
+				.deleteRange(effectiveRange)
+				.insertContentAt(effectiveRange.from, [
+					// FIXME: TEMPORARY WORKAROUND — the Tiptap mention extension's
+					// suggestion plugin doesn't reliably include the `@` trigger
+					// character in the range it passes to the command function when
+					// the user types `@` without any prefix character or query.
+					// Despite the `allowedPrefixes: null` fix in #62 and the
+					// `effectiveRange` extension in #63, a stray `@` is still
+					// occasionally left in the document — which causes the
+					// serialized markdown to contain `@<span ...>@<label></span>`
+					// instead of just `<span ...>@<label></span>`. To force the
+					// mention to be recognized as a complete unit, we wrap the
+					// mention node in zero-width spaces (U+200B) on BOTH sides.
+					// ZWSPs are invisible to the user (no visual noise), can't
+					// be accidentally deleted (user can't see them to target
+					// them), survive markdown serialization as text nodes, and
+					// act as word boundaries so the mention doesn't merge with
+					// adjacent text. This is a workaround, not a fix —
+					// investigate the root cause (likely a Tiptap suggestion
+					// plugin bug or version incompatibility) and remove the
+					// ZWSP wrapping once resolved.
+					{
+						type: 'text',
+						text: '​',
+					},
 					{
 						type: 'mention',
 						attrs: {
 							id: String(mention.id),
 							label: mention.name,
 							category: mention.category,
+							// Structured fields for students — embedded in the
+							// markdown as `{{studentName:<fullName>|student:<id>|
+							// admissionNo:<num>}}` so the backend workflow can
+							// resolve the document without an extra lookup.
+							studentName: isStudent ? mention.name : null,
+							admissionNo: isStudent
+								? (mention.admissionNo != null ? String(mention.admissionNo) : null)
+								: null,
+							studentId: isStudent && typeof mention.studentId === 'number'
+								? mention.studentId
+								: null,
 						},
 					},
 					{
 						type: 'text',
-						text: ' ',
+						text: '​',
 					},
 				])
 				.run();

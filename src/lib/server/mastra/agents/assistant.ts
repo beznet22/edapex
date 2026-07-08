@@ -16,14 +16,14 @@ import {
 	StreamErrorRetryProcessor,
 	TokenLimiterProcessor
 } from '@mastra/core/processors';
-import type { TenantContext } from '../tenant-context';
 import { requestContextSchema, DEFAULT_MODEL, DEFAULT_TITLE_MODEL } from './shared';
 import { createMastraStorage } from '$lib/server/mastra/storage/libsql/mastra-storage';
 import { Memory } from '@mastra/memory';
 import { ensureRegistry, resolveToolsForMessage } from '$lib/server/mastra/skill-tools';
 import { createStep, createWorkflow } from '@mastra/core/workflows';
 import { tenantWorkspace } from '$lib/server/mastra/storage/workspaces';
-import { documentStreamWorkflow } from '../workflows/document-stream';
+import { streamDocumentTool } from '../tools/operations/reporting/marksheet/stream-document';
+import { buildAssistantInstructions } from './skill-instructions';
 import z from 'zod';
 
 export const testAgent = new Agent({
@@ -121,109 +121,21 @@ export const assistantAgent = new Agent({
 		if (v2Config) return v2Config;
 		return (requestContext?.get('modelId') as string) || DEFAULT_MODEL;
 	},
-	instructions: ({ requestContext }) => {
-		// The agent may inspect requestContext.lastMessage via parseSlashCommand
-		// to detect slash commands and their subcommands. Skills already
-		// document each command's subcommands, so no system prompt text is
-		// appended here.
-		const ctx = requestContext?.get('tenantContext') as TenantContext | undefined;
-		const fileManifest = requestContext?.get('fileManifest') as string | undefined;
-
-		const instructions = [
-			'You are the EdApex Assistant, an expert AI partner for teachers and administrators.',
-			'You provide professional, data-driven support within the boundaries of the current workspace.',
-			'',
-			'### ABSOLUTE RULES (NEVER VIOLATE) ###',
-			'',
-			'RULE 1: When the FILE MANIFEST contains marksheet(s) (a file with `toolCallId` starting with `doc-`',
-			'or a name ending in `.jpeg`/`.jpg`/`.png`/`.pdf` that is a marksheet image), your FIRST action must be to call the `workflow-streamDocument` tool.',
-			'',
-			'RULE 2: You MUST NOT format or re-render the marksheet content in your text response. The actual formatted content is streamed by the document agent after you call `workflow-streamDocument`. When `workflow-streamDocument` returns with status "success", emit ONE short, helpful sentence that: (a) summarizes what was produced (e.g. student name and number of subjects), (b) tells the user to review it in the workspace panel, and (c) instructs them to click the Validate pill to commit. Example: "Formatted the marksheet for <student name> (<N> subjects). Please review it in the workspace panel and click Validate to commit." Keep it under 25 words.',
-			'',
-			'RULE 3: If the user uploads a marksheet image and asks to "process", "format", "extract", "render", "show", "review", or similar — ALWAYS call `workflow-streamDocument` with the `contentHash` from the FILE MANIFEST. NEVER describe what you would do; actually do it.',
-			'',
-			'### END ABSOLUTE RULES ###',
-			''
-		];
-
-		if (ctx) {
-			instructions.push(
-				'',
-				'TENANT BOUNDARIES (IDs):',
-				`- School ID: ${ctx.schoolId}`,
-				`- User ID: ${ctx.userId}`,
-				`- Designation ID: ${ctx.designationId}`,
-				`- Active Class ID: ${ctx.classId || 'None'}`,
-				`- Active Section ID: ${ctx.sectionId || 'None'}`,
-				`- Active Exam ID: ${ctx.examId || 'None'}`,
-				`- Active Exam Type ID: ${ctx.examTypeId || 'None'}`,
-				`- Active Academic Year ID: ${ctx.academicId || 'None'}`,
-				`- Active Student ID (if @mention resolved): ${ctx.studentId || 'None'}`,
-				`- Active Role ID: ${ctx.roleId || 'None'}`,
-				'',
-				'BEHAVIORAL GUIDELINES:',
-				'1. Use the provided domain data to answer accurately.',
-				'2. If data is missing but expected, inform the user politely.',
-				'3. Maintain a premium, helpful, and professional tone.',
-				'4. Never suggest actions that would bypass tenant isolation or school safety rules.',
-				'5. When a marksheet file is present, call `workflow-streamDocument` FIRST. Do not call get-academic-context before workflow-streamDocument. Missing examTypeId/academicId can be collected via request-selection AFTER streaming if the user did not mention them.',
-				'6. Before executing student-specific commands (/enroll, /admit, /promote, etc.), verify that studentId is resolved. If null, the @mention was not applied — ask the user to @mention the target student.',
-				'',
-				'OCR <-> STUDENT LINKING (reporting skill only):',
-				'- OCR cannot link marksheet images to DB students. The OCR returns whatever text is on the page; only @mentions in the user message can resolve identity before formatting. If the student is unclear, workflow-streamDocument will trigger formatting with the OCR name and the user can resolve identity during validation HITL.',
-				'- If multiple marksheets are pending (manifest.documents.filter(d => d.status === "pending").length >= 2), @mentions are AMBIGUOUS. Do NOT ask for student upfront; ask ONLY for examType + academicYear, and let the workflow defer student linking to per-screenshot HITL.',
-				'- If a single screenshot is uploaded and the user did NOT @mention a student, FIRST call `workflow-streamDocument` to format the marksheet, THEN use `request-selection` to ask which student the marksheet belongs to if still needed.',
-				'',
-				"DO NOT hallucinate data. If you don't know the assessment setups for a class or the names of the students, use getContext(types: ['assessment', 'students']).",
-				'',
-				'FILE CONTEXT:',
-				'When files are available (shown in the FILE CONTEXT section of your prompt),',
-				'the user may ask you to "extract data", "create document from the image", "process the marksheet",',
-				'or similar. You MUST call the `workflow-streamDocument` tool, passing the `contentHash`',
-				'shown in the FILE MANIFEST (the same value as the fileId), to transform the raw OCR markdown into',
-				'a clean, structured version streamed to the workspace panel.',
-				'',
-				'DO NOT format the marksheet in your response text. The streaming happens in the workspace panel after workflow-streamDocument returns',
-				'stream parts emitted by the tool — not via your text response. Your text response should ONLY',
-				'describe what you did and surface validation outcomes (e.g. "I formatted the marksheet. Please',
-				'review and validate.").',
-				'',
-				'If the user uploaded multiple marksheets, call `workflow-streamDocument` once per pending document.',
-				'The client will stream the formatted document for each file and the workflow will auto-suspend for',
-				'validation after each one (multi-file sequential commit per the reporting skill).',
-				'',
-				'TRANSCRIPT FORMAT: When the user asks for a student\'s multi-term or yearly transcript (e.g. \"show me {student}\'s transcript for AY4\") and the student is @mentioned, call `workflow-streamDocument` with `format: \"transcript\"`, `studentId`, and (optionally) `academicId`. Do NOT include `contentHash` for transcripts. The client will stream a formatted transcript with a Subject/Term 1/Term 2/Term 3/Total/Grade table and a \"Year Overview\" summary.',
-				'',
-				'Do not ask the user to provide the data again — it is already available on disk.',
-				'FILE MANIFEST is attached below\n\n',
-				fileManifest || 'No files attached'
-			);
-		}
-
-		return instructions.join('\n');
+	instructions: async ({ requestContext }) => {
+		return buildAssistantInstructions(
+			requestContext as unknown as { get<T = unknown>(key: string): T | undefined }
+		);
 	},
 	tools: async ({ requestContext }) => {
 		const isSlashCommand = requestContext?.get('isSlashCommand') as boolean | undefined;
 		const message = requestContext?.get('lastMessage') as string | undefined;
 
-		// Ensure registry is loaded
 		await ensureRegistry();
 		const dynamic = (await resolveToolsForMessage(message || '', !!isSlashCommand)) as ToolsInput;
-		// The workflow-streamDocument tool is registered via the agent's
-		// `workflows` config below (workflow-as-tool pattern), not via this
-		// tools callback. Mastra converts documentStreamWorkflow to a tool
-		// named `workflow-streamDocument`.
-		return dynamic;
+		return { ...dynamic, streamDocument: streamDocumentTool };
 	},
-	// Workflows registered here are converted to tools by Mastra and exposed
-	// to the LLM with the `workflow-<key>` naming convention. With key
-	// `streamDocument`, the tool name is `workflow-streamDocument`. The
-	// workflow's `description` field (in document-stream.ts) becomes the
-	// tool description the LLM reads.
-	workflows: { streamDocument: documentStreamWorkflow },
 	workspace: tenantWorkspace,
 	memory: new Memory({
-		storage: createMastraStorage(),
 		options: {
 			lastMessages: 10,
 			// generateTitle: {
@@ -232,9 +144,6 @@ export const assistantAgent = new Agent({
 			// },
 		},
 	}),
-	// `TokenLimiterProcessor` enforces a hard cap on input tokens (truncates
-	// the oldest messages to fit). 100_000 leaves ~28_000 for system prompt
-	// + output across all builtin models (smallest context = 128_000).
 	inputProcessors: [
 		new TokenLimiterProcessor({
 			limit: 100_000,
@@ -243,10 +152,6 @@ export const assistantAgent = new Agent({
 			trimMode: 'contiguous'
 		})
 	],
-	// `StreamErrorRetryProcessor` retries transient stream errors (OpenAI 5xx,
-	// Anthropic overloaded, etc.) that fire AFTER the first chunk — our
-	// `streamWithAutoRetry` only handles pre-stream 429s, so the two are
-	// complementary.
 	errorProcessors: [new StreamErrorRetryProcessor()],
 	requestContextSchema,
 });

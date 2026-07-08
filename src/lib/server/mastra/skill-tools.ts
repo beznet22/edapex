@@ -117,30 +117,32 @@ function detectNaturalLanguageSkill(message: string): string | null {
   return null;
 }
 
+export const SKILL_COMMAND_MAP: Record<string, string> = {
+  '/marksheet': 'reporting',
+  '/enroll': 'write',
+  '/admit': 'write',
+  '/transfer': 'write',
+  '/promote': 'write',
+  '/demote': 'write',
+  '/update': 'write',
+  '/self-assign': 'write',
+  '/staff': 'write',
+  '/transcript': 'transcript',
+  '/grade': 'academic',
+  '/mark': 'academic',
+  '/attendance': 'academic',
+  '/suspend': 'destructive',
+  '/reactivate': 'destructive',
+  '/password': 'destructive',
+  '/search': 'default',
+  '/switch': 'default',
+  '/context': 'default'
+};
+
 export function resolveToolsForMessage(message: string, isSlashCommand: boolean): Record<string, any> {
   const baseTools: Record<string, any> = { ...globalTools };
 
-  const skillCommandMap: Record<string, string> = {
-    '/marksheet': 'reporting',
-    '/enroll': 'write',
-    '/admit': 'write',
-    '/transfer': 'write',
-    '/promote': 'write',
-    '/demote': 'write',
-    '/update': 'write',
-    '/self-assign': 'write',
-    '/staff': 'write',
-    '/transcript': 'transcript',
-    '/grade': 'academic',
-    '/mark': 'academic',
-    '/attendance': 'academic',
-    '/suspend': 'destructive',
-    '/reactivate': 'destructive',
-    '/password': 'destructive',
-    '/search': 'default',
-    '/switch': 'default',
-    '/context': 'default',
-  };
+  const skillCommandMap = SKILL_COMMAND_MAP;
 
   let skillName: string | null = null;
   if (isSlashCommand) {

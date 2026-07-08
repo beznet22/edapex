@@ -22,7 +22,11 @@
 	import EditorCanvas from "./editor-canvas.svelte";
 	import { useInspector } from "$lib/context/inspector-context.svelte";
 	import { useChat } from "$lib/context/chat-context.svelte";
-	import { deriveDocumentId } from "$lib/context/thread-data.svelte";
+	import {
+		deriveDocumentId,
+		documentStreams,
+		type DocumentStreamEntry,
+	} from "$lib/context/thread-data.svelte";
 	import ShimmerArtifactCard from "$lib/components/ShimmerArtifactCard.svelte";
 	import Markdown from "$lib/components/prompt-kit/markdown/Markdown.svelte";
 
@@ -41,97 +45,158 @@
 	const inspector = useInspector();
 	const chat = useChat();
 
-	/**
-	 * Active document-stream tool part. Walks chat.messages for the
-	 * tool-workflow-streamDocument part whose derived `documentId`
-	 * matches the inspector's active chat artifact id. The inspector
-	 * sets activeChatArtifactId via openChatArtifact (called from
-	 * chat-context.svelte.ts's #onData on first streaming chunk AND from
-	 * ShimmerArtifactCard.svelte's click handler for user-initiated
-	 * re-opens). When activeId is null (workspace closed), this returns
-	 * null and the render block falls through to the empty state.
-	 *
-	 * The documentId comparison (not toolCallId) reconciles the server's
-	 * workflow-as-tool output with the AI SDK's tool part. Both client
-	 * and server compute the same key from the input via
-	 * `deriveDocumentId`, so we don't need to round-trip a toolCallId
-	 * to match. See `deriveDocumentId` in thread-data.svelte.ts.
-	 *
-	 * Guard: `chat` can be undefined if WorkspaceSidebar mounts before
-	 * SharedChatView provides ChatContext (both are siblings inside
-	 * WorkspacePaneGroup — mount order depends on Svelte's reactive
-	 * traversal). Without the guard, `chat.messages` throws at line 61.
-	 *
-	 * Final metadata (artifactId, filePath, etc.) lives on the tool
-	 * part's `output` field — read directly here via `finalOutput`. No
-	 * patching into threadData.documentStreams; the dual-source-of-truth
-	 * pattern means transient state lives in threadData and final state
-	 * lives on the tool part.
-	 */
 	const toolPart = $derived.by(() => {
 		if (!inspector.activeChatArtifactId || !chat) return null;
 		for (const message of chat.messages) {
 			for (const part of message.parts ?? []) {
-			 const p = part as {
-                  type?: string;
-                  toolCallId?: string;
-                  state?: string;
-                  input?: { format?: 'marksheet' | 'transcript'; contentHash?: string; fileName?: string; studentId?: number; academicId?: number };
-                  output?: {
-                    artifactId?: string;
-                    filePath?: string;
-                    contentHash?: string;
-                    fileName?: string;
-                    format?: 'marksheet' | 'transcript';
-                    studentId?: number | null;
-                    title?: string;
-                  };
-                  errorText?: string;
-                };
-                if (p.type === 'tool-workflow-streamDocument' && deriveDocumentId(p.input ?? {}) === inspector.activeChatArtifactId) {
-                  return p;
-                }
-              }
-            }
-          return null;
-        });
+				const p = part as {
+					type?: string;
+					toolCallId?: string;
+					state?: string;
+					input?: { contentHash?: string; fileName?: string };
+					output?: {
+						artifactId?: string;
+						contentHash?: string;
+						fileName?: string;
+						initialMarkdownPath?: string;
+						persistedMarkdownPath?: string;
+						title?: string;
+						validatedTitle?: string;
+						studentId?: number | null;
+						examTypeId?: number | null;
+						academicId?: number | null;
+						studentFullName?: string | null;
+						adminNo?: number | null;
+						documentId?: string;
+					};
+					errorText?: string;
+				};
+				if (
+					p.type === "tool-streamDocument" &&
+					deriveDocumentId(p.input ?? {}) ===
+						inspector.activeChatArtifactId
+				) {
+					return p;
+				}
+			}
+		}
+		return null;
+	});
 
-	/**
-	 * Effective status for the active document stream. Final states
-	 * (success/error) come from toolPart.state; transient states
-	 * (processing/streaming) come from threadData.documentStreams[activeId]
-	 * (where #onToolCall initializes to 'processing' and #onData
-	 * accumulates deltas + transitions to 'streaming').
-	 */
-	const entry = $derived(
-		inspector.activeChatArtifactId && chat
-			? chat.threadData.getDocumentStream(inspector.activeChatArtifactId)
-			: null
-	);
+	// Live streaming content. Module-level `$state` proxy shared across
+	// the app; ArtifactViewer reads via direct import (not via `chat`).
+	const entry = $derived.by((): DocumentStreamEntry | null => {
+		const activeId = inspector.activeChatArtifactId;
+		if (!activeId) return null;
+		return documentStreams[activeId] ?? null;
+	});
 
-	// $inspect("entry", entry);
 	const effectiveStatus = $derived.by(() => {
-		if (toolPart?.state === 'output-available') return 'success';
-		if (toolPart?.state === 'output-error') return 'error';
-		return entry?.status ?? 'processing';
+		if (toolPart?.state === "output-available") return "success";
+		if (toolPart?.state === "output-error") return "error";
+		return entry?.status ?? "processing";
 	});
 
 	/**
-	 * Final output from the tool result (artifactId, filePath, etc.).
-	 * Read directly from the tool part's `output` field — this is the
-	 * authoritative source for post-completion metadata.
+	 * Validation output for the same document. validate-marksheet runs in
+	 * a subsequent message (after the user clicks Validate and the
+	 * hitlVerifyStep resumes). We find it by matching input.studentId
+	 * against the active streamDocument's output.studentId. If the
+	 * streamDocument didn't carry a studentId (upload wasn't linked yet),
+	 * we don't have a reliable match — fall back to streamDocument output.
 	 */
-	const finalOutput = $derived(
-		toolPart?.state === 'output-available' ? toolPart.output : null
+	const validationOutput = $derived.by(() => {
+		if (!chat) return null;
+		const streamOutput =
+			toolPart?.state === "output-available" ? toolPart.output : null;
+		const streamStudentId = streamOutput?.studentId ?? null;
+		if (streamStudentId === null || streamStudentId === undefined)
+			return null;
+		for (const message of chat.messages) {
+			for (const part of message.parts ?? []) {
+				const p = part as {
+					type?: string;
+					state?: string;
+					input?: { studentId?: number };
+					output?: {
+						persistedMarkdownPath?: string;
+						validatedTitle?: string;
+						currentMarkdownPath?: string;
+						documentId?: string;
+						artifactId?: string;
+					};
+				};
+				if (
+					p.type === "tool-validate-marksheet" &&
+					p.state === "output-available" &&
+					p.input?.studentId === streamStudentId
+				) {
+					return p.output ?? null;
+				}
+			}
+		}
+		return null;
+	});
+
+	/**
+	 * Unified shape of the merged tool output. Both `streamDocument` and
+	 * `validate-marksheet` write to `part.output`; we merge them so the
+	 * UI sees a single flat object. All fields optional because either
+	 * tool may have run without the other, or the schema may evolve.
+	 */
+	type MergedToolOutput = {
+		artifactId?: string;
+		contentHash?: string;
+		fileName?: string;
+		initialMarkdownPath?: string;
+		persistedMarkdownPath?: string;
+		title?: string;
+		validatedTitle?: string;
+		studentId?: number | null;
+		examTypeId?: number | null;
+		academicId?: number | null;
+		studentFullName?: string | null;
+		adminNo?: number | null;
+		documentId?: string;
+		currentMarkdownPath?: string;
+	};
+
+	/**
+	 * Tool output captured from `part.output` when the tool completes.
+	 * Merges streamDocument output (filename-based title + initialMarkdownPath)
+	 * with validate-marksheet output (validatedTitle + persistedMarkdownPath).
+	 * Validation fields win because they supersede the working fields.
+	 */
+	const toolOutput = $derived.by((): MergedToolOutput | null => {
+		const streamOutput =
+			toolPart?.state === "output-available" ? toolPart.output : null;
+		if (!streamOutput && !validationOutput) return null;
+		if (!validationOutput && streamOutput)
+			return streamOutput as MergedToolOutput;
+		if (!streamOutput && validationOutput)
+			return validationOutput as MergedToolOutput;
+		return { ...streamOutput, ...validationOutput } as MergedToolOutput;
+	});
+
+	const persistedMarkdownPath = $derived(
+		toolOutput?.persistedMarkdownPath ??
+			toolOutput?.initialMarkdownPath ??
+			null,
 	);
 
-	let editorRef = $state<{ save: () => Promise<boolean> | void; copy: () => void } | undefined>(
-		undefined,
+	const displayTitle = $derived(
+		toolOutput?.validatedTitle ?? toolOutput?.title ?? "Untitled",
 	);
+
+	let editorRef = $state<
+		{ save: () => Promise<boolean> | void; copy: () => void } | undefined
+	>(undefined);
 
 	const viewingId = $derived(activeId ?? artifacts[0]?.id ?? null);
 	const current = $derived(artifacts.find((a) => a.id === viewingId) ?? null);
-	const isStreaming = $derived(current?.status === "processing" || current?.status === "streaming");
+	const isStreaming = $derived(
+		current?.status === "processing" || current?.status === "streaming",
+	);
 
 	async function handleSave() {
 		if (editorRef) {
@@ -150,7 +215,10 @@
 	function handleDownload() {
 		if (!current?.url) return;
 		const a = document.createElement("a");
-		a.href = current.url + (current.url.includes("?") ? "&" : "?") + "action=download";
+		a.href =
+			current.url +
+			(current.url.includes("?") ? "&" : "?") +
+			"action=download";
 		a.download = current.title;
 		document.body.appendChild(a);
 		a.click();
@@ -169,7 +237,8 @@
 		if (!current?.url) return;
 		const relPath = current.url.replace("/api/file/", "");
 		const wsIdx = (current.id ?? "").indexOf("exams/");
-		const workspace = wsIdx !== -1 ? (current.id ?? "").slice(0, wsIdx - 1) : "";
+		const workspace =
+			wsIdx !== -1 ? (current.id ?? "").slice(0, wsIdx - 1) : "";
 		try {
 			const res = await fetch("/api/file/share", {
 				method: "POST",
@@ -180,10 +249,14 @@
 			const data = await res.json();
 			if (data.url) {
 				await navigator.clipboard.writeText(data.url);
-				import("svelte-sonner").then((m) => m.toast.success("Share link copied to clipboard"));
+				import("svelte-sonner").then((m) =>
+					m.toast.success("Share link copied to clipboard"),
+				);
 			}
 		} catch {
-			import("svelte-sonner").then((m) => m.toast.error("Failed to generate share link"));
+			import("svelte-sonner").then((m) =>
+				m.toast.error("Failed to generate share link"),
+			);
 		}
 	}
 
@@ -191,7 +264,9 @@
 		if (!current?.content) return;
 		const win = window.open("", "_blank");
 		if (!win) return;
-		win.document.write(`<!DOCTYPE html><html><head><title>${current.title}</title></head><body>${current.content}</body></html>`);
+		win.document.write(
+			`<!DOCTYPE html><html><head><title>${current.title}</title></head><body>${current.content}</body></html>`,
+		);
 		win.document.close();
 		win.focus();
 		win.print();
@@ -206,7 +281,9 @@
 			if (!res.ok) throw new Error("Delete failed");
 			inspector.close();
 		} catch {
-			import("svelte-sonner").then((m) => m.toast.error("Failed to delete file"));
+			import("svelte-sonner").then((m) =>
+				m.toast.error("Failed to delete file"),
+			);
 		}
 	}
 </script>
@@ -244,18 +321,28 @@
 								size="sm"
 								class="h-8 px-2 text-[13px] font-semibold text-foreground hover:bg-muted/40 hover:text-foreground flex items-center gap-2 min-w-0 max-w-full"
 							>
-								<FileIcon class="size-4 text-primary/80 shrink-0" />
-								<span class="truncate text-left block min-w-0">{current?.title ?? "Untitled"}</span>
-								<ChevronDownIcon class="size-3.5 text-muted-foreground shrink-0" />
+								<FileIcon
+									class="size-4 text-primary/80 shrink-0"
+								/>
+								<span class="truncate text-left block min-w-0"
+									>{displayTitle}</span
+								>
+								<ChevronDownIcon
+									class="size-3.5 text-muted-foreground shrink-0"
+								/>
 							</Button>
 						{/snippet}
 					</DropdownMenu.Trigger>
 					<DropdownMenu.Content
 						align="start"
 						class="w-64 bg-popover backdrop-blur-xl border border-border/60 rounded-xl shadow-2xl"
-									>
-						<DropdownMenu.Label class="text-[10px] uppercase tracking-wider text-muted-foreground px-2 py-1.5">
-							{mode === "chat" ? "Artifacts in thread" : "Open file"}
+					>
+						<DropdownMenu.Label
+							class="text-[10px] uppercase tracking-wider text-muted-foreground px-2 py-1.5"
+						>
+							{mode === "chat"
+								? "Artifacts in thread"
+								: "Open file"}
 						</DropdownMenu.Label>
 						{#each artifacts as artifact (artifact.id)}
 							<DropdownMenu.Item
@@ -265,12 +352,15 @@
 										? "bg-primary/15 text-foreground"
 										: "text-muted-foreground hover:text-foreground hover:bg-muted/40",
 								)}
-								onclick={() => inspector.openChatArtifact(artifact.id)}
+								onclick={() =>
+									inspector.openChatArtifact(artifact.id)}
 							>
 								<FileTextIcon class="size-3 mr-2 shrink-0" />
 								<span class="truncate">{artifact.title}</span>
 								{#if viewingId === artifact.id}
-									<CheckIcon class="size-3 ml-auto text-primary shrink-0" />
+									<CheckIcon
+										class="size-3 ml-auto text-primary shrink-0"
+									/>
 								{/if}
 							</DropdownMenu.Item>
 						{/each}
@@ -279,8 +369,10 @@
 			{:else}
 				<div class="flex items-center gap-2 min-w-0 px-2">
 					<FileIcon class="size-4 text-primary/80 shrink-0" />
-					<span class="truncate text-[13px] font-semibold text-foreground">
-						{current?.title ?? "Untitled"}
+					<span
+						class="truncate text-[13px] font-semibold text-foreground"
+					>
+						{displayTitle}
 					</span>
 				</div>
 			{/if}
@@ -337,7 +429,10 @@
 							</Button>
 						{/snippet}
 					</DropdownMenu.Trigger>
-					<DropdownMenu.Content align="end" class="w-44 bg-popover backdrop-blur-xl border border-border/60 rounded-xl shadow-2xl">
+					<DropdownMenu.Content
+						align="end"
+						class="w-44 bg-popover backdrop-blur-xl border border-border/60 rounded-xl shadow-2xl"
+					>
 						<DropdownMenu.Item onclick={handleSave}>
 							<SaveIcon class="size-3.5 mr-2" />
 							Save
@@ -351,7 +446,10 @@
 							Print
 						</DropdownMenu.Item>
 						<DropdownMenu.Separator />
-						<DropdownMenu.Item onclick={() => (deleteOpen = true)} class="text-destructive focus:text-destructive">
+						<DropdownMenu.Item
+							onclick={() => (deleteOpen = true)}
+							class="text-destructive focus:text-destructive"
+						>
 							<Trash2Icon class="size-3.5 mr-2" />
 							Delete
 						</DropdownMenu.Item>
@@ -361,19 +459,29 @@
 		</div>
 	</header>
 
-	<div class="flex-1 min-h-0 relative group">
-		{#if finalOutput && finalOutput.filePath}
-			<EditorCanvas
-				bind:this={editorRef}
-				editorMode="wysiwyg"
-				filename={finalOutput.fileName ?? finalOutput.title ?? "Document"}
-				url={finalOutput.filePath}
-				saveUrl={finalOutput.filePath}
-				content={entry?.content ?? ""}
-				type="text"
-				streaming={false}
-				user={user}
-			/>
+	<div class="flex-1 h-full relative group">
+		{#if persistedMarkdownPath}
+			<ScrollArea class="h-full w-full">
+				<div
+					class="flex flex-col p-6 max-w-3xl mx-auto relative pb-20 group"
+				>
+					<EditorCanvas
+						bind:this={editorRef}
+						editorMode="wysiwyg"
+						filename={persistedMarkdownPath.split("/").pop() ??
+							displayTitle}
+						title={displayTitle}
+						url={`/api/file/${persistedMarkdownPath}`}
+						saveUrl={`/api/file/${persistedMarkdownPath}`}
+						content={entry?.content ?? ""}
+						type="text"
+						streaming={entry?.status === "streaming" ||
+							entry?.status === "processing"}
+						{user}
+						artifactId={toolOutput?.artifactId ?? ""}
+					/>
+				</div>
+			</ScrollArea>
 		{:else if entry?.content}
 			<ScrollArea class="h-full">
 				<div class="p-6 max-w-3xl mx-auto">
@@ -384,18 +492,32 @@
 				</div>
 			</ScrollArea>
 		{:else if !current}
-			<div class="h-full flex flex-col items-center justify-center text-center px-8 opacity-50">
-				<FileQuestionIcon class="size-12 text-muted-foreground/40 mb-3" />
-				<p class="text-[11px] font-semibold tracking-widest uppercase text-muted-foreground">
+			<div
+				class="h-full flex flex-col items-center justify-center text-center px-8 opacity-50"
+			>
+				<FileQuestionIcon
+					class="size-12 text-muted-foreground/40 mb-3"
+				/>
+				<p
+					class="text-[11px] font-semibold tracking-widest uppercase text-muted-foreground"
+				>
 					No artifact selected
 				</p>
 			</div>
 		{:else if current.kind === "unsupported"}
-			<div class="h-full flex flex-col items-center justify-center text-center px-8">
-				<FileQuestionIcon class="size-14 text-muted-foreground/50 mb-4" />
-				<p class="text-[13px] font-semibold text-foreground mb-1">{current.title}</p>
+			<div
+				class="h-full flex flex-col items-center justify-center text-center px-8"
+			>
+				<FileQuestionIcon
+					class="size-14 text-muted-foreground/50 mb-4"
+				/>
+				<p class="text-[13px] font-semibold text-foreground mb-1">
+					{current.title}
+				</p>
 				{#if current.size}
-					<p class="text-[10px] text-muted-foreground mb-4">{formatSize(current.size)}</p>
+					<p class="text-[10px] text-muted-foreground mb-4">
+						{formatSize(current.size)}
+					</p>
 				{/if}
 				{#if current.url}
 					<Button
@@ -419,7 +541,7 @@
 				content={current.content ?? ""}
 				type="text"
 				streaming={isStreaming}
-				user={user}
+				{user}
 			/>
 		{:else if current.kind === "pdf"}
 			<EditorCanvas
@@ -454,7 +576,9 @@
 		</AlertDialog.Header>
 		<AlertDialog.Footer>
 			<AlertDialog.Cancel>Cancel</AlertDialog.Cancel>
-			<AlertDialog.Action onclick={handleDelete}>Delete</AlertDialog.Action>
+			<AlertDialog.Action onclick={handleDelete}
+				>Delete</AlertDialog.Action
+			>
 		</AlertDialog.Footer>
 	</AlertDialog.Content>
 </AlertDialog.Root>

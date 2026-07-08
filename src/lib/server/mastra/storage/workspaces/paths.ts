@@ -67,9 +67,18 @@ export function marksheetJsonPath(studentId: number): string {
   return `marksheets/${studentId}.json`;
 }
 
-export function marksheetMarkdownPath(studentId: number, studentName?: string | null): string {
-  const slug = studentName ? `-${sanitizeForFilename(studentName)}` : "";
-  return `marksheets/${studentId}${slug}.md`;
+export function marksheetMarkdownPath(input: {
+  studentId: number;
+  adminNo?: number | null;
+  examTypeId?: number | null;
+  studentName?: string | null;
+}): string {
+  if (input.adminNo && input.examTypeId && input.studentName) {
+    const safeName = input.studentName.toLowerCase().replace(/\s+/g, '_');
+    return `marksheets/ADM${input.adminNo}-${input.examTypeId}-${safeName}.md`;
+  }
+  const slug = input.studentName ? `-${sanitizeForFilename(input.studentName)}` : "";
+  return `marksheets/${input.studentId}${slug}.md`;
 }
 
 export function marksheetPdfPath(studentId: number): string {

@@ -30,7 +30,7 @@
  */
 import { describe, it, expect, beforeAll } from 'vitest';
 import './helpers/mastra-instance';
-import { streamDocumentTool } from '$lib/server/mastra/tools/operations/reporting/marksheet/stream-document';
+import { streamDocumentTool } from '$lib/server/mastra/tools/operations/reporting/stream-document';
 import { getDatabase } from '$lib/server/db';
 import { ResultsRepository } from '$lib/server/repository/result.repo';
 import { ScopedRepositoryProvider } from '$lib/server/mastra/scoped-repository';

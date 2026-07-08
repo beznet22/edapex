@@ -3,6 +3,9 @@ import { LibSQLStore } from '@mastra/libsql';
 const MASTRA_STORAGE_ID = 'edapex-mastra';
 const DEFAULT_DB_URL = 'file:./mastra.db';
 
+let _sharedStorage: LibSQLStore | null = null;
+let _initPromise: Promise<void> | null = null;
+
 /**
  * Module-level singleton for the LibSQLStore connection.
  * 
@@ -15,21 +18,12 @@ const DEFAULT_DB_URL = 'file:./mastra.db';
  * - LibSQLStore handles serialization of writes internally
  * - TenantContext isolation is enforced at the query level (threadId, resourceId), not connection level
  */
-let _sharedStorage: LibSQLStore | null = null;
-let _initPromise: Promise<void> | null = null;
-
 export function createMastraStorage(dbUrl: string = DEFAULT_DB_URL): LibSQLStore {
 	if (!_sharedStorage) {
 		_sharedStorage = new LibSQLStore({
 			id: MASTRA_STORAGE_ID,
 			url: dbUrl
 		});
-		// Eagerly initialize tables (memory, workflows, scores, etc.).
-		// Without this, the first call to memory.getThreadById() fails with
-		// "SQLITE_ERROR: no such table: mastra_threads" because Mastra's
-		// lazy initialization only fires when an agent is registered on a
-		// Mastra instance — which doesn't happen reliably with our per-request
-		// dynamic agent pattern.
 		_initPromise = _sharedStorage.init().catch((err: unknown) => {
 			console.error('[mastra-storage] Init failed:', err);
 		});

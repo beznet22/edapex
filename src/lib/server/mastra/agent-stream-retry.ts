@@ -61,7 +61,7 @@ export async function streamWithAutoRetry<R>(opts: {
 			};
 
 			await opts.writer
-				.write({ type: 'data-rateLimit', id: `rl-${Date.now()}-${attempt}`, data } as never)
+				.write({ type: 'data-rateLimit', id: `rl-${Date.now()}-${attempt}`, data, transient: true } as never)
 				.catch(() => {});
 
 			if (opts.abortSignal?.aborted) throw new DOMException('Aborted', 'AbortError');

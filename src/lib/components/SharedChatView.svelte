@@ -4,7 +4,10 @@
   import ChatHeader from "$lib/components/chat-header.svelte";
   import Chat from "$lib/components/chat.svelte";
   import ArtifactViewer from "$lib/components/workspace/ArtifactViewer.svelte";
+  import WorkspacePaneGroup from "$lib/components/workspace/WorkspacePaneGroup.svelte";
+  import WorkspaceSidebar from "$lib/components/workspace/WorkspaceSidebar.svelte";
   import ArtifactsFab from "$lib/components/artifacts-fab.svelte";
+  import { IsMobile } from "$lib/hooks/is-mobile.svelte";
 
   import * as AlertDialog from "$lib/components/ui/alert-dialog";
   import * as Select from "$lib/components/ui/select";
@@ -43,6 +46,7 @@
   let userContext = $derived(UserContext.fromContext());
   const selectedClass = SelectedClass.fromContext();
   const inspector = useInspector();
+  const isMobile = new IsMobile();
 
   // svelte-ignore state_referenced_locally
   const chatContext = new ChatContext({
@@ -174,104 +178,216 @@
   };
 </script>
 
-<!-- Chat Stage: inspector + sidebar are mounted by (chat)/+layout.svelte -->
-<ChatHeader {user} />
-<ArtifactsFab count={chatArtifacts.length} threadId={chat.chatData?.threadId ?? null} />
-<Chat class="border-none" readonly={false} {user} />
+<!-- Chat Stage: inspector + workspace pane are mounted here so that
+     ArtifactViewer (inside WorkspaceSidebar) inherits ChatContext set by
+     this component. The chat layout gates the legacy mount so non-chat
+     routes (filestore) keep getting the layout-level WorkspacePaneGroup. -->
+{#if isMobile.current}
+  <div class="flex flex-col h-full min-h-0">
+    <ChatHeader {user} />
+    <ArtifactsFab count={chatArtifacts.length} threadId={chat.chatData?.threadId ?? null} />
+    <Chat class="border-none" readonly={false} {user} />
+  </div>
 
-<AlertDialog.Root bind:open>
-  <AlertDialog.Content
-    class="bg-background/95 backdrop-blur-3xl border border-white/10 rounded-[2.5rem] p-8 shadow-2xl max-w-[calc(100%-1.5rem)] sm:max-w-md"
-  >
-    <AlertDialog.Header>
-      <AlertDialog.Title>
-        {`${userContext.getDesignationTitle(userContext.designation)} Onboarding`}
-      </AlertDialog.Title>
-      <AlertDialog.Description>
-        You are not assigned to any class. Please select a class to work on.
-      </AlertDialog.Description>
-    </AlertDialog.Header>
-    <div class="grid gap-4">
-      <Select.Root
-        type="single"
-        name="classes"
-        bind:value
-        onValueChange={(val) => {
-          const selected = userContext.classes.find((c) => `${c.id}` === val);
-          if (selected) {
-            chat.selectedClass = selected;
-          }
-        }}
-      >
-        <Select.Trigger class="w-full">
-          {#if !chat.selectedClass}
-            Select a class
-          {:else}
-            {`${chat.selectedClass?.className} (${chat.selectedClass?.sectionName})`}
-          {/if}
-        </Select.Trigger>
-        <Select.Content>
-          <Select.Group>
-            <Select.Label>Classes and Sections</Select.Label>
-            {#each userContext.classes as cls (cls.id)}
-              <Select.Item value={`${cls.id}`} label={cls.className || ""}>
-                {`${cls.className} (${cls.sectionName})`}
-              </Select.Item>
-            {/each}
-          </Select.Group>
-        </Select.Content>
-      </Select.Root>
-      <div class="space-y-2 mt-4">
-        <label for="newPassword" class="text-sm font-medium"
-          >New Password (Optional)</label
+  <AlertDialog.Root bind:open>
+    <AlertDialog.Content
+      class="bg-background/95 backdrop-blur-3xl border border-white/10 rounded-[2.5rem] p-8 shadow-2xl max-w-[calc(100%-1.5rem)] sm:max-w-md"
+    >
+      <AlertDialog.Header>
+        <AlertDialog.Title>
+          {`${userContext.getDesignationTitle(userContext.designation)} Onboarding`}
+        </AlertDialog.Title>
+        <AlertDialog.Description>
+          You are not assigned to any class. Please select a class to work on.
+        </AlertDialog.Description>
+      </AlertDialog.Header>
+      <div class="grid gap-4">
+        <Select.Root
+          type="single"
+          name="classes"
+          bind:value
+          onValueChange={(val) => {
+            const selected = userContext.classes.find((c) => `${c.id}` === val);
+            if (selected) {
+              chat.selectedClass = selected;
+            }
+          }}
         >
-        <div class="relative">
-          <Input
-            id="newPassword"
-            type={showPassword ? "text" : "password"}
-            bind:value={newPassword}
-            placeholder="Enter a new password"
-            class="w-full pr-10"
-          />
-          <button
-            type="button"
-            class="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-            onpointerdown={(e) => {
-              e.preventDefault();
-              showPassword = true;
-            }}
-            onpointerup={() => (showPassword = false)}
-            onpointerleave={() => (showPassword = false)}
-            aria-label={showPassword ? "Hide password" : "Show password"}
-          >
-            {#if showPassword}
-              <EyeOffIcon class="h-4 w-4" />
+          <Select.Trigger class="w-full">
+            {#if !chat.selectedClass}
+              Select a class
             {:else}
-              <EyeIcon class="h-4 w-4" />
+              {`${chat.selectedClass?.className} (${chat.selectedClass?.sectionName})`}
             {/if}
-          </button>
+          </Select.Trigger>
+          <Select.Content>
+            <Select.Group>
+              <Select.Label>Classes and Sections</Select.Label>
+              {#each userContext.classes as cls (cls.id)}
+                <Select.Item value={`${cls.id}`} label={cls.className || ""}>
+                  {`${cls.className} (${cls.sectionName})`}
+                </Select.Item>
+              {/each}
+            </Select.Group>
+          </Select.Content>
+        </Select.Root>
+        <div class="space-y-2 mt-4">
+          <label for="newPassword" class="text-sm font-medium"
+            >New Password (Optional)</label
+          >
+          <div class="relative">
+            <Input
+              id="newPassword"
+              type={showPassword ? "text" : "password"}
+              bind:value={newPassword}
+              placeholder="Enter a new password"
+              class="w-full pr-10"
+            />
+            <button
+              type="button"
+              class="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+              onpointerdown={(e) => {
+                e.preventDefault();
+                showPassword = true;
+              }}
+              onpointerup={() => (showPassword = false)}
+              onpointerleave={() => (showPassword = false)}
+              aria-label={showPassword ? "Hide password" : "Show password"}
+            >
+              {#if showPassword}
+                <EyeOffIcon class="h-4 w-4" />
+              {:else}
+                <EyeIcon class="h-4 w-4" />
+              {/if}
+            </button>
+          </div>
+          {#if newPassword && newPassword.length < 6}
+            <p class="text-xs text-destructive">
+              Password must be at least 6 characters
+            </p>
+          {/if}
         </div>
-        {#if newPassword && newPassword.length < 6}
-          <p class="text-xs text-destructive">
-            Password must be at least 6 characters
-          </p>
-        {/if}
-      </div>
 
-      <AlertDialog.Footer
-        class="mt-6 flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2 gap-2"
+        <AlertDialog.Footer
+          class="mt-6 flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2 gap-2"
+        >
+          <Button variant="outline" onclick={handleLogout} disabled={isUpdating}
+            >Log Out</Button
+          >
+          <Button
+            onclick={doAssign}
+            disabled={isUpdating ||
+              (newPassword.length > 0 && newPassword.length < 6)}
+          >
+            {isUpdating ? "Saving..." : "Continue"}
+          </Button>
+        </AlertDialog.Footer>
+      </div>
+    </AlertDialog.Content>
+  </AlertDialog.Root>
+
+  <WorkspaceSidebar />
+{:else}
+  <WorkspacePaneGroup>
+    <ChatHeader {user} />
+    <ArtifactsFab count={chatArtifacts.length} threadId={chat.chatData?.threadId ?? null} />
+    <Chat class="border-none" readonly={false} {user} />
+
+    <AlertDialog.Root bind:open>
+      <AlertDialog.Content
+        class="bg-background/95 backdrop-blur-3xl border border-white/10 rounded-[2.5rem] p-8 shadow-2xl max-w-[calc(100%-1.5rem)] sm:max-w-md"
       >
-        <Button variant="outline" onclick={handleLogout} disabled={isUpdating}
-          >Log Out</Button
-        >
-        <Button
-          onclick={doAssign}
-          disabled={isUpdating ||
-            (newPassword.length > 0 && newPassword.length < 6)}
-        >
-          {isUpdating ? "Saving..." : "Continue"}
-        </Button>
-      </AlertDialog.Footer>
-    </div>
-  </AlertDialog.Content>
-</AlertDialog.Root>
+        <AlertDialog.Header>
+          <AlertDialog.Title>
+            {`${userContext.getDesignationTitle(userContext.designation)} Onboarding`}
+          </AlertDialog.Title>
+          <AlertDialog.Description>
+            You are not assigned to any class. Please select a class to work on.
+          </AlertDialog.Description>
+        </AlertDialog.Header>
+        <div class="grid gap-4">
+          <Select.Root
+            type="single"
+            name="classes"
+            bind:value
+            onValueChange={(val) => {
+              const selected = userContext.classes.find((c) => `${c.id}` === val);
+              if (selected) {
+                chat.selectedClass = selected;
+              }
+            }}
+          >
+            <Select.Trigger class="w-full">
+              {#if !chat.selectedClass}
+                Select a class
+              {:else}
+                {`${chat.selectedClass?.className} (${chat.selectedClass?.sectionName})`}
+              {/if}
+            </Select.Trigger>
+            <Select.Content>
+              <Select.Group>
+                <Select.Label>Classes and Sections</Select.Label>
+                {#each userContext.classes as cls (cls.id)}
+                  <Select.Item value={`${cls.id}`} label={cls.className || ""}>
+                    {`${cls.className} (${cls.sectionName})`}
+                  </Select.Item>
+                {/each}
+              </Select.Group>
+            </Select.Content>
+          </Select.Root>
+          <div class="space-y-2 mt-4">
+            <label for="newPassword" class="text-sm font-medium"
+              >New Password (Optional)</label
+            >
+            <div class="relative">
+              <Input
+                id="newPassword"
+                type={showPassword ? "text" : "password"}
+                bind:value={newPassword}
+                placeholder="Enter a new password"
+                class="w-full pr-10"
+              />
+              <button
+                type="button"
+                class="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                onpointerdown={(e) => {
+                  e.preventDefault();
+                  showPassword = true;
+                }}
+                onpointerup={() => (showPassword = false)}
+                onpointerleave={() => (showPassword = false)}
+                aria-label={showPassword ? "Hide password" : "Show password"}
+              >
+                {#if showPassword}
+                  <EyeOffIcon class="h-4 w-4" />
+                {:else}
+                  <EyeIcon class="h-4 w-4" />
+                {/if}
+              </button>
+            </div>
+            {#if newPassword && newPassword.length < 6}
+              <p class="text-xs text-destructive">
+                Password must be at least 6 characters
+              </p>
+            {/if}
+          </div>
+
+          <AlertDialog.Footer
+            class="mt-6 flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2 gap-2"
+          >
+            <Button variant="outline" onclick={handleLogout} disabled={isUpdating}
+              >Log Out</Button
+            >
+            <Button
+              onclick={doAssign}
+              disabled={isUpdating ||
+                (newPassword.length > 0 && newPassword.length < 6)}
+            >
+              {isUpdating ? "Saving..." : "Continue"}
+            </Button>
+          </AlertDialog.Footer>
+        </div>
+      </AlertDialog.Content>
+    </AlertDialog.Root>
+  </WorkspacePaneGroup>
+{/if}
