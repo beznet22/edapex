@@ -2,11 +2,13 @@
 
 > Comprehensive design specification covering the frontend refactor required to surface the new agentic workflow shipped in the recent backend refactor. This document is the source of truth for the redesign; all subsequent implementation work is derived from it.
 
+> **Update 2026-07-08 (commit `32dced1`)**: An interim commit (`797d498`) introduced a workflow-level agentic loop (`.dountil()` over an `agentLoopStep` with `AGENT_LOOP_MAX_ITERATIONS = 8`). That refactor was reverted because the AI SDK's native `maxSteps: 30` already drives the agentic loop inside `assistantStep` — the workflow-level wrapper duplicated that mechanism AND broke client-side streaming by failing to call `pipeTo(writer)`. The doc below has been updated to describe the current state: a linear workflow chain (`assistantStep → selectionGateStep → continuationAssistantStep → awaitValidationStep`) where the agentic loop is driven by the AI SDK's `maxSteps: 30` inside `assistantStep` and `continuationAssistantStep`. **The UI design decisions in this spec are unchanged** — they describe what the user sees, not how the loop is implemented in the workflow runtime.
+
 ---
 
 ## 1. Executive Summary
 
-The backend workflow was rebuilt across three phases (14 commits) into an agentic loop driven by `.dountil()` over an `agentLoopStep` with `AGENT_LOOP_MAX_ITERATIONS = 8`, gated HITL via `awaitValidationStep` or terminated by a no-op `passthroughStep`, and persistence of all `data-*` parts through `writeDataPart` so streams survive client reconnects.
+The backend chat workflow runs as a linear chain `assistantStep → selectionGateStep → continuationAssistantStep → awaitValidationStep`. Inside `assistantStep` (and `continuationAssistantStep`), the assistant agent is invoked with `generateText({ maxSteps: 30 })` — the AI SDK drives the agentic loop natively, executing tool calls inline until completion or the 30-step cap. HITL is gated via `awaitValidationStep`. All `data-*` parts emit via `writeDataPart` so streams survive client reconnects.
 
 The chat UI in `src/lib/components/chat.svelte` was **not updated to match**. It still consumes the old linear-chain shape, silently drops `tool-*` parts, ignores the persisted HITL `data-*` parts in some places, renders an outdated `pdf-preview.svelte` modal that the workspace panel already covers via embedPDF, and surfaces token usage inside the composer instead of the header. The result: tool calls invisible to users, HITL re-prompts unreliable across reconnects, redundant PDF modal, scattered control surface, and no friendly recovery for the new error codes the agent loop can emit.
 
@@ -22,13 +24,13 @@ The previous session completed three sequential refactors of `src/lib/server/mas
 
 | Concern | State | Where |
 |---|---|---|
-| Workflow shape | Linear chain replaced with `.dountil(agentLoopStep)` + `.branch([awaitValidationStep \| passthroughStep])` | `src/lib/server/mastra/workflows/index.ts` |
-| Iteration cap | `AGENT_LOOP_MAX_ITERATIONS = 8` | `src/lib/server/mastra/workflows/chat/chat-schemas.ts` |
-| Per-iteration agent | `agentLoopStep` uses `generateText({ maxSteps: 1 })` — inline tool calls execute within one cycle; the workflow `.dountil()` drives continuation | `src/lib/server/mastra/workflows/chat/agent-loop-step.ts` |
-| Terminal step | `passthroughStep` — no-op exit when no validation is required | `src/lib/server/mastra/workflows/chat/passthrough-step.ts` |
+| Workflow shape | Linear chain `assistantStep → selectionGateStep → continuationAssistantStep → awaitValidationStep`. HITL is gated through `selectionGateStep`; the chain continues into `awaitValidationStep` only when a marksheet is in flight. | `src/lib/server/mastra/workflows/index.ts` |
+| Iteration cap | `maxSteps: 30` on the agent invocation — the AI SDK runs the agentic loop natively, executing tool calls inline up to the 30-step limit. No workflow-level iteration guard. | `src/lib/server/mastra/workflows/chat/assistant-step.ts`, `src/lib/server/mastra/workflows/chat/continuation-assistant-step.ts` |
+| Per-iteration agent | `assistantStep` (and `continuationAssistantStep`) use `generateText({ maxSteps: 30 })`. The AI SDK handles tool-call loops inline within a single step; the workflow chain advances linearly to the next step when the agent stream completes. | `src/lib/server/mastra/workflows/chat/assistant-step.ts`, `src/lib/server/mastra/workflows/chat/continuation-assistant-step.ts` |
+| Streaming | `assistantStep` and `continuationAssistantStep` end with `await stream.fullStream.pipeTo(writer)` — every text-delta, reasoning-delta, and tool-call chunk is forwarded to the workflow writer for real-time client streaming. | `src/lib/server/mastra/workflows/chat/assistant-step.ts:96` |
 | HITL gate | `awaitValidationStep` — gated on `lastFormattedDocumentId` or `formatArtifactState.persistPath`; supports `dropdownOptionId` (option selection) + `cancel` (server-side `run.cancel()` via `/api/chat/cancel`) | `src/lib/server/mastra/workflows/chat/await-validation-step.ts` |
 | Persistence | All `data-*` parts emit via `writeDataPart`; non-persisted parts marked `transient: true` (`data-usage`, `data-isCustomPersistence`, `data-rateLimit`, `data-notification`, `data-generatePDF`, `data-streamDocument`) | `src/lib/server/mastra/utils/chat-utils.ts` |
-| Legacy files | `assistant-step.ts` + `continuation-assistant-step.ts` deleted; `chat.ts` (legacy linear chain) kept frozen for reference, to be deleted at session end | `src/lib/server/mastra/workflows/` |
+| Agent-loop architecture | The workflow-level `.dountil()` + `agentLoopStep` + `passthroughStep` + `seed-agent-loop-step` + `seed-branch-input-step` design from commit `797d498` was reverted in `32dced1` because it duplicated the AI SDK's native `maxSteps` loop AND broke streaming by failing to call `pipeTo(writer)`. | `32dced1` (revert) |
 | Cancel endpoint | `POST /api/chat/cancel` rehydrates `createRun({ runId }).cancel()` | `src/routes/api/chat/cancel/+server.ts` |
 | Auto-fix | `validate-marksheet.ts` retries with auto-fix `maxAttempts` cap; `permissionGrant` read from `requestContext` | `src/lib/server/mastra/tools/operations/reporting/marksheet/validate-marksheet.ts` |
 
@@ -40,14 +42,14 @@ The new agentic surface emits a richer and more structured `message.parts` strea
 
 2. **Honor persisted `data-*` parts.** `data-awaitValidation`, `data-validationErrors`, `data-selectOption`, `data-disambiguation`, `data-committed`, `data-emitPdfPart`, `data-emitNotification`, `data-emitSelectOption`, `data-rateLimit` all persist to libSQL. They survive reconnects and the UI must read them via the existing `ActionBar` and `useChat` flow, not via transient context.
 
-3. **Expose iteration count.** The agent loop can iterate up to 8 times. The UI must show a minimal shimmer on the most recent assistant message while the agent is still iterating (not a text counter — just a subtle pulse so the user knows the agent is working).
+3. **Expose agent activity.** The agent can iterate up to 30 steps inside a single assistant turn (via `maxSteps: 30` on `generateText`). The UI must show a minimal shimmer on the most recent assistant message while the agent is still working (not a step counter — just a subtle pulse so the user knows the agent is thinking).
 
 4. **Handle the new error surface.** Six new error codes can surface from the workflow:
    - `AUTO_FIX_EXHAUSTED` — auto-fix retries exhausted; marksheet needs manual edit
    - `STUDENT_ID_MISSING` — marksheet has no linked student
    - `PERSIST_PATH_MISSING` — formatted path not set; can't validate
    - `TOOL_NOT_REGISTERED` — workflow config error; admin needed
-   - `AGENT_LOOP_EXHAUSTED` — 8 iterations didn't reach a conclusion
+   - `AGENT_LOOP_EXHAUSTED` — the agent hit its `maxSteps: 30` cap without converging
    - `BUN_PRECONDITION_FAILED` — server-side dep missing; admin needed
 
    Each needs a friendly title, actionable message, and a suggested action. `ErrorAlert.svelte` already routes through `categorizeAIError`; the fix is to extend `categorizeAIError` and (for one new action) add a button to `ErrorAlert.svelte`.
@@ -635,22 +637,25 @@ These items were considered and explicitly excluded from this spec:
 
 ### Backend refactor (commit history)
 
-| Commit | Subject |
-|---|---|
-| `136b70a` | feat(workflow): persist data-awaitValidation via writeDataPart |
-| `062ab16` | feat(workflow): persist data-selectOption via writeDataPart |
-| `044ea69` | feat(workflow): persist disambiguation parts via writeDataPart |
-| `564ea1a` | feat(workflow): persist committed part via writeDataPart |
-| `db26991` | feat(workflow): emit pdf/notification/selectOption via writeDataPart |
-| `50d5051` | feat(workflow): rate-limit transient via writeDataPart |
-| `fd7cd37` | feat(workflow): extend awaitValidationStep schema (dropdownOptionId + cancel) |
-| `59c3f9e` | feat(workflow): validate-marksheet auto-fix retry cap + permissionGrant |
-| `c0150b9` | feat(workflow): server-side /api/chat/cancel endpoint |
-| `67c4c93` | feat(workflow): agentLoopOutputSchema + AGENT_LOOP_MAX_ITERATIONS=8 |
-| `698c61a` | feat(workflow): agentLoopStep with maxSteps=1 |
-| `db71cf4` | feat(workflow): passthroughStep terminal no-op |
-| `797d498` | refactor(workflow): replace linear chain with .dountil() + .branch() |
-| `dcc4431` | chore(workflow): delete assistant-step + continuation-assistant-step |
+The data-* persistence and HITL extensions (top of the table) are still the load-bearing changes this UI work exposes. The workflow-level agentic-loop commits at the bottom were reverted — the AI SDK's native `maxSteps: 30` now drives the loop inside `assistantStep` and `continuationAssistantStep`.
+
+| Commit | Subject | Status |
+|---|---|---|
+| `136b70a` | feat(workflow): persist data-awaitValidation via writeDataPart | Kept |
+| `062ab16` | feat(workflow): persist data-selectOption via writeDataPart | Kept |
+| `044ea69` | feat(workflow): persist disambiguation parts via writeDataPart | Kept |
+| `564ea1a` | feat(workflow): persist committed part via writeDataPart | Kept |
+| `db26991` | feat(workflow): emit pdf/notification/selectOption via writeDataPart | Kept |
+| `50d5051` | feat(workflow): rate-limit transient via writeDataPart | Kept |
+| `fd7cd37` | feat(workflow): extend awaitValidationStep schema (dropdownOptionId + cancel) | Kept |
+| `59c3f9e` | feat(workflow): validate-marksheet auto-fix retry cap + permissionGrant | Kept |
+| `c0150b9` | feat(workflow): server-side /api/chat/cancel endpoint | Kept |
+| `67c4c93` | feat(workflow): agentLoopOutputSchema + AGENT_LOOP_MAX_ITERATIONS=8 | Reverted in `32dced1` |
+| `698c61a` | feat(workflow): agentLoopStep with maxSteps=1 | Reverted in `32dced1` |
+| `db71cf4` | feat(workflow): passthroughStep terminal no-op | Reverted in `32dced1` |
+| `797d498` | refactor(workflow): replace linear chain with .dountil() + .branch() | Reverted in `32dced1` |
+| `dcc4431` | chore(workflow): delete assistant-step + continuation-assistant-step | Undone by `32dced1` (assistant-step + continuation-assistant-step restored) |
+| `32dced1` | revert(workflow): restore the legacy assistantStep linear chain (maxSteps: 30) | Current state — see header note |
 
 ### Key file paths
 
