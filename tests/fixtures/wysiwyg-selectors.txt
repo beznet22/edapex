@@ -1,0 +1,132 @@
+.ai-prompt-anchor
+.dark .drag-handle
+.drag-handle
+.drag-handle.hide
+.drag-handle:active
+.drag-handle:hover
+.mention-suggestion-popup
+.wysiwyg-editor-wrapper
+.wysiwyg-editor-wrapper .tiptap
+.wysiwyg-editor-wrapper .tiptap .code-block-copy
+.wysiwyg-editor-wrapper .tiptap .code-block-copy--success
+.wysiwyg-editor-wrapper .tiptap .code-block-copy:focus-visible
+.wysiwyg-editor-wrapper .tiptap .code-block-copy:hover
+.wysiwyg-editor-wrapper .tiptap .code-block-header
+.wysiwyg-editor-wrapper .tiptap .code-block-language
+.wysiwyg-editor-wrapper .tiptap .code-block-wrapper
+.wysiwyg-editor-wrapper .tiptap .hljs-addition
+.wysiwyg-editor-wrapper .tiptap .hljs-attr
+.wysiwyg-editor-wrapper .tiptap .hljs-attribute
+.wysiwyg-editor-wrapper .tiptap .hljs-built_in
+.wysiwyg-editor-wrapper .tiptap .hljs-bullet
+.wysiwyg-editor-wrapper .tiptap .hljs-class .hljs-title
+.wysiwyg-editor-wrapper .tiptap .hljs-comment
+.wysiwyg-editor-wrapper .tiptap .hljs-deletion
+.wysiwyg-editor-wrapper .tiptap .hljs-emphasis
+.wysiwyg-editor-wrapper .tiptap .hljs-function
+.wysiwyg-editor-wrapper .tiptap .hljs-keyword
+.wysiwyg-editor-wrapper .tiptap .hljs-literal
+.wysiwyg-editor-wrapper .tiptap .hljs-meta
+.wysiwyg-editor-wrapper .tiptap .hljs-name
+.wysiwyg-editor-wrapper .tiptap .hljs-number
+.wysiwyg-editor-wrapper .tiptap .hljs-quote
+.wysiwyg-editor-wrapper .tiptap .hljs-regexp
+.wysiwyg-editor-wrapper .tiptap .hljs-selector-tag
+.wysiwyg-editor-wrapper .tiptap .hljs-string
+.wysiwyg-editor-wrapper .tiptap .hljs-strong
+.wysiwyg-editor-wrapper .tiptap .hljs-symbol
+.wysiwyg-editor-wrapper .tiptap .hljs-tag
+.wysiwyg-editor-wrapper .tiptap .hljs-template-variable
+.wysiwyg-editor-wrapper .tiptap .hljs-title
+.wysiwyg-editor-wrapper .tiptap .hljs-variable
+.wysiwyg-editor-wrapper .tiptap .img-placeholder
+.wysiwyg-editor-wrapper .tiptap .img-placeholder::before
+.wysiwyg-editor-wrapper .tiptap .mention
+.wysiwyg-editor-wrapper .tiptap .mention::before
+.wysiwyg-editor-wrapper .tiptap .tableWrapper
+.wysiwyg-editor-wrapper .tiptap ::selection
+.wysiwyg-editor-wrapper .tiptap > :first-child
+.wysiwyg-editor-wrapper .tiptap > :last-child
+.wysiwyg-editor-wrapper .tiptap [data-ai-stream] > p
+.wysiwyg-editor-wrapper .tiptap a
+.wysiwyg-editor-wrapper .tiptap a.ProseMirror-selectednode
+.wysiwyg-editor-wrapper .tiptap a:focus-visible
+.wysiwyg-editor-wrapper .tiptap a:hover
+.wysiwyg-editor-wrapper .tiptap aside[data-callout]
+.wysiwyg-editor-wrapper .tiptap aside[data-callout] > [data-callout-content] > p
+.wysiwyg-editor-wrapper .tiptap aside[data-callout] > [data-callout-title]
+.wysiwyg-editor-wrapper .tiptap aside[data-callout] > [data-callout-title]::before
+.wysiwyg-editor-wrapper .tiptap aside[data-callout][data-type="caution"]
+.wysiwyg-editor-wrapper .tiptap aside[data-callout][data-type="caution"] > [data-callout-title]
+.wysiwyg-editor-wrapper .tiptap aside[data-callout][data-type="caution"] > [data-callout-title]::before
+.wysiwyg-editor-wrapper .tiptap aside[data-callout][data-type="important"]
+.wysiwyg-editor-wrapper .tiptap aside[data-callout][data-type="important"] > [data-callout-title]
+.wysiwyg-editor-wrapper .tiptap aside[data-callout][data-type="important"] > [data-callout-title]::before
+.wysiwyg-editor-wrapper .tiptap aside[data-callout][data-type="note"]
+.wysiwyg-editor-wrapper .tiptap aside[data-callout][data-type="note"] > [data-callout-title]
+.wysiwyg-editor-wrapper .tiptap aside[data-callout][data-type="note"] > [data-callout-title]::before
+.wysiwyg-editor-wrapper .tiptap aside[data-callout][data-type="tip"]
+.wysiwyg-editor-wrapper .tiptap aside[data-callout][data-type="tip"] > [data-callout-title]
+.wysiwyg-editor-wrapper .tiptap aside[data-callout][data-type="tip"] > [data-callout-title]::before
+.wysiwyg-editor-wrapper .tiptap aside[data-callout][data-type="warning"]
+.wysiwyg-editor-wrapper .tiptap aside[data-callout][data-type="warning"] > [data-callout-title]
+.wysiwyg-editor-wrapper .tiptap aside[data-callout][data-type="warning"] > [data-callout-title]::before
+.wysiwyg-editor-wrapper .tiptap blockquote
+.wysiwyg-editor-wrapper .tiptap blockquote > :first-child
+.wysiwyg-editor-wrapper .tiptap blockquote > :last-child
+.wysiwyg-editor-wrapper .tiptap code
+.wysiwyg-editor-wrapper .tiptap dd.tiptap-description-detail
+.wysiwyg-editor-wrapper .tiptap dd.tiptap-description-detail > p
+.wysiwyg-editor-wrapper .tiptap del
+.wysiwyg-editor-wrapper .tiptap dl.tiptap-description-list
+.wysiwyg-editor-wrapper .tiptap dt.tiptap-description-term
+.wysiwyg-editor-wrapper .tiptap em
+.wysiwyg-editor-wrapper .tiptap h1
+.wysiwyg-editor-wrapper .tiptap h2
+.wysiwyg-editor-wrapper .tiptap h3
+.wysiwyg-editor-wrapper .tiptap h4
+.wysiwyg-editor-wrapper .tiptap h5
+.wysiwyg-editor-wrapper .tiptap h6
+.wysiwyg-editor-wrapper .tiptap hr
+.wysiwyg-editor-wrapper .tiptap img
+.wysiwyg-editor-wrapper .tiptap img.ProseMirror-selectednode
+.wysiwyg-editor-wrapper .tiptap img:hover
+.wysiwyg-editor-wrapper .tiptap li
+.wysiwyg-editor-wrapper .tiptap li > p
+.wysiwyg-editor-wrapper .tiptap li::marker
+.wysiwyg-editor-wrapper .tiptap li[data-type="taskItem"]
+.wysiwyg-editor-wrapper .tiptap li[data-type="taskItem"] > div
+.wysiwyg-editor-wrapper .tiptap li[data-type="taskItem"] > div > p
+.wysiwyg-editor-wrapper .tiptap li[data-type="taskItem"] > label
+.wysiwyg-editor-wrapper .tiptap li[data-type="taskItem"] input[type="checkbox"]
+.wysiwyg-editor-wrapper .tiptap mark[style] > b
+.wysiwyg-editor-wrapper .tiptap mark[style] > strong
+.wysiwyg-editor-wrapper .tiptap ol
+.wysiwyg-editor-wrapper .tiptap p
+.wysiwyg-editor-wrapper .tiptap p.is-editor-empty:first-child::before
+.wysiwyg-editor-wrapper .tiptap p.is-empty::before
+.wysiwyg-editor-wrapper .tiptap pre.code-block-pre
+.wysiwyg-editor-wrapper .tiptap pre.code-block-pre code
+.wysiwyg-editor-wrapper .tiptap pre:not(.code-block-pre)
+.wysiwyg-editor-wrapper .tiptap pre:not(.code-block-pre) code
+.wysiwyg-editor-wrapper .tiptap span[style] > b
+.wysiwyg-editor-wrapper .tiptap span[style] > strong
+.wysiwyg-editor-wrapper .tiptap strong
+.wysiwyg-editor-wrapper .tiptap sub
+.wysiwyg-editor-wrapper .tiptap sup
+.wysiwyg-editor-wrapper .tiptap table
+.wysiwyg-editor-wrapper .tiptap tbody tr:hover
+.wysiwyg-editor-wrapper .tiptap td
+.wysiwyg-editor-wrapper .tiptap td > p
+.wysiwyg-editor-wrapper .tiptap tfoot
+.wysiwyg-editor-wrapper .tiptap tfoot td
+.wysiwyg-editor-wrapper .tiptap th
+.wysiwyg-editor-wrapper .tiptap th > p
+.wysiwyg-editor-wrapper .tiptap thead
+.wysiwyg-editor-wrapper .tiptap tr
+.wysiwyg-editor-wrapper .tiptap tr:last-child
+.wysiwyg-editor-wrapper .tiptap u
+.wysiwyg-editor-wrapper .tiptap ul
+.wysiwyg-editor-wrapper .tiptap ul[data-type="taskList"]
+.wysiwyg-editor-wrapper .tiptap ul[data-type="taskList"] li[data-checked="true"] > div > p
+.wysiwyg-editor-wrapper .tiptap:not(.dragging) .ProseMirror-selectednode
