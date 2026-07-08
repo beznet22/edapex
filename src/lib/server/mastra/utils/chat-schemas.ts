@@ -108,7 +108,11 @@ export const agentLoopOutputSchema = z.object({
 	status: z.enum(['continue', 'done', 'awaiting-hitl']),
 	text: z.string().default(''),
 	toolCallIds: z.array(z.string()).default([]),
-	iteration: z.number().int().nonnegative().default(0)
+	iteration: z.number().int().nonnegative().default(0),
+	// Carried through the loop so the post-loop `.map()` can hand
+	// resolvedFiles off to either branch (awaitValidation / passthrough)
+	// without re-fetching them from the workflow envelope.
+	resolvedFiles: z.array(fileStreamItemSchema).default([])
 });
 export type AgentLoopOutput = z.infer<typeof agentLoopOutputSchema>;
 

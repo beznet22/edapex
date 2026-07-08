@@ -8,7 +8,12 @@
  */
 
 import { createWorkflow } from '@mastra/core/workflows';
-import { chatWorkflowInputSchema, chatWorkflowOutputSchema } from '../utils/chat-schemas';
+import { z } from 'zod';
+import {
+	AGENT_LOOP_MAX_ITERATIONS,
+	chatWorkflowInputSchema,
+	chatWorkflowOutputSchema
+} from '../utils/chat-schemas';
 import { editorCommandRequestSchema, finalizedEditorCommandSchema } from '../editor/schemas';
 
 import { classifyAndStreamWorkflow } from './chat/classify-and-stream';
@@ -16,9 +21,8 @@ import { titleStep } from './chat/title-step';
 import { extractFileItemsStep } from './chat/extract-file-items-step';
 import { collapseStep } from './chat/collapse-step';
 import { hitlVerifyStep } from './chat/hitl-verify-step';
-import { assistantStep } from './chat/assistant-step';
-import { selectionGateStep } from './chat/selection-gate-step';
-import { continuationAssistantStep } from './chat/continuation-assistant-step';
+import { agentLoopStep } from './chat/agent-loop-step';
+import { passthroughStep } from './chat/passthrough-step';
 import { awaitValidationStep } from './chat/await-validation-step';
 
 import { deriveEditorContextStep } from './editor/derive-editor-context-step';
@@ -80,10 +84,63 @@ export const chatWorkflow = createWorkflow({
 	.then(extractFileItemsStep)
 	.then(collapseStep)
 	.then(hitlVerifyStep)
-	.then(assistantStep)
-	.then(selectionGateStep)
-	.then(continuationAssistantStep)
-	.then(awaitValidationStep)
+	// Map the workflow envelope to the agent-loop input shape. The agent
+	// loop reads promptText from getInitData() via the loop's first
+	// iteration; here we just seed the threadId/resourceId, forward the
+	// resolved file items, and start iteration=0.
+	.map(async ({ inputData, getInitData }) => {
+		const init = getInitData() as z.infer<typeof chatWorkflowInputSchema>;
+		return {
+			promptText: init.promptText,
+			threadId: inputData.threadId,
+			resourceId: inputData.resourceId,
+			resolvedFiles: inputData.fileItems ?? [],
+			iteration: 0
+		};
+	})
+	.dountil(
+		agentLoopStep,
+		async ({ inputData, iterationCount }) => {
+			// Abort if the agent never signals done — guards against runaway
+			// loops (e.g. a misbehaving tool call that always triggers another
+			// round).
+			if (iterationCount >= AGENT_LOOP_MAX_ITERATIONS) {
+				throw new Error(
+					`AGENT_LOOP_EXHAUSTED: agent did not converge within ${AGENT_LOOP_MAX_ITERATIONS} iterations`,
+				);
+			}
+			return inputData.status === 'done';
+		},
+	)
+	// Map the agent-loop output into the shared branch-input shape
+	// ({ text, resolvedFiles }) so both `awaitValidationStep` and
+	// `passthroughStep` can consume it. The status/toolCallIds/iteration
+	// fields are no longer needed once we've exited the loop.
+	.map(async ({ inputData }) => ({
+		text: inputData.text,
+		resolvedFiles: inputData.resolvedFiles ?? []
+	}))
+	.branch([
+		// Validation path: only when a marksheet was formatted in this turn.
+		// The step itself (after Task 2.2) also gates on these context keys,
+		// but the branch lets us skip the step entirely and pass through
+		// cheaply for non-validation turns.
+		[
+			async ({ requestContext }) => {
+				const lastFormattedId = requestContext?.get('lastFormattedDocumentId') as
+					| string
+					| undefined;
+				const formatState = requestContext?.get('formatArtifactState') as
+					| { persistPath?: string }
+					| undefined;
+				return Boolean(lastFormattedId) || Boolean(formatState?.persistPath);
+			},
+			awaitValidationStep
+		],
+		// No-op path: every other turn terminates here without emitting or
+		// suspending. The composer returns to its idle state.
+		[async () => true, passthroughStep]
+	])
 	.commit();
 
 /**
@@ -91,8 +148,6 @@ export const chatWorkflow = createWorkflow({
  * `step:` argument off these ids so the workflow ID and step ID stay in sync.
  */
 export const HITL_VERIFY_STEP_ID = hitlVerifyStep.id as 'hitl-verify';
-
-export const SELECTION_GATE_STEP_ID = selectionGateStep.id as 'selectionGate';
 
 export const AWAIT_VALIDATION_STEP_ID = awaitValidationStep.id as 'awaitValidation';
 

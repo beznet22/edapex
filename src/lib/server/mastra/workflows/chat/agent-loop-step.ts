@@ -84,7 +84,8 @@ export const agentLoopStep = createStep({
 				status: 'done' as const,
 				text,
 				toolCallIds: [],
-				iteration: inputData.iteration
+				iteration: inputData.iteration,
+				resolvedFiles: inputData.resolvedFiles
 			};
 		}
 
@@ -92,7 +93,8 @@ export const agentLoopStep = createStep({
 			status: 'continue' as const,
 			text,
 			toolCallIds: toolCalls.map((tc) => tc.toolCallId),
-			iteration: inputData.iteration + 1
+			iteration: inputData.iteration + 1,
+			resolvedFiles: inputData.resolvedFiles
 		};
 	}
 });
