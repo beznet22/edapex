@@ -26,6 +26,7 @@ import {
 } from "../_shared";
 import { transcriptPdfPath } from "$lib/server/mastra/storage/workspaces/paths";
 import { addEntry } from "$lib/server/mastra/storage/workspaces/manifest-store";
+import { type MemoryContext } from "../../../../utils/chat-utils";
 
 const CONFIRM_CONTEXT_KEY = "transcriptPublishConfirm";
 
@@ -129,6 +130,7 @@ async function ensureTranscriptPdf(args: RenderArgs): Promise<RenderResult> {
   if (!pdfExists || input.forceRegenerate) {
     await emitNotification(
       writer,
+      undefined,
       input.forceRegenerate
         ? "Re-rendering transcript PDF (forceRegenerate=true)…"
         : "Transcript PDF not found; rendering now…",
@@ -204,7 +206,7 @@ async function ensureTranscriptPdf(args: RenderArgs): Promise<RenderResult> {
     ? readResult
     : Buffer.from(readResult, "binary");
 
-  await emitPdfPart(writer, artifactId, {
+  await emitPdfPart(writer, undefined, artifactId, {
     status: "success",
     data: previewUrl,
     title,
@@ -265,6 +267,12 @@ export const publishTranscriptPdfTool = createTool({
     const writer = getWriter(context);
     const requestContext = getRequestContext(context);
 
+    const threadId = context.requestContext?.get('threadId') as string | undefined;
+    const resourceId = context.requestContext?.get('resourceId') as string | undefined;
+    const memCtx: MemoryContext | undefined = threadId && resourceId
+      ? { threadId, resourceId }
+      : undefined;
+
     const academicId = input.academicId ?? tenant.academicId;
     if (academicId === null || academicId === undefined) {
       throw new Error("ACADEMIC_ID_REQUIRED: no academicId in input or active tenant");
@@ -290,7 +298,7 @@ export const publishTranscriptPdfTool = createTool({
         );
       }
       if (stored.status === "cancelled") {
-        await emitNotification(writer, "Transcript publish cancelled.", "warning");
+        await emitNotification(writer, memCtx, "Transcript publish cancelled.", "warning");
         return {
           status: "cancelled" as const,
           artifactId: stored.artifactId,
@@ -301,6 +309,7 @@ export const publishTranscriptPdfTool = createTool({
       if (stored.status === "sent") {
         await emitNotification(
           writer,
+          memCtx,
           `Transcript already sent to ${stored.parentEmail}.`,
           "info",
         );
@@ -357,10 +366,11 @@ export const publishTranscriptPdfTool = createTool({
       if (!sendResult.success) {
         await emitNotification(
           writer,
+          memCtx,
           `Transcript email failed: ${sendResult.message}`,
           "error",
         );
-        await emitPdfPart(writer, stored.artifactId, {
+        await emitPdfPart(writer, memCtx, stored.artifactId, {
           status: "error",
           data: "",
           title: stored.title,
@@ -387,10 +397,11 @@ export const publishTranscriptPdfTool = createTool({
 
       await emitNotification(
         writer,
+        memCtx,
         `Transcript PDF sent to ${stored.parentEmail}`,
         "success",
       );
-      await emitPdfPart(writer, stored.artifactId, {
+      await emitPdfPart(writer, memCtx, stored.artifactId, {
         status: "success",
         data: stored.previewUrl,
         title: stored.title,
@@ -417,7 +428,7 @@ export const publishTranscriptPdfTool = createTool({
         status: "cancelled",
         artifactId: targetArtifactId,
       } as TranscriptConfirmState);
-      await emitNotification(writer, "Transcript publish cancelled.", "warning");
+      await emitNotification(writer, memCtx, "Transcript publish cancelled.", "warning");
       return {
         status: "cancelled" as const,
         artifactId: targetArtifactId,
@@ -452,6 +463,7 @@ export const publishTranscriptPdfTool = createTool({
     if (!parentEmail) {
       await emitNotification(
         writer,
+        memCtx,
         `Cannot publish transcript for ${student.fullName ?? "student"}: no parent email on file.`,
         "error",
       );
@@ -485,6 +497,7 @@ export const publishTranscriptPdfTool = createTool({
 
     await emitSelectOption(
       writer,
+      memCtx,
       [
         { id: `send:${parentEmail}`, label: `Send to ${parentEmail}`, icon: "mail" },
         { id: "cancel", label: "Cancel", icon: "x" },

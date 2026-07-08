@@ -24,6 +24,7 @@ import {
 } from "./_shared";
 import { marksheetPdfPath } from "$lib/server/mastra/storage/workspaces/paths";
 import { addEntry } from "$lib/server/mastra/storage/workspaces/manifest-store";
+import { type MemoryContext } from "../../../utils/chat-utils";
 
 const CONFIRM_CONTEXT_KEY = "resultPublishConfirm";
 
@@ -135,6 +136,7 @@ async function ensureResultPdf(
   if (!pdfExists || input.forceRegenerate) {
     await emitNotification(
       writer,
+      undefined,
       input.forceRegenerate
         ? "Re-rendering PDF (forceRegenerate=true)…"
         : "PDF not found; rendering now…",
@@ -191,6 +193,12 @@ export const publishResultPdfTool = createTool({
     const writer = getWriter(context);
     const requestContext = getRequestContext(context);
 
+    const threadId = context.requestContext?.get('threadId') as string | undefined;
+    const resourceId = context.requestContext?.get('resourceId') as string | undefined;
+    const memCtx: MemoryContext | undefined = threadId && resourceId
+      ? { threadId, resourceId }
+      : undefined;
+
     const examTypeId = input.examTypeId ?? tenant.examTypeId;
     if (examTypeId === null || examTypeId === undefined) {
       throw new Error("EXAM_TYPE_REQUIRED: no examTypeId in input or active tenant");
@@ -223,7 +231,7 @@ export const publishResultPdfTool = createTool({
       }
 
       if (stored.status === "cancelled") {
-        await emitNotification(writer, "Result publish cancelled.", "warning");
+        await emitNotification(writer, memCtx, "Result publish cancelled.", "warning");
         return {
           status: "cancelled" as const,
           artifactId: stored.artifactId,
@@ -235,6 +243,7 @@ export const publishResultPdfTool = createTool({
       if (stored.status === "sent") {
         await emitNotification(
           writer,
+          memCtx,
           `Result already published to ${stored.parentEmail}.`,
           "info",
         );
@@ -250,7 +259,7 @@ export const publishResultPdfTool = createTool({
       const assessment = await createAssessmentServiceForRequest(tenant);
       const alreadySent = await assessment.isEmailAlreadySent(stored.studentId, examTypeId);
       if (alreadySent) {
-        await emitPdfPart(writer, stored.artifactId, {
+        await emitPdfPart(writer, memCtx, stored.artifactId, {
           status: "success",
           data: stored.previewUrl,
           title: stored.title,
@@ -279,8 +288,8 @@ export const publishResultPdfTool = createTool({
           publishResult.errors.length > 0
             ? publishResult.errors.join("; ")
             : "Publisher did not report success";
-        await emitNotification(writer, `Result publish failed: ${message}`, "error");
-        await emitPdfPart(writer, stored.artifactId, {
+        await emitNotification(writer, memCtx, `Result publish failed: ${message}`, "error");
+        await emitPdfPart(writer, memCtx, stored.artifactId, {
           status: "error",
           data: "",
           title: stored.title,
@@ -303,10 +312,11 @@ export const publishResultPdfTool = createTool({
       requestContext.set?.(CONFIRM_CONTEXT_KEY, { ...stored, status: "sent" });
       await emitNotification(
         writer,
+        memCtx,
         `Result PDF sent to ${stored.parentEmail}`,
         "success",
       );
-      await emitPdfPart(writer, stored.artifactId, {
+      await emitPdfPart(writer, memCtx, stored.artifactId, {
         status: "success",
         data: stored.previewUrl,
         title: stored.title,
@@ -333,7 +343,7 @@ export const publishResultPdfTool = createTool({
         status: "cancelled",
         artifactId: targetArtifactId,
       } as ResultConfirmState);
-      await emitNotification(writer, "Result publish cancelled.", "warning");
+      await emitNotification(writer, memCtx, "Result publish cancelled.", "warning");
       return {
         status: "cancelled" as const,
         artifactId: targetArtifactId,
@@ -368,6 +378,7 @@ export const publishResultPdfTool = createTool({
     if (!parentEmail) {
       await emitNotification(
         writer,
+        memCtx,
         `Cannot publish result for ${student.fullName ?? "student"}: no parent email on file.`,
         "error",
       );
@@ -400,6 +411,7 @@ export const publishResultPdfTool = createTool({
 
     await emitSelectOption(
       writer,
+      memCtx,
       [
         { id: `send:${parentEmail}`, label: `Send to ${parentEmail}`, icon: "mail" },
         { id: "cancel", label: "Cancel", icon: "x" },

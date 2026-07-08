@@ -19,6 +19,7 @@ import {
 } from "../_shared";
 import { transcriptPdfPath } from "$lib/server/mastra/storage/workspaces/paths";
 import { addEntry } from "$lib/server/mastra/storage/workspaces/manifest-store";
+import { type MemoryContext } from "../../../../utils/chat-utils";
 
 const reportPdfInputSchema = z.object({
   ...studentCriteriaBase,
@@ -83,7 +84,7 @@ async function renderAndWriteTranscriptPdf(args: CoreRenderArgs): Promise<CoreRe
   const pdfExists = await fs.exists(storagePath);
 
   if (!republish) {
-    await emitPdfPart(writer, artifactId, {
+    await emitPdfPart(writer, undefined, artifactId, {
       status: "processing",
       data: "",
       title,
@@ -97,7 +98,7 @@ async function renderAndWriteTranscriptPdf(args: CoreRenderArgs): Promise<CoreRe
     const token = base64url(JSON.stringify(tokenPayload));
     const previewUrl = `/api/results/${token}`;
     if (!republish) {
-      await emitPdfPart(writer, artifactId, {
+      await emitPdfPart(writer, undefined, artifactId, {
         status: "success",
         data: previewUrl,
         title,
@@ -160,7 +161,7 @@ async function renderAndWriteTranscriptPdf(args: CoreRenderArgs): Promise<CoreRe
   const previewUrl = `/api/results/${token}`;
 
   if (!republish) {
-    await emitPdfPart(writer, artifactId, {
+    await emitPdfPart(writer, undefined, artifactId, {
       status: "success",
       data: previewUrl,
       title,
@@ -191,6 +192,12 @@ export const generateTranscriptPdfTool = createTool({
     const tenant = getTenant(context);
     const writer = getWriter(context);
 
+    const threadId = context.requestContext?.get('threadId') as string | undefined;
+    const resourceId = context.requestContext?.get('resourceId') as string | undefined;
+    const memCtx: MemoryContext | undefined = threadId && resourceId
+      ? { threadId, resourceId }
+      : undefined;
+
     const republish = input.republish === true;
     const academicId = input.academicId ?? tenant.academicId;
     const previewTitle = sanitizeForFilename(input.fullName ?? "student");
@@ -214,7 +221,7 @@ export const generateTranscriptPdfTool = createTool({
       };
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      await emitPdfPart(writer, provisionalArtifactId, {
+      await emitPdfPart(writer, memCtx, provisionalArtifactId, {
         status: "error",
         data: "",
         title: provisionalTitle,

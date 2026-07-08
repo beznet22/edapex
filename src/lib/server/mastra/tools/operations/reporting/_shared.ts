@@ -17,6 +17,7 @@ import type { TenantContext } from "$lib/server/mastra/tenant-context";
 import { StudentRepository } from "$lib/server/repository/student.repo";
 import { ScopedRepositoryProvider } from "$lib/server/mastra/scoped-repository";
 import type { StreamWriterLike } from "$lib/server/mastra/agent-stream-retry";
+import { writeDataPart, type MemoryContext } from "../../utils/chat-utils";
 import type { WorkspaceFilesystem } from "@mastra/core/workspace";
 import type { StudentDetails } from "$lib/server/repository/student.repo";
 
@@ -233,50 +234,67 @@ export type SelectOptionItem = { id: string; label: string; icon?: string };
 
 export async function emitPdfPart(
   writer: StreamWriterLike | undefined,
+  memCtx: MemoryContext,
   artifactId: string,
   payload: PdfArtifactData,
 ): Promise<void> {
-  if (!writer) return;
-  await writer.write({
-    type: "data-generatePDF",
-    id: artifactId,
-    data: payload,
-  } as never);
+  // Transient: the actual PDF lives on disk; this part is just progress.
+  await writeDataPart(writer as never, {
+    data: {
+      type: "data-generatePDF",
+      id: artifactId,
+      data: payload as never,
+    },
+    memory: memCtx,
+    transient: true,
+  });
 }
 
 export async function emitNotification(
   writer: StreamWriterLike | undefined,
+  memCtx: MemoryContext,
   message: string,
-  level: "info" | "warning" | "error" | "success",
+  level: "info" | "warning" | "error" | "success" = "info",
 ): Promise<void> {
-  if (!writer) return;
-  await writer.write({
-    type: "data-notification",
-    id: `notif-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-    data: { message, level },
-  } as never);
+  // Transient: toasts/banners are ephemeral UI signals.
+  await writeDataPart(writer as never, {
+    data: {
+      type: "data-notification",
+      id: `notif-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      data: { message, level },
+    },
+    memory: memCtx,
+    transient: true,
+  });
 }
 
 export async function emitSelectOption(
   writer: StreamWriterLike | undefined,
+  memCtx: MemoryContext,
   options: SelectOptionItem[],
   prompt: string,
-  contextKey: string,
-  stepId = "publishPdfConfirm",
+  runId: string,
+  stepId: string,
 ): Promise<void> {
-  if (!writer) return;
-  const gateId = `${stepId}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-  await writer.write({
-    type: "data-selectOption",
-    id: gateId,
+  // Persistent: the OptionDropdown must survive a page reload so the user
+  // can resume the publish flow. Note the 4th positional arg is now `runId`
+  // (was `contextKey`) — the contextKey field is intentionally dropped from
+  // the payload; downstream resume logic reads it from `pendingSelection`
+  // on the requestContext, not from the streamed part.
+  const gateId = `gate-${runId}-${Date.now()}`;
+  await writeDataPart(writer as never, {
     data: {
-      options,
-      promptText: prompt,
-      runId: gateId,
-      stepId,
-      contextKey,
+      type: "data-selectOption",
+      id: gateId,
+      data: {
+        options,
+        promptText: prompt,
+        runId,
+        stepId,
+      } as never,
     },
-  } as never);
+    memory: memCtx,
+  });
 }
 
 // PDF storage paths now live in `$lib/server/mastra/storage/workspaces/paths.ts`

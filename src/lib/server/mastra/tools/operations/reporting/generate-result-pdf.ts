@@ -22,6 +22,7 @@ import {
 import { marksheetPdfPath } from "$lib/server/mastra/storage/workspaces/paths";
 import { addEntry } from "$lib/server/mastra/storage/workspaces/manifest-store";
 import type { WorkspaceFilesystem } from "@mastra/core/workspace";
+import { type MemoryContext } from "../../../utils/chat-utils";
 
 const reportPdfInputSchema = z.object({
   ...studentCriteriaBase,
@@ -118,7 +119,7 @@ async function renderAndWriteResultPdf(args: CoreRenderArgs): Promise<CoreRender
       const artifactId = `pdf-${student.studentId}-${examTypeId}`;
       const msg = `NO_STUDENT_SESSION: no active student_records row for studentId=${student.studentId}, academicId=${tenant.academicId ?? "?"}`;
       console.warn(`[generate-result-pdf] ${msg}`);
-      await emitPdfPart(writer, artifactId, {
+      await emitPdfPart(writer, undefined, artifactId, {
         status: "error",
         data: "",
         title,
@@ -147,7 +148,7 @@ async function renderAndWriteResultPdf(args: CoreRenderArgs): Promise<CoreRender
   const pdfExists = await fs.exists(storagePath);
 
   if (!republish) {
-    await emitPdfPart(writer, artifactId, {
+    await emitPdfPart(writer, undefined, artifactId, {
       status: "processing",
       data: "",
       title,
@@ -160,7 +161,7 @@ async function renderAndWriteResultPdf(args: CoreRenderArgs): Promise<CoreRender
     const token = base64url(JSON.stringify({ studentId: student.studentId, examTypeId }));
     const previewUrl = `/api/results/${token}`;
     if (!republish) {
-      await emitPdfPart(writer, artifactId, {
+      await emitPdfPart(writer, undefined, artifactId, {
         status: "success",
         data: previewUrl,
         title,
@@ -228,7 +229,7 @@ async function renderAndWriteResultPdf(args: CoreRenderArgs): Promise<CoreRender
   const previewUrl = `/api/results/${token}`;
 
   if (!republish) {
-    await emitPdfPart(writer, artifactId, {
+    await emitPdfPart(writer, undefined, artifactId, {
       status: "success",
       data: previewUrl,
       title,
@@ -263,6 +264,12 @@ export const generateResultPdfTool = createTool({
     const tenant = getTenant(context);
     const writer = getWriter(context);
 
+    const threadId = context.requestContext?.get('threadId') as string | undefined;
+    const resourceId = context.requestContext?.get('resourceId') as string | undefined;
+    const memCtx: MemoryContext | undefined = threadId && resourceId
+      ? { threadId, resourceId }
+      : undefined;
+
     const republish = input.republish === true;
     const examTypeId = input.examTypeId ?? tenant.examTypeId;
     const previewTitle = sanitizeForFilename(input.fullName ?? "student");
@@ -292,7 +299,7 @@ export const generateResultPdfTool = createTool({
       };
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      await emitPdfPart(writer, provisionalArtifactId, {
+      await emitPdfPart(writer, memCtx, provisionalArtifactId, {
         status: "error",
         data: "",
         title: provisionalTitle,
