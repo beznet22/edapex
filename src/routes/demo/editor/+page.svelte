@@ -2,6 +2,7 @@
 	import { onMount } from "svelte";
 	import { page } from "$app/state";
 	import { normalizeMarkdown } from "$lib/components/editor/markdown-normalize";
+	import WysiwygEditor from "$lib/components/editor/WysiwygEditor.svelte";
 
 	let pathInput = $state("");
 	let activePath = $state<string | null>(null);
@@ -130,5 +131,46 @@
 		</div>
 	{/if}
 
-	<!-- Pane grid + diagnostics added in Tasks 4 & 5 -->
+	<main class="flex-1 min-h-0 grid grid-cols-1 md:grid-cols-2 gap-0">
+		<section
+			class="border-r border-border/60 min-h-0 flex flex-col"
+			aria-label="Raw markdown"
+		>
+			<div
+				class="px-4 py-2 text-[10px] font-semibold tracking-widest uppercase text-muted-foreground border-b border-border/40"
+			>
+				Raw
+			</div>
+			<pre
+				class="flex-1 min-h-0 overflow-auto p-4 text-xs font-mono leading-relaxed whitespace-pre-wrap break-words"
+			>{rawMarkdown || "(empty)"}</pre>
+		</section>
+
+		<section
+			class="min-h-0 flex flex-col"
+			aria-label="Rendered editor"
+		>
+			<div
+				class="px-4 py-2 text-[10px] font-semibold tracking-widest uppercase text-muted-foreground border-b border-border/40"
+			>
+				Rendered
+			</div>
+			<div class="flex-1 min-h-0">
+				{#if rawMarkdown}
+					<WysiwygEditor
+						content={rawMarkdown}
+						onUpdate={handleEditorUpdate}
+						{editable}
+						class="h-full"
+					/>
+				{:else}
+					<div
+						class="h-full flex items-center justify-center text-xs text-muted-foreground"
+					>
+						Load a file to render.
+					</div>
+				{/if}
+			</div>
+		</section>
+	</main>
 </div>
