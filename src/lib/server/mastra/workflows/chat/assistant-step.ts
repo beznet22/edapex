@@ -89,7 +89,8 @@ export const assistantStep = createStep({
 					}
 				}),
 			abortSignal,
-			writer
+			writer,
+			memCtx
 		});
 
 		await stream.fullStream.pipeTo(writer);

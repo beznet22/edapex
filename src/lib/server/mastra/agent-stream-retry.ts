@@ -19,6 +19,7 @@
  * shape the assistant step's `onError` already recognises.
  */
 import { RateLimitError } from '$lib/provider/errors';
+import { writeDataPart, type MemoryContext } from './utils/chat-utils';
 
 export const MAX_RETRY_ATTEMPTS = 3;
 
@@ -30,6 +31,11 @@ export interface RateLimitPartData {
 	maxAttempts: number;
 }
 
+/** Minimal stream-writer contract — anything with `write(chunk)`. The
+ *  workflow's `writer` exposes `custom` rather than `write`, but several call
+ *  sites pass a `{ write: () => Promise<void> }` no-op fallback when no
+ *  writer is available, so we keep `write` here for structural compatibility
+ *  and cast at the writeDataPart call site (which needs `custom`). */
 export interface StreamWriterLike {
 	write: (chunk: unknown) => Promise<void>;
 }
@@ -38,6 +44,11 @@ export async function streamWithAutoRetry<R>(opts: {
 	stream: () => Promise<R>;
 	abortSignal: AbortSignal | undefined;
 	writer: StreamWriterLike;
+	/** Thread identity for persisting non-transient data parts. Optional
+	 *  because several call sites (editor workflows, reporting tools) have no
+	 *  access to a chat thread; transient parts (e.g. `data-rateLimit`) don't
+	 *  need it because persistence is skipped. */
+	memCtx?: MemoryContext;
 }): Promise<R> {
 	let lastErr: unknown;
 	for (let attempt = 1; attempt <= MAX_RETRY_ATTEMPTS; attempt++) {
@@ -60,9 +71,15 @@ export async function streamWithAutoRetry<R>(opts: {
 				maxAttempts: MAX_RETRY_ATTEMPTS
 			};
 
-			await opts.writer
-				.write({ type: 'data-rateLimit', id: `rl-${Date.now()}-${attempt}`, data, transient: true } as never)
-				.catch(() => {});
+			await writeDataPart(opts.writer as never, {
+				data: {
+					type: 'data-rateLimit',
+					id: `rl-${Date.now()}-${attempt}`,
+					data,
+				},
+				memory: opts.memCtx,
+				transient: true,
+			}).catch(() => {});
 
 			if (opts.abortSignal?.aborted) throw new DOMException('Aborted', 'AbortError');
 			await new Promise((r) => setTimeout(r, secs * 1000));

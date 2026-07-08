@@ -23,6 +23,7 @@ export const continuationAssistantStep = createStep({
 
 		const init = getInitData() as z.infer<typeof chatWorkflowInputSchema>;
 		const label = (requestContext?.get(`${inputData.contextKey}Label`) as string | undefined) ?? inputData.selectedOptionId;
+		const memCtx = { threadId: init.threadId, resourceId: init.resourceId };
 
 		const continuationPrompt = [
 			`The user originally asked: "${init.promptText}".`,
@@ -45,7 +46,8 @@ export const continuationAssistantStep = createStep({
 					maxSteps: 30
 				}),
 			abortSignal,
-			writer
+			writer,
+			memCtx
 		});
 
 		await stream.fullStream.pipeTo(writer);
