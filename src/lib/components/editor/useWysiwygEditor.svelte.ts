@@ -53,6 +53,15 @@ export class WysiwygEditorController {
         toolName: string;
     } | null>(null);
 
+    // Cache of the last content we passed to `editor.commands.setContent`
+    // (post-normalize). Used by `syncExternalContent` to dedup against the
+    // INPUT rather than the lossy tiptap-markdown round-trip output —
+    // `editor.storage.markdown.getMarkdown()` re-serializes and adds a
+    // trailing newline, so comparing the input to that output makes the
+    // dedup fail on every run and the effect loops forever
+    // (effect_update_depth_exceeded).
+    private lastSetContent: string | null = null;
+
     private chatClient: Chat<UIMessage>;
 
     constructor(
@@ -261,14 +270,17 @@ export class WysiwygEditorController {
     }
 
     /** Sync external content (e.g. file switch) into the editor, deduplicated.
-     *  Uses the shared `normalizeMarkdown` helper so a parse/serialize round-trip
-     *  by tiptap-markdown does not trigger an extra `setContent` call. */
+     *  Dedups against `lastSetContent` (the input we last passed to
+     *  `setContent`) rather than the round-trip output of `getMarkdown()` —
+     *  the round-trip is lossy (trailing newline, table reformatting) so
+     *  comparing the input to it makes the dedup fail on every run, which
+     *  triggers `effect_update_depth_exceeded` in the parent `$effect`. */
     syncExternalContent(content: string): void {
         const editor = this.getEditor();
         if (!editor) return;
-        const current = editor.storage as { markdown?: { getMarkdown?: () => string } };
-        const currentMd = current.markdown?.getMarkdown?.() ?? editor.getHTML();
-        if (normalizeMarkdown(content) === normalizeMarkdown(currentMd)) return;
+        const normalized = normalizeMarkdown(content);
+        if (this.lastSetContent !== null && normalized === this.lastSetContent) return;
+        this.lastSetContent = normalized;
         editor.commands.setContent(content ?? "");
     }
 
