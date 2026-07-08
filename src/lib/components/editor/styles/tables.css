@@ -1,0 +1,108 @@
+/* === WysiwygEditor shadcnTheme partial === */
+/* Mirrors svelte-streamdown shadcnTheme (node_modules/svelte-streamdown/dist/theme.js:169-308). */
+/* Order: blocks → tables → code → media → chrome. Later files override earlier. */
+
+/* ---------- TABLES ---------- */
+/* Table styles — mirrors svelte-streamdown shadcnTheme table.* classes.
+ *
+ * Tiptap's TableView wraps every <table> in <div class="tableWrapper">
+ * (see @tiptap/extension-table TableView constructor). <table> is
+ * `display: table` and ignores the `overflow` property, so the
+ * horizontal-scroll container must live on the wrapper. Outer border
+ * and border-radius also belong on the wrapper — `border-collapse:
+ * collapse` on <table> silently drops border-radius from the corners,
+ * and the wrapper's `overflow-y: hidden` clips cells to the rounded
+ * shape.
+ *
+ * Requires @tiptap/extension-table to be added to the editor for live editing.
+ */
+
+.wysiwyg-editor-wrapper .tiptap .tableWrapper {
+
+         overflow-x: auto;
+         overflow-y: hidden;
+         margin-top: 1rem;
+         margin-bottom: 1rem;
+         border: 1px solid var(--border);
+         border-radius: 0.5rem;
+         /* iOS Safari momentum scrolling inside the scrollable wrapper.
+    * `-webkit-overflow-scrolling` is a non-standard but universally
+    * supported property on iOS; ignored on other platforms. */
+         -webkit-overflow-scrolling: touch;
+
+}
+
+.wysiwyg-editor-wrapper .tiptap table {
+
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 100%;
+
+}
+
+.wysiwyg-editor-wrapper .tiptap thead {
+
+    background: color-mix(in oklch, var(--muted), transparent 20%);
+
+}
+
+.wysiwyg-editor-wrapper .tiptap tr {
+
+    border-bottom: 1px solid var(--border);
+    transition: background-color 0.15s ease-in-out;
+
+}
+
+.wysiwyg-editor-wrapper .tiptap tbody tr:hover {
+
+    background-color: color-mix(in oklch, var(--muted), transparent 50%);
+
+}
+
+.wysiwyg-editor-wrapper .tiptap tfoot {
+
+    background-color: color-mix(in oklch, var(--muted), transparent 50%);
+    border-top: 1px solid var(--border);
+
+}
+
+.wysiwyg-editor-wrapper .tiptap tfoot td {
+
+    font-weight: 500;
+    color: var(--muted-foreground);
+
+}
+
+.wysiwyg-editor-wrapper .tiptap tr:last-child {
+
+    border-bottom: none;
+
+}
+
+.wysiwyg-editor-wrapper .tiptap th, .wysiwyg-editor-wrapper .tiptap td {
+
+    padding: 0.75rem 1rem;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    color: var(--foreground);
+    min-width: 200px;
+    max-width: 400px;
+    overflow-wrap: break-word;
+
+}
+
+.wysiwyg-editor-wrapper .tiptap th {
+
+    font-weight: 600;
+    text-align: left;
+
+}
+
+/* Tiptap renders <td><p>…</p></td>. Neutralize the <p> margin so cell padding
+ * is the only spacing. */
+
+.wysiwyg-editor-wrapper .tiptap th > p, .wysiwyg-editor-wrapper .tiptap td > p {
+
+    margin: 0;
+
+}

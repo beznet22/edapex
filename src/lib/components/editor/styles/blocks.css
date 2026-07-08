@@ -1,0 +1,494 @@
+/* === WysiwygEditor shadcnTheme partial === */
+/* Mirrors svelte-streamdown shadcnTheme (node_modules/svelte-streamdown/dist/theme.js:169-308). */
+/* Order: blocks → tables → code → media → chrome. Later files override earlier. */
+
+/* Mirrors svelte-streamdown shadcnTheme (node_modules/svelte-streamdown/dist/theme.js:169-308). */
+/* Order: blocks → tables → code → media → chrome. Later files override earlier. */
+/* ---------- BLOCKS ---------- */
+/* Block-level typography and structural elements: headings, paragraphs,
+ * lists, task lists, blockquote, hr, sup/sub, callouts. */
+
+.wysiwyg-editor-wrapper .tiptap {
+
+    color: var(--foreground);
+
+}
+
+.wysiwyg-editor-wrapper .tiptap h1 {
+
+    margin-top: 1.5rem;
+    margin-bottom: 0.5rem;
+    font-size: 1.875rem;
+    line-height: 2.25rem;
+    font-weight: 600;
+    color: var(--foreground);
+
+}
+
+.wysiwyg-editor-wrapper .tiptap h2 {
+
+    margin-top: 1.5rem;
+    margin-bottom: 0.5rem;
+    font-size: 1.5rem;
+    line-height: 2rem;
+    font-weight: 600;
+    color: var(--foreground);
+
+}
+
+.wysiwyg-editor-wrapper .tiptap h3 {
+
+    margin-top: 1.5rem;
+    margin-bottom: 0.5rem;
+    font-size: 1.25rem;
+    line-height: 1.75rem;
+    font-weight: 600;
+    color: var(--foreground);
+
+}
+
+.wysiwyg-editor-wrapper .tiptap h4 {
+
+    margin-top: 1.5rem;
+    margin-bottom: 0.5rem;
+    font-size: 1.125rem;
+    line-height: 1.75rem;
+    font-weight: 600;
+    color: var(--foreground);
+
+}
+
+.wysiwyg-editor-wrapper .tiptap h5 {
+
+    margin-top: 1.5rem;
+    margin-bottom: 0.5rem;
+    font-size: 1rem;
+    line-height: 1.5rem;
+    font-weight: 600;
+    color: var(--foreground);
+
+}
+
+.wysiwyg-editor-wrapper .tiptap h6 {
+
+    margin-top: 1.5rem;
+    margin-bottom: 0.5rem;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    font-weight: 600;
+    color: var(--foreground);
+
+}
+
+.wysiwyg-editor-wrapper .tiptap p {
+
+    color: var(--foreground);
+
+}
+
+/* Lists — `list-inside` matches svelte-streamdown shadcnTheme; bullets
+ * sit on the same row as the first line of content. */
+
+.wysiwyg-editor-wrapper .tiptap ul {
+
+    margin-left: 1rem;
+    list-style-position: inside;
+    list-style-type: disc;
+    white-space: normal;
+    color: var(--foreground);
+
+}
+
+.wysiwyg-editor-wrapper .tiptap ol {
+
+    margin-left: 1rem;
+    list-style-position: inside;
+    white-space: normal;
+    color: var(--foreground);
+
+}
+
+.wysiwyg-editor-wrapper .tiptap li {
+
+    padding-top: 0.25rem;
+    padding-bottom: 0.25rem;
+
+}
+
+/* Tiptap renders <li><p>…</p></li>. The browser's default <p> margin: 1em 0
+ * collapses the inside marker, so neutralize the <p> inside <li>. */
+
+.wysiwyg-editor-wrapper .tiptap li > p {
+
+    margin: 0;
+
+}
+
+.wysiwyg-editor-wrapper .tiptap li::marker {
+
+    color: var(--muted-foreground);
+
+}
+
+/* Task list — checkbox items. Tiptap renders <ul data-type="taskList"><li data-type="taskItem">
+ * with a hidden checkbox + label. The Tiptap TaskItem wraps the content in <div><p>…</p></div>;
+ * because <p> is block-level by default the checkbox ends up on a row ABOVE the text.
+ * Setting <div> to display:flex and <p> to flex:1 puts the checkbox and the first line of
+ * text on the same row while still allowing multi-line <p> content to wrap. */
+
+.wysiwyg-editor-wrapper .tiptap ul[data-type="taskList"] {
+
+    list-style: none;
+    padding-left: 0.25rem;
+
+}
+
+.wysiwyg-editor-wrapper .tiptap li[data-type="taskItem"] {
+
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+
+}
+
+.wysiwyg-editor-wrapper .tiptap li[data-type="taskItem"] > label {
+
+    flex: 0 0 auto;
+    margin-top: 0.35rem;
+    user-select: none;
+
+}
+
+.wysiwyg-editor-wrapper .tiptap li[data-type="taskItem"] > div {
+
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    align-items: flex-start;
+
+}
+
+.wysiwyg-editor-wrapper .tiptap li[data-type="taskItem"] > div > p {
+
+    flex: 1 1 auto;
+    min-width: 0;
+    margin: 0;
+
+}
+
+.wysiwyg-editor-wrapper .tiptap li[data-type="taskItem"] input[type="checkbox"] {
+
+    accent-color: var(--primary);
+    cursor: pointer;
+
+}
+
+.wysiwyg-editor-wrapper .tiptap code {
+
+    background-color: var(--muted);
+    border-radius: 0.25rem;
+    padding-left: 0.375rem;
+    padding-right: 0.375rem;
+    padding-top: 0.125rem;
+    padding-bottom: 0.125rem;
+    font-family: var(--font-mono);
+    color: var(--foreground);
+    font-size: 0.9em;
+
+}
+
+.wysiwyg-editor-wrapper .tiptap strong {
+
+    font-weight: 600;
+    color: var(--foreground);
+
+}
+
+.wysiwyg-editor-wrapper .tiptap em {
+
+    font-style: italic;
+
+}
+
+.wysiwyg-editor-wrapper .tiptap u {
+
+    text-decoration: underline;
+    text-underline-offset: 2px;
+
+}
+
+.wysiwyg-editor-wrapper .tiptap a {
+
+    color: var(--primary);
+    overflow-wrap: anywhere;
+    font-weight: 500;
+    text-decoration-line: underline;
+
+}
+
+.wysiwyg-editor-wrapper .tiptap a:hover {
+
+    color: color-mix(in oklch, var(--primary), transparent 20%);
+
+}
+
+/* Focus ring for keyboard navigation when tabbing through links inside
+ * the editor content. The Tiptap Link extension config sets `rel="noopener
+ * noreferrer"` and `class="tiptap-link"` on every rendered <a>. */
+
+.wysiwyg-editor-wrapper .tiptap a:focus-visible {
+
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+    border-radius: 0.125rem;
+
+}
+
+/* Selected link — when the cursor sits inside a link mark, ProseMirror
+ * adds ProseMirror-selectednode to the <a>. Tinted background to signal
+ * the mark's active range without interfering with the underline. */
+
+.wysiwyg-editor-wrapper .tiptap a.ProseMirror-selectednode {
+
+    background-color: color-mix(in oklch, var(--primary), transparent 92%);
+
+}
+
+.wysiwyg-editor-wrapper .tiptap blockquote {
+
+    border-color: color-mix(
+        in oklch,
+        var(--muted-foreground),
+        transparent 70%
+    );
+    color: var(--muted-foreground);
+    margin-top: 1rem;
+    margin-bottom: 1rem;
+    border-left-width: 4px;
+    padding-left: 1rem;
+    font-style: italic;
+
+}
+
+.wysiwyg-editor-wrapper .tiptap hr {
+
+    border: none;
+    border-top: 1px solid var(--border);
+    margin-top: 1.5rem;
+    margin-bottom: 1.5rem;
+    height: 0;
+
+}
+
+.wysiwyg-editor-wrapper .tiptap del {
+
+    color: var(--muted-foreground);
+
+}
+
+/* Description list — mirrors svelte-streamdown shadcnTheme
+ * descriptionList / descriptionTerm / descriptionDetail.
+ * Renders <dl><dt>…</dt><dd>…</dd></dl>. */
+
+.wysiwyg-editor-wrapper .tiptap dl.tiptap-description-list {
+
+    margin-top: 1rem;
+    margin-bottom: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+
+}
+
+.wysiwyg-editor-wrapper .tiptap dt.tiptap-description-term {
+
+    font-weight: 600;
+    color: var(--foreground);
+    border-left: 2px solid var(--border);
+    padding-left: 1rem;
+
+}
+
+.wysiwyg-editor-wrapper .tiptap dd.tiptap-description-detail {
+
+    color: var(--muted-foreground);
+    margin-left: 1rem;
+    line-height: 1.625;
+
+}
+
+/* Neutralize the <p> margin inside dd so cell-like padding is the only spacing. */
+
+.wysiwyg-editor-wrapper .tiptap dd.tiptap-description-detail > p {
+
+    margin: 0;
+
+}
+
+/* Sup / sub — svelte-streamdown shadcnTheme uses text-sm. */
+
+.wysiwyg-editor-wrapper .tiptap sup, .wysiwyg-editor-wrapper .tiptap sub {
+
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+
+}
+
+/* Callout — mirrors svelte-streamdown shadcnTheme alert.* classes.
+ * <aside data-callout data-type="…"><div data-callout-title>…</div><div data-callout-content>…</div></aside> */
+
+.wysiwyg-editor-wrapper .tiptap aside[data-callout] {
+
+    position: relative;
+    margin-top: 1rem;
+    margin-bottom: 1rem;
+    border-left-width: 4px;
+    padding: 1rem;
+    background-color: var(--card);
+    border-radius: 0 0.375rem 0.375rem 0;
+
+}
+
+.wysiwyg-editor-wrapper .tiptap aside[data-callout] > [data-callout-title] {
+
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+    text-transform: capitalize;
+
+}
+
+.wysiwyg-editor-wrapper .tiptap aside[data-callout] > [data-callout-title]::before {
+
+    content: "";
+    display: inline-block;
+    width: 1rem;
+    height: 1rem;
+    flex-shrink: 0;
+    background: currentColor;
+    mask-size: contain;
+    mask-repeat: no-repeat;
+    -webkit-mask-size: contain;
+    -webkit-mask-repeat: no-repeat;
+
+}
+
+.wysiwyg-editor-wrapper .tiptap aside[data-callout][data-type="note"] > [data-callout-title]::before {
+
+    mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='10' fill='none' stroke='%23000' stroke-width='2'/%3E%3Cpath d='M12 16v-4' fill='none' stroke='%23000' stroke-width='2'/%3E%3Cpath d='M12 8h.01' fill='none' stroke='%23000' stroke-width='2'/%3E%3C/svg%3E");
+    -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='10' fill='none' stroke='%23000' stroke-width='2'/%3E%3Cpath d='M12 16v-4' fill='none' stroke='%23000' stroke-width='2'/%3E%3Cpath d='M12 8h.01' fill='none' stroke='%23000' stroke-width='2'/%3E%3C/svg%3E");
+
+}
+
+.wysiwyg-editor-wrapper .tiptap aside[data-callout][data-type="tip"] > [data-callout-title]::before {
+
+    mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5' fill='none' stroke='%23000' stroke-width='2'/%3E%3Cpath d='M9 18h6' fill='none' stroke='%23000' stroke-width='2'/%3E%3Cpath d='M10 22h4' fill='none' stroke='%23000' stroke-width='2'/%3E%3C/svg%3E");
+    -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5' fill='none' stroke='%23000' stroke-width='2'/%3E%3Cpath d='M9 18h6' fill='none' stroke='%23000' stroke-width='2'/%3E%3Cpath d='M10 22h4' fill='none' stroke='%23000' stroke-width='2'/%3E%3C/svg%3E");
+
+}
+
+.wysiwyg-editor-wrapper .tiptap aside[data-callout][data-type="warning"] > [data-callout-title]::before {
+
+    mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3' fill='none' stroke='%23000' stroke-width='2'/%3E%3Cpath d='M12 9v4' fill='none' stroke='%23000' stroke-width='2'/%3E%3Cpath d='M12 17h.01' fill='none' stroke='%23000' stroke-width='2'/%3E%3C/svg%3E");
+    -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3' fill='none' stroke='%23000' stroke-width='2'/%3E%3Cpath d='M12 9v4' fill='none' stroke='%23000' stroke-width='2'/%3E%3Cpath d='M12 17h.01' fill='none' stroke='%23000' stroke-width='2'/%3E%3C/svg%3E");
+
+}
+
+.wysiwyg-editor-wrapper .tiptap aside[data-callout][data-type="caution"] > [data-callout-title]::before {
+
+    mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='10' fill='none' stroke='%23000' stroke-width='2'/%3E%3Cline x1='12' y1='8' x2='12' y2='12' stroke='%23000' stroke-width='2'/%3E%3Cline x1='12' y1='16' x2='12.01' y2='16' stroke='%23000' stroke-width='2'/%3E%3C/svg%3E");
+    -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='10' fill='none' stroke='%23000' stroke-width='2'/%3E%3Cline x1='12' y1='8' x2='12' y2='12' stroke='%23000' stroke-width='2'/%3E%3Cline x1='12' y1='16' x2='12.01' y2='16' stroke='%23000' stroke-width='2'/%3E%3C/svg%3E");
+
+}
+
+.wysiwyg-editor-wrapper .tiptap aside[data-callout][data-type="important"] > [data-callout-title]::before {
+
+    mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z' fill='none' stroke='%23000' stroke-width='2'/%3E%3Cpath d='M7 11h10' fill='none' stroke='%23000' stroke-width='2'/%3E%3Cpath d='M7 15h6' fill='none' stroke='%23000' stroke-width='2'/%3E%3Cpath d='M7 7h8' fill='none' stroke='%23000' stroke-width='2'/%3E%3C/svg%3E");
+    -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z' fill='none' stroke='%23000' stroke-width='2'/%3E%3Cpath d='M7 11h10' fill='none' stroke='%23000' stroke-width='2'/%3E%3Cpath d='M7 15h6' fill='none' stroke='%23000' stroke-width='2'/%3E%3Cpath d='M7 7h8' fill='none' stroke='%23000' stroke-width='2'/%3E%3C/svg%3E");
+
+}
+
+.wysiwyg-editor-wrapper .tiptap aside[data-callout] > [data-callout-content] > p {
+
+    margin: 0;
+
+}
+
+/* Callout semantic colors — single source of truth for note/tip/warning/
+ * important. caution already maps to --destructive (theme token). Values
+ * mirror Tailwind v4's blue-600 / green-600 / yellow-600 / purple-600 so
+ * the editor matches svelte-streamdown shadcnTheme's alert palette
+ * without depending on Tailwind's color var generation. */
+
+.wysiwyg-editor-wrapper {
+
+    --callout-note-color: oklch(0.6 0.18 240);
+    --callout-tip-color: oklch(0.55 0.17 145);
+    --callout-warning-color: oklch(0.7 0.16 85);
+    --callout-important-color: oklch(0.58 0.2 300);
+
+}
+
+.wysiwyg-editor-wrapper .tiptap aside[data-callout][data-type="note"] {
+
+    border-color: var(--callout-note-color);
+
+}
+
+.wysiwyg-editor-wrapper .tiptap aside[data-callout][data-type="note"] > [data-callout-title] {
+
+    color: var(--callout-note-color);
+
+}
+
+.wysiwyg-editor-wrapper .tiptap aside[data-callout][data-type="tip"] {
+
+    border-color: var(--callout-tip-color);
+
+}
+
+.wysiwyg-editor-wrapper .tiptap aside[data-callout][data-type="tip"] > [data-callout-title] {
+
+    color: var(--callout-tip-color);
+
+}
+
+.wysiwyg-editor-wrapper .tiptap aside[data-callout][data-type="warning"] {
+
+    border-color: var(--callout-warning-color);
+
+}
+
+.wysiwyg-editor-wrapper .tiptap aside[data-callout][data-type="warning"] > [data-callout-title] {
+
+    color: var(--callout-warning-color);
+
+}
+
+.wysiwyg-editor-wrapper .tiptap aside[data-callout][data-type="caution"] {
+
+    border-color: var(--destructive);
+
+}
+
+.wysiwyg-editor-wrapper .tiptap aside[data-callout][data-type="caution"] > [data-callout-title] {
+
+    color: var(--destructive);
+
+}
+
+.wysiwyg-editor-wrapper .tiptap aside[data-callout][data-type="important"] {
+
+    border-color: var(--callout-important-color);
+
+}
+
+.wysiwyg-editor-wrapper .tiptap aside[data-callout][data-type="important"] > [data-callout-title] {
+
+    color: var(--callout-important-color);
+
+}

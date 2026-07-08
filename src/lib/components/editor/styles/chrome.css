@@ -1,0 +1,174 @@
+/* === WysiwygEditor shadcnTheme partial === */
+/* Mirrors svelte-streamdown shadcnTheme (node_modules/svelte-streamdown/dist/theme.js:169-308). */
+/* Order: blocks → tables → code → media → chrome. Later files override earlier. */
+
+/* ---------- CHROME ---------- */
+/* Editor chrome — selection styling, mention pill, AI popover anchor,
+ * drag handle, and other meta-elements that wrap content rather than
+ * being content themselves.
+ */
+/* (3) Task list — checked line-through (Novel parity) */
+
+.wysiwyg-editor-wrapper .tiptap ul[data-type="taskList"] li[data-checked="true"] > div > p {
+
+    color: var(--muted-foreground);
+    text-decoration: line-through;
+    text-decoration-thickness: 2px;
+
+}
+
+/* (4) Selected node background — highlights the block when cursor inside
+ * (Novel .ProseMirror:not(.dragging) .ProseMirror-selectednode parity) */
+
+.wysiwyg-editor-wrapper .tiptap:not(.dragging) .ProseMirror-selectednode {
+
+    outline: none !important;
+    background-color: color-mix(in oklch, var(--primary), transparent 92%);
+    transition: background-color 0.2s;
+    box-shadow: none;
+
+}
+
+/* (5) Bold color issue fix — span/mark with inline color shouldn't trap bold.
+ * Novel parity for span[style] > strong and mark[style] > strong. */
+
+.wysiwyg-editor-wrapper .tiptap span[style] > strong, .wysiwyg-editor-wrapper .tiptap span[style] > b {
+
+    color: inherit;
+
+}
+
+.wysiwyg-editor-wrapper .tiptap mark[style] > strong, .wysiwyg-editor-wrapper .tiptap mark[style] > b {
+
+    color: inherit;
+
+}
+
+/* Mention — inline pill rendered by @tiptap/extension-mention. The Node
+ * itself is an inline atom; styling here ensures it reads as a
+ * structured variable without breaking the line baseline. */
+
+.wysiwyg-editor-wrapper .tiptap .mention {
+
+    display: inline-block;
+    padding: 0.0625rem 0.375rem;
+    margin: 0 0.0625rem;
+    background: color-mix(in oklch, var(--primary), transparent 88%);
+    color: var(--primary);
+    border: 1px solid color-mix(in oklch, var(--primary), transparent 70%);
+    border-radius: 0.375rem;
+    font-weight: 500;
+    font-size: 0.95em;
+    line-height: 1.2;
+    user-select: all;
+    cursor: default;
+
+}
+
+.wysiwyg-editor-wrapper .tiptap .mention::before {
+
+    content: "@";
+    opacity: 0.6;
+    margin-right: 0.125rem;
+
+}
+
+/* Mention suggestion popup — positioned absolutely, anchored to the caret
+ * by the suggestion plugin's clientRect. The popup itself is teleported
+ * to <body> so it escapes any overflow:hidden ancestor. */
+
+.mention-suggestion-popup {
+
+    font-family: inherit;
+
+}
+
+/* AiStreamNode — <NodeViewWrapper class="ai-stream-wrapper"> renders
+ * <p><Markdown /></p> indirectly through ProseMirror. Neutralize the
+ * trailing <p>'s default margin so the Accept/Discard row sits flush. */
+
+.wysiwyg-editor-wrapper .tiptap [data-ai-stream] > p {
+
+    margin: 0;
+
+}
+
+/* Selection styling */
+
+.wysiwyg-editor-wrapper .tiptap ::selection {
+
+    background: oklch(0.65 0.15 40 / 0.2);
+
+}
+
+/* Floating AI prompt popover anchor — positioned absolutely within the scroll container
+ * so the popover stays visible while the user scrolls. z-[60] sits above the
+ * BubbleMenu (z-50) and the slash/mention suggestion popups. */
+
+.ai-prompt-anchor {
+
+    position: absolute;
+    z-index: 60;
+
+}
+
+/* (6) Drag handle (⋮⋮ six-dot block drag) — renders the element from
+ * tiptap-extension-global-drag-handle. The library creates a `position: fixed`
+ * div; we position, size, add the icon, and control visibility.
+ * Hidden on mobile (< 600px) — BottomToolbar handles reordering instead. */
+
+.drag-handle {
+
+    position: fixed;
+    opacity: 1;
+    transition:
+        opacity ease-in 0.2s,
+        background-color 0.2s;
+    border-radius: 0.25rem;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10' style='fill: rgba(0, 0, 0, 0.5)'%3E%3Cpath d='M3,2 C2.44771525,2 2,1.55228475 2,1 C2,0.44771525 2.44771525,0 3,0 C3.55228475,0 4,0.44771525 4,1 C4,1.55228475 3.55228475,2 3,2 Z M3,6 C2.44771525,6 2,5.55228475 2,5 C2,4.44771525 2.44771525,4 3,4 C3.55228475,4 4,4.44771525 4,5 C4,5.55228475 3.55228475,6 3,6 Z M3,10 C2.44771525,10 2,9.55228475 2,9 C2,8.44771525 2.44771525,8 3,8 C3.55228475,8 4,8.44771525 4,9 C4,9.55228475 3.55228475,10 3,10 Z M7,2 C6.44771525,2 6,1.55228475 6,1 C6,0.44771525 6.44771525,0 7,0 C7.55228475,0 8,0.44771525 8,1 C8,1.55228475 7.55228475,2 7,2 Z M7,6 C6.44771525,6 6,5.55228475 6,5 C6,4.44771525 6.44771525,4 7,4 C7.55228475,4 8,4.44771525 8,5 C8,5.55228475 7.55228475,6 7,6 Z M7,10 C6.44771525,10 6,9.55228475 6,9 C6,8.44771525 6.44771525,8 7,8 C7.55228475,8 8,8.44771525 8,9 C8,9.55228475 7.55228475,10 7,10 Z'%3E%3C/path%3E%3C/svg%3E");
+    background-size: calc(0.5em + 0.375rem) calc(0.5em + 0.375rem);
+    background-repeat: no-repeat;
+    background-position: center;
+    width: 1.2rem;
+    height: 1.5rem;
+    z-index: 50;
+    cursor: grab;
+
+}
+
+.drag-handle:hover {
+
+    background-color: color-mix(in oklch, var(--muted), transparent 70%);
+    transition: background-color 0.2s;
+
+}
+
+.drag-handle:active {
+
+    background-color: color-mix(in oklch, var(--muted), transparent 40%);
+    transition: background-color 0.2s;
+    cursor: grabbing;
+
+}
+
+.drag-handle.hide {
+
+    opacity: 0;
+    pointer-events: none;
+
+}
+
+@media screen and (max-width: 600px) {
+
+    .drag-handle {
+        display: none;
+        pointer-events: none;
+    }
+
+}
+
+.dark .drag-handle {
+
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10' style='fill: rgba(255, 255, 255, 0.5)'%3E%3Cpath d='M3,2 C2.44771525,2 2,1.55228475 2,1 C2,0.44771525 2.44771525,0 3,0 C3.55228475,0 4,0.44771525 4,1 C4,1.55228475 3.55228475,2 3,2 Z M3,6 C2.44771525,6 2,5.55228475 2,5 C2,4.44771525 2.44771525,4 3,4 C3.55228475,4 4,4.44771525 4,5 C4,5.55228475 3.55228475,6 3,6 Z M3,10 C2.44771525,10 2,9.55228475 2,9 C2,8.44771525 2.44771525,8 3,8 C3.55228475,8 4,8.44771525 4,9 C4,9.55228475 3.55228475,10 3,10 Z M7,2 C6.44771525,2 6,1.55228475 6,1 C6,0.44771525 6.44771525,0 7,0 C7.55228475,0 8,0.44771525 8,1 C8,1.55228475 7.55228475,2 7,2 Z M7,6 C6.44771525,6 6,5.55228475 6,5 C6,4.44771525 6.44771525,4 7,4 C7.55228475,4 8,4.44771525 8,5 C8,5.55228475 7.55228475,6 7,6 Z M7,10 C6.44771525,10 6,9.55228475 6,9 C6,8.44771525 6.44771525,8 7,8 C7.55228475,8 8,8.44771525 8,9 C8,9.55228475 7.55228475,10 7,10 Z'/%3E%3Cpath d='M3,2 C2.44771525,2 2,1.55228475 2,1 C2,0.44771525 2.44771525,0 3,0 C3.55228475,0 4,0.44771525 4,1 C4,1.55228475 3.55228475,2 3,2 Z M3,6 C2.44771525,6 2,5.55228475 2,5 C2,4.44771525 2.44771525,4 3,4 C3.55228475,4 4,4.44771525 4,5 C4,5.55228475 3.55228475,6 3,6 Z M3,10 C2.44771525,10 2,9.55228475 2,9 C2,8.44771525 2.44771525,8 3,8 C3.55228475,8 4,8.44771525 4,9 C4,9.55228475 3.55228475,10 3,10 Z M7,2 C6.44771525,2 6,1.55228475 6,1 C6,0.44771525 6.44771525,0 7,0 C7.55228475,0 8,0.44771525 8,1 C8,1.55228475 7.55228475,2 7,2 Z M7,6 C6.44771525,6 6,5.55228475 6,5 C6,0.44771525 6.44771525,4 7,4 C7.55228475,4 8,4.44771525 8,5 C8,5.55228475 7.55228475,6 7,6 Z M7,10 C6.44771525,10 6,9.55228475 6,9 C6,0.44771525 6.44771525,8 7,8 C7.55228475,8 8,8.447725 8,9 C8,9.55228475 7.55228475,10 7,10 Z'%3E%3C/path%3E%3C/svg%3E");
+
+}

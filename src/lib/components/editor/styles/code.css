@@ -1,0 +1,205 @@
+/* === WysiwygEditor shadcnTheme partial === */
+/* Mirrors svelte-streamdown shadcnTheme (node_modules/svelte-streamdown/dist/theme.js:169-308). */
+/* Order: blocks → tables → code → media → chrome. Later files override earlier. */
+
+/* ---------- CODE ---------- */
+/* Code block + syntax-highlighting styles — mirrors svelte-streamdown
+ * shadcnTheme code.* and codespan.* classes.
+ *
+ * Tiptap CodeBlock renders <pre><code class="language-xxx">…</code></pre>.
+ * The CodeBlockHighlight NodeView (see extensions/code-block-lowlight.ts)
+ * wraps the <pre> in <div class="code-block-wrapper"> with a header bar
+ * carrying the language label and copy-to-clipboard button — mirrors
+ * svelte-streamdown's code.base / code.header / code.buttons / code.language
+ * / components.button stack.
+ */
+
+.wysiwyg-editor-wrapper .tiptap .code-block-wrapper {
+
+    margin-top: 1rem;
+    margin-bottom: 1rem;
+    width: 100%;
+    overflow: hidden;
+    border-radius: 0.5rem;
+    border: 1px solid var(--border);
+    background-color: color-mix(in oklch, var(--muted), transparent 60%);
+    display: flex;
+    flex-direction: column;
+
+}
+
+.wysiwyg-editor-wrapper .tiptap .code-block-header {
+
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background-color: color-mix(in oklch, var(--muted), transparent 20%);
+    padding: 0.25rem 0.5rem;
+    color: var(--muted-foreground);
+    font-size: 0.75rem;
+    line-height: 1rem;
+
+}
+
+.wysiwyg-editor-wrapper .tiptap .code-block-language {
+
+    margin-left: 0.25rem;
+    font-family: var(--font-mono);
+    text-transform: lowercase;
+
+}
+
+.wysiwyg-editor-wrapper .tiptap .code-block-copy {
+
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.5rem;
+    height: 1.5rem;
+    padding: 0.25rem;
+    color: var(--muted-foreground);
+    background: transparent;
+    border: none;
+    border-radius: 0.25rem;
+    cursor: pointer;
+    transition:
+        color 0.15s ease-in-out,
+        background-color 0.15s ease-in-out;
+
+}
+
+.wysiwyg-editor-wrapper .tiptap .code-block-copy:hover {
+
+    color: var(--foreground);
+    background-color: color-mix(in oklch, var(--border), transparent 50%);
+
+}
+
+.wysiwyg-editor-wrapper .tiptap .code-block-copy:focus-visible {
+
+    outline: 2px solid var(--ring);
+    outline-offset: 1px;
+
+}
+
+.wysiwyg-editor-wrapper .tiptap .code-block-copy--success {
+
+    color: oklch(0.55 0.17 145);
+
+}
+
+.wysiwyg-editor-wrapper .tiptap pre.code-block-pre {
+
+    margin: 0;
+    width: 100%;
+    overflow-x: auto;
+    border-radius: 0;
+    border: none;
+    background-color: color-mix(in oklch, var(--muted), transparent 40%);
+    padding: 0.75rem 1rem;
+    font-family: var(--font-mono);
+    font-size: 0.8125rem;
+    line-height: 1.5;
+    color: var(--foreground);
+    white-space: pre;
+
+}
+
+.wysiwyg-editor-wrapper .tiptap pre.code-block-pre code {
+
+    background-color: transparent;
+    border-radius: 0;
+    padding: 0;
+    color: inherit;
+    font-size: inherit;
+    font-family: inherit;
+    white-space: pre;
+
+}
+
+/* Legacy fallback for any code block that hasn't been wrapped by the
+ * NodeView (e.g. content pasted as raw HTML before the extension loaded).
+ * Mirrors the shadcnTheme `pre` styling so un-wrapped <pre> still looks
+ * acceptable. */
+
+.wysiwyg-editor-wrapper .tiptap pre:not(.code-block-pre) {
+
+    margin-top: 1rem;
+    margin-bottom: 1rem;
+    width: 100%;
+    overflow-x: auto;
+    border-radius: 0.5rem;
+    border: 1px solid var(--border);
+    background-color: color-mix(in oklch, var(--muted), transparent 60%);
+    padding: 0.75rem 1rem;
+    font-family: var(--font-mono);
+    font-size: 0.8125rem;
+    line-height: 1.5;
+    color: var(--foreground);
+    white-space: pre;
+
+}
+
+.wysiwyg-editor-wrapper .tiptap pre:not(.code-block-pre) code {
+
+    background-color: transparent;
+    border-radius: 0;
+    padding: 0;
+    color: inherit;
+    font-size: inherit;
+    font-family: inherit;
+    white-space: pre;
+
+}
+
+/* Syntax highlighting — lowlight emits <span class="hljs-xxx"> tokens. Uses design-token
+ * oklch hues so highlighting reads correctly in both light and dark modes. */
+
+.wysiwyg-editor-wrapper .tiptap .hljs-keyword, .wysiwyg-editor-wrapper .tiptap .hljs-selector-tag, .wysiwyg-editor-wrapper .tiptap .hljs-built_in, .wysiwyg-editor-wrapper .tiptap .hljs-name, .wysiwyg-editor-wrapper .tiptap .hljs-tag {
+
+    color: oklch(0.55 0.18 280);
+
+}
+
+.wysiwyg-editor-wrapper .tiptap .hljs-string, .wysiwyg-editor-wrapper .tiptap .hljs-attr, .wysiwyg-editor-wrapper .tiptap .hljs-symbol, .wysiwyg-editor-wrapper .tiptap .hljs-bullet, .wysiwyg-editor-wrapper .tiptap .hljs-addition {
+
+    color: oklch(0.55 0.16 145);
+
+}
+
+.wysiwyg-editor-wrapper .tiptap .hljs-number, .wysiwyg-editor-wrapper .tiptap .hljs-literal, .wysiwyg-editor-wrapper .tiptap .hljs-meta {
+
+    color: oklch(0.6 0.18 40);
+
+}
+
+.wysiwyg-editor-wrapper .tiptap .hljs-comment, .wysiwyg-editor-wrapper .tiptap .hljs-quote, .wysiwyg-editor-wrapper .tiptap .hljs-deletion {
+
+    color: var(--muted-foreground);
+    font-style: italic;
+
+}
+
+.wysiwyg-editor-wrapper .tiptap .hljs-function, .wysiwyg-editor-wrapper .tiptap .hljs-title, .wysiwyg-editor-wrapper .tiptap .hljs-class .hljs-title, .wysiwyg-editor-wrapper .tiptap .hljs-attribute {
+
+    color: oklch(0.55 0.2 240);
+
+}
+
+.wysiwyg-editor-wrapper .tiptap .hljs-variable, .wysiwyg-editor-wrapper .tiptap .hljs-template-variable, .wysiwyg-editor-wrapper .tiptap .hljs-regexp {
+
+    color: oklch(0.55 0.2 25);
+
+}
+
+.wysiwyg-editor-wrapper .tiptap .hljs-emphasis {
+
+    font-style: italic;
+
+}
+
+.wysiwyg-editor-wrapper .tiptap .hljs-strong {
+
+    font-weight: 700;
+
+}

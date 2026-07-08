@@ -1,0 +1,50 @@
+/* === WysiwygEditor shadcnTheme partial === */
+/* Mirrors svelte-streamdown shadcnTheme (node_modules/svelte-streamdown/dist/theme.js:169-308). */
+/* Order: blocks → tables → code → media → chrome. Later files override earlier. */
+
+/* Wrapper scope + entry @imports. */
+
+@import "./blocks.css";
+@import "./tables.css";
+@import "./code.css";
+@import "./media.css";
+@import "./chrome.css";
+
+/* Tiptap renders <blockquote><p>…</p></blockquote>. The <p>'s 1em margin
+ * doubles the blockquote's spacing — neutralize it. */
+
+.wysiwyg-editor-wrapper .tiptap blockquote > :first-child, .wysiwyg-editor-wrapper .tiptap blockquote > :last-child {
+
+    margin-top: 0;
+    margin-bottom: 0;
+
+}
+
+/* Placeholder styling */
+
+.wysiwyg-editor-wrapper .tiptap p.is-editor-empty:first-child::before, .wysiwyg-editor-wrapper .tiptap p.is-empty::before {
+
+    content: attr(data-placeholder);
+    float: left;
+    color: var(--muted-foreground);
+    pointer-events: none;
+    height: 0;
+    font-style: italic;
+    opacity: 0.5;
+
+}
+
+/* First/last-child margin reset — mirrors <Markdown />'s [&>*:first-child]:mt-0 [&>*:last-child]:mb-0
+ * so WYSIWYG edges match the preview exactly. */
+
+.wysiwyg-editor-wrapper .tiptap > :first-child {
+
+    margin-top: 0 !important;
+
+}
+
+.wysiwyg-editor-wrapper .tiptap > :last-child {
+
+    margin-bottom: 0 !important;
+
+}
