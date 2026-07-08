@@ -1,7 +1,7 @@
 import { createStep } from '@mastra/core/workflows';
 import { z } from 'zod';
 import { chatWorkflowInputSchema, fileStreamItemSchema, optionItemSchema, pendingSelectionSchema } from '../../utils/chat-schemas';
-import { writeDataPart } from '../../utils/chat-utils';
+import { writeDataPart, type MemoryContext } from '../../utils/chat-utils';
 
 export const selectionGateStep = createStep({
 	id: 'selectionGate',
@@ -24,7 +24,10 @@ export const selectionGateStep = createStep({
 	resumeSchema: z.object({
 		selectedOptionId: z.string()
 	}),
-	execute: async ({ inputData, requestContext, resumeData, suspend, writer, runId }) => {
+	execute: async ({ inputData, getInitData, requestContext, resumeData, suspend, writer, runId }) => {
+		const init = getInitData() as z.infer<typeof chatWorkflowInputSchema>;
+		const memCtx: MemoryContext = { threadId: init.threadId, resourceId: init.resourceId };
+
 		const rawPending = requestContext?.get('pendingSelection');
 		const parsed = pendingSelectionSchema.safeParse(rawPending);
 
@@ -36,8 +39,8 @@ export const selectionGateStep = createStep({
 
 		if (!resumeData) {
 			const gateId = `gate-${runId}-${Date.now()}`;
-			if (writer) {
-				await writer.write({
+			await writeDataPart(writer, {
+				data: {
 					type: 'data-selectOption',
 					id: gateId,
 					data: {
@@ -46,8 +49,9 @@ export const selectionGateStep = createStep({
 						runId: runId ?? '',
 						stepId: 'selectionGate'
 					}
-				} as never);
-			}
+				},
+				memory: memCtx,
+			});
 			await suspend({
 				options: pending.options,
 				promptText: pending.prompt,
