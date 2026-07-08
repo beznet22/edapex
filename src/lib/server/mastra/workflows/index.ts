@@ -8,7 +8,6 @@
  */
 
 import { createWorkflow } from '@mastra/core/workflows';
-import { z } from 'zod';
 import {
 	AGENT_LOOP_MAX_ITERATIONS,
 	chatWorkflowInputSchema,
@@ -24,6 +23,8 @@ import { hitlVerifyStep } from './chat/hitl-verify-step';
 import { agentLoopStep } from './chat/agent-loop-step';
 import { passthroughStep } from './chat/passthrough-step';
 import { awaitValidationStep } from './chat/await-validation-step';
+import { seedAgentLoopStep } from './chat/seed-agent-loop-step';
+import { seedBranchInputStep } from './chat/seed-branch-input-step';
 
 import { deriveEditorContextStep } from './editor/derive-editor-context-step';
 import { resolveMentionsStep } from './editor/resolve-mentions-step';
@@ -84,20 +85,12 @@ export const chatWorkflow = createWorkflow({
 	.then(extractFileItemsStep)
 	.then(collapseStep)
 	.then(hitlVerifyStep)
-	// Map the workflow envelope to the agent-loop input shape. The agent
-	// loop reads promptText from getInitData() via the loop's first
-	// iteration; here we just seed the threadId/resourceId, forward the
-	// resolved file items, and start iteration=0.
-	.map(async ({ inputData, getInitData }) => {
-		const init = getInitData() as z.infer<typeof chatWorkflowInputSchema>;
-		return {
-			promptText: init.promptText,
-			threadId: inputData.threadId,
-			resourceId: inputData.resourceId,
-			resolvedFiles: inputData.fileItems ?? [],
-			iteration: 0
-		};
-	})
+	// Map the workflow envelope to the agent-loop input shape. Replaces a
+	// `.map()` step (see seedAgentLoopStep's header) because the internal
+	// mapping step's `z.any()` schema silently forwards `undefined` fields
+	// downstream, surfacing as `WORKFLOW_STEP_INPUT_VALIDATION_FAILED` at
+	// the agent-loop step instead of a clear error at the seam.
+	.then(seedAgentLoopStep)
 	.dountil(
 		agentLoopStep,
 		async ({ inputData, iterationCount }) => {
@@ -112,14 +105,11 @@ export const chatWorkflow = createWorkflow({
 			return inputData.status === 'done';
 		},
 	)
-	// Map the agent-loop output into the shared branch-input shape
+	// Project the agent-loop output into the shared branch-input shape
 	// ({ text, resolvedFiles }) so both `awaitValidationStep` and
-	// `passthroughStep` can consume it. The status/toolCallIds/iteration
-	// fields are no longer needed once we've exited the loop.
-	.map(async ({ inputData }) => ({
-		text: inputData.text,
-		resolvedFiles: inputData.resolvedFiles ?? []
-	}))
+	// `passthroughStep` can consume it. Replaces a `.map()` step for the
+	// same reason as `seedAgentLoopStep`.
+	.then(seedBranchInputStep)
 	.branch([
 		// Validation path: only when a marksheet was formatted in this turn.
 		// The step itself (after Task 2.2) also gates on these context keys,
