@@ -3,6 +3,7 @@ import type { Transaction } from "@tiptap/pm/state";
 import { Chat } from "@ai-sdk/svelte";
 import { DefaultChatTransport, type UIMessage } from "ai";
 import { cacheOriginalText, cleanupStaleCacheEntries } from "./extensions/ai-stream-cache";
+import { normalizeMarkdown } from "./markdown-normalize";
 
 declare global {
     interface Window {
@@ -260,15 +261,14 @@ export class WysiwygEditorController {
     }
 
     /** Sync external content (e.g. file switch) into the editor, deduplicated.
-     *  Normalizes both sides (trim + CRLF → LF) so a trailing-newline rewrite
-     *  on disk doesn't trigger an extra `setContent` round-trip. */
+     *  Uses the shared `normalizeMarkdown` helper so a parse/serialize round-trip
+     *  by tiptap-markdown does not trigger an extra `setContent` call. */
     syncExternalContent(content: string): void {
         const editor = this.getEditor();
         if (!editor) return;
         const current = editor.storage as { markdown?: { getMarkdown?: () => string } };
         const currentMd = current.markdown?.getMarkdown?.() ?? editor.getHTML();
-        const normalize = (s: string): string => s.trim().replace(/\r\n/g, "\n");
-        if (normalize(content) === normalize(currentMd)) return;
+        if (normalizeMarkdown(content) === normalizeMarkdown(currentMd)) return;
         editor.commands.setContent(content ?? "");
     }
 

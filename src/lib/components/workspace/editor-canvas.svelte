@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { ScrollArea } from "$lib/components/ui/scroll-area";
 	import WysiwygEditor from "$lib/components/editor/WysiwygEditor.svelte";
+	import { normalizeMarkdown } from "$lib/components/editor/markdown-normalize";
 	import BottomToolbar from "$lib/components/editor/BottomToolbar.svelte";
 	import MobileAISheet from "$lib/components/editor/MobileAISheet.svelte";
 	import {
@@ -229,7 +230,10 @@
 
 	$effect(() => {
 		const md = wysiwygContent;
-		if (!md || md === lastSavedContent) return;
+		// Normalize both sides so tiptap-markdown's parse/serialize round-trip
+		// (whitespace, CRLF, trailing newline) never triggers a spurious write.
+		// Real user edits still differ after normalization and continue to save.
+		if (!md || normalizeMarkdown(md) === normalizeMarkdown(lastSavedContent)) return;
 		if (streaming) return;
 		if (!artifactId) return;
 		if (!url) return;
