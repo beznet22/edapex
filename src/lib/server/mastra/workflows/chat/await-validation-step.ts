@@ -1,6 +1,7 @@
 import { createStep } from '@mastra/core/workflows';
 import { z } from 'zod';
-import { fileStreamItemSchema } from '../../utils/chat-schemas';
+import { fileStreamItemSchema, chatWorkflowInputSchema } from '../../utils/chat-schemas';
+import { writeDataPart, type MemoryContext } from '../../utils/chat-utils';
 import { buildWorkspaceRequestContext } from '$lib/server/helpers/chat-helper';
 import { tenantWorkspace } from '../../storage/workspaces';
 import type { TenantContext } from '../../tenant-context';
@@ -23,7 +24,10 @@ export const awaitValidationStep = createStep({
 	suspendSchema: z.object({
 		artifactId: z.string()
 	}),
-	execute: async ({ inputData, requestContext, resumeData, suspend, writer, mastra: m, runId }) => {
+	execute: async ({ inputData, getInitData, requestContext, resumeData, suspend, writer, mastra: m, runId }) => {
+		const init = getInitData() as z.infer<typeof chatWorkflowInputSchema>;
+		const memCtx: MemoryContext = { threadId: init.threadId, resourceId: init.resourceId };
+
 		const tenant = (requestContext?.get('tenantContext') as TenantContext | undefined);
 		const lastFormattedId = (requestContext?.get('lastFormattedDocumentId') as string | undefined);
 		const artifactId = (resumeData?.artifactId as string | undefined)
@@ -31,13 +35,14 @@ export const awaitValidationStep = createStep({
 
 		// First-run path: emit data-awaitValidation, then suspend
 		if (!resumeData) {
-			if (writer) {
-				await writer.write({
+			await writeDataPart(writer, {
+				data: {
 					type: 'data-awaitValidation',
 					id: `await-${artifactId}`,
 					data: { artifactId, runId: runId ?? '' }
-				} as never);
-			}
+				},
+				memory: memCtx,
+			});
 			await suspend({ artifactId });
 			return {
 				text: inputData.text,
@@ -112,16 +117,17 @@ export const awaitValidationStep = createStep({
 
 		// Emit data-validationErrors if there are unresolved issues
 		if (fixResult.unresolvedErrors && fixResult.unresolvedErrors.length > 0) {
-			if (writer) {
-				await writer.write({
+			await writeDataPart(writer, {
+				data: {
 					type: 'data-validationErrors',
 					id: `ve-${artifactId}`,
 					data: {
 						artifactId,
 						errors: fixResult.unresolvedErrors
 					}
-				} as never);
-			}
+				},
+				memory: memCtx,
+			});
 			await suspend({ artifactId });
 			return {
 				text: inputData.text,
