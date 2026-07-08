@@ -279,7 +279,15 @@ export class WysiwygEditorController {
         const editor = this.getEditor();
         if (!editor) return;
         const normalized = normalizeMarkdown(content);
-        if (this.lastSetContent !== null && normalized === this.lastSetContent) return;
+        const dedupHit =
+            this.lastSetContent !== null && normalized === this.lastSetContent;
+        console.log("[syncExternalContent]", {
+            inputLen: content.length,
+            normalizedLen: normalized.length,
+            lastSetLen: this.lastSetContent?.length ?? null,
+            dedupHit,
+        });
+        if (dedupHit) return;
         this.lastSetContent = normalized;
         editor.commands.setContent(content ?? "");
     }

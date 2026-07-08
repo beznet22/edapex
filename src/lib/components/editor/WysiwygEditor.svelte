@@ -175,8 +175,17 @@
 
     // Sync external content (e.g. file switch) into the editor via the
     // controller's dedup + tiptap-markdown parsing pipeline.
+    //
+    // Wrapped in `untrack` so the effect tracks ONLY `content` and not
+    // the reactive reads inside `syncExternalContent` (it reads the
+    // `$editor` Svelte store via the `getEditor` closure, and svelte-tiptap
+    // updates that store after every `setContent` -> fires `onUpdate` ->
+    // parent re-renders -> effect would re-run forever without this guard).
+    // The controller's internal `lastSetContent` dedup is the second line
+    // of defense.
     $effect(() => {
-        controller.syncExternalContent(content);
+        const incoming = content;
+        untrack(() => controller.syncExternalContent(incoming));
     });
 </script>
 
