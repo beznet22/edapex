@@ -250,13 +250,6 @@ export class WysiwygEditorController {
         });
     }
 
-    /** Called once when Tiptap creates the editor — seeds initial content. */
-    setInitialContent(content: string): void {
-        const editor = this.getEditor();
-        if (!editor) return;
-        editor.commands.setContent(content ?? "");
-    }
-
     /** Tiptap onUpdate — skip getMarkdown during aiStreamBlock transactions. */
     handleEditorUpdate(transaction: Transaction, editor: Editor): void {
         if (transaction.getMeta("aiStream")) return;
@@ -266,13 +259,16 @@ export class WysiwygEditorController {
         this.options.onUpdate?.(md);
     }
 
-    /** Sync external content (e.g. file switch) into the editor, deduplicated. */
+    /** Sync external content (e.g. file switch) into the editor, deduplicated.
+     *  Normalizes both sides (trim + CRLF → LF) so a trailing-newline rewrite
+     *  on disk doesn't trigger an extra `setContent` round-trip. */
     syncExternalContent(content: string): void {
         const editor = this.getEditor();
         if (!editor) return;
         const current = editor.storage as { markdown?: { getMarkdown?: () => string } };
         const currentMd = current.markdown?.getMarkdown?.() ?? editor.getHTML();
-        if (content === currentMd) return;
+        const normalize = (s: string): string => s.trim().replace(/\r\n/g, "\n");
+        if (normalize(content) === normalize(currentMd)) return;
         editor.commands.setContent(content ?? "");
     }
 
