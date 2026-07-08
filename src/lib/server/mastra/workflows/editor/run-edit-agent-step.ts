@@ -1,7 +1,7 @@
 import { createStep } from '@mastra/core/workflows';
-import { resolvedEditorCommandSchema, editorCommandResultSchema } from '../../editor/schemas';
-import { stripLeakedSelection } from '../../editor/strip-leaked-selection';
-import { streamWithAutoRetry } from '../../agent-stream-retry';
+import { resolvedEditorCommandSchema, editorCommandResultSchema } from '$lib/server/mastra/editor/schemas';
+import { stripLeakedSelection } from '$lib/server/mastra/editor/strip-leaked-selection';
+import { streamWithAutoRetry } from '$lib/server/mastra/agent-stream-retry';
 
 export const runEditAgentStep = createStep({
 	id: 'run-edit-agent',

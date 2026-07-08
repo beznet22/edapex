@@ -1,5 +1,5 @@
 import { createStep } from '@mastra/core/workflows';
-import { editorCommandRequestSchema, derivedEditorCommandSchema } from '../../editor/schemas';
+import { editorCommandRequestSchema, derivedEditorCommandSchema } from '$lib/server/mastra/editor/schemas';
 
 export const deriveEditorContextStep = createStep({
 	id: 'derive-editor-context',

@@ -1,7 +1,7 @@
 import { createStep } from '@mastra/core/workflows';
 import { z } from 'zod';
-import { chatWorkflowInputSchema, fileStreamItemSchema } from '../../utils/chat-schemas';
-import type { FileStreamItem } from '../../utils/chat-schemas';
+import { chatWorkflowInputSchema, fileStreamItemSchema } from '$lib/server/mastra/utils/chat-schemas';
+import type { FileStreamItem } from '$lib/server/mastra/utils/chat-schemas';
 
 export const classifyStep = createStep({
 	id: 'classify',

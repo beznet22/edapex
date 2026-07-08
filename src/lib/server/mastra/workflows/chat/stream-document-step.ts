@@ -1,5 +1,5 @@
 import { createStep } from '@mastra/core/workflows';
-import { fileStreamItemSchema } from '../../utils/chat-schemas';
+import { fileStreamItemSchema } from '$lib/server/mastra/utils/chat-schemas';
 
 export const streamDocumentStep = createStep({
 	id: 'stream-document',

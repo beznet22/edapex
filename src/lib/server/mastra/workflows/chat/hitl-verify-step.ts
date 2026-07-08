@@ -1,6 +1,6 @@
 import { createStep } from '@mastra/core/workflows';
 import { z } from 'zod';
-import { workflowEnvelopeSchema } from '../../utils/chat-schemas';
+import { workflowEnvelopeSchema } from '$lib/server/mastra/utils/chat-schemas';
 
 export const hitlVerifyStep = createStep({
 	id: 'hitl-verify',

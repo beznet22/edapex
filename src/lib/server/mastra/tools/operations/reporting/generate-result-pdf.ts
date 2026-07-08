@@ -18,11 +18,11 @@ import {
   resolveStudent,
   sanitizeForFilename,
   studentCriteriaBase,
-} from "./_shared";
+} from "$lib/server/mastra/tools/operations/reporting/_shared";
 import { marksheetPdfPath } from "$lib/server/mastra/storage/workspaces/paths";
 import { addEntry } from "$lib/server/mastra/storage/workspaces/manifest-store";
 import type { WorkspaceFilesystem } from "@mastra/core/workspace";
-import { type MemoryContext } from "../../../utils/chat-utils";
+import { type MemoryContext } from "$lib/server/mastra/utils/chat-utils";
 
 const reportPdfInputSchema = z.object({
   ...studentCriteriaBase,
@@ -80,7 +80,7 @@ async function renderAndWriteResultPdf(args: CoreRenderArgs): Promise<CoreRender
 
   const student = await resolveStudent(
     tenant,
-{
+    {
       studentId: input.studentId,
       admissionNo: input.admissionNo,
       fullName: input.fullName,
@@ -108,7 +108,7 @@ async function renderAndWriteResultPdf(args: CoreRenderArgs): Promise<CoreRender
       if (process.env.NODE_ENV !== "production") {
         console.info(
           `[generate-result-pdf] resolved session for studentId=${student.studentId}: ` +
-            `classId=${session.classId}, sectionId=${session.sectionId}`,
+          `classId=${session.classId}, sectionId=${session.sectionId}`,
         );
       }
     } else {
@@ -292,9 +292,9 @@ export const generateResultPdfTool = createTool({
         previewUrl: rendered.previewUrl,
         ...(rendered.pdfBuffer
           ? {
-              pdfBase64: rendered.pdfBuffer.toString("base64"),
-              filename: rendered.title,
-            }
+            pdfBase64: rendered.pdfBuffer.toString("base64"),
+            filename: rendered.title,
+          }
           : {}),
       };
     } catch (err) {

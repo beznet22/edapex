@@ -17,7 +17,7 @@ import type { TenantContext } from "$lib/server/mastra/tenant-context";
 import { StudentRepository } from "$lib/server/repository/student.repo";
 import { ScopedRepositoryProvider } from "$lib/server/mastra/scoped-repository";
 import type { StreamWriterLike } from "$lib/server/mastra/agent-stream-retry";
-import { writeDataPart, type MemoryContext } from "../../utils/chat-utils";
+import { writeDataPart, type MemoryContext } from "$lib/server/mastra/utils/chat-utils";
 import type { WorkspaceFilesystem } from "@mastra/core/workspace";
 import type { StudentDetails } from "$lib/server/repository/student.repo";
 
@@ -166,8 +166,8 @@ export async function resolveStudent(
     }
     const exact = criteria.fullName
       ? matches.filter(
-          (row) => (row.fullName ?? "").trim().toLowerCase() === criteria.fullName!.trim().toLowerCase(),
-        )
+        (row) => (row.fullName ?? "").trim().toLowerCase() === criteria.fullName!.trim().toLowerCase(),
+      )
       : matches;
     if (exact.length === 0) {
       throw new Error(

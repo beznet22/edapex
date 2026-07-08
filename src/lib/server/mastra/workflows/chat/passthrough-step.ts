@@ -1,5 +1,5 @@
 import { createStep } from '@mastra/core/workflows';
-import { chatWorkflowOutputSchema } from '../../utils/chat-schemas';
+import { chatWorkflowOutputSchema } from '$lib/server/mastra/utils/chat-schemas';
 
 export const passthroughStep = createStep({
 	id: 'passthrough',

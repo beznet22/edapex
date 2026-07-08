@@ -263,7 +263,7 @@ CHAT_STEPS = [
             'import { z } from \'zod\';',
             'import { chatWorkflowInputSchema, fileStreamItemSchema } from \'../../utils/chat-schemas\';',
             'import { writeDataPart } from \'../../utils/persist-data-parts\';',
-            'import { parseResolvedOptionId } from \'../../utils/chat-utils\';',
+            'import { parseResolvedOptionId } from \'$lib/server/mastra/utils/chat-utils\';',
             'import { buildWorkspaceRequestContext } from \'$lib/server/helpers/chat-helper\';',
             'import { tenantWorkspace } from \'../../storage/workspaces\';',
             'import type { TenantContext } from \'../../tenant-context\';',

@@ -1,10 +1,10 @@
 import { createStep } from '@mastra/core/workflows';
 import { z } from 'zod';
-import { fileStreamItemSchema, chatWorkflowInputSchema } from '../../utils/chat-schemas';
-import { writeDataPart, type MemoryContext } from '../../utils/chat-utils';
+import { fileStreamItemSchema, chatWorkflowInputSchema } from '$lib/server/mastra/utils/chat-schemas';
+import { writeDataPart, type MemoryContext } from '$lib/server/mastra/utils/chat-utils';
 import { buildWorkspaceRequestContext } from '$lib/server/helpers/chat-helper';
-import { tenantWorkspace } from '../../storage/workspaces';
-import type { TenantContext } from '../../tenant-context';
+import { tenantWorkspace } from '$lib/server/mastra/storage/workspaces';
+import type { TenantContext } from '$lib/server/mastra/tenant-context';
 
 export const awaitValidationStep = createStep({
 	id: 'awaitValidation',

@@ -21,10 +21,10 @@ import {
   resolveStudent,
   sanitizeForFilename,
   studentCriteriaBase,
-} from "./_shared";
+} from "$lib/server/mastra/tools/operations/reporting/_shared";
 import { marksheetPdfPath } from "$lib/server/mastra/storage/workspaces/paths";
 import { addEntry } from "$lib/server/mastra/storage/workspaces/manifest-store";
-import { type MemoryContext } from "../../../utils/chat-utils";
+import { type MemoryContext } from "$lib/server/mastra/utils/chat-utils";
 
 const CONFIRM_CONTEXT_KEY = "resultPublishConfirm";
 
@@ -354,7 +354,7 @@ export const publishResultPdfTool = createTool({
 
     const student = await resolveStudent(
       tenant,
-{
+      {
         studentId: input.studentId,
         admissionNo: input.admissionNo,
         fullName: input.fullName,

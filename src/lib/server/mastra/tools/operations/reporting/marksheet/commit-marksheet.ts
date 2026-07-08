@@ -1,7 +1,7 @@
 import { createTool } from '@mastra/core/tools';
 import { z } from 'zod';
 import { type StreamWriterLike } from '../../../../agent-stream-retry';
-import { writeDataPart, type MemoryContext } from '../../../../utils/chat-utils';
+import { writeDataPart, type MemoryContext } from '$lib/server/mastra/utils/chat-utils';
 import { tenantWorkspace } from '../../../../storage/workspaces';
 import { buildWorkspaceRequestContext } from '$lib/server/helpers/chat-helper';
 import { marksheetJsonPath } from '../../../../storage/workspaces/paths';

@@ -1,6 +1,6 @@
 import { createStep } from '@mastra/core/workflows';
 import { z } from 'zod';
-import { chatWorkflowInputSchema, fileStreamItemSchema, workflowEnvelopeSchema } from '../../utils/chat-schemas';
+import { chatWorkflowInputSchema, fileStreamItemSchema, workflowEnvelopeSchema } from '$lib/server/mastra/utils/chat-schemas';
 
 export const collapseStep = createStep({
 	id: 'collapse-stream-results',

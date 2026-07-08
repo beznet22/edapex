@@ -23,10 +23,10 @@ import {
   resolveFilesystem,
   resolveStudent,
   sanitizeForFilename,
-} from "../_shared";
+} from "$lib/server/mastra/tools/operations/reporting/_shared";
 import { transcriptPdfPath } from "$lib/server/mastra/storage/workspaces/paths";
 import { addEntry } from "$lib/server/mastra/storage/workspaces/manifest-store";
-import { type MemoryContext } from "../../../../utils/chat-utils";
+import { type MemoryContext } from "$lib/server/mastra/utils/chat-utils";
 
 const CONFIRM_CONTEXT_KEY = "transcriptPublishConfirm";
 
@@ -105,7 +105,7 @@ async function ensureTranscriptPdf(args: RenderArgs): Promise<RenderResult> {
 
   const student = await resolveStudent(
     tenant,
-{
+    {
       studentId: input.studentId,
       admissionNo: input.admissionNo,
       fullName: input.fullName,
@@ -153,20 +153,20 @@ async function ensureTranscriptPdf(args: RenderArgs): Promise<RenderResult> {
     };
     type InnerOutput =
       | {
-          artifactId: string;
-          kind: "pdf";
-          status: "success";
-          title?: string;
-          storagePath?: string;
-          previewUrl?: string;
-        }
+        artifactId: string;
+        kind: "pdf";
+        status: "success";
+        title?: string;
+        storagePath?: string;
+        previewUrl?: string;
+      }
       | {
-          artifactId: string;
-          kind: "pdf";
-          status: "error";
-          title?: string;
-          error?: string;
-        };
+        artifactId: string;
+        kind: "pdf";
+        status: "error";
+        title?: string;
+        error?: string;
+      };
     type InnerInput = {
       schoolId?: number;
       academicId?: number;
@@ -324,7 +324,7 @@ export const publishTranscriptPdfTool = createTool({
 
       const student = await resolveStudent(
         tenant,
-{
+        {
           studentId: input.studentId ?? stored.studentId,
           admissionNo: input.admissionNo,
           fullName: input.fullName,
@@ -446,7 +446,7 @@ export const publishTranscriptPdfTool = createTool({
 
     const student = await resolveStudent(
       tenant,
-{
+      {
         studentId: input.studentId,
         admissionNo: input.admissionNo,
         fullName: input.fullName,

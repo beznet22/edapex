@@ -1,6 +1,6 @@
 import { createStep } from '@mastra/core/workflows';
 import { z } from 'zod';
-import { fileStreamItemSchema } from '../../utils/chat-schemas';
+import { fileStreamItemSchema } from '$lib/server/mastra/utils/chat-schemas';
 
 export const extractFileItemsStep = createStep({
 	id: 'extract-file-items',

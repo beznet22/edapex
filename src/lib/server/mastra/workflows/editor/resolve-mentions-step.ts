@@ -1,6 +1,6 @@
 import { createStep } from '@mastra/core/workflows';
-import { derivedEditorCommandSchema, resolvedMentionsSchema } from '../../editor/schemas';
-import { resolveMentionsInMarkdown } from '../../editor/mention-resolver';
+import { derivedEditorCommandSchema, resolvedMentionsSchema } from '$lib/server/mastra/editor/schemas';
+import { resolveMentionsInMarkdown } from '$lib/server/mastra/editor/mention-resolver';
 
 export const resolveMentionsStep = createStep({
 	id: 'resolve-mentions',

@@ -1,6 +1,6 @@
 import { createStep } from '@mastra/core/workflows';
 import { z } from 'zod';
-import { chatWorkflowInputSchema } from '../../utils/chat-schemas';
+import { chatWorkflowInputSchema } from '$lib/server/mastra/utils/chat-schemas';
 import { generateThreadTitle } from '$lib/server/helpers/chat-helper';
 
 export const titleStep = createStep({

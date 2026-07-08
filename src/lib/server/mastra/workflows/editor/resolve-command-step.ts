@@ -1,6 +1,6 @@
 import { createStep } from '@mastra/core/workflows';
-import { resolvedMentionsSchema, resolvedEditorCommandSchema } from '../../editor/schemas';
-import { buildEditPrompt, buildGeneratePrompt } from '../../editor/prompt-builders';
+import { resolvedMentionsSchema, resolvedEditorCommandSchema } from '$lib/server/mastra/editor/schemas';
+import { buildEditPrompt, buildGeneratePrompt } from '$lib/server/mastra/editor/prompt-builders';
 
 export const resolveCommandStep = createStep({
 	id: 'resolve-command',

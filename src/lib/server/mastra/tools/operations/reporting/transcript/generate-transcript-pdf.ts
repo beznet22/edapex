@@ -16,10 +16,10 @@ import {
   resolveStudent,
   sanitizeForFilename,
   studentCriteriaBase,
-} from "../_shared";
+} from "$lib/server/mastra/tools/operations/reporting/_shared";
 import { transcriptPdfPath } from "$lib/server/mastra/storage/workspaces/paths";
 import { addEntry } from "$lib/server/mastra/storage/workspaces/manifest-store";
-import { type MemoryContext } from "../../../../utils/chat-utils";
+import { type MemoryContext } from "$lib/server/mastra/utils/chat-utils";
 
 const reportPdfInputSchema = z.object({
   ...studentCriteriaBase,
@@ -63,7 +63,7 @@ async function renderAndWriteTranscriptPdf(args: CoreRenderArgs): Promise<CoreRe
 
   const student = await resolveStudent(
     tenant,
-{
+    {
       studentId: input.studentId,
       admissionNo: input.admissionNo,
       fullName: input.fullName,

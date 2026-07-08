@@ -12,7 +12,7 @@ import type { TenantContext } from '$lib/server/mastra/tenant-context';
 import type { WorkspaceFilesystem } from '@mastra/core/workspace';
 import type { RequestContext } from '@mastra/core/request-context';
 import type { ResolvedMention } from '$lib/server/mastra/editor/schemas';
-import { writeDataPart, type MemoryContext } from '../../../../utils/chat-utils';
+import { writeDataPart, type MemoryContext } from '$lib/server/mastra/utils/chat-utils';
 
 interface MarksheetToolContext {
 	requestContext?: {
@@ -542,13 +542,13 @@ export const validateMarksheetTool = createTool({
 				finalValidationIssues.length > 0
 					? finalValidationIssues
 					: (attempts[attempts.length - 1]?.validationErrors ?? [
-							{
-								path: '$',
-								message:
-									'STRUCTURED_OUTPUT_FAILED: document agent could not produce a marksheetSchema-conformant JSON after 3 attempts',
-								code: 'exhausted_retries'
-							}
-						])
+						{
+							path: '$',
+							message:
+								'STRUCTURED_OUTPUT_FAILED: document agent could not produce a marksheetSchema-conformant JSON after 3 attempts',
+							code: 'exhausted_retries'
+						}
+					])
 		};
 	}
 });

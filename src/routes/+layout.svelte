@@ -5,7 +5,7 @@
   import PWAInstallPrompt from "$lib/components/PWAInstallPrompt.svelte";
   import { Toaster } from "$lib/components/ui/sonner";
   import { PWAContext } from "$lib/context/pwa.svelte";
-  import SettingsModal from "$lib/components/settings-modal.svelte";
+  import SettingsModal from "$lib/components/settings/index.svelte";
   import { onMount } from "svelte";
   import { toast } from "svelte-sonner";
 

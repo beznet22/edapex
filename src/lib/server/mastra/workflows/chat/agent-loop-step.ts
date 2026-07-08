@@ -4,9 +4,9 @@ import {
 	agentLoopOutputSchema,
 	chatWorkflowInputSchema,
 	fileStreamItemSchema,
-} from '../../utils/chat-schemas';
-import { writeDataPart, type MemoryContext } from '../../utils/chat-utils';
-import { streamWithAutoRetry } from '../../agent-stream-retry';
+} from '$lib/server/mastra/utils/chat-schemas';
+import { writeDataPart, type MemoryContext } from '$lib/server/mastra/utils/chat-utils';
+import { streamWithAutoRetry } from '$lib/server/mastra/agent-stream-retry';
 
 const inputSchema = z.object({
 	promptText: z.string(),
