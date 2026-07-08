@@ -21,7 +21,14 @@ export interface MemoryContext {
 
 export interface WriteDataPartOptions {
 	data: PersistableDataPart;
-	memory: MemoryContext;
+	/**
+	 * Thread identity used to locate the latest assistant message in memory.
+	 * Optional: when omitted, the part is streamed to the client but
+	 * NOT persisted (typical for tools that don't have direct access to the
+	 * workflow envelope, e.g. MarksheetToolContext which only sees the
+	 * per-request `requestContext` populated by `buildRequestContext`).
+	 */
+	memory?: MemoryContext | undefined;
 	/**
 	 * When `true`, the part is streamed to the client but NOT persisted to
 	 * memory. Useful for ephemeral UI signals (rate-limit banners, toasts,
@@ -105,6 +112,13 @@ export async function writeDataPart(
 	}
 
 	if (!shouldPersist(data, transient)) return;
+	if (!memCtx) {
+		console.warn(
+			'[writeDataPart] No memory context provided; data part streamed but not persisted',
+			{ type: data?.type, id: (data as { id?: string } | undefined)?.id }
+		);
+		return;
+	}
 
 	let memory;
 	try {
