@@ -19,17 +19,34 @@ export const awaitValidationStep = createStep({
 		validationStatus: z.enum(['committed', 'autofixed', 'awaiting-user']).default('awaiting-user')
 	}),
 	resumeSchema: z.object({
-		artifactId: z.string()
+		artifactId: z.string(),
+		dropdownOptionId: z.enum(['default', 'force-commit', 'save-only']).optional(),
+		cancel: z.boolean().optional()
 	}),
 	suspendSchema: z.object({
 		artifactId: z.string()
 	}),
-	execute: async ({ inputData, getInitData, requestContext, resumeData, suspend, writer, mastra: m, runId }) => {
+	execute: async ({ inputData, getInitData, requestContext, resumeData, suspend, bail, writer, mastra: m, runId }) => {
 		const init = getInitData() as z.infer<typeof chatWorkflowInputSchema>;
 		const memCtx: MemoryContext = { threadId: init.threadId, resourceId: init.resourceId };
 
 		const tenant = (requestContext?.get('tenantContext') as TenantContext | undefined);
-		const lastFormattedId = (requestContext?.get('lastFormattedDocumentId') as string | undefined);
+		const lastFormattedId = requestContext?.get('lastFormattedDocumentId') as string | undefined;
+		const formatState = requestContext?.get('formatArtifactState') as
+			| { persistPath?: string; artifactId?: string; studentId?: number | null; studentHint?: { fullName?: string; admissionNo?: number; studentId?: number } | null }
+			| undefined;
+		const hasMarksheetContext = Boolean(lastFormattedId) || Boolean(formatState?.persistPath);
+
+		// Pass-through: no marksheet in scope for this turn. Without this guard,
+		// every chat turn would emit data-awaitValidation and freeze the workflow.
+		if (!hasMarksheetContext && !resumeData) {
+			return {
+				text: inputData.text,
+				resolvedFiles: inputData.resolvedFiles,
+				validationStatus: 'awaiting-user' as const,
+			};
+		}
+
 		const artifactId = (resumeData?.artifactId as string | undefined)
 			?? `doc-format-${lastFormattedId ?? 'unknown'}`;
 
@@ -56,14 +73,32 @@ export const awaitValidationStep = createStep({
 			throw new Error('TENANT_OR_DOCUMENT_MISSING: resume requires tenantContext and lastFormattedDocumentId in requestContext');
 		}
 
+		const dropdownOptionId = resumeData?.dropdownOptionId ?? 'default';
+
+		// 'save-only': user wants to persist the draft without commit. The
+		// validate-tool already wrote the canonical markdown via the resume path;
+		// skip validation/commit entirely.
+		if (dropdownOptionId === 'save-only') {
+			return {
+				text: inputData.text,
+				resolvedFiles: inputData.resolvedFiles,
+				validationStatus: 'committed' as const,
+			};
+		}
+
+		// 'cancel': user dismissed the ActionBar. Bail cleanly with no further work.
+		// (Task 2.4 will wire this up; for now just allow the schema to accept it.)
+		if (resumeData?.cancel === true) {
+			return bail({ reason: 'user_skipped_validation', artifactId } as never);
+		}
+
+		// 'default' and 'force-commit': fall through to validate → (auto-fix) → commit.
+
 		// Read the latest markdown from workspace
 		const fs = await tenantWorkspace.resolveFilesystem({
 			requestContext: buildWorkspaceRequestContext(tenant) as never
 		});
 		if (!fs) throw new Error('WORKSPACE_UNAVAILABLE: tenant workspace filesystem not configured');
-		const formatState = requestContext?.get('formatArtifactState') as
-			| { persistPath?: string; artifactId?: string; studentId?: number | null; studentHint?: { fullName?: string; admissionNo?: number; studentId?: number } | null }
-			| undefined;
 		const markdownPath = formatState?.persistPath;
 		if (!markdownPath) {
 			throw new Error('PERSIST_PATH_MISSING: formatArtifactState.persistPath is required. Run format-marksheet-document first or migrate legacy data.');
@@ -84,7 +119,12 @@ export const awaitValidationStep = createStep({
 		const validateTool = m?.getTool('validate-marksheet');
 		if (!validateTool) throw new Error('TOOL_NOT_REGISTERED: validate-marksheet');
 		const validateResult = await validateTool.execute!(
-			{ studentId, correctedMarkdown: currentMarkdown },
+			{
+				studentId,
+				correctedMarkdown: currentMarkdown,
+				currentMarkdownPath: markdownPath,
+				runId: runId ?? '',
+			},
 			{ requestContext, writer, mastra: m } as never
 		);
 
@@ -150,4 +190,3 @@ export const awaitValidationStep = createStep({
 		};
 	}
 });
-
