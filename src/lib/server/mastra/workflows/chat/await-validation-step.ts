@@ -1,8 +1,6 @@
 import { createStep } from '@mastra/core/workflows';
 import { z } from 'zod';
-import { chatWorkflowInputSchema, fileStreamItemSchema } from '../../utils/chat-schemas';
-import { writeDataPart } from '../../utils/chat-utils';
-import { parseResolvedOptionId } from '../../utils/chat-utils';
+import { fileStreamItemSchema } from '../../utils/chat-schemas';
 import { buildWorkspaceRequestContext } from '$lib/server/helpers/chat-helper';
 import { tenantWorkspace } from '../../storage/workspaces';
 import type { TenantContext } from '../../tenant-context';
@@ -58,11 +56,6 @@ export const awaitValidationStep = createStep({
 			requestContext: buildWorkspaceRequestContext(tenant) as never
 		});
 		if (!fs) throw new Error('WORKSPACE_UNAVAILABLE: tenant workspace filesystem not configured');
-		// Bug 1 fix: read the EXACT persistPath recorded by
-		// format-marksheet-document on the request context. The path is
-		// canonical: marksheets/<studentId>-<studentName>.md. If
-		// formatArtifactState is missing (legacy), throw — legacy data
-		// should be migrated to canonical paths via the migration script.
 		const formatState = requestContext?.get('formatArtifactState') as
 			| { persistPath?: string; artifactId?: string; studentId?: number | null; studentHint?: { fullName?: string; admissionNo?: number; studentId?: number } | null }
 			| undefined;
@@ -77,9 +70,6 @@ export const awaitValidationStep = createStep({
 		} catch {
 			// File may not exist yet; pass empty string
 		}
-
-		// Resolve studentId from formatArtifactState (set by format-marksheet-document).
-		// If missing, the marksheet hasn't been linked to a student yet — fail fast.
 		const studentId = formatState?.studentId ?? formatState?.studentHint?.studentId ?? null;
 		if (studentId === null) {
 			throw new Error('STUDENT_ID_MISSING: formatArtifactState.studentId is required. The marksheet must be linked to a DB student before validation. Use @mention in the chat or resolve identity during HITL.');
