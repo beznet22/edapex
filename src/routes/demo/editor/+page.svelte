@@ -173,4 +173,43 @@
 			</div>
 		</section>
 	</main>
+
+	<footer
+		class="border-t border-border/60 px-4 py-2 flex items-center gap-4 text-[10px] font-mono text-muted-foreground shrink-0 flex-wrap"
+	>
+		<span>bytes: <strong class="text-foreground">{bytes}</strong></span>
+		<span>lines: <strong class="text-foreground">{lines}</strong></span>
+		<span>table rows: <strong class="text-foreground">{tableRows}</strong></span>
+		<span>
+			round-trip: <strong class={normalizedEqual ? "text-foreground" : "text-destructive"}>
+				{normalizedEqual ? "stable" : "differs"}
+			</strong>
+		</span>
+		<span>
+			path: <strong class="text-foreground">{activePath ?? "(none)"}</strong>
+		</span>
+		<button
+			type="button"
+			onclick={() => (showJson = !showJson)}
+			class="ml-auto h-6 px-2 rounded border border-input text-[10px] font-medium hover:bg-muted/40"
+		>
+			{showJson ? "Hide JSON" : "Show JSON"}
+		</button>
+		<button
+			type="button"
+			onclick={() => navigator.clipboard.writeText(editorMarkdown)}
+			disabled={!editorMarkdown}
+			class="h-6 px-2 rounded border border-input text-[10px] font-medium hover:bg-muted/40 disabled:opacity-50"
+		>
+			Copy as markdown
+		</button>
+	</footer>
+
+	{#if showJson}
+		<aside
+			class="border-t border-border/60 max-h-64 overflow-auto bg-muted/20 px-4 py-2"
+		>
+			<pre class="text-[10px] font-mono leading-relaxed whitespace-pre-wrap break-words">{editorMarkdown}</pre>
+		</aside>
+	{/if}
 </div>
