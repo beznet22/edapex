@@ -12,6 +12,7 @@ import type { TenantContext } from '$lib/server/mastra/tenant-context';
 import type { WorkspaceFilesystem } from '@mastra/core/workspace';
 import type { RequestContext } from '@mastra/core/request-context';
 import type { ResolvedMention } from '$lib/server/mastra/editor/schemas';
+import { writeDataPart, type MemoryContext } from '../../../../utils/chat-utils';
 
 interface MarksheetToolContext {
 	requestContext?: {
@@ -277,21 +278,41 @@ export const validateMarksheetTool = createTool({
 		const effective = computeEffectiveIds(mentions, tenant, grant);
 		const missing = detectMissingIds(effective, mentions);
 
+		// Resolve thread/resource identity for `writeDataPart` persistence.
+		// NOTE: `buildRequestContext` (chat route) only sets `tenantContext`,
+		// `modelConfig`, `providerOptions`, `isSlashCommand`, `lastMessage`
+		// on the request context — `threadId`/`resourceId` are NOT set there
+		// (they live in the workflow's `inputData` instead, not the
+		// requestContext). When the tool runs via a workflow path that
+		// doesn't stash them on the request context, `memCtx` is undefined
+		// and `writeDataPart` will skip persistence with a warning (the part
+		// still streams to the client). A future change should hoist
+		// `threadId`/`resourceId` onto the chat requestContext (see
+		// buildRequestContext) so this tool can persist disambiguation
+		// options across page reloads.
+		const threadId = context.requestContext?.get('threadId') as string | undefined;
+		const resourceId = context.requestContext?.get('resourceId') as string | undefined;
+		const memCtx: MemoryContext | undefined = threadId && resourceId
+			? { threadId, resourceId }
+			: undefined;
+
 		if (missing.length > 0) {
 			const options = buildDisambiguationOptions(missing, tenant);
 			const promptText = buildDisambiguationPrompt(missing);
 
-			if (context.writer) {
-				await context.writer.write({
+			await writeDataPart(context.writer, {
+				data: {
 					type: 'data-selectOption',
+					id: `gate-${input.runId ?? ''}-${Date.now()}`,
 					data: {
 						options,
 						promptText,
 						runId: input.runId ?? '',
 						stepId: 'awaitValidation'
 					}
-				} as never);
-			}
+				},
+				memory: memCtx,
+			});
 
 			context.requestContext?.set('pendingSelection', {
 				options,
