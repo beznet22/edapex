@@ -1,7 +1,7 @@
 import { createStep } from '@mastra/core/workflows';
 import { z } from 'zod';
 import { chatWorkflowInputSchema, fileStreamItemSchema, optionItemSchema, pendingSelectionSchema } from '../../utils/chat-schemas';
-import { writeDataPart, type MemoryContext } from '$lib/server/mastra/utils/chat-utils';
+import { writeDataPart, type MemoryContext } from '../../utils/chat-utils';
 
 export const selectionGateStep = createStep({
 	id: 'selectionGate',
