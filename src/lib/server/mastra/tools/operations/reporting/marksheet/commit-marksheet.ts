@@ -1,6 +1,7 @@
 import { createTool } from '@mastra/core/tools';
 import { z } from 'zod';
 import { type StreamWriterLike } from '../../../../agent-stream-retry';
+import { writeDataPart, type MemoryContext } from '../../../../utils/chat-utils';
 import { tenantWorkspace } from '../../../../storage/workspaces';
 import { buildWorkspaceRequestContext } from '$lib/server/helpers/chat-helper';
 import { marksheetJsonPath } from '../../../../storage/workspaces/paths';
@@ -57,6 +58,12 @@ export const commitMarksheetTool = createTool({
     const tenant = getTenant(context);
     const writer = getWriter(context);
 
+    const threadId = context.requestContext?.get('threadId') as string | undefined;
+    const resourceId = context.requestContext?.get('resourceId') as string | undefined;
+    const memCtx: MemoryContext | undefined = threadId && resourceId
+      ? { threadId, resourceId }
+      : undefined;
+
     if (tenant.staffId <= 0) {
       throw new Error('STAFF_ID_REQUIRED: committing a marksheet requires a valid staffId in TenantContext');
     }
@@ -89,13 +96,14 @@ export const commitMarksheetTool = createTool({
 
     const studentName = validated.student?.fullName ?? 'Unknown';
 
-    if (writer) {
-      await writer.write({
+    await writeDataPart(writer as never, {
+      data: {
         type: 'data-committed',
         id: artifactId,
         data: { artifactId, recordId, studentName, status: 'committed' },
-      } as never);
-    }
+      },
+      memory: memCtx,
+    });
 
     return { artifactId, recordId, studentName };
   },
