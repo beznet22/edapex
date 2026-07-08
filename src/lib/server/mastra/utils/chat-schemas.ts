@@ -92,3 +92,29 @@ export type WorkflowEnvelope = z.infer<typeof workflowEnvelopeSchema>;
 export type FileStreamItem = z.infer<typeof fileStreamItemSchema>;
 export type ChatWorkflowInput = z.infer<typeof chatWorkflowInputSchema>;
 export type ChatWorkflowOutput = z.infer<typeof chatWorkflowOutputSchema>;
+
+/**
+ * Output of one iteration of the agent loop. The loop's `.dountil()` exit
+ * condition checks `status === 'done'`. The `iteration` field is used by the
+ * workflow's iterationCount guard to enforce AGENT_LOOP_MAX_ITERATIONS.
+ *
+ * - `done`: no tool calls were emitted; assistant is finished; exit the loop
+ * - `continue`: tool calls were emitted and executed; the next iteration will
+ *   see tool results appended to the thread memory
+ * - `awaiting-hitl`: a HITL tool suspended the workflow; the loop must yield
+ *   to the user before continuing
+ */
+export const agentLoopOutputSchema = z.object({
+	status: z.enum(['continue', 'done', 'awaiting-hitl']),
+	text: z.string().default(''),
+	toolCallIds: z.array(z.string()).default([]),
+	iteration: z.number().int().nonnegative().default(0)
+});
+export type AgentLoopOutput = z.infer<typeof agentLoopOutputSchema>;
+
+/**
+ * Maximum number of agent-loop iterations before the workflow aborts with
+ * AGENT_LOOP_EXHAUSTED. Tunable: raise if real workloads hit the cap, lower
+ * if runaway loops are a concern.
+ */
+export const AGENT_LOOP_MAX_ITERATIONS = 8;
