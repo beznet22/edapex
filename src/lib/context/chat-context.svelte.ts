@@ -592,11 +592,34 @@ export class ChatContext {
     );
   }
 
-  /** Dismiss the validation HITL without resuming the workflow. */
-  cancelValidation(): void {
+  /**
+   * Dismiss the validation HITL without resuming the workflow.
+   *
+   * Clears local state and POSTs to /api/chat/cancel so the suspended
+   * server-side run is terminated cleanly (no orphan libSQL row).
+   *
+   * Defined as an arrow-function property so `this` stays bound when the
+   * method is destructured or passed as a callback from the UI.
+   */
+  cancelValidation = async (): Promise<void> => {
     this.pendingValidationArtifactId = null;
     this.threadData.pendingAwaitingValidation = null;
-  }
+
+    if (this.activeRunId) {
+      try {
+        await fetch("/api/chat/cancel", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            runId: this.activeRunId,
+            artifactId: this.threadData.pendingAwaitingValidation ?? undefined
+          })
+        });
+      } catch (err) {
+        console.warn("[ChatContext] cancel failed", err);
+      }
+    }
+  };
 
   setContext = () => {
     setContext(CHAT_CONTEXT_KEY, this);
