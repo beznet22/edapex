@@ -258,6 +258,20 @@ export const validateMarksheetTool = createTool({
 		const context = ctx as MarksheetToolContext;
 		const tenant = getTenant(context);
 
+		// Auto-fix retry cap (Phase 2.3 — soft, requestContext may reset on resume).
+		// Counts every invocation of validate-marksheet, which is invoked once per
+		// resume cycle (validate → auto-fix → re-suspend → re-validate). After 3
+		// cycles we throw AUTO_FIX_EXHAUSTED so the user cannot loop forever on the
+		// same artifact. Phase 3 will replace this with the workflow's iterationCount.
+		const autoFixAttempts =
+			(context.requestContext?.get('autoFixAttempts') as number | undefined) ?? 0;
+		if (autoFixAttempts >= 3) {
+			throw new Error(
+				'AUTO_FIX_EXHAUSTED: validation errors could not be auto-fixed after 3 attempts'
+			);
+		}
+		context.requestContext?.set('autoFixAttempts', autoFixAttempts + 1);
+
 		// PRE-FLIGHT PIPELINE
 		// Resolves @mention IDs from the markdown, fetches the subject
 		// mapping table, computes effective IDs (mentions > tenant-with-
@@ -274,7 +288,9 @@ export const validateMarksheetTool = createTool({
 			undefined
 		);
 
-		const grant: PermissionGrant = input.permissionGrant ?? {};
+		const inputGrant = (input.permissionGrant ?? {}) as PermissionGrant;
+		const contextGrant = (requestContext?.get('permissionGrant') ?? {}) as PermissionGrant;
+		const grant: PermissionGrant = { ...inputGrant, ...contextGrant };
 		const effective = computeEffectiveIds(mentions, tenant, grant);
 		const missing = detectMissingIds(effective, mentions);
 
