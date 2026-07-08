@@ -24,22 +24,29 @@
 
 	async function loadFile(path: string): Promise<void> {
 		const trimmed = path.trim();
-		if (!trimmed) return;
+		console.log("[demo] loadFile called", { path, trimmed });
+		if (!trimmed) {
+			console.warn("[demo] loadFile: empty path, bailing");
+			return;
+		}
 		loading = true;
 		loadError = null;
 		const controller = new AbortController();
 		const timeoutId = setTimeout(() => controller.abort(), 10_000);
 		try {
-			const res = await fetch(
-				`/api/file/${encodeURIComponent(trimmed).replace(/%2F/g, "/")}`,
-				{ signal: controller.signal },
-			);
+
+			const url = `/api/file/${encodeURIComponent(trimmed).replace(/%2F/g, "/")}`;
+			console.log("[demo] loadFile: fetching", url);
+			const res = await fetch(url, { signal: controller.signal });
+			console.log("[demo] loadFile: response", { status: res.status, ok: res.ok });
 			if (!res.ok) {
 				const body = await res.text().catch(() => "");
 				loadError = `Failed to load ${trimmed}: HTTP ${res.status} — ${body || "(empty body)"}`;
+				console.error("[demo] loadFile: HTTP error", loadError);
 				return;
 			}
 			const text = await res.text();
+			console.log("[demo] loadFile: success", { bytes: text.length });
 			rawMarkdown = text;
 			editorMarkdown = text;
 			activePath = trimmed;
@@ -51,6 +58,7 @@
 				const msg = err instanceof Error ? err.message : String(err);
 				loadError = `Network error: ${msg}`;
 			}
+			console.error("[demo] loadFile: exception", loadError);
 		} finally {
 			clearTimeout(timeoutId);
 			loading = false;
@@ -62,6 +70,7 @@
 	}
 
 	function handleLoadClick(): void {
+		console.log("[demo] Load button clicked", { pathInput });
 		void loadFile(pathInput);
 	}
 
@@ -125,8 +134,11 @@
 	{#if loadError}
 		<div
 			role="alert"
-			class="px-4 py-2 bg-destructive/10 border-b border-destructive/40 text-destructive text-xs font-mono"
+			class="px-4 py-3 bg-destructive text-destructive-foreground border-b-2 border-destructive-foreground/40 text-xs font-mono whitespace-pre-wrap break-words"
 		>
+			<strong class="block text-[10px] font-bold tracking-widest uppercase mb-1">
+				Load failed
+			</strong>
 			{loadError}
 		</div>
 	{/if}
