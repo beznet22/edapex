@@ -165,7 +165,12 @@ export const GET: RequestHandler = async ({ params, url, locals, cookies }) => {
       headers: {
         'Content-Type': contentTypeFor(resolvedPath),
         'Content-Length': buffer.length.toString(),
-        'Cache-Control': 'public, max-age=3600',
+        // File content can change at any time (auto-save, OCR pipeline,
+        // manual edit). The previous `public, max-age=3600` cached stale
+        // content in the browser for an hour after a file rewrite, so
+        // the editor kept showing OCR-broken markdown even after disk
+        // updates. `no-store` forces a re-fetch on every read.
+        'Cache-Control': 'no-store',
       },
     });
   } catch (e: unknown) {
