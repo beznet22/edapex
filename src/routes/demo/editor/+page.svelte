@@ -84,4 +84,51 @@
 	});
 </script>
 
-<!-- Markup added in Task 3 -->
+<div class="min-h-screen bg-background text-foreground flex flex-col">
+	<header
+		class="flex items-center gap-2 px-4 py-3 border-b border-border/60 shrink-0"
+	>
+		<label for="demo-path" class="text-xs font-medium text-muted-foreground shrink-0">
+			File path
+		</label>
+		<input
+			id="demo-path"
+			type="text"
+			bind:value={pathInput}
+			onkeydown={handleKeydown}
+			placeholder="marksheets/adakole_jpg-0adbef75.md"
+			class="flex-1 min-w-0 h-8 px-2 rounded-md border border-input bg-background text-xs font-mono focus:outline-none focus:ring-2 focus:ring-ring"
+		/>
+		<button
+			type="button"
+			onclick={handleLoadClick}
+			disabled={loading}
+			class="h-8 px-3 rounded-md bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 disabled:opacity-50"
+		>
+			{loading ? "Loading…" : "Load"}
+		</button>
+		<button
+			type="button"
+			onclick={handleReloadClick}
+			disabled={!activePath || loading}
+			class="h-8 px-3 rounded-md border border-input text-xs font-medium hover:bg-muted/40 disabled:opacity-50"
+		>
+			Reload
+		</button>
+		<label class="flex items-center gap-2 text-xs text-muted-foreground shrink-0">
+			<input type="checkbox" bind:checked={editable} class="size-3.5" />
+			editable
+		</label>
+	</header>
+
+	{#if loadError}
+		<div
+			role="alert"
+			class="px-4 py-2 bg-destructive/10 border-b border-destructive/40 text-destructive text-xs font-mono"
+		>
+			{loadError}
+		</div>
+	{/if}
+
+	<!-- Pane grid + diagnostics added in Tasks 4 & 5 -->
+</div>
