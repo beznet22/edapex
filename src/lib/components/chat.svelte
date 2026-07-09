@@ -174,9 +174,6 @@
       ...m,
       toolParts: m.parts.filter((p) => p.type.startsWith("tool-")),
       nonToolParts: m.parts.filter((p) => !p.type.startsWith("tool-")),
-      hasArtifact: m.parts.some(
-        (p) => p.type === "data-streamDocument" || p.type === "data-generatePDF",
-      ),
     })),
   );
 </script>
@@ -268,7 +265,6 @@
         <div class="space-y-6 py-4 mx-auto max-w-3xl px-4 pb-52 sm:pb-56">
           {#each messagesWithToolSplit as message}
             {@const toolParts = message.toolParts}
-            {@const hasArtifact = message.hasArtifact}
             <div class="group relative">
               <Message from={message.role} class="py-0">
                 <MessageContent
@@ -310,27 +306,17 @@
                 </Shimmer>
               {/if}
 
-              {#if hasArtifact}
-                <Collapsible open={true}>
-                  <CollapsibleTrigger class="group flex w-full items-center gap-2 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground hover:text-foreground">
-                    Thinking completed
-                    <ChevronDownIcon class="size-3 transition-transform group-data-[state=open]:rotate-0 group-data-[state=closed]:-rotate-90" />
-                  </CollapsibleTrigger>
-                  <CollapsibleContent>
-                    {#each inlineDocumentStreams as stream (stream.toolCallId)}
-                      {#if message.parts?.some((p) => (p as { type?: string; toolCallId?: string }).type === "tool-streamDocument" && (p as { toolCallId?: string }).toolCallId === stream.toolCallId)}
-                        <div class="mt-2 mb-2 w-full">
-                          <ArtifactCard
-                            artifactId={stream.documentId}
-                            title={stream.title}
-                            status={stream.status}
-                          />
-                        </div>
-                      {/if}
-                    {/each}
-                  </CollapsibleContent>
-                </Collapsible>
-              {/if}
+              {#each inlineDocumentStreams as stream (stream.toolCallId)}
+                {#if message.parts?.some((p) => (p as { type?: string; toolCallId?: string }).type === "tool-streamDocument" && (p as { toolCallId?: string }).toolCallId === stream.toolCallId)}
+                  <div class="mt-2 mb-2 w-full">
+                    <ArtifactCard
+                      artifactId={stream.documentId}
+                      title={stream.title}
+                      status={stream.status}
+                    />
+                  </div>
+                {/if}
+              {/each}
 
               {#if toolParts.length > 0}
                 <div class="mt-2">
