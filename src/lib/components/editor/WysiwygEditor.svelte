@@ -173,20 +173,21 @@
         $editor?.setEditable(editable);
     });
 
-    // Sync external content (e.g. file switch) into the editor via the
-    // controller's dedup + tiptap-markdown parsing pipeline.
+    // NO $effect for syncing `content` into the editor.
     //
-    // Wrapped in `untrack` so the effect tracks ONLY `content` and not
-    // the reactive reads inside `syncExternalContent` (it reads the
-    // `$editor` Svelte store via the `getEditor` closure, and svelte-tiptap
-    // updates that store after every `setContent` -> fires `onUpdate` ->
-    // parent re-renders -> effect would re-run forever without this guard).
-    // The controller's internal `lastSetContent` dedup is the second line
-    // of defense.
-    $effect(() => {
-        const incoming = content;
-        untrack(() => controller.syncExternalContent(incoming));
-    });
+    // Mirrors Novel.sh's `apps/web/components/tailwind/advanced-editor.tsx`:
+    // content is supplied once to `createEditor({ content })` at mount time
+    // (the `initialContent` semantics). Re-syncing content via an effect was
+    // the architectural bug — Tiptap fires `onUpdate` many times per
+    // `setContent` (one per internal transaction), and the previous pattern
+    // wrote each `onUpdate` back to the parent's $state, which the effect
+    // then re-fed into `setContent`, tripping `effect_update_depth_exceeded`.
+    //
+    // Callers that need to load a different file MUST remount the editor
+    // (use `{#key activePath}` around `<WysiwygEditor />`). Imperative
+    // external syncs are still possible via `controller.syncExternalContent`,
+    // but they are protected by the `isExternalSync` flag and `lastSetContent`
+    // dedup so cascading `onUpdate` does not propagate back.
 </script>
 
 <div bind:this={container} class="flex-1 overflow-y-auto relative {className}">

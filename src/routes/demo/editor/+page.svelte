@@ -217,44 +217,46 @@
 			</div>
 			<div class="flex-1 min-h-0">
 				{#if rawMarkdown}
-					<svelte:boundary
-						onerror={(e) => {
-							renderError = e instanceof Error ? e.message : String(e);
-							log("error", `WysiwygEditor render error: ${renderError}`);
-						}}
-					>
-						<WysiwygEditor
-							content={rawMarkdown}
-							onUpdate={handleEditorUpdate}
-							{editable}
-							class="h-full"
-						/>
+					{#key activePath}
+						<svelte:boundary
+							onerror={(e) => {
+								renderError = e instanceof Error ? e.message : String(e);
+								log("error", `WysiwygEditor render error: ${renderError}`);
+							}}
+						>
+							<WysiwygEditor
+								content={rawMarkdown}
+								onUpdate={handleEditorUpdate}
+								{editable}
+								class="h-full"
+							/>
 
-						{#snippet failed(error, reset)}
-							<div
-								class="h-full flex flex-col items-center justify-center text-center px-6 gap-2"
-							>
-								<p class="text-xs font-semibold text-destructive">
-									Editor render failed
-								</p>
-								<p
-									class="text-[10px] font-mono text-muted-foreground max-w-md break-words whitespace-pre-wrap"
+							{#snippet failed(error, reset)}
+								<div
+									class="h-full flex flex-col items-center justify-center text-center px-6 gap-2"
 								>
-									{error instanceof Error ? error.message : String(error)}
-								</p>
-								<button
-									type="button"
-									onclick={() => {
-										reset();
-										renderError = null;
-									}}
-									class="h-7 px-3 rounded border border-input text-xs font-medium hover:bg-muted/40"
-								>
-									Retry render
-								</button>
-							</div>
-						{/snippet}
-					</svelte:boundary>
+									<p class="text-xs font-semibold text-destructive">
+										Editor render failed
+									</p>
+									<p
+										class="text-[10px] font-mono text-muted-foreground max-w-md break-words whitespace-pre-wrap"
+									>
+										{error instanceof Error ? error.message : String(error)}
+									</p>
+									<button
+										type="button"
+										onclick={() => {
+											reset();
+											renderError = null;
+										}}
+										class="h-7 px-3 rounded border border-input text-xs font-medium hover:bg-muted/40"
+									>
+										Retry render
+									</button>
+								</div>
+							{/snippet}
+						</svelte:boundary>
+					{/key}
 				{:else}
 					<div
 						class="h-full flex items-center justify-center text-xs text-muted-foreground"

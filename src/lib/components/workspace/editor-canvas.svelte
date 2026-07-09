@@ -368,17 +368,19 @@
 				class="flex-1 min-h-0 overflow-hidden"
 				bind:this={textContainerRef}
 			>
-				<WysiwygEditor
-					content={textContent}
-					onUpdate={handleWysiwygUpdate}
-					class="h-full"
-					{designationId}
-					{selectedClassId}
-					{selectedSectionId}
-					{selectedClassName}
-					{selectedSectionName}
-					{editable}
-				/>
+				{#key url}
+					<WysiwygEditor
+						content={textContent}
+						onUpdate={handleWysiwygUpdate}
+						class="h-full"
+						{designationId}
+						{selectedClassId}
+						{selectedSectionId}
+						{selectedClassName}
+						{selectedSectionName}
+						{editable}
+					/>
+				{/key}
 			</div>
 		{:else}
 			<ScrollArea

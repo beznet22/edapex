@@ -62,6 +62,15 @@ export class WysiwygEditorController {
     // (effect_update_depth_exceeded).
     private lastSetContent: string | null = null;
 
+    // True while we're pushing external content into the editor via
+    // `syncExternalContent`. `handleEditorUpdate` checks this and skips
+    // `options.onUpdate?.(md)` so Tiptap's cascading onUpdate calls during
+    // a single setContent don't propagate back to the parent (which would
+    // write to $state and trip the effect_update_depth_exceeded guard).
+    // User-driven edits (real typing) keep propagating normally because
+    // the flag is only set during programmatic external syncs.
+    private isExternalSync = false;
+
     private chatClient: Chat<UIMessage>;
 
     constructor(
@@ -260,8 +269,10 @@ export class WysiwygEditorController {
         });
     }
 
-    /** Tiptap onUpdate — skip getMarkdown during aiStreamBlock transactions. */
+    /** Tiptap onUpdate — skip getMarkdown during aiStreamBlock transactions
+     *  and during programmatic external syncs (see `isExternalSync`). */
     handleEditorUpdate(transaction: Transaction, editor: Editor): void {
+        if (this.isExternalSync) return;
         if (transaction.getMeta("aiStream")) return;
         const md =
             (editor.storage as { markdown?: { getMarkdown?: () => string } }).markdown
@@ -270,26 +281,27 @@ export class WysiwygEditorController {
     }
 
     /** Sync external content (e.g. file switch) into the editor, deduplicated.
-     *  Dedups against `lastSetContent` (the input we last passed to
-     *  `setContent`) rather than the round-trip output of `getMarkdown()` —
-     *  the round-trip is lossy (trailing newline, table reformatting) so
-     *  comparing the input to it makes the dedup fail on every run, which
-     *  triggers `effect_update_depth_exceeded` in the parent `$effect`. */
+     *  Two layers of protection against the
+     *  `effect_update_depth_exceeded` loop:
+     *    1. `lastSetContent` dedups against the input rather than the
+     *       round-trip output (which is lossy due to tiptap-markdown
+     *       re-serialization — trailing newline, table reformatting).
+     *    2. `isExternalSync` flag suppresses `handleEditorUpdate` callbacks
+     *       while the programmatic setContent runs, so Tiptap's cascading
+     *       onUpdate chain during one setContent doesn't write back to the
+     *       parent's $state (which is what trips the depth guard). */
     syncExternalContent(content: string): void {
         const editor = this.getEditor();
         if (!editor) return;
         const normalized = normalizeMarkdown(content);
-        const dedupHit =
-            this.lastSetContent !== null && normalized === this.lastSetContent;
-        console.log("[syncExternalContent]", {
-            inputLen: content.length,
-            normalizedLen: normalized.length,
-            lastSetLen: this.lastSetContent?.length ?? null,
-            dedupHit,
-        });
-        if (dedupHit) return;
+        if (this.lastSetContent !== null && normalized === this.lastSetContent) return;
         this.lastSetContent = normalized;
-        editor.commands.setContent(content ?? "");
+        this.isExternalSync = true;
+        try {
+            editor.commands.setContent(content ?? "");
+        } finally {
+            this.isExternalSync = false;
+        }
     }
 
     /** Generic AI command entry from GenerativeMenuSwitch (improve / shorten / etc.). */
