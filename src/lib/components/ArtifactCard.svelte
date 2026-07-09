@@ -79,7 +79,14 @@
     {/if}
     <button
       type="button"
-      onclick={() => dispatch("chat:openArtifact", { artifactId })}
+      onclick={() => {
+        dispatch("chat:openArtifact", { artifactId });
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(
+            new CustomEvent("chat:openArtifact", { detail: { artifactId } }),
+          );
+        }
+      }}
       aria-label="Preview artifact"
       class="size-6 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors"
     >
