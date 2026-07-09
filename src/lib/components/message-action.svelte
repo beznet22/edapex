@@ -8,7 +8,6 @@
   import RefreshCcwIcon from "@lucide/svelte/icons/refresh-ccw";
   import ThumbsDownIcon from "@lucide/svelte/icons/thumbs-down";
   import ThumbsUpIcon from "@lucide/svelte/icons/thumbs-up";
-  import PreviewModal from "./pdf-preview.svelte";
   import { goto } from "$app/navigation";
 
   let {
