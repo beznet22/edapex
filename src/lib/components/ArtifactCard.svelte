@@ -132,7 +132,7 @@
 
   <!-- FOOTER -->
   <div
-    class="flex items-center justify-between border-t border-border/30 bg-background/30 px-4 py-2.5"
+    class="flex items-center border-t border-border/30 bg-background/30 px-4 py-2.5 pr-16"
   >
     {#if isWorking}
       <div class="flex items-center gap-2">
@@ -154,21 +154,22 @@
         </span>
       </div>
     {/if}
-
-    <button
-      type="button"
-      onclick={() => {
-        dispatch("chat:openArtifact", { artifactId });
-        if (typeof window !== "undefined") {
-          window.dispatchEvent(
-            new CustomEvent("chat:openArtifact", { detail: { artifactId } }),
-          );
-        }
-      }}
-      aria-label="Preview artifact"
-      class="inline-flex size-9 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm shadow-primary/20 transition-all hover:scale-110 hover:bg-primary/90 hover:shadow-md hover:shadow-primary/30 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card"
-    >
-      <EyeIcon class="size-4" strokeWidth={2} />
-    </button>
   </div>
+
+  <!-- EYE FAB: absolutely positioned at bottom-right corner -->
+  <button
+    type="button"
+    onclick={() => {
+      dispatch("chat:openArtifact", { artifactId });
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(
+          new CustomEvent("chat:openArtifact", { detail: { artifactId } }),
+        );
+      }
+    }}
+    aria-label="Preview artifact"
+    class="absolute bottom-3 right-3 z-10 inline-flex size-10 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-md shadow-primary/30 transition-all hover:scale-110 hover:bg-primary/90 hover:shadow-lg hover:shadow-primary/40 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card"
+  >
+    <EyeIcon class="size-4" strokeWidth={2} />
+  </button>
 </div>
