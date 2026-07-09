@@ -37,7 +37,7 @@
   import AlertCircleIcon from "@lucide/svelte/icons/alert-circle";
   import FileWarningIcon from "@lucide/svelte/icons/file-warning";
 
-  import ShimmerArtifactCard from "./ShimmerArtifactCard.svelte";
+  import ArtifactCard from "./ArtifactCard.svelte";
 
   import ErrorAlert from "./shared/ErrorAlert.svelte";
 
@@ -294,12 +294,10 @@
               {#each inlineDocumentStreams as stream (stream.toolCallId)}
                 {#if message.parts?.some((p) => (p as { type?: string; toolCallId?: string }).type === "tool-streamDocument" && (p as { toolCallId?: string }).toolCallId === stream.toolCallId)}
                   <div class="mt-2 mb-2 w-full">
-                    <ShimmerArtifactCard
-                      id={stream.documentId}
+                    <ArtifactCard
+                      artifactId={stream.documentId}
                       title={stream.title}
                       status={stream.status}
-                      content={stream.content}
-                      kind="document"
                     />
                   </div>
                 {/if}

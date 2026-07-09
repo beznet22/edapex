@@ -110,8 +110,8 @@
 
   $effect(() => {
     function onOpen(e: Event) {
-      const detail = (e as CustomEvent).detail as { id: string };
-      inspector.openChatArtifact(detail.id);
+      const detail = (e as CustomEvent).detail as { artifactId: string };
+      inspector.openChatArtifact(detail.artifactId);
     }
     window.addEventListener("chat:openArtifact", onOpen);
     return () => window.removeEventListener("chat:openArtifact", onOpen);
