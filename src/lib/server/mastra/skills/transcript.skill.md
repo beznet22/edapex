@@ -29,7 +29,7 @@ The ChatComposer client normalizes bare `/transcript` to `/transcript report` be
 
 ## Tool semantics
 
-- `generate-transcript-pdf` — render a PDF preview of the transcript and surface it in the chat as a ShimmerArtifactCard (kind=pdf). No email is sent. Storage path: `exams/transcripts/ay-<academicId>/<studentId>.pdf`.
+- `generate-transcript-pdf` — render a PDF preview of the transcript and surface it in the chat as an ArtifactCard (kind=pdf). No email is sent. Storage path: `exams/transcripts/ay-<academicId>/<studentId>.pdf`.
 
 - `publish-transcript-pdf` — render the PDF, confirm with the user via the request-selection ActionBar ("Send to <parentEmail>?" / "Cancel"), then email the PDF to the parent. NO `smStudentTimelines` row is written — the email is the only delivery channel. Confidence gate: ≥ 90% required before invoking.
 

@@ -183,7 +183,7 @@
 				// Prefer the streamed content prop over a URL fetch. The orphan-draft
 				// file at `url` may not exist yet (auto-save debounce is 2s, and the
 				// file is only written by validate-marksheet after user verification).
-				// Using content avoids spurious 400s on ShimmerArtifactCard clicks that
+				// Using content avoids spurious 400s on ArtifactCard clicks that
 				// open the panel right after streaming completes.
 				textContent = content;
 				editContent = content;

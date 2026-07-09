@@ -177,7 +177,7 @@ export const streamDocumentTool = createTool({
     }
 
     // Write the ORPHAN DRAFT to disk so the file exists for cross-session
-    // continuity (clicking ShimmerArtifactCard after a refresh must find the
+    // continuity (clicking ArtifactCard after a refresh must find the
     // file at initialMarkdownPath; without this write, only the editor's
     // auto-save would create it, which doesn't fire until the user types).
     // The CANONICAL file (ADM<adminNo>-<examTypeId>-<studentName>.md) is still

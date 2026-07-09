@@ -492,7 +492,7 @@ export class ChatContext {
    * When the LLM calls `streamDocument`, this handler
    * initializes the transient streaming state in the module-level
    * `documentStreams` export in `thread-data.svelte.ts`. The inline
-   * ShimmerArtifactCard in chat.svelte's `inlineDocumentStreams`
+   * ArtifactCard in chat.svelte's `inlineDocumentStreams`
    * derivation picks up the entry immediately and renders with
    * `status: 'processing'`.
    *

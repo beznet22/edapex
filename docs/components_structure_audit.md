@@ -88,7 +88,7 @@ components/
 ├── ChatComposer.svelte            # ← Root-level loose files
 ├── PWAInstallPrompt.svelte
 ├── SharedChatView.svelte
-├── ShimmerArtifactCard.svelte
+├── ArtifactCard.svelte
 ├── ThemeHead.svelte
 ├── app-sidebar.svelte
 ├── auth-form.svelte

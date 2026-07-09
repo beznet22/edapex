@@ -51,7 +51,7 @@ export function deriveDocumentId(input: { contentHash?: string }): string {
  * display name (e.g., "adakole.jpg.jpeg" → "adakole"). Mirrors the title
  * derivation in `stream-document.ts`'s `deriveInitialFilename` so the
  * streaming entry's title (set in `#onToolCall`) matches the tool output's
- * `title` field — important so ShimmerArtifactCard shows the same title
+ * `title` field — important so ArtifactCard shows the same title
  * during streaming as ArtifactViewer does after streaming completes.
  */
 export function deriveInitialTitle(fileName: string): string {
