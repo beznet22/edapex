@@ -32,6 +32,23 @@
 			case 'open_settings':
 				void goto('/settings/providers');
 				break;
+			case 'edit_marksheet_then_retry':
+				// Open the workspace panel focused on the marksheet.
+				void goto('/workspace');
+				break;
+			case 'mention_student':
+			case 'rephrase_request': {
+				// Focus the chat composer input. Safe fallback: no-op if the
+				// selector doesn't match (e.g. composer not mounted yet).
+				const input = document.querySelector(
+					'textarea[data-composer], [contenteditable="true"]'
+				) as HTMLElement | null;
+				input?.focus();
+				break;
+			}
+			case 'rerun_format':
+				// No-op for now — format pending is a future chunk.
+				break;
 			case 'contact_support':
 			case 'none':
 			default:
@@ -62,6 +79,22 @@
 		{:else if presentation.action === 'open_settings'}
 			<Button size="sm" variant="outline" onclick={() => onAction(presentation.action)}>
 				Open Settings
+			</Button>
+		{:else if presentation.action === 'edit_marksheet_then_retry'}
+			<Button size="sm" variant="outline" onclick={() => onAction(presentation.action)}>
+				Edit marksheet
+			</Button>
+		{:else if presentation.action === 'mention_student'}
+			<Button size="sm" variant="outline" onclick={() => onAction(presentation.action)}>
+				Mention a student
+			</Button>
+		{:else if presentation.action === 'rerun_format'}
+			<Button size="sm" variant="outline" onclick={() => onAction(presentation.action)}>
+				Run /format
+			</Button>
+		{:else if presentation.action === 'rephrase_request'}
+			<Button size="sm" variant="outline" onclick={() => onAction(presentation.action)}>
+				Rephrase
 			</Button>
 		{/if}
 	</div>
