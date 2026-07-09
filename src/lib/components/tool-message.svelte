@@ -23,6 +23,8 @@
     CollapsibleContent,
     CollapsibleTrigger,
   } from "$lib/components/ui/collapsible";
+  import CopyIcon from "@lucide/svelte/icons/copy";
+  import { toast } from "svelte-sonner";
 
   let { part }: { part: xUIMessagePart } = $props();
 
@@ -189,7 +191,20 @@
       <CollapsibleTrigger
         class="text-muted-foreground hover:text-foreground flex w-full items-center justify-between px-3 py-2 text-xs font-medium"
       >
-        View raw output
+        <span>View raw output</span>
+        <button
+          type="button"
+          onclick={(e) => {
+            e.stopPropagation();
+            navigator.clipboard.writeText(JSON.stringify(output, null, 2))
+              .then(() => toast.success("Copied!"))
+              .catch(() => toast.error("Could not copy to clipboard"));
+          }}
+          aria-label="Copy raw output"
+          class="size-5 rounded-sm flex items-center justify-center hover:bg-muted/40 transition-colors"
+        >
+          <CopyIcon class="size-3" />
+        </button>
       </CollapsibleTrigger>
       <CollapsibleContent>
         <ToolOutput output={JSON.stringify(output, null, 2)} />
@@ -198,25 +213,23 @@
   {/if}
 {/snippet}
 
-<div class="max-w-2xl space-y-6">
-  {#if isTool(part)}
-    <Tool defaultOpen={true}>
-      <ToolHeader type={getToolType()} state={getState(part)} />
-      <ToolContent>
-        {#if getState(part) === "input-available"}
-          <ToolInput input={getInput(part)} />
-        {/if}
+{#if isTool(part)}
+  <Tool defaultOpen={true}>
+    <ToolHeader type={getToolType()} state={getState(part)} />
+    <ToolContent>
+      {#if getState(part) === "input-available"}
+        <ToolInput input={getInput(part)} />
+      {/if}
 
-        {#if getState(part) === "output-available" || getState(part) === "output-error"}
-          {#if part.type === "tool-validate-marksheet"}
-            {@render validateClassResults(part)}
-          {:else if part.type === "tool-manage-results"}
-            {@render upsertStudentResult(part)}
-          {:else}
-            {@render defaultTool(part)}
-          {/if}
+      {#if getState(part) === "output-available" || getState(part) === "output-error"}
+        {#if part.type === "tool-validate-marksheet"}
+          {@render validateClassResults(part)}
+        {:else if part.type === "tool-manage-results"}
+          {@render upsertStudentResult(part)}
+        {:else}
+          {@render defaultTool(part)}
         {/if}
-      </ToolContent>
-    </Tool>
-  {/if}
-</div>
+      {/if}
+    </ToolContent>
+  </Tool>
+{/if}

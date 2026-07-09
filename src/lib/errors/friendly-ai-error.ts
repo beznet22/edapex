@@ -40,7 +40,11 @@ export type FriendlyAction =
 	| 'clear_context' // drop the failed assistant message, ask user to start fresh
 	| 'open_settings' // go to /settings/providers
 	| 'contact_support'
-	| 'none';
+	| 'none'
+	| 'edit_marksheet_then_retry' // NEW
+	| 'mention_student' // NEW
+	| 'rerun_format' // NEW
+	| 'rephrase_request'; // NEW
 
 export type FriendlyAiError =
 	| { kind: 'rate_limit'; providerId: string; retryAfterSeconds: number | null; resetAt: string | null }
@@ -56,7 +60,13 @@ export type FriendlyAiError =
 	| { kind: 'service_unavailable'; status?: number }
 	| { kind: 'invalid_prompt' }
 	| { kind: 'retry_exhausted'; cause: string }
-	| { kind: 'unknown'; cause: string };
+	| { kind: 'unknown'; cause: string }
+	| { kind: 'auto_fix_exhausted'; title: string; message: string; action: 'edit_marksheet_then_retry' }
+	| { kind: 'student_id_missing'; title: string; message: string; action: 'mention_student' }
+	| { kind: 'persist_path_missing'; title: string; message: string; action: 'rerun_format' }
+	| { kind: 'tool_not_registered'; title: string; message: string; action: 'contact_support' }
+	| { kind: 'agent_loop_exhausted'; title: string; message: string; action: 'rephrase_request' }
+	| { kind: 'bun_precondition_failed'; title: string; message: string; action: 'contact_support' };
 
 export interface FriendlyPresentation {
 	title: string;
@@ -184,6 +194,61 @@ export function categorizeAIError(error: unknown): FriendlyAiError {
 		if (error.name === 'AbortError' || /aborted/i.test(error.message)) {
 			return { kind: 'aborted' };
 		}
+
+		// Agentic workflow errors (Chunk 5 / F6) — match by substring/case-insensitive.
+		if (/auto.?fix.?exhausted|AUTO_FIX_EXHAUSTED/i.test(error.message)) {
+			return {
+				kind: 'auto_fix_exhausted',
+				title: "Auto-fix couldn't resolve all issues",
+				message:
+					"We've auto-corrected what we could. Review the remaining marksheet errors and edit the document, then click Validate again.",
+				action: 'edit_marksheet_then_retry'
+			};
+		}
+		if (/student.?id.?missing|STUDENT_ID_MISSING/i.test(error.message)) {
+			return {
+				kind: 'student_id_missing',
+				title: 'Which student is this marksheet for?',
+				message:
+					'Mention the student in the chat using @studentName, or link the marksheet to a student in the workspace.',
+				action: 'mention_student'
+			};
+		}
+		if (/persist.?path.?missing|PERSIST_PATH_MISSING/i.test(error.message)) {
+			return {
+				kind: 'persist_path_missing',
+				title: "Marksheet hasn't been formatted yet",
+				message:
+					'The marksheet needs to be formatted before it can be validated. Try uploading it again or running /format.',
+				action: 'rerun_format'
+			};
+		}
+		if (/tool.?not.?registered|TOOL_NOT_REGISTERED/i.test(error.message)) {
+			return {
+				kind: 'tool_not_registered',
+				title: 'Workflow configuration issue',
+				message: "A required tool isn't registered with the workflow. Contact your administrator.",
+				action: 'contact_support'
+			};
+		}
+		if (/agent.?loop.?exhausted|AGENT_LOOP_EXHAUSTED|maxSteps/i.test(error.message)) {
+			return {
+				kind: 'agent_loop_exhausted',
+				title: "Agent didn't reach a conclusion",
+				message:
+					"The agent tried several approaches but couldn't resolve this in the allowed number of steps. Try rephrasing your request or breaking it into smaller parts.",
+				action: 'rephrase_request'
+			};
+		}
+		if (/bun.?precondition|BUN_PRECONDITION_FAILED|server.?side.?depend/i.test(error.message)) {
+			return {
+				kind: 'bun_precondition_failed',
+				title: 'Server setup incomplete',
+				message: 'A server-side dependency is missing. Contact your administrator.',
+				action: 'contact_support'
+			};
+		}
+
 		return { kind: 'unknown', cause: error.message };
 	}
 
@@ -274,6 +339,46 @@ export function describe(err: FriendlyAiError): FriendlyPresentation {
 				title: 'Retries exhausted',
 				message: `The provider kept failing across all retry attempts. (${err.cause})`,
 				action: 'regenerate'
+			};
+		case 'auto_fix_exhausted':
+			return {
+				title: "Auto-fix couldn't resolve all issues",
+				message:
+					"We've auto-corrected what we could. Review the remaining marksheet errors and edit the document, then click Validate again.",
+				action: 'edit_marksheet_then_retry'
+			};
+		case 'student_id_missing':
+			return {
+				title: 'Which student is this marksheet for?',
+				message:
+					'Mention the student in the chat using @studentName, or link the marksheet to a student in the workspace.',
+				action: 'mention_student'
+			};
+		case 'persist_path_missing':
+			return {
+				title: "Marksheet hasn't been formatted yet",
+				message:
+					'The marksheet needs to be formatted before it can be validated. Try uploading it again or running /format.',
+				action: 'rerun_format'
+			};
+		case 'tool_not_registered':
+			return {
+				title: 'Workflow configuration issue',
+				message: "A required tool isn't registered with the workflow. Contact your administrator.",
+				action: 'contact_support'
+			};
+		case 'agent_loop_exhausted':
+			return {
+				title: "Agent didn't reach a conclusion",
+				message:
+					"The agent tried several approaches but couldn't resolve this in the allowed number of steps. Try rephrasing your request or breaking it into smaller parts.",
+				action: 'rephrase_request'
+			};
+		case 'bun_precondition_failed':
+			return {
+				title: 'Server setup incomplete',
+				message: 'A server-side dependency is missing. Contact your administrator.',
+				action: 'contact_support'
 			};
 		case 'unknown':
 		default:

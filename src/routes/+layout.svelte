@@ -45,7 +45,7 @@
 <ThemeProvider attribute="class" disableTransitionOnChange>
   <ThemeHead />
   <PWAInstallPrompt />
-  <Toaster position="bottom-center" />
+  <Toaster position="bottom-left" />
   <SettingsModal />
   {@render children()}
 </ThemeProvider>

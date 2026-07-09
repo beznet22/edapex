@@ -27,7 +27,6 @@
 		documentStreams,
 		type DocumentStreamEntry,
 	} from "$lib/context/thread-data.svelte";
-	import ShimmerArtifactCard from "$lib/components/ShimmerArtifactCard.svelte";
 	import Markdown from "$lib/components/prompt-kit/markdown/Markdown.svelte";
 
 	let {

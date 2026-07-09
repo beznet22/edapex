@@ -47,7 +47,6 @@
   import { Separator } from "$lib/components/ui/separator";
   import { Switch } from "$lib/components/ui/switch";
   import * as Tooltip from "$lib/components/ui/tooltip";
-  import ContextUsageIndicator from "./ContextUsageIndicator.svelte";
   import ContextWarningBanner from "./ContextWarningBanner.svelte";
   import RateLimitBanner from "./RateLimitBanner.svelte";
   import CommandDropdown from "./chat/CommandDropdown.svelte";
@@ -1131,13 +1130,6 @@
             {/each}
           </Popover.Content>
         </Popover.Root>
-      {/if}
-
-      {#if currentModel}
-        <ContextUsageIndicator
-          modelId={currentModel.id}
-          maxTokens={maxContext}
-        />
       {/if}
 
       <Button
