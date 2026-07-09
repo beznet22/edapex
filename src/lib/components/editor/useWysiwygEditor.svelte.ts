@@ -71,6 +71,19 @@ export class WysiwygEditorController {
     // the flag is only set during programmatic external syncs.
     private isExternalSync = false;
 
+    // Debounce timer for propagating `onUpdate` to the parent. Tiptap fires
+    // `onUpdate` once per internal transaction, so the initial parse of a
+    // document (or any complex edit) produces a synchronous cascade of
+    // calls. Propagating each one to the parent causes `$state` writes that
+    // trigger parent re-renders which re-evaluate the editor template and
+    // re-fire more `onUpdate` calls — the chain trips
+    // `effect_update_depth_exceeded`. Debouncing collapses the cascade
+    // into a single parent write carrying the FINAL state, which matches
+    // Novel.sh's `useDebouncedCallback(..., 500)` pattern for the same
+    // reason. Auto-save in `editor-canvas.svelte` also benefits (one PUT
+    // per quiescent period instead of one per keystroke).
+    private onUpdateDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+
     private chatClient: Chat<UIMessage>;
 
     constructor(
@@ -270,14 +283,21 @@ export class WysiwygEditorController {
     }
 
     /** Tiptap onUpdate — skip getMarkdown during aiStreamBlock transactions
-     *  and during programmatic external syncs (see `isExternalSync`). */
+     *  and during programmatic external syncs (see `isExternalSync`). The
+     *  parent write is debounced via `onUpdateDebounceTimer` to coalesce
+     *  Tiptap's per-transaction `onUpdate` cascade into a single update
+     *  carrying the FINAL state. */
     handleEditorUpdate(transaction: Transaction, editor: Editor): void {
         if (this.isExternalSync) return;
         if (transaction.getMeta("aiStream")) return;
         const md =
             (editor.storage as { markdown?: { getMarkdown?: () => string } }).markdown
                 ?.getMarkdown?.() ?? editor.getHTML();
-        this.options.onUpdate?.(md);
+        if (this.onUpdateDebounceTimer) clearTimeout(this.onUpdateDebounceTimer);
+        this.onUpdateDebounceTimer = setTimeout(() => {
+            this.onUpdateDebounceTimer = null;
+            this.options.onUpdate?.(md);
+        }, 100);
     }
 
     /** Sync external content (e.g. file switch) into the editor, deduplicated.
