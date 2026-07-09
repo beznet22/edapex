@@ -38,6 +38,12 @@
   import FileWarningIcon from "@lucide/svelte/icons/file-warning";
 
   import ArtifactCard from "./ArtifactCard.svelte";
+  import ToolGroup from "./chat/ToolGroup.svelte";
+  import {
+    Collapsible,
+    CollapsibleContent,
+    CollapsibleTrigger,
+  } from "$lib/components/ui/collapsible";
 
   import ErrorAlert from "./shared/ErrorAlert.svelte";
 
@@ -162,6 +168,17 @@
     }
     return result;
   });
+
+  const messagesWithToolSplit = $derived(
+    chat.messages.map((m) => ({
+      ...m,
+      toolParts: m.parts.filter((p) => p.type.startsWith("tool-")),
+      nonToolParts: m.parts.filter((p) => !p.type.startsWith("tool-")),
+      hasArtifact: m.parts.some(
+        (p) => p.type === "data-streamDocument" || p.type === "data-generatePDF",
+      ),
+    })),
+  );
 </script>
 
 <div
@@ -249,7 +266,9 @@
       >
         <!-- Add padding bottom so messages don't hide behind floating input -->
         <div class="space-y-6 py-4 mx-auto max-w-3xl px-4 pb-52 sm:pb-56">
-          {#each chat.messages as message, index}
+          {#each messagesWithToolSplit as message}
+            {@const toolParts = message.toolParts}
+            {@const hasArtifact = message.hasArtifact}
             <div class="group relative">
               <Message from={message.role} class="py-0">
                 <MessageContent
@@ -291,17 +310,33 @@
                 </Shimmer>
               {/if}
 
-              {#each inlineDocumentStreams as stream (stream.toolCallId)}
-                {#if message.parts?.some((p) => (p as { type?: string; toolCallId?: string }).type === "tool-streamDocument" && (p as { toolCallId?: string }).toolCallId === stream.toolCallId)}
-                  <div class="mt-2 mb-2 w-full">
-                    <ArtifactCard
-                      artifactId={stream.documentId}
-                      title={stream.title}
-                      status={stream.status}
-                    />
-                  </div>
-                {/if}
-              {/each}
+              {#if hasArtifact}
+                <Collapsible open={true}>
+                  <CollapsibleTrigger class="group flex w-full items-center gap-2 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground hover:text-foreground">
+                    Thinking completed
+                    <ChevronDownIcon class="size-3 transition-transform group-data-[state=open]:rotate-0 group-data-[state=closed]:-rotate-90" />
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    {#each inlineDocumentStreams as stream (stream.toolCallId)}
+                      {#if message.parts?.some((p) => (p as { type?: string; toolCallId?: string }).type === "tool-streamDocument" && (p as { toolCallId?: string }).toolCallId === stream.toolCallId)}
+                        <div class="mt-2 mb-2 w-full">
+                          <ArtifactCard
+                            artifactId={stream.documentId}
+                            title={stream.title}
+                            status={stream.status}
+                          />
+                        </div>
+                      {/if}
+                    {/each}
+                  </CollapsibleContent>
+                </Collapsible>
+              {/if}
+
+              {#if toolParts.length > 0}
+                <div class="mt-2">
+                  <ToolGroup parts={toolParts} />
+                </div>
+              {/if}
 
               {#if chat.lastError && message.id === chat.lastMessage?.id}
                 <ErrorAlert
