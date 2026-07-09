@@ -7,7 +7,7 @@
 	import CodeIcon from '@lucide/svelte/icons/code';
 	import SparklesIcon from '@lucide/svelte/icons/sparkles';
 	import StepForwardIcon from '@lucide/svelte/icons/step-forward';
-	import type { ContainerBreakpoint } from './useContainerBreakpoint';
+	import type { ContainerBreakpoint } from './useContainerBreakpoint.svelte';
 	import EditorBubbleItem from './EditorBubbleItem.svelte';
 
 	/**

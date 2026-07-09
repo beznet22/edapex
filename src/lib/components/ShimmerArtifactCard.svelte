@@ -24,7 +24,6 @@
 		content?: string;
 		kind?: "document" | "pdf";
 	} = $props();
-
 	const chat = useChat();
 
 	const stateMeta: Record<Status, { label: string; tone: string }> = {

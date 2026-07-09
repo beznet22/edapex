@@ -13,7 +13,7 @@
 	import { cn } from "$lib/utils/shadcn";
 	import EditorBubbleItem from "./EditorBubbleItem.svelte";
 	import AISelector from "./AISelector.svelte";
-	import type { ContainerBreakpoint } from "./useContainerBreakpoint";
+	import type { ContainerBreakpoint } from "./useContainerBreakpoint.svelte";
 
 	/**
 	 * GenerativeMenuSwitch — two-state bubble wrapper rendered inside the

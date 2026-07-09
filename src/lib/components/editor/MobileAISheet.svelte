@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { Editor } from '@tiptap/core';
 	import { Drawer } from 'vaul-svelte';
-	import type { ContainerBreakpoint } from './useContainerBreakpoint';
+	import type { ContainerBreakpoint } from './useContainerBreakpoint.svelte';
 	import AISelector from './AISelector.svelte';
 
 	/**
