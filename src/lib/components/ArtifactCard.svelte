@@ -166,9 +166,9 @@
         }
       }}
       aria-label="Preview artifact"
-      class="inline-flex size-7 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card"
+      class="inline-flex size-9 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm shadow-primary/20 transition-all hover:scale-110 hover:bg-primary/90 hover:shadow-md hover:shadow-primary/30 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card"
     >
-      <EyeIcon class="size-3.5" />
+      <EyeIcon class="size-4" strokeWidth={2} />
     </button>
   </div>
 </div>
