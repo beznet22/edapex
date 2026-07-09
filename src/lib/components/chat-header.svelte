@@ -4,7 +4,10 @@
 	import { useSidebar } from "$lib/components/ui/sidebar/index.js";
 	import type { AuthUser } from "$lib/types/auth-types";
 	import { UserContext } from "$lib/context/user-context.svelte";
-	import ActivityPopover from "$lib/components/activity-popover.svelte";
+	import { SelectedModel, ResolvedModelHolder } from "$lib/context/sync.svelte";
+	import { getModelById } from "$lib/provider/catalog";
+	import type { ModelId } from "$lib/provider/types";
+	import ContextUsageIndicator from "$lib/components/ContextUsageIndicator.svelte";
 	import ModelSelector from "$lib/components/model-selector.svelte";
 
 	let {
@@ -15,6 +18,24 @@
 
 	const sidebar = useSidebar();
 	const userContext = UserContext.fromContext();
+	const selectedChatModel = SelectedModel.fromContext();
+	const resolvedModelHolder = ResolvedModelHolder.fromContext();
+
+	// Current model: try the SSR-resolved model first, then fall back to the
+	// catalog lookup. Mirrors ChatComposer.svelte so the header stays
+	// self-sufficient without coupling to the composer's local state.
+	const currentModel = $derived.by(() => {
+		const raw = selectedChatModel.value;
+		if (!raw) return resolvedModelHolder.value;
+		const modelId = raw.includes("@") ? raw.slice(0, raw.indexOf("@")) : raw;
+		const resolved = resolvedModelHolder.value;
+		if (resolved && (resolved.id === modelId || raw.startsWith(`${resolved.id}@`))) {
+			return resolved;
+		}
+		return getModelById(modelId as ModelId) ?? null;
+	});
+
+	const maxContext = $derived(currentModel?.limit.context ?? 128_000);
 </script>
 
 <header
@@ -31,6 +52,19 @@
   </div>
 
   <div class="flex items-center gap-1 shrink-0">
-    <ActivityPopover />
+    <!-- TODO(background-tasks): Re-enable <ActivityPopover /> here when
+         background-task feature ships (OCR worker, etc). Files to revisit:
+         src/lib/components/activity-popover.svelte
+         src/lib/state/background-tasks.svelte.ts
+         src/lib/types/background-tasks.ts
+         Note: state store and types remain consumed by routes/(chat)/filestore,
+         lib/workers/task-worker, lib/server/service/ocr-batch,
+         routes/api/file/[...path] — they are not orphaned. -->
+    {#if currentModel}
+      <ContextUsageIndicator
+        modelId={currentModel.id}
+        maxTokens={maxContext}
+      />
+    {/if}
   </div>
 </header>
