@@ -1,6 +1,13 @@
 <script lang="ts">
 	import { ScrollArea } from "$lib/components/ui/scroll-area";
 	import WysiwygEditor from "$lib/components/editor/WysiwygEditor.svelte";
+	import { normalizeMarkdown } from "$lib/components/editor/markdown-normalize";
+	import BottomToolbar from "$lib/components/editor/BottomToolbar.svelte";
+	import MobileAISheet from "$lib/components/editor/MobileAISheet.svelte";
+	import {
+		breakpointFromWidth,
+		type ContainerBreakpoint,
+	} from "$lib/components/editor/useContainerBreakpoint.svelte";
 	import LoadingState from "./loading-state.svelte";
 	import { Markdown } from "$lib/components/prompt-kit/markdown";
 	import { Spinner } from "$lib/components/ui/spinner/index.js";
@@ -65,6 +72,12 @@
 	let editContent = $state("");
 	let containerWidth = $state(0);
 	let containerRef = $state<HTMLDivElement | null>(null);
+	let textContainerRef = $state<HTMLDivElement | null>(null);
+	let textContainerWidth = $state(0);
+	const containerBreakpoint = $derived<ContainerBreakpoint>(
+		breakpointFromWidth(textContainerWidth),
+	);
+	let mobileSheetOpen = $state(false);
 	let pdfFetchState = $state<"idle" | "fetching" | "ready" | "error">("idle");
 	let pdfFetchError = $state<string | null>(null);
 	let editorSkeletonVisible = $state(false);
@@ -75,12 +88,14 @@
 	const selectedClass = SelectedClass.fromContext();
 	const chat = useChat();
 	const designationId = $derived(
-		(DESIGNATIONS.indexOf((user?.designation as any) ?? 'it') || 1)
+		DESIGNATIONS.indexOf((user?.designation as any) ?? "it") || 1,
 	);
-  const selectedClassId = $derived(selectedClass?.data?.classId ?? null);
-  const selectedSectionId = $derived(selectedClass?.data?.sectionId ?? null);
-  const selectedClassName = $derived(selectedClass?.data?.className ?? '');
-  const selectedSectionName = $derived(selectedClass?.data?.sectionName ?? '');
+	const selectedClassId = $derived(selectedClass?.data?.classId ?? null);
+	const selectedSectionId = $derived(selectedClass?.data?.sectionId ?? null);
+	const selectedClassName = $derived(selectedClass?.data?.className ?? "");
+	const selectedSectionName = $derived(
+		selectedClass?.data?.sectionName ?? "",
+	);
 
 	const editable = $derived.by(() => {
 		if (!artifactId) return true;
@@ -106,7 +121,8 @@
 		if (!target) return false;
 		isSaving = true;
 		try {
-			const body = editorMode === "wysiwyg" ? wysiwygContent : editContent;
+			const body =
+				editorMode === "wysiwyg" ? wysiwygContent : editContent;
 			const res = await fetch(target, {
 				method: "PUT",
 				body: new Blob([body], { type: "text/plain" }),
@@ -125,7 +141,10 @@
 	}
 
 	export function copy() {
-		const body = editorMode === "wysiwyg" && isMarkdownFile ? wysiwygContent : editContent;
+		const body =
+			editorMode === "wysiwyg" && isMarkdownFile
+				? wysiwygContent
+				: editContent;
 		if (body) {
 			navigator.clipboard.writeText(body);
 			toast.success("Copied to clipboard");
@@ -154,10 +173,24 @@
 	$effect(() => {
 		if (type === "text") {
 			if (streaming) {
-				console.log('[editor-canvas] streaming content update', { ts: performance.now(), contentLength: content?.length });
+				console.log("[editor-canvas] streaming content update", {
+					ts: performance.now(),
+					contentLength: content?.length,
+				});
 				textContent = content ?? "";
 				editContent = content ?? "";
+			} else if (content) {
+				// Prefer the streamed content prop over a URL fetch. The orphan-draft
+				// file at `url` may not exist yet (auto-save debounce is 2s, and the
+				// file is only written by validate-marksheet after user verification).
+				// Using content avoids spurious 400s on ShimmerArtifactCard clicks that
+				// open the panel right after streaming completes.
+				textContent = content;
+				editContent = content;
+				lastSavedContent = content;
 			} else if (url) {
+				// Fall back to URL fetch only when content is unavailable (e.g.,
+				// cross-session re-open where the editor reloads from disk).
 				const targetUrl = url;
 				textContent = "Loading...";
 				editContent = "";
@@ -191,29 +224,24 @@
 					cancelled = true;
 					clearTimeout(timeoutId);
 				};
-			} else if (content) {
-				textContent = content;
-				editContent = content;
-				lastSavedContent = content;
 			}
 		}
 	});
 
 	$effect(() => {
 		const md = wysiwygContent;
-		if (!md || md === lastSavedContent) return;
+		// Normalize both sides so tiptap-markdown's parse/serialize round-trip
+		// (whitespace, CRLF, trailing newline) never triggers a spurious write.
+		// Real user edits still differ after normalization and continue to save.
+		if (!md || normalizeMarkdown(md) === normalizeMarkdown(lastSavedContent)) return;
 		if (streaming) return;
 		if (!artifactId) return;
+		if (!url) return;
 
 		if (saveDebounceTimer) clearTimeout(saveDebounceTimer);
 		saveDebounceTimer = setTimeout(async () => {
-			const safeTitle = title.replace(/[^a-zA-Z0-9._-]/g, "_");
-			const path = examTypeId
-				? `exams/examType-${examTypeId}/${safeTitle}.md`
-				: null;
-			if (!path) return;
 			try {
-				const res = await fetch(`/api/file/${path}`, {
+				const res = await fetch(url, {
 					method: "PUT",
 					body: new Blob([md], { type: "text/markdown" }),
 				});
@@ -238,6 +266,16 @@
 				containerWidth = entries[0].contentRect.width;
 			});
 			observer.observe(containerRef);
+			return () => observer.disconnect();
+		}
+	});
+
+	$effect(() => {
+		if (textContainerRef) {
+			const observer = new ResizeObserver((entries) => {
+				textContainerWidth = entries[0].contentRect.width;
+			});
+			observer.observe(textContainerRef);
 			return () => observer.disconnect();
 		}
 	});
@@ -295,151 +333,157 @@
 </script>
 
 {#if filename}
-	<div class="flex flex-col w-full h-full relative pb-4 group">
-		<header
-			class="flex items-center justify-between h-11 px-3 sm:px-4 border-b border-border/30 bg-background/60 backdrop-blur-sm shrink-0"
-		>
-			<span class="text-[12px] font-semibold text-foreground truncate">
-				{filename || "Untitled"}
-			</span>
-			{#if streaming}
-				<span
-					class="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-primary/10 border border-primary/20 text-[10px] font-bold text-primary uppercase tracking-widest"
+	{#if type === "text"}
+		{#if streaming && isMarkdownFile && editorMode === "wysiwyg"}
+			{#if skeletonVisible}
+				<ScrollArea
+					class="flex-1 w-full bg-background overflow-hidden p-4"
 				>
-					<span class="size-1.5 rounded-full bg-primary animate-pulse"></span>
-					Streaming…
-				</span>
-			{/if}
-		</header>
-		{#if type === "text"}
-			{#if streaming && isMarkdownFile && editorMode === "wysiwyg"}
-				{#if skeletonVisible}
-					<ScrollArea class="flex-1 w-full bg-background overflow-hidden p-4">
-						<div class="space-y-2 max-w-3xl">
-							{#each [60, 80, 45, 75, 55, 70, 40] as w, i (i)}
-								<div
-									class="h-3 rounded-md bg-muted-foreground/15"
-									style:width="{w}%"
-								></div>
-							{/each}
-						</div>
-					</ScrollArea>
-				{:else}
-					<ScrollArea class="flex-1 w-full bg-background overflow-hidden p-4">
-						<div class="prose prose-sm max-w-none dark:prose-invert">
-							<Markdown content={textContent} />
-						</div>
-					</ScrollArea>
-				{/if}
-			{:else if textContent === "Loading..." || textContent.startsWith("Error loading")}
-				<LoadingState label={textContent === "Loading..." ? "Loading file content" : textContent} />
-			{:else if isMarkdownFile && editorMode === "wysiwyg"}
-				<div class="flex-1 min-h-0 overflow-hidden">
-				<WysiwygEditor
-					content={textContent}
-					onUpdate={handleWysiwygUpdate}
-					class="h-full"
-					designationId={designationId}
-					selectedClassId={selectedClassId}
-					selectedSectionId={selectedSectionId}
-					selectedClassName={selectedClassName}
-					selectedSectionName={selectedSectionName}
-					editable={editable}
-				/>
-				</div>
+					<div class="space-y-2 max-w-3xl">
+						{#each [60, 80, 45, 75, 55, 70, 40] as w, i (i)}
+							<div
+								class="h-3 rounded-md bg-muted-foreground/15"
+								style:width="{w}%"
+							></div>
+						{/each}
+					</div>
+				</ScrollArea>
 			{:else}
-				<ScrollArea class="flex-1 w-full bg-background overflow-hidden relative">
-					<textarea
-						bind:value={editContent}
-						readonly={streaming}
-						class="w-full min-h-full absolute inset-0 p-4 text-[0.7rem] font-mono leading-relaxed bg-transparent resize-none outline-none border-none focus:ring-0"
-					></textarea>
+				<ScrollArea
+					class="flex-1 w-full bg-background overflow-hidden p-4"
+				>
+					<div class="prose prose-sm max-w-none dark:prose-invert">
+						<Markdown content={textContent} />
+					</div>
 				</ScrollArea>
 			{/if}
-		{:else if type === "image"}
-			<ScrollArea class="flex-1">
-				<div class="flex items-center justify-center p-4">
-					<img
-						src={url}
-						alt={filename}
-						class="max-w-full rounded-md shadow-sm"
+		{:else if textContent === "Loading..." || textContent.startsWith("Error loading")}
+			<LoadingState
+				label={textContent === "Loading..."
+					? "Loading file content"
+					: textContent}
+			/>
+		{:else if isMarkdownFile && editorMode === "wysiwyg"}
+			<div
+				class="flex-1 min-h-0 overflow-hidden"
+				bind:this={textContainerRef}
+			>
+				{#key url}
+					<WysiwygEditor
+						content={textContent}
+						onUpdate={handleWysiwygUpdate}
+						class="h-full"
+						{designationId}
+						{selectedClassId}
+						{selectedSectionId}
+						{selectedClassName}
+						{selectedSectionName}
+						{editable}
 					/>
-				</div>
+				{/key}
+			</div>
+		{:else}
+			<ScrollArea
+				class="flex-1 w-full bg-background overflow-hidden relative"
+			>
+				<textarea
+					bind:value={editContent}
+					readonly={streaming}
+					class="w-full min-h-full absolute inset-0 p-4 text-[0.7rem] font-mono leading-relaxed bg-transparent resize-none outline-none border-none focus:ring-0"
+				></textarea>
 			</ScrollArea>
-		{:else if type === "pdf"}
-			<div
-				class="flex-1 overflow-hidden relative bg-white"
-				bind:this={containerRef}
-			>
-				{#if pdfEngine.isLoading || !pdfEngine.engine}
-					<LoadingState label="Loading PDF engine" />
-				{:else if pdfUrlError}
-					<div
-						class="h-full flex flex-col items-center justify-center gap-3 text-center px-6"
+		{/if}
+	{:else if type === "image"}
+		<ScrollArea class="flex-1">
+			<div class="flex items-center justify-center p-4">
+				<img
+					src={url}
+					alt={filename}
+					class="max-w-full rounded-md shadow-sm"
+				/>
+			</div>
+		</ScrollArea>
+	{:else if type === "pdf"}
+		<div
+			class="flex-1 overflow-hidden relative bg-white"
+			bind:this={containerRef}
+		>
+			{#if pdfEngine.isLoading || !pdfEngine.engine}
+				<LoadingState label="Loading PDF engine" />
+			{:else if pdfUrlError}
+				<div
+					class="h-full flex flex-col items-center justify-center gap-3 text-center px-6"
+				>
+					<AlertCircleIcon class="size-10 text-destructive/70" />
+					<p class="text-sm font-semibold text-foreground">
+						PDF not ready
+					</p>
+					<p class="text-[11px] text-muted-foreground max-w-xs">
+						{pdfUrlError}
+					</p>
+					<Button
+						size="sm"
+						variant="outline"
+						onclick={() => location.reload()}
 					>
-						<AlertCircleIcon class="size-10 text-destructive/70" />
-						<p class="text-sm font-semibold text-foreground">PDF not ready</p>
-						<p class="text-[11px] text-muted-foreground max-w-xs">{pdfUrlError}</p>
-						<Button size="sm" variant="outline" onclick={() => location.reload()}>
-							<RefreshCwIcon class="size-3.5 mr-1" /> Retry
-						</Button>
-					</div>
-				{:else if !pdfUrlReady}
-					<div class="h-full flex flex-col items-center justify-center gap-3">
-						<Spinner class="size-8 text-primary" />
-						<p
-							class="text-[10px] font-bold uppercase tracking-widest text-muted-foreground"
-						>
-							Loading PDF…
-						</p>
-					</div>
-				{:else}
-					<EmbedPDF engine={pdfEngine.engine} {plugins}>
-						{#snippet children({ activeDocumentId })}
-							{#if activeDocumentId}
-								{@const documentId = activeDocumentId}
-								<DocumentContent {documentId}>
-									{#snippet children(documentContent)}
-										{#if documentContent.isLoaded}
-											{#snippet renderPage(page: RenderPageProps)}
-												{@const pageScale = containerWidth
-													? containerWidth / page.width
-													: 1}
-												<div
-													style:width="{page.width * pageScale}px"
-													style:height="{page.height * pageScale}px"
-													class="bg-white origin-top transition-all duration-300"
-												>
-													<RenderLayer
-														{documentId}
-														pageIndex={page.pageIndex}
-														scale={pageScale}
-													/>
-												</div>
-											{/snippet}
-											<Viewport
-												{documentId}
-												class="w-full h-full overflow-x-hidden relative"
+						<RefreshCwIcon class="size-3.5 mr-1" /> Retry
+					</Button>
+				</div>
+			{:else if !pdfUrlReady}
+				<div
+					class="h-full flex flex-col items-center justify-center gap-3"
+				>
+					<Spinner class="size-8 text-primary" />
+					<p
+						class="text-[10px] font-bold uppercase tracking-widest text-muted-foreground"
+					>
+						Loading PDF…
+					</p>
+				</div>
+			{:else}
+				<EmbedPDF engine={pdfEngine.engine} {plugins}>
+					{#snippet children({ activeDocumentId })}
+						{#if activeDocumentId}
+							{@const documentId = activeDocumentId}
+							<DocumentContent {documentId}>
+								{#snippet children(documentContent)}
+									{#if documentContent.isLoaded}
+										{#snippet renderPage(
+											page: RenderPageProps,
+										)}
+											{@const pageScale = containerWidth
+												? containerWidth / page.width
+												: 1}
+											<div
+												style:width="{page.width *
+													pageScale}px"
+												style:height="{page.height *
+													pageScale}px"
+												class="bg-white origin-top transition-all duration-300"
 											>
-												<Scroller {documentId} {renderPage} />
-											</Viewport>
-										{/if}
-									{/snippet}
-								</DocumentContent>
-							{/if}
-						{/snippet}
-					</EmbedPDF>
-				{/if}
-			</div>
-		{/if}
-
-		{#if streaming}
-			<div
-				class="absolute bottom-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-full bg-primary/10 border border-primary/30 backdrop-blur-md flex items-center gap-2"
-			>
-				<span class="size-1.5 rounded-full bg-primary animate-pulse"></span>
-				<span class="text-[11px] font-bold text-primary uppercase tracking-wider">Streaming…</span>
-			</div>
-		{/if}
-	</div>
+												<RenderLayer
+													{documentId}
+													pageIndex={page.pageIndex}
+													scale={pageScale}
+												/>
+											</div>
+										{/snippet}
+										<Viewport
+											{documentId}
+											class="w-full h-full overflow-x-hidden relative"
+										>
+											<Scroller
+												{documentId}
+												{renderPage}
+											/>
+										</Viewport>
+									{/if}
+								{/snippet}
+							</DocumentContent>
+						{/if}
+					{/snippet}
+				</EmbedPDF>
+			{/if}
+		</div>
+	{/if}
 {/if}

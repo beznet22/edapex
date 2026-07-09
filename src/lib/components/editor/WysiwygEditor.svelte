@@ -32,6 +32,7 @@
       DescriptionTerm
   } from "./extensions/description-list";
   import "./styles/editor.css";
+    import { AIHighlight } from "./extensions/ai-highlight.ts";
 
   let {
     content = "",
@@ -116,6 +117,7 @@
       SlashMenuExtension,
       MentionExtension,
       AiStreamNode,
+      AIHighlight,
       dragHandle,
       Table.configure({
         resizable: false,
