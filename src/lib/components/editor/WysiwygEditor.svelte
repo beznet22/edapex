@@ -9,7 +9,7 @@
     import Subscript from "@tiptap/extension-subscript";
     import Superscript from "@tiptap/extension-superscript";
     import { Markdown } from "tiptap-markdown";
-    import { stripBlankLinesInTables } from "./markdown-normalize";
+    import { marked } from "marked";
     import GenerativeMenuSwitch from "./GenerativeMenuSwitch.svelte";
     import { dragHandle } from "./DragHandle.svelte";
     import { CopilotExtension } from "./extensions/copilot";
@@ -155,7 +155,7 @@
             DescriptionDetail,
             CodeBlockHighlight,
         ],
-        content: stripBlankLinesInTables(content ?? ""),
+        content: marked.parse(content ?? "", { async: false }),
         editable,
         editorProps: {
             attributes: {
