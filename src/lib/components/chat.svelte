@@ -18,7 +18,6 @@
   import ChatResource from "./chat-resource.svelte";
   import PdfLinkCard from "./chat/pdf-link-card.svelte";
   import MessageAction from "./message-action.svelte";
-  import PreviewModal from "./pdf-preview.svelte";
   import { Markdown } from "./prompt-kit/markdown";
   import {
     Reasoning,
@@ -362,5 +361,4 @@
   </div>
 </div>
 
-<PreviewModal />
 <ChatResource onFileSelected={() => {}} />
