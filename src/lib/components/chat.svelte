@@ -51,6 +51,7 @@
   import { onMount } from "svelte";
   import ActionBar from "./chat/ActionBar.svelte";
   import Loader from "./prompt-kit/loader/loader.svelte";
+    import MentionDropdown from "./chat/MentionDropdown.svelte";
 
   let {
     user,
@@ -102,7 +103,29 @@
   // DEBUG — temporary toggle to force the ActionBar visible so the wrapper
   // bg / composer rounded-top layout can be inspected without triggering a
   // real marksheet validation flow. Revert before shipping.
-  const DEBUG_FORCE_ACTIONBAR = true;
+  const DEBUG_FORCE_ACTIONBAR = false;
+
+  let mentionProps = $state({
+    show: false,
+    query: "",
+    designationId: 1,
+    onSelect: (_e: unknown) => {},
+    onDismiss: () => {},
+    refresh: null as null | ((q: string, v: boolean) => void),
+  });
+  let mentionDropdownRef = $state<MentionDropdown | null>(null);
+
+  // Publish a refresh closure into mentionProps.refresh so ChatComposer's
+  // effect (which fires whenever `mentionQuery` or `showMentions` changes)
+  // can push the latest query into the live dropdown instance. Re-publishes
+  // every time the dropdown instance swaps so a re-mount picks up the new
+  // function reference.
+  $effect(() => {
+    const ref = mentionDropdownRef;
+    mentionProps.refresh = ref
+      ? (q: string, v: boolean) => ref.refresh(q, v)
+      : null;
+  });
 
   let awaitValidation = $derived(
     lastValidationMessage?.parts.find((p) => p.type === "data-awaitValidation"),
@@ -360,15 +383,16 @@
   <div
     class="absolute bottom-4 left-0 w-full pt-10 pb-4 px-2 sm:px-4 safe-area-bottom pointer-events-none z-50 flex flex-col items-center gap-0"
   >
-    <!-- Wrapper bg mirrors the composer's dark/blurred surface so the
-         composer's rounded top corners (which expose the area outside the
-         rounded shape when no overflow-hidden clip is active) show a
-         visually consistent dark surface instead of the page background.
-         The ActionBar above keeps its own bg-secondary/40 surface, and the
-         composer's own bg-[#09090b]/40 + backdrop-blur continues to fill
-         the body so the gradient still lands inside the composer box. -->
+    <!-- Wrapper bg matches the ActionBar's bg-secondary/40 so the ActionBar
+         blends into the wrapper card (no visible seam); the composer sits
+         on top as a contrasting dark "viewport" with its own
+         bg-[#09090b]/40 + backdrop-blur, which makes it stand out against
+         the lighter wrapper surface. Without overflow-hidden, the
+         composer's rounded top corners expose the wrapper's bg in the
+         curve pixels, which is intentional and reads as one card with a
+         darker inset. -->
     <div
-      class="pointer-events-auto w-full max-w-[780px] relative z-20 flex flex-col rounded-4xl border border-border/10 shadow-[0_0_50px_-12px_rgba(0,0,0,0.5)] bg-[#09090b]/40 backdrop-blur-3xl"
+      class="pointer-events-auto w-full max-w-[780px] relative z-20 flex flex-col rounded-4xl border border-border/10 shadow-[0_0_50px_-12px_rgba(0,0,0,0.5)] bg-secondary/40 backdrop-blur-3xl"
     >
       {#if DEBUG_FORCE_ACTIONBAR || awaitValidation?.type === "data-awaitValidation"}
         <ActionBar
@@ -387,7 +411,24 @@
           onValidate={(id, dropdownId) => chat.resumeWorkflow(id, dropdownId)}
         />
       {/if}
-      <ChatComposer {user} {readonly} isInitial={false} />
+      <ChatComposer {user} {readonly} isInitial={false} bind:mentionProps />
+      <!-- Mention dropdown rendered as a sibling of ChatComposer inside the
+           same `relative` wrapper. Positioned `absolute bottom-full` so the
+           ActionBar height pushes it up automatically — the dropdown always
+           floats above the entire wrapper (ActionBar + Composer) rather than
+           overlapping the ActionBar when it's mounted. -->
+      {#if mentionProps.show}
+        <div class="absolute left-0 right-0 bottom-full mb-4 z-50 pointer-events-auto">
+          <MentionDropdown
+            bind:this={mentionDropdownRef}
+            query={mentionProps.query}
+            designationId={mentionProps.designationId}
+            visible={mentionProps.show}
+            onSelect={mentionProps.onSelect}
+            onDismiss={mentionProps.onDismiss}
+          />
+        </div>
+      {/if}
     </div>
   </div>
 </div>

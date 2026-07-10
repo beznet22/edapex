@@ -19,21 +19,26 @@
   const context = getPromptInputContext();
 
   // Auto-resize functionality using watch from runed
-  watch([() => context.value, () => context.maxHeight, () => disableAutosize], () => {
-    if (disableAutosize) return;
-    if (!context.textareaRef) return;
+  watch(
+    [() => context.value, () => context.maxHeight, () => disableAutosize],
+    () => {
+      if (disableAutosize) return;
+      if (!context.textareaRef) return;
 
-    if (context.textareaRef.scrollTop === 0) {
-      context.textareaRef.style.height = "auto";
-    }
+      if (context.textareaRef.scrollTop === 0) {
+        context.textareaRef.style.height = "auto";
+      }
 
-    context.textareaRef.style.height =
-      typeof context.maxHeight === "number"
-        ? `${Math.min(context.textareaRef.scrollHeight, context.maxHeight)}px`
-        : `min(${context.textareaRef.scrollHeight}px, ${context.maxHeight})`;
-  });
+      context.textareaRef.style.height =
+        typeof context.maxHeight === "number"
+          ? `${Math.min(context.textareaRef.scrollHeight, context.maxHeight)}px`
+          : `min(${context.textareaRef.scrollHeight}px, ${context.maxHeight})`;
+    },
+  );
 
-  function handleKeyDown(e: KeyboardEvent & { currentTarget: HTMLTextAreaElement }) {
+  function handleKeyDown(
+    e: KeyboardEvent & { currentTarget: HTMLTextAreaElement },
+  ) {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       context.onSubmit?.();
@@ -53,13 +58,13 @@
 </script>
 
 <Textarea
-  bind:ref={ref}
+  bind:ref
   value={context.value}
   oninput={handleInput}
   onkeydown={handleKeyDown}
   class={cn(
-    "w-full resize-none border-none! bg-transparent! shadow-none outline-none focus-visible:ring-0 focus-visible:ring-offset-0 p-0",
-    className
+    "w-full resize-none border-none! bg-transparent shadow-none outline-none focus-visible:ring-0 focus-visible:ring-offset-0 p-0",
+    className,
   )}
   rows={1}
   disabled={context.disabled}

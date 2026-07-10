@@ -51,18 +51,43 @@
   import ContextWarningBanner from "./ContextWarningBanner.svelte";
   import RateLimitBanner from "./RateLimitBanner.svelte";
   import CommandDropdown from "./chat/CommandDropdown.svelte";
-  import MentionDropdown from "./chat/MentionDropdown.svelte";
+  import { type MentionSearchResult } from "./chat/MentionDropdown.svelte";
   import OptionDropdown from "./chat/OptionDropdown.svelte";
   import { PromptInput, PromptInputActions, PromptInputTextarea } from "./prompt-kit/prompt-input";
+
+  /**
+   * Mention popover state surfaced to the parent so it can render the
+   * dropdown OUTSIDE the composer — positioned `absolute bottom-full` of the
+   * whole `chat.svelte` wrapper (ActionBar + Composer) so the dropdown
+   * auto-shifts up when the ActionBar mounts and isn't clipped by any future
+   * `overflow-hidden` re-introduction.
+   */
+  export interface MentionPopoverState {
+    show: boolean;
+    query: string;
+    designationId: number;
+    onSelect: (entity: MentionSearchResult) => void;
+    onDismiss: () => void;
+    refresh: ((q: string, v: boolean) => void) | null;
+  }
 
   let {
     user,
     readonly,
     isInitial = true,
+    mentionProps = $bindable<MentionPopoverState>({
+      show: false,
+      query: "",
+      designationId: 1,
+      onSelect: () => {},
+      onDismiss: () => {},
+      refresh: null,
+    }),
   }: {
     user?: AuthUser;
     readonly: boolean;
     isInitial?: boolean;
+    mentionProps?: MentionPopoverState;
   } = $props();
 
   let input = $state("");
@@ -93,7 +118,19 @@
   let commandQuery = $state("");
   let blockedWorkflowMessage = $state<string | null>(null);
   let selectedMentions = $state<MentionPayload[]>([]);
-  let mentionDropdownRef = $state<MentionDropdown | null>(null);
+
+  // Mirror detection state into the bindable so the parent can render the
+  // dropdown above the wrapper. selectMention is referenced via closure
+  // against the local handlers defined further below.
+  $effect(() => {
+    mentionProps.show = showMentions;
+    mentionProps.query = mentionQuery;
+    mentionProps.designationId = DESIGNATIONS.indexOf(
+      userContext.user?.designation ?? "it",
+    );
+    mentionProps.onSelect = (entity) => selectMention(entity as never);
+    mentionProps.onDismiss = () => (showMentions = false);
+  });
 
   let webSearchEnabled = $state(false);
   // TODO: pass webSearchEnabled to chat request body when web search tool is integrated
@@ -653,15 +690,15 @@
   });
 
   // Drive MentionDropdown's suggestion refresh imperatively (avoids the
-  // $state.raw self-loop that previously broke the @ dropdown).
+  // $state.raw self-loop that previously broke the @ dropdown). The parent
+  // (chat.svelte) owns the actual `<MentionDropdown>` instance and its
+  // `bind:this` ref; we forward the refresh via the bindable contract so
+  // the parent can call it once the dropdown is mounted.
   $effect(() => {
     const q = mentionQuery;
     const v = showMentions;
-    // Read mentionDropdownRef via the state-tracked field (initial null is OK;
-    // when the component mounts, the ref binds and the effect re-fires).
-    const ref = mentionDropdownRef;
-    if (ref) {
-      ref.refresh(q, v);
+    if (v && mentionProps.refresh) {
+      mentionProps.refresh(q, v);
     }
   });
 
@@ -687,7 +724,7 @@
 <RateLimitBanner />
 
 <PromptInput
-  class="composer-box relative w-full max-w-[780px] flex flex-col hermes-glass rounded-4xl shadow-[0_0_50px_-12px_rgba(0,0,0,0.5)] transition-all duration-500 focus-within:ring-1 focus-within:ring-primary/40 focus-within:border-primary/30 p-0 border-border/10"
+  class="composer-box relative w-full max-w-[780px] flex flex-col rounded-4xl transition-all duration-500 focus-within:ring-1 focus-within:ring-primary/40 focus-within:border-primary/30 p-0 border-border/10 bg-secondary/40"
   value={input}
   onValueChange={(val) => {
     input = val;
@@ -770,11 +807,11 @@
 
   <!-- Input Layer -->
   <div
-    class="relative flex flex-col min-h-[48px] w-full"
+    class="relative bg-transparent! flex flex-col min-h-[48px] w-full"
     onclick={() => textareaRef?.focus()}
     role="presentation"
   >
-    <!-- Active Workflow Badge (Requirement 14.2) -->
+    <!-- Active Workflow Badge -->
     {#if chat.activeWorkflows.length > 0}
       <div class="flex flex-wrap gap-1.5 px-4 pt-2">
         {#each chat.activeWorkflows as wf (wf.id)}
@@ -789,7 +826,7 @@
       </div>
     {/if}
 
-    <!-- Blocked Workflow Message (Requirement 14.6) -->
+    <!-- Blocked Workflow Message -->
     {#if blockedWorkflowMessage}
       <div
         class="mx-4 mt-2 px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-[11px] font-medium text-amber-300 animate-in fade-in slide-in-from-bottom-1 duration-200"
@@ -803,46 +840,9 @@
       onkeydown={handleKeydown}
       placeholder="Ask anything, / for commands @ for context..."
       readonly={inputDisabled}
-      class="resize-none border-none bg-transparent focus-visible:ring-0 text-base leading-relaxed scrollbar-slick min-h-[48px] w-full px-4 py-3 placeholder:text-muted-foreground/30 transition-all duration-300"
+      class="resize-none border-none bg-secondary/40! focus-visible:ring-0 text-base leading-relaxed scrollbar-slick min-h-[48px] w-full px-4 py-3 placeholder:text-muted-foreground/30 transition-all duration-300"
     />
   </div>
-
-  <!-- Floating Popovers (Above Composer) -->
-  {#if showCommands}
-    <div class="absolute bottom-full left-4 right-4 mb-4 z-50">
-      <CommandDropdown query={commandQuery} onSelect={selectCommand} />
-    </div>
-  {/if}
-
-  {#if showMentions}
-    <div class="absolute bottom-full left-4 right-4 mb-4 z-50">
-      <MentionDropdown
-        bind:this={mentionDropdownRef}
-        query={mentionQuery}
-        designationId={DESIGNATIONS.indexOf(userContext.user?.designation ?? "it")}
-        visible={showMentions}
-        onSelect={selectMention}
-        onDismiss={() => (showMentions = false)}
-      />
-    </div>
-  {/if}
-
-  <!-- Selection Gate Popover (data-selectOptions workflow event).
-       Positioned identically to CommandDropdown / MentionDropdown so all
-       composer popovers share the same vertical anchor. ResponsiveSheet
-       portals the chrome out, so this wrapper is just a positioning slot. -->
-  {#if pendingGate}
-    <div class="absolute bottom-full left-4 right-4 mb-4 z-50">
-      <OptionDropdown
-        open={true}
-        question={pendingGate.question}
-        options={pendingGate.options}
-        onSelect={(selection) => chat.resumePendingGate(selection)}
-        onCancel={() => chat.setPendingGate(null)}
-      />
-    </div>
-  {/if}
-
   <!-- Confidence Gate Confirmation Overlay -->
   {#if chat.pendingConfirmation}
     <div
@@ -893,7 +893,7 @@
 
   <!-- Actions Tray (Footer Layer) -->
   <PromptInputActions
-    class="flex items-center justify-between px-1 sm:pl-3 rounded-b-4xl bg-transparent border-none"
+    class="flex items-center justify-between px-2 sm:px-3 rounded-b-4xl bg-secondary/40! border-none"
   >
     <!-- Left Group: [Attach+Voice | Vertical Line | Context Chips] -->
     <div class="flex items-center sm:gap-1.5">
@@ -916,7 +916,7 @@
             align="start"
             side="top"
             sideOffset={8}
-            class="w-64 p-1 hermes-glass border-border/20 shadow-2xl rounded-xl"
+            class="w-64 hermes-glass border-border/20 shadow-2xl rounded-xl"
           >
             <Button
               variant="ghost"
