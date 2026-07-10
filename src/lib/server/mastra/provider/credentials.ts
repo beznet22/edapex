@@ -1,65 +1,29 @@
 /**
- * User credential CRUD over the `user_credentials` table — V2.
+ * User credential CRUD over the `user_credentials` table.
  *
- * Slim copy of V1's `credentials.ts`:
- * - Drops `getEffectiveCredential` (only the V1 `EdApexGateway` consumed it;
- *   the V2 resolver does the user-credential → env-fallback resolution inline).
- * - Drops the synchronous `UserCredentialState.apiKeyMasked` synthesis
- *   (the V1 list view needed it; V2's `getAllUserCredentials` is unchanged
- *   so list-rendering UI still works until the cutover PR migrates it).
- *
- * Same schema, same table — V1 and V2 share `user_credentials`. No migration.
+ * The resolver does the user-credential → env-fallback resolution inline.
  */
-import { eq, and, sql } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
 import type { LibSQLDatabase } from 'drizzle-orm/libsql';
+import { z } from 'zod';
 import {
 	userCredentials,
 	type UserCredential
 } from '$lib/server/mastra/storage/libsql/app-db.schema';
-import type { ProviderId } from './types';
-import { encrypt as encryptText, decrypt as decryptText, maskKey } from './crypto';
+import { ProviderIdSchema, type ProviderId } from './types';
+import { encrypt as encryptText, decrypt as decryptText, maskKey, getEncryptionKey } from './crypto';
+import { DecryptionError } from '$lib/provider/errors';
 import { CustomProviderEncryptedDataSchema } from './spec';
+import { log as writeAudit } from '$lib/server/audit-log';
+
+export interface CredentialAuditContext {
+	actorStaffId: number;
+	schoolId: number;
+}
 
 export interface UserCredentialState extends UserCredential {
 	source: 'db' | 'platform';
 	apiKeyMasked: string;
-}
-
-const ENCRYPTION_KEY_FALLBACK = 'edapex-default-encryption-key-32ch';
-
-function getEncryptionKey(env: Record<string, string | undefined>): string {
-	return env.TOKEN_ENCRYPTION_KEY || env.ENCRYPTION_KEY || ENCRYPTION_KEY_FALLBACK;
-}
-
-export async function ensureUserCredentialsSchema(db: LibSQLDatabase<any>): Promise<void> {
-	await db.run(sql`
-		CREATE TABLE IF NOT EXISTS user_credentials (
-			id TEXT PRIMARY KEY,
-			user_id INTEGER NOT NULL,
-			provider_id TEXT NOT NULL,
-			credential_type TEXT NOT NULL,
-			encrypted_data TEXT,
-			priority INTEGER NOT NULL DEFAULT 1,
-			enabled INTEGER NOT NULL DEFAULT 1,
-			discovered_models TEXT,
-			discovered_at TEXT,
-			created_at TEXT NOT NULL DEFAULT (datetime('now')),
-			updated_at TEXT NOT NULL DEFAULT (datetime('now')),
-			UNIQUE(user_id, provider_id)
-		)
-	`);
-	await db.run(sql`ALTER TABLE user_credentials ADD COLUMN discovered_models TEXT`).catch(() => {});
-	await db.run(sql`ALTER TABLE user_credentials ADD COLUMN discovered_at TEXT`).catch(() => {});
-	await db.run(sql`
-		CREATE TABLE IF NOT EXISTS user_model_visibility (
-			id TEXT PRIMARY KEY,
-			user_id INTEGER NOT NULL,
-			model_id TEXT NOT NULL,
-			visible INTEGER NOT NULL DEFAULT 1,
-			updated_at TEXT NOT NULL DEFAULT (datetime('now')),
-			UNIQUE(user_id, model_id)
-		)
-	`);
 }
 
 export interface SaveUserCredentialInput {
@@ -75,45 +39,62 @@ export interface SaveUserCredentialInput {
 	displayName?: string;
 }
 
+const SaveUserCredentialInputSchema = z.object({
+	userId: z.number().int().positive(),
+	providerId: ProviderIdSchema,
+	credentialType: z.enum(['env', 'credential', 'custom']),
+	apiKey: z.string().min(1).optional(),
+	baseUrl: z.string().url().optional(),
+	priority: z.number().int().min(0).optional(),
+	enabled: z.boolean().optional(),
+	models: z
+		.array(z.object({ id: z.string().min(1), displayName: z.string().min(1) }))
+		.optional(),
+	headers: z.array(z.object({ name: z.string().min(1), value: z.string().min(1) })).optional(),
+	displayName: z.string().min(1).optional()
+});
+
 export async function saveUserCredential(
 	db: LibSQLDatabase<any>,
 	env: Record<string, string | undefined>,
-	input: SaveUserCredentialInput
+	input: SaveUserCredentialInput,
+	audit?: CredentialAuditContext
 ): Promise<UserCredential> {
-	await ensureUserCredentialsSchema(db);
-
+	const validated = SaveUserCredentialInputSchema.parse(input);
 	const encryptionKey = getEncryptionKey(env);
-	const existing = await getUserCredential(db, env, input.userId, input.providerId);
+	const existing = await getUserCredential(db, env, validated.userId, validated.providerId);
 
 	let encryptedData: string | null = null;
 
-	if (input.credentialType === 'credential') {
-		if (input.apiKey) {
-			encryptedData = encryptText(JSON.stringify({ apiKey: input.apiKey }), encryptionKey);
+	if (validated.credentialType === 'credential') {
+		if (validated.apiKey) {
+			encryptedData = encryptText(JSON.stringify({ apiKey: validated.apiKey }), encryptionKey);
 		} else if (existing?.encryptedData) {
 			encryptedData = existing.encryptedData;
+		} else {
+			throw new Error('apiKey is required to create a credential-type credential');
 		}
-	} else if (input.credentialType === 'custom') {
+	} else if (validated.credentialType === 'custom') {
 		const prior = safeParseCustom(existing?.encryptedData ?? null, env);
 		const payload = CustomProviderEncryptedDataSchema.parse({
-			displayName: input.displayName ?? prior?.displayName ?? input.providerId,
-			baseUrl: input.baseUrl ?? prior?.baseUrl ?? '',
-			apiKey: input.apiKey ?? prior?.apiKey,
-			models: input.models ?? prior?.models ?? [],
-			headers: input.headers ?? prior?.headers ?? []
+			displayName: validated.displayName ?? prior?.displayName ?? validated.providerId,
+			baseUrl: validated.baseUrl ?? prior?.baseUrl ?? '',
+			apiKey: validated.apiKey ?? prior?.apiKey,
+			models: validated.models ?? prior?.models ?? [],
+			headers: validated.headers ?? prior?.headers ?? []
 		});
 		encryptedData = encryptText(JSON.stringify(payload), encryptionKey);
 	}
 
 	const now = new Date().toISOString();
-	const priority = input.priority ?? existing?.priority ?? 1;
-	const enabled = input.enabled !== undefined ? (input.enabled ? 1 : 0) : (existing?.enabled ?? 1);
+	const priority = validated.priority ?? existing?.priority ?? 1;
+	const enabled = validated.enabled !== undefined ? (validated.enabled ? 1 : 0) : (existing?.enabled ?? 1);
 
 	const written: UserCredential = {
 		id: existing?.id ?? crypto.randomUUID(),
-		userId: input.userId,
-		providerId: input.providerId,
-		credentialType: input.credentialType,
+		userId: validated.userId,
+		providerId: validated.providerId,
+		credentialType: validated.credentialType,
 		encryptedData,
 		priority,
 		enabled,
@@ -129,7 +110,7 @@ export async function saveUserCredential(
 		.onConflictDoUpdate({
 			target: [userCredentials.userId, userCredentials.providerId],
 			set: {
-				credentialType: input.credentialType,
+				credentialType: validated.credentialType,
 				encryptedData,
 				priority,
 				enabled,
@@ -137,11 +118,35 @@ export async function saveUserCredential(
 			}
 		});
 
+	if (audit) {
+		await writeAudit({
+			schoolId: audit.schoolId,
+			actorStaffId: audit.actorStaffId,
+			action: existing ? 'update' : 'create',
+			entityType: 'userCredential',
+			entityId: written.id,
+			before: existing
+				? {
+						credentialType: existing.credentialType,
+						priority: existing.priority,
+						enabled: existing.enabled
+				  }
+				: undefined,
+			after: {
+				userId: validated.userId,
+				providerId: validated.providerId,
+				credentialType: validated.credentialType,
+				priority,
+				enabled: enabled === 1
+			}
+		});
+	}
+
 	// Pass the just-written row directly so discovery doesn't race the
 	// INSERT/UPDATE returning. Previously this re-read the row, which could
 	// observe a stale value if the DB session hadn't yet seen its own write.
 	void discoverAndPersistInBackground(db, env, written).catch((err: unknown) => {
-		console.error(`[credentials] model discovery failed for ${input.providerId}:`, err);
+		console.error(`[credentials] model discovery failed for ${validated.providerId}:`, err);
 	});
 
 	return written;
@@ -189,13 +194,29 @@ export function decryptCustomProvider(encryptedData: string, env: Record<string,
 	return safeParseCustom(encryptedData, env);
 }
 
+/**
+ * Returns the configured baseUrl for a custom credential without exposing
+ * the encrypted blob to callers. This keeps `encryptedData` references out
+ * of remote-function / UI layers while still allowing the UI to show the
+ * custom endpoint URL.
+ */
+export function getCustomCredentialBaseUrl(
+	credential: UserCredential,
+	env: Record<string, string | undefined>
+): string {
+	if (credential.credentialType !== 'custom' || !credential.encryptedData) {
+		return '';
+	}
+	const customData = decryptCustomProvider(credential.encryptedData, env);
+	return customData?.baseUrl ?? '';
+}
+
 export async function getUserCredential(
 	db: LibSQLDatabase<any>,
 	env: Record<string, string | undefined>,
 	userId: number,
 	providerId: ProviderId
 ): Promise<UserCredential | null> {
-	await ensureUserCredentialsSchema(db);
 	const rows = await db
 		.select()
 		.from(userCredentials)
@@ -204,7 +225,7 @@ export async function getUserCredential(
 	return rows[0] ?? null;
 }
 
-const PLATFORM_ENV_KEYS: Partial<Record<ProviderId, string>> = {
+export const PLATFORM_ENV_KEYS: Partial<Record<ProviderId, string>> = {
 	groq: 'GROQ_API_KEY',
 	deepseek: 'DEEPSEEK_API_KEY',
 	opencode: 'OPENCODE_API_KEY',
@@ -212,33 +233,14 @@ const PLATFORM_ENV_KEYS: Partial<Record<ProviderId, string>> = {
 };
 
 /**
- * Used by the V2 resolver to resolve a single provider's API key for a user.
- * Returns the effective API key (user credential first, env fallback) and
- * whether the source is the user DB or the platform env. The V2 resolver
- * uses this inline; the V1 `getEffectiveCredential` was equivalent but
- * coupled to the V1 gateway's credential-cache lifecycle.
+ * Type kept for downstream consumers that only need the env-side shape.
+ * Resolution now flows through `resolveProviderKeyWithTrace` in
+ * `tier-router.ts`; this module only exposes helpers that back it.
  */
 export interface ResolvedProviderKey {
 	apiKey: string;
 	source: 'user' | 'env';
 	credentialEnabled: boolean | null;
-}
-
-export async function resolveProviderKey(
-	db: LibSQLDatabase<any>,
-	env: Record<string, string | undefined>,
-	userId: number,
-	providerId: ProviderId
-): Promise<ResolvedProviderKey | null> {
-	const credential = await getUserCredential(db, env, userId, providerId);
-	if (credential && credential.enabled === 1) {
-		const apiKey = resolveApiKeyForCredential(credential, env, providerId);
-		if (apiKey) return { apiKey, source: 'user', credentialEnabled: true };
-	}
-	const envKey = PLATFORM_ENV_KEYS[providerId];
-	const envValue = envKey ? env[envKey] : undefined;
-	if (envValue) return { apiKey: envValue, source: 'env', credentialEnabled: credential?.enabled === 1 ? true : null };
-	return null;
 }
 
 export async function getAllUserCredentials(
@@ -247,8 +249,6 @@ export async function getAllUserCredentials(
 	userId: number,
 	supportedProviderIds: ProviderId[]
 ): Promise<UserCredentialState[]> {
-	await ensureUserCredentialsSchema(db);
-
 	const rows = await db
 		.select()
 		.from(userCredentials)
@@ -310,25 +310,218 @@ function extractApiKey(encryptedData: string, encryptionKey: string): string | n
 export async function deleteUserCredential(
 	db: LibSQLDatabase<any>,
 	userId: number,
-	providerId: ProviderId
+	providerId: ProviderId,
+	audit?: CredentialAuditContext
 ): Promise<void> {
-	await ensureUserCredentialsSchema(db);
+	const existing = await getUserCredential(db, {} as Record<string, string | undefined>, userId, providerId);
 	await db
 		.delete(userCredentials)
 		.where(and(eq(userCredentials.userId, userId), eq(userCredentials.providerId, providerId)));
+	if (audit && existing) {
+		await writeAudit({
+			schoolId: audit.schoolId,
+			actorStaffId: audit.actorStaffId,
+			action: 'delete',
+			entityType: 'userCredential',
+			entityId: existing.id,
+			before: {
+				userId,
+				providerId,
+				credentialType: existing.credentialType,
+				enabled: existing.enabled === 1
+			}
+		});
+	}
 }
 
 export async function updateUserCredentialEnabled(
 	db: LibSQLDatabase<any>,
 	userId: number,
 	providerId: ProviderId,
-	enabled: boolean
+	enabled: boolean,
+	audit?: CredentialAuditContext
 ): Promise<void> {
-	await ensureUserCredentialsSchema(db);
+	const existing = await getUserCredential(db, {} as Record<string, string | undefined>, userId, providerId);
 	await db
 		.update(userCredentials)
 		.set({ enabled: enabled ? 1 : 0, updatedAt: new Date().toISOString() })
 		.where(and(eq(userCredentials.userId, userId), eq(userCredentials.providerId, providerId)));
+	if (audit && existing) {
+		await writeAudit({
+			schoolId: audit.schoolId,
+			actorStaffId: audit.actorStaffId,
+			action: enabled ? 'enable' : 'disable',
+			entityType: 'userCredential',
+			entityId: existing.id,
+			before: { enabled: existing.enabled === 1 },
+			after: { enabled }
+		});
+	}
+}
+
+export interface RotateCredentialInput {
+	userId: number;
+	providerId: ProviderId;
+	newEncryptionKey: string;
+}
+
+/**
+ * Re-encrypt a user's stored credential with a new encryption key.
+ *
+ * Reads the existing credential, decrypts the encrypted blob with the
+ * currently configured key, re-encrypts it with `newEncryptionKey`, and
+ * persists the updated blob. A round-trip check verifies the decrypted
+ * plaintext matches the original before the update is committed.
+ *
+ * Throws when the credential does not exist, has no encrypted data, or
+ * the re-encryption round-trip fails.
+ */
+export async function rotateCredential(
+	db: LibSQLDatabase<any>,
+	env: Record<string, string | undefined>,
+	input: RotateCredentialInput,
+	audit?: CredentialAuditContext
+): Promise<UserCredential> {
+	const existing = await getUserCredential(db, env, input.userId, input.providerId);
+	if (!existing) {
+		throw new Error(`No credential found for user ${input.userId} provider ${input.providerId}`);
+	}
+	if (!existing.encryptedData) {
+		throw new Error(`Credential ${existing.id} has no encrypted data to rotate`);
+	}
+
+	const oldEncryptionKey = getEncryptionKey(env);
+	const plaintext = decryptText(existing.encryptedData, oldEncryptionKey);
+	const rotatedEncryptedData = encryptText(plaintext, input.newEncryptionKey);
+
+	// Round-trip verification: ensure the new ciphertext decrypts back to the
+	// exact plaintext before we overwrite the stored value.
+	const roundTrip = decryptText(rotatedEncryptedData, input.newEncryptionKey);
+	if (roundTrip !== plaintext) {
+		throw new Error('Credential rotation round-trip verification failed');
+	}
+
+	const now = new Date().toISOString();
+	const updated: UserCredential = {
+		...existing,
+		encryptedData: rotatedEncryptedData,
+		updatedAt: now
+	};
+
+	await db
+		.update(userCredentials)
+		.set({ encryptedData: rotatedEncryptedData, updatedAt: now })
+		.where(eq(userCredentials.id, existing.id));
+
+	if (audit) {
+		await writeAudit({
+			schoolId: audit.schoolId,
+			actorStaffId: audit.actorStaffId,
+			action: 'update',
+			entityType: 'userCredential',
+			entityId: existing.id,
+			before: { encryptedData: existing.encryptedData },
+			after: { encryptedData: rotatedEncryptedData }
+		});
+	}
+
+	return updated;
+}
+
+export interface RepairCorruptedCredentialInput {
+	userId: number;
+	providerId: ProviderId;
+	fallbackEncryptionKey?: string;
+}
+
+/**
+ * Attempt to recover a credential whose ciphertext cannot be decrypted with
+ * the current key, then re-encrypt it with the current key.
+ *
+ * 1. Read the credential row.
+ * 2. Try decrypting with the configured key.
+ * 3. If that fails with a DecryptionError, try the optional fallback key or
+ *    the well-known non-production fallback (`ENCRYPTION_KEY_FALLBACK`).
+ * 4. If a plaintext is recovered, re-encrypt with the current key and update
+ *    the row.
+ * 5. Throw if the credential does not exist, has no encrypted data, or no
+ *    key can decrypt it.
+ */
+export async function repairCorruptedCredential(
+	db: LibSQLDatabase<any>,
+	env: Record<string, string | undefined>,
+	input: RepairCorruptedCredentialInput,
+	audit?: CredentialAuditContext
+): Promise<UserCredential> {
+	const existing = await getUserCredential(db, env, input.userId, input.providerId);
+	if (!existing) {
+		throw new Error(`No credential found for user ${input.userId} provider ${input.providerId}`);
+	}
+	if (!existing.encryptedData) {
+		throw new Error(`Credential ${existing.id} has no encrypted data to repair`);
+	}
+
+	const currentKey = getEncryptionKey(env);
+	let plaintext: string | undefined;
+	let usedFallback = false;
+
+	try {
+		plaintext = decryptText(existing.encryptedData, currentKey);
+	} catch (err) {
+		if (!(err instanceof DecryptionError)) throw err;
+	}
+
+	if (plaintext === undefined) {
+		const fallbackKey = input.fallbackEncryptionKey ?? 'edapex-default-encryption-key-32ch';
+		try {
+			plaintext = decryptText(existing.encryptedData, fallbackKey);
+			usedFallback = true;
+		} catch (err) {
+			if (err instanceof DecryptionError) {
+				throw new Error(
+					`Credential ${existing.id} could not be decrypted with current or fallback key`
+				);
+			}
+			throw err;
+		}
+	}
+
+	if (plaintext === undefined) {
+		throw new Error(`Credential ${existing.id} could not be decrypted`);
+	}
+
+	const reEncrypted = encryptText(plaintext, currentKey);
+	// Verify round-trip before writing.
+	const roundTrip = decryptText(reEncrypted, currentKey);
+	if (roundTrip !== plaintext) {
+		throw new Error('Credential repair round-trip verification failed');
+	}
+
+	const now = new Date().toISOString();
+	const updated: UserCredential = {
+		...existing,
+		encryptedData: reEncrypted,
+		updatedAt: now
+	};
+
+	await db
+		.update(userCredentials)
+		.set({ encryptedData: reEncrypted, updatedAt: now })
+		.where(eq(userCredentials.id, existing.id));
+
+	if (audit) {
+		await writeAudit({
+			schoolId: audit.schoolId,
+			actorStaffId: audit.actorStaffId,
+			action: 'update',
+			entityType: 'userCredential',
+			entityId: existing.id,
+			before: { encryptedData: existing.encryptedData, usedFallback },
+			after: { encryptedData: reEncrypted }
+		});
+	}
+
+	return updated;
 }
 
 export function resolveApiKeyForCredential(

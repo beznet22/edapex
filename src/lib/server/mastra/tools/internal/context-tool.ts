@@ -5,14 +5,18 @@ import { StudentRepository } from '../../../repository/student.repo';
 import { buildMastraToolContext } from '../../tenant-context';
 
 /**
- * Static getContext tool for the supervisor — retrieves domain context on demand.
+ * Static getContext tool for the supervisor — retrieves ADDITIONAL domain
+ * context on demand. The system prompt already surfaces the tenant
+ * context, class roster, and `resolvedMentions`; this tool is the escape
+ * hatch for lookups that aren't already present (a specific student,
+ * assessment setup, or class assignment).
  * Uses the Slice 0 bridge (buildMastraToolContext) to access the active
  * TenantContext and ScopedRepositoryProvider at call time. Read-only: no sm*
  * table is written.
  */
 export const getContextTool = createTool({
     id: 'getContext',
-    description: 'Retrieve specific domain context (assessment setups, students, subjects, etc.) on demand. Use this if the user asks about assessments, marks, students, or class assignments.',
+    description: 'Retrieve ADDITIONAL domain context (assessment setups, students, subjects, etc.) on demand. The system prompt already contains the tenant context, class roster, and resolved @mentions — only call this tool when you need data NOT already present in that context (e.g. a specific student lookup, assessment setup details, or class assignment).',
     inputSchema: z.object({
         types: z.array(z.enum(['assessment', 'students', 'class'])).describe('The specific categories of context needed'),
         query: z.string().optional().describe('Optional filter/search term for students or assessments'),

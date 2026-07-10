@@ -1,6 +1,6 @@
 import { STATIC_DIR } from "$lib/constants";
 import { eq } from "drizzle-orm";
-import { smStudents } from "$lib/server/db/sms-schema";
+import { smGeneralSettings, smStudents } from "$lib/server/db/sms-schema";
 import { getDatabase } from "$lib/server/db";
 import { createTenantContext } from "$lib/server/mastra/tenant-context";
 import { OcrWorkspaceStore } from "$lib/server/mastra/storage/ocr/ocr-workspace-store";
@@ -14,13 +14,14 @@ import { ScopedRepositoryProvider } from "$lib/server/mastra/scoped-repository";
 import { createTenantFileStorage } from "$lib/server/mastra/storage/tenant-file-storage";
 import { buildWorkspaceRequestContext, resolveWorkspaceContext } from "$lib/server/helpers/chat-helper";
 import { ALLOWED_DESIGNATIONS } from "$lib/types/sms-types";
+import { log } from "$lib/server/audit-log";
 import type { RequestHandler } from "@sveltejs/kit";
 import { error, json } from "@sveltejs/kit";
 import { mkdirSync, writeFileSync } from "fs";
 import { createHash, randomUUID } from "crypto";
 import { join } from "path";
 
-type UploadKind = "document" | "photo" | "studentPhoto";
+type UploadKind = "document" | "photo" | "studentPhoto" | "logo";
 
 function getFormString(formData: FormData, key: string): string | null {
   const value = formData.get(key);
@@ -40,8 +41,15 @@ function getFormFile(formData: FormData, key: string): File | null {
 }
 
 function normalizeKind(raw: string | null): UploadKind {
-  if (raw === "photo" || raw === "studentPhoto") return raw;
+  if (raw === "photo" || raw === "studentPhoto" || raw === "logo") return raw;
   return "document";
+}
+
+// Mirrors src/routes/+layout.server.ts so the API can independently gate
+// uploads that mutate school-wide config. Logos are a PlatformTab mutation,
+// so only admin/IT staff may upload them.
+function isAdminOrIt(user: NonNullable<App.Locals["user"]>): boolean {
+  return user.isAdministrator === true || user.designation === "it";
 }
 
 const STRUCTURED_OCR_SCHEMA: Record<string, unknown> = {
@@ -125,6 +133,98 @@ export const POST: RequestHandler = async ({ request, locals, cookies }) => {
       url: `/api/file/photos/${contentHash}.${ext}`,
       mimeType: file.type,
       size: file.size,
+    });
+  }
+
+  if (kind === "logo") {
+    if (!isAdminOrIt(user)) error(403, "Logo upload requires admin or IT role");
+    if (!file.type.startsWith("image/")) error(400, "Logo must be an image");
+
+    const logoSchoolId = user.schoolId ?? 1;
+    const logoDir = join(STATIC_DIR, "uploads", "logos");
+    mkdirSync(logoDir, { recursive: true });
+    const logoFilename = `${logoSchoolId}.${ext}`;
+    const logoPath = join(logoDir, logoFilename);
+    writeFileSync(logoPath, buffer);
+    const logoUrl = `/uploads/logos/${logoFilename}`;
+
+    // smGeneralSettings.logo is a single-row-per-school identity record;
+    // the BaseRepository caches it with a 5-minute TTL, so the new logo
+    // becomes visible (header, report headers, login page) on the next
+    // request after the cache expires. No cache invalidation here — the
+    // TTL is short enough that the next page load is acceptable.
+    const existing = await db
+      .select({ id: smGeneralSettings.id })
+      .from(smGeneralSettings)
+      .where(eq(smGeneralSettings.schoolId, logoSchoolId))
+      .limit(1);
+    if (existing.length === 0) {
+      await db.insert(smGeneralSettings).values({
+        schoolName: null,
+        siteTitle: null,
+        schoolCode: null,
+        address: null,
+        phone: null,
+        email: null,
+        currency: "USD",
+        currencySymbol: "$",
+        currencyFormat: "'symbol_amount'",
+        logo: logoUrl,
+        favicon: null,
+        systemVersion: "8.2.3",
+        activeStatus: 1,
+        currencyCode: "USD",
+        languageName: "en",
+        sessionYear: "2020",
+        apiUrl: 1,
+        websiteBtn: 1,
+        dashboardBtn: 1,
+        reportBtn: 1,
+        styleBtn: 1,
+        ltlRtlBtn: 1,
+        langBtn: 1,
+        ttlRtl: 2,
+        phoneNumberPrivacy: 1,
+        attendanceLayout: 1,
+        ssPageLoad: 3,
+        subTopicEnable: 1,
+        schoolId: logoSchoolId
+      });
+    } else {
+      await db
+        .update(smGeneralSettings)
+        .set({ logo: logoUrl })
+        .where(eq(smGeneralSettings.schoolId, logoSchoolId));
+    }
+
+    // Audit trail: only write if the actor has a staffId. The schema
+    // requires actorStaffId to be a number, so unauthenticated-but-typed
+    // edge cases (e.g. principal logins where staffId isn't populated)
+    // are skipped rather than logged with a sentinel value.
+    if (typeof user.staffId === "number") {
+      const previous = await db
+        .select({ logo: smGeneralSettings.logo })
+        .from(smGeneralSettings)
+        .where(eq(smGeneralSettings.schoolId, logoSchoolId))
+        .limit(1);
+      await log({
+        schoolId: logoSchoolId,
+        actorStaffId: user.staffId,
+        action: "update",
+        entityType: "smGeneralSettings.logo",
+        entityId: String(logoSchoolId),
+        before: { logo: previous[0]?.logo ?? null },
+        after: { logo: logoUrl }
+      });
+    }
+
+    return json({
+      success: true,
+      kind: "logo" as const,
+      logoUrl,
+      contentHash,
+      mimeType: file.type,
+      size: file.size
     });
   }
 

@@ -1,6 +1,18 @@
 // Verified: no native Mastra web search/fetch tool as of @mastra/core@1.32.1.
 // Custom Global Tools module implementing web_search and web_fetch with TinyFish primary
 // and DuckDuckGo/HTTP fallback chain. Always injected into Gateway regardless of active skill.
+//
+// Native Mastra workspace tools (auto-exposed on the assistant agent via
+// `workspace: tenantWorkspace` — see src/lib/server/mastra/agents/assistant.ts).
+// Do NOT recreate these as custom tools — the agent's workspace binding
+// injects them automatically:
+//   - mastra_workspace_read_file
+//   - mastra_workspace_write_file
+//   - mastra_workspace_edit_file
+//   - mastra_workspace_delete_file
+//   - mastra_workspace_stat
+//   - mastra_workspace_mkdir
+//   - mastra_workspace_grep
 
 import { createTool } from '@mastra/core/tools';
 import { z } from 'zod';

@@ -17,7 +17,8 @@ import type { ModelInfo } from '$lib/provider/spec';
 import type { ProviderId } from '$lib/provider/types';
 import { BUILTIN_MODELS, getModelsByProvider } from '$lib/provider/catalog';
 import { getDiscoveredModelsForUser } from './discovery';
-import { getHiddenModelIdsForUser } from './visibility';
+import { getCachedHiddenModelIdsForUser } from './cache';
+import { applyAdminDenylist, listAdminOverrides } from './admin-model-overrides';
 
 export type { AugmentedModelInfo } from '$lib/provider/spec';
 
@@ -28,14 +29,16 @@ function isBuiltinModel(value: ModelInfo): boolean {
 export async function getAvailableModelsForUser(
 	db: LibSQLDatabase<any>,
 	env: Record<string, string | undefined>,
-	userId: number
+	userId: number,
+	schoolId: number = 1
 ): Promise<AugmentedModelInfo[]> {
 	const credentialRows = await db
 		.select()
 		.from(userCredentials)
 		.where(eq(userCredentials.userId, userId));
 
-	const hiddenIds = await getHiddenModelIdsForUser(db, userId);
+	const hiddenIds = await getCachedHiddenModelIdsForUser(db, userId);
+	const adminOverrides = await listAdminOverrides(db, schoolId);
 
 	const result: AugmentedModelInfo[] = [];
 	const seenIds = new Set<string>();
@@ -77,7 +80,12 @@ export async function getAvailableModelsForUser(
 		return a.id.localeCompare(b.id);
 	});
 
-	return result;
+	const filtered = applyAdminDenylist(
+		result.map((entry) => ({ providerId: entry.providerId, modelId: entry.id })),
+		adminOverrides
+	);
+	const allowedIds = new Set(filtered.map((entry) => `${entry.providerId}::${entry.modelId}`));
+	return result.filter((entry) => allowedIds.has(`${entry.providerId}::${entry.id}`));
 }
 
 const SUPPORTED_PROVIDER_IDS: ProviderId[] = ['groq', 'deepseek', 'opencode', 'kimchi'];

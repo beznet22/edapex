@@ -21,7 +21,7 @@
 		class: className = "",
 		isStreaming = false,
 		open = $bindable(),
-		defaultOpen = true,
+		defaultOpen = false,
 		onOpenChange,
 		duration = $bindable(),
 		children,
@@ -84,6 +84,16 @@
 	);
 
 	// Auto-open when streaming starts, auto-close when streaming ends (once only)
+	watch(
+		() => isStreaming,
+		(isStreamingValue) => {
+			if (isStreamingValue && !isOpen) {
+				handleOpenChange(true);
+				hasAutoClosed = false;
+			}
+		}
+	);
+
 	watch(
 		() => [isStreaming, isOpen, defaultOpen, hasAutoClosed] as const,
 		([isStreamingValue, isOpenValue, defaultOpenValue, hasAutoClosedValue]) => {

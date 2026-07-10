@@ -11,6 +11,7 @@ export const assignStaffToClassSchema = z.object({
   staffId: z.number().describe("Numeric ID of the staff member to assign as class teacher"),
   classId: z.number().describe("Numeric ID of the class"),
   sectionId: z.number().describe("Numeric ID of the section"),
+  reason: z.string().describe("Human-readable action summary for user approval."),
 });
 
 export type AssignStaffToClassPayload = z.infer<typeof assignStaffToClassSchema>;
@@ -84,6 +85,7 @@ export const assignStaffToClassTool = createTool({
   description:
     "Assign a staff member as the class teacher for a specific class and section in the active academic year.",
   inputSchema: assignStaffToClassSchema,
+  requireApproval: true,
   execute: async (input: AssignStaffToClassPayload, context: ToolExecutionContext) => {
     assertMastraToolContext(context);
     return assignStaffToClassLogic(context, input);

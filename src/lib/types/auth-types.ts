@@ -21,6 +21,7 @@ export interface AuthUser {
   walletBalance?: number;
   schoolId?: number;
   academicId?: number;
+  role?: "admin" | "it" | string | null;
 }
 
 export interface DeviceInfo {

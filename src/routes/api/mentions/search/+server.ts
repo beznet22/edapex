@@ -12,6 +12,7 @@ import {
 import { ALLOWED_DESIGNATIONS } from "$lib/types/sms-types";
 import { BaseRepository } from '$lib/server/repository/base.repo';
 import { tenantWorkspace } from '$lib/server/mastra/storage/workspaces';
+import { readManifest } from '$lib/server/mastra/storage/workspaces/manifest-store';
 import { buildWorkspaceRequestContext } from '$lib/server/helpers/chat-helper';
 import type { FileEntry } from '@mastra/core/workspace';
 
@@ -295,6 +296,7 @@ async function searchFile(
 		});
 		if (!fs) return [];
 		const entries: FileEntry[] = await fs.readdir('.', { recursive: true });
+		const manifest = await readManifest(tenant);
 		const trimmed = query.trim().toLowerCase();
 		const files = entries.filter((e) => {
 			if (e.type !== 'file') return false;
@@ -306,9 +308,11 @@ async function searchFile(
 			const lastSlash = e.name.lastIndexOf('/');
 			const parentContext = lastSlash > 0 ? e.name.slice(0, lastSlash) : '';
 			const basename = lastSlash >= 0 ? e.name.slice(lastSlash + 1) : e.name;
+			const manifestEntry = manifest.entries[e.name];
+			const displayName = manifestEntry?.fileName ?? basename;
 			return {
 				id: e.name,
-				name: basename,
+				name: displayName,
 				category: 'file',
 				typeBadge: 'File',
 				parentContext,
@@ -351,11 +355,7 @@ async function searchEntities(
 	const searches: Array<Promise<ExtendedMentionSearchResult[]>> = [];
 	if (cats.includes('students')) searches.push(searchStudents(query, tenant, perCategory, classId, sectionId));
 	if (cats.includes('class_section')) {
-		searches.push(
-			trimmed
-				? searchClassSection(query, tenant, perCategory, classId)
-				: Promise.resolve<ExtendedMentionSearchResult[]>([]),
-		);
+		searches.push(searchClassSection(query, tenant, perCategory, classId));
 	}
 	if (cats.includes('academic_year')) searches.push(searchAcademicYear(query, tenant, perCategory));
 	if (cats.includes('exam')) searches.push(searchExam(query, tenant, perCategory));

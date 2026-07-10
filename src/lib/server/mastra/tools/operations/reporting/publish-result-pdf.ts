@@ -88,6 +88,7 @@ const reportPdfPublishInputSchema = z.object({
   forceRegenerate: z.boolean().optional(),
   confirmed: z.boolean().optional(),
   confirmationToken: z.string().optional(),
+  reason: z.string().describe("Human-readable action summary for user approval."),
 });
 
 const reportPdfPublishOutputSchema = z.object({
@@ -186,6 +187,7 @@ export const publishResultPdfTool = createTool({
   description:
     "Generate the PDF (if missing), require ActionBar confirmation of the parent email address, then publish to parent email + write StudentTimeline row. On first call emits data-selectOption with 'Send to <parentEmail>' / 'Cancel' and returns status='awaiting_confirmation'; on the second call pass confirmed=true with the matching confirmationToken to actually publish.",
   inputSchema: reportPdfPublishInputSchema,
+  requireApproval: true,
   outputSchema: reportPdfPublishOutputSchema,
   execute: async (input, ctx) => {
     const context = ctx as Parameters<typeof getTenant>[0];

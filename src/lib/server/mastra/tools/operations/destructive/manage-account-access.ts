@@ -39,6 +39,7 @@ export const manageAccessSchema = z.object({
   targetId: z.number().int().positive().describe("Numeric ID of the student or staff member"),
   confirmed: z.boolean().optional().default(false).describe("Set to true ONLY if the user has explicitly confirmed the action in the chat. DO NOT set to true on the first invocation."),
   newPassword: z.string().optional().describe("Optional new password for the 'reset' action. If omitted, a random password will be generated."),
+  reason: z.string().describe("Human-readable action summary for user approval."),
 });
 
 export type ManageAccessInput = z.input<typeof manageAccessSchema>;
@@ -211,6 +212,7 @@ export const manageAccountAccessTool = createTool({
   id: "manage-account-access",
   description: "Manage the account state of a student or staff member: suspend, restore, reset password, or delete.",
   inputSchema: manageAccessSchema,
+  requireApproval: true,
   execute: async (input: ManageAccessInput, context: ToolExecutionContext) => {
     if (!isMastraToolContext(context)) {
       throw new Error("manage-account-access requires a valid Mastra tool context");

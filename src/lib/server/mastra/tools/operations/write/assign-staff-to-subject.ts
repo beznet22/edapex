@@ -12,6 +12,7 @@ export const assignStaffToSubjectSchema = z.object({
   classId: z.number().describe("Numeric ID of the class"),
   sectionId: z.number().describe("Numeric ID of the section"),
   subjectId: z.number().describe("Numeric ID of the subject"),
+  reason: z.string().describe("Human-readable action summary for user approval."),
 });
 
 export type AssignStaffToSubjectPayload = z.infer<typeof assignStaffToSubjectSchema>;
@@ -86,6 +87,7 @@ export const assignStaffToSubjectTool = createTool({
   description:
     "Assign a staff member as the subject teacher for a specific class, section, and subject in the active academic year.",
   inputSchema: assignStaffToSubjectSchema,
+  requireApproval: true,
   execute: async (input: AssignStaffToSubjectPayload, context: ToolExecutionContext) => {
     assertMastraToolContext(context);
     return assignStaffToSubjectLogic(context, input);

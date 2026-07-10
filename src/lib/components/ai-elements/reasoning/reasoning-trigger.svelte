@@ -3,7 +3,8 @@
 	import { CollapsibleTrigger } from "$lib/components/ui/collapsible/index.js";
 	import { getReasoningContext } from "./reasoning-context.svelte.js";
 	import BrainIcon from "@lucide/svelte/icons/brain";
-	import ChevronDownIcon from "@lucide/svelte/icons/chevron-down";
+	import ChevronRightIcon from "@lucide/svelte/icons/chevron-right";
+	import Shimmer from "$lib/components/ai-elements/shimmer/Shimmer.svelte";
 
 	interface Props {
 		class?: string;
@@ -14,9 +15,11 @@
 
 	let reasoningContext = getReasoningContext();
 
-	let getThinkingMessage = $derived.by(() => {
-		let { isStreaming, duration } = reasoningContext;
+	let isStreaming = $derived(reasoningContext.isStreaming);
+	let duration = $derived(reasoningContext.duration);
+	let isOpen = $derived(reasoningContext.isOpen);
 
+	let getThinkingMessage = $derived.by(() => {
 		if (isStreaming || duration === 0) {
 			return "Thinking...";
 		}
@@ -37,12 +40,23 @@
 	{#if children}
 		{@render children()}
 	{:else}
-		<BrainIcon class="size-4" />
-		<p>{getThinkingMessage}</p>
-		<ChevronDownIcon
+		<BrainIcon
 			class={cn(
-				"size-4 transition-transform",
-				reasoningContext.isOpen ? "rotate-180" : "rotate-0"
+				"size-4 shrink-0 transition-colors",
+				isStreaming && "text-primary",
+			)}
+		/>
+		{#if isStreaming}
+			<Shimmer duration={1.6} spread={1.5} content_length={getThinkingMessage.length}>
+				{#snippet children()}{getThinkingMessage}{/snippet}
+			</Shimmer>
+		{:else}
+			<p class="leading-none">{getThinkingMessage}</p>
+		{/if}
+		<ChevronRightIcon
+			class={cn(
+				"size-4 ml-auto shrink-0 transition-transform duration-200",
+				isOpen ? "rotate-90" : "rotate-0",
 			)}
 		/>
 	{/if}

@@ -51,6 +51,7 @@ export const manageResultsSchema = z.object({
   remark: z.string().min(1).optional().describe("Free-text teacher remark or comment (Required for 'qualitative')"),
   trait: z.string().optional().describe("Name of the behavioral or psychomotor trait being rated (Required for 'behavioral')"),
   rating: z.number().min(1).max(5).optional().describe("Rating from 1 to 5 for the given trait (Required for 'behavioral')"),
+  reason: z.string().describe("Human-readable action summary for user approval."),
 
 }).superRefine((data, ctx) => {
   if (data.type === "academic") {
@@ -267,6 +268,7 @@ export const manageAcademicRecordsTool = createTool({
 	description:
 		"Record and edit marks, attendance, teacher remarks, and behavioral ratings for the active academic term. Use this tool whenever a user wants to submit a grade, log attendance, write a teacher remark, or add a personality/behavior rating for a student.",
 	inputSchema: manageResultsSchema,
+	requireApproval: true,
 	outputSchema: z.object({
 		status: z.enum(["SUCCESS", "FAILED"]),
 		message: z.string()

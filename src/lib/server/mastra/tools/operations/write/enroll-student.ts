@@ -26,6 +26,7 @@ export const onboardEntitySchema = z.object({
     classId: z.number().int().positive().describe("Numeric ID of the class to enroll in"),
     sectionId: z.number().int().positive().describe("Numeric ID of the section to enroll in"),
   }).describe("Target enrollment destination for the new student"),
+  reason: z.string().describe("Human-readable action summary for user approval."),
 });
 
 export type OnboardEntityPayload = z.infer<typeof onboardEntitySchema>;
@@ -188,6 +189,7 @@ export const enrollStudentTool = createTool({
   id: "enroll-student",
   description: "Enroll a new student into a class, with their guardian record, in the active academic context.",
   inputSchema: onboardEntitySchema,
+  requireApproval: true,
   execute: async (input: OnboardEntityPayload, context: ToolExecutionContext) => {
     assertMastraToolContext(context);
     return onboardEntityLogic(context, input);

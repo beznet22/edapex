@@ -19,6 +19,9 @@
 	import Trash2Icon from "@lucide/svelte/icons/trash-2";
 	import FileQuestionIcon from "@lucide/svelte/icons/file-question";
 	import ArrowLeftIcon from "@lucide/svelte/icons/arrow-left";
+	import FileTypeIcon from "@lucide/svelte/icons/file-type";
+	import EyeIcon from "@lucide/svelte/icons/eye";
+	import FileDownIcon from "@lucide/svelte/icons/file-down";
 	import EditorCanvas from "./editor-canvas.svelte";
 	import { useInspector } from "$lib/context/inspector-context.svelte";
 	import { useChat } from "$lib/context/chat-context.svelte";
@@ -187,14 +190,95 @@
 		toolOutput?.validatedTitle ?? toolOutput?.title ?? "Untitled",
 	);
 
+	// PDF counterpart lives next to the markdown file with the same stem.
+	// We don't know whether the assistant has published a PDF until we probe
+	// `/api/file/<pdfPath>` — that's the `pdfAvailable` derivation below.
+	const pdfUrl = $derived.by(() => {
+		if (!persistedMarkdownPath) return null;
+		const swapped = persistedMarkdownPath.replace(/\.md$/i, ".pdf");
+		return `/api/file/${swapped}`;
+	});
+
+	let viewMode = $state<"markdown" | "pdf">("markdown");
+	let pdfAvailable = $state(false);
+	let pdfProbeSeq = 0;
+
+	$effect(() => {
+		const url = pdfUrl;
+		if (!url) {
+			pdfAvailable = false;
+			return;
+		}
+		const seq = ++pdfProbeSeq;
+		fetch(url, { method: "HEAD" })
+			.then((r) => {
+				if (seq !== pdfProbeSeq) return;
+				pdfAvailable = r.ok;
+				if (!r.ok && viewMode === "pdf") viewMode = "markdown";
+			})
+			.catch(() => {
+				if (seq !== pdfProbeSeq) return;
+				pdfAvailable = false;
+				if (viewMode === "pdf") viewMode = "markdown";
+			});
+	});
+
 	let editorRef = $state<
 		{ save: () => Promise<boolean> | void; copy: () => void } | undefined
 	>(undefined);
 
+	async function triggerDownload(path: string, filename: string) {
+		try {
+			const res = await fetch(`/api/file/${path}`);
+			if (!res.ok) {
+				import("svelte-sonner").then((m) =>
+					m.toast.error(`Download failed: ${res.status}`),
+				);
+				return;
+			}
+			const blob = await res.blob();
+			const url = URL.createObjectURL(blob);
+			const a = document.createElement("a");
+			a.href = url;
+			a.download = filename;
+			document.body.appendChild(a);
+			a.click();
+			a.remove();
+			URL.revokeObjectURL(url);
+		} catch (e) {
+			import("svelte-sonner").then((m) =>
+				m.toast.error(e instanceof Error ? e.message : "Download failed"),
+			);
+		}
+	}
+
+	function handleDownloadMarkdown() {
+		if (!persistedMarkdownPath) return;
+		const filename =
+			persistedMarkdownPath.split("/").pop() ?? `${displayTitle}.md`;
+		triggerDownload(persistedMarkdownPath, filename);
+	}
+
+	function handleDownloadPDF() {
+		if (!pdfUrl || !pdfAvailable) return;
+		const filename =
+			persistedMarkdownPath?.replace(/\.md$/i, ".pdf").split("/").pop() ??
+			`${displayTitle}.pdf`;
+		triggerDownload(pdfUrl.replace(/^\/api\/file\//, ""), filename);
+	}
+
+	function toggleViewMode() {
+		viewMode = viewMode === "pdf" ? "markdown" : "pdf";
+	}
+
 	const viewingId = $derived(activeId ?? artifacts[0]?.id ?? null);
 	const current = $derived(artifacts.find((a) => a.id === viewingId) ?? null);
+	// Effective streaming state: prefer the merged tool output / stream-entry
+	// status so the header actions are disabled while the artifact is still
+	// being formatted by `streamDocument` or persisted by `validate-marksheet`,
+	// not just while the artifact card itself reports `processing`.
 	const isStreaming = $derived(
-		current?.status === "processing" || current?.status === "streaming",
+		effectiveStatus === "streaming" || effectiveStatus === "processing",
 	);
 
 	async function handleSave() {
@@ -378,7 +462,7 @@
 		</div>
 
 		<div class="flex items-center gap-1 shrink-0">
-			{#if current && !isStreaming}
+			{#if current}
 				<Tooltip.Root>
 					<Tooltip.Trigger>
 						{#snippet child({ props })}
@@ -386,14 +470,16 @@
 								{...props}
 								variant="ghost"
 								size="icon"
-								class="size-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/40"
+								class="size-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/40 disabled:opacity-40 disabled:pointer-events-none"
 								onclick={handleCopy}
+								disabled={isStreaming}
+								aria-label="Copy artifact"
 							>
 								<CopyIcon class="size-4" />
 							</Button>
 						{/snippet}
 					</Tooltip.Trigger>
-					<Tooltip.Content>Copy</Tooltip.Content>
+					<Tooltip.Content>{isStreaming ? 'Copy (available when streaming finishes)' : 'Copy'}</Tooltip.Content>
 				</Tooltip.Root>
 
 				{#if current.url}
@@ -404,14 +490,98 @@
 									{...props}
 									variant="ghost"
 									size="icon"
-									class="size-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/40"
+									class="size-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/40 disabled:opacity-40 disabled:pointer-events-none"
 									onclick={handleDownload}
+									disabled={isStreaming}
+									aria-label="Download artifact"
 								>
 									<DownloadIcon class="size-4" />
 								</Button>
 							{/snippet}
 						</Tooltip.Trigger>
-						<Tooltip.Content>Download</Tooltip.Content>
+						<Tooltip.Content>{isStreaming ? 'Download (available when streaming finishes)' : 'Download'}</Tooltip.Content>
+					</Tooltip.Root>
+				{/if}
+
+				{#if persistedMarkdownPath}
+					<Tooltip.Root>
+						<Tooltip.Trigger>
+							{#snippet child({ props })}
+								<Button
+									{...props}
+									variant="ghost"
+									size="icon"
+									class="size-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/40 disabled:opacity-40 disabled:pointer-events-none"
+									onclick={handleDownloadMarkdown}
+									disabled={isStreaming}
+									aria-label="Download markdown"
+								>
+									<FileTextIcon class="size-4" />
+								</Button>
+							{/snippet}
+						</Tooltip.Trigger>
+						<Tooltip.Content>Download markdown (.md)</Tooltip.Content>
+					</Tooltip.Root>
+				{/if}
+
+				{#if pdfAvailable && viewMode === 'pdf'}
+					<Tooltip.Root>
+						<Tooltip.Trigger>
+							{#snippet child({ props })}
+								<Button
+									{...props}
+									variant="ghost"
+									size="icon"
+									class="size-8 rounded-lg text-primary hover:text-primary hover:bg-primary/15 disabled:opacity-40 disabled:pointer-events-none"
+									onclick={toggleViewMode}
+									disabled={isStreaming}
+									aria-label="Switch to markdown view"
+								>
+									<EyeIcon class="size-4" />
+								</Button>
+							{/snippet}
+						</Tooltip.Trigger>
+						<Tooltip.Content>View markdown</Tooltip.Content>
+					</Tooltip.Root>
+				{:else if pdfAvailable && viewMode === 'markdown'}
+					<Tooltip.Root>
+						<Tooltip.Trigger>
+							{#snippet child({ props })}
+								<Button
+									{...props}
+									variant="ghost"
+									size="icon"
+									class="size-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/40 disabled:opacity-40 disabled:pointer-events-none"
+									onclick={toggleViewMode}
+									disabled={isStreaming}
+									aria-label="Switch to PDF view"
+								>
+									<FileTypeIcon class="size-4" />
+								</Button>
+							{/snippet}
+						</Tooltip.Trigger>
+						<Tooltip.Content>View PDF</Tooltip.Content>
+					</Tooltip.Root>
+				{/if}
+
+				{#if pdfAvailable}
+					<Tooltip.Root>
+						<Tooltip.Trigger>
+							{#snippet child({ props })}
+								<Button
+									{...props}
+									variant="ghost"
+									size="icon"
+									class="size-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/40 disabled:opacity-40 disabled:pointer-events-none"
+									onclick={handleDownloadPDF}
+									disabled={isStreaming}
+									aria-label="Download PDF"
+								>
+									<FileDownIcon class="size-4" />
+								</Button>
+							{/snippet}
+						</Tooltip.Trigger>
+						<Tooltip.Content>Download PDF</Tooltip.Content>
 					</Tooltip.Root>
 				{/if}
 
@@ -422,7 +592,9 @@
 								{...props}
 								variant="ghost"
 								size="icon"
-								class="size-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/40"
+								class="size-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/40 disabled:opacity-40 disabled:pointer-events-none"
+								disabled={isStreaming}
+								aria-label="More actions"
 							>
 								<MoreHorizontalIcon class="size-4" />
 							</Button>
@@ -432,15 +604,15 @@
 						align="end"
 						class="w-44 bg-popover backdrop-blur-xl border border-border/60 rounded-xl shadow-2xl"
 					>
-						<DropdownMenu.Item onclick={handleSave}>
+						<DropdownMenu.Item onclick={handleSave} disabled={isStreaming}>
 							<SaveIcon class="size-3.5 mr-2" />
 							Save
 						</DropdownMenu.Item>
-						<DropdownMenu.Item onclick={handleShare}>
+						<DropdownMenu.Item onclick={handleShare} disabled={isStreaming}>
 							<Share2Icon class="size-3.5 mr-2" />
 							Share
 						</DropdownMenu.Item>
-						<DropdownMenu.Item onclick={handlePrint}>
+						<DropdownMenu.Item onclick={handlePrint} disabled={isStreaming}>
 							<PrinterIcon class="size-3.5 mr-2" />
 							Print
 						</DropdownMenu.Item>
@@ -448,6 +620,7 @@
 						<DropdownMenu.Item
 							onclick={() => (deleteOpen = true)}
 							class="text-destructive focus:text-destructive"
+							disabled={isStreaming}
 						>
 							<Trash2Icon class="size-3.5 mr-2" />
 							Delete
@@ -459,7 +632,15 @@
 	</header>
 
 	<div class="flex-1 h-full relative group">
-		{#if persistedMarkdownPath}
+		{#if persistedMarkdownPath && viewMode === 'pdf' && pdfAvailable && pdfUrl}
+			<EditorCanvas
+				filename={persistedMarkdownPath.replace(/\.md$/i, '.pdf').split('/').pop() ?? `${displayTitle}.pdf`}
+				title={displayTitle}
+				url={pdfUrl}
+				type="pdf"
+				streaming={false}
+			/>
+		{:else if persistedMarkdownPath}
 			<ScrollArea class="h-full w-full">
 				<div
 					class="flex flex-col p-6 max-w-3xl mx-auto relative pb-20 group"

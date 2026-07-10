@@ -13,17 +13,50 @@ import { z } from 'zod';
 import { userCredentials, type UserCredential } from '$lib/server/mastra/storage/libsql/app-db.schema';
 import type { ProviderId, ModelId } from '$lib/provider/types';
 import { ModelInfoSchema, type ModelInfo } from '$lib/provider/spec';
-import { encrypt as encryptText, decrypt as decryptText } from './crypto';
+import { encrypt as encryptText, decrypt as decryptText, getEncryptionKey } from './crypto';
+import { DecryptionError } from '$lib/provider/errors';
 import { decryptCustomProvider } from './credentials';
 
-const ENCRYPTION_KEY_FALLBACK = 'edapex-default-encryption-key-32ch';
+export const DISCOVERY_TIMEOUT_MS = 10_000;
+export const DISCOVERY_ATTEMPTS = 3;
+export const DISCOVERY_BACKOFF_BASE_MS = 250;
+export const DISCOVERY_BACKOFF_MAX_MS = 2_000;
 
-function getEncryptionKey(env: Record<string, string | undefined> | undefined): string {
-	const source = env ?? ((process.env as Record<string, string | undefined>) ?? {});
-	return source.TOKEN_ENCRYPTION_KEY || source.ENCRYPTION_KEY || ENCRYPTION_KEY_FALLBACK;
+export interface BackoffOptions {
+	attempts: number;
+	baseMs: number;
+	maxMs: number;
+	shouldRetry?: (err: unknown) => boolean;
 }
 
-const DISCOVERY_TIMEOUT_MS = 10_000;
+function sleep(ms: number): Promise<void> {
+	return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function exponentialDelay(attempt: number, baseMs: number, maxMs: number): number {
+	const delay = baseMs * 2 ** attempt;
+	return Math.min(delay, maxMs);
+}
+
+export async function withExponentialBackoff<T>(
+	fn: () => Promise<T>,
+	options: BackoffOptions
+): Promise<T> {
+	let lastErr: unknown;
+	for (let attempt = 0; attempt < options.attempts; attempt += 1) {
+		try {
+			return await fn();
+		} catch (err) {
+			lastErr = err;
+			const isLast = attempt === options.attempts - 1;
+			if (isLast) break;
+			if (options.shouldRetry && !options.shouldRetry(err)) break;
+			const delayMs = exponentialDelay(attempt, options.baseMs, options.maxMs);
+			await sleep(delayMs);
+		}
+	}
+	throw lastErr;
+}
 const SKIP_DISCOVERY_PROVIDERS: ReadonlySet<ProviderId> = new Set<ProviderId>([
 	'opengateway' as ProviderId,
 	'nvidia' as ProviderId,
@@ -35,21 +68,18 @@ const RawArchitectureSchema = z
 		input_modalities: z.array(z.string()).optional(),
 		output_modalities: z.array(z.string()).optional()
 	})
-	.passthrough()
 	.optional();
 
 const RawCapabilitiesSchema = z
 	.object({
 		function_calling: z.boolean().optional()
 	})
-	.passthrough()
 	.optional();
 
 const RawTopProviderSchema = z
 	.object({
 		max_completion_tokens: z.number().optional()
 	})
-	.passthrough()
 	.optional();
 
 const RawPricingSchema = z
@@ -57,22 +87,19 @@ const RawPricingSchema = z
 		prompt: z.string().optional(),
 		completion: z.string().optional()
 	})
-	.passthrough()
 	.optional();
 
-const RawModelSchema = z
-	.object({
-		id: z.string().min(1),
-		name: z.string().optional(),
-		description: z.string().optional(),
-		context_length: z.number().optional(),
-		supported_parameters: z.array(z.string()).optional(),
-		capabilities: RawCapabilitiesSchema,
-		architecture: RawArchitectureSchema,
-		top_provider: RawTopProviderSchema,
-		pricing: RawPricingSchema
-	})
-	.passthrough();
+const RawModelSchema = z.object({
+	id: z.string().min(1),
+	name: z.string().optional(),
+	description: z.string().optional(),
+	context_length: z.number().optional(),
+	supported_parameters: z.array(z.string()).optional(),
+	capabilities: RawCapabilitiesSchema,
+	architecture: RawArchitectureSchema,
+	top_provider: RawTopProviderSchema,
+	pricing: RawPricingSchema
+});
 
 type RawModel = z.infer<typeof RawModelSchema>;
 
@@ -163,7 +190,7 @@ function extractModelsFromResponse(json: unknown): RawModel[] {
 	return out;
 }
 
-async function fetchModels(
+async function fetchModelsOnce(
 	baseUrl: string,
 	apiKey: string | undefined
 ): Promise<RawModel[]> {
@@ -177,21 +204,37 @@ async function fetchModels(
 	});
 
 	if (!response.ok) {
-		console.warn(
-			`[discoverProviderModels] /models returned HTTP ${response.status} from ${baseUrl}`
-		);
-		return [];
+		throw new Error(`HTTP ${response.status}`);
 	}
 
 	let json: unknown;
 	try {
 		json = await response.json();
 	} catch (err) {
-		console.warn('[discoverProviderModels] Failed to parse /models response as JSON:', err);
-		return [];
+		throw new Error('Failed to parse /models response as JSON');
 	}
 
 	return extractModelsFromResponse(json);
+}
+
+async function fetchModels(
+	baseUrl: string,
+	apiKey: string | undefined
+): Promise<RawModel[]> {
+	return withExponentialBackoff(
+		() => fetchModelsOnce(baseUrl, apiKey),
+		{
+			attempts: DISCOVERY_ATTEMPTS,
+			baseMs: DISCOVERY_BACKOFF_BASE_MS,
+			maxMs: DISCOVERY_BACKOFF_MAX_MS
+		}
+	).catch((err) => {
+		console.warn(
+			`[discoverProviderModels] /models failed after ${DISCOVERY_ATTEMPTS} attempts from ${baseUrl}:`,
+			err
+		);
+		return [];
+	});
 }
 
 export async function discoverProviderModels(
@@ -267,7 +310,18 @@ export async function getDiscoveredModelsForUser(
 	if (!encrypted) return [];
 
 	const encryptionKey = getEncryptionKey(env);
-	const decrypted = decryptText(encrypted, encryptionKey);
+	let decrypted: string;
+	try {
+		decrypted = decryptText(encrypted, encryptionKey);
+	} catch (err) {
+		if (!(err instanceof DecryptionError)) {
+			console.warn(
+				`[getDiscoveredModelsForUser:${providerId}] unexpected decrypt failure:`,
+				err
+			);
+		}
+		return [];
+	}
 	if (!decrypted) return [];
 
 	try {

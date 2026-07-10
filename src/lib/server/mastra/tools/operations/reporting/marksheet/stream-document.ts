@@ -125,6 +125,8 @@ export const streamDocumentTool = createTool({
       throw new Error(`MANIFEST_ENTRY_NOT_FOUND: contentHash=${contentHash}`);
     }
 
+    const { title, initialMarkdownPath } = deriveInitialFilename(entry.fileName, contentHash);
+
     const mdRelPath = ocrMarkdownPath(entry.fileName);
     if (!(await fs.exists(mdRelPath))) {
       throw new Error(`OCR_MARKDOWN_NOT_FOUND: ${mdRelPath}`);
@@ -137,6 +139,8 @@ export const streamDocumentTool = createTool({
 
     const prompt = [
       `Format the following OCR-extracted academic result for ${fileName} into clean, well-structured markdown.`,
+      `Use the supplied TITLE verbatim in any headings or front-matter you generate: "${title}".`,
+      `The output will be saved to the filename: ${initialMarkdownPath}. Do not alter the extension or basename.`,
       'Preserve every factual value, subject name, score, and grade from the input.',
       'Render it as an academic report card that a parent can read at a glance.',
       '',
@@ -184,7 +188,6 @@ export const streamDocumentTool = createTool({
     // only written by validate-marksheet after user verification — see
     // `validate-marksheet.ts`, which renames this draft away.
     const formattedDocumentId = entry.documentId ?? documentId;
-    const { title, initialMarkdownPath } = deriveInitialFilename(entry.fileName, contentHash);
     await fs.writeFile(initialMarkdownPath, markdown, { recursive: true });
     await addEntry(tenant, {
       path: initialMarkdownPath,

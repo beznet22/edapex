@@ -11,6 +11,7 @@ import { AssignmentRepository } from "../../../../repository/assignment.repo";
 export const teacherSelfAssignClassSchema = z.object({
   classId: z.number().describe("Numeric ID of the class"),
   sectionId: z.number().describe("Numeric ID of the section"),
+  reason: z.string().describe("Human-readable action summary for user approval."),
 });
 
 export type TeacherSelfAssignClassPayload = z.infer<typeof teacherSelfAssignClassSchema>;
@@ -90,6 +91,7 @@ export const teacherSelfAssignClassTool = createTool({
   description:
     "Allow the currently authenticated teacher to assign themselves as the class teacher for a class and section.",
   inputSchema: teacherSelfAssignClassSchema,
+  requireApproval: true,
   execute: async (input: TeacherSelfAssignClassPayload, context: ToolExecutionContext) => {
     assertMastraToolContext(context);
     return teacherSelfAssignClassLogic(context, input);

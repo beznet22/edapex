@@ -24,6 +24,7 @@ export const updateRecordSchema = z.object({
   mobile: z.string().optional().describe("New mobile phone number"),
   studentCategoryId: z.number().optional().describe("Numeric ID representing student category (student only)"),
   photoPath: z.string().optional().describe("Relative path of the uploaded photo to commit to the record"),
+  reason: z.string().describe("Human-readable action summary for user approval."),
 });
 
 export type UpdateRecordPayload = z.infer<typeof updateRecordSchema>;
@@ -321,6 +322,7 @@ export const updateRecordTool = createTool({
   description:
     "Update an entity's biographical fields and/or photo. entityType=student|staff (requires entityId) or entityType=self (updates the active staff member).",
   inputSchema: updateRecordSchema,
+  requireApproval: true,
   execute: async (input: UpdateRecordPayload, context: ToolExecutionContext) => {
     assertMastraToolContext(context);
     return updateRecordLogic(context, input);

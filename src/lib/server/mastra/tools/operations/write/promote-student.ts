@@ -19,6 +19,7 @@ export const promoteStudentSchema = z.object({
   sectionId: z.number().describe("Numeric ID of the destination section"),
   rollNo: z.number().optional().describe("Optional roll number in the destination class"),
   resultStatus: z.string().optional().describe("Promotion result status (defaults to PASSED when omitted)"),
+  reason: z.string().describe("Human-readable action summary for user approval."),
 });
 
 export type PromoteStudentInput = z.infer<typeof promoteStudentSchema>;
@@ -156,6 +157,7 @@ export const promoteStudentTool = createTool({
   id: "promote-student",
   description: "Promote a student to a new class and section for the active academic session, preserving history and assigning fees.",
   inputSchema: promoteStudentSchema,
+  requireApproval: true,
   execute: async (input: PromoteStudentInput, context: ToolExecutionContext) => {
     assertMastraToolContext(context);
     return promoteStudentLogic(context, input);

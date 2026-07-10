@@ -18,6 +18,7 @@ export const updateStaffBiodataSchema = z.object({
   mobile: z.string().optional().describe("New mobile phone number"),
   qualification: z.string().optional().describe("New qualification"),
   experience: z.string().optional().describe("New experience"),
+  reason: z.string().describe("Human-readable action summary for user approval."),
 });
 
 export type UpdateStaffBiodataPayload = z.infer<typeof updateStaffBiodataSchema>;
@@ -187,6 +188,7 @@ export const updateStaffBiodataTool = createTool({
   id: "update-staff-biodata",
   description: "Update an existing staff member's personal details.",
   inputSchema: updateStaffBiodataSchema,
+  requireApproval: true,
   execute: async (inputData: UpdateStaffBiodataPayload, context: ToolExecutionContext) => {
     assertMastraToolContext(context);
     return updateStaffBiodataLogic(context, inputData);

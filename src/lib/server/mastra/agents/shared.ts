@@ -46,6 +46,12 @@ export const requestContextSchema = z.object({
 	isSlashCommand: z.boolean().optional(),
 	lastMessage: z.string().optional(),
 	fileManifest: z.string().optional(),
+	/** Resolved @mentions from `processMentions`, forwarded by
+	 *  /api/chat so `buildAssistantInstructions` can render the
+	 *  `RESOLVED @MENTIONS` block (and any focus student derived
+	 *  from it). Shape is `MentionTag[]` but typed as `unknown` to
+	 *  avoid a circular import — callers cast at the read site. */
+	resolvedMentions: z.unknown().optional(),
 });
 
 export type RequestContextValues = z.infer<typeof requestContextSchema>;

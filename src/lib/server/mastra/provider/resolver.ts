@@ -31,11 +31,13 @@ import {
 	ProviderNotFoundError,
 	ModelNotFoundError
 } from './errors';
-import { resolveProviderKey } from './credentials';
+import { resolveProviderKeyWithTrace, AllTiersFailedError } from './tier-router';
 import { createRateLimitFetch } from './rate-limit';
+import { log as writeAudit } from '$lib/server/audit-log';
 import type { ProviderId, ModelId, VariantId } from './types';
 import { parseModelId } from './types';
 import type { ModelInfo, Capabilities } from './spec';
+import { withResolverTrace, type ResolverTraceContext } from './trace';
 
 function getEnv(): Record<string, string | undefined> {
 	return svelteEnv as Record<string, string | undefined>;
@@ -53,7 +55,9 @@ export interface ResolvedRequestModel {
 	capabilities: Capabilities;
 	limit: ModelInfo['limit'];
 	/** Where the API key came from. */
-	keySource: 'user' | 'env' | null;
+	keySource: 'user' | 'env' | 'pool' | null;
+	/** Tier that served the credential (1/2/3) when known. */
+	tier?: number | null;
 }
 
 /**
@@ -66,7 +70,7 @@ export interface ResolvedRequestModel {
  * Dynamic per-request headers (e.g. versioned `User-Agent`) are layered on
  * top inside `createRateLimitFetch` via the `HEADER_RESOLVERS` registry.
  */
-function buildModel(
+export function buildModel(
 	providerId: ProviderId,
 	provider: (typeof BUILTIN_PROVIDERS)[ProviderId],
 	modelName: string,
@@ -100,10 +104,19 @@ function buildModel(
 	} as unknown as MastraModelConfig;
 }
 
+export interface ResolveModelContext extends ResolverTraceContext {
+	/** Required to route tiers 2+ (potluck pool). */
+	userRole: string | null;
+	/** Optional token-usage cap check for tier 2. */
+	todayTokenUsage?: number;
+}
+
 export async function resolveModelForRequest(
 	userId: number,
 	modelIdWithVariant: string,
-	db: LibSQLDatabase<any>
+	db: LibSQLDatabase<any>,
+	audit?: { actorStaffId: number; schoolId: number },
+	resolveContext?: ResolveModelContext
 ): Promise<ResolvedRequestModel> {
 	if (!modelIdWithVariant) {
 		throw new NoProvidersError();
@@ -130,29 +143,77 @@ export async function resolveModelForRequest(
 		throw new ModelNotFoundError(providerId, modelId as ModelId);
 	}
 
-	const resolved = await resolveProviderKey(db, getEnv(), userId, providerId);
-	if (!resolved) {
-		throw new NoCredentialError(providerId);
-	}
-	if (resolved.credentialEnabled === false) {
-		throw new ProviderDisabledError(providerId);
-	}
+	const doResolve = async (): Promise<ResolvedRequestModel> => {
+		const traceArgs: import('./tier-router').ResolveArgs = {
+			db,
+			env: getEnv(),
+			userId,
+			providerId,
+			schoolId: traceContext?.schoolId ?? null,
+			userRole: traceContext?.userRole ?? null,
+			todayTokenUsage: traceContext?.todayTokenUsage ?? 0,
+			auditStaffId: traceContext?.actorStaffId ?? null,
+			auditActor: traceContext?.actorStaffId ?? null
+		};
+		const resolved = await resolveProviderKeyWithTrace(traceArgs);
+		if (resolved.credentialEnabled === false) {
+			throw new ProviderDisabledError(providerId);
+		}
 
-	const customFetch = await createRateLimitFetch(userId, providerId, getEnv());
-	const config = buildModel(providerId, provider, modelName, resolved.apiKey, customFetch, modelInfo);
+		const customFetch = await createRateLimitFetch(userId, providerId, getEnv());
+		const config = buildModel(providerId, provider, modelName, resolved.apiKey, customFetch, modelInfo);
+		const providerOptions = resolveProviderOptions(modelInfo, variantId);
 
-	const providerOptions = resolveProviderOptions(modelInfo, variantId);
+		if (audit) {
+			await writeAudit({
+				schoolId: audit.schoolId,
+				actorStaffId: audit.actorStaffId,
+				action: 'access',
+				entityType: 'providerKey',
+				entityId: `${userId}:${providerId}`,
+				before: { requested: true },
+				after: {
+					source: resolved.source,
+					tier: resolved.tier,
+					providerId,
+					modelId,
+					variantId
+				}
+			});
+		}
 
-	return {
-		config,
-		providerOptions,
-		providerId,
-		modelName,
-		variantId,
-		capabilities: modelInfo.capabilities,
-		limit: modelInfo.limit,
-		keySource: resolved.source
+		return {
+			config,
+			providerOptions,
+			providerId,
+			modelName,
+			variantId,
+			capabilities: modelInfo.capabilities,
+			limit: modelInfo.limit,
+			keySource: resolved.source,
+			tier: resolved.tier
+		};
 	};
+
+	const wrappedResolve = async (): Promise<ResolvedRequestModel> => {
+		try {
+			return await doResolve();
+		} catch (err) {
+			if (err instanceof AllTiersFailedError) {
+				throw new NoCredentialError(providerId);
+			}
+			throw err;
+		}
+	};
+
+	const traceContext = resolveContext ?? (audit ? { userId, schoolId: audit.schoolId, actorStaffId: audit.actorStaffId, userRole: null } : undefined);
+	if (traceContext) {
+		return withResolverTrace(wrappedResolve, traceContext, {
+			modelId: modelId as ModelId,
+			scope: 'user'
+		});
+	}
+	return wrappedResolve();
 }
 
 /**
@@ -175,7 +236,7 @@ export async function resolveModelForRequest(
  * in the variant arrays) — the agent is a tool-calling chat assistant,
  * not a deep-research model, so we want fast, cheap responses.
  */
-function pickDefaultVariantId(model: { variants: Array<{ id: string }> }): string | null {
+export function pickDefaultVariantId(model: { variants: Array<{ id: string }> }): string | null {
 	if (model.variants.length === 0) return null;
 	const low = model.variants.find((v) => v.id === 'low');
 	return low ? low.id : (model.variants[0]?.id ?? null);
@@ -188,20 +249,44 @@ export async function pickDefaultModelId(
 ): Promise<string | null> {
 	const preferred = BUILTIN_MODELS[DEFAULT_MODEL_ID];
 	if (preferred) {
-		const resolved = await resolveProviderKey(db, env, userId, preferred.providerId);
-		if (resolved) {
-			const variantId = pickDefaultVariantId(preferred);
-			const variantSuffix = variantId ? `@${variantId}` : '';
-			return `${preferred.id}${variantSuffix}`;
+		try {
+			const resolved = await resolveProviderKeyWithTrace({
+				db,
+				env,
+				userId,
+				providerId: preferred.providerId,
+				schoolId: null,
+				userRole: null,
+				todayTokenUsage: 0
+			});
+			if (resolved) {
+				const variantId = pickDefaultVariantId(preferred);
+				const variantSuffix = variantId ? `@${variantId}` : '';
+				return `${preferred.id}${variantSuffix}`;
+			}
+		} catch {
+			// Fall through to catalog walk.
 		}
 	}
 	for (const model of getChatRoutableModels()) {
 		if (model.id === DEFAULT_MODEL_ID) continue;
-		const resolved = await resolveProviderKey(db, env, userId, model.providerId);
-		if (!resolved) continue;
-		const variantId = pickDefaultVariantId(model);
-		const variantSuffix = variantId ? `@${variantId}` : '';
-		return `${model.id}${variantSuffix}`;
+		try {
+			const resolved = await resolveProviderKeyWithTrace({
+				db,
+				env,
+				userId,
+				providerId: model.providerId,
+				schoolId: null,
+				userRole: null,
+				todayTokenUsage: 0
+			});
+			if (!resolved) continue;
+			const variantId = pickDefaultVariantId(model);
+			const variantSuffix = variantId ? `@${variantId}` : '';
+			return `${model.id}${variantSuffix}`;
+		} catch {
+			continue;
+		}
 	}
 	return null;
 }
@@ -217,26 +302,19 @@ function resolveProviderOptions(
 }
 
 /**
- * Extract the provider segment from a model id. Accepts both canonical
- * slash (`groq/llama-3.3-70b-versatile`) and legacy colon
- * (`groq:llama-3.3-70b-versatile`). Slash is tried first; colon is the
- * fallback for legacy cookies, threads.metadata.model, and orphaned DB
- * rows that pre-date the V2 cutover. For nested model names like
- * `groq/qwen/qwen3-32b` the model name keeps its inner `/` (correctly
- * nested for the OpenAI-compat factory).
+ * Extract the provider segment from a model id. Accepts the canonical
+ * slash format only (`groq/llama-3.3-70b-versatile`). For nested model
+ * names like `groq/qwen/qwen3-32b` the model name keeps its inner `/`
+ * (correctly nested for the OpenAI-compat factory).
  */
 function extractProviderId(modelId: string): ProviderId | null {
 	const slashIdx = modelId.indexOf('/');
 	if (slashIdx > 0) return modelId.slice(0, slashIdx) as ProviderId;
-	const colonIdx = modelId.indexOf(':');
-	if (colonIdx > 0) return modelId.slice(0, colonIdx) as ProviderId;
 	return null;
 }
 
 function stripProviderPrefix(modelId: string, providerId: ProviderId): string {
 	const slashPrefix = `${providerId}/`;
 	if (modelId.startsWith(slashPrefix)) return modelId.slice(slashPrefix.length);
-	const colonPrefix = `${providerId}:`;
-	if (modelId.startsWith(colonPrefix)) return modelId.slice(colonPrefix.length);
 	return '';
 }

@@ -10,7 +10,7 @@
 
   let { parts }: { parts: xUIMessagePart[] } = $props();
   const toolCount = $derived(parts.length);
-  let open = $state(true);
+  let open = $state(false);
 </script>
 
 <div class="w-full max-w-2xl">

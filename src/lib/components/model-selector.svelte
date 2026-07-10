@@ -103,18 +103,18 @@
   const hasResults = $derived.by<boolean>(() => filteredGroups.some((g) => g.models.length > 0));
 
   /**
-   * Pick a model. If the model has a variants list (e.g. DeepSeek thinking
-   * modes), auto-attach the first variant id so the cookie carries
-   * `modelId@<firstVariant>` and the chat composer's thinking-mode
-   * dropdown starts in its default-on state from first paint. Variants
-   * are then controlled from the composer, not the model picker.
+   * Pick a model. The cookie carries only the bare model id — the chat
+   * composer's thinking-mode trigger is the source of truth for which
+   * variant (thinking/fast/auto) is active, and it auto-attaches the
+   * first variant on first paint when the model exposes any. Keeping
+   * model selection and variant selection split means picking a model
+   * never silently changes the user's chosen thinking effort.
    */
   function selectModel(model: ModelInfo): void {
-    const firstVariantId = model.variants[0]?.id;
     // V2 cookie format: `provider/model@variant`. Catalog ids are already
-    // slash-formatted, so the wire value is the catalog id verbatim.
-    const value = firstVariantId ? `${model.id}@${firstVariantId}` : model.id;
-    selectedChatModel.value = value;
+    // slash-formatted; we only write the bare model id here so the
+    // composer's variant trigger starts in its empty state.
+    selectedChatModel.value = model.id;
     open = false;
     searchQuery = "";
   }
@@ -150,19 +150,19 @@
 <Popover.Root bind:open onOpenChange={onOpenChange}>
   <Popover.Trigger>
     {#snippet child({ props })}
-      <Button
+      <button
         {...props}
-        variant="outline"
+        type="button"
         class={cn(
-          "data-[state=open]:bg-accent data-[state=open]:text-accent-foreground w-fit h-10 sm:min-h-12 px-1.5 sm:px-2 group",
+          "group inline-flex items-center gap-1 cursor-pointer text-xs font-bold tracking-tight text-sidebar-foreground/80 hover:text-foreground data-[state=open]:text-foreground transition-colors",
           c,
         )}
       >
-        <div class="max-w-[100px] sm:max-w-none truncate font-bold text-xs tracking-tight">
+        <span class="max-w-[160px] truncate">
           {selectedModelEntry?.name ?? "Select a model"}
-        </div>
-        <ChevronDownIcon class="size-4 opacity-50 group-hover:opacity-100 transition-opacity" />
-      </Button>
+        </span>
+        <ChevronDownIcon class="size-3.5 opacity-60 group-hover:opacity-100 transition-opacity" />
+      </button>
     {/snippet}
   </Popover.Trigger>
   <Popover.Content

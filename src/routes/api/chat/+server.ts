@@ -181,6 +181,14 @@ export const POST: RequestHandler = async ({ request, locals: { user, session },
 		lastMessage: promptText
 	});
 
+	// Surface resolved @mentions into the system prompt. ChatComposer
+	// already forwards `selectedMentions` via `body.mentions`; we forward
+	// them here so `buildAssistantInstructions` can render the
+	// `RESOLVED @MENTIONS` block (and any focus student derived from it).
+	if (mentions && mentions.length > 0) {
+		requestContext.set('resolvedMentions', mentions as never);
+	}
+
 	const runId = bodyRunId ?? randomUUID();
 	let stream;
 	try {

@@ -19,6 +19,7 @@ import {
 import type { Marksheet } from "$lib/schema/marksheet";
 import { transcriptSchema, type Transcript } from "$lib/schema/transcript";
 import { StudentRepository, ResultsRepository, TimelineRepository, StaffRepository } from "$lib/server/repository";
+import { SettingsService } from "./settings.service";
 import { ScopedRepositoryProvider } from "../mastra/scoped-repository";
 import type { TenantContext } from "../mastra/tenant-context";
 import type { ClassAverage, ExamSetup, MarkData, NewSmMarkStore, NewSmResultStore, ResultData, ScoreData } from "$lib/types/result-types";
@@ -547,6 +548,7 @@ export class AssessmentService {
     const { examType, academic, attendance, marks, ratings, remark, resultRecords } = resultData;
 
     const photo = withImages ? ensureBase64Image(studentData.studentPhoto || "", "/avatar.jpg") : undefined;
+    const termlySettings = await new SettingsService(studentData.schoolId ?? this.activeSchoolId()).getReportSettings();
     const student: Student = {
       id: studentData.studentId,
       examId: examType?.id || 0,
@@ -555,7 +557,7 @@ export class AssessmentService {
       parentEmail: studentData.email || "",
       parentName: studentData.guardiansName || "Unknown Parent",
       term: examType?.title || "",
-      title: "TERMLY SUMMARY OF PROGRESS REPORT",
+      title: termlySettings.termlyReportTitle,
       category: (studentData.categoryName as Category) || "MIDDLEBASIC",
       className: studentData.className || "",
       sectionName: studentData.sectionName || "",
@@ -739,7 +741,7 @@ export class AssessmentService {
       parentEmail: student.email ?? "",
       parentName: student.guardiansName ?? "Unknown Parent",
       term: data.terms.map((t) => t.title).join(" / "),
-      title: "ANNUAL SUMMARY OF PROGRESS REPORT",
+      title: (await new SettingsService(student.schoolId ?? this.activeSchoolId()).getReportSettings()).annualReportTitle,
       category: student.categoryName ?? "MIDDLEBASIC",
       className: student.className ?? "",
       sectionName: student.sectionName ?? "",

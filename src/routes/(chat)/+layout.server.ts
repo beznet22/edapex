@@ -213,7 +213,7 @@ export const load: LayoutServerLoad = async ({ cookies, locals, url }) => {
     // hiddenIds as the source of truth; consumers derive visibleModelIds
     // as `models - hiddenIds`.
     const [models, hidden, creds] = await Promise.all([
-      getAvailableModelsForUser(db, envKeys, user.id),
+      getAvailableModelsForUser(db, envKeys, user.id, user.schoolId ?? 1),
       getHiddenModelIdsForUser(db, user.id),
       getAllUserCredentials(db, envKeys, user.id, supportedList as any)
     ]);

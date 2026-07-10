@@ -227,8 +227,20 @@ export const validateMarksheetTool = createTool({
 		permissionGrant: permissionGrantSchema.describe(
 			'Permission flags granted by the user (extracted from "use current X" statements). When granted, the tenant context field is used instead of triggering disambiguation.'
 		),
-		runId: z.string().optional().describe('The active workflow runId for emitting data-selectOption parts.')
+		runId: z.string().optional().describe('The active workflow runId for emitting data-selectOption parts.'),
+		reason: z.string().describe('Human-readable action summary for user approval.'),
+		title: z
+			.string()
+			.optional()
+			.describe('Optional display title the caller wants reflected in headings or metadata.'),
+		filename: z
+			.string()
+			.optional()
+			.describe(
+				'Optional canonical filename the output should be saved to (e.g., "marksheets/ADM123-1-jane_doe.md").'
+			)
 	}),
+	requireApproval: true,
 	outputSchema: z.discriminatedUnion('ok', [
 		z.object({
 			ok: z.literal(true),
@@ -381,6 +393,9 @@ export const validateMarksheetTool = createTool({
 			``,
 			`EFFECTIVE IDS (from @mentions + permission grants — DO NOT override):`,
 			`  studentId: ${effective.studentId}`,
+			``,
+			`TITLE (from caller, verbatim): "${input.title ?? '(none)'}". If a title is supplied, reflect it verbatim in any headings or front-matter.`,
+			`FILENAME (from caller, do not alter): "${input.filename ?? '(derive from canonical path)'}". Your output will be persisted to that filename by the calling tool.`,
 			`  adminNo: ${effective.adminNo ?? 'null'}`,
 			`  studentName: ${effective.studentName ?? 'null'}`,
 			`  examTypeId: ${effective.examTypeId}`,

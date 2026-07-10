@@ -14,6 +14,7 @@ import {
 
 export const demoteStudentSchema = z.object({
   studentId: z.number().describe("Numeric ID of the student to demote/revert promotion"),
+  reason: z.string().describe("Human-readable action summary for user approval."),
 });
 
 export type DemoteStudentInput = z.infer<typeof demoteStudentSchema>;
@@ -220,6 +221,7 @@ export const demoteStudentTool = createTool({
   id: "demote-student",
   description: "Revert the most recent promotion for a student, restoring their previous class, section, and active student record.",
   inputSchema: demoteStudentSchema,
+  requireApproval: true,
   execute: async (input: DemoteStudentInput, context: ToolExecutionContext) => {
     assertMastraToolContext(context);
     return demoteStudentLogic(context, input);

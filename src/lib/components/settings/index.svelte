@@ -9,6 +9,7 @@
 	import PaintbrushIcon from "@lucide/svelte/icons/paintbrush";
 	import PlugIcon from "@lucide/svelte/icons/plug";
 	import BoxIcon from "@lucide/svelte/icons/box";
+	import Settings2Icon from "@lucide/svelte/icons/settings-2";
 
 	import { page } from "$app/state";
 	import { untrack } from "svelte";
@@ -33,6 +34,8 @@
 	import AppearanceTab from "./AppearanceTab.svelte";
 	import ProvidersTab from "./ProvidersTab.svelte";
 	import ModelsTab from "./ModelsTab.svelte";
+	import PlatformTab from "./PlatformTab.svelte";
+	import { isTabVisible } from "./_helpers.svelte";
 
 	type ProviderSummary = {
 		provider: string;
@@ -56,10 +59,24 @@
 		{ name: "General", icon: UserIcon },
 		{ name: "Appearance", icon: PaintbrushIcon },
 		{ name: "Providers", icon: PlugIcon },
-		{ name: "Models", icon: BoxIcon }
+		{ name: "Models", icon: BoxIcon },
+		{
+			name: "Platform",
+			icon: Settings2Icon,
+			allowedRoles: ["admin", "it"] as const
+		}
 	] as const;
 
 	type TabName = (typeof tabs)[number]["name"];
+
+	const userRole = $derived(page.data.user?.role ?? null);
+
+	const visibleTabs = $derived(
+		tabs.filter((tab) => {
+			const allowed = (tab as { allowedRoles?: readonly string[] }).allowedRoles;
+			return isTabVisible(allowed, userRole);
+		})
+	);
 
 	// ─── Dialog state ────────────────────────────────────────────────────────
 	let open = $state(false);
@@ -72,9 +89,7 @@
 	}
 
 	$effect(() => {
-		if (page.state.showModal !== undefined) {
-			open = !!page.state.showModal;
-		}
+		open = page.state.showModal === true;
 	});
 
 	function changeTab(name: TabName) {
@@ -428,7 +443,7 @@
 						>
 						<Sidebar.GroupContent>
 							<Sidebar.Menu class="gap-1">
-								{#each tabs as tab (tab.name)}
+								{#each visibleTabs as tab (tab.name)}
 									<Sidebar.MenuItem>
 										<Sidebar.MenuButton
 											isActive={activeTab === tab.name}
@@ -463,7 +478,7 @@
 					class="flex shrink-0 flex-col border-b border-sidebar-border/10 bg-background/50 backdrop-blur-xl"
 				>
 					<div class="flex md:hidden overflow-x-auto scrollbar-hide gap-1 px-3 py-2">
-						{#each tabs as tab (tab.name)}
+						{#each visibleTabs as tab (tab.name)}
 							<button
 								onclick={() => changeTab(tab.name)}
 								class="flex items-center gap-1.5 min-h-12 px-4 py-2 rounded-xl text-xs font-bold tracking-tight whitespace-nowrap shrink-0 transition-all {activeTab ===
@@ -546,6 +561,8 @@
 								onToggleVisibility={toggleModelVisibility}
 								onAddProvider={() => changeTab("Providers")}
 							/>
+						{:else if activeTab === "Platform"}
+							<PlatformTab />
 						{/if}
 					</div>
 				</ScrollArea>

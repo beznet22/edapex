@@ -29,6 +29,7 @@ import { pageToHtml } from "$lib/server/helpers";
 import { generate } from "$lib/server/helpers/pdf-generator";
 import { SMTPClient } from "$lib/server/helpers/smtp";
 import { TimelineRepository, ResultsRepository, StudentRepository } from "$lib/server/repository";
+import { SettingsService } from "./settings.service";
 import { smSchools } from "$lib/server/db/sms-schema";
 import { getDatabase } from "$lib/server/db";
 import { marksheetSchema } from "$lib/schema/marksheet";
@@ -219,14 +220,15 @@ export class AssessmentPublisherService {
           absoluteLogoPath = path.join(process.cwd(), "static", "school-logo.png");
         }
 
+        const reportSettings = await new SettingsService(assessment.schoolId).getReportSettings();
         const emailProps = {
           term: student.term,
           fullName: student.fullName,
           receiverName: student.parentName,
           schoolName: school.name,
-          principal: "Patience Okwube",
+          principal: reportSettings.principalName,
           contact: school.phone,
-          support: "admin@llacademy.ng",
+          support: reportSettings.supportEmail,
         };
 
         const content = render(ResultEmail as any, { props: emailProps });
@@ -235,7 +237,7 @@ export class AssessmentPublisherService {
         return {
           from: `"${school.name}" <${school.email}>`,
           to: student.parentEmail,
-          subject: "Result Notification",
+          subject: reportSettings.resultEmailSubject,
           html,
           attachments: [
             { filename: `${student.fullName}_result.pdf`, path: pdfResult.filePath },

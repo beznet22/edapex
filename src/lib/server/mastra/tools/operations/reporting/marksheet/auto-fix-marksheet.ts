@@ -97,7 +97,9 @@ export const autoFixMarksheetTool = createTool({
     studentId: z.number().int().positive().describe('The studentId whose marksheet JSON should be auto-fixed.'),
     errors: z.array(marksheetErrorSchema).describe('Validation errors that need fixing.'),
     currentMarkdown: z.string().describe('The markdown the user has been reviewing.'),
+    reason: z.string().describe('Human-readable action summary for user approval.'),
   }),
+  requireApproval: true,
   outputSchema: z.object({
     appliedFixes: z.array(appliedFixSchema),
     unresolvedErrors: z.array(unresolvedErrorSchema),

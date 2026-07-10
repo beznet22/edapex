@@ -6,6 +6,7 @@
   import CheckCircleIcon from "@lucide/svelte/icons/check-circle";
   import AlertCircleIcon from "@lucide/svelte/icons/alert-circle";
   import ChevronRightIcon from "@lucide/svelte/icons/chevron-right";
+  import ChevronDownIcon from "@lucide/svelte/icons/chevron-down";
   import ChevronsUpDownIcon from "@lucide/svelte/icons/chevrons-up-down";
   import FileTextIcon from "@lucide/svelte/icons/file-text";
   import FolderIcon from "@lucide/svelte/icons/folder";
@@ -135,10 +136,9 @@
     if (variants.length === 0) return null;
     const found = variants.find((v) => v.id === currentVariantId);
     if (found) return found.label;
-    // No variant in the cookie yet (legacy cookie, or first paint before
-    // auto-init). Fall back to the first variant's label — the model
-    // selector / SSR auto-pick auto-attach the first variant, so thinking
-    // mode is on by default.
+    // No variant in the cookie yet (legacy cookie, or first paint after a
+    // bare model select). Fall back to the first variant's label so the
+    // trigger still renders a sensible hint before the user picks one.
     return variants[0]?.label ?? null;
   });
 
@@ -262,6 +262,10 @@
       blockedWorkflowMessage = null;
       // Pass selected mentions to the chat context for inclusion in request body
       chat.pendingMentions = [...selectedMentions];
+      // The chat API promotes `pendingMentions` into the
+      // `resolvedMentions` slot of the per-request `requestContext`,
+      // which `buildAssistantInstructions` renders as the
+      // `RESOLVED @MENTIONS` block in the system prompt.
       // Build fileReferences by unioning THREE sources for reliability:
       //  1. uploadedReferences (local $state in ChatComposer — populated
       //     by handleDocumentUpload / handlePhotoUpload on success)
@@ -356,8 +360,9 @@
         showMentions = true;
         const prefix = mentionMatch[1] || "";
         const query = mentionMatch[2] || "";
-        // Encode the prefix in mentionQuery so MentionDropdown can derive category
-        mentionQuery = prefix ? `${prefix} ${query}` : query;
+        // Bare `@` defaults to the students category so MentionDropdown can
+        // resolve it without an explicit prefix.
+        mentionQuery = prefix ? `${prefix} ${query}` : `student ${query}`;
       } else {
         showMentions = false;
       }
@@ -888,11 +893,11 @@
 
   <!-- Actions Tray (Footer Layer) -->
   <PromptInputActions
-    class="flex items-center justify-between p-2 pl-2 sm:pl-3 pb-3 rounded-b-4xl bg-transparent border-none"
+    class="flex items-center justify-between px-1 sm:pl-3 rounded-b-4xl bg-transparent border-none"
   >
     <!-- Left Group: [Attach+Voice | Vertical Line | Context Chips] -->
-    <div class="flex items-center gap-0.5 sm:gap-1.5">
-      <div class="flex items-center gap-0.5">
+    <div class="flex items-center sm:gap-1.5">
+      <div class="flex items-center">
         <Popover.Root bind:open={mainMenuOpen}>
           <Popover.Trigger>
             {#snippet child({ props })}
@@ -900,10 +905,10 @@
                 {...props}
                 variant="ghost"
                 size="icon"
-                class="min-h-12 min-w-12 rounded-xl hover:bg-white/5 text-muted-foreground hover:text-primary transition-colors"
+                class="min-h-12 min-w-12 rounded-full hover:bg-white/5 text-muted-foreground hover:text-primary transition-colors"
                 aria-label="Add"
               >
-                <PlusIcon class="size-4.5" />
+                <PlusIcon class="size-4" />
               </Button>
             {/snippet}
           </Popover.Trigger>
@@ -1076,10 +1081,10 @@
                 {...props}
                 variant="ghost"
                 size="icon"
-                class="hidden sm:flex h-10 w-10 sm:min-h-12 sm:min-w-12 rounded-xl hover:bg-white/5 text-muted-foreground hover:text-primary transition-colors"
+                class="hidden sm:flex h-10 w-10 sm:min-h-12 sm:min-w-12 rounded-full hover:bg-white/5 text-muted-foreground hover:text-primary transition-colors"
                 aria-label="Voice input"
               >
-                <MicIcon class="size-4.5" />
+                <MicIcon class="size-4" />
               </Button>
             {/snippet}
           </Tooltip.Trigger>
@@ -1090,7 +1095,7 @@
       </div>
     </div>
 
-    <div class="flex items-center px-1 gap-1">
+    <div class="flex items-center gap-1">
       {#if currentModel && (currentModel.variants?.length ?? 0) > 0}
         <Popover.Root bind:open={variantPopoverOpen}>
           <Popover.Trigger>
@@ -1098,11 +1103,13 @@
               <Button
                 {...props}
                 variant="ghost"
-                class="text-[10px] rounded-4xl sm:text-xs font-bold tracking-widest text-muted-foreground transition-colors gap-1.5 min-h-12 min-w-12 sm:min-h-8"
-                aria-label="Select thinking mode"
+                class="text-[10px] rounded-4xl sm:text-xs font-bold tracking-widest text-muted-foreground transition-colors gap-1.5 min-h-12 min-w-12 sm:min-h-8 hover:text-primary"
+                aria-label="Thinking Mode"
               >
-                <span class="hidden sm:inline truncate max-w-[120px]">{currentVariantLabel}</span>
-                <ChevronsUpDownIcon class="size-3 opacity-60" />
+                <span class="truncate max-w-[120px]">{currentVariantLabel}</span>
+                <ChevronDownIcon
+                  class="size-3.5 transition-transform duration-200 {variantPopoverOpen ? 'rotate-180' : ''}"
+                />
               </Button>
             {/snippet}
           </Popover.Trigger>
@@ -1136,7 +1143,7 @@
         variant="default"
         size="icon"
         class={cn(
-          "min-h-12 min-w-12 rounded-full transition-all duration-300 relative group overflow-hidden shadow-2xl",
+          "min-h-8 min-w-8 rounded-full transition-all duration-300 relative group overflow-hidden shadow-2xl",
           chat.loading
             ? "bg-destructive hover:bg-destructive/90"
             : inputDisabled
@@ -1158,10 +1165,10 @@
         {#if chat.loading}
           <SquareIcon class="size-4 fill-current" />
         {:else if inputDisabled}
-          <LoaderCircleIcon class="size-5 animate-spin" />
+          <LoaderCircleIcon class="size-4 animate-spin" />
         {:else}
           <ArrowUpIcon
-            class="size-5 stroke-3 transform group-active:translate-y-[-2px] transition-transform"
+            class="size-4 stroke-3 transform group-active:translate-y-[-2px] transition-transform"
           />
         {/if}
       </Button>

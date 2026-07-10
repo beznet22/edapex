@@ -14,7 +14,12 @@ export const GET: RequestHandler = async ({ locals: { user }, setHeaders }) => {
 	try {
 		const db = getAppDb();
 		const envKeys = env as Record<string, string | undefined>;
-		const models = await getAvailableModelsForUser(db, envKeys, user.id);
+		const models = await getAvailableModelsForUser(
+			db,
+			envKeys,
+			user.id,
+			user.schoolId ?? 1
+		);
 		return json({ success: true, models });
 	} catch (err) {
 		console.error("[api/models] Failed to resolve available models:", err);

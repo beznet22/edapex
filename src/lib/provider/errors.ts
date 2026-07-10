@@ -32,16 +32,6 @@ export class ProviderNotFoundError extends ProviderError {
 	}
 }
 
-export class InitError extends ProviderError {
-	readonly _tag = 'InitError';
-	constructor(
-		public readonly providerId: ProviderId,
-		public override readonly cause?: unknown
-	) {
-		super(`Failed to initialize provider "${providerId}"`);
-	}
-}
-
 export class NoProvidersError extends ProviderError {
 	readonly _tag = 'NoProvidersError';
 	constructor() {
@@ -96,9 +86,22 @@ export class ProviderDisabledError extends ProviderError {
 	}
 }
 
-export class InvalidCustomProviderError extends ProviderError {
-	readonly _tag = 'InvalidCustomProviderError';
-	constructor(message: string, public readonly cause?: unknown) {
+/**
+ * Thrown when decrypting an encrypted credential blob fails. Covers
+ * malformed ciphertext (missing IV separator, invalid hex), wrong-key
+ * decryption (auth tag / padding mismatch from AES-CBC), and any
+ * other Node crypto failure during decipher.final().
+ *
+ * Callers MUST treat this as a hard failure — a returning empty string
+ * would silently authorize requests with no key at all.
+ */
+export class DecryptionError extends ProviderError {
+	readonly _tag = 'DecryptionError';
+	constructor(
+		message: string,
+		public readonly providerHint?: string,
+		public override readonly cause?: unknown
+	) {
 		super(message);
 	}
 }

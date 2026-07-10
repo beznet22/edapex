@@ -1,5 +1,17 @@
 import { ensureRegistry, skillRegistry, SKILL_COMMAND_MAP } from '$lib/server/mastra/skill-tools';
 import type { TenantContext } from '../tenant-context';
+import { getDatabase } from '$lib/server/db';
+import {
+  smSchools,
+  smClasses,
+  smSections,
+  smExamTypes,
+  smAcademicYears,
+  smStudents,
+  studentRecords,
+} from '$lib/server/db/sms-schema';
+import { DESIGNATIONS } from '$lib/types/sms-types';
+import { and, asc, eq } from 'drizzle-orm';
 
 /**
  * Maps the first token of a slash command to the skill name whose
@@ -21,10 +33,125 @@ interface TenantLike {
   roleId?: number | string;
   classId?: number | string;
   sectionId?: number | string;
-  examId?: number | string;
   examTypeId?: number | string;
   academicId?: number | string;
-  studentId?: number | string;
+}
+
+/**
+ * Readable view of the active tenant. Every field is optional because the
+ * request may carry a partial `TenantLike` (e.g. an unauthenticated probe
+ * or a tool call from a non-tenant-bound workflow).
+ */
+interface DisplayContext {
+  schoolName?: string;
+  className?: string;
+  sectionName?: string;
+  academicYearTitle?: string;
+  examTypeTitle?: string;
+  designationTitle?: string;
+}
+
+/**
+ * Resolves human-readable names for every tenant field that the assistant
+ * might mention. Each lookup is independent so a missing row for one ID
+ * never short-circuits the rest. Returns `undefined` for fields whose ID
+ * is absent or whose row could not be found.
+ */
+async function resolveDisplayContext(ctx: TenantLike): Promise<DisplayContext> {
+  const db = await getDatabase();
+  const out: DisplayContext = {};
+
+  if (ctx.schoolId != null) {
+    const rows = await db
+      .select({ name: smSchools.schoolName })
+      .from(smSchools)
+      .where(eq(smSchools.id, Number(ctx.schoolId)))
+      .limit(1);
+    if (rows[0]?.name) out.schoolName = rows[0].name;
+  }
+
+  if (ctx.classId != null) {
+    const rows = await db
+      .select({ name: smClasses.className })
+      .from(smClasses)
+      .where(eq(smClasses.id, Number(ctx.classId)))
+      .limit(1);
+    if (rows[0]?.name) out.className = rows[0].name;
+  }
+
+  if (ctx.sectionId != null) {
+    const rows = await db
+      .select({ name: smSections.sectionName })
+      .from(smSections)
+      .where(eq(smSections.id, Number(ctx.sectionId)))
+      .limit(1);
+    if (rows[0]?.name) out.sectionName = rows[0].name;
+  }
+
+  if (ctx.academicId != null) {
+    const rows = await db
+      .select({ title: smAcademicYears.title, year: smAcademicYears.year })
+      .from(smAcademicYears)
+      .where(eq(smAcademicYears.id, Number(ctx.academicId)))
+      .limit(1);
+    if (rows[0]) out.academicYearTitle = rows[0].title || rows[0].year || undefined;
+  }
+
+  if (ctx.examTypeId != null) {
+    const rows = await db
+      .select({ title: smExamTypes.title })
+      .from(smExamTypes)
+      .where(eq(smExamTypes.id, Number(ctx.examTypeId)))
+      .limit(1);
+    if (rows[0]?.title) out.examTypeTitle = rows[0].title;
+  }
+
+  if (ctx.designationId != null) {
+    const idx = Number(ctx.designationId);
+    if (Number.isInteger(idx) && idx >= 0 && idx < DESIGNATIONS.length) {
+      out.designationTitle = DESIGNATIONS[idx];
+    }
+  }
+
+  return out;
+}
+
+/**
+ * Returns the active class roster as `{ name, admissionNo }` rows. Joins
+ * `smStudents` with `studentRecords` to scope by class+section+academic
+ * year and the default-record flag — the same join shape used by
+ * `StudentRepository.getStudentsByClassSection`. Returns an empty list
+ * when any required ID is missing.
+ */
+async function getClassRoster(
+  ctx: TenantLike
+): Promise<Array<{ name: string; admissionNo?: string }>> {
+  if (ctx.classId == null || ctx.sectionId == null || ctx.academicId == null) return [];
+  const db = await getDatabase();
+  const rows = await db
+    .select({
+      id: smStudents.id,
+      fullName: smStudents.fullName,
+      admissionNo: smStudents.admissionNo,
+    })
+    .from(smStudents)
+    .innerJoin(studentRecords, eq(smStudents.id, studentRecords.studentId))
+    .where(
+      and(
+        eq(studentRecords.classId, Number(ctx.classId)),
+        eq(studentRecords.sectionId, Number(ctx.sectionId)),
+        eq(studentRecords.academicId, Number(ctx.academicId)),
+        eq(studentRecords.isDefault, 1),
+        eq(studentRecords.activeStatus, 1),
+        eq(smStudents.activeStatus, 1)
+      )
+    )
+    .orderBy(asc(smStudents.fullName));
+
+  return rows.map((r) => ({
+    name: r.fullName?.trim() || `Student #${r.id}`,
+    admissionNo: r.admissionNo != null ? String(r.admissionNo) : undefined,
+  }));
 }
 
 /**
@@ -32,7 +159,8 @@ interface TenantLike {
  *
  *   1. Global identity + behavior rules (tenant isolation, no hallucination,
  *      tone, etc.) — present in every request.
- *   2. Tenant context (schoolId, classId, file manifest) — present when
+ *   2. Tenant context — readable names, class roster, resolved @mentions,
+ *      and a separate TOOL CALLING CONTEXT (IDs only) — present when
  *      requestContext carries a `tenantContext` value.
  *   3. Active skill instructions — appended ONLY for slash commands. This
  *      is the procedural guidance that lives in `skills/*.skill.md`
@@ -53,6 +181,9 @@ export async function buildAssistantInstructions(
   const fileManifest = requestContext.get('fileManifest');
   const isSlashCommand = requestContext.get('isSlashCommand');
   const lastMessage = requestContext.get('lastMessage');
+  const resolvedMentions = requestContext.get('resolvedMentions') as
+    | Array<{ category: string; name: string; admissionNo?: string; parentContext?: string }>
+    | undefined;
 
   const instructions: string[] = [
     'You are the EdApex Assistant, an expert AI partner for teachers and administrators.',
@@ -66,23 +197,87 @@ export async function buildAssistantInstructions(
     '4. Use only the domain data provided (tenant context below, file manifest, message context).',
     '5. Domain-specific rules (marksheets, transcripts, enrollment, etc.) live in the loaded SKILL — follow the active skill\'s instructions for tool sequencing and intent interpretation.',
     '',
-    '### END GLOBAL RULES ###'
+    '### END GLOBAL RULES ###',
+    '',
+    '### THINKING FORMAT (structured reasoning) ###',
+    'When you need to reason before answering or calling tools, ALWAYS emit a thinking block at the start of your response using the exact markers below. The UI extracts these blocks into a collapsible "Thinking" panel — content outside the markers is shown to the user as the final answer.',
+    '### Thinking: <concise title summarizing your reasoning>',
+    '<your step-by-step reasoning, observations, tradeoffs, and intermediate conclusions>',
+    '### End of Thinking',
+    '',
+    'After the End of Thinking marker, produce ONLY the user-facing answer, tool call, or next step. Do not embed additional reasoning after the marker.',
+    '',
+    '### FILE RETRIEVAL DISCIPLINE ###',
+    'When the user references an existing file or you need to read a workspace artifact:',
+    '1. Locate the file via the FILE MANIFEST section below — use the exact `contentHash` (also known as `fileId`). Never invent file identifiers.',
+    '2. Read the file with `readWorkspaceFile` (or the appropriate workspace read tool) — never guess or summarize content you have not retrieved.',
+    '3. If multiple files match the user\'s description, ask the user to disambiguate using the manifest titles before reading.',
+    '4. After reading, surface the key facts in your thinking block before acting on them, and cite the file path you read.',
+    '',
+    '### TOOL CALLING DISCipline ###',
+    '1. Tool arguments must use the IDs from TOOL CALLING CONTEXT (schoolId, classId, sectionId, academicId, examTypeId, staffId, etc.). Never pass user-facing names to tools that expect IDs.',
+    '2. For mutating tools (those that declare `requireApproval: true`), you MUST include a `reason` string summarizing the action in plain language so the reviewer can decide without reading raw arguments.',
+    '3. Always emit a clear, concise `reason` describing WHY you are calling the tool (e.g., "Enroll new student Jane Doe into JSS1A for 2024/2025").',
+    '4. After a tool returns, inspect the result before proceeding — never assume success. On failure, explain the cause in plain language and propose a corrective next step.'
   ];
 
   if (ctx) {
+    const display = await resolveDisplayContext(ctx);
+    const roster = await getClassRoster(ctx);
+    const focusStudent = resolvedMentions?.find((m) => m.category === 'students');
+
     instructions.push(
       '',
-      'TENANT BOUNDARIES (IDs):',
-      `- School ID: ${ctx.schoolId ?? 'None'}`,
-      `- User ID: ${ctx.userId ?? 'None'}`,
-      `- Designation ID: ${ctx.designationId ?? 'None'}`,
-      `- Active Class ID: ${ctx.classId ?? 'None'}`,
-      `- Active Section ID: ${ctx.sectionId ?? 'None'}`,
-      `- Active Exam ID: ${ctx.examId ?? 'None'}`,
-      `- Active Exam Type ID: ${ctx.examTypeId ?? 'None'}`,
-      `- Active Academic Year ID: ${ctx.academicId ?? 'None'}`,
-      `- Active Student ID (if @mention resolved): ${ctx.studentId ?? 'None'}`,
-      `- Active Role ID: ${ctx.roleId ?? 'None'}`,
+      'TENANT CONTEXT (user-facing):',
+      `- School: ${display.schoolName ?? 'Unknown'}`,
+      `- Class: ${display.className ?? 'Unknown'}${display.sectionName ? ` - ${display.sectionName}` : ''}`,
+      `- Academic Year: ${display.academicYearTitle ?? 'Unknown'}`,
+      `- Exam Type: ${display.examTypeTitle ?? 'Unknown'}`,
+      `- Designation: ${display.designationTitle ?? 'Unknown'}`,
+      focusStudent
+        ? `- Focus Student: ${focusStudent.name}${focusStudent.admissionNo ? ` (Adm#${focusStudent.admissionNo})` : ''}`
+        : '- Focus Student: None',
+      '',
+      'CLASS ROSTER:'
+    );
+
+    if (roster.length === 0) {
+      instructions.push('- (no active students in this class/section)');
+    } else {
+      const MAX_ROSTER = 100;
+      const visible = roster.slice(0, MAX_ROSTER);
+      for (const r of visible) {
+        instructions.push(
+          `- ${r.name}${r.admissionNo ? ` (Adm#${r.admissionNo})` : ''}`
+        );
+      }
+      if (roster.length > MAX_ROSTER) {
+        instructions.push(`... and ${roster.length - MAX_ROSTER} more`);
+      }
+    }
+
+    if (resolvedMentions && resolvedMentions.length > 0) {
+      instructions.push('', 'RESOLVED @MENTIONS:');
+      for (const m of resolvedMentions) {
+        const label = m.parentContext ? `${m.name} (in ${m.parentContext})` : m.name;
+        instructions.push(`- ${m.category}: ${label}`);
+      }
+    }
+
+    instructions.push(
+      '',
+      'TOOL CALLING CONTEXT (for tool arguments only, never show user):',
+      `- schoolId: ${ctx.schoolId ?? 'None'}`,
+      `- userId: ${ctx.userId ?? 'None'}`,
+      `- staffId: ${ctx.staffId ?? 'None'}`,
+      `- designationId: ${ctx.designationId ?? 'None'}`,
+      `- roleId: ${ctx.roleId ?? 'None'}`,
+      `- classId: ${ctx.classId ?? 'None'}`,
+      `- sectionId: ${ctx.sectionId ?? 'None'}`,
+      `- academicId: ${ctx.academicId ?? 'None'}`,
+      `- examTypeId: ${ctx.examTypeId ?? 'None'}`,
+      '',
+      'CRITICAL: When presenting action summaries or talking to the user, ALWAYS use readable names from TENANT CONTEXT and RESOLVED @MENTIONS. NEVER present raw IDs unless the user explicitly asks. Admission numbers may be shown because they have no readable equivalent.',
       '',
       'FILE MANIFEST:',
       'When files are attached, they appear in the FILE MANIFEST below.',

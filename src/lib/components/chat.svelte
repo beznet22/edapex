@@ -99,6 +99,11 @@
     }),
   );
 
+  // DEBUG — temporary toggle to force the ActionBar visible so the wrapper
+  // bg / composer rounded-top layout can be inspected without triggering a
+  // real marksheet validation flow. Revert before shipping.
+  const DEBUG_FORCE_ACTIONBAR = true;
+
   let awaitValidation = $derived(
     lastValidationMessage?.parts.find((p) => p.type === "data-awaitValidation"),
   );
@@ -355,15 +360,22 @@
   <div
     class="absolute bottom-4 left-0 w-full pt-10 pb-4 px-2 sm:px-4 safe-area-bottom pointer-events-none z-50 flex flex-col items-center gap-0"
   >
+    <!-- Wrapper bg mirrors the composer's dark/blurred surface so the
+         composer's rounded top corners (which expose the area outside the
+         rounded shape when no overflow-hidden clip is active) show a
+         visually consistent dark surface instead of the page background.
+         The ActionBar above keeps its own bg-secondary/40 surface, and the
+         composer's own bg-[#09090b]/40 + backdrop-blur continues to fill
+         the body so the gradient still lands inside the composer box. -->
     <div
-      class="pointer-events-auto w-full max-w-[780px] relative z-20 flex flex-col rounded-4xl overflow-hidden border border-border/10"
+      class="pointer-events-auto w-full max-w-[780px] relative z-20 flex flex-col rounded-4xl border border-border/10 shadow-[0_0_50px_-12px_rgba(0,0,0,0.5)] bg-[#09090b]/40 backdrop-blur-3xl"
     >
-      {#if awaitValidation?.type === "data-awaitValidation"}
+      {#if DEBUG_FORCE_ACTIONBAR || awaitValidation?.type === "data-awaitValidation"}
         <ActionBar
           mode="validation"
-          artifactId={awaitValidation.data.artifactId}
+          artifactId={awaitValidation?.data?.artifactId ?? "debug-artifact-id"}
           validating={chat.pendingValidationArtifactId ===
-            awaitValidation.data.artifactId}
+            (awaitValidation?.data?.artifactId ?? "debug-artifact-id")}
           context="Marksheet validation required"
           subContext={`marksheets/${chat.selectedClass?.classId ?? "?"} · 2nd term`}
           secondaryLabel="Skip"

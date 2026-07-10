@@ -57,6 +57,7 @@ export const CapabilitiesSchema = z.object({
 	input: z.array(z.string()).default([]),
 	output: z.array(z.string()).default([]),
 	reasoning: z.boolean().default(false),
+	thinkingEffort: z.boolean().default(false),
 	vision: z.boolean().default(false)
 });
 export type Capabilities = z.infer<typeof CapabilitiesSchema>;

@@ -7,10 +7,8 @@
  * runtime from `user_credentials` and merged into a per-request registry.
  *
  * ID format: slash (e.g. `groq/llama-3.3-70b-versatile`). This matches the
- * Mastra native router's expected `<provider>/<model>` shape and the V2
- * `selected-model` cookie. Colon format (`groq:llama-3.3-70b-versatile`) is
- * read-only for legacy cookies, threads.metadata.model, and orphaned DB rows
- * via the `COLON_TO_SLASH_ALIAS` map below.
+ * Mastra native router's expected `<provider>/<model>` shape and the
+ * `selected-model` cookie. Colon format is no longer supported.
  *
  * Note: Mistral is NOT in this catalog. The Mistral SDK is used directly by
  * the extraction workflow for OCR — it is not part of the gateway routing.
@@ -19,50 +17,42 @@ import type { ProviderInfo, ModelInfo, Variant } from './spec';
 import type { ProviderId, ModelId } from './types';
 
 /**
- * Shared thinking-mode variants for any DeepSeek V4 model, regardless of
- * which provider surfaces it (deepseek direct, opencode:zen proxy, etc.).
+ * Unified thinking-effort variants shared across every reasoning-capable
+ * model in the catalog. These are abstract, provider-agnostic shapes; the
+ * per-provider request resolver maps them onto provider-specific API
+ * options at request time (e.g. DeepSeek `reasoning_effort`, Kimchi
+ * `thinking.type`, OpenAI/Anthropic native toggles).
  *
- * Matches the DeepSeek Thinking API: `thinking.enabled` toggle +
- * `reasoning_effort` ∈ { 'high', 'medium', 'low' }.
- *
- * Reference: https://api-docs.deepseek.com/guides/thinking_mode
+ * The three-mode abstraction maps onto the user mental model regardless of
+ * provider: "I want max reasoning", "I want speed", "let the model decide".
  */
-const DEEPSEEK_THINKING_VARIANTS: Variant[] = [
+export const THINKING_VARIANTS: Variant[] = [
 	{
-		id: 'high',
-		label: 'High',
-		description: 'Maximum reasoning depth',
+		id: 'thinking',
+		label: 'Thinking',
+		description: 'Maximum reasoning depth — explicit chain-of-thought',
 		headers: {},
 		body: {},
 		generation: {},
 		options: { thinking: { type: 'enabled' }, reasoningEffort: 'high' }
 	},
 	{
-		id: 'medium',
-		label: 'Medium',
-		description: 'Balanced reasoning effort',
-		headers: {},
-		body: {},
-		generation: {},
-		options: { thinking: { type: 'enabled' }, reasoningEffort: 'medium' }
-	},
-	{
-		id: 'low',
-		label: 'Low',
-		description: 'Light reasoning — faster responses',
+		id: 'fast',
+		label: 'Fast',
+		description: 'Light reasoning — faster responses, lower latency',
 		headers: {},
 		body: {},
 		generation: {},
 		options: { thinking: { type: 'enabled' }, reasoningEffort: 'low' }
 	},
 	{
-		id: 'disabled',
-		label: 'Off',
-		description: 'No chain-of-thought reasoning',
+		id: 'auto',
+		label: 'Auto',
+		description: 'Model-default reasoning effort',
 		headers: {},
 		body: {},
 		generation: {},
-		options: { thinking: { type: 'disabled' } }
+		options: { thinking: { type: 'auto' } }
 	}
 ];
 
@@ -121,7 +111,7 @@ export const BUILTIN_MODELS: Record<ModelId, ModelInfo> = {
 		id: 'groq/openai/gpt-oss-120b' as ModelId,
 		providerId: 'groq' as ProviderId,
 		name: 'GPT-OSS 120B',
-		capabilities: { tools: true, input: ['text/*'], output: ['text/*'], reasoning: false, vision: false },
+		capabilities: { tools: true, input: ['text/*'], output: ['text/*'], reasoning: false, thinkingEffort: false, vision: false },
 		request: { headers: {}, body: {}, generation: {}, options: {} },
 		variants: [],
 		status: 'active',
@@ -135,7 +125,7 @@ export const BUILTIN_MODELS: Record<ModelId, ModelInfo> = {
 		id: 'groq/llama-3.3-70b-versatile' as ModelId,
 		providerId: 'groq' as ProviderId,
 		name: 'Llama 3.3 70B',
-		capabilities: { tools: true, input: ['text/*'], output: ['text/*'], reasoning: false, vision: false },
+		capabilities: { tools: true, input: ['text/*'], output: ['text/*'], reasoning: false, thinkingEffort: false, vision: false },
 		request: { headers: {}, body: {}, generation: {}, options: {} },
 		variants: [],
 		status: 'active',
@@ -149,7 +139,7 @@ export const BUILTIN_MODELS: Record<ModelId, ModelInfo> = {
 		id: 'groq/llama-3.1-8b-instant' as ModelId,
 		providerId: 'groq' as ProviderId,
 		name: 'Llama 3.1 8B Instant',
-		capabilities: { tools: true, input: ['text/*'], output: ['text/*'], reasoning: false, vision: false },
+		capabilities: { tools: true, input: ['text/*'], output: ['text/*'], reasoning: false, thinkingEffort: false, vision: false },
 		request: { headers: {}, body: {}, generation: {}, options: {} },
 		variants: [],
 		status: 'active',
@@ -163,9 +153,9 @@ export const BUILTIN_MODELS: Record<ModelId, ModelInfo> = {
 		id: 'groq/qwen/qwen3-32b' as ModelId,
 		providerId: 'groq' as ProviderId,
 		name: 'Qwen3 32B',
-		capabilities: { tools: true, input: ['text/*'], output: ['text/*'], reasoning: true, vision: false },
+		capabilities: { tools: true, input: ['text/*'], output: ['text/*'], reasoning: true, thinkingEffort: true, vision: false },
 		request: { headers: {}, body: {}, generation: {}, options: {} },
-		variants: [],
+		variants: THINKING_VARIANTS,
 		status: 'active',
 		enabled: true,
 		limit: { context: 128_000, output: 16_384 },
@@ -177,14 +167,14 @@ export const BUILTIN_MODELS: Record<ModelId, ModelInfo> = {
 		id: 'deepseek/deepseek-v4-flash' as ModelId,
 		providerId: 'deepseek' as ProviderId,
 		name: 'DeepSeek V4 Flash',
-		capabilities: { tools: true, input: ['text/*'], output: ['text/*'], reasoning: true, vision: false },
+		capabilities: { tools: true, input: ['text/*'], output: ['text/*'], reasoning: true, thinkingEffort: true, vision: false },
 		request: {
 			headers: {},
 			body: {},
 			generation: { temperature: 1.0 },
 			options: { thinking: { type: 'enabled' }, reasoningEffort: 'high' }
 		},
-		variants: DEEPSEEK_THINKING_VARIANTS,
+		variants: THINKING_VARIANTS,
 		status: 'active',
 		enabled: true,
 		limit: { context: 128_000, output: 16_384 },
@@ -196,14 +186,14 @@ export const BUILTIN_MODELS: Record<ModelId, ModelInfo> = {
 		id: 'deepseek/deepseek-v4-pro' as ModelId,
 		providerId: 'deepseek' as ProviderId,
 		name: 'DeepSeek V4 Pro',
-		capabilities: { tools: true, input: ['text/*'], output: ['text/*'], reasoning: true, vision: false },
+		capabilities: { tools: true, input: ['text/*'], output: ['text/*'], reasoning: true, thinkingEffort: true, vision: false },
 		request: {
 			headers: {},
 			body: {},
 			generation: { temperature: 1.0 },
 			options: { thinking: { type: 'enabled' }, reasoningEffort: 'high' }
 		},
-		variants: DEEPSEEK_THINKING_VARIANTS,
+		variants: THINKING_VARIANTS,
 		status: 'active',
 		enabled: true,
 		limit: { context: 128_000, output: 16_384 },
@@ -220,9 +210,9 @@ export const BUILTIN_MODELS: Record<ModelId, ModelInfo> = {
 		id: 'opencode/mimo-v2.5-free' as ModelId,
 		providerId: 'opencode' as ProviderId,
 		name: 'Mimo V2.5 Free',
-		capabilities: { tools: true, input: ['text/*'], output: ['text/*'], reasoning: true, vision: false },
+		capabilities: { tools: true, input: ['text/*'], output: ['text/*'], reasoning: true, thinkingEffort: true, vision: false },
 		request: { headers: {}, body: {}, generation: {}, options: {} },
-		variants: [],
+		variants: THINKING_VARIANTS,
 		status: 'active',
 		enabled: true,
 		limit: { context: 128_000, output: 16_384 },
@@ -235,9 +225,9 @@ export const BUILTIN_MODELS: Record<ModelId, ModelInfo> = {
 		id: 'opencode/deepseek-v4-flash-free' as ModelId,
 		providerId: 'opencode' as ProviderId,
 		name: 'DeepSeek V4 Flash Free',
-		capabilities: { tools: true, input: ['text/*'], output: ['text/*'], reasoning: true, vision: false },
+		capabilities: { tools: true, input: ['text/*'], output: ['text/*'], reasoning: true, thinkingEffort: true, vision: false },
 		request: { headers: {}, body: {}, generation: {}, options: {} },
-		variants: DEEPSEEK_THINKING_VARIANTS,
+		variants: THINKING_VARIANTS,
 		status: 'active',
 		enabled: true,
 		limit: { context: 128_000, output: 16_384 },
@@ -249,9 +239,9 @@ export const BUILTIN_MODELS: Record<ModelId, ModelInfo> = {
 		id: 'opencode/nemotron-3-super-free' as ModelId,
 		providerId: 'opencode' as ProviderId,
 		name: 'Nemotron 3 Super Free',
-		capabilities: { tools: true, input: ['text/*'], output: ['text/*'], reasoning: true, vision: false },
+		capabilities: { tools: true, input: ['text/*'], output: ['text/*'], reasoning: true, thinkingEffort: true, vision: false },
 		request: { headers: {}, body: {}, generation: {}, options: {} },
-		variants: [],
+		variants: THINKING_VARIANTS,
 		status: 'active',
 		enabled: true,
 		limit: { context: 128_000, output: 16_384 },
@@ -264,9 +254,9 @@ export const BUILTIN_MODELS: Record<ModelId, ModelInfo> = {
 		id: 'opencode/ring-2.6-1t-free' as ModelId,
 		providerId: 'opencode' as ProviderId,
 		name: 'Ring 2.6 1T Free',
-		capabilities: { tools: true, input: ['text/*'], output: ['text/*'], reasoning: true, vision: false },
+		capabilities: { tools: true, input: ['text/*'], output: ['text/*'], reasoning: true, thinkingEffort: true, vision: false },
 		request: { headers: {}, body: {}, generation: {}, options: {} },
-		variants: [],
+		variants: THINKING_VARIANTS,
 		status: 'active',
 		enabled: true,
 		limit: { context: 128_000, output: 16_384 },
@@ -286,9 +276,9 @@ export const BUILTIN_MODELS: Record<ModelId, ModelInfo> = {
 		id: 'kimchi/minimax-m3' as ModelId,
 		providerId: 'kimchi' as ProviderId,
 		name: 'Minimax M3',
-		capabilities: { tools: true, input: ['text/*', 'image/*'], output: ['text/*'], reasoning: true, vision: true },
+		capabilities: { tools: true, input: ['text/*', 'image/*'], output: ['text/*'], reasoning: true, thinkingEffort: true, vision: true },
 		request: { headers: {}, body: {}, generation: {}, options: {} },
-		variants: [],
+		variants: THINKING_VARIANTS,
 		status: 'active',
 		enabled: true,
 		limit: { context: 1_048_576, output: 1_048_576 },
@@ -300,9 +290,9 @@ export const BUILTIN_MODELS: Record<ModelId, ModelInfo> = {
 		id: 'kimchi/kimi-k2.7' as ModelId,
 		providerId: 'kimchi' as ProviderId,
 		name: 'Kimi K2.7',
-		capabilities: { tools: true, input: ['text/*', 'image/*'], output: ['text/*'], reasoning: true, vision: true },
+		capabilities: { tools: true, input: ['text/*', 'image/*'], output: ['text/*'], reasoning: true, thinkingEffort: true, vision: true },
 		request: { headers: {}, body: {}, generation: {}, options: {} },
-		variants: [],
+		variants: THINKING_VARIANTS,
 		status: 'active',
 		enabled: true,
 		limit: { context: 262_144, output: 262_144 },
@@ -314,9 +304,9 @@ export const BUILTIN_MODELS: Record<ModelId, ModelInfo> = {
 		id: 'kimchi/kimi-k2.6' as ModelId,
 		providerId: 'kimchi' as ProviderId,
 		name: 'Kimi K2.6',
-		capabilities: { tools: true, input: ['text/*', 'image/*'], output: ['text/*'], reasoning: true, vision: true },
+		capabilities: { tools: true, input: ['text/*', 'image/*'], output: ['text/*'], reasoning: true, thinkingEffort: true, vision: true },
 		request: { headers: {}, body: {}, generation: {}, options: {} },
-		variants: [],
+		variants: THINKING_VARIANTS,
 		status: 'active',
 		enabled: true,
 		limit: { context: 262_144, output: 262_144 },
@@ -328,9 +318,9 @@ export const BUILTIN_MODELS: Record<ModelId, ModelInfo> = {
 		id: 'kimchi/deepseek-v4-flash' as ModelId,
 		providerId: 'kimchi' as ProviderId,
 		name: 'DeepSeek V4 Flash',
-		capabilities: { tools: true, input: ['text/*'], output: ['text/*'], reasoning: true, vision: false },
+		capabilities: { tools: true, input: ['text/*'], output: ['text/*'], reasoning: true, thinkingEffort: true, vision: false },
 		request: { headers: {}, body: {}, generation: {}, options: {} },
-		variants: [],
+		variants: THINKING_VARIANTS,
 		status: 'active',
 		enabled: true,
 		limit: { context: 1_048_576, output: 1_048_576 },
@@ -342,9 +332,9 @@ export const BUILTIN_MODELS: Record<ModelId, ModelInfo> = {
 		id: 'kimchi/minimax-m2.7' as ModelId,
 		providerId: 'kimchi' as ProviderId,
 		name: 'MiniMax M2.7',
-		capabilities: { tools: true, input: ['text/*'], output: ['text/*'], reasoning: true, vision: false },
+		capabilities: { tools: true, input: ['text/*'], output: ['text/*'], reasoning: true, thinkingEffort: true, vision: false },
 		request: { headers: {}, body: {}, generation: {}, options: {} },
-		variants: [],
+		variants: THINKING_VARIANTS,
 		status: 'active',
 		enabled: true,
 		limit: { context: 196_608, output: 196_608 },
@@ -356,9 +346,9 @@ export const BUILTIN_MODELS: Record<ModelId, ModelInfo> = {
 		id: 'kimchi/nemotron-3-ultra-fp4' as ModelId,
 		providerId: 'kimchi' as ProviderId,
 		name: 'Nemotron 3 Ultra FP4',
-		capabilities: { tools: true, input: ['text/*'], output: ['text/*'], reasoning: true, vision: false },
+		capabilities: { tools: true, input: ['text/*'], output: ['text/*'], reasoning: true, thinkingEffort: true, vision: false },
 		request: { headers: {}, body: {}, generation: {}, options: {} },
-		variants: [],
+		variants: THINKING_VARIANTS,
 		status: 'active',
 		enabled: true,
 		limit: { context: 1_048_576, output: 1_048_576 },
@@ -368,30 +358,12 @@ export const BUILTIN_MODELS: Record<ModelId, ModelInfo> = {
 	}
 };
 
-/**
- * Legacy colon → canonical slash alias map. Built once at module load from
- * the canonical `BUILTIN_MODELS` keys. `getModelById` consults this map
- * after a direct slash lookup misses, so legacy cookies and orphaned DB
- * rows continue to resolve. Never write colon-format ids back to storage
- * or the cookie — the SSR layout rewrites them on read.
- */
-const COLON_TO_SLASH_ALIAS: ReadonlyMap<string, ModelId> = new Map(
-	Object.keys(BUILTIN_MODELS).map((slashId) => {
-		const colonId = slashId.replace(/^([^/]+)\//, '$1:');
-		return [colonId, slashId as ModelId];
-	})
-);
-
 export function getProviderById(id: ProviderId): ProviderInfo | undefined {
 	return BUILTIN_PROVIDERS[id];
 }
 
 export function getModelById(id: ModelId): ModelInfo | undefined {
-	const direct = BUILTIN_MODELS[id];
-	if (direct) return direct;
-	const slashAlias = COLON_TO_SLASH_ALIAS.get(id);
-	if (slashAlias) return BUILTIN_MODELS[slashAlias];
-	return undefined;
+	return BUILTIN_MODELS[id];
 }
 
 export function getModelsByProvider(providerId: ProviderId): ModelInfo[] {

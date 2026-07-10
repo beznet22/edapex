@@ -16,7 +16,7 @@ export const assignEntitySchema = z.object({
   targetClassId: z.number().describe("Numeric ID of the destination class"),
   targetSectionId: z.number().describe("Numeric ID of the destination section"),
   academicYearId: z.number().optional().describe("Numeric ID of the academic year (defaults to active term if omitted)"),
-  reason: z.string().optional().describe("Optional reason for the transfer/assignment for audit logs"),
+  reason: z.string().describe("Human-readable action summary for user approval."),
 });
 export type AssignEntityInput = z.infer<typeof assignEntitySchema>;
 
@@ -117,6 +117,7 @@ export const transferStudentTool = createTool({
   id: "transfer-student",
   description: "Transfer an enrolled student to a different class or section within the active school.",
   inputSchema: assignEntitySchema,
+  requireApproval: true,
   execute: async (input: AssignEntityInput, context: ToolExecutionContext) => {
     assertMastraToolContext(context);
     return assignEntityLogic(context, input);

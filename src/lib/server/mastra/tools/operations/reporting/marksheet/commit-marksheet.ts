@@ -47,7 +47,9 @@ export const commitMarksheetTool = createTool({
     'AssessmentService.upsertMarksheet. Emits data-committed { artifactId, recordId, studentName, status: "committed" }.',
   inputSchema: z.object({
     studentId: z.number().int().positive().describe('The studentId whose marksheet should be committed.'),
+    reason: z.string().describe('Human-readable action summary for user approval.'),
   }),
+  requireApproval: true,
   outputSchema: z.object({
     artifactId: z.string(),
     recordId: z.number(),

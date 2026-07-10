@@ -1,33 +1,15 @@
 /**
- * Per-user model visibility (Settings → Models tab) — V2.
- *
- * Identical to V1's `visibility.ts`. Kept as a separate file so the
- * V2 module has its own surface and the cutover PR can delete the V1
- * directory wholesale.
+ * Per-user model visibility (Settings → Models tab).
  */
-import { eq, and, sql } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import type { LibSQLDatabase } from 'drizzle-orm/libsql';
 import { userModelVisibility } from '$lib/server/mastra/storage/libsql/app-db.schema';
 import type { ModelId } from './types';
-
-export async function ensureVisibilitySchema(db: LibSQLDatabase<any>): Promise<void> {
-	await db.run(sql`
-		CREATE TABLE IF NOT EXISTS user_model_visibility (
-			id TEXT PRIMARY KEY,
-			user_id INTEGER NOT NULL,
-			model_id TEXT NOT NULL,
-			visible INTEGER NOT NULL DEFAULT 1,
-			updated_at TEXT NOT NULL DEFAULT (datetime('now')),
-			UNIQUE(user_id, model_id)
-		)
-	`);
-}
 
 export async function getHiddenModelIdsForUser(
 	db: LibSQLDatabase<any>,
 	userId: number
 ): Promise<Set<ModelId>> {
-	await ensureVisibilitySchema(db);
 	const rows = await db
 		.select()
 		.from(userModelVisibility)
@@ -46,7 +28,6 @@ export async function setModelVisibility(
 	modelId: ModelId,
 	visible: boolean
 ): Promise<void> {
-	await ensureVisibilitySchema(db);
 	await db
 		.insert(userModelVisibility)
 		.values({
@@ -67,7 +48,6 @@ export async function setAllModelVisibility(
 	modelIds: ModelId[],
 	visible: boolean
 ): Promise<void> {
-	await ensureVisibilitySchema(db);
 	const now = new Date().toISOString();
 	for (const modelId of modelIds) {
 		await db

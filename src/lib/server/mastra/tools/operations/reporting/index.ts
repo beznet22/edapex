@@ -8,6 +8,7 @@ export { publishResultPdfTool } from "./publish-result-pdf";
 export { generateTranscriptPdfTool } from "./transcript/generate-transcript-pdf";
 export { publishTranscriptPdfTool } from "./transcript/publish-transcript-pdf";
 export { transcriptReportTool } from "./transcript/transcript-report";
+export { validateTranscriptTool } from "./transcript/validate-transcript";
 
 import { getActiveMarksheetTool } from "./marksheet/get-active-marksheet";
 import { validateMarksheetTool } from "./marksheet/validate-marksheet";
@@ -19,6 +20,7 @@ import { publishResultPdfTool } from "./publish-result-pdf";
 import { generateTranscriptPdfTool } from "./transcript/generate-transcript-pdf";
 import { publishTranscriptPdfTool } from "./transcript/publish-transcript-pdf";
 import { transcriptReportTool } from "./transcript/transcript-report";
+import { validateTranscriptTool } from "./transcript/validate-transcript";
 
 /**
  * Reporting tools. `streamDocumentTool` formats and streams marksheet OCR
@@ -34,5 +36,6 @@ export const reportingTools = {
   publishResultPdfTool,
   generateTranscriptPdfTool,
   publishTranscriptPdfTool,
-  transcriptReportTool
+  transcriptReportTool,
+  validateTranscriptTool
 };

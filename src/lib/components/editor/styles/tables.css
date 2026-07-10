@@ -80,7 +80,6 @@
 }
 
 .wysiwyg-editor-wrapper .tiptap th, .wysiwyg-editor-wrapper .tiptap td {
-
     padding: 0.75rem 1rem;
     font-size: 0.875rem;
     line-height: 1.25rem;
@@ -88,21 +87,16 @@
     min-width: 200px;
     max-width: 400px;
     overflow-wrap: break-word;
-
 }
 
 .wysiwyg-editor-wrapper .tiptap th {
-
     font-weight: 600;
     text-align: left;
-
 }
 
 /* Tiptap renders <td><p>…</p></td>. Neutralize the <p> margin so cell padding
  * is the only spacing. */
 
 .wysiwyg-editor-wrapper .tiptap th > p, .wysiwyg-editor-wrapper .tiptap td > p {
-
     margin: 0;
-
 }

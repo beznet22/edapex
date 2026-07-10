@@ -42,6 +42,11 @@ const KIMCHI_VERSION_TTL_MS = 86_400_000; // 24h, matches the CLI's VERSION_GITH
 // `responseCache` patterns elsewhere in this codebase.
 const kimchiVersionCache: { current: VersionCacheEntry | null } = { current: null };
 
+/** Test seam to reset module-level cache. */
+export function resetKimchiVersionCache(): void {
+	kimchiVersionCache.current = null;
+}
+
 /**
  * Resolve the kimchi CLI version to embed in `User-Agent`.
  *

@@ -12,10 +12,15 @@ export default defineConfig({
 				extends: true,
 				test: {
 					name: 'unit',
-					include: ['tests/unit/**/*.test.ts'],
+					include: [
+						'tests/unit/**/*.test.ts',
+						'src/lib/server/mastra/provider/**/*.test.ts',
+						'src/lib/server/mastra/storage/libsql/**/*.test.ts'
+					],
 					environment: 'node',
 					globals: true,
-					testTimeout: 10_000
+					testTimeout: 10_000,
+					setupFiles: ['./tests/unit/setup.ts']
 				}
 			},
 			{

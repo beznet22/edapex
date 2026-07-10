@@ -52,3 +52,11 @@ basic-ai-editor/
 novel/
 reference/
 .kimchi/
+
+# Per-school runtime data (report-settings cache, audit log)
+/data/
+/data/report-settings/
+/data/audit-log/
+
+# Logo uploads (per-school, populated by PlatformTab logo upload)
+/static/uploads/logos/

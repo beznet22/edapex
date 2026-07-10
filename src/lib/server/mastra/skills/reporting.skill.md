@@ -37,6 +37,30 @@ The user can express their intent with ANY verb that semantically maps to one of
 
 Do NOT refuse a request just because the verb is not in the list above — read the user's intent and pick the closest tool. If the user types only `/marksheet` with no verb, ask whether they want to generate, publish, view a result, or open an existing artifact.
 
+## Publish-intent triggers
+
+When the user's request includes ANY of the following verbs or intent phrases — even as part of a longer sentence — you MUST run the full marksheet pipeline (stream → validate → commit → render) and end with `publish-result-pdf` (which renders the PDF and emails it to parents). Do NOT stop at `generate-result-pdf` for these intents.
+
+- publish
+- email / e-mail
+- send / send out
+- share / share with
+- notify
+- dispatch
+- deliver / deliver to
+
+Examples that MUST trigger `publish-result-pdf`:
+
+- "publish the result for JSS1A"
+- "email the report card to parents"
+- "send out the marksheet for Al-Azeem"
+- "share the result with the parent email"
+- "notify parents that the result is ready"
+- "dispatch the PDF to the guardian"
+- "deliver the report card to the parent"
+
+These triggers take precedence over a bare "preview" / "generate" intent. If the user mixes verbs ("generate and email the result"), treat the publish verb as authoritative and call `publish-result-pdf`. The publish step itself will surface an ActionBar confirmation — never skip it, even when the user has already said "yes" in the chat; the ActionBar is the safety net.
+
 ## OCR ↔ student linking — the four branches
 
 OCR cannot link marksheet images to DB students. The OCR returns whatever text it sees on the page; the LLM must reconcile it against `sm_students` via `search-school-directory`. Decision tree:

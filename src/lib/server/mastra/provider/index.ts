@@ -1,12 +1,18 @@
 /**
- * Provider module barrel — V2 (server-only).
+ * Provider module — public barrel (server-only).
  *
- * Slimmer surface than V1: callers import only the two resolver
- * functions plus the data needed to build a UI (BUILTIN_PROVIDERS,
- * BUILTIN_MODELS, errors). The rate-limit, credentials, and discovery
- * modules are imported internally by the resolver; they're not
- * re-exported here because no caller outside this directory should
- * reach for them directly.
+ * Contract surface for callers outside this directory:
+ * - resolver: `resolveModelForRequest`, `pickDefaultModelId`
+ * - catalog:  built-in providers/models + lookup helpers
+ * - credentials: per-user CRUD + helpers used by remote functions
+ * - visibility: hidden-model selectors for the chat UI
+ * - availability: `getAvailableModelsForUser` for the connect UI
+ *
+ * Internal infrastructure (rate-limit fetch, request cache, resolver
+ * trace, discovery backoff, 4-tier router, schema bootstrap) lives in
+ * `./internal` and is re-exported only for sibling modules in this
+ * directory. Importing from `./internal` outside this directory is a
+ * contract violation — open an issue instead.
  */
 export {
 	resolveModelForRequest,
@@ -31,26 +37,24 @@ export {
 	saveUserCredential,
 	getUserCredential,
 	getAllUserCredentials,
+	getCustomCredentialBaseUrl,
 	deleteUserCredential,
 	updateUserCredentialEnabled,
 	decryptCustomProvider,
 	resolveApiKeyForCredential,
-	resolveProviderKey,
-	ensureUserCredentialsSchema,
+	rotateCredential,
+	repairCorruptedCredential,
+	PLATFORM_ENV_KEYS,
 	type UserCredentialState,
 	type SaveUserCredentialInput,
-	type ResolvedProviderKey
+	type RotateCredentialInput,
+	type RepairCorruptedCredentialInput
 } from './credentials';
 
 export {
 	getHiddenModelIdsForUser,
 	setModelVisibility,
-	setAllModelVisibility,
-	ensureVisibilitySchema
+	setAllModelVisibility
 } from './visibility';
 
 export { getAvailableModelsForUser, type AugmentedModelInfo } from './availability';
-
-export { RateLimit, createRateLimitFetch, RATE_LIMIT_INLINE_THRESHOLD_MS } from './rate-limit';
-
-export { encrypt, decrypt, maskKey } from './crypto';

@@ -9,7 +9,7 @@ import {
   deleteUserCredential as deleteUserCredentialFn,
   getAllUserCredentials,
   getUserCredential,
-  decryptCustomProvider
+  getCustomCredentialBaseUrl
 } from "$lib/server/mastra/provider/credentials";
 import {
   setModelVisibility,
@@ -20,7 +20,19 @@ import { getAvailableModelsForUser, type AugmentedModelInfo } from "$lib/server/
 import { CustomProviderEncryptedDataSchema } from "$lib/server/mastra/provider/spec";
 import { SUPPORTED_PROVIDER_IDS } from "$lib/provider/catalog";
 import { agentSettings } from "$lib/server/mastra/storage/libsql/app-db.schema";
+import { smGeneralSettings } from "$lib/server/db/sms-schema";
+import { getDatabase as getMysqlDatabase } from "$lib/server/db";
 import type { ProviderId } from "$lib/provider/types";
+import {
+  exportDonations as exportDonationsFn,
+  importDonations as importDonationsFn,
+  assertUploadSize,
+  PotluckUploadTooLargeError,
+  POTLUCK_MAX_UPLOAD_BYTES,
+  type ExportMode,
+  type ImportResult
+} from "$lib/server/service/potluck.service";
+import { log } from "$lib/server/audit-log";
 
 const envKeys: Record<string, string | undefined> = env;
 
@@ -35,7 +47,7 @@ const headerSchema = z.object({
   value: z.string().min(1)
 });
 
-type AuthSuccess = { user: { id: number } };
+type AuthSuccess = { user: { id: number; schoolId: number | null; staffId: number | null } };
 type AuthFailure = { error: string };
 type AuthResult = AuthSuccess | AuthFailure;
 
@@ -47,7 +59,13 @@ function getAuthenticatedUserId(errorMessage: string): AuthResult {
   if (!locals.user) {
     return { error: errorMessage };
   }
-  return { user: { id: locals.user.id } };
+  return {
+    user: {
+      id: locals.user.id,
+      schoolId: locals.user.schoolId ?? null,
+      staffId: typeof locals.user.staffId === "number" ? locals.user.staffId : null
+    }
+  };
 }
 
 function getStrictUserId(): AuthResult {
@@ -55,7 +73,13 @@ function getStrictUserId(): AuthResult {
   if (!locals.user) {
     return { error: "Unauthorized" };
   }
-  return { user: { id: locals.user.id } };
+  return {
+    user: {
+      id: locals.user.id,
+      schoolId: locals.user.schoolId ?? null,
+      staffId: typeof locals.user.staffId === "number" ? locals.user.staffId : null
+    }
+  };
 }
 
 function isAuthFailure(result: AuthResult): result is AuthFailure {
@@ -201,11 +225,7 @@ export const getUserCredentials = command(
       );
 
       const providers: ProviderSummary[] = credentials.map(c => {
-        let baseUrl = '';
-        if (c.credentialType === 'custom' && c.encryptedData) {
-          const customData = decryptCustomProvider(c.encryptedData, envKeys);
-          baseUrl = customData?.baseUrl ?? '';
-        }
+        const baseUrl = getCustomCredentialBaseUrl(c, envKeys);
         const credentialType: 'credential' | 'custom' =
           c.credentialType === 'custom' ? 'custom' : 'credential';
         return {
@@ -423,7 +443,12 @@ export const getAvailableModels = command(
 
     try {
       const db = getAppDb();
-      const models = await getAvailableModelsForUser(db, envKeys, auth.user.id);
+      const models = await getAvailableModelsForUser(
+        db,
+        envKeys,
+        auth.user.id,
+        auth.user.schoolId ?? 1
+      );
       return { success: true, models };
     } catch (err) {
       console.error("[getAvailableModels] Failed to resolve models:", err);
@@ -462,5 +487,146 @@ export const getPlatformDefaults = command(
     })).filter((d) => d.hasEnvKey);
 
     return { success: true, defaults };
+  }
+);
+
+// ────────────────────────────── Pot-Luck CSV ──────────────────────────────
+
+function isAdminOrItRole(user: NonNullable<App.Locals["user"]>): boolean {
+  if (user.isAdministrator === true) return true;
+  return user.designation === "it";
+}
+
+async function resolveSchoolNameForUser(
+  auth: { user: { id: number; schoolId: number | null } }
+): Promise<string> {
+  const schoolId = typeof auth.user.schoolId === "number" ? auth.user.schoolId : 1;
+  try {
+    const mysql = await getMysqlDatabase();
+    const rows = await mysql
+      .select({ schoolName: smGeneralSettings.schoolName })
+      .from(smGeneralSettings)
+      .where(eq(smGeneralSettings.schoolId, schoolId))
+      .limit(1);
+    const name = rows[0]?.schoolName;
+    return typeof name === "string" && name.length > 0 ? name : `school-${schoolId}`;
+  } catch {
+    return `school-${schoolId}`;
+  }
+}
+
+export interface ExportPotluckResult {
+  success: boolean;
+  message?: string;
+  csv?: string;
+  count?: number;
+  mode?: ExportMode;
+}
+
+export const exportPotluckDonations = command(
+  z.object({
+    mode: z.enum(["metadata-only", "encrypted"]),
+    passphrase: z.string().min(1).max(512).optional()
+  }),
+  async ({ mode, passphrase }): Promise<ExportPotluckResult> => {
+    const auth = getStrictUserId();
+    if (isAuthFailure(auth)) return { success: false, message: auth.error };
+    if (!isAdminOrItRole(auth.user as NonNullable<App.Locals["user"]>)) {
+      return { success: false, message: "admin or IT role required" };
+    }
+    if (mode === "encrypted" && !passphrase) {
+      return { success: false, message: "passphrase required for encrypted mode" };
+    }
+    const schoolId = typeof auth.user.schoolId === "number" ? auth.user.schoolId : 1;
+    const schoolName = await resolveSchoolNameForUser(auth);
+    try {
+      const result = await exportDonationsFn(getAppDb(), schoolId, {
+        mode,
+        passphrase: mode === "encrypted" ? passphrase : undefined,
+        schoolName
+      });
+      if (typeof auth.user.staffId === "number") {
+        await log({
+          schoolId,
+          actorStaffId: auth.user.staffId,
+          action: "export",
+          entityType: "potluckDonations",
+          entityId: String(schoolId),
+          before: { requested: true },
+          after: {
+            mode: result.mode,
+            count: result.count,
+            csvBytes: result.csv.length
+            // Never log passphrase, decrypted key, or the CSV body itself.
+          }
+        });
+      }
+      return { success: true, csv: result.csv, count: result.count, mode: result.mode };
+    } catch (err) {
+      console.error("[exportPotluckDonations] failed", err);
+      return { success: false, message: "export failed" };
+    }
+  }
+);
+
+export interface ImportPotluckResult {
+  success: boolean;
+  message?: string;
+  result?: ImportResult;
+}
+
+export const importPotluckDonations = command(
+  z.object({
+    csv: z.string().min(0).max(POTLUCK_MAX_UPLOAD_BYTES + 1024),
+    passphrase: z.string().min(0).max(512).optional(),
+    conflictStrategy: z.enum(["skip", "replace"])
+  }),
+  async ({ csv, passphrase, conflictStrategy }): Promise<ImportPotluckResult> => {
+    const auth = getStrictUserId();
+    if (isAuthFailure(auth)) return { success: false, message: auth.error };
+    if (!isAdminOrItRole(auth.user as NonNullable<App.Locals["user"]>)) {
+      return { success: false, message: "admin or IT role required" };
+    }
+    const schoolId = typeof auth.user.schoolId === "number" ? auth.user.schoolId : 1;
+    try {
+      assertUploadSize(csv);
+    } catch (err) {
+      if (err instanceof PotluckUploadTooLargeError) {
+        return {
+          success: false,
+          message: `file exceeds ${err.maxBytes} bytes (got ${err.sizeBytes})`
+        };
+      }
+      throw err;
+    }
+    const schoolName = await resolveSchoolNameForUser(auth);
+    try {
+      const result = await importDonationsFn(getAppDb(), csv, {
+        passphrase: passphrase && passphrase.length > 0 ? passphrase : undefined,
+        schoolName,
+        conflictStrategy
+      });
+      if (typeof auth.user.staffId === "number") {
+        await log({
+          schoolId,
+          actorStaffId: auth.user.staffId,
+          action: "import",
+          entityType: "potluckDonations",
+          entityId: String(schoolId),
+          before: { requested: true, csvBytes: csv.length, conflictStrategy },
+          after: {
+            imported: result.imported,
+            skipped: result.skipped,
+            replaced: result.replaced,
+            failures: result.failures.length
+            // Never log passphrase, decrypted keys, or the CSV body itself.
+          }
+        });
+      }
+      return { success: true, result };
+    } catch (err) {
+      console.error("[importPotluckDonations] failed", err);
+      return { success: false, message: "import failed" };
+    }
   }
 );

@@ -37,6 +37,7 @@ export const enrollStaffSchema = z.object({
   department: z.string().min(1).describe("Department name, e.g. Administration, Academics, IT"),
   qualification: z.string().optional().describe("Academic or professional qualification"),
   experience: z.string().optional().describe("Relevant work experience"),
+  reason: z.string().describe("Human-readable action summary for user approval."),
 });
 
 export type EnrollStaffPayload = z.infer<typeof enrollStaffSchema>;
@@ -212,6 +213,7 @@ export const enrollStaffTool = createTool({
   id: "enroll-staff",
   description: "Enroll a new staff member into the school with a temporary password.",
   inputSchema: enrollStaffSchema,
+  requireApproval: true,
   execute: async (inputData: EnrollStaffPayload, context: ToolExecutionContext) => {
     assertMastraToolContext(context);
     return enrollStaffLogic(context, inputData);

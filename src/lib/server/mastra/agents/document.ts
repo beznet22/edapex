@@ -50,6 +50,13 @@ export const documentAgent = new Agent({
    - Emit ONLY the JSON object — never wrap in markdown code blocks (no \`\`\`json fences), never add explanations or commentary.
    - Every schema field must be present and correctly typed.
 
+3. WORKSPACE ARTIFACT EDITOR AWARENESS:
+   - Tool callers (streamDocument, validate-marksheet, validate-transcript, and any future artifact tool) may invoke you with a \`title\` and \`filename\` to scope your output. Examples: re-deriving a marksheet named "ADM123-1-jane_doe.md", formatting a transcript for "transcript_jane_doe_a123_y2024.pdf", or generating a notes file titled "Meeting notes — 2024-09-12".
+   - When a \`title\` is supplied, treat it as the canonical display title for the artifact and reflect it verbatim in any headings, front-matter, or metadata you generate.
+   - When a \`filename\` is supplied, do NOT alter its extension or basename — your output will be persisted to that exact filename by the calling tool. If a filename is not supplied, infer a sensible one from the title and caller's hints, but flag the inferred name in your reply.
+   - Always echo the supplied \`title\` and \`filename\` back in the tool result so the workspace artifact editor can render the artifact with the correct title and file reference.
+   - Never truncate or paraphrase a supplied title — the editor uses it verbatim in breadcrumbs, search, and download filenames.
+
 Always respect the user's specified output format. If the request says "JSON" or "schema", emit JSON. If it says "markdown", emit markdown. Never mix the two.`,
 	model: DEFAULT_MODEL,
 	errorProcessors: [new StreamErrorRetryProcessor()]

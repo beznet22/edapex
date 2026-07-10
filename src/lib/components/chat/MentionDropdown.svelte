@@ -77,7 +77,10 @@
   // Derived: the categories to show
   const categories = $derived(allowedCategories);
 
-  // Derived: category inferred from the typed @prefix (e.g. @class → class_section)
+  // Derived: category inferred from the typed @prefix (e.g. @class → class_section).
+  // Bare `@` (no prefix) defaults to `student` so the scoped roster shows up
+  // immediately when the user starts an @mention — typing `@jo` then narrows
+  // by name without the user having to type the `student` keyword first.
   const inferredCategory = $derived.by<MentionCategory | null>(() => {
     if (!visible) return null;
     if (query.startsWith("class ")) return "class_section";
@@ -85,6 +88,11 @@
     if (query.startsWith("term ")) return "exam";  // alias for exam
     if (query.startsWith("exam ")) return "exam";
     if (query.startsWith("file ")) return "file";
+    if (query.startsWith("student ")) return "students";
+    // Bare `@` (no name fragment yet, no prefix) → students tab. ChatComposer
+    // sends `"student "` for a bare `@` so this branch matches before the
+    // user types a name.
+    if (query === "student") return "students";
     return null;
   });
 
@@ -138,8 +146,9 @@
     errorMessage = null;
 
     // Strip typed @category prefix (e.g. "class foo" → "foo") so the search API
-    // receives just the entity-name fragment.
-    const searchQuery = rawQuery.replace(/^(?:class|year|exam|term|file)\s+/, "");
+    // receives just the entity-name fragment. `student` is the implicit
+    // category for a bare `@` (no prefix), so it's stripped the same way.
+    const searchQuery = rawQuery.replace(/^(?:class|year|exam|term|file|student)\s+/, "");
 
     // Empty query is allowed — the backend returns the default tab
     // (students + class_section). Only bail on hidden state.

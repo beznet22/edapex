@@ -37,7 +37,9 @@ export const updatePhotoTool = createTool({
     studentId: z.number().int().positive(),
     contentHash: z.string().min(1),
     ext: z.string().min(1).max(10),
+    reason: z.string().describe('Human-readable action summary for user approval.'),
   }),
+  requireApproval: true,
   outputSchema: z.object({
     ok: z.literal(true),
     photoUrl: z.string(),
