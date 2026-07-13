@@ -10,7 +10,11 @@
 import { eq, and, sql } from 'drizzle-orm';
 import type { LibSQLDatabase } from 'drizzle-orm/libsql';
 import { z } from 'zod';
-import { userCredentials, type UserCredential } from '$lib/server/mastra/storage/libsql/app-db.schema';
+import {
+	encryptedCredentials,
+	platformProviderDiscoveries,
+	type EncryptedCredential
+} from '$lib/server/mastra/storage/libsql/app-db.schema';
 import type { ProviderId, ModelId } from '$lib/provider/types';
 import { ModelInfoSchema, type ModelInfo } from '$lib/provider/spec';
 import { encrypt as encryptText, decrypt as decryptText, getEncryptionKey } from './crypto';
@@ -27,6 +31,13 @@ export interface BackoffOptions {
 	baseMs: number;
 	maxMs: number;
 	shouldRetry?: (err: unknown) => boolean;
+}
+
+/** Minimal credential shape required by `discoverProviderModels`. */
+export interface UserCredentialAdapter {
+	providerId: string;
+	credentialKind: 'personal' | 'donation' | 'custom';
+	encryptedData: string;
 }
 
 function sleep(ms: number): Promise<void> {
@@ -238,20 +249,35 @@ async function fetchModels(
 }
 
 export async function discoverProviderModels(
-	credential: UserCredential,
+	credential: EncryptedCredential | UserCredentialAdapter,
 	env: Record<string, string | undefined>
 ): Promise<ModelInfo[]> {
 	const providerId = credential.providerId as ProviderId;
 	if (SKIP_DISCOVERY_PROVIDERS.has(providerId)) return [];
-	if (credential.credentialType === 'env') return [];
-	if (credential.credentialType === 'credential') return [];
+	const credentialKind = 'credentialKind' in credential ? credential.credentialKind : null;
+	if (credentialKind === null) return [];
 	if (!credential.encryptedData) return [];
 
-	const decrypted = decryptCustomProvider(credential.encryptedData, env);
-	if (!decrypted || !decrypted.baseUrl) return [];
+	let baseUrl: string;
+	let apiKey: string | undefined;
 
-	const baseUrl = decrypted.baseUrl.replace(/\/+$/, '');
-	const apiKey = decrypted.apiKey;
+	if (credentialKind === 'personal') {
+		// Built-in provider with a user-supplied key: use the catalog URL.
+		const { BUILTIN_PROVIDERS } = await import('$lib/provider/catalog');
+		const info = BUILTIN_PROVIDERS[providerId];
+		if (!info?.api?.url) return [];
+		baseUrl = info.api.url.replace(/\/+$/, '');
+		const { resolveApiKeyForCredential } = await import('./credentials');
+		apiKey =
+			resolveApiKeyForCredential(credential as EncryptedCredential, env, providerId) ?? undefined;
+		if (!apiKey) return [];
+	} else {
+		// Custom provider: read baseUrl + apiKey from the encrypted blob.
+		const decrypted = decryptCustomProvider(credential.encryptedData, env);
+		if (!decrypted || !decrypted.baseUrl) return [];
+		baseUrl = decrypted.baseUrl.replace(/\/+$/, '');
+		apiKey = decrypted.apiKey;
+	}
 
 	let rawModels: RawModel[];
 	try {
@@ -284,12 +310,18 @@ export async function persistDiscoveredModels(
 	const encryptionKey = getEncryptionKey(env);
 	const encrypted = encryptText(JSON.stringify(models), encryptionKey);
 	await db
-		.update(userCredentials)
+		.update(encryptedCredentials)
 		.set({
 			discoveredModels: encrypted,
 			discoveredAt: sql`(datetime('now'))`
 		})
-		.where(and(eq(userCredentials.userId, userId), eq(userCredentials.providerId, providerId)));
+		.where(
+			and(
+				eq(encryptedCredentials.scope, 'user'),
+				eq(encryptedCredentials.userId, userId),
+				eq(encryptedCredentials.providerId, providerId)
+			)
+		);
 }
 
 const ModelInfoListSchema = z.array(ModelInfoSchema);
@@ -301,9 +333,15 @@ export async function getDiscoveredModelsForUser(
 	providerId: ProviderId
 ): Promise<ModelInfo[]> {
 	const rows = await db
-		.select({ discoveredModels: userCredentials.discoveredModels })
-		.from(userCredentials)
-		.where(and(eq(userCredentials.userId, userId), eq(userCredentials.providerId, providerId)))
+		.select({ discoveredModels: encryptedCredentials.discoveredModels })
+		.from(encryptedCredentials)
+		.where(
+			and(
+				eq(encryptedCredentials.scope, 'user'),
+				eq(encryptedCredentials.userId, userId),
+				eq(encryptedCredentials.providerId, providerId)
+			)
+		)
 		.limit(1);
 
 	const encrypted = rows[0]?.discoveredModels;
@@ -339,6 +377,97 @@ export async function getDiscoveredModelsForUser(
 export type { ModelId };
 
 /**
+ * Discover and cache the model list for an env-backed (platform) provider.
+ *
+ * Resolves the API key from `PLATFORM_ENV_KEYS`, fetches `${catalogUrl}/models`,
+ * persists the encrypted result into `platform_provider_discoveries` keyed by
+ * `(schoolId, providerId)`, and returns the parsed `ModelInfo[]`. Called by
+ * the availability pipeline for any school whose platform provider is
+ * enabled.
+ */
+export async function discoverPlatformProviderModels(
+	db: LibSQLDatabase<any>,
+	env: Record<string, string | undefined>,
+	schoolId: number,
+	providerId: ProviderId
+): Promise<ModelInfo[]> {
+	if (SKIP_DISCOVERY_PROVIDERS.has(providerId)) return [];
+	const { PLATFORM_ENV_KEYS } = await import('./credentials');
+	const envKey = PLATFORM_ENV_KEYS[providerId];
+	if (!envKey) return [];
+	const apiKey = env[envKey];
+	if (!apiKey) return [];
+
+	const { BUILTIN_PROVIDERS } = await import('$lib/provider/catalog');
+	const info = BUILTIN_PROVIDERS[providerId];
+	if (!info?.api?.url) return [];
+	const baseUrl = info.api.url.replace(/\/+$/, '');
+
+	const rawModels = await fetchModels(baseUrl, apiKey);
+
+	const models: ModelInfo[] = [];
+	for (const raw of rawModels) {
+		const built = buildModelInfo(raw, providerId);
+		if (!built) continue;
+		if (built.id.startsWith('~')) continue;
+		models.push(built);
+	}
+
+	const encryptionKey = getEncryptionKey(env);
+	const encrypted = encryptText(JSON.stringify(models), encryptionKey);
+	const now = sql`(datetime('now'))`;
+	await db
+		.insert(platformProviderDiscoveries)
+		.values({ schoolId, providerId, models: encrypted, discoveredAt: now })
+		.onConflictDoUpdate({
+			target: [platformProviderDiscoveries.schoolId, platformProviderDiscoveries.providerId],
+			set: { models: encrypted, discoveredAt: now }
+		});
+
+	return models;
+}
+
+/**
+ * Read the cached discovery for a platform provider. Returns `[]` if no
+ * cache row exists yet or decryption/parse fails. Callers should
+ * opportunistically trigger `discoverPlatformProviderModels` when this
+ * returns empty.
+ */
+export async function getCachedPlatformProviderModels(
+	db: LibSQLDatabase<any>,
+	env: Record<string, string | undefined>,
+	schoolId: number,
+	providerId: ProviderId
+): Promise<ModelInfo[]> {
+	const rows = await db
+		.select({ models: platformProviderDiscoveries.models })
+		.from(platformProviderDiscoveries)
+		.where(
+			and(
+				eq(platformProviderDiscoveries.schoolId, schoolId),
+				eq(platformProviderDiscoveries.providerId, providerId)
+			)
+		)
+		.limit(1);
+	const encrypted = rows[0]?.models;
+	if (!encrypted) return [];
+	const encryptionKey = getEncryptionKey(env);
+	try {
+		const decrypted = decryptText(encrypted, encryptionKey);
+		const parsed = ModelInfoListSchema.safeParse(JSON.parse(decrypted));
+		return parsed.success ? parsed.data : [];
+	} catch (err) {
+		if (!(err instanceof DecryptionError)) {
+			console.warn(
+				`[getCachedPlatformProviderModels:${providerId}] decrypt/parse failed:`,
+				err
+			);
+		}
+		return [];
+	}
+}
+
+/**
  * Aggregate all `discovered_models` snapshots across a user's credentials
  * into a single lookup map. Used by `catalog.ts:resolveModelInfo` to find
  * custom-provider models SSR-side without an extra roundtrip per provider.
@@ -356,9 +485,18 @@ export async function getAllDiscoveredModelsForUser(
 	const encryptionKey = getEncryptionKey(svelteEnv as Record<string, string | undefined>);
 
 	const rows = await db
-		.select({ discoveredModels: userCredentials.discoveredModels, providerId: userCredentials.providerId })
-		.from(userCredentials)
-		.where(and(eq(userCredentials.userId, userId), sql`${userCredentials.discoveredModels} IS NOT NULL`));
+		.select({
+			discoveredModels: encryptedCredentials.discoveredModels,
+			providerId: encryptedCredentials.providerId
+		})
+		.from(encryptedCredentials)
+		.where(
+			and(
+				eq(encryptedCredentials.scope, 'user'),
+				eq(encryptedCredentials.userId, userId),
+				sql`${encryptedCredentials.discoveredModels} IS NOT NULL`
+			)
+		);
 
 	const out = new Map<ModelId, ModelInfo>();
 	for (const row of rows) {

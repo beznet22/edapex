@@ -2,7 +2,7 @@
 	import BuildingIcon from "@lucide/svelte/icons/building";
 	import FileTextIcon from "@lucide/svelte/icons/file-text";
 	import CalendarIcon from "@lucide/svelte/icons/calendar";
-	import CpuIcon from "@lucide/svelte/icons/cpu";
+	import ServerIcon from "@lucide/svelte/icons/server";
 	import GiftIcon from "@lucide/svelte/icons/gift";
 	import SaveIcon from "@lucide/svelte/icons/save";
 	import XIcon from "@lucide/svelte/icons/x";
@@ -21,14 +21,14 @@
 	import SchoolIdentitySection from "./platform/SchoolIdentitySection.svelte";
 	import ReportTemplatesSection from "./platform/ReportTemplatesSection.svelte";
 	import AcademicCalendarSection from "./platform/AcademicCalendarSection.svelte";
-	import ModelRegistrySection from "./platform/ModelRegistrySection.svelte";
+	import PlatformProvidersSection from "./platform/PlatformProvidersSection.svelte";
 	import PotLuckConfigSection from "./platform/PotLuckConfigSection.svelte";
 
 	type SectionId =
 		| "school-identity"
 		| "report-templates"
 		| "academic-calendar"
-		| "model-registry"
+		| "platform-providers"
 		| "potluck-configuration";
 
 	interface SectionConfig {
@@ -73,12 +73,13 @@
 			standalone: false
 		},
 		{
-			id: "model-registry",
-			title: "Model Registry",
-			description: "Disable specific models or entire providers platform-wide.",
+			id: "platform-providers",
+			title: "Platform Providers",
+			description:
+				"Toggle env-backed providers (GROQ_API_KEY, DEEPSEEK_API_KEY, …) on or off school-wide.",
 			placeholder:
-				"Model Registry fields land here in Phase 6. Disables write to admin_model_overrides (LibSQLite app-db) and are excluded from availableModels.",
-			icon: CpuIcon,
+				"Platform providers land here in Phase 2. Disables write to admin_model_overrides with modelId=null and are excluded from availableModels.",
+			icon: ServerIcon,
 			standalone: true
 		},
 		{
@@ -103,7 +104,7 @@
 		"school-identity": false,
 		"report-templates": false,
 		"academic-calendar": false,
-		"model-registry": false,
+		"platform-providers": false,
 		"potluck-configuration": false
 	});
 
@@ -164,8 +165,8 @@
 								<ReportTemplatesSection />
 							{:else if section.id === "academic-calendar"}
 								<AcademicCalendarSection />
-							{:else if section.id === "model-registry"}
-								<ModelRegistrySection />
+							{:else if section.id === "platform-providers"}
+								<PlatformProvidersSection />
 							{:else if section.id === "potluck-configuration"}
 								<PotLuckConfigSection />
 							{/if}

@@ -120,13 +120,13 @@ describe('paths helpers', () => {
 
 	describe('marksheetMarkdownPath', () => {
 		it('with name', () => {
-			expect(marksheetMarkdownPath(188, 'Al-Azeem')).toBe('marksheets/188-Al-Azeem.md');
+			expect(marksheetMarkdownPath({ studentId: 188, studentName: 'Al-Azeem' })).toBe('marksheets/188-Al-Azeem.md');
 		});
 		it('without name', () => {
-			expect(marksheetMarkdownPath(188)).toBe('marksheets/188.md');
+			expect(marksheetMarkdownPath({ studentId: 188 })).toBe('marksheets/188.md');
 		});
 		it('null name treated as absent', () => {
-			expect(marksheetMarkdownPath(188, null)).toBe('marksheets/188.md');
+			expect(marksheetMarkdownPath({ studentId: 188, studentName: null })).toBe('marksheets/188.md');
 		});
 	});
 

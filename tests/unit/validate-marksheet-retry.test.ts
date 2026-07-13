@@ -18,17 +18,27 @@ vi.mock('$lib/server/mastra/index', () => ({
 }));
 
 // Mock the workspace filesystem so writes don't hit the real disk.
-const writeFileMock = vi.fn(async () => {});
-const addEntryMock = vi.fn(async () => {});
+const writeFileMock = vi.fn(async () => { });
+const addEntryMock = vi.fn(async () => { });
+const removeEntryMock = vi.fn(async () => { });
+const existsMock = vi.fn(async () => true);
+const readFileMock = vi.fn(async () => '# Test markdown\n');
+const deleteFileMock = vi.fn(async () => { });
 vi.mock('$lib/server/mastra/storage/workspaces', () => ({
   get tenantWorkspace() {
     return {
-      resolveFilesystem: async () => ({ writeFile: writeFileMock })
+      resolveFilesystem: async () => ({
+        writeFile: writeFileMock,
+        exists: existsMock,
+        readFile: readFileMock,
+        deleteFile: deleteFileMock
+      })
     };
   }
 }));
 vi.mock('$lib/server/mastra/storage/workspaces/manifest-store', () => ({
-  addEntry: addEntryMock
+  addEntry: addEntryMock,
+  removeEntry: removeEntryMock
 }));
 vi.mock('$lib/server/helpers/chat-helper', () => ({
   buildWorkspaceRequestContext: () => ({})
@@ -52,7 +62,8 @@ function makeTenant() {
     selectedSectionId: 6,
     className: 'LOWER BASIC 2',
     sectionName: 'B',
-    academicYearTitle: '2025/2026'
+    academicYearTitle: '2025/2026',
+    studentId: 188
   };
 }
 
@@ -70,7 +81,7 @@ function minimalValidJson(): Record<string, unknown> {
   return {
     school: { id: 1, name: 'Test School', email: 'a@b.c', phone: '123', city: 'City', state: 'State', title: 'Title', vacation_date: '2026-01-01' },
     student: {
-      id: 188, examId: 6, fullName: 'Test Student', gender: 'M', parentEmail: 'p@p.c',
+      id: 188, examTypeId: 6, fullName: 'Test Student', gender: 'M', parentEmail: 'p@p.c',
       parentName: 'Parent', term: 'SECOND TERM', title: 'Term Report',
       category: 'LOWERBASIC', className: 'LOWER BASIC 2', sectionName: 'B',
       adminNo: 225, sessionYear: '2025/2026', daysOpened: 100, daysAbsent: 0,
@@ -113,19 +124,46 @@ beforeEach(() => {
   documentAgentMock.mockReset();
   writeFileMock.mockClear();
   addEntryMock.mockClear();
+  removeEntryMock.mockClear();
+  existsMock.mockReset();
+  readFileMock.mockReset();
+  deleteFileMock.mockReset();
+  existsMock.mockResolvedValue(true);
+  readFileMock.mockResolvedValue('# Test markdown\n');
+  deleteFileMock.mockResolvedValue(undefined);
 });
 
 afterEach(() => {
   vi.useRealTimers();
 });
 
+async function runTool(
+  input: Parameters<NonNullable<typeof validateMarksheetTool.execute>>[0],
+  context: Parameters<NonNullable<typeof validateMarksheetTool.execute>>[1]
+) {
+  const execute = validateMarksheetTool.execute;
+  if (!execute) {
+    throw new Error('validateMarksheetTool.execute is not defined');
+  }
+  const result = await execute(input, context);
+  if (!result || typeof result !== 'object' || !('ok' in result)) {
+    throw new Error('Expected result to have ok property');
+  }
+  return result;
+}
+
 describe('validate-marksheet retry-with-feedback', () => {
   it('returns ok on the first attempt when JSON is valid', async () => {
     const valid = minimalValidJson();
     documentAgentMock.mockResolvedValueOnce({ text: JSON.stringify(valid), object: valid });
 
-    const result = await validateMarksheetTool.execute(
-      { studentId: 188, correctedMarkdown: '# Test' },
+    const result = await runTool(
+      {
+        currentMarkdownPath: 'marksheets/188-aaaaaaaa.md',
+        student: { id: 188, name: 'Test Student', admissionNo: 225 },
+        reason: 'test',
+        title: 'Test'
+      },
       { requestContext: makeRequestContext() as never }
     );
 
@@ -146,8 +184,13 @@ describe('validate-marksheet retry-with-feedback', () => {
     const valid = minimalValidJson();
     documentAgentMock.mockResolvedValueOnce({ text: JSON.stringify(valid), object: valid });
 
-    const result = await validateMarksheetTool.execute(
-      { studentId: 188, correctedMarkdown: '# Test' },
+    const result = await runTool(
+      {
+        currentMarkdownPath: 'marksheets/188-aaaaaaaa.md',
+        student: { id: 188, name: 'Test Student', admissionNo: 225 },
+        reason: 'test',
+        title: 'Test'
+      },
       { requestContext: makeRequestContext() as never }
     );
 
@@ -163,15 +206,20 @@ describe('validate-marksheet retry-with-feedback', () => {
     // Attempt 1: throws MastraError with validation issues
     const err1 = new Error(
       'Structured output validation failed: - school: Invalid input: expected object, received string\n' +
-        '- student.id: Invalid input: expected number, received undefined'
+      '- student.id: Invalid input: expected number, received undefined'
     );
     documentAgentMock.mockRejectedValueOnce(err1);
     // Attempt 2: returns a valid JSON
     const valid = minimalValidJson();
     documentAgentMock.mockResolvedValueOnce({ text: JSON.stringify(valid), object: valid });
 
-    const result = await validateMarksheetTool.execute(
-      { studentId: 188, correctedMarkdown: '# Test' },
+    const result = await runTool(
+      {
+        currentMarkdownPath: 'marksheets/188-aaaaaaaa.md',
+        student: { id: 188, name: 'Test Student', admissionNo: 225 },
+        reason: 'test',
+        title: 'Test'
+      },
       { requestContext: makeRequestContext() as never }
     );
 
@@ -187,20 +235,32 @@ describe('validate-marksheet retry-with-feedback', () => {
   it('exhausts 3 attempts and returns unresolved errors when no attempt succeeds', async () => {
     documentAgentMock.mockResolvedValue({ text: '{"school":"wrong"}', object: { school: 'wrong' } });
 
-    const result = (await validateMarksheetTool.execute(
-      { studentId: 188, correctedMarkdown: '# Test' },
+    const result = await runTool(
+      {
+        currentMarkdownPath: 'marksheets/188-aaaaaaaa.md',
+        student: { id: 188, name: 'Test Student', admissionNo: 225 },
+        reason: 'test',
+        title: 'Test'
+      },
       { requestContext: makeRequestContext() as never }
-    )) as { ok: false; errors: unknown[]; unresolvedErrors: Array<{ path: string; message: string }> };
+    );
 
     expect(documentAgentMock).toHaveBeenCalledTimes(3);
     expect(result.ok).toBe(false);
-    expect(result.unresolvedErrors.length).toBeGreaterThan(0);
+    if (!result.ok) {
+      expect(result.unresolvedErrors.length).toBeGreaterThan(0);
+    }
     // No file should be written when validation fails
     expect(writeFileMock).not.toHaveBeenCalled();
   });
 
   it('sleeps on rate-limit errors and retries within the 3-attempt budget', async () => {
-    vi.useFakeTimers();
+    const setTimeoutMock = vi.spyOn(globalThis, 'setTimeout').mockImplementation((cb: any) => {
+      // Execute the callback immediately to skip waiting
+      cb();
+      return 0 as any;
+    });
+
     const rateLimitErr = new Error(
       'Rate limit reached for model `llama-3.1-8b-instant`. Please try again in 2s.'
     );
@@ -208,16 +268,21 @@ describe('validate-marksheet retry-with-feedback', () => {
     const valid = minimalValidJson();
     documentAgentMock.mockResolvedValueOnce({ text: JSON.stringify(valid), object: valid });
 
-    const promise = validateMarksheetTool.execute(
-      { studentId: 188, correctedMarkdown: '# Test' },
+    const result = await runTool(
+      {
+        currentMarkdownPath: 'marksheets/188-aaaaaaaa.md',
+        student: { id: 188, name: 'Test Student', admissionNo: 225 },
+        reason: 'test',
+        title: 'Test'
+      },
       { requestContext: makeRequestContext() as never }
     );
 
-    await vi.advanceTimersByTimeAsync(3000);
-    const result = await promise;
-
     expect(documentAgentMock).toHaveBeenCalledTimes(2);
     expect(result.ok).toBe(true);
+    expect(setTimeoutMock).toHaveBeenCalled();
+
+    setTimeoutMock.mockRestore();
   });
 });
 

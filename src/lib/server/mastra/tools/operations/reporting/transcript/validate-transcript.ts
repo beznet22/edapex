@@ -7,7 +7,7 @@ import { transcriptSchema } from '$lib/schema/transcript';
 import { transcriptJsonPath, transcriptMarkdownPath } from '$lib/server/mastra/storage/workspaces/paths';
 import { addEntry, removeEntry } from '$lib/server/mastra/storage/workspaces/manifest-store';
 import { resolveMentionsInMarkdown } from '$lib/server/mastra/editor/mention-resolver';
-import { AssessmentService } from '$lib/server/service/assessment.service';
+import { createAssessmentServiceForRequest } from '$lib/server/service/assessment.service';
 import type { TenantContext } from '$lib/server/mastra/tenant-context';
 import type { WorkspaceFilesystem } from '@mastra/core/workspace';
 import type { RequestContext } from '@mastra/core/request-context';
@@ -333,27 +333,19 @@ export const validateTranscriptTool = createTool({
 
 		// All required IDs resolved. Fetch subject mapping table and
 		// proceed with the existing documentAgent re-derivation pipeline.
-		const mapping = await (AssessmentService as unknown as {
-			getMappingData: (
-				staffId: number | null,
-				classId?: number,
-				sectionId?: number
-			) => Promise<{
-				subjects: Array<{
-					subjectId: number | null;
-					subjectCode: string | null;
-					title?: string | null;
-				}>;
-			}>;
-		}).getMappingData(tenant.staffId, tenant.classId ?? undefined, tenant.sectionId ?? undefined);
-
+		const assessment = await createAssessmentServiceForRequest(tenant);
+		const mapping = await assessment.getMappingData(
+			tenant.staffId,
+			tenant.classId ?? undefined,
+			tenant.sectionId ?? undefined
+		);
 		const documentAgent = await getDocumentAgent();
 
 		const subjectMappingTable = mapping.subjects
-			.map((s: { subjectId: number | null; subjectCode: string | null; title?: string | null }) => {
-				const subjectId = s.subjectId;
+			.map((s) => {
+				const subjectId = s.id;
 				const subjectCode = s.subjectCode;
-				const title = s.title;
+				const title = s.subjectName;
 				if (subjectId == null || subjectCode == null) return null;
 				return `  - ${subjectCode} → subjectId=${subjectId}${title ? ` (${title})` : ''}`;
 			})

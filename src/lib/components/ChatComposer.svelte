@@ -52,7 +52,6 @@
   import RateLimitBanner from "./RateLimitBanner.svelte";
   import CommandDropdown from "./chat/CommandDropdown.svelte";
   import { type MentionSearchResult } from "./chat/MentionDropdown.svelte";
-  import OptionDropdown from "./chat/OptionDropdown.svelte";
   import { PromptInput, PromptInputActions, PromptInputTextarea } from "./prompt-kit/prompt-input";
 
   /**
@@ -216,35 +215,14 @@
 
   const extractingCount = $derived(chat.loading ? 1 : 0);
 
-  // Selection-gate popover follows the same lifecycle as chat.pendingGate —
-  // populated by `data-selectOptions` stream events (see chat-context).
-  const pendingGate = $derived(chat.pendingGate);
 
-  // When validation is awaiting, chat.svelte mounts an ActionBar above the
-  // composer inside a shared rounded-4xl parent. We derive this from
-  // `chat.messages` (not `chat.pendingAwaitingValidation`) because the
-  // message stream is re-hydrated from the server on page reload while the
-  // context state is not — otherwise the composer's top seam would disappear
-  // after a reload even though the ActionBar is still showing.
-  const hasAwaitingValidation = $derived.by(() => {
-    const lastAssistant = [...chat.messages]
-      .reverse()
-      .find((m) => m.role === "assistant");
-    return !!lastAssistant?.parts?.some(
-      (p) => (p as { type?: string }).type === "data-awaitValidation",
-    );
-  });
-
-  // The composer always keeps `rounded-4xl` on all four corners. When an
-  // ActionBar mounts above it inside the shared parent, the parent's
-  // `rounded-4xl overflow-hidden` mask clips the composer's top corners —
-  // its own rounding coincides with the mask and remains visible as the
-  // card's outer shape. The hairline `border-t` only appears when the
-  // ActionBar is mounted above, marking the seam between the two sections.
+  // The composer always keeps `rounded-4xl` on all four corners. When the
+  // ActionBar mounts above it (approval pending), the shared parent's
+  // `rounded-4xl overflow-hidden` clips the top corners. A `border-t`
+  // marks the seam when an approval is pending.
   const composerClass = $derived(
     cn(
       "composer-box relative w-full max-w-[780px] flex flex-col hermes-glass rounded-4xl shadow-[0_0_50px_-12px_rgba(0,0,0,0.5)] transition-all duration-500 focus-within:ring-1 focus-within:ring-primary/40 focus-within:border-primary/30 p-0 border-border/10 bg-[#09090b]/40 backdrop-blur-3xl ring-offset-background",
-      hasAwaitingValidation && "border-t border-border/30",
     ),
   );
   /**
@@ -270,14 +248,6 @@
     return text;
   }
 
-  /**
-   * Check if a workflow of the same type is already active.
-   * Blocks duplicate workflow slash commands per Requirement 14.6.
-   */
-  function isDuplicateWorkflow(command: string): boolean {
-    return chat.activeWorkflows.some((wf) => wf.name.toLowerCase() === command.toLowerCase());
-  }
-
   function onSubmit() {
     if (chat.loading) {
       chat.client.stop();
@@ -285,17 +255,6 @@
     }
 
     if (input.trim() && chat.status === "ready") {
-      // Block duplicate workflow slash commands (Requirement 14.6)
-      const slashCommand = extractSlashCommand(input);
-      if (slashCommand && isDuplicateWorkflow(slashCommand)) {
-        blockedWorkflowMessage = `A "${slashCommand}" workflow is already in progress. Please wait for it to complete.`;
-        // Auto-dismiss the blocked message after 5 seconds
-        setTimeout(() => {
-          blockedWorkflowMessage = null;
-        }, 5000);
-        return;
-      }
-
       blockedWorkflowMessage = null;
       // Pass selected mentions to the chat context for inclusion in request body
       chat.pendingMentions = [...selectedMentions];
@@ -343,7 +302,6 @@
           merged.push(r);
         }
       }
-      console.log('[ChatComposer.submit] fileReferences merged:', merged.length, 'from local:', fromLocal.length, 'refs:', fromRefs.length, 'uploads:', fromUploads.length);
       chat.fileReferences = merged;
 
       // Default a bare `/transcript` to `/transcript report` (design decision B1).
@@ -671,9 +629,13 @@
   }
 
   function handleRequestValidation(e: Event): void {
-    const detail = (e as CustomEvent<{ artifactId: string; mode: string }>).detail;
+    const detail = (e as CustomEvent<{ artifactId: string }>).detail;
     if (!detail?.artifactId) return;
-    chat.resumeWorkflow(detail.artifactId);
+    // The actual validation is triggered by the agent via requireApproval.
+    // This event is a hint to scroll to or focus the approval ActionBar.
+    window.dispatchEvent(
+      new CustomEvent('chat:focusApproval', { detail: { artifactId: detail.artifactId } })
+    );
   }
 
   $effect(() => {
@@ -724,7 +686,7 @@
 <RateLimitBanner />
 
 <PromptInput
-  class="composer-box relative w-full max-w-[780px] flex flex-col rounded-4xl transition-all duration-500 focus-within:ring-1 focus-within:ring-primary/40 focus-within:border-primary/30 p-0 border-border/10 bg-secondary/40"
+  class="composer-box relative w-full max-w-[780px] flex flex-col rounded-4xl transition-all duration-500 focus-within:ring-1 focus-within:ring-primary/40 focus-within:border-primary/30 p-0 border-border/10 bg-foreground/5"
   value={input}
   onValueChange={(val) => {
     input = val;
@@ -811,21 +773,6 @@
     onclick={() => textareaRef?.focus()}
     role="presentation"
   >
-    <!-- Active Workflow Badge -->
-    {#if chat.activeWorkflows.length > 0}
-      <div class="flex flex-wrap gap-1.5 px-4 pt-2">
-        {#each chat.activeWorkflows as wf (wf.id)}
-          <div
-            class="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-primary/10 border border-primary/20 text-[10px] font-bold tracking-wide text-primary animate-pulse"
-          >
-            <span class="size-1.5 rounded-full bg-primary"></span>
-            <span class="uppercase">{wf.name}</span>
-            <span class="opacity-60">Running</span>
-          </div>
-        {/each}
-      </div>
-    {/if}
-
     <!-- Blocked Workflow Message -->
     {#if blockedWorkflowMessage}
       <div
@@ -843,50 +790,15 @@
       class="resize-none border-none bg-secondary/40! focus-visible:ring-0 text-base leading-relaxed scrollbar-slick min-h-[48px] w-full px-4 py-3 placeholder:text-muted-foreground/30 transition-all duration-300"
     />
   </div>
-  <!-- Confidence Gate Confirmation Overlay -->
-  {#if chat.pendingConfirmation}
-    <div
-      class="absolute bottom-full left-0 right-0 mb-3 z-50 px-4 animate-in fade-in slide-in-from-bottom-2 duration-300"
-    >
-      <div
-        class="w-full max-w-[780px] mx-auto hermes-glass rounded-2xl border border-amber-500/20 shadow-[0_0_30px_-8px_rgba(212,175,55,0.15)] p-4"
-      >
-        <div class="flex items-start gap-3">
-          <div class="flex-shrink-0 p-2 rounded-xl bg-amber-500/10 border border-amber-500/20">
-            <ShieldAlertIcon class="size-5 text-amber-400" />
-          </div>
-          <div class="flex-1 min-w-0">
-            <div class="flex items-center gap-2 mb-1.5">
-              <span class="text-[10px] font-black uppercase tracking-widest text-amber-400">
-                {chat.pendingConfirmation.type === "mutation" ? "Mutation Gate" : "Navigation Gate"}
-              </span>
-              <Badge
-                variant="outline"
-                class="text-[9px] font-bold border-amber-500/30 text-amber-300 px-1.5 py-0"
-              >
-                {Math.round(chat.pendingConfirmation.confidence * 100)}% / {Math.round(
-                  chat.pendingConfirmation.threshold * 100,
-                )}%
-              </Badge>
-            </div>
-            <p class="text-xs text-muted-foreground/80 leading-relaxed line-clamp-2">
-              {chat.pendingConfirmation.reasoning}
-            </p>
-            <div class="flex items-center gap-2 mt-3">
-              <Button
-                variant="ghost"
-                size="sm"
-                class="h-7 text-[10px] font-bold uppercase tracking-wider text-muted-foreground hover:text-foreground hover:bg-white/5 rounded-lg"
-                onclick={() => (chat.pendingConfirmation = null)}
-              >
-                Dismiss
-              </Button>
-              <span class="text-[9px] text-muted-foreground/40">
-                Use a slash command (e.g. /extract) to bypass
-              </span>
-            </div>
-          </div>
-        </div>
+
+  <!-- Command Dropdown -->
+  {#if showCommands}
+    <div class="absolute bottom-full left-0 right-0 mb-3 z-50 flex justify-center px-4 animate-in fade-in slide-in-from-bottom-2 duration-200">
+      <div class="w-full max-w-[780px] flex justify-start">
+        <CommandDropdown
+          query={commandQuery}
+          onSelect={selectCommand}
+        />
       </div>
     </div>
   {/if}

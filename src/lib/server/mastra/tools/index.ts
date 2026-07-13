@@ -9,6 +9,7 @@ import { reportingTools } from "./operations/reporting";
 import { academicTools } from "./operations/academic";
 import { searchSchoolDirectoryTool } from "./operations/read/search-school-directory";
 import { chooseDocumentTool } from "./internal/choose-document";
+import { readWorkspaceFileTool } from "./internal/workspace-read";
 import type { MastraToolContext } from "../tenant-context";
 
 export { searchSchoolDirectoryTool as searchEntityTool };
@@ -33,7 +34,8 @@ export const coreTools = {
 	...parentTools,
 	...reportingTools,
 	...academicTools,
-	chooseDocumentTool
+	chooseDocumentTool,
+	readWorkspaceFileTool
 };
 
 /**

@@ -10,14 +10,19 @@ export function slideOut(node: Element) {
 	return fly(node, { y: -12, duration: 150 });
 }
 
-// Returns true when the role-gating rule for a tab is satisfied for the
-// given user. Tabs with no `allowedRoles` are visible to everyone; tabs
-// with an `allowedRoles` whitelist are visible only when the user holds one
-// of the listed roles. Anonymous users (role === null) never see gated tabs.
+// Returns true when the designation-gating rule for a tab is satisfied for
+// the given user. Tabs with no `allowedDesignations` are visible to everyone;
+// tabs with an `allowedDesignations` whitelist are visible when the user
+// either (a) is a flagged administrator (`isAdministrator === true`) or
+// (b) holds one of the listed designations. Anonymous users never see
+// gated tabs. The administrator escape hatch mirrors the backend
+// `requireAdminOrIt` helper so the frontend and backend stay in sync.
 export function isTabVisible(
-	allowedRoles: readonly string[] | undefined,
-	userRole: string | null
+	allowedDesignations: readonly string[] | undefined,
+	userDesignation: string | null,
+	isAdministrator: boolean = false
 ): boolean {
-	if (!allowedRoles || allowedRoles.length === 0) return true;
-	return userRole !== null && allowedRoles.includes(userRole);
+	if (!allowedDesignations || allowedDesignations.length === 0) return true;
+	if (isAdministrator) return true;
+	return userDesignation !== null && allowedDesignations.includes(userDesignation);
 }

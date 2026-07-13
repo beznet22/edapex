@@ -19,7 +19,8 @@ function isAdminOrIt(
 ): user is NonNullable<App.Locals['user']> {
 	if (!user) return false;
 	if (user.isAdministrator === true) return true;
-	return user.designation === 'it';
+	const designation = user.designation;
+	return designation === 'it' || designation === 'it_support' || designation === 'admin';
 }
 
 /**

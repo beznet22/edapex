@@ -1,14 +1,14 @@
 import { createTool } from '@mastra/core/tools';
 import { z } from 'zod';
-import { type StreamWriterLike } from '../../../../agent-stream-retry';
+import { type StreamWriterLike } from '$lib/server/mastra/agent-stream-retry';
 import { writeDataPart, type MemoryContext } from '$lib/server/mastra/utils/chat-utils';
-import { tenantWorkspace } from '../../../../storage/workspaces';
+import { tenantWorkspace } from '$lib/server/mastra/storage/workspaces';
 import { buildWorkspaceRequestContext } from '$lib/server/helpers/chat-helper';
-import { marksheetJsonPath } from '../../../../storage/workspaces/paths';
-import { addEntry } from '../../../../storage/workspaces/manifest-store';
+import { marksheetJsonPath } from '$lib/server/mastra/storage/workspaces/paths';
+import { addEntry } from '$lib/server/mastra/storage/workspaces/manifest-store';
 import { createAssessmentServiceForRequest } from '$lib/server/service/assessment.service';
 import { marksheetSchema, type Marksheet } from '$lib/schema/marksheet';
-import type { TenantContext } from '../../../../tenant-context';
+import type { TenantContext } from '$lib/server/mastra/tenant-context';
 import type { WorkspaceFilesystem } from '@mastra/core/workspace';
 
 interface MarksheetToolContext {

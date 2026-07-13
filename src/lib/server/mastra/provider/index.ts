@@ -46,6 +46,7 @@ export {
 	repairCorruptedCredential,
 	PLATFORM_ENV_KEYS,
 	type UserCredentialState,
+	type UserCredentialKind,
 	type SaveUserCredentialInput,
 	type RotateCredentialInput,
 	type RepairCorruptedCredentialInput

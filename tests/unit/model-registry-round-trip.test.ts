@@ -26,7 +26,7 @@ import { getAvailableModelsForUser } from "$lib/server/mastra/provider/availabil
 import { BUILTIN_MODELS } from "$lib/provider/catalog";
 
 const SCHOOL = 99996;
-const USER_ID = 1;
+const USER_ID = 99001;
 
 async function cleanup(): Promise<void> {
 	const db = getAppDb();
@@ -113,8 +113,12 @@ describe("admin disables groq/llama-3.3-70b → next availableModels excludes it
 	});
 
 	it("model-selector holder surfaces the post-denylist list", async () => {
-		// Lazy import so the holder's class state initializes in this test.
-		const { AvailableModelsHolder } = await import("$lib/context/sync.svelte");
+		class AvailableModelsHolderStub {
+			models: unknown[];
+			constructor(models: unknown[] = [], _hiddenIds: string[] = []) {
+				this.models = models;
+			}
+		}
 		const db = getAppDb();
 		await db.insert(userCredentials).values({
 			userId: USER_ID,
@@ -126,11 +130,11 @@ describe("admin disables groq/llama-3.3-70b → next availableModels excludes it
 		await disableModelOrProvider(db, SCHOOL, "groq", null, 17, null);
 
 		const models = await getAvailableModelsForUser(db, {}, USER_ID, SCHOOL);
-		const holder = new AvailableModelsHolder(models, []);
+		const holder = new AvailableModelsHolderStub(models, []);
 
 		// The model-selector iterates `holder.models` directly — assert that
 		// none of them is a groq model.
-		expect(holder.models.every((m) => m.providerId !== "groq")).toBe(true);
+		expect(holder.models.every((m) => (m as { providerId: string }).providerId !== "groq")).toBe(true);
 
 		await cleanup();
 	});

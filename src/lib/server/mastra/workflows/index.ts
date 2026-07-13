@@ -15,11 +15,8 @@ import { classifyAndStreamWorkflow } from './chat/classify-and-stream';
 import { titleStep } from './chat/title-step';
 import { extractFileItemsStep } from './chat/extract-file-items-step';
 import { collapseStep } from './chat/collapse-step';
-import { hitlVerifyStep } from './chat/hitl-verify-step';
+import { resolveToolsStep } from './chat/resolve-tools-step';
 import { assistantStep } from './chat/assistant-step';
-import { selectionGateStep } from './chat/selection-gate-step';
-import { continuationAssistantStep } from './chat/continuation-assistant-step';
-import { awaitValidationStep } from './chat/await-validation-step';
 
 import { deriveEditorContextStep } from './editor/derive-editor-context-step';
 import { resolveMentionsStep } from './editor/resolve-mentions-step';
@@ -35,34 +32,15 @@ export const chatWorkflow = createWorkflow({
 	description: 'Per-file OCR streaming + assistant text generation',
 	inputSchema: chatWorkflowInputSchema,
 	outputSchema: chatWorkflowOutputSchema,
-	retryConfig: {
-		attempts: 2,
-		delay: 1000
-	},
+	retryConfig: { attempts: 2, delay: 1000 },
 	options: {
 		onFinish: async (result) => {
-			if (result.status === 'failed') {
-				console.error('[chatWorkflow] failed', {
-					runId: result.runId,
-					workflowId: result.workflowId,
-					error: result.error
-				});
-				return;
-			}
 			if (result.status === 'success') {
 				console.info('[chatWorkflow] completed', {
 					runId: result.runId,
 					workflowId: result.workflowId,
 					fileCount: result.result?.resolvedFiles?.length ?? 0,
 					textLength: result.result?.text?.length ?? 0
-				});
-			}
-
-			if (result.status === 'suspended') {
-				console.info('[chatWorkflow] suspended', {
-					runId: result.runId,
-					workflowId: result.workflowId,
-					reason: 'Human In The Loop Verification Required'
 				});
 			}
 		},
@@ -79,25 +57,12 @@ export const chatWorkflow = createWorkflow({
 	.parallel([classifyAndStreamWorkflow, titleStep])
 	.then(extractFileItemsStep)
 	.then(collapseStep)
-	.then(hitlVerifyStep)
+	.then(resolveToolsStep)
 	.then(assistantStep)
-	.then(selectionGateStep)
-	.then(continuationAssistantStep)
-	.then(awaitValidationStep)
 	.commit();
 
-/**
- * Sentinel exports for the resume route — the resume endpoint keys its
- * `step:` argument off these ids so the workflow ID and step ID stay in sync.
- */
-export const HITL_VERIFY_STEP_ID = hitlVerifyStep.id as 'hitl-verify';
-
-export const SELECTION_GATE_STEP_ID = selectionGateStep.id as 'selectionGate';
-
-export const AWAIT_VALIDATION_STEP_ID = awaitValidationStep.id as 'awaitValidation';
 
 // ─── editorCommandWorkflow ────────────────────────────────────────────────
-
 export const editorCommandWorkflow = createWorkflow({
 	id: 'editorCommandWorkflow',
 	description: 'Resolves editor context and mentions, then executes edit, continue, or generate agents with streaming',

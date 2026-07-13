@@ -359,7 +359,7 @@ export class AssessmentService {
    */
   async upsertMarksheet(marksheet: Marksheet, staffId: number): Promise<Marksheet> {
     const studentId = marksheet.student.id;
-    const examTypeId = marksheet.examType?.id ?? marksheet.student.examId;
+    const examTypeId = marksheet.examType?.id ?? marksheet.student.examTypeId;
     if (!studentId || !examTypeId) {
       throw new Error("Student ID and Exam Type ID are required");
     }
@@ -551,7 +551,7 @@ export class AssessmentService {
     const termlySettings = await new SettingsService(studentData.schoolId ?? this.activeSchoolId()).getReportSettings();
     const student: Student = {
       id: studentData.studentId,
-      examId: examType?.id || 0,
+      examTypeId: examType?.id || 0,
       fullName: studentData.fullName || "",
       gender: studentData.genderName || "",
       parentEmail: studentData.email || "",
@@ -735,7 +735,7 @@ export class AssessmentService {
 
     const studentPayload = {
       id: student.studentId,
-      examId: data.terms[0]?.id ?? 0,
+      examTypeId: data.terms[0]?.id ?? 0,
       fullName: student.fullName ?? "",
       gender: student.genderName ?? "",
       parentEmail: student.email ?? "",

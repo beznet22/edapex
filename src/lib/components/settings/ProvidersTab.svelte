@@ -97,7 +97,7 @@
 		label: string;
 		classes: string;
 	} {
-		if (cred.credentialType === "custom") {
+		if (cred.credentialKind === "custom") {
 			return { label: "Custom", classes: "bg-primary/20 text-primary" };
 		}
 		if (cred.source === "platform") {

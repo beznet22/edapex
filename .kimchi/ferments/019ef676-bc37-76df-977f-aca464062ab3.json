@@ -611,7 +611,7 @@
   "decisions": [],
   "memories": [],
   "createdAt": "2026-06-23T21:50:37.111Z",
-  "updatedAt": "2026-07-10T10:18:29.366Z",
+  "updatedAt": "2026-07-11T08:40:30.481Z",
   "goal": "Consolidate five overlapping provider-related tables into three unified tables (encrypted_credentials, model_visibility, provider_access_policy) and harden the resulting lifecycle across security, concurrency, observability, recovery, API-contract, and test-coverage dimensions. Remove legacy compat code (colon-format cookies, 2-tier resolver, V1/legacy comments) and apply the migration blast radius the user authorized.",
   "successCriteria": [
     "[scope] Coverage applies to all 5 source tables (user_credentials, user_model_visibility, admin_model_overrides, potluck_config, potluck_donations). After consolidation, code paths target 3 unified tables (encrypted_credentials, model_visibility, provider_access_policy). potluck_config is kept but its allowed_providers column is removed.",

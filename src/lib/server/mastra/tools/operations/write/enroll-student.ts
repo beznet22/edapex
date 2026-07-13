@@ -8,6 +8,7 @@ import {
 } from "../../../tenant-context";
 import { StudentRepository } from "../../../../repository/student.repo";
 import { TimelineRepository } from "../../../../repository/timeline.repo";
+import { bridgeToolContext } from "../../internal/bridge";
 
 export const onboardEntitySchema = z.object({
   studentDetails: z.object({
@@ -191,8 +192,8 @@ export const enrollStudentTool = createTool({
   inputSchema: onboardEntitySchema,
   requireApproval: true,
   execute: async (input: OnboardEntityPayload, context: ToolExecutionContext) => {
-    assertMastraToolContext(context);
-    return onboardEntityLogic(context, input);
+    const ctx = await bridgeToolContext(context);
+    return onboardEntityLogic(ctx, input);
   },
   toModelOutput: (output: unknown) => {
     if (!isEnrollStudentResult(output)) {

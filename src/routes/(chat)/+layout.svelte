@@ -12,7 +12,6 @@
   import { page } from "$app/state";
   import InspectorProvider from "$lib/components/workspace/InspectorProvider.svelte";
   import WorkspacePaneGroup from "$lib/components/workspace/WorkspacePaneGroup.svelte";
-  import WorkspaceSidebar from "$lib/components/workspace/WorkspaceSidebar.svelte";
   import type { LayoutData } from "./$types.js";
 
   let { data, children } = $props<{
@@ -91,8 +90,6 @@
     filesContext.rehydrate(data.uploads);
   });
 
-  const isMobile = new IsMobile();
-
   // Chat pages render <SharedChatView>, which carries its own
   // <WorkspacePaneGroup><WorkspaceSidebar /></WorkspacePaneGroup> so
   // ArtifactViewer inside WorkspaceSidebar can resolve useChat(). Filestore
@@ -119,9 +116,6 @@
     <InspectorProvider>
       {#if isChatRoute}
         {@render children()}
-      {:else if isMobile.current}
-        {@render children()}
-        <WorkspaceSidebar />
       {:else}
         <WorkspacePaneGroup>
           {@render children()}

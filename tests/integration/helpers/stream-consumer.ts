@@ -24,10 +24,10 @@
 import type { ReadableStream } from 'node:stream/web';
 
 export interface ToolCallRecord {
-	readonly toolCallId: string;
-	readonly toolName: string;
-	readonly input: unknown;
-	readonly output: unknown;
+	toolCallId: string;
+	toolName: string;
+	input: unknown;
+	output: unknown;
 }
 
 export interface DataEvent {

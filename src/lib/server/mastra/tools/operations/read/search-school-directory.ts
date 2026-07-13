@@ -1,10 +1,11 @@
 import { z } from "zod";
 import { createTool } from "@mastra/core/tools";
 import { like } from "drizzle-orm";
-import type { TenantContext } from "../../../tenant-context";
+import type { TenantContext } from "tenant-context";
 import { StudentRepository } from "../../../../repository/student.repo";
 import { StaffRepository } from "../../../../repository/staff.repo";
 import { smStaffs } from "../../../../db/sms-schema";
+import { bridgeToolContext } from "../../internal/bridge";
 
 export type SearchCandidate = {
   id: number | string;
@@ -101,12 +102,8 @@ export const searchSchoolDirectoryTool = createTool({
   description: "Search the school directory for students or staff by name, admission number, or class context.",
   inputSchema: searchEntitySchema,
   execute: async (input, context) => {
-    const ctx = context as {
-      tenantContext: TenantContext;
-      getRepo: <T>(RepoClass: { new(...args: never[]): T }) => T;
-      audit?: { threadId?: string; modelId?: string };
-    };
-    const { tenantContext, getRepo } = ctx;
+    const ctx = await bridgeToolContext(context);
+    const { tenantContext, getRepo, audit } = ctx;
     const studentRepo = getRepo(StudentRepository);
     const staffRepo = getRepo(StaffRepository);
 
@@ -140,8 +137,8 @@ export const searchSchoolDirectoryTool = createTool({
               "Cannot list students without a class/section context. Provide classId/sectionId in the input or set the active workspace context.",
             audit: {
               source: "context_fallback",
-              threadId: ctx.audit?.threadId,
-              modelId: ctx.audit?.modelId,
+              threadId: audit?.threadId,
+              modelId: audit?.modelId,
             },
           } satisfies SearchResult;
         }
@@ -188,8 +185,8 @@ export const searchSchoolDirectoryTool = createTool({
     }
 
     return searchEntityLogic({ ...tenantContext, classId: resolvedClassId, sectionId: resolvedSectionId }, input.query, matches, {
-      threadId: ctx.audit?.threadId,
-      modelId: ctx.audit?.modelId,
+      threadId: audit?.threadId,
+      modelId: audit?.modelId,
     });
   },
   toModelOutput: (output: unknown) => {

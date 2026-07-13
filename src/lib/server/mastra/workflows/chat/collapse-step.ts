@@ -7,7 +7,6 @@ export const collapseStep = createStep({
 	inputSchema: z.array(fileStreamItemSchema),
 	outputSchema: workflowEnvelopeSchema,
 	execute: async ({ inputData, getInitData }) => {
-		console.log("COLLAPSE HIT");
 		const initial = getInitData() as z.infer<typeof chatWorkflowInputSchema>;
 		return {
 			threadId: initial.threadId,

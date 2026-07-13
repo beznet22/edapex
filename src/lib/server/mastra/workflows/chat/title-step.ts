@@ -8,8 +8,6 @@ export const titleStep = createStep({
 	inputSchema: chatWorkflowInputSchema,
 	outputSchema: z.object({}),
 	execute: async ({ inputData, writer, mastra: m }) => {
-		console.log("TITLE HIT");
-
 		const agent = m?.getAgent('assistant');
 		const memory = agent ? await agent.getMemory() : undefined;
 		try {

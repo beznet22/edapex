@@ -9,7 +9,7 @@ import type {
   StreamDataPart,
 } from "$lib/types/chat-types";
 import { Chat } from "@ai-sdk/svelte";
-import { DefaultChatTransport, lastAssistantMessageIsCompleteWithToolCalls, type ChatStatus } from "ai";
+import { DefaultChatTransport, lastAssistantMessageIsCompleteWithToolCalls, lastAssistantMessageIsCompleteWithApprovalResponses, type ChatStatus } from "ai";
 import { getContext, setContext } from "svelte";
 import { ChatHistory } from "./chat-history.svelte";
 import type { ClassSection } from "$lib/types/result-types";
@@ -68,26 +68,11 @@ export class ChatUsageState {
   static fromContext(): ChatUsageState {
     const existing = getContext<ChatUsageState>(CHAT_USAGE_KEY);
     if (existing) return existing;
-    // Fallback for components rendered outside the chat layout (e.g. the
-    // root +layout.svelte that mounts the settings modal). Returns a
-    // zero-state holder; the consumer should not rely on it being the
-    // shared instance.
     return new ChatUsageState();
   }
 }
 
-/** Shared singleton used by the indicator + accumulator without a context lookup. */
 export const chatUsage = new ChatUsageState();
-
-/**
- * Tracks the active rate limit surfaced by the workflow's auto-retry loop.
- * Updated from the stream's `data-rateLimit` parts and cleared on
- * `#onFinish` so the banner only persists for the in-flight message.
- * Per-chat-context (see `setContext` in the chat context constructor), with
- * a module-level singleton kept for symmetry with `chatUsage` — components
- * should prefer `RateLimitState.fromContext()` so they read the active
- * chat's state.
- */
 export interface ActiveRateLimit {
   providerId: string;
   retryAfterSeconds: number;
@@ -144,20 +129,6 @@ export type MentionPayload = {
   parentContext?: string;
 };
 
-export type PendingGateOption = {
-  id: string;
-  label: string;
-  icon?: string;
-};
-
-export type PendingGate = {
-  runId: string;
-  stepId: string;
-  question: string;
-  options: PendingGateOption[];
-  allowFreeText: boolean;
-};
-
 export type InitChat = {
   initialMessages?: xUIMessage[];
   api?: string;
@@ -179,38 +150,10 @@ export class ChatContext {
   get error() {
     return this.client?.error;
   }
-  get activeWorkflows() {
-    return this.threadData.activeWorkflows;
-  }
-  set activeWorkflows(v) {
-    this.threadData.activeWorkflows = v;
-  }
-  get pendingConfirmation() {
-    return this.threadData.pendingConfirmation;
-  }
-  set pendingConfirmation(v) {
-    this.threadData.pendingConfirmation = v;
-  }
   get runInfo(): { runId: string } | null {
     return this.threadData.runInfo;
   }
-  get awaitingValidation(): string | null {
-    return this.threadData.pendingAwaitingValidation;
-  }
   pendingMentions = $state<MentionPayload[]>([]);
-  pendingGate = $state<PendingGate | null>(null);
-  /** workflow runId from data-runInfo (set by chat route prepend) */
-  activeRunId = $state<string | null>(null);
-  /** artifactId currently in validation flow (set by data-awaitValidation) */
-  pendingValidationArtifactId = $state<string | null>(null);
-  /** validation errors (set by data-validationErrors) */
-  pendingValidationErrors = $state<{ artifactId: string; errors: Array<{ path: string; message: string }> } | null>(null);
-  /** last validation outcome (set by data-validationResult) */
-  lastValidationOutcome = $state<{ artifactId: string; status: 'success' | 'errors' } | null>(null);
-  /** last committed artifact (set by data-committed) — persists for chat lifetime per D15 */
-  lastCommittedArtifactId = $state<string | null>(null);
-  /** per-keystroke edit tracking for ValidateFab mode derivation */
-  editContent = $state<string>('');
   fileReferences = $state<
     {
       key: string;
@@ -241,39 +184,14 @@ export class ChatContext {
   }
   chatHistory = ChatHistory.fromContext();
   #selectedClass: SelectedClass;
-
-  /**
-   * Inspector context for auto-opening the workspace panel when document
-   * streaming begins. Resolved in the constructor via
-   * InspectorContext.fromContext() — InspectorProvider is set up by
-   * (chat)/+layout.svelte BEFORE SharedChatView constructs ChatContext,
-   * so this resolves successfully inside the chat layout. The try/catch
-   * degrades gracefully: if ChatContext is somehow rendered outside the
-   * inspector provider, #inspector stays undefined and the auto-open
-   * path becomes a no-op (the inline Shimmer card still appears in the
-   * chat thread; only the auto-open-of-workspace-panel behavior is lost).
-   */
   #inspector: InspectorContext | undefined;
-  /**
-   * Tracks which document toolCalls have already triggered the workspace
-   * panel auto-open, so the inspector.openChatArtifact call fires
-   * exactly once per toolCallId. Survives component remounts within
-   * the same session because it lives on the ChatContext instance
-   * which is created once per chat route mount.
-   */
   #autoOpenedToolCallIds = new Set<string>();
   // #selectedAgent removed
 
   constructor({ initialMessages, api, chatData, selectedClass }: InitChat) {
     try {
       this.#inspector = InspectorContext.fromContext();
-    } catch {
-      // Inspector not available — ChatContext rendered outside the chat layout.
-      // Auto-open degrades to no-op; everything else (inline Shimmer card,
-      // streaming Markdown render, EditorCanvas) keeps working because they
-      // read from the module-level `documentStreams` export in
-      // `thread-data.svelte.ts` plus `chat.messages`, not the inspector.
-    }
+    } catch { }
 
     this.usage = new ChatUsageState();
     this.usage.setContext();
@@ -290,6 +208,7 @@ export class ChatContext {
       new Chat<xUIMessage>({
         id: chatData?.threadId,
         messages: initialMessages,
+        sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithApprovalResponses,
         transport: new DefaultChatTransport({
           api,
           prepareSendMessagesRequest: this.#prepareSendMessagesRequest.bind(this),
@@ -321,23 +240,9 @@ export class ChatContext {
   }
 
   #prepareSendMessagesRequest = ({ messages, id }: { messages: xUIMessage[]; id?: string }) => {
-    // Reset the data-chat received flag at the start of each new stream
     this.threadData.resetReceived();
-    // Clear any prior turn's error so a new send doesn't render the old alert
     this.lastError = null;
-    // Clear any pending gate from a prior turn so the ActionBar doesn't
-    // linger on the new stream (it represents a previous suspended workflow).
-    this.pendingGate = null;
-
     const api = "/api/chat";
-
-    // Always send the full messages array. The previous
-    // `this.user ? [lastMessage] : messages` ternary was wrong on both
-    // branches: `sendMessage` doesn't need single-message optimization
-    // (AI SDK already passes the full array), and `addToolOutput` resume
-    // NEEDS the full array — including the user prompt, prior turns, and
-    // the assistant message with the tool result — so the server-side
-    // agent has context to continue.
     const body: Record<string, any> = {
       messages,
       threadId: id,
@@ -347,13 +252,10 @@ export class ChatContext {
       fileReferences: this.fileReferences.length > 0 ? [...this.fileReferences] : undefined,
     };
 
-    // Include @mention tags if any were selected for this message
     if (this.pendingMentions.length > 0) {
       body.mentions = this.pendingMentions;
       this.pendingMentions = [];
     }
-
-    // Clear file references after capturing them in the payload
     if (this.fileReferences.length > 0) {
       this.fileReferences = [];
     }
@@ -362,36 +264,22 @@ export class ChatContext {
   };
 
   #onFinish = async (msg: { message: { metadata?: Record<string, unknown> } } | undefined) => {
-    // Accumulate token usage from the finished message's metadata
     if (msg?.message?.metadata) {
       chatUsage.accumulate(msg.message.metadata as Partial<LanguageModelUsage>);
     }
 
     this.rateLimit?.clear();
     this.lastError = null;
-
-    this.activeWorkflows = [];
-    this.pendingConfirmation = null;
-    this.pendingGate = null;
-
-    // Only navigate if we have a valid chatId AND conditions require it:
-    // - Skip goto() if no data-chat event was received during stream (URL was already correct)
-    // - Skip goto() if replaceState already updated the URL to /chat/[chatId]
-    // - Otherwise call goto() (e.g., user navigated away during stream)
     if (this.chatData?.threadId) {
       const targetPath = `/chat/${this.chatData.threadId}`;
 
       if (!this.threadData.receivedDataChat) {
-        // No data-chat event received — URL was already correct before stream started
         return;
       }
 
       if (window.location.pathname === targetPath) {
-        // replaceState already handled the URL update — skip to avoid duplicate history entry
         return;
       }
-
-      // URL doesn't match (user navigated away during stream) — redirect back
       goto(targetPath, {
         replaceState: true,
       });
@@ -399,62 +287,48 @@ export class ChatContext {
   };
 
   #onData = (part: StreamDataPart) => {
-    this.threadData.handlePart(part);
-    // console.log("part type", part.type);
-    // Accumulate usage from streamed `data-usage` parts emitted by the
-    // workflow's assistant-step onFinish. End-of-message guar/marksheet please process this documentantee matches
-    // the user's preference (no live-streaming counts).
-    if (part.type === "data-usage") {
-      const data = (part as { data?: LanguageModelUsage }).data;
-      chatUsage.accumulate(data);
-    } else if (part.type === "data-rateLimit") {
-      const data = (part as {
-        data?: { providerId: string; retryAfterSeconds: number; resetAt?: string };
-      }).data;
-      if (data?.providerId && typeof data.retryAfterSeconds === "number") {
-        const resetAt =
-          data.resetAt ?? new Date(Date.now() + data.retryAfterSeconds * 1000).toISOString();
-        this.rateLimit?.start(data.providerId, data.retryAfterSeconds, resetAt);
-        rateLimit.start(data.providerId, data.retryAfterSeconds, resetAt);
-      }
-    } else if (part.type === "data-error") {
-      // Server-categorized error. Trust the discriminator; only re-categorize
-      // if the data isn't a FriendlyAiError (defense-in-depth).
-      const data = (part as { data?: FriendlyAiError | { kind: string } }).data;
-      if (data && typeof data === "object" && "kind" in data) {
-        this.lastError = data as FriendlyAiError;
-      }
-    } else if (part.type === "data-selectOption") {
-      const data = (part as { data?: { options?: PendingGateOption[]; promptText?: string; runId?: string; stepId?: string } }).data;
-      if (data?.options && data.promptText && data.runId && data.stepId) {
-        this.pendingGate = {
-          runId: data.runId,
-          stepId: data.stepId,
-          question: data.promptText,
-          options: data.options,
-          allowFreeText: true
-        };
-      }
-    } else if (part.type === "data-validationResult") {
-    } else if (part.type === "data-awaitValidation") {
-      const data = (part as { data?: { artifactId?: string } }).data;
-      if (data?.artifactId) {
-        (this.threadData as { pendingAwaitingValidation?: string | null }).pendingAwaitingValidation = data.artifactId;
-      }
-    } else if (part.type === "data-streamDocument") {
-      const d = (part as { data?: { documentId?: string; phase?: 'start' | 'delta' | 'end'; delta?: string } }).data;
-      if (!d?.documentId) return;
-      if (d.phase !== 'delta' || typeof d.delta !== 'string') return;
-      const prev = getDocumentStream(d.documentId);
-      patchDocumentStream(d.documentId, {
-        status: prev?.status === 'processing' ? 'streaming' : (prev?.status ?? 'streaming'),
-        content: (prev?.content ?? '') + d.delta,
-        deltaCount: (prev?.deltaCount ?? 0) + 1
-      });
-      if (!this.#autoOpenedToolCallIds.has(d.documentId)) {
-        this.#autoOpenedToolCallIds.add(d.documentId);
-        this.#inspector?.openChatArtifact(d.documentId);
-      }
+    this.threadData.handlePart(part)
+
+    switch (part.type) {
+      case "data-usage":
+        let usage = (part as { data?: LanguageModelUsage }).data;
+        chatUsage.accumulate(usage);
+        break;
+      case "data-rateLimit":
+        let rateLimitData = (part as {
+          data?: { providerId: string; retryAfterSeconds: number; resetAt?: string };
+        }).data;
+        if (rateLimitData?.providerId && typeof rateLimitData.retryAfterSeconds === "number") {
+          const resetAt =
+            rateLimitData.resetAt ?? new Date(Date.now() + rateLimitData.retryAfterSeconds * 1000).toISOString();
+          this.rateLimit?.start(rateLimitData.providerId, rateLimitData.retryAfterSeconds, resetAt);
+          rateLimit.start(rateLimitData.providerId, rateLimitData.retryAfterSeconds, resetAt);
+        }
+        break;
+      case "data-error":
+        // Server-categorized error. Trust the discriminator; only re-categorize
+        // if the data isn't a FriendlyAiError (defense-in-depth).
+        const data = (part as { data?: FriendlyAiError | { kind: string } }).data;
+        if (data && typeof data === "object" && "kind" in data) {
+          this.lastError = data as FriendlyAiError;
+        }
+        break;
+      case "data-streamDocument":
+        const d = (part as { data?: { documentId?: string; phase?: 'start' | 'delta' | 'end'; delta?: string } }).data;
+        if (!d?.documentId) return;
+        if (d.phase !== 'delta' || typeof d.delta !== 'string') return;
+        const prev = getDocumentStream(d.documentId);
+        patchDocumentStream(d.documentId, {
+          status: prev?.status === 'processing' ? 'streaming' : (prev?.status ?? 'streaming'),
+          content: (prev?.content ?? '') + d.delta,
+          deltaCount: (prev?.deltaCount ?? 0) + 1
+        });
+        if (!this.#autoOpenedToolCallIds.has(d.documentId)) {
+          this.#autoOpenedToolCallIds.add(d.documentId);
+          this.#inspector?.openChatArtifact(d.documentId);
+        }
+        break;
+
     }
   };
 
@@ -478,43 +352,12 @@ export class ChatContext {
     });
   };
 
-  /**
-   * AI SDK v5 fires `onToolCall` for every tool call the model makes that
-   * is NOT provider-executed (i.e. for custom tools defined in our
-   * application, including the workflow-as-tool `streamDocument` (formerly streamDocument)).
-   * Verified empirically: Mastra's tool-input-available chunk omits
-   * `providerExecuted` for custom tools (see
-   * `@mastra/core/dist/chunk-QPZ35KK2.cjs:208`), and the client's
-   * `processUIMessageStream` in `ai/dist/index.js:5752` calls
-   * `onToolCall` when `!chunk.providerExecuted` (which is true for our
-   * workflow-as-tool because the field is absent).
-   *
-   * When the LLM calls `streamDocument`, this handler
-   * initializes the transient streaming state in the module-level
-   * `documentStreams` export in `thread-data.svelte.ts`. The inline
-   * ArtifactCard in chat.svelte's `inlineDocumentStreams`
-   * derivation picks up the entry immediately and renders with
-   * `status: 'processing'`.
-   *
-   * NO auto-open happens here — the workspace panel opens on the FIRST
-   * `data-streamDocument` chunk arrival (in `#onData`, step 3) so the
-   * user sees the inline Shimmer transition to 'Extracting' before the
-   * panel opens with content already streaming.
-   *
-   * The server-side execution happens entirely in
-   * `the streamDocument tool`. When it
-   * returns, its outputSchema result lands as a
-   * `tool-streamDocument` part on the assistant message with
-   * `state: 'output-available'` — ArtifactViewer reads that part's
-   * `output` field directly via `$derived.by` to render the EditorCanvas.
-   */
   #onToolCall = ({ toolCall }: { toolCall: { dynamic?: boolean; toolName: string; toolCallId: string; input?: unknown } }) => {
     if (toolCall.toolName !== "streamDocument") return;
     const input = (toolCall.input ?? {}) as {
       contentHash?: string;
       fileName?: string;
     };
-    console.log("TOOL_NAME", toolCall.toolName);
     const documentId = deriveDocumentId(input);
     patchDocumentStream(documentId, {
       format: 'marksheet',
@@ -537,89 +380,76 @@ export class ChatContext {
     }
   };
 
-  setPendingGate = (gate: PendingGate | null): void => {
-    this.pendingGate = gate;
-  };
+  /**
+   * Builds a per-reasoning-block state map for an assistant message.
+   *
+   * Each `reasoning` UI part is paired with its matching `data-reasoning`
+   * data part by occurrence order: the Nth `reasoning` part pairs with
+   * the data part whose id is `${runId}-reasoning-${N}`. The pairing is
+   * positional because the rendered reasoning UI part does not expose
+   * the provider-assigned `chunk.payload.id`. The server
+   * (`assistantStep`) emits the data parts with the same counter, so
+   * emissions and lookups stay aligned across resumes.
+   *
+   * Returns a map keyed by the part's index in `message.parts`, so the
+   * template can do `reasoningStates.get(partIndex)` to get that block's
+   * own `isStreaming` and `duration` — no shared state across blocks.
+   */
+  buildReasoningStateMap = (
+    parts: xUIMessagePart[]
+  ): Map<number, { isStreaming: boolean; duration: number }> => {
+    const map = new Map<number, { isStreaming: boolean; duration: number }>();
 
-  resumePendingGate = (selection: { selectedOptionId: string; freeTextAnswer?: string }): void => {
-    const gate = this.pendingGate;
-    if (!gate) return;
-    this.client.sendMessage(
-      { text: "" },
-      {
-        body: {
-          runId: gate.runId,
-          stepId: gate.stepId,
-          resumeData: {
-            selectedOptionId: selection.selectedOptionId,
-            freeTextAnswer: selection.freeTextAnswer,
-          },
-        },
-      },
-    );
-    this.pendingGate = null;
-  };
-
-  resumeWorkflow(artifactId: string, dropdownOptionId?: string): void {
-    if (!this.activeRunId) {
-      console.warn('[ChatContext] resumeWorkflow called but activeRunId is not set');
-      return;
-    }
-    if (!artifactId) {
-      console.warn('[ChatContext] resumeWorkflow called with empty artifactId');
-      return;
-    }
-    this.pendingValidationArtifactId = artifactId;
-
-    const resumeData: Record<string, unknown> = { artifactId };
-    if (dropdownOptionId) {
-      resumeData.dropdownOptionId = dropdownOptionId;
-    }
-
-    this.client.sendMessage(
-      { text: '' },
-      {
-        body: {
-          threadId: this.chatData?.threadId,
-          runId: this.activeRunId,
-          step: 'awaitValidation',
-          resumeData,
-          selectedClass: this.selectedClass,
-          mentions: [],
-          fileReferences: []
+    let runId: string | null = null;
+    for (const p of parts) {
+      if (p.type === 'data-runInfo') {
+        const data = (p as { data?: { runId?: string } }).data;
+        if (data?.runId) {
+          runId = data.runId;
+          break;
         }
       }
-    );
-  }
-
-  /**
-   * Dismiss the validation HITL without resuming the workflow.
-   *
-   * Clears local state and POSTs to /api/chat/cancel so the suspended
-   * server-side run is terminated cleanly (no orphan libSQL row).
-   *
-   * Defined as an arrow-function property so `this` stays bound when the
-   * method is destructured or passed as a callback from the UI.
-   */
-  cancelValidation = async (): Promise<void> => {
-    this.pendingValidationArtifactId = null;
-    this.threadData.pendingAwaitingValidation = null;
-
-    if (this.activeRunId) {
-      try {
-        await fetch("/api/chat/cancel", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({
-            runId: this.activeRunId,
-            artifactId: this.threadData.pendingAwaitingValidation ?? undefined
-          })
-        });
-      } catch (err) {
-        console.warn("[ChatContext] cancel failed", err);
+    }
+    if (!runId) {
+      for (const p of parts) {
+        if (p.type === 'data-reasoning') {
+          const id = (p as { id?: string }).id;
+          if (id) {
+            const idx = id.lastIndexOf('-reasoning-');
+            if (idx > 0) {
+              runId = id.slice(0, idx);
+              break;
+            }
+          }
+        }
       }
     }
+    if (!runId) return map;
+
+    let reasoningCounter = 0;
+    parts.forEach((p, idx) => {
+      if (p.type !== 'reasoning') return;
+      reasoningCounter += 1;
+      const targetId = `${runId}-reasoning-${reasoningCounter}`;
+
+      let last: { isStreaming: boolean; duration: number } | null = null;
+      for (const q of parts) {
+        if (q.type === 'data-reasoning' && (q as { id?: string }).id === targetId) {
+          const data = (q as { data?: { state?: string; duration?: number } }).data;
+          if (data) {
+            last = {
+              isStreaming: data.state === 'streaming',
+              duration: typeof data.duration === 'number' ? data.duration : 0
+            };
+          }
+        }
+      }
+      if (last) map.set(idx, last);
+    });
+
+    return map;
   };
+
 
   setContext = () => {
     setContext(CHAT_CONTEXT_KEY, this);

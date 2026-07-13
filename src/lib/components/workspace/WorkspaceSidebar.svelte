@@ -9,7 +9,10 @@
 	import { UserContext } from "$lib/context/user-context.svelte";
 	import type { Artifact } from "$lib/types/workspace-types";
 
-	let { open = $bindable(false) }: { open?: boolean } = $props();
+	let {
+		open = $bindable(false),
+		inlineMobileViewer = false,
+	}: { open?: boolean; inlineMobileViewer?: boolean } = $props();
 	const userContext = UserContext.fromContext();
 	const user = $derived(userContext?.user);
 
@@ -31,7 +34,7 @@
 	}
 </script>
 
-{#if !isMobile.current}
+{#if !isMobile.current || inlineMobileViewer}
 	<ArtifactViewer
 		artifacts={desktopArtifacts}
 		activeId={desktopActiveId}
@@ -41,7 +44,9 @@
 {/if}
 
 <!-- Mobile viewer sheet (mounts ArtifactViewer) -->
-<MobileArtifactViewer />
+{#if !inlineMobileViewer}
+	<MobileArtifactViewer />
+{/if}
 
 <!-- Mobile browser sheet (lists thread artifacts) -->
 <ResponsiveSheet

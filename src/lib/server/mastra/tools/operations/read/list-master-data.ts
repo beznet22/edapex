@@ -1,8 +1,8 @@
-import { createTool } from '@mastra/core/tools';
-import { z } from 'zod';
-import { StaffRepository } from '$lib/server/repository/staff.repo';
-import { StudentRepository } from '$lib/server/repository/student.repo';
-import type { MastraToolContext } from '../../../tenant-context';
+import { createTool } from "@mastra/core/tools";
+import { z } from "zod";
+import { StaffRepository } from "$lib/server/repository/staff.repo";
+import { StudentRepository } from "$lib/server/repository/student.repo";
+import type { MastraToolContext } from "$lib/server/mastra/tenant-context";
 
 const listMasterDataSchema = z.object({
 	type: z

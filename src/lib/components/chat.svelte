@@ -23,7 +23,7 @@
     Reasoning,
     ReasoningTrigger,
     ReasoningContent,
-  } from "./prompt-kit/reasoning";
+  } from "$lib/components/ai-elements/reasoning";
   import ToolMessage from "./tool-message.svelte";
   import { Button } from "./ui/button";
   import * as Tooltip from "./ui/tooltip";
@@ -49,9 +49,9 @@
 
   import { cn } from "$lib/utils/shadcn";
   import { onMount } from "svelte";
-  import ActionBar from "./chat/ActionBar.svelte";
   import Loader from "./prompt-kit/loader/loader.svelte";
-    import MentionDropdown from "./chat/MentionDropdown.svelte";
+  import ActionBar from "./chat/ActionBar.svelte";
+  import MentionDropdown from "./chat/MentionDropdown.svelte";
 
   let {
     user,
@@ -93,17 +93,51 @@
     [...chat.messages].reverse().find((m) => m.role === "assistant"),
   );
 
-  const lastValidationMessage = $derived(
-    chat.messages.find((m) => {
-      if (m.role !== "assistant") return false;
-      return m.parts.some((p) => p.type === "data-awaitValidation");
-    }),
-  );
+  // $inspect("Last Assistant Message", lastAssistantMessage);
+  /**
+   * Derives the first pending tool-call approval from the last assistant message.
+   * AI SDK sets state = 'approval-requested' and approval.id when Mastra emits
+   * a tool-call-approval stream chunk for a requireApproval:true tool.
+   * When present, the ActionBar mounts above the ChatComposer.
+   */
+  type ApprovalPart = {
+    type: string;
+    toolCallId: string;
+    toolName: string;
+    state: "approval-requested";
+    approval: { id: string };
+    input: Record<string, unknown>;
+  };
 
-  // DEBUG — temporary toggle to force the ActionBar visible so the wrapper
-  // bg / composer rounded-top layout can be inspected without triggering a
-  // real marksheet validation flow. Revert before shipping.
-  const DEBUG_FORCE_ACTIONBAR = false;
+  const pendingApproval = $derived.by((): ApprovalPart | null => {
+    if (!lastAssistantMessage) return null;
+    for (const part of lastAssistantMessage.parts ?? []) {
+      const p = part as Partial<ApprovalPart>;
+      if (p.state === "approval-requested" && p.approval?.id && p.toolCallId) {
+        return p as ApprovalPart;
+      }
+    }
+    return null;
+  });
+
+  // Disable approval actions while the resumed stream is in flight.
+  const approving = $derived(chat.status === 'submitted' || chat.status === 'streaming');
+
+  async function handleApprove(toolCallId: string): Promise<void> {
+    if (!pendingApproval || approving) return;
+    await chat.client.addToolApprovalResponse({
+      id: pendingApproval.approval.id,
+      approved: true,
+    });
+  }
+
+  async function handleReject(toolCallId: string): Promise<void> {
+    if (!pendingApproval || approving) return;
+    await chat.client.addToolApprovalResponse({
+      id: pendingApproval.approval.id,
+      approved: false,
+    });
+  }
 
   let mentionProps = $state({
     show: false,
@@ -127,27 +161,12 @@
       : null;
   });
 
-  let awaitValidation = $derived(
-    lastValidationMessage?.parts.find((p) => p.type === "data-awaitValidation"),
-  );
-
-  const hasDataFields = $derived(
-    !!lastAssistantMessage?.parts?.some(
-      (p) => p.type === "data-awaitValidation",
-    ),
-  );
-
   const hasVisibleContent = $derived(
     !!lastAssistantMessage?.parts?.some(
       (p) => p.type === "reasoning" || p.type === "text",
     ),
   );
 
-  const reasoningIsStreaming = $derived.by(() => {
-    if (chat.status !== "streaming") return false;
-    if (chat.lastMessage?.id !== lastAssistantMessage?.id) return false;
-    return lastAssistantMessage?.parts?.at(-1)?.type === "reasoning";
-  });
 
   const inlineDocumentStreams = $derived.by(() => {
     const result: Array<{
@@ -291,7 +310,8 @@
       >
         <!-- Add padding bottom so messages don't hide behind floating input -->
         <div class="space-y-6 py-4 mx-auto max-w-3xl px-4 pb-52 sm:pb-56">
-          {#each messagesWithToolSplit as message}
+          {#each messagesWithToolSplit as message, messageIndex}
+            {@const reasoningStates = chat. (message.parts)}
             {@const toolParts = message.toolParts}
             <div class="group relative">
               <Message from={message.role} class="py-0">
@@ -299,15 +319,15 @@
                   variant="flat"
                   class="pb-2 {message.role === 'user' ? 'bg-accent!' : ''}"
                 >
-                  {#each message.parts as part}
+                  {#each message.parts as part, partIndex}
                     {#if part.type === "reasoning"}
+                      {@const reasoningState = reasoningStates.get(partIndex)}
                       <Reasoning
                         class="w-full mb-2"
-                        isStreaming={reasoningIsStreaming}
+                        isStreaming={reasoningState?.isStreaming ?? false}
+                        duration={reasoningState?.duration ?? 0}
                       >
-                        <ReasoningTrigger>
-                          <span class="text-primary">Thinking...</span>
-                        </ReasoningTrigger>
+                        <ReasoningTrigger />
                         <ReasoningContent>
                           <Markdown
                             class="**:text-muted-foreground prose prose-sm dark:prose-invert max-w-none"
@@ -392,23 +412,19 @@
          curve pixels, which is intentional and reads as one card with a
          darker inset. -->
     <div
-      class="pointer-events-auto w-full max-w-[780px] relative z-20 flex flex-col rounded-4xl border border-border/10 shadow-[0_0_50px_-12px_rgba(0,0,0,0.5)] bg-secondary/40 backdrop-blur-3xl"
+      class="pointer-events-auto w-full max-w-[780px] relative z-20 flex flex-col rounded-4xl shadow-[0_0_50px_-12px_rgba(0,0,0,0.5)] bg-secondary/5 backdrop-blur-3xl"
     >
-      {#if DEBUG_FORCE_ACTIONBAR || awaitValidation?.type === "data-awaitValidation"}
+      {#if pendingApproval}
         <ActionBar
-          mode="validation"
-          artifactId={awaitValidation?.data?.artifactId ?? "debug-artifact-id"}
-          validating={chat.pendingValidationArtifactId ===
-            (awaitValidation?.data?.artifactId ?? "debug-artifact-id")}
-          context="Marksheet validation required"
-          subContext={`marksheets/${chat.selectedClass?.classId ?? "?"} · 2nd term`}
-          secondaryLabel="Skip"
-          onSecondary={() => chat.cancelValidation()}
-          dropdownOptions={[
-            { id: "force-commit", label: "Force commit (skip auto-fix)" },
-            { id: "save-only", label: "Save without committing" },
-          ]}
-          onValidate={(id, dropdownId) => chat.resumeWorkflow(id, dropdownId)}
+          toolCallId={pendingApproval.toolCallId}
+          approvalToolName={pendingApproval.toolName}
+          approvalSummary={Object.entries(pendingApproval.input ?? {})
+            .slice(0, 2)
+            .map(([k, v]) => `${k}: ${v}`)
+            .join(" · ")}
+          {approving}
+          onApprove={handleApprove}
+          onReject={handleReject}
         />
       {/if}
       <ChatComposer {user} {readonly} isInitial={false} bind:mentionProps />
@@ -418,7 +434,9 @@
            floats above the entire wrapper (ActionBar + Composer) rather than
            overlapping the ActionBar when it's mounted. -->
       {#if mentionProps.show}
-        <div class="absolute left-0 right-0 bottom-full mb-4 z-50 pointer-events-auto">
+        <div
+          class="absolute left-0 right-0 bottom-full mb-4 z-50 pointer-events-auto"
+        >
           <MentionDropdown
             bind:this={mentionDropdownRef}
             query={mentionProps.query}

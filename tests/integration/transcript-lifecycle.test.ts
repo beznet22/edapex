@@ -20,29 +20,14 @@ import { buildRequestContext } from '$lib/server/helpers/chat-helper';
 import { getModelForTest, TEST_MODEL_ID } from './helpers/tenant';
 import type { TenantContext } from '$lib/server/mastra/tenant-context';
 import type { RequestContext } from '@mastra/core/request-context';
-import type { RequestContextValues } from '$lib/server/mastra/agents';
 import { randomUUID } from 'node:crypto';
-
-async function buildRunContext(tenant: TenantContext): Promise<RequestContext<RequestContextValues>> {
-	const userId = tenant.userId;
-	const modelConfig = await getModelForTest(userId, TEST_MODEL_ID);
-	const ctx: RequestContext<RequestContextValues> = await buildRequestContext({
-		context: tenant,
-		userId,
-		modelId: TEST_MODEL_ID,
-		isSlashCommand: false,
-		lastMessage: ''
-	});
-	ctx.set('modelConfig', modelConfig);
-	return ctx;
-}
 
 async function runTranscriptWorkflow(params: {
 	tenant: TenantContext;
 	prompt: string;
 }): Promise<Awaited<ReturnType<typeof collectStream>>> {
 	const userId = params.tenant.userId;
-	const requestContext: RequestContext<RequestContextValues> = await buildRequestContext({
+	const requestContext: RequestContext<unknown> = await buildRequestContext({
 		context: params.tenant,
 		userId,
 		modelId: TEST_MODEL_ID,

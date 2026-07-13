@@ -6,7 +6,7 @@
  * LibSQLStore in storage.ts and live in the same physical file with the
  * `mastra_` prefix.
  */
-import { sqliteTable, text, integer, unique } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer, unique, primaryKey } from 'drizzle-orm/sqlite-core';
 import { sql } from 'drizzle-orm';
 
 /**
@@ -104,47 +104,6 @@ export const providerAccessPolicy = sqliteTable(
 	})
 );
 
-
-/**
- * Sovereign User Credentials Table
- *
- * Stores user-specific provider credentials keyed by `ProviderId` (branded string).
- * Supports three credential sources:
- * - 'env'         — resolved at request time from process env
- * - 'credential' — encrypted API key stored in `encryptedData.apiKey`
- * - 'custom'      — full custom provider config (baseUrl, apiKey, models, headers)
- */
-export const userCredentials = sqliteTable('user_credentials', {
-	id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
-	userId: integer('user_id').notNull(),
-	providerId: text('provider_id').notNull(),
-	credentialType: text('credential_type').notNull(), // 'env' | 'credential' | 'custom'
-	encryptedData: text('encrypted_data'),
-	priority: integer('priority').notNull().default(1),
-	enabled: integer('enabled').notNull().default(1),
-	createdAt: text('created_at').notNull().default(sql`(datetime('now'))`),
-	updatedAt: text('updated_at').notNull().default(sql`(datetime('now'))`),
-	// Snapshot of models discovered by calling the provider's /models endpoint
-	// at connect time. Encrypted JSON of ModelInfo[]. Falls back to
-	// BUILTIN_MODELS filtered by providerId when this is null.
-	discoveredModels: text('discovered_models'),
-	discoveredAt: text('discovered_at')
-}, (table) => ({
-	unq: unique().on(table.userId, table.providerId)
-}));
-
-/**
- * Per-user model visibility (Settings → Models tab toggles).
- */
-export const userModelVisibility = sqliteTable('user_model_visibility', {
-	id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
-	userId: integer('user_id').notNull(),
-	modelId: text('model_id').notNull(),
-	visible: integer('visible').notNull().default(1),
-	updatedAt: text('updated_at').notNull().default(sql`(datetime('now'))`)
-}, (table) => ({
-	unq: unique().on(table.userId, table.modelId)
-}));
 
 /**
  * Agent Settings Table
@@ -250,67 +209,6 @@ export const potluckConfig = sqliteTable('potluck_config', {
 });
 
 /**
- * Pot-Luck Donations Table
- *
- * Each row is one donated provider API key, encrypted at rest with the
- * school-scoped TOKEN_ENCRYPTION_KEY. Only the user who donated the key
- * (or a school admin/IT) can see the `donatedBy` field; CSV export omits
- * it for privacy. Read by the 4-tier router (tier 2) when no personal
- * credential is available.
- */
-export const potluckDonations = sqliteTable(
-	'potluck_donations',
-	{
-		id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
-		schoolId: integer('school_id').notNull().default(1),
-		providerId: text('provider_id').notNull(),
-		apiKeyEncrypted: text('api_key_encrypted').notNull(),
-		donatedBy: integer('donated_by').notNull(),
-		donatedAt: text('donated_at').notNull().default(sql`(datetime('now'))`),
-		isActive: integer('is_active').notNull().default(1),
-		lastValidatedAt: text('last_validated_at'),
-		lastValidationStatus: text('last_validation_status'),
-		tosAcceptedAt: text('tos_accepted_at'),
-		tosAcceptedBy: integer('tos_accepted_by'),
-		tosVersion: text('tos_version')
-	},
-	(table) => ({
-		// One donation per (school, provider, donor) so a user can't
-		// accidentally donate multiple keys for the same provider.
-		unq: unique().on(table.schoolId, table.providerId, table.donatedBy)
-	})
-);
-
-/**
- * Admin Model Overrides Table
- *
- * School-wide denylist entries. A row with a non-null `modelId` disables a
- * specific model; a row with a null `modelId` disables the entire provider.
- * Seeded and mutated only by the PlatformTab Model Registry section (admin/IT).
- * Read at request time by `availableModels` derivation to filter out disabled
- * provider/model pairs before they reach the chat composer's model-selector.
- */
-export const adminModelOverrides = sqliteTable(
-	'admin_model_overrides',
-	{
-		id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
-		schoolId: integer('school_id').notNull().default(1),
-		providerId: text('provider_id').notNull(),
-		// null when disabling the entire provider; non-null for a single model
-		modelId: text('model_id'),
-		reason: text('reason'),
-		disabledBy: integer('disabled_by').notNull(),
-		disabledAt: text('disabled_at').notNull().default(sql`(datetime('now'))`)
-	},
-	(table) => ({
-		// NULL modelId collapses to a single row per (school, provider) so a
-		// whole-provider disable cannot accidentally collide with itself on
-		// repeated toggles.
-		unq: unique().on(table.schoolId, table.providerId, table.modelId)
-	})
-);
-
-/**
  * Telegram Parent Link Table
  *
  * Maps a Telegram chat_id to a parent record with denormalized school contact
@@ -346,17 +244,36 @@ export const connectTokens = sqliteTable('connect_tokens', {
 	createdAt: text('created_at').notNull().default(sql`(datetime('now'))`),
 });
 
-export type UserCredential = typeof userCredentials.$inferSelect;
-export type UserModelVisibility = typeof userModelVisibility.$inferSelect;
 export type AgentSetting = typeof agentSettings.$inferSelect;
 export type RateLimitStateRow = typeof rateLimitState.$inferSelect;
 export type MastraRun = typeof mastraRuns.$inferSelect;
 export type MastraRunStep = typeof mastraRunSteps.$inferSelect;
 export type TelegramParentLink = typeof telegramParentLink.$inferSelect;
 export type ConnectToken = typeof connectTokens.$inferSelect;
-export type AdminModelOverride = typeof adminModelOverrides.$inferSelect;
 export type PotluckConfig = typeof potluckConfig.$inferSelect;
-export type PotluckDonation = typeof potluckDonations.$inferSelect;
 export type EncryptedCredential = typeof encryptedCredentials.$inferSelect;
 export type ModelVisibility = typeof modelVisibility.$inferSelect;
 export type ProviderAccessPolicy = typeof providerAccessPolicy.$inferSelect;
+
+/**
+ * Platform Provider Discoveries
+ *
+ * School-scoped cache of `/models` responses for env-backed (platform)
+ * providers. Populated lazily by `discoverPlatformProviderModels` and
+ * read by `availability.ts` so platform provider models flow through the
+ * same discovery pipeline as user-connected credentials.
+ */
+export const platformProviderDiscoveries = sqliteTable(
+	'platform_provider_discoveries',
+	{
+		schoolId: integer('school_id').notNull(),
+		providerId: text('provider_id').notNull(),
+		models: text('models').notNull(),
+		discoveredAt: text('discovered_at').notNull().default(sql`(datetime('now'))`)
+	},
+	(table) => ({
+		pk: primaryKey({ columns: [table.schoolId, table.providerId] })
+	})
+);
+
+export type PlatformProviderDiscovery = typeof platformProviderDiscoveries.$inferSelect;

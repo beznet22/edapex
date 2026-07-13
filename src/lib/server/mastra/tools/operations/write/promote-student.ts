@@ -12,6 +12,7 @@ import {
   ForbiddenError,
   type MastraToolContext,
 } from "../../../tenant-context";
+import { bridgeToolContext } from "../../internal/bridge";
 
 export const promoteStudentSchema = z.object({
   studentId: z.number().describe("Numeric ID of the student to promote"),
@@ -159,8 +160,8 @@ export const promoteStudentTool = createTool({
   inputSchema: promoteStudentSchema,
   requireApproval: true,
   execute: async (input: PromoteStudentInput, context: ToolExecutionContext) => {
-    assertMastraToolContext(context);
-    return promoteStudentLogic(context, input);
+    const ctx = await bridgeToolContext(context);
+    return promoteStudentLogic(ctx, input);
   },
   toModelOutput: (output: unknown) => {
     if (!isPromotionResult(output)) {

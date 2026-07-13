@@ -14,7 +14,7 @@ vi.mock("$lib/server/audit-log", () => ({
 // populate the holder → assert the model-selector sees the filtered list.
 import { getAppDb } from "$lib/server/mastra/storage/libsql/app-db";
 import { eq } from "drizzle-orm";
-import { adminModelOverrides } from "$lib/server/mastra/storage/libsql/app-db.schema";
+import { providerAccessPolicy } from "$lib/server/mastra/storage/libsql/app-db.schema";
 import { disableModelOrProvider } from "$lib/server/mastra/provider/admin-model-overrides";
 import { getAvailableModelsForUser } from "$lib/server/mastra/provider/availability";
 import { BUILTIN_MODELS } from "$lib/provider/catalog";
@@ -24,8 +24,8 @@ const SCHOOL = 99998;
 
 async function cleanup(): Promise<void> {
 	await getAppDb()
-		.delete(adminModelOverrides)
-		.where(eq(adminModelOverrides.schoolId, SCHOOL));
+		.delete(providerAccessPolicy)
+		.where(eq(providerAccessPolicy.schoolId, SCHOOL));
 }
 
 describe("availableModels admin-denylist pipeline", () => {

@@ -10,7 +10,7 @@
  * - `isSlashCommand`: Whether the current message is a slash command (activates mutation tools)
  * - `tenantContext`: Tenant isolation boundaries
  */
-import { Agent, type ToolsInput } from '@mastra/core/agent';
+import { Agent } from '@mastra/core/agent';
 import type { MastraModelConfig } from '@mastra/core/llm';
 import {
 	StreamErrorRetryProcessor,
@@ -19,10 +19,9 @@ import {
 import { requestContextSchema, DEFAULT_MODEL, DEFAULT_TITLE_MODEL } from './shared';
 import { createMastraStorage } from '$lib/server/mastra/storage/libsql/mastra-storage';
 import { Memory } from '@mastra/memory';
-import { ensureRegistry, resolveToolsForMessage } from '$lib/server/mastra/skill-tools';
 import { createStep, createWorkflow } from '@mastra/core/workflows';
 import { tenantWorkspace } from '$lib/server/mastra/storage/workspaces';
-import { streamDocumentTool } from '../tools/operations/reporting/marksheet/stream-document';
+import { BASE_AGENT_TOOLS } from '../tools/internal/base-agent-tools';
 import { buildAssistantInstructions } from './skill-instructions';
 import z from 'zod';
 
@@ -126,14 +125,7 @@ export const assistantAgent = new Agent({
 			requestContext as unknown as { get<T = unknown>(key: string): T | undefined }
 		);
 	},
-	tools: async ({ requestContext }) => {
-		const isSlashCommand = requestContext?.get('isSlashCommand') as boolean | undefined;
-		const message = requestContext?.get('lastMessage') as string | undefined;
-
-		await ensureRegistry();
-		const dynamic = (await resolveToolsForMessage(message || '', !!isSlashCommand)) as ToolsInput;
-		return { ...dynamic, streamDocument: streamDocumentTool };
-	},
+	tools: BASE_AGENT_TOOLS,
 	workspace: tenantWorkspace,
 	memory: new Memory({
 		options: {

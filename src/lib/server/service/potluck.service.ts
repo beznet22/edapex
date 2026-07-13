@@ -11,14 +11,20 @@
  * donation alone) or `replace` (overwrite the existing row with the CSV
  * data).
  *
- * All payloads go through `data/audit-log/{schoolId}.jsonl` from the
- * remote-function layer (added in step 6); the service itself does not
- * write audit-log so it can be unit-tested without filesystem side-effects.
+ * Donations now live in the unified `encrypted_credentials` table with
+ * `scope = 'school'` and `credential_kind = 'donation'`. The donor metadata
+ * (donatedBy, tos info, etc.) is encrypted inside `encrypted_data` so the
+ * export path needs `env` to decrypt and re-encrypt for the CSV.
  */
 import { eq, and } from 'drizzle-orm';
 import type { LibSQLDatabase } from 'drizzle-orm/libsql';
 import { createCipheriv, createDecipheriv, pbkdf2Sync, randomBytes, timingSafeEqual } from 'node:crypto';
-import { potluckDonations, type PotluckDonation } from '$lib/server/mastra/storage/libsql/app-db.schema';
+import {
+	encryptedCredentials,
+	type EncryptedCredential
+} from '$lib/server/mastra/storage/libsql/app-db.schema';
+import { decrypt as decryptText, encrypt as encryptText, getEncryptionKey } from '$lib/server/mastra/provider/crypto';
+import type { ProviderId } from '$lib/server/mastra/provider/types';
 
 export type ExportMode = 'metadata-only' | 'encrypted';
 
@@ -59,11 +65,6 @@ const SALT_BYTES = 16;
 const IV_BYTES = 12;
 const AUTH_TAG_BYTES = 16;
 
-/**
- * Maximum CSV payload size the import endpoint will accept. Enforced
- * both at the Zod-schema layer (with +1024 bytes of slack for CSV
- * escaping overhead) and inside the handler as a defense-in-depth check.
- */
 export const POTLUCK_MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 
 export class PotluckUploadTooLargeError extends Error {
@@ -83,7 +84,6 @@ export function assertUploadSize(csv: string): void {
 	}
 }
 
-// CSV columns. Deliberately omits `donatedBy` (no donor PII in the file).
 const CSV_COLUMNS = [
 	'id',
 	'schoolId',
@@ -144,7 +144,6 @@ function parseCsvLine(line: string): string[] {
 }
 
 function parseCsv(input: string): { header: string[]; rows: string[][] } {
-	// Normalize line endings; tolerate CRLF/CR/LF.
 	const text = input.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
 	const lines = text.split('\n').filter((line) => line.length > 0);
 	if (lines.length === 0) return { header: [], rows: [] };
@@ -159,9 +158,6 @@ function parseCsv(input: string): { header: string[]; rows: string[][] } {
 // ────────────────────────────── crypto helpers ──────────────────────────────
 
 function deriveKey(passphrase: string, schoolName: string): { key: Buffer; salt: Buffer } {
-	// schoolName doubles as a per-school salt. Combined with the fixed PBKDF2
-	// salt-length this gives stable, school-scoped keys without leaking the
-	// school name itself.
 	const salt = Buffer.alloc(SALT_BYTES);
 	Buffer.from(schoolName, 'utf8').copy(salt, 0, 0, Math.min(schoolName.length, SALT_BYTES));
 	const key = pbkdf2Sync(passphrase, salt, PBKDF2_ITERATIONS, KEY_BYTES, 'sha256');
@@ -199,12 +195,6 @@ export function decryptKey(blob: string, passphrase: string, schoolName: string)
 	}
 }
 
-/**
- * Returns true when the passphrase matches the encrypted blob's auth tag.
- * Uses timingSafeEqual on the auth tag derived from a fresh encrypt of an
- * empty string so the check always takes the same time. This is the only
- * fast way to reject a wrong passphrase without trying to decrypt.
- */
 export function verifyPassphrase(blob: string, passphrase: string, schoolName: string): boolean {
 	const probe = encryptKey('probe', passphrase, schoolName);
 	const a = Buffer.from(blob, 'base64');
@@ -213,47 +203,103 @@ export function verifyPassphrase(blob: string, passphrase: string, schoolName: s
 	return timingSafeEqual(a, b);
 }
 
+// ────────────────────────────── donation payload helpers ──────────────────────────────
+
+interface DonationPayload {
+	apiKey: string;
+	donatedBy: number;
+	donatedAt: string;
+	tosAcceptedAt: string | null;
+	tosAcceptedBy: number | null;
+	tosVersion: string | null;
+}
+
+function decodePayload(encryptedData: string, env: Record<string, string | undefined>): DonationPayload {
+	const decrypted = decryptText(encryptedData, getEncryptionKey(env));
+	return JSON.parse(decrypted) as DonationPayload;
+}
+
+function encodePayload(payload: DonationPayload, env: Record<string, string | undefined>): string {
+	return encryptText(JSON.stringify(payload), getEncryptionKey(env));
+}
+
+function rowToDonation(
+	row: EncryptedCredential,
+	env: Record<string, string | undefined>
+): {
+	id: string;
+	schoolId: number;
+	providerId: string;
+	apiKeyEncrypted: string;
+	donatedBy: number;
+	donatedAt: string;
+	isActive: number;
+	lastValidatedAt: string | null;
+	lastValidationStatus: string | null;
+	tosAcceptedAt: string | null;
+	tosAcceptedBy: number | null;
+	tosVersion: string | null;
+} {
+	const payload = decodePayload(row.encryptedData, env);
+	return {
+		id: row.id,
+		schoolId: row.schoolId ?? 0,
+		providerId: row.providerId,
+		apiKeyEncrypted: row.encryptedData,
+		donatedBy: payload.donatedBy,
+		donatedAt: payload.donatedAt,
+		isActive: row.enabled,
+		lastValidatedAt: null,
+		lastValidationStatus: null,
+		tosAcceptedAt: payload.tosAcceptedAt,
+		tosAcceptedBy: payload.tosAcceptedBy,
+		tosVersion: payload.tosVersion
+	};
+}
+
 // ────────────────────────────── export ──────────────────────────────
 
-/**
- * Export all donations (active + inactive) for a school as CSV. The `key`
- * column is either empty (metadata-only mode) or an AES-256-GCM encrypted
- * blob (encrypted mode). The donor field is deliberately excluded for
- * privacy.
- */
 export async function exportDonations(
 	db: LibSQLDatabase<any>,
+	env: Record<string, string | undefined>,
 	schoolId: number,
 	options: ExportOptions
 ): Promise<ExportResult> {
 	const rows = await db
 		.select()
-		.from(potluckDonations)
-		.where(eq(potluckDonations.schoolId, schoolId));
+		.from(encryptedCredentials)
+		.where(
+			and(
+				eq(encryptedCredentials.scope, 'school'),
+				eq(encryptedCredentials.credentialKind, 'donation'),
+				eq(encryptedCredentials.schoolId, schoolId)
+			)
+		);
 
 	const lines: string[] = [csvRow(CSV_COLUMNS as readonly string[])];
 	for (const row of rows) {
+		const donation = rowToDonation(row, env);
 		const keyField =
 			options.mode === 'metadata-only'
 				? ''
 				: options.passphrase && options.schoolName
-					? encryptKey(row.apiKeyEncrypted, options.passphrase, options.schoolName)
+					? encryptKey(donation.apiKeyEncrypted, options.passphrase, options.schoolName)
 					: '';
 		lines.push(
 			csvRow([
-				row.id,
-				String(row.schoolId),
-				row.providerId,
+				donation.id,
+				String(donation.schoolId),
+				donation.providerId,
 				keyField,
-				row.donatedAt ?? '',
-				String(row.isActive),
-				row.lastValidatedAt ?? '',
-				row.lastValidationStatus ?? '',
-				row.tosAcceptedAt ?? '',
-				row.tosAcceptedBy !== null && row.tosAcceptedBy !== undefined
-					? String(row.tosAcceptedBy)
+				donation.donatedAt ?? '',
+				String(donation.isActive),
+				donation.lastValidatedAt ?? '',
+				donation.lastValidationStatus ?? '',
+				donation.tosAcceptedAt ?? '',
+				donation.tosAcceptedBy !== null && donation.tosAcceptedBy !== undefined
+					? String(donation.tosAcceptedBy)
 					: '',
-				row.tosVersion ?? ''
+				donation.tosVersion ?? ''
 			])
 		);
 	}
@@ -265,7 +311,7 @@ export async function exportDonations(
 interface ParsedRow {
 	id: string;
 	schoolId: number;
-	providerId: string;
+	providerId: ProviderId;
 	keyEncryptedBlob: string;
 	donatedAt: string;
 	isActive: number;
@@ -331,18 +377,13 @@ function validateRow(
 			failures.push({ rowIndex, reason: 'wrong_passphrase_or_corrupt_key', rawId: id });
 			return null;
 		}
-		// `decrypted` is the original at-rest ciphertext (the
-		// donation's `apiKeyEncrypted` column as stored by the donor flow).
-		// We store it as-is so the 4-tier router's `decrypt()` continues
-		// to read it with the server key on the next request — no
-		// double-encryption.
 		keyEncryptedBlob = decrypted;
 	}
 
 	return {
 		id,
 		schoolId,
-		providerId,
+		providerId: providerId as ProviderId,
 		keyEncryptedBlob,
 		donatedAt,
 		isActive,
@@ -354,35 +395,30 @@ function validateRow(
 	};
 }
 
-function reencryptWithServerKey(_plaintext: string): never {
-	throw new Error('reencryptWithServerKey is no longer used');
-}
-void reencryptWithServerKey;
-
-/**
- * Import donations from a CSV. Lenient: valid rows are applied, invalid
- * rows are collected into `failures` with a reason. Existing rows are
- * either skipped (default) or replaced based on `conflictStrategy`.
- *
- * Note: the schema enforces UNIQUE(school_id, provider_id, donated_by);
- * since we don't track `donatedBy` here, we treat the row's `id` as the
- * de-dupe key. If the imported `id` already exists in the DB we apply
- * the conflictStrategy against that row; otherwise we INSERT a new row.
- */
 export async function importDonations(
 	db: LibSQLDatabase<any>,
+	env: Record<string, string | undefined>,
 	csv: string,
 	options: ImportOptions
 ): Promise<ImportResult> {
 	const { header, rows } = parseCsv(csv);
 	const failures: ImportFailure[] = [];
-	const encrypted = header.includes('key') && rows.some((r) => (r[header.indexOf('key')] ?? '').length > 0);
+	const encrypted =
+		header.includes('key') && rows.some((r) => (r[header.indexOf('key')] ?? '').length > 0);
 	if (encrypted && !options.passphrase) {
 		failures.push({ rowIndex: 0, reason: 'passphrase_required' });
 	}
 	const parsed: ParsedRow[] = [];
 	for (let i = 0; i < rows.length; i++) {
-		const row = validateRow(i + 1, header, rows[i], encrypted, options.passphrase, options.schoolName, failures);
+		const row = validateRow(
+			i + 1,
+			header,
+			rows[i],
+			encrypted,
+			options.passphrase,
+			options.schoolName,
+			failures
+		);
 		if (row) parsed.push(row);
 	}
 
@@ -393,43 +429,61 @@ export async function importDonations(
 	for (const row of parsed) {
 		const existing = await db
 			.select()
-			.from(potluckDonations)
-			.where(and(eq(potluckDonations.id, row.id), eq(potluckDonations.schoolId, row.schoolId)))
+			.from(encryptedCredentials)
+			.where(
+				and(
+					eq(encryptedCredentials.id, row.id),
+					eq(encryptedCredentials.scope, 'school'),
+					eq(encryptedCredentials.credentialKind, 'donation')
+				)
+			)
 			.limit(1);
+
+		const now = new Date().toISOString();
+		const payload: DonationPayload = {
+			apiKey: row.keyEncryptedBlob,
+			donatedBy: 1,
+			donatedAt: row.donatedAt,
+			tosAcceptedAt: row.tosAcceptedAt,
+			tosAcceptedBy: row.tosAcceptedBy,
+			tosVersion: row.tosVersion
+		};
+		const encryptedData =
+			row.keyEncryptedBlob || existing[0]
+				? encodePayload(
+						row.keyEncryptedBlob
+							? payload
+							: decodePayload(existing[0].encryptedData, env),
+						env
+				  )
+				: '';
+
 		if (existing[0]) {
 			if (options.conflictStrategy === 'skip') {
 				skipped++;
 				continue;
 			}
 			await db
-				.update(potluckDonations)
+				.update(encryptedCredentials)
 				.set({
 					providerId: row.providerId,
-					apiKeyEncrypted: row.keyEncryptedBlob || existing[0].apiKeyEncrypted,
-					donatedAt: row.donatedAt,
-					isActive: row.isActive,
-					lastValidatedAt: row.lastValidatedAt,
-					lastValidationStatus: row.lastValidationStatus,
-					tosAcceptedAt: row.tosAcceptedAt,
-					tosAcceptedBy: row.tosAcceptedBy,
-					tosVersion: row.tosVersion
+					encryptedData,
+					enabled: row.isActive,
+					updatedAt: now
 				})
-				.where(eq(potluckDonations.id, row.id));
+				.where(eq(encryptedCredentials.id, row.id));
 			replaced++;
 		} else {
-			await db.insert(potluckDonations).values({
+			await db.insert(encryptedCredentials).values({
 				id: row.id,
+				scope: 'school',
+				credentialKind: 'donation',
+				userId: null,
 				schoolId: row.schoolId,
 				providerId: row.providerId,
-				apiKeyEncrypted: row.keyEncryptedBlob || '',
-				donatedBy: 1,
-				donatedAt: row.donatedAt,
-				isActive: row.isActive,
-				lastValidatedAt: row.lastValidatedAt,
-				lastValidationStatus: row.lastValidationStatus,
-				tosAcceptedAt: row.tosAcceptedAt,
-				tosAcceptedBy: row.tosAcceptedBy,
-				tosVersion: row.tosVersion
+				encryptedData,
+				priority: 1,
+				enabled: row.isActive
 			});
 			imported++;
 		}
@@ -437,5 +491,3 @@ export async function importDonations(
 
 	return { imported, skipped, replaced, failures };
 }
-
-export type { PotluckDonation };

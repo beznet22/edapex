@@ -272,7 +272,24 @@
 	}
 
 	const viewingId = $derived(activeId ?? artifacts[0]?.id ?? null);
-	const current = $derived(artifacts.find((a) => a.id === viewingId) ?? null);
+	const current = $derived.by((): Artifact | null => {
+		const found = artifacts.find((a) => a.id === viewingId);
+		if (found) return found;
+		// Streamed documents are not added to inspector.chatArtifacts, but the
+		// workspace panel still needs a current artifact to render header actions.
+		if (effectiveStatus === "success" && persistedMarkdownPath) {
+			return {
+				id: viewingId,
+				title: displayTitle,
+				kind: "document" as const,
+				content: entry?.content ?? "",
+				url: `/api/file/${persistedMarkdownPath}`,
+				saveUrl: `/api/file/${persistedMarkdownPath}`,
+				status: "success" as const,
+			};
+		}
+		return null;
+	});
 	// Effective streaming state: prefer the merged tool output / stream-entry
 	// status so the header actions are disabled while the artifact is still
 	// being formatted by `streamDocument` or persisted by `validate-marksheet`,
@@ -655,8 +672,7 @@
 						saveUrl={`/api/file/${persistedMarkdownPath}`}
 						content={entry?.content ?? ""}
 						type="text"
-						streaming={entry?.status === "streaming" ||
-							entry?.status === "processing"}
+						streaming={isStreaming}
 						{user}
 						artifactId={toolOutput?.artifactId ?? ""}
 					/>

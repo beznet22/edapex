@@ -16,7 +16,11 @@ import {
   setAllModelVisibility as setAllModelVisibilityFn,
   getHiddenModelIdsForUser
 } from "$lib/server/mastra/provider/visibility";
-import { getAvailableModelsForUser, type AugmentedModelInfo } from "$lib/server/mastra/provider/availability";
+import {
+  getAvailableModelsForUser,
+  getAllDiscoveredModelsForSettings,
+  type AugmentedModelInfo
+} from "$lib/server/mastra/provider/availability";
 import { CustomProviderEncryptedDataSchema } from "$lib/server/mastra/provider/spec";
 import { SUPPORTED_PROVIDER_IDS } from "$lib/provider/catalog";
 import { agentSettings } from "$lib/server/mastra/storage/libsql/app-db.schema";
@@ -457,6 +461,34 @@ export const getAvailableModels = command(
   }
 );
 
+type GetSettingsModelsResult =
+  | { success: true; models: AugmentedModelInfo[] }
+  | { success: false; message: string };
+
+export const getSettingsModels = command(
+  z.object({}),
+  async (): Promise<GetSettingsModelsResult> => {
+    const auth = getStrictUserId();
+    if (isAuthFailure(auth)) {
+      return { success: false, message: auth.error };
+    }
+
+    try {
+      const db = getAppDb();
+      const models = await getAllDiscoveredModelsForSettings(
+        db,
+        envKeys,
+        auth.user.id,
+        auth.user.schoolId ?? 1
+      );
+      return { success: true, models };
+    } catch (err) {
+      console.error("[getSettingsModels] Failed to resolve settings models:", err);
+      return { success: false, message: 'Failed to fetch settings models' };
+    }
+  }
+);
+
 interface PlatformDefault {
   providerId: ProviderId;
   hasEnvKey: boolean;
@@ -540,7 +572,7 @@ export const exportPotluckDonations = command(
     const schoolId = typeof auth.user.schoolId === "number" ? auth.user.schoolId : 1;
     const schoolName = await resolveSchoolNameForUser(auth);
     try {
-      const result = await exportDonationsFn(getAppDb(), schoolId, {
+      const result = await exportDonationsFn(getAppDb(), envKeys, schoolId, {
         mode,
         passphrase: mode === "encrypted" ? passphrase : undefined,
         schoolName
@@ -601,7 +633,7 @@ export const importPotluckDonations = command(
     }
     const schoolName = await resolveSchoolNameForUser(auth);
     try {
-      const result = await importDonationsFn(getAppDb(), csv, {
+      const result = await importDonationsFn(getAppDb(), envKeys, csv, {
         passphrase: passphrase && passphrase.length > 0 ? passphrase : undefined,
         schoolName,
         conflictStrategy

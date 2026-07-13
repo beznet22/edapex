@@ -121,6 +121,16 @@ async function discoverFixture(): Promise<ResolvedFixture> {
 			`No active class sections found for schoolId=${schoolId}, academicId=${academicId}. Live E2E tests require at least one active (class, section).`
 		);
 	}
+	if (
+		firstSection.classId === null ||
+		firstSection.classId === undefined ||
+		firstSection.sectionId === null ||
+		firstSection.sectionId === undefined
+	) {
+		throw new Error(
+			`Invalid class section tuple for schoolId=${schoolId}, academicId=${academicId}`
+		);
+	}
 	const classId = firstSection.classId;
 	const sectionId = firstSection.sectionId;
 
@@ -155,7 +165,7 @@ async function discoverFixture(): Promise<ResolvedFixture> {
 	const students = await studentRepo.getStudentsByClassSection({ classId, sectionId });
 	const studentId = (students as Array<{ id: number }>)[0]?.id ?? 0;
 
-	cached = {
+	const result: ResolvedFixture = {
 		schoolId,
 		classId,
 		sectionId,
@@ -166,7 +176,8 @@ async function discoverFixture(): Promise<ResolvedFixture> {
 		studentId,
 		designationId: ALLOWED_DESIGNATIONS.IT
 	};
-	return cached;
+	cached = result;
+	return result;
 }
 
 /**

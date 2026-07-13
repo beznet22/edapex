@@ -177,7 +177,7 @@ async function tryTier2Pool(args: {
 		};
 	}
 
-	const donation = await findActiveDonationForProvider(db, schoolId, providerId);
+	const donation = await findActiveDonationForProvider(db, env, schoolId, providerId);
 	if (!donation) {
 		return {
 			result: null,

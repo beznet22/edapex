@@ -89,11 +89,11 @@
 
 
 **Task 1 — Dynamic Thinking UI**
+- Redesign the Thinking test to be dynamic, slick and modern, should have a shimmer effect when thinking, then no shimmer when done. the shimer should be only on the thinking text. change to "Thought for N mins N secs" only should appear after the thinking is done. add your own optimization modern industry recommendations,
 - the BrainIcon/statuse aware icon is currently not showing up, we need to make it visible. please debug
 - the thinking text should be muted/grayed out slightly (`text-muted-foreground`)
 - we already have a shimmer component in src/lib/components/ai-elements/shimmer
-- Structured reasoning content, should be done during the assistant agent /llm reasoning process, the assistant agent should output a structured reasoning content based on the prompt, then it should display it to the user in a structured format. the thinking process is for the user to understand how the agent arrived at the final response, not for the agent to just output a bunch of text. (no need for a parseReasoningSections funtion, and don't use `parseReasoningSections`)
-- Thinking should be collaped by default, but can be expanded by clicking on the thinking text or brain icon/status aware icon
+- Thinking should be collaped by default, should be be expanded only when the user clicks on the "Thinking" text or the brain icon/status aware icon.
 - use tailwind for any new styles or components, ensure consistency with the existing styles and components
 
 **Task 2 — Variant Selection + Thinking Effort Mapping **

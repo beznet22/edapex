@@ -260,7 +260,7 @@ describe('LB2B marksheet lifecycle — Al-Azeem YUSUFF (sid=188)', () => {
 				provider
 			);
 			const rows = await timelineRepo
-				.getTimelinesByStudentId({ studentId: 188, academicId: 4 })
+				.getTimelinesByStudentId(188)
 				.catch(() => []);
 			const published = rows.filter((r) =>
 				/published|sent|publish-result/i.test(String(r.title ?? ''))

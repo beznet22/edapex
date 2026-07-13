@@ -125,7 +125,7 @@ async function resolveDisplayContext(ctx: TenantLike): Promise<DisplayContext> {
  */
 async function getClassRoster(
   ctx: TenantLike
-): Promise<Array<{ name: string; admissionNo?: string }>> {
+): Promise<Array<{ id: number; name: string; admissionNo?: string }>> {
   if (ctx.classId == null || ctx.sectionId == null || ctx.academicId == null) return [];
   const db = await getDatabase();
   const rows = await db
@@ -149,6 +149,7 @@ async function getClassRoster(
     .orderBy(asc(smStudents.fullName));
 
   return rows.map((r) => ({
+    id: r.id,
     name: r.fullName?.trim() || `Student #${r.id}`,
     admissionNo: r.admissionNo != null ? String(r.admissionNo) : undefined,
   }));
@@ -197,16 +198,6 @@ export async function buildAssistantInstructions(
     '4. Use only the domain data provided (tenant context below, file manifest, message context).',
     '5. Domain-specific rules (marksheets, transcripts, enrollment, etc.) live in the loaded SKILL — follow the active skill\'s instructions for tool sequencing and intent interpretation.',
     '',
-    '### END GLOBAL RULES ###',
-    '',
-    '### THINKING FORMAT (structured reasoning) ###',
-    'When you need to reason before answering or calling tools, ALWAYS emit a thinking block at the start of your response using the exact markers below. The UI extracts these blocks into a collapsible "Thinking" panel — content outside the markers is shown to the user as the final answer.',
-    '### Thinking: <concise title summarizing your reasoning>',
-    '<your step-by-step reasoning, observations, tradeoffs, and intermediate conclusions>',
-    '### End of Thinking',
-    '',
-    'After the End of Thinking marker, produce ONLY the user-facing answer, tool call, or next step. Do not embed additional reasoning after the marker.',
-    '',
     '### FILE RETRIEVAL DISCIPLINE ###',
     'When the user references an existing file or you need to read a workspace artifact:',
     '1. Locate the file via the FILE MANIFEST section below — use the exact `contentHash` (also known as `fileId`). Never invent file identifiers.',
@@ -248,7 +239,7 @@ export async function buildAssistantInstructions(
       const visible = roster.slice(0, MAX_ROSTER);
       for (const r of visible) {
         instructions.push(
-          `- ${r.name}${r.admissionNo ? ` (Adm#${r.admissionNo})` : ''}`
+          `- ${r.name}${r.admissionNo ? ` (Adm#${r.admissionNo})` : ''} [studentId=${r.id}]`
         );
       }
       if (roster.length > MAX_ROSTER) {
@@ -287,24 +278,24 @@ export async function buildAssistantInstructions(
     );
   }
 
-  if (isSlashCommand === true && typeof lastMessage === 'string' && lastMessage.length > 0) {
-    await ensureRegistry();
-    const skillName = resolveSkillName(lastMessage, true);
-    if (skillName) {
-      const skill = skillRegistry.getSkill(skillName);
-      if (skill?.instructions) {
-        instructions.push(
-          '',
-          `### SKILL INSTRUCTIONS — ${skill.name || skillName} ###`,
-          skill.instructions,
-          '',
-          '### END SKILL INSTRUCTIONS ###',
-          '',
-          'Follow the SKILL INSTRUCTIONS above precisely when handling this slash command.'
-        );
-      }
-    }
-  }
+  // if (isSlashCommand === true && typeof lastMessage === 'string' && lastMessage.length > 0) {
+  //   await ensureRegistry();
+  //   const skillName = resolveSkillName(lastMessage, true);
+  //   if (skillName) {
+  //     const skill = skillRegistry.getSkill(skillName);
+  //     if (skill?.instructions) {
+  //       instructions.push(
+  //         '',
+  //         `### SKILL INSTRUCTIONS — ${skill.name || skillName} ###`,
+  //         skill.instructions,
+  //         '',
+  //         '### END SKILL INSTRUCTIONS ###',
+  //         '',
+  //         'Follow the SKILL INSTRUCTIONS above precisely when handling this slash command.'
+  //       );
+  //     }
+  //   }
+  // }
 
   return instructions.join('\n');
 }

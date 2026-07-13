@@ -1,29 +1,112 @@
 /**
- * Per-user model availability — V2.
+ * Per-user model availability — V3.
  *
- * Slimmed from V1:
- * - Drops the platform-default synthesis loop (the V2 resolver does the
- *   user-credential → env-fallback resolution inline, so a separate
- *   "platform default" virtual credential row is no longer needed).
- * - Keeps the BUILTIN + user-discovered merge with visibility filtering.
+ * Returns only models that have been discovered via a provider's `/models`
+ * endpoint (no static catalog fallback). Sources:
+ * - User-connected credentials: discoveries stored on the credential row.
+ * - Platform (env-backed) providers: discoveries cached in
+ *   `platform_provider_discoveries`. A provider that is admin-disabled
+ *   platform-wide (`admin_model_overrides` with `modelId = null`) is
+ *   skipped entirely unless the user has connected their own key, which
+ *   overrides the platform decision.
  *
  * Used by the model selector and the SSR auto-pick.
  */
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import type { LibSQLDatabase } from 'drizzle-orm/libsql';
-import { userCredentials } from '$lib/server/mastra/storage/libsql/app-db.schema';
+import { encryptedCredentials } from '$lib/server/mastra/storage/libsql/app-db.schema';
 import type { AugmentedModelInfo } from '$lib/provider/spec';
 import type { ModelInfo } from '$lib/provider/spec';
 import type { ProviderId } from '$lib/provider/types';
-import { BUILTIN_MODELS, getModelsByProvider } from '$lib/provider/catalog';
-import { getDiscoveredModelsForUser } from './discovery';
+import { BUILTIN_MODELS } from '$lib/provider/catalog';
+import {
+	getCachedPlatformProviderModels,
+	getDiscoveredModelsForUser
+} from './discovery';
 import { getCachedHiddenModelIdsForUser } from './cache';
 import { applyAdminDenylist, listAdminOverrides } from './admin-model-overrides';
+import { PLATFORM_ENV_KEYS } from './credentials';
 
 export type { AugmentedModelInfo } from '$lib/provider/spec';
 
+/**
+ * Returns every discovered model for a user across user credentials AND
+ * platform providers, without applying the user-hidden or admin-denylist
+ * filters. Used by the Settings → Models tab so users can re-enable
+ * models they previously hid. The model selector continues to use
+ * `getAvailableModelsForUser` for its filtered view.
+ */
+export async function getAllDiscoveredModelsForSettings(
+	db: LibSQLDatabase<any>,
+	env: Record<string, string | undefined>,
+	userId: number,
+	schoolId: number = 1
+): Promise<AugmentedModelInfo[]> {
+	const credentialRows = await db
+		.select()
+		.from(encryptedCredentials)
+		.where(and(eq(encryptedCredentials.scope, 'user'), eq(encryptedCredentials.userId, userId)));
+
+	const adminOverrides = await listAdminOverrides(db, schoolId);
+	const disabledProviderIds = new Set(
+		adminOverrides.filter((row) => row.modelId === null).map((row) => row.providerId)
+	);
+	const disabledModelKeys = new Set(
+		adminOverrides
+			.filter((row) => row.modelId !== null)
+			.map((row) => `${row.providerId}::${row.modelId}`)
+	);
+
+	const result: AugmentedModelInfo[] = [];
+	const seenIds = new Set<string>();
+
+	for (const row of credentialRows) {
+		if (row.enabled !== 1) continue;
+		const providerId = row.providerId as ProviderId;
+		const discovered = await getDiscoveredModelsForUser(db, env, userId, providerId);
+		for (const model of discovered) {
+			if (disabledProviderIds.has(model.providerId)) continue;
+			if (disabledModelKeys.has(`${model.providerId}::${model.id}`)) continue;
+			if (seenIds.has(model.id)) continue;
+			seenIds.add(model.id);
+			result.push({ ...model, source: 'user' });
+		}
+	}
+
+	for (const [providerId, envKey] of Object.entries(PLATFORM_ENV_KEYS)) {
+		if (!envKey) continue;
+		if (!env[envKey]) continue;
+		if (disabledProviderIds.has(providerId)) continue;
+		const cached = await getCachedPlatformProviderModels(
+			db,
+			env,
+			schoolId,
+			providerId as ProviderId
+		);
+		for (const model of cached) {
+			if (disabledProviderIds.has(model.providerId)) continue;
+			if (disabledModelKeys.has(`${model.providerId}::${model.id}`)) continue;
+			if (seenIds.has(model.id)) continue;
+			seenIds.add(model.id);
+			result.push({ ...model, source: 'platform' });
+		}
+	}
+
+	result.sort((a, b) => a.id.localeCompare(b.id));
+	return result;
+}
+
 function isBuiltinModel(value: ModelInfo): boolean {
 	return Object.prototype.hasOwnProperty.call(BUILTIN_MODELS, value.id);
+}
+
+function isProviderDisabledByAdmin(
+	overrides: Array<{ providerId: string; modelId: string | null }>,
+	providerId: string
+): boolean {
+	return overrides.some(
+		(row) => row.providerId === providerId && row.modelId === null
+	);
 }
 
 export async function getAvailableModelsForUser(
@@ -34,8 +117,8 @@ export async function getAvailableModelsForUser(
 ): Promise<AugmentedModelInfo[]> {
 	const credentialRows = await db
 		.select()
-		.from(userCredentials)
-		.where(eq(userCredentials.userId, userId));
+		.from(encryptedCredentials)
+		.where(and(eq(encryptedCredentials.scope, 'user'), eq(encryptedCredentials.userId, userId)));
 
 	const hiddenIds = await getCachedHiddenModelIdsForUser(db, userId);
 	const adminOverrides = await listAdminOverrides(db, schoolId);
@@ -47,11 +130,9 @@ export async function getAvailableModelsForUser(
 	for (const row of credentialRows) {
 		if (row.enabled !== 1) continue;
 		const providerId = row.providerId as ProviderId;
-
 		const discovered = await getDiscoveredModelsForUser(db, env, userId, providerId);
-		const credentialModels = discovered.length > 0 ? discovered : getModelsByProvider(providerId);
 
-		for (const model of credentialModels) {
+		for (const model of discovered) {
 			if (hiddenIds.has(model.id)) continue;
 			if (seenIds.has(model.id)) continue;
 			seenIds.add(model.id);
@@ -60,12 +141,19 @@ export async function getAvailableModelsForUser(
 		}
 	}
 
-	for (const providerId of SUPPORTED_PROVIDER_IDS) {
-		if (userProviderIds.has(providerId)) continue;
-		const envKey = `${providerId.toUpperCase()}_API_KEY`;
+	for (const [providerId, envKey] of Object.entries(PLATFORM_ENV_KEYS)) {
+		if (!envKey) continue;
+		if (userProviderIds.has(providerId as ProviderId)) continue;
 		if (!env[envKey]) continue;
-		for (const model of Object.values(BUILTIN_MODELS)) {
-			if (model.providerId !== providerId) continue;
+		if (isProviderDisabledByAdmin(adminOverrides, providerId)) continue;
+
+		const cached = await getCachedPlatformProviderModels(
+			db,
+			env,
+			schoolId,
+			providerId as ProviderId
+		);
+		for (const model of cached) {
 			if (hiddenIds.has(model.id)) continue;
 			if (seenIds.has(model.id)) continue;
 			seenIds.add(model.id);
@@ -88,4 +176,3 @@ export async function getAvailableModelsForUser(
 	return result.filter((entry) => allowedIds.has(`${entry.providerId}::${entry.id}`));
 }
 
-const SUPPORTED_PROVIDER_IDS: ProviderId[] = ['groq', 'deepseek', 'opencode', 'kimchi'];

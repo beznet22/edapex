@@ -83,7 +83,7 @@ export async function GET(event: RequestEvent): Promise<Response> {
 
 export async function POST(event: RequestEvent): Promise<Response> {
 	const { user, schoolId } = requireAdminOrIt(event);
-	const data = parseJsonBody(event, PostSchema);
+	const data = await parseJsonBody(event, PostSchema);
 
 	const db = getAppDb();
 	const before = await getPotluckConfig(db, schoolId);

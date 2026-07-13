@@ -10,6 +10,7 @@ import {
 } from "../../../tenant-context";
 import { StudentRepository } from "../../../../repository/student.repo";
 import { TimelineRepository } from "../../../../repository/timeline.repo";
+import { bridgeToolContext } from "../../internal/bridge";
 
 export const assignEntitySchema = z.object({
   studentId: z.number().describe("The ID of the student to assign or transfer"),
@@ -119,8 +120,8 @@ export const transferStudentTool = createTool({
   inputSchema: assignEntitySchema,
   requireApproval: true,
   execute: async (input: AssignEntityInput, context: ToolExecutionContext) => {
-    assertMastraToolContext(context);
-    return assignEntityLogic(context, input);
+    const ctx = await bridgeToolContext(context);
+    return assignEntityLogic(ctx, input);
   },
   toModelOutput: (output: unknown) => {
     if (!isTransferStudentResult(output)) {

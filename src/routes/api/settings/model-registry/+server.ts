@@ -61,7 +61,7 @@ export async function GET(event: RequestEvent): Promise<Response> {
 
 export async function POST(event: RequestEvent): Promise<Response> {
 	const { user, schoolId } = requireAdminOrIt(event);
-	const body = parseJsonBody(event, PostSchema);
+	const body = await parseJsonBody(event, PostSchema);
 	const db = getAppDb();
 
 	const before = await listAdminOverrides(db, schoolId);

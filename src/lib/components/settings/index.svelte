@@ -63,18 +63,18 @@
 		{
 			name: "Platform",
 			icon: Settings2Icon,
-			allowedRoles: ["admin", "it"] as const
+			allowedDesignations: ["admin", "it", "it_support"] as const
 		}
 	] as const;
 
 	type TabName = (typeof tabs)[number]["name"];
 
-	const userRole = $derived(page.data.user?.role ?? null);
+	const userDesignation = $derived(page.data.user?.designation ?? null);
 
 	const visibleTabs = $derived(
 		tabs.filter((tab) => {
-			const allowed = (tab as { allowedRoles?: readonly string[] }).allowedRoles;
-			return isTabVisible(allowed, userRole);
+			const allowed = (tab as { allowedDesignations?: readonly string[] }).allowedDesignations;
+			return isTabVisible(allowed, userDesignation);
 		})
 	);
 
@@ -152,7 +152,11 @@
 	}
 
 	const connectedProviderIds = $derived(
-		new Set(connectedProviders.map((p) => p.provider))
+		new Set(
+			connectedProviders
+				.filter((p) => p.source === "db")
+				.map((p) => p.provider)
+		)
 	);
 	const popularProviders = $derived(
 		Object.values(BUILTIN_PROVIDERS).slice(0, POPULAR_VISIBLE_COUNT)

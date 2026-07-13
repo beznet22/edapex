@@ -16,7 +16,6 @@
 	import { Button } from "$lib/components/ui/button/index.js";
 	import { toast } from "svelte-sonner";
 	import { SelectedClass } from "$lib/context/sync.svelte";
-	import { useChat } from "$lib/context/chat-context.svelte";
 	import { DESIGNATIONS } from "$lib/types/sms-types";
 
 	import { usePdfiumEngine } from "@embedpdf/engines/svelte";
@@ -86,7 +85,6 @@
 	let skeletonVisible = $state(true);
 
 	const selectedClass = SelectedClass.fromContext();
-	const chat = useChat();
 	const designationId = $derived(
 		DESIGNATIONS.indexOf((user?.designation as any) ?? "it") || 1,
 	);
@@ -97,12 +95,9 @@
 		selectedClass?.data?.sectionName ?? "",
 	);
 
-	const editable = $derived.by(() => {
-		if (!artifactId) return true;
-		if (chat?.lastCommittedArtifactId === artifactId) return true;
-		if (chat?.pendingValidationArtifactId === artifactId) return false;
-		return true;
-	});
+	// Editor is always editable; validation approval is handled via the tool
+	// approval flow (ActionBar) and does not lock the canvas.
+	const editable = $derived(true);
 
 	const isMarkdownFile = $derived(
 		filename.endsWith(".md") || filename.endsWith(".markdown"),

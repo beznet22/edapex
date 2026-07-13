@@ -11,6 +11,7 @@ import {
   ForbiddenError,
   type MastraToolContext,
 } from "../../../tenant-context";
+import { bridgeToolContext } from "../../internal/bridge";
 
 export const demoteStudentSchema = z.object({
   studentId: z.number().describe("Numeric ID of the student to demote/revert promotion"),
@@ -223,8 +224,8 @@ export const demoteStudentTool = createTool({
   inputSchema: demoteStudentSchema,
   requireApproval: true,
   execute: async (input: DemoteStudentInput, context: ToolExecutionContext) => {
-    assertMastraToolContext(context);
-    return demoteStudentLogic(context, input);
+    const ctx = await bridgeToolContext(context);
+    return demoteStudentLogic(ctx, input);
   },
   toModelOutput: (output: unknown) => {
     if (!isDemotionResult(output)) {

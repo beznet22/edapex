@@ -13,6 +13,7 @@ import { StaffRepository } from "../../../../repository/staff.repo";
 import { AuthRepository } from "../../../../repository/auth.repo";
 import { TimelineRepository } from "../../../../repository/timeline.repo";
 import { hashPwd } from "../../../../helpers/utils";
+import { bridgeToolContext } from "../../internal/bridge";
 
 export const validateIntentConfidence = async (type: "mutation" | "read", confidence: number) => {
   const threshold = type === "mutation" ? 0.9 : 0.7;
@@ -195,15 +196,6 @@ export const manageAccessLogic = async (context: MastraToolContext, input: Manag
   }
 };
 
-function isMastraToolContext(value: unknown): value is MastraToolContext {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    "tenantContext" in value &&
-    "getRepo" in value
-  );
-}
-
 function hasMessageField(value: unknown): value is { message: unknown } {
   return typeof value === "object" && value !== null && "message" in value;
 }
@@ -214,10 +206,8 @@ export const manageAccountAccessTool = createTool({
   inputSchema: manageAccessSchema,
   requireApproval: true,
   execute: async (input: ManageAccessInput, context: ToolExecutionContext) => {
-    if (!isMastraToolContext(context)) {
-      throw new Error("manage-account-access requires a valid Mastra tool context");
-    }
-    return manageAccessLogic(context, input);
+    const ctx = await bridgeToolContext(context);
+    return manageAccessLogic(ctx, input);
   },
   toModelOutput: (output: unknown) => {
     if (hasMessageField(output) && typeof output.message === "string") {

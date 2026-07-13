@@ -7,7 +7,9 @@ import { marksheetSchema } from '$lib/schema/marksheet';
 import { marksheetJsonPath, marksheetMarkdownPath } from '$lib/server/mastra/storage/workspaces/paths';
 import { addEntry, removeEntry } from '$lib/server/mastra/storage/workspaces/manifest-store';
 import { resolveMentionsInMarkdown } from '$lib/server/mastra/editor/mention-resolver';
-import { AssessmentService } from '$lib/server/service/assessment.service';
+import { createAssessmentServiceForRequest } from '$lib/server/service/assessment.service';
+import { StudentRepository } from '$lib/server/repository/student.repo';
+import { bridgeToolContext } from '$lib/server/mastra/tools/internal/bridge';
 import type { TenantContext } from '$lib/server/mastra/tenant-context';
 import type { WorkspaceFilesystem } from '@mastra/core/workspace';
 import type { RequestContext } from '@mastra/core/request-context';
@@ -26,12 +28,6 @@ interface MarksheetToolContext {
 interface MissingIdField {
 	field: 'studentId' | 'examTypeId' | 'academicId';
 	source: 'no_mention' | 'mention_unresolved' | 'tenant_unset';
-}
-
-interface PermissionGrant {
-	student?: boolean;
-	examType?: boolean;
-	academicYear?: boolean;
 }
 
 interface EffectiveIds {
@@ -86,25 +82,31 @@ function toNumberOrNull(value: unknown): number | null {
 function computeEffectiveIds(
 	mentions: ResolvedMention[],
 	tenant: TenantContext,
-	grant: PermissionGrant
+	inputStudent: { id: number; fullName: string; admissionNo?: number } | undefined
 ): EffectiveIds {
 	const studentMention = mentions.find((m) => m.category === 'students');
 	const academicMention = mentions.find((m) => m.category === 'academic_year');
 	const examMention = mentions.find((m) => m.category === 'exam');
 
+	const studentId =
+		toNumberOrNull(studentMention?.id) ??
+		(inputStudent ? inputStudent.id : null) ??
+		tenant.studentId ??
+		null;
+
 	return {
-		studentId: toNumberOrNull(studentMention?.id) ?? (grant.student ? tenant.studentId : null),
-		adminNo: studentMention?.admissionNo ? Number(studentMention.admissionNo) : null,
-		studentName: studentMention?.studentName ?? null,
-		examTypeId: toNumberOrNull(examMention?.id) ?? (grant.examType ? tenant.examTypeId : null),
-		academicId:
-			toNumberOrNull(academicMention?.id) ?? (grant.academicYear ? tenant.academicId : null)
+		studentId,
+		adminNo: studentMention?.admissionNo ? Number(studentMention.admissionNo) : inputStudent?.admissionNo ?? null,
+		studentName: studentMention?.studentName ?? inputStudent?.fullName ?? null,
+		examTypeId: toNumberOrNull(examMention?.id) ?? tenant.examTypeId ?? null,
+		academicId: toNumberOrNull(academicMention?.id) ?? tenant.academicId ?? null
 	};
 }
 
 function detectMissingIds(
 	effective: EffectiveIds,
-	mentions: ResolvedMention[]
+	mentions: ResolvedMention[],
+	hasInputStudent: boolean
 ): MissingIdField[] {
 	const hasStudentMention = mentions.some((m) => m.category === 'students');
 	const hasExamMention = mentions.some((m) => m.category === 'exam');
@@ -112,10 +114,12 @@ function detectMissingIds(
 
 	const missing: MissingIdField[] = [];
 	if (effective.studentId === null) {
-		missing.push({
-			field: 'studentId',
-			source: hasStudentMention ? 'mention_unresolved' : 'no_mention'
-		});
+		const source: MissingIdField['source'] = hasStudentMention
+			? 'mention_unresolved'
+			: hasInputStudent
+				? 'tenant_unset'
+				: 'no_mention';
+		missing.push({ field: 'studentId', source });
 	}
 	if (effective.examTypeId === null) {
 		missing.push({
@@ -132,33 +136,36 @@ function detectMissingIds(
 	return missing;
 }
 
-function buildDisambiguationOptions(
-	missing: MissingIdField[],
+async function buildRosterDisambiguationOptions(
 	tenant: TenantContext
-): DisambiguationOption[] {
+): Promise<DisambiguationOption[]> {
 	const options: DisambiguationOption[] = [];
 
-	for (const m of missing) {
-		if (m.field === 'studentId' && tenant.studentId != null) {
-			options.push({
-				id: `student:use_tenant:${tenant.studentId}`,
-				label: 'Use active student from tenant context',
-				description: `Student ID: ${tenant.studentId}`
+	if (tenant.studentId != null) {
+		options.push({
+			id: `student:use_tenant:${tenant.studentId}`,
+			label: 'Use active student from tenant context',
+			description: `Student ID: ${tenant.studentId}`
+		});
+	}
+
+	if (tenant.classId != null && tenant.sectionId != null) {
+		try {
+			const { getRepo } = await bridgeToolContext({ requestContext: undefined } as never);
+			const studentRepo = getRepo(StudentRepository);
+			const students = await studentRepo.getStudentsByClassSection({
+				classId: tenant.classId,
+				sectionId: tenant.sectionId
 			});
-		}
-		if (m.field === 'examTypeId' && tenant.examTypeId != null) {
-			options.push({
-				id: `examType:use_tenant:${tenant.examTypeId}`,
-				label: 'Use active exam type from tenant context',
-				description: `Exam type ID: ${tenant.examTypeId}`
-			});
-		}
-		if (m.field === 'academicId' && tenant.academicId != null) {
-			options.push({
-				id: `academicYear:use_tenant:${tenant.academicId}`,
-				label: 'Use active academic year from tenant context',
-				description: `Academic year ID: ${tenant.academicId}`
-			});
+			for (const s of students ?? []) {
+				options.push({
+					id: `student:roster:${s.id}`,
+					label: s.name || `Student #${s.id}`,
+					description: s.admissionNo != null ? `Adm#${s.admissionNo}` : undefined
+				});
+			}
+		} catch {
+			// best-effort roster; if the bridge fails we still surface the tenant option
 		}
 	}
 
@@ -194,51 +201,34 @@ const marksheetErrorSchema = z.object({
 	code: z.string()
 });
 
-const permissionGrantSchema = z
-	.object({
-		student: z.boolean().optional(),
-		examType: z.boolean().optional(),
-		academicYear: z.boolean().optional()
-	})
-	.optional();
-
 export const validateMarksheetTool = createTool({
 	id: 'validate-marksheet',
 	description:
-		'Re-derive the JSON from the corrected markdown via the document agent, ' +
-		'then run marksheetSchema.safeParseAsync. Persists the validated JSON to marksheets/<studentId>.json ' +
-		'and writes the user-corrected markdown to the canonical path ' +
-		'marksheets/ADM<adminNo>-<examTypeId>-<studentName>.md (constructed from the validated JSON). ' +
-		'If `currentMarkdownPath` is provided and differs from the canonical path, the draft is removed ' +
-		'and its manifest entry cleared.',
+		'Read the user-edited marksheet markdown from the workspace, re-derive the structured JSON via the document agent, ' +
+		'then validate against marksheetSchema. Persists the validated JSON to marksheets/<studentId>.json and writes the ' +
+		'canonical markdown to marksheets/ADM<adminNo>-<examTypeId>-<studentName>.md. Removes the draft at currentMarkdownPath ' +
+		'after the canonical file is written.',
 	inputSchema: z.object({
-		studentId: z
-			.number()
-			.int()
-			.positive()
-			.describe('The studentId whose marksheet JSON should be re-derived and validated.'),
-		correctedMarkdown: z.string().describe('The user-corrected markdown to re-derive JSON from.'),
 		currentMarkdownPath: z
 			.string()
+			.describe(
+				'Workspace-relative path of the editor auto-saved draft (e.g. marksheets/adakole-a1b2c3d4.md). Read at execution time to capture the user\'s edits.'
+			),
+		student: z
+			.object({
+				id: z.number().int().positive(),
+				fullName: z.string(),
+				admissionNo: z.number().int().optional()
+			})
 			.optional()
 			.describe(
-				'The filename-based draft path the editor panel auto-saved to (e.g., marksheets/adakole-a1b2c3d4.md). If provided and differs from the canonical path, the draft is removed after the canonical file is written.'
+				'Resolved student identity from the injected classRoster or tenant context. Ignored if the markdown contains an @student mention.'
 			),
-		permissionGrant: permissionGrantSchema.describe(
-			'Permission flags granted by the user (extracted from "use current X" statements). When granted, the tenant context field is used instead of triggering disambiguation.'
-		),
-		runId: z.string().optional().describe('The active workflow runId for emitting data-selectOption parts.'),
 		reason: z.string().describe('Human-readable action summary for user approval.'),
 		title: z
 			.string()
 			.optional()
-			.describe('Optional display title the caller wants reflected in headings or metadata.'),
-		filename: z
-			.string()
-			.optional()
-			.describe(
-				'Optional canonical filename the output should be saved to (e.g., "marksheets/ADM123-1-jane_doe.md").'
-			)
+			.describe('Optional display title carried through to the canonical markdown.')
 	}),
 	requireApproval: true,
 	outputSchema: z.discriminatedUnion('ok', [
@@ -254,11 +244,7 @@ export const validateMarksheetTool = createTool({
 				.string()
 				.describe(
 					'Display title derived from the validated JSON: `${student.fullName} — ${examType.title}`.'
-				),
-			currentMarkdownPath: z
-				.string()
-				.optional()
-				.describe('Echoes the input draft path so the client knows what was renamed away.')
+				)
 		}),
 		z.object({
 			ok: z.literal(false),
@@ -267,14 +253,8 @@ export const validateMarksheetTool = createTool({
 		})
 	]),
 	execute: async (input, ctx) => {
-		const context = ctx as MarksheetToolContext;
+		const context = (await bridgeToolContext(ctx)) as unknown as MarksheetToolContext;
 		const tenant = getTenant(context);
-
-		// Auto-fix retry cap (Phase 2.3 — soft, requestContext may reset on resume).
-		// Counts every invocation of validate-marksheet, which is invoked once per
-		// resume cycle (validate → auto-fix → re-suspend → re-validate). After 3
-		// cycles we throw AUTO_FIX_EXHAUSTED so the user cannot loop forever on the
-		// same artifact. Phase 3 will replace this with the workflow's iterationCount.
 		const autoFixAttempts =
 			(context.requestContext?.get('autoFixAttempts') as number | undefined) ?? 0;
 		if (autoFixAttempts >= 3) {
@@ -284,27 +264,37 @@ export const validateMarksheetTool = createTool({
 		}
 		context.requestContext?.set('autoFixAttempts', autoFixAttempts + 1);
 
+		// Read the authoritative user-edited markdown from disk. The editor
+		// panel auto-saves on every keystroke, so this captures any edits the
+		// user made after the agent initially read the file. @mention
+		// resolution runs against THIS string, so any @mentions the user
+		// added in the editor are evaluated at approval time.
+		const fs = await resolveTenantFilesystem(tenant);
+		if (!(await fs.exists(input.currentMarkdownPath))) {
+			throw new Error(
+				`WORKSPACE_FILE_NOT_FOUND: ${input.currentMarkdownPath} (the editor may not have auto-saved yet)`
+			);
+		}
+		const rawMarkdown = await fs.readFile(input.currentMarkdownPath, { encoding: 'utf-8' });
+		const correctedMarkdown = typeof rawMarkdown === 'string' ? rawMarkdown : rawMarkdown.toString('utf-8');
+
 		// PRE-FLIGHT PIPELINE
-		// Resolves @mention IDs from the markdown, fetches the subject
-		// mapping table, computes effective IDs (mentions > tenant-with-
-		// permission > null), and detects any missing required IDs. If
-		// any are missing, emits a data-selectOption part (which the UI
-		// surfaces as an OptionDropdown disambiguation sheet) and seeds
-		// `pendingSelection` so the existing selectionGateStep can
-		// resume the workflow with the user's choice.
+		// Resolves @mention IDs from the markdown, computes effective IDs
+		// (mentions > input.student > tenant), and detects any missing
+		// required IDs. If any are missing, emits a data-selectOption part
+		// (which the UI surfaces as an OptionDropdown disambiguation sheet)
+		// and seeds `pendingSelection` so the existing selectionGateStep
+		// can resume the workflow with the user's choice.
 
 		const requestContext = context.requestContext as RequestContext | undefined;
 		const { mentions } = await resolveMentionsInMarkdown(
-			input.correctedMarkdown,
+			correctedMarkdown,
 			requestContext,
 			undefined
 		);
 
-		const inputGrant = (input.permissionGrant ?? {}) as PermissionGrant;
-		const contextGrant = (requestContext?.get('permissionGrant') ?? {}) as PermissionGrant;
-		const grant: PermissionGrant = { ...inputGrant, ...contextGrant };
-		const effective = computeEffectiveIds(mentions, tenant, grant);
-		const missing = detectMissingIds(effective, mentions);
+		const effective = computeEffectiveIds(mentions, tenant, input.student);
+		const missing = detectMissingIds(effective, mentions, input.student != null);
 
 		// Resolve thread/resource identity for `writeDataPart` persistence.
 		// NOTE: `buildRequestContext` (chat route) only sets `tenantContext`,
@@ -325,21 +315,21 @@ export const validateMarksheetTool = createTool({
 			: undefined;
 
 		if (missing.length > 0) {
-			const options = buildDisambiguationOptions(missing, tenant);
+			const options = await buildRosterDisambiguationOptions(tenant);
 			const promptText = buildDisambiguationPrompt(missing);
 
-			await writeDataPart(context.writer, {
+			await writeDataPart(ctx.writer, {
 				data: {
 					type: 'data-selectOption',
-					id: `gate-${input.runId ?? ''}-${Date.now()}`,
+					id: `gate-validate-${Date.now()}`,
 					data: {
 						options,
 						promptText,
-						runId: input.runId ?? '',
+						runId: '',
 						stepId: 'awaitValidation'
 					}
 				},
-				memory: memCtx,
+				memory: memCtx
 			});
 
 			context.requestContext?.set('pendingSelection', {
@@ -353,7 +343,7 @@ export const validateMarksheetTool = createTool({
 				errors: [],
 				unresolvedErrors: missing.map((m) => ({
 					path: m.field,
-					message: `${m.field.toUpperCase()}_REQUIRED: resolve via @mention, tenant grant, or disambiguation`,
+					message: `${m.field.toUpperCase()}_REQUIRED: resolve via @mention, roster match, or disambiguation`,
 					code: 'id_required'
 				}))
 			};
@@ -361,7 +351,8 @@ export const validateMarksheetTool = createTool({
 
 		// All required IDs resolved. Fetch subject mapping table and
 		// proceed with the existing documentAgent re-derivation pipeline.
-		const mapping = await AssessmentService.getMappingData(
+		const assessment = await createAssessmentServiceForRequest(tenant);
+		const mapping = await assessment.getMappingData(
 			tenant.staffId,
 			tenant.classId ?? undefined,
 			tenant.sectionId ?? undefined
@@ -371,9 +362,9 @@ export const validateMarksheetTool = createTool({
 
 		const subjectMappingTable = mapping.subjects
 			.map((s) => {
-				const subjectId = (s as { subjectId: number | null }).subjectId;
-				const subjectCode = (s as { subjectCode: string | null }).subjectCode;
-				const title = (s as { title?: string | null }).title;
+				const subjectId = s.id;
+				const subjectCode = s.subjectCode;
+				const title = s.subjectName;
 				if (subjectId == null || subjectCode == null) return null;
 				return `  - ${subjectCode} → subjectId=${subjectId}${title ? ` (${title})` : ''}`;
 			})
@@ -391,24 +382,23 @@ export const validateMarksheetTool = createTool({
 			`  classId: ${tenant.classId ?? 'null'}`,
 			`  sectionId: ${tenant.sectionId ?? 'null'}`,
 			``,
-			`EFFECTIVE IDS (from @mentions + permission grants — DO NOT override):`,
+			`EFFECTIVE IDS (from @mentions + input.student + tenant \u2014 DO NOT override):`,
 			`  studentId: ${effective.studentId}`,
-			``,
-			`TITLE (from caller, verbatim): "${input.title ?? '(none)'}". If a title is supplied, reflect it verbatim in any headings or front-matter.`,
-			`FILENAME (from caller, do not alter): "${input.filename ?? '(derive from canonical path)'}". Your output will be persisted to that filename by the calling tool.`,
 			`  adminNo: ${effective.adminNo ?? 'null'}`,
 			`  studentName: ${effective.studentName ?? 'null'}`,
 			`  examTypeId: ${effective.examTypeId}`,
 			`  academicId: ${effective.academicId}`,
 			``,
-			`SUBJECT MAPPING TABLE (subjectCode → subjectId):`,
+			`TITLE (from caller, verbatim): "${input.title ?? '(none)'}". If a title is supplied, reflect it verbatim in any headings or front-matter.`,
+			``,
+			`SUBJECT MAPPING TABLE (subjectCode \u2192 subjectId):`,
 			subjectMappingTable || '  (no subjects configured for this class)',
 			``,
 			`SCHEMA REQUIREMENTS (every field must be present and correctly typed):`,
 			`- school: object { id, name, email, phone, city, state, title, vacation_date }`,
 			`- student: object { id, examId, fullName, gender, parentEmail, parentName, term, title, category, className, sectionName, adminNo, sessionYear, daysOpened, daysAbsent, daysPresent, token }`,
 			`- subjects: array of { subjectId, subjectCode, teacherId, title }`,
-			`- records: array of { studentId, resultId, subjectId, subject, subjectCode, titleIds, titles, markIds, marks, fullMarks, totalScore, grade, category, learningOutcome, objectives }`,
+			`- records: array of { studentId, resultId, subjectId, subject, subjectCode, titleIds, titles, marks, markIds, fullMarks, totalScore, grade, category, learningOutcome, objectives }`,
 			`- score: object { total, average, classAverage, maxScores }`,
 			`- ratings: array of { attribute, rate, remark, color }`,
 			`- remark: object { remark }`,
@@ -422,7 +412,7 @@ export const validateMarksheetTool = createTool({
 			`- Output ONLY the JSON object. No markdown fences, no commentary.`,
 			``,
 			`\`\`\`markdown`,
-			input.correctedMarkdown,
+			correctedMarkdown,
 			`\`\`\``
 		].join('\n');
 
@@ -475,16 +465,14 @@ export const validateMarksheetTool = createTool({
 				}
 				const parsed = await marksheetSchema.safeParseAsync(finalJson);
 				if (parsed.success) {
-					const fs = await resolveTenantFilesystem(tenant);
-
-					const jsonPath = marksheetJsonPath(input.studentId);
+					const jsonPath = marksheetJsonPath(parsed.data.student.id);
 					await fs.writeFile(jsonPath, JSON.stringify(finalJson, null, 2), {
 						recursive: true
 					});
 					await addEntry(tenant, {
 						path: jsonPath,
 						kind: 'marksheet-json',
-						studentId: input.studentId,
+						studentId: parsed.data.student.id,
 						uploadedAt: new Date().toISOString(),
 						modifiedAt: new Date().toISOString(),
 						mimeType: 'application/json'
@@ -496,9 +484,9 @@ export const validateMarksheetTool = createTool({
 						examTypeId: parsed.data.examType?.id ?? null,
 						studentName: parsed.data.student.fullName
 					});
-					const validatedTitle = `${parsed.data.student.fullName} — ${parsed.data.examType?.title ?? 'Exam'}`;
+					const validatedTitle = `${parsed.data.student.fullName} \u2014 ${parsed.data.examType?.title ?? 'Exam'}`;
 
-					await fs.writeFile(canonicalMarkdownPath, input.correctedMarkdown, {
+					await fs.writeFile(canonicalMarkdownPath, correctedMarkdown, {
 						recursive: true
 					});
 					await addEntry(tenant, {
@@ -512,7 +500,7 @@ export const validateMarksheetTool = createTool({
 						mimeType: 'text/markdown'
 					});
 
-					if (input.currentMarkdownPath && input.currentMarkdownPath !== canonicalMarkdownPath) {
+					if (input.currentMarkdownPath !== canonicalMarkdownPath) {
 						if (await fs.exists(input.currentMarkdownPath)) {
 							await fs.deleteFile(input.currentMarkdownPath);
 						}
@@ -523,8 +511,7 @@ export const validateMarksheetTool = createTool({
 						ok: true as const,
 						json: finalJson,
 						persistedMarkdownPath: canonicalMarkdownPath,
-						validatedTitle,
-						currentMarkdownPath: input.currentMarkdownPath
+						validatedTitle
 					};
 				}
 				finalValidationIssues = parsed.error.issues.map((issue) => ({

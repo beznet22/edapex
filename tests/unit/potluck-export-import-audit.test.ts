@@ -4,10 +4,11 @@ import { getAppDb } from "$lib/server/mastra/storage/libsql/app-db";
 import { potluckDonations } from "$lib/server/mastra/storage/libsql/app-db.schema";
 import { exportDonations, importDonations } from "$lib/server/service/potluck.service";
 import { encrypt } from "$lib/server/mastra/provider/crypto";
+import type { AuditLogInput } from "$lib/server/audit-log";
 
 // Mock the audit-log module to capture log() calls without writing to disk.
-const logMock = vi.fn(async () => {});
-const readRecentMock = vi.fn(async () => []);
+const logMock = vi.fn<(input: AuditLogInput) => Promise<void>>(async () => {});
+const readRecentMock = vi.fn<(schoolId: number, limit?: number) => Promise<unknown[]>>(async () => []);
 vi.mock("$lib/server/audit-log", () => ({
 	log: logMock,
 	readRecent: readRecentMock
@@ -69,6 +70,9 @@ describe("potluck-export-import-audit: no secret data in audit-log payloads", ()
 
 		expect(logMock).toHaveBeenCalledTimes(1);
 		const entry = logMock.mock.calls[0][0];
+		if (!entry) {
+			throw new Error("Expected entry to be defined");
+		}
 
 		expect(entry.schoolId).toBe(SCHOOL);
 		expect(entry.actorStaffId).toBe(17);
@@ -135,6 +139,9 @@ describe("potluck-export-import-audit: no secret data in audit-log payloads", ()
 
 		expect(logMock).toHaveBeenCalledTimes(1);
 		const entry = logMock.mock.calls[0][0];
+		if (!entry) {
+			throw new Error("Expected entry to be defined");
+		}
 
 		expect(entry.action).toBe("import");
 		expect(entry.after).toEqual({
@@ -196,6 +203,9 @@ describe("potluck-export-import-audit: no secret data in audit-log payloads", ()
 		});
 
 		const entry = logMock.mock.calls[0][0];
+		if (!entry) {
+			throw new Error("Expected entry to be defined");
+		}
 		const serialized = JSON.stringify(entry);
 		expect(serialized).not.toContain("correct-pass");
 		expect(serialized).not.toContain("wrong-pass-2026");
@@ -231,8 +241,16 @@ describe("potluck-export-import-audit: no secret data in audit-log payloads", ()
 		});
 
 		const entry = logMock.mock.calls[0][0];
-		expect(entry.after.mode).toBe("metadata-only");
-		expect(entry.after.count).toBe(1);
+		if (!entry) {
+			throw new Error("Expected entry to be defined");
+		}
+		const after = entry.after;
+		if (after && typeof after === "object" && "mode" in after && "count" in after) {
+			expect(after.mode).toBe("metadata-only");
+			expect(after.count).toBe(1);
+		} else {
+			throw new Error("Expected after to have mode and count");
+		}
 
 		await cleanup();
 	});

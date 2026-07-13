@@ -1,11 +1,11 @@
 import { createTool } from '@mastra/core/tools';
 import { z } from 'zod';
-import { streamWithAutoRetry, type StreamWriterLike } from '../../../../agent-stream-retry';
-import { tenantWorkspace } from '../../../../storage/workspaces';
+import { streamWithAutoRetry, type StreamWriterLike } from '$lib/server/mastra/agent-stream-retry';
+import { tenantWorkspace } from '$lib/server/mastra/storage/workspaces';
 import { buildWorkspaceRequestContext } from '$lib/server/helpers/chat-helper';
-import { marksheetJsonPath, marksheetMarkdownPath } from '../../../../storage/workspaces/paths';
-import { addEntry } from '../../../../storage/workspaces/manifest-store';
-import type { TenantContext } from '../../../../tenant-context';
+import { marksheetJsonPath, marksheetMarkdownPath } from '$lib/server/mastra/storage/workspaces/paths';
+import { addEntry } from '$lib/server/mastra/storage/workspaces/manifest-store';
+import type { TenantContext } from '$lib/server/mastra/tenant-context';
 import type { WorkspaceFilesystem } from '@mastra/core/workspace';
 
 interface MarksheetToolContext {
@@ -211,7 +211,7 @@ export const autoFixMarksheetTool = createTool({
 
     const sid = studentIdFromJson(fix.fixedJson);
     if (sid !== undefined) {
-      const mdPath = marksheetMarkdownPath(sid, studentName ?? null);
+      const mdPath = marksheetMarkdownPath({ studentId: sid, studentName: studentName ?? null });
       await fs.writeFile(mdPath, markdown, { recursive: true });
       await addEntry(tenant, {
         path: mdPath,

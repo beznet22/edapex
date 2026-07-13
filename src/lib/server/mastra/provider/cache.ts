@@ -8,8 +8,7 @@
  */
 import { AsyncLocalStorage } from 'node:async_hooks';
 import type { LibSQLDatabase } from 'drizzle-orm/libsql';
-import type { UserCredential } from '$lib/server/mastra/storage/libsql/app-db.schema';
-import type { PotluckConfig } from '$lib/server/mastra/storage/libsql/app-db.schema';
+import type { EncryptedCredential, PotluckConfig } from '$lib/server/mastra/storage/libsql/app-db.schema';
 import { getUserCredential } from './credentials';
 import { getHiddenModelIdsForUser } from './visibility';
 import { getPotluckConfig } from './potluck';
@@ -17,7 +16,7 @@ import type { ProviderId, ModelId } from './types';
 
 export interface RequestCache {
 	/** userId:providerId → credential row */
-	credentials: Map<string, UserCredential | null>;
+	credentials: Map<string, EncryptedCredential | null>;
 	/** userId → hidden model ids */
 	visibility: Map<string, Set<ModelId>>;
 	/** schoolId → potluck config row */
@@ -56,7 +55,7 @@ export async function getCachedUserCredential(
 	env: Record<string, string | undefined>,
 	userId: number,
 	providerId: ProviderId
-): Promise<UserCredential | null> {
+): Promise<EncryptedCredential | null> {
 	const cache = getRequestCache();
 	if (!cache) {
 		return getUserCredential(db, env, userId, providerId);

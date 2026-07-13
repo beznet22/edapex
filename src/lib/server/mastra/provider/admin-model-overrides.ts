@@ -1,27 +1,22 @@
 /**
  * Admin Model Overrides (PlatformTab → Model Registry section)
  *
- * School-wide denylist. Two delete patterns:
- * - Provider-wide: row with `modelId = null` disables every model on that
- *   provider for the school.
- * - Model-specific: row with a non-null `modelId` disables one model.
+ * School-wide denylist backed by the unified `provider_access_policy` table.
+ * Two delete patterns:
+ * - Provider-wide: row with `target = 'provider'`, `model_id = null` disables
+ *   every model on that provider for the school.
+ * - Model-specific: row with `target = 'model'`, `model_id != null` disables
+ *   one model.
  *
  * Idempotent: re-disabling an already-disabled entry is a no-op.
- *
- * Schema is owned by the migration runner (src/lib/server/mastra/storage/libsql/migrations).
- * This module assumes the schema has been verified by `ensureProviderSchema`
- * during app startup.
  */
 import { and, eq, isNull } from 'drizzle-orm';
 import type { LibSQLDatabase } from 'drizzle-orm/libsql';
-import { adminModelOverrides, type AdminModelOverride } from '$lib/server/mastra/storage/libsql/app-db.schema';
+import {
+	providerAccessPolicy,
+	type ProviderAccessPolicy
+} from '$lib/server/mastra/storage/libsql/app-db.schema';
 
-// Process-level serial queue for admin override mutations. SQLite's UNIQUE
-// constraint treats multiple NULL values as distinct, so provider-wide
-// (modelId = null) disables are not naturally deduplicated by a simple upsert.
-// Queueing the read-then-write sequence prevents concurrent calls from racing
-// between the existence check and the insert without holding a database
-// transaction open against the shared singleton connection.
 let adminOverrideQueue: Promise<unknown> = Promise.resolve();
 
 function runAdminOverrideMutation<T>(fn: () => Promise<T>): Promise<T> {
@@ -38,27 +33,53 @@ export interface ModelRegistryEntry {
 	disabledAt: string;
 }
 
+function rowToEntry(row: ProviderAccessPolicy): ModelRegistryEntry {
+	return {
+		providerId: row.providerId,
+		modelId: row.modelId,
+		disabledBy: row.disabledBy ?? 0,
+		reason: row.reason,
+		disabledAt: row.disabledAt
+	};
+}
+
 export async function listAdminOverrides(
 	db: LibSQLDatabase<any>,
 	schoolId: number
 ): Promise<ModelRegistryEntry[]> {
 	const rows = await db
 		.select()
-		.from(adminModelOverrides)
-		.where(eq(adminModelOverrides.schoolId, schoolId));
-	return rows.map((row) => ({
-		providerId: row.providerId,
-		modelId: row.modelId,
-		disabledBy: row.disabledBy,
-		reason: row.reason,
-		disabledAt: row.disabledAt
-	}));
+		.from(providerAccessPolicy)
+		.where(
+			and(
+				eq(providerAccessPolicy.schoolId, schoolId),
+				eq(providerAccessPolicy.ruleType, 'deny')
+			)
+		);
+	return rows.map(rowToEntry);
 }
 
-/**
- * Idempotent disable. When `modelId` is null, disables the whole provider.
- * Returns the resulting row (or `null` if the inputs are unusable).
- */
+export async function isProviderDisabled(
+	db: LibSQLDatabase<any>,
+	schoolId: number,
+	providerId: string
+): Promise<boolean> {
+	const rows = await db
+		.select({ id: providerAccessPolicy.id })
+		.from(providerAccessPolicy)
+		.where(
+			and(
+				eq(providerAccessPolicy.schoolId, schoolId),
+				eq(providerAccessPolicy.ruleType, 'deny'),
+				eq(providerAccessPolicy.target, 'provider'),
+				eq(providerAccessPolicy.providerId, providerId),
+				isNull(providerAccessPolicy.modelId)
+			)
+		)
+		.limit(1);
+	return rows.length > 0;
+}
+
 export async function disableModelOrProvider(
 	db: LibSQLDatabase<any>,
 	schoolId: number,
@@ -66,34 +87,39 @@ export async function disableModelOrProvider(
 	modelId: string | null,
 	disabledBy: number,
 	reason: string | null
-): Promise<AdminModelOverride | null> {
+): Promise<ProviderAccessPolicy | null> {
 	return runAdminOverrideMutation(async () => {
+		const target = modelId === null ? 'provider' : 'model';
 		const existing = await db
 			.select()
-			.from(adminModelOverrides)
+			.from(providerAccessPolicy)
 			.where(
 				and(
-					eq(adminModelOverrides.schoolId, schoolId),
-					eq(adminModelOverrides.providerId, providerId),
+					eq(providerAccessPolicy.schoolId, schoolId),
+					eq(providerAccessPolicy.ruleType, 'deny'),
+					eq(providerAccessPolicy.target, target),
+					eq(providerAccessPolicy.providerId, providerId),
 					modelId === null
-						? isNull(adminModelOverrides.modelId)
-						: eq(adminModelOverrides.modelId, modelId)
+						? isNull(providerAccessPolicy.modelId)
+						: eq(providerAccessPolicy.modelId, modelId)
 				)
 			)
 			.limit(1);
 		if (existing[0]) {
 			if (reason !== null && existing[0].reason !== reason) {
 				await db
-					.update(adminModelOverrides)
+					.update(providerAccessPolicy)
 					.set({ reason })
-					.where(eq(adminModelOverrides.id, existing[0].id));
+					.where(eq(providerAccessPolicy.id, existing[0].id));
 			}
 			return { ...existing[0], reason: reason ?? existing[0].reason };
 		}
 		const [inserted] = await db
-			.insert(adminModelOverrides)
+			.insert(providerAccessPolicy)
 			.values({
 				schoolId,
+				ruleType: 'deny',
+				target,
 				providerId,
 				modelId,
 				reason,
@@ -110,25 +136,23 @@ export async function enableModelOrProvider(
 	providerId: string,
 	modelId: string | null
 ): Promise<boolean> {
+	const target = modelId === null ? 'provider' : 'model';
 	await db
-		.delete(adminModelOverrides)
+		.delete(providerAccessPolicy)
 		.where(
 			and(
-				eq(adminModelOverrides.schoolId, schoolId),
-				eq(adminModelOverrides.providerId, providerId),
+				eq(providerAccessPolicy.schoolId, schoolId),
+				eq(providerAccessPolicy.ruleType, 'deny'),
+				eq(providerAccessPolicy.target, target),
+				eq(providerAccessPolicy.providerId, providerId),
 				modelId === null
-					? isNull(adminModelOverrides.modelId)
-					: eq(adminModelOverrides.modelId, modelId)
+					? isNull(providerAccessPolicy.modelId)
+					: eq(providerAccessPolicy.modelId, modelId)
 			)
 		);
 	return true;
 }
 
-/**
- * Filter helper: given a list of (providerId, modelId) pairs and the school's
- * denylist, return only the entries NOT disabled. Used by the availableModels
- * derivation in `step-3` of this phase.
- */
 export function applyAdminDenylist<T extends { providerId: string; modelId: string }>(
 	entries: readonly T[],
 	overrides: readonly ModelRegistryEntry[]

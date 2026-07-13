@@ -31,34 +31,18 @@ import { marksheetSchema, type Marksheet } from '$lib/schema/marksheet';
 import { randomUUID } from 'node:crypto';
 import { getDatabase } from '$lib/server/db';
 import { eq, and } from 'drizzle-orm';
-import { smMarks } from '$lib/server/db/sms-schema';
 import { StudentRepository } from '$lib/server/repository/student.repo';
 import { ScopedRepositoryProvider } from '$lib/server/mastra/scoped-repository';
 import { ResultsRepository } from '$lib/server/repository/result.repo';
 import type { TenantContext } from '$lib/server/mastra/tenant-context';
 import type { RequestContext } from '@mastra/core/request-context';
-import type { RequestContextValues } from '$lib/server/mastra/agents';
-
-async function buildRunContext(tenant: TenantContext): Promise<RequestContext<RequestContextValues>> {
-	const userId = tenant.userId;
-	const modelConfig = await getModelForTest(userId, TEST_MODEL_ID);
-	const ctx: RequestContext<RequestContextValues> = await buildRequestContext({
-		context: tenant,
-		userId,
-		modelId: TEST_MODEL_ID,
-		isSlashCommand: false,
-		lastMessage: ''
-	});
-	ctx.set('modelConfig', modelConfig);
-	return ctx;
-}
 
 async function runWorkflow(params: {
 	tenant: TenantContext;
 	prompt: string;
 }): Promise<Awaited<ReturnType<typeof collectStream>>> {
 	const userId = params.tenant.userId;
-	const requestContext: RequestContext<RequestContextValues> = await buildRequestContext({
+	const requestContext: RequestContext<unknown> = await buildRequestContext({
 		context: params.tenant,
 		userId,
 		modelId: TEST_MODEL_ID,

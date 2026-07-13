@@ -30,7 +30,6 @@ import { scoreStructural } from './helpers/scorers';
 import { buildRequestContext } from '$lib/server/helpers/chat-helper';
 import type { TenantContext } from '$lib/server/mastra/tenant-context';
 import type { RequestContext } from '@mastra/core/request-context';
-import type { RequestContextValues } from '$lib/server/mastra/agents';
 import { randomUUID } from 'node:crypto';
 
 interface RunResult {
@@ -39,10 +38,10 @@ interface RunResult {
 	collected: Awaited<ReturnType<typeof collectStream>>;
 }
 
-async function buildRunContext(tenant: TenantContext): Promise<RequestContext<RequestContextValues>> {
+async function buildRunContext(tenant: TenantContext): Promise<RequestContext<unknown>> {
 	const userId = tenant.userId;
 	const modelConfig = await getModelForTest(userId, TEST_MODEL_ID);
-	const ctx: RequestContext<RequestContextValues> = await buildRequestContext({
+	const ctx: RequestContext<unknown> = await buildRequestContext({
 		context: tenant,
 		userId,
 		modelId: TEST_MODEL_ID,
@@ -65,7 +64,7 @@ async function runWorkflow(params: {
 	// marker so the suite reports a clean SKIP rather than a stack trace.
 	const userId = params.tenant.userId;
 	const modelConfig = await getModelForTest(userId, TEST_MODEL_ID);
-	const requestContext: RequestContext<RequestContextValues> = await buildRequestContext({
+	const requestContext: RequestContext<unknown> = await buildRequestContext({
 		context: params.tenant,
 		userId,
 		modelId: TEST_MODEL_ID,

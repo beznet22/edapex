@@ -1,23 +1,33 @@
 <script lang="ts">
 	import { cn } from "$lib/utils/shadcn";
 	import { CollapsibleContent } from "$lib/components/ui/collapsible/index.js";
-	import Response from "$lib/components/ai-elements/response/response.svelte";
+	import { Response } from "$lib/components/ai-elements/response";
+	import type { Snippet } from "svelte";
 
 	interface Props {
 		class?: string;
-		content: string;
+		content?: string;
+		children?: Snippet;
 	}
 
-	let { class: className = "", content, ...props }: Props = $props();
+	let { class: className = "", content = "", children, ...props }: Props = $props();
 </script>
 
 <CollapsibleContent
 	class={cn(
-		"mt-4 text-sm",
-		"data-[state=closed]:fade-out-0 data-[state=closed]:slide-out-to-top-2 data-[state=open]:slide-in-from-top-2 text-muted-foreground data-[state=closed]:animate-out data-[state=open]:animate-in outline-none",
+		"overflow-hidden text-sm text-muted-foreground outline-none",
+		"transition-[height,opacity] duration-200 ease-out will-change-[height,opacity]",
+		"data-[state=open]:opacity-100 data-[state=closed]:opacity-0",
+		"data-[state=open]:animate-collapsible-down data-[state=closed]:animate-collapsible-up",
 		className
 	)}
 	{...props}
 >
-	<Response class="grid gap-2" {content} />
+	<div class="pt-4">
+		{#if children}
+			{@render children()}
+		{:else}
+			<Response class="grid gap-2" {content} />
+		{/if}
+	</div>
 </CollapsibleContent>

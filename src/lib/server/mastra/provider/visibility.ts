@@ -1,9 +1,14 @@
 /**
  * Per-user model visibility (Settings → Models tab).
+ *
+ * Backed by the unified `model_visibility` table with `scope = 'user'`.
+ * School-scoped visibility rows are written by admins/IT from the Platform
+ * tab and win on conflict (a school-visible model is visible to every user
+ * in the school regardless of their personal toggle state).
  */
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import type { LibSQLDatabase } from 'drizzle-orm/libsql';
-import { userModelVisibility } from '$lib/server/mastra/storage/libsql/app-db.schema';
+import { modelVisibility } from '$lib/server/mastra/storage/libsql/app-db.schema';
 import type { ModelId } from './types';
 
 export async function getHiddenModelIdsForUser(
@@ -12,14 +17,33 @@ export async function getHiddenModelIdsForUser(
 ): Promise<Set<ModelId>> {
 	const rows = await db
 		.select()
-		.from(userModelVisibility)
-		.where(eq(userModelVisibility.userId, userId));
+		.from(modelVisibility)
+		.where(and(eq(modelVisibility.scope, 'user'), eq(modelVisibility.userId, userId)));
 
 	const hidden = new Set<ModelId>();
 	for (const row of rows) {
 		if (row.visible === 0) hidden.add(row.modelId as ModelId);
 	}
 	return hidden;
+}
+
+export interface ModelVisibilityRecord {
+	modelId: ModelId;
+	visible: boolean;
+}
+
+export async function getModelVisibilityRecordsForUser(
+	db: LibSQLDatabase<any>,
+	userId: number
+): Promise<ModelVisibilityRecord[]> {
+	const rows = await db
+		.select({ modelId: modelVisibility.modelId, visible: modelVisibility.visible })
+		.from(modelVisibility)
+		.where(and(eq(modelVisibility.scope, 'user'), eq(modelVisibility.userId, userId)));
+	return rows.map((row) => ({
+		modelId: row.modelId as ModelId,
+		visible: row.visible === 1
+	}));
 }
 
 export async function setModelVisibility(
@@ -29,15 +53,17 @@ export async function setModelVisibility(
 	visible: boolean
 ): Promise<void> {
 	await db
-		.insert(userModelVisibility)
+		.insert(modelVisibility)
 		.values({
+			scope: 'user',
 			userId,
+			schoolId: null,
 			modelId,
 			visible: visible ? 1 : 0,
 			updatedAt: new Date().toISOString()
 		})
 		.onConflictDoUpdate({
-			target: [userModelVisibility.userId, userModelVisibility.modelId],
+			target: [modelVisibility.scope, modelVisibility.userId, modelVisibility.modelId],
 			set: { visible: visible ? 1 : 0, updatedAt: new Date().toISOString() }
 		});
 }
@@ -51,10 +77,17 @@ export async function setAllModelVisibility(
 	const now = new Date().toISOString();
 	for (const modelId of modelIds) {
 		await db
-			.insert(userModelVisibility)
-			.values({ userId, modelId, visible: visible ? 1 : 0, updatedAt: now })
+			.insert(modelVisibility)
+			.values({
+				scope: 'user',
+				userId,
+				schoolId: null,
+				modelId,
+				visible: visible ? 1 : 0,
+				updatedAt: now
+			})
 			.onConflictDoUpdate({
-				target: [userModelVisibility.userId, userModelVisibility.modelId],
+				target: [modelVisibility.scope, modelVisibility.userId, modelVisibility.modelId],
 				set: { visible: visible ? 1 : 0, updatedAt: now }
 			});
 	}

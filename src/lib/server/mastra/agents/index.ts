@@ -2,7 +2,6 @@
  * Central barrel file for all agents 
  */
 
-export { supervisorAgent } from './supervisor';
 export { assistantAgent } from './assistant';
 export { titleAgent } from './title';
 export { editorEditAgent } from './editor-edit';

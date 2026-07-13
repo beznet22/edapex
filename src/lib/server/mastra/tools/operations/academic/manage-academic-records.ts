@@ -9,6 +9,7 @@ import {
 import { ResultsRepository } from "../../../../repository/result.repo";
 import { StudentRepository } from "../../../../repository/student.repo";
 import { TimelineRepository } from "../../../../repository/timeline.repo";
+import { bridgeToolContext } from "../../internal/bridge";
 
 export const academicMarkSchema = z.object({
   type: z.literal("academic"),
@@ -274,12 +275,10 @@ export const manageAcademicRecordsTool = createTool({
 		message: z.string()
 	}),
 	execute: async (input, ctx) => {
-		const tenantContext = (ctx.requestContext as { get?: (k: string) => unknown } | undefined)?.get?.(
-			"tenantContext"
-		) as Parameters<typeof manageResultsLogic>[1] | undefined;
-		if (!tenantContext) {
+		const context = await bridgeToolContext(ctx);
+		if (!context.tenantContext) {
 			throw new Error("TENANT_CONTEXT_REQUIRED: manage-academic-records requires an active tenantContext");
 		}
-		return manageResultsLogic(input as ManageResultsInput, tenantContext, { audit: undefined });
+		return manageResultsLogic(context, input as ManageResultsInput);
 	}
 });

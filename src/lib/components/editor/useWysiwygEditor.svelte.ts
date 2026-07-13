@@ -281,12 +281,6 @@ export class WysiwygEditorController {
         const normalized = normalizeMarkdown(content);
         const dedupHit =
             this.lastSetContent !== null && normalized === this.lastSetContent;
-        console.log("[syncExternalContent]", {
-            inputLen: content.length,
-            normalizedLen: normalized.length,
-            lastSetLen: this.lastSetContent?.length ?? null,
-            dedupHit,
-        });
         if (dedupHit) return;
         this.lastSetContent = normalized;
         editor.commands.setContent(content ?? "");

@@ -1,13 +1,13 @@
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
-import { getDatabase } from "../../../../db";
-import { smStudents } from "../../../../db/sms-schema";
+import { getDatabase } from "$lib/server/db";
+import { smStudents } from "$lib/server/db/sms-schema";
 import { and, eq, like, or, type SQL } from "drizzle-orm";
-import type { StreamWriterLike } from "../../../agent-stream-retry";
-import { resolveExamTypeId, type TenantContext } from "../../../tenant-context";
-import { createAssessmentServiceForRequest } from "../../../../service/assessment.service";
-import type { StudentDetails } from "../../../../repository/student.repo";
-import type { Marksheet, MarksRecord } from "../../../../../schema/marksheet";
+import type { StreamWriterLike } from "$lib/server/mastra/agent-stream-retry";
+import { resolveExamTypeId, type TenantContext } from "$lib/server/mastra/tenant-context";
+import { createAssessmentServiceForRequest } from "$lib/server/service/assessment.service";
+import type { StudentDetails } from "$lib/server/repository/student.repo";
+import type { Marksheet, MarksRecord } from "$lib/schema/marksheet";
 
 interface ReportPdfToolContext {
   requestContext?: {

@@ -75,7 +75,7 @@ export const POST: RequestHandler = async (event) => {
 	const { session, user } = event.locals;
 	if (!user || !session) error(401, "Unauthorized");
 	const { schoolId } = requireAdminOrIt(event);
-	const action: CalendarAction = parseJsonBody(event, ActionSchema);
+	const action: CalendarAction = await parseJsonBody(event, ActionSchema);
 	const service = new SettingsService(schoolId);
 
 	switch (action.kind) {

@@ -25,7 +25,7 @@ const SCHOOL_A = 99992; // tier 1 test
 const SCHOOL_B = 99991; // tier 2 test
 const SCHOOL_C = 99990; // tier 3 test
 const SCHOOL_D = 99989; // tier 4 test
-const USER_ID = 1;
+const USER_ID = 99002;
 const ENCRYPTION_KEY = "edapex-default-encryption-key-32ch";
 
 async function cleanupSchool(schoolId: number): Promise<void> {

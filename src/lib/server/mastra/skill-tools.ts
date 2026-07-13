@@ -168,7 +168,7 @@ export function resolveToolsForMessage(message: string, isSlashCommand: boolean)
         }
       }
 
-      if (!skillTools['search-school-directory']) {
+      if (!skillTools['search-school-directory'] && skillName !== 'reporting') {
         skillTools['search-school-directory'] = searchEntityTool;
       }
 

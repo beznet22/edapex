@@ -52,7 +52,7 @@ function makeCache(): TenantContextCache {
 	return new TenantContextCache();
 }
 
-function call(mentions: MentionTag[], tenant = baseTenant, designationId = ALLOWED_DESIGNATIONS.IT) {
+function call(mentions: MentionTag[], tenant = baseTenant, designationId: number = ALLOWED_DESIGNATIONS.IT) {
 	return processMentions(mentions, tenant, makeCache(), 'test-session', designationId, sameSchoolResolver);
 }
 

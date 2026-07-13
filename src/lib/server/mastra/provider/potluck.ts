@@ -1,27 +1,87 @@
 /**
- * Pot-Luck pool service — V1.
+ * Pot-Luck pool service.
  *
- * Owns CRUD for `potluck_config` (school-scoped settings) and
- * `potluck_donations` (encrypted API-key donations). Read at request time
- * by the 4-tier router (tier 2 = pool) and edited by admins via the
+ * Owns CRUD for `potluck_config` (school-scoped settings) and donations
+ * stored in the unified `encrypted_credentials` table with
+ * `scope = 'school'` and `credential_kind = 'donation'`. Read at request
+ * time by the 4-tier router (tier 2 = pool) and edited by admins via the
  * PlatformTab Pot-Luck Configuration section.
- *
- * Schema is owned by the migration runner (src/lib/server/mastra/storage/libsql/migrations).
- * This module assumes the schema has been verified by `ensureProviderSchema`
- * during app startup.
  */
 import { and, eq } from 'drizzle-orm';
 import type { LibSQLDatabase } from 'drizzle-orm/libsql';
 import { z } from 'zod';
 import {
 	potluckConfig,
-	potluckDonations,
+	encryptedCredentials,
 	type PotluckConfig,
-	type PotluckDonation
+	type EncryptedCredential
 } from '$lib/server/mastra/storage/libsql/app-db.schema';
+import { decrypt as decryptText, encrypt as encryptText, getEncryptionKey } from './crypto';
 import { log as writeAudit } from '$lib/server/audit-log';
+import type { ProviderId } from './types';
 
-// ──────────────────────────── potluck_config ────────────────────────────
+export const POTLUCK_DONATION_KIND = 'donation' as const;
+export const POTLUCK_SCOPE = 'school' as const;
+
+interface DonationPayload {
+	apiKey: string;
+	donatedBy: number;
+	donatedAt: string;
+	tosAcceptedAt: string | null;
+	tosAcceptedBy: number | null;
+	tosVersion: string | null;
+}
+
+function encodeDonationPayload(
+	env: Record<string, string | undefined>,
+	payload: DonationPayload
+): string {
+	return encryptText(JSON.stringify(payload), getEncryptionKey(env));
+}
+
+function decodeDonationPayload(
+	encrypted: string,
+	env: Record<string, string | undefined>
+): DonationPayload {
+	const decrypted = decryptText(encrypted, getEncryptionKey(env));
+	return JSON.parse(decrypted) as DonationPayload;
+}
+
+function rowToDonation(
+	row: EncryptedCredential,
+	env: Record<string, string | undefined>
+): {
+	id: string;
+	schoolId: number;
+	providerId: ProviderId;
+	apiKeyEncrypted: string;
+	donatedBy: number;
+	donatedAt: string;
+	isActive: boolean;
+	lastValidatedAt: string | null;
+	lastValidationStatus: string | null;
+	tosAcceptedAt: string | null;
+	tosAcceptedBy: number | null;
+	tosVersion: string | null;
+} {
+	const payload = decodeDonationPayload(row.encryptedData, env);
+	return {
+		id: row.id,
+		schoolId: row.schoolId ?? 0,
+		providerId: row.providerId as ProviderId,
+		apiKeyEncrypted: row.encryptedData,
+		donatedBy: payload.donatedBy,
+		donatedAt: payload.donatedAt,
+		isActive: row.enabled === 1,
+		lastValidatedAt: null,
+		lastValidationStatus: null,
+		tosAcceptedAt: payload.tosAcceptedAt,
+		tosAcceptedBy: payload.tosAcceptedBy,
+		tosVersion: payload.tosVersion
+	};
+}
+
+export type PotluckDonation = ReturnType<typeof rowToDonation>;
 
 export async function getPotluckConfig(
 	db: LibSQLDatabase<any>,
@@ -35,10 +95,6 @@ export async function getPotluckConfig(
 	return rows[0] ?? null;
 }
 
-/**
- * Idempotent upsert. Creates the row with safe defaults if missing,
- * otherwise patches the supplied fields. Returns the post-state.
- */
 export async function savePotluckConfig(
 	db: LibSQLDatabase<any>,
 	schoolId: number,
@@ -50,7 +106,6 @@ export async function savePotluckConfig(
 	const now = new Date().toISOString();
 	const values = { schoolId, ...patch, updatedBy, updatedAt: now };
 
-	// Conflict-safe upsert: SQLite guarantees only one row per schoolId.
 	await db
 		.insert(potluckConfig)
 		.values(values)
@@ -92,50 +147,55 @@ export async function savePotluckConfig(
 	return after;
 }
 
-// ──────────────────────────── potluck_donations ────────────────────────────
-
 export async function listDonations(
 	db: LibSQLDatabase<any>,
+	env: Record<string, string | undefined>,
 	schoolId: number,
 	options: { activeOnly?: boolean } = {}
 ): Promise<PotluckDonation[]> {
 	const rows = await db
 		.select()
-		.from(potluckDonations)
+		.from(encryptedCredentials)
 		.where(
-			options.activeOnly === true
-				? and(
-						eq(potluckDonations.schoolId, schoolId),
-						eq(potluckDonations.isActive, 1)
-					)
-				: eq(potluckDonations.schoolId, schoolId)
+			and(
+				eq(encryptedCredentials.scope, POTLUCK_SCOPE),
+				eq(encryptedCredentials.credentialKind, POTLUCK_DONATION_KIND),
+				eq(encryptedCredentials.schoolId, schoolId)
+			)
 		);
-	return rows;
+	const donations = rows.map((row) => rowToDonation(row, env));
+	if (options.activeOnly === true) {
+		return donations.filter((d) => d.isActive);
+	}
+	return donations;
 }
 
 export async function findActiveDonationForProvider(
 	db: LibSQLDatabase<any>,
+	env: Record<string, string | undefined>,
 	schoolId: number,
-	providerId: string
+	providerId: ProviderId
 ): Promise<PotluckDonation | null> {
 	const rows = await db
 		.select()
-		.from(potluckDonations)
+		.from(encryptedCredentials)
 		.where(
 			and(
-				eq(potluckDonations.schoolId, schoolId),
-				eq(potluckDonations.providerId, providerId),
-				eq(potluckDonations.isActive, 1)
+				eq(encryptedCredentials.scope, POTLUCK_SCOPE),
+				eq(encryptedCredentials.credentialKind, POTLUCK_DONATION_KIND),
+				eq(encryptedCredentials.schoolId, schoolId),
+				eq(encryptedCredentials.providerId, providerId),
+				eq(encryptedCredentials.enabled, 1)
 			)
 		)
 		.limit(1);
-	return rows[0] ?? null;
+	return rows[0] ? rowToDonation(rows[0], env) : null;
 }
 
 const UpsertDonationInputSchema = z.object({
 	schoolId: z.number().int().positive(),
 	providerId: z.string().min(1),
-	apiKeyEncrypted: z.string().min(1),
+	apiKey: z.string().min(1),
 	donatedBy: z.number().int().positive(),
 	tosAcceptedBy: z.number().int().positive().nullable(),
 	tosVersion: z.string().min(1).nullable()
@@ -143,9 +203,10 @@ const UpsertDonationInputSchema = z.object({
 
 export async function upsertDonation(
 	db: LibSQLDatabase<any>,
+	env: Record<string, string | undefined>,
 	schoolId: number,
-	providerId: string,
-	apiKeyEncrypted: string,
+	providerId: ProviderId,
+	apiKey: string,
 	donatedBy: number,
 	tosAcceptedBy: number | null,
 	tosVersion: string | null,
@@ -154,64 +215,62 @@ export async function upsertDonation(
 	const validated = UpsertDonationInputSchema.parse({
 		schoolId,
 		providerId,
-		apiKeyEncrypted,
+		apiKey,
 		donatedBy,
 		tosAcceptedBy,
 		tosVersion
 	});
-	const existing = await db
-		.select()
-		.from(potluckDonations)
-		.where(
-			and(
-				eq(potluckDonations.schoolId, validated.schoolId),
-				eq(potluckDonations.providerId, validated.providerId),
-				eq(potluckDonations.donatedBy, validated.donatedBy)
-			)
-		)
-		.limit(1);
+	const existing = await findActiveDonationForProvider(
+		db,
+		env,
+		validated.schoolId,
+		validated.providerId as ProviderId
+	);
 	const now = new Date().toISOString();
 	const tosAcceptedAt = validated.tosAcceptedBy !== null ? now : null;
-	const wasCreate = !existing[0];
+	const wasCreate = !existing;
 
-	// Conflict-safe upsert keyed by (schoolId, providerId, donatedBy).
-	await db
-		.insert(potluckDonations)
+	const payload: DonationPayload = {
+		apiKey: validated.apiKey,
+		donatedBy: validated.donatedBy,
+		donatedAt: now,
+		tosAcceptedAt,
+		tosAcceptedBy: validated.tosAcceptedBy,
+		tosVersion: validated.tosVersion
+	};
+	const encryptedData = encodeDonationPayload(env, payload);
+
+	const inserted = await db
+		.insert(encryptedCredentials)
 		.values({
+			scope: POTLUCK_SCOPE,
+			credentialKind: POTLUCK_DONATION_KIND,
+			userId: null,
 			schoolId: validated.schoolId,
 			providerId: validated.providerId,
-			apiKeyEncrypted: validated.apiKeyEncrypted,
-			donatedBy: validated.donatedBy,
-			tosAcceptedAt,
-			tosAcceptedBy: validated.tosAcceptedBy,
-			tosVersion: validated.tosVersion
+			encryptedData,
+			priority: 1,
+			enabled: 1
 		})
 		.onConflictDoUpdate({
 			target: [
-				potluckDonations.schoolId,
-				potluckDonations.providerId,
-				potluckDonations.donatedBy
+				encryptedCredentials.scope,
+				encryptedCredentials.credentialKind,
+				encryptedCredentials.userId,
+				encryptedCredentials.providerId
 			],
 			set: {
-				apiKeyEncrypted: validated.apiKeyEncrypted,
-				isActive: 1,
-				tosAcceptedAt,
-				tosAcceptedBy: validated.tosAcceptedBy,
-				tosVersion: validated.tosVersion
+				encryptedData,
+				enabled: 1,
+				updatedAt: now
 			}
-		});
-	const rows = await db
-		.select()
-		.from(potluckDonations)
-		.where(
-			and(
-				eq(potluckDonations.schoolId, validated.schoolId),
-				eq(potluckDonations.providerId, validated.providerId),
-				eq(potluckDonations.donatedBy, validated.donatedBy)
-			)
-		)
-		.limit(1);
-	const after = rows[0];
+		})
+		.returning();
+
+	const after = inserted[0]
+		? rowToDonation(inserted[0], env)
+		: (await findActiveDonationForProvider(db, env, validated.schoolId, validated.providerId as ProviderId))!;
+
 	if (audit) {
 		await writeAudit({
 			schoolId: validated.schoolId,
@@ -219,8 +278,8 @@ export async function upsertDonation(
 			action: wasCreate ? 'create' : 'update',
 			entityType: 'potluckDonation',
 			entityId: after.id,
-			before: existing[0]
-				? { isActive: existing[0].isActive === 1, tosVersion: existing[0].tosVersion }
+			before: existing
+				? { isActive: existing.isActive, tosVersion: existing.tosVersion }
 				: undefined,
 			after: {
 				providerId: validated.providerId,
@@ -240,14 +299,14 @@ export async function deactivateDonation(
 ): Promise<void> {
 	const rows = await db
 		.select()
-		.from(potluckDonations)
-		.where(eq(potluckDonations.id, id))
+		.from(encryptedCredentials)
+		.where(eq(encryptedCredentials.id, id))
 		.limit(1);
 	const existing = rows[0];
 	await db
-		.update(potluckDonations)
-		.set({ isActive: 0 })
-		.where(eq(potluckDonations.id, id));
+		.update(encryptedCredentials)
+		.set({ enabled: 0, updatedAt: new Date().toISOString() })
+		.where(eq(encryptedCredentials.id, id));
 	if (audit && existing) {
 		await writeAudit({
 			schoolId: audit.schoolId,
@@ -255,13 +314,11 @@ export async function deactivateDonation(
 			action: 'disable',
 			entityType: 'potluckDonation',
 			entityId: id,
-			before: { isActive: existing.isActive === 1, providerId: existing.providerId },
+			before: { isActive: existing.enabled === 1, providerId: existing.providerId },
 			after: { isActive: false }
 		});
 	}
 }
-
-// ──────────────────────────── helpers ────────────────────────────
 
 export function parseJsonArray(value: string | null | undefined): string[] {
 	if (!value) return [];

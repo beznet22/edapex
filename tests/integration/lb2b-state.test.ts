@@ -63,16 +63,22 @@ describe('LB2B state (read-only diagnostic)', () => {
 		console.log('\n=== LOWER BASIC 2 / B (matched) ===');
 		console.log(lb2b);
 
+		const classId = lb2b?.classId;
+		const sectionId = lb2b?.sectionId;
+		if (classId === null || classId === undefined || sectionId === null || sectionId === undefined) {
+			throw new Error('LOWER BASIC 2 B classId or sectionId is null or undefined');
+		}
+
 		const students = await studentRepo.getStudentsByClassSection({
-			classId: lb2b!.classId,
-			sectionId: lb2b!.sectionId
+			classId,
+			sectionId
 		});
 		console.log('\n=== Students in LOWER BASIC 2 / B ===');
 		console.log(students);
 
 		const teacher = await staffRepo.getStaffByClassSection({
-			classId: lb2b!.classId,
-			sectionId: lb2b!.sectionId
+			classId,
+			sectionId
 		});
 		console.log('\n=== Class teacher assigned to LOWER BASIC 2 / B ===');
 		console.log(teacher);

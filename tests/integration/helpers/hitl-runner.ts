@@ -29,7 +29,6 @@ import { getModelForTest, TEST_MODEL_ID } from './tenant';
 import { collectStream } from './stream-consumer';
 import type { TenantContext } from '$lib/server/mastra/tenant-context';
 import type { RequestContext } from '@mastra/core/request-context';
-import type { RequestContextValues } from '$lib/server/mastra/agents';
 import type { MarksheetFixture } from './ocr-fixtures';
 
 export interface RunParams {
@@ -68,27 +67,13 @@ export interface RunResult {
 	awaitingValidation: AwaitingValidation | null;
 }
 
-async function buildRunContext(tenant: TenantContext): Promise<RequestContext<RequestContextValues>> {
-	const userId = tenant.userId;
-	const modelConfig = await getModelForTest(userId, TEST_MODEL_ID);
-	const ctx: RequestContext<RequestContextValues> = await buildRequestContext({
-		context: tenant,
-		userId,
-		modelId: TEST_MODEL_ID,
-		isSlashCommand: false,
-		lastMessage: ''
-	});
-	ctx.set('modelConfig', modelConfig);
-	return ctx;
-}
-
 /**
  * Invoke the chatWorkflow with the given params (or resume a prior run).
  * Returns the full event stream + extracted HITL gates.
  */
 export async function runWorkflow(params: RunParams): Promise<RunResult> {
 	const userId = params.tenant.userId;
-	const requestContext: RequestContext<RequestContextValues> = await buildRequestContext({
+	const requestContext: RequestContext<unknown> = await buildRequestContext({
 		context: params.tenant,
 		userId,
 		modelId: TEST_MODEL_ID,

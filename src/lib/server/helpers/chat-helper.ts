@@ -41,9 +41,9 @@ export async function buildRequestContext(params: {
   modelId: string;
   isSlashCommand: boolean;
   lastMessage: string;
-}): Promise<RequestContext<RequestContextValues>> {
+}): Promise<RequestContext<unknown>> {
   const { context, userId, modelId, isSlashCommand, lastMessage } = params;
-  const requestContext = new RequestContext<RequestContextValues>();
+  const requestContext = new RequestContext<unknown>();
 
   requestContext.set('tenantContext', context);
   requestContext.set('isSlashCommand', isSlashCommand);
@@ -82,8 +82,8 @@ export async function buildRequestContext(params: {
  */
 export function buildWorkspaceRequestContext(
   context: TenantContext,
-): RequestContext<RequestContextValues> {
-  const requestContext = new RequestContext<RequestContextValues>();
+): RequestContext<unknown> {
+  const requestContext = new RequestContext<unknown>();
   requestContext.set('tenantContext', context);
   return requestContext;
 }
@@ -96,7 +96,7 @@ export function buildWorkspaceRequestContext(
  */
 export interface WorkspaceContextBundle {
   tenant: TenantContext;
-  requestContext: RequestContext<RequestContextValues>;
+  requestContext: RequestContext<unknown>;
 }
 
 /**

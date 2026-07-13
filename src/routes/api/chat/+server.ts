@@ -1,212 +1,45 @@
 import { allowAnonymousChats } from "$lib/constants";
-import type { xUIMessage } from "$lib/types/chat-types";
-import { error, type RequestHandler } from "@sveltejs/kit";
-import { randomUUID } from "node:crypto";
+import { error, type Cookies, type RequestHandler } from "@sveltejs/kit";
 import {
 	createUIMessageStream,
 	createUIMessageStreamResponse
 } from "ai";
 import { handleWorkflowStream } from "@mastra/ai-sdk";
-import type { WorkflowStreamHandlerParams } from "@mastra/ai-sdk";
 import { toAISdkV5Messages } from "@mastra/ai-sdk/ui";
-import {
-	createTenantContext,
-	resolveExamTypeId,
-	withAcademicId,
-	withExamTypeId,
-	WorkspaceMismatchError
-} from "$lib/server/mastra/tenant-context";
-import { resolveActiveClassScope } from "$lib/server/helpers/class-scope";
-import { getDatabase } from "$lib/server/db";
-import { BaseRepository } from "$lib/server/repository/base.repo";
-import type { ClassSection } from "$lib/types/result-types";
-import { processMentions, type MentionTag } from "$lib/server/mastra/mention-processor";
-import { TenantContextCache } from "$lib/server/mastra/context-cache";
-import type { FileReference } from "$lib/server/mastra/file-context";
+import { WorkspaceMismatchError } from "$lib/server/mastra/tenant-context";
 import { mastra } from "$lib/server/mastra";
-import { buildRequestContext, resolveThread, resolveWorkspaceContext } from "$lib/server/helpers/chat-helper";
-import { ALLOWED_DESIGNATIONS } from "$lib/types/sms-types";
-import { warmUpFileReferences } from "$lib/server/mastra/file-reference-warmup";
-import { chatWorkflowInputSchema } from "$lib/server/mastra/utils/chat-schemas";
-import type { z } from "zod";
-import type { RequestContext } from "@mastra/core/request-context";
-
-type ChatWorkflowInput = z.infer<typeof chatWorkflowInputSchema>;
-type ChatWorkflowParams = WorkflowStreamHandlerParams & {
-	inputData: ChatWorkflowInput;
-	requestContext: RequestContext<unknown>;
-	abortSignal?: AbortSignal;
-};
-
-const tenantContextCache = new TenantContextCache();
+import {
+	buildApprovalContext,
+	buildWorkflowParams,
+	findToolApprovalResponse,
+	resumeAgentToolCall,
+	type ChatWorkflowParams
+} from "./workflow-params";
+import type { AuthUser } from "$lib/types/auth-types";
+import type { xUIMessagePart } from "$lib/types/chat-types";
 
 export const POST: RequestHandler = async ({ request, locals: { user, session }, cookies }) => {
-
-	let { threadId, messages, selectedClass: bodySelectedClass, fileReferences, mentions, runId: bodyRunId, step: bodyStep, resumeData: bodyResumeData }: {
-		threadId: string;
-		messages: xUIMessage[];
-		selectedClass?: ClassSection;
-		fileReferences?: FileReference[];
-		mentions?: MentionTag[];
-		runId?: string;
-		step?: string;
-		resumeData?: Record<string, any>;
-	} = await request.json();
+	const payload = await request.json();
+	const promptText = payload?.messages?.at(-1)?.parts?.find((p: xUIMessagePart) => p.type === "text")?.text || "";
+	console.info(`[api/chat] New request received: ${promptText}`);
 
 	if ((!user || !session) && !allowAnonymousChats) error(401, "Unauthorized");
 	if (!user) error(401, "User session required for provider resolution");
 
-	const cookieClass = cookies.get("selected-class");
-	let selectedClass: ClassSection | undefined = bodySelectedClass;
-	if (cookieClass) {
-		try {
-			const parsed = JSON.parse(cookieClass) as {
-				id?: number;
-				classId?: number;
-				sectionId?: number;
-				className?: string;
-				sectionName?: string;
-			};
-			const effectiveClassId = parsed.classId ?? parsed.id;
-			if (typeof effectiveClassId === "number") {
-				selectedClass = {
-					id: parsed.id ?? effectiveClassId,
-					classId: parsed.classId,  // KEEP classId — without this the
-					//                          chat route falls back to .id (= 100)
-					sectionId: typeof parsed.sectionId === "number" ? parsed.sectionId : 0,
-					className: parsed.className ?? bodySelectedClass?.className ?? "",
-					sectionName: parsed.sectionName ?? bodySelectedClass?.sectionName ?? ""
-				} as ClassSection;
-			}
-		} catch {
-			// ignore parse error, fall back to body
-		}
-	}
-
-	const selectedChatModel = cookies.get("selected-model") ?? "";
-	if (selectedChatModel === 'auto' || selectedChatModel === 'deep-reasoning') {
-		error(400, "Invalid model selection");
-	}
-	// Empty cookie is OK — chat-helper will auto-pick from platform defaults.
-
-	const resourceId = `user-${user.id}`;
-	const { tenant: tenantContext } = await resolveWorkspaceContext(cookies, {
-		id: user.id,
-		schoolId: user.schoolId ?? null,
-		staffId: (user as any).staffId ?? null,
-		designationId: (user as any).designationId ?? null,
-		roleId: (user as any).roleId ?? null
-	});
-	if (tenantContext.classId === null && selectedClass) {
-		(tenantContext as { classId: number | null }).classId =
-			(selectedClass as { classId?: number } | undefined)?.classId
-			?? (selectedClass as { id?: number } | undefined)?.id ?? null;
-	}
-	if (tenantContext.sectionId === null && selectedClass) {
-		(tenantContext as { sectionId: number | null }).sectionId =
-			selectedClass?.sectionId ?? null;
-	}
-
-	let activeContext = tenantContext;
-	if (mentions && mentions.length > 0) {
-		try {
-			const sessionId = session?.id ?? `anon-${user.id}`;
-			const designationId = (user as any).designationId ?? ALLOWED_DESIGNATIONS.IT;
-			activeContext = await processMentions(
-				mentions,
-				tenantContext,
-				tenantContextCache,
-				sessionId,
-				designationId
-			);
-		} catch (e) {
-			if (e instanceof WorkspaceMismatchError) {
-				return new Response(
-					JSON.stringify({ error: 'WORKSPACE_MISMATCH', message: e.message }),
-					{ status: 403, headers: { 'Content-Type': 'application/json' } }
-				);
-			}
-			throw e;
-		}
-	}
-
-	const lastMessage = messages[messages.length - 1];
-	const promptText = lastMessage.parts?.find((p) => p.type === "text")?.text || "";
-	const isSlashCommand = promptText.trim().startsWith('/');
-
-	if (activeContext.examTypeId === null) {
-		const resolved = await resolveExamTypeId(activeContext.schoolId, null);
-		activeContext = withExamTypeId(activeContext, resolved);
-	}
-
-	if (activeContext.academicId === null) {
-		const db = await getDatabase();
-		const baseRepo = await BaseRepository.build(db, activeContext);
-		const academicId = await baseRepo.getAcademicId();
-		activeContext = withAcademicId(activeContext, academicId);
-	}
-
-	if (
-		activeContext.classId === null &&
-		activeContext.sectionId === null &&
-		(user as { staffId?: number }).staffId
-	) {
-		const resolved = await resolveActiveClassScope({
-			schoolId: activeContext.schoolId,
-			staffId: (user as { staffId?: number }).staffId
-		});
-		if (resolved) {
-			activeContext = Object.freeze({
-				...activeContext,
-				classId: resolved.classId,
-				sectionId: resolved.sectionId
-			});
-		}
-	}
-
-	if (!bodyRunId && fileReferences && fileReferences.length > 0) {
-		try {
-			fileReferences = await warmUpFileReferences(activeContext, fileReferences);
-		} catch (err) {
-			const msg = err instanceof Error ? err.message : String(err);
-			console.warn(`[api/chat] File reference warm-up failed: ${msg}`);
-		}
-	}
-
-	const requestContext = await buildRequestContext({
-		context: activeContext,
-		userId: user.id,
-		modelId: selectedChatModel,
-		isSlashCommand,
-		lastMessage: promptText
-	});
-
-	// Surface resolved @mentions into the system prompt. ChatComposer
-	// already forwards `selectedMentions` via `body.mentions`; we forward
-	// them here so `buildAssistantInstructions` can render the
-	// `RESOLVED @MENTIONS` block (and any focus student derived from it).
-	if (mentions && mentions.length > 0) {
-		requestContext.set('resolvedMentions', mentions as never);
-	}
-
-	const runId = bodyRunId ?? randomUUID();
-	let stream;
-	try {
-		const params: ChatWorkflowParams = {
-			runId,
-			...(bodyResumeData ? { resumeData: bodyResumeData } : {}),
-			...(bodyStep ? { step: bodyStep } : {}),
-			inputData: {
-				threadId,
-				resourceId,
-				promptText,
-				fileReferences: fileReferences ?? []
-			},
-			requestContext: requestContext as RequestContext<unknown>,
+	const approvalResponse = findToolApprovalResponse(payload.messages ?? []);
+	if (approvalResponse) {
+		const { requestContext } = await buildApprovalContext(user, cookies);
+		const stream = await resumeAgentToolCall({
+			approval: approvalResponse,
+			requestContext,
 			abortSignal: request.signal
-		};
+		});
+		return createUIMessageStreamResponse({ stream });
+	}
 
-		stream = await handleWorkflowStream<xUIMessage>({
+	try {
+		const params = await buildWorkflowParams(user, session, payload, cookies);
+		const stream = await handleWorkflowStream({
 			version: 'v6',
 			mastra,
 			workflowId: 'chatWorkflow',
@@ -214,7 +47,14 @@ export const POST: RequestHandler = async ({ request, locals: { user, session },
 			sendReasoning: true,
 			sendSources: true
 		});
+		return createUIMessageStreamResponse({ stream });
 	} catch (e) {
+		if (e instanceof WorkspaceMismatchError) {
+			return new Response(
+				JSON.stringify({ error: 'WORKSPACE_MISMATCH', message: e.message }),
+				{ status: 403, headers: { 'Content-Type': 'application/json' } }
+			);
+		}
 		const msg = e instanceof Error ? e.message : String(e);
 		if (msg.includes('AbortError') || msg.includes('aborted')) {
 			console.info('[api/chat] Stream aborted by client');
@@ -223,14 +63,6 @@ export const POST: RequestHandler = async ({ request, locals: { user, session },
 		}
 		throw e;
 	}
-
-	const wrappedStream = createUIMessageStream({
-		execute: async ({ writer }) => {
-			writer.merge(stream);
-		}
-	});
-
-	return createUIMessageStreamResponse({ stream: wrappedStream });
 };
 
 /**
@@ -261,3 +93,4 @@ export const GET: RequestHandler = async ({ url, locals: { user } }) => {
 	const uiMessages = toAISdkV5Messages(response?.messages || []);
 	return Response.json(uiMessages);
 };
+

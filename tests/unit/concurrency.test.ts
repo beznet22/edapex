@@ -2,17 +2,15 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { eq, and } from 'drizzle-orm';
 import { getAppDb } from '$lib/server/mastra/storage/libsql/app-db';
 import {
-	userCredentials,
-	userModelVisibility,
-	adminModelOverrides,
-	potluckConfig,
-	potluckDonations
+	encryptedCredentials,
+	modelVisibility,
+	providerAccessPolicy,
+	potluckConfig
 } from '$lib/server/mastra/storage/libsql/app-db.schema';
 import { saveUserCredential } from '$lib/server/mastra/provider/credentials';
 import { setModelVisibility } from '$lib/server/mastra/provider/visibility';
 import { disableModelOrProvider } from '$lib/server/mastra/provider/admin-model-overrides';
 import { savePotluckConfig, upsertDonation } from '$lib/server/mastra/provider/potluck';
-import { encrypt } from '$lib/server/mastra/provider/crypto';
 
 const SCHOOL = 98001;
 const USER_ID = 9801;
@@ -22,18 +20,30 @@ const ENCRYPTION_KEY = 'edapex-default-encryption-key-32ch';
 
 async function cleanupDb(): Promise<void> {
 	const db = getAppDb();
-	await db.delete(userCredentials).where(eq(userCredentials.userId, USER_ID));
-	await db.delete(userModelVisibility).where(eq(userModelVisibility.userId, USER_ID));
-	await db.delete(adminModelOverrides).where(eq(adminModelOverrides.schoolId, SCHOOL));
+	await db
+		.delete(encryptedCredentials)
+		.where(and(eq(encryptedCredentials.scope, 'user'), eq(encryptedCredentials.userId, USER_ID)));
+	await db
+		.delete(modelVisibility)
+		.where(and(eq(modelVisibility.scope, 'user'), eq(modelVisibility.userId, USER_ID)));
+	await db.delete(providerAccessPolicy).where(eq(providerAccessPolicy.schoolId, SCHOOL));
 	await db.delete(potluckConfig).where(eq(potluckConfig.schoolId, SCHOOL));
-	await db.delete(potluckDonations).where(eq(potluckDonations.schoolId, SCHOOL));
+	await db
+		.delete(encryptedCredentials)
+		.where(
+			and(
+				eq(encryptedCredentials.scope, 'school'),
+				eq(encryptedCredentials.credentialKind, 'donation'),
+				eq(encryptedCredentials.schoolId, SCHOOL)
+			)
+		);
 }
 
 describe('concurrent provider table writes', () => {
 	beforeEach(cleanupDb);
 	afterEach(cleanupDb);
 
-	it('user_credentials: 50 concurrent saves for the same key leave exactly one row', async () => {
+	it('encrypted_credentials: 50 concurrent saves for the same key leave exactly one row', async () => {
 		const db = getAppDb();
 		const env = { TOKEN_ENCRYPTION_KEY: ENCRYPTION_KEY };
 
@@ -52,13 +62,17 @@ describe('concurrent provider table writes', () => {
 		expect(results).toHaveLength(50);
 
 		const count = await db.$count(
-			userCredentials,
-			and(eq(userCredentials.userId, USER_ID), eq(userCredentials.providerId, PROVIDER))
+			encryptedCredentials,
+			and(
+				eq(encryptedCredentials.scope, 'user'),
+				eq(encryptedCredentials.userId, USER_ID),
+				eq(encryptedCredentials.providerId, PROVIDER)
+			)
 		);
 		expect(count).toBe(1);
 	});
 
-	it('user_model_visibility: 50 concurrent sets for the same key leave exactly one row', async () => {
+	it('model_visibility: 50 concurrent sets for the same key leave exactly one row', async () => {
 		const db = getAppDb();
 
 		const writes = Array.from({ length: 50 }, () =>
@@ -69,13 +83,17 @@ describe('concurrent provider table writes', () => {
 		expect(results).toHaveLength(50);
 
 		const count = await db.$count(
-			userModelVisibility,
-			and(eq(userModelVisibility.userId, USER_ID), eq(userModelVisibility.modelId, MODEL_ID))
+			modelVisibility,
+			and(
+				eq(modelVisibility.scope, 'user'),
+				eq(modelVisibility.userId, USER_ID),
+				eq(modelVisibility.modelId, MODEL_ID)
+			)
 		);
 		expect(count).toBe(1);
 	});
 
-	it('admin_model_overrides: 50 concurrent disables for the same key leave exactly one row', async () => {
+	it('provider_access_policy: 50 concurrent disables for the same key leave exactly one row', async () => {
 		const db = getAppDb();
 
 		const writes = Array.from({ length: 50 }, () =>
@@ -87,11 +105,12 @@ describe('concurrent provider table writes', () => {
 		expect(results.every((row) => row !== null)).toBe(true);
 
 		const count = await db.$count(
-			adminModelOverrides,
+			providerAccessPolicy,
 			and(
-				eq(adminModelOverrides.schoolId, SCHOOL),
-				eq(adminModelOverrides.providerId, PROVIDER),
-				eq(adminModelOverrides.modelId, MODEL_ID)
+				eq(providerAccessPolicy.schoolId, SCHOOL),
+				eq(providerAccessPolicy.ruleType, 'deny'),
+				eq(providerAccessPolicy.providerId, PROVIDER),
+				eq(providerAccessPolicy.modelId, MODEL_ID)
 			)
 		);
 		expect(count).toBe(1);
@@ -124,23 +143,24 @@ describe('concurrent provider table writes', () => {
 		expect(count).toBe(1);
 	});
 
-	it('potluck_donations: 50 concurrent upserts for the same key leave exactly one row', async () => {
+	it('encrypted_credentials donations: 50 concurrent upserts for the same key leave exactly one row', async () => {
 		const db = getAppDb();
-		const apiKeyEncrypted = encrypt('sk-donation-concurrent', ENCRYPTION_KEY);
+		const env = { TOKEN_ENCRYPTION_KEY: ENCRYPTION_KEY };
 
 		const writes = Array.from({ length: 50 }, () =>
-			upsertDonation(db, SCHOOL, PROVIDER, apiKeyEncrypted, USER_ID, USER_ID, 'v1')
+			upsertDonation(db, env, SCHOOL, PROVIDER, 'sk-donation-concurrent', USER_ID, USER_ID, 'v1')
 		);
 
 		const results = await Promise.all(writes);
 		expect(results).toHaveLength(50);
 
 		const count = await db.$count(
-			potluckDonations,
+			encryptedCredentials,
 			and(
-				eq(potluckDonations.schoolId, SCHOOL),
-				eq(potluckDonations.providerId, PROVIDER),
-				eq(potluckDonations.donatedBy, USER_ID)
+				eq(encryptedCredentials.scope, 'school'),
+				eq(encryptedCredentials.credentialKind, 'donation'),
+				eq(encryptedCredentials.schoolId, SCHOOL),
+				eq(encryptedCredentials.providerId, PROVIDER)
 			)
 		);
 		expect(count).toBe(1);

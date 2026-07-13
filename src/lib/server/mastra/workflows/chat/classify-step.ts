@@ -8,7 +8,6 @@ export const classifyStep = createStep({
 	inputSchema: chatWorkflowInputSchema,
 	outputSchema: z.array(fileStreamItemSchema),
 	execute: async ({ inputData }) => {
-		console.log("CLASSIFY HIT");
 		if (inputData.fileReferences.length === 0) {
 			return [];
 		}

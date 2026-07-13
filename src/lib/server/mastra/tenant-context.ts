@@ -176,8 +176,8 @@ export interface MastraToolContext {
  * See `docs/slash_command_tool_hardening_plan.md` §2.2 (B2 fix) and §4
  * Slice 0.
  */
-export async function buildMastraToolContext(
-  requestContext: RequestContext | undefined,
+export async function buildMastraToolContext<T = unknown>(
+  requestContext: RequestContext<T> | undefined,
   mastra?: unknown,
 ): Promise<MastraToolContext> {
   if (!requestContext) {

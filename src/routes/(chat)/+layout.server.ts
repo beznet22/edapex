@@ -1,4 +1,3 @@
-import { SelectedModel, SelectedClass } from "$lib/context/sync.svelte";
 import { error, redirect } from "@sveltejs/kit";
 import type { LayoutServerLoad } from "./$types";
 import { allowAnonymousChats, STORAGE_DIR, UPLOADS_DIR } from "$lib/constants";
@@ -8,7 +7,6 @@ import { join } from "path";
 import type { ChatThread, UploadedData } from "$lib/types/chat-types";
 import { existsSync, rm, rmdirSync, type Dirent } from "fs";
 import type { ClassSection } from "$lib/types/result-types";
-import { DESIGNATIONS, type Designation } from "$lib/types/sms-types";
 import { generateId } from "ai";
 import { getAppDb } from "$lib/server/mastra/storage/libsql/app-db";
 import { getAllUserCredentials } from "$lib/server/mastra/provider/credentials";

@@ -30,7 +30,7 @@
  */
 import { describe, it, expect, beforeAll } from 'vitest';
 import './helpers/mastra-instance';
-import { streamDocumentTool } from '$lib/server/mastra/tools/operations/reporting/stream-document';
+import { streamDocumentTool } from '$lib/server/mastra/tools/operations/reporting/marksheet/stream-document';
 import { getDatabase } from '$lib/server/db';
 import { ResultsRepository } from '$lib/server/repository/result.repo';
 import { ScopedRepositoryProvider } from '$lib/server/mastra/scoped-repository';
@@ -273,7 +273,7 @@ describe('LB2B direct tool-call lifecycle — Al-Azeem YUSUFF (sid=188)', () => 
 		'Step 4 — generateResultPdf writes pdfs/marksheet-<sid>.pdf',
 		async () => {
 			const tool = generateResultPdfTool;
-			if (!tool) throw new Error('TOOL_NOT_REGISTERED: generate-result-pdf');
+			if (!tool.execute) throw new Error('Tool generateResultPdf has no execute function');
 			const result = (await tool.execute(
 				{ studentId: SID, examTypeId: EXAM_TYPE_ID },
 				{
@@ -306,8 +306,9 @@ describe('LB2B direct tool-call lifecycle — Al-Azeem YUSUFF (sid=188)', () => 
 			};
 			// Real RequestContext persists state across the two publish calls.
 
+			if (!tool.execute) throw new Error('Tool publishResultPdf has no execute function');
 			const result = (await tool.execute(
-				{ studentId: SID, examTypeId: EXAM_TYPE_ID },
+				{ studentId: SID, examTypeId: EXAM_TYPE_ID, reason: 'testing' },
 				{
 					requestContext: await getRequestContext(),
 					writer: fakeWriter as never
@@ -377,9 +378,11 @@ describe('LB2B direct tool-call lifecycle — Al-Azeem YUSUFF (sid=188)', () => 
 			};
 			// Real RequestContext persists state across the two publish calls.
 
+			if (!tool.execute) throw new Error('Tool publishResultPdf has no execute function');
+
 			// First call to set up the state
 			await tool.execute(
-				{ studentId: SID, examTypeId: EXAM_TYPE_ID },
+				{ studentId: SID, examTypeId: EXAM_TYPE_ID, reason: 'testing' },
 				{
 					requestContext: await getRequestContext(),
 					writer: fakeWriter as never
@@ -398,7 +401,8 @@ describe('LB2B direct tool-call lifecycle — Al-Azeem YUSUFF (sid=188)', () => 
 					studentId: SID,
 					examTypeId: EXAM_TYPE_ID,
 					confirmed: true,
-					confirmationToken: stored!.confirmationToken
+					confirmationToken: stored!.confirmationToken,
+					reason: 'testing'
 				},
 				{
 					requestContext: await getRequestContext(),
