@@ -18,6 +18,9 @@ export default defineConfig({
     }
   },
   build: {
+    commonjsOptions: {
+      ignoreDynamicRequires: true
+    },
     rollupOptions: {
       external: [/@libsql\//, 'libsql', '@neon-rs/load', 'detect-libc']
     }
