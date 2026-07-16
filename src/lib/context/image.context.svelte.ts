@@ -1,6 +1,7 @@
 import { getContext, setContext } from "svelte";
 import ImageCompressorWorker from "$lib/workers/image-compressor.worker.ts?worker";
 import { toast } from "svelte-sonner";
+import { IMAGE_COMPRESSION_DEFAULTS, type ImageCompressionDefaults } from "$lib/compression.config";
 
 const IMAGE_CONTEXT_KEY = Symbol("image-compression-context");
 
@@ -12,13 +13,9 @@ export interface CompressionStats {
     wasConverted: boolean;
 }
 
-export interface CompressionOptions {
-    maxWidth?: number;
-    maxHeight?: number;
-    quality?: number;
-    maxSizeKB?: number;
-    convertPngThreshold?: number; // bytes
-}
+export type CompressionOptions = Partial<ImageCompressionDefaults>;
+export { IMAGE_COMPRESSION_DEFAULTS };
+
 
 export class ImageContext {
     lastStats = $state<CompressionStats | null>(null);
@@ -67,11 +64,11 @@ export class ImageContext {
                 id,
                 file,
                 options: {
-                    maxWidth: options.maxWidth ?? 2048,
-                    maxHeight: options.maxHeight ?? 2048,
-                    quality: options.quality ?? 0.8,
-                    maxSizeKB: options.maxSizeKB ?? 0,
-                    convertPngThreshold: options.convertPngThreshold ?? 2 * 1024 * 1024,
+                    maxWidth: options.maxWidth ?? IMAGE_COMPRESSION_DEFAULTS.maxWidth,
+                    maxHeight: options.maxHeight ?? IMAGE_COMPRESSION_DEFAULTS.maxHeight,
+                    quality: options.quality ?? IMAGE_COMPRESSION_DEFAULTS.quality,
+                    maxSizeKB: options.maxSizeKB ?? IMAGE_COMPRESSION_DEFAULTS.maxSizeKB,
+                    convertPngThreshold: options.convertPngThreshold ?? IMAGE_COMPRESSION_DEFAULTS.convertPngThreshold,
                 }
             });
         });

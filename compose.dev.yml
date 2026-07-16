@@ -18,6 +18,7 @@ services:
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
       - TELEGRAM_BOT_USERNAME=${TELEGRAM_BOT_USERNAME}
       - MASTRA_DB_URL=file:/app/storage/edapex-mastra.db
+      - BODY_SIZE_LIMIT=25M
     volumes:
       - ${STORAGE_DIR}/storage:/app/storage/
       - ${STORAGE_DIR}/uploads:/app/static/uploads/

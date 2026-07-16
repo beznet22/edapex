@@ -34,9 +34,11 @@
   import type { MentionPayload } from "$lib/context/chat-context.svelte";
   import { useChat, chatUsage } from "$lib/context/chat-context.svelte";
   import { useFileActions } from "$lib/context/file-context.svelte";
+  import { useImageCompression } from "$lib/context/image.context.svelte";
   import { UserContext } from "$lib/context/user-context.svelte";
   import { SelectedModel, ResolvedModelHolder } from "$lib/context/sync.svelte";
   import { BUILTIN_PROVIDERS, getModelById } from "$lib/provider/catalog";
+  import { IMAGE_COMPRESSION_DEFAULTS, COMPRESSION_SKIP_THRESHOLD_BYTES } from "$lib/compression.config";
   import type { ModelId } from "$lib/provider/types";
   import type { ModelInfo, Variant } from "$lib/provider/spec";
   import type { AuthUser } from "$lib/types/auth-types";
@@ -141,9 +143,34 @@
 
   const chat = useChat();
   const file = useFileActions();
+  const imageContext = useImageCompression();
   const userContext = UserContext.fromContext();
   const selectedChatModel = SelectedModel.fromContext();
   const resolvedModelHolder = ResolvedModelHolder.fromContext();
+
+  function extFromMime(type: string): string {
+    if (type === "image/jpeg") return "jpg";
+    if (type === "image/png") return "png";
+    if (type === "image/webp") return "webp";
+    if (type === "image/gif") return "gif";
+    return "";
+  }
+
+  function filenameForMime(originalName: string, mime: string): string {
+    if (mime && mime.startsWith("image/")) {
+      const ext = extFromMime(mime);
+      if (ext) {
+        return originalName.replace(/\.[^.]+$/, "") + "." + ext;
+      }
+    }
+    return originalName;
+  }
+
+  async function compressIfImage(file: File): Promise<File> {
+    if (!file.type.startsWith("image/")) return file;
+    if (file.size < COMPRESSION_SKIP_THRESHOLD_BYTES) return file;
+    return imageContext.compress(file, IMAGE_COMPRESSION_DEFAULTS);
+  }
 
   // Current model: try the SSR-resolved model first, then fall back to the
   // catalog lookup. The SSR-resolved model handles custom-provider discovered
@@ -432,11 +459,16 @@
     const input = e.target as HTMLInputElement;
     if (!input.files?.length) return;
 
-    for (const f of Array.from(input.files)) {
+    const originals = Array.from(input.files);
+    const prepared = await Promise.all(originals.map(compressIfImage));
+
+    for (let i = 0; i < originals.length; i++) {
+      const f = originals[i];
+      const compressed = prepared[i];
       try {
         const formData = new FormData();
-        formData.append("file", f);
-        formData.append("filename", f.name);
+        formData.append("file", compressed);
+        formData.append("filename", filenameForMime(f.name, compressed.type));
         formData.append("kind", "photo");
 
         const res = await fetch("/api/uploads", {
@@ -500,7 +532,12 @@
     const classId = selectedClass?.classId ?? null;
     const sectionId = selectedClass?.sectionId ?? null;
 
-    for (const f of Array.from(input.files)) {
+    const originals = Array.from(input.files);
+    const prepared = await Promise.all(originals.map(compressIfImage));
+
+    for (let i = 0; i < originals.length; i++) {
+      const f = originals[i];
+      const compressed = prepared[i];
       // Optimistic pill: add with status='uploading' immediately so the
       // indicator shows up before the fetch resolves.
       const tempKey = `pending-${f.name}-${Date.now()}-${Math.random()}`;
@@ -512,8 +549,8 @@
       }
       try {
         const formData = new FormData();
-        formData.append("file", f);
-        formData.append("filename", f.name);
+        formData.append("file", compressed);
+        formData.append("filename", filenameForMime(f.name, compressed.type));
         formData.append("kind", "document");
         if (classId !== null) formData.append("classId", String(classId));
         if (sectionId !== null) formData.append("sectionId", String(sectionId));
@@ -763,6 +800,16 @@
             </button>
           </div>
         {/each}
+        {#if imageContext.isCompressing}
+          <div
+            class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/60 border border-white/5 text-[11px] font-bold tracking-wide text-foreground/70 shadow-sm"
+            data-status="compressing"
+            aria-label="compressing image"
+          >
+            <span class="size-3 rounded-full border-2 border-primary/40 border-t-primary animate-spin"></span>
+            <span class="uppercase tracking-tighter">Compressing…</span>
+          </div>
+        {/if}
       {/if}
     </div>
   {/if}
