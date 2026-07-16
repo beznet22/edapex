@@ -1,7 +1,7 @@
 import { LibSQLStore } from '@mastra/libsql';
 
 const MASTRA_STORAGE_ID = 'edapex-mastra';
-const DEFAULT_DB_URL = 'file:./mastra.db';
+const DEFAULT_DB_URL = process.env.MASTRA_DB_URL ?? 'file:./mastra.db';
 
 let _sharedStorage: LibSQLStore | null = null;
 let _initPromise: Promise<void> | null = null;
