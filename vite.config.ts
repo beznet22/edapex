@@ -17,7 +17,9 @@ export default defineConfig({
       ]
     }
   },
-  ssr: {
-    external: ['@libsql/linux-x64-gnu', '@libsql/linux-x64-musl']
+  build: {
+    rollupOptions: {
+      external: [/@libsql\//, 'libsql', '@neon-rs/load', 'detect-libc']
+    }
   }
 });
