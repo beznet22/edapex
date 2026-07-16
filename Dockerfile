@@ -47,7 +47,7 @@ RUN groupadd -g 1001 nodejs && \
     useradd -m -u 1001 -g nodejs nodejs
 
 # Create necessary directories first
-RUN mkdir -p /app/storage/uploads /app/storage/cache /app/storage/private /app/temp && \
+RUN mkdir -p /app/storage/uploads /app/storage/cache /app/storage/private /app/.workspaces /app/temp && \
     chown -R nodejs:nodejs /app
 
 # Copy files using --chown to prevent layer doubling
