@@ -5,6 +5,8 @@ import {
 import { globalTools } from '$lib/server/mastra/tools/internal/global-tools';
 import { SkillRegistry } from '$lib/server/mastra/skill-registry';
 import { getContextTool } from '$lib/server/mastra/tools/internal/context-tool';
+import { readFileSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
 
 const ALL_TOOLS = [
   searchEntityTool,
@@ -21,10 +23,50 @@ for (const tool of ALL_TOOLS) {
 export const skillRegistry = new SkillRegistry();
 let registryInitialized = false;
 
+/**
+ * Bundled skill loader — Vite/Rollup resolves this glob at build time
+ * and inlines every `.skill.md` raw string into the production bundle.
+ * In production Docker images the `src/` tree is NOT copied, so the
+ * FS-based `loadFromDirectory` would `ENOENT`; this glob gives the
+ * runtime zero-dependency access to the skill content.
+ *
+ * In dev/test (Vite), the glob resolves against the on-disk source
+ * files exactly the same way, so behavior matches.
+ */
+const BUNDLED_SKILLS = import.meta.glob<{ default: string }>(
+  '/src/lib/server/mastra/skills/*.skill.md',
+  { query: '?raw', import: 'default', eager: true }
+);
+
+function loadBundledSkills(knownTools: Set<string>) {
+  const entries = Object.entries(BUNDLED_SKILLS).map(([path, raw]) => ({
+    filename: path.split('/').pop() ?? path,
+    raw: typeof raw === 'string' ? raw : (raw as { default: string }).default
+  }));
+  return skillRegistry.loadFromContent(entries, knownTools, 'src/lib/server/mastra/skills');
+}
+
+function loadFromFilesystem(knownTools: Set<string>) {
+  // Fallback only — used when the bundled glob is empty (e.g. some
+  // test runners that don't process import.meta.glob). Production
+  // Docker builds always have the glob populated.
+  const skillDir = process.cwd() + '/src/lib/server/mastra/skills';
+  const files = readdirSync(skillDir).filter((f) => f.endsWith('.skill.md'));
+  const entries = files.map((f) => ({
+    filename: f,
+    raw: readFileSync(join(skillDir, f), 'utf-8')
+  }));
+  return skillRegistry.loadFromContent(entries, knownTools, skillDir);
+}
+
 export async function ensureRegistry() {
   if (!registryInitialized) {
     const knownTools = new Set(Object.keys(TOOL_MAP));
-    await skillRegistry.loadFromDirectory(process.cwd() + '/src/lib/server/mastra/skills', knownTools);
+    if (Object.keys(BUNDLED_SKILLS).length > 0) {
+      loadBundledSkills(knownTools);
+    } else {
+      await loadFromFilesystem(knownTools);
+    }
     registryInitialized = true;
   }
 }

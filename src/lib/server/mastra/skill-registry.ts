@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import {
 	parseSkillFile,
 	validateSkillDirectory,
+	validateSkillEntries,
 	type SkillDefinition,
 	type ValidationResult
 } from './skill-schema';
@@ -72,6 +73,40 @@ export class SkillRegistry {
 
 	async loadFromDirectory(skillDir: string, knownTools: Set<string>): Promise<SkillManifest> {
 		const manifest = await generateSkillManifest(skillDir, knownTools);
+		this.loadFromManifest(manifest);
+		return manifest;
+	}
+
+	/**
+	 * Load skills from already-imported raw content (e.g. from
+	 * `import.meta.glob` in production builds). This avoids any
+	 * filesystem access at runtime, so the registry works inside
+	 * slim Docker images that don't carry the `src/` tree.
+	 */
+	loadFromContent(
+		entries: Array<{ filename: string; raw: string }>,
+		knownTools: Set<string>,
+		basePath: string = ''
+	): SkillManifest {
+		const results = validateSkillEntries(entries, knownTools, basePath);
+		const skills: Record<string, SkillDefinition> = {};
+		const errors: Array<{ file: string; errors: string[] }> = [];
+
+		for (const result of results) {
+			if (result.valid && result.skill) {
+				const key = result.skill.name.toLowerCase();
+				skills[key] = result.skill;
+			} else {
+				errors.push({ file: result.file, errors: result.errors });
+			}
+		}
+
+		const manifest: SkillManifest = {
+			version: 1,
+			generatedAt: new Date().toISOString(),
+			skills,
+			errors
+		};
 		this.loadFromManifest(manifest);
 		return manifest;
 	}

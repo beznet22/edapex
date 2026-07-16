@@ -46,16 +46,28 @@ export interface ValidationResult {
  */
 export async function parseSkillFile(filePath: string): Promise<SkillDefinition> {
 	const raw = await readFile(filePath, 'utf-8');
+	return parseSkillContent(raw, filePath);
+}
+
+/**
+ * Parse a `.skill.md` payload from its raw string content.
+ * Used by the bundled loader (import.meta.glob) so production
+ * builds don't need filesystem access to /src/lib/server/mastra/skills.
+ *
+ * The `sourcePath` is used only for error messages and the
+ * `filePath` field on the returned skill definition.
+ */
+export function parseSkillContent(raw: string, sourcePath: string): SkillDefinition {
 	const { data, content } = matter(raw);
 	const validated = SkillSchema.parse(data);
 
-	const filename = basename(filePath, '.skill.md');
+	const filename = basename(sourcePath, '.skill.md');
 
 	return {
 		...validated,
 		instructions: content.trim(),
 		slashCommand: `/${filename}`,
-		filePath
+		filePath: sourcePath
 	};
 }
 
@@ -70,14 +82,33 @@ export async function validateSkillDirectory(
 ): Promise<ValidationResult[]> {
 	const files = await readdir(dirPath);
 	const skillFiles = files.filter((f) => f.endsWith('.skill.md'));
-	const results: ValidationResult[] = [];
-
+	const entries: Array<{ filename: string; raw: string }> = [];
 	for (const file of skillFiles) {
 		const filePath = join(dirPath, file);
-		const result: ValidationResult = { file, valid: true, errors: [] };
+		entries.push({ filename: file, raw: await readFile(filePath, 'utf-8') });
+	}
+	return validateSkillEntries(entries, knownTools, dirPath);
+}
+
+/**
+ * Validate a set of pre-loaded skill entries (raw content + filename).
+ * The `basePath` is used as the `filePath` prefix for error messages and
+ * the resulting SkillDefinition.filePath field. Pass an empty string for
+ * virtual/glob-loaded skills where the path is informational only.
+ */
+export function validateSkillEntries(
+	entries: Array<{ filename: string; raw: string }>,
+	knownTools: Set<string>,
+	basePath: string = ''
+): ValidationResult[] {
+	const results: ValidationResult[] = [];
+
+	for (const { filename, raw } of entries) {
+		const filePath = basePath ? join(basePath, filename) : filename;
+		const result: ValidationResult = { file: filename, valid: true, errors: [] };
 
 		try {
-			const skill = await parseSkillFile(filePath);
+			const skill = parseSkillContent(raw, filePath);
 
 			// Reject skills that declare reserved Global Tool IDs
 			const conflictingTools = skill.tools.filter((t) => RESERVED_GLOBAL_TOOL_IDS.has(t));
@@ -85,7 +116,7 @@ export async function validateSkillDirectory(
 				result.valid = false;
 				for (const tool of conflictingTools) {
 					result.errors.push(
-						`Tool "${tool}" in ${file} conflicts with a reserved Global Tool — skills cannot declare Global Tool IDs`
+						`Tool "${tool}" in ${filename} conflicts with a reserved Global Tool — skills cannot declare Global Tool IDs`
 					);
 				}
 			}
@@ -94,7 +125,7 @@ export async function validateSkillDirectory(
 			if (missingTools.length > 0) {
 				result.valid = false;
 				for (const tool of missingTools) {
-					result.errors.push(`Tool "${tool}" referenced in ${file} does not exist in the registry`);
+					result.errors.push(`Tool "${tool}" referenced in ${filename} does not exist in the registry`);
 				}
 			}
 
