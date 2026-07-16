@@ -1,0 +1,23 @@
+services:
+  edapex-dev:
+    image: ghcr.io/beznet22/edapex:latest
+    pull_policy: always
+    user: "${UID}:${GID}"
+    ports:
+      - "3000:3000"
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - JWT_SIGN_SECRET=${JWT_SIGN_SECRET}
+      - JWE_ENC_SECRET=${JWE_ENC_SECRET}
+      - SMTP_HOST=${SMTP_HOST}
+      - SMTP_PORT=${SMTP_PORT}
+      - SMTP_USER=${SMTP_USER}
+      - SMTP_PASS=${SMTP_PASS}
+      - SMTP_FROM=${SMTP_FROM}
+      - SMTP_FROM_NAME=${SMTP_FROM_NAME}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_BOT_USERNAME=${TELEGRAM_BOT_USERNAME}
+    volumes:
+      - ${STORAGE_DIR}/storage:/app/storage/
+      - ${STORAGE_DIR}/static:/app/static/
+    restart: unless-stopped

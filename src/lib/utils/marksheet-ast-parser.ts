@@ -1,5 +1,9 @@
 import type { Marksheet, Category } from "$lib/schema/marksheet";
 import { EXAM_MARK_MAXIMUMS } from "$lib/constants/assessment";
+import { fromMarkdown } from "mdast-util-from-markdown";
+import { gfmFromMarkdown } from "mdast-util-gfm";
+import { gfm } from "micromark-extension-gfm";
+import type { Root } from "mdast";
 
 const MENTION_SPAN_RE = /<span\s+([^>]*data-type="mention"[^>]*)>@([^<]+)<\/span>/g;
 
@@ -53,19 +57,120 @@ function parseMentions(md: string): {
   return result as { studentId: number | null; examTypeId: number | null; academicId: number | null; admissionNo: number | null; studentName: string | null };
 }
 
-function parseSchoolInfo(md: string): Marksheet["school"] {
-  const section = extractSection(md, "## School Information");
+function stripHtml(val: string): string {
+  return val.replace(/<[^>]*>/g, "").replace(/^@/, "").trim();
+}
+
+function extractTitleLine(md: string): { fullName: string; title: string } {
+  const m = /^#\s+(.+?)\s*—\s*(.+?)\s*$/m.exec(md);
+  if (m) {
+    return { fullName: m[1].trim(), title: m[2].trim() };
+  }
+  return { fullName: "", title: "" };
+}
+
+// ─── AST helpers ─────────────────────────────────────────────────────────────
+
+function parseMd(md: string): Root {
+  return fromMarkdown(md, {
+    extensions: [gfm()],
+    mdastExtensions: [gfmFromMarkdown()],
+  });
+}
+
+function getNodeText(node: any): string {
+  if (!node) return "";
+  if (node.type === "text") return node.value;
+  if (node.type === "html") return "";
+  if (node.type === "inlineCode") return node.value;
+  if (node.children) return node.children.map(getNodeText).join("");
+  return "";
+}
+
+function getCellText(cell: any): string {
+  if (!cell || !cell.children) return "";
+  return cell.children.map(getNodeText).join("").trim();
+}
+
+function findSection(tree: Root, headingName: string): any[] | null {
+  let result: any[] | null = null;
+  for (let i = 0; i < tree.children.length; i++) {
+    const node = tree.children[i];
+    if (node.type !== "heading") continue;
+    const text = getNodeText(node);
+    if (text === headingName) {
+      const start = i + 1;
+      let end = tree.children.length;
+      for (let j = start; j < tree.children.length; j++) {
+        if (tree.children[j].type === "heading") {
+          end = j;
+          break;
+        }
+      }
+      result = tree.children.slice(start, end);
+      break;
+    }
+  }
+  return result;
+}
+
+function findTableInNodes(nodes: any[]): any | null {
+  for (const n of nodes) {
+    if (n.type === "table") return n;
+  }
+  return null;
+}
+
+function findBlockquoteInNodes(nodes: any[]): any | null {
+  for (const n of nodes) {
+    if (n.type === "blockquote") return n;
+  }
+  return null;
+}
+
+function findListInNodes(nodes: any[]): any | null {
+  for (const n of nodes) {
+    if (n.type === "list") return n;
+  }
+  return null;
+}
+
+function parseTableToKV(table: any): Record<string, string> {
+  const kv: Record<string, string> = {};
+  // Skip separator row (if present, already handled by mdast)
+  // data rows start at index 0 (header is index 0 in mdast)
+  // mdast-util-gfm keeps header as first row, no separator row
+  const rows = table.children;
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    if (!row.children || row.children.length < 2) continue;
+    const key = getCellText(row.children[0]).toLowerCase();
+    const val = getCellText(row.children[1]);
+    if (key === "field" && val.toLowerCase() === "details") continue;
+    kv[key] = val;
+  }
+  return kv;
+}
+
+// ─── Rewritten parsing helpers (AST-based) ───────────────────────────────────
+
+function parseSchoolInfoFromTree(tree: Root): Marksheet["school"] {
+  const section = findSection(tree, "School Information");
   if (!section) {
     return { id: 0, name: "", email: "", phone: "", city: "", state: "", title: "", vacation_date: "" };
   }
 
   const map: Record<string, string> = {};
-  const lineRe = /-\s+\*\*([^*]+)\*\*\s*(.+)/g;
-  let m: RegExpExecArray | null;
-  while ((m = lineRe.exec(section)) !== null) {
-    const key = m[1].trim().replace(/:$/, "").toLowerCase().replace(/\s+/g, "_");
-    const val = m[2].trim();
-    map[key] = val;
+  const list = findListInNodes(section);
+  if (list) {
+    for (const item of list.children) {
+      const text = getNodeText(item);
+      const m = text.match(/^\s*\*\*([^*]+)\*\*\s*(.+)/);
+      if (m) {
+        const key = m[1].trim().replace(/:$/, "").toLowerCase().replace(/\s+/g, "_");
+        map[key] = m[2].trim();
+      }
+    }
   }
 
   return {
@@ -80,38 +185,27 @@ function parseSchoolInfo(md: string): Marksheet["school"] {
   };
 }
 
-function extractSection(md: string, heading: string): string | null {
-  const esc = heading.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const re = new RegExp(`(?:^|\\n)${esc}\\s*\\n([\\s\\S]*?)(?=\\n## |\\n# |$)`, "");
-  const m = re.exec(md);
-  return m ? m[1].trim() : null;
-}
-
-function stripHtml(val: string): string {
-  return val.replace(/<[^>]*>/g, "").replace(/^@/, "").trim();
-}
-
-function parseStudentInfo(md: string, mentions: ReturnType<typeof parseMentions>): Marksheet["student"] & { categoryRaw?: string } {
-  const section = extractSection(md, "## Student Information");
+function parseStudentInfoFromTree(tree: Root, md: string, mentions: ReturnType<typeof parseMentions>): Marksheet["student"] & { categoryRaw?: string } {
+  const section = findSection(tree, "Student Information");
   if (!section) {
     return { id: 0, examTypeId: 0, fullName: "", gender: "", parentEmail: "", parentName: "", term: "", title: "", category: "DAYCARE", className: "", sectionName: "", adminNo: 0, sessionYear: "", daysOpened: 0, daysAbsent: 0, daysPresent: 0, token: "" };
   }
 
   const kv: Record<string, string> = {};
-  const tableRe = /\|\s*([^|]+)\s*\|\s*([^|]+)\s*\|/g;
-  let t: RegExpExecArray | null;
-  while ((t = tableRe.exec(section)) !== null) {
-    const key = t[1].trim().toLowerCase();
-    const val = t[2].trim();
-    if (key === "field" && val === "details") continue;
-    kv[key] = val;
+  const table = findTableInNodes(section);
+  if (table) {
+    Object.assign(kv, parseTableToKV(table));
   }
-  const lineRe = /-\s+\*\*([^*]+)\*\*\s*(.+)/g;
-  let l: RegExpExecArray | null;
-  while ((l = lineRe.exec(section)) !== null) {
-    const key = l[1].trim().toLowerCase();
-    const val = l[2].trim();
-    kv[key] = val;
+  const list = findListInNodes(section);
+  if (list) {
+    for (const item of list.children) {
+      const text = getNodeText(item);
+      const m = text.match(/^\s*\*\*([^*]+)\*\*\s*(.+)/);
+      if (m) {
+        const key = m[1].trim().toLowerCase();
+        kv[key] = m[2].trim();
+      }
+    }
   }
 
   function read(field: string): string {
@@ -151,30 +245,22 @@ function parseStudentInfo(md: string, mentions: ReturnType<typeof parseMentions>
   };
 }
 
-function extractTitleLine(md: string): { fullName: string; title: string } {
-  const m = /^#\s+(.+?)\s*—\s*(.+?)\s*$/m.exec(md);
-  if (m) {
-    return { fullName: m[1].trim(), title: m[2].trim() };
-  }
-  return { fullName: "", title: "" };
-}
-
-function extractSubjectsAndRecords(md: string, studentId: number, category: Category): { subjects: Marksheet["subjects"]; records: Marksheet["records"] } {
-  const section = extractSection(md, "## Academic Performance");
+function extractSubjectsAndRecordsFromTree(tree: Root, studentId: number, category: Category): { subjects: Marksheet["subjects"]; records: Marksheet["records"] } {
+  const section = findSection(tree, "Academic Performance");
   if (!section) return { subjects: [], records: [] };
 
-  const table = extractTable(section);
-  if (!table || table.rows.length < 1) return { subjects: [], records: [] };
+  const table = findTableInNodes(section);
+  if (!table || table.children.length < 2) return { subjects: [], records: [] };
 
-  const headerCells = table.headers;
-  if (headerCells.length < 2) return { subjects: [], records: [] };
+  const headerRow = table.children[0];
+  const dataRows = table.children.slice(1);
 
   const titles: string[] = [];
   const fullMarks: number[] = [];
   let loCol = -1;
 
-  for (let i = 1; i < headerCells.length; i++) {
-    const h = headerCells[i].trim();
+  for (let i = 1; i < headerRow.children.length; i++) {
+    const h = getCellText(headerRow.children[i]);
     const loMatch = h.match(/^learning\s*outcome$/i);
     if (loMatch) {
       loCol = i;
@@ -194,20 +280,20 @@ function extractSubjectsAndRecords(md: string, studentId: number, category: Cate
   const records: Marksheet["records"] = [];
   const nTitles = titles.length;
 
-  for (const row of table.rows) {
-    if (row.length < 2) continue;
-    const subjectCode = row[0].trim();
+  for (const row of dataRows) {
+    if (!row.children || row.children.length < 2) continue;
+    const subjectCode = getCellText(row.children[0]);
     if (!subjectCode || subjectCode.startsWith("**")) continue;
 
     const marks: number[] = [];
-    for (let i = 1; i < row.length && i - 1 < nTitles; i++) {
-      marks.push(Number(row[i].trim()) || 0);
+    for (let i = 1; i < row.children.length && i - 1 < nTitles; i++) {
+      marks.push(Number(getCellText(row.children[i])) || 0);
     }
     const totalScore = marks.reduce((s, v) => s + v, 0);
 
     let learningOutcome: string | null = null;
-    if (loCol > 0 && loCol < row.length) {
-      const raw = row[loCol].trim();
+    if (loCol > 0 && loCol < row.children.length) {
+      const raw = getCellText(row.children[loCol]);
       if (raw) learningOutcome = raw;
     }
 
@@ -234,48 +320,16 @@ function extractSubjectsAndRecords(md: string, studentId: number, category: Cate
   return { subjects, records };
 }
 
-interface SimpleTable {
-  headers: string[];
-  rows: string[][];
-}
-
-function extractTable(md: string): SimpleTable | null {
-  const lines = md.split("\n").filter(l => l.trim().startsWith("|"));
-  if (lines.length < 2) return null;
-
-  const rows: string[][] = [];
-  let isHeaderSep = false;
-
-  for (const line of lines) {
-    const cells = line.split("|").slice(1, -1).map(c => c.trim());
-    if (cells.every(c => /^:?-+:?$/.test(c.replace(/\*/g, "").trim()))) {
-      isHeaderSep = true;
-      continue;
-    }
-    rows.push(cells);
-  }
-
-  if (rows.length === 0) return null;
-
-  const headerCells = rows[0];
-  const dataRows = isHeaderSep ? rows.slice(1) : rows.slice(1);
-
-  return {
-    headers: headerCells,
-    rows: dataRows,
-  };
-}
-
-function parseRatings(md: string): Marksheet["ratings"] {
-  const section = extractSection(md, "## Learner's Rating");
+function parseRatingsFromTree(tree: Root): Marksheet["ratings"] {
+  const section = findSection(tree, "Learner's Rating");
   if (!section) return [];
 
-  const table = extractTable(section);
+  const table = findTableInNodes(section);
   if (!table) return [];
 
-  return table.rows.map(row => {
-    const attr = row[0]?.trim() ?? "";
-    const rateStr = row[1]?.trim() ?? "";
+  return table.children.slice(1).map((row: any) => {
+    const attr = getCellText(row.children[0] ?? {}) ?? "";
+    const rateStr = getCellText(row.children[1] ?? {}) ?? "";
     return {
       attribute: attr,
       rate: Number(rateStr) || null,
@@ -285,28 +339,36 @@ function parseRatings(md: string): Marksheet["ratings"] {
   });
 }
 
-function parseRemark(md: string): { remark: string | null } {
-  const section = extractSection(md, "## Teacher's Remark");
+function parseRemarkFromTree(tree: Root): { remark: string | null } {
+  const section = findSection(tree, "Teacher's Remark");
   if (!section) return { remark: null };
 
-  const blockquoteRe = />\s*(.+)/g;
+  const bq = findBlockquoteInNodes(section);
+  if (!bq) return { remark: null };
+
   const lines: string[] = [];
-  let m: RegExpExecArray | null;
-  while ((m = blockquoteRe.exec(section)) !== null) {
-    lines.push(m[1].trim());
+  for (const p of bq.children) {
+    const text = getNodeText(p);
+    if (text) lines.push(text);
   }
   const remark = lines.join("\n");
   return { remark: remark || null };
 }
 
-function extractExamType(md: string, mentions: ReturnType<typeof parseMentions>): Marksheet["examType"] | undefined {
-  const section = extractSection(md, "## Student Information");
+function extractExamTypeFromTree(tree: Root, md: string, mentions: ReturnType<typeof parseMentions>): Marksheet["examType"] | undefined {
+  const section = findSection(tree, "Student Information");
   let termName = "";
   if (section) {
-    const termRe = /\|\s*Term\s*\|\s*(.+?)\s*\|/i;
-    const t = termRe.exec(section);
-    if (t) {
-      termName = t[1].replace(/<[^>]*>/g, "").replace(/^@/, "").trim();
+    const table = findTableInNodes(section);
+    if (table) {
+      for (const row of table.children) {
+        if (row.children && row.children.length >= 2) {
+          const key = getCellText(row.children[0]).toLowerCase();
+          if (key === "term") {
+            termName = stripHtml(getCellText(row.children[1]));
+          }
+        }
+      }
     }
   }
 
@@ -336,24 +398,169 @@ function computeScore(records: Marksheet["records"]): Marksheet["score"] {
   };
 }
 
-export function parseMarksheetMarkdown(markdown: string): Marksheet {
-  const mentions = parseMentions(markdown);
+// ─── Context for enriching parsed output ─────────────────────────────────────
 
-  const school = parseSchoolInfo(markdown);
+export interface ParseContextTenant {
+  schoolId?: number;
+  classId?: number;
+  sectionId?: number;
+  examTypeId?: number;
+  academicId?: number;
+  studentId?: number;
+  className?: string;
+  sectionName?: string;
+  academicYearTitle?: string;
+}
 
-  const studentPartial = parseStudentInfo(markdown, mentions);
+export interface ParseContextMappingSubject {
+  id: number;
+  subjectCode: string;
+}
 
-  const { subjects, records } = extractSubjectsAndRecords(markdown, studentPartial.id, studentPartial.category);
+export interface ParseContextRosterEntry {
+  id: number;
+  name: string;
+  admissionNo?: number | string;
+}
 
-  const ratings = parseRatings(markdown);
+export interface ParseContext {
+  tenant?: ParseContextTenant;
+  school?: {
+    name?: string;
+    email?: string;
+    phone?: string;
+    city?: string;
+    state?: string;
+    title?: string;
+    vacation_date?: string;
+  };
+  mapping?: {
+    subjects?: ParseContextMappingSubject[];
+  };
+  roster?: ParseContextRosterEntry[];
+  learningOutcomeFallback?: string;
+}
 
-  const remark = parseRemark(markdown);
+function mergeContext(result: Marksheet, context?: ParseContext): Marksheet {
+  if (!context) return result;
 
-  const examType = extractExamType(markdown, mentions);
+  const { tenant, school: schoolCtx, mapping, roster, learningOutcomeFallback } = context;
 
+  // Resolve student from roster
+  let resolvedStudentId = tenant?.studentId ?? null;
+  const studentName = result.student.fullName;
+  const studentAdmNo = result.student.adminNo;
+  if (!resolvedStudentId && roster && roster.length > 0) {
+    const byName = roster.find(
+      (r) => r.name.toUpperCase() === studentName.toUpperCase(),
+    );
+    const byAdm = studentAdmNo
+      ? roster.find(
+          (r) => String(r.admissionNo ?? "") === String(studentAdmNo),
+        )
+      : null;
+    const match = byName ?? byAdm;
+    if (match) resolvedStudentId = match.id;
+  }
+
+  // Build subjectCode → id map
+  const subjectMap = new Map<string, number>();
+  if (mapping?.subjects) {
+    for (const s of mapping.subjects) {
+      if (s.subjectCode && s.id != null) {
+        subjectMap.set(s.subjectCode.toUpperCase(), s.id);
+      }
+    }
+  }
+
+  // ── School ──
+  const school = { ...result.school };
+  if (tenant?.schoolId != null) school.id = tenant.schoolId;
+  if (schoolCtx?.name) school.name = schoolCtx.name;
+  if (schoolCtx?.email) school.email = schoolCtx.email;
+  if (schoolCtx?.phone) school.phone = schoolCtx.phone;
+  if (schoolCtx?.city) school.city = schoolCtx.city;
+  if (schoolCtx?.state) school.state = schoolCtx.state;
+  if (schoolCtx?.title) school.title = schoolCtx.title;
+  if (schoolCtx?.vacation_date) school.vacation_date = schoolCtx.vacation_date;
+
+  // ── Student ──
+  const student = { ...result.student };
+  if (resolvedStudentId) student.id = resolvedStudentId;
+  if (tenant?.examTypeId != null) student.examTypeId = tenant.examTypeId;
+  if (tenant?.className) student.className = tenant.className;
+  if (tenant?.sectionName) student.sectionName = tenant.sectionName;
+  if (tenant?.academicYearTitle && !student.sessionYear) {
+    student.sessionYear = tenant.academicYearTitle;
+  }
+  student.token = `token-${student.adminNo || 0}`;
+
+  // ── Subjects & Records ──
+  const subjects = result.subjects.map((s) => {
+    const sid = s.subjectCode
+      ? subjectMap.get(s.subjectCode.toUpperCase()) ?? null
+      : null;
+    return { ...s, subjectId: sid };
+  });
+
+  const stId = resolvedStudentId ?? result.student.id;
+  const records = result.records.map((r) => {
+    const sid = r.subjectCode
+      ? subjectMap.get(r.subjectCode.toUpperCase()) ?? null
+      : 0;
+    let lo = r.learningOutcome;
+    if (
+      r.category === "DAYCARE" &&
+      (lo == null || lo === "")
+    ) {
+      lo =
+        learningOutcomeFallback ??
+        `${r.subjectCode}: Progressing`;
+    }
+    return { ...r, studentId: stId, subjectId: sid ?? 0, learningOutcome: lo };
+  });
+
+  // ── Exam type ──
+  let examType = result.examType;
+  if (tenant?.examTypeId != null) {
+    examType = { ...(examType ?? {}), id: tenant.examTypeId };
+  }
+
+  // ── Score (recalculate from updated records) ──
   const score = computeScore(records);
 
   return {
+    ...result,
+    school,
+    student,
+    subjects,
+    records,
+    score,
+    examType,
+  };
+}
+
+// ─── Public API ──────────────────────────────────────────────────────────────
+
+export function parseMarksheetMarkdown(markdown: string, context?: ParseContext): Marksheet {
+  const tree = parseMd(markdown);
+  const mentions = parseMentions(markdown);
+
+  const school = parseSchoolInfoFromTree(tree);
+
+  const studentPartial = parseStudentInfoFromTree(tree, markdown, mentions);
+
+  const { subjects, records } = extractSubjectsAndRecordsFromTree(tree, studentPartial.id, studentPartial.category);
+
+  const ratings = parseRatingsFromTree(tree);
+
+  const remark = parseRemarkFromTree(tree);
+
+  const examType = extractExamTypeFromTree(tree, markdown, mentions);
+
+  const score = computeScore(records);
+
+  const base: Marksheet = {
     school,
     student: studentPartial,
     subjects,
@@ -364,6 +571,8 @@ export function parseMarksheetMarkdown(markdown: string): Marksheet {
     examType,
     recordId: null,
   };
+
+  return mergeContext(base, context);
 }
 
 // ─── Auto-fix types ──────────────────────────────────────────────────────────
@@ -437,7 +646,6 @@ const REQUIRED_STUDENT_ROWS = new Set([
   "full name", "admission no", "class", "section", "category", "term",
 ]);
 
-// Build reverse lookup: normalized title → { category, max }[]
 const TITLE_MAX_LOOKUP: Record<string, { category: string; max: number }[]> = {};
 const TITLE_ALIASES: Record<string, string> = {
   HW: "HOMEWORK",
@@ -448,7 +656,6 @@ for (const [cat, titles] of Object.entries(EXAM_MARK_MAXIMUMS)) {
     const norm = title.toUpperCase().replace(/[\s-]/g, "");
     if (!TITLE_MAX_LOOKUP[norm]) TITLE_MAX_LOOKUP[norm] = [];
     TITLE_MAX_LOOKUP[norm].push({ category: cat, max });
-    // Add aliases
     for (const [alias, target] of Object.entries(TITLE_ALIASES)) {
       if (norm === target) {
         if (!TITLE_MAX_LOOKUP[alias]) TITLE_MAX_LOOKUP[alias] = [];
@@ -457,85 +664,6 @@ for (const [cat, titles] of Object.entries(EXAM_MARK_MAXIMUMS)) {
     }
   }
 }
-
-// ─── Split ───────────────────────────────────────────────────────────────────
-
-export function splitDocument(md: string): DocBlock[] {
-  const lines = md.split("\n");
-  const blocks: DocBlock[] = [];
-  let current: DocBlock | null = null;
-
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    const isH1 = line.startsWith("# ");
-    const isSection = line.startsWith("## ");
-
-    if (isH1 || isSection) {
-      if (current) {
-        current.endLine = i;
-        current.body = current.body.replace(/\n+$/, "");
-      }
-      current = {
-        type: isH1 ? "h1" : "section",
-        heading: isH1 ? line.slice(2).trim() : line.slice(3).trim(),
-        body: "",
-        startLine: i,
-        endLine: i,
-      };
-      blocks.push(current);
-    } else if (current) {
-      if (current.body) current.body += "\n";
-      current.body += line;
-      current.endLine = i + 1;
-    }
-  }
-
-  // Trim trailing blank lines from each block's body
-  for (const b of blocks) {
-    b.body = b.body.replace(/\n+$/, "");
-  }
-
-  return blocks;
-}
-
-function joinBlocks(blocks: DocBlock[]): string {
-  return blocks
-    .map((b) => {
-      const heading = b.type === "h1" ? `# ${b.heading ?? ""}` : `## ${b.heading ?? ""}`;
-      if (!b.body) return heading;
-      return `${heading}\n${b.body}`;
-    })
-    .join("\n");
-}
-
-function headingToSectionKind(heading: string | null): SectionKind | null {
-  if (!heading) return null;
-  const key = `## ${heading}`;
-  return CANONICAL_HEADINGS[key] ?? null;
-}
-
-// ─── Detect category from a block's body ─────────────────────────────────────
-
-function detectCategoryFromBlock(block: DocBlock | null): Category | null {
-  if (!block) return null;
-  const m = block.body.match(/(?:^|\n)\|\s*Category\s*\|\s*(.+?)\s*\|/i);
-  if (m) {
-    const raw = m[1].replace(/<[^>]*>/g, "").trim().toLowerCase().replace(/[\s-]/g, "");
-    for (const [key, val] of Object.entries(CATEGORY_MAP)) {
-      if (raw.includes(key)) return val;
-    }
-  }
-  const m2 = block.body.match(/(?:^|\n)-\s*\*{0,2}Category\*{0,2}:\s*(.+?)(?:\n|$)/i);
-  if (m2) {
-    const raw = m2[1].replace(/<[^>]*>/g, "").trim().toLowerCase().replace(/[\s-]/g, "");
-    for (const [key, val] of Object.entries(CATEGORY_MAP)) {
-      if (raw.includes(key)) return val;
-    }
-  }
-  return null;
-}
-
-// ─── Extract raw table from a block body ────────────────────────────────────
 
 function extractRawTable(body: string): { headerIndex: number; headerLine: string; rows: string[] } | null {
   const lines = body.split("\n");
@@ -573,686 +701,388 @@ function extractRawTable(body: string): { headerIndex: number; headerLine: strin
   return { headerIndex, headerLine, rows: dataRows };
 }
 
-interface ParsedTableRow {
-  cells: string[];
+export function splitDocument(md: string): DocBlock[] {
+  const lines = md.split("\n");
+  const blocks: DocBlock[] = [];
+  let current: DocBlock | null = null;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const isH1 = line.startsWith("# ");
+    const isSection = line.startsWith("## ");
+
+    if (isH1 || isSection) {
+      if (current) {
+        current.endLine = i;
+        current.body = current.body.replace(/\n+$/, "");
+      }
+      current = {
+        type: isH1 ? "h1" : "section",
+        heading: isH1 ? line.slice(2).trim() : line.slice(3).trim(),
+        body: "",
+        startLine: i,
+        endLine: i,
+      };
+      blocks.push(current);
+    } else if (current) {
+      if (current.body) current.body += "\n";
+      current.body += line;
+      current.endLine = i + 1;
+    }
+  }
+
+  for (const b of blocks) {
+    b.body = b.body.replace(/\n+$/, "");
+  }
+
+  return blocks;
 }
 
-function parseTableLine(line: string): string[] {
-  return line.split("|").slice(1, -1).map((c) => c.trim());
+function joinBlocks(blocks: DocBlock[]): string {
+  return blocks
+    .map((b) => {
+      const heading = b.type === "h1" ? `# ${b.heading ?? ""}` : `## ${b.heading ?? ""}`;
+      if (!b.body) return heading;
+      return `${heading}\n${b.body}`;
+    })
+    .join("\n");
 }
 
-function isAllNonNumeric(values: string[]): boolean {
-  if (values.length === 0) return false;
-  return values.every((v) => {
-    const trimmed = v.replace(/<[^>]*>/g, "").trim();
-    if (!trimmed) return false;
-    return isNaN(Number(trimmed));
-  });
+function headingToSectionKind(heading: string | null): SectionKind | null {
+  if (!heading) return null;
+  const key = `## ${heading}`;
+  return CANONICAL_HEADINGS[key] ?? null;
 }
 
-// ─── Diagnose ────────────────────────────────────────────────────────────────
+function detectCategoryFromBlock(block: DocBlock | null): Category | null {
+  if (!block) return null;
+  const m = block.body.match(/(?:^|\n)\|\s*Category\s*\|\s*(.+?)\s*\|/i);
+  if (m) {
+    const raw = m[1].replace(/<[^>]*>/g, "").trim().toLowerCase().replace(/[\s-]/g, "");
+    for (const [key, val] of Object.entries(CATEGORY_MAP)) {
+      if (raw.includes(key)) return val;
+    }
+  }
+  const m2 = block.body.match(/(?:^|\n)-\s*\*{0,2}Category\*{0,2}:\s*(.+?)(?:\n|$)/i);
+  if (m2) {
+    const raw = m2[1].replace(/<[^>]*>/g, "").trim().toLowerCase().replace(/[\s-]/g, "");
+    for (const [key, val] of Object.entries(CATEGORY_MAP)) {
+      if (raw.includes(key)) return val;
+    }
+  }
+  return null;
+}
 
 export function diagnoseStructure(blocks: DocBlock[]): StructureDiagnostic[] {
   const diags: StructureDiagnostic[] = [];
 
-  // Find blocks by type
   const h1Block = blocks.find((b) => b.type === "h1");
   const h1Blocks = blocks.filter((b) => b.type === "h1");
 
   const sections = blocks.filter((b) => b.type === "section");
-  const schoolBlock = sections.find((b) => headingToSectionKind(b.heading) === "school") ?? null;
-  const studentBlock = sections.find((b) => headingToSectionKind(b.heading) === "student") ?? null;
-  const academicBlock = sections.find((b) => headingToSectionKind(b.heading) === "academic") ?? null;
-  const ratingsBlock = sections.find((b) => headingToSectionKind(b.heading) === "ratings") ?? null;
-  const remarkBlock = sections.find((b) => headingToSectionKind(b.heading) === "remark") ?? null;
 
-  // H1
-  if (h1Blocks.length === 0) {
-    diags.push({ code: "H1_MISSING", severity: "error", section: "h1", message: "Missing H1 title line (# Name — ExamTitle)" });
-  } else if (h1Block && !h1Block.heading?.includes("—")) {
-    diags.push({ code: "H1_MALFORMED", severity: "error", section: "h1", message: `H1 title missing "—" separator: "${h1Block.heading}"` });
-  }
-
-  // School
-  if (!schoolBlock) {
-    diags.push({ code: "SCHOOL_SECTION_MISSING", severity: "warning", section: "school", message: "Missing ## School Information section" });
+  // Check H1
+  if (!h1Block) {
+    diags.push({ code: "H1_MISSING", severity: "error", section: "h1", message: "Missing H1 heading" });
+  } else if (h1Blocks.length > 1) {
+    diags.push({ code: "DUPLICATE_SECTION", severity: "error", section: "h1", message: "Multiple H1 headings found" });
   } else {
-    const bulletRe = /^- \*\*(.+?)\*\*(?::|\s|$)/m;
-    const pipeTableRe = /^\|/m;
-    const plainBulletRe = /^- [^*].+:/m;
-    const hasBullets = bulletRe.test(schoolBlock.body);
-    const isPipeTable = pipeTableRe.test(schoolBlock.body);
-    const isPlainBullet = plainBulletRe.test(schoolBlock.body);
-    if (!hasBullets && isPipeTable) {
-      diags.push({ code: "SCHOOL_BULLET_FORMAT_WRONG", severity: "error", section: "school", message: "School Information uses pipe table instead of bullet list" });
-    } else if (!hasBullets && isPlainBullet) {
-      diags.push({ code: "SCHOOL_BULLET_FORMAT_WRONG", severity: "error", section: "school", message: "School Information bullets missing ** on keys" });
-    } else if (!hasBullets && !isPipeTable && schoolBlock.body.trim()) {
-      diags.push({ code: "SCHOOL_BULLET_FORMAT_WRONG", severity: "error", section: "school", message: "School Information content is not in - **Key:** val format" });
-    } else if (hasBullets && /^- \*\*.*?- \*\*/m.test(schoolBlock.body)) {
-      diags.push({ code: "SCHOOL_BULLETS_FLATTENED", severity: "error", section: "school", message: "School Information has multiple fields on one line; each field must be its own bullet item" });
+    const h1Text = h1Block.heading ?? "";
+    const hasDash = h1Text.includes("—") || h1Text.includes("–") || h1Text.includes("-");
+    if (!hasDash) {
+      diags.push({ code: "H1_MALFORMED", severity: "error", section: "h1", message: "H1 must contain ' — ' separator between name and exam title" });
     }
   }
 
-  // Student
-  if (!studentBlock) {
-    diags.push({ code: "STUDENT_SECTION_MISSING", severity: "error", section: "student", message: "Missing ## Student Information section" });
-  } else {
-    const isPipeTable = /^\|/m.test(studentBlock.body);
-    const isBulletList = /^- \*\*(.+?)\*\*(?::|\s|$)/m.test(studentBlock.body);
-    if (!isPipeTable && isBulletList) {
-      diags.push({ code: "STUDENT_TABLE_MALFORMED", severity: "error", section: "student", message: "Student Information uses bullet list instead of pipe table" });
-    } else if (!isPipeTable && !isBulletList && studentBlock.body.trim()) {
-      diags.push({ code: "STUDENT_TABLE_MALFORMED", severity: "error", section: "student", message: "Student Information content is not in | Field | Details | format" });
-    } else if (isPipeTable) {
-      const rawTable = extractRawTable(studentBlock.body);
-      if (rawTable) {
-        const fieldNames = rawTable.rows.map((r) => parseTableLine(r)[0]?.trim().toLowerCase() ?? "");
-        const missing = [...REQUIRED_STUDENT_ROWS].filter((f) => !fieldNames.some((n) => n.includes(f)));
-        if (missing.length > 0) {
-          diags.push({
-            code: "STUDENT_FIELD_ROW_MISSING",
-            severity: "error",
-            section: "student",
-            message: `Student Information missing required fields: ${missing.join(", ")}`,
-          });
-        }
-      }
-    }
-  }
+  // Track which canonical sections we've seen (and their order)
+  const seen = new Set<SectionKind>();
+  let outOfOrder = false;
+  let lastCanonIdx = -1;
 
-  // Academic
-  if (!academicBlock) {
-    diags.push({ code: "ACADEMIC_SECTION_MISSING", severity: "error", section: "academic", message: "Missing ## Academic Performance section" });
-  } else {
-    const category = detectCategoryFromBlock(studentBlock);
-    const rawTable = extractRawTable(academicBlock.body);
-    const allTableLines = academicBlock.body.split("\n").filter((l) => l.trim().startsWith("|"));
-    const tablesInSection = countTables(academicBlock.body);
-
-    if (!rawTable && allTableLines.length === 0) {
-      diags.push({ code: "ACADEMIC_TABLE_MISSING", severity: "error", section: "academic", message: "Academic Performance section has no pipe table" });
-    } else if (rawTable) {
-      const headerCells = parseTableLine(rawTable.headerLine);
-      if (headerCells.length > 0 && headerCells[0].toLowerCase() !== "subject code") {
-        diags.push({ code: "ACADEMIC_FIRST_COLUMN_WRONG", severity: "error", section: "academic", message: `First column header is "${headerCells[0]}", expected "Subject Code"` });
-      }
-
-      if (category === "DAYCARE") {
-        const hasLO = headerCells.some((h) => /^learning\s*outcome$/i.test(h));
-        if (!hasLO) {
-          diags.push({ code: "ACADEMIC_LO_COLUMN_REQUIRED", severity: "error", section: "academic", message: "DAYCARE requires a Learning Outcome column" });
-        }
-      } else if (category && category !== "DAYCARE") {
-        const hasLO = headerCells.some((h) => /^learning\s*outcome$/i.test(h));
-        if (hasLO) {
-          diags.push({ code: "ACADEMIC_LO_COLUMN_UNEXPECTED", severity: "warning", section: "academic", message: "Non-DAYCARE category has Learning Outcome column" });
-        }
-      }
-
-      const assessmentHeaders = headerCells.slice(1).filter((h) => !/^learning\s*outcome$/i.test(h));
-      for (const h of assessmentHeaders) {
-        if (h.trim() && !/\((\d+)\)$/.test(h.trim())) {
-          diags.push({ code: "ACADEMIC_HEADER_MISSING_MAX", severity: "error", section: "academic", message: `Assessment header "${h}" missing (max) value` });
-        }
-      }
-
-      if (rawTable.rows.length === 0) {
-        diags.push({ code: "ACADEMIC_NO_DATA_ROWS", severity: "error", section: "academic", message: "Academic Performance table has no data rows" });
-      }
-    }
-
-    if (tablesInSection > 1) {
-      diags.push({ code: "ACADEMIC_MULTIPLE_TABLES", severity: "error", section: "academic", message: `Academic Performance has ${tablesInSection} tables, expected 1` });
-    }
-  }
-
-  // Ratings
-  if (!ratingsBlock) {
-    diags.push({ code: "RATINGS_SECTION_MISSING", severity: "error", section: "ratings", message: "Missing ## Learner's Rating section" });
-  } else {
-    const isPipeTable = /^\|/m.test(ratingsBlock.body);
-    const isBulletList = /^- \*\*(.+?)\*\*(?::|\s|$)/m.test(ratingsBlock.body);
-    if (!isPipeTable && isBulletList) {
-      diags.push({ code: "RATINGS_TABLE_MALFORMED", severity: "error", section: "ratings", message: "Learner's Rating uses bullet list instead of pipe table" });
-    } else if (!isPipeTable && ratingsBlock.body.trim()) {
-      diags.push({ code: "RATINGS_TABLE_MALFORMED", severity: "error", section: "ratings", message: "Learner's Rating content is not in | Trait | Rating | format" });
-    }
-  }
-
-  // Remark
-  if (!remarkBlock) {
-    diags.push({ code: "REMARK_SECTION_MISSING", severity: "error", section: "remark", message: "Missing ## Teacher's Remark section" });
-  } else {
-    const hasBlockquote = />\s*/.test(remarkBlock.body);
-    if (!hasBlockquote && remarkBlock.body.trim()) {
-      diags.push({ code: "REMARK_BLOCKQUOTE_MISSING", severity: "error", section: "remark", message: "Teacher's Remark not wrapped in > blockquote" });
-    }
-  }
-
-  // Document-level
-  const seen = new Set<string>();
-  for (const b of sections) {
-    if (seen.has(b.heading ?? "")) {
-      diags.push({ code: "DUPLICATE_SECTION", severity: "error", section: "academic", message: `Duplicate section heading: ## ${b.heading}` });
-    }
-    seen.add(b.heading ?? "");
-  }
-
-  const foundKinds = sections.map((b) => headingToSectionKind(b.heading)).filter(Boolean) as SectionKind[];
-  const canonical = CANONICAL_ORDER.filter((k) => foundKinds.includes(k));
-  for (let i = 0; i < canonical.length; i++) {
-    if (canonical[i] !== foundKinds[i]) {
-      diags.push({ code: "SECTION_OUT_OF_ORDER", severity: "error", section: "academic", message: `Sections out of order: expected ${canonical[i]} after ${canonical[i - 1] ?? "start"}, found ${foundKinds[i]}` });
-      break;
-    }
-  }
-
-  for (const b of sections) {
-    const kind = headingToSectionKind(b.heading);
+  for (const s of sections) {
+    const kind = headingToSectionKind(s.heading);
     if (!kind) {
-      diags.push({ code: "EXTRA_SECTION", severity: "warning", section: "academic", message: `Unknown section: ## ${b.heading}` });
+      diags.push({ code: "EXTRA_SECTION", severity: "warning", section: "h1", message: `Unknown section "${s.heading}"` });
+      continue;
     }
+    if (seen.has(kind)) {
+      diags.push({ code: "DUPLICATE_SECTION", severity: "error", section: kind, message: `Duplicate ## ${s.heading} section` });
+      continue;
+    }
+    seen.add(kind);
+
+    const canonIdx = CANONICAL_ORDER.indexOf(kind);
+    if (canonIdx < lastCanonIdx) outOfOrder = true;
+    lastCanonIdx = canonIdx;
+
+    switch (kind) {
+      case "school": {
+        if (!s.body.trim()) {
+          diags.push({ code: "SCHOOL_SECTION_MISSING", severity: "error", section: kind, message: "School Information section is empty" });
+          break;
+        }
+        const hasBullets = /-\s+\*\*[^*]+\*\*/.test(s.body);
+        const isPipeTable = /^\|.*\|/m.test(s.body);
+        if (isPipeTable) {
+          diags.push({ code: "SCHOOL_BULLET_FORMAT_WRONG", severity: "warning", section: kind, message: "School Information should use bullet points, not a table" });
+        } else if (!hasBullets) {
+          diags.push({ code: "SCHOOL_BULLETS_FLATTENED", severity: "warning", section: kind, message: "School Information bullets appear to be flattened onto one line" });
+        }
+        break;
+      }
+      case "student": {
+        if (!s.body.trim()) {
+          diags.push({ code: "STUDENT_SECTION_MISSING", severity: "error", section: kind, message: "Student Information section is empty" });
+          break;
+        }
+        const rawTable = extractRawTable(s.body);
+        if (!rawTable) {
+          diags.push({ code: "STUDENT_TABLE_MALFORMED", severity: "error", section: kind, message: "Student Information must contain a pipe table" });
+          break;
+        }
+        const presentRows = new Set(rawTable.rows.map((r) => {
+          const cells = r.split("|").slice(1, -1).map((c) => c.trim().toLowerCase());
+          return cells[0] || "";
+        }));
+        for (const required of REQUIRED_STUDENT_ROWS) {
+          if (!presentRows.has(required)) {
+            diags.push({ code: "STUDENT_FIELD_ROW_MISSING", severity: "error", section: kind, message: `Missing required student field: "${required}"` });
+          }
+        }
+        break;
+      }
+      case "academic": {
+        if (!s.body.trim()) {
+          diags.push({ code: "ACADEMIC_SECTION_MISSING", severity: "error", section: kind, message: "Academic Performance section is empty" });
+          break;
+        }
+        const tables = s.body.split(/\n\n+/).filter((b) => b.trim().startsWith("|"));
+        if (tables.length === 0) {
+          diags.push({ code: "ACADEMIC_TABLE_MISSING", severity: "error", section: kind, message: "No performance table found" });
+          break;
+        }
+        if (tables.length > 1) {
+          diags.push({ code: "ACADEMIC_MULTIPLE_TABLES", severity: "error", section: kind, message: "Found multiple tables; expected exactly one" });
+          break;
+        }
+        const rawTable = extractRawTable(s.body);
+        if (!rawTable || rawTable.rows.length === 0) {
+          diags.push({ code: "ACADEMIC_NO_DATA_ROWS", severity: "error", section: kind, message: "Performance table has no data rows" });
+          break;
+        }
+        const hdrs = rawTable.headerLine.split("|").slice(1, -1).map((c) => c.trim());
+        if (hdrs.length < 2) {
+          diags.push({ code: "ACADEMIC_FIRST_COLUMN_WRONG", severity: "error", section: kind, message: "Expected first column to be Subject Code" });
+          break;
+        }
+        const firstCol = hdrs[0].toLowerCase();
+        if (firstCol !== "subject code" && firstCol !== "subject" && firstCol !== "learning areas") {
+          diags.push({ code: "ACADEMIC_FIRST_COLUMN_WRONG", severity: "error", section: kind, message: `Expected first column 'Subject Code', got '${hdrs[0]}'` });
+        }
+
+        const detectedCategory = detectCategoryFromBlock(s);
+        let hasLoCol = false;
+        for (let i = 1; i < hdrs.length; i++) {
+          if (/^learning\s*outcomes?$/i.test(hdrs[i])) {
+            hasLoCol = true;
+          } else {
+            const hasMax = /\(\d+\)/.test(hdrs[i]);
+            if (!hasMax && detectedCategory !== "DAYCARE") {
+              diags.push({ code: "ACADEMIC_HEADER_MISSING_MAX", severity: "warning", section: kind, message: `Column "${hdrs[i]}" missing (max) value` });
+            }
+          }
+        }
+        if (detectedCategory === "DAYCARE" && !hasLoCol) {
+          diags.push({ code: "ACADEMIC_LO_COLUMN_REQUIRED", severity: "error", section: kind, message: "DAYCARE requires a Learning Outcome column" });
+        }
+        if (detectedCategory !== "DAYCARE" && hasLoCol) {
+          diags.push({ code: "ACADEMIC_LO_COLUMN_UNEXPECTED", severity: "warning", section: kind, message: "Learning Outcome column found for non-DAYCARE category" });
+        }
+        break;
+      }
+      case "ratings": {
+        if (!s.body.trim()) {
+          diags.push({ code: "RATINGS_SECTION_MISSING", severity: "error", section: kind, message: "Missing ## Learner's Rating section" });
+          break;
+        }
+        const rt = extractRawTable(s.body);
+        if (!rt) {
+          diags.push({ code: "RATINGS_TABLE_MALFORMED", severity: "error", section: kind, message: "Ratings must be a pipe table" });
+        }
+        break;
+      }
+      case "remark": {
+        if (!s.body.trim()) {
+          diags.push({ code: "REMARK_SECTION_MISSING", severity: "error", section: kind, message: "Missing ## Teacher's Remark section" });
+          break;
+        }
+        if (!s.body.includes(">")) {
+          diags.push({ code: "REMARK_BLOCKQUOTE_MISSING", severity: "error", section: kind, message: "Remark must use > blockquote" });
+        }
+        break;
+      }
+    }
+  }
+
+  // Missing sections
+  for (const kind of CANONICAL_ORDER) {
+    if (!seen.has(kind)) {
+      diags.push({ code: `${kind.toUpperCase()}_SECTION_MISSING` as DiagnosticCode, severity: "error", section: kind, message: `Missing ## ${Object.entries(CANONICAL_HEADINGS).find(([, v]) => v === kind)?.[0]?.slice(3) ?? kind} section` });
+    }
+  }
+
+  if (outOfOrder) {
+    diags.push({ code: "SECTION_OUT_OF_ORDER", severity: "warning", section: "h1", message: "Sections are out of canonical order" });
   }
 
   return diags;
 }
 
-function countTables(body: string): number {
-  const lines = body.split("\n");
-  let count = 0;
-  let inTable = false;
-  for (const line of lines) {
-    const t = line.trim();
-    if (t.startsWith("|") && t.includes("---")) continue;
-    if (t.startsWith("|")) {
-      if (!inTable) {
-        count++;
-        inTable = true;
-      }
-    } else {
-      inTable = false;
-    }
-  }
-  return count;
-}
-
-// ─── Fix helpers ─────────────────────────────────────────────────────────────
-
-function pipeTableToBullets(body: string): string {
-  return body
-    .split("\n")
-    .filter((l) => l.trim().startsWith("|"))
-    .map((l) => {
-      const cells = parseTableLine(l);
-      if (cells.length < 2) return null;
-      const key = cells[0].replace(/<[^>]*>/g, "").trim();
-      const val = cells.slice(1).join(" ").replace(/<[^>]*>/g, "").trim();
-      if (!key || key.toLowerCase() === "field") return null;
-      return `- **${key}:** ${val}`;
-    })
-    .filter(Boolean)
-    .join("\n");
-}
-
-function bulletsToPipeTable(body: string): string {
-  const rows: string[] = [];
-  const re = /^-\s+\*\*(.+?)\*\*(?::\s*|\s+)(.*)$/;
-  for (const line of body.split("\n")) {
-    const m = line.match(re);
-    if (m) {
-      const key = m[1].replace(/:+\s*$/, '').trim();
-      const val = m[2].trim();
-      rows.push(`| ${key} | ${val} |`);
-    }
-  }
-  if (rows.length === 0) return body;
-  return `| Field | Details |\n|---|---|\n${rows.join("\n")}`;
-}
-
-function fixMissingBoldInBullets(body: string): string {
-  return body.replace(/^-\s+(?!\*\*)(.+?):\s*(.*?)$/gm, "- **$1:** $2");
-}
-
-function ratingsBulletsToTable(body: string): string {
-  const rows: string[] = [];
-  const re = /^-\s+\*\*(.+?)\*\*(?::\s*|\s+)(.*)$/;
-  for (const line of body.split("\n")) {
-    const m = line.match(re);
-    if (m) {
-      const key = m[1].replace(/:+\s*$/, '').trim();
-      const val = m[2].trim();
-      rows.push(`| ${key} | ${val} |`);
-    }
-  }
-  if (rows.length === 0) return body;
-  return `| Trait | Rating |\n|---|---|\n${rows.join("\n")}`;
-}
-
-function wrapInBlockquote(body: string): string {
-  if (!body.trim()) return body;
-  return body
-    .split("\n")
-    .map((l) => (l.trim() ? `> ${l}` : ">"))
-    .join("\n");
-}
-
-function renameFirstColumnHeader(body: string, newName: string): string {
-  const lines = body.split("\n");
-  const result: string[] = [];
-  let found = false;
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (!trimmed.startsWith("|")) {
-      result.push(line);
-      continue;
-    }
-    if (/^\|[\s:]*-+[\s:]*\|/.test(trimmed)) {
-      result.push(line);
-      continue;
-    }
-    if (!found) {
-      const cells = parseTableLine(trimmed);
-      if (cells.length > 0) {
-        cells[0] = newName;
-        result.push(`| ${cells.join(" | ")} |`);
-        found = true;
-        continue;
-      }
-    }
-    result.push(line);
-  }
-  return result.join("\n");
-}
-
-function addMissingMaxToHeaders(body: string, category: Category | null): string {
-  const lines = body.split("\n");
-  const result: string[] = [];
-  let headerProcessed = false;
-
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (!trimmed.startsWith("|")) {
-      result.push(line);
-      continue;
-    }
-    if (/^\|[\s:]*-+[\s:]*\|/.test(trimmed)) {
-      result.push(line);
-      continue;
-    }
-
-    if (!headerProcessed) {
-      const cells = parseTableLine(trimmed);
-      const newCells = cells.map((c, i) => {
-        if (i === 0) return c;
-        const stripped = c.replace(/<[^>]*>/g, "").trim();
-        if (/\((\d+)\)$/.test(stripped)) return c;
-        if (/^learning\s*outcome$/i.test(stripped)) return c;
-        const norm = stripped.toUpperCase().replace(/[\s/-]/g, "");
-        const matches = TITLE_MAX_LOOKUP[norm];
-        if (!matches || matches.length === 0) return c;
-        let max: number | null = null;
-        if (matches.length === 1) {
-          max = matches[0].max;
-        } else if (category) {
-          const catMatch = matches.find((m) => m.category === category);
-          if (catMatch) max = catMatch.max;
-        }
-        // Fallback: use highest max regardless of category
-        if (max === null) {
-          max = Math.max(...matches.map((m) => m.max));
-        }
-        if (max !== null) {
-          return `${stripped} (${max})`;
-        }
-        return c;
-      });
-      result.push(`| ${newCells.join(" | ")} |`);
-      headerProcessed = true;
-    } else {
-      result.push(line);
-    }
-  }
-
-  return result.join("\n");
-}
-
-function detectLOColumn(body: string): string {
-  const lines = body.split("\n");
-  const result: string[] = [];
-  let inHeader = true;
-
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (!trimmed.startsWith("|")) {
-      result.push(line);
-      continue;
-    }
-    if (/^\|[\s:]*-+[\s:]*\|/.test(trimmed)) {
-      result.push(line);
-      inHeader = false;
-      continue;
-    }
-
-    if (inHeader) {
-      const cells = parseTableLine(trimmed);
-      const hasLO = cells.some((c) => /^learning\s*outcome$/i.test(c));
-      if (hasLO) {
-        result.push(line);
-      } else if (cells.length === 2) {
-        // 2-column table: Subject Code + unnamed second column → rename to LO
-        cells[cells.length - 1] = "Learning Outcome";
-        result.push(`| ${cells.join(" | ")} |`);
-      } else if (cells.length > 2) {
-        // 3+ columns: check if last column values are non-numeric
-        const dataLines = lines.slice(lines.indexOf(line) + 1).filter((l) => l.trim().startsWith("|") && !/^\|[\s:]*-+[\s:]*\|/.test(l));
-        const lastColValues = dataLines.map((dl) => {
-          const dc = parseTableLine(dl);
-          return dc[dc.length - 1] ?? "";
-        });
-        if (isAllNonNumeric(lastColValues)) {
-          cells[cells.length - 1] = "Learning Outcome";
-          result.push(`| ${cells.join(" | ")} |`);
-        } else {
-          result.push(line);
-        }
-      } else {
-        result.push(line);
-      }
-      inHeader = false;
-    } else {
-      result.push(line);
-    }
-  }
-
-  return result.join("\n");
-}
-
-function mergeMultipleTables(body: string): string {
-  const rawLines = body.split("\n");
-  const tables: { headerLine: string; dataLines: string[] }[] = [];
-  let currentTable: { headerLine: string; dataLines: string[] } | null = null;
-
-  for (const line of rawLines) {
-    const trimmed = line.trim();
-    if (!trimmed.startsWith("|")) {
-      currentTable = null;
-      continue;
-    }
-    if (/^\|[\s:]*-+[\s:]*\|/.test(trimmed)) {
-      continue;
-    }
-    if (!currentTable) {
-      currentTable = { headerLine: trimmed, dataLines: [] };
-      tables.push(currentTable);
-    } else {
-      currentTable.dataLines.push(trimmed);
-    }
-  }
-
-  if (tables.length <= 1) return body;
-
-  const base = tables[0];
-  const baseCells = parseTableLine(base.headerLine);
-
-  for (let t = 1; t < tables.length; t++) {
-    const table = tables[t];
-    const tableCells = parseTableLine(table.headerLine);
-    const isCompatible =
-      tableCells.length === baseCells.length ||
-      baseCells.every((c, i) => tableCells[i] === c);
-
-    if (isCompatible) {
-      base.dataLines.push(...table.dataLines);
-    } else {
-      // Try column alignment by name
-      const baseCols = new Map(baseCells.map((c, i) => [c, i]));
-      for (const dataLine of table.dataLines) {
-        const cells = parseTableLine(dataLine);
-        const newRow = new Array(baseCells.length).fill("");
-        for (let i = 0; i < tableCells.length; i++) {
-          const colIdx = baseCols.get(tableCells[i]);
-          if (colIdx !== undefined && colIdx < newRow.length) {
-            newRow[colIdx] = cells[i] ?? "";
-          }
-        }
-        base.dataLines.push(`| ${newRow.join(" | ")} |`);
-      }
-    }
-  }
-
-  // Rebuild: header + separator + merged data
-  const sep = `|${baseCells.map(() => "---").join(" | ")}|`;
-  return `| ${baseCells.join(" | ")} |\n${sep}\n${base.dataLines.join("\n")}`;
-}
-
-// ─── Reconstruct H1 from student block ──────────────────────────────────────
-
-function reconstructH1(studentBlock: DocBlock | null): { name: string; title: string } | null {
-  if (!studentBlock) return null;
-
-  const nameMatch = studentBlock.body.match(/(?:^|\n)\|\s*Full Name\s*\|\s*(.+?)\s*\|/i);
-  const name = nameMatch ? nameMatch[1].replace(/<[^>]*>/g, "").replace(/^@/, "").trim() : "";
-
-  const termMatch = studentBlock.body.match(/(?:^|\n)\|\s*Term\s*\|\s*(.+?)\s*\|/i);
-  const term = termMatch ? termMatch[1].replace(/<[^>]*>/g, "").replace(/^@/, "").trim() : "";
-
-  if (name && term) return { name, title: term };
-  if (name) return { name, title: "EXAMINATION" };
-  return null;
-}
-
-function fixFlattenedSchoolBullets(body: string): string {
-  return body.replace(/^- \*\*([^*]+)\*\*[:\s]*(.*)$/gm, (line, key, val) => {
-    if (!val.includes("- **")) return line;
-    const bullets: string[] = [];
-    const parts = val.split(/(?=\s*- \*\*)/);
-    for (let i = 0; i < parts.length; i++) {
-      const m = parts[i].match(/-\s+\*\*([^*]+)\*\*[:\s]*(.*)/);
-      if (m) {
-        bullets.push(`- **${m[1].trim()}:** ${m[2].trim()}`);
-      } else if (i === 0) {
-        // First part is the value of the original key
-        bullets.push(`- **${key.trim()}:** ${parts[i].trim()}`);
-      }
-    }
-    return bullets.join("\n");
-  });
-}
-
 // ─── Fix rounds ──────────────────────────────────────────────────────────────
 
-function fixRound1(blocks: DocBlock[], diags: StructureDiagnostic[], fixes: FixRecord[]): void {
-  // Remove extra sections
-  for (let i = blocks.length - 1; i >= 0; i--) {
-    const b = blocks[i];
-    if (b.type !== "section") continue;
-    const code = `EXTRA_SECTION` as DiagnosticCode;
-    if (diags.some((d) => d.code === code && d.section === "academic" && d.message.includes(b.heading ?? ""))) {
-      blocks.splice(i, 1);
-      fixes.push({ section: "academic", code: "EXTRA_SECTION", description: `Removed unknown section: ## ${b.heading}` });
-    }
+function fixRound1(blocks: DocBlock[], errors: StructureDiagnostic[], fixes: FixRecord[]) {
+  // Fix 1.1: Insert missing H1
+  const hasH1 = blocks.some((b) => b.type === "h1");
+  if (!hasH1) {
+    const name = "Unknown Student";
+    const title = "Unknown Examination";
+    blocks.unshift({ type: "h1", heading: `${name} — ${title}`, body: "", startLine: 0, endLine: 0 });
+    fixes.push({ section: "h1", code: "H1_MISSING", description: `Inserted H1: ${name} — ${title}` });
   }
 
-  // Remove duplicate sections (keep last)
-  const seen = new Set<string>();
-  for (let i = blocks.length - 1; i >= 0; i--) {
-    const b = blocks[i];
-    if (b.type !== "section") continue;
-    const key = b.heading ?? "";
-    if (seen.has(key)) {
-      blocks.splice(i, 1);
-      fixes.push({ section: "academic", code: "DUPLICATE_SECTION", description: `Removed duplicate section: ## ${key}` });
-    }
-    seen.add(key);
+  // Fix 1.2: Remove extra H1s
+  const h1Indices = blocks.reduce((acc, b, i) => { if (b.type === "h1") acc.push(i); return acc; }, [] as number[]);
+  while (h1Indices.length > 1) {
+    const idx = h1Indices.pop()!;
+    blocks.splice(idx, 1);
+    fixes.push({ section: "h1", code: "DUPLICATE_SECTION", description: "Removed duplicate H1" });
   }
 
-  // Reorder to canonical
-  const h1Block = blocks.find((b) => b.type === "h1");
-  const sectionBlocks = blocks.filter((b) => b.type === "section");
-  const ordered: DocBlock[] = [];
-  const remaining = new Set(sectionBlocks);
-
+  // Fix 1.3: Insert missing sections in canonical order
   for (const kind of CANONICAL_ORDER) {
-    const headingKey = Object.entries(CANONICAL_HEADINGS).find(([, v]) => v === kind)?.[0];
-    if (!headingKey) continue;
-    const h = headingKey.replace("## ", "");
-    const block = sectionBlocks.find((b) => b.heading === h);
-    if (block && remaining.has(block)) {
-      ordered.push(block);
-      remaining.delete(block);
+    const hasSection = blocks.some((b) => b.type === "section" && headingToSectionKind(b.heading) === kind);
+    if (!hasSection) {
+      const headingKey = Object.entries(CANONICAL_HEADINGS).find(([, v]) => v === kind)?.[0];
+      if (!headingKey) continue;
+      const headingText = headingKey.slice(3);
+      const lastSectionIdx = blocks.reduce((acc, b, i) => (b.type === "section" || b.type === "h1" ? i : acc), 0);
+      const insertAt = lastSectionIdx + 1;
+      blocks.splice(insertAt, 0, { type: "section", heading: headingText, body: "", startLine: 0, endLine: 0 });
+      fixes.push({ section: kind, code: `${kind.toUpperCase()}_SECTION_MISSING` as DiagnosticCode, description: `Inserted empty ## ${headingText} section` });
     }
   }
 
-  // Add any remaining sections that weren't in canonical order
-  ordered.push(...remaining);
-
-  const newBlocks: DocBlock[] = [];
-  if (h1Block) newBlocks.push(h1Block);
-  newBlocks.push(...ordered);
-
-  // Check if order changed
-  const oldOrder = blocks.map((b) => b.heading).join(",");
-  const newOrder = newBlocks.map((b) => b.heading).join(",");
-  if (oldOrder !== newOrder) {
-    fixes.push({ section: "academic", code: "SECTION_OUT_OF_ORDER", description: "Reordered sections to canonical sequence" });
+  // Fix 1.4: Reorder sections to canonical order
+  const sectionBlocks = blocks.filter((b) => b.type === "section");
+  const sorted = [...sectionBlocks].sort((a, b) => {
+    const ka = headingToSectionKind(a.heading);
+    const kb = headingToSectionKind(b.heading);
+    return CANONICAL_ORDER.indexOf(ka ?? "remark") - CANONICAL_ORDER.indexOf(kb ?? "remark");
+  });
+  let changed = false;
+  for (let i = 0; i < sectionBlocks.length; i++) {
+    if (sectionBlocks[i] !== sorted[i]) { changed = true; break; }
   }
-
-  blocks.length = 0;
-  blocks.push(...newBlocks);
-}
-
-function fixRound2(blocks: DocBlock[], diags: StructureDiagnostic[], fixes: FixRecord[]): void {
-  for (const b of blocks) {
-    if (b.type !== "section") continue;
-    const kind = headingToSectionKind(b.heading);
-    if (!kind) continue;
-    const originalBody = b.body;
-
-    switch (kind) {
-      case "school": {
-        const flattened = diags.some((d) => d.code === "SCHOOL_BULLETS_FLATTENED" && d.section === "school");
-        if (flattened) {
-          b.body = fixFlattenedSchoolBullets(b.body);
-          break;
-        }
-        const bulletWrong = diags.some((d) => d.code === "SCHOOL_BULLET_FORMAT_WRONG" && d.section === "school");
-        if (!bulletWrong) break;
-
-        const isPipeTable = /^\|/m.test(b.body);
-        const isPlainBullet = /^-(?!\s*\*\*)/m.test(b.body);
-
-        if (isPipeTable) {
-          b.body = pipeTableToBullets(b.body);
-        } else if (isPlainBullet) {
-          b.body = fixMissingBoldInBullets(b.body);
-        }
-        break;
-      }
-      case "student": {
-        const tableWrong = diags.some((d) => d.code === "STUDENT_TABLE_MALFORMED" && d.section === "student");
-        if (!tableWrong) break;
-
-        const isBulletList = /^- \*\*(.+?)\*\*(?::|\s|$)/m.test(b.body);
-        if (isBulletList) {
-          b.body = bulletsToPipeTable(b.body);
-        }
-        break;
-      }
-      case "ratings": {
-        const tableWrong = diags.some((d) => d.code === "RATINGS_TABLE_MALFORMED" && d.section === "ratings");
-        if (!tableWrong) break;
-
-        const isBulletList = /^- \*\*(.+?)\*\*(?::|\s|$)/m.test(b.body);
-        if (isBulletList) {
-          b.body = ratingsBulletsToTable(b.body);
-        }
-        break;
-      }
-      case "remark": {
-        const missingBq = diags.some((d) => d.code === "REMARK_BLOCKQUOTE_MISSING" && d.section === "remark");
-        if (!missingBq) break;
-        b.body = wrapInBlockquote(b.body);
-        break;
-      }
+  if (changed) {
+    const h1 = blocks.find((b) => b.type === "h1");
+    const rest = blocks.filter((b) => b.type !== "h1");
+    const reordered = [];
+    for (const kind of CANONICAL_ORDER) {
+      const candidate = sorted.find((b) => headingToSectionKind(b.heading) === kind);
+      if (candidate) reordered.push(candidate);
     }
-
-    if (b.body !== originalBody) {
-      fixes.push({ section: kind, code: diags.find((d) => d.section === kind)?.code ?? "ACADEMIC_TABLE_MISSING", description: `Fixed ${kind} section format` });
-    }
+    blocks.length = 0;
+    if (h1) blocks.push(h1);
+    blocks.push(...reordered);
+    fixes.push({ section: "h1", code: "SECTION_OUT_OF_ORDER", description: "Reordered sections to canonical order" });
   }
 }
 
-function fixRound3(blocks: DocBlock[], diags: StructureDiagnostic[], fixes: FixRecord[]): void {
-  const academicBlock = blocks.find((b) => b.type === "section" && headingToSectionKind(b.heading) === "academic");
-  const studentBlock = blocks.find((b) => b.type === "section" && headingToSectionKind(b.heading) === "student");
-  if (!academicBlock) return;
-
-  const category = detectCategoryFromBlock(studentBlock);
-  const originalBody = academicBlock.body;
-
-  const firstColWrong = diags.some((d) => d.code === "ACADEMIC_FIRST_COLUMN_WRONG" && d.section === "academic");
-  if (firstColWrong) {
-    academicBlock.body = renameFirstColumnHeader(academicBlock.body, "Subject Code");
-  }
-
-  const missingMax = diags.some((d) => d.code === "ACADEMIC_HEADER_MISSING_MAX" && d.section === "academic");
-  if (missingMax) {
-    academicBlock.body = addMissingMaxToHeaders(academicBlock.body, category);
-  }
-
-  const loRequired = diags.some((d) => d.code === "ACADEMIC_LO_COLUMN_REQUIRED" && d.section === "academic");
-  if (loRequired) {
-    academicBlock.body = detectLOColumn(academicBlock.body);
-  }
-
-  const multipleTables = diags.some((d) => d.code === "ACADEMIC_MULTIPLE_TABLES" && d.section === "academic");
-  if (multipleTables) {
-    academicBlock.body = mergeMultipleTables(academicBlock.body);
-  }
-
-  if (academicBlock.body !== originalBody) {
-    fixes.push({ section: "academic", code: diags.find((d) => d.section === "academic")?.code ?? "ACADEMIC_TABLE_MISSING", description: "Fixed Academic Performance table structure" });
-  }
-}
-
-function fixRound4(blocks: DocBlock[], diags: StructureDiagnostic[], fixes: FixRecord[]): void {
+function fixRound2(blocks: DocBlock[], errors: StructureDiagnostic[], fixes: FixRecord[]) {
+  // Fix 2.1: Reconstruct malformed H1
   const h1Block = blocks.find((b) => b.type === "h1");
-  const h1Missing = diags.some((d) => d.code === "H1_MISSING" || d.code === "H1_MALFORMED");
-  if (!h1Missing) return;
-
-  const studentBlock = blocks.find((b) => b.type === "section" && headingToSectionKind(b.heading) === "student");
-  const reconstructed = reconstructH1(studentBlock);
-
-  if (reconstructed) {
-    const h1Line = `# ${reconstructed.name} — ${reconstructed.title}`;
-    if (h1Block) {
-      h1Block.heading = `${reconstructed.name} — ${reconstructed.title}`;
-      h1Block.body = "";
-    } else {
-      blocks.unshift({ type: "h1", heading: `${reconstructed.name} — ${reconstructed.title}`, body: "", startLine: 0, endLine: 1 });
+  if (h1Block) {
+    const hasDash = h1Block.heading?.includes("—") || h1Block.heading?.includes("–") || h1Block.heading?.includes("-");
+    const studentSection = blocks.find((b) => headingToSectionKind(b.heading) === "student");
+    if (!hasDash && studentSection) {
+      let studentName = "";
+      const nameM = studentSection.body.match(/\|\s*full\s*name\s*\|\s*(.+?)\s*\|/i);
+      if (nameM) studentName = nameM[1].replace(/<[^>]*>/g, "").replace(/^@/, "").trim();
+      let examTitle = "";
+      const termM = studentSection.body.match(/\|\s*term\s*\|\s*(.+?)\s*\|/i);
+      if (termM) examTitle = termM[1].replace(/<[^>]*>/g, "").replace(/^@/, "").trim();
+      if (studentName && examTitle) {
+        h1Block.heading = `${studentName} — ${examTitle}`;
+        h1Block.body = "";
+        fixes.push({ section: "h1", code: "H1_MALFORMED", description: `Reconstructed H1 as: ${studentName} — ${examTitle}` });
+      }
     }
-    fixes.push({ section: "h1", code: "H1_MALFORMED", description: `Reconstructed H1 as: ${h1Line}` });
   }
 }
 
-// ─── Auto-fix entry point ────────────────────────────────────────────────────
+function fixRound3(blocks: DocBlock[], errors: StructureDiagnostic[], fixes: FixRecord[]) {
+  // Fix 3.1: Turn flattened school info back into bullets
+  const schoolBlock = blocks.find((b) => headingToSectionKind(b.heading) === "school");
+  if (schoolBlock && schoolBlock.body.trim()) {
+    const hasBullets = /-\s+\*\*[^*]+\*\*/.test(schoolBlock.body);
+    const isPipeTable = /^\|.*\|/m.test(schoolBlock.body);
+    if (!hasBullets && !isPipeTable) {
+      const lines = schoolBlock.body.split("\n").filter((l) => l.trim());
+      if (lines.length === 1 && lines[0].includes(",")) {
+        const parts = lines[0].split(",").map((p) => p.trim());
+        const reconstructed = parts.map((p) => {
+          const colonIdx = p.indexOf(":");
+          if (colonIdx > 0) {
+            const key = p.slice(0, colonIdx).trim();
+            const val = p.slice(colonIdx + 1).trim();
+            return `- **${key}:** ${val}`;
+          }
+          return `- ${p}`;
+        }).join("\n");
+        schoolBlock.body = reconstructed;
+        fixes.push({ section: "school", code: "SCHOOL_BULLETS_FLATTENED", description: "Reconstructed flattened school info" });
+      }
+    }
+  }
+}
 
-export function autoFixStructure(md: string): AutoFixResult {
+function fixRound4(blocks: DocBlock[], errors: StructureDiagnostic[], fixes: FixRecord[]) {
+  // Fix 4.1: Add missing blockquote to remark
+  const remarkBlock = blocks.find((b) => headingToSectionKind(b.heading) === "remark");
+  if (remarkBlock && remarkBlock.body.trim() && !remarkBlock.body.includes(">")) {
+    remarkBlock.body = `> ${remarkBlock.body}`;
+    fixes.push({ section: "remark", code: "REMARK_BLOCKQUOTE_MISSING", description: "Wrapped remark in blockquote" });
+  }
+
+  // Fix 4.2: Restore table separator rows if missing
+  for (const block of blocks) {
+    if (block.type !== "section") continue;
+    const kind = headingToSectionKind(block.heading);
+    if (!kind || kind === "school") continue;
+    const rawTable = extractRawTable(block.body);
+    if (!rawTable) continue;
+    const lines = block.body.split("\n");
+    const sepIndex = rawTable.headerIndex + 1;
+    if (sepIndex < lines.length && !/^\|[\s:]*-+[\s:]*\|/.test(lines[sepIndex])) {
+      const hdrCells = rawTable.headerLine.split("|").slice(1, -1);
+      const sep = "| " + hdrCells.map(() => "---").join(" | ") + " |";
+      lines.splice(sepIndex, 0, sep);
+      block.body = lines.join("\n");
+      fixes.push({ section: kind, code: "STUDENT_TABLE_MALFORMED", description: `Added missing separator row to ${kind} table` });
+    }
+  }
+}
+
+export function autoFixStructure(md: string, context?: ParseContext): AutoFixResult {
   const blocks = splitDocument(md);
   let diags = diagnoseStructure(blocks);
   const fixes: FixRecord[] = [];
 
-  // Only proceed if there are error-level diagnostics
   const errors = diags.filter((d) => d.severity === "error");
   if (errors.length === 0) {
-    const parsed = parseMarksheetMarkdown(md);
+    const parsed = parseMarksheetMarkdown(md, context);
     return { fixedMd: md, fixes: [], unresolved: [], parsed };
   }
-
-  // Four linear passes with re-diagnosis between each.
-  // Each pass is idempotent and targets a specific class of issues.
-  // Re-diagnosis ensures the next pass works with accurate state.
 
   const takeSnapshot = () => joinBlocks(blocks);
 
@@ -1276,11 +1106,10 @@ export function autoFixStructure(md: string): AutoFixResult {
   }
 
   fixRound4(blocks, diags.filter((d) => d.severity === "error"), fixes);
-  // No re-diagnose after Round 4 — it's the last pass
 
   const fixedMd = joinBlocks(blocks);
   const finalDiags = diagnoseStructure(blocks);
-  const parsed = parseMarksheetMarkdown(fixedMd);
+  const parsed = parseMarksheetMarkdown(fixedMd, context);
 
   return {
     fixedMd,
