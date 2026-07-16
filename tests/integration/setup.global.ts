@@ -5,6 +5,7 @@
  * tables contain rows. A failed precondition causes the entire suite to skip
  * rather than running tests that will fail mysteriously.
  */
+import 'dotenv/config';
 import { sql } from 'drizzle-orm';
 import { getDatabase, closeDatabase } from '$lib/server/db';
 

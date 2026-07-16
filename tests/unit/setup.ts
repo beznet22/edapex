@@ -94,6 +94,7 @@ CREATE TABLE IF NOT EXISTS encrypted_credentials (
 	discovered_at TEXT,
 	created_at TEXT NOT NULL DEFAULT (datetime('now')),
 	updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+	UNIQUE(scope, credential_kind, user_id, provider_id),
 	CHECK (
 		(scope = 'user' AND user_id IS NOT NULL AND school_id IS NULL) OR
 		(scope = 'school' AND school_id IS NOT NULL AND user_id IS NULL)
@@ -108,6 +109,7 @@ CREATE TABLE IF NOT EXISTS model_visibility (
 	model_id TEXT NOT NULL,
 	visible INTEGER NOT NULL DEFAULT 1,
 	updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+	UNIQUE(scope, user_id, model_id),
 	CHECK (
 		(scope = 'user' AND user_id IS NOT NULL AND school_id IS NULL) OR
 		(scope = 'school' AND school_id IS NOT NULL AND user_id IS NULL)
@@ -124,6 +126,7 @@ CREATE TABLE IF NOT EXISTS provider_access_policy (
 	reason TEXT,
 	disabled_by INTEGER,
 	disabled_at TEXT NOT NULL DEFAULT (datetime('now')),
+	UNIQUE(school_id, rule_type, target, provider_id, model_id),
 	CHECK (
 		(target = 'provider' AND model_id IS NULL) OR
 		(target = 'model' AND model_id IS NOT NULL)

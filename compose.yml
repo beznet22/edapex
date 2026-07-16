@@ -20,5 +20,6 @@ services:
       - MASTRA_DB_URL=file:/app/storage/edapex-mastra.db
     volumes:
       - ${STORAGE_DIR}/.workspaces:/app/workspaces/
+      - ${STORAGE_DIR}/storage:/app/storage/
       - ${STORAGE_DIR}/static:/app/static/
     restart: unless-stopped
