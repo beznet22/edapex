@@ -16,5 +16,8 @@ export default defineConfig({
         '**/node_modules/**'
       ]
     }
+  },
+  ssr: {
+    external: ['@libsql/linux-x64-gnu', '@libsql/linux-x64-musl']
   }
 });
