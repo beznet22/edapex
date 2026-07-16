@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { getAppDb } from '$lib/server/mastra/storage/libsql/app-db';
-import { userModelVisibility } from '$lib/server/mastra/storage/libsql/app-db.schema';
+import { modelVisibility } from '$lib/server/mastra/storage/libsql/app-db.schema';
 import {
 	getHiddenModelIdsForUser,
 	setModelVisibility,
@@ -12,7 +12,9 @@ const USER_ID = 98200;
 
 async function cleanup(): Promise<void> {
 	const db = getAppDb();
-	await db.delete(userModelVisibility).where(eq(userModelVisibility.userId, USER_ID));
+	await db
+		.delete(modelVisibility)
+		.where(and(eq(modelVisibility.scope, 'user'), eq(modelVisibility.userId, USER_ID)));
 }
 
 describe('visibility', () => {

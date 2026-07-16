@@ -13,15 +13,15 @@
 	import SaveIcon from "@lucide/svelte/icons/save";
 	import CopyIcon from "@lucide/svelte/icons/copy";
 	import DownloadIcon from "@lucide/svelte/icons/download";
-	import MoreHorizontalIcon from "@lucide/svelte/icons/more-horizontal";
+	import MoreVerticalIcon from "@lucide/svelte/icons/more-vertical";
 	import Share2Icon from "@lucide/svelte/icons/share-2";
 	import PrinterIcon from "@lucide/svelte/icons/printer";
 	import Trash2Icon from "@lucide/svelte/icons/trash-2";
 	import FileQuestionIcon from "@lucide/svelte/icons/file-question";
 	import ArrowLeftIcon from "@lucide/svelte/icons/arrow-left";
-	import FileTypeIcon from "@lucide/svelte/icons/file-type";
 	import EyeIcon from "@lucide/svelte/icons/eye";
-	import FileDownIcon from "@lucide/svelte/icons/file-down";
+	import EyeOffIcon from "@lucide/svelte/icons/eye-off";
+	import SendIcon from "@lucide/svelte/icons/send";
 	import EditorCanvas from "./editor-canvas.svelte";
 	import { useInspector } from "$lib/context/inspector-context.svelte";
 	import { useChat } from "$lib/context/chat-context.svelte";
@@ -31,6 +31,7 @@
 		type DocumentStreamEntry,
 	} from "$lib/context/thread-data.svelte";
 	import Markdown from "$lib/components/prompt-kit/markdown/Markdown.svelte";
+	import { autoFixStructure } from "$lib/utils/marksheet-ast-parser";
 
 	let {
 		artifacts,
@@ -56,21 +57,21 @@
 					toolCallId?: string;
 					state?: string;
 					input?: { contentHash?: string; fileName?: string };
-					output?: {
-						artifactId?: string;
-						contentHash?: string;
-						fileName?: string;
-						initialMarkdownPath?: string;
-						persistedMarkdownPath?: string;
-						title?: string;
-						validatedTitle?: string;
-						studentId?: number | null;
-						examTypeId?: number | null;
-						academicId?: number | null;
-						studentFullName?: string | null;
-						adminNo?: number | null;
-						documentId?: string;
-					};
+				output?: {
+					artifactId?: string;
+					contentHash?: string;
+					fileName?: string;
+					initialMarkdownPath?: string;
+					persistedMarkdownPath?: string;
+					title?: string;
+					validatedTitle?: string;
+					studentId?: number | null;
+					examTypeId?: number | null;
+					academicId?: number | null;
+					studentFullName?: string | null;
+					adminNo?: number | null;
+					documentId?: string;
+				};
 					errorText?: string;
 				};
 				if (
@@ -96,7 +97,8 @@
 	const effectiveStatus = $derived.by(() => {
 		if (toolPart?.state === "output-available") return "success";
 		if (toolPart?.state === "output-error") return "error";
-		return entry?.status ?? "processing";
+		if (entry?.status) return entry.status;
+		return "processing";
 	});
 
 	/**
@@ -154,6 +156,7 @@
 		persistedMarkdownPath?: string;
 		title?: string;
 		validatedTitle?: string;
+		marksheetStatus?: string;
 		studentId?: number | null;
 		examTypeId?: number | null;
 		academicId?: number | null;
@@ -161,6 +164,8 @@
 		adminNo?: number | null;
 		documentId?: string;
 		currentMarkdownPath?: string;
+		parentName?: string | null;
+		parentEmail?: string | null;
 	};
 
 	/**
@@ -190,18 +195,24 @@
 		toolOutput?.validatedTitle ?? toolOutput?.title ?? "Untitled",
 	);
 
-	// PDF counterpart lives next to the markdown file with the same stem.
-	// We don't know whether the assistant has published a PDF until we probe
-	// `/api/file/<pdfPath>` — that's the `pdfAvailable` derivation below.
+	// PDF URL: either derived from the API response (after generate) or probed.
+	let pdfStoragePath = $state<string | null>(null);
+	let pdfGenerating = $state(false);
+
 	const pdfUrl = $derived.by(() => {
+		if (pdfStoragePath) return `/api/file/${pdfStoragePath}`;
 		if (!persistedMarkdownPath) return null;
 		const swapped = persistedMarkdownPath.replace(/\.md$/i, ".pdf");
 		return `/api/file/${swapped}`;
 	});
 
-	let viewMode = $state<"markdown" | "pdf">("markdown");
+	let viewMode = $state<"markdown" | "validate" | "pdf">("markdown");
 	let pdfAvailable = $state(false);
 	let pdfProbeSeq = 0;
+
+	let validateLoading = $state(false);
+	let validateLoadingText = $state("");
+	let validationExplanation = $state<string | null>(null);
 
 	$effect(() => {
 		const url = pdfUrl;
@@ -252,23 +263,197 @@
 		}
 	}
 
-	function handleDownloadMarkdown() {
-		if (!persistedMarkdownPath) return;
-		const filename =
-			persistedMarkdownPath.split("/").pop() ?? `${displayTitle}.md`;
-		triggerDownload(persistedMarkdownPath, filename);
+	function extractStudentIds():
+		{ studentId: number | null; examTypeId: number | null; academicId: number | null; studentFullName: string | null; adminNo: number | null } {
+		if (toolOutput) {
+			return {
+				studentId: toolOutput.studentId ?? null,
+				examTypeId: toolOutput.examTypeId ?? null,
+				academicId: toolOutput.academicId ?? null,
+				studentFullName: toolOutput.studentFullName ?? null,
+				adminNo: toolOutput.adminNo ?? null,
+			};
+		}
+		if (current?.id) {
+			const match = current.id.match(/^pdf-(\d+)-(\d+)$/);
+			if (match) {
+				return {
+					studentId: Number(match[1]),
+					examTypeId: Number(match[2]),
+					academicId: null,
+					studentFullName: null,
+					adminNo: null,
+				};
+			}
+		}
+		const path = persistedMarkdownPath ?? validatePath;
+		if (path) {
+			const match = path.match(/ADM(\d+)-(\d+)-(.+?)\.md$/);
+			if (match) {
+				return {
+					adminNo: Number(match[1]),
+					studentId: null,
+					examTypeId: Number(match[2]),
+					academicId: null,
+					studentFullName: match[3].replace(/_/g, " ") ?? null,
+				};
+			}
+		}
+		return { studentId: null, examTypeId: null, academicId: null, studentFullName: null, adminNo: null };
 	}
 
-	function handleDownloadPDF() {
-		if (!pdfUrl || !pdfAvailable) return;
-		const filename =
-			persistedMarkdownPath?.replace(/\.md$/i, ".pdf").split("/").pop() ??
-			`${displayTitle}.pdf`;
-		triggerDownload(pdfUrl.replace(/^\/api\/file\//, ""), filename);
+	async function handleDownload() {
+		const ids = extractStudentIds();
+		if (!ids.studentId || !ids.examTypeId) {
+			if (current?.url) {
+				handleDownloadRaw();
+				return;
+			}
+			import("svelte-sonner").then((m) =>
+				m.toast.error("No student data available — cannot generate PDF"),
+			);
+			return;
+		}
+
+		pdfGenerating = true;
+		try {
+			const res = await fetch("/api/results/generate-pdf", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({
+					studentId: ids.studentId,
+					examTypeId: ids.examTypeId,
+					academicId: ids.academicId,
+					fullName: ids.studentFullName,
+					admissionNo: ids.adminNo,
+				}),
+			});
+			if (!res.ok) throw new Error(`HTTP ${res.status}`);
+			const data = await res.json();
+			if (data.error) throw new Error(data.error);
+
+			const binary = Uint8Array.from(atob(data.pdfBase64), (c) => c.charCodeAt(0));
+			const blob = new Blob([binary], { type: "application/pdf" });
+			const url = URL.createObjectURL(blob);
+			const a = document.createElement("a");
+			a.href = url;
+			a.download = data.filename ?? "result.pdf";
+			document.body.appendChild(a);
+			a.click();
+			a.remove();
+			URL.revokeObjectURL(url);
+
+			pdfStoragePath = data.storagePath;
+			viewMode = "pdf";
+		} catch (e) {
+			import("svelte-sonner").then((m) =>
+				m.toast.error(e instanceof Error ? e.message : "Download failed"),
+			);
+		} finally {
+			pdfGenerating = false;
+		}
 	}
 
-	function toggleViewMode() {
-		viewMode = viewMode === "pdf" ? "markdown" : "pdf";
+	async function handleToggleView() {
+		if (viewMode === "pdf" || viewMode === "validate") {
+			viewMode = "markdown";
+			return;
+		}
+		const committedOrPublished =
+			marksheetStatus === "committed" || marksheetStatus === "published";
+		if (!committedOrPublished) {
+			viewMode = "validate";
+			return;
+		}
+		if (pdfAvailable && pdfUrl) {
+			viewMode = "pdf";
+			return;
+		}
+		const ids = extractStudentIds();
+		if (!ids.studentId || !ids.examTypeId) {
+			import("svelte-sonner").then((m) =>
+				m.toast.error("No student data available — cannot generate PDF"),
+			);
+			return;
+		}
+
+		pdfGenerating = true;
+		try {
+			const res = await fetch("/api/results/generate-pdf", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({
+					studentId: ids.studentId,
+					examTypeId: ids.examTypeId,
+					academicId: ids.academicId,
+					fullName: ids.studentFullName,
+					admissionNo: ids.adminNo,
+				}),
+			});
+			if (!res.ok) throw new Error(`HTTP ${res.status}`);
+			const data = await res.json();
+			if (data.error) throw new Error(data.error);
+
+			pdfStoragePath = data.storagePath;
+			viewMode = "pdf";
+		} catch (e) {
+			import("svelte-sonner").then((m) =>
+				m.toast.error(e instanceof Error ? e.message : "Failed to generate PDF"),
+			);
+		} finally {
+			pdfGenerating = false;
+		}
+	}
+
+	async function handleValidate() {
+		const path = validatePath;
+		if (!path) {
+			import("svelte-sonner").then((m) =>
+				m.toast.error("No marksheet markdown to validate"),
+			);
+			return;
+		}
+
+		const ids = extractStudentIds();
+
+		validateLoading = true;
+		validateLoadingText = "Validating marksheet...";
+		validationExplanation = null;
+		try {
+			const res = await fetch("/api/results/validate-marksheet", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({
+					studentId: ids.studentId,
+					examTypeId: ids.examTypeId,
+					academicId: ids.academicId,
+					admissionNo: ids.adminNo,
+					fullName: ids.studentFullName,
+					currentMarkdownPath: path,
+				}),
+			});
+			if (!res.ok) throw new Error(`HTTP ${res.status}`);
+			const data = await res.json();
+			if (data.ok) {
+				viewMode = "markdown";
+				import("svelte-sonner").then((m) =>
+					m.toast.success("Marksheet validated successfully"),
+				);
+			} else if (data.explanation) {
+				validationExplanation = data.explanation;
+			} else {
+				import("svelte-sonner").then((m) =>
+					m.toast.error(data.error ?? "Validation failed"),
+				);
+			}
+		} catch (e) {
+			import("svelte-sonner").then((m) =>
+				m.toast.error(e instanceof Error ? e.message : "Validation failed"),
+			);
+		} finally {
+			validateLoading = false;
+			validateLoadingText = "";
+		}
 	}
 
 	const viewingId = $derived(activeId ?? artifacts[0]?.id ?? null);
@@ -277,12 +462,22 @@
 		if (found) return found;
 		// Streamed documents are not added to inspector.chatArtifacts, but the
 		// workspace panel still needs a current artifact to render header actions.
-		if (effectiveStatus === "success" && persistedMarkdownPath) {
+		// Status is computed from primitives to avoid a circular dependency with
+		// `effectiveStatus` (which reads `current?.status`).
+		const syntheticStatus =
+			toolPart?.state === "output-available"
+				? "success"
+				: toolPart?.state === "output-error"
+					? "error"
+					: entry?.status ?? "processing";
+		if (syntheticStatus === "success" && persistedMarkdownPath) {
+			const rawContent = entry?.content ?? "";
+			const { fixedMd } = autoFixStructure(rawContent);
 			return {
 				id: viewingId,
 				title: displayTitle,
 				kind: "document" as const,
-				content: entry?.content ?? "",
+				content: fixedMd,
 				url: `/api/file/${persistedMarkdownPath}`,
 				saveUrl: `/api/file/${persistedMarkdownPath}`,
 				status: "success" as const,
@@ -290,12 +485,25 @@
 		}
 		return null;
 	});
+
+	const marksheetStatus = $derived.by((): string | null => {
+		if (toolOutput?.marksheetStatus) return toolOutput.marksheetStatus;
+		if (current?.marksheetStatus) return current.marksheetStatus;
+		return null;
+	});
+
+	/** Path to the marksheet file for validation. Falls back to current.url
+	 *  in filestore mode where toolOutput is not available. */
+	const validatePath = $derived(
+		persistedMarkdownPath ?? (mode === "filestore" && current?.url ? current.url.replace("/api/file/", "") : null),
+	);
 	// Effective streaming state: prefer the merged tool output / stream-entry
 	// status so the header actions are disabled while the artifact is still
 	// being formatted by `streamDocument` or persisted by `validate-marksheet`,
 	// not just while the artifact card itself reports `processing`.
 	const isStreaming = $derived(
-		effectiveStatus === "streaming" || effectiveStatus === "processing",
+		(toolPart !== null || entry !== null) &&
+		(effectiveStatus === "streaming" || effectiveStatus === "processing"),
 	);
 
 	async function handleSave() {
@@ -312,7 +520,83 @@
 		}
 	}
 
-	function handleDownload() {
+	let publishDialogOpen = $state(false);
+	let publishState = $state<{
+		parentName: string;
+		parentEmail: string;
+		studentName: string;
+		loading: boolean;
+		loadingText: string;
+	} | null>(null);
+
+	function handlePublishClick() {
+		if (!toolOutput?.parentName && !toolOutput?.parentEmail) {
+			import("svelte-sonner").then((m) =>
+				m.toast.error("No parent contact info available for this student"),
+			);
+			return;
+		}
+		publishState = {
+			parentName: toolOutput?.parentName ?? "Parent/Guardian",
+			parentEmail: toolOutput?.parentEmail ?? "",
+			studentName: toolOutput?.studentFullName ?? toolOutput?.validatedTitle ?? "Student",
+			loading: false,
+			loadingText: "",
+		};
+		publishDialogOpen = true;
+	}
+
+	async function handlePublishConfirm() {
+		if (!toolOutput) return;
+		const { studentId, examTypeId, academicId, studentFullName, adminNo } = toolOutput;
+		if (!studentId || !examTypeId) return;
+
+		if (!publishState) return;
+		publishState.loading = true;
+		publishState.loadingText = "Generating PDF...";
+
+		try {
+			const res = await fetch("/api/results/publish-pdf", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({
+					studentId,
+					examTypeId,
+					academicId,
+					fullName: studentFullName,
+					admissionNo: adminNo,
+				}),
+			});
+			if (!res.ok) throw new Error(`HTTP ${res.status}`);
+			const data = await res.json();
+			publishDialogOpen = false;
+			if (data.status === "published") {
+				import("svelte-sonner").then((m) =>
+					m.toast.success(`Result published to ${data.parentEmail}`),
+				);
+			} else if (data.status === "skipped_already_published") {
+				import("svelte-sonner").then((m) =>
+					m.toast.info(`Result already published to ${data.parentEmail}`),
+				);
+			} else {
+				import("svelte-sonner").then((m) =>
+					m.toast.error(data.error ?? "Publish failed"),
+				);
+			}
+		} catch (e) {
+			publishDialogOpen = false;
+			import("svelte-sonner").then((m) =>
+				m.toast.error(e instanceof Error ? e.message : "Publish failed"),
+			);
+		} finally {
+			if (publishState) {
+				publishState.loading = false;
+				publishState.loadingText = "";
+			}
+		}
+	}
+
+	function handleDownloadRaw() {
 		if (!current?.url) return;
 		const a = document.createElement("a");
 		a.href =
@@ -489,7 +773,7 @@
 								size="icon"
 								class="size-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/40 disabled:opacity-40 disabled:pointer-events-none"
 								onclick={handleCopy}
-								disabled={isStreaming}
+								disabled={isStreaming || pdfGenerating}
 								aria-label="Copy artifact"
 							>
 								<CopyIcon class="size-4" />
@@ -499,108 +783,65 @@
 					<Tooltip.Content>{isStreaming ? 'Copy (available when streaming finishes)' : 'Copy'}</Tooltip.Content>
 				</Tooltip.Root>
 
-				{#if current.url}
-					<Tooltip.Root>
-						<Tooltip.Trigger>
-							{#snippet child({ props })}
-								<Button
-									{...props}
-									variant="ghost"
-									size="icon"
-									class="size-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/40 disabled:opacity-40 disabled:pointer-events-none"
-									onclick={handleDownload}
-									disabled={isStreaming}
-									aria-label="Download artifact"
-								>
-									<DownloadIcon class="size-4" />
-								</Button>
-							{/snippet}
-						</Tooltip.Trigger>
-						<Tooltip.Content>{isStreaming ? 'Download (available when streaming finishes)' : 'Download'}</Tooltip.Content>
-					</Tooltip.Root>
-				{/if}
+			<Tooltip.Root>
+				<Tooltip.Trigger>
+					{#snippet child({ props })}
+						<Button
+							{...props}
+							variant="ghost"
+							size="icon"
+							class="size-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/40 disabled:opacity-40 disabled:pointer-events-none"
+							onclick={handleToggleView}
+							disabled={isStreaming || pdfGenerating || validateLoading}
+							aria-label={
+								viewMode === "markdown"
+									? marksheetStatus === "committed" || marksheetStatus === "published"
+										? "View PDF"
+										: "Validate marksheet"
+									: "View markdown"
+							}
+						>
+							{#if viewMode === "pdf"}
+								<EyeOffIcon class="size-4" />
+							{:else if viewMode === "validate"}
+								<EyeOffIcon class="size-4" />
+							{:else}
+								<EyeIcon class="size-4" />
+							{/if}
+						</Button>
+					{/snippet}
+				</Tooltip.Trigger>
+				<Tooltip.Content>
+					{viewMode === "pdf"
+						? "View markdown"
+						: viewMode === "validate"
+							? "View markdown"
+							: pdfGenerating
+								? "Generating PDF…"
+								: marksheetStatus === "committed" || marksheetStatus === "published"
+									? "View PDF"
+									: "Validate marksheet"}
+				</Tooltip.Content>
+			</Tooltip.Root>
 
-				{#if persistedMarkdownPath}
-					<Tooltip.Root>
-						<Tooltip.Trigger>
-							{#snippet child({ props })}
-								<Button
-									{...props}
-									variant="ghost"
-									size="icon"
-									class="size-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/40 disabled:opacity-40 disabled:pointer-events-none"
-									onclick={handleDownloadMarkdown}
-									disabled={isStreaming}
-									aria-label="Download markdown"
-								>
-									<FileTextIcon class="size-4" />
-								</Button>
-							{/snippet}
-						</Tooltip.Trigger>
-						<Tooltip.Content>Download markdown (.md)</Tooltip.Content>
-					</Tooltip.Root>
-				{/if}
-
-				{#if pdfAvailable && viewMode === 'pdf'}
-					<Tooltip.Root>
-						<Tooltip.Trigger>
-							{#snippet child({ props })}
-								<Button
-									{...props}
-									variant="ghost"
-									size="icon"
-									class="size-8 rounded-lg text-primary hover:text-primary hover:bg-primary/15 disabled:opacity-40 disabled:pointer-events-none"
-									onclick={toggleViewMode}
-									disabled={isStreaming}
-									aria-label="Switch to markdown view"
-								>
-									<EyeIcon class="size-4" />
-								</Button>
-							{/snippet}
-						</Tooltip.Trigger>
-						<Tooltip.Content>View markdown</Tooltip.Content>
-					</Tooltip.Root>
-				{:else if pdfAvailable && viewMode === 'markdown'}
-					<Tooltip.Root>
-						<Tooltip.Trigger>
-							{#snippet child({ props })}
-								<Button
-									{...props}
-									variant="ghost"
-									size="icon"
-									class="size-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/40 disabled:opacity-40 disabled:pointer-events-none"
-									onclick={toggleViewMode}
-									disabled={isStreaming}
-									aria-label="Switch to PDF view"
-								>
-									<FileTypeIcon class="size-4" />
-								</Button>
-							{/snippet}
-						</Tooltip.Trigger>
-						<Tooltip.Content>View PDF</Tooltip.Content>
-					</Tooltip.Root>
-				{/if}
-
-				{#if pdfAvailable}
-					<Tooltip.Root>
-						<Tooltip.Trigger>
-							{#snippet child({ props })}
-								<Button
-									{...props}
-									variant="ghost"
-									size="icon"
-									class="size-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/40 disabled:opacity-40 disabled:pointer-events-none"
-									onclick={handleDownloadPDF}
-									disabled={isStreaming}
-									aria-label="Download PDF"
-								>
-									<FileDownIcon class="size-4" />
-								</Button>
-							{/snippet}
-						</Tooltip.Trigger>
-						<Tooltip.Content>Download PDF</Tooltip.Content>
-					</Tooltip.Root>
-				{/if}
+				<Tooltip.Root>
+					<Tooltip.Trigger>
+						{#snippet child({ props })}
+							<Button
+								{...props}
+								variant="ghost"
+								size="icon"
+								class="size-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/40 disabled:opacity-40 disabled:pointer-events-none"
+								onclick={handleDownload}
+								disabled={isStreaming || pdfGenerating}
+								aria-label="Download PDF"
+							>
+								<DownloadIcon class="size-4" />
+							</Button>
+						{/snippet}
+					</Tooltip.Trigger>
+					<Tooltip.Content>{pdfGenerating ? "Generating PDF…" : "Download PDF"}</Tooltip.Content>
+				</Tooltip.Root>
 
 				<DropdownMenu.Root>
 					<DropdownMenu.Trigger>
@@ -610,10 +851,10 @@
 								variant="ghost"
 								size="icon"
 								class="size-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/40 disabled:opacity-40 disabled:pointer-events-none"
-								disabled={isStreaming}
+								disabled={isStreaming || pdfGenerating}
 								aria-label="More actions"
 							>
-								<MoreHorizontalIcon class="size-4" />
+								<MoreVerticalIcon class="size-4" />
 							</Button>
 						{/snippet}
 					</DropdownMenu.Trigger>
@@ -633,6 +874,10 @@
 							<PrinterIcon class="size-3.5 mr-2" />
 							Print
 						</DropdownMenu.Item>
+						<DropdownMenu.Item onclick={handlePublishClick} disabled={isStreaming}>
+							<SendIcon class="size-3.5 mr-2" />
+							Publish
+						</DropdownMenu.Item>
 						<DropdownMenu.Separator />
 						<DropdownMenu.Item
 							onclick={() => (deleteOpen = true)}
@@ -649,9 +894,40 @@
 	</header>
 
 	<div class="flex-1 h-full relative group">
-		{#if persistedMarkdownPath && viewMode === 'pdf' && pdfAvailable && pdfUrl}
+		{#if viewMode === "validate"}
+			<div class="h-full flex flex-col items-center justify-center gap-6 px-8">
+				{#if validateLoading}
+					<div class="flex flex-col items-center gap-3">
+						<div class="size-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+						<p class="text-sm text-muted-foreground">{validateLoadingText}</p>
+					</div>
+				{:else if validationExplanation}
+					<ScrollArea class="h-full w-full">
+						<div class="p-6 max-w-3xl mx-auto">
+							<Markdown content={validationExplanation} />
+						</div>
+					</ScrollArea>
+					<div class="pb-6 shrink-0">
+						<Button onclick={handleValidate}>
+							<CheckIcon class="size-4 mr-2" />
+							Retry validation
+						</Button>
+					</div>
+				{:else}
+					<div class="flex flex-col items-center gap-4 max-w-md text-center">
+						<p class="text-sm text-muted-foreground">
+							Validate this marksheet to check for errors and persist the structured data.
+						</p>
+						<Button size="lg" onclick={handleValidate}>
+							<CheckIcon class="size-4 mr-2" />
+							Validate marksheet
+						</Button>
+					</div>
+				{/if}
+			</div>
+		{:else if persistedMarkdownPath && viewMode === 'pdf' && pdfAvailable && pdfUrl}
 			<EditorCanvas
-				filename={persistedMarkdownPath.replace(/\.md$/i, '.pdf').split('/').pop() ?? `${displayTitle}.pdf`}
+				filename={pdfUrl?.split('/').pop() ?? `${displayTitle}.pdf`}
 				title={displayTitle}
 				url={pdfUrl}
 				type="pdf"
@@ -674,8 +950,8 @@
 						type="text"
 						streaming={isStreaming}
 						{user}
-						artifactId={toolOutput?.artifactId ?? ""}
-					/>
+				artifactId={toolOutput?.artifactId ?? ""}
+				/>
 				</div>
 			</ScrollArea>
 		{:else if entry?.content}
@@ -720,7 +996,7 @@
 						variant="outline"
 						size="sm"
 						class="rounded-full text-xs"
-						onclick={handleDownload}
+						onclick={handleDownloadRaw}
 					>
 						<DownloadIcon class="size-3.5 mr-2" />
 						Download
@@ -775,6 +1051,31 @@
 			<AlertDialog.Action onclick={handleDelete}
 				>Delete</AlertDialog.Action
 			>
+		</AlertDialog.Footer>
+	</AlertDialog.Content>
+</AlertDialog.Root>
+
+<AlertDialog.Root bind:open={publishDialogOpen}>
+	<AlertDialog.Content>
+		<AlertDialog.Header>
+			<AlertDialog.Title>Publish result</AlertDialog.Title>
+			<AlertDialog.Description>
+				{#if publishState}
+					Publish result for <strong>{publishState.studentName}</strong> to
+					<strong>{publishState.parentName}</strong> ({publishState.parentEmail})?
+				{/if}
+			</AlertDialog.Description>
+		</AlertDialog.Header>
+		<AlertDialog.Footer>
+			{#if publishState?.loading}
+				<div class="flex items-center gap-2 text-sm text-muted-foreground">
+					<div class="size-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+					{publishState.loadingText}
+				</div>
+			{:else}
+				<AlertDialog.Cancel>Cancel</AlertDialog.Cancel>
+				<AlertDialog.Action onclick={handlePublishConfirm}>Publish</AlertDialog.Action>
+			{/if}
 		</AlertDialog.Footer>
 	</AlertDialog.Content>
 </AlertDialog.Root>

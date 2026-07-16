@@ -12,6 +12,8 @@ import {
 } from '$lib/server/db/sms-schema';
 import { DESIGNATIONS } from '$lib/types/sms-types';
 import { and, asc, eq } from 'drizzle-orm';
+import { fs } from 'files-sdk/fs';
+import { writeFileSync } from 'fs';
 
 /**
  * Maps the first token of a slash command to the skill name whose
@@ -123,7 +125,7 @@ async function resolveDisplayContext(ctx: TenantLike): Promise<DisplayContext> {
  * `StudentRepository.getStudentsByClassSection`. Returns an empty list
  * when any required ID is missing.
  */
-async function getClassRoster(
+export async function getClassRoster(
   ctx: TenantLike
 ): Promise<Array<{ id: number; name: string; admissionNo?: string }>> {
   if (ctx.classId == null || ctx.sectionId == null || ctx.academicId == null) return [];
@@ -212,9 +214,13 @@ export async function buildAssistantInstructions(
     '4. After a tool returns, inspect the result before proceeding — never assume success. On failure, explain the cause in plain language and propose a corrective next step.'
   ];
 
+  let activeSkillName: string | null = null;
+  if (isSlashCommand === true && typeof lastMessage === 'string' && lastMessage.length > 0) {
+    activeSkillName = resolveSkillName(lastMessage, true);
+  }
+
   if (ctx) {
     const display = await resolveDisplayContext(ctx);
-    const roster = await getClassRoster(ctx);
     const focusStudent = resolvedMentions?.find((m) => m.category === 'students');
 
     instructions.push(
@@ -228,22 +234,24 @@ export async function buildAssistantInstructions(
       focusStudent
         ? `- Focus Student: ${focusStudent.name}${focusStudent.admissionNo ? ` (Adm#${focusStudent.admissionNo})` : ''}`
         : '- Focus Student: None',
-      '',
-      'CLASS ROSTER:'
     );
 
-    if (roster.length === 0) {
-      instructions.push('- (no active students in this class/section)');
-    } else {
-      const MAX_ROSTER = 100;
-      const visible = roster.slice(0, MAX_ROSTER);
-      for (const r of visible) {
-        instructions.push(
-          `- ${r.name}${r.admissionNo ? ` (Adm#${r.admissionNo})` : ''} [studentId=${r.id}]`
-        );
-      }
-      if (roster.length > MAX_ROSTER) {
-        instructions.push(`... and ${roster.length - MAX_ROSTER} more`);
+    if (activeSkillName === 'reporting') {
+      const roster = await getClassRoster(ctx);
+      instructions.push('', 'CLASS ROSTER:');
+      if (roster.length === 0) {
+        instructions.push('- (no active students in this class/section)');
+      } else {
+        const MAX_ROSTER = 100;
+        const visible = roster.slice(0, MAX_ROSTER);
+        for (const r of visible) {
+          instructions.push(
+            `- ${r.name}${r.admissionNo ? ` (Adm#${r.admissionNo})` : ''} [studentId=${r.id}]`
+          );
+        }
+        if (roster.length > MAX_ROSTER) {
+          instructions.push(`... and ${roster.length - MAX_ROSTER} more`);
+        }
       }
     }
 
@@ -257,45 +265,30 @@ export async function buildAssistantInstructions(
 
     instructions.push(
       '',
-      'TOOL CALLING CONTEXT (for tool arguments only, never show user):',
-      `- schoolId: ${ctx.schoolId ?? 'None'}`,
-      `- userId: ${ctx.userId ?? 'None'}`,
-      `- staffId: ${ctx.staffId ?? 'None'}`,
-      `- designationId: ${ctx.designationId ?? 'None'}`,
-      `- roleId: ${ctx.roleId ?? 'None'}`,
-      `- classId: ${ctx.classId ?? 'None'}`,
-      `- sectionId: ${ctx.sectionId ?? 'None'}`,
-      `- academicId: ${ctx.academicId ?? 'None'}`,
-      `- examTypeId: ${ctx.examTypeId ?? 'None'}`,
+      `TOOL CALLING CONTEXT: schoolId=${ctx.schoolId ?? 'None'}, userId=${ctx.userId ?? 'None'}, staffId=${ctx.staffId ?? 'None'}, designationId=${ctx.designationId ?? 'None'}, roleId=${ctx.roleId ?? 'None'}, classId=${ctx.classId ?? 'None'}, sectionId=${ctx.sectionId ?? 'None'}, academicId=${ctx.academicId ?? 'None'}, examTypeId=${ctx.examTypeId ?? 'None'}`,
       '',
-      'CRITICAL: When presenting action summaries or talking to the user, ALWAYS use readable names from TENANT CONTEXT and RESOLVED @MENTIONS. NEVER present raw IDs unless the user explicitly asks. Admission numbers may be shown because they have no readable equivalent.',
-      '',
-      'FILE MANIFEST:',
-      'When files are attached, they appear in the FILE MANIFEST below.',
-      'Pass the `contentHash` (same as `fileId`) to the appropriate streaming tool — never invent file identifiers.',
-      '',
-      typeof fileManifest === 'string' ? fileManifest : 'No files attached'
+      'CRITICAL: When presenting action summaries to the user, ALWAYS use readable names from TENANT CONTEXT and RESOLVED @MENTIONS. NEVER present raw IDs unless explicitly asked. Admission numbers may be shown.',
     );
+
+    if (typeof fileManifest === 'string' && fileManifest.length > 0) {
+      instructions.push('', 'FILE MANIFEST:', fileManifest);
+    }
   }
 
-  // if (isSlashCommand === true && typeof lastMessage === 'string' && lastMessage.length > 0) {
-  //   await ensureRegistry();
-  //   const skillName = resolveSkillName(lastMessage, true);
-  //   if (skillName) {
-  //     const skill = skillRegistry.getSkill(skillName);
-  //     if (skill?.instructions) {
-  //       instructions.push(
-  //         '',
-  //         `### SKILL INSTRUCTIONS — ${skill.name || skillName} ###`,
-  //         skill.instructions,
-  //         '',
-  //         '### END SKILL INSTRUCTIONS ###',
-  //         '',
-  //         'Follow the SKILL INSTRUCTIONS above precisely when handling this slash command.'
-  //       );
-  //     }
-  //   }
-  // }
-
+  if (activeSkillName) {
+    await ensureRegistry();
+    const skill = skillRegistry.getSkill(activeSkillName);
+    if (skill?.instructions) {
+      instructions.push(
+        '',
+        `### SKILL INSTRUCTIONS — ${skill.name || activeSkillName} ###`,
+        skill.instructions,
+        '',
+        '### END SKILL INSTRUCTIONS ###',
+        '',
+        'Follow the SKILL INSTRUCTIONS above precisely when handling this slash command.'
+      );
+    }
+  }
   return instructions.join('\n');
 }

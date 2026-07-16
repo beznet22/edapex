@@ -4,14 +4,13 @@
 	import { ReasoningContext, setReasoningContext } from "./reasoning-context.svelte";
 	import { untrack } from "svelte";
 
-	// indexing
-
 	interface Props {
 		class?: string;
 		isStreaming?: boolean;
 		open?: boolean;
 		defaultOpen?: boolean;
 		onOpenChange?: (open: boolean) => void;
+		/** Durable duration from message meta (seconds). Prefer over local when set. */
 		duration?: number;
 		children?: import("svelte").Snippet;
 	}
@@ -22,27 +21,44 @@
 		open = $bindable(),
 		defaultOpen = false,
 		onOpenChange,
-		duration = $bindable(),
+		duration,
 		children,
 		...props
 	}: Props = $props();
 
-	let MS_IN_S = 1000;
+	const MS_IN_S = 1000;
+	const TICK_MS = 250;
 
-	// Create the reasoning context
 	let reasoningContext = new ReasoningContext({
 		isStreaming: untrack(() => isStreaming),
 		isOpen: open ?? untrack(() => defaultOpen),
-		duration: duration ?? 0,
+		duration: untrack(() => (typeof duration === "number" && duration > 0 ? duration : 0)),
 	});
 
-	// Set up controllable state for open
 	let isOpen = $state(open ?? untrack(() => defaultOpen));
-	let currentDuration = $state(duration ?? 0);
+	/** Client-measured duration for the current/last streaming session (seconds). */
+	let localDuration = $state(0);
+	let startedAt: number | null = null;
+	let tickTimer: ReturnType<typeof setInterval> | null = null;
 
-	// Sync external props to context and local state
+	const clearTick = () => {
+		if (tickTimer !== null) {
+			clearInterval(tickTimer);
+			tickTimer = null;
+		}
+	};
+
+	const effectiveDuration = $derived.by(() => {
+		if (typeof duration === "number" && duration > 0) return duration;
+		return localDuration;
+	});
+
 	$effect(() => {
 		reasoningContext.isStreaming = isStreaming;
+	});
+
+	$effect(() => {
+		reasoningContext.duration = effectiveDuration;
 	});
 
 	$effect(() => {
@@ -52,21 +68,28 @@
 		}
 	});
 
+	// Live duration: start on stream enter, tick while streaming, freeze on exit.
 	$effect(() => {
-		if (duration !== undefined) {
-			currentDuration = duration;
-			reasoningContext.duration = duration;
+		if (isStreaming) {
+			if (startedAt === null) {
+				startedAt = Date.now();
+				localDuration = 0;
+			}
+			clearTick();
+			tickTimer = setInterval(() => {
+				if (startedAt === null) return;
+				localDuration = Math.max(0, (Date.now() - startedAt) / MS_IN_S);
+			}, TICK_MS);
+			return () => clearTick();
+		}
+
+		clearTick();
+		if (startedAt !== null) {
+			localDuration = Math.max(0, (Date.now() - startedAt) / MS_IN_S);
+			startedAt = null;
 		}
 	});
 
-	// Sync the final duration back to the optional bindable prop when streaming stops.
-	$effect(() => {
-		if (!isStreaming && duration !== undefined) {
-			duration = currentDuration;
-		}
-	});
-
-	// Panel only opens when the user clicks the trigger; no auto-open/close.
 	let handleOpenChange = (newOpen: boolean) => {
 		isOpen = newOpen;
 		reasoningContext.setIsOpen(newOpen);
@@ -78,7 +101,6 @@
 		onOpenChange?.(newOpen);
 	};
 
-	// Set the context for child components
 	setReasoningContext(reasoningContext);
 </script>
 

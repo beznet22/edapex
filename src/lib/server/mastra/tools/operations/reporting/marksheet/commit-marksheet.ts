@@ -5,7 +5,7 @@ import { writeDataPart, type MemoryContext } from '$lib/server/mastra/utils/chat
 import { tenantWorkspace } from '$lib/server/mastra/storage/workspaces';
 import { buildWorkspaceRequestContext } from '$lib/server/helpers/chat-helper';
 import { marksheetJsonPath } from '$lib/server/mastra/storage/workspaces/paths';
-import { addEntry } from '$lib/server/mastra/storage/workspaces/manifest-store';
+import { addEntry, updateEntryStatus } from '$lib/server/mastra/storage/workspaces/manifest-store';
 import { createAssessmentServiceForRequest } from '$lib/server/service/assessment.service';
 import { marksheetSchema, type Marksheet } from '$lib/schema/marksheet';
 import type { TenantContext } from '$lib/server/mastra/tenant-context';
@@ -95,6 +95,7 @@ export const commitMarksheetTool = createTool({
       modifiedAt: new Date().toISOString(),
       mimeType: 'application/json'
     });
+    await updateEntryStatus(tenant, jsonPath, 'committed');
 
     const studentName = validated.student?.fullName ?? 'Unknown';
 

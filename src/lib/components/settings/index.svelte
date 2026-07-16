@@ -21,8 +21,7 @@
 		deleteUserCredential,
 		getModelVisibility,
 		updateModelVisibility,
-		getAvailableModels,
-		getPlatformDefaults
+		getAvailableModels
 	} from "$lib/api/agent.remote.js";
 	import { AvailableModelsHolder } from "$lib/context/sync.svelte";
 	import { BUILTIN_PROVIDERS } from "$lib/provider/catalog";
@@ -46,7 +45,6 @@
 		baseUrl: string;
 		credentialType: "credential" | "custom";
 	};
-	type PlatformDefault = { providerId: string; hasEnvKey: boolean };
 	type ModelRow = { id: string; displayName: string };
 	type HeaderRow = { name: string; value: string };
 	type ProviderGroup = {
@@ -105,7 +103,6 @@
 	let showMoreProviders = $state(false);
 	let connectingProvider = $state<ProviderInfo | null>(null);
 	let isCustomFlow = $state(false);
-	let platformDefaults = $state<PlatformDefault[]>([]);
 	let apiKeyInput = $state("");
 	let isSavingApiKey = $state(false);
 	let apiKeyError = $state<string | null>(null);
@@ -130,18 +127,12 @@
 	async function loadProviders(): Promise<void> {
 		isLoadingProviders = true;
 		try {
-			const [credsResult, platformResult] = await Promise.all([
-				getUserCredentials({}),
-				getPlatformDefaults({})
-			]);
+			const credsResult = await getUserCredentials({});
 			if (credsResult.success) {
 				connectedProviders = credsResult.providers;
 			} else {
 				connectedProviders = [];
 				toast.error(credsResult.message ?? "Failed to load providers");
-			}
-			if (platformResult.success) {
-				platformDefaults = platformResult.defaults;
 			}
 		} catch (err) {
 			console.error("Failed to load providers:", err);
@@ -520,7 +511,7 @@
 				<ScrollArea class="h-full" scrollbarYClasses="w-1 px-0.5">
 					<div class="p-6 md:p-8 max-w-3xl mx-auto space-y-8">
 						{#if activeTab === "General"}
-							<GeneralTab />
+							<GeneralTab designation={userDesignation} />
 						{:else if activeTab === "Appearance"}
 							<AppearanceTab />
 						{:else if activeTab === "Providers"}
@@ -531,7 +522,6 @@
 								{showMoreProviders}
 								{connectingProvider}
 								{isCustomFlow}
-								{platformDefaults}
 								bind:apiKeyInput
 								{isSavingApiKey}
 								{apiKeyError}

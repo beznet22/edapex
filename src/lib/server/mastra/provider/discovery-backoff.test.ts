@@ -6,12 +6,12 @@ import {
 	DISCOVERY_BACKOFF_BASE_MS,
 	DISCOVERY_BACKOFF_MAX_MS
 } from './discovery';
-import type { UserCredential } from '$lib/server/mastra/storage/libsql/app-db.schema';
+import type { EncryptedCredential } from '$lib/server/mastra/storage/libsql/app-db.schema';
 import { encrypt as encryptText, getEncryptionKey } from './crypto';
 
 const envKey = getEncryptionKey({});
 
-function buildCustomCredential(baseUrl: string, apiKey?: string): UserCredential {
+function buildCustomCredential(baseUrl: string, apiKey?: string): EncryptedCredential {
 	const payload = JSON.stringify({
 		displayName: 'custom',
 		baseUrl,
@@ -21,9 +21,11 @@ function buildCustomCredential(baseUrl: string, apiKey?: string): UserCredential
 	});
 	return {
 		id: 'cred-1',
+		scope: 'user',
+		credentialKind: 'custom',
 		userId: 1,
+		schoolId: null,
 		providerId: 'custom-provider',
-		credentialType: 'custom',
 		encryptedData: encryptText(payload, envKey),
 		priority: 1,
 		enabled: 1,
@@ -58,9 +60,7 @@ describe('discovery backoff', () => {
 
 		const promise = discoverProviderModels(buildCustomCredential('https://example.com'), env);
 
-		// First attempt fires immediately.
 		await vi.advanceTimersByTimeAsync(0);
-		// Exhaust remaining backoff sleeps.
 		await vi.runAllTimersAsync();
 
 		const models = await promise;
@@ -107,7 +107,6 @@ describe('discovery backoff', () => {
 		await promise;
 
 		expect(fetchSpy).toHaveBeenCalledTimes(DISCOVERY_ATTEMPTS);
-		// With 3 attempts there are 2 delays: base * 2^0 and base * 2^1, capped at max.
 		expect(delays).toHaveLength(2);
 		expect(delays[0]).toBe(DISCOVERY_BACKOFF_BASE_MS);
 		expect(delays[1]).toBe(Math.min(DISCOVERY_BACKOFF_BASE_MS * 2, DISCOVERY_BACKOFF_MAX_MS));

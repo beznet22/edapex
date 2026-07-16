@@ -1,16 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { getAppDb } from "$lib/server/mastra/storage/libsql/app-db";
-import {
-	userCredentials,
-	potluckConfig,
-	potluckDonations
-} from "$lib/server/mastra/storage/libsql/app-db.schema";
+import { encryptedCredentials, potluckConfig } from "$lib/server/mastra/storage/libsql/app-db.schema";
 import { saveUserCredential } from "$lib/server/mastra/provider/credentials";
-import {
-	savePotluckConfig,
-	upsertDonation
-} from "$lib/server/mastra/provider/potluck";
+import { savePotluckConfig, upsertDonation } from "$lib/server/mastra/provider/potluck";
 import {
 	resolveProviderKeyWithTrace,
 	AllTiersFailedError
@@ -24,8 +17,18 @@ const ENCRYPTION_KEY = "edapex-default-encryption-key-32ch";
 
 async function cleanupDb(): Promise<void> {
 	const db = getAppDb();
-	await db.delete(userCredentials).where(eq(userCredentials.userId, USER_ID));
-	await db.delete(potluckDonations).where(eq(potluckDonations.schoolId, SCHOOL));
+	await db
+		.delete(encryptedCredentials)
+		.where(and(eq(encryptedCredentials.scope, "user"), eq(encryptedCredentials.userId, USER_ID)));
+	await db
+		.delete(encryptedCredentials)
+		.where(
+			and(
+				eq(encryptedCredentials.scope, "school"),
+				eq(encryptedCredentials.credentialKind, "donation"),
+				eq(encryptedCredentials.schoolId, SCHOOL)
+			)
+		);
 	await db.delete(potluckConfig).where(eq(potluckConfig.schoolId, SCHOOL));
 }
 
@@ -41,6 +44,7 @@ describe("security hardening", () => {
 	describe("ToS version enforcement in tier-router", () => {
 		async function seedPool(tosVersion: string): Promise<void> {
 			const db = getAppDb();
+			const env = { TOKEN_ENCRYPTION_KEY: ENCRYPTION_KEY };
 			await savePotluckConfig(
 				db,
 				SCHOOL,
@@ -58,9 +62,10 @@ describe("security hardening", () => {
 			);
 			await upsertDonation(
 				db,
+				env,
 				SCHOOL,
 				"groq",
-				encrypt("pool-test-key", ENCRYPTION_KEY),
+				"pool-test-key",
 				17,
 				17,
 				tosVersion
@@ -86,7 +91,6 @@ describe("security hardening", () => {
 		it("skips tier 2 when donation tos_version mismatches config", async () => {
 			await seedPool("v2");
 			const db = getAppDb();
-			// Update config to a newer ToS version while donation stays on v2
 			await savePotluckConfig(
 				db,
 				SCHOOL,
@@ -151,38 +155,24 @@ describe("security hardening", () => {
 						userId: USER_ID,
 						providerId: "groq",
 						credentialType: "credential"
-					}
+					} as never
 				)
 			).rejects.toThrow();
 		});
 
 		it("upsertDonation rejects invalid schoolId", async () => {
 			const db = getAppDb();
+			const env = { TOKEN_ENCRYPTION_KEY: ENCRYPTION_KEY };
 			await expect(
-				upsertDonation(
-					db,
-					0,
-					"groq",
-					encrypt("key", ENCRYPTION_KEY),
-					17,
-					17,
-					"v1"
-				)
+				upsertDonation(db, env, 0, "groq", encrypt("key", ENCRYPTION_KEY), 17, 17, "v1")
 			).rejects.toThrow();
 		});
 
 		it("upsertDonation rejects empty providerId", async () => {
 			const db = getAppDb();
+			const env = { TOKEN_ENCRYPTION_KEY: ENCRYPTION_KEY };
 			await expect(
-				upsertDonation(
-					db,
-					SCHOOL,
-					"",
-					encrypt("key", ENCRYPTION_KEY),
-					17,
-					17,
-					"v1"
-				)
+				upsertDonation(db, env, SCHOOL, "", encrypt("key", ENCRYPTION_KEY), 17, 17, "v1")
 			).rejects.toThrow();
 		});
 	});
@@ -202,9 +192,7 @@ describe("security hardening", () => {
 			const original = process.env.NODE_ENV;
 			process.env.NODE_ENV = "production";
 			try {
-				expect(() => getEncryptionKey({})).toThrow(
-					"Encryption key required in production"
-				);
+				expect(() => getEncryptionKey({})).toThrow("Encryption key required in production");
 			} finally {
 				if (original !== undefined) process.env.NODE_ENV = original;
 				else delete process.env.NODE_ENV;

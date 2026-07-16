@@ -14,6 +14,8 @@ import type { TenantContext } from "$lib/server/mastra/tenant-context";
 import { buildWorkspaceRequestContext } from "$lib/server/helpers/chat-helper";
 import { tenantWorkspace } from "$lib/server/mastra/storage/workspaces";
 
+export type MarksheetStatus = 'extracted' | 'formatted' | 'validated' | 'committed' | 'published';
+
 export type ArtifactKind =
   | "ocr-markdown"
   | "ocr-meta"
@@ -31,6 +33,7 @@ export type ArtifactKind =
 export interface ManifestEntry {
   path: string;
   kind: ArtifactKind;
+  marksheetStatus?: MarksheetStatus;
   /** UUID minted per upload (toolCallId); used as the formatted marksheet's
    *  documentId after stream-document runs. Enables tools to look up uploads
    *  without a separate `extracted/manifest.json`. */
@@ -186,6 +189,21 @@ export async function removeEntry(
   m.byKind.transcripts = m.byKind.transcripts.filter((x) => `transcripts/${x.studentId}.json` !== relPath);
   m.byKind.pdfs = m.byKind.pdfs.filter((x) => x.name !== relPath);
   m.byKind.notes = m.byKind.notes.filter((x) => x.path !== relPath);
+  await writeManifest(tenant, m);
+  return m;
+}
+
+export async function updateEntryStatus(
+  tenant: TenantContext,
+  relPath: string,
+  status: MarksheetStatus
+): Promise<WorkspaceManifest> {
+  const m = await readManifest(tenant);
+  const entry = m.entries[relPath];
+  if (entry) {
+    entry.marksheetStatus = status;
+    entry.modifiedAt = new Date().toISOString();
+  }
   await writeManifest(tenant, m);
   return m;
 }

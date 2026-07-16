@@ -66,15 +66,16 @@ export type RequestContextValues = z.infer<typeof requestContextSchema>;
  * env-keyed fallback (see provider/credentials.ts for the platform-default
  * synthesis and provider/router.ts for defaultModelForRole).
  */
-const groqProvider1 = createOpenAICompatible({
-	name: 'groq',
+const kimchiProvider1 = createOpenAICompatible({
+	name: 'kimchi',
 	apiKey: env.KIMCHI_API_KEY,
 	baseURL: 'https://llm.kimchi.dev/openai/v1',
 	headers: { 'Accept-Encoding': 'identity' },
 	supportsStructuredOutputs: true,
+
 });
 
-export const DEFAULT_MODEL = groqProvider1.chatModel('deepseek-v4-flash');
+export const DEFAULT_MODEL = kimchiProvider1.chatModel('deepseek-v4-flash');
 
 
 const groqProvider = createOpenAICompatible({
@@ -84,6 +85,9 @@ const groqProvider = createOpenAICompatible({
 	headers: { 'Accept-Encoding': 'identity' },
 	supportsStructuredOutputs: false,
 });
+
+
+export const DEFAULT_ARTIFACT_MODEL = groqProvider.chatModel('openai/gpt-oss-120b');
 
 /**
  * Default title model — prefers Groq for fast inference.

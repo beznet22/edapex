@@ -3,19 +3,25 @@ import { and, eq } from "drizzle-orm";
 import { getDatabase } from "$lib/server/db";
 import { smAcademicYears, smExamTypes } from "$lib/server/db/sms-schema";
 import {
-	createTenantContext,
 	resolveExamTypeId,
 } from "$lib/server/mastra/tenant-context";
-import { buildWorkspaceRequestContext } from "$lib/server/helpers/chat-helper";
 import { resolveActiveClassScope } from "$lib/server/helpers/class-scope";
 import { ALLOWED_DESIGNATIONS } from "$lib/types/sms-types";
-import { tenantWorkspace } from "$lib/server/mastra/storage/workspaces";
+import { resolveTenantWorkspace } from "$lib/server/workspace/scope";
 import { getMemory } from "$lib/server/mastra";
 import { toAISdkMessages } from "@mastra/ai-sdk/ui";
 import { deriveCategory, deriveKind, deriveSource } from "$lib/utils/artifact-kind";
+import { readManifest } from "$lib/server/mastra/storage/workspaces/manifest-store";
 import type { PageServerLoad } from "./$types";
 import type { Artifact } from "$lib/types/workspace-types";
 import type { SerializedTenant } from "$lib/types/background-tasks";
+
+const EXCLUDED_DIR_PREFIXES = ['ocr/', 'scratch/'];
+
+function extractExamTypeFromPath(relPath: string): number | null {
+	const match = relPath.match(/\bexamType-(\d+)\//);
+	return match ? Number(match[1]) : null;
+}
 
 export const load: PageServerLoad = async ({ url, locals, cookies }) => {
 	if (!locals.user) throw error(401);
@@ -29,18 +35,6 @@ export const load: PageServerLoad = async ({ url, locals, cookies }) => {
 		className: url.searchParams.get("className"),
 		sectionName: url.searchParams.get("sectionName"),
 		selectedClassCookie: cookies.get("selected-class"),
-	});
-
-	const baseTenant = createTenantContext({
-		schoolId,
-		userId: user.id,
-		designationId: (user as { designationId?: number }).designationId ?? ALLOWED_DESIGNATIONS.IT,
-		staffId: (user as { staffId?: number }).staffId ?? 1,
-		classId: scope?.classId ?? null,
-		sectionId: scope?.sectionId ?? null,
-		examId: null,
-		examTypeId: null,
-		academicId: null,
 	});
 
 	const db = await getDatabase();
@@ -97,81 +91,78 @@ export const load: PageServerLoad = async ({ url, locals, cookies }) => {
 			: (examTypeId ?? 0);
 
 	const threadId = url.searchParams.get("threadId") || null;
-	const tenant: SerializedTenant & { examTypeId: number | null } = {
-		schoolId: baseTenant.schoolId,
-		userId: baseTenant.userId,
-		designationId: baseTenant.designationId,
-		staffId: baseTenant.staffId,
-		classId: baseTenant.classId,
-		sectionId: baseTenant.sectionId,
-		examTypeId: activeTermId || null,
-		academicId: activeAcademicId,
-	};
 
-	if (!activeTermId) {
-		return {
-			termOptions,
-			activeTermId: 0,
-			activeAcademicTitle,
-			files: [] as Artifact[],
-			threadId,
-			tenant,
-		};
-	}
-
-	const scopedTenant = { ...baseTenant, examTypeId: activeTermId, academicId: activeAcademicId };
-	const requestContext = buildWorkspaceRequestContext(scopedTenant);
-	const fs = await tenantWorkspace.resolveFilesystem({
-		requestContext: requestContext as never,
+	// Use central workspace resolver to get the correct human-readable path
+	const { tenant, requestContext, fs } = await resolveTenantWorkspace({
+		schoolId,
+		userId: user.id,
+		staffId: (user as { staffId?: number }).staffId,
+		designationId: (user as { designationId?: number }).designationId ?? ALLOWED_DESIGNATIONS.IT,
+		selectedClassCookie: cookies.get("selected-class"),
 	});
 	if (!fs) throw error(500, "Workspace filesystem unavailable");
 
-	const yearSeg = `AY${scopedTenant.academicId ?? 0}`;
-	const classSeg = `${scopedTenant.classId}_${scopedTenant.sectionId}_${yearSeg}`;
-	// `resolveFilesystem` is already rooted at `${schoolId}/${classSeg}`, so
-	// pass only the term-relative subpath for fs operations. The full
-	// school/class-relative path is used as the file API URL key.
-	const termRelPath = `exams/examType-${activeTermId}`;
-	const fullPrefix = `${scopedTenant.schoolId}/${classSeg}/exams/examType-${activeTermId}`;
+	const tenantForSerialization: SerializedTenant & { examTypeId: number | null } = {
+		schoolId: tenant.schoolId,
+		userId: tenant.userId,
+		designationId: tenant.designationId,
+		staffId: tenant.staffId,
+		classId: tenant.classId,
+		sectionId: tenant.sectionId,
+		examTypeId: activeTermId || null,
+		academicId: tenant.academicId,
+		className: tenant.className,
+		sectionName: tenant.sectionName,
+		academicYearTitle: tenant.academicYearTitle,
+	};
 
+	// Scan the entire workspace root recursively, filtering out:
+	// - JSON data files
+	// - ocr/ and scratch/ temp directories
+	// - manifest.json
 	let entries: Array<{ name: string; type: "file" | "directory"; size?: number }> = [];
 	try {
-		entries = await fs.readdir(termRelPath, { recursive: true });
+		entries = await fs.readdir('.', { recursive: true });
 	} catch {
 		entries = [];
 	}
 
+	const filteredEntries = entries.filter((e) => {
+		if (e.name === '.' || e.name === '..' || e.type !== 'file') return false;
+		if (e.name.endsWith('.json')) return false;
+		if (EXCLUDED_DIR_PREFIXES.some((p) => e.name.startsWith(p))) return false;
+		return true;
+	});
+
+	const workspaceClassPrefix = `${tenant.schoolId}/${tenant.classId}-${tenant.sectionId}_AY${tenant.academicId ?? 0}`;
+
 	let files: Artifact[] = await Promise.all(
-		entries
-			.filter((e) => e.name !== "." && e.name !== ".." && e.type === "file")
-			.map(async (e) => {
-				const relKey = `${termRelPath}/${e.name}`;
-				const key = `${fullPrefix}/${e.name}`;
-				let modifiedAt: number | undefined;
-				try {
-					const s = await fs.stat(relKey);
-					modifiedAt = s.modifiedAt instanceof Date ? s.modifiedAt.getTime() : undefined;
-				} catch {
-					modifiedAt = undefined;
-				}
-				return {
-					id: key,
-					title: e.name,
-					kind: deriveKind(e.name),
-					category: deriveCategory(e.name),
-					source: deriveSource(key),
-					url: `/api/file/${relKey}`,
-					saveUrl: `/api/file/${relKey}`,
-					size: e.size,
-					modifiedAt,
-				};
-			}),
+		filteredEntries.map(async (e) => {
+			const key = `${workspaceClassPrefix}/${e.name}`;
+			let modifiedAt: number | undefined;
+			try {
+				const s = await fs.stat(e.name);
+				modifiedAt = s.modifiedAt instanceof Date ? s.modifiedAt.getTime() : undefined;
+			} catch {
+				modifiedAt = undefined;
+			}
+			return {
+				id: key,
+				title: e.name.split('/').pop() ?? e.name,
+				kind: deriveKind(e.name),
+				category: deriveCategory(e.name),
+				source: deriveSource(e.name),
+				url: `/api/file/${e.name}`,
+				saveUrl: `/api/file/${e.name}`,
+				size: e.size,
+				modifiedAt,
+				examTypeId: extractExamTypeFromPath(e.name) ?? undefined,
+			} as Artifact & { examTypeId?: number };
+		}),
 	);
 
 	// When the URL carries a `threadId`, filter the list to files that were
-	// generated by the active thread. The mapping relies on the current term
-	// (we don't track per-message examType history), so historical artifacts
-	// from prior terms won't match — acceptable for v1.
+	// generated by the active thread.
 	if (threadId) {
 		const memory = await getMemory();
 		const threadFileKeys = new Set<string>();
@@ -193,7 +184,10 @@ export const load: PageServerLoad = async ({ url, locals, cookies }) => {
 							) {
 								const ext = part.type === "data-generatePDF" ? ".pdf" : ".md";
 								const safeTitle = part.data.title.replace(/[^a-zA-Z0-9._-]/g, "_");
-								threadFileKeys.add(`${fullPrefix}/${safeTitle}${ext}`);
+								// Thread files are created under the active term's exam dir
+								threadFileKeys.add(
+									`${workspaceClassPrefix}/exams/examType-${activeTermId || examTypeId || 0}/${safeTitle}${ext}`
+								);
 							}
 						}
 					}
@@ -205,15 +199,34 @@ export const load: PageServerLoad = async ({ url, locals, cookies }) => {
 		files = files.filter((f) => threadFileKeys.has(f.id));
 	}
 
+	// Merge marksheetStatus from manifest into artifacts
+	const manifest = await readManifest(tenant);
+	if (manifest && Object.keys(manifest.entries).length > 0) {
+		const pathToStatus = new Map<string, string>();
+		for (const [relPath, entry] of Object.entries(manifest.entries)) {
+			if (entry.marksheetStatus) {
+				pathToStatus.set(relPath, entry.marksheetStatus);
+			}
+		}
+		if (pathToStatus.size > 0) {
+			for (const f of files) {
+				const relKey = f.url.replace("/api/file/", "");
+				const status = pathToStatus.get(relKey);
+				if (status) {
+					(f as Artifact & { marksheetStatus?: string }).marksheetStatus = status;
+				}
+			}
+		}
+	}
+
 	return {
 		termOptions,
 		activeTermId,
 		activeAcademicTitle,
 		files,
 		threadId,
-		tenant,
+		tenant: tenantForSerialization,
 		activeClassId: scope?.classId ?? null,
 		activeSectionId: scope?.sectionId ?? null,
 	};
 };
-

@@ -136,6 +136,7 @@
 				(!f.category || !categoryMulti.has(f.category))
 			)
 				return false;
+			if (data.activeTermId && data.activeTermId > 0 && f.examTypeId && f.examTypeId !== data.activeTermId) return false;
 			return true;
 		});
 
@@ -346,6 +347,9 @@
 				sectionId: data.tenant.sectionId,
 				examTypeId: activeTermId,
 				academicId: data.tenant.academicId,
+				className: data.tenant.className,
+				sectionName: data.tenant.sectionName,
+				academicYearTitle: data.tenant.academicYearTitle,
 			});
 			backgroundTasks.runTask({ kind: "ocr-batch", keys, tenant });
 			toast.info(`Queued ${keys.length} file${keys.length === 1 ? "" : "s"} for extraction`);

@@ -24,16 +24,30 @@ import { z } from 'zod';
 import { workflowEnvelopeSchema } from '$lib/server/mastra/utils/chat-schemas';
 import { ensureRegistry, resolveToolsForMessage } from '$lib/server/mastra/skill-tools';
 import { BASE_AGENT_TOOLS } from '$lib/server/mastra/tools/internal/base-agent-tools';
+import type { ToolsetsInput } from '@mastra/core/agent';
 
 const resolveToolsEnvelopeSchema = workflowEnvelopeSchema.extend({
-	tools: z.record(z.string(), z.unknown())
+	tools: z.custom<ToolsetsInput>()
 });
 
-export const resolveToolsStep = createStep({
-	id: 'resolve-tools',
+export const resolveAgentContextStep = createStep({
+	id: 'resolve-agent-context',
 	inputSchema: workflowEnvelopeSchema,
 	outputSchema: resolveToolsEnvelopeSchema,
 	execute: async ({ inputData, requestContext }) => {
+		if (inputData.fileItems.length > 0) {
+			const manifestText = inputData.fileItems
+				.map((f) => {
+					const contentHash = f.fileId ?? f.contentHash ?? f.toolCallId;
+					if ('error' in f) {
+						return `- ${f.fileName} (contentHash: ${contentHash}) — Error: ${f.error}`;
+					}
+					return `- ${f.fileName} (contentHash: ${contentHash})`;
+				})
+				.join('\n');
+			requestContext?.set('fileManifest', manifestText);
+		}
+
 		const lastMessage = requestContext?.get('lastMessage') as string | undefined;
 		const isSlashCommand = requestContext?.get('isSlashCommand') as boolean | undefined;
 		await ensureRegistry();
@@ -43,12 +57,9 @@ export const resolveToolsStep = createStep({
 			!!isSlashCommand
 		);
 
-		const merged = { ...BASE_AGENT_TOOLS, ...skillTools };
-		console.log('tools: ', Object.keys(merged));
-
 		return {
 			...inputData,
-			tools: merged
+			tools: { default: { ...BASE_AGENT_TOOLS, ...skillTools } }
 		};
 	}
 });

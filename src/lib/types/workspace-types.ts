@@ -18,7 +18,9 @@ export interface Artifact {
 	saveUrl?: string;
 	size?: number;
 	status?: ArtifactStatus;
+	marksheetStatus?: string;
 	source?: ArtifactSource;
 	category?: ArtifactCategory;
 	modifiedAt?: number;
+	examTypeId?: number;
 }

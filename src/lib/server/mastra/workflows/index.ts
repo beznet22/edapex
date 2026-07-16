@@ -15,7 +15,6 @@ import { classifyAndStreamWorkflow } from './chat/classify-and-stream';
 import { titleStep } from './chat/title-step';
 import { extractFileItemsStep } from './chat/extract-file-items-step';
 import { collapseStep } from './chat/collapse-step';
-import { resolveToolsStep } from './chat/resolve-tools-step';
 import { assistantStep } from './chat/assistant-step';
 
 import { deriveEditorContextStep } from './editor/derive-editor-context-step';
@@ -24,6 +23,7 @@ import { resolveCommandStep } from './editor/resolve-command-step';
 import { runEditAgentStep } from './editor/run-edit-agent-step';
 import { runGenerateAgentStep } from './editor/run-generate-agent-step';
 import { stripLeakedSelection } from '../editor/strip-leaked-selection';
+import { resolveAgentContextStep } from './chat/resolve-context-step';
 
 // ─── chatWorkflow ─────────────────────────────────────────────────────────
 
@@ -34,16 +34,6 @@ export const chatWorkflow = createWorkflow({
 	outputSchema: chatWorkflowOutputSchema,
 	retryConfig: { attempts: 2, delay: 1000 },
 	options: {
-		onFinish: async (result) => {
-			if (result.status === 'success') {
-				console.info('[chatWorkflow] completed', {
-					runId: result.runId,
-					workflowId: result.workflowId,
-					fileCount: result.result?.resolvedFiles?.length ?? 0,
-					textLength: result.result?.text?.length ?? 0
-				});
-			}
-		},
 		onError: async (errorInfo) => {
 			console.error('[chatWorkflow] error', {
 				runId: errorInfo.runId,
@@ -57,7 +47,7 @@ export const chatWorkflow = createWorkflow({
 	.parallel([classifyAndStreamWorkflow, titleStep])
 	.then(extractFileItemsStep)
 	.then(collapseStep)
-	.then(resolveToolsStep)
+	.then(resolveAgentContextStep)
 	.then(assistantStep)
 	.commit();
 
@@ -73,7 +63,7 @@ export const editorCommandWorkflow = createWorkflow({
 	.then(resolveMentionsStep as any)
 	.then(resolveCommandStep as any)
 	.branch([
-		[async ({ inputData }: any) => inputData.toolName === 'generate', runGenerateAgentStep as any],
+		[async ({ inputData }: any) => ['generate', 'continue'].includes(inputData.toolName), runGenerateAgentStep as any],
 		[async ({ inputData }: any) => ['edit', 'improve', 'fix', 'shorter', 'longer'].includes(inputData.toolName), runEditAgentStep as any],
 	] as any)
 	.commit();

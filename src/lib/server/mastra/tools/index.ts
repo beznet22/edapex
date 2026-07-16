@@ -34,8 +34,6 @@ export const coreTools = {
 	...parentTools,
 	...reportingTools,
 	...academicTools,
-	chooseDocumentTool,
-	readWorkspaceFileTool
 };
 
 /**

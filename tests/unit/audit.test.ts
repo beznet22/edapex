@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import fs from "fs/promises";
 import path from "path";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { getAppDb } from "$lib/server/mastra/storage/libsql/app-db";
-import { userCredentials, potluckConfig, potluckDonations } from "$lib/server/mastra/storage/libsql/app-db.schema";
+import { encryptedCredentials, potluckConfig } from "$lib/server/mastra/storage/libsql/app-db.schema";
 import {
 	saveUserCredential,
 	deleteUserCredential,
@@ -14,7 +14,6 @@ import {
 	upsertDonation,
 	deactivateDonation
 } from "$lib/server/mastra/provider/potluck";
-import { encrypt } from "$lib/server/mastra/provider/crypto";
 import { readRecent } from "$lib/server/audit-log";
 
 const SCHOOL = 97001;
@@ -30,8 +29,18 @@ async function removeAuditFile(): Promise<void> {
 
 async function cleanupDb(): Promise<void> {
 	const db = getAppDb();
-	await db.delete(userCredentials).where(eq(userCredentials.userId, USER_ID));
-	await db.delete(potluckDonations).where(eq(potluckDonations.schoolId, SCHOOL));
+	await db
+		.delete(encryptedCredentials)
+		.where(and(eq(encryptedCredentials.scope, "user"), eq(encryptedCredentials.userId, USER_ID)));
+	await db
+		.delete(encryptedCredentials)
+		.where(
+			and(
+				eq(encryptedCredentials.scope, "school"),
+				eq(encryptedCredentials.credentialKind, "donation"),
+				eq(encryptedCredentials.schoolId, SCHOOL)
+			)
+		);
 	await db.delete(potluckConfig).where(eq(potluckConfig.schoolId, SCHOOL));
 }
 
@@ -69,7 +78,7 @@ describe("audit-log: credential CRUD writes audit entries with exact counts", ()
 		expect(entries[0].after).toMatchObject({
 			userId: USER_ID,
 			providerId: "groq",
-			credentialType: "credential"
+			credentialKind: "personal"
 		});
 	});
 
@@ -91,7 +100,6 @@ describe("audit-log: credential CRUD writes audit entries with exact counts", ()
 
 		const entries = await readRecent(SCHOOL, 50);
 		expect(entries.length).toBe(2);
-		// Most-recent-first ordering: the update is at index 0.
 		expect(entries[0].action).toBe("update");
 		expect(entries[1].action).toBe("create");
 	});
@@ -140,18 +148,12 @@ describe("audit-log: credential CRUD writes audit entries with exact counts", ()
 			{ userId: USER_ID, providerId: "groq", credentialType: "credential", apiKey: "sk-secret-1234" },
 			{ actorStaffId: ACTOR, schoolId: SCHOOL }
 		);
-		await deleteUserCredential(
-			db,
-			USER_ID,
-			"groq",
-			{ actorStaffId: ACTOR, schoolId: SCHOOL }
-		);
+		await deleteUserCredential(db, USER_ID, "groq", { actorStaffId: ACTOR, schoolId: SCHOOL });
 
 		const entries = await readRecent(SCHOOL, 50);
 		expect(entries.length).toBe(2);
 		expect(entries[0].action).toBe("delete");
 		expect(entries[0].entityType).toBe("userCredential");
-		// Redaction: apiKey pattern in `before` must be replaced with [REDACTED].
 		const beforeJson = JSON.stringify(entries[0].before ?? {});
 		expect(beforeJson).not.toContain("sk-secret-1234");
 	});
@@ -199,12 +201,13 @@ describe("audit-log: credential CRUD writes audit entries with exact counts", ()
 
 	it("upsertDonation writes create + update; deactivateDonation writes disable", async () => {
 		const db = getAppDb();
-		const encrypted = encrypt("sk-donation-secret-key", ENCRYPTION_KEY);
+		const env = { TOKEN_ENCRYPTION_KEY: ENCRYPTION_KEY };
 		const created = await upsertDonation(
 			db,
+			env,
 			SCHOOL,
 			"groq",
-			encrypted,
+			"sk-donation-secret-key",
 			USER_ID,
 			USER_ID,
 			"v1",
@@ -212,9 +215,10 @@ describe("audit-log: credential CRUD writes audit entries with exact counts", ()
 		);
 		await upsertDonation(
 			db,
+			env,
 			SCHOOL,
 			"groq",
-			encrypt("sk-donation-secret-key-v2", ENCRYPTION_KEY),
+			"sk-donation-secret-key-v2",
 			USER_ID,
 			USER_ID,
 			"v1",
@@ -229,7 +233,6 @@ describe("audit-log: credential CRUD writes audit entries with exact counts", ()
 		expect(entries.length).toBe(3);
 		expect(entries.map((e) => e.action)).toEqual(["disable", "update", "create"]);
 		expect(entries.every((e) => e.entityType === "potluckDonation")).toBe(true);
-		// Redaction: apiKeyEncrypted must NOT appear in any entry.
 		const allJson = JSON.stringify(entries);
 		expect(allJson).not.toContain("sk-donation-secret-key");
 	});

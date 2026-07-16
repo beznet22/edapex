@@ -6,10 +6,9 @@
  * which blocks path traversal at the framework level — no regex sanitization
  * is needed here.
  *
- * The workspace is resolved per request from the active `tenantContext` in
- * the request context. The `verifyTeacherAssignment` check runs as part of
- * the resolver, so any attempt to access a class the staff member does not
- * teach is rejected before any I/O occurs.
+ * The workspace is resolved per request via `resolveTenantWorkspace` (the
+ * central workspace resolver in scope.ts) which guarantees the correct
+ * human-readable path is used and eliminates stale ID-only ghost directories.
  *
  * Batch OCR actions (`?action=batch-extract|status|finalize`) are routed to
  * `OcrBatchService` and are designed to be called from the dedicated task
@@ -18,11 +17,9 @@
  */
 import { json, error, type RequestHandler } from '@sveltejs/kit';
 import { auth } from '$lib/server/service/auth.service';
-import { createTenantContext, WorkspaceMismatchError } from '$lib/server/mastra/tenant-context';
 import { tenantWorkspace } from '$lib/server/mastra/storage/workspaces';
-import { assertPathAgentVisible, WorkspaceScopeError } from '$lib/server/workspace/scope';
+import { assertPathAgentVisible, resolveTenantWorkspace, WorkspaceScopeError } from '$lib/server/workspace/scope';
 import { buildWorkspaceRequestContext } from '$lib/server/helpers/chat-helper';
-import { resolveActiveClassScope, resolveClassNamesByIds } from '$lib/server/helpers/class-scope';
 import { ALLOWED_DESIGNATIONS } from "$lib/types/sms-types";
 import { ocrBatchService } from '$lib/server/service/ocr-batch.service';
 import type { SerializedTenant } from '$lib/types/background-tasks';
@@ -52,7 +49,7 @@ function safeRelPath(rawPath: string | undefined): string {
 }
 
 function resolveScopedPath(
-  tenant: ReturnType<typeof createTenantContext>,
+  tenant: ReturnType<typeof import('$lib/server/mastra/tenant-context')['createTenantContext']>,
   paramsPath: string | undefined,
 ): string {
   const relPath = safeRelPath(paramsPath);
@@ -79,57 +76,20 @@ function entryToWire(entry: FileEntry): {
   };
 }
 
-async function resolveRequestTenant({
-  locals,
-  url,
-  cookies,
-}: {
-  locals: App.Locals;
-  url: URL;
-  cookies: { get: (name: string) => string | undefined };
-}) {
-  const scope = await resolveActiveClassScope({
-    schoolId: locals.user?.schoolId ?? 1,
-    staffId: locals.user?.staffId,
-    className: url.searchParams.get('className'),
-    sectionName: url.searchParams.get('sectionName'),
-    selectedClassCookie: cookies.get('selected-class'),
-  });
-  const displayNames = scope
-    ? await resolveClassNamesByIds({
-        schoolId: locals.user?.schoolId ?? 1,
-        classId: scope.classId,
-        sectionId: scope.sectionId,
-        academicId: scope.academicId
-      })
-    : { className: null, sectionName: null, academicYearTitle: null };
-  return createTenantContext({
-    schoolId: locals.user?.schoolId ?? 1,
-    userId: locals.user?.id ?? 1,
-    designationId: (locals.user as { designationId?: number } | undefined)?.designationId ?? ALLOWED_DESIGNATIONS.IT,
-    staffId: (locals.user as { staffId?: number } | undefined)?.staffId ?? 1,
-    classId: scope?.classId ?? null,
-    sectionId: scope?.sectionId ?? null,
-    examId: null,
-    examTypeId: null,
-    academicId: scope?.academicId ?? null,
-    className: displayNames.className,
-    sectionName: displayNames.sectionName,
-    academicYearTitle: displayNames.academicYearTitle
-  });
-}
-
 export const GET: RequestHandler = async ({ params, url, locals, cookies }) => {
   try {
     if (!locals.user) throw error(401, 'Unauthorized');
 
-    const tenant = await resolveRequestTenant({ locals, url, cookies });
+    const { tenant, requestContext, fs } = await resolveTenantWorkspace({
+      schoolId: locals.user.schoolId ?? 1,
+      userId: locals.user.id ?? 1,
+      staffId: (locals.user as { staffId?: number })?.staffId,
+      designationId: (locals.user as { designationId?: number })?.designationId ?? ALLOWED_DESIGNATIONS.IT,
+      selectedClassCookie: cookies.get('selected-class'),
+    });
+    if (!fs) throw error(500, 'Workspace filesystem unavailable');
 
     const resolvedPath = resolveScopedPath(tenant, params.path);
-
-    const requestContext = buildWorkspaceRequestContext(tenant);
-    const fs = await tenantWorkspace.resolveFilesystem({ requestContext: requestContext as never });
-    if (!fs) throw error(500, 'Workspace filesystem unavailable');
     const action = url.searchParams.get('action');
 
     if (action === 'list') {
@@ -165,18 +125,10 @@ export const GET: RequestHandler = async ({ params, url, locals, cookies }) => {
       headers: {
         'Content-Type': contentTypeFor(resolvedPath),
         'Content-Length': buffer.length.toString(),
-        // File content can change at any time (auto-save, OCR pipeline,
-        // manual edit). The previous `public, max-age=3600` cached stale
-        // content in the browser for an hour after a file rewrite, so
-        // the editor kept showing OCR-broken markdown even after disk
-        // updates. `no-store` forces a re-fetch on every read.
         'Cache-Control': 'no-store',
       },
     });
   } catch (e: unknown) {
-    if (e instanceof WorkspaceMismatchError) {
-      return json({ success: false, error: 'WORKSPACE_MISMATCH', message: e.message }, { status: 403 });
-    }
     if (e instanceof WorkspaceScopeError) {
       return json({ success: false, error: 'WORKSPACE_SCOPE_VIOLATION', message: e.message }, { status: 403 });
     }
@@ -189,14 +141,16 @@ export const POST: RequestHandler = async ({ params, url, request, locals, cooki
   try {
     if (!locals.user) throw error(401, 'Unauthorized');
 
-    const tenant = await resolveRequestTenant({ locals, url, cookies });
-
-    const resolvedPath = resolveScopedPath(tenant, params.path);
-
-    const requestContext = buildWorkspaceRequestContext(tenant);
-    const fs = await tenantWorkspace.resolveFilesystem({ requestContext: requestContext as never });
+    const { tenant, requestContext, fs } = await resolveTenantWorkspace({
+      schoolId: locals.user.schoolId ?? 1,
+      userId: locals.user.id ?? 1,
+      staffId: (locals.user as { staffId?: number })?.staffId,
+      designationId: (locals.user as { designationId?: number })?.designationId ?? ALLOWED_DESIGNATIONS.IT,
+      selectedClassCookie: cookies.get('selected-class'),
+    });
     if (!fs) throw error(500, 'Workspace filesystem unavailable');
 
+    const resolvedPath = resolveScopedPath(tenant, params.path);
     const action = url.searchParams.get('action');
 
     if (action === 'rename') {
@@ -241,9 +195,6 @@ export const POST: RequestHandler = async ({ params, url, request, locals, cooki
     await fs.writeFile(resolvedPath, bytes, { recursive: true, overwrite: true });
     return json({ success: true, path: resolvedPath });
   } catch (e: unknown) {
-    if (e instanceof WorkspaceMismatchError) {
-      return json({ success: false, error: 'WORKSPACE_MISMATCH', message: e.message }, { status: 403 });
-    }
     if (e instanceof WorkspaceScopeError) {
       return json({ success: false, error: 'WORKSPACE_SCOPE_VIOLATION', message: e.message }, { status: 403 });
     }
@@ -256,20 +207,19 @@ export const DELETE: RequestHandler = async ({ params, url, locals, cookies }) =
   try {
     if (!locals.user) throw error(401, 'Unauthorized');
 
-    const tenant = await resolveRequestTenant({ locals, url, cookies });
-
-    const resolvedPath = resolveScopedPath(tenant, params.path);
-
-    const requestContext = buildWorkspaceRequestContext(tenant);
-    const fs = await tenantWorkspace.resolveFilesystem({ requestContext: requestContext as never });
+    const { tenant, requestContext, fs } = await resolveTenantWorkspace({
+      schoolId: locals.user.schoolId ?? 1,
+      userId: locals.user.id ?? 1,
+      staffId: (locals.user as { staffId?: number })?.staffId,
+      designationId: (locals.user as { designationId?: number })?.designationId ?? ALLOWED_DESIGNATIONS.IT,
+      selectedClassCookie: cookies.get('selected-class'),
+    });
     if (!fs) throw error(500, 'Workspace filesystem unavailable');
 
+    const resolvedPath = resolveScopedPath(tenant, params.path);
     await fs.deleteFile(resolvedPath);
     return json({ success: true });
   } catch (e: unknown) {
-    if (e instanceof WorkspaceMismatchError) {
-      return json({ success: false, error: 'WORKSPACE_MISMATCH', message: e.message }, { status: 403 });
-    }
     if (e instanceof WorkspaceScopeError) {
       return json({ success: false, error: 'WORKSPACE_SCOPE_VIOLATION', message: e.message }, { status: 403 });
     }
@@ -282,22 +232,21 @@ export const PUT: RequestHandler = async ({ params, request, locals, cookies, ur
   try {
     if (!locals.user) throw error(401, 'Unauthorized');
 
-    const tenant = await resolveRequestTenant({ locals, url, cookies });
-
-    const resolvedPath = resolveScopedPath(tenant, params.path);
-
-    const requestContext = buildWorkspaceRequestContext(tenant);
-    const fs = await tenantWorkspace.resolveFilesystem({ requestContext: requestContext as never });
+    const { tenant, requestContext, fs } = await resolveTenantWorkspace({
+      schoolId: locals.user.schoolId ?? 1,
+      userId: locals.user.id ?? 1,
+      staffId: (locals.user as { staffId?: number })?.staffId,
+      designationId: (locals.user as { designationId?: number })?.designationId ?? ALLOWED_DESIGNATIONS.IT,
+      selectedClassCookie: cookies.get('selected-class'),
+    });
     if (!fs) throw error(500, 'Workspace filesystem unavailable');
 
+    const resolvedPath = resolveScopedPath(tenant, params.path);
     const blob = await request.blob();
     const bytes = new Uint8Array(await blob.arrayBuffer());
     await fs.writeFile(resolvedPath, bytes, { recursive: true, overwrite: true });
     return json({ success: true, path: resolvedPath });
   } catch (e: unknown) {
-    if (e instanceof WorkspaceMismatchError) {
-      return json({ success: false, error: 'WORKSPACE_MISMATCH', message: e.message }, { status: 403 });
-    }
     if (e instanceof WorkspaceScopeError) {
       return json({ success: false, error: 'WORKSPACE_SCOPE_VIOLATION', message: e.message }, { status: 403 });
     }
@@ -306,12 +255,7 @@ export const PUT: RequestHandler = async ({ params, request, locals, cookies, ur
   }
 };
 
-/**
- * Build a `SerializedTenant` snapshot from a `TenantContext`. Used by the
- * batch-OCR endpoints to forward the active tenant into the worker (the
- * worker re-rehydrates the context on the server side).
- */
-function emptySerializedTenant(tenant: ReturnType<typeof createTenantContext>): SerializedTenant {
+function emptySerializedTenant(tenant: ReturnType<typeof import('$lib/server/mastra/tenant-context')['createTenantContext']>): SerializedTenant {
   return {
     schoolId: tenant.schoolId,
     userId: tenant.userId,
@@ -321,5 +265,8 @@ function emptySerializedTenant(tenant: ReturnType<typeof createTenantContext>): 
     sectionId: tenant.sectionId,
     examTypeId: tenant.examTypeId,
     academicId: tenant.academicId,
+    className: tenant.className,
+    sectionName: tenant.sectionName,
+    academicYearTitle: tenant.academicYearTitle,
   };
 }

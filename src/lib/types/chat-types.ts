@@ -85,8 +85,13 @@ export type xDataPart = {
 		phase?: 'start' | 'delta' | 'end';
 		delta: string;
 	};
-  reasoning: {
-    duration: number;
+  /**
+   * Ordered wall-clock seconds per reasoning UI block for one assistant turn.
+   * Written once after the stream lands; pairs by occurrence order with
+   * `type: 'reasoning'` parts on the same message.
+   */
+  reasoningMeta: {
+    durations: number[];
   };
 };
 

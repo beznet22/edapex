@@ -223,6 +223,7 @@
       nonToolParts: m.parts.filter((p) => !p.type.startsWith("tool-")),
     })),
   );
+
 </script>
 
 <div
@@ -311,7 +312,7 @@
         <!-- Add padding bottom so messages don't hide behind floating input -->
         <div class="space-y-6 py-4 mx-auto max-w-3xl px-4 pb-52 sm:pb-56">
           {#each messagesWithToolSplit as message, messageIndex}
-            {@const reasoningStates = chat. (message.parts)}
+            {@const reasoningDurations = chat.buildReasoningDurationMap(message.parts)}
             {@const toolParts = message.toolParts}
             <div class="group relative">
               <Message from={message.role} class="py-0">
@@ -321,11 +322,10 @@
                 >
                   {#each message.parts as part, partIndex}
                     {#if part.type === "reasoning"}
-                      {@const reasoningState = reasoningStates.get(partIndex)}
                       <Reasoning
                         class="w-full mb-2"
-                        isStreaming={reasoningState?.isStreaming ?? false}
-                        duration={reasoningState?.duration ?? 0}
+                        isStreaming={part.state === "streaming"}
+                        duration={reasoningDurations.get(partIndex)}
                       >
                         <ReasoningTrigger />
                         <ReasoningContent>

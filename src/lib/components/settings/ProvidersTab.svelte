@@ -11,7 +11,7 @@
 	import ConnectApiKeyForm from "./ConnectApiKeyForm.svelte";
 	import CustomProviderForm from "./CustomProviderForm.svelte";
 	import { BUILTIN_PROVIDERS } from "$lib/provider/catalog";
-	import type { ProviderInfo, ModelInfo } from "$lib/provider/spec";
+	import type { ProviderInfo } from "$lib/provider/spec";
 	import type { ProviderId } from "$lib/provider/types";
 
 	type ProviderSummary = {
@@ -23,7 +23,6 @@
 		baseUrl: string;
 		credentialType: "credential" | "custom";
 	};
-	type PlatformDefault = { providerId: string; hasEnvKey: boolean };
 	type ModelRow = { id: string; displayName: string };
 	type HeaderRow = { name: string; value: string };
 
@@ -34,7 +33,6 @@
 		showMoreProviders: boolean;
 		connectingProvider: ProviderInfo | null;
 		isCustomFlow: boolean;
-		platformDefaults: PlatformDefault[];
 
 		apiKeyInput: string;
 		isSavingApiKey: boolean;
@@ -69,7 +67,6 @@
 		showMoreProviders,
 		connectingProvider,
 		isCustomFlow,
-		platformDefaults,
 		apiKeyInput = $bindable(),
 		isSavingApiKey,
 		apiKeyError,
@@ -93,18 +90,16 @@
 		onClearError
 	}: Props = $props();
 
+	let userConnectedProviders = $derived(
+		connectedProviders.filter((c) => c.source !== "platform")
+	);
+
 	function badgeForCredential(cred: ProviderSummary): {
 		label: string;
 		classes: string;
 	} {
-		if (cred.credentialKind === "custom") {
+		if (cred.credentialType === "custom") {
 			return { label: "Custom", classes: "bg-primary/20 text-primary" };
-		}
-		if (cred.source === "platform") {
-			return {
-				label: "Platform",
-				classes: "bg-blue-500/20 text-blue-300 border-blue-500/30"
-			};
 		}
 		return { label: "API key", classes: "bg-primary/20 text-primary" };
 	}
@@ -131,7 +126,7 @@
 				</h3>
 				{#if !isLoadingProviders}
 					<span class="text-[10px] font-bold text-muted-foreground/40"
-						>{connectedProviders.length} active</span
+						>{userConnectedProviders.length} active</span
 					>
 				{/if}
 			</div>
@@ -151,7 +146,7 @@
 						</div>
 					{/each}
 				</div>
-			{:else if connectedProviders.length === 0}
+			{:else if userConnectedProviders.length === 0}
 				<div
 					class="p-6 rounded-2xl border border-dashed border-sidebar-border/40 text-center"
 				>
@@ -162,7 +157,7 @@
 				</div>
 			{:else}
 				<div class="space-y-2">
-					{#each connectedProviders as cred (cred.provider)}
+					{#each userConnectedProviders as cred (cred.provider)}
 						{@const badge = badgeForCredential(cred)}
 						{@const info = BUILTIN_PROVIDERS[cred.provider as ProviderId]}
 						<ProviderCard
@@ -175,8 +170,7 @@
 							onConnect={() => onDisconnect(cred)}
 							connectLabel="Disconnect"
 							connectVariant="ghost"
-							connectDisabled={removingProviderId === cred.provider ||
-								cred.source === "platform"}
+							connectDisabled={removingProviderId === cred.provider}
 						>
 							{#snippet connectContent()}
 								{#if removingProviderId === cred.provider}
@@ -188,35 +182,6 @@
 				</div>
 			{/if}
 		</section>
-
-		{#if connectedProviders.length === 0 && platformDefaults.length > 0}
-			<section class="space-y-3">
-				<div class="flex items-center justify-between">
-					<h3
-						class="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60 ml-1"
-					>
-						Platform Defaults
-					</h3>
-					<span class="text-[10px] font-bold text-muted-foreground/40"
-						>{platformDefaults.length} available</span
-					>
-				</div>
-				<div class="space-y-2">
-					{#each platformDefaults as pd (pd.providerId)}
-						{@const info = BUILTIN_PROVIDERS[pd.providerId as ProviderId]}
-						<ProviderCard
-							providerId={pd.providerId}
-							providerName={info?.name ?? pd.providerId}
-							logoAlt={info?.name ?? pd.providerId}
-							containerClass="bg-blue-500/5 border border-blue-500/20"
-							badge={{ label: "Platform", classes: "bg-blue-500/20 text-blue-300 border-blue-500/30 text-[9px] font-black px-1.5 py-0 rounded-md" }}
-							meta="Provided by the platform — auto-disconnects when you connect your own key"
-							metaClass="text-[10px] text-muted-foreground/60"
-						/>
-					{/each}
-				</div>
-			</section>
-		{/if}
 
 		<section class="space-y-3" in:slideIn out:slideOut>
 			<h3

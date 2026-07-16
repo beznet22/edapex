@@ -1,11 +1,10 @@
 import { describe, expect, it, beforeEach } from "vitest";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { getAppDb } from "$lib/server/mastra/storage/libsql/app-db";
 import {
-	adminModelOverrides,
-	potluckConfig,
-	potluckDonations,
-	userCredentials
+	encryptedCredentials,
+	providerAccessPolicy,
+	potluckConfig
 } from "$lib/server/mastra/storage/libsql/app-db.schema";
 import {
 	AllTiersFailedError,
@@ -17,46 +16,57 @@ import {
 	upsertDonation
 } from "$lib/server/mastra/provider/potluck";
 import { disableModelOrProvider } from "$lib/server/mastra/provider/admin-model-overrides";
-import { encrypt } from "$lib/server/mastra/provider/crypto";
 
-// Per-test school IDs to keep tests isolated (and avoid colliding with any
-// other test fixture or production data).
-const SCHOOL_A = 99992; // tier 1 test
-const SCHOOL_B = 99991; // tier 2 test
-const SCHOOL_C = 99990; // tier 3 test
-const SCHOOL_D = 99989; // tier 4 test
+const SCHOOL_A = 99992;
+const SCHOOL_B = 99991;
+const SCHOOL_C = 99990;
+const SCHOOL_D = 99989;
 const USER_ID = 99002;
 const ENCRYPTION_KEY = "edapex-default-encryption-key-32ch";
 
 async function cleanupSchool(schoolId: number): Promise<void> {
 	const db = getAppDb();
-	await db.delete(userCredentials).where(eq(userCredentials.userId, USER_ID));
-	await db.delete(adminModelOverrides).where(eq(adminModelOverrides.schoolId, schoolId));
+	await db
+		.delete(encryptedCredentials)
+		.where(and(eq(encryptedCredentials.scope, "user"), eq(encryptedCredentials.userId, USER_ID)));
+	await db.delete(providerAccessPolicy).where(eq(providerAccessPolicy.schoolId, schoolId));
 	await db.delete(potluckConfig).where(eq(potluckConfig.schoolId, schoolId));
-	await db.delete(potluckDonations).where(eq(potluckDonations.schoolId, schoolId));
+	await db
+		.delete(encryptedCredentials)
+		.where(
+			and(
+				eq(encryptedCredentials.scope, "school"),
+				eq(encryptedCredentials.credentialKind, "donation"),
+				eq(encryptedCredentials.schoolId, schoolId)
+			)
+		);
 }
 
 async function seedPersonalCredential(): Promise<void> {
 	const db = getAppDb();
-	await db.insert(userCredentials).values({
+	await db.insert(encryptedCredentials).values({
+		scope: "user",
+		credentialKind: "personal",
 		userId: USER_ID,
+		schoolId: null,
 		providerId: "groq",
-		credentialType: "credential",
-		encryptedData: encrypt(
-			JSON.stringify({ apiKey: "personal-test-key-12345" }),
-			ENCRYPTION_KEY
-		),
+		encryptedData: JSON.stringify({ apiKey: "personal-test-key-12345" }),
+		priority: 1,
 		enabled: 1
 	});
 }
 
-async function seedPool(schoolId: number, options: {
-	enabled?: boolean;
-	consumerRoles?: string[];
-	allowedProviders?: string[];
-	perUserDailyTokenCap?: number;
-} = {}): Promise<void> {
+async function seedPool(
+	schoolId: number,
+	options: {
+		enabled?: boolean;
+		consumerRoles?: string[];
+		allowedProviders?: string[];
+		perUserDailyTokenCap?: number;
+	} = {}
+): Promise<void> {
 	const db = getAppDb();
+	const env = { TOKEN_ENCRYPTION_KEY: ENCRYPTION_KEY };
 	await savePotluckConfig(
 		db,
 		schoolId,
@@ -73,10 +83,11 @@ async function seedPool(schoolId: number, options: {
 	);
 	await upsertDonation(
 		db,
+		env,
 		schoolId,
 		"groq",
-		encrypt("pool-test-key-67890", ENCRYPTION_KEY),
-		17, // donor
+		"pool-test-key-67890",
+		17,
 		17,
 		"v1"
 	);
@@ -154,8 +165,6 @@ describe("potluck routing (4-tier router integration)", () => {
 			userRole: "student"
 		});
 
-		// student role not in consumerRoles=["admin"], so pool is skipped with reason role_not_allowed,
-		// platform env fallback serves.
 		expect(resolved.tier).toBe(3);
 		expect(resolved.source).toBe("env");
 		expect(resolved.trace[1]).toMatchObject({
@@ -179,7 +188,7 @@ describe("potluck routing (4-tier router integration)", () => {
 			providerId: "groq",
 			schoolId: SCHOOL_B,
 			userRole: "teacher",
-			todayTokenUsage: 1000 // exactly at cap
+			todayTokenUsage: 1000
 		});
 
 		expect(resolved.tier).toBe(3);
@@ -218,21 +227,27 @@ describe("potluck routing (4-tier router integration)", () => {
 
 	it("(c) no personal, pool exhausted, platform env key present → tier 3 served", async () => {
 		await seedPool(SCHOOL_C);
-		// Deactivate the donation so the pool tier reports no_active_donation
 		const db = getAppDb();
+		const env = { TOKEN_ENCRYPTION_KEY: ENCRYPTION_KEY };
 		const donations = await db
-			.select()
-			.from(potluckDonations)
-			.where(eq(potluckDonations.schoolId, SCHOOL_C));
+			.select({ id: encryptedCredentials.id })
+			.from(encryptedCredentials)
+			.where(
+				and(
+					eq(encryptedCredentials.scope, "school"),
+					eq(encryptedCredentials.credentialKind, "donation"),
+					eq(encryptedCredentials.schoolId, SCHOOL_C)
+				)
+			);
 		for (const d of donations) await deactivateDonation(db, d.id);
 
-		const env: Record<string, string | undefined> = {
+		const requestEnv: Record<string, string | undefined> = {
 			GROQ_API_KEY: "platform-fallback-key"
 		};
 
 		const resolved = await resolveProviderKeyWithTrace({
 			db,
-			env,
+			env: requestEnv,
 			userId: USER_ID,
 			providerId: "groq",
 			schoolId: SCHOOL_C,
@@ -253,7 +268,6 @@ describe("potluck routing (4-tier router integration)", () => {
 	});
 
 	it("(d) all tiers fail → AllTiersFailedError with full tier trace", async () => {
-		// Pool disabled so tier 2 always fails, no env key, no personal cred.
 		const db = getAppDb();
 		await savePotluckConfig(
 			db,
@@ -270,7 +284,7 @@ describe("potluck routing (4-tier router integration)", () => {
 			1
 		);
 
-		const env: Record<string, string | undefined> = {}; // no GROQ_API_KEY
+		const env: Record<string, string | undefined> = {};
 
 		let caught: unknown = null;
 		try {
@@ -304,9 +318,6 @@ describe("potluck routing (4-tier router integration)", () => {
 	});
 
 	it("admin denylist on a SPECIFIC model does not block provider-wide pool serving", async () => {
-		// Sanity: the router checks provider-wide denials on tier 2, but a
-		// model-specific deny shouldn't block the whole provider from serving
-		// other models via the pool.
 		await seedPool(SCHOOL_B);
 		const db = getAppDb();
 		await disableModelOrProvider(
@@ -330,7 +341,6 @@ describe("potluck routing (4-tier router integration)", () => {
 			userRole: "teacher"
 		});
 
-		// Tier 2 should still serve — the disable is model-specific, not provider-wide.
 		expect(resolved.tier).toBe(2);
 		expect(resolved.source).toBe("pool");
 	});

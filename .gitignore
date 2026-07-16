@@ -60,3 +60,6 @@ reference/
 
 # Logo uploads (per-school, populated by PlatformTab logo upload)
 /static/uploads/logos/
+storage/edapex-mastra.db
+storage/edapex-mastra.db-wal
+storage/edapex-mastra.db-shm

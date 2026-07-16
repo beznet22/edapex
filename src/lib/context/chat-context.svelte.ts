@@ -136,6 +136,24 @@ export type InitChat = {
   selectedClass: SelectedClass;
 };
 
+/**
+ * Ordered per-block durations (seconds) for an assistant message.
+ * Reads the single durable `data-reasoningMeta` part written after the stream
+ * lands. Messages without this part (older turns or failed persists) get no
+ * measured duration and fall back to static "Thought for a few seconds" copy.
+ */
+function getReasoningDurations(parts: xUIMessagePart[]): number[] {
+  for (const p of parts) {
+    if (p.type !== 'data-reasoningMeta') continue;
+    const raw = (p as { data?: { durations?: unknown } }).data?.durations;
+    if (!Array.isArray(raw)) continue;
+    return raw.filter(
+      (d): d is number => typeof d === 'number' && Number.isFinite(d) && d >= 0
+    );
+  }
+  return [];
+}
+
 export class ChatContext {
   // Reactive state using Svelte 5 runes
   user = $state<AuthUser | undefined>(undefined);
@@ -186,6 +204,7 @@ export class ChatContext {
   #selectedClass: SelectedClass;
   #inspector: InspectorContext | undefined;
   #autoOpenedToolCallIds = new Set<string>();
+  #streamDocumentPartsReceived = 0;
   // #selectedAgent removed
 
   constructor({ initialMessages, api, chatData, selectedClass }: InitChat) {
@@ -315,6 +334,7 @@ export class ChatContext {
         break;
       case "data-streamDocument":
         const d = (part as { data?: { documentId?: string; phase?: 'start' | 'delta' | 'end'; delta?: string } }).data;
+        this.#streamDocumentPartsReceived++;
         if (!d?.documentId) return;
         if (d.phase !== 'delta' || typeof d.delta !== 'string') return;
         const prev = getDocumentStream(d.documentId);
@@ -381,72 +401,25 @@ export class ChatContext {
   };
 
   /**
-   * Builds a per-reasoning-block state map for an assistant message.
+   * Maps each `reasoning` UI part index → durable duration (seconds).
    *
-   * Each `reasoning` UI part is paired with its matching `data-reasoning`
-   * data part by occurrence order: the Nth `reasoning` part pairs with
-   * the data part whose id is `${runId}-reasoning-${N}`. The pairing is
-   * positional because the rendered reasoning UI part does not expose
-   * the provider-assigned `chunk.payload.id`. The server
-   * (`assistantStep`) emits the data parts with the same counter, so
-   * emissions and lookups stay aligned across resumes.
-   *
-   * Returns a map keyed by the part's index in `message.parts`, so the
-   * template can do `reasoningStates.get(partIndex)` to get that block's
-   * own `isStreaming` and `duration` — no shared state across blocks.
+   * Prefers `data-reasoningMeta.durations` (ordered by occurrence). Falls back
+   * to legacy per-block `data-reasoning` done parts when meta is absent so
+   * older threads still show measured times when they were successfully saved.
    */
-  buildReasoningStateMap = (
-    parts: xUIMessagePart[]
-  ): Map<number, { isStreaming: boolean; duration: number }> => {
-    const map = new Map<number, { isStreaming: boolean; duration: number }>();
+  buildReasoningDurationMap = (parts: xUIMessagePart[]): Map<number, number> => {
+    const map = new Map<number, number>();
+    const durations = getReasoningDurations(parts);
+    if (durations.length === 0) return map;
 
-    let runId: string | null = null;
-    for (const p of parts) {
-      if (p.type === 'data-runInfo') {
-        const data = (p as { data?: { runId?: string } }).data;
-        if (data?.runId) {
-          runId = data.runId;
-          break;
-        }
-      }
-    }
-    if (!runId) {
-      for (const p of parts) {
-        if (p.type === 'data-reasoning') {
-          const id = (p as { id?: string }).id;
-          if (id) {
-            const idx = id.lastIndexOf('-reasoning-');
-            if (idx > 0) {
-              runId = id.slice(0, idx);
-              break;
-            }
-          }
-        }
-      }
-    }
-    if (!runId) return map;
-
-    let reasoningCounter = 0;
+    let i = 0;
     parts.forEach((p, idx) => {
       if (p.type !== 'reasoning') return;
-      reasoningCounter += 1;
-      const targetId = `${runId}-reasoning-${reasoningCounter}`;
-
-      let last: { isStreaming: boolean; duration: number } | null = null;
-      for (const q of parts) {
-        if (q.type === 'data-reasoning' && (q as { id?: string }).id === targetId) {
-          const data = (q as { data?: { state?: string; duration?: number } }).data;
-          if (data) {
-            last = {
-              isStreaming: data.state === 'streaming',
-              duration: typeof data.duration === 'number' ? data.duration : 0
-            };
-          }
-        }
+      const d = durations[i++];
+      if (typeof d === 'number' && Number.isFinite(d) && d >= 0) {
+        map.set(idx, d);
       }
-      if (last) map.set(idx, last);
     });
-
     return map;
   };
 

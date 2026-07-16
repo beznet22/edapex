@@ -4,16 +4,14 @@ import { smGeneralSettings, smStudents } from "$lib/server/db/sms-schema";
 import { getDatabase } from "$lib/server/db";
 import { createTenantContext } from "$lib/server/mastra/tenant-context";
 import { OcrWorkspaceStore } from "$lib/server/mastra/storage/ocr/ocr-workspace-store";
-import { addEntry as addWorkspaceEntry } from "$lib/server/mastra/storage/workspaces/manifest-store";
-import { uploadPath } from "$lib/server/mastra/storage/workspaces/paths";
+import { addEntry as addWorkspaceEntry, removeEntry as removeWorkspaceEntry, readManifest } from "$lib/server/mastra/storage/workspaces/manifest-store";
+import { uploadPath, ocrMarkdownPath, ocrMetaPath, marksheetJsonPath, marksheetMarkdownPath, marksheetPdfPath, transcriptJsonPath, transcriptMarkdownPath, transcriptPdfPath } from "$lib/server/mastra/storage/workspaces/paths";
 import { resolveTenantFilesystem } from "$lib/server/mastra/storage/workspaces/resolve-tenant-filesystem";
+import { resolveTenantWorkspace } from "$lib/server/workspace/scope";
 import { mistralOcrService } from "$lib/server/service/mistral-ocr.service";
-import { ocrMarkdownPath, ocrMetaPath } from "$lib/server/mastra/storage/workspaces/paths";
-import { ResultsRepository, BaseRepository } from "$lib/server/repository";
+import { ResultsRepository } from "$lib/server/repository";
 import { ScopedRepositoryProvider } from "$lib/server/mastra/scoped-repository";
-import { createTenantFileStorage } from "$lib/server/mastra/storage/tenant-file-storage";
 import { buildWorkspaceRequestContext, resolveWorkspaceContext } from "$lib/server/helpers/chat-helper";
-import { ALLOWED_DESIGNATIONS } from "$lib/types/sms-types";
 import { log } from "$lib/server/audit-log";
 import type { RequestHandler } from "@sveltejs/kit";
 import { error, json } from "@sveltejs/kit";
@@ -331,74 +329,106 @@ export const POST: RequestHandler = async ({ request, locals, cookies }) => {
   });
 };
 
-export const DELETE: RequestHandler = async ({ url, locals }) => {
+export const DELETE: RequestHandler = async ({ url, locals, cookies }) => {
   const { session, user } = locals;
   if (!user || !session) error(401, "Unauthorized");
 
   const clearAll = url.searchParams.get("clear") === "all";
   const filename = url.searchParams.get("filename");
-  const fileId = url.searchParams.get("fileId");
+  const documentId = url.searchParams.get("documentId");
 
-  const targetPath = fileId || filename;
-  if (!targetPath) return json({ success: false, message: "No filename or fileId provided" });
+  if (!clearAll && !filename && !documentId) {
+    return json({ success: false, message: "No filename or documentId provided" });
+  }
 
-  // Resolve active academic year so the workspace lookup lands on the
-  // canonical AY<a>-<slug>/... path instead of AY0-0.
-  const deleteDb = await getDatabase();
-  const deleteBaseRepo = await BaseRepository.build(deleteDb);
-  const deleteActiveYear = await deleteBaseRepo.getActiveAcademicYear().catch(() => null);
-
-  const deleteTenant = createTenantContext({
+  // Use the central workspace resolver for correct human-readable paths
+  const { tenant, fs } = await resolveTenantWorkspace({
     schoolId: user.schoolId ?? 1,
     userId: user.id,
-    staffId: user.staffId ?? 1,
-    academicId: deleteActiveYear?.id ?? null,
-    academicYearTitle: deleteActiveYear?.title ?? null,
+    staffId: (user as { staffId?: number }).staffId,
+    designationId: (user as { designationId?: number }).designationId,
+    selectedClassCookie: cookies.get("selected-class"),
   });
-  const deleteFileStorage = await createTenantFileStorage(deleteTenant);
-  const deleteProvider = new ScopedRepositoryProvider(deleteDb, deleteTenant);
-  void deleteProvider;
+  if (!fs) throw error(500, "Workspace filesystem unavailable");
 
   if (clearAll) {
-    await deleteFileStorage.clearAll();
-    return json({ success: true });
-  }
-
-  const studentFolder = (targetPath.includes('/') ? targetPath.split('/').pop() : targetPath.split('.')[0]) || targetPath;
-  const normalizedFolder = deleteFileStorage.formatName(studentFolder);
-
-  try {
-    const assessmentData = await deleteFileStorage.load(normalizedFolder);
-
-    if (assessmentData?.data?.studentData) {
-      const { studentId, classId, sectionId, recordId, examTypeId } = assessmentData.data.studentData;
-      if (studentId && classId && sectionId && recordId && examTypeId) {
-        const schoolId = assessmentData.data.studentData.schoolId || 1;
-        const cleanupTenant = createTenantContext({
-          schoolId,
-          userId: user.id,
-          staffId: user.staffId ?? 1,
-          classId,
-          sectionId,
-          academicId: deleteActiveYear?.id ?? null,
-          academicYearTitle: deleteActiveYear?.title ?? null,
-        });
-        const cleanupProvider = new ScopedRepositoryProvider(await getDatabase(), cleanupTenant);
-        await cleanupProvider.getRepo(ResultsRepository).cleanMarks({
-          recordId,
-          studentId,
-          classId,
-          sectionId,
-          examTermId: examTypeId,
-          schoolId,
-        });
+    // Remove all exam-scoped directories and their contents
+    for (const dir of ["exams", "uploads", "ocr", "marksheets", "pdfs", "scratch", "notes", "shared"]) {
+      try {
+        await fs.rmdir(dir, { recursive: true });
+      } catch {
+        // directory may not exist — ignore
       }
     }
-
-    await deleteFileStorage.deleteStudentFolder(normalizedFolder);
     return json({ success: true });
-  } catch (e) {
-    console.error("Deletion error:", e);
-    return json({ success: false, message: e instanceof Error ? e.message : "Internal deletion error" });
   }
+
+  // For individual file delete, determine the filename from the manifest
+  // (via documentId lookup) or use the provided filename directly.
+  let targetFilename = filename;
+  if (!targetFilename && documentId) {
+    const manifest = await readManifest(tenant);
+    for (const [relPath, entry] of Object.entries(manifest.entries)) {
+      if (entry.documentId === documentId) {
+        targetFilename = entry.fileName ?? null;
+        break;
+      }
+    }
+    if (!targetFilename) {
+      return json({ success: false, message: "File not found in manifest" });
+    }
+  }
+  if (!targetFilename) {
+    return json({ success: false, message: "Could not determine filename to delete" });
+  }
+
+  // Build the set of paths to delete: upload, OCR markdown, OCR meta
+  const pathsToDelete: string[] = [uploadPath(targetFilename), ocrMarkdownPath(targetFilename), ocrMetaPath(targetFilename)];
+
+  // Also clean up marksheets and transcripts for this file (scan manifest for entries matching the filename)
+  const manifest = await readManifest(tenant);
+  for (const [relPath, entry] of Object.entries(manifest.entries)) {
+    if (entry.fileName === targetFilename && entry.kind === "user-file") {
+      if (entry.studentId !== undefined) {
+        pathsToDelete.push(marksheetJsonPath(entry.studentId));
+        pathsToDelete.push(marksheetMarkdownPath({ studentId: entry.studentId }));
+        pathsToDelete.push(marksheetPdfPath(entry.studentId));
+        pathsToDelete.push(transcriptJsonPath(entry.studentId));
+        pathsToDelete.push(transcriptMarkdownPath(entry.studentId));
+        pathsToDelete.push(transcriptPdfPath(entry.studentId));
+      }
+      if (entry.recordId !== undefined && entry.studentId !== undefined && entry.examTypeId !== undefined) {
+        try {
+          const cleanupProvider = new ScopedRepositoryProvider(await getDatabase(), tenant);
+          await cleanupProvider.getRepo(ResultsRepository).cleanMarks({
+            recordId: entry.recordId,
+            studentId: entry.studentId,
+            classId: tenant.classId ?? 0,
+            sectionId: tenant.sectionId ?? 0,
+            examTermId: entry.examTypeId,
+            schoolId: tenant.schoolId,
+          });
+        } catch (e) {
+          console.error("[uploads] Failed to clean marks:", e);
+        }
+      }
+    }
+  }
+
+  let deleted = 0;
+  for (const p of pathsToDelete) {
+    try {
+      await fs.deleteFile(p);
+      deleted++;
+    } catch {
+      // file may not exist — ignore
+    }
+    try {
+      await removeWorkspaceEntry(tenant, p);
+    } catch {
+      // ignore
+    }
+  }
+
+  return json({ success: true, deleted });
 };

@@ -1,6 +1,5 @@
 # Dependencies
 node_modules
-bun.lock
 
 # Environment variables
 .env
@@ -67,6 +66,4 @@ temp
 # Large directories that should be volumes
 static/public/uploads
 
-# Bun specific
-.bun
-!.bun/install/cache
+# Lockfiles (pnpm-lock.yaml is NOT excluded — required for reproducible builds)

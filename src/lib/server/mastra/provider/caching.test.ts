@@ -9,17 +9,19 @@ import {
 import * as credentials from './credentials';
 import * as visibility from './visibility';
 import * as potluck from './potluck';
-import type { UserCredential, PotluckConfig } from '$lib/server/mastra/storage/libsql/app-db.schema';
+import type { EncryptedCredential, PotluckConfig } from '$lib/server/mastra/storage/libsql/app-db.schema';
 import type { ModelId, ProviderId } from './types';
 
 const fakeDb = {} as LibSQLDatabase<any>;
 const env = {} as Record<string, string | undefined>;
 
-const sampleCredential: UserCredential = {
+const sampleCredential: EncryptedCredential = {
 	id: 'cred-1',
+	scope: 'user',
+	credentialKind: 'personal',
 	userId: 42,
+	schoolId: null,
 	providerId: 'groq',
-	credentialType: 'credential',
 	encryptedData: 'encrypted',
 	priority: 1,
 	enabled: 1,
@@ -87,9 +89,11 @@ describe('per-request caching layer', () => {
 	});
 
 	it('does not share cache across different keys', async () => {
-		const spy = vi.spyOn(credentials, 'getUserCredential').mockImplementation(async (_db, _env, userId, providerId) => {
-			return { ...sampleCredential, userId, providerId } as UserCredential;
-		});
+		const spy = vi.spyOn(credentials, 'getUserCredential').mockImplementation(
+			async (_db, _env, userId, providerId) => {
+				return { ...sampleCredential, userId, providerId } as EncryptedCredential;
+			}
+		);
 		await runWithCache(async () => {
 			await getCachedUserCredential(fakeDb, env, 1, 'groq' as ProviderId);
 			await getCachedUserCredential(fakeDb, env, 2, 'groq' as ProviderId);

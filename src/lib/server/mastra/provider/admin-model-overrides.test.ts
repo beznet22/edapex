@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { getAppDb } from '$lib/server/mastra/storage/libsql/app-db';
-import { adminModelOverrides } from '$lib/server/mastra/storage/libsql/app-db.schema';
+import { providerAccessPolicy } from '$lib/server/mastra/storage/libsql/app-db.schema';
 import {
 	listAdminOverrides,
 	disableModelOrProvider,
@@ -14,7 +14,9 @@ const ADMIN_ID = 98401;
 
 async function cleanup(): Promise<void> {
 	const db = getAppDb();
-	await db.delete(adminModelOverrides).where(eq(adminModelOverrides.schoolId, SCHOOL_ID));
+	await db
+		.delete(providerAccessPolicy)
+		.where(eq(providerAccessPolicy.schoolId, SCHOOL_ID));
 }
 
 describe('admin-model-overrides', () => {

@@ -1,8 +1,8 @@
 /**
  * Zod schemas + z.infer types for the chat workflow.
  *
- * Extracted from `workflows/chat.ts` so individual step files can import
- * only the contracts they need without re-defining the full envelope.
+ * Centralised here so individual step files can import only the contracts
+ * they need without re-defining the full envelope.
  *
  * Public exports:
  *   - `chatWorkflowInputSchema`  — what `/api/chat` POSTs into `handleWorkflowStream`

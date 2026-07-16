@@ -2,17 +2,17 @@
  * Assessment OCR Service — EdApex
  *
  * Owns the per-request OCR extraction pipeline that turns uploaded mark sheets
- * into a structured `ExtractedAssessment` shell ready for the result-mapper
- * agent (Slice 12) to finish mapping to a `ResultInput`.
+ * into a structured extraction result ready for the result-mapper agent to
+ * finish mapping to a `ResultInput`.
  *
  * Pipeline (per file):
  *  1. Look up class/section names for storage path resolution
  *  2. Call `MistralOcrService.processDocument` to OCR the file
- *  3. Persist OCR markdown via `TenantFileStorage` (per-tenant workspace)
- *  4. Build a partially-populated `ExtractedAssessment` shell. The
- *     full markdown → structured mapping requires the result-mapper agent;
- *     until then this method returns the OCR text + populated studentData
- *     shell so the UI can render the review form.
+ *  3. Persist OCR markdown to the workspace at `exams/examType-{id}/ocr/<filename>.md`
+ *  4. Build a partially-populated extraction result. The full markdown →
+ *     structured mapping requires the result-mapper agent; until then this
+ *     method returns the OCR text + populated studentData shell so the UI can
+ *     render the review form.
  *
  * The pipeline is invoked from:
  *  - `routes/api/uploads/+server.ts` (file drop)
@@ -25,10 +25,13 @@
 import { ScopedRepositoryProvider } from "$lib/server/mastra/scoped-repository";
 import type { TenantContext } from "$lib/server/mastra/tenant-context";
 import { ResultsRepository, StudentRepository } from "$lib/server/repository";
-import { createTenantFileStorage, TenantFileStorage } from "$lib/server/mastra/storage/tenant-file-storage";
 import { mistralOcrService } from "./mistral-ocr.service";
 import type { Category } from "$lib/schema/marksheet";
 import { GRADE_RANGES } from "$lib/server/service/assessment.service";
+import { resolveTenantFilesystem } from "$lib/server/mastra/storage/workspaces/resolve-tenant-filesystem";
+import { buildWorkspaceRequestContext } from "$lib/server/helpers/chat-helper";
+import { ocrMarkdownPath } from "$lib/server/mastra/storage/workspaces/paths";
+import { addEntry } from "$lib/server/mastra/storage/workspaces/manifest-store";
 
 export interface ExtractionResult {
   success: boolean;
@@ -46,11 +49,11 @@ export interface ExtractionResult {
 
 export class AssessmentOcrService {
   private readonly provider: ScopedRepositoryProvider;
-  private readonly fileStorage: TenantFileStorage;
+  private readonly tenant: TenantContext;
 
-  constructor(provider: ScopedRepositoryProvider, fileStorage: TenantFileStorage) {
+  constructor(provider: ScopedRepositoryProvider, tenant: TenantContext) {
     this.provider = provider;
-    this.fileStorage = fileStorage;
+    this.tenant = tenant;
   }
 
   private result() {
@@ -62,9 +65,9 @@ export class AssessmentOcrService {
   }
 
   /**
-   * Run Mistral OCR on a single file and persist an `ExtractedAssessment`
-   * shell to the tenant's `extracted/<studentName>/` folder. Returns null
-   * when OCR produces no text (caller should treat as a hard failure).
+   * Run Mistral OCR on a single file and persist OCR markdown + upload to
+   * the tenant workspace at `ocr/<filename>.md` and `uploads/<filename>`.
+   * Returns an `ExtractionResult` with the raw text and student data.
    */
   async runExtraction(params: {
     userId: number;
@@ -82,9 +85,6 @@ export class AssessmentOcrService {
     const classSection = await this.result().getClassSectionById(classId, sectionId);
     if (!classSection) throw new Error("Class section not found");
 
-    const identifier = studentId?.toString() || admissionNo?.toString() || fullName || "Unknown";
-    const studentFolder = this.fileStorage.formatName(identifier);
-
     const fileName = originalName || "uploaded";
     const ocrResponse = await mistralOcrService.processDocument(file, fileName);
     const rawText = (ocrResponse as { pages?: Array<{ markdown?: string }> }).pages
@@ -97,7 +97,21 @@ export class AssessmentOcrService {
       return null;
     }
 
-    await this.fileStorage.saveRawText(studentFolder, "ocr.md", rawText);
+    // Persist OCR markdown to the workspace at the canonical path
+    const rc = buildWorkspaceRequestContext(this.tenant);
+    const fs = await resolveTenantFilesystem({ requestContext: rc as never });
+    if (!fs) throw new Error("Tenant workspace filesystem unavailable");
+
+    const ocrPath = ocrMarkdownPath(fileName);
+    await fs.writeFile(ocrPath, rawText, { recursive: true });
+    await addEntry(this.tenant, {
+      path: ocrPath,
+      kind: "ocr-markdown",
+      fileName,
+      uploadedAt: new Date().toISOString(),
+      modifiedAt: new Date().toISOString(),
+      mimeType: "text/markdown",
+    });
 
     const finalClassName = classSection.className || "Unknown";
     const finalSectionName = classSection.sectionName || "Unknown";
@@ -115,16 +129,7 @@ export class AssessmentOcrService {
       mappingStatus: "pending" as const,
     };
 
-    const storagePath = await this.fileStorage.save(
-      {
-        data: extractedData as any,
-        extractedAt: new Date(),
-        verified: false,
-        status: "extracted",
-        originalName: originalName || "file.json",
-      },
-      Buffer.from(await file.arrayBuffer())
-    );
+    const storagePath = ocrPath;
 
     return {
       success: true,
@@ -137,32 +142,40 @@ export class AssessmentOcrService {
   }
 
   /**
-   * Load the verified `ExtractedAssessment` for a student from the active
-   * tenant workspace. Returns null when the file hasn't been approved or
-   * no record exists for the student.
+   * Load the OCR markdown for a student from the active tenant workspace.
+   * Returns null when no OCR record exists.
    */
-  async getExtractedAssessment(studentId: number, _examId: number) {
+  async getExtractedAssessment(studentId: number, examTypeId: number) {
     const student = await this.student().getStudentById(studentId);
     if (!student) return null;
 
-    const studentFolder = this.fileStorage.formatName(student.fullName || "Unknown");
-    const extracted = await this.fileStorage.load(studentFolder);
-    if (!extracted || !extracted.verified) return null;
+    const rc = buildWorkspaceRequestContext(this.tenant);
+    const fs = await resolveTenantFilesystem({ requestContext: rc as never });
+    if (!fs) return null;
 
-    return {
-      studentId: extracted.data?.studentData?.studentId,
-      examTypeId: extracted.data?.studentData?.examTypeId,
-      marksData: extracted.data?.marksData?.map((m: any) => ({
-        subjectCode: m.subjectCode,
-        marks: m.marks,
-        subjectName: m.subjectName,
-        subjectId: m.subjectId,
-        examTitles: m.examTitles,
-      })),
-      studentData: { ...extracted.data?.studentData },
-      teachersRemark: extracted.data?.teachersRemark,
-      studentRatings: extracted.data?.studentRatings,
-    } as any;
+    // Scan ocr/ directory for any markdown content referencing this student
+    try {
+      const entries = await fs.readdir(".");
+      const ocrEntry = entries.find((e) => e.name.startsWith("ocr/") && e.name.endsWith(".md") && e.type === "file");
+      if (!ocrEntry) return null;
+
+      const rawText = await fs.readFile(ocrEntry.name, { encoding: "utf-8" });
+      const content = typeof rawText === "string" ? rawText : rawText.toString("utf-8");
+
+      return {
+        studentId,
+        examTypeId,
+        marksData: [],
+        studentData: {
+          fullName: student.fullName,
+          className: student.className,
+          sectionName: student.sectionName,
+        },
+        rawText: content,
+      };
+    } catch {
+      return null;
+    }
   }
 }
 
@@ -241,6 +254,5 @@ export async function createAssessmentOcrServiceForRequest(
   const { getDatabase } = await import("$lib/server/db");
   const db = await getDatabase();
   const provider = new ScopedRepositoryProvider(db, tenant);
-  const fileStorage = await createTenantFileStorage(tenant);
-  return new AssessmentOcrService(provider, fileStorage);
+  return new AssessmentOcrService(provider, tenant);
 }

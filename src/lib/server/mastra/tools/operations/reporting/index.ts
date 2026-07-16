@@ -1,6 +1,5 @@
 export { getActiveMarksheetTool } from "./marksheet/get-active-marksheet";
 export { validateMarksheetTool } from "./marksheet/validate-marksheet";
-export { autoFixMarksheetTool } from "./marksheet/auto-fix-marksheet";
 export { commitMarksheetTool } from "./marksheet/commit-marksheet";
 export { streamDocumentTool } from "./marksheet/stream-document";
 export { generateResultPdfTool } from "./generate-result-pdf";
@@ -12,7 +11,6 @@ export { validateTranscriptTool } from "./transcript/validate-transcript";
 
 import { getActiveMarksheetTool } from "./marksheet/get-active-marksheet";
 import { validateMarksheetTool } from "./marksheet/validate-marksheet";
-import { autoFixMarksheetTool } from "./marksheet/auto-fix-marksheet";
 import { commitMarksheetTool } from "./marksheet/commit-marksheet";
 import { streamDocumentTool } from "./marksheet/stream-document";
 import { generateResultPdfTool } from "./generate-result-pdf";
@@ -29,7 +27,6 @@ import { validateTranscriptTool } from "./transcript/validate-transcript";
 export const reportingTools = {
   getActiveMarksheetTool,
   validateMarksheetTool,
-  autoFixMarksheetTool,
   commitMarksheetTool,
   streamDocumentTool,
   generateResultPdfTool,

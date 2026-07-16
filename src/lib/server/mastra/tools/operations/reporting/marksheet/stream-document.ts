@@ -32,14 +32,17 @@
  */
 import { createTool } from '@mastra/core/tools';
 import { z } from 'zod';
+import { appendFileSync } from 'fs';
 import { streamWithAutoRetry, type StreamWriterLike } from '$lib/server/mastra/agent-stream-retry';
-import { readManifest as readWorkspaceManifest, addEntry } from '$lib/server/mastra/storage/workspaces/manifest-store';
+import { readManifest as readWorkspaceManifest, addEntry, updateEntryStatus } from '$lib/server/mastra/storage/workspaces/manifest-store';
 import { ocrMarkdownPath } from '$lib/server/mastra/storage/workspaces/paths';
 import {
   getTenant,
   getWriter,
   resolveFilesystem
 } from '../_shared';
+import { createAssessmentServiceForRequest } from '$lib/server/service/assessment.service';
+import { getClassRoster } from '$lib/server/mastra/agents/skill-instructions';
 
 const streamDocumentInputSchema = z.object({
   contentHash: z.string().describe('The contentHash of the OCR upload (also shown as fileId in the FILE MANIFEST).'),
@@ -137,16 +140,75 @@ export const streamDocumentTool = createTool({
     const studentId = entry.studentId ?? null;
     const artifactId = `artifact-${documentId}`;
 
+    // Fetch subject mapping + roster for context
+    const assessment = await createAssessmentServiceForRequest(tenant);
+    const mapping = await assessment.getMappingData(
+      tenant.staffId,
+      tenant.classId ?? undefined,
+      tenant.sectionId ?? undefined
+    );
+
+    const examTypeTitle = Array.isArray(mapping.examTypes)
+      ? mapping.examTypes[0]?.title
+      : (mapping.examTypes as Record<string, unknown>)?.title ?? '';
+
+    const roster = await getClassRoster({
+      classId: tenant.classId ?? undefined,
+      sectionId: tenant.sectionId ?? undefined,
+      academicId: tenant.academicId ?? undefined,
+    });
+    const rosterLines = roster
+      .map((r) => `  - ${r.name}${r.admissionNo ? ` (Adm#${r.admissionNo})` : ''}`)
+      .join('\n');
+
+    const subjectLines = mapping.subjects
+      .filter((s) => s.id && s.subjectCode)
+      .map((s) => `  - ${s.subjectCode}`)
+      .join('\n');
+
+    const CATEGORY_COLS = `DAYCARE: Subject Code | Learning Outcome
+NURSERY: Subject Code | CA (30) | ORAL (5) | PSYCHO (5) | HW (10) | EXAM (50)
+GRADEK: Subject Code | CA1 (20) | CA2 (20) | HW (2) | REPORT (4) | PSYCHO (4) | EXAM (50)
+LOWERBASIC: Subject Code | MTA (30) | CA (10) | REPORT (10) | EXAM (50)
+MIDDLEBASIC: Subject Code | MTA (30) | CA (10) | REPORT (10) | EXAM (50)`;
+
     const prompt = [
-      `Format the following OCR-extracted academic result for ${fileName} into clean, well-structured markdown.`,
-      `Use the supplied TITLE verbatim in any headings or front-matter you generate: "${title}".`,
-      `The output will be saved to the filename: ${initialMarkdownPath}. Do not alter the extension or basename.`,
-      'Preserve every factual value, subject name, score, and grade from the input.',
-      'Render it as an academic report card that a parent can read at a glance.',
+      'Format this OCR into a strict marksheet markdown.',
+      'Use the context below to fill in the correct values as plain text (no spans).',
       '',
-      '```markdown',
+      '# FullName — ExamTitle',
+      '',
+      '## Student Information (| Field | Details |)',
+      'Full Name, Admission No, Class, Section, Category, Term, Academic Year, Days Open, Days Present, Days Absent',
+      '',
+      '## Academic Performance (single table, subjects as rows)',
+      'Infer category, pick columns:',
+      CATEGORY_COLS,
+      'No Total/Grade rows. DAYCARE must include Learning Outcome column. Use exact Title (Max) format.',
+      '',
+      "## Learner's Rating (| Trait | Rating | 1-5)",
+      'Traits: Adherent and independent, Flexibility and creativity, Meticulous, Neatness, Self-control and interaction, Overall progress.',
+      '',
+      '## Teacher\'s Remark',
+      '> blockquote',
+      '',
+      'No markdown fences, no commentary.',
+      '',
+       '--- CONTEXT ---',
+      `Class: ${tenant.className ?? ''} (id=${tenant.classId ?? ''})`,
+      `Section: ${tenant.sectionName ?? ''} (id=${tenant.sectionId ?? ''})`,
+      `Term: ${examTypeTitle || tenant.examTypeId || ''}`,
+      `Academic Year: ${tenant.academicYearTitle ?? ''}`,
+      '',
+      'STUDENT ROSTER (admissionNo here is AUTHORITATIVE):',
+      rosterLines || '  (no roster available)',
+      'Match the student Full Name from the OCR to this roster, then use the roster admissionNo in the Admission No field — NOT the value from the OCR.',
+      '',
+      'SUBJECT CODES:',
+      subjectLines || '  (no subjects available)',
+      '',
+      '--- OCR INPUT ---',
       ocrMarkdown,
-      '```'
     ].join('\n');
 
     const { mastra } = await import('$lib/server/mastra');
@@ -159,16 +221,19 @@ export const streamDocumentTool = createTool({
       stream: () =>
         documentAgent.stream(prompt, {
           ...(context.abortSignal ? { abortSignal: context.abortSignal } : {}),
-          ...(context.requestContext ? { requestContext: context.requestContext as never } : {})
+          ...(context.requestContext ? { requestContext: context.requestContext as never } : {}),
+          providerOptions: { deepseek: { thinking: 'none' } }
         }),
       abortSignal: context.abortSignal,
       writer: writer ?? { write: async () => {} }
     });
 
     let markdown = '';
+    let chunkCount = 0;
     for await (const chunk of stream.textStream) {
       if (typeof chunk !== 'string' || chunk.length === 0) continue;
       markdown += chunk;
+      chunkCount++;
       await writerWithCustom.custom({
         type: 'data-streamDocument',
         data: {
@@ -179,6 +244,14 @@ export const streamDocumentTool = createTool({
         transient: true
       });
     }
+    console.log('[streamDocument-DIAG]', { documentId, chunkCount, markdownLength: markdown.length });
+    console.log('[streamDocument-DIAG]', { documentId, chunkCount, markdownLength: markdown.length });
+    try {
+      appendFileSync(
+        '/home/beznet/Workspace/edapex/stream-document-diag.log',
+        JSON.stringify({ at: new Date().toISOString(), side: 'emit', documentId, chunkCount, markdownLength: markdown.length }) + '\n'
+      );
+    } catch { /* diagnostics — never block the pipeline */ }
 
     // Write the ORPHAN DRAFT to disk so the file exists for cross-session
     // continuity (clicking ArtifactCard after a refresh must find the
@@ -199,6 +272,7 @@ export const streamDocumentTool = createTool({
       uploadedAt: new Date().toISOString(),
       modifiedAt: new Date().toISOString()
     });
+    await updateEntryStatus(tenant, initialMarkdownPath, 'formatted');
 
     return {
       artifactId,

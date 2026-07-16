@@ -61,6 +61,44 @@ function cacheKey(userId: number, providerId: string): string {
 	return `${userId}:${providerId}`;
 }
 
+/**
+ * Convert `HeadersInit` into a plain record so it can be spread safely.
+ *
+ * The AI SDK (and some fetch implementations) pass `init.headers` as a
+ * `Headers` instance or as `[key, value]` arrays. Spreading those directly
+ * drops values because they are not plain objects. This helper normalises
+ * all common forms into `Record<string, string>`.
+ */
+function headersToRecord(headers?: HeadersInit | undefined): Record<string, string> {
+	if (!headers) return {};
+	if (headers instanceof Headers) {
+		const out: Record<string, string> = {};
+		headers.forEach((value, key) => {
+			out[key] = value;
+		});
+		return out;
+	}
+	if (Array.isArray(headers)) {
+		const out: Record<string, string> = {};
+		for (const [key, value] of headers) {
+			if (typeof key === 'string' && typeof value === 'string') {
+				out[key] = value;
+			}
+		}
+		return out;
+	}
+	if (typeof headers === 'object') {
+		const out: Record<string, string> = {};
+		for (const [key, value] of Object.entries(headers)) {
+			if (typeof value === 'string') {
+				out[key] = value;
+			}
+		}
+		return out;
+	}
+	return {};
+}
+
 function computeResetAt(rl: Partial<RateLimitState>): Date | null {
 	const seconds =
 		rl.retryAfterSeconds ?? parseResetDuration(rl.resetRequests) ?? parseResetDuration(rl.resetTokens);
@@ -142,7 +180,11 @@ export class RateLimit {
 	 *
 	 * When `providerId` and `env` are supplied, the wrapper additionally:
 	 *   - Merges dynamic headers from `HEADER_RESOLVERS[providerId](env)`
-	 *     into every outbound request (init.headers wins per-key).
+	 *     into every outbound request. Dynamic headers win per-key so the
+	 *     provider catalog's static fallback values cannot overwrite
+	 *     per-request values (e.g. `X-Session-Id`, versioned `User-Agent`).
+	 *   - Normalises `init.headers` from `Headers` / array form into a plain
+	 *     object before merging so no header values are dropped.
 	 *   - Runs `sanitizeRequestInit` over the body to coerce tool-message
 	 *     `content` to a string and replace assistant tool-call `content: null`
 	 *     with `''`. Defends against SDK regressions independent of the
@@ -161,7 +203,10 @@ export class RateLimit {
 			if (Object.keys(dynamicHeaders).length > 0) {
 				enrichedInit = {
 					...init,
-					headers: { ...dynamicHeaders, ...(init?.headers as Record<string, string> | undefined) }
+					headers: {
+						...headersToRecord(init?.headers),
+						...dynamicHeaders
+					}
 				};
 			}
 			enrichedInit = sanitizeRequestInit(enrichedInit) ?? enrichedInit;

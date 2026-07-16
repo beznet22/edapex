@@ -246,7 +246,10 @@ export class FilesContext {
 
   deleteFile = async (upload: UploadedData) => {
     const params = new URLSearchParams();
-    params.append("fileId", upload.id);
+    // Use the documentId from the manifest lookup, falling back to the
+    // upload id for backward compatibility with legacy resources.
+    const docId = (upload.data as { documentId?: string } | undefined)?.documentId ?? upload.id;
+    params.append("documentId", docId);
 
     try {
       const resp = await fetch(`/api/uploads?${params.toString()}`, {

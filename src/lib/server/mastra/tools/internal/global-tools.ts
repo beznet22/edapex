@@ -133,7 +133,7 @@ export function validateUrlForSSRF(urlString: string): string | null {
 // ─── Web Search Tool ────────────────────────────────────────────────────────────
 
 export const webSearchTool = createTool({
-	id: 'web-search',
+	id: 'webSearch',
 	description:
 		'Search the academic web for current information to support lesson planning, research, or curriculum alignment. Returns structured results with title, URL, snippet, and source domain. Use for finding educational resources, documentation, or current information.',
 	inputSchema: z.object({
@@ -226,7 +226,7 @@ export const webSearchTool = createTool({
 // ─── Web Fetch Tool ─────────────────────────────────────────────────────────────
 
 export const webFetchTool = createTool({
-	id: 'web-fetch',
+	id: 'webFetch',
 	description:
 		'Open and read content from an external resource referenced in academic research. Returns the page content as markdown or plain text with metadata. Use for reading specific URLs found in search results or provided by users.',
 	inputSchema: z.object({

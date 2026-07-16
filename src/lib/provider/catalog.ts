@@ -177,7 +177,7 @@ export const BUILTIN_MODELS: Record<ModelId, ModelInfo> = {
 		variants: THINKING_VARIANTS,
 		status: 'active',
 		enabled: true,
-		limit: { context: 128_000, output: 16_384 },
+		limit: { context: 1_000_000, output: 1_000_000 },
 		tier: 'speed',
 		cost: { input: 0, output: 0, cache: { read: 0, write: 0 } },
 		description: 'Fast inference with strong reasoning'
@@ -196,7 +196,7 @@ export const BUILTIN_MODELS: Record<ModelId, ModelInfo> = {
 		variants: THINKING_VARIANTS,
 		status: 'active',
 		enabled: true,
-		limit: { context: 128_000, output: 16_384 },
+		limit: { context: 1_000_000, output: 1_000_000 },
 		tier: 'pro',
 		cost: { input: 0, output: 0, cache: { read: 0, write: 0 } },
 		description: 'DeepSeek flagship reasoning model'
@@ -215,7 +215,7 @@ export const BUILTIN_MODELS: Record<ModelId, ModelInfo> = {
 		variants: THINKING_VARIANTS,
 		status: 'active',
 		enabled: true,
-		limit: { context: 128_000, output: 16_384 },
+		limit: { context: 200_000, output: 200_000 },
 		tier: 'mid',
 		cost: { input: 0, output: 0, cache: { read: 0, write: 0 } },
 		description: 'Mimo V2.5 free via OpenCode Zen'
@@ -230,7 +230,7 @@ export const BUILTIN_MODELS: Record<ModelId, ModelInfo> = {
 		variants: THINKING_VARIANTS,
 		status: 'active',
 		enabled: true,
-		limit: { context: 128_000, output: 16_384 },
+		limit: { context: 200_000, output: 200_000 },
 		tier: 'speed',
 		cost: { input: 0, output: 0, cache: { read: 0, write: 0 } },
 		description: 'DeepSeek V4 Flash free via OpenCode Zen'
@@ -244,7 +244,7 @@ export const BUILTIN_MODELS: Record<ModelId, ModelInfo> = {
 		variants: THINKING_VARIANTS,
 		status: 'active',
 		enabled: true,
-		limit: { context: 128_000, output: 16_384 },
+		limit: { context: 200_000, output: 200_000 },
 		tier: 'pro',
 		cost: { input: 0, output: 0, cache: { read: 0, write: 0 } },
 		description: 'NVIDIA Nemotron 3 Super free via OpenCode Zen'
@@ -259,7 +259,7 @@ export const BUILTIN_MODELS: Record<ModelId, ModelInfo> = {
 		variants: THINKING_VARIANTS,
 		status: 'active',
 		enabled: true,
-		limit: { context: 128_000, output: 16_384 },
+		limit: { context: 200_000, output: 200_000 },
 		tier: 'pro',
 		cost: { input: 0, output: 0, cache: { read: 0, write: 0 } },
 		description: 'Ring 2.6 1T free via OpenCode Zen'

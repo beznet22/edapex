@@ -1,13 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { drizzle, type LibSQLDatabase } from 'drizzle-orm/libsql';
-import { createClient, type Client } from '@libsql/client';
-import { eq } from 'drizzle-orm';
-import { userCredentials, type UserCredential } from '$lib/server/mastra/storage/libsql/app-db.schema';
-import {
-	repairCorruptedCredential,
-	saveUserCredential,
-	type RepairCorruptedCredentialInput
-} from './credentials';
+import { and, eq } from 'drizzle-orm';
+import { getAppDb } from '$lib/server/mastra/storage/libsql/app-db';
+import { encryptedCredentials } from '$lib/server/mastra/storage/libsql/app-db.schema';
+import { repairCorruptedCredential } from './credentials';
 import { encrypt as encryptText, decrypt as decryptText } from './crypto';
 import * as auditLog from '$lib/server/audit-log';
 import type { ProviderId } from './types';
@@ -16,77 +11,76 @@ vi.mock('$lib/server/audit-log', () => ({
 	log: vi.fn().mockResolvedValue(undefined)
 }));
 
-const CREATE_USER_CREDENTIALS_SQL = `
-CREATE TABLE IF NOT EXISTS user_credentials (
-	id TEXT PRIMARY KEY,
-	user_id INTEGER NOT NULL,
-	provider_id TEXT NOT NULL,
-	credential_type TEXT NOT NULL,
-	encrypted_data TEXT,
-	priority INTEGER NOT NULL DEFAULT 1,
-	enabled INTEGER NOT NULL DEFAULT 1,
-	created_at TEXT NOT NULL DEFAULT (datetime('now')),
-	updated_at TEXT NOT NULL DEFAULT (datetime('now')),
-	discovered_models TEXT,
-	discovered_at TEXT,
-	UNIQUE(user_id, provider_id)
-);
-`;
-
-function createInMemoryDb(): LibSQLDatabase<any> {
-	const client = createClient({ url: ':memory:' });
-	client.execute(CREATE_USER_CREDENTIALS_SQL);
-	return drizzle(client);
-}
-
+const USER_A = 98600;
+const USER_B = 98601;
+const USER_C = 98602;
+const USER_D = 98603;
+const PROVIDER = 'groq' as ProviderId;
 const CURRENT_KEY = 'current-encryption-key-32chars!!';
 const OLD_KEY = 'old-encryption-key-32chars!!!';
 
-describe('repairCorruptedCredential', () => {
-	let db: LibSQLDatabase<any>;
-	let client: Client;
+async function cleanupUser(userId: number): Promise<void> {
+	const db = getAppDb();
+	await db
+		.delete(encryptedCredentials)
+		.where(and(eq(encryptedCredentials.scope, 'user'), eq(encryptedCredentials.userId, userId)));
+}
 
-	beforeEach(() => {
-		const c = createClient({ url: ':memory:' });
-		c.execute(CREATE_USER_CREDENTIALS_SQL);
-		client = c;
-		db = drizzle(c);
+async function insertCredential(
+	userId: number,
+	providerId: ProviderId,
+	encryptedData: string | null
+): Promise<string> {
+	const db = getAppDb();
+	const rows = await db
+		.insert(encryptedCredentials)
+		.values({
+			scope: 'user',
+			credentialKind: 'personal',
+			userId,
+			schoolId: null,
+			providerId,
+			encryptedData: encryptedData ?? '',
+			enabled: 1
+		})
+		.returning();
+	const row = rows[0];
+	if (!row) throw new Error('Expected insert to return row');
+	return row.id;
+}
+
+describe('repairCorruptedCredential', () => {
+	beforeEach(async () => {
+		await cleanupUser(USER_A);
+		await cleanupUser(USER_B);
+		await cleanupUser(USER_C);
+		await cleanupUser(USER_D);
 	});
 
 	afterEach(async () => {
+		await cleanupUser(USER_A);
+		await cleanupUser(USER_B);
+		await cleanupUser(USER_C);
+		await cleanupUser(USER_D);
 		vi.restoreAllMocks();
-		await client.close();
 	});
 
 	it('re-encrypts a credential that was encrypted with a different key', async () => {
-		const userId = 42;
-		const providerId = 'groq' as ProviderId;
 		const plaintext = JSON.stringify({ apiKey: 'super-secret-key' });
 		const corruptedBlob = encryptText(plaintext, OLD_KEY);
-
-		const inserted = await db
-			.insert(userCredentials)
-			.values({
-				userId,
-				providerId,
-				credentialType: 'credential',
-				encryptedData: corruptedBlob,
-				enabled: 1
-			})
-			.returning();
+		const insertedId = await insertCredential(USER_A, PROVIDER, corruptedBlob);
 
 		const env = { TOKEN_ENCRYPTION_KEY: CURRENT_KEY };
 		const repaired = await repairCorruptedCredential(
-			db,
+			getAppDb(),
 			env,
-			{ userId, providerId, fallbackEncryptionKey: OLD_KEY },
+			{ userId: USER_A, providerId: PROVIDER, fallbackEncryptionKey: OLD_KEY },
 			{ schoolId: 1, actorStaffId: 99 }
 		);
 
-		expect(repaired.id).toBe(inserted[0]?.id);
+		expect(repaired.id).toBe(insertedId);
 		expect(repaired.encryptedData).not.toBe(corruptedBlob);
 
-		// The repaired ciphertext must decrypt with the current key.
 		const decrypted = decryptText(repaired.encryptedData!, CURRENT_KEY);
 		expect(JSON.parse(decrypted).apiKey).toBe('super-secret-key');
 
@@ -99,24 +93,15 @@ describe('repairCorruptedCredential', () => {
 	});
 
 	it('throws when neither current nor fallback key can decrypt the blob', async () => {
-		const userId = 7;
-		const providerId = 'deepseek' as ProviderId;
 		const plaintext = JSON.stringify({ apiKey: 'x' });
 		const blob = encryptText(plaintext, 'yet-another-key-32chars!!');
-
-		await db.insert(userCredentials).values({
-			userId,
-			providerId,
-			credentialType: 'credential',
-			encryptedData: blob,
-			enabled: 1
-		});
+		await insertCredential(USER_B, PROVIDER, blob);
 
 		const env = { TOKEN_ENCRYPTION_KEY: CURRENT_KEY };
 		await expect(
-			repairCorruptedCredential(db, env, {
-				userId,
-				providerId,
+			repairCorruptedCredential(getAppDb(), env, {
+				userId: USER_B,
+				providerId: PROVIDER,
 				fallbackEncryptionKey: OLD_KEY
 			})
 		).rejects.toThrow(/could not be decrypted/);
@@ -125,27 +110,22 @@ describe('repairCorruptedCredential', () => {
 	it('throws when the credential row is missing', async () => {
 		const env = { TOKEN_ENCRYPTION_KEY: CURRENT_KEY };
 		await expect(
-			repairCorruptedCredential(db, env, {
-				userId: 999,
-				providerId: 'groq' as ProviderId
+			repairCorruptedCredential(getAppDb(), env, {
+				userId: 999999,
+				providerId: PROVIDER
 			})
 		).rejects.toThrow(/No credential found/);
 	});
 
 	it('throws when the credential has no encrypted data', async () => {
-		const userId = 8;
-		const providerId = 'groq' as ProviderId;
-		await db.insert(userCredentials).values({
-			userId,
-			providerId,
-			credentialType: 'env',
-			encryptedData: null,
-			enabled: 1
-		});
+		await insertCredential(USER_D, PROVIDER, null);
 
 		const env = { TOKEN_ENCRYPTION_KEY: CURRENT_KEY };
 		await expect(
-			repairCorruptedCredential(db, env, { userId, providerId })
+			repairCorruptedCredential(getAppDb(), env, {
+				userId: USER_D,
+				providerId: PROVIDER
+			})
 		).rejects.toThrow(/no encrypted data to repair/);
 	});
 });

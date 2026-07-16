@@ -1,14 +1,18 @@
 /**
  * Per-user model availability — V3.
  *
- * Returns only models that have been discovered via a provider's `/models`
- * endpoint (no static catalog fallback). Sources:
+ * Returns models that have been discovered via a provider's `/models`
+ * endpoint, falling back to the static catalog (`BUILTIN_MODELS`) when no
+ * discovered or cached models are available so the model selector never
+ * renders empty. Sources:
  * - User-connected credentials: discoveries stored on the credential row.
  * - Platform (env-backed) providers: discoveries cached in
  *   `platform_provider_discoveries`. A provider that is admin-disabled
  *   platform-wide (`admin_model_overrides` with `modelId = null`) is
  *   skipped entirely unless the user has connected their own key, which
  *   overrides the platform decision.
+ * - Static catalog fallback: used only when the above sources produced no
+ *   models at all.
  *
  * Used by the model selector and the SSR auto-pick.
  */
@@ -158,6 +162,19 @@ export async function getAvailableModelsForUser(
 			if (seenIds.has(model.id)) continue;
 			seenIds.add(model.id);
 			result.push({ ...model, source: 'platform' });
+		}
+	}
+
+	// Static catalog fallback: when no user credentials and no env-backed
+	// platform providers produced models, surface the built-in catalog so the
+	// chat model selector remains usable until a provider is connected.
+	if (result.length === 0) {
+		for (const model of Object.values(BUILTIN_MODELS)) {
+			if (hiddenIds.has(model.id)) continue;
+			if (seenIds.has(model.id)) continue;
+			if (isProviderDisabledByAdmin(adminOverrides, model.providerId)) continue;
+			seenIds.add(model.id);
+			result.push({ ...model, source: 'user' });
 		}
 	}
 

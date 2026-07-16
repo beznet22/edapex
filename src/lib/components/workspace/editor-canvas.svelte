@@ -17,6 +17,7 @@
 	import { toast } from "svelte-sonner";
 	import { SelectedClass } from "$lib/context/sync.svelte";
 	import { DESIGNATIONS } from "$lib/types/sms-types";
+	import { parseMarksheetMarkdown, autoFixStructure } from "$lib/utils/marksheet-ast-parser";
 
 	import { usePdfiumEngine } from "@embedpdf/engines/svelte";
 	import { EmbedPDF } from "@embedpdf/core/svelte";
@@ -168,24 +169,13 @@
 	$effect(() => {
 		if (type === "text") {
 			if (streaming) {
-				console.log("[editor-canvas] streaming content update", {
-					ts: performance.now(),
-					contentLength: content?.length,
-				});
 				textContent = content ?? "";
 				editContent = content ?? "";
 			} else if (content) {
-				// Prefer the streamed content prop over a URL fetch. The orphan-draft
-				// file at `url` may not exist yet (auto-save debounce is 2s, and the
-				// file is only written by validate-marksheet after user verification).
-				// Using content avoids spurious 400s on ArtifactCard clicks that
-				// open the panel right after streaming completes.
 				textContent = content;
 				editContent = content;
 				lastSavedContent = content;
 			} else if (url) {
-				// Fall back to URL fetch only when content is unavailable (e.g.,
-				// cross-session re-open where the editor reloads from disk).
 				const targetUrl = url;
 				textContent = "Loading...";
 				editContent = "";
@@ -223,11 +213,10 @@
 		}
 	});
 
+	let parseStatus = $state<"idle" | "ok" | "error">("idle");
+
 	$effect(() => {
 		const md = wysiwygContent;
-		// Normalize both sides so tiptap-markdown's parse/serialize round-trip
-		// (whitespace, CRLF, trailing newline) never triggers a spurious write.
-		// Real user edits still differ after normalization and continue to save.
 		if (!md || normalizeMarkdown(md) === normalizeMarkdown(lastSavedContent)) return;
 		if (streaming) return;
 		if (!artifactId) return;
@@ -240,7 +229,36 @@
 					method: "PUT",
 					body: new Blob([md], { type: "text/markdown" }),
 				});
-				if (res.ok) lastSavedContent = md;
+				if (!res.ok) return;
+				lastSavedContent = md;
+
+				// Parse — auto-fix structural issues if template is corrupted
+				try {
+					const parsed = parseMarksheetMarkdown(md);
+					parseStatus = "ok";
+					const rawJsonUrl = url.replace(/\.md$/, ".raw.json");
+					await fetch(rawJsonUrl, {
+						method: "PUT",
+						body: new Blob([JSON.stringify(parsed, null, 2)], { type: "application/json" }),
+					}).catch(() => {});
+				} catch (parseErr) {
+					// Parser failed — template corrupted. Auto-fix structure.
+					const result = autoFixStructure(md);
+					if (result.fixes.length > 0 && result.fixedMd !== md) {
+						// Replace editor content with fixed version
+						wysiwygContent = result.fixedMd;
+						editContent = result.fixedMd;
+						const rawJsonUrl = url.replace(/\.md$/, ".raw.json");
+						const reparsed = parseMarksheetMarkdown(result.fixedMd);
+						await fetch(rawJsonUrl, {
+							method: "PUT",
+							body: new Blob([JSON.stringify(reparsed, null, 2)], { type: "application/json" }),
+						}).catch(() => {});
+						parseStatus = "ok";
+					} else {
+						parseStatus = "error";
+					}
+				}
 			} catch (err) {
 				const msg = err instanceof Error ? err.message : String(err);
 				console.error("Auto-save failed:", msg);
@@ -359,23 +377,39 @@
 					: textContent}
 			/>
 		{:else if isMarkdownFile && editorMode === "wysiwyg"}
-			<div
-				class="flex-1 min-h-0 overflow-hidden"
-				bind:this={textContainerRef}
-			>
-				{#key url}
-					<WysiwygEditor
-						content={textContent}
-						onUpdate={handleWysiwygUpdate}
-						class="h-full"
-						{designationId}
-						{selectedClassId}
-						{selectedSectionId}
-						{selectedClassName}
-						{selectedSectionName}
-						{editable}
-					/>
-				{/key}
+			<div class="flex-1 min-h-0 overflow-hidden flex flex-col">
+				<div
+					class="flex-1 min-h-0 overflow-hidden"
+					bind:this={textContainerRef}
+				>
+					{#key url}
+						<WysiwygEditor
+							content={textContent}
+							onUpdate={handleWysiwygUpdate}
+							class="h-full"
+							{designationId}
+							{selectedClassId}
+							{selectedSectionId}
+							{selectedClassName}
+							{selectedSectionName}
+							{editable}
+						/>
+					{/key}
+				</div>
+				{#if parseStatus !== "idle"}
+					<div
+						class="h-5 px-3 flex items-center gap-1.5 text-[10px] font-medium border-t {parseStatus === 'ok' ? 'bg-green-50/50' : 'bg-red-50/50'}"
+					>
+						<div
+							class="size-1.5 rounded-full {parseStatus === 'ok' ? 'bg-green-500' : 'bg-red-500'}"
+						></div>
+						<span
+							class={parseStatus === "ok" ? "text-green-700" : "text-red-700"}
+						>
+							{parseStatus === "ok" ? "Template OK" : "Template error — could not auto-fix"}
+						</span>
+					</div>
+				{/if}
 			</div>
 		{:else}
 			<ScrollArea

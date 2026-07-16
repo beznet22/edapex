@@ -1,3 +1,4 @@
+import "dotenv/config";
 import { createTelegramAdapter } from "@chat-adapter/telegram";
 
 export const telegramAdapter = createTelegramAdapter();

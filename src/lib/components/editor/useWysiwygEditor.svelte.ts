@@ -286,10 +286,20 @@ export class WysiwygEditorController {
         editor.commands.setContent(content ?? "");
     }
 
-    /** Generic AI command entry from GenerativeMenuSwitch (improve / shorten / etc.). */
+    /** Generic AI command entry from GenerativeMenuSwitch / AISelector (improve / shorten / continue / generate etc.). */
     handleAiCommand(option: string, text: string): void {
         const editor = this.getEditor();
         if (!editor || this.isAiProcessing || this.aiPromptOpen) return;
+
+        if (option === 'continue') {
+            return this.handleContinueCommand(text, editor);
+        }
+        if (option === 'generate') {
+            if (!text.trim()) return;
+            return this.handleGenerateCommand(text, editor);
+        }
+
+        // Selection-based commands (improve, fix, shorter, longer)
         const { from, to } = editor.state.selection;
         if (from === to) return;
         const selectedText =
@@ -320,6 +330,84 @@ export class WysiwygEditorController {
             `Apply the following instruction to the selected text: ${option}. Return only the resulting text.`;
 
         this.runAiEdit(from, to, selectedText, prompt);
+    }
+
+    private handleContinueCommand(cursorContext: string, editor: Editor): void {
+        const { from } = editor.state.selection;
+        const streamId = crypto.randomUUID();
+        cleanupStaleCacheEntries();
+
+        const storage = editor.storage as { markdown?: { getMarkdown?: () => string } };
+        const markdown = storage.markdown?.getMarkdown?.() ?? editor.getHTML();
+        this.currentCtx = { markdown, selectedText: cursorContext, toolName: "continue" };
+
+        editor
+            .chain()
+            .focus()
+            .insertContentAt(from, {
+                type: "aiStreamBlock",
+                attrs: {
+                    content: "",
+                    status: "streaming",
+                    toolName: "continue",
+                    streamId,
+                },
+            })
+            .run();
+
+        let foundPos: number | null = null;
+        editor.state.doc.descendants((node, pos) => {
+            if (node.type.name === "aiStreamBlock" && foundPos === null) {
+                foundPos = pos;
+            }
+            return foundPos === null;
+        });
+        this.aiStreamNodePos = foundPos;
+        this.accumulatedContent = "";
+        this.lastMessageId = "";
+        this.isAiProcessing = true;
+        this.chatClient.messages = [];
+        this.chatClient.sendMessage({
+            text: "Continue writing naturally from this point. Match the tone and style of the surrounding text.",
+        });
+    }
+
+    private handleGenerateCommand(userPrompt: string, editor: Editor): void {
+        const { from } = editor.state.selection;
+        const streamId = crypto.randomUUID();
+        cleanupStaleCacheEntries();
+
+        const storage = editor.storage as { markdown?: { getMarkdown?: () => string } };
+        const markdown = storage.markdown?.getMarkdown?.() ?? editor.getHTML();
+        this.currentCtx = { markdown, selectedText: "", toolName: "generate" };
+
+        editor
+            .chain()
+            .focus()
+            .insertContentAt(from, {
+                type: "aiStreamBlock",
+                attrs: {
+                    content: "",
+                    status: "streaming",
+                    toolName: "generate",
+                    streamId,
+                },
+            })
+            .run();
+
+        let foundPos: number | null = null;
+        editor.state.doc.descendants((node, pos) => {
+            if (node.type.name === "aiStreamBlock" && foundPos === null) {
+                foundPos = pos;
+            }
+            return foundPos === null;
+        });
+        this.aiStreamNodePos = foundPos;
+        this.accumulatedContent = "";
+        this.lastMessageId = "";
+        this.isAiProcessing = true;
+        this.chatClient.messages = [];
+        this.chatClient.sendMessage({ text: userPrompt });
     }
 
     private runAiEdit(

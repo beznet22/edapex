@@ -1,13 +1,25 @@
 /**
- * Workspace scope guard — EdApex
+ * Workspace scope guard & central tenant workspace resolver — EdApex
  *
- * Validates that a file path is within the active tenant's workspace root
- * before allowing read/write operations. Prevents cross-tenant file access.
+ * Central resolver for all workspace CRUD operations. Every route or tool
+ * that needs to read or write files in a tenant's workspace MUST use
+ * `resolveTenantWorkspace` instead of building the tenant context inline.
+ *
+ * This guarantees:
+ *   1. The correct human-readable workspace path is produced
+ *      (.workspaces/<schoolId>/AY<id>-<year-slug>/<classId>-<slug>_<sectionId>-<slug>/)
+ *      instead of the ID-only fallback that created stale ghost directories.
+ *   2. `className`, `sectionName`, and `academicYearTitle` are always
+ *      populated via `resolveClassNamesByIds()`.
+ *   3. The per-request teacher-assignment verification runs once.
+ *
+ * Resolver output:
+ *   { tenant: TenantContext, requestContext: RequestContext, fs: LocalFilesystem }
  *
  * Workspace root format (see `classDir` in paths.ts for the canonical builder):
  *   <WORKSPACE_ROOT>/<schoolId>/AY<academicId>-<year-slug>/<classId>-<class-slug>_<sectionId>-<section-slug>/
  *
- * Example: /abs/.workspaces/1/AY4-2025-2026/12-c_5-a/ for school 1, AY 4 (year
+ * Example: /abs/.workspaces/1/AY4-2025/2026/12-c_5-a/ for school 1, AY 4 (year
  * "2025/2026"), class 12 (slug "c"), section 5 (slug "a").
  *
  * `buildWorkspaceRoot` delegates to `classDir` so the file API's path
@@ -15,7 +27,12 @@
  * and other write paths.
  */
 import type { TenantContext } from '$lib/server/mastra/tenant-context';
+import { createTenantContext } from '$lib/server/mastra/tenant-context';
 import { classDir } from '$lib/server/mastra/storage/workspaces/paths';
+import { tenantWorkspace } from '$lib/server/mastra/storage/workspaces';
+import { buildWorkspaceRequestContext } from '$lib/server/helpers/chat-helper';
+import { resolveActiveClassScope, resolveClassNamesByIds } from '$lib/server/helpers/class-scope';
+import { ALLOWED_DESIGNATIONS } from '$lib/types/sms-types';
 
 export class WorkspaceScopeError extends Error {
   constructor(message: string = 'WORKSPACE_SCOPE_VIOLATION') {
@@ -31,6 +48,71 @@ export function buildWorkspaceRoot(tenant: TenantContext): string {
     );
   }
   return classDir(tenant);
+}
+
+/**
+ * Central workspace resolver — single source of truth for ALL workspace CRUD.
+ *
+ * Every route/tool that needs workspace access should call this instead of
+ * building the tenant context inline. Automatically resolves the active class
+ * scope (cookie → query param → teacher assignment), display names for
+ * human-readable path slugs, and returns a ready-to-use LocalFilesystem.
+ */
+export async function resolveTenantWorkspace(params: {
+  schoolId: number;
+  userId: number;
+  staffId?: number;
+  designationId?: number;
+  roleId?: number | null;
+  className?: string | null;
+  sectionName?: string | null;
+  selectedClassCookie?: string | null;
+  examTypeId?: number | null;
+  academicId?: number | null;
+}): Promise<{
+  tenant: TenantContext;
+  requestContext: import('@mastra/core/request-context').RequestContext<unknown>;
+  fs: import('@mastra/core/workspace').LocalFilesystem;
+}> {
+  const scope = await resolveActiveClassScope({
+    schoolId: params.schoolId,
+    staffId: params.staffId,
+    className: params.className,
+    sectionName: params.sectionName,
+    selectedClassCookie: params.selectedClassCookie,
+  });
+
+  const displayNames = scope
+    ? await resolveClassNamesByIds({
+        schoolId: params.schoolId,
+        classId: scope.classId,
+        sectionId: scope.sectionId,
+        academicId: scope.academicId,
+      })
+    : { className: null, sectionName: null, academicYearTitle: null };
+
+  const tenant = createTenantContext({
+    schoolId: params.schoolId,
+    userId: params.userId,
+    staffId: params.staffId ?? 1,
+    designationId: params.designationId ?? ALLOWED_DESIGNATIONS.IT,
+    roleId: params.roleId ?? null,
+    classId: scope?.classId ?? null,
+    sectionId: scope?.sectionId ?? null,
+    examId: null,
+    examTypeId: params.examTypeId ?? null,
+    academicId: scope?.academicId ?? null,
+    className: displayNames.className,
+    sectionName: displayNames.sectionName,
+    academicYearTitle: displayNames.academicYearTitle,
+  });
+
+  const requestContext = buildWorkspaceRequestContext(tenant);
+  const fs = await tenantWorkspace.resolveFilesystem({
+    requestContext: requestContext as never,
+  });
+
+  return { tenant, requestContext, fs };
 }
 
 /**

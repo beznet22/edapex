@@ -25,10 +25,77 @@
   let {
     query,
     onSelect,
+    onDismiss,
   }: {
     query: string;
     onSelect: (cmd: string) => void;
+    onDismiss?: () => void;
   } = $props();
+
+  let highlightedIndex = $state(0);
+  let dropdownRef = $state<HTMLDivElement | null>(null);
+
+  $effect(() => {
+    const _ = filtered;
+    highlightedIndex = 0;
+  });
+
+  function handleKeydown(e: KeyboardEvent) {
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault();
+        e.stopPropagation();
+        if (filtered.length > 0) {
+          highlightedIndex = (highlightedIndex + 1) % filtered.length;
+          scrollToHighlighted();
+        }
+        break;
+      case 'ArrowUp':
+        e.preventDefault();
+        e.stopPropagation();
+        if (filtered.length > 0) {
+          highlightedIndex = (highlightedIndex - 1 + filtered.length) % filtered.length;
+          scrollToHighlighted();
+        }
+        break;
+      case 'Enter':
+      case 'Tab':
+        e.preventDefault();
+        e.stopPropagation();
+        if (filtered.length > 0 && highlightedIndex >= 0 && highlightedIndex < filtered.length) {
+          onSelect(filtered[highlightedIndex].id);
+        }
+        break;
+      case 'Escape':
+        e.preventDefault();
+        e.stopPropagation();
+        onDismiss?.();
+        break;
+    }
+  }
+
+  function scrollToHighlighted() {
+    const container = dropdownRef?.querySelector('[data-results]');
+    const item = container?.querySelector(`[data-index="${highlightedIndex}"]`);
+    if (item) {
+      item.scrollIntoView({ block: 'nearest' });
+    }
+  }
+
+  function handleClickOutside(e: MouseEvent) {
+    if (dropdownRef && !dropdownRef.contains(e.target as Node)) {
+      onDismiss?.();
+    }
+  }
+
+  $effect(() => {
+    document.addEventListener('keydown', handleKeydown, true);
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('keydown', handleKeydown, true);
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  });
 
   const commands = $derived.by(() => {
     // Subcommand pickers when user has typed a command prefix
@@ -264,7 +331,10 @@
 </script>
 
 <div
+  bind:this={dropdownRef}
   class="w-full min-w-[320px] bg-popover/90 backdrop-blur-2xl border border-border/10 rounded-xl shadow-2xl p-1 animate-in fade-in slide-in-from-bottom-2 duration-200"
+  role="listbox"
+  aria-label="Command suggestions"
 >
   <div
     class="px-2 py-1.5 text-[10px] font-bold text-muted-foreground/60 uppercase tracking-[0.15em]"
@@ -272,23 +342,36 @@
     Available Commands
   </div>
   <div
+    data-results
     class="flex flex-col gap-0.5 max-h-[270px] overflow-y-auto scrollbar-slick px-0.5"
   >
-    {#each filtered as cmd}
+    {#each filtered as cmd, index}
       <button
-        class="group flex items-center gap-3 w-full p-2 rounded-lg hover:bg-sidebar-accent/50 text-left transition-colors cursor-pointer"
+        data-index={index}
+        class="group flex items-center gap-3 w-full p-2 rounded-lg text-left transition-colors cursor-pointer {highlightedIndex === index
+          ? 'bg-primary/10 border border-primary/20'
+          : 'hover:bg-sidebar-accent/50 border border-transparent'}"
         onclick={() => onSelect(cmd.id)}
+        onmouseenter={() => (highlightedIndex = index)}
+        role="option"
+        aria-selected={highlightedIndex === index}
       >
         <div
-          class="size-8 flex items-center justify-center rounded-md border border-border/10 bg-sidebar-accent/20 group-hover:border-primary/20 group-hover:bg-primary/5 transition-colors"
+          class="size-8 flex items-center justify-center rounded-md border transition-colors {highlightedIndex === index
+            ? 'border-primary/30 bg-primary/10'
+            : 'border-border/10 bg-sidebar-accent/20 group-hover:border-primary/20'}"
         >
           <cmd.icon
-            class="size-4 text-muted-foreground group-hover:text-primary transition-colors"
+            class="size-4 transition-colors {highlightedIndex === index
+              ? 'text-primary'
+              : 'text-muted-foreground group-hover:text-primary'}"
           />
         </div>
         <div class="flex flex-col">
           <span
-            class="text-sm font-medium text-foreground group-hover:text-primary transition-colors"
+            class="text-sm font-medium transition-colors {highlightedIndex === index
+              ? 'text-primary'
+              : 'text-foreground group-hover:text-primary'}"
             >/{cmd.label}</span
           >
           <span class="text-xs text-muted-foreground">{cmd.desc}</span>
@@ -301,4 +384,13 @@
       </div>
     {/if}
   </div>
+
+  {#if filtered.length > 0}
+    <div class="mx-1.5 h-px bg-border/10 mt-0.5"></div>
+    <div class="flex items-center gap-3 px-2 py-1.5 text-[9px] text-muted-foreground/40">
+      <span><kbd class="px-1 py-0.5 rounded bg-sidebar-accent/30 text-muted-foreground/50 font-mono">↑↓</kbd> navigate</span>
+      <span><kbd class="px-1 py-0.5 rounded bg-sidebar-accent/30 text-muted-foreground/50 font-mono">↵</kbd> select</span>
+      <span><kbd class="px-1 py-0.5 rounded bg-sidebar-accent/30 text-muted-foreground/50 font-mono">esc</kbd> dismiss</span>
+    </div>
+  {/if}
 </div>

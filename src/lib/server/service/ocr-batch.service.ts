@@ -49,7 +49,6 @@ export type FinalizeBatchResult = {
   results: Array<{
     key: string;
     status: "success" | "error";
-    extractedKey?: string;
     contentHash?: string;
     mistralFileId?: string;
     error?: string;
@@ -91,6 +90,9 @@ export class OcrBatchService {
       sectionId: tenant.sectionId,
       examTypeId: tenant.examTypeId,
       academicId: tenant.academicId,
+      className: tenant.className,
+      sectionName: tenant.sectionName,
+      academicYearTitle: tenant.academicYearTitle,
     });
   }
 
@@ -260,7 +262,6 @@ export class OcrBatchService {
         results.push({
           key,
           status: "success",
-          extractedKey: `extracted/${persisted.contentHash}.md`,
           contentHash: persisted.contentHash,
           mistralFileId: persisted.mistralFileId,
         });

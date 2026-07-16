@@ -20,6 +20,6 @@ export function createTenantWorkspace(): Workspace {
     name: "Tenant Workspace",
     filesystem: resolveTenantFilesystem,
     bm25: true,
-    autoIndexPaths: ["extracted", "agentic-files", "docs", "exams"],
+    autoIndexPaths: ["agentic-files", "docs", "exams"],
   });
 }

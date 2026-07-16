@@ -265,7 +265,7 @@ async function searchAcademicYear(
 			)
 		: academicYears;
 	return filtered.slice(0, limit).map((y) => {
-		const label = y.year?.trim() || `Year #${y.id}`;
+		const label = y.title?.trim() || `Year #${y.id}`;
 		return {
 			id: y.id,
 			name: label,

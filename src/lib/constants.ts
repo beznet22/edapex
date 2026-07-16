@@ -3,7 +3,6 @@ import { join } from "path";
 
 export const STORAGE_DIR = join(process.cwd(), "storage");
 export const UPLOADS_DIR = join(STORAGE_DIR, "uploads");
-export const EXTRACTED_DIR = join(UPLOADS_DIR, "extracted");
 export const CACHE_DIR = join(STORAGE_DIR, "cache");
 export const STATIC_DIR = join(process.cwd(), "static");
 

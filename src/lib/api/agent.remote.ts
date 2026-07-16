@@ -40,7 +40,7 @@ import { log } from "$lib/server/audit-log";
 
 const envKeys: Record<string, string | undefined> = env;
 
-const credentialTypeSchema = z.enum(['env', 'credential', 'custom']);
+const credentialTypeSchema = z.enum(['credential', 'custom']);
 const providerIdSchema = z.string().min(1).regex(/^[a-z0-9_-]+$/, 'Invalid provider id');
 const modelSchema = z.object({
   id: z.string().min(1),
@@ -231,7 +231,7 @@ export const getUserCredentials = command(
       const providers: ProviderSummary[] = credentials.map(c => {
         const baseUrl = getCustomCredentialBaseUrl(c, envKeys);
         const credentialType: 'credential' | 'custom' =
-          c.credentialType === 'custom' ? 'custom' : 'credential';
+          c.credentialKind === 'custom' ? 'custom' : 'credential';
         return {
           provider: c.providerId,
           name: c.apiKeyMasked,
@@ -281,8 +281,8 @@ export const updateUserCredential = command(
         return { success: false, message: 'Provider not found' };
       }
 
-      const credentialType = isKnownCredentialType(existing.credentialType)
-        ? existing.credentialType
+      const credentialType = isKnownCredentialType(existing.credentialKind)
+        ? existing.credentialKind
         : 'credential';
 
       await saveUserCredentialFn(db, envKeys, {

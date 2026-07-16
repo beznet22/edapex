@@ -13,11 +13,7 @@ import { mastra } from '$lib/server/mastra';
 import { editorCommandRequestSchema } from '$lib/server/mastra/editor/schemas';
 import { handleWorkflowStream } from '@mastra/ai-sdk';
 import { createUIMessageStreamResponse, type UIMessageChunk } from 'ai';
-import { buildWorkspaceRequestContext } from '$lib/server/helpers/chat-helper';
-import {
-	createTenantContext,
-} from '$lib/server/mastra/tenant-context';
-import { ALLOWED_DESIGNATIONS } from "$lib/types/sms-types";
+import { buildWorkspaceRequestContext, resolveWorkspaceContext } from '$lib/server/helpers/chat-helper';
 import type { RequestContext } from '@mastra/core/request-context';
 
 // Hard cap on document markdown sent as backgroundData. The full doc is sent
@@ -31,7 +27,7 @@ function capMarkdown(md: string | undefined): string {
 	return md.slice(0, MAX_MARKDOWN_CHARS) + '\n\n[…document truncated for AI context…]';
 }
 
-export const POST: RequestHandler = async ({ request, locals: { user } }) => {
+export const POST: RequestHandler = async ({ request, locals: { user }, cookies }) => {
 	if (!user) error(401, 'Unauthorized');
 
 	const body = await request.json();
@@ -45,16 +41,12 @@ export const POST: RequestHandler = async ({ request, locals: { user } }) => {
 		parsed.data.ctx.markdown = capMarkdown(parsed.data.ctx.markdown);
 	}
 
-	const tenantContext = createTenantContext({
-		schoolId: user.schoolId ?? 1,
-		userId: user.id,
-		staffId: (user as any).staffId ?? 1,
-		designationId: (user as any).designationId ?? ALLOWED_DESIGNATIONS.IT,
-		roleId: (user as any).roleId ?? null,
-		classId: (user as any).classId ?? null,
-		sectionId: (user as any).sectionId ?? null,
-		examId: null,
-		academicId: (user as any).academicId ?? null,
+	const { tenant: tenantContext } = await resolveWorkspaceContext(cookies, {
+		id: user.id,
+		schoolId: user.schoolId ?? null,
+		staffId: (user as { staffId?: number }).staffId ?? null,
+		designationId: (user as { designationId?: number }).designationId ?? null,
+		roleId: (user as { roleId?: number | null }).roleId ?? null,
 	});
 	const requestContext = buildWorkspaceRequestContext(tenantContext);
 

@@ -358,6 +358,10 @@ export const MentionExtension = baseExtension.configure({
 				//   @year 2025      -> q='2025', category='academic_year' → years matching "2025"
 				//   @term           -> q='', category='exam'            → all exam types
 				//   @term mid       -> q='mid', category='exam'         → exam types matching "mid"
+				//   @class          -> q='', category='class_section'   → all class-section combos
+				//   @class A        -> q='A', category='class_section'  → classes/sections matching "A"
+				//   @adm            -> q='', category='students'        → all students (sorted by adm)
+				//   @adm 123        -> q='123', category='students'     → students whose name or adm# matches "123"
 				//   @anything else  -> q=<original>, no category        → default multi-category search
 				const trimmedQuery = query.trim().toLowerCase();
 				let actualQuery = query;
@@ -376,6 +380,14 @@ export const MentionExtension = baseExtension.configure({
 					actualQuery = trimmedQuery.startsWith('term ')
 						? trimmedQuery.slice('term '.length).trim()
 						: '';
+				} else if (trimmedQuery === 'class' || trimmedQuery.startsWith('class ')) {
+					categoryToSend = 'class_section';
+					actualQuery = trimmedQuery.startsWith('class ')
+						? trimmedQuery.slice('class '.length).trim()
+						: '';
+				} else if (trimmedQuery === 'adm' || trimmedQuery.startsWith('adm')) {
+					categoryToSend = 'students';
+					actualQuery = trimmedQuery === 'adm' ? '' : trimmedQuery.replace(/^adm#?\s*/, '').trim();
 				}
 
 				params.set('q', actualQuery);
@@ -407,6 +419,13 @@ export const MentionExtension = baseExtension.configure({
 			const effectiveRange = charBefore === '@'
 				? { from: Math.max(0, range.from - 1), to: range.to }
 				: range;
+			// Detect @adm trigger by checking the typed text in the range
+			const triggerText = state.doc.textBetween(effectiveRange.from, effectiveRange.to).toLowerCase();
+			const isAdmTrigger = triggerText.startsWith('@adm');
+			const studentLabel = isStudent && mention.admissionNo != null
+				? `ADM#${mention.admissionNo}`
+				: mention.name;
+			const label = isAdmTrigger && isStudent ? studentLabel : mention.name;
 			editor
 				.chain()
 				.focus()
@@ -439,7 +458,7 @@ export const MentionExtension = baseExtension.configure({
 						type: 'mention',
 						attrs: {
 							id: String(mention.id),
-							label: mention.name,
+							label,
 							category: mention.category,
 							// Structured fields for students — embedded in the
 							// markdown as `{{studentName:<fullName>|student:<id>|

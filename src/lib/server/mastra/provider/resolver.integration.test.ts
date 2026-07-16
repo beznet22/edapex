@@ -1,17 +1,15 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { getAppDb } from '$lib/server/mastra/storage/libsql/app-db';
 import {
-	userCredentials,
-	adminModelOverrides,
-	potluckConfig,
-	potluckDonations
+	encryptedCredentials,
+	providerAccessPolicy,
+	potluckConfig
 } from '$lib/server/mastra/storage/libsql/app-db.schema';
 import { resolveModelForRequest, pickDefaultModelId } from './resolver';
 import { saveUserCredential } from './credentials';
 import { savePotluckConfig, upsertDonation } from './potluck';
 import { disableModelOrProvider } from './admin-model-overrides';
-import { encrypt } from './crypto';
 import * as auditLog from '$lib/server/audit-log';
 import { NoCredentialError, ProviderDisabledError } from '$lib/provider/errors';
 import type { ProviderId } from './types';
@@ -25,23 +23,33 @@ vi.mock('$lib/server/audit-log', () => ({
 }));
 
 const ENCRYPTION_KEY = 'edapex-default-encryption-key-32ch';
+const ENV = { TOKEN_ENCRYPTION_KEY: ENCRYPTION_KEY };
 const USER_ID = 98100;
 const ACTOR_ID = 98101;
 const SCHOOL_ID = 98100;
 
 async function cleanup(): Promise<void> {
 	const db = getAppDb();
-	await db.delete(userCredentials).where(eq(userCredentials.userId, USER_ID));
-	await db.delete(adminModelOverrides).where(eq(adminModelOverrides.schoolId, SCHOOL_ID));
+	await db
+		.delete(encryptedCredentials)
+		.where(and(eq(encryptedCredentials.scope, 'user'), eq(encryptedCredentials.userId, USER_ID)));
+	await db.delete(providerAccessPolicy).where(eq(providerAccessPolicy.schoolId, SCHOOL_ID));
 	await db.delete(potluckConfig).where(eq(potluckConfig.schoolId, SCHOOL_ID));
-	await db.delete(potluckDonations).where(eq(potluckDonations.schoolId, SCHOOL_ID));
+	await db
+		.delete(encryptedCredentials)
+		.where(
+			and(
+				eq(encryptedCredentials.scope, 'school'),
+				eq(encryptedCredentials.credentialKind, 'donation'),
+				eq(encryptedCredentials.schoolId, SCHOOL_ID)
+			)
+		);
 }
 
 async function seedPersonalCredential(providerId: ProviderId = 'groq'): Promise<void> {
-	const db = getAppDb();
 	await saveUserCredential(
-		db,
-		{ TOKEN_ENCRYPTION_KEY: ENCRYPTION_KEY },
+		getAppDb(),
+		ENV,
 		{
 			userId: USER_ID,
 			providerId,
@@ -53,9 +61,8 @@ async function seedPersonalCredential(providerId: ProviderId = 'groq'): Promise<
 }
 
 async function seedPool(providerId: ProviderId = 'groq'): Promise<void> {
-	const db = getAppDb();
 	await savePotluckConfig(
-		db,
+		getAppDb(),
 		SCHOOL_ID,
 		{
 			enabled: 1,
@@ -70,10 +77,11 @@ async function seedPool(providerId: ProviderId = 'groq'): Promise<void> {
 		ACTOR_ID
 	);
 	await upsertDonation(
-		db,
+		getAppDb(),
+		ENV,
 		SCHOOL_ID,
 		providerId,
-		encrypt(`pool-${providerId}-key`, ENCRYPTION_KEY),
+		`pool-${providerId}-key`,
 		ACTOR_ID,
 		ACTOR_ID,
 		'v1'
@@ -95,14 +103,13 @@ describe('resolver 4-table integration', () => {
 		await cleanup();
 	});
 
-	it('serves tier 1 from user_credentials when personal credential exists', async () => {
+	it('serves tier 1 from encrypted_credentials when personal credential exists', async () => {
 		await seedPersonalCredential();
-		const db = getAppDb();
 
 		const resolved = await resolveModelForRequest(
 			USER_ID,
 			'groq/llama-3.3-70b-versatile',
-			db,
+			getAppDb(),
 			{ actorStaffId: ACTOR_ID, schoolId: SCHOOL_ID },
 			{ userId: USER_ID, schoolId: SCHOOL_ID, actorStaffId: ACTOR_ID, userRole: 'student' }
 		);
@@ -113,14 +120,13 @@ describe('resolver 4-table integration', () => {
 		expect(resolved.config).toMatchObject({ apiKey: 'personal-groq-key' });
 	});
 
-	it('serves tier 2 from potluck_donations when pool is enabled and no personal credential', async () => {
+	it('serves tier 2 from encrypted_credentials donations when pool is enabled and no personal credential', async () => {
 		await seedPool();
-		const db = getAppDb();
 
 		const resolved = await resolveModelForRequest(
 			USER_ID,
 			'groq/llama-3.3-70b-versatile',
-			db,
+			getAppDb(),
 			{ actorStaffId: ACTOR_ID, schoolId: SCHOOL_ID },
 			{ userId: USER_ID, schoolId: SCHOOL_ID, actorStaffId: ACTOR_ID, userRole: 'student' }
 		);
@@ -132,9 +138,8 @@ describe('resolver 4-table integration', () => {
 
 	it('serves tier 3 from env key when no personal credential and pool unavailable', async () => {
 		process.env.GROQ_API_KEY = 'env-groq-key';
-		const db = getAppDb();
 		await savePotluckConfig(
-			db,
+			getAppDb(),
 			SCHOOL_ID,
 			{
 				enabled: 0,
@@ -151,7 +156,7 @@ describe('resolver 4-table integration', () => {
 		const resolved = await resolveModelForRequest(
 			USER_ID,
 			'groq/llama-3.3-70b-versatile',
-			db,
+			getAppDb(),
 			{ actorStaffId: ACTOR_ID, schoolId: SCHOOL_ID },
 			{ userId: USER_ID, schoolId: SCHOOL_ID, actorStaffId: ACTOR_ID, userRole: 'student' }
 		);
@@ -162,9 +167,8 @@ describe('resolver 4-table integration', () => {
 	});
 
 	it('throws NoCredentialError when all four tiers fail', async () => {
-		const db = getAppDb();
 		await savePotluckConfig(
-			db,
+			getAppDb(),
 			SCHOOL_ID,
 			{
 				enabled: 0,
@@ -182,7 +186,7 @@ describe('resolver 4-table integration', () => {
 			resolveModelForRequest(
 				USER_ID,
 				'groq/llama-3.3-70b-versatile',
-				db,
+				getAppDb(),
 				{ actorStaffId: ACTOR_ID, schoolId: SCHOOL_ID },
 				{ userId: USER_ID, schoolId: SCHOOL_ID, actorStaffId: ACTOR_ID, userRole: 'student' }
 			)
@@ -190,10 +194,9 @@ describe('resolver 4-table integration', () => {
 	});
 
 	it('throws ProviderDisabledError when personal credential is explicitly disabled', async () => {
-		const db = getAppDb();
 		await saveUserCredential(
-			db,
-			{ TOKEN_ENCRYPTION_KEY: ENCRYPTION_KEY },
+			getAppDb(),
+			ENV,
 			{
 				userId: USER_ID,
 				providerId: 'groq',
@@ -207,7 +210,7 @@ describe('resolver 4-table integration', () => {
 			resolveModelForRequest(
 				USER_ID,
 				'groq/llama-3.3-70b-versatile',
-				db,
+				getAppDb(),
 				{ actorStaffId: ACTOR_ID, schoolId: SCHOOL_ID },
 				{ userId: USER_ID, schoolId: SCHOOL_ID, actorStaffId: ACTOR_ID, userRole: 'student' }
 			)
@@ -216,12 +219,11 @@ describe('resolver 4-table integration', () => {
 
 	it('writes audit logs for both resolver and tier-router on success', async () => {
 		await seedPersonalCredential();
-		const db = getAppDb();
 
 		await resolveModelForRequest(
 			USER_ID,
 			'groq/llama-3.3-70b-versatile',
-			db,
+			getAppDb(),
 			{ actorStaffId: ACTOR_ID, schoolId: SCHOOL_ID },
 			{ userId: USER_ID, schoolId: SCHOOL_ID, actorStaffId: ACTOR_ID, userRole: 'student' }
 		);
@@ -247,9 +249,8 @@ describe('resolver 4-table integration', () => {
 	});
 
 	it('writes audit logs when all tiers fail', async () => {
-		const db = getAppDb();
 		await savePotluckConfig(
-			db,
+			getAppDb(),
 			SCHOOL_ID,
 			{
 				enabled: 0,
@@ -267,7 +268,7 @@ describe('resolver 4-table integration', () => {
 			resolveModelForRequest(
 				USER_ID,
 				'groq/llama-3.3-70b-versatile',
-				db,
+				getAppDb(),
 				{ actorStaffId: ACTOR_ID, schoolId: SCHOOL_ID },
 				{ userId: USER_ID, schoolId: SCHOOL_ID, actorStaffId: ACTOR_ID, userRole: 'student' }
 			)
@@ -279,16 +280,15 @@ describe('resolver 4-table integration', () => {
 		expect(keyAccess![0].after).toMatchObject({ tier: 4 });
 	});
 
-	it('applies admin_model_overrides provider-wide deny to skip pool tier', async () => {
+	it('applies provider_access_policy provider-wide deny to skip pool tier', async () => {
 		await seedPool();
 		process.env.GROQ_API_KEY = 'env-groq-key';
-		const db = getAppDb();
-		await disableModelOrProvider(db, SCHOOL_ID, 'groq', null, ACTOR_ID, 'maintenance');
+		await disableModelOrProvider(getAppDb(), SCHOOL_ID, 'groq', null, ACTOR_ID, 'maintenance');
 
 		const resolved = await resolveModelForRequest(
 			USER_ID,
 			'groq/llama-3.3-70b-versatile',
-			db,
+			getAppDb(),
 			{ actorStaffId: ACTOR_ID, schoolId: SCHOOL_ID },
 			{ userId: USER_ID, schoolId: SCHOOL_ID, actorStaffId: ACTOR_ID, userRole: 'student' }
 		);
@@ -299,9 +299,8 @@ describe('resolver 4-table integration', () => {
 
 	it('honors allowed_providers in potluck_config to restrict pool tier', async () => {
 		process.env.GROQ_API_KEY = 'env-groq-key';
-		const db = getAppDb();
 		await savePotluckConfig(
-			db,
+			getAppDb(),
 			SCHOOL_ID,
 			{
 				enabled: 1,
@@ -315,20 +314,12 @@ describe('resolver 4-table integration', () => {
 			},
 			ACTOR_ID
 		);
-		await upsertDonation(
-			db,
-			SCHOOL_ID,
-			'groq',
-			encrypt('pool-groq-key', ENCRYPTION_KEY),
-			ACTOR_ID,
-			ACTOR_ID,
-			'v1'
-		);
+		await upsertDonation(getAppDb(), ENV, SCHOOL_ID, 'groq', 'pool-groq-key', ACTOR_ID, ACTOR_ID, 'v1');
 
 		const resolved = await resolveModelForRequest(
 			USER_ID,
 			'groq/llama-3.3-70b-versatile',
-			db,
+			getAppDb(),
 			{ actorStaffId: ACTOR_ID, schoolId: SCHOOL_ID },
 			{ userId: USER_ID, schoolId: SCHOOL_ID, actorStaffId: ACTOR_ID, userRole: 'student' }
 		);
@@ -339,12 +330,11 @@ describe('resolver 4-table integration', () => {
 
 	it('returns variant options for requested variant suffix', async () => {
 		await seedPersonalCredential();
-		const db = getAppDb();
 
 		const resolved = await resolveModelForRequest(
 			USER_ID,
 			'groq/qwen/qwen3-32b@fast',
-			db,
+			getAppDb(),
 			{ actorStaffId: ACTOR_ID, schoolId: SCHOOL_ID },
 			{ userId: USER_ID, schoolId: SCHOOL_ID, actorStaffId: ACTOR_ID, userRole: 'student' }
 		);
@@ -356,27 +346,24 @@ describe('resolver 4-table integration', () => {
 
 	it('pickDefaultModelId returns the default model when personal credential exists', async () => {
 		await seedPersonalCredential();
-		const db = getAppDb();
 
-		const modelId = await pickDefaultModelId(db, { GROQ_API_KEY: 'env-groq-key' }, USER_ID);
+		const modelId = await pickDefaultModelId(getAppDb(), { GROQ_API_KEY: 'env-groq-key' }, USER_ID);
 		expect(modelId).not.toBeNull();
 		expect(modelId).toContain('groq/');
 	});
 
 	it('pickDefaultModelId returns null when no credentials are available', async () => {
-		const db = getAppDb();
-		const modelId = await pickDefaultModelId(db, {}, USER_ID);
+		const modelId = await pickDefaultModelId(getAppDb(), {}, USER_ID);
 		expect(modelId).toBeNull();
 	});
 
 	it('skips pool tier when no potluck config exists', async () => {
 		process.env.GROQ_API_KEY = 'env-groq-key';
-		const db = getAppDb();
 
 		const resolved = await resolveModelForRequest(
 			USER_ID,
 			'groq/llama-3.3-70b-versatile',
-			db,
+			getAppDb(),
 			{ actorStaffId: ACTOR_ID, schoolId: SCHOOL_ID },
 			{ userId: USER_ID, schoolId: SCHOOL_ID, actorStaffId: ACTOR_ID, userRole: 'student' }
 		);
@@ -387,9 +374,8 @@ describe('resolver 4-table integration', () => {
 
 	it('skips pool tier when user role is not in consumerRoles', async () => {
 		process.env.GROQ_API_KEY = 'env-groq-key';
-		const db = getAppDb();
 		await savePotluckConfig(
-			db,
+			getAppDb(),
 			SCHOOL_ID,
 			{
 				enabled: 1,
@@ -403,20 +389,12 @@ describe('resolver 4-table integration', () => {
 			},
 			ACTOR_ID
 		);
-		await upsertDonation(
-			db,
-			SCHOOL_ID,
-			'groq',
-			encrypt('pool-groq-key', ENCRYPTION_KEY),
-			ACTOR_ID,
-			ACTOR_ID,
-			'v1'
-		);
+		await upsertDonation(getAppDb(), ENV, SCHOOL_ID, 'groq', 'pool-groq-key', ACTOR_ID, ACTOR_ID, 'v1');
 
 		const resolved = await resolveModelForRequest(
 			USER_ID,
 			'groq/llama-3.3-70b-versatile',
-			db,
+			getAppDb(),
 			{ actorStaffId: ACTOR_ID, schoolId: SCHOOL_ID },
 			{ userId: USER_ID, schoolId: SCHOOL_ID, actorStaffId: ACTOR_ID, userRole: 'student' }
 		);
@@ -427,9 +405,8 @@ describe('resolver 4-table integration', () => {
 
 	it('skips pool tier when provider is not in allowedProviders', async () => {
 		process.env.GROQ_API_KEY = 'env-groq-key';
-		const db = getAppDb();
 		await savePotluckConfig(
-			db,
+			getAppDb(),
 			SCHOOL_ID,
 			{
 				enabled: 1,
@@ -443,20 +420,12 @@ describe('resolver 4-table integration', () => {
 			},
 			ACTOR_ID
 		);
-		await upsertDonation(
-			db,
-			SCHOOL_ID,
-			'groq',
-			encrypt('pool-groq-key', ENCRYPTION_KEY),
-			ACTOR_ID,
-			ACTOR_ID,
-			'v1'
-		);
+		await upsertDonation(getAppDb(), ENV, SCHOOL_ID, 'groq', 'pool-groq-key', ACTOR_ID, ACTOR_ID, 'v1');
 
 		const resolved = await resolveModelForRequest(
 			USER_ID,
 			'groq/llama-3.3-70b-versatile',
-			db,
+			getAppDb(),
 			{ actorStaffId: ACTOR_ID, schoolId: SCHOOL_ID },
 			{ userId: USER_ID, schoolId: SCHOOL_ID, actorStaffId: ACTOR_ID, userRole: 'student' }
 		);
@@ -467,9 +436,8 @@ describe('resolver 4-table integration', () => {
 
 	it('skips pool tier when per-user daily token cap is exceeded', async () => {
 		process.env.GROQ_API_KEY = 'env-groq-key';
-		const db = getAppDb();
 		await savePotluckConfig(
-			db,
+			getAppDb(),
 			SCHOOL_ID,
 			{
 				enabled: 1,
@@ -483,20 +451,12 @@ describe('resolver 4-table integration', () => {
 			},
 			ACTOR_ID
 		);
-		await upsertDonation(
-			db,
-			SCHOOL_ID,
-			'groq',
-			encrypt('pool-groq-key', ENCRYPTION_KEY),
-			ACTOR_ID,
-			ACTOR_ID,
-			'v1'
-		);
+		await upsertDonation(getAppDb(), ENV, SCHOOL_ID, 'groq', 'pool-groq-key', ACTOR_ID, ACTOR_ID, 'v1');
 
 		const resolved = await resolveModelForRequest(
 			USER_ID,
 			'groq/llama-3.3-70b-versatile',
-			db,
+			getAppDb(),
 			{ actorStaffId: ACTOR_ID, schoolId: SCHOOL_ID },
 			{
 				userId: USER_ID,
@@ -513,9 +473,8 @@ describe('resolver 4-table integration', () => {
 
 	it('skips pool tier when donation ToS version does not match config', async () => {
 		process.env.GROQ_API_KEY = 'env-groq-key';
-		const db = getAppDb();
 		await savePotluckConfig(
-			db,
+			getAppDb(),
 			SCHOOL_ID,
 			{
 				enabled: 1,
@@ -529,20 +488,12 @@ describe('resolver 4-table integration', () => {
 			},
 			ACTOR_ID
 		);
-		await upsertDonation(
-			db,
-			SCHOOL_ID,
-			'groq',
-			encrypt('pool-groq-key', ENCRYPTION_KEY),
-			ACTOR_ID,
-			ACTOR_ID,
-			'v1'
-		);
+		await upsertDonation(getAppDb(), ENV, SCHOOL_ID, 'groq', 'pool-groq-key', ACTOR_ID, ACTOR_ID, 'v1');
 
 		const resolved = await resolveModelForRequest(
 			USER_ID,
 			'groq/llama-3.3-70b-versatile',
-			db,
+			getAppDb(),
 			{ actorStaffId: ACTOR_ID, schoolId: SCHOOL_ID },
 			{ userId: USER_ID, schoolId: SCHOOL_ID, actorStaffId: ACTOR_ID, userRole: 'student' }
 		);
@@ -553,9 +504,8 @@ describe('resolver 4-table integration', () => {
 
 	it('falls through to env tier when donation decryption fails', async () => {
 		process.env.GROQ_API_KEY = 'env-groq-key';
-		const db = getAppDb();
 		await savePotluckConfig(
-			db,
+			getAppDb(),
 			SCHOOL_ID,
 			{
 				enabled: 1,
@@ -570,7 +520,8 @@ describe('resolver 4-table integration', () => {
 			ACTOR_ID
 		);
 		await upsertDonation(
-			db,
+			getAppDb(),
+			ENV,
 			SCHOOL_ID,
 			'groq',
 			'not-valid-encrypted-data',
@@ -582,7 +533,7 @@ describe('resolver 4-table integration', () => {
 		const resolved = await resolveModelForRequest(
 			USER_ID,
 			'groq/llama-3.3-70b-versatile',
-			db,
+			getAppDb(),
 			{ actorStaffId: ACTOR_ID, schoolId: SCHOOL_ID },
 			{ userId: USER_ID, schoolId: SCHOOL_ID, actorStaffId: ACTOR_ID, userRole: 'student' }
 		);

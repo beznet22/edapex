@@ -5,11 +5,9 @@ import { resultInputSchema } from "$lib/schema/result-input";
 import z from "zod";
 import { createAssessmentServiceForRequest } from "$lib/server/service/assessment.service";
 import { createTenantContext } from "$lib/server/mastra/tenant-context";
-import { createTenantFileStorage } from "$lib/server/mastra/storage/tenant-file-storage";
-import { readdir, stat } from "fs/promises";
-import { join } from "path";
+import { resolveTenantWorkspace } from "$lib/server/workspace/scope";
+import { readManifest } from "$lib/server/mastra/storage/workspaces/manifest-store";
 import type { ChatThread, UploadedData } from "$lib/types/chat-types";
-import { existsSync, rmdirSync } from "fs";
 import { getMemory, mastra } from "$lib/server/mastra";
 import type { StorageThreadType } from "@mastra/core/memory";
 
@@ -219,79 +217,99 @@ export const getResources = query(
     sectionName: z.string().optional(),
   }),
   async ({ className, sectionName }) => {
-    const { user } = getRequestEvent().locals;
+    const event = getRequestEvent();
+    const { user } = event.locals;
+    const cookies = event.cookies;
     if (!user) return { success: true, resources: [] };
 
-    let tenant = createTenantContext({
+    const { tenant, fs } = await resolveTenantWorkspace({
       schoolId: user.schoolId ?? 1,
       userId: user.id,
-      staffId: user.staffId ?? undefined,
+      staffId: (user as { staffId?: number }).staffId,
+      designationId: (user as { designationId?: number }).designationId,
+      selectedClassCookie: cookies.get("selected-class"),
     });
+    if (!fs) return { success: true, resources: [] };
 
-    if (className && sectionName) {
-      const assessment = await createAssessmentServiceForRequest(tenant);
-      const assigned = await assessment.getAssignedClassSection(user.staffId || 1);
-      if (assigned) {
-        tenant = createTenantContext({
-          schoolId: user.schoolId ?? 1,
-          userId: user.id,
-          staffId: user.staffId ?? undefined,
-          classId: assigned.classId,
-          sectionId: assigned.sectionId,
-        });
-      }
-    } else if (user.designation === "class_teacher") {
-      const assessment = await createAssessmentServiceForRequest(tenant);
-      const assigned = await assessment.getAssignedClassSection(user.staffId || 1);
-      if (assigned) {
-        tenant = createTenantContext({
-          schoolId: user.schoolId ?? 1,
-          userId: user.id,
-          staffId: user.staffId ?? undefined,
-          classId: assigned.classId,
-          sectionId: assigned.sectionId,
-        });
-      }
-    }
-
-    const fileStorage = await createTenantFileStorage(tenant);
-    const studentFolders = await fileStorage.listStudentFolders();
-
-    if (studentFolders.length === 0) {
-      return { success: true, resources: [] };
-    }
-
-    const token = `${className ?? ""}(${sectionName ?? ""})`.toLowerCase().replaceAll(" ", "_");
-    const displayToken = token === "()" ? "" : token;
+    const manifest = await readManifest(tenant);
+    const indexedPaths = new Set(Object.keys(manifest.entries));
 
     const resources: UploadedData[] = [];
-    for (const studentFolder of studentFolders) {
-      try {
-        const assessmentData = await fileStorage.load(studentFolder);
-        if (!assessmentData) continue;
+    for (const [relPath, entry] of Object.entries(manifest.entries)) {
+      if (entry.kind !== "user-file" && entry.kind !== "ocr-markdown") continue;
+      const displayName = entry.fileName ?? relPath.split("/").pop() ?? relPath;
+      resources.push({
+        id: entry.documentId ?? relPath,
+        filename: displayName,
+        originalName: displayName,
+        status: "extracted",
+        success: true,
+        type: entry.mimeType ?? "application/octet-stream",
+        url: `/api/file/${relPath}`,
+        data: {
+          studentId: entry.studentId,
+          examId: entry.examTypeId,
+          contentHash: entry.contentHash,
+          fullName: displayName,
+        },
+      });
+    }
 
-        const resourceId = assessmentData.storagePath || studentFolder;
-        resources.push({
-          id: resourceId,
-          filename: assessmentData.data?.studentData?.fullName || assessmentData.originalName || studentFolder,
-          originalName: assessmentData.originalName || studentFolder,
-          token: displayToken,
-          status: assessmentData.status,
-          success: ["extracted", "approved", "published"].includes(assessmentData.status),
-          type: "image/jpeg",
-          url: `/api/file/${resourceId}/image.jpg?token=${displayToken}`,
-          data: {
-            studentId: assessmentData.data?.studentData?.studentId,
-            examId: assessmentData.data?.studentData?.examTypeId,
-            classId: assessmentData.data?.studentData?.classId,
-            sectionId: assessmentData.data?.studentData?.sectionId,
-            fullName: assessmentData.data?.studentData?.fullName,
-          },
-          error: assessmentData.error,
-        });
-      } catch (e) {
-        console.error("Failed to load assessment data for folder:", studentFolder, e);
+    // Fallback: scan the workspace for files in uploads/ and ocr/ that
+    // aren't yet indexed in the manifest (legacy files or files written
+    // by tools that bypass the manifest).
+    const seenPaths = new Set(resources.map((r) => (r.url ?? "").replace("/api/file/", "")));
+    for (const scanDir of ["uploads", "ocr"]) {
+      try {
+        const entries = await fs.readdir(scanDir);
+        for (const entry of entries) {
+          if (entry.type !== "file") continue;
+          const relPath = `${scanDir}/${entry.name}`;
+          if (indexedPaths.has(relPath) || seenPaths.has(relPath)) continue;
+          resources.push({
+            id: relPath,
+            filename: entry.name,
+            originalName: entry.name,
+            status: "uploaded",
+            success: true,
+            type: "application/octet-stream",
+            url: `/api/file/${relPath}`,
+          });
+        }
+      } catch {
+        // directory may not exist — ignore
       }
+    }
+
+    // Also scan exams/*/uploads/ and exams/*/ocr/ for any exam-scoped files
+    try {
+      const exams = await fs.readdir("exams");
+      for (const exam of exams) {
+        if (exam.type !== "directory") continue;
+        for (const subDir of ["uploads", "ocr"]) {
+          try {
+            const subEntries = await fs.readdir(`${exam.name}/${subDir}`);
+            for (const subEntry of subEntries) {
+              if (subEntry.type !== "file") continue;
+              const relPath = `${exam.name}/${subDir}/${subEntry.name}`;
+              if (indexedPaths.has(relPath) || seenPaths.has(relPath)) continue;
+              resources.push({
+                id: relPath,
+                filename: subEntry.name,
+                originalName: subEntry.name,
+                status: "uploaded",
+                success: true,
+                type: "application/octet-stream",
+                url: `/api/file/${relPath}`,
+              });
+            }
+          } catch {
+            // sub-directory may not exist — ignore
+          }
+        }
+      }
+    } catch {
+      // exams directory may not exist — ignore
     }
 
     return { success: true, resources };

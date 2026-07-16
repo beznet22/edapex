@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import fs from "fs/promises";
 import path from "path";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { getAppDb } from "$lib/server/mastra/storage/libsql/app-db";
-import { userCredentials } from "$lib/server/mastra/storage/libsql/app-db.schema";
+import { encryptedCredentials } from "$lib/server/mastra/storage/libsql/app-db.schema";
 import {
 	saveUserCredential,
 	rotateCredential,
@@ -27,7 +27,9 @@ async function removeAuditFile(): Promise<void> {
 
 async function cleanupDb(): Promise<void> {
 	const db = getAppDb();
-	await db.delete(userCredentials).where(eq(userCredentials.userId, USER_ID));
+	await db
+		.delete(encryptedCredentials)
+		.where(and(eq(encryptedCredentials.scope, "user"), eq(encryptedCredentials.userId, USER_ID)));
 }
 
 async function seedCredential(): Promise<void> {
@@ -74,21 +76,23 @@ describe("rotateCredential() round-trip", () => {
 		expect(rotated.encryptedData).not.toBeNull();
 		expect(rotated.encryptedData).not.toBe("");
 
-		// The old key must no longer decrypt the stored blob.
 		const stored = await db
 			.select()
-			.from(userCredentials)
-			.where(eq(userCredentials.userId, USER_ID))
+			.from(encryptedCredentials)
+			.where(
+				and(
+					eq(encryptedCredentials.scope, "user"),
+					eq(encryptedCredentials.userId, USER_ID)
+				)
+			)
 			.limit(1)
 			.then((rows) => rows[0]);
 		expect(stored).toBeDefined();
 		expect(() => decrypt(stored!.encryptedData!, OLD_KEY)).toThrow();
 
-		// The new key must decrypt to the original API key.
 		const decrypted = decrypt(stored!.encryptedData!, NEW_KEY);
 		expect(JSON.parse(decrypted)).toMatchObject({ apiKey: "sk-rotate-me-12345" });
 
-		// Resolving with the new key returns the original key.
 		expect(resolveApiKeyForCredential(stored, { TOKEN_ENCRYPTION_KEY: NEW_KEY }, "groq")).toBe(
 			"sk-rotate-me-12345"
 		);
@@ -110,7 +114,7 @@ describe("rotateCredential() round-trip", () => {
 		);
 
 		const entries = await readRecent(SCHOOL, 50);
-		expect(entries.length).toBe(2); // create from seed + update from rotation
+		expect(entries.length).toBe(2);
 		const rotationEntry = entries.find((e) => e.action === "update");
 		expect(rotationEntry).toBeDefined();
 		expect(rotationEntry!.entityType).toBe("userCredential");

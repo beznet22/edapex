@@ -191,5 +191,8 @@ export function serializeTenant(t: SerializedTenant): SerializedTenant {
     sectionId: t.sectionId,
     examTypeId: t.examTypeId,
     academicId: t.academicId,
+    className: t.className,
+    sectionName: t.sectionName,
+    academicYearTitle: t.academicYearTitle,
   };
 }

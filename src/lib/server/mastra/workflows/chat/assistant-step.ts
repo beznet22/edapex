@@ -1,21 +1,19 @@
 /**
  * Assistant workflow step.
  *
- * Streams the assistant agent's response and emits reasoning lifecycle
- * events to the client. Reasoning events are emitted PER BLOCK (not per
- * step): each run of `reasoning-delta` chunks that share the same
- * `chunk.payload.id` is one block, and a block ends the moment a non-delta
- * chunk arrives. The client pairs these events by occurrence index via
- * `chat.buildReasoningStateMap` (see `chat-context.svelte.ts`), so every
- * `<Reasoning>` instance gets its own `isStreaming` / `duration` and
- * no two blocks share state.
+ * Streams the assistant agent's response. Reasoning UI streaming state comes
+ * from AI SDK `ReasoningUIPart.state` on the client. This step only *measures*
+ * per-block durations (via reasoning-delta id boundaries) and persists them
+ * once after the stream lands as a single `data-reasoningMeta` part so
+ * durations survive page reload.
  *
- * Mastra only emits `reasoning-delta` chunks at runtime — the typed
- * `reasoning-start` / `reasoning-end` chunks are never produced — so
- * block boundaries are detected from id-changes and non-delta transitions.
+ * Mastra typically emits `reasoning-delta` chunks at runtime — typed
+ * `reasoning-start` / `reasoning-end` may be absent — so block boundaries are
+ * detected from payload-id changes and non-delta transitions.
  */
 
 import { createStep, type ChunkType } from '@mastra/core/workflows';
+import type { ToolsetsInput } from '@mastra/core/agent';
 import { z } from 'zod';
 import { chatWorkflowOutputSchema, workflowEnvelopeSchema } from '../../utils/chat-schemas';
 import { writeDataPart } from '../../utils/chat-utils';
@@ -27,89 +25,55 @@ import { streamWithAutoRetry } from '../../agent-stream-retry';
  * contract so downstream code can rely on it.
  */
 const assistantStepInputSchema = workflowEnvelopeSchema.extend({
-	tools: z.record(z.string(), z.unknown())
+	tools: z.custom<ToolsetsInput>()
 });
 
-const REASONING_TICK_MS = 3000;
+interface ReasoningDurationTracker {
+	onChunk: (chunk: ChunkType) => void;
+	close: () => void;
+	getDurations: () => number[];
+}
 
-interface ReasoningTracker {
-	onChunk: (chunk: ChunkType) => Promise<void>;
-	close: () => Promise<void>;
+/** Subset of AI SDK `LanguageModelUsage` fields consumed by the onFinish callback. */
+interface UsageLike {
+	inputTokens?: number;
+	outputTokens?: number;
+	reasoningTokens?: number;
+	cachedInputTokens?: number;
 }
 
 /**
- * Creates a per-reasoning-block tracker. Each invocation owns its own
- * state (current block id, start time, periodic timer) so no globals
- * leak across turns. A no-op when `runId` is undefined (e.g. unit tests).
+ * Measure-only tracker: records wall-clock seconds per reasoning block.
+ * Emits nothing during the stream — the caller flushes durations after
+ * `pipeTo` so memory persistence can attach to the assistant message.
  */
-function createReasoningTracker(
-	runId: string | undefined,
-	writer: Parameters<typeof writeDataPart>[0],
-	memCtx: { threadId: string; resourceId: string }
-): ReasoningTracker {
-	let blockIndex = 0;
+function createReasoningDurationTracker(): ReasoningDurationTracker {
 	let currentBlockId: string | null = null;
 	let currentBlockStart = 0;
-	let timer: ReturnType<typeof setInterval> | null = null;
+	const durations: number[] = [];
 
-	const emit = async (
-		index: number,
-		payload: { state: 'streaming' | 'done'; duration: number },
-		transient: boolean
-	) => {
-		if (!runId) return;
-		await writeDataPart(writer, {
-			data: {
-				type: 'data-reasoning',
-				id: `${runId}-reasoning-${index}`,
-				data: payload
-			},
-			memory: memCtx,
-			transient
-		});
-	};
-
-	const closeCurrentBlock = async () => {
+	const closeOpenBlock = () => {
 		if (currentBlockId === null) return;
-		const index = blockIndex;
-		const startedAt = currentBlockStart;
+		durations.push((Date.now() - currentBlockStart) / 1000);
 		currentBlockId = null;
 		currentBlockStart = 0;
-		if (timer) {
-			clearInterval(timer);
-			timer = null;
-		}
-		await emit(index, { state: 'done', duration: (Date.now() - startedAt) / 1000 }, false);
 	};
 
 	return {
-		onChunk: async (chunk: ChunkType) => {
+		onChunk: (chunk: ChunkType) => {
 			if (chunk.type === 'reasoning-delta') {
-				const payloadId = (chunk.payload as { id?: string } | undefined)?.id ?? null;
-				if (payloadId !== null && currentBlockId !== payloadId) {
-					// New reasoning block: provider id changed or first delta.
-					await closeCurrentBlock();
-					blockIndex += 1;
+				const payloadId = chunk.payload?.id ?? null;
+				if (payloadId !== null && payloadId !== currentBlockId) {
+					closeOpenBlock();
 					currentBlockId = payloadId;
 					currentBlockStart = Date.now();
-					await emit(blockIndex, { state: 'streaming', duration: 0 }, true);
-					// Periodic ticker so long blocks surface "Thinking (Ns)…"
-					// instead of an indeterminate shimmer. Cleared on close.
-					timer = setInterval(async () => {
-						if (currentBlockId !== payloadId) return;
-						await emit(blockIndex, {
-							state: 'streaming',
-							duration: (Date.now() - currentBlockStart) / 1000
-						}, true);
-					}, REASONING_TICK_MS);
 				}
-				// Same block: the ticker (if running) handles duration updates.
 			} else {
-				// Any non-delta chunk closes the currently-open reasoning block.
-				await closeCurrentBlock();
+				closeOpenBlock();
 			}
 		},
-		close: closeCurrentBlock
+		close: closeOpenBlock,
+		getDurations: () => durations.slice()
 	};
 }
 
@@ -123,50 +87,24 @@ export const assistantStep = createStep({
 			throw new Error('Assistant agent not registered on Mastra instance');
 		}
 
-		if (writer && requestContext) {
-			requestContext.set('writer', writer);
-		}
-
-		if (inputData.fileItems.length > 0) {
-			const manifestText = inputData.fileItems
-				.map((f) => {
-					const contentHash = f.fileId ?? f.contentHash ?? f.toolCallId;
-					if ('error' in f) {
-						return `- ${f.fileName} (contentHash: ${contentHash}) — Error: ${f.error}`;
-					}
-					return `- ${f.fileName} (contentHash: ${contentHash})`;
-				})
-				.join('\n');
-			requestContext?.set('fileManifest', manifestText);
-		}
-
 		const memCtx = { threadId: inputData.threadId, resourceId: inputData.resourceId };
 		const providerOptions = requestContext?.get('providerOptions') as
 			| Record<string, Record<string, unknown>>
 			| undefined;
-		const reasoning = createReasoningTracker(runId, writer, memCtx);
+		const reasoning = createReasoningDurationTracker();
 
-		const baseAgentOptions = {
+		const agentOptions = {
 			...(runId ? { runId } : {}),
 			...(abortSignal ? { abortSignal } : {}),
 			...(requestContext ? { requestContext } : {}),
 			...(providerOptions ? { providerOptions: providerOptions as never } : {}),
-			tools: inputData.tools,
+			toolsets: inputData.tools,
 			memory: { thread: inputData.threadId, resource: inputData.resourceId },
 			maxSteps: 30,
 			onChunk: (chunk: any) => reasoning.onChunk(chunk),
-			onStepFinish: async () => await reasoning.close(),
-			onFinish: async ({
-				usage
-			}: {
-				usage: {
-					inputTokens?: number;
-					outputTokens?: number;
-					reasoningTokens?: number;
-					cachedInputTokens?: number;
-				};
-			}) => {
-				await reasoning.close();
+			onFinish: (event: { usage: UsageLike }) => {
+				const { usage } = event;
+				reasoning.close();
 				// Token usage is conversation-scoped, not message-attached — fire-and-forget.
 				writeDataPart(writer, {
 					data: {
@@ -179,19 +117,35 @@ export const assistantStep = createStep({
 							cachedInputTokens: usage.cachedInputTokens ?? 0
 						}
 					},
-					memory: memCtx
-				}).catch(() => {});
+					memory: memCtx,
+					transient: true
+				}).catch(() => { });
 			}
 		};
 
 		const stream = await streamWithAutoRetry({
-			stream: () => agent.stream(inputData.promptText, baseAgentOptions),
+			stream: () => agent.stream(inputData.promptText, agentOptions),
 			abortSignal,
 			writer,
 			memCtx
 		});
 
 		await stream.fullStream.pipeTo(writer);
+		reasoning.close();
+
+		// Assistant message now exists in memory — safe to persist durable meta.
+		const durations = reasoning.getDurations();
+		if (runId && durations.length > 0) {
+			await writeDataPart(writer, {
+				data: {
+					type: 'data-reasoningMeta',
+					id: `rm-${runId}`,
+					data: { durations }
+				},
+				memory: memCtx
+			});
+		}
+
 		if (runId) {
 			await writeDataPart(writer, {
 				data: { type: 'data-runInfo', id: `ri-${runId}`, data: { runId } },

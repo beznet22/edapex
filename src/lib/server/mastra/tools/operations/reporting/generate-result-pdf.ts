@@ -18,6 +18,7 @@ import {
   resolveStudent,
   sanitizeForFilename,
   studentCriteriaBase,
+  type PdfArtifactData,
 } from "$lib/server/mastra/tools/operations/reporting/_shared";
 import { marksheetPdfPath } from "$lib/server/mastra/storage/workspaces/paths";
 import { addEntry } from "$lib/server/mastra/storage/workspaces/manifest-store";
@@ -142,7 +143,7 @@ async function renderAndWriteResultPdf(args: CoreRenderArgs): Promise<CoreRender
   const fullName = student.fullName ?? "student";
   const title = `${sanitizeForFilename(fullName)}.pdf`;
   const artifactId = `pdf-${student.studentId}-${examTypeId}`;
-  const storagePath = marksheetPdfPath(student.studentId);
+  const storagePath = marksheetPdfPath(student.studentId, student.admissionNo, student.fullName);
   const fs = await resolveFilesystem(resolvedTenant);
 
   const pdfExists = await fs.exists(storagePath);

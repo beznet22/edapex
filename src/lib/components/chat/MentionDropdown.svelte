@@ -230,6 +230,7 @@
     switch (e.key) {
       case 'ArrowDown':
         e.preventDefault();
+        e.stopPropagation();
         if (flatItems.length > 0) {
           highlightedIndex = (highlightedIndex + 1) % flatItems.length;
           scrollToHighlighted();
@@ -238,6 +239,7 @@
 
       case 'ArrowUp':
         e.preventDefault();
+        e.stopPropagation();
         if (flatItems.length > 0) {
           highlightedIndex = (highlightedIndex - 1 + flatItems.length) % flatItems.length;
           scrollToHighlighted();
@@ -246,14 +248,16 @@
 
       case 'Enter':
       case 'Tab':
+        e.preventDefault();
+        e.stopPropagation();
         if (flatItems.length > 0 && highlightedIndex >= 0 && highlightedIndex < flatItems.length) {
-          e.preventDefault();
           onSelect(flatItems[highlightedIndex]);
         }
         break;
 
       case 'Escape':
         e.preventDefault();
+        e.stopPropagation();
         onDismiss();
         break;
     }

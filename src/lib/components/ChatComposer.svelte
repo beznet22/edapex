@@ -798,6 +798,7 @@
         <CommandDropdown
           query={commandQuery}
           onSelect={selectCommand}
+          onDismiss={() => (showCommands = false)}
         />
       </div>
     </div>

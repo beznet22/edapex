@@ -20,14 +20,10 @@
 
 import { globalTools } from './global-tools';
 import { getContextTool } from './context-tool';
-import { readWorkspaceFileTool } from './workspace-read';
-import { streamDocumentTool } from '../operations/reporting/marksheet/stream-document';
 
 export const BASE_AGENT_TOOLS = {
 	...globalTools,
 	getContext: getContextTool,
-	readWorkspaceFile: readWorkspaceFileTool,
-	streamDocument: streamDocumentTool
 } as const;
 
 export type BaseAgentToolName = keyof typeof BASE_AGENT_TOOLS;

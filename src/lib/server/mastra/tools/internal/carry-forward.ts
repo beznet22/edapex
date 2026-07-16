@@ -8,7 +8,7 @@ import { tenantWorkspace, verifyTeacherAssignment } from "$lib/server/mastra/sto
  * The `exams` root is walked recursively so all per-exam subfolders are
  * carried forward alongside year-level content.
  */
-const DEFAULT_CARRY_PATHS = ["extracted", "agentic-files", "docs", "exams"];
+const DEFAULT_CARRY_PATHS = ["agentic-files", "docs", "exams"];
 
 export const carryForwardFilesSchema = z.object({
   sourceAcademicId: z

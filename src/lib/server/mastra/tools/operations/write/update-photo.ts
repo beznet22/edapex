@@ -47,9 +47,7 @@ export const updatePhotoTool = createTool({
   execute: async (input, ctx) => {
     const tenant = getTenant(ctx as UpdatePhotoContext);
 
-    const workspaceRoot = `.workspaces/${tenant.schoolId}/${tenant.classId ?? 0}_${tenant.sectionId ?? 0}_AY${tenant.academicId ?? 0}`;
     const sourceRelative = `photos/${input.contentHash}.${input.ext}`;
-    const sourcePath = `${workspaceRoot}/${sourceRelative}`;
 
     const fs = await tenantWorkspace.resolveFilesystem({
       requestContext: buildWorkspaceRequestContext(tenant) as never,

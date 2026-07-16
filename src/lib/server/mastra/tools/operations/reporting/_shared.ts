@@ -234,7 +234,7 @@ export type SelectOptionItem = { id: string; label: string; icon?: string };
 
 export async function emitPdfPart(
   writer: StreamWriterLike | undefined,
-  memCtx: MemoryContext,
+  memCtx: MemoryContext | undefined,
   artifactId: string,
   payload: PdfArtifactData,
 ): Promise<void> {
@@ -252,7 +252,7 @@ export async function emitPdfPart(
 
 export async function emitNotification(
   writer: StreamWriterLike | undefined,
-  memCtx: MemoryContext,
+  memCtx: MemoryContext | undefined,
   message: string,
   level: "info" | "warning" | "error" | "success" = "info",
 ): Promise<void> {
@@ -270,7 +270,7 @@ export async function emitNotification(
 
 export async function emitSelectOption(
   writer: StreamWriterLike | undefined,
-  memCtx: MemoryContext,
+  memCtx: MemoryContext | undefined,
   options: SelectOptionItem[],
   prompt: string,
   runId: string,

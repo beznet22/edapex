@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { drizzle, type LibSQLDatabase } from 'drizzle-orm/libsql';
-import { createClient, type Client } from '@libsql/client';
+import { and, eq } from 'drizzle-orm';
 import {
 	discoverProviderModels,
 	persistDiscoveredModels,
@@ -9,39 +8,23 @@ import {
 	withExponentialBackoff,
 	DISCOVERY_TIMEOUT_MS
 } from './discovery';
-import { userCredentials, type UserCredential } from '$lib/server/mastra/storage/libsql/app-db.schema';
+import { encryptedCredentials, type EncryptedCredential } from '$lib/server/mastra/storage/libsql/app-db.schema';
+import { getAppDb } from '$lib/server/mastra/storage/libsql/app-db';
 import { encrypt as encryptText, decrypt as decryptText, getEncryptionKey } from './crypto';
 import type { ProviderId } from './types';
 import type { ModelInfo } from '$lib/provider/spec';
 
-const CREATE_USER_CREDENTIALS_SQL = `
-CREATE TABLE IF NOT EXISTS user_credentials (
-	id TEXT PRIMARY KEY,
-	user_id INTEGER NOT NULL,
-	provider_id TEXT NOT NULL,
-	credential_type TEXT NOT NULL,
-	encrypted_data TEXT,
-	priority INTEGER NOT NULL DEFAULT 1,
-	enabled INTEGER NOT NULL DEFAULT 1,
-	created_at TEXT NOT NULL DEFAULT (datetime('now')),
-	updated_at TEXT NOT NULL DEFAULT (datetime('now')),
-	discovered_models TEXT,
-	discovered_at TEXT,
-	UNIQUE(user_id, provider_id)
-);
-`;
-
 const envKey = getEncryptionKey({});
 const env = { TOKEN_ENCRYPTION_KEY: envKey };
 
-function createInMemoryDb(): { db: LibSQLDatabase<any>; client: Client } {
-	const client = createClient({ url: ':memory:' });
-	client.execute(CREATE_USER_CREDENTIALS_SQL);
-	const db = drizzle(client);
-	return { db, client };
+async function cleanupUser(userId: number): Promise<void> {
+	const db = getAppDb();
+	await db
+		.delete(encryptedCredentials)
+		.where(and(eq(encryptedCredentials.scope, 'user'), eq(encryptedCredentials.userId, userId)));
 }
 
-function buildCustomCredential(overrides: Partial<UserCredential> = {}): UserCredential {
+function buildCustomCredential(overrides: Partial<EncryptedCredential> = {}): EncryptedCredential {
 	const baseUrl = 'https://custom.example.com';
 	const payload = JSON.stringify({
 		displayName: 'custom',
@@ -52,9 +35,11 @@ function buildCustomCredential(overrides: Partial<UserCredential> = {}): UserCre
 	});
 	return {
 		id: 'cred-1',
+		scope: 'user',
+		credentialKind: 'custom',
 		userId: 1,
+		schoolId: null,
 		providerId: 'custom-provider',
-		credentialType: 'custom',
 		encryptedData: encryptText(payload, envKey),
 		priority: 1,
 		enabled: 1,
@@ -67,20 +52,13 @@ function buildCustomCredential(overrides: Partial<UserCredential> = {}): UserCre
 }
 
 describe('discoverProviderModels', () => {
-	let db: LibSQLDatabase<any>;
-	let client: Client;
-
 	beforeEach(() => {
-		const pair = createInMemoryDb();
-		db = pair.db;
-		client = pair.client;
 		vi.useFakeTimers({ shouldAdvanceTime: false });
 	});
 
 	afterEach(async () => {
 		vi.restoreAllMocks();
 		vi.useRealTimers();
-		await client.close();
 	});
 
 	it('skips discovery for opengateway provider', async () => {
@@ -107,17 +85,9 @@ describe('discoverProviderModels', () => {
 		expect(models).toEqual([]);
 	});
 
-	it('skips discovery for env-type credential', async () => {
+	it('skips discovery for personal credential', async () => {
 		const models = await discoverProviderModels(
-			buildCustomCredential({ credentialType: 'env', encryptedData: null }),
-			env
-		);
-		expect(models).toEqual([]);
-	});
-
-	it('skips discovery for credential-type credential', async () => {
-		const models = await discoverProviderModels(
-			buildCustomCredential({ credentialType: 'credential' }),
+			buildCustomCredential({ credentialKind: 'personal' }),
 			env
 		);
 		expect(models).toEqual([]);
@@ -125,7 +95,7 @@ describe('discoverProviderModels', () => {
 
 	it('returns empty array when encrypted data is missing', async () => {
 		const models = await discoverProviderModels(
-			buildCustomCredential({ encryptedData: null }),
+			buildCustomCredential({ encryptedData: '' }),
 			env
 		);
 		expect(models).toEqual([]);
@@ -183,8 +153,17 @@ describe('discoverProviderModels', () => {
 		const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
 			new Response(JSON.stringify({ data: [] }), { status: 200 })
 		);
-		const payload = JSON.stringify({ displayName: 'x', baseUrl: 'https://custom.example.com///', apiKey: 'k', models: [], headers: [] });
-		await discoverProviderModels(buildCustomCredential({ encryptedData: encryptText(payload, envKey) }), env);
+		const payload = JSON.stringify({
+			displayName: 'x',
+			baseUrl: 'https://custom.example.com///',
+			apiKey: 'k',
+			models: [],
+			headers: []
+		});
+		await discoverProviderModels(
+			buildCustomCredential({ encryptedData: encryptText(payload, envKey) }),
+			env
+		);
 		expect(fetchSpy).toHaveBeenCalledWith('https://custom.example.com/models', expect.any(Object));
 	});
 
@@ -236,9 +215,7 @@ describe('discoverProviderModels', () => {
 		expect(models).toHaveLength(1);
 		expect(models[0]?.capabilities.reasoning).toBe(true);
 		expect(models[0]?.capabilities.vision).toBe(true);
-		expect(models[0]?.capabilities.input).toEqual(
-			expect.arrayContaining(['image/*', 'application/*'])
-		);
+		expect(models[0]?.capabilities.input).toEqual(expect.arrayContaining(['image/*', 'application/*']));
 		expect(models[0]?.capabilities.output).toBeDefined();
 		expect(models[0]?.cost).toBeDefined();
 	});
@@ -260,26 +237,25 @@ describe('discoverProviderModels', () => {
 });
 
 describe('persistDiscoveredModels', () => {
-	let db: LibSQLDatabase<any>;
-	let client: Client;
-
-	beforeEach(() => {
-		const pair = createInMemoryDb();
-		db = pair.db;
-		client = pair.client;
+	beforeEach(async () => {
+		await cleanupUser(1);
 	});
 
 	afterEach(async () => {
-		await client.close();
+		await cleanupUser(1);
 	});
 
 	it('encrypts and persists discovered models', async () => {
-		await db.insert(userCredentials).values({
-			id: 'cred-1',
+		await getAppDb().insert(encryptedCredentials).values({
+			scope: 'user',
+			credentialKind: 'custom',
 			userId: 1,
+			schoolId: null,
 			providerId: 'custom-provider',
-			credentialType: 'custom',
-			encryptedData: encryptText(JSON.stringify({ displayName: 'x', baseUrl: 'https://x.com', models: [], headers: [] }), envKey),
+			encryptedData: encryptText(
+				JSON.stringify({ displayName: 'x', baseUrl: 'https://x.com', models: [], headers: [] }),
+				envKey
+			),
 			enabled: 1
 		});
 
@@ -288,7 +264,14 @@ describe('persistDiscoveredModels', () => {
 				id: 'custom-provider/m1' as ProviderId,
 				providerId: 'custom-provider' as ProviderId,
 				name: 'Model One',
-				capabilities: { tools: false, input: [], output: [], reasoning: false, vision: false, thinkingEffort: false },
+				capabilities: {
+					tools: false,
+					input: [],
+					output: [],
+					reasoning: false,
+					vision: false,
+					thinkingEffort: false
+				},
 				request: { headers: {}, body: {}, generation: {}, options: {} },
 				variants: [],
 				status: 'active',
@@ -299,9 +282,18 @@ describe('persistDiscoveredModels', () => {
 			}
 		];
 
-		await persistDiscoveredModels(db, env, 1, 'custom-provider' as ProviderId, models);
+		await persistDiscoveredModels(getAppDb(), env, 1, 'custom-provider' as ProviderId, models);
 
-		const rows = await db.select({ discoveredModels: userCredentials.discoveredModels }).from(userCredentials);
+		const rows = await getAppDb()
+			.select({ discoveredModels: encryptedCredentials.discoveredModels })
+			.from(encryptedCredentials)
+			.where(
+				and(
+					eq(encryptedCredentials.scope, 'user'),
+					eq(encryptedCredentials.userId, 1),
+					eq(encryptedCredentials.providerId, 'custom-provider')
+				)
+			);
 		const encrypted = rows[0]?.discoveredModels;
 		expect(encrypted).toBeTruthy();
 		const decrypted = JSON.parse(decryptText(encrypted!, envKey));
@@ -311,21 +303,21 @@ describe('persistDiscoveredModels', () => {
 });
 
 describe('getDiscoveredModelsForUser', () => {
-	let db: LibSQLDatabase<any>;
-	let client: Client;
-
-	beforeEach(() => {
-		const pair = createInMemoryDb();
-		db = pair.db;
-		client = pair.client;
+	beforeEach(async () => {
+		await cleanupUser(1);
 	});
 
 	afterEach(async () => {
-		await client.close();
+		await cleanupUser(1);
 	});
 
 	it('returns empty array when no discovered models exist', async () => {
-		const models = await getDiscoveredModelsForUser(db, env, 1, 'custom-provider' as ProviderId);
+		const models = await getDiscoveredModelsForUser(
+			getAppDb(),
+			env,
+			1,
+			'custom-provider' as ProviderId
+		);
 		expect(models).toEqual([]);
 	});
 
@@ -335,7 +327,14 @@ describe('getDiscoveredModelsForUser', () => {
 				id: 'custom-provider/m1' as ProviderId,
 				providerId: 'custom-provider' as ProviderId,
 				name: 'Model One',
-				capabilities: { tools: false, input: [], output: [], reasoning: false, vision: false, thinkingEffort: false },
+				capabilities: {
+					tools: false,
+					input: [],
+					output: [],
+					reasoning: false,
+					vision: false,
+					thinkingEffort: false
+				},
 				request: { headers: {}, body: {}, generation: {}, options: {} },
 				variants: [],
 				status: 'active',
@@ -345,66 +344,88 @@ describe('getDiscoveredModelsForUser', () => {
 				description: ''
 			}
 		];
-		await db.insert(userCredentials).values({
-			id: 'cred-1',
+		await getAppDb().insert(encryptedCredentials).values({
+			scope: 'user',
+			credentialKind: 'custom',
 			userId: 1,
+			schoolId: null,
 			providerId: 'custom-provider',
-			credentialType: 'custom',
-			encryptedData: encryptText(JSON.stringify({ displayName: 'x', baseUrl: 'https://x.com', models: [], headers: [] }), envKey),
+			encryptedData: encryptText(
+				JSON.stringify({ displayName: 'x', baseUrl: 'https://x.com', models: [], headers: [] }),
+				envKey
+			),
 			discoveredModels: encryptText(JSON.stringify(models), envKey),
 			enabled: 1
 		});
 
-		const result = await getDiscoveredModelsForUser(db, env, 1, 'custom-provider' as ProviderId);
+		const result = await getDiscoveredModelsForUser(
+			getAppDb(),
+			env,
+			1,
+			'custom-provider' as ProviderId
+		);
 		expect(result).toHaveLength(1);
 		expect(result[0]?.id).toBe('custom-provider/m1');
 	});
 
 	it('returns empty array when decryption fails', async () => {
-		await db.insert(userCredentials).values({
-			id: 'cred-1',
+		await getAppDb().insert(encryptedCredentials).values({
+			scope: 'user',
+			credentialKind: 'custom',
 			userId: 1,
+			schoolId: null,
 			providerId: 'custom-provider',
-			credentialType: 'custom',
-			encryptedData: encryptText(JSON.stringify({ displayName: 'x', baseUrl: 'https://x.com', models: [], headers: [] }), envKey),
+			encryptedData: encryptText(
+				JSON.stringify({ displayName: 'x', baseUrl: 'https://x.com', models: [], headers: [] }),
+				envKey
+			),
 			discoveredModels: 'invalid-ciphertext',
 			enabled: 1
 		});
 
-		const result = await getDiscoveredModelsForUser(db, env, 1, 'custom-provider' as ProviderId);
+		const result = await getDiscoveredModelsForUser(
+			getAppDb(),
+			env,
+			1,
+			'custom-provider' as ProviderId
+		);
 		expect(result).toEqual([]);
 	});
 
 	it('returns empty array when parsed JSON is invalid', async () => {
-		await db.insert(userCredentials).values({
-			id: 'cred-1',
+		await getAppDb().insert(encryptedCredentials).values({
+			scope: 'user',
+			credentialKind: 'custom',
 			userId: 1,
+			schoolId: null,
 			providerId: 'custom-provider',
-			credentialType: 'custom',
-			encryptedData: encryptText(JSON.stringify({ displayName: 'x', baseUrl: 'https://x.com', models: [], headers: [] }), envKey),
+			encryptedData: encryptText(
+				JSON.stringify({ displayName: 'x', baseUrl: 'https://x.com', models: [], headers: [] }),
+				envKey
+			),
 			discoveredModels: encryptText('not-json', envKey),
 			enabled: 1
 		});
 
-		const result = await getDiscoveredModelsForUser(db, env, 1, 'custom-provider' as ProviderId);
+		const result = await getDiscoveredModelsForUser(
+			getAppDb(),
+			env,
+			1,
+			'custom-provider' as ProviderId
+		);
 		expect(result).toEqual([]);
 	});
 });
 
 describe('getAllDiscoveredModelsForUser', () => {
-	let db: LibSQLDatabase<any>;
-	let client: Client;
-
-	beforeEach(() => {
-		const pair = createInMemoryDb();
-		db = pair.db;
-		client = pair.client;
+	beforeEach(async () => {
+		await cleanupUser(1);
 		vi.resetModules();
 	});
 
 	afterEach(async () => {
 		vi.restoreAllMocks();
-		await client.close();
+		await cleanupUser(1);
 	});
 
 	it('aggregates discovered models across credentials', async () => {
@@ -417,7 +438,14 @@ describe('getAllDiscoveredModelsForUser', () => {
 				id: 'provider-a/m1' as ProviderId,
 				providerId: 'provider-a' as ProviderId,
 				name: 'Model A',
-				capabilities: { tools: false, input: [], output: [], reasoning: false, vision: false, thinkingEffort: false },
+				capabilities: {
+					tools: false,
+					input: [],
+					output: [],
+					reasoning: false,
+					vision: false,
+					thinkingEffort: false
+				},
 				request: { headers: {}, body: {}, generation: {}, options: {} },
 				variants: [],
 				status: 'active',
@@ -428,18 +456,22 @@ describe('getAllDiscoveredModelsForUser', () => {
 			}
 		];
 
-		await db.insert(userCredentials).values({
-			id: 'cred-a',
+		await getAppDb().insert(encryptedCredentials).values({
+			scope: 'user',
+			credentialKind: 'custom',
 			userId: 1,
+			schoolId: null,
 			providerId: 'provider-a',
-			credentialType: 'custom',
-			encryptedData: encryptText(JSON.stringify({ displayName: 'x', baseUrl: 'https://a.com', models: [], headers: [] }), envKey),
+			encryptedData: encryptText(
+				JSON.stringify({ displayName: 'x', baseUrl: 'https://a.com', models: [], headers: [] }),
+				envKey
+			),
 			discoveredModels: encryptText(JSON.stringify(models), envKey),
 			enabled: 1
 		});
 
 		const { getAllDiscoveredModelsForUser: fn } = await import('./discovery');
-		const map = await fn(db, 1);
+		const map = await fn(getAppDb(), 1);
 		expect(map.size).toBe(1);
 		expect(map.get('provider-a/m1' as ProviderId)?.name).toBe('Model A');
 	});

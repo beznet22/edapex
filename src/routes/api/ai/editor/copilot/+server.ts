@@ -1,12 +1,10 @@
 import { error, type RequestHandler } from '@sveltejs/kit';
 import { mastra } from '$lib/server/mastra';
 import { copilotRequestSchema } from '$lib/server/mastra/editor/schemas';
-import { buildWorkspaceRequestContext } from '$lib/server/helpers/chat-helper';
-import { ALLOWED_DESIGNATIONS } from "$lib/types/sms-types";
-import { createTenantContext } from '$lib/server/mastra/tenant-context';
+import { buildWorkspaceRequestContext, resolveWorkspaceContext } from '$lib/server/helpers/chat-helper';
 import { buildCopilotSystemPrompt } from '$lib/server/mastra/agents/editor-copilot';
 
-export const POST: RequestHandler = async ({ request, locals: { user } }) => {
+export const POST: RequestHandler = async ({ request, locals: { user }, cookies }) => {
 	if (!user) error(401, 'Unauthorized');
 
 	try {
@@ -17,16 +15,12 @@ export const POST: RequestHandler = async ({ request, locals: { user } }) => {
 			return new Response(`Invalid request: ${parsed.error.message}`, { status: 400 });
 		}
 
-		const tenantContext = createTenantContext({
-			schoolId: user.schoolId ?? 1,
-			userId: user.id,
-			staffId: (user as any).staffId ?? 1,
-			designationId: (user as any).designationId ?? ALLOWED_DESIGNATIONS.IT,
-			roleId: (user as any).roleId ?? null,
-			classId: (user as any).classId ?? null,
-			sectionId: (user as any).sectionId ?? null,
-			examId: null,
-			academicId: (user as any).academicId ?? null,
+		const { tenant: tenantContext } = await resolveWorkspaceContext(cookies, {
+			id: user.id,
+			schoolId: user.schoolId ?? null,
+			staffId: (user as { staffId?: number }).staffId ?? null,
+			designationId: (user as { designationId?: number }).designationId ?? null,
+			roleId: (user as { roleId?: number | null }).roleId ?? null,
 		});
 		const requestContext = buildWorkspaceRequestContext(tenantContext);
 

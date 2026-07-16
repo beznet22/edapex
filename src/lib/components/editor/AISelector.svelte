@@ -95,7 +95,7 @@
 	}
 
 	function handleSubmit() {
-		if (hasCompletion) return;
+		if (hasCompletion || isLoading) return;
 		handleGenerate();
 	}
 </script>

@@ -21,13 +21,15 @@
 	let isOpen = $derived(reasoningContext.isOpen);
 
 	let getThinkingMessage = $derived.by(() => {
-		if (isStreaming || !duration) {
-			return "AI is thinking...";
+		if (isStreaming) {
+			return duration > 0
+				? `Thinking (${formatDuration(duration)})…`
+				: "AI is thinking...";
 		}
-		if (!duration) {
-			return "Thought for a few seconds";
+		if (duration > 0) {
+			return `Thought for ${formatDuration(duration)}`;
 		}
-		return `Thought for ${formatDuration(duration)}`;
+		return "Thought for a few seconds";
 	});
 </script>
 
@@ -49,7 +51,7 @@
 			)}
 		/>
 		<div class="flex gap-2">
-			{#if isStreaming || !duration}
+			{#if isStreaming}
 				<Shimmer
 					duration={1.6}
 					spread={1.5}

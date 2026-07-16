@@ -25,17 +25,18 @@ export type SerializedTenant = {
   sectionId: number | null;
   examTypeId: number | null;
   academicId: number | null;
+  className: string | null;
+  sectionName: string | null;
+  academicYearTitle: string | null;
 };
 
 /**
  * Per-file result from a batch OCR job. The `key` is the workspace key of
- * the source file; `extractedKey` is the workspace key of the persisted .md
- * (under `exams/examType-{id}/extracted/{hash}.md` when examTypeId is set).
+ * the source file.
  */
 export type BatchExtractResult = {
   key: string;
   status: "success" | "error";
-  extractedKey?: string;
   contentHash?: string;
   mistralFileId?: string;
   error?: string;

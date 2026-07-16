@@ -4,13 +4,14 @@ import { fileSchema } from "$lib/schema/chat-schema";
 import { resultInputSchema } from "$lib/schema/result-input";
 import { pageToHtml } from "$lib/server/helpers";
 import { generate } from "$lib/server/helpers/pdf-generator";
-import { StaffRepository, StudentRepository } from "$lib/server/repository";
+import { StudentRepository, StaffRepository } from "$lib/server/repository";
 import { ScopedRepositoryProvider } from "$lib/server/mastra/scoped-repository";
 import { getDatabase } from "$lib/server/db";
 import { createAssessmentOcrServiceForRequest } from "$lib/server/service/assessment-ocr.service";
 import { createAssessmentServiceForRequest } from "$lib/server/service/assessment.service";
 import { createTenantContext } from "$lib/server/mastra/tenant-context";
-import { createTenantFileStorage } from "$lib/server/mastra/storage/tenant-file-storage";
+import { resolveTenantWorkspace } from "$lib/server/workspace/scope";
+import { readManifest, addEntry } from "$lib/server/mastra/storage/workspaces/manifest-store";
 import { render } from "svelte/server";
 import z from "zod";
 
@@ -82,13 +83,19 @@ export const publishResult = command(
       }
 
       const provider = new ScopedRepositoryProvider(await getDatabase(), tenant);
-      const fileStorage = await createTenantFileStorage(tenant);
       const student = await provider.getRepo(StudentRepository).getStudentById(studentId);
       if (student) {
-        const extracted = await fileStorage.loadByStudent(provider, studentId);
-        if (extracted) {
-          extracted.status = "published";
-          await fileStorage.save(extracted);
+        // Update manifest marksheet status to published
+        const manifest = await readManifest(tenant);
+        for (const [relPath, entry] of Object.entries(manifest.entries)) {
+          if (entry.kind === "marksheet-json" && entry.studentId === studentId) {
+            try {
+              await addEntry(tenant, { ...entry, marksheetStatus: "published", modifiedAt: new Date().toISOString() });
+            } catch {
+              // ignore manifest write errors
+            }
+            break;
+          }
         }
       }
 

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { getAppDb } from '$lib/server/mastra/storage/libsql/app-db';
-import { userCredentials } from '$lib/server/mastra/storage/libsql/app-db.schema';
+import { encryptedCredentials } from '$lib/server/mastra/storage/libsql/app-db.schema';
 import { getAvailableModelsForUser } from './availability';
 import { saveUserCredential } from './credentials';
 import * as discovery from './discovery';
@@ -29,7 +29,9 @@ vi.mock('$env/dynamic/private', () => ({
 
 async function cleanup(): Promise<void> {
 	const db = getAppDb();
-	await db.delete(userCredentials).where(eq(userCredentials.userId, USER_ID));
+	await db
+		.delete(encryptedCredentials)
+		.where(and(eq(encryptedCredentials.scope, 'user'), eq(encryptedCredentials.userId, USER_ID)));
 }
 
 async function seedCredential(providerId: string, enabled = true): Promise<void> {
@@ -90,7 +92,7 @@ describe('getAvailableModelsForUser', () => {
 		expect(models.some((m) => m.id === 'discovered-1' && m.source === 'user')).toBe(true);
 	});
 
-	it('falls back to built-in models when discovery returns empty', async () => {
+	it('does not fall back to built-in models when discovery returns empty', async () => {
 		const db = getAppDb();
 		await seedCredential('groq');
 		vi.mocked(discovery.getDiscoveredModelsForUser).mockResolvedValue([]);
@@ -100,8 +102,7 @@ describe('getAvailableModelsForUser', () => {
 		);
 
 		const models = await getAvailableModelsForUser(db, {}, USER_ID, SCHOOL_ID);
-		expect(models.length).toBeGreaterThan(0);
-		expect(models.every((m) => m.source === 'user')).toBe(true);
+		expect(models).toHaveLength(0);
 	});
 
 	it('skips disabled credentials', async () => {

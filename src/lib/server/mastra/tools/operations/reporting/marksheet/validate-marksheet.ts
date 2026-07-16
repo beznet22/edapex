@@ -1,11 +1,12 @@
 import { createTool } from '@mastra/core/tools';
 import { z } from 'zod';
+import { eq } from 'drizzle-orm';
 import { type StreamWriterLike } from '$lib/server/mastra/agent-stream-retry';
 import { tenantWorkspace } from '$lib/server/mastra/storage/workspaces';
 import { buildWorkspaceRequestContext } from '$lib/server/helpers/chat-helper';
 import { marksheetSchema } from '$lib/schema/marksheet';
 import { marksheetJsonPath, marksheetMarkdownPath } from '$lib/server/mastra/storage/workspaces/paths';
-import { addEntry, removeEntry } from '$lib/server/mastra/storage/workspaces/manifest-store';
+import { addEntry, removeEntry, updateEntryStatus } from '$lib/server/mastra/storage/workspaces/manifest-store';
 import { resolveMentionsInMarkdown } from '$lib/server/mastra/editor/mention-resolver';
 import { createAssessmentServiceForRequest } from '$lib/server/service/assessment.service';
 import { StudentRepository } from '$lib/server/repository/student.repo';
@@ -15,6 +16,8 @@ import type { WorkspaceFilesystem } from '@mastra/core/workspace';
 import type { RequestContext } from '@mastra/core/request-context';
 import type { ResolvedMention } from '$lib/server/mastra/editor/schemas';
 import { writeDataPart, type MemoryContext } from '$lib/server/mastra/utils/chat-utils';
+import { getDatabase } from '$lib/server/db';
+import { smStudents, smParents, smSchools } from '$lib/server/db/sms-schema';
 
 interface MarksheetToolContext {
 	requestContext?: {
@@ -50,15 +53,6 @@ function getTenant(ctx: MarksheetToolContext): TenantContext {
 		throw new Error('TENANT_CONTEXT_REQUIRED: marksheet tools require an active tenantContext');
 	}
 	return tenant;
-}
-
-async function getDocumentAgent() {
-	const { mastra } = await import('../../../../index');
-	const agent = mastra.getAgent('document');
-	if (!agent) {
-		throw new Error('AGENT_NOT_REGISTERED: document agent is not registered on the Mastra instance');
-	}
-	return agent;
 }
 
 async function resolveTenantFilesystem(tenant: TenantContext): Promise<WorkspaceFilesystem> {
@@ -204,10 +198,10 @@ const marksheetErrorSchema = z.object({
 export const validateMarksheetTool = createTool({
 	id: 'validate-marksheet',
 	description:
-		'Read the user-edited marksheet markdown from the workspace, re-derive the structured JSON via the document agent, ' +
-		'then validate against marksheetSchema. Persists the validated JSON to marksheets/<studentId>.json and writes the ' +
-		'canonical markdown to marksheets/ADM<adminNo>-<examTypeId>-<studentName>.md. Removes the draft at currentMarkdownPath ' +
-		'after the canonical file is written.',
+		'Read the user-edited marksheet markdown from the workspace, parse it via the markdown AST parser, ' +
+		'validate against marksheetSchema, persist the validated JSON to marksheets/<studentId>.json, and write the ' +
+		'canonical markdown to marksheets/ADM<adminNo>-<examTypeId>-<studentName>.md. Removes the draft at currentMarkdownPath. ' +
+		'No LLM call — pure TS parsing + zod validation.',
 	inputSchema: z.object({
 		currentMarkdownPath: z
 			.string()
@@ -244,7 +238,10 @@ export const validateMarksheetTool = createTool({
 				.string()
 				.describe(
 					'Display title derived from the validated JSON: `${student.fullName} — ${examType.title}`.'
-				)
+				),
+			marksheetStatus: z.string().describe('Current lifecycle status: validated.'),
+			parentName: z.string().nullable().optional().describe('Parent/guardian name for the linked student.'),
+			parentEmail: z.string().nullable().optional().describe('Parent/guardian email for the linked student.')
 		}),
 		z.object({
 			ok: z.literal(false),
@@ -255,14 +252,6 @@ export const validateMarksheetTool = createTool({
 	execute: async (input, ctx) => {
 		const context = (await bridgeToolContext(ctx)) as unknown as MarksheetToolContext;
 		const tenant = getTenant(context);
-		const autoFixAttempts =
-			(context.requestContext?.get('autoFixAttempts') as number | undefined) ?? 0;
-		if (autoFixAttempts >= 3) {
-			throw new Error(
-				'AUTO_FIX_EXHAUSTED: validation errors could not be auto-fixed after 3 attempts'
-			);
-		}
-		context.requestContext?.set('autoFixAttempts', autoFixAttempts + 1);
 
 		// Read the authoritative user-edited markdown from disk. The editor
 		// panel auto-saves on every keystroke, so this captures any edits the
@@ -349,8 +338,7 @@ export const validateMarksheetTool = createTool({
 			};
 		}
 
-		// All required IDs resolved. Fetch subject mapping table and
-		// proceed with the existing documentAgent re-derivation pipeline.
+		// All required IDs resolved. Read raw.json (pre-parsed by editor auto-save).
 		const assessment = await createAssessmentServiceForRequest(tenant);
 		const mapping = await assessment.getMappingData(
 			tenant.staffId,
@@ -358,244 +346,158 @@ export const validateMarksheetTool = createTool({
 			tenant.sectionId ?? undefined
 		);
 
-		const documentAgent = await getDocumentAgent();
-
-		const subjectMappingTable = mapping.subjects
-			.map((s) => {
-				const subjectId = s.id;
-				const subjectCode = s.subjectCode;
-				const title = s.subjectName;
-				if (subjectId == null || subjectCode == null) return null;
-				return `  - ${subjectCode} → subjectId=${subjectId}${title ? ` (${title})` : ''}`;
-			})
-			.filter((line): line is string => line !== null)
-			.join('\n');
-
-		const basePrompt = [
-			`Re-derive the structured academic result JSON from the following markdown.`,
-			`Use the SUBJECT MAPPING TABLE to populate each record's subjectId by exact subjectCode match (case-insensitive).`,
-			`Use the EFFECTIVE IDS as authoritative values for student.id, student.adminNo, student.fullName, examType.id, and academicId (sessionYear).`,
-			`Emit ONLY the JSON object that conforms to the Marksheet schema. Never wrap in markdown code fences.`,
-			``,
-			`TENANT CONTEXT:`,
-			`  schoolId: ${tenant.schoolId}`,
-			`  classId: ${tenant.classId ?? 'null'}`,
-			`  sectionId: ${tenant.sectionId ?? 'null'}`,
-			``,
-			`EFFECTIVE IDS (from @mentions + input.student + tenant \u2014 DO NOT override):`,
-			`  studentId: ${effective.studentId}`,
-			`  adminNo: ${effective.adminNo ?? 'null'}`,
-			`  studentName: ${effective.studentName ?? 'null'}`,
-			`  examTypeId: ${effective.examTypeId}`,
-			`  academicId: ${effective.academicId}`,
-			``,
-			`TITLE (from caller, verbatim): "${input.title ?? '(none)'}". If a title is supplied, reflect it verbatim in any headings or front-matter.`,
-			``,
-			`SUBJECT MAPPING TABLE (subjectCode \u2192 subjectId):`,
-			subjectMappingTable || '  (no subjects configured for this class)',
-			``,
-			`SCHEMA REQUIREMENTS (every field must be present and correctly typed):`,
-			`- school: object { id, name, email, phone, city, state, title, vacation_date }`,
-			`- student: object { id, examId, fullName, gender, parentEmail, parentName, term, title, category, className, sectionName, adminNo, sessionYear, daysOpened, daysAbsent, daysPresent, token }`,
-			`- subjects: array of { subjectId, subjectCode, teacherId, title }`,
-			`- records: array of { studentId, resultId, subjectId, subject, subjectCode, titleIds, titles, marks, markIds, fullMarks, totalScore, grade, category, learningOutcome, objectives }`,
-			`- score: object { total, average, classAverage, maxScores }`,
-			`- ratings: array of { attribute, rate, remark, color }`,
-			`- remark: object { remark }`,
-			`- examType: object { id, title }`,
-			``,
-			`CRITICAL:`,
-			`- Look up subjectId from the SUBJECT MAPPING TABLE by exact subjectCode. NEVER invent a subjectId.`,
-			`- If a subjectCode in the markdown is not in the mapping table, set subjectId to null and emit a flag.`,
-			`- For DAYCARE: learningOutcome is required and must not contain HTML tags.`,
-			`- For non-DAYCARE: titles must match TITLES_BY_CATEGORY and marks.length === titles.length.`,
-			`- Output ONLY the JSON object. No markdown fences, no commentary.`,
-			``,
-			`\`\`\`markdown`,
-			correctedMarkdown,
-			`\`\`\``
-		].join('\n');
-
-		interface AttemptResult {
-			json: unknown;
-			validationErrors: Array<{ path: string; message: string; code: string }>;
-			attempt: number;
-		}
-
-		const attempts: AttemptResult[] = [];
-		let finalJson: unknown = null;
-		let finalValidationIssues: Array<{ path: string; message: string; code: string }> = [];
-
-		for (let attempt = 0; attempt < 3; attempt++) {
-			const feedback = attempts
-				.map(
-					(a) =>
-						`Attempt ${a.attempt + 1} failed with these validation errors:\n` +
-						a.validationErrors.map((e) => `  - ${e.path || 'root'}: ${e.message}`).join('\n') +
-						'\nFix these specific issues and try again.'
-				)
-				.join('\n\n');
-
-			const prompt = feedback ? `${basePrompt}\n\n${feedback}` : basePrompt;
-
-			try {
-				const response = await documentAgent.generate(prompt, {
-					...(context.abortSignal ? { abortSignal: context.abortSignal } : {}),
-					...(context.requestContext ? { requestContext: context.requestContext as never } : {})
-				});
-				finalJson =
-					(response as { object?: unknown }).object ??
-					(() => {
-						const text = (response as { text?: string }).text ?? '';
-						try {
-							return JSON.parse(text);
-						} catch {
-							return null;
-						}
-					})();
-				if (finalJson === null || finalJson === undefined) {
-					attempts.push({
-						json: null,
-						validationErrors: [
-							{ path: '$', message: 'STRUCTURED_OUTPUT_EMPTY', code: 'empty_output' }
-						],
-						attempt
-					});
-					continue;
-				}
-				const parsed = await marksheetSchema.safeParseAsync(finalJson);
-				if (parsed.success) {
-					const jsonPath = marksheetJsonPath(parsed.data.student.id);
-					await fs.writeFile(jsonPath, JSON.stringify(finalJson, null, 2), {
-						recursive: true
-					});
-					await addEntry(tenant, {
-						path: jsonPath,
-						kind: 'marksheet-json',
-						studentId: parsed.data.student.id,
-						uploadedAt: new Date().toISOString(),
-						modifiedAt: new Date().toISOString(),
-						mimeType: 'application/json'
-					});
-
-					const canonicalMarkdownPath = marksheetMarkdownPath({
-						studentId: parsed.data.student.id,
-						adminNo: parsed.data.student.adminNo,
-						examTypeId: parsed.data.examType?.id ?? null,
-						studentName: parsed.data.student.fullName
-					});
-					const validatedTitle = `${parsed.data.student.fullName} \u2014 ${parsed.data.examType?.title ?? 'Exam'}`;
-
-					await fs.writeFile(canonicalMarkdownPath, correctedMarkdown, {
-						recursive: true
-					});
-					await addEntry(tenant, {
-						path: canonicalMarkdownPath,
-						kind: 'marksheet-markdown',
-						documentId: String(parsed.data.student.id),
-						fileName: canonicalMarkdownPath.split('/').pop(),
-						studentId: parsed.data.student.id,
-						uploadedAt: new Date().toISOString(),
-						modifiedAt: new Date().toISOString(),
-						mimeType: 'text/markdown'
-					});
-
-					if (input.currentMarkdownPath !== canonicalMarkdownPath) {
-						if (await fs.exists(input.currentMarkdownPath)) {
-							await fs.deleteFile(input.currentMarkdownPath);
-						}
-						await removeEntry(tenant, input.currentMarkdownPath);
-					}
-
-					return {
-						ok: true as const,
-						json: finalJson,
-						persistedMarkdownPath: canonicalMarkdownPath,
-						validatedTitle
-					};
-				}
-				finalValidationIssues = parsed.error.issues.map((issue) => ({
-					path: issue.path.join('.'),
-					message: issue.message,
-					code: issue.code
-				}));
-				attempts.push({ json: finalJson, validationErrors: finalValidationIssues, attempt });
-			} catch (err) {
-				const message = err instanceof Error ? err.message : String(err);
-				const retryAfterSec = parseRetryAfter(err);
-				if (retryAfterSec > 0 && attempt < 2) {
-					await sleep(retryAfterSec * 1000);
-					attempts.push({
-						json: null,
-						validationErrors: [{ path: '$', message: 'RATE_LIMITED', code: 'rate_limited' }],
-						attempt
-					});
-					continue;
-				}
-				const issues = parseStructuredOutputError(message);
-				attempts.push({ json: null, validationErrors: issues, attempt });
+		const subjectMap = new Map<string, number>();
+		for (const s of mapping.subjects) {
+			if (s.subjectCode && s.id != null) {
+				subjectMap.set(s.subjectCode.toUpperCase(), s.id);
 			}
 		}
+
+		const rawJsonPath = input.currentMarkdownPath.replace(/\.md$/, '.raw.json');
+		let jsonData: Record<string, unknown>;
+
+		if (await fs.exists(rawJsonPath)) {
+			const raw = await fs.readFile(rawJsonPath, { encoding: 'utf-8' });
+			jsonData = JSON.parse(typeof raw === 'string' ? raw : raw.toString('utf-8'));
+		} else {
+			// Fallback: parse markdown directly if raw.json doesn't exist yet
+			const { parseMarksheetMarkdown } = await import('$lib/utils/marksheet-ast-parser');
+			jsonData = parseMarksheetMarkdown(correctedMarkdown) as unknown as Record<string, unknown>;
+		}
+
+		// Override resolved IDs onto the parsed data
+		if (effective.studentId != null) (jsonData.student as Record<string, unknown>).id = effective.studentId;
+		if (effective.adminNo != null) (jsonData.student as Record<string, unknown>).adminNo = effective.adminNo;
+		if (effective.studentName != null) (jsonData.student as Record<string, unknown>).fullName = effective.studentName;
+		if (effective.examTypeId != null) {
+			jsonData.examType = { ...(jsonData.examType as Record<string, unknown> ?? {}), id: effective.examTypeId };
+		}
+		for (const record of (jsonData.records as Array<Record<string, unknown>>) ?? []) {
+			const sid = subjectMap.get(String(record.subjectCode ?? '').toUpperCase());
+			record.subjectId = sid ?? 0;
+			record.studentId = effective.studentId ?? 0;
+		}
+		for (const subj of (jsonData.subjects as Array<Record<string, unknown>>) ?? []) {
+			const code = String(subj.subjectCode ?? '');
+			subj.subjectId = code ? (subjectMap.get(code.toUpperCase()) ?? null) : null;
+		}
+
+		// Inject school info, gender, sessionYear from DB (these are removed from agent output)
+		const db = await getDatabase();
+		const schoolRow = await db
+			.select({ schoolName: smSchools.schoolName, email: smSchools.email, phone: smSchools.phone })
+			.from(smSchools)
+			.where(eq(smSchools.id, tenant.schoolId))
+			.limit(1)
+			.then((rows) => rows[0] ?? null);
+		if (schoolRow) {
+			(jsonData.school as Record<string, unknown>).id = tenant.schoolId;
+			(jsonData.school as Record<string, unknown>).name = schoolRow.schoolName ?? '';
+			(jsonData.school as Record<string, unknown>).email = schoolRow.email ?? '';
+			(jsonData.school as Record<string, unknown>).phone = schoolRow.phone ?? '';
+		}
+		if (effective.studentId != null && !(jsonData.student as Record<string, unknown>).sessionYear) {
+			(jsonData.student as Record<string, unknown>).sessionYear = tenant.academicYearTitle ?? '';
+		}
+
+		const validationResult = await marksheetSchema.safeParseAsync(jsonData);
+		// No LLM fallback — template is structurally sound (auto-fixed browser-side).
+		// Zod errors are data-level, surfaced to the user via the report skill loop.
+
+		if (validationResult.success) {
+			const finalJson = validationResult.data;
+			const jsonPath = marksheetJsonPath(finalJson.student.id);
+			await fs.writeFile(jsonPath, JSON.stringify(finalJson, null, 2), {
+				recursive: true
+			});
+			await addEntry(tenant, {
+				path: jsonPath,
+				kind: 'marksheet-json',
+				studentId: finalJson.student.id,
+				uploadedAt: new Date().toISOString(),
+				modifiedAt: new Date().toISOString(),
+				mimeType: 'application/json'
+			});
+
+			const canonicalMarkdownPath = marksheetMarkdownPath({
+				studentId: finalJson.student.id,
+				adminNo: finalJson.student.adminNo,
+				examTypeId: finalJson.examType?.id ?? null,
+				studentName: finalJson.student.fullName
+			});
+			const validatedTitle = `${finalJson.student.fullName} \u2014 ${finalJson.examType?.title ?? 'Exam'}`;
+
+			await fs.writeFile(canonicalMarkdownPath, correctedMarkdown, {
+				recursive: true
+			});
+			await addEntry(tenant, {
+				path: canonicalMarkdownPath,
+				kind: 'marksheet-markdown',
+				documentId: String(finalJson.student.id),
+				fileName: canonicalMarkdownPath.split('/').pop(),
+				studentId: finalJson.student.id,
+				uploadedAt: new Date().toISOString(),
+				modifiedAt: new Date().toISOString(),
+				mimeType: 'text/markdown'
+			});
+			await updateEntryStatus(tenant, jsonPath, 'validated');
+			await updateEntryStatus(tenant, canonicalMarkdownPath, 'validated');
+
+			if (input.currentMarkdownPath !== canonicalMarkdownPath) {
+				if (await fs.exists(input.currentMarkdownPath)) {
+					await fs.deleteFile(input.currentMarkdownPath);
+				}
+				await removeEntry(tenant, input.currentMarkdownPath);
+			}
+
+			const db = await getDatabase();
+			const studentRow = await db
+				.select({ parentId: smStudents.parentId })
+				.from(smStudents)
+				.where(eq(smStudents.id, finalJson.student.id))
+				.limit(1)
+				.then((rows) => rows[0] ?? null);
+			let parentName: string | null = null;
+			let parentEmail: string | null = null;
+			if (studentRow?.parentId != null) {
+				const parent = await db
+					.select({
+						guardiansName: smParents.guardiansName,
+						guardiansEmail: smParents.guardiansEmail,
+					})
+					.from(smParents)
+					.where(eq(smParents.id, studentRow.parentId))
+					.limit(1)
+					.then((rows) => rows[0] ?? null);
+				if (parent) {
+					parentName = parent.guardiansName;
+					parentEmail = parent.guardiansEmail;
+				}
+			}
+
+			return {
+				ok: true as const,
+				json: finalJson,
+				persistedMarkdownPath: canonicalMarkdownPath,
+				validatedTitle,
+				marksheetStatus: 'validated',
+				parentName,
+				parentEmail,
+			};
+		}
+
+		const finalValidationIssues = validationResult.error.issues.map((issue) => ({
+			path: issue.path.join('.'),
+			message: issue.message,
+			code: issue.code
+		}));
 
 		return {
 			ok: false as const,
 			errors: [],
-			unresolvedErrors:
-				finalValidationIssues.length > 0
-					? finalValidationIssues
-					: (attempts[attempts.length - 1]?.validationErrors ?? [
-						{
-							path: '$',
-							message:
-								'STRUCTURED_OUTPUT_FAILED: document agent could not produce a marksheetSchema-conformant JSON after 3 attempts',
-							code: 'exhausted_retries'
-						}
-					])
+			unresolvedErrors: finalValidationIssues,
 		};
 	}
 });
 
-function sleep(ms: number): Promise<void> {
-	return new Promise((resolve) => setTimeout(resolve, ms));
-}
 
-function parseRetryAfter(err: unknown): number {
-	if (!err || typeof err !== 'object') return 0;
-	const e = err as {
-		message?: string;
-		statusCode?: number;
-		responseHeaders?: Record<string, string>;
-		data?: unknown;
-	};
-	const msg = typeof e.message === 'string' ? e.message : '';
-	const match = msg.match(/try again in ([0-9.]+)s/i);
-	if (match && match[1]) return Math.ceil(parseFloat(match[1]));
-	if (e.responseHeaders && typeof e.responseHeaders === 'object') {
-		const ra = e.responseHeaders['retry-after'] ?? e.responseHeaders['x-ratelimit-reset'];
-		if (ra) {
-			const secs = parseInt(ra, 10);
-			if (!Number.isNaN(secs)) return secs;
-		}
-	}
-	if (e.statusCode === 429) return 10;
-	return 0;
-}
-
-function parseStructuredOutputError(
-	message: string
-): Array<{ path: string; message: string; code: string }> {
-	const lines = message.split('\n').filter((l) => l.trim().startsWith('- '));
-	if (lines.length === 0) {
-		return [{ path: '$', message, code: 'structured_output_failed' }];
-	}
-	return lines.map((line) => {
-		const trimmed = line.replace(/^- /, '').trim();
-		const colonIdx = trimmed.indexOf(':');
-		if (colonIdx === -1) {
-			return { path: '$', message: trimmed, code: 'structured_output_failed' };
-		}
-		const path = trimmed.slice(0, colonIdx).trim();
-		const msg = trimmed.slice(colonIdx + 1).trim();
-		return { path: path || '$', message: msg, code: 'structured_output_failed' };
-	});
-}
