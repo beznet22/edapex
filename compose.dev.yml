@@ -17,6 +17,7 @@ services:
       - SMTP_FROM_NAME=${SMTP_FROM_NAME}
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
       - TELEGRAM_BOT_USERNAME=${TELEGRAM_BOT_USERNAME}
+      - MASTRA_DB_URL=file:/app/storage/edapex-mastra.db
     volumes:
       - ${STORAGE_DIR}/storage:/app/storage/
       - ${STORAGE_DIR}/static:/app/static/
