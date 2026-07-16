@@ -289,7 +289,6 @@ function extractSubjectsAndRecordsFromTree(tree: Root, studentId: number, catego
     for (let i = 1; i < row.children.length && i - 1 < nTitles; i++) {
       marks.push(Number(getCellText(row.children[i])) || 0);
     }
-    const totalScore = marks.reduce((s, v) => s + v, 0);
 
     let learningOutcome: string | null = null;
     if (loCol > 0 && loCol < row.children.length) {
@@ -310,7 +309,6 @@ function extractSubjectsAndRecordsFromTree(tree: Root, studentId: number, catego
       markIds: [],
       marks,
       fullMarks,
-      totalScore,
       grade: "",
       category,
       learningOutcome,
@@ -376,25 +374,6 @@ function extractExamTypeFromTree(tree: Root, md: string, mentions: ReturnType<ty
   return {
     id: mentions.examTypeId ?? 0,
     title: termName || undefined,
-  };
-}
-
-function computeScore(records: Marksheet["records"]): Marksheet["score"] {
-  if (records.length === 0) {
-    return { total: 0, average: 0, classAverage: { min: { value: "0" }, max: { value: "0" } }, maxScores: 0 };
-  }
-  const totals = records.map(r => r.totalScore);
-  const total = totals.reduce((s, v) => s + v, 0);
-  const average = total / records.length;
-  const maxScores = records.length * 100;
-  return {
-    total: Math.round(total * 100) / 100,
-    average: Math.round(average * 100) / 100,
-    classAverage: {
-      min: { value: String(Math.min(...totals)) },
-      max: { value: String(Math.max(...totals)) },
-    },
-    maxScores,
   };
 }
 
@@ -526,16 +505,12 @@ function mergeContext(result: Marksheet, context?: ParseContext): Marksheet {
     examType = { ...(examType ?? {}), id: tenant.examTypeId };
   }
 
-  // ── Score (recalculate from updated records) ──
-  const score = computeScore(records);
-
   return {
     ...result,
     school,
     student,
     subjects,
     records,
-    score,
     examType,
   };
 }
@@ -558,14 +533,11 @@ export function parseMarksheetMarkdown(markdown: string, context?: ParseContext)
 
   const examType = extractExamTypeFromTree(tree, markdown, mentions);
 
-  const score = computeScore(records);
-
   const base: Marksheet = {
     school,
     student: studentPartial,
     subjects,
     records,
-    score,
     ratings,
     remark,
     examType,

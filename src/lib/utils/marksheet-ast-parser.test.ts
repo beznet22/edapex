@@ -90,7 +90,6 @@ describe('parseMarksheetMarkdown — agent-formatted marksheet', () => {
     const result = parseMarksheetMarkdown(md);
     expect(result.records).toEqual(raw.records);
     expect(result.subjects).toEqual(raw.subjects);
-    expect(result.score).toEqual(raw.score);
     expect(result.ratings).toEqual(raw.ratings);
     expect(result.remark).toEqual(raw.remark);
   });

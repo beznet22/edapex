@@ -42,7 +42,7 @@ function applyPragmas(client: Client): void {
 	_pragmasApplied = true;
 }
 
-function getClient(): Client {
+export function getClient(): Client {
 	if (!_sharedClient) {
 		_sharedClient = createClient({ url: DB_URL });
 		applyPragmas(_sharedClient);

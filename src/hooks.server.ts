@@ -1,5 +1,12 @@
 import { auth } from "$lib/server/service/auth.service";
+import { applyMigrations } from "$lib/server/mastra/storage/libsql/migrations/runner";
+import { getClient } from "$lib/server/mastra/storage/libsql/app-db";
 import { type Handle } from "@sveltejs/kit";
+
+// Apply app DB migrations on cold start (creates encrypted_credentials etc.)
+applyMigrations(getClient()).catch((err: unknown) =>
+  console.error("[migration] app schema migration failed:", err)
+);
 
 // workerPool.initializeWorkers();
 

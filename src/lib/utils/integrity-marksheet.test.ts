@@ -40,7 +40,6 @@ function extractNumbers(md: string): RawNumbers {
   if (daysPresent == null) throw new Error('Days Present not found');
   if (daysAbsent == null) throw new Error('Days Absent not found');
 
-  // ── Extract marks from Academic Performance table ──────────────
   const perfIdx = lines.findIndex((l) => l.trim().startsWith('## Academic Performance'));
   const nextSectionIdx = lines.slice(perfIdx + 1).findIndex((l) => l.trim().startsWith('## '));
   const tableLines = nextSectionIdx === -1
@@ -49,7 +48,6 @@ function extractNumbers(md: string): RawNumbers {
 
   const subjectMarks: { subject: string; marks: number[] }[] = [];
 
-  // skip header row and separator row
   let dataStart = 0;
   for (let i = 0; i < tableLines.length; i++) {
     const trimmed = tableLines[i].trim();
@@ -72,25 +70,6 @@ function extractNumbers(md: string): RawNumbers {
   }
 
   return { admissionNo, daysOpened, daysPresent, daysAbsent, subjectMarks };
-}
-
-interface RecordNumerics {
-  marks: number[];
-  totalScore: number;
-}
-
-function pickRecordNumerics(r: Marksheet['records'][number]): RecordNumerics {
-  return { marks: [...r.marks], totalScore: r.totalScore };
-}
-
-interface ScoreNumerics {
-  total: number;
-  average: number;
-  maxScores: number;
-}
-
-function pickScoreNumerics(s: Marksheet['score']): ScoreNumerics {
-  return { total: s.total, average: s.average, maxScores: s.maxScores };
 }
 
 interface StudentNumerics {
@@ -134,14 +113,11 @@ describe('marksheet numeric integrity — markdown raw vs parser', () => {
       const raw = extractNumbers(md);
       const parsed = parseMarksheetMarkdown(md);
 
-      // ── Student numerics ───────────────────────────────────────
       expect(parsed.student.adminNo).toBe(raw.admissionNo);
       expect(parsed.student.daysOpened).toBe(raw.daysOpened);
       expect(parsed.student.daysPresent).toBe(raw.daysPresent);
       expect(parsed.student.daysAbsent).toBe(raw.daysAbsent);
 
-      // ── Subject marks ───────────────────────────────────────────
-      // DAYCARE has no numeric marks — skip subject comparison
       if (raw.subjectMarks.length === 0) return;
 
       expect(parsed.records.length).toBe(raw.subjectMarks.length);
@@ -153,13 +129,11 @@ describe('marksheet numeric integrity — markdown raw vs parser', () => {
     test(`${name} — raw markdown numbers match generated.json`, () => {
       const raw = extractNumbers(md);
 
-      // Student numerics
       expect(generated.student.adminNo).toBe(raw.admissionNo);
       expect(generated.student.daysOpened).toBe(raw.daysOpened);
       expect(generated.student.daysPresent).toBe(raw.daysPresent);
       expect(generated.student.daysAbsent).toBe(raw.daysAbsent);
 
-      // Subject marks
       if (raw.subjectMarks.length === 0) return;
 
       expect(generated.records.length).toBe(raw.subjectMarks.length);
@@ -170,23 +144,17 @@ describe('marksheet numeric integrity — markdown raw vs parser', () => {
   }
 });
 
-describe('marksheet numeric integrity — unenriched vs generated', () => {
+describe('marksheet numeric integrity — unenriched vs generated (marks only)', () => {
   const fixtures = load();
 
   for (const { name, md, generated } of fixtures) {
-    test(`${name} — all marks and scores preserved through pipeline`, () => {
+    test(`${name} — record marks preserved through pipeline`, () => {
       const baseline = parseMarksheetMarkdown(md);
 
       expect(baseline.records.length).toBe(generated.records.length);
       for (let i = 0; i < baseline.records.length; i++) {
-        expect(pickRecordNumerics(baseline.records[i])).toEqual(
-          pickRecordNumerics(generated.records[i])
-        );
+        expect(baseline.records[i].marks).toEqual(generated.records[i].marks);
       }
-
-      expect(pickScoreNumerics(baseline.score)).toEqual(
-        pickScoreNumerics(generated.score)
-      );
 
       expect(pickStudentNumerics(baseline.student)).toEqual(
         pickStudentNumerics(generated.student)
@@ -195,24 +163,18 @@ describe('marksheet numeric integrity — unenriched vs generated', () => {
   }
 });
 
-describe('marksheet numeric integrity — unenriched vs context-enriched (pre-Zod)', () => {
+describe('marksheet numeric integrity — unenriched vs context-enriched (pre-Zod, marks only)', () => {
   const fixtures = load();
 
   for (const { name, md, context } of fixtures) {
-    test(`${name} — context merge does not alter numeric values`, () => {
+    test(`${name} — context merge does not alter mark values`, () => {
       const baseline = parseMarksheetMarkdown(md);
       const enriched = parseMarksheetMarkdown(md, context);
 
       expect(baseline.records.length).toBe(enriched.records.length);
       for (let i = 0; i < baseline.records.length; i++) {
-        expect(pickRecordNumerics(baseline.records[i])).toEqual(
-          pickRecordNumerics(enriched.records[i])
-        );
+        expect(baseline.records[i].marks).toEqual(enriched.records[i].marks);
       }
-
-      expect(pickScoreNumerics(baseline.score)).toEqual(
-        pickScoreNumerics(enriched.score)
-      );
 
       expect(pickStudentNumerics(baseline.student)).toEqual(
         pickStudentNumerics(enriched.student)
