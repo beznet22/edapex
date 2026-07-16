@@ -7,7 +7,8 @@ RUN corepack enable
 
 # Build-time placeholder — Telegram adapter validates botToken at module import
 # during postbuild analysis. Real value injected at runtime via compose.
-ENV TELEGRAM_BOT_TOKEN=placeholder
+# ARG (not ENV) ensures it doesn't persist into production image layers.
+ARG TELEGRAM_BOT_TOKEN=placeholder
 
 WORKDIR /app
 
