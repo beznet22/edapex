@@ -240,7 +240,7 @@ export const publishResultPdfTool = createTool({
 
     const firstResult = publishResult.results[0];
     const jsonPath = marksheetJsonPath(student.studentId, examTypeId);
-    await updateEntryStatus(tenant, jsonPath, 'published');
+    await updateEntryStatus(tenant, jsonPath, 'published', examTypeId);
 
     await emitNotification(
       writer,

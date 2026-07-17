@@ -12,7 +12,7 @@ import {
 import { ALLOWED_DESIGNATIONS } from "$lib/types/sms-types";
 import { BaseRepository } from '$lib/server/repository/base.repo';
 import { tenantWorkspace } from '$lib/server/workspace';
-import { readManifest } from '$lib/server/workspace/manifest';
+import { readAllManifests } from '$lib/server/workspace/manifest';
 import { buildWorkspaceRequestContext } from '$lib/server/helpers/chat-helper';
 import { filterMentionableFiles } from '$lib/server/workspace/file-filters';
 import type { FileEntry } from '@mastra/core/workspace';
@@ -312,7 +312,16 @@ async function searchFile(
 		});
 		if (!fs) return [];
 		const entries: FileEntry[] = await fs.readdir('.', {recursive: true});
-		const manifest = await readManifest(tenant);
+		const manifests = await readAllManifests(tenant);
+		// Build a path -> manifestEntry map by merging all per-exam manifests.
+		// Each per-exam manifest's paths are unique because the examTypeId
+		// prefix is part of the relPath, so we just take the last writer.
+		const mergedEntries: Record<string, import('$lib/server/workspace/manifest').ManifestEntry> = {};
+		for (const m of manifests) {
+			for (const [relPath, entry] of Object.entries(m.entries)) {
+				mergedEntries[relPath] = entry;
+			}
+		}
 		const trimmed = query.trim().toLowerCase();
 		const filtered = filterMentionableFiles(entries).filter((e) => {
 			if (!trimmed) return true;
@@ -327,7 +336,7 @@ async function searchFile(
 			const lastSlash = e.name.lastIndexOf('/');
 			const parentContext = lastSlash > 0 ? e.name.slice(0, lastSlash) : '';
 			const basename = lastSlash >= 0 ? e.name.slice(lastSlash + 1) : e.name;
-			const manifestEntry = manifest.entries[e.name];
+			const manifestEntry = mergedEntries[e.name];
 			const displayName = manifestEntry?.fileName ?? basename;
 			const typeBadge = deriveFileTypeBadge(manifestEntry?.kind, e.name);
 			const mimeType = mimeTypeForName(e.name);

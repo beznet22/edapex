@@ -78,7 +78,11 @@ async function renderAndWriteTranscriptPdf(args: CoreRenderArgs): Promise<CoreRe
   const fullName = student.fullName ?? "student";
   const title = `${sanitizeForFilename(fullName)}.pdf`;
   const artifactId = `pdf-transcript-${student.studentId}-${academicId}`;
-  const storagePath = transcriptPdfPath(student.studentId, tenant.examTypeId);
+  if (tenant.examTypeId == null) {
+    throw new Error("EXAM_TYPE_REQUIRED: generate-transcript-pdf needs an active examTypeId");
+  }
+  const examTypeId = tenant.examTypeId;
+  const storagePath = transcriptPdfPath(student.studentId, examTypeId);
 
   const fs = await resolveFilesystem(tenant);
   const pdfExists = await fs.exists(storagePath);
@@ -146,15 +150,19 @@ async function renderAndWriteTranscriptPdf(args: CoreRenderArgs): Promise<CoreRe
     recursive: true,
     overwrite: true,
   });
-  await addEntry(tenant, {
-    path: storagePath,
-    kind: 'transcript-pdf',
-    studentId: student.studentId,
-    academicId,
-    uploadedAt: new Date().toISOString(),
-    modifiedAt: new Date().toISOString(),
-    mimeType: 'application/pdf'
-  });
+  await addEntry(
+    tenant,
+    {
+      path: storagePath,
+      kind: 'transcript-pdf',
+      studentId: student.studentId,
+      academicId,
+      uploadedAt: new Date().toISOString(),
+      modifiedAt: new Date().toISOString(),
+      mimeType: 'application/pdf'
+    },
+    examTypeId
+  );
 
   const tokenPayload = { studentId: student.studentId, academicId, kind: "transcript" as const };
   const token = base64url(JSON.stringify(tokenPayload));

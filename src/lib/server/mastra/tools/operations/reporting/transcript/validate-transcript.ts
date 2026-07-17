@@ -441,22 +441,35 @@ export const validateTranscriptTool = createTool({
 				const parsed = await transcriptSchema.safeParseAsync(finalJson);
 				if (parsed.success) {
 					const fs = await resolveTenantFilesystem(tenant);
-					const examTypeId = tenant.examTypeId ?? null;
+					if (tenant.examTypeId == null) {
+						return {
+							ok: false as const,
+							errors: [
+								{ path: 'tenant.examTypeId', message: 'EXAM_TYPE_REQUIRED: validate-transcript needs an active examTypeId', code: 'EXAM_TYPE_REQUIRED' }
+							],
+							attempt
+						};
+					}
+					const examTypeId = tenant.examTypeId;
 
 					const jsonPath = transcriptJsonPath(input.studentId, examTypeId);
 					await fs.writeFile(jsonPath, JSON.stringify(finalJson, null, 2), {
 						recursive: true
 					});
-					await addEntry(tenant, {
-						path: jsonPath,
-						kind: 'transcript-json',
-						studentId: input.studentId,
-						academicId: parsed.data.academicYear.id,
-						examTypeId,
-						uploadedAt: new Date().toISOString(),
-						modifiedAt: new Date().toISOString(),
-						mimeType: 'application/json'
-					});
+					await addEntry(
+						tenant,
+						{
+							path: jsonPath,
+							kind: 'transcript-json',
+							studentId: input.studentId,
+							academicId: parsed.data.academicYear.id,
+							examTypeId,
+							uploadedAt: new Date().toISOString(),
+							modifiedAt: new Date().toISOString(),
+							mimeType: 'application/json'
+						},
+						examTypeId
+					);
 
 					const canonicalMarkdownPath = transcriptMarkdownPath(parsed.data.student.id, examTypeId);
 					const validatedTitle = `${parsed.data.student.fullName} — Transcript ${parsed.data.academicYear.title}`;
@@ -464,23 +477,27 @@ export const validateTranscriptTool = createTool({
 					await fs.writeFile(canonicalMarkdownPath, input.correctedMarkdown, {
 						recursive: true
 					});
-					await addEntry(tenant, {
-						path: canonicalMarkdownPath,
-						kind: 'transcript-markdown',
-						documentId: String(parsed.data.student.id),
-						fileName: canonicalMarkdownPath.split('/').pop(),
-						studentId: parsed.data.student.id,
-						academicId: parsed.data.academicYear.id,
-						uploadedAt: new Date().toISOString(),
-						modifiedAt: new Date().toISOString(),
-						mimeType: 'text/markdown'
-					});
+					await addEntry(
+						tenant,
+						{
+							path: canonicalMarkdownPath,
+							kind: 'transcript-markdown',
+							documentId: String(parsed.data.student.id),
+							fileName: canonicalMarkdownPath.split('/').pop(),
+							studentId: parsed.data.student.id,
+							academicId: parsed.data.academicYear.id,
+							uploadedAt: new Date().toISOString(),
+							modifiedAt: new Date().toISOString(),
+							mimeType: 'text/markdown'
+						},
+						examTypeId
+					);
 
 					if (input.currentMarkdownPath && input.currentMarkdownPath !== canonicalMarkdownPath) {
 						if (await fs.exists(input.currentMarkdownPath)) {
 							await fs.deleteFile(input.currentMarkdownPath);
 						}
-						await removeEntry(tenant, input.currentMarkdownPath);
+						await removeEntry(tenant, input.currentMarkdownPath, examTypeId);
 					}
 
 					return {

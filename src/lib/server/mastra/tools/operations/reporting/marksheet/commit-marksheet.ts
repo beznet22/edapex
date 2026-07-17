@@ -83,7 +83,20 @@ export const commitMarksheetTool = createTool({
 		}
 
 		const fs = await resolveTenantFilesystem(tenant);
-		const jsonPath = marksheetJsonPath(input.studentId, tenant.examTypeId);
+		if (tenant.examTypeId == null) {
+			return {
+				ok: false as const,
+				errors: [
+					{
+						path: 'tenant.examTypeId',
+						message: 'EXAM_TYPE_REQUIRED: committing a marksheet requires an active examTypeId',
+						code: 'EXAM_TYPE_REQUIRED'
+					}
+				]
+			};
+		}
+		const examTypeId = tenant.examTypeId;
+		const jsonPath = marksheetJsonPath(input.studentId, examTypeId);
 		if (!(await fs.exists(jsonPath))) {
 			return {
 				ok: false as const,
@@ -147,17 +160,21 @@ export const commitMarksheetTool = createTool({
 			};
 		}
 
-		await addEntry(tenant, {
-			path: jsonPath,
-			kind: 'marksheet-json',
-			studentId: input.studentId,
-			examTypeId: tenant.examTypeId ?? null,
-			recordId,
-			uploadedAt: new Date().toISOString(),
-			modifiedAt: new Date().toISOString(),
-			mimeType: 'application/json'
-		});
-		await updateEntryStatus(tenant, jsonPath, 'committed');
+		await addEntry(
+			tenant,
+			{
+				path: jsonPath,
+				kind: 'marksheet-json',
+				studentId: input.studentId,
+				examTypeId,
+				recordId,
+				uploadedAt: new Date().toISOString(),
+				modifiedAt: new Date().toISOString(),
+				mimeType: 'application/json'
+			},
+			examTypeId
+		);
+		await updateEntryStatus(tenant, jsonPath, 'committed', examTypeId);
 
 		const studentName = validated.student?.fullName ?? 'Unknown';
 		return { ok: true as const, artifactId, recordId, studentName };

@@ -216,15 +216,19 @@ async function renderAndWriteResultPdf(args: CoreRenderArgs): Promise<CoreRender
     recursive: true,
     overwrite: true,
   });
-  await addEntry(resolvedTenant, {
-    path: storagePath,
-    kind: 'marksheet-pdf',
-    studentId: student.studentId,
-    examTypeId,
-    uploadedAt: new Date().toISOString(),
-    modifiedAt: new Date().toISOString(),
-    mimeType: 'application/pdf'
-  });
+  await addEntry(
+    resolvedTenant,
+    {
+      path: storagePath,
+      kind: 'marksheet-pdf',
+      studentId: student.studentId,
+      examTypeId,
+      uploadedAt: new Date().toISOString(),
+      modifiedAt: new Date().toISOString(),
+      mimeType: 'application/pdf'
+    },
+    examTypeId
+  );
 
   const token = base64url(JSON.stringify({ studentId: student.studentId, examTypeId }));
   const previewUrl = `/api/results/${token}`;

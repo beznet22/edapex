@@ -22,7 +22,9 @@ export {
 	marksheetPdfPath,
 	transcriptJsonPath,
 	transcriptMarkdownPath,
-	transcriptPdfPath
+	transcriptPdfPath,
+	manifestPath,
+	examDir
 } from './paths';
 export {
 	classSlug,
@@ -36,7 +38,9 @@ export {
 	addEntry,
 	removeEntry,
 	updateEntryStatus,
-	emptyManifest
+	emptyManifest,
+	readAllManifests,
+	clearExamArtifacts
 } from './manifest';
 export type { WorkspaceManifest, ManifestEntry, ArtifactKind, MarksheetStatus } from './manifest';
 export { isMentionableFile, filterMentionableFiles, EXCLUDED_DIR_PREFIXES } from './file-filters';

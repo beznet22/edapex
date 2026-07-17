@@ -85,12 +85,22 @@ export const publishResult = command(
       const provider = new ScopedRepositoryProvider(await getDatabase(), tenant);
       const student = await provider.getRepo(StudentRepository).getStudentById(studentId);
       if (student) {
-        // Update manifest marksheet status to published
-        const manifest = await readManifest(tenant);
+        // Update manifest marksheet status to published. Each per-exam
+        // manifest is checked independently; we update the one that
+        // contains the marksheet for this student.
+        if (tenant.examTypeId == null) {
+          return { success: false, message: "Cannot publish result without an active exam" };
+        }
+        const examTypeId = tenant.examTypeId;
+        const manifest = await readManifest(tenant, examTypeId);
         for (const [relPath, entry] of Object.entries(manifest.entries)) {
           if (entry.kind === "marksheet-json" && entry.studentId === studentId) {
             try {
-              await addEntry(tenant, { ...entry, marksheetStatus: "published", modifiedAt: new Date().toISOString() });
+              await addEntry(
+                tenant,
+                { ...entry, marksheetStatus: "published", modifiedAt: new Date().toISOString() },
+                examTypeId
+              );
             } catch {
               // ignore manifest write errors
             }

@@ -123,11 +123,15 @@ export class OcrWorkspaceStore {
     const contentHash = await sha256Hex(bytes);
 
     const fs = await resolveFilesystem(params.tenant);
+    if (params.tenant.examTypeId == null) {
+      throw new Error('TENANT_EXAM_TYPE_REQUIRED: OCR writes require an active examTypeId');
+    }
+    const examTypeId = params.tenant.examTypeId;
 
-    if (await fs.exists(ocrMarkdownPath(params.fileName, params.tenant.examTypeId))) {
+    if (await fs.exists(ocrMarkdownPath(params.fileName, examTypeId))) {
       const existing = await readMeta(fs, params.tenant, params.fileName);
       if (existing) {
-        const markdown = await readMarkdownViaFs(fs, params.fileName, params.tenant.examTypeId);
+        const markdown = await readMarkdownViaFs(fs, params.fileName, examTypeId);
         return { ...existing, markdown };
       }
     }
@@ -162,30 +166,38 @@ export class OcrWorkspaceStore {
       createdAt: new Date().toISOString(),
     };
 
-    const mdPath = ocrMarkdownPath(params.fileName, params.tenant.examTypeId);
-    const metaPath = ocrMetaPath(params.fileName, params.tenant.examTypeId);
+    const mdPath = ocrMarkdownPath(params.fileName, examTypeId);
+    const metaPath = ocrMetaPath(params.fileName, examTypeId);
     await fs.writeFile(mdPath, markdown, { recursive: true });
     await fs.writeFile(metaPath, JSON.stringify(meta), { recursive: true });
-    await addEntry(params.tenant, {
-      path: mdPath,
-      kind: 'ocr-markdown',
-      fileName: params.fileName,
-      contentHash,
-      examTypeId: params.tenant.examTypeId ?? null,
-      uploadedAt: meta.createdAt,
-      modifiedAt: meta.createdAt,
-      mimeType: 'text/markdown'
-    });
-    await addEntry(params.tenant, {
-      path: metaPath,
-      kind: 'ocr-meta',
-      fileName: params.fileName,
-      contentHash,
-      examTypeId: params.tenant.examTypeId ?? null,
-      uploadedAt: meta.createdAt,
-      modifiedAt: meta.createdAt,
-      mimeType: 'application/json'
-    });
+    await addEntry(
+      params.tenant,
+      {
+        path: mdPath,
+        kind: 'ocr-markdown',
+        fileName: params.fileName,
+        contentHash,
+        examTypeId,
+        uploadedAt: meta.createdAt,
+        modifiedAt: meta.createdAt,
+        mimeType: 'text/markdown'
+      },
+      examTypeId
+    );
+    await addEntry(
+      params.tenant,
+      {
+        path: metaPath,
+        kind: 'ocr-meta',
+        fileName: params.fileName,
+        contentHash,
+        examTypeId,
+        uploadedAt: meta.createdAt,
+        modifiedAt: meta.createdAt,
+        mimeType: 'application/json'
+      },
+      examTypeId
+    );
 
     return { ...meta, markdown };
   }

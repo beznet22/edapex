@@ -4,7 +4,7 @@ import { smGeneralSettings, smStudents } from "$lib/server/db/sms-schema";
 import { getDatabase } from "$lib/server/db";
 import { createTenantContext } from "$lib/server/mastra/tenant-context";
 import { OcrWorkspaceStore } from "$lib/server/mastra/storage/ocr/ocr-workspace-store";
-import { addEntry as addWorkspaceEntry, removeEntry as removeWorkspaceEntry, readManifest } from "$lib/server/workspace/manifest";
+import { addEntry as addWorkspaceEntry, removeEntry as removeWorkspaceEntry, readAllManifests, clearExamArtifacts } from "$lib/server/workspace/manifest";
 import { uploadPath, ocrMarkdownPath, ocrMetaPath, marksheetJsonPath, marksheetMarkdownPath, marksheetPdfPath, transcriptJsonPath, transcriptMarkdownPath, transcriptPdfPath } from "$lib/server/workspace/paths";
 import { resolveTenantFilesystem } from "$lib/server/workspace";
 import { resolveTenantWorkspace } from "$lib/server/workspace/scope";
@@ -229,26 +229,34 @@ export const POST: RequestHandler = async ({ request, locals, cookies }) => {
 
   const documentId = randomUUID();
 
+  if (tenant.examTypeId == null) {
+    return json({ success: false, message: "EXAM_TYPE_REQUIRED: cannot upload without an active examTypeId" }, { status: 400 });
+  }
+  const examTypeId = tenant.examTypeId;
+
   // Save the original upload to the workspace at the canonical uploads/
   // path so it can be re-extracted later and discovered via @file mention.
   const requestContext = buildWorkspaceRequestContext(tenant);
   const fs = await resolveTenantFilesystem({ requestContext: requestContext as never });
-  await fs.writeFile(uploadPath(filename, tenant.examTypeId), buffer, { recursive: true });
+  await fs.writeFile(uploadPath(filename, examTypeId), buffer, { recursive: true });
 
-  // Register the upload in the single workspace manifest.json (kind:
-  // user-file). The legacy `extracted/manifest.json` is gone.
-  await addWorkspaceEntry(tenant, {
-    path: uploadPath(filename, tenant.examTypeId),
-    kind: "user-file",
-    documentId,
-    fileName: filename,
-    contentHash,
-    examTypeId: tenant.examTypeId ?? null,
-    uploadedAt: new Date().toISOString(),
-    modifiedAt: new Date().toISOString(),
-    mimeType: file.type,
-    sizeBytes: file.size
-  });
+  // Register the upload in the per-exam manifest (kind: user-file).
+  await addWorkspaceEntry(
+    tenant,
+    {
+      path: uploadPath(filename, examTypeId),
+      kind: "user-file",
+      documentId,
+      fileName: filename,
+      contentHash,
+      examTypeId,
+      uploadedAt: new Date().toISOString(),
+      modifiedAt: new Date().toISOString(),
+      mimeType: file.type,
+      sizeBytes: file.size
+    },
+    examTypeId
+  );
 
   // Trigger Mistral OCR on the uploaded image. Writes the canonical
   // ocr/<fileName>.md + ocr/<fileName>.meta.json so format-marksheet-
@@ -265,7 +273,7 @@ export const POST: RequestHandler = async ({ request, locals, cookies }) => {
       // — saves the monthly Mistral trial quota when the user re-uploads
       // the same marksheet. format-marksheet-document reads from this same
       // path, so a cached OCR is consumed normally downstream.
-      const ocrPath = ocrMarkdownPath(filename, tenant.examTypeId);
+      const ocrPath = ocrMarkdownPath(filename, examTypeId);
       if (await fs.exists(ocrPath)) {
         ocrStatus = 'ready';
         console.info(`[uploads] OCR cache hit for ${filename}, skipping Mistral call`);
@@ -282,7 +290,7 @@ export const POST: RequestHandler = async ({ request, locals, cookies }) => {
           .join('\n\n');
         await fs.writeFile(ocrPath, markdown, { recursive: true });
         await fs.writeFile(
-          ocrMetaPath(filename, tenant.examTypeId),
+          ocrMetaPath(filename, examTypeId),
           JSON.stringify(
             {
               fileName: filename,
@@ -298,26 +306,34 @@ export const POST: RequestHandler = async ({ request, locals, cookies }) => {
         );
         // Register both entries (only on fresh OCR; cache hits already
         // have them from the first upload's manifest).
-        await addWorkspaceEntry(tenant, {
-          path: ocrPath,
-          kind: 'ocr-markdown',
-          fileName: filename,
-          contentHash,
-          examTypeId: tenant.examTypeId ?? null,
-          uploadedAt: new Date().toISOString(),
-          modifiedAt: new Date().toISOString(),
-          mimeType: 'text/markdown'
-        });
-        await addWorkspaceEntry(tenant, {
-          path: ocrMetaPath(filename, tenant.examTypeId),
-          kind: 'ocr-meta',
-          fileName: filename,
-          contentHash,
-          examTypeId: tenant.examTypeId ?? null,
-          uploadedAt: new Date().toISOString(),
-          modifiedAt: new Date().toISOString(),
-          mimeType: 'application/json'
-        });
+        await addWorkspaceEntry(
+          tenant,
+          {
+            path: ocrPath,
+            kind: 'ocr-markdown',
+            fileName: filename,
+            contentHash,
+            examTypeId,
+            uploadedAt: new Date().toISOString(),
+            modifiedAt: new Date().toISOString(),
+            mimeType: 'text/markdown'
+          },
+          examTypeId
+        );
+        await addWorkspaceEntry(
+          tenant,
+          {
+            path: ocrMetaPath(filename, examTypeId),
+            kind: 'ocr-meta',
+            fileName: filename,
+            contentHash,
+            examTypeId,
+            uploadedAt: new Date().toISOString(),
+            modifiedAt: new Date().toISOString(),
+            mimeType: 'application/json'
+          },
+          examTypeId
+        );
         ocrStatus = 'ready';
       }
     }
@@ -343,11 +359,12 @@ export const DELETE: RequestHandler = async ({ url, locals, cookies }) => {
   if (!user || !session) error(401, "Unauthorized");
 
   const clearAll = url.searchParams.get("clear") === "all";
+  const clearExamParam = url.searchParams.get("exam");
   const filename = url.searchParams.get("filename");
   const documentId = url.searchParams.get("documentId");
 
-  if (!clearAll && !filename && !documentId) {
-    return json({ success: false, message: "No filename or documentId provided" });
+  if (!clearAll && !clearExamParam && !filename && !documentId) {
+    return json({ success: false, message: "No filename, documentId, or clear scope provided" });
   }
 
   // Use the central workspace resolver for correct human-readable paths
@@ -361,27 +378,41 @@ export const DELETE: RequestHandler = async ({ url, locals, cookies }) => {
   if (!fs) throw error(500, "Workspace filesystem unavailable");
 
   if (clearAll) {
-    // Remove all exam-scoped directories and their contents
-    for (const dir of ["exams", "uploads", "ocr", "marksheets", "pdfs", "scratch", "notes", "shared"]) {
-      try {
-        await fs.rmdir(dir, { recursive: true });
-      } catch {
-        // directory may not exist — ignore
-      }
+    // Every workspace artifact lives under exams/. Wiping exams/ removes
+    // every per-exam manifest and all associated files.
+    try {
+      await fs.rmdir("exams", { recursive: true });
+    } catch {
+      // directory may not exist — ignore
     }
     return json({ success: true });
   }
 
+  if (clearExamParam) {
+    const examTypeId = Number(clearExamParam);
+    if (!Number.isFinite(examTypeId)) {
+      return json({ success: false, message: "Invalid exam id" }, { status: 400 });
+    }
+    await clearExamArtifacts(tenant, examTypeId);
+    return json({ success: true });
+  }
+
   // For individual file delete, determine the filename from the manifest
-  // (via documentId lookup) or use the provided filename directly.
+  // (via documentId lookup across all per-exam manifests) or use the
+  // provided filename directly.
   let targetFilename = filename;
+  let documentIdExamTypeId: number | null = null;
   if (!targetFilename && documentId) {
-    const manifest = await readManifest(tenant);
-    for (const [relPath, entry] of Object.entries(manifest.entries)) {
-      if (entry.documentId === documentId) {
-        targetFilename = entry.fileName ?? null;
-        break;
+    const manifests = await readAllManifests(tenant);
+    for (const m of manifests) {
+      for (const [relPath, entry] of Object.entries(m.entries)) {
+        if (entry.documentId === documentId) {
+          targetFilename = entry.fileName ?? null;
+          documentIdExamTypeId = m.examTypeId;
+          break;
+        }
       }
+      if (targetFilename) break;
     }
     if (!targetFilename) {
       return json({ success: false, message: "File not found in manifest" });
@@ -391,40 +422,49 @@ export const DELETE: RequestHandler = async ({ url, locals, cookies }) => {
     return json({ success: false, message: "Could not determine filename to delete" });
   }
 
-  // Build the set of paths to delete: upload, OCR markdown, OCR meta
-  const examTypeId = tenant.examTypeId ?? null;
+  // Build the set of paths to delete: upload, OCR markdown, OCR meta.
+  // The file lives in the exam that owns the upload entry.
+  const tenantExamTypeId = tenant.examTypeId;
+  const examTypeIdForFile = documentIdExamTypeId ?? tenantExamTypeId;
+  if (examTypeIdForFile == null) {
+    return json({ success: false, message: "EXAM_TYPE_REQUIRED: cannot resolve the file's exam scope" }, { status: 400 });
+  }
   const pathsToDelete: string[] = [
-    uploadPath(targetFilename, examTypeId),
-    ocrMarkdownPath(targetFilename, examTypeId),
-    ocrMetaPath(targetFilename, examTypeId)
+    uploadPath(targetFilename, examTypeIdForFile),
+    ocrMarkdownPath(targetFilename, examTypeIdForFile),
+    ocrMetaPath(targetFilename, examTypeIdForFile)
   ];
 
-  // Also clean up marksheets and transcripts for this file (scan manifest for entries matching the filename)
-  const manifest = await readManifest(tenant);
-  for (const [relPath, entry] of Object.entries(manifest.entries)) {
-    if (entry.fileName === targetFilename && entry.kind === "user-file") {
-      const entryExamTypeId = entry.examTypeId ?? examTypeId;
-      if (entry.studentId !== undefined) {
-        pathsToDelete.push(marksheetJsonPath(entry.studentId, entryExamTypeId));
-        pathsToDelete.push(marksheetMarkdownPath({ studentId: entry.studentId }));
-        pathsToDelete.push(marksheetPdfPath(entry.studentId, undefined, undefined, entryExamTypeId));
-        pathsToDelete.push(transcriptJsonPath(entry.studentId, entryExamTypeId));
-        pathsToDelete.push(transcriptMarkdownPath(entry.studentId, entryExamTypeId));
-        pathsToDelete.push(transcriptPdfPath(entry.studentId, entryExamTypeId));
-      }
-      if (entry.recordId !== undefined && entry.studentId !== undefined && entry.examTypeId !== undefined) {
-        try {
-          const cleanupProvider = new ScopedRepositoryProvider(await getDatabase(), tenant);
-          await cleanupProvider.getRepo(ResultsRepository).cleanMarks({
-            recordId: entry.recordId,
-            studentId: entry.studentId,
-            classId: tenant.classId ?? 0,
-            sectionId: tenant.sectionId ?? 0,
-            examTermId: entry.examTypeId,
-            schoolId: tenant.schoolId,
-          });
-        } catch (e) {
-          console.error("[uploads] Failed to clean marks:", e);
+  // Also clean up marksheets and transcripts for this file (scan every
+  // per-exam manifest for entries matching the filename). Each manifest
+  // tracks its own examTypeId, so the path is unambiguous.
+  const manifests = await readAllManifests(tenant);
+  for (const m of manifests) {
+    for (const [relPath, entry] of Object.entries(m.entries)) {
+      if (entry.fileName === targetFilename && entry.kind === "user-file") {
+        const entryExamTypeId = entry.examTypeId ?? m.examTypeId;
+        if (entry.studentId !== undefined) {
+          pathsToDelete.push(marksheetJsonPath(entry.studentId, entryExamTypeId));
+          pathsToDelete.push(marksheetMarkdownPath({ studentId: entry.studentId }));
+          pathsToDelete.push(marksheetPdfPath(entry.studentId, undefined, undefined, entryExamTypeId));
+          pathsToDelete.push(transcriptJsonPath(entry.studentId, entryExamTypeId));
+          pathsToDelete.push(transcriptMarkdownPath(entry.studentId, entryExamTypeId));
+          pathsToDelete.push(transcriptPdfPath(entry.studentId, entryExamTypeId));
+        }
+        if (entry.recordId !== undefined && entry.studentId !== undefined && entry.examTypeId !== undefined) {
+          try {
+            const cleanupProvider = new ScopedRepositoryProvider(await getDatabase(), tenant);
+            await cleanupProvider.getRepo(ResultsRepository).cleanMarks({
+              recordId: entry.recordId,
+              studentId: entry.studentId,
+              classId: tenant.classId ?? 0,
+              sectionId: tenant.sectionId ?? 0,
+              examTermId: entry.examTypeId,
+              schoolId: tenant.schoolId,
+            });
+          } catch (e) {
+            console.error("[uploads] Failed to clean marks:", e);
+          }
         }
       }
     }
@@ -438,10 +478,18 @@ export const DELETE: RequestHandler = async ({ url, locals, cookies }) => {
     } catch {
       // file may not exist — ignore
     }
-    try {
-      await removeWorkspaceEntry(tenant, p);
-    } catch {
-      // ignore
+    // The entry is registered in the manifest that owns its directory.
+    // We try every per-exam manifest's removeEntry — only the one
+    // containing the relPath will actually mutate state.
+    const manifests = await readAllManifests(tenant);
+    for (const m of manifests) {
+      if (m.entries[p]) {
+        try {
+          await removeWorkspaceEntry(tenant, p, m.examTypeId);
+        } catch {
+          // ignore
+        }
+      }
     }
   }
 

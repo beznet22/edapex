@@ -6,7 +6,7 @@ import z from "zod";
 import { createAssessmentServiceForRequest } from "$lib/server/service/assessment.service";
 import { createTenantContext } from "$lib/server/mastra/tenant-context";
 import { resolveTenantWorkspace } from "$lib/server/workspace/scope";
-import { readManifest } from "$lib/server/workspace/manifest";
+import { readAllManifests } from "$lib/server/workspace/manifest";
 import type { ChatThread, UploadedData } from "$lib/types/chat-types";
 import { getMemory, mastra } from "$lib/server/mastra";
 import type { StorageThreadType } from "@mastra/core/memory";
@@ -233,11 +233,17 @@ export const getResources = query(
     });
     if (!fs) return { success: true, resources: [] };
 
-    const manifest = await readManifest(tenant);
-    const indexedPaths = new Set(Object.keys(manifest.entries));
+    const manifests = await readAllManifests(tenant);
+    const mergedEntries: Record<string, { relPath: string; entry: import("$lib/server/workspace/manifest").ManifestEntry }> = {};
+    for (const m of manifests) {
+      for (const [relPath, entry] of Object.entries(m.entries)) {
+        mergedEntries[relPath] = { relPath, entry };
+      }
+    }
+    const indexedPaths = new Set(Object.keys(mergedEntries));
 
     const resources: UploadedData[] = [];
-    for (const [relPath, entry] of Object.entries(manifest.entries)) {
+    for (const { relPath, entry } of Object.values(mergedEntries)) {
       if (entry.kind !== "user-file" && entry.kind !== "ocr-markdown") continue;
       const displayName = entry.fileName ?? relPath.split("/").pop() ?? relPath;
       resources.push({

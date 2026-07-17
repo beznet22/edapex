@@ -16,7 +16,9 @@ import {
 	transcriptMarkdownPath,
 	ocrMarkdownPath,
 	ocrMetaPath,
-	uploadPath
+	uploadPath,
+	manifestPath,
+	examDir
 } from '$lib/server/workspace/paths';
 import { createTenantContext } from '$lib/server/mastra/tenant-context';
 import path from 'node:path';
@@ -221,5 +223,22 @@ describe('canonical workspace layout invariants', () => {
 		expect(marksheetPdfPath(188)).not.toContain('name');
 		expect(transcriptPdfPath(188)).not.toContain('admissionNo');
 		expect(marksheetJsonPath(188)).not.toContain('admissionNo');
+	});
+});
+
+describe('manifestPath', () => {
+	it('returns exams/examType-{id}/manifest.json for any examTypeId', () => {
+		expect(manifestPath(1)).toBe('exams/examType-1/manifest.json');
+		expect(manifestPath(2)).toBe('exams/examType-2/manifest.json');
+		expect(manifestPath(42)).toBe('exams/examType-42/manifest.json');
+	});
+});
+
+describe('examDir', () => {
+	it('returns exams/examType-{id}/{kind} for each kind', () => {
+		expect(examDir(1, 'uploads')).toBe('exams/examType-1/uploads');
+		expect(examDir(2, 'notes')).toBe('exams/examType-2/notes');
+		expect(examDir(3, 'shared')).toBe('exams/examType-3/shared');
+		expect(examDir(4, 'scratch')).toBe('exams/examType-4/scratch');
 	});
 });

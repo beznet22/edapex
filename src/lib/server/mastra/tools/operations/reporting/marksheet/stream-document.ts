@@ -120,7 +120,11 @@ export const streamDocumentTool = createTool({
     const writerWithCustom = writer as unknown as { custom: (chunk: unknown) => Promise<void> };
 
     const { contentHash, fileName } = input;
-    const manifest = await readWorkspaceManifest(tenant);
+    if (tenant.examTypeId == null) {
+      throw new Error('TENANT_EXAM_TYPE_REQUIRED: stream-document needs an active examTypeId to scope the per-exam manifest');
+    }
+    const examTypeId = tenant.examTypeId;
+    const manifest = await readWorkspaceManifest(tenant, examTypeId);
     const entry = Object.values(manifest.entries).find(
       (e) => e.contentHash === contentHash && e.kind === 'user-file'
     );
@@ -130,7 +134,7 @@ export const streamDocumentTool = createTool({
 
     const { title, initialMarkdownPath } = deriveInitialFilename(entry.fileName, contentHash);
 
-    const mdRelPath = ocrMarkdownPath(entry.fileName, tenant.examTypeId);
+    const mdRelPath = ocrMarkdownPath(entry.fileName, examTypeId);
     if (!(await fs.exists(mdRelPath))) {
       throw new Error(`OCR_MARKDOWN_NOT_FOUND: ${mdRelPath}`);
     }
@@ -262,17 +266,21 @@ MIDDLEBASIC: Subject Code | MTA (30) | CA (10) | REPORT (10) | EXAM (50)`;
     // `validate-marksheet.ts`, which renames this draft away.
     const formattedDocumentId = entry.documentId ?? documentId;
     await fs.writeFile(initialMarkdownPath, markdown, { recursive: true });
-    await addEntry(tenant, {
-      path: initialMarkdownPath,
-      kind: 'marksheet-markdown',
-      documentId: formattedDocumentId,
-      fileName: entry.fileName,
-      contentHash,
-      studentId: studentId ?? undefined,
-      uploadedAt: new Date().toISOString(),
-      modifiedAt: new Date().toISOString()
-    });
-    await updateEntryStatus(tenant, initialMarkdownPath, 'formatted');
+    await addEntry(
+      tenant,
+      {
+        path: initialMarkdownPath,
+        kind: 'marksheet-markdown',
+        documentId: formattedDocumentId,
+        fileName: entry.fileName,
+        contentHash,
+        studentId: studentId ?? undefined,
+        uploadedAt: new Date().toISOString(),
+        modifiedAt: new Date().toISOString()
+      },
+      examTypeId
+    );
+    await updateEntryStatus(tenant, initialMarkdownPath, 'formatted', examTypeId);
 
     return {
       artifactId,

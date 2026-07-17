@@ -298,20 +298,27 @@ export const validateMarksheetTool = createTool({
 
 		if (validationResult.success) {
 			const finalJson = validationResult.data;
-			const examTypeId = finalJson.examType?.id ?? tenant.examTypeId ?? null;
+			const examTypeId = finalJson.examType?.id ?? tenant.examTypeId;
+			if (examTypeId == null) {
+				throw new Error('EXAM_TYPE_REQUIRED: validate-marksheet needs an examTypeId to write the per-exam manifest');
+			}
 			const jsonPath = marksheetJsonPath(finalJson.student.id, examTypeId);
 			await fs.writeFile(jsonPath, JSON.stringify(finalJson, null, 2), {
 				recursive: true
 			});
-			await addEntry(tenant, {
-				path: jsonPath,
-				kind: 'marksheet-json',
-				studentId: finalJson.student.id,
-				examTypeId,
-				uploadedAt: new Date().toISOString(),
-				modifiedAt: new Date().toISOString(),
-				mimeType: 'application/json'
-			});
+			await addEntry(
+				tenant,
+				{
+					path: jsonPath,
+					kind: 'marksheet-json',
+					studentId: finalJson.student.id,
+					examTypeId,
+					uploadedAt: new Date().toISOString(),
+					modifiedAt: new Date().toISOString(),
+					mimeType: 'application/json'
+				},
+				examTypeId
+			);
 
 			const canonicalMarkdownPath = marksheetMarkdownPath({
 				studentId: finalJson.student.id,
@@ -324,25 +331,29 @@ export const validateMarksheetTool = createTool({
 			await fs.writeFile(canonicalMarkdownPath, correctedMarkdown, {
 				recursive: true
 			});
-			await addEntry(tenant, {
-				path: canonicalMarkdownPath,
-				kind: 'marksheet-markdown',
-				documentId: String(finalJson.student.id),
-				fileName: canonicalMarkdownPath.split('/').pop(),
-				studentId: finalJson.student.id,
-				examTypeId,
-				uploadedAt: new Date().toISOString(),
-				modifiedAt: new Date().toISOString(),
-				mimeType: 'text/markdown'
-			});
-			await updateEntryStatus(tenant, jsonPath, 'validated');
-			await updateEntryStatus(tenant, canonicalMarkdownPath, 'validated');
+			await addEntry(
+				tenant,
+				{
+					path: canonicalMarkdownPath,
+					kind: 'marksheet-markdown',
+					documentId: String(finalJson.student.id),
+					fileName: canonicalMarkdownPath.split('/').pop(),
+					studentId: finalJson.student.id,
+					examTypeId,
+					uploadedAt: new Date().toISOString(),
+					modifiedAt: new Date().toISOString(),
+					mimeType: 'text/markdown'
+				},
+				examTypeId
+			);
+			await updateEntryStatus(tenant, jsonPath, 'validated', examTypeId);
+			await updateEntryStatus(tenant, canonicalMarkdownPath, 'validated', examTypeId);
 
 			if (input.currentMarkdownPath !== canonicalMarkdownPath) {
 				if (await fs.exists(input.currentMarkdownPath)) {
 					await fs.deleteFile(input.currentMarkdownPath);
 				}
-				await removeEntry(tenant, input.currentMarkdownPath);
+				await removeEntry(tenant, input.currentMarkdownPath, examTypeId);
 			}
 
 			const db = await getDatabase();

@@ -347,17 +347,25 @@ export const PUT: RequestHandler = async ({ params, request, locals, cookies, ur
 
     const fileName = resolvedPath.split('/').pop() ?? 'upload';
     const contentHash = createHash('md5').update(bytes).digest('hex');
-    await addWorkspaceEntry(tenant, {
-      path: resolvedPath,
-      kind: 'user-file',
-      documentId: randomUUID(),
-      fileName,
-      contentHash,
-      uploadedAt: new Date().toISOString(),
-      modifiedAt: new Date().toISOString(),
-      mimeType: contentTypeFor(resolvedPath),
-      sizeBytes: bytes.length,
-    });
+    if (tenant.examTypeId == null) {
+      throw error(400, 'EXAM_TYPE_REQUIRED: cannot register a workspace upload without an active examTypeId');
+    }
+    await addWorkspaceEntry(
+      tenant,
+      {
+        path: resolvedPath,
+        kind: 'user-file',
+        documentId: randomUUID(),
+        fileName,
+        contentHash,
+        examTypeId: tenant.examTypeId,
+        uploadedAt: new Date().toISOString(),
+        modifiedAt: new Date().toISOString(),
+        mimeType: contentTypeFor(resolvedPath),
+        sizeBytes: bytes.length,
+      },
+      tenant.examTypeId
+    );
 
     return json({ success: true, path: resolvedPath });
   } catch (e: unknown) {

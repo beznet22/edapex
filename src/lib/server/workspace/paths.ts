@@ -5,29 +5,32 @@
  * helpers. The single source of truth — DO NOT compute paths inline in
  * individual tools; always use these helpers.
  *
- * Layout:
+ * Layout (per examTypeId — strict, no class-root fallback for content):
  *   .workspaces/<schoolId>/AY<academicId>-<year-slug>/<classId>-<classSlug>_<sectionId>-<sectionSlug>/
- *     manifest.json                       — single manifest tracking every artifact
  *     exams/examType-{id}/
- *       uploads/<fileName>                — original uploaded images
- *       ocr/<fileName>.md                 — raw OCR markdown (one per upload)
- *       ocr/<fileName>.meta.json          — OCR meta sidecar (mistralFileId, etc.)
- *       marksheets/<studentId>.json       — validated Marksheet JSON (after LLM)
- *       marksheets/<studentId>-<slug>.md  — formatted academic report markdown
- *       transcripts/<studentId>.md        — multi-term transcript markdown
- *       transcripts/<studentId>.json      — transcript data
- *       pdfs/marksheet-<studentId>.pdf    — rendered marksheet PDF
- *       pdfs/transcript-<studentId>.pdf   — rendered transcript PDF
- *       notes/                            — user-defined (anything goes)
- *       shared/                           — shared resources
- *     scratch/                            — temporary work
+ *       manifest.json                  — per-exam manifest tracking every artifact
+ *       uploads/<fileName>             — original uploaded images
+ *       ocr/<fileName>.md              — raw OCR markdown (one per upload)
+ *       ocr/<fileName>.meta.json       — OCR meta sidecar (mistralFileId, etc.)
+ *       marksheets/<studentId>.json    — validated Marksheet JSON (after LLM)
+ *       marksheets/<studentId>-<slug>.md — formatted academic report markdown
+ *       transcripts/<studentId>.md     — multi-term transcript markdown
+ *       transcripts/<studentId>.json   — transcript data
+ *       pdfs/marksheet-<studentId>.pdf — rendered marksheet PDF
+ *       pdfs/transcript-<studentId>.pdf — rendered transcript PDF
+ *       notes/                         — user-defined per-exam notes
+ *       shared/                        — per-exam shared resources
+ *       scratch/                       — per-exam temporary work
  *
- * All exam-type-scoped helpers accept an optional `examTypeId` parameter.
- * When provided, paths are prefixed with `exams/examType-{id}/`.
- * When omitted (legacy callers), paths are relative to the workspace root.
+ * Every workspace write (including notes/shared/scratch) must be scoped
+ * to an examTypeId. Admin tools without an active class use the separate
+ * SYSTEM_WORKSPACE at .workspaces/_system/.
  *
- * The workspace is a general-purpose storage directory. The user can
- * write any kind of file under any subdirectory.
+ * The path builders (ocrMarkdownPath, uploadPath, etc.) keep an optional
+ * `examTypeId` for callers that legitimately need to compute a path
+ * without knowing the exam (e.g. defensive fallback in OCR caching).
+ * The manifest write layer (see manifest.ts) is strict and throws when
+ * examTypeId is null/undefined.
  */
 import path from "node:path";
 import type { TenantContext } from "$lib/server/mastra/tenant-context";
@@ -53,8 +56,23 @@ export function classDir(tenant: TenantContext): string {
   return path.join(WORKSPACE_ROOT, String(tenant.schoolId), yearSeg, `${classSeg}_${sectionSeg}`);
 }
 
-export function manifestPath(): string {
-  return "manifest.json";
+/**
+ * Per-exam manifest path. examTypeId is REQUIRED — there is no
+ * class-root manifest. Every workspace (including notes/shared/scratch)
+ * is scoped to an exam.
+ */
+export function manifestPath(examTypeId: number): string {
+  return `exams/examType-${examTypeId}/manifest.json`;
+}
+
+/**
+ * Per-exam subdirectory paths. The `kind` argument is one of
+ * "uploads" | "ocr" | "marksheets" | "transcripts" | "pdfs" |
+ * "notes" | "shared" | "scratch". Used by the manifest read/write
+ * paths to build canonical relPath values.
+ */
+export function examDir(examTypeId: number, kind: "uploads" | "ocr" | "marksheets" | "transcripts" | "pdfs" | "notes" | "shared" | "scratch"): string {
+  return `exams/examType-${examTypeId}/${kind}`;
 }
 
 export function ocrMarkdownPath(fileName: string, examTypeId?: number | null): string {

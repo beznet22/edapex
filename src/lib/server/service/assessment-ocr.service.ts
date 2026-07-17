@@ -107,18 +107,26 @@ export class AssessmentOcrService {
     const rc = buildWorkspaceRequestContext(this.tenant);
     const fs = await resolveTenantFilesystem({ requestContext: rc as never });
     if (!fs) throw new Error("Tenant workspace filesystem unavailable");
+    if (this.tenant.examTypeId == null) {
+      throw new Error("TENANT_EXAM_TYPE_REQUIRED: assessment-ocr requires an active examTypeId");
+    }
+    const examTypeId = this.tenant.examTypeId;
 
-    const ocrPath = ocrMarkdownPath(fileName, this.tenant.examTypeId);
+    const ocrPath = ocrMarkdownPath(fileName, examTypeId);
     await fs.writeFile(ocrPath, rawText, { recursive: true });
-    await addEntry(this.tenant, {
-      path: ocrPath,
-      examTypeId: this.tenant.examTypeId ?? null,
-      kind: "ocr-markdown",
-      fileName,
-      uploadedAt: new Date().toISOString(),
-      modifiedAt: new Date().toISOString(),
-      mimeType: "text/markdown",
-    });
+    await addEntry(
+      this.tenant,
+      {
+        path: ocrPath,
+        examTypeId,
+        kind: "ocr-markdown",
+        fileName,
+        uploadedAt: new Date().toISOString(),
+        modifiedAt: new Date().toISOString(),
+        mimeType: "text/markdown",
+      },
+      examTypeId
+    );
 
     const finalClassName = classSection.className || "Unknown";
     const finalSectionName = classSection.sectionName || "Unknown";

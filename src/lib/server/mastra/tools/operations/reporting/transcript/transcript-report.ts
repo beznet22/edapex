@@ -266,18 +266,26 @@ export const transcriptReportTool = createTool({
     }
 
     const fs = await resolveFilesystem(tenant);
-    const persistPath = transcriptMarkdownPath(student.studentId, tenant.examTypeId);
+    if (tenant.examTypeId == null) {
+      throw new Error('TENANT_EXAM_TYPE_REQUIRED: transcript-report needs an active examTypeId');
+    }
+    const examTypeId = tenant.examTypeId;
+    const persistPath = transcriptMarkdownPath(student.studentId, examTypeId);
     await fs.writeFile(persistPath, markdown, { recursive: true });
-    await addEntry(tenant, {
-      path: persistPath,
-      kind: 'transcript-markdown',
-      studentId: student.studentId,
-      examTypeId: tenant.examTypeId ?? null,
-      academicId,
-      uploadedAt: new Date().toISOString(),
-      modifiedAt: new Date().toISOString(),
-      mimeType: 'text/markdown'
-    });
+    await addEntry(
+      tenant,
+      {
+        path: persistPath,
+        kind: 'transcript-markdown',
+        studentId: student.studentId,
+        examTypeId,
+        academicId,
+        uploadedAt: new Date().toISOString(),
+        modifiedAt: new Date().toISOString(),
+        mimeType: 'text/markdown'
+      },
+      examTypeId
+    );
 
     return {
       artifactId,

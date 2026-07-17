@@ -1,15 +1,24 @@
 /**
- * Workspace manifest — single source of truth at workspace root.
+ * Workspace manifest — per-examTypeId source of truth.
  *
- * Lives at `.workspaces/<schoolId>/AY<id>-<year-slug>/<classId>-<classSlug>_<sectionId>-<sectionSlug>/manifest.json`.
+ * Every manifest lives at:
+ *   .workspaces/<schoolId>/AY<id>/<classId>_<sectionId>/exams/examType-<id>/manifest.json
  *
- * Tracks every artifact in the workspace. Indexed by relative path AND by
- * kind for fast lookups. Writes are atomic via temp file + rename so
- * concurrent writes don't tear the file.
+ * There is NO class-root manifest. Every workspace write — including
+ * notes/shared/scratch — is scoped to an examTypeId. Admin tools without
+ * an active class use the separate SYSTEM_WORKSPACE at .workspaces/_system/.
+ *
+ * Tracks every artifact in the per-exam scope. Indexed by relative path
+ * AND by kind for fast lookups within the exam. Writes are atomic via
+ * temp file + rename so concurrent writes don't tear the file.
+ *
+ * `byKind` is kept (per design decision) for forward compatibility with
+ * future cross-exam dashboards. It is populated per-exam and concatenated
+ * by `readAllManifests`.
  */
 import { promises as fs } from "node:fs";
 import path from "node:path";
-import { classDir, ocrMarkdownPath, marksheetJsonPath, transcriptJsonPath } from "./paths";
+import { classDir, manifestPath as buildManifestPath } from "./paths";
 import type { TenantContext } from "$lib/server/mastra/tenant-context";
 import { buildWorkspaceRequestContext } from "$lib/server/helpers/chat-helper";
 import { tenantWorkspace } from "$lib/server/workspace";
@@ -56,17 +65,19 @@ export interface WorkspaceManifest {
   academicYear: { id: number; title: string };
   classId: number;
   sectionId: number;
+  /** Identifies which exam this manifest tracks. Always set. */
+  examTypeId: number;
   entries: Record<string, ManifestEntry>;
   byKind: {
-    marksheets: Array<{ studentId: number; examTypeId: number | null; committedAt: string; recordId?: number }>;
-    transcripts: Array<{ studentId: number; examTypeId: number | null; academicId: number }>;
-    ocrUploads: Array<{ fileName: string; contentHash: string; examTypeId: number | null; uploadedAt: string }>;
-    pdfs: Array<{ name: string; kind: "marksheet" | "transcript"; studentId: number; examTypeId: number | null }>;
+    marksheets: Array<{ studentId: number; committedAt: string; recordId?: number }>;
+    transcripts: Array<{ studentId: number; academicId: number }>;
+    ocrUploads: Array<{ fileName: string; contentHash: string; uploadedAt: string }>;
+    pdfs: Array<{ name: string; kind: "marksheet" | "transcript"; studentId: number }>;
     notes: Array<{ path: string; modifiedAt: string }>;
   };
 }
 
-export function emptyManifest(tenant: TenantContext): WorkspaceManifest {
+export function emptyManifest(tenant: TenantContext, examTypeId: number): WorkspaceManifest {
   return {
     version: 1,
     schoolId: tenant.schoolId,
@@ -76,6 +87,7 @@ export function emptyManifest(tenant: TenantContext): WorkspaceManifest {
     },
     classId: tenant.classId ?? 0,
     sectionId: tenant.sectionId ?? 0,
+    examTypeId,
     entries: {},
     byKind: { marksheets: [], transcripts: [], ocrUploads: [], pdfs: [], notes: [] }
   };
@@ -88,41 +100,74 @@ async function resolveWorkspaceFs(tenant: TenantContext) {
   return fs;
 }
 
-const MANIFEST_REL = "manifest.json";
+export class WorkspaceScopeError extends Error {
+  constructor(message: string = 'WORKSPACE_SCOPE_VIOLATION') {
+    super(message);
+    this.name = 'WorkspaceScopeError';
+  }
+}
 
-export async function readManifest(tenant: TenantContext): Promise<WorkspaceManifest> {
+/**
+ * Strict validation: every write function requires a non-null examTypeId.
+ * The class root has no manifest. Admin/system tools without an active
+ * class use SYSTEM_WORKSPACE directly.
+ */
+function requireExamTypeId(examTypeId: number | null | undefined, op: string): number {
+  if (examTypeId == null) {
+    throw new WorkspaceScopeError(
+      `${op} requires an explicit examTypeId. ` +
+        `All workspace files (including notes/shared/scratch) must be scoped to an exam. ` +
+        `Use SYSTEM_WORKSPACE at .workspaces/_system/ for admin tools without an active class.`
+    );
+  }
+  return examTypeId;
+}
+
+export async function readManifest(
+  tenant: TenantContext,
+  examTypeId: number
+): Promise<WorkspaceManifest> {
   const ws = await resolveWorkspaceFs(tenant);
-  if (!(await ws.exists(MANIFEST_REL))) return emptyManifest(tenant);
-  const raw = await ws.readFile(MANIFEST_REL, { encoding: "utf-8" });
+  const rel = buildManifestPath(examTypeId);
+  if (!(await ws.exists(rel))) return emptyManifest(tenant, examTypeId);
+  const raw = await ws.readFile(rel, { encoding: "utf-8" });
   const text = typeof raw === "string" ? raw : raw.toString("utf-8");
   try {
     const parsed = JSON.parse(text) as WorkspaceManifest;
-    if (parsed.version !== 1) return emptyManifest(tenant);
+    if (parsed.version !== 1) return emptyManifest(tenant, examTypeId);
+    // Repair missing examTypeId on legacy files (defensive — write path
+    // always sets it, so this only matters for files written before the
+    // per-exam refactor).
+    if (parsed.examTypeId == null) parsed.examTypeId = examTypeId;
     return parsed;
   } catch {
-    return emptyManifest(tenant);
+    return emptyManifest(tenant, examTypeId);
   }
 }
 
 export async function writeManifest(
   tenant: TenantContext,
-  manifest: WorkspaceManifest
+  manifest: WorkspaceManifest,
+  examTypeId: number
 ): Promise<void> {
+  const validated = requireExamTypeId(examTypeId, "writeManifest");
   const ws = await resolveWorkspaceFs(tenant);
-  const tmp = `${MANIFEST_REL}.tmp-${Date.now()}`;
-  await ws.writeFile(tmp, JSON.stringify(manifest, null, 2), { recursive: true });
+  const rel = buildManifestPath(validated);
+  const tmp = `${rel}.tmp-${Date.now()}`;
+  // Write the manifest with the validated examTypeId stamped in.
+  const out: WorkspaceManifest = { ...manifest, examTypeId: validated };
+  await ws.writeFile(tmp, JSON.stringify(out, null, 2), { recursive: true });
   // Atomic rename: remove the old file then move tmp into place.
   // LocalFilesystem doesn't expose rename, so we delete + write.
-  if (await ws.exists(MANIFEST_REL)) {
-    // Use a direct fs.unlink as fallback when the workspace is the real FS.
+  if (await ws.exists(rel)) {
     try {
-      await fs.unlink(path.join(classDir(tenant), MANIFEST_REL));
+      await fs.unlink(path.join(classDir(tenant), rel));
     } catch {
       // ignore — writeFile overwrites
     }
   }
   const finalRaw = await ws.readFile(tmp, { encoding: "utf-8" });
-  await ws.writeFile(MANIFEST_REL, finalRaw, { recursive: true });
+  await ws.writeFile(rel, finalRaw, { recursive: true });
   try {
     await fs.unlink(path.join(classDir(tenant), tmp));
   } catch {
@@ -132,37 +177,31 @@ export async function writeManifest(
 
 export async function addEntry(
   tenant: TenantContext,
-  entry: ManifestEntry
+  entry: ManifestEntry,
+  examTypeId: number
 ): Promise<WorkspaceManifest> {
-  const m = await readManifest(tenant);
+  const validated = requireExamTypeId(examTypeId, "addEntry");
+  const m = await readManifest(tenant, validated);
   m.entries[entry.path] = entry;
-  const examTypeId = entry.examTypeId ?? tenant.examTypeId ?? null;
-  // Maintain byKind indexes. Marksheets/transcripts/PDFs are deduplicated by
-  // (studentId, examTypeId) so the same student can have one marksheet per
-  // exam (midterm, final, etc.) without overwriting previous entries.
+  // Maintain byKind indexes. Within a single per-exam manifest, the
+  // (studentId, examTypeId) tuple is unique by construction — examTypeId
+  // is fixed for the whole file. Dedup is purely on studentId here.
   if (entry.kind === "marksheet-json" && entry.studentId !== undefined) {
-    const existing = m.byKind.marksheets.find(
-      (x) => x.studentId === entry.studentId && x.examTypeId === examTypeId
-    );
+    const existing = m.byKind.marksheets.find((x) => x.studentId === entry.studentId);
     if (!existing) {
       m.byKind.marksheets.push({
         studentId: entry.studentId,
-        examTypeId,
         committedAt: entry.uploadedAt,
         recordId: entry.recordId
       });
     }
   } else if (entry.kind === "transcript-json" && entry.studentId !== undefined && entry.academicId !== undefined) {
     const existing = m.byKind.transcripts.find(
-      (x) =>
-        x.studentId === entry.studentId &&
-        x.examTypeId === examTypeId &&
-        x.academicId === entry.academicId
+      (x) => x.studentId === entry.studentId && x.academicId === entry.academicId
     );
     if (!existing) {
       m.byKind.transcripts.push({
         studentId: entry.studentId,
-        examTypeId,
         academicId: entry.academicId
       });
     }
@@ -170,7 +209,6 @@ export async function addEntry(
     m.byKind.ocrUploads.push({
       fileName: entry.fileName,
       contentHash: entry.contentHash,
-      examTypeId,
       uploadedAt: entry.uploadedAt
     });
   } else if ((entry.kind === "marksheet-pdf" || entry.kind === "transcript-pdf") && entry.studentId !== undefined) {
@@ -179,55 +217,91 @@ export async function addEntry(
       m.byKind.pdfs.push({
         name: entry.path,
         kind: pdfKind,
-        studentId: entry.studentId,
-        examTypeId
+        studentId: entry.studentId
       });
     }
   } else if (entry.kind === "note") {
     m.byKind.notes.push({ path: entry.path, modifiedAt: entry.modifiedAt });
   }
-  await writeManifest(tenant, m);
+  await writeManifest(tenant, m, validated);
   return m;
 }
 
 export async function removeEntry(
   tenant: TenantContext,
-  relPath: string
+  relPath: string,
+  examTypeId: number
 ): Promise<WorkspaceManifest> {
-  const m = await readManifest(tenant);
-  const entry = m.entries[relPath];
+  const validated = requireExamTypeId(examTypeId, "removeEntry");
+  const m = await readManifest(tenant, validated);
   delete m.entries[relPath];
-  // The dedup path used by addEntry varies by examTypeId, so we look up the
-  // entry's examTypeId to match the path the index was built from. This
-  // works for both the new grouped layout (exams/examType-{id}/...) and
-  // the legacy ungrouped layout (no prefix).
-  const examTypeId = entry?.examTypeId ?? tenant.examTypeId ?? null;
-  m.byKind.ocrUploads = m.byKind.ocrUploads.filter(
-    (x) => ocrMarkdownPath(x.fileName, x.examTypeId) !== relPath
-  );
-  m.byKind.marksheets = m.byKind.marksheets.filter(
-    (x) => marksheetJsonPath(x.studentId, x.examTypeId) !== relPath
-  );
-  m.byKind.transcripts = m.byKind.transcripts.filter(
-    (x) => transcriptJsonPath(x.studentId, x.examTypeId) !== relPath
-  );
+  m.byKind.ocrUploads = m.byKind.ocrUploads.filter((x) => !relPath.endsWith(`ocr/${x.fileName}.md`));
+  m.byKind.marksheets = m.byKind.marksheets.filter((x) => !relPath.endsWith(`marksheets/${x.studentId}.json`));
+  m.byKind.transcripts = m.byKind.transcripts.filter((x) => !relPath.endsWith(`transcripts/${x.studentId}.json`));
   m.byKind.pdfs = m.byKind.pdfs.filter((x) => x.name !== relPath);
   m.byKind.notes = m.byKind.notes.filter((x) => x.path !== relPath);
-  await writeManifest(tenant, m);
+  await writeManifest(tenant, m, validated);
   return m;
 }
 
 export async function updateEntryStatus(
   tenant: TenantContext,
   relPath: string,
-  status: MarksheetStatus
+  status: MarksheetStatus,
+  examTypeId: number
 ): Promise<WorkspaceManifest> {
-  const m = await readManifest(tenant);
+  const validated = requireExamTypeId(examTypeId, "updateEntryStatus");
+  const m = await readManifest(tenant, validated);
   const entry = m.entries[relPath];
   if (entry) {
     entry.marksheetStatus = status;
     entry.modifiedAt = new Date().toISOString();
   }
-  await writeManifest(tenant, m);
+  await writeManifest(tenant, m, validated);
   return m;
+}
+
+/**
+ * Read every per-exam manifest for the active class in parallel and
+ * return them as an array sorted by examTypeId ascending. Used by
+ * cross-exam aggregation pages (filestore, chat resource list, mentions
+ * search). Each returned manifest is a per-exam view; callers that
+ * need a single merged `entries` map should concatenate themselves.
+ */
+export async function readAllManifests(tenant: TenantContext): Promise<WorkspaceManifest[]> {
+  const ws = await resolveWorkspaceFs(tenant);
+  let examTypeIds: number[] = [];
+  try {
+    // Scan exams/ to discover which per-exam manifests exist on disk.
+    // This is a single readdir; we read each manifest in parallel below.
+    const entries = await ws.readdir("exams");
+    examTypeIds = entries
+      .filter((e) => e.type === "directory" && e.name.startsWith("examType-"))
+      .map((e) => Number(e.name.slice("examType-".length)))
+      .filter((n) => Number.isFinite(n))
+      .sort((a, b) => a - b);
+  } catch {
+    return [];
+  }
+  const manifests = await Promise.all(
+    examTypeIds.map((id) => readManifest(tenant, id))
+  );
+  return manifests;
+}
+
+/**
+ * Remove the entire per-exam scope: the manifest + every artifact
+ * directory under it. Used by the uploads DELETE handler with the
+ * `?exam=N` query param for partial clean-up.
+ */
+export async function clearExamArtifacts(
+  tenant: TenantContext,
+  examTypeId: number
+): Promise<void> {
+  const validated = requireExamTypeId(examTypeId, "clearExamArtifacts");
+  const ws = await resolveWorkspaceFs(tenant);
+  const dir = `exams/examType-${validated}`;
+  if (await ws.exists(dir)) {
+    await ws.rmdir(dir, { recursive: true });
+  }
 }

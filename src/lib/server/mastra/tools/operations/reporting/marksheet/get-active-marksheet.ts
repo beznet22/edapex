@@ -53,12 +53,22 @@ export const getActiveMarksheetTool = createTool({
     const tenant = getTenant(context);
 
     const fs = await resolveTenantFilesystem(tenant);
-    const jsonPath = marksheetJsonPath(input.studentId, tenant.examTypeId);
+    if (tenant.examTypeId == null) {
+      return {
+        studentId: input.studentId,
+        json: null,
+        examTypeId: null,
+        committedAt: null,
+        recordId: null
+      };
+    }
+    const examTypeId = tenant.examTypeId;
+    const jsonPath = marksheetJsonPath(input.studentId, examTypeId);
     if (!(await fs.exists(jsonPath))) {
       return {
         studentId: input.studentId,
         json: null,
-        examTypeId: tenant.examTypeId,
+        examTypeId,
         committedAt: null,
         recordId: null
       };
@@ -68,13 +78,13 @@ export const getActiveMarksheetTool = createTool({
     const json = JSON.parse(text) as Record<string, unknown>;
 
     // Look up manifest entry for recordId + committedAt
-    const manifest = await readNewManifest(tenant);
+    const manifest = await readNewManifest(tenant, examTypeId);
     const entry = manifest.entries[jsonPath];
 
     return {
       studentId: input.studentId,
       json,
-      examTypeId: tenant.examTypeId,
+      examTypeId,
       committedAt: entry?.uploadedAt ?? null,
       recordId: entry?.recordId ?? null
     };
