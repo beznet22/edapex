@@ -168,5 +168,20 @@ CREATE TABLE IF NOT EXISTS connect_tokens (
 	created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 `
+	},
+	{
+		id: '003_create_token_usage',
+		name: 'create token_usage table for per-user daily caps',
+		upSql: `
+CREATE TABLE IF NOT EXISTS token_usage (
+	user_id INTEGER NOT NULL,
+	day TEXT NOT NULL,
+	provider_id TEXT NOT NULL,
+	tokens INTEGER NOT NULL DEFAULT 0,
+	requests INTEGER NOT NULL DEFAULT 0,
+	updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+	PRIMARY KEY (user_id, day, provider_id)
+);
+`
 	}
 ] as const;

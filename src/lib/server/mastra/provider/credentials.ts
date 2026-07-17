@@ -167,16 +167,22 @@ export async function saveUserCredential(
 		});
 	}
 
-	// Pass the just-written row directly so discovery doesn't race the
-	// INSERT/UPDATE returning.
-	void discoverAndPersistInBackground(db, env, written).catch((err: unknown) => {
+	// Discover and persist models synchronously so the API caller can
+	// immediately re-read the discovered set without racing the
+	// discovery worker. The discovery step has its own timeout + retry
+	// caps (see `DISCOVERY_TIMEOUT_MS` / `DISCOVERY_ATTEMPTS` in
+	// `discovery.ts`) and is best-effort: a failure is logged but does
+	// not roll back the credential write.
+	try {
+		await discoverAndPersist(db, env, written);
+	} catch (err) {
 		console.error(`[credentials] model discovery failed for ${validated.providerId}:`, err);
-	});
+	}
 
 	return written;
 }
 
-async function discoverAndPersistInBackground(
+async function discoverAndPersist(
 	db: LibSQLDatabase<any>,
 	env: Record<string, string | undefined>,
 	credential: EncryptedCredential
@@ -275,7 +281,8 @@ export const PLATFORM_ENV_KEYS: Partial<Record<ProviderId, string>> = {
 	groq: 'GROQ_API_KEY',
 	deepseek: 'DEEPSEEK_API_KEY',
 	opencode: 'OPENCODE_API_KEY',
-	kimchi: 'KIMCHI_API_KEY'
+	kimchi: 'KIMCHI_API_KEY',
+	mistral: 'MISTRAL_API_KEY'
 };
 
 export interface ResolvedProviderKey {
@@ -316,7 +323,8 @@ export async function getAllUserCredentials(
 		{ providerId: 'groq' as ProviderId, envKey: 'GROQ_API_KEY' },
 		{ providerId: 'deepseek' as ProviderId, envKey: 'DEEPSEEK_API_KEY' },
 		{ providerId: 'opencode' as ProviderId, envKey: 'OPENCODE_API_KEY' },
-		{ providerId: 'kimchi' as ProviderId, envKey: 'KIMCHI_API_KEY' }
+		{ providerId: 'kimchi' as ProviderId, envKey: 'KIMCHI_API_KEY' },
+		{ providerId: 'mistral' as ProviderId, envKey: 'MISTRAL_API_KEY' }
 	];
 	for (const p of platformDefaults) {
 		if (!supportedProviderIds.includes(p.providerId)) continue;

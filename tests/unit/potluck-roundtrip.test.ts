@@ -43,6 +43,7 @@ async function insertDonation(
 			JSON.stringify({
 				apiKey,
 				donatedBy: opts.donatedBy,
+				donatedAt: new Date().toISOString(),
 				tosVersion: opts.tosVersion ?? null
 			}),
 			ENCRYPTION_KEY

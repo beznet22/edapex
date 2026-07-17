@@ -18,7 +18,8 @@ export const GET: RequestHandler = async ({ locals: { user }, setHeaders }) => {
 			db,
 			envKeys,
 			user.id,
-			user.schoolId ?? 1
+			user.schoolId ?? 1,
+			user.designation ?? null
 		);
 		return json({ success: true, models });
 	} catch (err) {

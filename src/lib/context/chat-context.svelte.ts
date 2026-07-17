@@ -133,6 +133,7 @@ export type InitChat = {
   initialMessages?: xUIMessage[];
   api?: string;
   chatData?: ChatThread;
+  chatId?: string;
   selectedClass: SelectedClass;
 };
 
@@ -207,7 +208,7 @@ export class ChatContext {
   #streamDocumentPartsReceived = 0;
   // #selectedAgent removed
 
-  constructor({ initialMessages, api, chatData, selectedClass }: InitChat) {
+  constructor({ initialMessages, api, chatData, chatId, selectedClass }: InitChat) {
     try {
       this.#inspector = InspectorContext.fromContext();
     } catch { }
@@ -223,9 +224,10 @@ export class ChatContext {
     // doesn't bleed across chat switches.
     rateLimit.clear();
 
+    const effectiveId = chatId ?? chatData?.threadId;
     this.client = $derived(
       new Chat<xUIMessage>({
-        id: chatData?.threadId,
+        id: effectiveId,
         messages: initialMessages,
         sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithApprovalResponses,
         transport: new DefaultChatTransport({

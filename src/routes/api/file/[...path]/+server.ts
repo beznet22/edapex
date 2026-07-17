@@ -210,7 +210,7 @@ export const POST: RequestHandler = async ({ params, url, request, locals, cooki
       const raw = await fs.readFile(resolvedPath);
       const bytes = raw instanceof Uint8Array
         ? raw
-        : new TextEncoder().encode(raw as string);
+        : new TextEncoder().encode(String(raw));
       const filename = resolvedPath.split('/').pop() ?? 'ocr';
       const ocrResponse = await mistralOcrService.processDocument(bytes, filename, {
         db: getAppDb(),
@@ -280,9 +280,12 @@ export const POST: RequestHandler = async ({ params, url, request, locals, cooki
     return json({ success: true, path: resolvedPath });
   } catch (e: unknown) {
     if (e instanceof WorkspaceScopeError) {
+      console.error('[file-api] PUT SCOPE_VIOLATION', { path: params.path, message: e.message });
       return json({ success: false, error: 'WORKSPACE_SCOPE_VIOLATION', message: e.message }, { status: 403 });
     }
     const message = e instanceof Error ? e.message : String(e);
+    const detail = (e as { data$?: unknown; detail?: unknown }).data$ ?? (e as { detail?: unknown }).detail;
+    console.error('[file-api] PUT ERROR', { path: params.path, message, detail, userId: locals.user?.id });
     return json({ success: false, error: message }, { status: 400 });
   }
 };
@@ -316,12 +319,16 @@ export const PUT: RequestHandler = async ({ params, request, locals, cookies, ur
   try {
     if (!locals.user) throw error(401, 'Unauthorized');
 
+    const examTypeIdParam = url.searchParams.get('examTypeId');
+    const parsedExamTypeId = examTypeIdParam ? parseInt(examTypeIdParam, 10) : null;
+
     const { tenant, requestContext, fs } = await resolveTenantWorkspace({
       schoolId: locals.user.schoolId ?? 1,
       userId: locals.user.id ?? 1,
       staffId: (locals.user as { staffId?: number })?.staffId,
       designationId: (locals.user as { designationId?: number })?.designationId ?? ALLOWED_DESIGNATIONS.IT,
       selectedClassCookie: cookies.get('selected-class'),
+      examTypeId: parsedExamTypeId,
     });
     if (!fs) throw error(500, 'Workspace filesystem unavailable');
     if (tenant.classId === null || tenant.sectionId === null) {
@@ -338,6 +345,7 @@ export const PUT: RequestHandler = async ({ params, request, locals, cookies, ur
       classId: tenant.classId,
       sectionId: tenant.sectionId,
       academicId: tenant.academicId,
+      examTypeId: tenant.examTypeId,
       path: resolvedPath,
       size: bytes.length,
       at: new Date().toISOString(),

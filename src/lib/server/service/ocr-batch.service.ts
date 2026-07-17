@@ -21,8 +21,9 @@
  * service exposes the three primitives the worker calls via `fetch`.
  */
 import { Mistral } from "@mistralai/mistralai";
+import type { LibSQLDatabase } from "drizzle-orm/libsql";
 import { env } from "$env/dynamic/private";
-import { tenantWorkspace } from "$lib/server/mastra/storage/workspaces";
+import { tenantWorkspace } from "$lib/server/workspace";
 import { buildWorkspaceRequestContext } from "$lib/server/helpers/chat-helper";
 import {
   createTenantContext,
@@ -30,6 +31,7 @@ import {
 } from "$lib/server/mastra/tenant-context";
 import { OcrWorkspaceStore } from "$lib/server/mastra/storage/ocr/ocr-workspace-store";
 import type { SerializedTenant } from "$lib/types/background-tasks";
+import { resolveMistralApiKey } from "$lib/server/mastra/provider/ocr-key-resolver";
 
 export type StartBatchResult = {
   jobId: string;
@@ -67,11 +69,14 @@ export class OcrBatchService {
     return OcrBatchService.instance;
   }
 
-  private getClient(): Mistral {
-    const apiKey = env.MISTRAL_API_KEY;
-    if (!apiKey) {
-      throw new Error("MISTRAL_API_KEY is not configured in environment variables.");
-    }
+  private async getClient(tenant: SerializedTenant, db: LibSQLDatabase<any>): Promise<Mistral> {
+    const apiKey = await resolveMistralApiKey({
+      db,
+      userId: tenant.userId,
+      schoolId: tenant.schoolId,
+      userRole: null,
+      env: env as Record<string, string | undefined>
+    });
     return new Mistral({ apiKey });
   }
 
@@ -125,7 +130,7 @@ export class OcrBatchService {
    * Uploads each file individually first, then submits a batch spec
    * referencing all the resulting `fileId`s.
    */
-  async startBatch(tenant: SerializedTenant, keys: string[]): Promise<StartBatchResult> {
+  async startBatch(tenant: SerializedTenant, keys: string[], db: LibSQLDatabase<any>): Promise<StartBatchResult> {
     if (keys.length === 0) {
       throw new Error("No files supplied for batch OCR");
     }
@@ -133,7 +138,7 @@ export class OcrBatchService {
     const t = this.rehydrateTenant(tenant);
     const files = await this.readFiles(t, keys);
 
-    const client = this.getClient();
+    const client = await this.getClient(tenant, db);
     const requests: Array<{ custom_id: string; body: unknown }> = [];
     const keyByCustomId = new Map<string, string>();
 
@@ -150,7 +155,7 @@ export class OcrBatchService {
         custom_id: customId,
         body: {
           model: "mistral-ocr-latest",
-          document: { type: "file", fileId: uploaded.id },
+          document: { type: "file", file_id: uploaded.id },
           include_image_base64: true,
         },
       });
@@ -177,8 +182,12 @@ export class OcrBatchService {
    * Poll a batch job and return normalised status counts. The worker calls
    * this in a loop; the server itself is stateless.
    */
-  async pollBatch(jobId: string): Promise<PollBatchResult> {
-    const client = this.getClient();
+  async pollBatch(
+    jobId: string,
+    tenant: SerializedTenant,
+    db: LibSQLDatabase<any>,
+  ): Promise<PollBatchResult> {
+    const client = await this.getClient(tenant, db);
     const job = await client.batch.jobs.get({ jobId });
 
     const status = (job.status ?? "QUEUED") as PollBatchResult["status"];
@@ -193,6 +202,21 @@ export class OcrBatchService {
   }
 
   /**
+   * Request cancellation of a running Mistral batch job. Fire-and-forget;
+   * the next `pollBatch` call will see the job in `CANCELLATION_REQUESTED`
+   * then `CANCELLED`. Used by the worker when the user clicks Cancel
+   * in the popover or when the local 5-min poll cap hits.
+   */
+  async cancelBatch(
+    jobId: string,
+    tenant: SerializedTenant,
+    db: LibSQLDatabase<any>,
+  ): Promise<void> {
+    const client = await this.getClient(tenant, db);
+    await client.batch.jobs.cancel({ jobId });
+  }
+
+  /**
    * Download the batch output, parse JSONL, and persist each successful
    * result via the OCR workspace store. Returns one entry per input key
    * (in input order), with `status: "error"` for any per-request failures
@@ -202,11 +226,12 @@ export class OcrBatchService {
     tenant: SerializedTenant,
     jobId: string,
     keys: string[],
+    db: LibSQLDatabase<any>,
   ): Promise<FinalizeBatchResult> {
     const t = this.rehydrateTenant(tenant);
-    const client = this.getClient();
+    const client = await this.getClient(tenant, db);
 
-    const polled = await this.pollBatch(jobId);
+    const polled = await this.pollBatch(jobId, tenant, db);
     if (!polled.outputFileId) {
       return {
         results: keys.map((k) => ({
@@ -258,6 +283,8 @@ export class OcrBatchService {
           tenant: t,
           file: new Blob([entry.markdown], { type: "text/markdown" }),
           fileName: `${key.split("/").pop() ?? "ocr"}.md`,
+          db,
+          userId: tenant.userId,
         });
         results.push({
           key,

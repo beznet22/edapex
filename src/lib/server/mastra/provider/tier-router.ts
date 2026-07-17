@@ -217,8 +217,9 @@ async function tryTier2Pool(args: {
 	// The user's own id is encoded in the audit-log so consumer attribution
 	// can be recovered, but we don't surface it on the trace.
 	void userId;
+	const parsed = JSON.parse(decrypted) as { apiKey: string };
 	return {
-		result: { apiKey: decrypted },
+		result: { apiKey: parsed.apiKey },
 		trace: { tier: 2, status: 'served', source: 'pool' }
 	};
 }

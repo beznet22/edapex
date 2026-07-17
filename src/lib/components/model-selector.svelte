@@ -68,6 +68,8 @@
     const seen = new Set<string>();
     const groups: ModelGroup[] = [];
     for (const m of models) {
+      // Mistral is OCR-only; never show in the chat model selector.
+      if (m.providerId === "mistral") continue;
       if (seen.has(m.providerId)) continue;
       seen.add(m.providerId);
       const providerModels = models.filter((x) => x.providerId === m.providerId);
@@ -124,7 +126,11 @@
     try {
       const result = await getAvailableModels({});
       if (result.success) {
-        availableModelsHolder.replace(result.models, []);
+        availableModelsHolder.replace(
+          result.models,
+          result.hiddenModelIds ?? [],
+          result.enabledModelIds ?? []
+        );
         // Local mirror — $effect re-syncs but we update eagerly for snappier
         // render after the first manual refresh.
         models = result.models;
@@ -168,7 +174,7 @@
   <Popover.Content
     align="start"
     sideOffset={6}
-    class="w-[calc(100vw-2rem)] sm:w-[360px] p-0 hermes-glass shadow-2xl border-sidebar-border/30 rounded-xl overflow-hidden"
+    class="w-[calc(100vw-2rem)] sm:w-[360px] p-0 not-only:shadow-2xl border-sidebar-border/30 rounded-xl overflow-hidden"
   >
     <Command.Root shouldFilter={false}>
       <div class="flex items-center gap-2 border-b border-sidebar-border/20 px-2 py-1.5">
@@ -190,10 +196,7 @@
             </Command.Empty>
           {/if}
           {#each filteredGroups as group (group.id)}
-            <Command.Group
-              heading={group.label}
-              class="[&_[data-slot=command-group-heading]]:text-muted-foreground [&_[data-slot=command-group-heading]]:px-3 [&_[data-slot=command-group-heading]]:py-1.5 [&_[data-slot=command-group-heading]]:text-[9px] [&_[data-slot=command-group-heading]]:font-black [&_[data-slot=command-group-heading]]:uppercase [&_[data-slot=command-group-heading]]:tracking-widest [&_[data-slot=command-group-heading]]:opacity-50"
-            >
+            <Command.Group heading={group.label} class="">
               {#each group.models as chatModel (chatModel.id)}
                 {@const isSelected = selectedChatModel.value === chatModel.id
                   || selectedChatModel.value?.startsWith(`${chatModel.id}@`)}
@@ -208,6 +211,14 @@
                       {chatModel.name.split(" - ").pop()}
                     </span>
                     <div class="flex items-center gap-1 shrink-0">
+                      {#if chatModel.source === 'pool'}
+                        <Badge
+                          variant="outline"
+                          class="text-[8px] font-black px-1 py-0 rounded-sm border-emerald-500/40 text-emerald-700 dark:text-emerald-300 bg-emerald-500/10"
+                        >
+                          POOL
+                        </Badge>
+                      {/if}
                       {#if isModelFree(chatModel)}
                         <Badge
                           variant="outline"

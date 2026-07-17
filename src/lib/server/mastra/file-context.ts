@@ -1,6 +1,7 @@
 // Verified: no native Mastra API for file-as-context injection as of @mastra/core@0.10.x
 // Custom implementation per design spec — reads workspace files and formats them for agent context injection.
 
+import type { LibSQLDatabase } from 'drizzle-orm/libsql';
 import { workspaceFiles } from '$lib/server/mastra/storage/files';
 
 const MAX_REFS = 5;
@@ -65,7 +66,8 @@ export function isBinaryMimeType(mimeType: string | undefined): boolean {
  */
 export async function injectFileContext(
 	references: FileReference[],
-	workspace: string
+	workspace: string,
+	ctx: { db: LibSQLDatabase<any>; userId: number; schoolId: number | null; userRole?: string | null }
 ): Promise<string> {
 	if (!references || references.length === 0) return '';
 
@@ -78,7 +80,7 @@ export async function injectFileContext(
 			try {
 				// We dynamically import to avoid circular dependencies if needed, or just use the service
 				const { mistralOcrService } = await import('$lib/server/service/mistral-ocr.service');
-				const content = await mistralOcrService.getMarkdownByFileId(null, ref.fileId);
+				const content = await mistralOcrService.getMarkdownByFileId(ctx, ref.fileId);
 				parts.push(`--- ${ref.name} (OCR Extraction) ---\n${content}`);
 			} catch (err) {
 				parts.push(`[File: ${ref.name} — OCR Extraction Failed]`);

@@ -1,6 +1,6 @@
 import { error, redirect } from "@sveltejs/kit";
 import type { LayoutServerLoad } from "./$types";
-import { allowAnonymousChats, STORAGE_DIR, UPLOADS_DIR } from "$lib/constants";
+import { allowAnonymousChats, CONFIG_COOKIE_MAX_AGE_SEC, STORAGE_DIR, UPLOADS_DIR } from "$lib/constants";
 import type { ClassStudent } from "$lib/server/repository/student.repo";
 import { readdir, stat } from "fs/promises";
 import { join } from "path";
@@ -15,8 +15,9 @@ import {
 	getAvailableModelsForUser,
 	type AugmentedModelInfo
 } from "$lib/server/mastra/provider/availability";
-import { getHiddenModelIdsForUser } from "$lib/server/mastra/provider/visibility";
+import { getHiddenModelIdsForUser, getEnabledModelIdsForUser } from "$lib/server/mastra/provider/visibility";
 import { pickDefaultModelId } from "$lib/server/mastra/provider";
+import { getPotluckConfig, parseJsonArray } from "$lib/server/mastra/provider/potluck";
 import { getModelById } from "$lib/provider/catalog";
 import { env } from "$env/dynamic/private";
 import { getMemory, mastra } from "$lib/server/mastra";
@@ -48,7 +49,7 @@ export const load: LayoutServerLoad = async ({ cookies, locals, url }) => {
       modelId = `${migrated.id}${variantSuffix}`;
       cookies.set("selected-model", modelId, {
         path: "/",
-        maxAge: 60 * 60 * 24 * 365,
+        maxAge: CONFIG_COOKIE_MAX_AGE_SEC,
         httpOnly: false,
         sameSite: "lax"
       });
@@ -64,12 +65,16 @@ export const load: LayoutServerLoad = async ({ cookies, locals, url }) => {
   const db = getAppDb();
   if (!modelId && user) {
     try {
-      const autoPicked = await pickDefaultModelId(db, env as Record<string, string | undefined>, user.id);
+      const autoPicked = await pickDefaultModelId(db, env as Record<string, string | undefined>, {
+        userId: user.id,
+        schoolId: user.schoolId ?? null,
+        userRole: user.designation ?? null
+      });
       if (autoPicked) {
         modelId = autoPicked;
         cookies.set("selected-model", modelId, {
           path: "/",
-          maxAge: 60 * 60 * 24 * 365,
+          maxAge: CONFIG_COOKIE_MAX_AGE_SEC,
           httpOnly: false,
           sameSite: "lax"
         });
@@ -88,6 +93,7 @@ export const load: LayoutServerLoad = async ({ cookies, locals, url }) => {
 
   const selectedClassRaw = cookies.get("selected-class");
   const selectedAgentId = cookies.get("selected-agent") || "";
+  const potluckAlwaysDonate = cookies.get("potluck-always-donate") || "";
 
   let students: ClassStudent[] | null = null;
   let classes: ClassSection[] = [];
@@ -199,6 +205,7 @@ export const load: LayoutServerLoad = async ({ cookies, locals, url }) => {
   let connectedProviders: any[] = [];
   let availableModels: AugmentedModelInfo[] = [];
   let hiddenIds: string[] = [];
+  let enabledIds: string[] = [];
   let userPriority: string[] = [];
 
   if (user) {
@@ -208,18 +215,52 @@ export const load: LayoutServerLoad = async ({ cookies, locals, url }) => {
     // Same data the getAvailableModels remote command + getModelVisibility
     // return. SSR loaded so the model selector + settings modal render
     // instantly on first paint (no flash, no spinner). The holder keeps
-    // hiddenIds as the source of truth; consumers derive visibleModelIds
-    // as `models - hiddenIds`.
-    const [models, hidden, creds] = await Promise.all([
-      getAvailableModelsForUser(db, envKeys, user.id, user.schoolId ?? 1),
+    // hiddenIds + enabledIds as the source of truth; consumers derive
+    // visibleModelIds as `(catalog-known && !hidden) || enabled`.
+    const [models, hidden, enabled, creds] = await Promise.all([
+      getAvailableModelsForUser(db, envKeys, user.id, user.schoolId ?? 1, user.designation ?? null),
       getHiddenModelIdsForUser(db, user.id),
+      getEnabledModelIdsForUser(db, user.id),
       getAllUserCredentials(db, envKeys, user.id, supportedList as any)
     ]);
 
     availableModels = models;
     hiddenIds = [...hidden];
+    enabledIds = [...enabled];
     userPriority = creds.filter((p) => p.enabled === 1).map((p) => p.providerId);
     connectedProviders = creds;
+  }
+
+  // ─── Pot-luck pool config + donor-role gating ────────────────────────────
+  // Used by the user-facing donate flow (Settings → Providers) to decide
+  // whether to render the "Also donate to school pool" checkbox and to
+  // resolve the current ToS version for the confirmation dialog. Falls back
+  // to a "disabled / no donors / no ToS" shape when no row exists.
+  let poolConfig: {
+    enabled: boolean;
+    donorRoles: string[];
+    tosVersion: string | null;
+  } = { enabled: false, donorRoles: [], tosVersion: null };
+  let canDonate = false;
+  if (user && typeof user.schoolId === "number") {
+    try {
+      const cfg = await getPotluckConfig(db, user.schoolId);
+      if (cfg) {
+        const donorRoles = parseJsonArray(cfg.donorRoles);
+        poolConfig = {
+          enabled: cfg.enabled === 1,
+          donorRoles,
+          tosVersion: cfg.tosVersion ?? null
+        };
+        const userRole = user.designation ?? null;
+        canDonate =
+          poolConfig.enabled &&
+          (donorRoles.length === 0 ||
+            (userRole !== null && donorRoles.includes(userRole)));
+      }
+    } catch (err) {
+      console.warn("[layout] failed to load potluck config:", err);
+    }
   }
 
   return {
@@ -232,12 +273,14 @@ export const load: LayoutServerLoad = async ({ cookies, locals, url }) => {
     resolvedModel,
     selectedClassRaw,
     selectedAgentId,
+    potluckAlwaysDonate,
     uploads,
     assignedSection,
     defaultProvider,
     connectedProviders,
     availableModels,
     hiddenIds,
+    enabledIds,
     supportedProviders: Object.values(BUILTIN_PROVIDERS).map((p) => ({
       id: p.id,
       name: p.name,
@@ -245,6 +288,8 @@ export const load: LayoutServerLoad = async ({ cookies, locals, url }) => {
       url: p.docUrl ?? ''
     })),
     userPriority,
+    poolConfig,
+    canDonate,
     examTypeId: await resolveExamTypeId(user?.schoolId ?? 1, null),
   };
 };

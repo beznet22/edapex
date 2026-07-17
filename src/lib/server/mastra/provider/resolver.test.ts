@@ -328,7 +328,7 @@ describe('pickDefaultModelId edge cases', () => {
 		vi.mocked(tierRouter.resolveProviderKeyWithTrace).mockRejectedValue(
 			new tierRouter.AllTiersFailedError('groq' as ProviderId, [])
 		);
-		const result = await pickDefaultModelId(db, {}, 42);
+		const result = await pickDefaultModelId(db, {}, { userId: 42, schoolId: null, userRole: null });
 		expect(result).toBeNull();
 	});
 
@@ -342,7 +342,7 @@ describe('pickDefaultModelId edge cases', () => {
 			trace: []
 		});
 
-		const result = await pickDefaultModelId(db, {}, 42);
+		const result = await pickDefaultModelId(db, {}, { userId: 42, schoolId: null, userRole: null });
 		expect(result).not.toBeNull();
 		expect(result).toContain(defaultModel);
 	});
@@ -364,7 +364,7 @@ describe('pickDefaultModelId edge cases', () => {
 			};
 		});
 
-		const result = await pickDefaultModelId(db, {}, 42);
+		const result = await pickDefaultModelId(db, {}, { userId: 42, schoolId: null, userRole: null });
 		expect(result).not.toBeNull();
 		expect(calls).toBeGreaterThan(1);
 	});

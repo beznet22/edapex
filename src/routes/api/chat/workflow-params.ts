@@ -4,6 +4,7 @@ import { buildRequestContext, resolveWorkspaceContext } from "$lib/server/helper
 import { resolveActiveClassScope } from "$lib/server/helpers/class-scope";
 import { TenantContextCache } from "$lib/server/mastra/context-cache";
 import { warmUpFileReferences } from "$lib/server/mastra/file-reference-warmup";
+import { getAppDb } from "$lib/server/mastra/storage/libsql/app-db";
 import { processMentions, type MentionTag } from "$lib/server/mastra/mention-processor";
 import { resolveExamTypeId, withAcademicId, withExamTypeId, WorkspaceMismatchError } from "$lib/server/mastra/tenant-context";
 import { BaseRepository } from "$lib/server/repository";
@@ -215,7 +216,7 @@ export const buildWorkflowParams = async (
 
     if (fileReferences && fileReferences.length > 0) {
         try {
-            fileReferences = await warmUpFileReferences(activeContext, fileReferences);
+            fileReferences = await warmUpFileReferences(activeContext, fileReferences, getAppDb());
         } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
             console.warn(`[api/chat] File reference warm-up failed: ${msg}`);

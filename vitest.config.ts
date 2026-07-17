@@ -8,22 +8,23 @@ export default defineConfig({
 	...viteConfig,
 	test: {
 		projects: [
-			{
-				extends: true,
-				test: {
-					name: 'unit',
-					include: [
-						'tests/unit/**/*.test.ts',
-						'src/lib/server/mastra/provider/**/*.test.ts',
-						'src/lib/server/mastra/storage/libsql/**/*.test.ts',
-						'src/lib/utils/**/*.test.ts'
-					],
-					environment: 'node',
-					globals: true,
-					testTimeout: 10_000,
-					setupFiles: ['./tests/unit/setup.ts']
-				}
-			},
+				{
+					extends: true,
+					test: {
+						name: 'unit',
+						include: [
+							'tests/unit/**/*.test.ts',
+							'src/lib/server/mastra/provider/**/*.test.ts',
+							'src/lib/server/mastra/storage/libsql/**/*.test.ts',
+							'src/lib/utils/**/*.test.ts'
+						],
+						environment: 'node',
+						globals: true,
+						testTimeout: 10_000,
+						fileParallelism: false,
+						setupFiles: ['./tests/unit/setup.ts']
+					}
+				},
 			{
 				extends: true,
 				test: {

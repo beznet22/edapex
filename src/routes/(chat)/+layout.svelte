@@ -5,7 +5,7 @@
   import { ChatHistory } from "$lib/context/chat-history.svelte.js";
   import { FilesContext } from "$lib/context/file-context.svelte.js";
   import { UserContext } from "$lib/context/user-context.svelte";
-  import { SelectedModel, SelectedClass, ResolvedModelHolder, AvailableModelsHolder } from "$lib/context/sync.svelte";
+  import { SelectedModel, SelectedClass, PotluckAlwaysDonate, ResolvedModelHolder, AvailableModelsHolder } from "$lib/context/sync.svelte";
   import { ImageContext } from "$lib/context/image.context.svelte";
   import { useAI } from "$lib/context/ai-context.svelte";
   import { IsMobile } from "$lib/hooks/is-mobile.svelte.js";
@@ -31,6 +31,7 @@
     resolvedModel,
     availableModels,
     hiddenIds,
+    enabledIds,
     selectedClassRaw,
     uploads,
     sidebarCollapsed,
@@ -48,12 +49,16 @@
 
   const availableModelsHolder = new AvailableModelsHolder(
     availableModels ?? [],
-    hiddenIds ?? []
+    hiddenIds ?? [],
+    enabledIds ?? []
   );
   availableModelsHolder.setContext();
 
   const selectedClass = new SelectedClass(selectedClassRaw || "");
   selectedClass.setContext();
+
+  const alwaysDonate = new PotluckAlwaysDonate(data.potluckAlwaysDonate || "");
+  alwaysDonate.setContext();
 
   $effect(() => {
     chatHistory.rehydrate(data.chats);

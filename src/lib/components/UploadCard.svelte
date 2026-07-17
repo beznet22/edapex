@@ -24,7 +24,7 @@
   import XIcon from "@lucide/svelte/icons/x";
   import { formatBytes } from "$lib/compression.utils";
 
-  export type UploadJobStatus = "compressing" | "uploading" | "done" | "error";
+  export type UploadJobStatus = "compressing" | "uploading" | "ocr" | "done" | "error";
 
   export interface UploadJob {
     id: string;
@@ -56,7 +56,8 @@
 
   const headerText = $derived.by(() => {
     if (allDone && errorCount === 0) return "Upload complete";
-    if (allDone && errorCount > 0) return `Uploaded ${doneCount}, ${errorCount} failed`;
+    if (allDone && errorCount > 0)
+      return `Uploaded ${doneCount}, ${errorCount} failed`;
     return "Uploading";
   });
 
@@ -71,6 +72,7 @@
     if (p.status === "done") return 100;
     if (p.status === "error") return 100;
     if (p.status === "uploading") return 70;
+    if (p.status === "ocr") return 70;
     return 30;
   }
 
@@ -78,12 +80,15 @@
     if (p.status === "done") return "bg-emerald-400";
     if (p.status === "error") return "bg-destructive";
     if (p.status === "uploading") return "bg-primary";
+    if (p.status === "ocr") return "bg-amber-400";
     return "bg-amber-400";
   }
 
   function iconBgClass(p: UploadJob): string {
-    if (p.status === "compressing") return "bg-amber-400/15 text-amber-400 compress-shimmer";
+    if (p.status === "compressing")
+      return "bg-amber-400/15 text-amber-400 compress-shimmer";
     if (p.status === "uploading") return "bg-primary/15 text-primary";
+    if (p.status === "ocr") return "bg-amber-400/15 text-amber-400";
     if (p.status === "done") return "bg-emerald-400/15 text-emerald-400";
     return "bg-destructive/15 text-destructive";
   }
@@ -112,8 +117,10 @@
         class="size-8 rounded-xl flex items-center justify-center shrink-0
                transition-all duration-300
                {allDone
-                 ? (errorCount > 0 ? 'bg-destructive/15' : 'bg-emerald-400/15')
-                 : 'bg-primary/15'}"
+          ? errorCount > 0
+            ? 'bg-destructive/15'
+            : 'bg-emerald-400/15'
+          : 'bg-primary/15'}"
       >
         {#if allDone}
           {#if errorCount > 0}
@@ -127,7 +134,9 @@
       </div>
 
       <div class="flex-1 min-w-0">
-        <p class="text-[11px] font-black uppercase tracking-widest text-foreground truncate">
+        <p
+          class="text-[11px] font-black uppercase tracking-widest text-foreground truncate"
+        >
           {headerText}
         </p>
         <p class="text-[10px] text-muted-foreground tabular-nums">
@@ -135,10 +144,16 @@
         </p>
       </div>
 
-      <div class="w-32 h-1 rounded-full bg-foreground/5 overflow-hidden shrink-0">
+      <div
+        class="w-32 h-1 rounded-full bg-foreground/5 overflow-hidden shrink-0"
+      >
         <div
           class="h-full rounded-full transition-all duration-500 ease-out
-                 {allDone ? (errorCount > 0 ? 'bg-destructive' : 'bg-emerald-400') : 'bg-primary'}"
+                 {allDone
+            ? errorCount > 0
+              ? 'bg-destructive'
+              : 'bg-emerald-400'
+            : 'bg-primary'}"
           style="width: {Math.round(completedFraction * 100)}%"
         ></div>
       </div>
@@ -155,7 +170,9 @@
       </button>
     </div>
 
-    <ul class="divide-y divide-border/30 max-h-80 overflow-y-auto scrollbar-hide">
+    <ul
+      class="divide-y divide-border/30 max-h-80 overflow-y-auto scrollbar-hide"
+    >
       {#each jobs as job (job.id)}
         {@const Icon = fileIcon(job.file)}
         {@const reduction = reductionPct(job.file.size, job.compressedSize)}
@@ -177,6 +194,8 @@
               <Loader2Icon class="size-4 animate-spin" />
             {:else if job.status === "uploading"}
               <UploadIcon class="size-4 animate-pulse" />
+            {:else if job.status === "ocr"}
+              <Loader2Icon class="size-4 animate-spin" />
             {:else if job.status === "done"}
               <CheckCircle2Icon class="size-4" />
             {:else}
@@ -189,21 +208,31 @@
               {job.file.name}
             </p>
             <p class="text-[10px] text-muted-foreground tabular-nums">
-              {#if job.status === "error" && job.error}
+              {#if job.status === "ocr"}
+                <span class="text-amber-400">Extracting text…</span>
+              {:else if job.status === "error" && job.error}
                 <span class="text-destructive">{job.error}</span>
               {:else if reduction !== null}
-                <span class="text-emerald-400">{formatBytes(job.compressedSize)}</span>
+                <span class="text-emerald-400"
+                  >{formatBytes(job.compressedSize)}</span
+                >
                 <span class="text-muted-foreground/60"> · -{reduction}%</span>
-                <span class="text-muted-foreground/40"> from {formatBytes(job.file.size)}</span>
+                <span class="text-muted-foreground/40">
+                  from {formatBytes(job.file.size)}</span
+                >
               {:else}
                 {formatBytes(job.file.size)}
               {/if}
             </p>
           </div>
 
-          <div class="w-16 h-1 rounded-full bg-foreground/5 overflow-hidden shrink-0">
+          <div
+            class="w-16 h-1 rounded-full bg-foreground/5 overflow-hidden shrink-0"
+          >
             <div
-              class="h-full rounded-full transition-all duration-500 ease-out {progressBarClass(job)}"
+              class="h-full rounded-full transition-all duration-500 ease-out {progressBarClass(
+                job,
+              )}"
               style="width: {progressBarWidthPct(job)}%"
             ></div>
           </div>

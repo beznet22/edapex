@@ -19,21 +19,26 @@
 		getUserCredentials,
 		saveUserCredential,
 		deleteUserCredential,
-		getModelVisibility,
 		updateModelVisibility,
-		getAvailableModels
+		getAvailableModels,
+		getSettingsModels,
+		donateUserCredential,
+		revokeMyDonation,
+		getMyDonations
 	} from "$lib/api/agent.remote.js";
 	import { AvailableModelsHolder } from "$lib/context/sync.svelte";
 	import { BUILTIN_PROVIDERS } from "$lib/provider/catalog";
 	import { CustomProviderEncryptedDataSchema } from "$lib/provider/spec";
-	import type { ProviderInfo, ModelInfo } from "$lib/provider/spec";
+	import type { ProviderInfo, ModelInfo, AugmentedModelInfo } from "$lib/provider/spec";
 	import type { ProviderId } from "$lib/provider/types";
 
 	import GeneralTab from "./GeneralTab.svelte";
 	import AppearanceTab from "./AppearanceTab.svelte";
 	import ProvidersTab from "./ProvidersTab.svelte";
 	import ModelsTab from "./ModelsTab.svelte";
+	import { PotluckAlwaysDonate } from "$lib/context/sync.svelte";
 	import PlatformTab from "./PlatformTab.svelte";
+	import DonateConfirmDialog from "./donate/DonateConfirmDialog.svelte";
 	import { isTabVisible } from "./_helpers.svelte";
 
 	type ProviderSummary = {
@@ -50,7 +55,7 @@
 	type ProviderGroup = {
 		id: string;
 		info: ProviderInfo | undefined;
-		models: ModelInfo[];
+		models: AugmentedModelInfo[];
 	};
 
 	const tabs = [
@@ -106,6 +111,92 @@
 	let apiKeyInput = $state("");
 	let isSavingApiKey = $state(false);
 	let apiKeyError = $state<string | null>(null);
+
+	// ─── Donate state ────────────────────────────────────────────────────────
+	// `canDonate` and `poolConfig` come from the layout server's pool metadata
+	// (read once at SSR). The user checks "Also donate to school pool" in the
+	// connect form; after `saveUserCredential` succeeds we either open the
+	// ToS confirmation dialog (if a `tosVersion` is set) or call
+	// `donateUserCredential` directly.
+	const poolConfig = $derived(
+		page.data.poolConfig ?? { enabled: false, donorRoles: [], tosVersion: null }
+	);
+	const canDonate = $derived(page.data.canDonate === true);
+	// Pre-check the donate box when the user has the "always donate" cookie
+	// set globally. The box is then disabled — opting in once is enough.
+	// Source of truth: the `PotluckAlwaysDonate` context (set by the layout,
+	// written by `AlwaysDonateToggle`). Falls back to empty when the layout
+	// hasn't mounted (e.g. SSR-only render).
+	const alwaysDonateHolder = $derived.by(() => {
+		const ctx = PotluckAlwaysDonate.fromContext();
+		return ctx?.value === "on";
+	});
+	let donateChecked = $state(false);
+	let donateDialogOpen = $state(false);
+	let pendingDonation = $state<{
+		providerId: string;
+		providerName: string;
+		apiKey: string;
+	} | null>(null);
+	const alwaysDonateEnabled = $derived(alwaysDonateHolder);
+
+	// ─── Donations list (parent-owned) ─────────────────────────────────────
+	// The list is fetched on modal open + after a successful donation. The
+	// `YourDonationsChips` component is purely presentational — it never
+	// calls the `getMyDonations` command itself, so we never trigger
+	// SvelteKit's automatic `invalidateAll` from a `$effect` (which caused
+	// the infinite-loop bug).
+	type MyDonation = {
+		id: string;
+		providerId: string;
+		donatedAt: string;
+		isActive: boolean;
+		tosVersion: string | null;
+	};
+	let donations = $state<MyDonation[]>([]);
+	let donationsLoading = $state(false);
+	let donationsHasLoadedOnce = $state(false);
+	let revokingDonationId = $state<string | null>(null);
+
+	async function loadDonations() {
+		donationsLoading = true;
+		try {
+			const res = await getMyDonations({});
+			if (res.success) {
+				donations = res.donations.filter((d) => d.isActive);
+				donationsHasLoadedOnce = true;
+			} else {
+				toast.error(res.message ?? "Failed to load donations");
+			}
+		} catch (err) {
+			console.error("[settings] loadDonations failed", err);
+			toast.error("Failed to load donations");
+		} finally {
+			donationsLoading = false;
+		}
+	}
+
+	async function handleRevokeDonation(donation: MyDonation) {
+		if (revokingDonationId) return;
+		revokingDonationId = donation.id;
+		try {
+			const res = await revokeMyDonation({ donationId: donation.id });
+			if (res.success) {
+				toast.success(
+					`Revoked ${donation.providerId}`
+				);
+				// Optimistic update — drop the row from the visible list.
+				donations = donations.filter((d) => d.id !== donation.id);
+			} else {
+				toast.error(res.message ?? "Revoke failed");
+			}
+		} catch (err) {
+			console.error("[settings] revoke failed", err);
+			toast.error("Revoke failed");
+		} finally {
+			revokingDonationId = null;
+		}
+	}
 
 	const customFormSchema = CustomProviderEncryptedDataSchema.extend({
 		providerId: z
@@ -167,6 +258,9 @@
 		isCustomFlow = false;
 		apiKeyInput = "";
 		apiKeyError = null;
+		// Pre-check when the user has opted in globally. The connect form
+		// will render the checkbox disabled in that case.
+		donateChecked = alwaysDonateHolder && canDonate;
 	}
 
 	function startCustomConnect() {
@@ -181,6 +275,7 @@
 		isCustomFlow = false;
 		apiKeyInput = "";
 		apiKeyError = null;
+		donateChecked = false;
 		if (wasCustom) resetCustomForm();
 	}
 
@@ -215,8 +310,24 @@
 			});
 			if (result.success) {
 				toast.success(`${connectingProvider.name} connected`);
+				const shouldDonate = donateChecked && canDonate;
+				const providerId = connectingProvider.id;
+				const providerName = connectingProvider.name;
 				exitConnectForm();
 				await loadProviders();
+				await loadModels();
+				// Post-save donation: if the box was checked AND a ToS version
+				// is configured, open the confirmation dialog; otherwise
+				// call the command directly. Failures are toasted as warnings
+				// (the personal credential already succeeded).
+				if (shouldDonate) {
+					if (poolConfig.tosVersion) {
+						pendingDonation = { providerId, providerName, apiKey: trimmed };
+						donateDialogOpen = true;
+					} else {
+						await performDonation(providerId, trimmed);
+					}
+				}
 			} else {
 				apiKeyError = result.message ?? "Failed to save API key";
 			}
@@ -226,6 +337,36 @@
 		} finally {
 			isSavingApiKey = false;
 		}
+	}
+
+	async function performDonation(providerId: string, apiKey: string) {
+		try {
+			const res = await donateUserCredential({ providerId, apiKey });
+			if (res.success) {
+				toast.success(`Donated ${providerId} to the school pool`);
+				// Re-fetch the donations list (called from an event-handler
+				// chain, not from a $effect — safe from SvelteKit's
+				// automatic invalidateAll loop).
+				await loadDonations();
+			} else {
+				toast.warning(`Donation skipped: ${res.message ?? 'unknown reason'}`);
+			}
+		} catch (err) {
+			console.error("[donate] failed", err);
+			toast.warning("Donation skipped — your key is still connected.");
+		}
+	}
+
+	async function onDonateConfirmed() {
+		if (!pendingDonation) return { success: false };
+		const { providerId, apiKey } = pendingDonation;
+		await performDonation(providerId, apiKey);
+		pendingDonation = null;
+		return { success: true };
+	}
+
+	function onDonateDialogClose() {
+		pendingDonation = null;
 	}
 
 	async function submitCustomProvider() {
@@ -274,6 +415,7 @@
 				toast.success(`${parsed.data.displayName} added`);
 				exitConnectForm();
 				await loadProviders();
+				await loadModels();
 			} else {
 				toast.error(result.message ?? "Failed to save custom provider");
 			}
@@ -298,6 +440,7 @@
 			if (result.success) {
 				toast.success(`${cred.provider} disconnected`);
 				await loadProviders();
+				await loadModels();
 			} else {
 				toast.error(result.message ?? "Failed to disconnect");
 			}
@@ -312,11 +455,42 @@
 	// ─── Models state ────────────────────────────────────────────────────────
 	const availableModelsHolder = AvailableModelsHolder.fromContext();
 	const availableModels = $derived(availableModelsHolder.models);
-	const visibleModelIds = $derived(
-		availableModelsHolder.models
-			.map((m) => m.id)
-			.filter((id) => !availableModelsHolder.hiddenIds.has(id))
-	);
+	/**
+	 * `settingsModels` is the broader set used by the Models tab — every
+	 * discovered model + every catalog-known model for a credentialed
+	 * provider, regardless of enabled/disabled state. The chat
+	 * model-selector uses `availableModels` (the filtered subset).
+	 */
+	let settingsModels = $state<AugmentedModelInfo[]>([]);
+	/**
+	 * `enabledModelIds` — non-catalog models the user has explicitly
+	 * enabled. Catalog models are auto-enabled (the denylist is
+	 * `hiddenIds` instead).
+	 */
+	const enabledModelIds = $derived(availableModelsHolder.enabledIds);
+	/**
+	 * Returns true if the model is currently selected for the chat
+	 * model-selector.
+	 *   - catalog-known: enabled unless hidden
+	 *   - non-catalog:   enabled only if explicitly in `enabledModelIds`
+	 */
+	function isModelEnabled(model: AugmentedModelInfo): boolean {
+		if (model.isCatalogKnown) {
+			return !availableModelsHolder.hiddenIds.has(model.id);
+		}
+		return enabledModelIds.has(model.id);
+	}
+	/**
+	 * Set of model ids currently enabled for the model-selector. Used by
+	 * ModelsTab to render toggle state.
+	 */
+	const visibleModelIds = $derived.by(() => {
+		const ids = new Set<string>();
+		for (const m of settingsModels) {
+			if (isModelEnabled(m)) ids.add(m.id);
+		}
+		return [...ids];
+	});
 
 	let isLoadingModels = $state(false);
 	let modelSearch = $state("");
@@ -325,17 +499,21 @@
 	async function loadModels(): Promise<void> {
 		isLoadingModels = true;
 		try {
-			const [modelsResult, visibilityResult] = await Promise.all([
+			const [modelsResult, settingsResult] = await Promise.all([
 				getAvailableModels({}),
-				getModelVisibility({})
+				getSettingsModels({})
 			]);
 			if (modelsResult.success) {
-				const hiddenIds = visibilityResult.success
-					? (visibilityResult.hiddenModelIds ?? [])
-					: [];
-				availableModelsHolder.replace(modelsResult.models, hiddenIds);
+				availableModelsHolder.replace(
+					modelsResult.models,
+					modelsResult.hiddenModelIds ?? [],
+					modelsResult.enabledModelIds ?? []
+				);
 			} else {
 				toast.error(modelsResult.message ?? "Failed to load models");
+			}
+			if (settingsResult.success) {
+				settingsModels = settingsResult.models;
 			}
 		} catch (err) {
 			console.error("Failed to load models:", err);
@@ -345,15 +523,15 @@
 	}
 
 	const modelsByProvider = $derived.by(() => {
-		const grouped: Record<string, ModelInfo[]> = {};
-		for (const model of availableModels) {
+		const grouped: Record<string, AugmentedModelInfo[]> = {};
+		for (const model of settingsModels) {
 			if ((model as ModelInfo & { source?: string }).source === "platform") continue;
 			(grouped[model.providerId] ??= []).push(model);
 		}
 		return grouped;
 	});
 	const platformModels = $derived.by(() =>
-		availableModels.filter((m) => (m as ModelInfo & { source?: string }).source === "platform")
+		settingsModels.filter((m) => (m as ModelInfo & { source?: string }).source === "platform")
 	);
 	const visiblePlatformModels = $derived.by(() => {
 		const search = modelSearch.trim().toLowerCase();
@@ -381,23 +559,69 @@
 			})
 			.filter((g) => g.models.length > 0);
 	});
+	/**
+	 * Models that are NOT in the catalog (raw discoveries from upstream).
+	 * Rendered in the Models tab as a "Discovered" group so the user can
+	 * opt-in. Catalog-known models are auto-shown in their provider group.
+	 */
+	const discoveredOnlyModels = $derived.by(() =>
+		settingsModels.filter((m) => m.isCatalogKnown === false)
+	);
+	const visibleDiscoveredModels = $derived.by(() => {
+		const search = modelSearch.trim().toLowerCase();
+		if (search.length === 0) return discoveredOnlyModels;
+		return discoveredOnlyModels.filter(
+			(m) =>
+				m.name.toLowerCase().includes(search) ||
+				m.providerId.toLowerCase().includes(search) ||
+				(m.description ?? "").toLowerCase().includes(search)
+		);
+	});
 
-	async function toggleModelVisibility(modelId: string, nextVisible: boolean) {
-		togglingModelId = modelId;
-		const nextHidden = nextVisible
-			? new Set([...availableModelsHolder.hiddenIds].filter((id) => id !== modelId))
-			: new Set([...availableModelsHolder.hiddenIds, modelId]);
-		const previous = availableModelsHolder.hiddenIds;
-		availableModelsHolder.replace(availableModelsHolder.models, [...nextHidden]);
+	async function toggleModelVisibility(model: AugmentedModelInfo, nextVisible: boolean) {
+		togglingModelId = model.id;
+		const previousHidden = availableModelsHolder.hiddenIds;
+		const previousEnabled = availableModelsHolder.enabledIds;
+		const isCatalog = model.isCatalogKnown === true;
+
+		// Catalog-known: denylist via hiddenIds.
+		// Non-catalog: allowlist via enabledIds.
+		const nextHidden = isCatalog
+			? nextVisible
+				? new Set([...previousHidden].filter((id) => id !== model.id))
+				: new Set([...previousHidden, model.id])
+			: previousHidden;
+		const nextEnabled = isCatalog
+			? previousEnabled
+			: nextVisible
+				? new Set([...previousEnabled, model.id])
+				: new Set([...previousEnabled].filter((id) => id !== model.id));
+
+		availableModelsHolder.replace(
+			availableModelsHolder.models,
+			[...nextHidden],
+			[...nextEnabled]
+		);
 		try {
-			const result = await updateModelVisibility({ modelId, visible: nextVisible });
+			const result = await updateModelVisibility({ modelId: model.id, visible: nextVisible });
 			if (!result.success) {
-				availableModelsHolder.replace(availableModelsHolder.models, [...previous]);
+				availableModelsHolder.replace(
+					availableModelsHolder.models,
+					[...previousHidden],
+					[...previousEnabled]
+				);
 				toast.error(result.message ?? "Failed to update visibility");
+			} else {
+				// Server has the source of truth — reload to reconcile.
+				await loadModels();
 			}
 		} catch (err) {
 			console.error(err);
-			availableModelsHolder.replace(availableModelsHolder.models, [...previous]);
+			availableModelsHolder.replace(
+				availableModelsHolder.models,
+				[...previousHidden],
+				[...previousEnabled]
+			);
 			toast.error("Unexpected error");
 		} finally {
 			togglingModelId = null;
@@ -410,6 +634,7 @@
 			untrack(() => {
 				if (activeTab === "Providers") void loadProviders();
 				if (activeTab === "Models") void loadModels();
+				void loadDonations();
 			});
 		}
 	});
@@ -417,7 +642,7 @@
 
 <Dialog.Root bind:open {onOpenChange}>
 	<Dialog.Content
-		class="overflow-hidden p-0 fixed inset-0 w-full h-full max-w-none rounded-none md:left-1/2 md:right-auto md:top-1/2 md:bottom-auto md:-translate-x-1/2 md:-translate-y-1/2 md:w-auto md:h-auto md:max-h-[85vh] md:max-w-[1000px] md:rounded-2xl border-sidebar-border bg-background"
+		class="overflow-hidden p-0 fixed inset-0 w-full h-full max-w-none rounded-none translate-x-0 translate-y-0 md:left-1/2 md:right-auto md:top-1/2 md:bottom-auto md:-translate-x-1/2 md:-translate-y-1/2 md:w-auto md:h-auto md:max-h-[85vh] md:max-w-[1000px] md:rounded-2xl border-sidebar-border bg-background"
 		trapFocus={false}
 	>
 		<Dialog.Title class="sr-only">Settings</Dialog.Title>
@@ -425,7 +650,7 @@
 			>Configure your EdApex workspace preferences.</Dialog.Description
 		>
 
-		<Sidebar.Provider class="items-start bg-transparent">
+		<Sidebar.Provider class="h-full items-start bg-transparent">
 			<Sidebar.Root
 				collapsible="none"
 				class="hidden md:flex bg-sidebar w-64 border-r border-sidebar-border/10"
@@ -535,6 +760,14 @@
 								{isSubmittingCustom}
 								{visiblePopular}
 								{visibleRemaining}
+								{canDonate}
+								bind:donateChecked
+								alwaysDonateEnabled={alwaysDonateEnabled}
+								{donations}
+								donationsLoading={donationsLoading}
+								donationsHasLoadedOnce={donationsHasLoadedOnce}
+								revokingDonationId={revokingDonationId}
+								onRevokeDonation={handleRevokeDonation}
 								onStartConnect={startConnect}
 								onStartCustomConnect={startCustomConnect}
 								onCancelConnect={exitConnectForm}
@@ -544,12 +777,25 @@
 								onToggleShowMore={() => (showMoreProviders = !showMoreProviders)}
 								onClearError={clearCustomError}
 							/>
+							{#if pendingDonation}
+								<DonateConfirmDialog
+									bind:open={donateDialogOpen}
+									providerId={pendingDonation.providerId}
+									providerName={pendingDonation.providerName}
+									tosVersion={poolConfig.tosVersion}
+									donorRoles={poolConfig.donorRoles}
+									userRole={userDesignation}
+									onConfirm={onDonateConfirmed}
+									onClose={onDonateDialogClose}
+								/>
+							{/if}
 						{:else if activeTab === "Models"}
 							<ModelsTab
 								bind:modelSearch
 								{isLoadingModels}
 								{visibleProviderGroups}
 								{visiblePlatformModels}
+								{visibleDiscoveredModels}
 								{visibleModelIds}
 								{togglingModelId}
 								onToggleVisibility={toggleModelVisibility}

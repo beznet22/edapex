@@ -54,6 +54,16 @@ export class SelectedCategory extends SynchronizedCookie {
 	}
 }
 
+export class PotluckAlwaysDonate extends SynchronizedCookie {
+	constructor(value: string) {
+		super("potluck-always-donate", value);
+	}
+
+	static fromContext(): PotluckAlwaysDonate {
+		return super.fromContext("potluck-always-donate") as PotluckAlwaysDonate;
+	}
+}
+
 export class SelectedClass extends SynchronizedCookie {
 	constructor(value: string) {
 		super("selected-class", value);
@@ -87,14 +97,17 @@ export class SelectedClass extends SynchronizedCookie {
 export class AvailableModelsHolder {
 	#models = $state<AugmentedModelInfo[]>([]);
 	#hiddenIds = $state<Set<string>>(new Set());
+	#enabledIds = $state<Set<string>>(new Set());
 	#contextKey: symbol;
 
 	constructor(
 		models: AugmentedModelInfo[] = [],
-		hiddenIds: string[] = []
+		hiddenIds: string[] = [],
+		enabledIds: string[] = []
 	) {
 		this.#models = models;
 		this.#hiddenIds = new Set(hiddenIds);
+		this.#enabledIds = new Set(enabledIds);
 		this.#contextKey = Symbol.for("AvailableModelsHolder");
 	}
 
@@ -106,13 +119,26 @@ export class AvailableModelsHolder {
 		return this.#hiddenIds;
 	}
 
+	get enabledIds(): ReadonlySet<string> {
+		return this.#enabledIds;
+	}
+
 	hasHidden(modelId: string): boolean {
 		return this.#hiddenIds.has(modelId);
 	}
 
-	replace(models: AugmentedModelInfo[], hiddenIds: string[]): void {
+	hasEnabled(modelId: string): boolean {
+		return this.#enabledIds.has(modelId);
+	}
+
+	replace(
+		models: AugmentedModelInfo[],
+		hiddenIds: string[],
+		enabledIds: string[] = []
+	): void {
 		this.#models = models;
 		this.#hiddenIds = new Set(hiddenIds);
+		this.#enabledIds = new Set(enabledIds);
 	}
 
 	setContext(): void {

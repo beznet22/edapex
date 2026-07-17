@@ -43,6 +43,7 @@ async function insertDonation(schoolId: number, args: {
 			JSON.stringify({
 				apiKey: args.apiKey,
 				donatedBy: args.donatedBy,
+				donatedAt: new Date().toISOString(),
 				tosVersion: args.tosVersion ?? null
 			}),
 			ENCRYPTION_KEY

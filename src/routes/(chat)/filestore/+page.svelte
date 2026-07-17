@@ -9,7 +9,9 @@
 	import * as AlertDialog from "$lib/components/ui/alert-dialog";
 	import { Textarea } from "$lib/components/ui/textarea";
 	import ChatHeader from "$lib/components/chat-header.svelte";
-	import UploadCard, { type UploadJob } from "$lib/components/UploadCard.svelte";
+	import UploadCard, {
+		type UploadJob,
+	} from "$lib/components/UploadCard.svelte";
 	import Confetti from "$lib/components/Confetti.svelte";
 	import Search from "@lucide/svelte/icons/search";
 	import ChevronDown from "@lucide/svelte/icons/chevron-down";
@@ -36,26 +38,36 @@
 	import ScanSearch from "@lucide/svelte/icons/scan-search";
 	import MessageSquare from "@lucide/svelte/icons/message-square";
 	import CloudUploadIcon from "@lucide/svelte/icons/cloud-upload";
+	import { generateId } from "ai";
 	import { useInspector } from "$lib/context/inspector-context.svelte";
-	import { FilesContext } from "$lib/context/file-context.svelte";
 	import { useImageCompression } from "$lib/context/image.context.svelte";
 	import { mobileUiState } from "$lib/state/mobile-ui.svelte";
 	import { IsMobile } from "$lib/hooks/is-mobile.svelte";
-	import { backgroundTasks, serializeTenant } from "$lib/state/background-tasks.svelte";
+	import {
+		backgroundTasks,
+		serializeTenant,
+	} from "$lib/state/background-tasks.svelte";
+	import type { SerializedTenant } from "$lib/types/background-tasks";
 	import { cn } from "$lib/utils/shadcn";
 	import { compressIfImage, filenameForMime } from "$lib/compression.utils";
 	import { toast } from "svelte-sonner";
 	import type { PageData } from "./$types";
-	import type { Artifact, ArtifactCategory, ArtifactSource } from "$lib/types/workspace-types";
+	import type {
+		Artifact,
+		ArtifactCategory,
+		ArtifactSource,
+	} from "$lib/types/workspace-types";
 
 	let { data }: { data: PageData } = $props();
 
 	const inspector = useInspector();
 	const isMobile = new IsMobile();
-	const isThreadScoped = $derived(typeof data.threadId === "string" && data.threadId.length > 0);
+	const isThreadScoped = $derived(
+		typeof data.threadId === "string" && data.threadId.length > 0,
+	);
 	const imageContext = useImageCompression();
 
-	const BATCH_THRESHOLD = 4;
+	const BATCH_THRESHOLD = 30;
 	const CONFETTI_THRESHOLD = 2;
 
 	let activeTermId = $state(data.activeTermId);
@@ -74,8 +86,8 @@
 	let noteSaving = $state(false);
 	let fileInputRef = $state<HTMLInputElement | null>(null);
 	let deleteDialogOpen = $state(false);
-	let isStartingChat = $state(false);
 	let isExtracting = $state(false);
+	let isStartingChat = $state(false);
 
 	let uploadJobs = $state<UploadJob[]>([]);
 	let isDragOver = $state(false);
@@ -141,6 +153,10 @@
 		categoryMulti = next;
 	}
 
+	function clearSelection() {
+		selectedIds = new Set();
+	}
+
 	function toggleSelect(id: string) {
 		const next = new Set(selectedIds);
 		if (next.has(id)) next.delete(id);
@@ -154,10 +170,6 @@
 		} else {
 			selectedIds = new Set(filteredFiles.map((f) => f.id));
 		}
-	}
-
-	function clearSelection() {
-		selectedIds = new Set();
 	}
 
 	function toggleSort(column: "name" | "modified" | "size") {
@@ -175,13 +187,23 @@
 			if (q && !f.title.toLowerCase().includes(q)) return false;
 			if (categoryFilter === "images" && f.kind !== "image") return false;
 			if (categoryFilter === "files" && f.kind === "image") return false;
-			if (sourceFilter.size > 0 && (!f.source || !sourceFilter.has(f.source))) return false;
+			if (
+				sourceFilter.size > 0 &&
+				(!f.source || !sourceFilter.has(f.source))
+			)
+				return false;
 			if (
 				categoryMulti.size > 0 &&
 				(!f.category || !categoryMulti.has(f.category))
 			)
 				return false;
-			if (data.activeTermId && data.activeTermId > 0 && f.examTypeId && f.examTypeId !== data.activeTermId) return false;
+			if (
+				data.activeTermId &&
+				data.activeTermId > 0 &&
+				f.examTypeId &&
+				f.examTypeId !== data.activeTermId
+			)
+				return false;
 			return true;
 		});
 
@@ -223,7 +245,10 @@
 		const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
 		if (d > sevenDaysAgo) return dayName;
 
-		return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+		return d.toLocaleDateString("en-US", {
+			month: "short",
+			day: "numeric",
+		});
 	}
 
 	function categoryLabel(c: ArtifactCategory | undefined): string {
@@ -286,15 +311,19 @@
 
 	function mimeForKind(kind: Artifact["kind"]): string {
 		switch (kind) {
-			case "pdf": return "application/pdf";
-			case "image": return "image/jpeg";
-			case "document": return "text/markdown";
-			default: return "application/octet-stream";
+			case "pdf":
+				return "application/pdf";
+			case "image":
+				return "image/jpeg";
+			case "document":
+				return "text/markdown";
+			default:
+				return "application/octet-stream";
 		}
 	}
 
 	function termPrefix(): string {
-		return `exams/examType-${activeTermId}/`;
+		return `exams/examType-${activeTermId}/uploads/`;
 	}
 
 	function slugify(name: string): string {
@@ -322,34 +351,44 @@
 			statusEpoch: 0,
 		}));
 		uploadJobs = [...uploadJobs, ...jobs];
+		const startIndex = uploadJobs.length - originals.length;
 
 		const prepared = await Promise.all(
 			originals.map(async (f, i) => {
 				const compressed = await compressIfImage(f, (file, opts) =>
-					imageContext.compress(file, opts)
+					imageContext.compress(file, opts),
 				);
-				jobs[i] = {
-					...jobs[i],
+				uploadJobs[startIndex + i] = {
+					...uploadJobs[startIndex + i],
 					status: "uploading",
 					compressedSize: compressed.size,
-					statusEpoch: jobs[i].statusEpoch! + 1,
+					statusEpoch: (uploadJobs[startIndex + i].statusEpoch ?? 0) + 1,
 				};
 				uploadJobs = [...uploadJobs];
-				return { job: jobs[i], compressed };
-			})
+				return { job: uploadJobs[startIndex + i], compressed };
+			}),
 		);
 
 		const prefix = termPrefix();
 		const uploadedKeys: string[] = [];
+		// Tracks the workspace key → job index so the inline-OCR phase
+		// can flip the right pill's status without scanning.
+		const keyToJobIndex = new Map<string, number>();
 		for (let i = 0; i < prepared.length; i++) {
 			const { compressed, job } = prepared[i];
 			try {
-				const filename = filenameForMime(job.file.name, compressed.type);
+				const filename = filenameForMime(
+					job.file.name,
+					compressed.type,
+				);
 				const path = prefix + filename;
-				const res = await fetch(`/api/file/${path}`, {
-					method: "PUT",
-					body: compressed,
-				});
+				const res = await fetch(
+					`/api/file/${path}?examTypeId=${activeTermId}`,
+					{
+						method: "PUT",
+						body: compressed,
+					},
+				);
 				if (!res.ok) {
 					let errMsg = `HTTP ${res.status}`;
 					try {
@@ -358,27 +397,36 @@
 					} catch {
 						/* non-JSON error */
 					}
+					console.error("[filestore] upload failed", {
+						path,
+						status: res.status,
+						error: errMsg,
+					});
 					throw new Error(errMsg);
 				}
 				uploadedKeys.push(path);
-				jobs[i] = {
-					...job,
+				keyToJobIndex.set(path, startIndex + i);
+				uploadJobs[startIndex + i] = {
+					...uploadJobs[startIndex + i]!,
 					status: "done",
-					statusEpoch: job.statusEpoch! + 1,
+					statusEpoch: (uploadJobs[startIndex + i]!.statusEpoch ?? 0) + 1,
 				};
 			} catch (err) {
-				const message = err instanceof Error ? err.message : String(err);
-				jobs[i] = {
-					...job,
+				const message =
+					err instanceof Error ? err.message : String(err);
+				uploadJobs[startIndex + i] = {
+					...uploadJobs[startIndex + i]!,
 					status: "error",
 					error: message,
-					statusEpoch: job.statusEpoch! + 1,
+					statusEpoch: (uploadJobs[startIndex + i]!.statusEpoch ?? 0) + 1,
 				};
 			}
 			uploadJobs = [...uploadJobs];
 		}
 
-		const imageKeys = uploadedKeys.filter((k) => /\.(jpe?g|png|webp|gif)$/i.test(k));
+		const imageKeys = uploadedKeys.filter((k) =>
+			/\.(jpe?g|png|webp|gif)$/i.test(k),
+		);
 		if (imageKeys.length > 0) {
 			const tenant = serializeTenant({
 				schoolId: data.tenant.schoolId,
@@ -393,33 +441,119 @@
 				sectionName: data.tenant.sectionName,
 				academicYearTitle: data.tenant.academicYearTitle,
 			});
-			if (imageKeys.length === 1) {
-				backgroundTasks.runTask({ kind: "ocr-single", key: imageKeys[0], tenant });
-			} else if (imageKeys.length >= BATCH_THRESHOLD) {
-				backgroundTasks.runTask({ kind: "ocr-batch", keys: imageKeys, tenant });
-			} else {
-				backgroundTasks.runTask({ kind: "ocr-batch", keys: imageKeys, tenant });
-			}
+
+			// Threshold-based routing:
+			//   1 image  → inline direct Mistral call (no background task, no popover)
+			//   2-3      → inline direct Mistral calls, sequential (no background task, no popover)
+			//   4+       → single Mistral batch job (background task, popover auto-opens)
 			const imageCount = imageKeys.length;
-			toast.info(
-				`Uploaded ${uploadedKeys.length}. ${imageCount === 1 ? "Queued for OCR" : `Queued ${imageCount} for batch OCR`}.`
-			);
+			if (imageCount >= BATCH_THRESHOLD) {
+				backgroundTasks.runTask({
+					kind: "ocr-batch",
+					keys: imageKeys,
+					tenant,
+				});
+				toast.info(
+					`Uploaded ${uploadedKeys.length}. Queued ${imageCount} for batch OCR.`,
+				);
+			} else {
+				// 1, 2-3 → inline direct OCR per file. Each pill transitions
+				// through "uploading → ocr → done" sequentially. No popover
+				// entry, no background task. The user sees progress on the
+				// upload card.
+				await runInlineOcr(imageKeys, keyToJobIndex, tenant);
+				toast.info(
+					`Uploaded ${uploadedKeys.length} ${imageCount === 1 ? "file" : "files"}. Extracting text.`,
+				);
+			}
 		} else if (uploadedKeys.length > 0) {
-			toast.success(`Uploaded ${uploadedKeys.length} ${uploadedKeys.length === 1 ? "file" : "files"}`);
+			toast.success(
+				`Uploaded ${uploadedKeys.length} ${uploadedKeys.length === 1 ? "file" : "files"}`,
+			);
 		}
 
-		const completedNow = jobs.filter((j) => j.status === "done").length;
+		const completedNow = uploadedKeys.length;
+		const hasErrors = completedNow < originals.length;
+		const isBatchOcr = imageKeys.length >= BATCH_THRESHOLD;
 		if (
 			completedNow > 0 &&
 			completedNow > lastCompletionCount &&
 			completedNow >= CONFETTI_THRESHOLD &&
-			jobs.every((j) => j.status === "done" || j.status === "error")
+			!hasErrors &&
+			!isBatchOcr
 		) {
 			confettiTrigger += 1;
 		}
 		lastCompletionCount = completedNow;
 
 		await invalidateAll();
+	}
+
+	/**
+	 * Inline OCR for the 1-image and 2-3 image cases. Hits the
+	 * `?action=ocr-direct` endpoint sequentially, updating each pill's
+	 * `status` to `"ocr"` → `"done"` (or `"error"`) as the calls complete.
+	 *
+	 * No background task, no popover entry — the user sees progress in the
+	 * upload card. Each file's upload already completed by the time this
+	 * runs; we just call Mistral's direct OCR API per file.
+	 */
+	async function runInlineOcr(
+		imageKeys: string[],
+		keyToJobIndex: Map<string, number>,
+		tenant: SerializedTenant,
+	): Promise<void> {
+		for (const key of imageKeys) {
+			const jobIndex = keyToJobIndex.get(key);
+			if (jobIndex === undefined) continue;
+
+			// Flip pill to "ocr"
+			const ocrJob = uploadJobs[jobIndex];
+			if (!ocrJob) continue;
+			uploadJobs[jobIndex] = {
+				...ocrJob,
+				status: "ocr" as const,
+				statusEpoch: (ocrJob.statusEpoch ?? 0) + 1,
+			};
+
+			try {
+				const res = await fetch("/api/file/?action=ocr-direct", {
+					method: "POST",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({ key, tenant }),
+				});
+				if (!res.ok) {
+					let errMsg = `OCR failed: HTTP ${res.status}`;
+					try {
+						const body = await res.json();
+						if (body?.error) errMsg = body.error;
+					} catch {
+						/* non-JSON */
+					}
+					throw new Error(errMsg);
+				}
+				const doneJob = uploadJobs[jobIndex];
+				if (doneJob) {
+					uploadJobs[jobIndex] = {
+						...doneJob,
+						status: "done" as const,
+						statusEpoch: (doneJob.statusEpoch ?? 0) + 1,
+					};
+				}
+			} catch (err) {
+				const message =
+					err instanceof Error ? err.message : String(err);
+				const errJob = uploadJobs[jobIndex];
+				if (errJob) {
+					uploadJobs[jobIndex] = {
+						...errJob,
+						status: "error" as const,
+						error: message,
+						statusEpoch: (errJob.statusEpoch ?? 0) + 1,
+					};
+				}
+			}
+		}
 	}
 
 	function dismissUploadJob(id: string): void {
@@ -438,11 +572,14 @@
 		noteSaving = true;
 		try {
 			const path = termPrefix() + slugify(noteName) + ".md";
-			const res = await fetch(`/api/file/${path}`, {
-				method: "PUT",
-				headers: { "Content-Type": "text/markdown" },
-				body: noteBody,
-			});
+			const res = await fetch(
+				`/api/file/${path}?examTypeId=${activeTermId}`,
+				{
+					method: "PUT",
+					headers: { "Content-Type": "text/markdown" },
+					body: noteBody,
+				},
+			);
 			if (!res.ok) throw new Error(`HTTP ${res.status}`);
 			toast.success("Note saved");
 			noteDialogOpen = false;
@@ -458,27 +595,19 @@
 	}
 
 	async function startChatWithSelected() {
-		if (selectedIds.size !== 1) return;
-		const id = [...selectedIds][0];
-		const file = filteredFiles.find((f) => f.id === id);
-		if (!file) return;
+		if (selectedIds.size === 0) return;
 		isStartingChat = true;
 		try {
-			const threadId = crypto.randomUUID();
-			const filesContext = FilesContext.fromContext();
-			filesContext.references = [
-				{
-					key: file.id,
-					name: file.title,
-					type: "file",
-					mimeType: mimeForKind(file.kind),
-				},
-			];
+			const chatId = generateId();
+			const selectedFiles = filteredFiles.filter((f) =>
+				selectedIds.has(f.id),
+			);
+			const keys = selectedFiles
+				.map((f) => f.id)
+				.map(encodeURIComponent)
+				.join(",");
 			clearSelection();
-			await goto(`/chat/${threadId}`);
-		} catch (err) {
-			const message = err instanceof Error ? err.message : String(err);
-			toast.error(`Failed to start chat: ${message}`);
+			await goto(`/chat/${chatId}?refs=${keys}`);
 		} finally {
 			isStartingChat = false;
 		}
@@ -486,7 +615,9 @@
 
 	async function extractSelected() {
 		if (selectedIds.size === 0) return;
-		const keys = filteredFiles.filter((f) => selectedIds.has(f.id)).map((f) => f.id);
+		const keys = filteredFiles
+			.filter((f) => selectedIds.has(f.id))
+			.map((f) => f.id);
 		isExtracting = true;
 		try {
 			const tenant = serializeTenant({
@@ -502,8 +633,20 @@
 				sectionName: data.tenant.sectionName,
 				academicYearTitle: data.tenant.academicYearTitle,
 			});
-			backgroundTasks.runTask({ kind: "ocr-batch", keys, tenant });
-			toast.info(`Queued ${keys.length} file${keys.length === 1 ? "" : "s"} for extraction`);
+			// Same threshold routing as the auto-OCR path: 1-3 selected
+			// files use inline direct Mistral; 4+ uses the Mistral batch
+			// API (background task, popover auto-opens).
+			if (keys.length >= BATCH_THRESHOLD) {
+				backgroundTasks.runTask({ kind: "ocr-batch", keys, tenant });
+				toast.info(
+					`Queued ${keys.length} file${keys.length === 1 ? "" : "s"} for batch OCR`,
+				);
+			} else {
+				await runInlineOcr(keys, new Map(), tenant);
+				toast.info(
+					`Extracting text from ${keys.length} file${keys.length === 1 ? "" : "s"}`,
+				);
+			}
 			clearSelection();
 		} catch (err) {
 			const message = err instanceof Error ? err.message : String(err);
@@ -522,7 +665,9 @@
 			);
 			clearSelection();
 			await invalidateAll();
-			toast.success(`Deleted ${ids.length} file${ids.length === 1 ? "" : "s"}`);
+			toast.success(
+				`Deleted ${ids.length} file${ids.length === 1 ? "" : "s"}`,
+			);
 		} catch (err) {
 			const message = err instanceof Error ? err.message : String(err);
 			toast.error(`Failed to delete: ${message}`);
@@ -539,7 +684,6 @@
 
 	const activeFilterCount = $derived(sourceFilter.size + categoryMulti.size);
 	const bulkActionsVisible = $derived(selectedIds.size > 0);
-	const singleSelected = $derived(selectedIds.size === 1);
 </script>
 
 <svelte:head>
@@ -553,17 +697,25 @@
 		class="fixed inset-0 z-50 pointer-events-none flex items-center justify-center
 			   bg-background/60 backdrop-blur-2xl"
 	>
-		<div class="hermes-glass rounded-3xl p-10 sm:p-12 flex flex-col items-center gap-6
-					shadow-2xl gold-glow max-w-md mx-4">
-			<div class="size-20 rounded-2xl bg-primary/10 border border-primary/20
-						flex items-center justify-center drag-wobble">
+		<div
+			class="hermes-glass rounded-3xl p-10 sm:p-12 flex flex-col items-center gap-6
+					shadow-2xl gold-glow max-w-md mx-4"
+		>
+			<div
+				class="size-20 rounded-2xl bg-primary/10 border border-primary/20
+						flex items-center justify-center drag-wobble"
+			>
 				<CloudUploadIcon class="size-10 text-primary" />
 			</div>
 			<div class="text-center space-y-1.5">
-				<p class="text-2xl sm:text-3xl font-black tracking-tighter text-foreground">
+				<p
+					class="text-2xl sm:text-3xl font-black tracking-tighter text-foreground"
+				>
 					Drop files to upload
 				</p>
-				<p class="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
+				<p
+					class="text-[11px] font-bold uppercase tracking-widest text-muted-foreground"
+				>
 					They'll be added to the active term
 				</p>
 			</div>
@@ -575,7 +727,9 @@
 	<ChatHeader />
 
 	<div class="flex-1 min-h-0 overflow-auto bg-background">
-		<div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-10 py-6 sm:py-10 space-y-6 sm:space-y-8">
+		<div
+			class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-10 py-6 sm:py-10 space-y-6 sm:space-y-8"
+		>
 			<header
 				class="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between"
 			>
@@ -606,7 +760,9 @@
 						Library
 					</h1>
 					{#if isThreadScoped}
-						<span class="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60 ml-1 hidden sm:inline">
+						<span
+							class="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60 ml-1 hidden sm:inline"
+						>
 							Thread artifacts
 						</span>
 					{/if}
@@ -628,14 +784,14 @@
 					<DropdownMenu.Root>
 						<DropdownMenu.Trigger>
 							{#snippet child({ props })}
-							<button
-								{...props}
-								type="button"
-								class="h-10 px-4 rounded-full font-bold text-sm gap-1.5 bg-primary text-primary-foreground hover:opacity-90 active:opacity-80 transition-opacity inline-flex items-center"
-							>
-								New
-								<ChevronDown class="h-4 w-4 opacity-80" />
-							</button>
+								<button
+									{...props}
+									type="button"
+									class="h-10 px-4 rounded-full font-bold text-sm gap-1.5 bg-primary text-primary-foreground hover:opacity-90 active:opacity-80 transition-opacity inline-flex items-center"
+								>
+									New
+									<ChevronDown class="h-4 w-4 opacity-80" />
+								</button>
 							{/snippet}
 						</DropdownMenu.Trigger>
 						<DropdownMenu.Content
@@ -647,14 +803,18 @@
 								onclick={() => fileInputRef?.click()}
 								class="px-3 py-2.5 rounded-lg text-sm font-medium cursor-pointer"
 							>
-								<Upload class="h-4 w-4 mr-3 text-muted-foreground" />
+								<Upload
+									class="h-4 w-4 mr-3 text-muted-foreground"
+								/>
 								Upload files
 							</DropdownMenu.Item>
 							<DropdownMenu.Item
 								onclick={() => (noteDialogOpen = true)}
 								class="px-3 py-2.5 rounded-lg text-sm font-medium cursor-pointer"
 							>
-								<FileText class="h-4 w-4 mr-3 text-muted-foreground" />
+								<FileText
+									class="h-4 w-4 mr-3 text-muted-foreground"
+								/>
 								New note
 							</DropdownMenu.Item>
 						</DropdownMenu.Content>
@@ -689,22 +849,13 @@
 						<X class="size-3.5" />
 						<span class="hidden sm:inline">Clear</span>
 					</button>
-					<span class="text-[10px] font-black uppercase tracking-widest text-muted-foreground/80 ml-1">
+					<span
+						class="text-[10px] font-black uppercase tracking-widest text-muted-foreground/80 ml-1"
+					>
 						{selectedIds.size} selected
 					</span>
-					<span class="h-5 w-px bg-border/60 mx-1" aria-hidden="true"></span>
-
-					<Button
-						variant="default"
-						size="sm"
-						class="h-9 px-3.5 rounded-full gap-1.5 text-xs font-bold"
-						disabled={!singleSelected || isStartingChat}
-						onclick={startChatWithSelected}
-						title={singleSelected ? "Start a new chat with this file" : "Multi-file chat coming soon"}
-					>
-						<MessageSquare class="size-3.5" />
-						Start chat
-					</Button>
+					<span class="h-5 w-px bg-border/60 mx-1" aria-hidden="true"
+					></span>
 
 					<Button
 						variant="secondary"
@@ -716,18 +867,39 @@
 						<ScanSearch class="size-3.5" />
 						Extract
 					</Button>
+					<Button
+						variant="default"
+						size="sm"
+						class="h-9 px-3.5 rounded-full gap-1.5 text-xs font-bold"
+						disabled={isStartingChat}
+						onclick={startChatWithSelected}
+					>
+						<MessageSquare class="size-3.5" />
+						Start chat
+					</Button>
+					<span class="flex-1" aria-hidden="true"></span>
+					<Button
+						variant="destructive"
+						size="sm"
+						class="h-9 px-3.5 rounded-full gap-1.5 text-xs font-bold"
+						onclick={() => (deleteDialogOpen = true)}
+					>
+						<Trash2 class="size-3.5" />
+						Delete
+					</Button>
 				</div>
 			{:else}
 				<div class="flex items-center justify-between gap-3 flex-wrap">
-					<nav class="flex items-center gap-1 sm:gap-2" aria-label="File categories">
-						{#each [
-							{ id: "all", label: "All" },
-							{ id: "images", label: "Images" },
-							{ id: "files", label: "Files" },
-						] as tab (tab.id)}
+					<nav
+						class="flex items-center gap-1 sm:gap-2"
+						aria-label="File categories"
+					>
+						{#each [{ id: "all", label: "All" }, { id: "images", label: "Images" }, { id: "files", label: "Files" }] as tab (tab.id)}
 							<button
 								type="button"
-								onclick={() => (categoryFilter = tab.id as typeof categoryFilter)}
+								onclick={() =>
+									(categoryFilter =
+										tab.id as typeof categoryFilter)}
 								class={cn(
 									"h-9 px-4 rounded-full text-sm font-bold transition-colors",
 									categoryFilter === tab.id
@@ -750,11 +922,14 @@
 										aria-label="Filter"
 										class={cn(
 											"h-9 px-3 sm:px-4 inline-flex items-center gap-1.5 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors text-xs font-bold uppercase tracking-wider",
-											activeFilterCount > 0 && "text-primary bg-primary/10",
+											activeFilterCount > 0 &&
+												"text-primary bg-primary/10",
 										)}
 									>
 										<Funnel class="h-4 w-4" />
-										<span class="hidden sm:inline">Filter</span>
+										<span class="hidden sm:inline"
+											>Filter</span
+										>
 										{#if activeFilterCount > 0}
 											<span
 												class="h-4 min-w-4 px-1 grid place-items-center rounded-full bg-primary text-primary-foreground text-[10px] font-black tabular-nums"
@@ -777,28 +952,35 @@
 										>
 											Exam term
 											{#if data.activeAcademicTitle}
-												<span class="ml-1 text-muted-foreground/50 normal-case font-medium tracking-normal">
+												<span
+													class="ml-1 text-muted-foreground/50 normal-case font-medium tracking-normal"
+												>
 													· {data.activeAcademicTitle}
 												</span>
 											{/if}
 										</DropdownMenu.GroupHeading>
 										<DropdownMenu.RadioGroup
 											value={String(activeTermId)}
-											onValueChange={(v) => selectTerm(Number(v))}
+											onValueChange={(v) =>
+												selectTerm(Number(v))}
 										>
 											{#each data.termOptions as opt (opt.id)}
 												<DropdownMenu.RadioItem
 													value={String(opt.id)}
 													class="px-3 py-2.5 rounded-lg text-sm font-medium cursor-pointer"
 												>
-													<Calendar class="h-4 w-4 mr-3 text-muted-foreground" />
+													<Calendar
+														class="h-4 w-4 mr-3 text-muted-foreground"
+													/>
 													{opt.name}
 												</DropdownMenu.RadioItem>
 											{/each}
 										</DropdownMenu.RadioGroup>
 									</DropdownMenu.Group>
 
-									<DropdownMenu.Separator class="my-2 h-px bg-border/60" />
+									<DropdownMenu.Separator
+										class="my-2 h-px bg-border/60"
+									/>
 								{/if}
 
 								<DropdownMenu.Group>
@@ -809,23 +991,31 @@
 									</DropdownMenu.GroupHeading>
 									<DropdownMenu.CheckboxItem
 										checked={sourceFilter.has("uploaded")}
-										onCheckedChange={() => toggleSource("uploaded")}
+										onCheckedChange={() =>
+											toggleSource("uploaded")}
 										class="px-3 py-2.5 rounded-lg text-sm font-medium cursor-pointer"
 									>
-										<Upload class="h-4 w-4 mr-3 text-muted-foreground" />
+										<Upload
+											class="h-4 w-4 mr-3 text-muted-foreground"
+										/>
 										Uploaded
 									</DropdownMenu.CheckboxItem>
 									<DropdownMenu.CheckboxItem
 										checked={sourceFilter.has("generated")}
-										onCheckedChange={() => toggleSource("generated")}
+										onCheckedChange={() =>
+											toggleSource("generated")}
 										class="px-3 py-2.5 rounded-lg text-sm font-medium cursor-pointer"
 									>
-										<Sparkles class="h-4 w-4 mr-3 text-muted-foreground" />
+										<Sparkles
+											class="h-4 w-4 mr-3 text-muted-foreground"
+										/>
 										Generated
 									</DropdownMenu.CheckboxItem>
 								</DropdownMenu.Group>
 
-								<DropdownMenu.Separator class="my-2 h-px bg-border/60" />
+								<DropdownMenu.Separator
+									class="my-2 h-px bg-border/60"
+								/>
 
 								<DropdownMenu.Group>
 									<DropdownMenu.GroupHeading
@@ -833,19 +1023,16 @@
 									>
 										File type
 									</DropdownMenu.GroupHeading>
-									{#each [
-										{ id: "image" as const, label: "Images", Icon: FileImage },
-										{ id: "document" as const, label: "Documents", Icon: FileText },
-										{ id: "spreadsheet" as const, label: "Spreadsheets", Icon: Table2 },
-										{ id: "presentation" as const, label: "Presentations", Icon: Presentation },
-										{ id: "pdf" as const, label: "PDFs", Icon: FileText },
-									] as item (item.id)}
+									{#each [{ id: "image" as const, label: "Images", Icon: FileImage }, { id: "document" as const, label: "Documents", Icon: FileText }, { id: "spreadsheet" as const, label: "Spreadsheets", Icon: Table2 }, { id: "presentation" as const, label: "Presentations", Icon: Presentation }, { id: "pdf" as const, label: "PDFs", Icon: FileText }] as item (item.id)}
 										<DropdownMenu.CheckboxItem
 											checked={categoryMulti.has(item.id)}
-											onCheckedChange={() => toggleCategory(item.id)}
+											onCheckedChange={() =>
+												toggleCategory(item.id)}
 											class="px-3 py-2.5 rounded-lg text-sm font-medium cursor-pointer"
 										>
-											<item.Icon class="h-4 w-4 mr-3 text-muted-foreground" />
+											<item.Icon
+												class="h-4 w-4 mr-3 text-muted-foreground"
+											/>
 											{item.label}
 										</DropdownMenu.CheckboxItem>
 									{/each}
@@ -853,7 +1040,10 @@
 							</DropdownMenu.Content>
 						</DropdownMenu.Root>
 
-						<div class="h-5 w-px bg-border/60 mx-1" aria-hidden="true"></div>
+						<div
+							class="h-5 w-px bg-border/60 mx-1"
+							aria-hidden="true"
+						></div>
 
 						<DropdownMenu.Root>
 							<DropdownMenu.Trigger>
@@ -881,20 +1071,30 @@
 									onclick={() => (viewMode = "grid")}
 									class="px-3 py-2.5 rounded-lg text-sm font-medium cursor-pointer"
 								>
-									<LayoutGrid class="h-4 w-4 mr-3 text-muted-foreground" />
+									<LayoutGrid
+										class="h-4 w-4 mr-3 text-muted-foreground"
+									/>
 									Grid
 									{#if viewMode === "grid"}
-										<Check class="h-4 w-4 ml-auto" strokeWidth={3} />
+										<Check
+											class="h-4 w-4 ml-auto"
+											strokeWidth={3}
+										/>
 									{/if}
 								</DropdownMenu.Item>
 								<DropdownMenu.Item
 									onclick={() => (viewMode = "list")}
 									class="px-3 py-2.5 rounded-lg text-sm font-medium cursor-pointer"
 								>
-									<LayoutList class="h-4 w-4 mr-3 text-muted-foreground" />
+									<LayoutList
+										class="h-4 w-4 mr-3 text-muted-foreground"
+									/>
 									List
 									{#if viewMode === "list"}
-										<Check class="h-4 w-4 ml-auto" strokeWidth={3} />
+										<Check
+											class="h-4 w-4 ml-auto"
+											strokeWidth={3}
+										/>
 									{/if}
 								</DropdownMenu.Item>
 							</DropdownMenu.Content>
@@ -933,7 +1133,9 @@
 			{/if}
 
 			{#if !data.files}
-				<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
+				<div
+					class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5"
+				>
 					{#each Array(6) as _, i (i)}
 						<Skeleton class="aspect-[3/4] rounded-3xl" />
 					{/each}
@@ -942,7 +1144,9 @@
 				<div
 					class="flex flex-col items-center justify-center py-24 text-center rounded-3xl border border-dashed border-accent/50 bg-accent/10"
 				>
-					<FileQuestion class="size-12 text-muted-foreground/30 mb-3" />
+					<FileQuestion
+						class="size-12 text-muted-foreground/30 mb-3"
+					/>
 					<p
 						class="text-[11px] font-black uppercase tracking-widest text-muted-foreground"
 					>
@@ -969,8 +1173,10 @@
 				>
 					{#each filteredFiles as file (file.id)}
 						{@const Icon = categoryIcon(file.category)}
-						{@const isActive = inspector.filestoreArtifact?.id === file.id}
+						{@const isActive =
+							inspector.filestoreArtifact?.id === file.id}
 						{@const isSelected = selectedIds.has(file.id)}
+						{@const displayName = file.title.replace(/\.[a-z0-9]+$/i, "")}
 						<div
 							role="button"
 							tabindex="0"
@@ -1009,7 +1215,6 @@
 									<Check class="size-3.5" strokeWidth={3.5} />
 								{/if}
 							</button>
-
 							{#if file.kind === "image" && file.url}
 								<img
 									src={file.url}
@@ -1017,26 +1222,44 @@
 									loading="lazy"
 									class="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
 								/>
+								<div
+									class="absolute bottom-0 left-0 right-0 h-1/2 bg-linear-to-t from-black/40 to-transparent pointer-events-none"
+								>
+									<Icon
+										class="size-14 text-foreground/30"
+										strokeWidth={1.25}
+									/>
+								</div>
 							{:else}
 								<div
 									class="absolute inset-0 grid place-items-center from-muted/30 via-background/10 to-muted/40"
 								>
-									<Icon class="size-14 text-foreground/30" strokeWidth={1.25} />
+									<Icon
+										class="size-14 text-foreground/30"
+										strokeWidth={1.25}
+									/>
 								</div>
 							{/if}
 
 							<h3
-								class="absolute text-white/65 top-3 left-3 right-12 text-base font-bol leading-tight line-clamp-2 mix-blend-difference pointer-events-none"
+								class="absolute capitalize text-base top-3 left-3 right-12 font-bold leading-tight line-clamp-2 text-white drop-shadow-sm pointer-events-none"
 								title={file.title}
 							>
-								{file.title}
+								{displayName}
 							</h3>
 							<div
-								class="absolute bottom-3 left-3 right-12 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest mix-blend-difference pointer-events-none"
+								class="absolute bottom-3 left-3 right-12 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest pointer-events-none"
 							>
-								<span class="text-white/40">{categoryLabel(file.category)}</span>
-								<span class="text-white/40" aria-hidden="true">·</span>
-								<span class="tabular-nums text-white/40">{formatSize(file.size) || "—"}</span>
+								<span class="text-white/60 drop-shadow-sm"
+									>{categoryLabel(file.category)}</span
+								>
+								<span class="text-white/40" aria-hidden="true"
+									>·</span
+								>
+								<span
+									class="tabular-nums text-white/60 drop-shadow-sm"
+									>{formatSize(file.size) || "—"}</span
+								>
 							</div>
 						</div>
 					{/each}
@@ -1046,7 +1269,6 @@
 					<div
 						class="grid grid-cols-[1fr_auto] sm:grid-cols-[auto_1fr_140px_120px_60px] items-center gap-4 px-2 sm:px-4 py-2 text-[11px] font-black uppercase tracking-widest text-muted-foreground"
 					>
-						<span class="sm:hidden">Name</span>
 						<button
 							type="button"
 							aria-label="Select all"
@@ -1061,14 +1283,19 @@
 								</span>
 							{:else if selectedIds.size > 0}
 								<span
-									class="grid place-items-center size-4 rounded-[5px] border-[1.5px] border-foreground bg-foreground/30 text-background"
+									class="grid place-items-center size-4 rounded-[5px] border border-foreground/60 bg-foreground/10"
 								>
-									<span class="block w-2 h-0.5 bg-current rounded-full"></span>
+									<div
+										class="size-2 rounded-[3px] bg-foreground/60"
+									/>
 								</span>
 							{:else}
-								<Square class="size-4 text-muted-foreground/60" strokeWidth={1.5} />
+								<span
+									class="size-4 rounded-[5px] border border-foreground/30"
+								/>
 							{/if}
 						</button>
+						<span class="sm:hidden">Name</span>
 						<button
 							type="button"
 							onclick={() => toggleSort("name")}
@@ -1100,22 +1327,22 @@
 						>
 							Size
 						</button>
-						<span class="hidden sm:inline" aria-hidden="true"></span>
+						<span class="hidden sm:inline" aria-hidden="true"
+						></span>
 					</div>
 
 					<ul class="divide-y divide-border/40">
 						{#each filteredFiles as file (file.id)}
 							{@const Icon = categoryIcon(file.category)}
-							{@const isActive = inspector.filestoreArtifact?.id === file.id}
+							{@const isActive =
+								inspector.filestoreArtifact?.id === file.id}
 							{@const isSelected = selectedIds.has(file.id)}
 							<li
 								class={cn(
 									"grid grid-cols-[1fr_auto] sm:grid-cols-[auto_1fr_140px_120px_60px] items-center gap-4 px-2 sm:px-4 py-2 transition-colors rounded-lg",
 									isActive
 										? "bg-foreground/10"
-										: isSelected
-											? "bg-primary/10"
-											: "hover:bg-muted/30",
+										: "hover:bg-muted/30",
 								)}
 							>
 								<button
@@ -1125,22 +1352,19 @@
 										e.stopPropagation();
 										toggleSelect(file.id);
 									}}
-									class="hidden sm:grid place-items-center"
+									class={cn(
+										"hidden sm:grid place-items-center size-5 rounded-full border transition-all shrink-0",
+										isSelected
+											? "bg-primary text-primary-foreground border-primary"
+											: "border-foreground/30",
+									)}
 								>
 									{#if isSelected}
-										<span
-											class="grid place-items-center size-4 rounded-[5px] bg-foreground text-background"
-										>
-											<Check class="size-3" strokeWidth={3.5} />
-										</span>
-									{:else}
-										<Square
-											class="size-4 text-muted-foreground/60 group-hover:text-foreground transition-colors"
-											strokeWidth={1.5}
+										<div
+											class="size-2 rounded-full bg-current"
 										/>
 									{/if}
 								</button>
-
 								<button
 									type="button"
 									onclick={() => openFile(file)}
@@ -1157,23 +1381,33 @@
 												class="w-full h-full object-cover"
 											/>
 										{:else}
-											<Icon class="size-5 text-foreground/70" />
+											<Icon
+												class="size-5 text-foreground/70"
+											/>
 										{/if}
 									</div>
 									<div class="flex flex-col min-w-0">
-										<span class="truncate text-sm font-medium text-foreground/90">
+										<span
+											class="truncate text-sm font-medium text-foreground/90"
+										>
 											{file.title}
 										</span>
-										<span class="truncate text-xs text-muted-foreground sm:hidden">
+										<span
+											class="truncate text-xs text-muted-foreground sm:hidden"
+										>
 											{formatDate(file.modifiedAt)}
 										</span>
 									</div>
 								</button>
 
-								<span class="hidden sm:inline text-sm text-muted-foreground truncate">
+								<span
+									class="hidden sm:inline text-sm text-muted-foreground truncate"
+								>
 									{formatDate(file.modifiedAt)}
 								</span>
-								<span class="hidden sm:inline text-sm text-muted-foreground tabular-nums">
+								<span
+									class="hidden sm:inline text-sm text-muted-foreground tabular-nums"
+								>
 									{formatSize(file.size) || "—"}
 								</span>
 
@@ -1184,7 +1418,8 @@
 												{...props}
 												type="button"
 												aria-label="More actions"
-												onclick={(e) => e.stopPropagation()}
+												onclick={(e) =>
+													e.stopPropagation()}
 												class="size-8 grid place-items-center rounded-full text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
 											>
 												<Ellipsis class="size-4" />
@@ -1200,21 +1435,29 @@
 											onclick={() => openFile(file)}
 											class="px-3 py-2 rounded-lg text-sm font-medium cursor-pointer"
 										>
-											<Eye class="h-4 w-4 mr-3 text-muted-foreground" />
+											<Eye
+												class="h-4 w-4 mr-3 text-muted-foreground"
+											/>
 											Open
 										</DropdownMenu.Item>
 										<DropdownMenu.Item
 											onclick={() => downloadFile(file)}
 											class="px-3 py-2 rounded-lg text-sm font-medium cursor-pointer"
 										>
-											<Download class="h-4 w-4 mr-3 text-muted-foreground" />
+											<Download
+												class="h-4 w-4 mr-3 text-muted-foreground"
+											/>
 											Download
 										</DropdownMenu.Item>
-										<DropdownMenu.Separator class="my-1 h-px bg-border/60" />
+										<DropdownMenu.Separator
+											class="my-1 h-px bg-border/60"
+										/>
 										<DropdownMenu.Item
 											onclick={() => {
 												clearSelection();
-												selectedIds = new Set([file.id]);
+												selectedIds = new Set([
+													file.id,
+												]);
 												deleteDialogOpen = true;
 											}}
 											class="px-3 py-2 rounded-lg text-sm font-medium text-destructive focus:text-destructive cursor-pointer"
@@ -1234,7 +1477,9 @@
 </div>
 
 <Dialog.Root bind:open={noteDialogOpen}>
-	<Dialog.Content class="bg-background/95 backdrop-blur-3xl border border-border/60 rounded-3xl p-6 shadow-2xl max-w-md">
+	<Dialog.Content
+		class="bg-background/95 backdrop-blur-3xl border border-border/60 rounded-3xl p-6 shadow-2xl max-w-md"
+	>
 		<Dialog.Header>
 			<Dialog.Title>New note</Dialog.Title>
 			<Dialog.Description>
@@ -1269,11 +1514,18 @@
 </Dialog.Root>
 
 <AlertDialog.Root bind:open={deleteDialogOpen}>
-	<AlertDialog.Content class="bg-background/95 backdrop-blur-3xl border border-border/60 rounded-3xl p-6 shadow-2xl max-w-sm">
+	<AlertDialog.Content
+		class="bg-background/95 backdrop-blur-3xl border border-border/60 rounded-3xl p-6 shadow-2xl max-w-sm"
+	>
 		<AlertDialog.Header>
-			<AlertDialog.Title>Delete {selectedIds.size} file{selectedIds.size === 1 ? "" : "s"}?</AlertDialog.Title>
+			<AlertDialog.Title
+				>Delete {selectedIds.size} file{selectedIds.size === 1
+					? ""
+					: "s"}?</AlertDialog.Title
+			>
 			<AlertDialog.Description>
-				This action cannot be undone. The selected files will be permanently removed from your library.
+				This action cannot be undone. The selected files will be
+				permanently removed from your library.
 			</AlertDialog.Description>
 		</AlertDialog.Header>
 		<AlertDialog.Footer class="gap-2">

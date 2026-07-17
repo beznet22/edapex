@@ -111,7 +111,7 @@ export const ModelTierSchema = z.enum([
 ]);
 export type ModelTier = z.infer<typeof ModelTierSchema>;
 
-export const ModelSourceSchema = z.enum(['user', 'platform']);
+export const ModelSourceSchema = z.enum(['user', 'platform', 'pool']);
 export type ModelSource = z.infer<typeof ModelSourceSchema>;
 
 export const ModelInfoSchema = z.object({
@@ -147,6 +147,16 @@ export type CustomProviderEncryptedData = z.infer<typeof CustomProviderEncrypted
 /**
  * Source discriminator for a model entry: where did it come from?
  *   - 'user'     : discovered via the user's own credential (or BUILTIN fallback)
+ *   - 'pool'     : school pot-luck pool donation
  *   - 'platform' : env-keyed platform default
  */
-export type AugmentedModelInfo = ModelInfo & { source: ModelSource };
+export type AugmentedModelInfo = ModelInfo & {
+	source: ModelSource;
+	/**
+	 * True if this model id exists in the static `BUILTIN_MODELS` catalog.
+	 * False for "raw" discovered models from the upstream `/models` endpoint
+	 * that don't match a known catalog entry. Used by the UI to group
+	 * "Built-in" vs "Discovered" models in Settings → Models.
+	 */
+	isCatalogKnown?: boolean;
+};

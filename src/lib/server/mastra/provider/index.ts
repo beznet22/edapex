@@ -17,7 +17,8 @@
 export {
 	resolveModelForRequest,
 	pickDefaultModelId,
-	type ResolvedRequestModel
+	type ResolvedRequestModel,
+	type ResolveModelContext
 } from './resolver';
 
 export {

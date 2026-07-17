@@ -1,50 +1,74 @@
 /**
- * Per-user model availability — V3.
+ * Per-user model availability — V4.
  *
- * Returns models that have been discovered via a provider's `/models`
- * endpoint, falling back to the static catalog (`BUILTIN_MODELS`) when no
- * discovered or cached models are available so the model selector never
- * renders empty. Sources:
- * - User-connected credentials: discoveries stored on the credential row.
+ * Returns models for the chat model-selector and the Settings → Models
+ * tab. Source model inventory:
+ * - User-connected credentials: discoveries stored on the credential row
+ *   in `encrypted_credentials.discovered_models`.
  * - Platform (env-backed) providers: discoveries cached in
- *   `platform_provider_discoveries`. A provider that is admin-disabled
- *   platform-wide (`admin_model_overrides` with `modelId = null`) is
- *   skipped entirely unless the user has connected their own key, which
- *   overrides the platform decision.
- * - Static catalog fallback: used only when the above sources produced no
- *   models at all.
+ *   `platform_provider_discoveries`.
+ * - Static `BUILTIN_MODELS` catalog: source of truth for catalog-known
+ *   models. When a user has a credential for a catalog provider, every
+ *   catalog entry for that provider is auto-included (subject to the
+ *   admin denylist and user-hidden filters).
  *
- * Used by the model selector and the SSR auto-pick.
+ * Visibility semantics:
+ * - Catalog-known models are auto-enabled by default. The user can
+ *   hide them via Settings → Models, which adds the id to the hidden
+ *   set (denylist). A hidden catalog model stays hidden even after a
+ *   new credential is added.
+ * - Discovered models that do NOT match a catalog id are opt-in.
+ *   They are surfaced in the Models tab (with a "Discovered" badge)
+ *   but excluded from the chat model-selector until the user toggles
+ *   them on. Toggling on adds the id to the enabled set (allowlist).
+ *
+ * A provider that is admin-disabled platform-wide
+ * (`admin_model_overrides` with `modelId = null`) is skipped entirely
+ * unless the user has connected their own key, which overrides the
+ * platform decision.
  */
 import { and, eq } from 'drizzle-orm';
 import type { LibSQLDatabase } from 'drizzle-orm/libsql';
 import { encryptedCredentials } from '$lib/server/mastra/storage/libsql/app-db.schema';
-import type { AugmentedModelInfo } from '$lib/provider/spec';
-import type { ModelInfo } from '$lib/provider/spec';
+import type { AugmentedModelInfo, ModelInfo } from '$lib/provider/spec';
 import type { ProviderId } from '$lib/provider/types';
-import { BUILTIN_MODELS } from '$lib/provider/catalog';
+import { BUILTIN_MODELS, getCatalogModelsByProvider, isCatalogModelId } from '$lib/provider/catalog';
 import {
 	getCachedPlatformProviderModels,
-	getDiscoveredModelsForUser
+	getAllDiscoveredModelsForUser
 } from './discovery';
-import { getCachedHiddenModelIdsForUser } from './cache';
+import {
+	getCachedEnabledModelIdsForUser,
+	getCachedHiddenModelIdsForUser,
+	getCachedPotluckConfig
+} from './cache';
 import { applyAdminDenylist, listAdminOverrides } from './admin-model-overrides';
 import { PLATFORM_ENV_KEYS } from './credentials';
+import { findActiveDonationForProvider, parseJsonArray } from './potluck';
 
 export type { AugmentedModelInfo } from '$lib/provider/spec';
 
 /**
- * Returns every discovered model for a user across user credentials AND
- * platform providers, without applying the user-hidden or admin-denylist
- * filters. Used by the Settings → Models tab so users can re-enable
- * models they previously hid. The model selector continues to use
- * `getAvailableModelsForUser` for its filtered view.
+ * Returns EVERY model the user can see in the Settings → Models tab,
+ * regardless of enabled/disabled state. Used to populate the toggle
+ * list so the user can opt into non-catalog "discovered" models.
+ *
+ * Emits:
+ * - Every discovered model for every user credential (whether the
+ *   id matches the catalog or not).
+ * - Every catalog model for every credentialed provider (so the user
+ *   can see what's auto-included and toggle-off if desired).
+ * - Platform discoveries (env-backed providers with cached lists).
+ *
+ * Each entry is tagged with `isCatalogKnown` so the UI can group
+ * "Built-in" vs "Discovered" sections.
  */
 export async function getAllDiscoveredModelsForSettings(
 	db: LibSQLDatabase<any>,
 	env: Record<string, string | undefined>,
 	userId: number,
-	schoolId: number = 1
+	schoolId: number = 1,
+	userRole: string | null = null
 ): Promise<AugmentedModelInfo[]> {
 	const credentialRows = await db
 		.select()
@@ -63,24 +87,90 @@ export async function getAllDiscoveredModelsForSettings(
 
 	const result: AugmentedModelInfo[] = [];
 	const seenIds = new Set<string>();
+	const userProviderIds = new Set<string>();
 
+	const allDiscovered = await getAllDiscoveredModelsForUser(db, userId);
+
+	// Pass 1: per-credential discovered models + catalog extras.
+	// Note: user-scoped credentials are NOT subject to the provider-level
+	// admin denylist — if the user has their own key, they get to use the
+	// provider regardless of platform-level admin preferences. Per-model
+	// admin denials still apply (see `disabledModelKeys`).
 	for (const row of credentialRows) {
 		if (row.enabled !== 1) continue;
 		const providerId = row.providerId as ProviderId;
-		const discovered = await getDiscoveredModelsForUser(db, env, userId, providerId);
-		for (const model of discovered) {
-			if (disabledProviderIds.has(model.providerId)) continue;
+		userProviderIds.add(providerId);
+
+		// 1a. Every discovered model for this credential, as-is.
+		for (const model of allDiscovered.values()) {
+			if (model.providerId !== providerId) continue;
 			if (disabledModelKeys.has(`${model.providerId}::${model.id}`)) continue;
 			if (seenIds.has(model.id)) continue;
 			seenIds.add(model.id);
-			result.push({ ...model, source: 'user' });
+			const catalog = isCatalogModelId(model.id) ? BUILTIN_MODELS[model.id] : undefined;
+			result.push({ ...(catalog ?? model), source: 'user', isCatalogKnown: !!catalog });
+		}
+
+		// 1b. Catalog models for this provider that the upstream didn't return.
+		for (const catalogModel of getCatalogModelsByProvider(providerId)) {
+			if (disabledModelKeys.has(`${catalogModel.providerId}::${catalogModel.id}`)) continue;
+			if (seenIds.has(catalogModel.id)) continue;
+			seenIds.add(catalogModel.id);
+			result.push({ ...catalogModel, source: 'user', isCatalogKnown: true });
 		}
 	}
 
+	// Pass 2: pool-sourced (school donations). Only consultable when
+	// the user has no personal credential for a given provider. Follows
+	// the same gates as tier-router: pool config enabled, consumerRoles
+	// allowlist, allowedProviders filter, admin denylist, active donation.
+	// Emitted models are tagged source='pool' so the UI can badge them.
+	const poolCfg = await getCachedPotluckConfig(db, schoolId);
+	if (poolCfg && poolCfg.enabled === 1) {
+		const consumerRoles = parseJsonArray(poolCfg.consumerRoles);
+		if (
+			consumerRoles.length === 0 ||
+			(userRole !== null && consumerRoles.includes(userRole))
+		) {
+			const allowedPoolProviders = parseJsonArray(poolCfg.allowedProviders);
+			const catalogProviders = new Set(
+				Object.values(BUILTIN_MODELS).map((m) => m.providerId)
+			);
+			for (const providerId of catalogProviders) {
+			if (disabledProviderIds.has(providerId)) continue;
+			if (userProviderIds.has(providerId)) continue;
+				if (
+					allowedPoolProviders.length > 0 &&
+					!allowedPoolProviders.includes(providerId)
+				) {
+					continue;
+				}
+				const donation = await findActiveDonationForProvider(
+					db,
+					env,
+					schoolId,
+					providerId as ProviderId
+				);
+				if (!donation) continue;
+				for (const catalogModel of getCatalogModelsByProvider(providerId as ProviderId)) {
+					if (disabledModelKeys.has(`${catalogModel.providerId}::${catalogModel.id}`)) continue;
+					if (seenIds.has(catalogModel.id)) continue;
+					seenIds.add(catalogModel.id);
+					result.push({ ...catalogModel, source: 'pool', isCatalogKnown: true });
+				}
+			}
+		}
+	}
+
+	// Pass 3: platform (env-backed) providers
 	for (const [providerId, envKey] of Object.entries(PLATFORM_ENV_KEYS)) {
 		if (!envKey) continue;
 		if (!env[envKey]) continue;
 		if (disabledProviderIds.has(providerId)) continue;
+		// Mistral is OCR-only; never surface its models in chat-side
+		// availability (model selector, Models tab, getAvailableModels).
+		if ((providerId as ProviderId) === ('mistral' as ProviderId)) continue;
+
 		const cached = await getCachedPlatformProviderModels(
 			db,
 			env,
@@ -88,11 +178,17 @@ export async function getAllDiscoveredModelsForSettings(
 			providerId as ProviderId
 		);
 		for (const model of cached) {
-			if (disabledProviderIds.has(model.providerId)) continue;
 			if (disabledModelKeys.has(`${model.providerId}::${model.id}`)) continue;
 			if (seenIds.has(model.id)) continue;
 			seenIds.add(model.id);
-			result.push({ ...model, source: 'platform' });
+			const catalog = isCatalogModelId(model.id) ? BUILTIN_MODELS[model.id] : undefined;
+			result.push({ ...(catalog ?? model), source: 'platform', isCatalogKnown: !!catalog });
+		}
+		for (const catalogModel of getCatalogModelsByProvider(providerId as ProviderId)) {
+			if (disabledModelKeys.has(`${catalogModel.providerId}::${catalogModel.id}`)) continue;
+			if (seenIds.has(catalogModel.id)) continue;
+			seenIds.add(catalogModel.id);
+			result.push({ ...catalogModel, source: 'platform', isCatalogKnown: true });
 		}
 	}
 
@@ -101,7 +197,7 @@ export async function getAllDiscoveredModelsForSettings(
 }
 
 function isBuiltinModel(value: ModelInfo): boolean {
-	return Object.prototype.hasOwnProperty.call(BUILTIN_MODELS, value.id);
+	return isCatalogModelId(value.id);
 }
 
 function isProviderDisabledByAdmin(
@@ -113,11 +209,21 @@ function isProviderDisabledByAdmin(
 	);
 }
 
+/**
+ * Returns the SET of models the user can pick in the chat
+ * model-selector. Applies:
+ * - Catalog-known auto-include: any catalog model for a credentialed
+ *   provider is shown unless explicitly hidden.
+ * - Discovered-non-catalog opt-in: only shown if the user toggled
+ *   the id on in Settings → Models (allowlist).
+ * - Denylist (hiddenIds) and admin denylist.
+ */
 export async function getAvailableModelsForUser(
 	db: LibSQLDatabase<any>,
 	env: Record<string, string | undefined>,
 	userId: number,
-	schoolId: number = 1
+	schoolId: number = 1,
+	userRole: string | null = null
 ): Promise<AugmentedModelInfo[]> {
 	const credentialRows = await db
 		.select()
@@ -125,56 +231,152 @@ export async function getAvailableModelsForUser(
 		.where(and(eq(encryptedCredentials.scope, 'user'), eq(encryptedCredentials.userId, userId)));
 
 	const hiddenIds = await getCachedHiddenModelIdsForUser(db, userId);
+	const enabledIds = await getCachedEnabledModelIdsForUser(db, userId);
 	const adminOverrides = await listAdminOverrides(db, schoolId);
+	// Per-model denylist (admin disabled a specific model id; the
+	// provider-level denylist is handled separately at Pass 3).
+	const disabledModelKeys = new Set(
+		adminOverrides
+			.filter((row) => row.modelId !== null)
+			.map((row) => `${row.providerId}::${row.modelId}`)
+	);
 
 	const result: AugmentedModelInfo[] = [];
 	const seenIds = new Set<string>();
 	const userProviderIds = new Set<string>();
 
+	const allDiscovered = await getAllDiscoveredModelsForUser(db, userId);
+
+	// Pass 1: per-credential
 	for (const row of credentialRows) {
 		if (row.enabled !== 1) continue;
 		const providerId = row.providerId as ProviderId;
-		const discovered = await getDiscoveredModelsForUser(db, env, userId, providerId);
+		// Provider-level admin denylist does NOT block user-scoped models:
+		// the comment at the top of this file promises that "the user has
+		// connected their own key, which overrides the platform decision."
+		// Per-model denylist still applies (see `disabledModelKeys` checks
+		// inside the loops below).
+		userProviderIds.add(providerId);
 
-		for (const model of discovered) {
-			if (hiddenIds.has(model.id)) continue;
-			if (seenIds.has(model.id)) continue;
-			seenIds.add(model.id);
-			userProviderIds.add(model.providerId);
-			result.push({ ...model, source: 'user' });
+		// 1a. Catalog models for this provider — auto-included unless hidden
+		// or per-model-disabled by admin.
+		for (const catalogModel of getCatalogModelsByProvider(providerId)) {
+			if (hiddenIds.has(catalogModel.id)) continue;
+			if (disabledModelKeys.has(`${catalogModel.providerId}::${catalogModel.id}`)) continue;
+			if (seenIds.has(catalogModel.id)) continue;
+			seenIds.add(catalogModel.id);
+			result.push({ ...catalogModel, source: 'user', isCatalogKnown: true });
+		}
+
+		// 1b. Discovered models — catalog-known merge with catalog, others
+		//     require explicit enable.
+		for (const d of allDiscovered.values()) {
+			if (d.providerId !== providerId) continue;
+			if (isCatalogModelId(d.id)) {
+				// Catalog-known: already emitted in 1a (if not hidden).
+				continue;
+			}
+			if (!enabledIds.has(d.id)) continue; // require opt-in
+			if (hiddenIds.has(d.id)) continue;
+			if (seenIds.has(d.id)) continue;
+			seenIds.add(d.id);
+			result.push({ ...d, source: 'user', isCatalogKnown: false });
 		}
 	}
 
+	// Pass 2: pool-sourced (school donations). Only consultable when
+	// the user has no personal credential for a given provider. Follows
+	// the same gates as tier-router: pool config enabled, consumerRoles
+	// allowlist, allowedProviders filter, admin denylist, active donation.
+	const poolCfg2 = await getCachedPotluckConfig(db, schoolId);
+	if (poolCfg2 && poolCfg2.enabled === 1) {
+		const consumerRoles2 = parseJsonArray(poolCfg2.consumerRoles);
+		if (
+			consumerRoles2.length === 0 ||
+			(userRole !== null && consumerRoles2.includes(userRole))
+		) {
+			const allowedPoolProviders2 = parseJsonArray(poolCfg2.allowedProviders);
+			const catalogProviders2 = new Set(
+				Object.values(BUILTIN_MODELS).map((m) => m.providerId)
+			);
+			for (const providerId of catalogProviders2) {
+				if (isProviderDisabledByAdmin(adminOverrides, providerId)) continue;
+				if (userProviderIds.has(providerId)) continue;
+				if (
+					allowedPoolProviders2.length > 0 &&
+					!allowedPoolProviders2.includes(providerId)
+				) {
+					continue;
+				}
+				const donation = await findActiveDonationForProvider(
+					db,
+					env,
+					schoolId,
+					providerId as ProviderId
+				);
+				if (!donation) continue;
+				for (const catalogModel of getCatalogModelsByProvider(providerId as ProviderId)) {
+					if (hiddenIds.has(catalogModel.id)) continue;
+					if (seenIds.has(catalogModel.id)) continue;
+					seenIds.add(catalogModel.id);
+					result.push({ ...catalogModel, source: 'pool', isCatalogKnown: true });
+				}
+			}
+		}
+	}
+
+	// Pass 3: platform (env-backed) providers not already covered by user credentials
 	for (const [providerId, envKey] of Object.entries(PLATFORM_ENV_KEYS)) {
 		if (!envKey) continue;
 		if (userProviderIds.has(providerId as ProviderId)) continue;
 		if (!env[envKey]) continue;
 		if (isProviderDisabledByAdmin(adminOverrides, providerId)) continue;
+		// Mistral is OCR-only; never surface its models in chat-side
+		// availability (model selector, Models tab, getAvailableModels).
+		if ((providerId as ProviderId) === ('mistral' as ProviderId)) continue;
 
+		// 2a. Catalog models for this platform provider.
+		for (const catalogModel of getCatalogModelsByProvider(providerId as ProviderId)) {
+			if (hiddenIds.has(catalogModel.id)) continue;
+			if (seenIds.has(catalogModel.id)) continue;
+			seenIds.add(catalogModel.id);
+			result.push({ ...catalogModel, source: 'platform', isCatalogKnown: true });
+		}
+
+		// 2b. Discovered non-catalog for this platform provider (opt-in).
 		const cached = await getCachedPlatformProviderModels(
 			db,
 			env,
 			schoolId,
 			providerId as ProviderId
 		);
-		for (const model of cached) {
-			if (hiddenIds.has(model.id)) continue;
-			if (seenIds.has(model.id)) continue;
-			seenIds.add(model.id);
-			result.push({ ...model, source: 'platform' });
+		for (const d of cached) {
+			if (isCatalogModelId(d.id)) continue; // covered by 2a
+			if (!enabledIds.has(d.id)) continue;
+			if (hiddenIds.has(d.id)) continue;
+			if (seenIds.has(d.id)) continue;
+			seenIds.add(d.id);
+			result.push({ ...d, source: 'platform', isCatalogKnown: false });
 		}
 	}
 
-	// Static catalog fallback: when no user credentials and no env-backed
-	// platform providers produced models, surface the built-in catalog so the
-	// chat model selector remains usable until a provider is connected.
+	// Static catalog fallback: when nothing else produced models, surface
+	// catalog entries for the user's enabled credentials only (so the
+	// selector stays usable). This is a degraded fallback for when
+	// discovery has never completed.
 	if (result.length === 0) {
-		for (const model of Object.values(BUILTIN_MODELS)) {
-			if (hiddenIds.has(model.id)) continue;
-			if (seenIds.has(model.id)) continue;
-			if (isProviderDisabledByAdmin(adminOverrides, model.providerId)) continue;
-			seenIds.add(model.id);
-			result.push({ ...model, source: 'user' });
+		for (const row of credentialRows) {
+			if (row.enabled !== 1) continue;
+			const providerId = row.providerId as ProviderId;
+			// Mistral is OCR-only.
+			if (providerId === ('mistral' as ProviderId)) continue;
+			if (isProviderDisabledByAdmin(adminOverrides, providerId)) continue;
+			for (const catalogModel of getCatalogModelsByProvider(providerId)) {
+				if (hiddenIds.has(catalogModel.id)) continue;
+				if (seenIds.has(catalogModel.id)) continue;
+				seenIds.add(catalogModel.id);
+				result.push({ ...catalogModel, source: 'user', isCatalogKnown: true });
+			}
 		}
 	}
 
@@ -185,11 +387,26 @@ export async function getAvailableModelsForUser(
 		return a.id.localeCompare(b.id);
 	});
 
-	const filtered = applyAdminDenylist(
-		result.map((entry) => ({ providerId: entry.providerId, modelId: entry.id })),
-		adminOverrides
+	// Apply the admin denylist ONLY to platform-sourced entries. User
+	// credentials and pool donations are user-driven — when a user
+	// has connected their own key, or when the school has a pool
+	// donation, those models are visible regardless of the platform
+	// admin's provider-level preference. Per-model denials (modelId
+	// !== null) still apply to every source.
+	const platformEntries = result
+		.filter((entry) => entry.source === 'platform')
+		.map((entry) => ({ providerId: entry.providerId, modelId: entry.id }));
+	const filteredPlatform = applyAdminDenylist(platformEntries, adminOverrides);
+	const allowedPlatformIds = new Set(
+		filteredPlatform.map((entry) => `${entry.providerId}::${entry.modelId}`)
 	);
-	const allowedIds = new Set(filtered.map((entry) => `${entry.providerId}::${entry.modelId}`));
-	return result.filter((entry) => allowedIds.has(`${entry.providerId}::${entry.id}`));
+	return result.filter((entry) => {
+		// User + pool sources bypass the provider-level denylist, but still
+		// honour per-model denials.
+		if (entry.source === 'user' || entry.source === 'pool') {
+			return !disabledModelKeys.has(`${entry.providerId}::${entry.id}`);
+		}
+		// Platform source: full denylist applies.
+		return allowedPlatformIds.has(`${entry.providerId}::${entry.id}`);
+	});
 }
-

@@ -70,7 +70,7 @@
         {/snippet}
       </DropdownMenu.Trigger>
       <DropdownMenu.Content
-        class="hermes-glass border-primary/20 min-w-[260px] max-h-[340px] overflow-y-auto p-1.5 shadow-2xl custom-scrollbar rounded-2xl"
+        class="border-primary/20 min-w-[260px] max-h-[340px] overflow-y-auto p-1.5 shadow-2xl custom-scrollbar rounded-2xl"
         align="start"
         side="bottom"
       >

@@ -35,6 +35,7 @@ class BackgroundTasksStore {
   #worker: Worker | null = null;
   #workerReady: Promise<void> | null = null;
   #tasksById = new Map<string, Task>();
+  #abortControllers = new Map<string, AbortController>();
 
   /**
    * Lazy-initialise the worker on first use. Returns a promise that
@@ -67,6 +68,20 @@ class BackgroundTasksStore {
     return this.#workerReady;
   }
 
+  /**
+   * Returns (and lazily creates) an AbortController for the given task
+   * id. Used by the `ocr-direct` worker handler so a `cancel` message
+   * can abort the in-flight `fetch` immediately.
+   */
+  getAbortController(taskId: string): AbortController {
+    let controller = this.#abortControllers.get(taskId);
+    if (!controller) {
+      controller = new AbortController();
+      this.#abortControllers.set(taskId, controller);
+    }
+    return controller;
+  }
+
   #handleEvent(event: TaskEvent): void {
     const task = this.#tasksById.get(event.taskId);
     if (!task) return;
@@ -89,6 +104,7 @@ class BackgroundTasksStore {
         task.message = `${event.result.succeeded} of ${event.result.results.length} completed`;
         task.result = event.result;
         task.completedAt = Date.now();
+        this.#abortControllers.delete(event.taskId);
         break;
       case "failed":
         task.status = "failed";
@@ -100,6 +116,23 @@ class BackgroundTasksStore {
           task.message = event.error;
         }
         task.completedAt = Date.now();
+        this.#abortControllers.delete(event.taskId);
+        break;
+      case "cancelled":
+        task.status = "cancelled";
+        task.message = event.partial
+          ? `Cancelled — ${event.partial.succeeded} of ${event.partial.results.length} completed`
+          : "Cancelled by user";
+        task.completedAt = Date.now();
+        if (event.partial) {
+          task.result = event.partial;
+        }
+        // Abort any in-flight ocr-direct fetch for this task
+        const controller = this.#abortControllers.get(event.taskId);
+        if (controller) {
+          controller.abort();
+          this.#abortControllers.delete(event.taskId);
+        }
         break;
     }
 
@@ -134,6 +167,26 @@ class BackgroundTasksStore {
   }
 
   /**
+   * Request cancellation of a running or queued task. Posts a `cancel`
+   * message to the worker, which:
+   *   - For `ocr-batch` (Mistral batch): sets a per-task `cancelled`
+   *     flag and fires `POST /api/file?action=cancel-batch` so Mistral
+   *     stops charging for the job.
+   *   - For `ocr-direct`: calls `controller.abort()` on the AbortController
+   *     stored in `#abortControllers` so the in-flight `fetch` aborts
+   *     immediately. The server's `?action=ocr-direct` handler
+   *     returns early.
+   * The worker eventually posts a `cancelled` `TaskEvent` which sets
+   * `task.status = "cancelled"` and `task.completedAt = Date.now()`.
+   */
+  cancelTask(id: string): void {
+    const worker = this.#worker;
+    if (!worker) return;
+    const message: WorkerInbound = { type: "cancel", taskId: id };
+    worker.postMessage(message);
+  }
+
+  /**
    * Re-run a failed task. If the task has `partial` results, only the
    * failed keys are re-submitted. Otherwise, the entire spec is re-run.
    */
@@ -160,17 +213,27 @@ class BackgroundTasksStore {
 
   dismissTask(id: string): void {
     this.#tasksById.delete(id);
+    this.#abortControllers.delete(id);
     this.tasks = this.tasks.filter((t) => t.id !== id);
   }
 
   clearCompleted(): void {
-    const toRemove = this.tasks.filter((t) => t.status === "completed" || t.status === "failed");
-    for (const t of toRemove) this.#tasksById.delete(t.id);
-    this.tasks = this.tasks.filter((t) => t.status !== "completed" && t.status !== "failed");
+    const toRemove = this.tasks.filter(
+      (t) => t.status === "completed" || t.status === "failed" || t.status === "cancelled"
+    );
+    for (const t of toRemove) {
+      this.#tasksById.delete(t.id);
+      this.#abortControllers.delete(t.id);
+    }
+    this.tasks = this.tasks.filter(
+      (t) => t.status !== "completed" && t.status !== "failed" && t.status !== "cancelled"
+    );
   }
 
   get activeCount(): number {
-    return this.tasks.filter((t) => t.status === "running" || t.status === "queued").length;
+    return this.tasks.filter(
+      (t) => t.status === "running" || t.status === "queued"
+    ).length;
   }
 }
 

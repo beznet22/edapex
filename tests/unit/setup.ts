@@ -94,12 +94,13 @@ CREATE TABLE IF NOT EXISTS encrypted_credentials (
 	discovered_at TEXT,
 	created_at TEXT NOT NULL DEFAULT (datetime('now')),
 	updated_at TEXT NOT NULL DEFAULT (datetime('now')),
-	UNIQUE(scope, credential_kind, user_id, provider_id),
 	CHECK (
 		(scope = 'user' AND user_id IS NOT NULL AND school_id IS NULL) OR
 		(scope = 'school' AND school_id IS NOT NULL AND user_id IS NULL)
 	)
 );
+CREATE UNIQUE INDEX IF NOT EXISTS uniq_encrypted_credential_user ON encrypted_credentials(scope, credential_kind, user_id, provider_id);
+CREATE UNIQUE INDEX IF NOT EXISTS uniq_encrypted_credential_school ON encrypted_credentials(scope, credential_kind, school_id, provider_id);
 
 CREATE TABLE IF NOT EXISTS model_visibility (
 	id TEXT PRIMARY KEY,
@@ -109,12 +110,13 @@ CREATE TABLE IF NOT EXISTS model_visibility (
 	model_id TEXT NOT NULL,
 	visible INTEGER NOT NULL DEFAULT 1,
 	updated_at TEXT NOT NULL DEFAULT (datetime('now')),
-	UNIQUE(scope, user_id, model_id),
 	CHECK (
 		(scope = 'user' AND user_id IS NOT NULL AND school_id IS NULL) OR
 		(scope = 'school' AND school_id IS NOT NULL AND user_id IS NULL)
 	)
 );
+CREATE UNIQUE INDEX IF NOT EXISTS uniq_model_visibility_user ON model_visibility(scope, user_id, model_id) WHERE scope = 'user';
+CREATE UNIQUE INDEX IF NOT EXISTS uniq_model_visibility_school ON model_visibility(scope, school_id, model_id) WHERE scope = 'school';
 
 CREATE TABLE IF NOT EXISTS provider_access_policy (
 	id TEXT PRIMARY KEY,
@@ -131,6 +133,16 @@ CREATE TABLE IF NOT EXISTS provider_access_policy (
 		(target = 'provider' AND model_id IS NULL) OR
 		(target = 'model' AND model_id IS NOT NULL)
 	)
+);
+
+CREATE TABLE IF NOT EXISTS token_usage (
+	user_id INTEGER NOT NULL,
+	day TEXT NOT NULL,
+	provider_id TEXT NOT NULL,
+	tokens INTEGER NOT NULL DEFAULT 0,
+	requests INTEGER NOT NULL DEFAULT 0,
+	updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+	PRIMARY KEY (user_id, day, provider_id)
 );
 `;
 

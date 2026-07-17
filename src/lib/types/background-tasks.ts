@@ -52,35 +52,47 @@ export type TaskSpec =
       kind: "ocr-single";
       key: string;
       tenant: SerializedTenant;
+    }
+  | {
+      kind: "ocr-direct";
+      key: string;
+      tenant: SerializedTenant;
     };
 
 export type TaskEvent =
-  | { type: "started"; taskId: string }
-  | { type: "progress"; taskId: string; progress: number; message: string }
-  | {
-      type: "completed";
-      taskId: string;
-      result: { succeeded: number; failed: number; results: BatchExtractResult[] };
-    }
-  | {
-      type: "failed";
-      taskId: string;
-      error: string;
-      partial?: { succeeded: number; failed: number; results: BatchExtractResult[] };
-    };
+	| { type: "started"; taskId: string }
+	| { type: "progress"; taskId: string; progress: number; message: string }
+	| {
+			type: "completed";
+			taskId: string;
+			result: { succeeded: number; failed: number; results: BatchExtractResult[] };
+	  }
+	| {
+			type: "failed";
+			taskId: string;
+			error: string;
+			partial?: { succeeded: number; failed: number; results: BatchExtractResult[] };
+	  }
+	| {
+			type: "cancelled";
+			taskId: string;
+			partial?: { succeeded: number; failed: number; results: BatchExtractResult[] };
+	  };
 
-export type TaskStatus = "queued" | "running" | "completed" | "failed";
+export type TaskStatus = "queued" | "running" | "completed" | "failed" | "cancelled";
 
 export type Task = {
-  id: string;
-  spec: TaskSpec;
-  status: TaskStatus;
-  progress: number;
-  message: string;
-  startedAt: number;
-  completedAt?: number;
-  result?: { succeeded: number; failed: number; results: BatchExtractResult[] };
-  error?: string;
+	id: string;
+	spec: TaskSpec;
+	status: TaskStatus;
+	progress: number;
+	message: string;
+	startedAt: number;
+	completedAt?: number;
+	result?: { succeeded: number; failed: number; results: BatchExtractResult[] };
+	error?: string;
 };
 
-export type WorkerInbound = { type: "run"; taskId: string; spec: TaskSpec };
+export type WorkerInbound =
+	| { type: "run"; taskId: string; spec: TaskSpec }
+	| { type: "cancel"; taskId: string };

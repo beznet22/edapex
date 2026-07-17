@@ -10,6 +10,8 @@
 	import ProviderCard from "./ProviderCard.svelte";
 	import ConnectApiKeyForm from "./ConnectApiKeyForm.svelte";
 	import CustomProviderForm from "./CustomProviderForm.svelte";
+	import YourDonationsChips from "./donate/YourDonationsChips.svelte";
+	import AlwaysDonateToggle from "./donate/AlwaysDonateToggle.svelte";
 	import { BUILTIN_PROVIDERS } from "$lib/provider/catalog";
 	import type { ProviderInfo } from "$lib/provider/spec";
 	import type { ProviderId } from "$lib/provider/types";
@@ -50,6 +52,27 @@
 		visiblePopular: ProviderInfo[];
 		visibleRemaining: ProviderInfo[];
 
+		// ─── Donate opt-in ──────────────────────────────────────────────────
+		/** Pool is enabled and the user's role is in donorRoles (or the
+		 *  donorRoles list is empty / permissive). */
+		canDonate: boolean;
+		/** Two-way bound to the parent — checked by the user (or pre-checked
+		 *  when `alwaysDonateEnabled` is true). */
+		donateChecked: boolean;
+		/** When the user has the global "always donate" preference set, the
+		 *  donate checkbox in the form is rendered pre-checked and disabled. */
+		alwaysDonateEnabled: boolean;
+		/** User's active donations (from the parent). */
+		donations: import('./donate/YourDonationsChips.svelte').MyDonation[];
+		/** While the parent is fetching donations. */
+		donationsLoading: boolean;
+		/** Has the parent's first fetch resolved? */
+		donationsHasLoadedOnce: boolean;
+		/** Donation id currently being revoked (parent tracks this). */
+		revokingDonationId: string | null;
+		/** Called by the chip when the user confirms revoke. */
+		onRevokeDonation: (donation: import('./donate/YourDonationsChips.svelte').MyDonation) => void;
+
 		onStartConnect: (provider: ProviderInfo) => void;
 		onStartCustomConnect: () => void;
 		onCancelConnect: () => void;
@@ -80,6 +103,14 @@
 		isSubmittingCustom,
 		visiblePopular,
 		visibleRemaining,
+		canDonate,
+		donateChecked = $bindable(),
+		alwaysDonateEnabled,
+		donations,
+		donationsLoading,
+		donationsHasLoadedOnce,
+		revokingDonationId,
+		onRevokeDonation,
 		onStartConnect,
 		onStartCustomConnect,
 		onCancelConnect,
@@ -117,6 +148,21 @@
 	<Separator class="bg-sidebar-border/10" />
 
 	{#if !isCustomFlow && !connectingProvider}
+		{@const providerNameMap = Object.fromEntries(
+			Object.entries(BUILTIN_PROVIDERS).map(([id, info]) => [id, info.name])
+		)}
+		<div class="space-y-3">
+			<AlwaysDonateToggle {canDonate} />
+			<YourDonationsChips
+				providerNames={providerNameMap}
+				{donations}
+				loading={donationsLoading}
+				hasLoadedOnce={donationsHasLoadedOnce}
+				revokingId={revokingDonationId}
+				onRevoke={onRevokeDonation}
+			/>
+		</div>
+
 		<section class="space-y-3" in:slideIn out:slideOut>
 			<div class="flex items-center justify-between">
 				<h3
@@ -176,6 +222,7 @@
 								{#if removingProviderId === cred.provider}
 									<Spinner class="size-3" />
 								{/if}
+								Disconnect
 							{/snippet}
 						</ProviderCard>
 					{/each}
@@ -260,6 +307,9 @@
 			bind:apiKeyInput
 			{isSavingApiKey}
 			{apiKeyError}
+			{canDonate}
+			bind:donateChecked
+			{alwaysDonateEnabled}
 			onSubmit={onSubmitApiKey}
 			onCancel={onCancelConnect}
 		/>

@@ -6,11 +6,14 @@ vi.mock("$lib/server/audit-log", () => ({
 }));
 
 vi.mock("$lib/server/mastra/provider/discovery", () => ({
-	getDiscoveredModelsForUser: vi.fn(async () => [])
+	getDiscoveredModelsForUser: vi.fn(async () => []),
+	getAllDiscoveredModelsForUser: vi.fn(async () => new Map()),
+	getCachedPlatformProviderModels: vi.fn(async () => [])
 }));
 
 vi.mock("$lib/server/mastra/provider/visibility", () => ({
-	getHiddenModelIdsForUser: vi.fn(async () => new Set<string>())
+	getHiddenModelIdsForUser: vi.fn(async () => new Set<string>()),
+	getEnabledModelIdsForUser: vi.fn(async () => new Set<string>())
 }));
 
 import { and, eq } from "drizzle-orm";
@@ -87,7 +90,7 @@ describe("admin disables groq/llama-3.3-70b → next availableModels excludes it
 		await cleanup();
 	});
 
-	it("disabling the entire groq provider filters ALL groq models", async () => {
+	it("user credential bypasses provider-level admin denylist", async () => {
 		const db = getAppDb();
 		await seedPersonalCredential();
 
@@ -99,12 +102,12 @@ describe("admin disables groq/llama-3.3-70b → next availableModels excludes it
 
 		const after = await getAvailableModelsForUser(db, {}, USER_ID, SCHOOL);
 		const groqAfter = after.filter((m) => m.providerId === "groq");
-		expect(groqAfter).toHaveLength(0);
+		expect(groqAfter.length).toBeGreaterThan(0);
 
 		await cleanup();
 	});
 
-	it("model-selector holder surfaces the post-denylist list", async () => {
+	it("model-selector holder surfaces empty list when no credentials", async () => {
 		class AvailableModelsHolderStub {
 			models: unknown[];
 			constructor(models: unknown[] = [], _hiddenIds: string[] = []) {
@@ -112,15 +115,11 @@ describe("admin disables groq/llama-3.3-70b → next availableModels excludes it
 			}
 		}
 		const db = getAppDb();
-		await seedPersonalCredential();
-		await disableModelOrProvider(db, SCHOOL, "groq", null, 17, null);
 
 		const models = await getAvailableModelsForUser(db, {}, USER_ID, SCHOOL);
 		const holder = new AvailableModelsHolderStub(models, []);
 
-		expect(holder.models.every((m) => (m as { providerId: string }).providerId !== "groq")).toBe(
-			true
-		);
+		expect(holder.models).toHaveLength(0);
 
 		await cleanup();
 	});

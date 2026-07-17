@@ -10,7 +10,7 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import type { LibSQLDatabase } from 'drizzle-orm/libsql';
 import type { EncryptedCredential, PotluckConfig } from '$lib/server/mastra/storage/libsql/app-db.schema';
 import { getUserCredential } from './credentials';
-import { getHiddenModelIdsForUser } from './visibility';
+import { getHiddenModelIdsForUser, getEnabledModelIdsForUser } from './visibility';
 import { getPotluckConfig } from './potluck';
 import type { ProviderId, ModelId } from './types';
 
@@ -19,6 +19,8 @@ export interface RequestCache {
 	credentials: Map<string, EncryptedCredential | null>;
 	/** userId → hidden model ids */
 	visibility: Map<string, Set<ModelId>>;
+	/** userId → explicitly enabled (non-catalog) model ids */
+	enabledModels: Map<string, Set<ModelId>>;
 	/** schoolId → potluck config row */
 	potluck: Map<string, PotluckConfig | null>;
 }
@@ -29,6 +31,7 @@ export function runWithCache<T>(fn: () => T | Promise<T>): Promise<T> {
 	const cache: RequestCache = {
 		credentials: new Map(),
 		visibility: new Map(),
+		enabledModels: new Map(),
 		potluck: new Map()
 	};
 	return storage.run(cache, async () => fn()) as Promise<T>;
@@ -84,6 +87,22 @@ export async function getCachedHiddenModelIdsForUser(
 	return fetched;
 }
 
+export async function getCachedEnabledModelIdsForUser(
+	db: LibSQLDatabase<any>,
+	userId: number
+): Promise<Set<ModelId>> {
+	const cache = getRequestCache();
+	if (!cache) {
+		return getEnabledModelIdsForUser(db, userId);
+	}
+	const key = visibilityKey(userId);
+	const cached = cache.enabledModels.get(key);
+	if (cached !== undefined) return cached;
+	const fetched = await getEnabledModelIdsForUser(db, userId);
+	cache.enabledModels.set(key, fetched);
+	return fetched;
+}
+
 export async function getCachedPotluckConfig(
 	db: LibSQLDatabase<any>,
 	schoolId: number
@@ -120,4 +139,5 @@ export function invalidateCachedVisibility(userId: number): void {
 	const cache = getRequestCache();
 	if (!cache) return;
 	cache.visibility.delete(visibilityKey(userId));
+	cache.enabledModels.delete(visibilityKey(userId));
 }

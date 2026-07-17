@@ -20,7 +20,7 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 
     const thread = await memory.getThreadById({ threadId: chatId });
     if (!thread) {
-      redirect(302, "/");
+      return { chat: null, messages: [] };
     }
 
     if (thread.metadata?.visibility === "private") {

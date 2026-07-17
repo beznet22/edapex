@@ -245,8 +245,15 @@ export function pickDefaultVariantId(model: { variants: Array<{ id: string }> })
 export async function pickDefaultModelId(
 	db: LibSQLDatabase<any>,
 	env: Record<string, string | undefined>,
-	userId: number
+	args: {
+		userId: number;
+		schoolId: number | null;
+		userRole: string | null;
+		todayTokenUsage?: number;
+	}
 ): Promise<string | null> {
+	const { userId, schoolId, userRole } = args;
+	const todayTokenUsage = args.todayTokenUsage ?? 0;
 	const preferred = BUILTIN_MODELS[DEFAULT_MODEL_ID];
 	if (preferred) {
 		try {
@@ -255,9 +262,9 @@ export async function pickDefaultModelId(
 				env,
 				userId,
 				providerId: preferred.providerId,
-				schoolId: null,
-				userRole: null,
-				todayTokenUsage: 0
+				schoolId,
+				userRole,
+				todayTokenUsage
 			});
 			if (resolved) {
 				const variantId = pickDefaultVariantId(preferred);
@@ -276,9 +283,9 @@ export async function pickDefaultModelId(
 				env,
 				userId,
 				providerId: model.providerId,
-				schoolId: null,
-				userRole: null,
-				todayTokenUsage: 0
+				schoolId,
+				userRole,
+				todayTokenUsage
 			});
 			if (!resolved) continue;
 			const variantId = pickDefaultVariantId(model);

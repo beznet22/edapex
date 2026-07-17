@@ -277,3 +277,33 @@ export const platformProviderDiscoveries = sqliteTable(
 );
 
 export type PlatformProviderDiscovery = typeof platformProviderDiscoveries.$inferSelect;
+
+/**
+ * Token Usage Table
+ *
+ * Per-user daily token + request counters, one row per (userId, day, providerId).
+ * Read at request time by the 4-tier router's tier-2 (pool) check: when
+ * `potluck_config.perUserDailyTokenCap` is non-zero and today's sum exceeds
+ * it, the pool tier short-circuits with `reason: 'quota_exceeded'`.
+ *
+ * `day` is a `YYYY-MM-DD` UTC string so the daily boundary is a single
+ * string comparison — no timezone arithmetic, no `date(...)` gymnastics.
+ * `tokens` and `requests` are upserted (`+=` semantics) on every chat turn
+ * completion; the writer is the chat-pipeline completion hook in `chat.remote.ts`.
+ */
+export const tokenUsage = sqliteTable(
+	'token_usage',
+	{
+		userId: integer('user_id').notNull(),
+		day: text('day').notNull(), // 'YYYY-MM-DD' UTC
+		providerId: text('provider_id').notNull(),
+		tokens: integer('tokens').notNull().default(0),
+		requests: integer('requests').notNull().default(0),
+		updatedAt: text('updated_at').notNull().default(sql`(datetime('now'))`)
+	},
+	(table) => ({
+		pk: primaryKey({ columns: [table.userId, table.day, table.providerId] })
+	})
+);
+
+export type TokenUsage = typeof tokenUsage.$inferSelect;

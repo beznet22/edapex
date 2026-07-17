@@ -8,22 +8,23 @@
 	import SearchIcon from "@lucide/svelte/icons/search";
 	import CheckIcon from "@lucide/svelte/icons/check";
 	import SparklesIcon from "@lucide/svelte/icons/sparkles";
-	import type { ProviderInfo, ModelInfo } from "$lib/provider/spec";
+	import type { ProviderInfo, ModelInfo, AugmentedModelInfo } from "$lib/provider/spec";
 
 	type ProviderGroup = {
 		id: string;
 		info: ProviderInfo | undefined;
-		models: ModelInfo[];
+		models: AugmentedModelInfo[];
 	};
 
 	interface Props {
 		modelSearch: string;
 		isLoadingModels: boolean;
 		visibleProviderGroups: ProviderGroup[];
-		visiblePlatformModels: ModelInfo[];
+		visiblePlatformModels: AugmentedModelInfo[];
+		visibleDiscoveredModels: AugmentedModelInfo[];
 		visibleModelIds: string[];
 		togglingModelId: string | null;
-		onToggleVisibility: (modelId: string, visible: boolean) => void;
+		onToggleVisibility: (model: AugmentedModelInfo, visible: boolean) => void;
 		onAddProvider: () => void;
 	}
 
@@ -32,6 +33,7 @@
 		isLoadingModels,
 		visibleProviderGroups,
 		visiblePlatformModels,
+		visibleDiscoveredModels,
 		visibleModelIds,
 		togglingModelId,
 		onToggleVisibility,
@@ -118,7 +120,7 @@
 				</div>
 			{/each}
 		</div>
-	{:else if visibleProviderGroups.length === 0 && visiblePlatformModels.length === 0}
+	{:else if visibleProviderGroups.length === 0 && visiblePlatformModels.length === 0 && visibleDiscoveredModels.length === 0}
 		<div
 			class="p-6 rounded-2xl border border-dashed border-sidebar-border/40 text-center"
 		>
@@ -140,16 +142,16 @@
 							>{visiblePlatformModels.length} models</span
 						>
 					</h3>
-					<div class="flex flex-wrap gap-2">
-						{#each visiblePlatformModels as model (model.id)}
-							{@const enabled = isModelVisible(model.id)}
-							{@const busy = togglingModelId === model.id}
-							<button
-								type="button"
-								disabled={busy}
-								onclick={() => onToggleVisibility(model.id, !enabled)}
-								aria-pressed={enabled}
-								aria-label={`${enabled ? 'Hide' : 'Show'} ${modelShortName(model)}`}
+			<div class="flex flex-wrap gap-2">
+				{#each visiblePlatformModels as model (model.id)}
+					{@const enabled = isModelVisible(model.id)}
+					{@const busy = togglingModelId === model.id}
+					<button
+						type="button"
+						disabled={busy}
+						onclick={() => onToggleVisibility(model, !enabled)}
+						aria-pressed={enabled}
+						aria-label={`${enabled ? 'Hide' : 'Show'} ${modelShortName(model)}`}
 								class="group inline-flex items-center gap-1.5 h-8 px-3 rounded-full text-[11px] font-bold tracking-tight transition-all duration-200 ease-out disabled:opacity-50 {enabled
 									? 'bg-blue-500/20 text-blue-300 border border-blue-500/40 hover:bg-blue-500/30 hover:scale-[1.02]'
 									: 'bg-muted/5 text-muted-foreground/50 border border-dashed border-sidebar-border/40 hover:bg-muted/10 hover:text-muted-foreground/80 hover:border-sidebar-border/70'}"
@@ -158,6 +160,13 @@
 									<CheckIcon class="size-3 shrink-0" />
 								{/if}
 								<span class="truncate max-w-[180px]">{modelShortName(model)}</span>
+								{#if model.source === 'pool'}
+									<Badge
+										class="bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 text-[8px] font-black px-1 py-0 rounded-sm"
+									>
+										POOL
+									</Badge>
+								{/if}
 								{#if isModelFree(model)}
 									<Badge
 										class="bg-primary/15 text-primary border-none text-[8px] font-black px-1 py-0 rounded-sm"
@@ -187,7 +196,7 @@
 							<button
 								type="button"
 								disabled={busy}
-								onclick={() => onToggleVisibility(model.id, !enabled)}
+								onclick={() => onToggleVisibility(model, !enabled)}
 								aria-pressed={enabled}
 								aria-label={`${enabled ? 'Hide' : 'Show'} ${modelShortName(model)}`}
 								title={model.description || modelShortName(model)}
@@ -199,6 +208,13 @@
 									<CheckIcon class="size-3 shrink-0" />
 								{/if}
 								<span class="truncate max-w-[180px]">{modelShortName(model)}</span>
+								{#if model.source === 'pool'}
+									<Badge
+										class="bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 text-[8px] font-black px-1 py-0 rounded-sm"
+									>
+										POOL
+									</Badge>
+								{/if}
 								{#if isModelFree(model)}
 									<Badge
 										class="bg-primary-foreground/20 text-primary-foreground border-none text-[8px] font-black px-1 py-0 rounded-sm"
@@ -211,6 +227,55 @@
 					</div>
 				</div>
 			{/each}
+			{#if visibleDiscoveredModels.length > 0}
+				<div class="space-y-3">
+					<h3
+						class="text-[10px] font-black uppercase tracking-widest text-amber-300/80 ml-1 flex items-center gap-2"
+					>
+						<SparklesIcon class="size-3" />
+						Discovered (not in catalogue)
+						<span class="text-muted-foreground/30 font-bold normal-case tracking-tight"
+							>{visibleDiscoveredModels.length} models</span
+						>
+					</h3>
+					<div class="flex flex-wrap gap-2">
+						{#each visibleDiscoveredModels as model (model.id)}
+							{@const enabled = isModelVisible(model.id)}
+							{@const busy = togglingModelId === model.id}
+							<button
+								type="button"
+								disabled={busy}
+								onclick={() => onToggleVisibility(model, !enabled)}
+								aria-pressed={enabled}
+								aria-label={`${enabled ? 'Disable' : 'Enable'} ${modelShortName(model)}`}
+								title={model.description || modelShortName(model)}
+								class="group inline-flex items-center gap-1.5 h-8 px-3 rounded-full text-[11px] font-bold tracking-tight transition-all duration-200 ease-out disabled:opacity-50 {enabled
+									? 'bg-amber-500/20 text-amber-200 border border-amber-500/40 hover:bg-amber-500/30 hover:scale-[1.02]'
+									: 'bg-muted/5 text-muted-foreground/50 border border-dashed border-sidebar-border/40 hover:bg-muted/10 hover:text-muted-foreground/80 hover:border-sidebar-border/70'}"
+							>
+								{#if enabled}
+									<CheckIcon class="size-3 shrink-0" />
+								{/if}
+								<span class="truncate max-w-[180px]">{modelShortName(model)}</span>
+								{#if model.source === 'pool'}
+									<Badge
+										class="bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 text-[8px] font-black px-1 py-0 rounded-sm"
+									>
+										POOL
+									</Badge>
+								{/if}
+								{#if isModelFree(model)}
+									<Badge
+										class="bg-primary/15 text-primary border-none text-[8px] font-black px-1 py-0 rounded-sm"
+									>
+										FREE
+									</Badge>
+								{/if}
+							</button>
+						{/each}
+					</div>
+				</div>
+			{/if}
 		</div>
 	{/if}
 </div>

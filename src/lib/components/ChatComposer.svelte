@@ -948,7 +948,7 @@
             align="start"
             side="top"
             sideOffset={8}
-            class="w-64 hermes-glass border-border/20 shadow-2xl rounded-xl"
+            class="w-64 border-border/20 shadow-2xl rounded-xl"
           >
             <Button
               variant="ghost"
@@ -958,7 +958,7 @@
               <CameraIcon class="size-3.5 opacity-70 shrink-0" />
               <div class="flex flex-col items-start min-w-0">
                 <span class="truncate">Upload Photo</span>
-                <span class="text-[9px] text-muted-foreground/60">Workspace asset. Use /update photo @student to attach.</span>
+                <span class="text-[10px] text-muted-foreground/60">Upload a photo</span>
               </div>
             </Button>
 
@@ -969,14 +969,14 @@
             >
               <ScanLineIcon class="size-3.5 opacity-70 shrink-0" />
               <div class="flex flex-col items-start min-w-0">
-                <span class="truncate">Upload Document</span>
-                <span class="text-[9px] text-muted-foreground/60">OCR + structured extraction (PDF/image).</span>
+                <span class="truncate">Upload Documents</span>
+                <span class="text-[10px] text-muted-foreground/60">Extract text from PDFs & Images</span>
               </div>
             </Button>
 
-            <Separator class="my-1" />
-
-            <Popover.Root bind:open={recentMenuOpen}>
+            <!-- TODO: Implement Recents feature -->
+            <!-- <Separator class="my-1" /> -->
+            <!-- <Popover.Root bind:open={recentMenuOpen}>
               <Popover.Trigger>
                 {#snippet child({ props })}
                   <Button
@@ -1015,7 +1015,6 @@
                 >
                   Recents
                 </div>
-                <!-- TODO: render recent files list once chat history API exposes last attachments -->
                 <div class="px-2 py-2 text-[11px] text-muted-foreground/50 italic">
                   (no recent files)
                 </div>
@@ -1041,9 +1040,9 @@
                 >
               </div>
               <Switch bind:checked={webSearchEnabled} />
-            </div>
+            </div> -->
 
-            <Popover.Root bind:open={moreMenuOpen}>
+            <!-- <Popover.Root bind:open={moreMenuOpen}>
               <Popover.Trigger>
                 {#snippet child({ props })}
                   <Button
@@ -1102,7 +1101,7 @@
                   <span class="truncate">Canvas</span>
                 </Button>
               </Popover.Content>
-            </Popover.Root>
+            </Popover.Root> -->
           </Popover.Content>
         </Popover.Root>
 

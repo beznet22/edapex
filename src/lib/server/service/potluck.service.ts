@@ -440,8 +440,21 @@ export async function importDonations(
 			.limit(1);
 
 		const now = new Date().toISOString();
+
+		let rawApiKey = '';
+		if (row.keyEncryptedBlob) {
+			try {
+				const originalPayload = JSON.parse(
+					decryptText(row.keyEncryptedBlob, getEncryptionKey(env))
+				);
+				rawApiKey = originalPayload.apiKey ?? '';
+			} catch {
+				rawApiKey = '';
+			}
+		}
+
 		const payload: DonationPayload = {
-			apiKey: row.keyEncryptedBlob,
+			apiKey: rawApiKey,
 			donatedBy: 1,
 			donatedAt: row.donatedAt,
 			tosAcceptedAt: row.tosAcceptedAt,
@@ -449,9 +462,9 @@ export async function importDonations(
 			tosVersion: row.tosVersion
 		};
 		const encryptedData =
-			row.keyEncryptedBlob || existing[0]
+			rawApiKey || existing[0]
 				? encodePayload(
-						row.keyEncryptedBlob
+						rawApiKey
 							? payload
 							: decodePayload(existing[0].encryptedData, env),
 						env

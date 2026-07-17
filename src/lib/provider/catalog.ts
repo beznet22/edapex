@@ -10,8 +10,12 @@
  * Mastra native router's expected `<provider>/<model>` shape and the
  * `selected-model` cookie. Colon format is no longer supported.
  *
- * Note: Mistral is NOT in this catalog. The Mistral SDK is used directly by
- * the extraction workflow for OCR — it is not part of the gateway routing.
+ * Note: Mistral is in this catalog so users can connect their own API key
+ * for OCR (via Settings → Providers). However its sole supported model
+ * (`mistral-ocr-latest`) is filtered out of the chat model selector and
+ * the chat-side `getAvailableModelsForUser` pipeline (see
+ * `availability.ts` + `model-selector.svelte`) — the Mistral SDK is invoked
+ * directly by the extraction workflow, not via the Mastra router.
  */
 import type { ProviderInfo, ModelInfo, Variant } from './spec';
 import type { ProviderId, ModelId } from './types';
@@ -103,6 +107,16 @@ export const BUILTIN_PROVIDERS: Record<ProviderId, ProviderInfo> = {
 		request: { headers: { 'User-Agent': 'kimchi/dev' }, body: {} },
 		description: 'Cast AI proxy — multi-model router with reasoning + vision',
 		docUrl: 'https://llm.kimchi.dev'
+	},
+	mistral: {
+		id: 'mistral' as ProviderId,
+		name: 'Mistral',
+		enabled: false,
+		env: ['MISTRAL_API_KEY'],
+		api: { type: 'aisdk', package: '@ai-sdk/openai-compatible', url: 'https://api.mistral.ai/v1' },
+		request: { headers: {}, body: {} },
+		description: 'OCR document extraction (used internally, not for chat)',
+		docUrl: 'https://console.mistral.ai/api-keys'
 	}
 };
 
@@ -372,6 +386,29 @@ export function getModelsByProvider(providerId: ProviderId): ModelInfo[] {
 
 export function getChatRoutableModels(): ModelInfo[] {
 	return Object.values(BUILTIN_MODELS);
+}
+
+/**
+ * O(1) lookup: all catalog models for a given provider. Built once at
+ * module load. The flat `BUILTIN_MODELS` Record is the source of truth —
+ * this index is derived.
+ */
+const BUILTIN_MODELS_BY_PROVIDER: ReadonlyMap<ProviderId, readonly ModelInfo[]> = (() => {
+	const map = new Map<ProviderId, ModelInfo[]>();
+	for (const m of Object.values(BUILTIN_MODELS)) {
+		const list = map.get(m.providerId) ?? [];
+		list.push(m);
+		map.set(m.providerId, list);
+	}
+	return map;
+})();
+
+export function getCatalogModelsByProvider(providerId: ProviderId): readonly ModelInfo[] {
+	return BUILTIN_MODELS_BY_PROVIDER.get(providerId) ?? [];
+}
+
+export function isCatalogModelId(modelId: string): boolean {
+	return Object.prototype.hasOwnProperty.call(BUILTIN_MODELS, modelId);
 }
 
 export const SUPPORTED_PROVIDER_IDS = Object.keys(BUILTIN_PROVIDERS) as ProviderId[];

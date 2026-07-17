@@ -6,6 +6,7 @@
 	import ScanSearchIcon from "@lucide/svelte/icons/scan-search";
 	import RotateCcwIcon from "@lucide/svelte/icons/rotate-ccw";
 	import XIcon from "@lucide/svelte/icons/x";
+	import XCircleIcon from "@lucide/svelte/icons/x-circle";
 	import InboxIcon from "@lucide/svelte/icons/inbox";
 	import { fly } from "svelte/transition";
 	import { backOut } from "svelte/easing";
@@ -17,6 +18,18 @@
   const hasActivity = $derived(activeCount > 0);
   const isPulsing = $derived(hasActivity);
 
+  let isOpen = $state(false);
+  const wasActive = $state(false);
+
+  // Auto-open the popover when a true background job starts (activeCount
+  // transitions 0 → ≥1). Inline OCR (1, 2-3 images) doesn't add a
+  // popover entry, so this only fires for the 4+ batch case.
+  $effect(() => {
+    if (activeCount > 0 && !wasActive) {
+      isOpen = true;
+    }
+  });
+
   function titleFor(task: Task): string {
     switch (task.spec.kind) {
       case "ocr-batch": {
@@ -27,35 +40,61 @@
         const name = task.spec.key.split("/").pop() ?? task.spec.key;
         return `OCR — ${name}`;
       }
+      case "ocr-direct": {
+        const name = task.spec.key.split("/").pop() ?? task.spec.key;
+        return `OCR — ${name}`;
+      }
     }
   }
 
   function statusLabel(task: Task): string {
     if (task.status === "completed") return "Completed";
     if (task.status === "failed") return "Failed";
+    if (task.status === "cancelled") return "Cancelled";
     if (task.status === "queued") return "Queued";
     return "Running";
   }
 
   function barClass(task: Task): string {
     if (task.status === "failed") return "bg-rose-500/70";
+    if (task.status === "cancelled") return "bg-muted-foreground/50";
     if (task.status === "completed") return "bg-emerald-500";
     return "bg-primary";
   }
 
   function statusTextClass(task: Task): string {
     if (task.status === "failed") return "text-rose-500";
+    if (task.status === "cancelled") return "text-muted-foreground";
     if (task.status === "completed") return "text-emerald-500";
     return "text-muted-foreground";
   }
 
   function barWidth(task: Task): number {
-    if (task.status === "completed" || task.status === "failed") return 100;
+    if (task.status === "completed" || task.status === "failed" || task.status === "cancelled") return 100;
     return Math.round(task.progress * 100);
+  }
+
+  /**
+   * Format a unix timestamp as a relative duration:
+   *   `just now` (<60s), `Xm ago` (<60m), `Xh ago` (<24h), `Xd ago`.
+   * Shown next to the status label on completed/failed/cancelled cards
+   * so users can see at a glance which tasks are stale.
+   */
+  function formatRelativeAge(ts: number | undefined): string {
+    if (!ts) return "";
+    const diffMs = Date.now() - ts;
+    const diffSec = Math.floor(diffMs / 1000);
+    if (diffSec < 60) return "just now";
+    const diffMin = Math.floor(diffSec / 60);
+    if (diffMin < 60) return `${diffMin}m ago`;
+    const diffHr = Math.floor(diffMin / 60);
+    if (diffHr < 24) return `${diffHr}h ago`;
+    const diffDay = Math.floor(diffHr / 24);
+    return `${diffDay}d ago`;
   }
 </script>
 
-<Popover.Root>
+<Popover.Root bind:open={isOpen}>
   <Popover.Trigger>
     {#snippet child({ props })}
       <button
@@ -93,16 +132,16 @@
           Background activity
         </h3>
       </div>
-      {#if tasks.some((t) => t.status === "completed" || t.status === "failed")}
-        <button
-          type="button"
-          class="text-[10px] font-bold uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors"
-          onclick={() => backgroundTasks.clearCompleted()}
-        >
-          Clear completed
-        </button>
-      {/if}
-    </header>
+  {#if tasks.some((t) => t.status === "completed" || t.status === "failed" || t.status === "cancelled")}
+    <button
+      type="button"
+      class="text-[10px] font-bold uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors"
+      onclick={() => backgroundTasks.clearCompleted()}
+    >
+      Clear completed
+    </button>
+  {/if}
+</header>
 
     <div class="max-h-96 overflow-y-auto">
       {#if tasks.length === 0}
@@ -129,15 +168,39 @@
                   <ScanSearchIcon
                     class="size-3 shrink-0 {task.status === 'failed'
                       ? 'text-rose-500'
-                      : task.status === 'completed'
-                        ? 'text-emerald-500'
-                        : 'text-primary'}"
+                      : task.status === 'cancelled'
+                        ? 'text-muted-foreground'
+                        : task.status === 'completed'
+                          ? 'text-emerald-500'
+                          : 'text-primary'}"
                   />
                   <span class="text-[12px] font-semibold text-foreground truncate">
                     {titleFor(task)}
                   </span>
                 </div>
                 <div class="flex items-center gap-0.5 shrink-0">
+                  {#if (task.status === "running" || task.status === "queued") && task.spec.kind !== "ocr-direct"}
+                    <button
+                      type="button"
+                      class="h-6 w-6 rounded-md hover:bg-foreground/10 text-muted-foreground hover:text-rose-500 flex items-center justify-center transition-colors"
+                      onclick={() => backgroundTasks.cancelTask(task.id)}
+                      aria-label="Cancel task"
+                      title="Cancel"
+                    >
+                      <XCircleIcon class="size-3.5" />
+                    </button>
+                  {/if}
+                  {#if task.status === "running" && task.spec.kind === "ocr-direct"}
+                    <button
+                      type="button"
+                      class="h-6 w-6 rounded-md hover:bg-foreground/10 text-muted-foreground hover:text-rose-500 flex items-center justify-center transition-colors"
+                      onclick={() => backgroundTasks.cancelTask(task.id)}
+                      aria-label="Cancel task"
+                      title="Cancel"
+                    >
+                      <XCircleIcon class="size-3.5" />
+                    </button>
+                  {/if}
                   {#if task.status === "failed" && task.result}
                     <button
                       type="button"
@@ -172,6 +235,8 @@
                   class="text-[9px] font-black uppercase tracking-wider {statusTextClass(task)}"
                 >
                   {statusLabel(task)}
+                  {#if (task.status === "completed" || task.status === "failed" || task.status === "cancelled") && formatRelativeAge(task.completedAt)}
+                  {/if}
                 </span>
               </div>
 
@@ -181,6 +246,11 @@
 
               {#if task.status === "failed" && task.result}
                 <p class="text-[9px] font-bold text-rose-400/80 mt-1.5 uppercase tracking-wider">
+                  {task.result.succeeded} of {task.result.results.length} completed
+                </p>
+              {/if}
+              {#if task.status === "cancelled" && task.result}
+                <p class="text-[9px] font-bold text-muted-foreground/70 mt-1.5 uppercase tracking-wider">
                   {task.result.succeeded} of {task.result.results.length} completed
                 </p>
               {/if}

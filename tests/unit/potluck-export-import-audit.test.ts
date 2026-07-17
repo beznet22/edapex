@@ -36,7 +36,12 @@ async function insertDonation(apiKey: string, donatedBy = 17): Promise<void> {
 		userId: null,
 		providerId: "groq",
 		encryptedData: encrypt(
-			JSON.stringify({ apiKey, donatedBy, termsAccepted: true }),
+			JSON.stringify({
+				apiKey,
+				donatedBy,
+				donatedAt: new Date().toISOString(),
+				tosVersion: null
+			}),
 			ENCRYPTION_KEY
 		),
 		enabled: 1

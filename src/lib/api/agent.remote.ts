@@ -14,7 +14,8 @@ import {
 import {
   setModelVisibility,
   setAllModelVisibility as setAllModelVisibilityFn,
-  getHiddenModelIdsForUser
+  getHiddenModelIdsForUser,
+  getEnabledModelIdsForUser
 } from "$lib/server/mastra/provider/visibility";
 import {
   getAvailableModelsForUser,
@@ -36,6 +37,11 @@ import {
   type ExportMode,
   type ImportResult
 } from "$lib/server/service/potluck.service";
+import {
+  donateUserCredential as donateUserCredentialFn,
+  listMyDonations as listMyDonationsFn,
+  revokeMyDonation as revokeMyDonationFn
+} from "$lib/server/service/user-donation.service";
 import { log } from "$lib/server/audit-log";
 
 const envKeys: Record<string, string | undefined> = env;
@@ -51,7 +57,7 @@ const headerSchema = z.object({
   value: z.string().min(1)
 });
 
-type AuthSuccess = { user: { id: number; schoolId: number | null; staffId: number | null } };
+type AuthSuccess = { user: { id: number; schoolId: number | null; staffId: number | null; designation: string | null | undefined } };
 type AuthFailure = { error: string };
 type AuthResult = AuthSuccess | AuthFailure;
 
@@ -67,7 +73,8 @@ function getAuthenticatedUserId(errorMessage: string): AuthResult {
     user: {
       id: locals.user.id,
       schoolId: locals.user.schoolId ?? null,
-      staffId: typeof locals.user.staffId === "number" ? locals.user.staffId : null
+      staffId: typeof locals.user.staffId === "number" ? locals.user.staffId : null,
+      designation: locals.user.designation ?? null
     }
   };
 }
@@ -81,7 +88,8 @@ function getStrictUserId(): AuthResult {
     user: {
       id: locals.user.id,
       schoolId: locals.user.schoolId ?? null,
-      staffId: typeof locals.user.staffId === "number" ? locals.user.staffId : null
+      staffId: typeof locals.user.staffId === "number" ? locals.user.staffId : null,
+      designation: locals.user.designation ?? null
     }
   };
 }
@@ -125,7 +133,12 @@ type GetAgentSettingsResult =
   | { success: false; message: string };
 
 type GetAvailableModelsResult =
-  | { success: true; models: AugmentedModelInfo[] }
+  | {
+      success: true;
+      models: AugmentedModelInfo[];
+      hiddenModelIds: string[];
+      enabledModelIds: string[];
+    }
   | { success: false; message: string };
 
 const saveUserCredentialInputSchema = z.object({
@@ -447,13 +460,17 @@ export const getAvailableModels = command(
 
     try {
       const db = getAppDb();
-      const models = await getAvailableModelsForUser(
-        db,
-        envKeys,
-        auth.user.id,
-        auth.user.schoolId ?? 1
-      );
-      return { success: true, models };
+      const [models, hiddenIds, enabledIds] = await Promise.all([
+        getAvailableModelsForUser(db, envKeys, auth.user.id, auth.user.schoolId ?? 1, auth.user.designation ?? null),
+        getHiddenModelIdsForUser(db, auth.user.id),
+        getEnabledModelIdsForUser(db, auth.user.id)
+      ]);
+      return {
+        success: true,
+        models,
+        hiddenModelIds: [...hiddenIds],
+        enabledModelIds: [...enabledIds]
+      };
     } catch (err) {
       console.error("[getAvailableModels] Failed to resolve models:", err);
       return { success: false, message: 'Failed to fetch models' };
@@ -479,7 +496,8 @@ export const getSettingsModels = command(
         db,
         envKeys,
         auth.user.id,
-        auth.user.schoolId ?? 1
+        auth.user.schoolId ?? 1,
+        auth.user.designation ?? null
       );
       return { success: true, models };
     } catch (err) {
@@ -659,6 +677,127 @@ export const importPotluckDonations = command(
     } catch (err) {
       console.error("[importPotluckDonations] failed", err);
       return { success: false, message: "import failed" };
+    }
+  }
+);
+
+// ─── User-facing pot-luck donation commands ────────────────────────────────
+
+const donateUserCredentialInputSchema = z.object({
+  providerId: providerIdSchema,
+  apiKey: z.string().min(10).max(1024)
+});
+
+type DonateUserCredentialResult =
+  | { success: true; donationId: string; providerId: string }
+  | { success: false; message: string };
+
+export const donateUserCredential = command(
+  donateUserCredentialInputSchema,
+  async (input): Promise<DonateUserCredentialResult> => {
+    const auth = getStrictUserId();
+    if (isAuthFailure(auth)) {
+      return { success: false, message: auth.error };
+    }
+    if (typeof auth.user.schoolId !== "number") {
+      return { success: false, message: "School scope required" };
+    }
+    try {
+      const result = await donateUserCredentialFn({
+        db: getAppDb(),
+        userId: auth.user.id,
+        schoolId: auth.user.schoolId,
+        userRole: auth.user.designation ?? null,
+        staffId: auth.user.staffId,
+        providerId: input.providerId as ProviderId,
+        apiKey: input.apiKey
+      });
+      if (!result.success) {
+        return { success: false, message: result.error ?? "Donation failed" };
+      }
+      return {
+        success: true,
+        donationId: result.donation?.id ?? "",
+        providerId: input.providerId
+      };
+    } catch (err) {
+      console.error(`[donateUserCredential:${input.providerId}] failed`, err);
+      return { success: false, message: "Donation failed" };
+    }
+  }
+);
+
+type MyDonation = {
+  id: string;
+  providerId: string;
+  donatedAt: string;
+  isActive: boolean;
+  tosVersion: string | null;
+};
+
+type GetMyDonationsResult =
+  | { success: true; donations: MyDonation[] }
+  | { success: false; message: string; donations: [] };
+
+export const getMyDonations = command(z.object({}), async (): Promise<GetMyDonationsResult> => {
+  const auth = getStrictUserId();
+  if (isAuthFailure(auth)) {
+    return { success: false, message: auth.error, donations: [] };
+  }
+  if (typeof auth.user.schoolId !== "number") {
+    return { success: false, message: "School scope required", donations: [] };
+  }
+  try {
+    const donations = await listMyDonationsFn({
+      db: getAppDb(),
+      userId: auth.user.id,
+      schoolId: auth.user.schoolId
+    });
+    return {
+      success: true,
+      donations: donations.map((d) => ({
+        id: d.id,
+        providerId: d.providerId,
+        donatedAt: d.donatedAt,
+        isActive: d.isActive,
+        tosVersion: d.tosVersion
+      }))
+    };
+  } catch (err) {
+    console.error("[getMyDonations] failed", err);
+    return { success: false, message: "Failed to load donations", donations: [] };
+  }
+});
+
+const revokeMyDonationInputSchema = z.object({
+  donationId: z.string().min(1).max(128)
+});
+
+export const revokeMyDonation = command(
+  revokeMyDonationInputSchema,
+  async (input): Promise<SimpleResult> => {
+    const auth = getStrictUserId();
+    if (isAuthFailure(auth)) {
+      return { success: false, message: auth.error };
+    }
+    if (typeof auth.user.schoolId !== "number") {
+      return { success: false, message: "School scope required" };
+    }
+    try {
+      const result = await revokeMyDonationFn({
+        db: getAppDb(),
+        userId: auth.user.id,
+        schoolId: auth.user.schoolId,
+        staffId: auth.user.staffId,
+        donationId: input.donationId
+      });
+      if (!result.success) {
+        return { success: false, message: result.error ?? "Revoke failed" };
+      }
+      return { success: true };
+    } catch (err) {
+      console.error(`[revokeMyDonation] failed`, err);
+      return { success: false, message: "Revoke failed" };
     }
   }
 );

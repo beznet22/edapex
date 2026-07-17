@@ -1,9 +1,21 @@
 import { Mistral } from '@mistralai/mistralai';
 import { SDKError, HTTPValidationError } from '@mistralai/mistralai/models/errors';
-import { env } from '$env/dynamic/private';
+import type { LibSQLDatabase } from 'drizzle-orm/libsql';
+import { env as defaultEnv } from '$env/dynamic/private';
+import { resolveMistralApiKey } from '$lib/server/mastra/provider/ocr-key-resolver';
 
 let lastCallTimestamp = 0;
 let lastCallPromise: Promise<void> = Promise.resolve();
+
+export interface MistralClientContext {
+	db: LibSQLDatabase<any>;
+	userId: number;
+	/** School scope. Required for the pool tier to be consulted. */
+	schoolId: number | null;
+	/** User role string (e.g. 'class_teacher'). Used for pool consumerRoles gating. */
+	userRole?: string | null;
+	env?: Record<string, string | undefined>;
+}
 
 export class MistralOcrService {
   private static instance: MistralOcrService;
@@ -17,11 +29,14 @@ export class MistralOcrService {
     return MistralOcrService.instance;
   }
 
-  private getClient(): Mistral {
-    const apiKey = env.MISTRAL_API_KEY;
-    if (!apiKey) {
-      throw new Error('MISTRAL_API_KEY is not configured in environment variables.');
-    }
+  private async getClient(ctx: MistralClientContext): Promise<Mistral> {
+    const apiKey = await resolveMistralApiKey({
+      db: ctx.db,
+      userId: ctx.userId,
+      schoolId: ctx.schoolId,
+      userRole: ctx.userRole,
+      env: ctx.env
+    });
     return new Mistral({ apiKey });
   }
 
@@ -77,12 +92,13 @@ export class MistralOcrService {
    */
   public async processDocument(
     fileContent: Blob | Buffer | Uint8Array,
-    fileName: string
+    fileName: string,
+    ctx: MistralClientContext
   ) {
     await this.enforceCooldown();
 
     return this.withRetry(async () => {
-      const client = this.getClient();
+      const client = await this.getClient(ctx);
 
       // Convert fileContent to a Blob if it is Buffer or Uint8Array, or keep it as is
       const uploadPayload = fileContent instanceof Blob
@@ -133,11 +149,12 @@ export class MistralOcrService {
     fileContent: Blob | Buffer | Uint8Array,
     fileName: string,
     jsonSchema: Record<string, unknown>,
+    ctx: MistralClientContext,
   ): Promise<unknown> {
     await this.enforceCooldown();
 
     return this.withRetry(async () => {
-      const client = this.getClient();
+      const client = await this.getClient(ctx);
 
       const uploadPayload = fileContent instanceof Blob
         ? fileContent
@@ -170,10 +187,10 @@ export class MistralOcrService {
    * Get OCR markdown for a file that was previously uploaded (has a fileId).
    * Downloads processed OCR markdown on-demand from Mistral.
    */
-  public async getMarkdownByFileId(context: any, fileId: string): Promise<string> {
+  public async getMarkdownByFileId(ctx: MistralClientContext, fileId: string): Promise<string> {
     return this.withRetry(async () => {
-      const client = this.getClient();
-      
+      const client = await this.getClient(ctx);
+
       // Validate file exists & is accessible under current client (tenant API key)
       const fileInfo = await client.files.retrieve({ fileId });
       if (!fileInfo) {
@@ -202,10 +219,11 @@ export class MistralOcrService {
    * then submits them as a single Batch Job.
    */
   public async createBatchJob(
-    files: Array<{ fileName: string; content: Blob | Buffer | Uint8Array; customId: string }>
+    files: Array<{ fileName: string; content: Blob | Buffer | Uint8Array; customId: string }>,
+    ctx: MistralClientContext,
   ) {
     return this.withRetry(async () => {
-      const client = this.getClient();
+      const client = await this.getClient(ctx);
       const requests = [];
 
       for (const file of files) {
@@ -227,7 +245,7 @@ export class MistralOcrService {
             model: 'mistral-ocr-latest',
             document: {
               type: 'file',
-              fileId: uploadedFile.id,
+              file_id: uploadedFile.id,
             },
             include_image_base64: true,
           }
@@ -248,11 +266,11 @@ export class MistralOcrService {
   /**
    * Polls a batch job and returns its status
    */
-  public async pollBatchJob(jobId: string) {
+  public async pollBatchJob(jobId: string, ctx: MistralClientContext) {
     return this.withRetry(async () => {
-      const client = this.getClient();
+      const client = await this.getClient(ctx);
       const job = await client.batch.jobs.get({ jobId });
-      
+
       return {
         jobId: job.id,
         status: job.status,
@@ -268,16 +286,16 @@ export class MistralOcrService {
   /**
    * Download and parse batch results from a completed job's outputFileId.
    */
-  public async downloadBatchResults(outputFileId: string) {
+  public async downloadBatchResults(outputFileId: string, ctx: MistralClientContext) {
     return this.withRetry(async () => {
-      const client = this.getClient();
+      const client = await this.getClient(ctx);
       // download() returns a ReadableStream<Uint8Array>
       const stream = await client.files.download({ fileId: outputFileId });
-      
+
       const reader = stream.getReader();
       const decoder = new TextDecoder('utf-8');
       let text = '';
-      
+
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
@@ -314,3 +332,4 @@ export class MistralOcrService {
 }
 
 export const mistralOcrService = MistralOcrService.getInstance();
+

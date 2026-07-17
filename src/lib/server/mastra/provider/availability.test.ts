@@ -15,7 +15,10 @@ const SCHOOL_ID = 98300;
 
 vi.mock('./discovery', () => ({
 	getDiscoveredModelsForUser: vi.fn(),
-	discoverProviderModels: vi.fn()
+	getAllDiscoveredModelsForUser: vi.fn(),
+	getCachedPlatformProviderModels: vi.fn(),
+	discoverProviderModels: vi.fn(),
+	persistDiscoveredModels: vi.fn(async () => {})
 }));
 
 vi.mock('./admin-model-overrides', () => ({
@@ -53,6 +56,10 @@ describe('getAvailableModelsForUser', () => {
 	beforeEach(async () => {
 		await cleanup();
 		vi.mocked(discovery.getDiscoveredModelsForUser).mockReset();
+		vi.mocked(discovery.getAllDiscoveredModelsForUser).mockReset();
+		vi.mocked(discovery.getAllDiscoveredModelsForUser).mockResolvedValue(new Map());
+		vi.mocked(discovery.getCachedPlatformProviderModels).mockReset();
+		vi.mocked(discovery.getCachedPlatformProviderModels).mockResolvedValue([]);
 		vi.mocked(adminOverrides.listAdminOverrides).mockReset();
 		vi.mocked(adminOverrides.applyAdminDenylist).mockReset();
 	});
@@ -76,33 +83,29 @@ describe('getAvailableModelsForUser', () => {
 		expect(models.some((m) => m.providerId === 'groq')).toBe(true);
 	});
 
-	it('returns user-sourced models from discovered list', async () => {
+	it('returns user-sourced catalog models for credentialed provider', async () => {
 		const db = getAppDb();
 		await seedCredential('groq');
-		const discovered = [
-			{ id: 'discovered-1', providerId: 'groq', name: 'Discovered', capabilities: { tools: true }, limit: { context: 4096, output: 2048 }, tier: 'mid' }
-		];
-		vi.mocked(discovery.getDiscoveredModelsForUser).mockResolvedValue(discovered as any);
 		vi.mocked(adminOverrides.listAdminOverrides).mockResolvedValue([]);
 		vi.mocked(adminOverrides.applyAdminDenylist).mockImplementation(
 			(entries) => entries as { providerId: string; modelId: string }[]
 		);
 
 		const models = await getAvailableModelsForUser(db, {}, USER_ID, SCHOOL_ID);
-		expect(models.some((m) => m.id === 'discovered-1' && m.source === 'user')).toBe(true);
+		expect(models.some((m) => m.providerId === 'groq' && m.source === 'user')).toBe(true);
 	});
 
-	it('does not fall back to built-in models when discovery returns empty', async () => {
+	it('returns catalog models for credentialed provider even when discovery empty', async () => {
 		const db = getAppDb();
 		await seedCredential('groq');
-		vi.mocked(discovery.getDiscoveredModelsForUser).mockResolvedValue([]);
 		vi.mocked(adminOverrides.listAdminOverrides).mockResolvedValue([]);
 		vi.mocked(adminOverrides.applyAdminDenylist).mockImplementation(
 			(entries) => entries as { providerId: string; modelId: string }[]
 		);
 
 		const models = await getAvailableModelsForUser(db, {}, USER_ID, SCHOOL_ID);
-		expect(models).toHaveLength(0);
+		expect(models.length).toBeGreaterThan(0);
+		expect(models.every((m) => m.source === 'user')).toBe(true);
 	});
 
 	it('skips disabled credentials', async () => {
@@ -139,14 +142,43 @@ describe('getAvailableModelsForUser', () => {
 		await cleanup();
 	});
 
-	it('applies admin denylist', async () => {
+	it('platform-sourced models respect admin denylist', async () => {
 		const db = getAppDb();
-		await seedCredential('groq');
-		vi.mocked(discovery.getDiscoveredModelsForUser).mockResolvedValue([]);
 		vi.mocked(adminOverrides.listAdminOverrides).mockResolvedValue([]);
 		vi.mocked(adminOverrides.applyAdminDenylist).mockImplementation(() => []);
 
+		const models = await getAvailableModelsForUser(
+			db,
+			{ GROQ_API_KEY: 'platform-groq' },
+			USER_ID,
+			SCHOOL_ID
+		);
+		expect(models).toHaveLength(0);
+	});
+
+	it('user-scoped credentials bypass provider-level admin denylist', async () => {
+		// Regression: the comment at the top of availability.ts promises that
+		// "the user has connected their own key, which overrides the platform
+		// decision." Provider-level admin denials (modelId=null) must NOT
+		// block user-scoped models in Pass 1. They still apply to Pass 3
+		// (platform env-backed providers).
+		const db = getAppDb();
+		await seedCredential('groq');
+		// Admin disabled groq at the provider level.
+		vi.mocked(adminOverrides.listAdminOverrides).mockResolvedValue([
+			{ providerId: 'groq', modelId: null, schoolId: SCHOOL_ID, reason: 'test' } as any
+		]);
+		vi.mocked(adminOverrides.applyAdminDenylist).mockImplementation(
+			(entries) => entries as { providerId: string; modelId: string }[]
+		);
+		vi.mocked(discovery.getAllDiscoveredModelsForUser).mockResolvedValue(new Map());
+		vi.mocked(discovery.getCachedPlatformProviderModels).mockResolvedValue([]);
+
 		const models = await getAvailableModelsForUser(db, {}, USER_ID, SCHOOL_ID);
-		expect(models.length).toBe(0);
+		// User-scoped groq catalog models still appear, with source='user'
+		// (not 'platform'), even though the provider is admin-disabled.
+		const groqModels = models.filter((m) => m.providerId === 'groq');
+		expect(groqModels.length).toBeGreaterThan(0);
+		expect(groqModels.every((m) => m.source === 'user')).toBe(true);
 	});
 });

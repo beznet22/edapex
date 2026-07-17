@@ -6,7 +6,9 @@ import type { TenantContext } from "$lib/server/mastra/tenant-context";
 import type { MastraMemory, StorageThreadType } from "@mastra/core/memory";
 import type { MastraModelConfig } from "@mastra/core/llm";
 import { mastra } from "$lib/server/mastra";
-import { resolveModelForRequest, pickDefaultModelId } from "$lib/server/mastra/provider";
+import { resolveModelForRequest, pickDefaultModelId, type ResolveModelContext } from "$lib/server/mastra/provider";
+import { resolveUserRole } from "$lib/server/mastra/provider/role-resolver";
+import { getTodayTokenUsage } from "$lib/server/mastra/provider/usage-tracker";
 import { getAppDb } from "$lib/server/mastra/storage/libsql/app-db";
 import { BaseRepository } from "$lib/server/repository/base.repo";
 import { getDatabase } from "$lib/server/db";
@@ -52,20 +54,61 @@ export async function buildRequestContext(params: {
   const db = getAppDb();
   const envKeys = env as Record<string, string | undefined>;
 
+  // Resolve today's per-user token usage for the chosen provider so the
+  // 4-tier router's `perUserDailyTokenCap` check can fire. We read the
+  // providerId from the modelId before calling `resolveModelForRequest`
+  // (which is the request that the cap guards) — a brief race where the
+  // current turn's tokens are not yet recorded is acceptable; the cap is a
+  // soft quota, not a hard stop.
+  let providerIdForCap: string | null = null;
   if (modelId) {
-    const resolved = await resolveModelForRequest(userId, modelId, db);
+    const slashIdx = modelId.indexOf('/');
+    if (slashIdx > 0) providerIdForCap = modelId.slice(0, slashIdx);
+  }
+  const todayTokenUsage = providerIdForCap
+    ? await getTodayTokenUsage({ db, userId, providerId: providerIdForCap })
+    : 0;
+
+  // Forward tenant school/role so the 4-tier router can serve the pool
+  // (tier 2) and the consumerRoles allowlist gate can fire.
+  const traceContext: ResolveModelContext = {
+    userId,
+    schoolId: context.schoolId,
+    actorStaffId: context.staffId,
+    userRole: resolveUserRole(context.designationId),
+    todayTokenUsage
+  };
+
+  if (modelId) {
+    const resolved = await resolveModelForRequest(
+      userId,
+      modelId,
+      db,
+      undefined,
+      traceContext
+    );
     requestContext.set('modelConfig', resolved.config as MastraModelConfig);
     if (resolved.providerOptions) {
       requestContext.set('providerOptions', resolved.providerOptions);
     }
   } else {
-    const defaultId = await pickDefaultModelId(db, envKeys, userId);
+    const defaultId = await pickDefaultModelId(db, envKeys, {
+      userId,
+      schoolId: context.schoolId,
+      userRole: resolveUserRole(context.designationId)
+    });
     if (!defaultId) {
       throw new Error(
         'No model available. Connect a provider in Settings → Providers.'
       );
     }
-    const resolved = await resolveModelForRequest(userId, defaultId, db);
+    const resolved = await resolveModelForRequest(
+      userId,
+      defaultId,
+      db,
+      undefined,
+      traceContext
+    );
     requestContext.set('modelConfig', resolved.config as MastraModelConfig);
     if (resolved.providerOptions) {
       requestContext.set('providerOptions', resolved.providerOptions);

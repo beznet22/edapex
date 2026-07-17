@@ -16,6 +16,7 @@ import {
 	upsertDonation
 } from "$lib/server/mastra/provider/potluck";
 import { disableModelOrProvider } from "$lib/server/mastra/provider/admin-model-overrides";
+import { encrypt as encryptText, getEncryptionKey } from "$lib/server/mastra/provider/crypto";
 
 const SCHOOL_A = 99992;
 const SCHOOL_B = 99991;
@@ -44,13 +45,14 @@ async function cleanupSchool(schoolId: number): Promise<void> {
 
 async function seedPersonalCredential(): Promise<void> {
 	const db = getAppDb();
+	const encryptionKey = getEncryptionKey({ TOKEN_ENCRYPTION_KEY: ENCRYPTION_KEY });
 	await db.insert(encryptedCredentials).values({
 		scope: "user",
 		credentialKind: "personal",
 		userId: USER_ID,
 		schoolId: null,
 		providerId: "groq",
-		encryptedData: JSON.stringify({ apiKey: "personal-test-key-12345" }),
+		encryptedData: encryptText(JSON.stringify({ apiKey: "personal-test-key-12345" }), encryptionKey),
 		priority: 1,
 		enabled: 1
 	});

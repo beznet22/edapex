@@ -1,6 +1,7 @@
 import { error, json, type RequestHandler } from '@sveltejs/kit';
 import { eq, and, or, like, sql, asc, type SQL } from 'drizzle-orm';
-import { createTenantContext, type TenantContext } from '$lib/server/mastra/tenant-context';
+import { type TenantContext } from '$lib/server/mastra/tenant-context';
+import { resolveTenantWorkspace } from '$lib/server/workspace/scope';
 import type { MentionCategory, MentionSearchResult } from './mention-utils';
 import { getDatabase } from '$lib/server/db';
 import {
@@ -524,47 +525,22 @@ export const GET: RequestHandler = async ({ url, locals, cookies }) => {
 		return json({ error: 'FORBIDDEN' }, { status: 403 });
 	}
 
-	// Privacy: compute effective class scope from server-side authoritative sources.
-	// Active class (from class-selector cookie):
-	let activeClassId: number | null = null;
-	let activeSectionId: number | null = null;
-	try {
-		const cookieValue = cookies.get('selected-class');
-		if (cookieValue) {
-			const parsed = JSON.parse(cookieValue) as {
-				classId?: number | null;
-				sectionId?: number | null;
-			} | null;
-			if (parsed) {
-				activeClassId = parsed.classId ?? null;
-				activeSectionId = parsed.sectionId ?? null;
-			}
-		}
-	} catch {
-		// Ignore cookie parse errors — fall through to assigned class.
-	}
-
-	// Assigned class (from on-boarding):
-	const assignedClassId = (user as any).classId ?? null;
-	const assignedSectionId = (user as any).sectionId ?? null;
-
-	// Active takes precedence; assigned is the fallback. For class teachers
-	// these are identical; for admins/IT/coordinators only active applies.
-	const effectiveClassId = activeClassId ?? assignedClassId;
-	const effectiveSectionId = activeSectionId ?? assignedSectionId;
-
-	const tenantContext = createTenantContext({
+	// Resolve tenant workspace with full 3-fallback class resolution
+	// (query param → cookie → teacher DB table), matching the filestore
+	// page's logic. When no class is selected, classId/sectionId are null
+	// and file search falls back to _system/ (empty results).
+	const { tenant: tenantContext } = await resolveTenantWorkspace({
 		schoolId: user.schoolId ?? 1,
 		userId: user.id ?? 1,
+		staffId: (user as any).staffId,
 		designationId,
-		staffId: (user as any).staffId ?? 1,
 		roleId: (user as any).roleId ?? null,
-		classId: effectiveClassId,
-		sectionId: effectiveSectionId,
-		examId: null,
-		academicId: user.academicId ?? null
+		selectedClassCookie: cookies.get('selected-class'),
 	});
 
-	const results = await searchEntities(query, category, tenantContext, limit, effectiveClassId, effectiveSectionId, designationId);
+	const classId = tenantContext.classId;
+	const sectionId = tenantContext.sectionId;
+
+	const results = await searchEntities(query, category, tenantContext, limit, classId, sectionId, designationId);
 	return json({ results });
 };

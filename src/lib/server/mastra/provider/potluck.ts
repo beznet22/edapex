@@ -82,6 +82,7 @@ function rowToDonation(
 }
 
 export type PotluckDonation = ReturnType<typeof rowToDonation>;
+export { rowToDonation };
 
 export async function getPotluckConfig(
 	db: LibSQLDatabase<any>,
@@ -189,7 +190,12 @@ export async function findActiveDonationForProvider(
 			)
 		)
 		.limit(1);
-	return rows[0] ? rowToDonation(rows[0], env) : null;
+	if (!rows[0]) return null;
+	try {
+		return rowToDonation(rows[0], env);
+	} catch {
+		return null;
+	}
 }
 
 const UpsertDonationInputSchema = z.object({
@@ -256,7 +262,7 @@ export async function upsertDonation(
 			target: [
 				encryptedCredentials.scope,
 				encryptedCredentials.credentialKind,
-				encryptedCredentials.userId,
+				encryptedCredentials.schoolId,
 				encryptedCredentials.providerId
 			],
 			set: {

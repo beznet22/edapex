@@ -347,14 +347,23 @@ describe('resolver 4-table integration', () => {
 	it('pickDefaultModelId returns the default model when personal credential exists', async () => {
 		await seedPersonalCredential();
 
-		const modelId = await pickDefaultModelId(getAppDb(), { GROQ_API_KEY: 'env-groq-key' }, USER_ID);
+		const modelId = await pickDefaultModelId(getAppDb(), { GROQ_API_KEY: 'env-groq-key' }, { userId: USER_ID, schoolId: SCHOOL_ID, userRole: 'student' });
 		expect(modelId).not.toBeNull();
 		expect(modelId).toContain('groq/');
 	});
 
 	it('pickDefaultModelId returns null when no credentials are available', async () => {
-		const modelId = await pickDefaultModelId(getAppDb(), {}, USER_ID);
+		const modelId = await pickDefaultModelId(getAppDb(), {}, { userId: USER_ID, schoolId: SCHOOL_ID, userRole: 'student' });
 		expect(modelId).toBeNull();
+	});
+
+	it('pickDefaultModelId returns a pool-served model when pool is enabled and tier 1/3 fail', async () => {
+		// Pool is the only key available — no env, no personal credential.
+		await seedPool();
+
+		const modelId = await pickDefaultModelId(getAppDb(), {}, { userId: USER_ID, schoolId: SCHOOL_ID, userRole: 'student' });
+		expect(modelId).not.toBeNull();
+		expect(modelId).toContain('groq/');
 	});
 
 	it('skips pool tier when no potluck config exists', async () => {
@@ -519,16 +528,17 @@ describe('resolver 4-table integration', () => {
 			},
 			ACTOR_ID
 		);
-		await upsertDonation(
-			getAppDb(),
-			ENV,
-			SCHOOL_ID,
-			'groq',
-			'not-valid-encrypted-data',
-			ACTOR_ID,
-			ACTOR_ID,
-			'v1'
-		);
+		await getAppDb().insert(encryptedCredentials).values({
+			id: crypto.randomUUID(),
+			scope: 'school',
+			credentialKind: 'donation',
+			schoolId: SCHOOL_ID,
+			userId: null,
+			providerId: 'groq',
+			encryptedData: 'invalid:ciphertext',
+			priority: 1,
+			enabled: 1
+		});
 
 		const resolved = await resolveModelForRequest(
 			USER_ID,

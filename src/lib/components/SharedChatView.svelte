@@ -29,11 +29,15 @@
     user,
     messages = [],
     chatData = undefined,
+    chatId = undefined,
+    fileKeys = [],
     examTypeId = null,
   } = $props<{
     user: AuthUser;
     messages?: xUIMessage[];
     chatData?: ChatThread;
+    chatId?: string;
+    fileKeys?: string[];
     examTypeId?: number | null;
   }>();
   let open = $state(false);
@@ -49,6 +53,7 @@
   const chatContext = new ChatContext({
     initialMessages: messages,
     chatData,
+    chatId,
     selectedClass,
   });
 
@@ -102,6 +107,17 @@
     if (filesContext.references.length > 0) {
       chatContext.fileReferences = [...filesContext.references];
       filesContext.references = [];
+    }
+  });
+
+  $effect(() => {
+    if (fileKeys.length > 0) {
+      const refs = fileKeys.map((key: string) => ({
+        key,
+        name: key.split("/").pop() ?? key,
+        type: "file" as const,
+      }));
+      chatContext.fileReferences = refs;
     }
   });
 

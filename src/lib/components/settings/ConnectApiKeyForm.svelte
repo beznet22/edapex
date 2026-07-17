@@ -4,7 +4,9 @@
 	import { Label } from "$lib/components/ui/label/index.js";
 	import { Separator } from "$lib/components/ui/separator/index.js";
 	import { Spinner } from "$lib/components/ui/spinner/index.js";
+	import { Checkbox } from "$lib/components/ui/checkbox/index.js";
 	import ArrowLeftIcon from "@lucide/svelte/icons/arrow-left";
+	import GiftIcon from "@lucide/svelte/icons/gift";
 	import KeyRoundIcon from "@lucide/svelte/icons/key-round";
 	import { slideIn, slideOut } from "./_helpers.svelte";
 	import { providerLogos } from "./_logos";
@@ -15,6 +17,16 @@
 		apiKeyInput: string;
 		isSavingApiKey: boolean;
 		apiKeyError: string | null;
+		/** When the user can donate (pool enabled, role in donorRoles),
+		 *  the "Also donate to school pool" checkbox is rendered. */
+		canDonate: boolean;
+		donateChecked: boolean;
+		/** When the user has set the global "always donate" preference, the
+		 *  per-form checkbox is rendered disabled (it's already opted-in). */
+		alwaysDonateEnabled: boolean;
+		/** Optional — only used when `donateChecked` is NOT two-way bound.
+		 *  With `bind:donateChecked` the parent sees updates directly. */
+		onDonateChange?: (next: boolean) => void;
 		onSubmit: () => void;
 		onCancel: () => void;
 	}
@@ -24,8 +36,12 @@
 		apiKeyInput = $bindable(),
 		isSavingApiKey,
 		apiKeyError,
+		canDonate,
+		donateChecked = $bindable(),
+		alwaysDonateEnabled,
+		onDonateChange,
 		onSubmit,
-		onCancel
+		onCancel,
 	}: Props = $props();
 </script>
 
@@ -49,16 +65,21 @@
 						alt={provider.name}
 						class="size-full object-contain dark:invert"
 						onerror={(e) => {
-							(e.target as HTMLImageElement).style.display = "none";
+							(e.target as HTMLImageElement).style.display =
+								"none";
 						}}
 					/>
 				{:else}
 					<KeyRoundIcon class="size-4 text-muted-foreground" />
 				{/if}
 			</div>
-			<h3 class="text-lg font-black tracking-tight">Connect {provider.name}</h3>
+			<h3 class="text-lg font-black tracking-tight">
+				Connect {provider.name}
+			</h3>
 		</div>
-		<p class="text-sm text-muted-foreground leading-relaxed">{provider.description}</p>
+		<p class="text-sm text-muted-foreground leading-relaxed">
+			{provider.description}
+		</p>
 		{#if provider.docUrl}
 			<a
 				href={provider.docUrl}
@@ -87,9 +108,36 @@
 			class="h-12 bg-muted/5 border-sidebar-border/50 rounded-xl px-4 font-mono text-sm focus:border-primary/50 transition-all"
 		/>
 		{#if apiKeyError}
-			<p class="text-[11px] font-bold text-destructive ml-1">{apiKeyError}</p>
+			<p class="text-[11px] font-bold text-destructive ml-1">
+				{apiKeyError}
+			</p>
 		{/if}
 	</div>
+
+	{#if canDonate}
+		<label
+			class="flex items-start gap-3 rounded-xl border border-amber-500/30 bg-amber-500/5 px-3 py-2 cursor-pointer"
+		>
+			<Checkbox
+				checked={donateChecked}
+				onCheckedChange={(v: boolean) => onDonateChange(!!v)}
+				disabled={isSavingApiKey || alwaysDonateEnabled}
+			/>
+			<div class="flex flex-col gap-0.5 text-xs">
+				<span class="flex items-center gap-1.5 font-bold">
+					<GiftIcon class="size-3.5 text-amber-500" />
+					Also donate to the school pool
+				</span>
+				<span class="text-muted-foreground">
+					Your key is encrypted and shared. Other members of the
+					school can use it when they don't have their own.
+					{#if alwaysDonateEnabled}<span class="text-amber-600 dark:text-amber-400"
+							>(set as your default in Settings → General)</span
+						>{/if}
+				</span>
+			</div>
+		</label>
+	{/if}
 
 	<div class="flex items-center gap-2">
 		<Button
