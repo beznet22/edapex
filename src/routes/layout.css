@@ -364,6 +364,67 @@ code, pre, kbd, .font-mono {
   animation: hermes-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
+/* Compression shimmer — sweeps a tinted gradient across icons that are compressing */
+@keyframes compress-shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.compress-shimmer {
+  background-image: linear-gradient(
+    90deg,
+    transparent 0%,
+    color-mix(in oklch, var(--primary), transparent 60%) 50%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: compress-shimmer 1.5s ease-in-out infinite;
+}
+
+/* Error shake — three horizontal cycles for a row whose upload failed */
+@keyframes error-shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-4px); }
+  40% { transform: translateX(4px); }
+  60% { transform: translateX(-4px); }
+  80% { transform: translateX(3px); }
+}
+
+.shake-once {
+  animation: error-shake 0.4s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+}
+
+/* Done pop — quick scale-up + back to identity, used when a row's status flips to done */
+@keyframes done-pop {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.04); }
+  100% { transform: scale(1); }
+}
+
+.pop-once {
+  animation: done-pop 0.28s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+/* Drag-over icon wobble — gentle 3deg rotation while a file is being dragged over the page */
+@keyframes drag-wobble {
+  0%, 100% { transform: rotate(-3deg); }
+  50% { transform: rotate(3deg); }
+}
+
+.drag-wobble {
+  animation: drag-wobble 1.4s ease-in-out infinite;
+}
+
+/* Activity ring — expanding ring around the activity-popover trigger when tasks are running */
+@keyframes activity-ring {
+  0% { transform: scale(1); opacity: 0.5; }
+  100% { transform: scale(1.6); opacity: 0; }
+}
+
+.activity-ring {
+  animation: activity-ring 1.8s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
 /* Spring-like Transition Utilities (spec §4 — panel resize/chip injection) */
 .transition-spring {
   transition-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1);

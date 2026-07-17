@@ -9,6 +9,8 @@
 	import * as AlertDialog from "$lib/components/ui/alert-dialog";
 	import { Textarea } from "$lib/components/ui/textarea";
 	import ChatHeader from "$lib/components/chat-header.svelte";
+	import UploadCard, { type UploadJob } from "$lib/components/UploadCard.svelte";
+	import Confetti from "$lib/components/Confetti.svelte";
 	import Search from "@lucide/svelte/icons/search";
 	import ChevronDown from "@lucide/svelte/icons/chevron-down";
 	import ChevronLeft from "@lucide/svelte/icons/chevron-left";
@@ -33,12 +35,15 @@
 	import Calendar from "@lucide/svelte/icons/calendar";
 	import ScanSearch from "@lucide/svelte/icons/scan-search";
 	import MessageSquare from "@lucide/svelte/icons/message-square";
+	import CloudUploadIcon from "@lucide/svelte/icons/cloud-upload";
 	import { useInspector } from "$lib/context/inspector-context.svelte";
 	import { FilesContext } from "$lib/context/file-context.svelte";
+	import { useImageCompression } from "$lib/context/image.context.svelte";
 	import { mobileUiState } from "$lib/state/mobile-ui.svelte";
 	import { IsMobile } from "$lib/hooks/is-mobile.svelte";
 	import { backgroundTasks, serializeTenant } from "$lib/state/background-tasks.svelte";
 	import { cn } from "$lib/utils/shadcn";
+	import { compressIfImage, filenameForMime } from "$lib/compression.utils";
 	import { toast } from "svelte-sonner";
 	import type { PageData } from "./$types";
 	import type { Artifact, ArtifactCategory, ArtifactSource } from "$lib/types/workspace-types";
@@ -48,6 +53,10 @@
 	const inspector = useInspector();
 	const isMobile = new IsMobile();
 	const isThreadScoped = $derived(typeof data.threadId === "string" && data.threadId.length > 0);
+	const imageContext = useImageCompression();
+
+	const BATCH_THRESHOLD = 4;
+	const CONFETTI_THRESHOLD = 2;
 
 	let activeTermId = $state(data.activeTermId);
 	let searchQuery = $state("");
@@ -68,6 +77,11 @@
 	let isStartingChat = $state(false);
 	let isExtracting = $state(false);
 
+	let uploadJobs = $state<UploadJob[]>([]);
+	let isDragOver = $state(false);
+	let confettiTrigger = $state(0);
+	let lastCompletionCount = 0;
+
 	$effect(() => {
 		if (activeTermId !== data.activeTermId) {
 			goto("?term=" + activeTermId, {
@@ -76,6 +90,37 @@
 				noScroll: true,
 			});
 		}
+	});
+
+	$effect(() => {
+		if (typeof document === "undefined") return;
+		let counter = 0;
+		const onEnter = (e: DragEvent) => {
+			if (!e.dataTransfer?.types?.includes("Files")) return;
+			counter++;
+			isDragOver = true;
+		};
+		const onLeave = (e: DragEvent) => {
+			counter = Math.max(0, counter - 1);
+			if (counter === 0) isDragOver = false;
+		};
+		const onDrop = (e: DragEvent) => {
+			counter = 0;
+			isDragOver = false;
+			const files = e.dataTransfer?.files;
+			if (files && files.length > 0) {
+				queueUpload(Array.from(files));
+			}
+		};
+		document.addEventListener("dragenter", onEnter);
+		document.addEventListener("dragleave", onLeave);
+		document.addEventListener("drop", onDrop);
+		document.addEventListener("dragover", (e) => e.preventDefault());
+		return () => {
+			document.removeEventListener("dragenter", onEnter);
+			document.removeEventListener("dragleave", onLeave);
+			document.removeEventListener("drop", onDrop);
+		};
 	});
 
 	function selectTerm(id: number) {
@@ -261,22 +306,128 @@
 
 	async function handleFileUpload(event: Event) {
 		const input = event.target as HTMLInputElement;
-		const files = input.files;
-		if (!files || files.length === 0) return;
+		if (!input.files || input.files.length === 0) return;
+		const files = Array.from(input.files);
+		if (input) input.value = "";
+		await queueUpload(files);
+	}
+
+	async function queueUpload(originals: File[]): Promise<void> {
+		if (originals.length === 0) return;
+
+		const jobs: UploadJob[] = originals.map((f) => ({
+			id: crypto.randomUUID(),
+			file: f,
+			status: "compressing",
+			statusEpoch: 0,
+		}));
+		uploadJobs = [...uploadJobs, ...jobs];
+
+		const prepared = await Promise.all(
+			originals.map(async (f, i) => {
+				const compressed = await compressIfImage(f, (file, opts) =>
+					imageContext.compress(file, opts)
+				);
+				jobs[i] = {
+					...jobs[i],
+					status: "uploading",
+					compressedSize: compressed.size,
+					statusEpoch: jobs[i].statusEpoch! + 1,
+				};
+				uploadJobs = [...uploadJobs];
+				return { job: jobs[i], compressed };
+			})
+		);
+
 		const prefix = termPrefix();
-		for (const file of Array.from(files)) {
-			const path = prefix + file.name;
-			const res = await fetch(`/api/file/${path}`, {
-				method: "PUT",
-				body: file,
-			});
-			if (!res.ok) {
-				toast.error(`Failed to upload ${file.name}`);
+		const uploadedKeys: string[] = [];
+		for (let i = 0; i < prepared.length; i++) {
+			const { compressed, job } = prepared[i];
+			try {
+				const filename = filenameForMime(job.file.name, compressed.type);
+				const path = prefix + filename;
+				const res = await fetch(`/api/file/${path}`, {
+					method: "PUT",
+					body: compressed,
+				});
+				if (!res.ok) {
+					let errMsg = `HTTP ${res.status}`;
+					try {
+						const body = await res.json();
+						if (body?.error) errMsg = body.error;
+					} catch {
+						/* non-JSON error */
+					}
+					throw new Error(errMsg);
+				}
+				uploadedKeys.push(path);
+				jobs[i] = {
+					...job,
+					status: "done",
+					statusEpoch: job.statusEpoch! + 1,
+				};
+			} catch (err) {
+				const message = err instanceof Error ? err.message : String(err);
+				jobs[i] = {
+					...job,
+					status: "error",
+					error: message,
+					statusEpoch: job.statusEpoch! + 1,
+				};
 			}
+			uploadJobs = [...uploadJobs];
 		}
-		toast.success(`Uploaded ${files.length} file${files.length === 1 ? "" : "s"}`);
-		if (fileInputRef) fileInputRef.value = "";
+
+		const imageKeys = uploadedKeys.filter((k) => /\.(jpe?g|png|webp|gif)$/i.test(k));
+		if (imageKeys.length > 0) {
+			const tenant = serializeTenant({
+				schoolId: data.tenant.schoolId,
+				userId: data.tenant.userId,
+				designationId: data.tenant.designationId,
+				staffId: data.tenant.staffId,
+				classId: data.tenant.classId,
+				sectionId: data.tenant.sectionId,
+				examTypeId: data.tenant.examTypeId,
+				academicId: data.tenant.academicId,
+				className: data.tenant.className,
+				sectionName: data.tenant.sectionName,
+				academicYearTitle: data.tenant.academicYearTitle,
+			});
+			if (imageKeys.length === 1) {
+				backgroundTasks.runTask({ kind: "ocr-single", key: imageKeys[0], tenant });
+			} else if (imageKeys.length >= BATCH_THRESHOLD) {
+				backgroundTasks.runTask({ kind: "ocr-batch", keys: imageKeys, tenant });
+			} else {
+				backgroundTasks.runTask({ kind: "ocr-batch", keys: imageKeys, tenant });
+			}
+			const imageCount = imageKeys.length;
+			toast.info(
+				`Uploaded ${uploadedKeys.length}. ${imageCount === 1 ? "Queued for OCR" : `Queued ${imageCount} for batch OCR`}.`
+			);
+		} else if (uploadedKeys.length > 0) {
+			toast.success(`Uploaded ${uploadedKeys.length} ${uploadedKeys.length === 1 ? "file" : "files"}`);
+		}
+
+		const completedNow = jobs.filter((j) => j.status === "done").length;
+		if (
+			completedNow > 0 &&
+			completedNow > lastCompletionCount &&
+			completedNow >= CONFETTI_THRESHOLD &&
+			jobs.every((j) => j.status === "done" || j.status === "error")
+		) {
+			confettiTrigger += 1;
+		}
+		lastCompletionCount = completedNow;
+
 		await invalidateAll();
+	}
+
+	function dismissUploadJob(id: string): void {
+		uploadJobs = uploadJobs.filter((j) => j.id !== id);
+	}
+
+	function collapseUploadCard(): void {
+		uploadJobs = [];
 	}
 
 	async function saveNote() {
@@ -395,6 +546,31 @@
 	<title>{isThreadScoped ? "Thread artifacts" : "Library"} · Edapex</title>
 </svelte:head>
 
+<Confetti trigger={confettiTrigger} />
+
+{#if isDragOver}
+	<div
+		class="fixed inset-0 z-50 pointer-events-none flex items-center justify-center
+			   bg-background/60 backdrop-blur-2xl"
+	>
+		<div class="hermes-glass rounded-3xl p-10 sm:p-12 flex flex-col items-center gap-6
+					shadow-2xl gold-glow max-w-md mx-4">
+			<div class="size-20 rounded-2xl bg-primary/10 border border-primary/20
+						flex items-center justify-center drag-wobble">
+				<CloudUploadIcon class="size-10 text-primary" />
+			</div>
+			<div class="text-center space-y-1.5">
+				<p class="text-2xl sm:text-3xl font-black tracking-tighter text-foreground">
+					Drop files to upload
+				</p>
+				<p class="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
+					They'll be added to the active term
+				</p>
+			</div>
+		</div>
+	</div>
+{/if}
+
 <div class="flex-1 flex flex-col min-h-0 w-full h-full overflow-hidden">
 	<ChatHeader />
 
@@ -492,6 +668,12 @@
 					/>
 				</div>
 			</header>
+
+			<UploadCard
+				jobs={uploadJobs}
+				onDismissJob={dismissUploadJob}
+				onCollapse={collapseUploadCard}
+			/>
 
 			{#if bulkActionsVisible}
 				<div

@@ -38,7 +38,7 @@
   import { UserContext } from "$lib/context/user-context.svelte";
   import { SelectedModel, ResolvedModelHolder } from "$lib/context/sync.svelte";
   import { BUILTIN_PROVIDERS, getModelById } from "$lib/provider/catalog";
-  import { IMAGE_COMPRESSION_DEFAULTS, COMPRESSION_SKIP_THRESHOLD_BYTES } from "$lib/compression.config";
+  import { compressIfImage as rawCompressIfImage, filenameForMime } from "$lib/compression.utils";
   import type { ModelId } from "$lib/provider/types";
   import type { ModelInfo, Variant } from "$lib/provider/spec";
   import type { AuthUser } from "$lib/types/auth-types";
@@ -148,29 +148,8 @@
   const selectedChatModel = SelectedModel.fromContext();
   const resolvedModelHolder = ResolvedModelHolder.fromContext();
 
-  function extFromMime(type: string): string {
-    if (type === "image/jpeg") return "jpg";
-    if (type === "image/png") return "png";
-    if (type === "image/webp") return "webp";
-    if (type === "image/gif") return "gif";
-    return "";
-  }
-
-  function filenameForMime(originalName: string, mime: string): string {
-    if (mime && mime.startsWith("image/")) {
-      const ext = extFromMime(mime);
-      if (ext) {
-        return originalName.replace(/\.[^.]+$/, "") + "." + ext;
-      }
-    }
-    return originalName;
-  }
-
-  async function compressIfImage(file: File): Promise<File> {
-    if (!file.type.startsWith("image/")) return file;
-    if (file.size < COMPRESSION_SKIP_THRESHOLD_BYTES) return file;
-    return imageContext.compress(file, IMAGE_COMPRESSION_DEFAULTS);
-  }
+  const compressIfImage = (f: File) =>
+    rawCompressIfImage(f, (file, opts) => imageContext.compress(file, opts));
 
   // Current model: try the SSR-resolved model first, then fall back to the
   // catalog lookup. The SSR-resolved model handles custom-provider discovered

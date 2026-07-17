@@ -1,12 +1,14 @@
 <script lang="ts">
-  import * as Popover from "$lib/components/ui/popover";
-  import { backgroundTasks } from "$lib/state/background-tasks.svelte";
-  import type { Task } from "$lib/types/background-tasks";
-  import ActivityIcon from "@lucide/svelte/icons/activity";
-  import ScanSearchIcon from "@lucide/svelte/icons/scan-search";
-  import RotateCcwIcon from "@lucide/svelte/icons/rotate-ccw";
-  import XIcon from "@lucide/svelte/icons/x";
-  import InboxIcon from "@lucide/svelte/icons/inbox";
+	import * as Popover from "$lib/components/ui/popover";
+	import { backgroundTasks } from "$lib/state/background-tasks.svelte";
+	import type { Task } from "$lib/types/background-tasks";
+	import ActivityIcon from "@lucide/svelte/icons/activity";
+	import ScanSearchIcon from "@lucide/svelte/icons/scan-search";
+	import RotateCcwIcon from "@lucide/svelte/icons/rotate-ccw";
+	import XIcon from "@lucide/svelte/icons/x";
+	import InboxIcon from "@lucide/svelte/icons/inbox";
+	import { fly } from "svelte/transition";
+	import { backOut } from "svelte/easing";
 
   const tasks = $derived(backgroundTasks.tasks);
   const activeCount = $derived(
@@ -62,6 +64,9 @@
         aria-label="Background activity"
         class="relative size-9 shrink-0 rounded-md transition-colors text-muted-foreground hover:text-foreground hover:bg-muted/40 flex items-center justify-center"
       >
+        {#if hasActivity}
+          <span class="absolute inset-0 rounded-md activity-ring pointer-events-none" aria-hidden="true"></span>
+        {/if}
         <ActivityIcon class="size-4 {isPulsing ? 'text-primary animate-pulse' : ''}" />
         {#if activeCount > 0}
           <span
@@ -113,7 +118,12 @@
       {:else}
         <ul class="flex flex-col divide-y divide-border/30">
           {#each tasks as task (task.id)}
-            <li class="px-4 py-3 group" data-status={task.status}>
+            <li
+              class="px-4 py-3 group"
+              data-status={task.status}
+              in:fly={{ y: -8, duration: 240, easing: backOut }}
+              out:fly={{ y: -4, duration: 160, easing: backOut }}
+            >
               <div class="flex items-start justify-between gap-2 mb-1.5">
                 <div class="flex items-center gap-1.5 min-w-0">
                   <ScanSearchIcon

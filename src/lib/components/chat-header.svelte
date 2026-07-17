@@ -9,6 +9,7 @@
 	import type { ModelId } from "$lib/provider/types";
 	import ContextUsageIndicator from "$lib/components/ContextUsageIndicator.svelte";
 	import ModelSelector from "$lib/components/model-selector.svelte";
+	import ActivityPopover from "$lib/components/activity-popover.svelte";
 
 	let {
 		user,
@@ -52,14 +53,7 @@
   </div>
 
   <div class="flex items-center gap-1 shrink-0">
-    <!-- TODO(background-tasks): Re-enable <ActivityPopover /> here when
-         background-task feature ships (OCR worker, etc). Files to revisit:
-         src/lib/components/activity-popover.svelte
-         src/lib/state/background-tasks.svelte.ts
-         src/lib/types/background-tasks.ts
-         Note: state store and types remain consumed by routes/(chat)/filestore,
-         lib/workers/task-worker, lib/server/service/ocr-batch,
-         routes/api/file/[...path] — they are not orphaned. -->
+    <ActivityPopover />
     {#if currentModel}
       <ContextUsageIndicator
         modelId={currentModel.id}

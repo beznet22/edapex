@@ -16,12 +16,14 @@
  * finalizes without blocking the main thread.
  */
 import { json, error, type RequestHandler } from '@sveltejs/kit';
+import { createHash, randomUUID } from 'node:crypto';
 import { auth } from '$lib/server/service/auth.service';
 import { tenantWorkspace } from '$lib/server/mastra/storage/workspaces';
 import { assertPathAgentVisible, resolveTenantWorkspace, WorkspaceScopeError } from '$lib/server/workspace/scope';
 import { buildWorkspaceRequestContext } from '$lib/server/helpers/chat-helper';
 import { ALLOWED_DESIGNATIONS } from "$lib/types/sms-types";
 import { ocrBatchService } from '$lib/server/service/ocr-batch.service';
+import { addEntry as addWorkspaceEntry } from '$lib/server/mastra/storage/workspaces/manifest-store';
 import type { SerializedTenant } from '$lib/types/background-tasks';
 import type { FileEntry } from '@mastra/core/workspace';
 
@@ -240,11 +242,41 @@ export const PUT: RequestHandler = async ({ params, request, locals, cookies, ur
       selectedClassCookie: cookies.get('selected-class'),
     });
     if (!fs) throw error(500, 'Workspace filesystem unavailable');
+    if (tenant.classId === null || tenant.sectionId === null) {
+      throw error(400, 'Active class context required for upload. Please select a class.');
+    }
 
     const resolvedPath = resolveScopedPath(tenant, params.path);
     const blob = await request.blob();
     const bytes = new Uint8Array(await blob.arrayBuffer());
+
+    console.info('[file-api] PUT', {
+      userId: locals.user.id,
+      schoolId: tenant.schoolId,
+      classId: tenant.classId,
+      sectionId: tenant.sectionId,
+      academicId: tenant.academicId,
+      path: resolvedPath,
+      size: bytes.length,
+      at: new Date().toISOString(),
+    });
+
     await fs.writeFile(resolvedPath, bytes, { recursive: true, overwrite: true });
+
+    const fileName = resolvedPath.split('/').pop() ?? 'upload';
+    const contentHash = createHash('md5').update(bytes).digest('hex');
+    await addWorkspaceEntry(tenant, {
+      path: resolvedPath,
+      kind: 'user-file',
+      documentId: randomUUID(),
+      fileName,
+      contentHash,
+      uploadedAt: new Date().toISOString(),
+      modifiedAt: new Date().toISOString(),
+      mimeType: contentTypeFor(resolvedPath),
+      sizeBytes: bytes.length,
+    });
+
     return json({ success: true, path: resolvedPath });
   } catch (e: unknown) {
     if (e instanceof WorkspaceScopeError) {
