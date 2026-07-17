@@ -38,6 +38,14 @@ export interface MentionSearchResult {
 	admissionNo?: string;
 	studentId?: number;
 	studentName?: string;
+	/** File size in bytes (file category only). */
+	size?: number;
+	/** Absolute path on the file API for download/preview (file category only). */
+	url?: string;
+	/** Best-effort MIME-type guess (file category only). */
+	mimeType?: string;
+	/** Resolved exam-type title for paths under `exams/examType-N/`. */
+	examTypeTitle?: string | null;
 }
 
 export interface MentionExtensionOptions {

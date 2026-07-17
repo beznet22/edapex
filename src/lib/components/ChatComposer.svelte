@@ -9,6 +9,9 @@
   import ChevronDownIcon from "@lucide/svelte/icons/chevron-down";
   import ChevronsUpDownIcon from "@lucide/svelte/icons/chevrons-up-down";
   import FileTextIcon from "@lucide/svelte/icons/file-text";
+  import BookTextIcon from "@lucide/svelte/icons/book-text";
+  import FileImageIcon from "@lucide/svelte/icons/file-image";
+  import FileQuestionIcon from "@lucide/svelte/icons/file-question";
   import FolderIcon from "@lucide/svelte/icons/folder";
   import FolderOpenIcon from "@lucide/svelte/icons/folder-open";
   import GlobeIcon from "@lucide/svelte/icons/globe";
@@ -381,6 +384,24 @@
   }
 
   function selectMention(mention: any) {
+    // File mentions render as chip pills above the input — skip text
+    // insertion. The mention still flows through `selectedMentions` so
+    // it's bundled into the request body on submit and the server-side
+    // merge in `workflow-params.ts` folds it into `fileReferences`.
+    if (mention.category === "file") {
+      showMentions = false;
+      selectedMentions = [
+        ...selectedMentions,
+        {
+          category: mention.category,
+          id: mention.id,
+          name: mention.name,
+          parentContext: mention.parentContext,
+        },
+      ];
+      textareaRef?.focus();
+      return;
+    }
     const cursor = textareaRef?.selectionStart || 0;
     const beforeCursor = input.substring(0, cursor);
     const afterCursor = input.substring(cursor);
@@ -402,6 +423,55 @@
     ];
     textareaRef?.focus();
   }
+
+  function removeFileMention(id: string | number): void {
+    selectedMentions = selectedMentions.filter((m) => m.id !== id);
+  }
+
+  /**
+   * Maps a `MentionPayload` for a file mention to the icon + badge that
+   * should appear in the chip pill. Mirrors the `fileCategoryIcon`
+   * helper in `MentionDropdown.svelte` so the chip and the dropdown row
+   * stay in sync. Falls back to a generic file icon for unknown kinds.
+   */
+  function fileChipMeta(mention: MentionPayload): {
+    Icon: typeof FileTextIcon;
+    badge: string;
+  } {
+    const id = String(mention.id ?? "");
+    const ext = id.split(".").pop()?.toLowerCase() ?? "";
+    const looksLikeImage = ["jpg", "jpeg", "png", "gif", "webp", "bmp", "tiff"].includes(ext);
+    const parent = mention.parentContext ?? "";
+    let badge = "FILE";
+    let Icon: typeof FileTextIcon = FileTextIcon;
+    if (parent.includes("/marksheets/")) {
+      badge = "MARKSHEET";
+      Icon = BookTextIcon;
+    } else if (parent.includes("/transcripts/")) {
+      badge = "TRANSCRIPT";
+      Icon = BookTextIcon;
+    } else if (parent.includes("/notes/")) {
+      badge = "NOTE";
+      Icon = BookTextIcon;
+    } else if (ext === "pdf") {
+      badge = "PDF";
+      Icon = FileTextIcon;
+    } else if (ext === "md" || ext === "markdown") {
+      badge = "MD";
+      Icon = BookTextIcon;
+    } else if (looksLikeImage) {
+      badge = "IMG";
+      Icon = FileImageIcon;
+    } else if (ext) {
+      badge = ext.toUpperCase().slice(0, 4);
+      Icon = FileQuestionIcon;
+    }
+    return { Icon, badge };
+  }
+
+  const selectedFileMentions = $derived(
+    selectedMentions.filter((m) => m.category === "file")
+  );
 
   function closeAllMenus(): void {
     mainMenuOpen = false;
@@ -711,7 +781,7 @@
   {onSubmit}
 >
   <!-- Attachment Tray (Top Layer) -->
-  {#if file.files.length > 0 || chat.studentData || uploadedReferences.length > 0 || (file.references && file.references.length > 0)}
+  {#if file.files.length > 0 || chat.studentData || uploadedReferences.length > 0 || (file.references && file.references.length > 0) || selectedFileMentions.length > 0}
     <div class="flex flex-wrap gap-2 px-4 pt-4 pb-2 transition-all duration-500 ease-out">
       {#if chat.studentData}
         <div
@@ -774,6 +844,29 @@
               }}
               class="opacity-40 group-hover:opacity-100 hover:text-destructive transition-all ml-1 min-h-12 min-w-12 sm:min-h-8 sm:min-w-8 flex items-center justify-center"
               aria-label={`Remove reference ${ref.name}`}
+            >
+              <XIcon class="size-3" />
+            </button>
+          </div>
+        {/each}
+        {#each selectedFileMentions as fm (String(fm.id) + "-file-mention")}
+          {@const meta = fileChipMeta(fm)}
+          <div
+            class="group flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/60 border border-white/5 text-[11px] font-bold tracking-wide text-foreground/70 group shadow-sm"
+            data-status="file-mention"
+            title={fm.parentContext ?? fm.name}
+            aria-label={`Mentioned file ${fm.name}`}
+          >
+            <meta.Icon class="size-3.5 opacity-80" />
+            <span class="max-w-[150px] truncate uppercase tracking-tighter">{fm.name}</span>
+            <span class="shrink-0 px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider bg-primary/15 text-primary/80">
+              {meta.badge}
+            </span>
+            <button
+              type="button"
+              onclick={() => removeFileMention(fm.id)}
+              class="opacity-40 group-hover:opacity-100 hover:text-destructive transition-all ml-1 min-h-12 min-w-12 sm:min-h-8 sm:min-w-8 flex items-center justify-center"
+              aria-label={`Remove mention ${fm.name}`}
             >
               <XIcon class="size-3" />
             </button>

@@ -8,6 +8,10 @@
   import CalendarIcon from "@lucide/svelte/icons/calendar";
   import ClockIcon from "@lucide/svelte/icons/clock";
   import FolderIcon from "@lucide/svelte/icons/folder";
+  import FileTextIcon from "@lucide/svelte/icons/file-text";
+  import FileImageIcon from "@lucide/svelte/icons/file-image";
+  import BookTextIcon from "@lucide/svelte/icons/book-text";
+  import FileQuestionIcon from "@lucide/svelte/icons/file-question";
   import LoaderCircleIcon from "@lucide/svelte/icons/loader-circle";
   import AlertCircleIcon from "@lucide/svelte/icons/alert-circle";
   import { ALLOWED_DESIGNATIONS } from "$lib/types/sms-types";
@@ -16,11 +20,19 @@
    * Entity result from /api/mentions/search
    */
   export interface MentionSearchResult {
-    id: number;
+    id: number | string;
     name: string;
     category: string;
     typeBadge: string;
     parentContext?: string;
+    /** File size in bytes (file category only). */
+    size?: number;
+    /** Absolute path on the file API for download/preview (file category only). */
+    url?: string;
+    /** Best-effort MIME-type guess (file category only). */
+    mimeType?: string;
+    /** Resolved exam-type title for paths under `exams/examType-N/`. */
+    examTypeTitle?: string | null;
   }
 
   type MentionCategory = 'schools' | 'students' | 'class_section' | 'academic_year' | 'exam' | 'file';
@@ -66,6 +78,25 @@
 
   // State
   let activeCategory = $state<MentionCategory | null>(null);
+
+  // Maps the per-file `typeBadge` returned by /api/mentions/search to a
+  // lucide icon. Mirrors the badge derivation on the server (see
+  // `routes/api/mentions/search/+server.ts:deriveFileTypeBadge`).
+  function fileCategoryIcon(badge: string | undefined) {
+    switch (badge) {
+      case "PDF":
+        return FileTextIcon;
+      case "NOTE":
+      case "MD":
+      case "MARKSHEET":
+      case "TRANSCRIPT":
+        return BookTextIcon;
+      case "IMG":
+        return FileImageIcon;
+      default:
+        return FileQuestionIcon;
+    }
+  }
   let results = $state<MentionSearchResult[]>([]);
   let loading = $state(false);
   let errorMessage = $state<string | null>(null);
@@ -399,7 +430,8 @@
               {:else if item.category === 'exam'}
                 <ClockIcon class={cn("size-4", highlightedIndex === index ? "text-primary" : "text-muted-foreground group-hover:text-primary")} />
               {:else if item.category === 'file'}
-                <FolderIcon class={cn("size-4", highlightedIndex === index ? "text-primary" : "text-muted-foreground group-hover:text-primary")} />
+                {@const FileIcon = fileCategoryIcon(item.typeBadge)}
+                <FileIcon class={cn("size-4", highlightedIndex === index ? "text-primary" : "text-muted-foreground group-hover:text-primary")} />
               {:else}
                 <GraduationCapIcon class={cn("size-4", highlightedIndex === index ? "text-primary" : "text-muted-foreground group-hover:text-primary")} />
               {/if}
@@ -418,7 +450,11 @@
                   {item.typeBadge}
                 </span>
               </div>
-              {#if item.parentContext}
+              {#if item.category === 'file' && (item.examTypeTitle || item.parentContext)}
+                <span class="text-[10px] text-muted-foreground/60 truncate">
+                  {item.examTypeTitle || item.parentContext}
+                </span>
+              {:else if item.parentContext}
                 <span class="text-[10px] text-muted-foreground/60 truncate">
                   {item.parentContext}
                 </span>

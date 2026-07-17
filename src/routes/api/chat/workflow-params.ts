@@ -180,6 +180,39 @@ export const buildWorkflowParams = async (
         }
     }
 
+    if (mentions && mentions.length > 0) {
+        // Fold any `file` mentions into the fileReferences list. The
+        // workspace key on the mention id matches the format used by
+        // `searchFile()` (the workspace-relative path). Once merged,
+        // the existing `warmUpFileReferences` call below OCR-warms the
+        // file and `resolveAgentContextStep` includes it in the
+        // `fileManifest` for the assistant's system prompt. Dedupe by
+        // `key` against the already-attached `fileReferences` so the
+        // same file mentioned + uploaded collapses to one entry.
+        const fileMentions = mentions.filter((m) => m.category === 'file');
+        if (fileMentions.length > 0) {
+            const seen = new Set(
+                (fileReferences ?? [])
+                    .map((r) => r.key)
+                    .filter((k): k is string => typeof k === 'string' && k.length > 0)
+            );
+            const newRefs: FileReference[] = [];
+            for (const m of fileMentions) {
+                if (typeof m.id !== 'string' || m.id.length === 0) continue;
+                if (seen.has(m.id)) continue;
+                newRefs.push({
+                    key: m.id,
+                    name: m.name,
+                    type: 'file' as const,
+                });
+                seen.add(m.id);
+            }
+            if (newRefs.length > 0) {
+                fileReferences = [...(fileReferences ?? []), ...newRefs];
+            }
+        }
+    }
+
     if (fileReferences && fileReferences.length > 0) {
         try {
             fileReferences = await warmUpFileReferences(activeContext, fileReferences);

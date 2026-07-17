@@ -14,6 +14,7 @@ import { BaseRepository } from '$lib/server/repository/base.repo';
 import { tenantWorkspace } from '$lib/server/mastra/storage/workspaces';
 import { readManifest } from '$lib/server/mastra/storage/workspaces/manifest-store';
 import { buildWorkspaceRequestContext } from '$lib/server/helpers/chat-helper';
+import { filterMentionableFiles } from '$lib/server/workspace/file-filters';
 import type { FileEntry } from '@mastra/core/workspace';
 
 /**
@@ -40,6 +41,14 @@ type ClassSectionId = { classId: number; sectionId: number };
 
 type ExtendedMentionSearchResult = Omit<MentionSearchResult, 'id'> & {
   id: number | string | ClassSectionId;
+  /** File size in bytes (file category only). */
+  size?: number;
+  /** Absolute path on the file API for download/preview (file category only). */
+  url?: string;
+  /** Best-effort MIME-type guess (file category only). */
+  mimeType?: string;
+  /** Resolved exam-type title (e.g. "First Term 2025") for paths under `exams/examType-N/`. */
+  examTypeTitle?: string | null;
 };
 
 /**
@@ -282,7 +291,14 @@ async function searchAcademicYear(
  * `LocalFilesystem({ contained: true })` sandbox and the teacher-assignment
  * check) is enforced identically to other workspace-aware endpoints.
  * Recursive `readdir` flattens nested entries into relative paths; we
- * filter to `type === 'file'` and optionally narrow by `q`.
+ * apply `filterMentionableFiles` (shared with the filestore page) so
+ * `.json` files, `ocr/*`, and `scratch/*` are excluded — users only see
+ * mention candidates they'd see in the library.
+ *
+ * The result is enriched with `size`, `url`, `mimeType`, and a
+ * category-specific `typeBadge` derived from the manifest `kind`
+ * (or extension as fallback) so the dropdown can render proper icons
+ * and a per-file parent context.
  */
 async function searchFile(
 	query: string,
@@ -295,32 +311,126 @@ async function searchFile(
 			requestContext: requestContext as never
 		});
 		if (!fs) return [];
-		const entries: FileEntry[] = await fs.readdir('.', { recursive: true });
+		const entries: FileEntry[] = await fs.readdir('.', {recursive: true});
 		const manifest = await readManifest(tenant);
 		const trimmed = query.trim().toLowerCase();
-		const files = entries.filter((e) => {
-			if (e.type !== 'file') return false;
-			if (e.name === '.' || e.name === '..') return false;
+		const filtered = filterMentionableFiles(entries).filter((e) => {
 			if (!trimmed) return true;
 			return e.name.toLowerCase().includes(trimmed);
 		});
-		return files.slice(0, limit).map((e) => {
+
+		// Resolve examType-N in paths to readable titles for the secondary
+		// line in the dropdown. Loaded once per request.
+		const examTypeMap = await loadExamTypeTitleMap(tenant);
+
+		return filtered.slice(0, limit).map((e) => {
 			const lastSlash = e.name.lastIndexOf('/');
 			const parentContext = lastSlash > 0 ? e.name.slice(0, lastSlash) : '';
 			const basename = lastSlash >= 0 ? e.name.slice(lastSlash + 1) : e.name;
 			const manifestEntry = manifest.entries[e.name];
 			const displayName = manifestEntry?.fileName ?? basename;
+			const typeBadge = deriveFileTypeBadge(manifestEntry?.kind, e.name);
+			const mimeType = mimeTypeForName(e.name);
+			const examTypeTitle = examTypeTitleFromPath(e.name, examTypeMap);
 			return {
 				id: e.name,
 				name: displayName,
 				category: 'file',
-				typeBadge: 'File',
+				typeBadge,
 				parentContext,
+				examTypeTitle,
+				size: e.size,
+				url: `/api/file/${e.name}`,
+				mimeType,
 			};
 		});
 	} catch {
 		return [];
 	}
+}
+
+/**
+ * Builds a map of `examTypeId -> title` for the active academic year.
+ * Used to resolve `exams/examType-N/...` paths to a human-readable
+ * secondary line in the dropdown. Cached per request — falls back to
+ * `null` if the DB is unreachable.
+ */
+async function loadExamTypeTitleMap(
+	tenant: TenantContext
+): Promise<Map<number, string>> {
+	const map = new Map<number, string>();
+	try {
+		const db = await getDatabase();
+		const baseRepo = new BaseRepository(db as never, tenant);
+		const examTypes = await baseRepo.getExamTypes();
+		for (const t of examTypes) {
+			map.set(t.id, t.title?.trim() || `Exam #${t.id}`);
+		}
+	} catch {
+		// best-effort; missing lookup just leaves the title as null
+	}
+	return map;
+}
+
+/**
+ * Extracts the exam-type id from a workspace path and resolves it to
+ * a title via the pre-loaded map. Returns null for non-exam paths.
+ */
+function examTypeTitleFromPath(
+	path: string,
+	map: Map<number, string>
+): string | null {
+	const match = path.match(/examType-(\d+)/);
+	if (!match) return null;
+	const id = Number(match[1]);
+	return map.get(id) ?? null;
+}
+
+/**
+ * Derives a category-specific badge label for a workspace file. Prefers
+ * the manifest `kind` (the authoritative source — handles renamed files,
+ * re-typed artefacts, etc.) and falls back to extension sniffing.
+ */
+function deriveFileTypeBadge(
+	kind: string | undefined,
+	path: string
+): 'File' | 'IMG' | 'PDF' | 'NOTE' | 'MD' | 'MARKSHEET' | 'TRANSCRIPT' {
+	const ext = path.split('.').pop()?.toLowerCase() ?? '';
+	const looksLikeImage = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'tiff'].includes(ext);
+	if (kind === 'note') return 'NOTE';
+	if (kind === 'marksheet-markdown' || kind === 'marksheet-pdf') return 'MARKSHEET';
+	if (kind === 'transcript-markdown' || kind === 'transcript-pdf') return 'TRANSCRIPT';
+	if (ext === 'pdf') return 'PDF';
+	if (ext === 'md' || ext === 'markdown') return 'MD';
+	if (looksLikeImage) return 'IMG';
+	return 'File';
+}
+
+/**
+ * Best-effort MIME-type guess from the file extension. The
+ * `contentTypeFor` helper used by the file API lives server-side; the
+ * dropdown only needs a hint for icon selection, not an authoritative
+ * value.
+ */
+function mimeTypeForName(path: string): string | undefined {
+	const ext = path.split('.').pop()?.toLowerCase() ?? '';
+	const map: Record<string, string> = {
+		pdf: 'application/pdf',
+		md: 'text/markdown',
+		markdown: 'text/markdown',
+		txt: 'text/plain',
+		json: 'application/json',
+		jpg: 'image/jpeg',
+		jpeg: 'image/jpeg',
+		png: 'image/png',
+		gif: 'image/gif',
+		webp: 'image/webp',
+		svg: 'image/svg+xml',
+		csv: 'text/csv',
+		html: 'text/html',
+		htm: 'text/html',
+	};
+	return map[ext];
 }
 
 async function searchEntities(

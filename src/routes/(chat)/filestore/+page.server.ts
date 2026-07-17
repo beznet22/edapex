@@ -12,11 +12,10 @@ import { getMemory } from "$lib/server/mastra";
 import { toAISdkMessages } from "@mastra/ai-sdk/ui";
 import { deriveCategory, deriveKind, deriveSource } from "$lib/utils/artifact-kind";
 import { readManifest } from "$lib/server/mastra/storage/workspaces/manifest-store";
+import { filterMentionableFiles } from "$lib/server/workspace/file-filters";
 import type { PageServerLoad } from "./$types";
 import type { Artifact } from "$lib/types/workspace-types";
 import type { SerializedTenant } from "$lib/types/background-tasks";
-
-const EXCLUDED_DIR_PREFIXES = ['ocr/', 'scratch/'];
 
 function extractExamTypeFromPath(relPath: string): number | null {
 	const match = relPath.match(/\bexamType-(\d+)\//);
@@ -127,12 +126,7 @@ export const load: PageServerLoad = async ({ url, locals, cookies }) => {
 		entries = [];
 	}
 
-	const filteredEntries = entries.filter((e) => {
-		if (e.name === '.' || e.name === '..' || e.type !== 'file') return false;
-		if (e.name.endsWith('.json')) return false;
-		if (EXCLUDED_DIR_PREFIXES.some((p) => e.name.startsWith(p))) return false;
-		return true;
-	});
+	const filteredEntries = filterMentionableFiles(entries);
 
 	const workspaceClassPrefix = `${tenant.schoolId}/${tenant.classId}-${tenant.sectionId}_AY${tenant.academicId ?? 0}`;
 
