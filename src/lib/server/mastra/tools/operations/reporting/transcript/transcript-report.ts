@@ -1,7 +1,7 @@
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 import { streamWithAutoRetry, type StreamWriterLike } from "$lib/server/mastra/agent-stream-retry";
-import { tenantWorkspace } from "$lib/server/mastra/storage/workspaces";
+import { tenantWorkspace } from "$lib/server/workspace";
 import { buildWorkspaceRequestContext } from "$lib/server/helpers/chat-helper";
 import { createAssessmentServiceForRequest } from "$lib/server/service/assessment.service";
 import type { TenantContext } from "$lib/server/mastra/tenant-context";
@@ -12,8 +12,8 @@ import { and, eq, like, or, type SQL } from "drizzle-orm";
 import type { StudentDetails } from "$lib/server/repository/student.repo";
 import { StudentRepository } from "$lib/server/repository/student.repo";
 import { ScopedRepositoryProvider } from "$lib/server/mastra/scoped-repository";
-import { transcriptMarkdownPath } from "$lib/server/mastra/storage/workspaces/paths";
-import { addEntry } from "$lib/server/mastra/storage/workspaces/manifest-store";
+import { transcriptMarkdownPath } from "$lib/server/workspace/paths";
+import { addEntry } from "$lib/server/workspace/manifest";
 
 interface ReportToolContext {
   requestContext?: {
@@ -266,12 +266,13 @@ export const transcriptReportTool = createTool({
     }
 
     const fs = await resolveFilesystem(tenant);
-    const persistPath = transcriptMarkdownPath(student.studentId);
+    const persistPath = transcriptMarkdownPath(student.studentId, tenant.examTypeId);
     await fs.writeFile(persistPath, markdown, { recursive: true });
     await addEntry(tenant, {
       path: persistPath,
       kind: 'transcript-markdown',
       studentId: student.studentId,
+      examTypeId: tenant.examTypeId ?? null,
       academicId,
       uploadedAt: new Date().toISOString(),
       modifiedAt: new Date().toISOString(),

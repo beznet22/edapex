@@ -1,11 +1,11 @@
 import { createTool } from '@mastra/core/tools';
 import { z } from 'zod';
 import { type StreamWriterLike } from '$lib/server/mastra/agent-stream-retry';
-import { tenantWorkspace } from '$lib/server/mastra/storage/workspaces';
+import { tenantWorkspace } from '$lib/server/workspace';
 import { buildWorkspaceRequestContext } from '$lib/server/helpers/chat-helper';
 import { transcriptSchema } from '$lib/schema/transcript';
-import { transcriptJsonPath, transcriptMarkdownPath } from '$lib/server/mastra/storage/workspaces/paths';
-import { addEntry, removeEntry } from '$lib/server/mastra/storage/workspaces/manifest-store';
+import { transcriptJsonPath, transcriptMarkdownPath } from '$lib/server/workspace/paths';
+import { addEntry, removeEntry } from '$lib/server/workspace/manifest';
 import { resolveMentionsInMarkdown } from '$lib/server/mastra/editor/mention-resolver';
 import { createAssessmentServiceForRequest } from '$lib/server/service/assessment.service';
 import type { TenantContext } from '$lib/server/mastra/tenant-context';
@@ -441,8 +441,9 @@ export const validateTranscriptTool = createTool({
 				const parsed = await transcriptSchema.safeParseAsync(finalJson);
 				if (parsed.success) {
 					const fs = await resolveTenantFilesystem(tenant);
+					const examTypeId = tenant.examTypeId ?? null;
 
-					const jsonPath = transcriptJsonPath(input.studentId);
+					const jsonPath = transcriptJsonPath(input.studentId, examTypeId);
 					await fs.writeFile(jsonPath, JSON.stringify(finalJson, null, 2), {
 						recursive: true
 					});
@@ -451,12 +452,13 @@ export const validateTranscriptTool = createTool({
 						kind: 'transcript-json',
 						studentId: input.studentId,
 						academicId: parsed.data.academicYear.id,
+						examTypeId,
 						uploadedAt: new Date().toISOString(),
 						modifiedAt: new Date().toISOString(),
 						mimeType: 'application/json'
 					});
 
-					const canonicalMarkdownPath = transcriptMarkdownPath(parsed.data.student.id);
+					const canonicalMarkdownPath = transcriptMarkdownPath(parsed.data.student.id, examTypeId);
 					const validatedTitle = `${parsed.data.student.fullName} — Transcript ${parsed.data.academicYear.title}`;
 
 					await fs.writeFile(canonicalMarkdownPath, input.correctedMarkdown, {

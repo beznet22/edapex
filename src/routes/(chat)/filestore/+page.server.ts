@@ -11,7 +11,7 @@ import { resolveTenantWorkspace } from "$lib/server/workspace/scope";
 import { getMemory } from "$lib/server/mastra";
 import { toAISdkMessages } from "@mastra/ai-sdk/ui";
 import { deriveCategory, deriveKind, deriveSource } from "$lib/utils/artifact-kind";
-import { readManifest } from "$lib/server/mastra/storage/workspaces/manifest-store";
+import { readManifest } from "$lib/server/workspace/manifest";
 import { filterMentionableFiles } from "$lib/server/workspace/file-filters";
 import type { PageServerLoad } from "./$types";
 import type { Artifact } from "$lib/types/workspace-types";

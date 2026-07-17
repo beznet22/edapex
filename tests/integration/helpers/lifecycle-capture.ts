@@ -7,7 +7,7 @@
  */
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
-import { WORKSPACE_ROOT, classDir } from '$lib/server/mastra/storage/workspaces/paths';
+import { WORKSPACE_ROOT, classDir } from '$lib/server/workspace/paths';
 import type { TenantContext } from '$lib/server/mastra/tenant-context';
 
 export interface CapturedArtifact {

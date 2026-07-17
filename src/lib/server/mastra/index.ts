@@ -14,7 +14,7 @@ import { editorEditAgent, editorGenerateAgent, editorCopilotAgent } from './agen
 import { parentAssistantAgent } from './agents/parent-assistant';
 import { chatWorkflow, editorCommandWorkflow } from './workflows';
 import { createMastraStorage } from '$lib/server/mastra/storage/libsql/mastra-storage';
-import { tenantWorkspace } from '$lib/server/mastra/storage/workspaces';
+import { tenantWorkspace } from '$lib/server/workspace';
 import { testAgent, testWorkflow } from './agents/assistant';
 
 // ─── Singleton Mastra Instance ──────────────────────────────────────────────

@@ -28,8 +28,8 @@
  */
 import type { TenantContext } from '$lib/server/mastra/tenant-context';
 import { createTenantContext } from '$lib/server/mastra/tenant-context';
-import { classDir } from '$lib/server/mastra/storage/workspaces/paths';
-import { tenantWorkspace } from '$lib/server/mastra/storage/workspaces';
+import { classDir } from '$lib/server/workspace/paths';
+import { tenantWorkspace } from '$lib/server/workspace';
 import { buildWorkspaceRequestContext } from '$lib/server/helpers/chat-helper';
 import { resolveActiveClassScope, resolveClassNamesByIds } from '$lib/server/helpers/class-scope';
 import { ALLOWED_DESIGNATIONS } from '$lib/types/sms-types';

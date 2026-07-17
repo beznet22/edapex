@@ -4,7 +4,7 @@ import { buildRequestContext } from "$lib/server/helpers/chat-helper";
 import { resolveActiveClassScope, resolveClassNamesByIds } from "$lib/server/helpers/class-scope";
 import { ALLOWED_DESIGNATIONS } from "$lib/types/sms-types";
 import { validateMarksheetTool } from "$lib/server/mastra/tools/operations/reporting/marksheet/validate-marksheet";
-import { tenantWorkspace } from "$lib/server/mastra/storage/workspaces";
+import { tenantWorkspace } from "$lib/server/workspace";
 import type { RequestHandler } from "@sveltejs/kit";
 
 type SuccessResult = {

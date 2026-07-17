@@ -18,6 +18,8 @@ import { z } from 'zod';
 import { chatWorkflowOutputSchema, workflowEnvelopeSchema } from '../../utils/chat-schemas';
 import { writeDataPart } from '../../utils/chat-utils';
 import { streamWithAutoRetry } from '../../agent-stream-retry';
+import { recordUsage } from '../../provider/usage-tracker';
+import { getAppDb } from '../../storage/libsql/app-db';
 
 /**
  * `resolveToolsStep` (chained immediately before this step) attaches the
@@ -120,6 +122,35 @@ export const assistantStep = createStep({
 					memory: memCtx,
 					transient: true
 				}).catch(() => { });
+
+				// Persist today's per-user usage so the 4-tier router's tier-2
+				// `perUserDailyTokenCap` check can fire on the next request.
+				// Resolve the provider from the modelConfig the chat-helper
+				// stored in requestContext (Mastra's config id is
+				// `<providerId>/<modelName>`). Fire-and-forget — a failed
+				// write must never crash the response stream.
+				const totalTokens =
+					(usage.inputTokens ?? 0) +
+					(usage.outputTokens ?? 0) +
+					(usage.reasoningTokens ?? 0);
+				if (totalTokens > 0) {
+					const modelConfig = requestContext?.get('modelConfig') as
+						| { id?: string }
+						| undefined;
+					const slashIdx = modelConfig?.id?.indexOf('/') ?? -1;
+					const providerId = slashIdx > 0 ? modelConfig!.id!.slice(0, slashIdx) : null;
+					const userId = Number(inputData.resourceId);
+					if (providerId && Number.isFinite(userId) && userId > 0) {
+						recordUsage({
+							db: getAppDb(),
+							userId,
+							providerId,
+							tokens: totalTokens
+						}).catch((err) =>
+							console.error('[assistant-step] recordUsage failed', err)
+						);
+					}
+				}
 			}
 		};
 

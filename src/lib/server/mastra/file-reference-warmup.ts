@@ -1,6 +1,7 @@
 import type { RequestContext } from '@mastra/core/request-context';
 import type { WorkspaceFilesystem } from '@mastra/core/workspace';
-import { tenantWorkspace } from '$lib/server/mastra/storage/workspaces';
+import type { LibSQLDatabase } from 'drizzle-orm/libsql';
+import { tenantWorkspace } from '$lib/server/workspace';
 import { buildWorkspaceRequestContext } from '$lib/server/helpers/chat-helper';
 import { OcrWorkspaceStore } from '$lib/server/mastra/storage/ocr/ocr-workspace-store';
 import type { TenantContext } from '$lib/server/mastra/tenant-context';
@@ -27,6 +28,7 @@ async function resolveFilesystem(tenant: TenantContext): Promise<WorkspaceFilesy
 export async function warmUpFileReferences(
   tenant: TenantContext,
   refs: FileReference[],
+  db: LibSQLDatabase<any>,
 ): Promise<FileReference[]> {
   const candidates = refs.filter(needsWarmup);
   if (candidates.length === 0) return refs;
@@ -48,6 +50,8 @@ export async function warmUpFileReferences(
           file: bytes,
           fileName: ref.name,
           mimeType: ref.mimeType,
+          db,
+          userId: tenant.userId,
         });
         if (ocr.mistralFileId) {
           ref.fileId = ocr.mistralFileId;

@@ -11,7 +11,7 @@ import { createAssessmentOcrServiceForRequest } from "$lib/server/service/assess
 import { createAssessmentServiceForRequest } from "$lib/server/service/assessment.service";
 import { createTenantContext } from "$lib/server/mastra/tenant-context";
 import { resolveTenantWorkspace } from "$lib/server/workspace/scope";
-import { readManifest, addEntry } from "$lib/server/mastra/storage/workspaces/manifest-store";
+import { readManifest, addEntry } from "$lib/server/workspace/manifest";
 import { render } from "svelte/server";
 import z from "zod";
 

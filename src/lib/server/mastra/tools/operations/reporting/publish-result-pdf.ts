@@ -18,8 +18,8 @@ import {
   sanitizeForFilename,
   studentCriteriaBase,
 } from "$lib/server/mastra/tools/operations/reporting/_shared";
-import { marksheetPdfPath, marksheetJsonPath } from "$lib/server/mastra/storage/workspaces/paths";
-import { updateEntryStatus } from "$lib/server/mastra/storage/workspaces/manifest-store";
+import { marksheetPdfPath, marksheetJsonPath } from "$lib/server/workspace/paths";
+import { updateEntryStatus } from "$lib/server/workspace/manifest";
 import type { MemoryContext } from "$lib/server/mastra/utils/chat-utils";
 
 interface ParentLookup {
@@ -172,7 +172,7 @@ export const publishResultPdfTool = createTool({
     const fullName = student.fullName ?? "student";
     const title = `${sanitizeForFilename(fullName)}.pdf`;
     const artifactId = `pdf-${student.studentId}-${examTypeId}`;
-    const storagePath = marksheetPdfPath(student.studentId, student.admissionNo, student.fullName);
+    const storagePath = marksheetPdfPath(student.studentId, student.admissionNo, student.fullName, examTypeId);
 
     const preview = await ensureResultPdf(tenant, writer, input, student, examTypeId, artifactId, title, storagePath, ctx);
 
@@ -239,7 +239,7 @@ export const publishResultPdfTool = createTool({
     }
 
     const firstResult = publishResult.results[0];
-    const jsonPath = marksheetJsonPath(student.studentId);
+    const jsonPath = marksheetJsonPath(student.studentId, examTypeId);
     await updateEntryStatus(tenant, jsonPath, 'published');
 
     await emitNotification(

@@ -17,8 +17,8 @@ import {
   sanitizeForFilename,
   studentCriteriaBase,
 } from "$lib/server/mastra/tools/operations/reporting/_shared";
-import { transcriptPdfPath } from "$lib/server/mastra/storage/workspaces/paths";
-import { addEntry } from "$lib/server/mastra/storage/workspaces/manifest-store";
+import { transcriptPdfPath } from "$lib/server/workspace/paths";
+import { addEntry } from "$lib/server/workspace/manifest";
 import { type MemoryContext } from "$lib/server/mastra/utils/chat-utils";
 
 const reportPdfInputSchema = z.object({
@@ -78,7 +78,7 @@ async function renderAndWriteTranscriptPdf(args: CoreRenderArgs): Promise<CoreRe
   const fullName = student.fullName ?? "student";
   const title = `${sanitizeForFilename(fullName)}.pdf`;
   const artifactId = `pdf-transcript-${student.studentId}-${academicId}`;
-  const storagePath = transcriptPdfPath(student.studentId);
+  const storagePath = transcriptPdfPath(student.studentId, tenant.examTypeId);
 
   const fs = await resolveFilesystem(tenant);
   const pdfExists = await fs.exists(storagePath);

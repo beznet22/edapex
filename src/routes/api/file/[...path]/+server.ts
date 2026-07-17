@@ -18,12 +18,15 @@
 import { json, error, type RequestHandler } from '@sveltejs/kit';
 import { createHash, randomUUID } from 'node:crypto';
 import { auth } from '$lib/server/service/auth.service';
-import { tenantWorkspace } from '$lib/server/mastra/storage/workspaces';
+import { tenantWorkspace } from '$lib/server/workspace';
 import { assertPathAgentVisible, resolveTenantWorkspace, WorkspaceScopeError } from '$lib/server/workspace/scope';
 import { buildWorkspaceRequestContext } from '$lib/server/helpers/chat-helper';
 import { ALLOWED_DESIGNATIONS } from "$lib/types/sms-types";
 import { ocrBatchService } from '$lib/server/service/ocr-batch.service';
-import { addEntry as addWorkspaceEntry } from '$lib/server/mastra/storage/workspaces/manifest-store';
+import { mistralOcrService } from '$lib/server/service/mistral-ocr.service';
+import { OcrWorkspaceStore } from '$lib/server/mastra/storage/ocr/ocr-workspace-store';
+import { addEntry as addWorkspaceEntry } from '$lib/server/workspace/manifest';
+import { getAppDb } from '$lib/server/mastra/storage/libsql/app-db';
 import type { SerializedTenant } from '$lib/types/background-tasks';
 import type { FileEntry } from '@mastra/core/workspace';
 
@@ -105,7 +108,7 @@ export const GET: RequestHandler = async ({ params, url, locals, cookies }) => {
     if (action === 'batch-status') {
       const jobId = url.searchParams.get('jobId');
       if (!jobId) throw new Error("Missing 'jobId' for batch-status");
-      const result = await ocrBatchService.pollBatch(jobId);
+      const result = await ocrBatchService.pollBatch(jobId, emptySerializedTenant(tenant), getAppDb());
       return json({ success: true, ...result });
     }
 
@@ -167,7 +170,7 @@ export const POST: RequestHandler = async ({ params, url, request, locals, cooki
       const body = (await request.json()) as { keys?: string[]; tenant?: SerializedTenant };
       const keys = body.keys ?? [];
       if (keys.length === 0) throw new Error('No keys supplied for batch-extract');
-      const result = await ocrBatchService.startBatch(body.tenant ?? emptySerializedTenant(tenant), keys);
+      const result = await ocrBatchService.startBatch(body.tenant ?? emptySerializedTenant(tenant), keys, getAppDb());
       return json({ success: true, ...result });
     }
 
@@ -176,8 +179,87 @@ export const POST: RequestHandler = async ({ params, url, request, locals, cooki
       if (!body.jobId) throw new Error("Missing 'jobId' for batch-finalize");
       const keys = body.keys ?? [];
       if (keys.length === 0) throw new Error('No keys supplied for batch-finalize');
-      const result = await ocrBatchService.finalizeBatch(body.tenant ?? emptySerializedTenant(tenant), body.jobId, keys);
+      const result = await ocrBatchService.finalizeBatch(body.tenant ?? emptySerializedTenant(tenant), body.jobId, keys, getAppDb());
       return json({ success: true, ...result });
+    }
+
+    /**
+     * Single-file direct OCR. Used by:
+     *   - The 1-image auto-OCR path (background task via the worker)
+     *   - The 2-3 image auto-OCR path (inline call from queueUpload)
+     *   - The Extract button for 1-3 selected files (inline call)
+     *
+     * Unlike `batch-extract` this is a single direct Mistral call — no
+     * batch job, no polling. The worker uses an `AbortController` so
+     * the in-flight call can be cancelled mid-flight via the `cancel`
+     * worker message. The Mistral client uses the env `MISTRAL_API_KEY`
+     * (consistent with the existing `mistralOcrService` path).
+     */
+    if (action === 'ocr-direct') {
+      const body = (await request.json()) as { key?: string; tenant?: SerializedTenant };
+      if (!body.key) throw new Error("Missing 'key' for ocr-direct");
+      const tContext = ocrBatchService['rehydrateTenant'](
+        body.tenant ?? emptySerializedTenant(tenant)
+      );
+      const requestContext = buildWorkspaceRequestContext(tContext);
+      const fs = await tenantWorkspace.resolveFilesystem({
+        requestContext: requestContext as never
+      });
+      if (!fs) throw error(500, 'Workspace filesystem unavailable');
+      const resolvedPath = resolveScopedPath(tContext, body.key);
+      const raw = await fs.readFile(resolvedPath);
+      const bytes = raw instanceof Uint8Array
+        ? raw
+        : new TextEncoder().encode(raw as string);
+      const filename = resolvedPath.split('/').pop() ?? 'ocr';
+      const ocrResponse = await mistralOcrService.processDocument(bytes, filename, {
+        db: getAppDb(),
+        userId: tContext.userId,
+        schoolId: tContext.schoolId,
+        userRole: null
+      });
+      const pages = (ocrResponse as { pages?: Array<{ markdown?: string }> }).pages ?? [];
+      const markdown = pages.map((p) => p.markdown ?? '').filter(Boolean).join('\n\n');
+      const mistralFileId = (ocrResponse as { fileId?: string }).fileId ?? '';
+      // Pass the precomputed Mistral result to getOrCreate so it doesn't
+      // make a second Mistral call. db + userId are required by the
+      // signature even when precomputed is provided.
+      const persisted = await OcrWorkspaceStore.getOrCreate({
+        tenant: tContext,
+        file: bytes,
+        fileName: `${filename}.md`,
+        mimeType: 'text/markdown',
+        db: getAppDb(),
+        userId: tContext.userId,
+        precomputed: {
+          markdown,
+          mistralFileId,
+          pagesProcessed: ocrResponse.usageInfo?.pagesProcessed
+        }
+      });
+      return json({
+        success: true,
+        contentHash: persisted.contentHash,
+        mistralFileId: persisted.mistralFileId
+      });
+    }
+
+    /**
+     * Request cancellation of a running Mistral batch job. Used by the
+     * worker when the user clicks Cancel in the popover or when the
+     * local 5-min poll cap hits. Fire-and-forget on Mistral's side; the
+     * next `pollBatch` call observes `CANCELLATION_REQUESTED` then
+     * `CANCELLED`.
+     */
+    if (action === 'cancel-batch') {
+      const body = (await request.json()) as { jobId?: string; tenant?: SerializedTenant };
+      if (!body.jobId) throw new Error("Missing 'jobId' for cancel-batch");
+      await ocrBatchService.cancelBatch(
+        body.jobId,
+        body.tenant ?? emptySerializedTenant(tenant),
+        getAppDb()
+      );
+      return json({ success: true });
     }
 
     const contentType = request.headers.get('content-type') || '';

@@ -2,20 +2,18 @@ import { createTool } from '@mastra/core/tools';
 import { z } from 'zod';
 import { eq } from 'drizzle-orm';
 import { type StreamWriterLike } from '$lib/server/mastra/agent-stream-retry';
-import { tenantWorkspace } from '$lib/server/mastra/storage/workspaces';
+import { tenantWorkspace } from '$lib/server/workspace';
 import { buildWorkspaceRequestContext } from '$lib/server/helpers/chat-helper';
 import { marksheetSchema } from '$lib/schema/marksheet';
-import { marksheetJsonPath, marksheetMarkdownPath } from '$lib/server/mastra/storage/workspaces/paths';
-import { addEntry, removeEntry, updateEntryStatus } from '$lib/server/mastra/storage/workspaces/manifest-store';
+import { marksheetJsonPath, marksheetMarkdownPath } from '$lib/server/workspace/paths';
+import { addEntry, removeEntry, updateEntryStatus } from '$lib/server/workspace/manifest';
 import { resolveMentionsInMarkdown } from '$lib/server/mastra/editor/mention-resolver';
 import { createAssessmentServiceForRequest } from '$lib/server/service/assessment.service';
-import { StudentRepository } from '$lib/server/repository/student.repo';
 import { bridgeToolContext } from '$lib/server/mastra/tools/internal/bridge';
 import type { TenantContext } from '$lib/server/mastra/tenant-context';
 import type { WorkspaceFilesystem } from '@mastra/core/workspace';
 import type { RequestContext } from '@mastra/core/request-context';
 import type { ResolvedMention } from '$lib/server/mastra/editor/schemas';
-import { writeDataPart, type MemoryContext } from '$lib/server/mastra/utils/chat-utils';
 import { getDatabase } from '$lib/server/db';
 import { smStudents, smParents, smSchools } from '$lib/server/db/sms-schema';
 
@@ -39,12 +37,6 @@ interface EffectiveIds {
 	studentName: string | null;
 	examTypeId: number | null;
 	academicId: number | null;
-}
-
-interface DisambiguationOption {
-	id: string;
-	label: string;
-	description?: string;
 }
 
 function getTenant(ctx: MarksheetToolContext): TenantContext {
@@ -128,65 +120,6 @@ function detectMissingIds(
 		});
 	}
 	return missing;
-}
-
-async function buildRosterDisambiguationOptions(
-	tenant: TenantContext
-): Promise<DisambiguationOption[]> {
-	const options: DisambiguationOption[] = [];
-
-	if (tenant.studentId != null) {
-		options.push({
-			id: `student:use_tenant:${tenant.studentId}`,
-			label: 'Use active student from tenant context',
-			description: `Student ID: ${tenant.studentId}`
-		});
-	}
-
-	if (tenant.classId != null && tenant.sectionId != null) {
-		try {
-			const { getRepo } = await bridgeToolContext({ requestContext: undefined } as never);
-			const studentRepo = getRepo(StudentRepository);
-			const students = await studentRepo.getStudentsByClassSection({
-				classId: tenant.classId,
-				sectionId: tenant.sectionId
-			});
-			for (const s of students ?? []) {
-				options.push({
-					id: `student:roster:${s.id}`,
-					label: s.name || `Student #${s.id}`,
-					description: s.admissionNo != null ? `Adm#${s.admissionNo}` : undefined
-				});
-			}
-		} catch {
-			// best-effort roster; if the bridge fails we still surface the tenant option
-		}
-	}
-
-	options.push({
-		id: 'proceed:anyway',
-		label: 'Proceed with what can be inferred (best-effort)',
-		description: 'Continue validation; missing fields will be defaulted'
-	});
-
-	return options;
-}
-
-function buildDisambiguationPrompt(missing: MissingIdField[]): string {
-	const fields = missing.map((m) => {
-		switch (m.field) {
-			case 'studentId':
-				return 'student';
-			case 'examTypeId':
-				return 'exam type';
-			case 'academicId':
-				return 'academic year';
-		}
-	});
-	if (fields.length === 1) return `Which ${fields[0]} is this marksheet for?`;
-	if (fields.length === 2) return `Which ${fields[0]} and ${fields[1]} is this marksheet for?`;
-	const last = fields[fields.length - 1];
-	return `Which ${fields.slice(0, -1).join(', ')}, and ${last} is this marksheet for?`;
 }
 
 const marksheetErrorSchema = z.object({
@@ -285,54 +218,13 @@ export const validateMarksheetTool = createTool({
 		const effective = computeEffectiveIds(mentions, tenant, input.student);
 		const missing = detectMissingIds(effective, mentions, input.student != null);
 
-		// Resolve thread/resource identity for `writeDataPart` persistence.
-		// NOTE: `buildRequestContext` (chat route) only sets `tenantContext`,
-		// `modelConfig`, `providerOptions`, `isSlashCommand`, `lastMessage`
-		// on the request context — `threadId`/`resourceId` are NOT set there
-		// (they live in the workflow's `inputData` instead, not the
-		// requestContext). When the tool runs via a workflow path that
-		// doesn't stash them on the request context, `memCtx` is undefined
-		// and `writeDataPart` will skip persistence with a warning (the part
-		// still streams to the client). A future change should hoist
-		// `threadId`/`resourceId` onto the chat requestContext (see
-		// buildRequestContext) so this tool can persist disambiguation
-		// options across page reloads.
-		const threadId = context.requestContext?.get('threadId') as string | undefined;
-		const resourceId = context.requestContext?.get('resourceId') as string | undefined;
-		const memCtx: MemoryContext | undefined = threadId && resourceId
-			? { threadId, resourceId }
-			: undefined;
-
 		if (missing.length > 0) {
-			const options = await buildRosterDisambiguationOptions(tenant);
-			const promptText = buildDisambiguationPrompt(missing);
-
-			await writeDataPart(ctx.writer, {
-				data: {
-					type: 'data-selectOption',
-					id: `gate-validate-${Date.now()}`,
-					data: {
-						options,
-						promptText,
-						runId: '',
-						stepId: 'awaitValidation'
-					}
-				},
-				memory: memCtx
-			});
-
-			context.requestContext?.set('pendingSelection', {
-				options,
-				prompt: promptText,
-				contextKey: 'pendingIdResolution'
-			});
-
 			return {
 				ok: false as const,
 				errors: [],
 				unresolvedErrors: missing.map((m) => ({
 					path: m.field,
-					message: `${m.field.toUpperCase()}_REQUIRED: resolve via @mention, roster match, or disambiguation`,
+					message: `${m.field.toUpperCase()}_REQUIRED (source=${m.source})`,
 					code: 'id_required'
 				}))
 			};
@@ -406,7 +298,8 @@ export const validateMarksheetTool = createTool({
 
 		if (validationResult.success) {
 			const finalJson = validationResult.data;
-			const jsonPath = marksheetJsonPath(finalJson.student.id);
+			const examTypeId = finalJson.examType?.id ?? tenant.examTypeId ?? null;
+			const jsonPath = marksheetJsonPath(finalJson.student.id, examTypeId);
 			await fs.writeFile(jsonPath, JSON.stringify(finalJson, null, 2), {
 				recursive: true
 			});
@@ -414,6 +307,7 @@ export const validateMarksheetTool = createTool({
 				path: jsonPath,
 				kind: 'marksheet-json',
 				studentId: finalJson.student.id,
+				examTypeId,
 				uploadedAt: new Date().toISOString(),
 				modifiedAt: new Date().toISOString(),
 				mimeType: 'application/json'
@@ -422,7 +316,7 @@ export const validateMarksheetTool = createTool({
 			const canonicalMarkdownPath = marksheetMarkdownPath({
 				studentId: finalJson.student.id,
 				adminNo: finalJson.student.adminNo,
-				examTypeId: finalJson.examType?.id ?? null,
+				examTypeId,
 				studentName: finalJson.student.fullName
 			});
 			const validatedTitle = `${finalJson.student.fullName} \u2014 ${finalJson.examType?.title ?? 'Exam'}`;
@@ -436,6 +330,7 @@ export const validateMarksheetTool = createTool({
 				documentId: String(finalJson.student.id),
 				fileName: canonicalMarkdownPath.split('/').pop(),
 				studentId: finalJson.student.id,
+				examTypeId,
 				uploadedAt: new Date().toISOString(),
 				modifiedAt: new Date().toISOString(),
 				mimeType: 'text/markdown'

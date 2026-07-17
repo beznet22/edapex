@@ -11,8 +11,8 @@ import {
 } from '$lib/server/db/sms-schema';
 import { ALLOWED_DESIGNATIONS } from "$lib/types/sms-types";
 import { BaseRepository } from '$lib/server/repository/base.repo';
-import { tenantWorkspace } from '$lib/server/mastra/storage/workspaces';
-import { readManifest } from '$lib/server/mastra/storage/workspaces/manifest-store';
+import { tenantWorkspace } from '$lib/server/workspace';
+import { readManifest } from '$lib/server/workspace/manifest';
 import { buildWorkspaceRequestContext } from '$lib/server/helpers/chat-helper';
 import { filterMentionableFiles } from '$lib/server/workspace/file-filters';
 import type { FileEntry } from '@mastra/core/workspace';

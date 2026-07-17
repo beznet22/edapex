@@ -4,11 +4,12 @@ import { smGeneralSettings, smStudents } from "$lib/server/db/sms-schema";
 import { getDatabase } from "$lib/server/db";
 import { createTenantContext } from "$lib/server/mastra/tenant-context";
 import { OcrWorkspaceStore } from "$lib/server/mastra/storage/ocr/ocr-workspace-store";
-import { addEntry as addWorkspaceEntry, removeEntry as removeWorkspaceEntry, readManifest } from "$lib/server/mastra/storage/workspaces/manifest-store";
-import { uploadPath, ocrMarkdownPath, ocrMetaPath, marksheetJsonPath, marksheetMarkdownPath, marksheetPdfPath, transcriptJsonPath, transcriptMarkdownPath, transcriptPdfPath } from "$lib/server/mastra/storage/workspaces/paths";
-import { resolveTenantFilesystem } from "$lib/server/mastra/storage/workspaces/resolve-tenant-filesystem";
+import { addEntry as addWorkspaceEntry, removeEntry as removeWorkspaceEntry, readManifest } from "$lib/server/workspace/manifest";
+import { uploadPath, ocrMarkdownPath, ocrMetaPath, marksheetJsonPath, marksheetMarkdownPath, marksheetPdfPath, transcriptJsonPath, transcriptMarkdownPath, transcriptPdfPath } from "$lib/server/workspace/paths";
+import { resolveTenantFilesystem } from "$lib/server/workspace";
 import { resolveTenantWorkspace } from "$lib/server/workspace/scope";
 import { mistralOcrService } from "$lib/server/service/mistral-ocr.service";
+import { getAppDb } from "$lib/server/mastra/storage/libsql/app-db";
 import { ResultsRepository } from "$lib/server/repository";
 import { ScopedRepositoryProvider } from "$lib/server/mastra/scoped-repository";
 import { buildWorkspaceRequestContext, resolveWorkspaceContext } from "$lib/server/helpers/chat-helper";
@@ -232,16 +233,17 @@ export const POST: RequestHandler = async ({ request, locals, cookies }) => {
   // path so it can be re-extracted later and discovered via @file mention.
   const requestContext = buildWorkspaceRequestContext(tenant);
   const fs = await resolveTenantFilesystem({ requestContext: requestContext as never });
-  await fs.writeFile(uploadPath(filename), buffer, { recursive: true });
+  await fs.writeFile(uploadPath(filename, tenant.examTypeId), buffer, { recursive: true });
 
   // Register the upload in the single workspace manifest.json (kind:
   // user-file). The legacy `extracted/manifest.json` is gone.
   await addWorkspaceEntry(tenant, {
-    path: uploadPath(filename),
+    path: uploadPath(filename, tenant.examTypeId),
     kind: "user-file",
     documentId,
     fileName: filename,
     contentHash,
+    examTypeId: tenant.examTypeId ?? null,
     uploadedAt: new Date().toISOString(),
     modifiedAt: new Date().toISOString(),
     mimeType: file.type,
@@ -263,19 +265,24 @@ export const POST: RequestHandler = async ({ request, locals, cookies }) => {
       // — saves the monthly Mistral trial quota when the user re-uploads
       // the same marksheet. format-marksheet-document reads from this same
       // path, so a cached OCR is consumed normally downstream.
-      const ocrPath = ocrMarkdownPath(filename);
+      const ocrPath = ocrMarkdownPath(filename, tenant.examTypeId);
       if (await fs.exists(ocrPath)) {
         ocrStatus = 'ready';
         console.info(`[uploads] OCR cache hit for ${filename}, skipping Mistral call`);
       } else {
-        const ocrResult = await mistralOcrService.processDocument(buffer, filename);
+        const ocrResult = await mistralOcrService.processDocument(buffer, filename, {
+          db: getAppDb(),
+          userId: user!.id,
+          schoolId: user!.schoolId ?? null,
+          userRole: user!.designation ?? null
+        });
         const markdown = ((ocrResult as { pages?: Array<{ markdown?: string }> }).pages ?? [])
           .map((p) => p.markdown ?? '')
           .filter(Boolean)
           .join('\n\n');
         await fs.writeFile(ocrPath, markdown, { recursive: true });
         await fs.writeFile(
-          ocrMetaPath(filename),
+          ocrMetaPath(filename, tenant.examTypeId),
           JSON.stringify(
             {
               fileName: filename,
@@ -296,15 +303,17 @@ export const POST: RequestHandler = async ({ request, locals, cookies }) => {
           kind: 'ocr-markdown',
           fileName: filename,
           contentHash,
+          examTypeId: tenant.examTypeId ?? null,
           uploadedAt: new Date().toISOString(),
           modifiedAt: new Date().toISOString(),
           mimeType: 'text/markdown'
         });
         await addWorkspaceEntry(tenant, {
-          path: ocrMetaPath(filename),
+          path: ocrMetaPath(filename, tenant.examTypeId),
           kind: 'ocr-meta',
           fileName: filename,
           contentHash,
+          examTypeId: tenant.examTypeId ?? null,
           uploadedAt: new Date().toISOString(),
           modifiedAt: new Date().toISOString(),
           mimeType: 'application/json'
@@ -383,19 +392,25 @@ export const DELETE: RequestHandler = async ({ url, locals, cookies }) => {
   }
 
   // Build the set of paths to delete: upload, OCR markdown, OCR meta
-  const pathsToDelete: string[] = [uploadPath(targetFilename), ocrMarkdownPath(targetFilename), ocrMetaPath(targetFilename)];
+  const examTypeId = tenant.examTypeId ?? null;
+  const pathsToDelete: string[] = [
+    uploadPath(targetFilename, examTypeId),
+    ocrMarkdownPath(targetFilename, examTypeId),
+    ocrMetaPath(targetFilename, examTypeId)
+  ];
 
   // Also clean up marksheets and transcripts for this file (scan manifest for entries matching the filename)
   const manifest = await readManifest(tenant);
   for (const [relPath, entry] of Object.entries(manifest.entries)) {
     if (entry.fileName === targetFilename && entry.kind === "user-file") {
+      const entryExamTypeId = entry.examTypeId ?? examTypeId;
       if (entry.studentId !== undefined) {
-        pathsToDelete.push(marksheetJsonPath(entry.studentId));
+        pathsToDelete.push(marksheetJsonPath(entry.studentId, entryExamTypeId));
         pathsToDelete.push(marksheetMarkdownPath({ studentId: entry.studentId }));
-        pathsToDelete.push(marksheetPdfPath(entry.studentId));
-        pathsToDelete.push(transcriptJsonPath(entry.studentId));
-        pathsToDelete.push(transcriptMarkdownPath(entry.studentId));
-        pathsToDelete.push(transcriptPdfPath(entry.studentId));
+        pathsToDelete.push(marksheetPdfPath(entry.studentId, undefined, undefined, entryExamTypeId));
+        pathsToDelete.push(transcriptJsonPath(entry.studentId, entryExamTypeId));
+        pathsToDelete.push(transcriptMarkdownPath(entry.studentId, entryExamTypeId));
+        pathsToDelete.push(transcriptPdfPath(entry.studentId, entryExamTypeId));
       }
       if (entry.recordId !== undefined && entry.studentId !== undefined && entry.examTypeId !== undefined) {
         try {

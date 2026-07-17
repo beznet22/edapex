@@ -24,7 +24,7 @@ const removeEntryMock = vi.fn(async () => { });
 const existsMock = vi.fn(async () => true);
 const readFileMock = vi.fn(async () => '# Test markdown\n');
 const deleteFileMock = vi.fn(async () => { });
-vi.mock('$lib/server/mastra/storage/workspaces', () => ({
+vi.mock('$lib/server/workspace', () => ({
   get tenantWorkspace() {
     return {
       resolveFilesystem: async () => ({
@@ -36,7 +36,7 @@ vi.mock('$lib/server/mastra/storage/workspaces', () => ({
     };
   }
 }));
-vi.mock('$lib/server/mastra/storage/workspaces/manifest-store', () => ({
+vi.mock('$lib/server/workspace/manifest', () => ({
   addEntry: addEntryMock,
   removeEntry: removeEntryMock
 }));

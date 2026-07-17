@@ -34,8 +34,8 @@ import { createTool } from '@mastra/core/tools';
 import { z } from 'zod';
 import { appendFileSync } from 'fs';
 import { streamWithAutoRetry, type StreamWriterLike } from '$lib/server/mastra/agent-stream-retry';
-import { readManifest as readWorkspaceManifest, addEntry, updateEntryStatus } from '$lib/server/mastra/storage/workspaces/manifest-store';
-import { ocrMarkdownPath } from '$lib/server/mastra/storage/workspaces/paths';
+import { readManifest as readWorkspaceManifest, addEntry, updateEntryStatus } from '$lib/server/workspace/manifest';
+import { ocrMarkdownPath } from '$lib/server/workspace/paths';
 import {
   getTenant,
   getWriter,
@@ -130,7 +130,7 @@ export const streamDocumentTool = createTool({
 
     const { title, initialMarkdownPath } = deriveInitialFilename(entry.fileName, contentHash);
 
-    const mdRelPath = ocrMarkdownPath(entry.fileName);
+    const mdRelPath = ocrMarkdownPath(entry.fileName, tenant.examTypeId);
     if (!(await fs.exists(mdRelPath))) {
       throw new Error(`OCR_MARKDOWN_NOT_FOUND: ${mdRelPath}`);
     }

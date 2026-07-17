@@ -1,6 +1,6 @@
 import { createTool, type ToolExecutionContext } from '@mastra/core/tools';
 import { z } from 'zod';
-import { tenantWorkspace } from '../../storage/workspaces';
+import { tenantWorkspace } from '$lib/server/workspace';
 import { buildWorkspaceRequestContext } from '../../../helpers/chat-helper';
 import { bridgeToolContext } from './bridge';
 import type { TenantContext } from '../../tenant-context';

@@ -1,10 +1,10 @@
 import { createTool } from '@mastra/core/tools';
 import { z } from 'zod';
 import { type StreamWriterLike } from '$lib/server/mastra/agent-stream-retry';
-import { tenantWorkspace } from '$lib/server/mastra/storage/workspaces';
+import { tenantWorkspace } from '$lib/server/workspace';
 import { buildWorkspaceRequestContext } from '$lib/server/helpers/chat-helper';
-import { readManifest as readNewManifest } from '$lib/server/mastra/storage/workspaces/manifest-store';
-import { marksheetJsonPath } from '$lib/server/mastra/storage/workspaces/paths';
+import { readManifest as readNewManifest } from '$lib/server/workspace/manifest';
+import { marksheetJsonPath } from '$lib/server/workspace/paths';
 import type { TenantContext } from '$lib/server/mastra/tenant-context';
 import type { WorkspaceFilesystem } from '@mastra/core/workspace';
 
@@ -53,7 +53,7 @@ export const getActiveMarksheetTool = createTool({
     const tenant = getTenant(context);
 
     const fs = await resolveTenantFilesystem(tenant);
-    const jsonPath = marksheetJsonPath(input.studentId);
+    const jsonPath = marksheetJsonPath(input.studentId, tenant.examTypeId);
     if (!(await fs.exists(jsonPath))) {
       return {
         studentId: input.studentId,

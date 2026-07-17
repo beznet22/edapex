@@ -20,7 +20,7 @@ import { requestContextSchema, DEFAULT_MODEL, DEFAULT_TITLE_MODEL } from './shar
 import { createMastraStorage } from '$lib/server/mastra/storage/libsql/mastra-storage';
 import { Memory } from '@mastra/memory';
 import { createStep, createWorkflow } from '@mastra/core/workflows';
-import { tenantWorkspace } from '$lib/server/mastra/storage/workspaces';
+import { tenantWorkspace } from '$lib/server/workspace';
 import { BASE_AGENT_TOOLS } from '../tools/internal/base-agent-tools';
 import { buildAssistantInstructions } from './skill-instructions';
 import z from 'zod';

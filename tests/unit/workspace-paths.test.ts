@@ -4,7 +4,7 @@ import {
 	sectionSlug,
 	academicYearSlug,
 	sanitizeForFilename
-} from '$lib/server/mastra/storage/workspaces/slug';
+} from '$lib/server/workspace/slug';
 import {
 	classDir,
 	WORKSPACE_ROOT,
@@ -15,8 +15,9 @@ import {
 	transcriptJsonPath,
 	transcriptMarkdownPath,
 	ocrMarkdownPath,
-	ocrMetaPath
-} from '$lib/server/mastra/storage/workspaces/paths';
+	ocrMetaPath,
+	uploadPath
+} from '$lib/server/workspace/paths';
 import { createTenantContext } from '$lib/server/mastra/tenant-context';
 import path from 'node:path';
 
@@ -101,8 +102,18 @@ describe('paths helpers', () => {
 	});
 
 	describe('marksheetPdfPath', () => {
-		it('returns pdfs/marksheet-<studentId>.pdf', () => {
-			expect(marksheetPdfPath(188)).toBe('pdfs/marksheet-188.pdf');
+		it('returns ADM<adminNo>-<studentId>-<slug>.pdf', () => {
+			expect(marksheetPdfPath(188, 42, 'Al-Azeem Junior')).toBe(
+				'pdfs/ADM42-188-Al-Azeem_Junior.pdf'
+			);
+		});
+		it('falls back to student-<id> when no name provided', () => {
+			expect(marksheetPdfPath(188)).toBe('pdfs/ADM0-188-student-188.pdf');
+		});
+		it('prefixes with exams/examType-{id}/ when examTypeId is set', () => {
+			expect(marksheetPdfPath(188, 42, 'Al-Azeem Junior', 1)).toBe(
+				'exams/examType-1/pdfs/ADM42-188-Al-Azeem_Junior.pdf'
+			);
 		});
 	});
 
@@ -110,11 +121,17 @@ describe('paths helpers', () => {
 		it('returns pdfs/transcript-<studentId>.pdf', () => {
 			expect(transcriptPdfPath(188)).toBe('pdfs/transcript-188.pdf');
 		});
+		it('prefixes with exams/examType-{id}/ when examTypeId is set', () => {
+			expect(transcriptPdfPath(188, 2)).toBe('exams/examType-2/pdfs/transcript-188.pdf');
+		});
 	});
 
 	describe('marksheetJsonPath', () => {
 		it('returns marksheets/<studentId>.json', () => {
 			expect(marksheetJsonPath(188)).toBe('marksheets/188.json');
+		});
+		it('prefixes with exams/examType-{id}/ when examTypeId is set', () => {
+			expect(marksheetJsonPath(188, 1)).toBe('exams/examType-1/marksheets/188.json');
 		});
 	});
 
@@ -128,17 +145,33 @@ describe('paths helpers', () => {
 		it('null name treated as absent', () => {
 			expect(marksheetMarkdownPath({ studentId: 188, studentName: null })).toBe('marksheets/188.md');
 		});
+		it('with adminNo + examTypeId + name uses canonical ADM<adminNo>-<examTypeId>-<name>.md', () => {
+			expect(
+				marksheetMarkdownPath({
+					studentId: 188,
+					adminNo: 42,
+					examTypeId: 1,
+					studentName: 'Al-Azeem'
+				})
+			).toBe('exams/examType-1/marksheets/ADM42-1-al-azeem.md');
+		});
 	});
 
 	describe('transcriptJsonPath', () => {
 		it('returns transcripts/<studentId>.json', () => {
 			expect(transcriptJsonPath(188)).toBe('transcripts/188.json');
 		});
+		it('prefixes with exams/examType-{id}/ when examTypeId is set', () => {
+			expect(transcriptJsonPath(188, 1)).toBe('exams/examType-1/transcripts/188.json');
+		});
 	});
 
 	describe('transcriptMarkdownPath', () => {
 		it('returns transcripts/<studentId>.md', () => {
 			expect(transcriptMarkdownPath(188)).toBe('transcripts/188.md');
+		});
+		it('prefixes with exams/examType-{id}/ when examTypeId is set', () => {
+			expect(transcriptMarkdownPath(188, 2)).toBe('exams/examType-2/transcripts/188.md');
 		});
 	});
 
@@ -148,6 +181,18 @@ describe('paths helpers', () => {
 		});
 		it('ocrMetaPath uses sanitized filename', () => {
 			expect(ocrMetaPath('Al-Azeem.jpg.jpeg')).toBe('ocr/Al-Azeem.jpg.jpeg.meta.json');
+		});
+		it('ocrMarkdownPath prefixes with exams/examType-{id}/ when examTypeId is set', () => {
+			expect(ocrMarkdownPath('foo.jpg', 1)).toBe('exams/examType-1/ocr/foo.jpg.md');
+		});
+	});
+
+	describe('uploadPath', () => {
+		it('returns uploads/<filename> when no examTypeId', () => {
+			expect(uploadPath('foo.png')).toBe('uploads/foo.png');
+		});
+		it('prefixes with exams/examType-{id}/ when examTypeId is set', () => {
+			expect(uploadPath('foo.png', 1)).toBe('exams/examType-1/uploads/foo.png');
 		});
 	});
 });

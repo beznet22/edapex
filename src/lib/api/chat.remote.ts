@@ -1,12 +1,12 @@
 import { command, getRequestEvent, query } from "$app/server";
-import { allowAnonymousChats } from "$lib/constants";
+import { allowAnonymousChats, CONFIG_COOKIE_MAX_AGE_SEC } from "$lib/constants";
 import { chatVisibilitySchema, fileSchema, type ChatVisibility } from "$lib/schema/chat-schema";
 import { resultInputSchema } from "$lib/schema/result-input";
 import z from "zod";
 import { createAssessmentServiceForRequest } from "$lib/server/service/assessment.service";
 import { createTenantContext } from "$lib/server/mastra/tenant-context";
 import { resolveTenantWorkspace } from "$lib/server/workspace/scope";
-import { readManifest } from "$lib/server/mastra/storage/workspaces/manifest-store";
+import { readManifest } from "$lib/server/workspace/manifest";
 import type { ChatThread, UploadedData } from "$lib/types/chat-types";
 import { getMemory, mastra } from "$lib/server/mastra";
 import type { StorageThreadType } from "@mastra/core/memory";
@@ -113,13 +113,15 @@ export const syncCookie = command(
       case "selected-class":
         if (!value) return null;
         break;
+      case "potluck-always-donate":
+        break;
       default:
         return null;
     }
     cookies.set(key, value, {
       path: "/",
       sameSite: "lax",
-      expires: new Date(Date.now() + 1000 * 60 * 60 * 24 * 30),
+      maxAge: CONFIG_COOKIE_MAX_AGE_SEC,
       httpOnly: true,
     });
 

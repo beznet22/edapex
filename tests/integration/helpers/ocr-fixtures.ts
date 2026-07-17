@@ -36,13 +36,13 @@ import { readFile, writeFile, mkdir, stat } from 'node:fs/promises';
 import path from 'node:path';
 import type { TenantContext } from '$lib/server/mastra/tenant-context';
 import { OcrWorkspaceStore } from '$lib/server/mastra/storage/ocr/ocr-workspace-store';
-import { addEntry as addWorkspaceEntry } from '$lib/server/mastra/storage/workspaces/manifest-store';
-import { tenantWorkspace } from '$lib/server/mastra/storage/workspaces';
+import { addEntry as addWorkspaceEntry } from '$lib/server/workspace/manifest';
+import { tenantWorkspace } from '$lib/server/workspace';
 import { buildWorkspaceRequestContext } from '$lib/server/helpers/chat-helper';
 import {
 	ocrMarkdownPath,
 	ocrMetaPath
-} from '$lib/server/mastra/storage/workspaces/paths';
+} from '$lib/server/workspace/paths';
 
 const MARKSHEET_FIXTURE_DIR = path.resolve(process.cwd(), 'static/marksheets');
 const OCR_CACHE_DIR = path.resolve(process.cwd(), '.kimchi/ocr-cache');
@@ -96,7 +96,7 @@ export async function seedMarksheetFixture(params: {
 	if (cachedMarkdown !== undefined) {
 		// Replay the cached markdown into the tenant workspace without calling Mistral.
 		const fs = await (
-			await import('$lib/server/mastra/storage/workspaces/resolve-tenant-filesystem')
+			await import('$lib/server/workspace/resolve-filesystem')
 		).resolveTenantFilesystem({
 			requestContext: buildWorkspaceRequestContext(params.tenant) as never
 		});
@@ -164,7 +164,7 @@ export async function seedMarksheetFixture(params: {
 		// re-extraction flows can find the source bytes. Register in
 		// single manifest.json (kind: user-file).
 		const liveFs = await (
-			await import('$lib/server/mastra/storage/workspaces/resolve-tenant-filesystem')
+			await import('$lib/server/workspace/resolve-filesystem')
 		).resolveTenantFilesystem({
 			requestContext: buildWorkspaceRequestContext(params.tenant) as never
 		});

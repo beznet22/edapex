@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { type TenantContext, type MastraToolContext } from "../../tenant-context";
-import { tenantWorkspace, verifyTeacherAssignment } from "$lib/server/mastra/storage/workspaces";
+import { tenantWorkspace, verifyTeacherAssignment } from "$lib/server/workspace";
 
 /**
  * Default carry-forward roots when the caller does not specify paths.

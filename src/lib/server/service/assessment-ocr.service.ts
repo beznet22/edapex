@@ -28,10 +28,11 @@ import { ResultsRepository, StudentRepository } from "$lib/server/repository";
 import { mistralOcrService } from "./mistral-ocr.service";
 import type { Category } from "$lib/schema/marksheet";
 import { GRADE_RANGES } from "$lib/server/service/assessment.service";
-import { resolveTenantFilesystem } from "$lib/server/mastra/storage/workspaces/resolve-tenant-filesystem";
+import { resolveTenantFilesystem } from "$lib/server/workspace";
 import { buildWorkspaceRequestContext } from "$lib/server/helpers/chat-helper";
-import { ocrMarkdownPath } from "$lib/server/mastra/storage/workspaces/paths";
-import { addEntry } from "$lib/server/mastra/storage/workspaces/manifest-store";
+import { ocrMarkdownPath } from "$lib/server/workspace/paths";
+import { addEntry } from "$lib/server/workspace/manifest";
+import { getAppDb } from "$lib/server/mastra/storage/libsql/app-db";
 
 export interface ExtractionResult {
   success: boolean;
@@ -86,7 +87,12 @@ export class AssessmentOcrService {
     if (!classSection) throw new Error("Class section not found");
 
     const fileName = originalName || "uploaded";
-    const ocrResponse = await mistralOcrService.processDocument(file, fileName);
+    const ocrResponse = await mistralOcrService.processDocument(file, fileName, {
+      db: getAppDb(),
+      userId: params.userId,
+      schoolId: null,
+      userRole: null
+    });
     const rawText = (ocrResponse as { pages?: Array<{ markdown?: string }> }).pages
       ?.map((p) => p.markdown ?? "")
       .filter(Boolean)
@@ -102,10 +108,11 @@ export class AssessmentOcrService {
     const fs = await resolveTenantFilesystem({ requestContext: rc as never });
     if (!fs) throw new Error("Tenant workspace filesystem unavailable");
 
-    const ocrPath = ocrMarkdownPath(fileName);
+    const ocrPath = ocrMarkdownPath(fileName, this.tenant.examTypeId);
     await fs.writeFile(ocrPath, rawText, { recursive: true });
     await addEntry(this.tenant, {
       path: ocrPath,
+      examTypeId: this.tenant.examTypeId ?? null,
       kind: "ocr-markdown",
       fileName,
       uploadedAt: new Date().toISOString(),

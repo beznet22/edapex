@@ -15,4 +15,4 @@ export const workspaceFiles = new Files({
   adapter: fs({ root: path.join(process.cwd(), '.workspaces') })
 });
 
-export { FilesSDKFilesystem } from './workspaces/files-sdk-filesystem';
+export { FilesSDKFilesystem } from '$lib/server/workspace';

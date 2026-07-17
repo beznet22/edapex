@@ -15,7 +15,7 @@ import { handleWorkflowStream } from '@mastra/ai-sdk';
 import { collectStream } from './helpers/stream-consumer';
 import { makeAdminPersona } from './helpers/tenant';
 import { buildWorkspaceRequestContext } from '$lib/server/helpers/chat-helper';
-import { tenantWorkspace } from '$lib/server/mastra/storage/workspaces';
+import { tenantWorkspace } from '$lib/server/workspace';
 import { buildRequestContext } from '$lib/server/helpers/chat-helper';
 import { getModelForTest, TEST_MODEL_ID } from './helpers/tenant';
 import type { TenantContext } from '$lib/server/mastra/tenant-context';

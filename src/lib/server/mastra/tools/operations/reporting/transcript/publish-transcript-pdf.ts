@@ -24,8 +24,8 @@ import {
   resolveStudent,
   sanitizeForFilename,
 } from "$lib/server/mastra/tools/operations/reporting/_shared";
-import { transcriptPdfPath } from "$lib/server/mastra/storage/workspaces/paths";
-import { addEntry } from "$lib/server/mastra/storage/workspaces/manifest-store";
+import { transcriptPdfPath } from "$lib/server/workspace/paths";
+import { addEntry } from "$lib/server/workspace/manifest";
 import { type MemoryContext } from "$lib/server/mastra/utils/chat-utils";
 
 const CONFIRM_CONTEXT_KEY = "transcriptPublishConfirm";
@@ -120,7 +120,7 @@ async function ensureTranscriptPdf(args: RenderArgs): Promise<RenderResult> {
   const fullName = student.fullName ?? "student";
   const title = `${sanitizeForFilename(fullName)}.pdf`;
   const artifactId = `pdf-transcript-${student.studentId}-${academicId}`;
-  const storagePath = transcriptPdfPath(student.studentId);
+  const storagePath = transcriptPdfPath(student.studentId, tenant.examTypeId);
   const fsHandle = await resolveFilesystem(tenant);
   const pdfExists = await fsHandle.exists(storagePath);
 

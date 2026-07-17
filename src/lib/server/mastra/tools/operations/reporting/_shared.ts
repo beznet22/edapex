@@ -11,7 +11,7 @@ import { and, desc, eq, like, or, type SQL } from "drizzle-orm";
 import { z } from "zod";
 import { getDatabase } from "$lib/server/db";
 import { smAcademicYears, smStudents, studentRecords } from "$lib/server/db/sms-schema";
-import { tenantWorkspace } from "$lib/server/mastra/storage/workspaces";
+import { tenantWorkspace } from "$lib/server/workspace";
 import { buildWorkspaceRequestContext } from "$lib/server/helpers/chat-helper";
 import type { TenantContext } from "$lib/server/mastra/tenant-context";
 import { StudentRepository } from "$lib/server/repository/student.repo";
@@ -73,7 +73,7 @@ export function generateConfirmationToken(): string {
   return base64url(`${Date.now()}-${Math.random().toString(36).slice(2, 10)}`);
 }
 
-export { sanitizeForFilename } from "$lib/server/mastra/storage/workspaces/slug";
+export { sanitizeForFilename } from "$lib/server/workspace/slug";
 
 export type StudentCriteria = {
   studentId?: number | null;
@@ -297,7 +297,7 @@ export async function emitSelectOption(
   });
 }
 
-// PDF storage paths now live in `$lib/server/mastra/storage/workspaces/paths.ts`
+// PDF storage paths now live in `$lib/server/workspace/paths.ts`
 // as `marksheetPdfPath(studentId)` and `transcriptPdfPath(studentId)`. The
 // admissionNo-based path builders are gone — they collided when two students
 // in the same class shared an admission sequence. Use the studentId-keyed

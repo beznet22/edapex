@@ -5,7 +5,7 @@ import { mkdirSync, writeFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import { getDatabase } from '$lib/server/db';
 import { smStudents } from '$lib/server/db/sms-schema';
-import { tenantWorkspace } from '$lib/server/mastra/storage/workspaces';
+import { tenantWorkspace } from '$lib/server/workspace';
 import { buildWorkspaceRequestContext } from '$lib/server/helpers/chat-helper';
 import { STATIC_DIR } from '$lib/constants';
 import type { TenantContext } from '$lib/server/mastra/tenant-context';
