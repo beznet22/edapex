@@ -42,6 +42,21 @@ export type BatchExtractResult = {
   error?: string;
 };
 
+/**
+ * Per-file state for the upload+OCR pipeline (kind: "process-files").
+ * Updated incrementally via `file-update` events from the worker.
+ */
+export type UploadFileState = {
+  key: string;
+  name: string;
+  status: "compressing" | "uploading" | "ocr" | "completed" | "error";
+  error?: string;
+  compressedSize?: number;
+  originalSize?: number;
+};
+
+export type TaskPhase = "upload" | "ocr";
+
 export type TaskSpec =
   | {
       kind: "ocr-batch";
@@ -57,11 +72,20 @@ export type TaskSpec =
       kind: "ocr-direct";
       key: string;
       tenant: SerializedTenant;
+    }
+  | {
+      kind: "process-files";
+      files: Array<{ file: File; name: string }>;
+      tenant: SerializedTenant;
+      prefix: string;
+      examTypeId: number;
     };
 
 export type TaskEvent =
 	| { type: "started"; taskId: string }
 	| { type: "progress"; taskId: string; progress: number; message: string }
+	| { type: "file-update"; taskId: string; files: UploadFileState[] }
+	| { type: "phase-change"; taskId: string; phase: TaskPhase }
 	| {
 			type: "completed";
 			taskId: string;
@@ -85,6 +109,8 @@ export type Task = {
 	id: string;
 	spec: TaskSpec;
 	status: TaskStatus;
+	phase?: TaskPhase;
+	files?: UploadFileState[];
 	progress: number;
 	message: string;
 	startedAt: number;

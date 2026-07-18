@@ -26,6 +26,7 @@ import type {
   WorkerInbound,
   SerializedTenant,
   BatchExtractResult,
+  UploadFileState,
 } from "$lib/types/background-tasks";
 import TaskWorker from "$lib/workers/task-worker.ts?worker";
 
@@ -49,10 +50,11 @@ class BackgroundTasksStore {
         return;
       }
       const worker: Worker = new TaskWorker();
-      worker.onmessage = (e: MessageEvent<TaskEvent>) => this.#handleEvent(e.data);
+      worker.onmessage = (e: MessageEvent<TaskEvent>) => {
+        this.#handleEvent(e.data);
+      };
       worker.onerror = (e: ErrorEvent) => {
-        console.error("[background-tasks] worker error", e);
-        // Mark all running tasks as failed
+        console.error("[bg] worker error", e);
         for (const task of this.tasks) {
           if (task.status === "running" || task.status === "queued") {
             task.status = "failed";
@@ -82,62 +84,74 @@ class BackgroundTasksStore {
     return controller;
   }
 
-  #handleEvent(event: TaskEvent): void {
-    const task = this.#tasksById.get(event.taskId);
-    if (!task) return;
+	#handleEvent(event: TaskEvent): void {
+		// Side effects before state update
+		const taskIdx = this.tasks.findIndex((t) => t.id === event.taskId);
+		if (taskIdx === -1) {
+			console.warn("[bg] event orphaned — no task for", event.taskId.slice(0, 8), event.type);
+			return;
+		}
+		if (event.type === "cancelled" || event.type === "completed" || event.type === "failed") {
+			this.#abortControllers.delete(event.taskId);
+		}
+		if (event.type === "cancelled") {
+			const controller = this.#abortControllers.get(event.taskId);
+			if (controller) controller.abort();
+		}
 
-    switch (event.type) {
-      case "started":
-        task.status = "running";
-        task.progress = 0;
-        task.message = "Running…";
-        task.startedAt = Date.now();
-        break;
-      case "progress":
-        task.status = "running";
-        task.progress = event.progress;
-        task.message = event.message;
-        break;
-      case "completed":
-        task.status = "completed";
-        task.progress = 1;
-        task.message = `${event.result.succeeded} of ${event.result.results.length} completed`;
-        task.result = event.result;
-        task.completedAt = Date.now();
-        this.#abortControllers.delete(event.taskId);
-        break;
-      case "failed":
-        task.status = "failed";
-        task.error = event.error;
-        if (event.partial) {
-          task.result = event.partial;
-          task.message = `${event.partial.succeeded} of ${event.partial.results.length} completed`;
-        } else {
-          task.message = event.error;
-        }
-        task.completedAt = Date.now();
-        this.#abortControllers.delete(event.taskId);
-        break;
-      case "cancelled":
-        task.status = "cancelled";
-        task.message = event.partial
-          ? `Cancelled — ${event.partial.succeeded} of ${event.partial.results.length} completed`
-          : "Cancelled by user";
-        task.completedAt = Date.now();
-        if (event.partial) {
-          task.result = event.partial;
-        }
-        // Abort any in-flight ocr-direct fetch for this task
-        const controller = this.#abortControllers.get(event.taskId);
-        if (controller) {
-          controller.abort();
-          this.#abortControllers.delete(event.taskId);
-        }
-        break;
-    }
+		// Immutable state update through $state proxy
+		this.tasks = this.tasks.map((t) => {
+			if (t.id !== event.taskId) return t;
 
-    this.tasks = [...this.tasks];
-  }
+			switch (event.type) {
+				case "started":
+					return { ...t, status: "running" as const, progress: 0, message: "Running…", startedAt: Date.now() };
+				case "progress":
+					return { ...t, status: "running" as const, progress: event.progress, message: event.message };
+				case "file-update":
+					return { ...t, files: event.files };
+				case "phase-change":
+					return { ...t, phase: event.phase };
+				case "completed":
+					return {
+						...t,
+						status: "completed" as const,
+						progress: 1,
+						message: `${event.result.succeeded} of ${event.result.results.length} completed`,
+						result: event.result,
+						completedAt: Date.now(),
+					};
+				case "failed":
+					return {
+						...t,
+						status: "failed" as const,
+						error: event.error,
+						message: event.partial
+							? `${event.partial.succeeded} of ${event.partial.results.length} completed`
+							: event.error,
+						result: event.partial ?? t.result,
+						completedAt: Date.now(),
+					};
+				case "cancelled":
+					return {
+						...t,
+						status: "cancelled" as const,
+						message: event.partial
+							? `Cancelled — ${event.partial.succeeded} of ${event.partial.results.length} completed`
+							: "Cancelled by user",
+						result: event.partial ?? t.result,
+						completedAt: Date.now(),
+					};
+				default:
+					return t;
+			}
+		});
+
+		// Keep #tasksById in sync for downstream consumers.  Strip any
+		// $state proxy wrapper so the object survives postMessage on retry.
+		const updated = this.tasks.find((t) => t.id === event.taskId);
+		if (updated) this.#tasksById.set(event.taskId, { ...updated });
+	}
 
   /**
    * Spawn a background task. Returns the `taskId` synchronously; updates
@@ -158,7 +172,10 @@ class BackgroundTasksStore {
 
     void this.#ensureWorker().then(() => {
       const worker = this.#worker;
-      if (!worker) return;
+      if (!worker) {
+        console.error("[bg] no worker after ensureWorker resolved");
+        return;
+      }
       const message: WorkerInbound = { type: "run", taskId: id, spec };
       worker.postMessage(message);
     });
@@ -181,7 +198,10 @@ class BackgroundTasksStore {
    */
   cancelTask(id: string): void {
     const worker = this.#worker;
-    if (!worker) return;
+    if (!worker) {
+      console.warn("[bg] cancelTask — no worker");
+      return;
+    }
     const message: WorkerInbound = { type: "cancel", taskId: id };
     worker.postMessage(message);
   }

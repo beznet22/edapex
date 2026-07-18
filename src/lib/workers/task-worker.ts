@@ -27,12 +27,16 @@ import type {
 	WorkerInbound,
 	BatchExtractResult,
 	SerializedTenant,
+	UploadFileState,
 } from "$lib/types/background-tasks";
+import { compressImage, filenameForMime } from "$lib/compression.utils";
 
 declare const self: DedicatedWorkerGlobalScope;
 
 const POLL_INTERVAL_MS = 3000;
 const POLL_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
+const UPLOAD_BATCH_SIZE = 3;
+const OCR_BATCH_SIZE = 5;
 
 // AbortController per task — used by `runOcrDirect` so a `cancel`
 // message can abort the in-flight `fetch` immediately.
@@ -264,6 +268,204 @@ async function runOcrDirect(
 	});
 }
 
+async function fetchWithTimeout(
+	url: string,
+	options: RequestInit & { signal?: AbortSignal },
+	timeoutMs: number,
+): Promise<Response> {
+	let timeoutId: ReturnType<typeof setTimeout>;
+	const timeoutPromise = new Promise<never>((_, reject) => {
+		timeoutId = setTimeout(() => {
+			reject(new DOMException(`Request timed out after ${timeoutMs}ms`, "TimeoutError"));
+		}, timeoutMs);
+	});
+	try {
+		return await Promise.race([fetch(url, options), timeoutPromise]);
+	} finally {
+		clearTimeout(timeoutId!);
+	}
+}
+
+async function runFilePipeline(
+	taskId: string,
+	files: Array<{ file: File; name: string }>,
+	tenant: SerializedTenant,
+	prefix: string,
+	examTypeId: number,
+): Promise<void> {
+	const states: UploadFileState[] = files.map((f) => ({
+		key: "",
+		name: f.name,
+		status: "compressing",
+	}));
+
+	function emitFiles(): void {
+		emit({ type: "file-update", taskId, files: states.map((s) => ({ ...s })) });
+	}
+
+	const abortController = new AbortController();
+	abortControllers.set(taskId, abortController);
+
+	// ── Phase 1: Upload pool ─────────────────────────────────────────────────
+	emit({ type: "phase-change", taskId, phase: "upload" });
+	postProgress(taskId, 0, `Uploading ${files.length} file(s)…`);
+
+	const uploadedKeys: string[] = [];
+	let uploadIdx = 0;
+
+	async function uploadWorker(): Promise<void> {
+		while (true) {
+			if (cancelledTasks.has(taskId)) return;
+			const idx = uploadIdx++;
+			if (idx >= files.length) return;
+			const f = files[idx];
+
+			try {
+				states[idx] = { ...states[idx], status: "compressing" };
+				emitFiles();
+
+				const result = await compressImage(f.file);
+
+				states[idx] = {
+					...states[idx],
+					status: "uploading",
+					compressedSize: result.file.size,
+					originalSize: f.file.size,
+				};
+				emitFiles();
+
+				const filename = filenameForMime(f.name, result.file.type);
+				const path = prefix + filename;
+
+				const res = await fetchWithTimeout(
+					`/api/file/${path}?examTypeId=${examTypeId}`,
+					{ method: "PUT", body: result.file, signal: abortController.signal },
+					60000,
+				);
+
+				if (!res.ok) {
+					let msg = `HTTP ${res.status}`;
+					try { const b = await res.json(); if (b?.error) msg = b.error; } catch { /* skip */ }
+					throw new Error(msg);
+				}
+
+				states[idx] = { ...states[idx], status: "completed", key: path };
+				uploadedKeys.push(path);
+				emitFiles();
+			} catch (err) {
+				if (err instanceof DOMException && err.name === "AbortError") {
+					return; // task cancelled — stop this worker
+				}
+				const msg = err instanceof Error ? err.message : String(err);
+				states[idx] = {
+					...states[idx],
+					status: "error",
+					error: msg,
+				};
+				emitFiles();
+			}
+		}
+	}
+
+	const uploadWorkers = Array.from(
+		{ length: Math.min(UPLOAD_BATCH_SIZE, files.length) },
+		() => uploadWorker(),
+	);
+	await Promise.all(uploadWorkers);
+
+	if (cancelledTasks.has(taskId)) {
+		postCancelled(taskId);
+		return;
+	}
+
+	// ── Phase 2: OCR pool for image files ────────────────────────────────────
+	const imageKeys = uploadedKeys.filter((k) => /\.(jpe?g|png|webp|gif)$/i.test(k));
+
+	if (imageKeys.length > 0) {
+		emit({ type: "phase-change", taskId, phase: "ocr" });
+		postProgress(taskId, 0.5, `Extracting ${imageKeys.length} file(s)…`);
+
+		for (const key of imageKeys) {
+			const s = states.find((st) => st.key === key);
+			if (s) { s.status = "ocr"; }
+		}
+		emitFiles();
+
+		let ocrIdx = 0;
+
+		async function ocrWorker(): Promise<void> {
+			while (true) {
+				if (cancelledTasks.has(taskId)) return;
+				const idx = ocrIdx++;
+				if (idx >= imageKeys.length) return;
+				const key = imageKeys[idx];
+
+				try {
+					const res = await fetchWithTimeout(
+						"/api/file/?action=ocr-direct",
+						{
+							method: "POST",
+							headers: { "Content-Type": "application/json" },
+							body: JSON.stringify({ key, tenant }),
+							signal: abortController.signal,
+						},
+						120000,
+					);
+
+					if (!res.ok) {
+						let msg = `HTTP ${res.status}`;
+						try { const b = await res.json(); if (b?.error) msg = b.error; } catch { /* skip */ }
+						throw new Error(msg);
+					}
+
+					const s = states.find((st) => st.key === key);
+					if (s) { s.status = "completed"; }
+					emitFiles();
+				} catch (err) {
+					if (err instanceof DOMException && err.name === "AbortError") {
+						return; // task cancelled — stop this worker
+					}
+					const msg = err instanceof Error ? err.message : String(err);
+					const s = states.find((st) => st.key === key);
+					if (s) {
+						s.status = "error";
+						s.error = msg;
+					}
+					emitFiles();
+				}
+			}
+		}
+
+		const ocrWorkers = Array.from(
+			{ length: Math.min(OCR_BATCH_SIZE, imageKeys.length) },
+			() => ocrWorker(),
+		);
+		await Promise.all(ocrWorkers);
+	}
+
+	// ── Result ──────────────────────────────────────────────────────────────
+	if (cancelledTasks.has(taskId)) {
+		postCancelled(taskId);
+		return;
+	}
+
+	const succeeded = states.filter((s) => s.status === "completed").length;
+	const failed = states.filter((s) => s.status === "error").length;
+	const results: BatchExtractResult[] = states
+		.filter((s) => s.key)
+		.map((s) => ({
+			key: s.key,
+			status: s.status === "completed" ? "success" as const : "error" as const,
+			error: s.error,
+		}));
+
+	if (failed > 0) {
+		postFailed(taskId, `${failed} of ${states.length} failed`, { succeeded, failed, results });
+	} else {
+		postCompleted(taskId, { succeeded, failed, results });
+	}
+}
+
 async function runOcrSingle(
   taskId: string,
   key: string,
@@ -284,6 +486,9 @@ async function runTask(taskId: string, spec: TaskSpec): Promise<void> {
 				break;
 			case "ocr-direct":
 				await runOcrDirect(taskId, spec.key, spec.tenant);
+				break;
+			case "process-files":
+				await runFilePipeline(taskId, spec.files, spec.tenant, spec.prefix, spec.examTypeId);
 				break;
 		}
 	} catch (err) {
@@ -311,6 +516,10 @@ self.onmessage = (e: MessageEvent<WorkerInbound>) => {
  *   - For `ocr-direct` (in-flight `fetch`): aborts the AbortController
  *     stored in `abortControllers`. The fetch's promise rejects with
  *     `AbortError`; `runOcrDirect` catches this and posts `cancelled`.
+ *   - For `process-files` (upload+OCR pipeline): sets `cancelledTasks`
+ *     and aborts the controller, which cancels all in-flight PUT and
+ *     OCR fetch requests. The pipeline checks `cancelledTasks` before
+ *     each batch and after AbortError, posting `cancelled` and returning.
  */
 function handleCancel(taskId: string): void {
 	cancelledTasks.add(taskId);
