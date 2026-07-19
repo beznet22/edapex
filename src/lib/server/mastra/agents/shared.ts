@@ -66,16 +66,15 @@ export type RequestContextValues = z.infer<typeof requestContextSchema>;
  * env-keyed fallback (see provider/credentials.ts for the platform-default
  * synthesis and provider/router.ts for defaultModelForRole).
  */
-const kimchiProvider1 = createOpenAICompatible({
-	name: 'kimchi',
-	apiKey: env.KIMCHI_API_KEY,
-	baseURL: 'https://llm.kimchi.dev/openai/v1',
+export const openCodeProvider = createOpenAICompatible({
+	name: 'open-code',
+	apiKey: env.OPENCODE_API_KEY,
+	baseURL: 'https://opencode.ai/zen/v1',
 	headers: { 'Accept-Encoding': 'identity' },
 	supportsStructuredOutputs: true,
-
 });
 
-export const DEFAULT_MODEL = kimchiProvider1.chatModel('deepseek-v4-flash');
+export const DEFAULT_MODEL = openCodeProvider.chatModel('opencode/deepseek-v4-flash');
 
 
 const groqProvider = createOpenAICompatible({

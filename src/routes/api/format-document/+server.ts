@@ -7,6 +7,7 @@ import { getClassRoster } from '$lib/server/mastra/agents/skill-instructions';
 import { extractRateLimitFromHeaders } from '$lib/provider/rate-limit';
 import { deriveInitialFilename } from '$lib/server/mastra/tools/operations/reporting/marksheet/stream-document';
 import { ALLOWED_DESIGNATIONS } from '$lib/types/sms-types';
+import { openCodeProvider } from '$lib/server/mastra/agents/shared';
 
 export const POST: RequestHandler = async ({ request, locals, cookies }) => {
   try {
@@ -198,9 +199,10 @@ MIDDLEBASIC: Subject Code | MTA (30) | CA (10) | REPORT (10) | EXAM (50)`;
       const fallbackProvider = selectedModel.split('/')[0];
       if (selectedModel && fallbackProvider && fallbackProvider !== 'groq') {
         try {
+          const model = openCodeProvider.chatModel(selectedModel.split('/')[1]);
           const result = await agent.generate(prompt, {
-            model: selectedModel as never,
-            providerOptions: { groq: { reasoningEffort: 'none' } } as never,
+            model,
+            providerOptions: { deepseek: { reasoningEffort: 'none' } } as never,
           });
           markdown = result.text;
         } catch {

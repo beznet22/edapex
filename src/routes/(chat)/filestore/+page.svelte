@@ -61,7 +61,7 @@
 
 	let activeTermId = $state(data.activeTermId);
 	let searchQuery = $state("");
-	let categoryFilter = $state<"all" | "images" | "files">("all");
+	let categoryFilter = $state<"all" | "images" | "files">("images");
 	let sourceFilter = $state<Set<ArtifactSource>>(new Set());
 	let categoryMulti = $state<Set<ArtifactCategory>>(new Set());
 	let viewMode = $state<"grid" | "list">("grid");
@@ -79,6 +79,7 @@
 	let isFormatting = $state(false);
 	let isStartingChat = $state(false);
 	let optimisticFiles = $state(new Map<string, Artifact>());
+	let lastCompletedTime = $state(0);
 
 	$effect(() => {
 		if (activeTermId !== data.activeTermId) {
@@ -130,6 +131,10 @@
 								});
 								changed = true;
 							}
+							if (fileState.contentHash && fileState.contentHash !== existing.contentHash) {
+								next.set(url, { ...existing, contentHash: fileState.contentHash });
+								changed = true;
+							}
 						} else {
 							if (fileState.status !== "completed" && fileState.status !== "formatting") continue;
 							next.set(url, {
@@ -145,6 +150,7 @@
 								examTypeId: task.spec.kind === "process-files" ? task.spec.examTypeId ?? undefined : undefined,
 								status: "processing",
 								manifestStatus: fileState.manifestStatus,
+								contentHash: fileState.contentHash,
 							});
 							changed = true;
 						}
@@ -154,17 +160,76 @@
 				// Terminal result update
 				if (task.status === "completed" && task.result) {
 					for (const result of task.result.results) {
+						if (!result.key) continue;
 						const url = `/api/file/${result.key}`;
 						const existing = next.get(url);
-						if (!existing) continue;
-						if (existing.manifestStatus === result.manifestStatus) continue;
+						if (!existing) {
+							const name = result.key.split("/").pop() ?? result.key;
+							next.set(url, {
+								id: url,
+								title: name,
+								kind: deriveKind(name),
+								category: deriveCategory(name),
+								source: "uploaded",
+								url,
+								saveUrl: url,
+								modifiedAt: Date.now(),
+								status: result.status === "success" ? "success" : "error",
+								manifestStatus: result.manifestStatus,
+								contentHash: result.contentHash,
+							});
+							changed = true;
+							continue;
+						}
 
-						next.set(url, {
-							...existing,
-							status: result.status === "success" ? "success" : "error",
-							manifestStatus: result.manifestStatus,
-						});
-						changed = true;
+						const updates: Partial<Artifact> = {};
+						if (result.status === "success" && existing.status !== "success") updates.status = "success";
+						if (result.manifestStatus && result.manifestStatus !== existing.manifestStatus) updates.manifestStatus = result.manifestStatus;
+						if (result.contentHash && result.contentHash !== existing.contentHash) updates.contentHash = result.contentHash;
+
+						if (Object.keys(updates).length > 0) {
+							next.set(url, { ...existing, ...updates });
+							changed = true;
+						}
+					}
+				}
+			}
+
+			// OCR tasks — no live file states, only terminal results
+			if (task.spec.kind === "ocr-batch" || task.spec.kind === "ocr-single" || task.spec.kind === "ocr-direct") {
+				if (task.status === "completed" && task.result) {
+					for (const result of task.result.results) {
+						if (!result.key) continue;
+						const url = `/api/file/${result.key}`;
+						const existing = next.get(url);
+
+						if (result.status === "success" && result.manifestStatus === "Extracted") {
+							if (existing) {
+								const updates: Partial<Artifact> = {};
+								if (existing.manifestStatus !== result.manifestStatus) updates.manifestStatus = result.manifestStatus;
+								if (result.contentHash && result.contentHash !== existing.contentHash) updates.contentHash = result.contentHash;
+								if (Object.keys(updates).length > 0) {
+									next.set(url, { ...existing, ...updates });
+									changed = true;
+								}
+							} else {
+								const name = result.key.split("/").pop() ?? result.key;
+								next.set(url, {
+									id: url,
+									title: name,
+									kind: deriveKind(name),
+									category: deriveCategory(name),
+									source: "uploaded",
+									url,
+									saveUrl: url,
+									modifiedAt: Date.now(),
+									status: "success",
+									manifestStatus: result.manifestStatus,
+									contentHash: result.contentHash,
+								});
+								changed = true;
+							}
+						}
 					}
 				}
 			}
@@ -223,7 +288,7 @@
 		const map = new Map<string, Artifact>();
 		for (const f of data.files) map.set(f.url ?? f.id, f);
 		for (const [, f] of optimisticFiles) {
-			if (!map.has(f.url ?? f.id)) map.set(f.url ?? f.id, f);
+			map.set(f.url ?? f.id, f);
 		}
 		return [...map.values()];
 	});
@@ -333,13 +398,13 @@
 	}
 
 	function badgeConfig(file: Artifact): { label: string; cls: string; pulse?: boolean } | null {
-		const ms = file.manifestStatus;
+		const ms = file.manifestStatus ?? file.marksheetStatus;
 		if (ms === "Failed") return { label: "Failed", cls: "bg-rose-400/15 text-rose-300", pulse: false };
 		if (ms === "Uploaded") return { label: "Processing", cls: "bg-amber-400/15 text-amber-300", pulse: true };
 		if (ms === "Extracted") return { label: "Extracted", cls: "bg-sky-400/15 text-sky-300" };
-		if (ms === "Formatted") return { label: "Ready", cls: "bg-emerald-400/15 text-emerald-300" };
-		if (ms === "Validated") return { label: "Validated", cls: "bg-emerald-400/15 text-emerald-300" };
-		if (ms === "Committed") return { label: "Committed", cls: "bg-emerald-400/15 text-emerald-300" };
+		if (ms === "Formatted" || ms === "formatted") return { label: "Ready", cls: "bg-emerald-400/15 text-emerald-300" };
+		if (ms === "Validated" || ms === "validated") return { label: "Validated", cls: "bg-emerald-400/15 text-emerald-300" };
+		if (ms === "Committed" || ms === "committed") return { label: "Committed", cls: "bg-emerald-400/15 text-emerald-300" };
 		if (ms === "Generated") return { label: "Generated", cls: "bg-emerald-400/15 text-emerald-300" };
 		if (ms === "Published") return { label: "Published", cls: "bg-emerald-400/15 text-emerald-300" };
 		if (file.status === "processing") return { label: "Processing", cls: "bg-amber-400/15 text-amber-300", pulse: true };

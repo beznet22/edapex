@@ -1,14 +1,19 @@
 <script lang="ts">
   /**
    * Confetti — pure-canvas particle burst for batch-success celebration.
-   * No external dependency. Mounts a single fixed-position canvas; the
-   * `trigger` prop is a counter — increment to fire. Particles use the
+   * No external dependency. Mounts a single fixed-position canvas at the
+   * document body level so it stacks above portalled content (popovers etc).
+   * The `trigger` prop is a counter — increment to fire. Particles use the
    * app's OKLCH tokens so the burst matches the design system in both
    * light and dark modes.
    */
   import { onMount } from "svelte";
 
-  let { trigger = 0 }: { trigger: number } = $props();
+  let {
+    trigger = 0,
+    originX,
+    originY,
+  }: { trigger: number; originX?: number; originY?: number } = $props();
 
   let canvas: HTMLCanvasElement | null = $state(null);
   let raf = 0;
@@ -28,6 +33,18 @@
 
   let particles: Particle[] = [];
 
+  onMount(() => {
+    const el = document.createElement("canvas");
+    el.className = "fixed inset-0 z-[9999] pointer-events-none";
+    el.setAttribute("aria-hidden", "true");
+    document.body.appendChild(el);
+    canvas = el;
+    return () => {
+      if (raf) cancelAnimationFrame(raf);
+      el.remove();
+    };
+  });
+
   function cssVar(name: string): string {
     if (typeof document === "undefined") return "#000";
     const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
@@ -45,21 +62,19 @@
     ];
   }
 
-  function fire(c: HTMLCanvasElement) {
+  function fire(c: HTMLCanvasElement, ox: number, oy: number) {
     const ctx = c.getContext("2d");
     if (!ctx) return;
     const W = c.width = window.innerWidth;
     const H = c.height = window.innerHeight;
     const colors = readColors();
     const count = 36;
-    const originX = W / 2;
-    const originY = H * 0.32;
     for (let i = 0; i < count; i++) {
       const angle = (-Math.PI / 2) + (Math.random() - 0.5) * Math.PI * 0.9;
       const speed = 380 + Math.random() * 460;
       particles.push({
-        x: originX + (Math.random() - 0.5) * 80,
-        y: originY,
+        x: ox + (Math.random() - 0.5) * 80,
+        y: oy,
         vx: Math.cos(angle) * speed,
         vy: Math.sin(angle) * speed,
         rot: Math.random() * Math.PI * 2,
@@ -111,16 +126,8 @@
   }
 
   $effect(() => {
-    if (trigger > 0 && canvas) fire(canvas);
-  });
-
-  onMount(() => () => {
-    if (raf) cancelAnimationFrame(raf);
+    if (trigger > 0 && canvas) {
+      fire(canvas, originX ?? canvas.width / 2, originY ?? canvas.height * 0.32);
+    }
   });
 </script>
-
-<canvas
-  bind:this={canvas}
-  class="fixed inset-0 z-40 pointer-events-none"
-  aria-hidden="true"
-></canvas>

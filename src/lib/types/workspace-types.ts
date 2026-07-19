@@ -25,4 +25,7 @@ export interface Artifact {
 	category?: ArtifactCategory;
 	modifiedAt?: number;
 	examTypeId?: number;
+	contentHash?: string;
+	documentId?: string;
+	mimeType?: string;
 }

@@ -73,6 +73,13 @@
 	let isOpen = $state(false);
 	let wasActive = $state(false);
 	let confettiTrigger = $state(0);
+	let popoverContentRef = $state<HTMLElement | null>(null);
+	const confettiOriginX = $derived(popoverContentRef
+		? popoverContentRef.getBoundingClientRect().left + popoverContentRef.offsetWidth / 2
+		: undefined);
+	const confettiOriginY = $derived(popoverContentRef
+		? popoverContentRef.getBoundingClientRect().top + popoverContentRef.offsetHeight / 2
+		: undefined);
 
 	const footerSummary = $derived.by(() => {
 		const parts: string[] = [];
@@ -244,6 +251,7 @@
 	</Popover.Trigger>
 
 	<Popover.Content
+		bind:ref={popoverContentRef}
 		align="end"
 		side="bottom"
 		sideOffset={8}
@@ -476,4 +484,4 @@
 	</Popover.Content>
 </Popover.Root>
 
-<Confetti trigger={confettiTrigger} />
+<Confetti trigger={confettiTrigger} originX={confettiOriginX} originY={confettiOriginY} />

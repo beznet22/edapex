@@ -215,18 +215,26 @@ export const load: PageServerLoad = async ({ url, locals, cookies }) => {
 		for (const f of files) {
 			const relKey = f.url?.replace("/api/file/", "");
 			if (!relKey) continue;
-			const ms = pathToMarksheetStatus.get(relKey);
-			if (ms) (f as Artifact & { marksheetStatus?: string }).marksheetStatus = ms;
-			const manifestStatus = pathToManifestStatus.get(relKey);
-			if (manifestStatus) (f as any).manifestStatus = manifestStatus;
-			const manifestError = pathToError.get(relKey);
-			if (manifestError) (f as any).manifestError = manifestError;
-			const ch = pathToContentHash.get(relKey);
-			if (ch) (f as any).contentHash = ch;
-			const did = pathToDocumentId.get(relKey);
-			if (did) (f as any).documentId = did;
-			const mt = pathToMimeType.get(relKey);
-			if (mt) (f as any).mimeType = mt;
+			const candidates = [relKey];
+			if (relKey.includes("/notes/")) {
+				candidates.push(relKey.replace("/notes/", "/uploads/"));
+			} else if (relKey.includes("/uploads/")) {
+				candidates.push(relKey.replace("/uploads/", "/notes/"));
+			}
+			for (const key of candidates) {
+				const ms = pathToMarksheetStatus.get(key);
+				if (ms && !f.marksheetStatus) f.marksheetStatus = ms;
+				const manifestStatus = pathToManifestStatus.get(key);
+				if (manifestStatus && !f.manifestStatus) f.manifestStatus = manifestStatus;
+				const manifestError = pathToError.get(key);
+				if (manifestError && !f.manifestError) f.manifestError = manifestError;
+				const ch = pathToContentHash.get(key);
+				if (ch && !f.contentHash) f.contentHash = ch;
+				const did = pathToDocumentId.get(key);
+				if (did && !f.documentId) f.documentId = did;
+				const mt = pathToMimeType.get(key);
+				if (mt && !f.mimeType) f.mimeType = mt;
+			}
 		}
 	}
 
