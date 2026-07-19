@@ -277,6 +277,7 @@ export const transcriptReportTool = createTool({
       {
         path: persistPath,
         kind: 'transcript-markdown',
+        status: 'Formatted',
         studentId: student.studentId,
         examTypeId,
         academicId,

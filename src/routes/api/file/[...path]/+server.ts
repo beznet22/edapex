@@ -25,7 +25,8 @@ import { ALLOWED_DESIGNATIONS } from "$lib/types/sms-types";
 import { ocrBatchService } from '$lib/server/service/ocr-batch.service';
 import { mistralOcrService } from '$lib/server/service/mistral-ocr.service';
 import { OcrWorkspaceStore } from '$lib/server/mastra/storage/ocr/ocr-workspace-store';
-import { addEntry as addWorkspaceEntry } from '$lib/server/workspace/manifest';
+import { addEntry as addWorkspaceEntry, updateEntry } from '$lib/server/workspace/manifest';
+import { uploadPath } from '$lib/server/workspace/paths';
 import { getAppDb } from '$lib/server/mastra/storage/libsql/app-db';
 import type { SerializedTenant } from '$lib/types/background-tasks';
 import type { FileEntry } from '@mastra/core/workspace';
@@ -146,12 +147,16 @@ export const POST: RequestHandler = async ({ params, url, request, locals, cooki
   try {
     if (!locals.user) throw error(401, 'Unauthorized');
 
+    const examTypeIdParam = url.searchParams.get('examTypeId');
+    const parsedExamTypeId = examTypeIdParam ? parseInt(examTypeIdParam, 10) : null;
+
     const { tenant, requestContext, fs } = await resolveTenantWorkspace({
       schoolId: locals.user.schoolId ?? 1,
       userId: locals.user.id ?? 1,
       staffId: (locals.user as { staffId?: number })?.staffId,
       designationId: (locals.user as { designationId?: number })?.designationId ?? ALLOWED_DESIGNATIONS.IT,
       selectedClassCookie: cookies.get('selected-class'),
+      examTypeId: parsedExamTypeId,
     });
     if (!fs) throw error(500, 'Workspace filesystem unavailable');
 
@@ -227,7 +232,7 @@ export const POST: RequestHandler = async ({ params, url, request, locals, cooki
       const persisted = await OcrWorkspaceStore.getOrCreate({
         tenant: tContext,
         file: bytes,
-        fileName: `${filename}.md`,
+        fileName: filename,
         mimeType: 'text/markdown',
         db: getAppDb(),
         userId: tContext.userId,
@@ -237,10 +242,14 @@ export const POST: RequestHandler = async ({ params, url, request, locals, cooki
           pagesProcessed: ocrResponse.usageInfo?.pagesProcessed
         }
       });
+      if (body.key && tContext.examTypeId != null) {
+        await updateEntry(tContext, body.key, { status: 'Extracted' }, tContext.examTypeId);
+      }
       return json({
         success: true,
         contentHash: persisted.contentHash,
-        mistralFileId: persisted.mistralFileId
+        mistralFileId: persisted.mistralFileId,
+        manifestStatus: 'Extracted',
       });
     }
 
@@ -277,6 +286,29 @@ export const POST: RequestHandler = async ({ params, url, request, locals, cooki
     }
 
     await fs.writeFile(resolvedPath, bytes, { recursive: true, overwrite: true });
+
+    if (tenant.examTypeId != null) {
+      const fileName = resolvedPath.split('/').pop() ?? 'file';
+      const contentHash = createHash('md5').update(bytes).digest('hex');
+      await addWorkspaceEntry(
+        tenant,
+        {
+          path: resolvedPath,
+          kind: 'user-file',
+          status: 'Uploaded',
+          documentId: randomUUID(),
+          fileName,
+          contentHash,
+          examTypeId: tenant.examTypeId,
+          uploadedAt: new Date().toISOString(),
+          modifiedAt: new Date().toISOString(),
+          mimeType: contentTypeFor(resolvedPath),
+          sizeBytes: bytes.length,
+        },
+        tenant.examTypeId
+      );
+    }
+
     return json({ success: true, path: resolvedPath });
   } catch (e: unknown) {
     if (e instanceof WorkspaceScopeError) {
@@ -321,6 +353,7 @@ export const PUT: RequestHandler = async ({ params, request, locals, cookies, ur
 
     const examTypeIdParam = url.searchParams.get('examTypeId');
     const parsedExamTypeId = examTypeIdParam ? parseInt(examTypeIdParam, 10) : null;
+    const entryKind = url.searchParams.get('kind') ?? 'user-file';
 
     const { tenant, requestContext, fs } = await resolveTenantWorkspace({
       schoolId: locals.user.schoolId ?? 1,
@@ -358,11 +391,15 @@ export const PUT: RequestHandler = async ({ params, request, locals, cookies, ur
     if (tenant.examTypeId == null) {
       throw error(400, 'EXAM_TYPE_REQUIRED: cannot register a workspace upload without an active examTypeId');
     }
+    const manifestRelPath = entryKind === 'note'
+      ? (params.path ?? '')
+      : uploadPath(fileName, tenant.examTypeId);
     await addWorkspaceEntry(
       tenant,
       {
-        path: resolvedPath,
-        kind: 'user-file',
+        path: manifestRelPath,
+        kind: entryKind as any,
+        status: 'Uploaded',
         documentId: randomUUID(),
         fileName,
         contentHash,

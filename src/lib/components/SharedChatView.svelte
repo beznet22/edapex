@@ -106,18 +106,35 @@
     const filesContext = FilesContext.fromContext();
     if (filesContext.references.length > 0) {
       chatContext.fileReferences = [...filesContext.references];
-      filesContext.references = [];
+      // Not clearing — ChatComposer's submit handler clears file.references
+      // after the message is sent so the pill row resets properly.
     }
   });
 
   $effect(() => {
     if (fileKeys.length > 0) {
-      const refs = fileKeys.map((key: string) => ({
-        key,
-        name: key.split("/").pop() ?? key,
-        type: "file" as const,
-      }));
-      chatContext.fileReferences = refs;
+      const refs = fileKeys.map((raw: string) => {
+        let key = raw;
+        let name = raw.split("/").pop() ?? raw;
+        let mimeType: string | undefined;
+        let contentHash: string | undefined;
+        let fileId: string | undefined;
+        try {
+          const decoded = JSON.parse(atob(raw));
+          if (decoded && typeof decoded === "object") {
+            key = decoded.k ?? key;
+            name = decoded.n ?? name;
+            mimeType = decoded.m;
+            contentHash = decoded.c;
+            fileId = decoded.d;
+          }
+        } catch {}
+        return { key, name, type: "file" as const, mimeType, contentHash, fileId };
+      });
+      const filesContext = FilesContext.fromContext();
+      for (const ref of refs) {
+        filesContext.addReference(ref);
+      }
     }
   });
 

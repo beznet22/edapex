@@ -18,8 +18,8 @@ import {
   sanitizeForFilename,
   studentCriteriaBase,
 } from "$lib/server/mastra/tools/operations/reporting/_shared";
-import { marksheetPdfPath, marksheetJsonPath } from "$lib/server/workspace/paths";
-import { updateEntryStatus } from "$lib/server/workspace/manifest";
+import { marksheetPdfPath, marksheetJsonPath, marksheetMarkdownPath } from "$lib/server/workspace/paths";
+import { updateEntryStatus, updateEntry, readManifest as readWorkspaceManifest } from "$lib/server/workspace/manifest";
 import type { MemoryContext } from "$lib/server/mastra/utils/chat-utils";
 
 interface ParentLookup {
@@ -51,6 +51,7 @@ const reportPdfInputSchema = z.object({
 const reportPdfPublishInputSchema = z.object({
   ...studentCriteriaBase,
   forceRegenerate: z.boolean().optional(),
+  resend: z.boolean().optional().describe('Skip the already-sent check and resend the email.'),
 });
 
 const reportPdfPublishOutputSchema = z.object({
@@ -197,29 +198,11 @@ export const publishResultPdfTool = createTool({
       };
     }
 
-    const assessment = await createAssessmentServiceForRequest(tenant);
-    const alreadySent = await assessment.isEmailAlreadySent(student.studentId, examTypeId);
-    if (alreadySent) {
-      await emitNotification(
-        writer,
-        memCtx,
-        `Result already published to ${parentEmail}.`,
-        "info",
-      );
-      return {
-        status: "skipped_already_published" as const,
-        artifactId: preview.artifactId,
-        publicationUrl: preview.previewUrl,
-        parentEmail,
-        parentName: parentName ?? undefined,
-      };
-    }
-
     const publisher = await createAssessmentPublisherServiceForRequest(tenant);
     const publishResult = await publisher.publishResults({
       studentIds: [student.studentId],
       examId: examTypeId,
-      resend: false,
+      resend: input.resend ?? false,
     });
 
     if (!publishResult.success) {
@@ -241,6 +224,10 @@ export const publishResultPdfTool = createTool({
     const firstResult = publishResult.results[0];
     const jsonPath = marksheetJsonPath(student.studentId, examTypeId);
     await updateEntryStatus(tenant, jsonPath, 'published', examTypeId);
+    const mdPath = marksheetMarkdownPath({ studentId: student.studentId, examTypeId });
+    await updateEntry(tenant, jsonPath, { status: 'Published' }, examTypeId);
+    await updateEntry(tenant, mdPath, { status: 'Published' }, examTypeId);
+    await updateEntry(tenant, storagePath, { status: 'Published' }, examTypeId);
 
     await emitNotification(
       writer,

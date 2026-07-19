@@ -30,6 +30,7 @@ import {
   type TenantContext,
 } from "$lib/server/mastra/tenant-context";
 import { OcrWorkspaceStore } from "$lib/server/mastra/storage/ocr/ocr-workspace-store";
+import { updateEntry } from "$lib/server/workspace/manifest";
 import type { SerializedTenant } from "$lib/types/background-tasks";
 import { resolveMistralApiKey } from "$lib/server/mastra/provider/ocr-key-resolver";
 
@@ -54,6 +55,7 @@ export type FinalizeBatchResult = {
     contentHash?: string;
     mistralFileId?: string;
     error?: string;
+    manifestStatus?: string;
   }>;
 };
 
@@ -275,7 +277,8 @@ export class OcrBatchService {
     for (const key of keys) {
       const entry = byCustomId.get(key);
       if (!entry || !entry.markdown) {
-        results.push({ key, status: "error", error: "No OCR result in batch output" });
+        await updateEntry(t, key, { status: "Failed", error: "No OCR result in batch output" }, t.examTypeId ?? 0).catch(() => {});
+        results.push({ key, status: "error", error: "No OCR result in batch output", manifestStatus: "Failed" });
         continue;
       }
       try {
@@ -286,15 +289,18 @@ export class OcrBatchService {
           db,
           userId: tenant.userId,
         });
+        await updateEntry(t, key, { status: "Extracted" }, t.examTypeId ?? 0).catch(() => {});
         results.push({
           key,
           status: "success",
           contentHash: persisted.contentHash,
           mistralFileId: persisted.mistralFileId,
+          manifestStatus: "Extracted",
         });
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
-        results.push({ key, status: "error", error: message });
+        await updateEntry(t, key, { status: "Failed", error: message }, t.examTypeId ?? 0).catch(() => {});
+        results.push({ key, status: "error", error: message, manifestStatus: "Failed" });
       }
     }
 

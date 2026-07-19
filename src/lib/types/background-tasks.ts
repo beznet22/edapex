@@ -40,6 +40,7 @@ export type BatchExtractResult = {
   contentHash?: string;
   mistralFileId?: string;
   error?: string;
+  manifestStatus?: string;
 };
 
 /**
@@ -49,13 +50,15 @@ export type BatchExtractResult = {
 export type UploadFileState = {
   key: string;
   name: string;
-  status: "compressing" | "uploading" | "ocr" | "completed" | "error";
+  status: "compressing" | "uploading" | "ocr" | "formatting" | "completed" | "error";
   error?: string;
   compressedSize?: number;
   originalSize?: number;
+  manifestStatus?: string;
+  contentHash?: string;
 };
 
-export type TaskPhase = "upload" | "ocr";
+export type TaskPhase = "upload" | "ocr" | "format";
 
 export type TaskSpec =
   | {
@@ -79,6 +82,12 @@ export type TaskSpec =
       tenant: SerializedTenant;
       prefix: string;
       examTypeId: number;
+    }
+  | {
+      kind: "format-batch";
+      keys: string[];
+      contentHashes?: Record<string, string>;
+      tenant: SerializedTenant;
     };
 
 export type TaskEvent =
@@ -86,6 +95,7 @@ export type TaskEvent =
 	| { type: "progress"; taskId: string; progress: number; message: string }
 	| { type: "file-update"; taskId: string; files: UploadFileState[] }
 	| { type: "phase-change"; taskId: string; phase: TaskPhase }
+	| { type: "rate-limited"; taskId: string; retryAfterSeconds: number; resetAt: string }
 	| {
 			type: "completed";
 			taskId: string;
@@ -117,6 +127,7 @@ export type Task = {
 	completedAt?: number;
 	result?: { succeeded: number; failed: number; results: BatchExtractResult[] };
 	error?: string;
+	rateLimitInfo?: { retryAfterSeconds: number; resetAt: string; countdownEnd: number };
 };
 
 export type WorkerInbound =

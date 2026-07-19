@@ -32,7 +32,8 @@ import { TimelineRepository, ResultsRepository, StudentRepository } from "$lib/s
 import { SettingsService } from "./settings.service";
 import { smSchools } from "$lib/server/db/sms-schema";
 import { getDatabase } from "$lib/server/db";
-import { marksheetSchema } from "$lib/schema/marksheet";
+import { env } from "$env/dynamic/private";
+import { AssessmentService } from "./assessment.service";
 import ResultTemplate from "$lib/components/template/ResultTemplate.svelte";
 import ResultEmail from "$lib/components/template/result-email.svelte";
 
@@ -80,9 +81,11 @@ function resolveSchoolLogoAbsolutePath(): string | null {
 
 export class AssessmentPublisherService {
   private readonly provider: ScopedRepositoryProvider;
+  private readonly assessmentService: AssessmentService;
 
   constructor(provider: ScopedRepositoryProvider) {
     this.provider = provider;
+    this.assessmentService = new AssessmentService(provider);
   }
 
   private timeline(): TimelineRepository {
@@ -129,10 +132,10 @@ export class AssessmentPublisherService {
     attachments: Array<{ filename: string; content: Buffer }>;
   }): Promise<PublishTranscriptResult> {
     const smtp = new SMTPClient({
-      host: process.env.SMTP_HOST,
-      port: Number(process.env.SMTP_PORT || 587),
-      secure: Number(process.env.SMTP_PORT || 587) === 465,
-      auth: { user: process.env.SMTP_USER || "", pass: process.env.SMTP_PASS || "" },
+      host: env.SMTP_HOST,
+      port: Number(env.SMTP_PORT || 587),
+      secure: Number(env.SMTP_PORT || 587) === 465,
+      auth: { user: env.SMTP_USER || "", pass: env.SMTP_PASS || "" },
     });
 
     try {
@@ -182,21 +185,14 @@ export class AssessmentPublisherService {
           }
         }
 
-        const resultData = await this.result().queryResultData(
-          (await this.student().getStudentById(studentId)) as never,
-          examId,
-        );
-        const validatedResult = await marksheetSchema.safeParseAsync(resultData);
-        if (!validatedResult.success || !resultData) {
+        const marksheet = await this.assessmentService.getStudentResult({ id: studentId, examId });
+        if (!marksheet) {
           processingErrors.push(`Student ${studentId}: Result validation failed`);
           return null;
         }
-        const { student, school } = validatedResult.data as never as {
-          student: { id: number; fullName: string; adminNo: number | null; term: string; parentName: string; parentEmail: string };
-          school: { id: number; name: string; email: string; phone: string; city: string; state: string; title: string; vacation_date: string; logo?: string };
-        };
+        const { student, school } = marksheet;
 
-        const pdfProps = { data: resultData };
+        const pdfProps = { data: marksheet };
         let { body, head } = render(ResultTemplate, { props: pdfProps });
         let html = pageToHtml(body, head);
         const fileName = `res_${student.fullName}_a${student.adminNo}_e${examId}_${Date.now()}`;
@@ -275,10 +271,10 @@ export class AssessmentPublisherService {
     for (const message of messages) {
       try {
         const smtp = new SMTPClient({
-          host: process.env.SMTP_HOST,
-          port: Number(process.env.SMTP_PORT || 587),
-          secure: Number(process.env.SMTP_PORT || 587) === 465,
-          auth: { user: process.env.SMTP_USER || "", pass: process.env.SMTP_PASS || "" },
+          host: env.SMTP_HOST,
+          port: Number(env.SMTP_PORT || 587),
+          secure: Number(env.SMTP_PORT || 587) === 465,
+          auth: { user: env.SMTP_USER || "", pass: env.SMTP_PASS || "" },
         });
         const result = await smtp.from(message.from).to(message.to).subject(message.subject).html(message.html).send();
         if (!result.success) {
@@ -334,7 +330,7 @@ export class AssessmentPublisherService {
     }
 
     return this.sendViaSmtp({
-      fromAddress: process.env.SMTP_FROM || school.email,
+      fromAddress: env.SMTP_FROM || school.email,
       schoolName: school.name,
       toAddress: params.parentEmail,
       subject: `Academic Transcript — ${params.studentName} — Academic Year ${params.academicId}`,

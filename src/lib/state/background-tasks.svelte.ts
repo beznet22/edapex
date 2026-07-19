@@ -112,6 +112,17 @@ class BackgroundTasksStore {
 					return { ...t, files: event.files };
 				case "phase-change":
 					return { ...t, phase: event.phase };
+				case "rate-limited":
+					return {
+						...t,
+						status: "running" as const,
+						rateLimitInfo: {
+							retryAfterSeconds: event.retryAfterSeconds,
+							resetAt: event.resetAt,
+							countdownEnd: Date.now() + event.retryAfterSeconds * 1000,
+						},
+						message: `Rate limited — retrying in ${event.retryAfterSeconds}s…`,
+					};
 				case "completed":
 					return {
 						...t,
@@ -146,6 +157,29 @@ class BackgroundTasksStore {
 					return t;
 			}
 		});
+
+		// Auto-chain format after ocr-batch completes successfully
+		if (event.type === "completed") {
+			const completedTask = this.tasks.find((t) => t.id === event.taskId);
+			if (completedTask?.spec.kind === "ocr-batch" && event.result.succeeded > 0) {
+				const succeeded = event.result.results.filter((r) => r.status === "success");
+				const succeededKeys = succeeded.map((r) => r.key);
+				const contentHashes: Record<string, string> = {};
+				for (const r of succeeded) {
+					if (r.contentHash) contentHashes[r.key] = r.contentHash;
+				}
+				if (succeededKeys.length > 0) {
+					setTimeout(() => {
+						this.runTask({
+							kind: "format-batch",
+							keys: succeededKeys,
+							contentHashes: Object.keys(contentHashes).length > 0 ? contentHashes : undefined,
+							tenant: completedTask.spec.tenant,
+						});
+					}, 0);
+				}
+			}
+		}
 
 		// Keep #tasksById in sync for downstream consumers.  Strip any
 		// $state proxy wrapper so the object survives postMessage on retry.

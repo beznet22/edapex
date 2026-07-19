@@ -9,7 +9,7 @@
  * The `requestContext` mechanism provides tenant isolation without per-request instantiation.
  */
 import { Mastra } from '@mastra/core';
-import { assistantAgent, titleAgent, documentAgent } from './agents';
+import { assistantAgent, titleAgent, documentAgent, formatAgent } from './agents';
 import { editorEditAgent, editorGenerateAgent, editorCopilotAgent } from './agents';
 import { parentAssistantAgent } from './agents/parent-assistant';
 import { chatWorkflow, editorCommandWorkflow } from './workflows';
@@ -35,6 +35,7 @@ export const mastra = new Mastra({
   agents: {
     testAgent: testAgent,
     assistant: assistantAgent,
+    format: formatAgent,
     title: titleAgent,
     editorEdit: editorEditAgent,
     editorGenerate: editorGenerateAgent,

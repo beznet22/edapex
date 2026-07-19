@@ -245,7 +245,7 @@ function parseStudentInfoFromTree(tree: Root, md: string, mentions: ReturnType<t
   };
 }
 
-function extractSubjectsAndRecordsFromTree(tree: Root, studentId: number, category: Category): { subjects: Marksheet["subjects"]; records: Marksheet["records"] } {
+function extractSubjectsAndRecordsFromTree(tree: Root, studentId: number, category: Category, mapping?: ParseContextMappingSubject[]): { subjects: Marksheet["subjects"]; records: Marksheet["records"] } {
   const section = findSection(tree, "Academic Performance");
   if (!section) return { subjects: [], records: [] };
 
@@ -296,7 +296,8 @@ function extractSubjectsAndRecordsFromTree(tree: Root, studentId: number, catego
       if (raw) learningOutcome = raw;
     }
 
-    subjects.push({ subjectId: null, subjectCode, teacherId: null });
+    const matchedSubject = mapping?.find((m) => m.subjectCode.toUpperCase() === subjectCode.toUpperCase());
+    subjects.push({ subjectId: matchedSubject?.id ?? null, subjectCode, teacherId: matchedSubject?.teacherId ?? null });
     records.push({
       studentId,
       resultId: 0,
@@ -389,11 +390,13 @@ export interface ParseContextTenant {
   className?: string;
   sectionName?: string;
   academicYearTitle?: string;
+  fullName?: string;
 }
 
 export interface ParseContextMappingSubject {
   id: number;
   subjectCode: string;
+  teacherId: number;
 }
 
 export interface ParseContextRosterEntry {
@@ -469,6 +472,7 @@ function mergeContext(result: Marksheet, context?: ParseContext): Marksheet {
   if (tenant?.examTypeId != null) student.examTypeId = tenant.examTypeId;
   if (tenant?.className) student.className = tenant.className;
   if (tenant?.sectionName) student.sectionName = tenant.sectionName;
+  if (tenant?.fullName) student.fullName = tenant.fullName;
   if (tenant?.academicYearTitle && !student.sessionYear) {
     student.sessionYear = tenant.academicYearTitle;
   }
@@ -479,7 +483,10 @@ function mergeContext(result: Marksheet, context?: ParseContext): Marksheet {
     const sid = s.subjectCode
       ? subjectMap.get(s.subjectCode.toUpperCase()) ?? null
       : null;
-    return { ...s, subjectId: sid };
+    const matched = s.subjectCode
+      ? mapping?.subjects?.find((m) => m.subjectCode.toUpperCase() === s.subjectCode?.toUpperCase())
+      : undefined;
+    return { ...s, subjectId: sid, teacherId: matched?.teacherId ?? s.teacherId };
   });
 
   const stId = resolvedStudentId ?? result.student.id;
@@ -525,7 +532,7 @@ export function parseMarksheetMarkdown(markdown: string, context?: ParseContext)
 
   const studentPartial = parseStudentInfoFromTree(tree, markdown, mentions);
 
-  const { subjects, records } = extractSubjectsAndRecordsFromTree(tree, studentPartial.id, studentPartial.category);
+  const { subjects, records } = extractSubjectsAndRecordsFromTree(tree, studentPartial.id, studentPartial.category, context?.mapping?.subjects);
 
   const ratings = parseRatingsFromTree(tree);
 

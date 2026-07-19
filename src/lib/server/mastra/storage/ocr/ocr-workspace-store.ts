@@ -15,8 +15,8 @@ import { tenantWorkspace } from '$lib/server/workspace';
 import { buildWorkspaceRequestContext } from '$lib/server/helpers/chat-helper';
 import type { TenantContext } from '$lib/server/mastra/tenant-context';
 import { mistralOcrService } from '$lib/server/service/mistral-ocr.service';
-import { ocrMarkdownPath, ocrMetaPath } from '$lib/server/workspace/paths';
-import { addEntry } from '$lib/server/workspace/manifest';
+import { ocrMarkdownPath, ocrMetaPath, uploadPath } from '$lib/server/workspace/paths';
+import { addEntry, updateEntry } from '$lib/server/workspace/manifest';
 
 export interface OcrMeta {
   contentHash: string;
@@ -198,6 +198,9 @@ export class OcrWorkspaceStore {
       },
       examTypeId
     );
+
+    const sourcePath = uploadPath(params.fileName, examTypeId);
+    await updateEntry(params.tenant, sourcePath, { status: 'Extracted' }, examTypeId);
 
     return { ...meta, markdown };
   }

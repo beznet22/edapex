@@ -30,8 +30,8 @@ import type { Category } from "$lib/schema/marksheet";
 import { GRADE_RANGES } from "$lib/server/service/assessment.service";
 import { resolveTenantFilesystem } from "$lib/server/workspace";
 import { buildWorkspaceRequestContext } from "$lib/server/helpers/chat-helper";
-import { ocrMarkdownPath } from "$lib/server/workspace/paths";
-import { addEntry } from "$lib/server/workspace/manifest";
+import { ocrMarkdownPath, uploadPath } from "$lib/server/workspace/paths";
+import { addEntry, updateEntry } from "$lib/server/workspace/manifest";
 import { getAppDb } from "$lib/server/mastra/storage/libsql/app-db";
 
 export interface ExtractionResult {
@@ -128,6 +128,9 @@ export class AssessmentOcrService {
       examTypeId
     );
 
+    const sourceFilePath = uploadPath(fileName, examTypeId);
+    await updateEntry(this.tenant, sourceFilePath, { status: 'Extracted' }, examTypeId);
+
     const finalClassName = classSection.className || "Unknown";
     const finalSectionName = classSection.sectionName || "Unknown";
     const extractedData = {
@@ -168,13 +171,15 @@ export class AssessmentOcrService {
     const fs = await resolveTenantFilesystem({ requestContext: rc as never });
     if (!fs) return null;
 
-    // Scan ocr/ directory for any markdown content referencing this student
+    // Scan exam-scoped ocr/ directory for any markdown content
     try {
-      const entries = await fs.readdir(".");
-      const ocrEntry = entries.find((e) => e.name.startsWith("ocr/") && e.name.endsWith(".md") && e.type === "file");
-      if (!ocrEntry) return null;
+      const ocrDir = `exams/examType-${examTypeId}/ocr/`;
+      const entries = await fs.readdir(ocrDir);
+      const ocrEntry = entries.find((e) => e.name.endsWith(".md") && e.type === "file");
+      const entryPath = ocrEntry ? `${ocrDir}${ocrEntry.name}` : null;
+      if (!entryPath) return null;
 
-      const rawText = await fs.readFile(ocrEntry.name, { encoding: "utf-8" });
+      const rawText = await fs.readFile(entryPath, { encoding: "utf-8" });
       const content = typeof rawText === "string" ? rawText : rawText.toString("utf-8");
 
       return {

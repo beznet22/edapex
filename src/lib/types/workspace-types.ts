@@ -19,6 +19,8 @@ export interface Artifact {
 	size?: number;
 	status?: ArtifactStatus;
 	marksheetStatus?: string;
+	manifestStatus?: string;
+	manifestError?: string;
 	source?: ArtifactSource;
 	category?: ArtifactCategory;
 	modifiedAt?: number;

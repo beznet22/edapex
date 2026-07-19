@@ -37,12 +37,17 @@ export type ArtifactKind =
   | "user-file"
   | "note"
   | "shared"
-  | "scratch";
+  | "scratch"
+  | "photo";
+
+export type FileStatus = "Uploaded" | "Extracted" | "Formatted" | "Validated" | "Committed" | "Generated" | "Published" | "Failed";
 
 export interface ManifestEntry {
   path: string;
   kind: ArtifactKind;
   marksheetStatus?: MarksheetStatus;
+  status?: FileStatus;
+  error?: string;
   /** UUID minted per upload (toolCallId); used as the formatted marksheet's
    *  documentId after stream-document runs. Enables tools to look up uploads
    *  without a separate `extracted/manifest.json`. */
@@ -74,6 +79,7 @@ export interface WorkspaceManifest {
     ocrUploads: Array<{ fileName: string; contentHash: string; uploadedAt: string }>;
     pdfs: Array<{ name: string; kind: "marksheet" | "transcript"; studentId: number }>;
     notes: Array<{ path: string; modifiedAt: string }>;
+    photos: Array<{ contentHash: string; path: string; uploadedAt: string }>;
   };
 }
 
@@ -89,7 +95,7 @@ export function emptyManifest(tenant: TenantContext, examTypeId: number): Worksp
     sectionId: tenant.sectionId ?? 0,
     examTypeId,
     entries: {},
-    byKind: { marksheets: [], transcripts: [], ocrUploads: [], pdfs: [], notes: [] }
+    byKind: { marksheets: [], transcripts: [], ocrUploads: [], pdfs: [], notes: [], photos: [] }
   };
 }
 
@@ -222,6 +228,12 @@ export async function addEntry(
     }
   } else if (entry.kind === "note") {
     m.byKind.notes.push({ path: entry.path, modifiedAt: entry.modifiedAt });
+  } else if (entry.kind === "photo" && entry.contentHash) {
+    m.byKind.photos.push({
+      contentHash: entry.contentHash,
+      path: entry.path,
+      uploadedAt: entry.uploadedAt
+    });
   }
   await writeManifest(tenant, m, validated);
   return m;
@@ -255,7 +267,24 @@ export async function updateEntryStatus(
   const entry = m.entries[relPath];
   if (entry) {
     entry.marksheetStatus = status;
+    entry.error = undefined;
     entry.modifiedAt = new Date().toISOString();
+  }
+  await writeManifest(tenant, m, validated);
+  return m;
+}
+
+export async function updateEntry(
+  tenant: TenantContext,
+  relPath: string,
+  partial: Partial<ManifestEntry>,
+  examTypeId: number
+): Promise<WorkspaceManifest> {
+  const validated = requireExamTypeId(examTypeId, "updateEntry");
+  const m = await readManifest(tenant, validated);
+  const entry = m.entries[relPath];
+  if (entry) {
+    Object.assign(entry, partial, { modifiedAt: new Date().toISOString() });
   }
   await writeManifest(tenant, m, validated);
   return m;

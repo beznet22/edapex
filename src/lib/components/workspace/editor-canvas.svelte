@@ -386,7 +386,6 @@
 						<WysiwygEditor
 							content={textContent}
 							onUpdate={handleWysiwygUpdate}
-							class="h-full"
 							{designationId}
 							{selectedClassId}
 							{selectedSectionId}

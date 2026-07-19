@@ -57,21 +57,21 @@
 					toolCallId?: string;
 					state?: string;
 					input?: { contentHash?: string; fileName?: string };
-				output?: {
-					artifactId?: string;
-					contentHash?: string;
-					fileName?: string;
-					initialMarkdownPath?: string;
-					persistedMarkdownPath?: string;
-					title?: string;
-					validatedTitle?: string;
-					studentId?: number | null;
-					examTypeId?: number | null;
-					academicId?: number | null;
-					studentFullName?: string | null;
-					adminNo?: number | null;
-					documentId?: string;
-				};
+					output?: {
+						artifactId?: string;
+						contentHash?: string;
+						fileName?: string;
+						initialMarkdownPath?: string;
+						persistedMarkdownPath?: string;
+						title?: string;
+						validatedTitle?: string;
+						studentId?: number | null;
+						examTypeId?: number | null;
+						academicId?: number | null;
+						studentFullName?: string | null;
+						adminNo?: number | null;
+						documentId?: string;
+					};
 					errorText?: string;
 				};
 				if (
@@ -258,13 +258,20 @@
 			URL.revokeObjectURL(url);
 		} catch (e) {
 			import("svelte-sonner").then((m) =>
-				m.toast.error(e instanceof Error ? e.message : "Download failed"),
+				m.toast.error(
+					e instanceof Error ? e.message : "Download failed",
+				),
 			);
 		}
 	}
 
-	function extractStudentIds():
-		{ studentId: number | null; examTypeId: number | null; academicId: number | null; studentFullName: string | null; adminNo: number | null } {
+	function extractStudentIds(): {
+		studentId: number | null;
+		examTypeId: number | null;
+		academicId: number | null;
+		studentFullName: string | null;
+		adminNo: number | null;
+	} {
 		if (toolOutput) {
 			return {
 				studentId: toolOutput.studentId ?? null,
@@ -299,7 +306,13 @@
 				};
 			}
 		}
-		return { studentId: null, examTypeId: null, academicId: null, studentFullName: null, adminNo: null };
+		return {
+			studentId: null,
+			examTypeId: null,
+			academicId: null,
+			studentFullName: null,
+			adminNo: null,
+		};
 	}
 
 	async function handleDownload() {
@@ -310,7 +323,9 @@
 				return;
 			}
 			import("svelte-sonner").then((m) =>
-				m.toast.error("No student data available — cannot generate PDF"),
+				m.toast.error(
+					"No student data available — cannot generate PDF",
+				),
 			);
 			return;
 		}
@@ -332,7 +347,9 @@
 			const data = await res.json();
 			if (data.error) throw new Error(data.error);
 
-			const binary = Uint8Array.from(atob(data.pdfBase64), (c) => c.charCodeAt(0));
+			const binary = Uint8Array.from(atob(data.pdfBase64), (c) =>
+				c.charCodeAt(0),
+			);
 			const blob = new Blob([binary], { type: "application/pdf" });
 			const url = URL.createObjectURL(blob);
 			const a = document.createElement("a");
@@ -347,7 +364,9 @@
 			viewMode = "pdf";
 		} catch (e) {
 			import("svelte-sonner").then((m) =>
-				m.toast.error(e instanceof Error ? e.message : "Download failed"),
+				m.toast.error(
+					e instanceof Error ? e.message : "Download failed",
+				),
 			);
 		} finally {
 			pdfGenerating = false;
@@ -372,7 +391,9 @@
 		const ids = extractStudentIds();
 		if (!ids.studentId || !ids.examTypeId) {
 			import("svelte-sonner").then((m) =>
-				m.toast.error("No student data available — cannot generate PDF"),
+				m.toast.error(
+					"No student data available — cannot generate PDF",
+				),
 			);
 			return;
 		}
@@ -398,7 +419,9 @@
 			viewMode = "pdf";
 		} catch (e) {
 			import("svelte-sonner").then((m) =>
-				m.toast.error(e instanceof Error ? e.message : "Failed to generate PDF"),
+				m.toast.error(
+					e instanceof Error ? e.message : "Failed to generate PDF",
+				),
 			);
 		} finally {
 			pdfGenerating = false;
@@ -448,7 +471,9 @@
 			}
 		} catch (e) {
 			import("svelte-sonner").then((m) =>
-				m.toast.error(e instanceof Error ? e.message : "Validation failed"),
+				m.toast.error(
+					e instanceof Error ? e.message : "Validation failed",
+				),
 			);
 		} finally {
 			validateLoading = false;
@@ -469,7 +494,7 @@
 				? "success"
 				: toolPart?.state === "output-error"
 					? "error"
-					: entry?.status ?? "processing";
+					: (entry?.status ?? "processing");
 		if (syntheticStatus === "success" && persistedMarkdownPath) {
 			const rawContent = entry?.content ?? "";
 			const { fixedMd } = autoFixStructure(rawContent);
@@ -495,7 +520,10 @@
 	/** Path to the marksheet file for validation. Falls back to current.url
 	 *  in filestore mode where toolOutput is not available. */
 	const validatePath = $derived(
-		persistedMarkdownPath ?? (mode === "filestore" && current?.url ? current.url.replace("/api/file/", "") : null),
+		persistedMarkdownPath ??
+			(mode === "filestore" && current?.url
+				? current.url.replace("/api/file/", "")
+				: null),
 	);
 	// Effective streaming state: prefer the merged tool output / stream-entry
 	// status so the header actions are disabled while the artifact is still
@@ -503,7 +531,8 @@
 	// not just while the artifact card itself reports `processing`.
 	const isStreaming = $derived(
 		(toolPart !== null || entry !== null) &&
-		(effectiveStatus === "streaming" || effectiveStatus === "processing"),
+			(effectiveStatus === "streaming" ||
+				effectiveStatus === "processing"),
 	);
 
 	async function handleSave() {
@@ -532,14 +561,19 @@
 	function handlePublishClick() {
 		if (!toolOutput?.parentName && !toolOutput?.parentEmail) {
 			import("svelte-sonner").then((m) =>
-				m.toast.error("No parent contact info available for this student"),
+				m.toast.error(
+					"No parent contact info available for this student",
+				),
 			);
 			return;
 		}
 		publishState = {
 			parentName: toolOutput?.parentName ?? "Parent/Guardian",
 			parentEmail: toolOutput?.parentEmail ?? "",
-			studentName: toolOutput?.studentFullName ?? toolOutput?.validatedTitle ?? "Student",
+			studentName:
+				toolOutput?.studentFullName ??
+				toolOutput?.validatedTitle ??
+				"Student",
 			loading: false,
 			loadingText: "",
 		};
@@ -548,7 +582,8 @@
 
 	async function handlePublishConfirm() {
 		if (!toolOutput) return;
-		const { studentId, examTypeId, academicId, studentFullName, adminNo } = toolOutput;
+		const { studentId, examTypeId, academicId, studentFullName, adminNo } =
+			toolOutput;
 		if (!studentId || !examTypeId) return;
 
 		if (!publishState) return;
@@ -576,7 +611,9 @@
 				);
 			} else if (data.status === "skipped_already_published") {
 				import("svelte-sonner").then((m) =>
-					m.toast.info(`Result already published to ${data.parentEmail}`),
+					m.toast.info(
+						`Result already published to ${data.parentEmail}`,
+					),
 				);
 			} else {
 				import("svelte-sonner").then((m) =>
@@ -586,7 +623,9 @@
 		} catch (e) {
 			publishDialogOpen = false;
 			import("svelte-sonner").then((m) =>
-				m.toast.error(e instanceof Error ? e.message : "Publish failed"),
+				m.toast.error(
+					e instanceof Error ? e.message : "Publish failed",
+				),
 			);
 		} finally {
 			if (publishState) {
@@ -780,49 +819,55 @@
 							</Button>
 						{/snippet}
 					</Tooltip.Trigger>
-					<Tooltip.Content>{isStreaming ? 'Copy (available when streaming finishes)' : 'Copy'}</Tooltip.Content>
+					<Tooltip.Content
+						>{isStreaming
+							? "Copy (available when streaming finishes)"
+							: "Copy"}</Tooltip.Content
+					>
 				</Tooltip.Root>
 
-			<Tooltip.Root>
-				<Tooltip.Trigger>
-					{#snippet child({ props })}
-						<Button
-							{...props}
-							variant="ghost"
-							size="icon"
-							class="size-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/40 disabled:opacity-40 disabled:pointer-events-none"
-							onclick={handleToggleView}
-							disabled={isStreaming || pdfGenerating || validateLoading}
-							aria-label={
-								viewMode === "markdown"
-									? marksheetStatus === "committed" || marksheetStatus === "published"
+				<Tooltip.Root>
+					<Tooltip.Trigger>
+						{#snippet child({ props })}
+							<Button
+								{...props}
+								variant="ghost"
+								size="icon"
+								class="size-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/40 disabled:opacity-40 disabled:pointer-events-none"
+								onclick={handleToggleView}
+								disabled={isStreaming ||
+									pdfGenerating ||
+									validateLoading}
+								aria-label={viewMode === "markdown"
+									? marksheetStatus === "committed" ||
+										marksheetStatus === "published"
 										? "View PDF"
 										: "Validate marksheet"
-									: "View markdown"
-							}
-						>
-							{#if viewMode === "pdf"}
-								<EyeOffIcon class="size-4" />
-							{:else if viewMode === "validate"}
-								<EyeOffIcon class="size-4" />
-							{:else}
-								<EyeIcon class="size-4" />
-							{/if}
-						</Button>
-					{/snippet}
-				</Tooltip.Trigger>
-				<Tooltip.Content>
-					{viewMode === "pdf"
-						? "View markdown"
-						: viewMode === "validate"
+									: "View markdown"}
+							>
+								{#if viewMode === "pdf"}
+									<EyeOffIcon class="size-4" />
+								{:else if viewMode === "validate"}
+									<EyeOffIcon class="size-4" />
+								{:else}
+									<EyeIcon class="size-4" />
+								{/if}
+							</Button>
+						{/snippet}
+					</Tooltip.Trigger>
+					<Tooltip.Content>
+						{viewMode === "pdf"
 							? "View markdown"
-							: pdfGenerating
-								? "Generating PDF…"
-								: marksheetStatus === "committed" || marksheetStatus === "published"
-									? "View PDF"
-									: "Validate marksheet"}
-				</Tooltip.Content>
-			</Tooltip.Root>
+							: viewMode === "validate"
+								? "View markdown"
+								: pdfGenerating
+									? "Generating PDF…"
+									: marksheetStatus === "committed" ||
+										  marksheetStatus === "published"
+										? "View PDF"
+										: "Validate marksheet"}
+					</Tooltip.Content>
+				</Tooltip.Root>
 
 				<Tooltip.Root>
 					<Tooltip.Trigger>
@@ -840,7 +885,11 @@
 							</Button>
 						{/snippet}
 					</Tooltip.Trigger>
-					<Tooltip.Content>{pdfGenerating ? "Generating PDF…" : "Download PDF"}</Tooltip.Content>
+					<Tooltip.Content
+						>{pdfGenerating
+							? "Generating PDF…"
+							: "Download PDF"}</Tooltip.Content
+					>
 				</Tooltip.Root>
 
 				<DropdownMenu.Root>
@@ -862,19 +911,31 @@
 						align="end"
 						class="w-44 bg-popover backdrop-blur-xl border border-border/60 rounded-xl shadow-2xl"
 					>
-						<DropdownMenu.Item onclick={handleSave} disabled={isStreaming}>
+						<DropdownMenu.Item
+							onclick={handleSave}
+							disabled={isStreaming}
+						>
 							<SaveIcon class="size-3.5 mr-2" />
 							Save
 						</DropdownMenu.Item>
-						<DropdownMenu.Item onclick={handleShare} disabled={isStreaming}>
+						<DropdownMenu.Item
+							onclick={handleShare}
+							disabled={isStreaming}
+						>
 							<Share2Icon class="size-3.5 mr-2" />
 							Share
 						</DropdownMenu.Item>
-						<DropdownMenu.Item onclick={handlePrint} disabled={isStreaming}>
+						<DropdownMenu.Item
+							onclick={handlePrint}
+							disabled={isStreaming}
+						>
 							<PrinterIcon class="size-3.5 mr-2" />
 							Print
 						</DropdownMenu.Item>
-						<DropdownMenu.Item onclick={handlePublishClick} disabled={isStreaming}>
+						<DropdownMenu.Item
+							onclick={handlePublishClick}
+							disabled={isStreaming}
+						>
 							<SendIcon class="size-3.5 mr-2" />
 							Publish
 						</DropdownMenu.Item>
@@ -895,11 +956,17 @@
 
 	<div class="flex-1 h-full relative group">
 		{#if viewMode === "validate"}
-			<div class="h-full flex flex-col items-center justify-center gap-6 px-8">
+			<div
+				class="h-full flex flex-col items-center justify-center gap-6 px-8"
+			>
 				{#if validateLoading}
 					<div class="flex flex-col items-center gap-3">
-						<div class="size-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-						<p class="text-sm text-muted-foreground">{validateLoadingText}</p>
+						<div
+							class="size-6 border-2 border-primary border-t-transparent rounded-full animate-spin"
+						/>
+						<p class="text-sm text-muted-foreground">
+							{validateLoadingText}
+						</p>
 					</div>
 				{:else if validationExplanation}
 					<ScrollArea class="h-full w-full">
@@ -914,9 +981,12 @@
 						</Button>
 					</div>
 				{:else}
-					<div class="flex flex-col items-center gap-4 max-w-md text-center">
+					<div
+						class="flex flex-col items-center gap-4 max-w-md text-center"
+					>
 						<p class="text-sm text-muted-foreground">
-							Validate this marksheet to check for errors and persist the structured data.
+							Validate this marksheet to check for errors and
+							persist the structured data.
 						</p>
 						<Button size="lg" onclick={handleValidate}>
 							<CheckIcon class="size-4 mr-2" />
@@ -925,14 +995,19 @@
 					</div>
 				{/if}
 			</div>
-		{:else if persistedMarkdownPath && viewMode === 'pdf' && pdfAvailable && pdfUrl}
-			<EditorCanvas
-				filename={pdfUrl?.split('/').pop() ?? `${displayTitle}.pdf`}
-				title={displayTitle}
-				url={pdfUrl}
-				type="pdf"
-				streaming={false}
-			/>
+		{:else if persistedMarkdownPath && viewMode === "pdf" && pdfAvailable && pdfUrl}
+			<ScrollArea class="h-full w-full">
+				<div class="p-6 max-w-3xl mx-auto">
+					<EditorCanvas
+						filename={pdfUrl?.split("/").pop() ??
+							`${displayTitle}.pdf`}
+						title={displayTitle}
+						url={pdfUrl}
+						type="pdf"
+						streaming={false}
+					/>
+				</div>
+			</ScrollArea>
 		{:else if persistedMarkdownPath}
 			<ScrollArea class="h-full w-full">
 				<div
@@ -950,8 +1025,8 @@
 						type="text"
 						streaming={isStreaming}
 						{user}
-				artifactId={toolOutput?.artifactId ?? ""}
-				/>
+						artifactId={toolOutput?.artifactId ?? ""}
+					/>
 				</div>
 			</ScrollArea>
 		{:else if entry?.content}
@@ -1004,24 +1079,32 @@
 				{/if}
 			</div>
 		{:else if current.kind === "document"}
-			<EditorCanvas
-				bind:this={editorRef}
-				editorMode="wysiwyg"
-				filename={current.title}
-				url={current.url ?? ""}
-				saveUrl={current.saveUrl ?? current.url}
-				content={current.content ?? ""}
-				type="text"
-				streaming={isStreaming}
-				{user}
-			/>
+			<ScrollArea class="h-full w-full mb-20">
+				<div class="p-6 max-w-3xl mx-auto">
+					<EditorCanvas
+						bind:this={editorRef}
+						editorMode="wysiwyg"
+						filename={current.title}
+						url={current.url ?? ""}
+						saveUrl={current.saveUrl ?? current.url}
+						content={current.content ?? ""}
+						type="text"
+						streaming={isStreaming}
+						{user}
+					/>
+				</div>
+			</ScrollArea>
 		{:else if current.kind === "pdf"}
-			<EditorCanvas
-				filename={current.title}
-				url={current.url ?? ""}
-				type="pdf"
-				streaming={false}
-			/>
+			<ScrollArea class="h-full w-full">
+				<div class="p-6 max-w-3xl mx-auto">
+					<EditorCanvas
+						filename={current.title}
+						url={current.url ?? ""}
+						type="pdf"
+						streaming={false}
+					/>
+				</div>
+			</ScrollArea>
 		{:else if current.kind === "image"}
 			<ScrollArea class="h-full">
 				<div class="flex items-center justify-center p-4 min-h-full">
@@ -1061,20 +1144,30 @@
 			<AlertDialog.Title>Publish result</AlertDialog.Title>
 			<AlertDialog.Description>
 				{#if publishState}
-					Publish result for <strong>{publishState.studentName}</strong> to
-					<strong>{publishState.parentName}</strong> ({publishState.parentEmail})?
+					Publish result for <strong
+						>{publishState.studentName}</strong
+					>
+					to
+					<strong>{publishState.parentName}</strong>
+					({publishState.parentEmail})?
 				{/if}
 			</AlertDialog.Description>
 		</AlertDialog.Header>
 		<AlertDialog.Footer>
 			{#if publishState?.loading}
-				<div class="flex items-center gap-2 text-sm text-muted-foreground">
-					<div class="size-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+				<div
+					class="flex items-center gap-2 text-sm text-muted-foreground"
+				>
+					<div
+						class="size-4 border-2 border-primary border-t-transparent rounded-full animate-spin"
+					/>
 					{publishState.loadingText}
 				</div>
 			{:else}
 				<AlertDialog.Cancel>Cancel</AlertDialog.Cancel>
-				<AlertDialog.Action onclick={handlePublishConfirm}>Publish</AlertDialog.Action>
+				<AlertDialog.Action onclick={handlePublishConfirm}
+					>Publish</AlertDialog.Action
+				>
 			{/if}
 		</AlertDialog.Footer>
 	</AlertDialog.Content>

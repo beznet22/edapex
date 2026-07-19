@@ -3,7 +3,6 @@
   import ArrowUpIcon from "@lucide/svelte/icons/arrow-up";
   import BookOpenIcon from "@lucide/svelte/icons/book-open";
   import CameraIcon from "@lucide/svelte/icons/camera";
-  import CheckCircleIcon from "@lucide/svelte/icons/check-circle";
   import AlertCircleIcon from "@lucide/svelte/icons/alert-circle";
   import ChevronRightIcon from "@lucide/svelte/icons/chevron-right";
   import ChevronDownIcon from "@lucide/svelte/icons/chevron-down";
@@ -13,7 +12,6 @@
   import FileImageIcon from "@lucide/svelte/icons/file-image";
   import FileQuestionIcon from "@lucide/svelte/icons/file-question";
   import FolderIcon from "@lucide/svelte/icons/folder";
-  import FolderOpenIcon from "@lucide/svelte/icons/folder-open";
   import GlobeIcon from "@lucide/svelte/icons/globe";
   import GraduationCapIcon from "@lucide/svelte/icons/graduation-cap";
   import ImageIcon from "@lucide/svelte/icons/image";
@@ -23,7 +21,6 @@
   import MicIcon from "@lucide/svelte/icons/mic";
   import MoreHorizontalIcon from "@lucide/svelte/icons/more-horizontal";
   import PaletteIcon from "@lucide/svelte/icons/palette";
-  import PaperclipIcon from "@lucide/svelte/icons/paperclip";
   import PlusIcon from "@lucide/svelte/icons/plus";
   import ScanLineIcon from "@lucide/svelte/icons/scan-line";
   import ShieldAlertIcon from "@lucide/svelte/icons/shield-alert";
@@ -36,7 +33,7 @@
 
   import type { MentionPayload } from "$lib/context/chat-context.svelte";
   import { useChat, chatUsage } from "$lib/context/chat-context.svelte";
-  import { useFileActions } from "$lib/context/file-context.svelte";
+  import { useFileActions, type FileReference } from "$lib/context/file-context.svelte";
   import { useImageCompression } from "$lib/context/image.context.svelte";
   import { UserContext } from "$lib/context/user-context.svelte";
   import { SelectedModel, ResolvedModelHolder } from "$lib/context/sync.svelte";
@@ -98,24 +95,32 @@
   let textareaRef = $state<HTMLTextAreaElement | null>(null);
   let photoFileInput = $state<HTMLInputElement | null>(null);
   let documentFileInput = $state<HTMLInputElement | null>(null);
-  // Mirror of file-context addReference() calls in local $state so the
-  // pill row actually re-renders. Svelte 5's class-field $state arrays
-  // inside FilesContext don't reliably trigger template reactivity when
-  // mutated through an arrow-function class method. This local mirror
-  // lives in template scope, where Svelte's compiler instruments the
-  // reads correctly. We still call file.addReference() so the backend
-  // payload (chat.fileReferences) stays correct.
-  type UploadedRef = {
-    key: string;
-    name: string;
-    type: "file" | "dir";
-    mimeType?: string;
-    fileId?: string;
-    contentHash?: string;
+  // Single local $state mirror of all file references shown as chips
+  // in the composer tray. Fed from three sources:
+  //   1. file.references (FilesContext — ?refs= from SharedChatView, @file mentions)
+  //   2. handleDocumentUpload / handlePhotoUpload (upload success)
+  //   3. @file mention handler
+  // Local $state guarantees Svelte 5 template reactivity on mutations.
+  // We still call file.addReference() / file.removeReference() to keep
+  // FilesContext in sync for the SharedChatView → ChatContext bridge.
+  type LocalRef = FileReference & {
     status: "uploading" | "ready" | "error" | "skipped";
     error?: string;
   };
-  let uploadedReferences = $state<UploadedRef[]>([]);
+  let references = $state<LocalRef[]>([]);
+  let dismissedKeys = $state(new Set<string>());
+
+  // Sync refs from FilesContext (SharedChatView ?refs=, @file mentions) into
+  // local $state so the template renders them with full reactivity.
+  $effect(() => {
+    const refs = file.references;
+    for (const ref of refs) {
+      if (!dismissedKeys.has(ref.key) && !references.find((p) => p.key === ref.key)) {
+        references = [...references, { ...ref, status: "ready" as const }];
+      }
+    }
+  });
+
   let showCommands = $state(false);
   let showMentions = $state(false);
   let mentionQuery = $state("");
@@ -271,47 +276,18 @@
       // `resolvedMentions` slot of the per-request `requestContext`,
       // which `buildAssistantInstructions` renders as the
       // `RESOLVED @MENTIONS` block in the system prompt.
-      // Build fileReferences by unioning THREE sources for reliability:
-      //  1. uploadedReferences (local $state in ChatComposer — populated
-      //     by handleDocumentUpload / handlePhotoUpload on success)
-      //  2. file.references (file-context class-field $state — set by
-      //     addReference() inside #performUpload; Svelte 5 propagation
-      //     to template scope is unreliable)
-      //  3. file.uploads filtered to terminal statuses (file-context —
-      //     the paperclip path's authoritative state)
-      // Dedup by key so duplicates from any source collapse to one entry.
-      const fromLocal = uploadedReferences.map((u) => ({
-        key: u.key,
-        name: u.name,
-        type: u.type,
-        fileId: u.fileId,
-        contentHash: u.contentHash
-      }));
-      const fromRefs = (file.references ?? []).map((r) => ({
-        key: r.key,
-        name: r.name,
-        type: r.type,
-        fileId: r.fileId,
-        contentHash: r.contentHash
-      }));
-      const fromUploads = (file.uploads ?? [])
-        .filter((u) => u.status === 'uploaded' || u.status === 'extracted' || u.status === 'approved' || u.status === 'published')
-        .map((u) => ({
-          key: (u.data?.contentHash as string | undefined) ?? u.id,
-          name: u.originalName ?? u.filename,
-          type: 'file' as const,
-          fileId: u.id,
-          contentHash: u.data?.contentHash as string | undefined
+      // Build fileReferences from the single local $state references array.
+      // This covers all sources: uploads, ?refs=, @file mentions — the sync
+      // $effect and upload handlers both write to it.
+      chat.fileReferences = references
+        .filter((r) => r.status === "ready")
+        .map((r) => ({
+          key: r.key,
+          name: r.name,
+          type: r.type,
+          fileId: r.fileId,
+          contentHash: r.contentHash,
         }));
-      const seen = new Set<string>();
-      const merged: typeof fromLocal = [];
-      for (const r of [...fromLocal, ...fromRefs, ...fromUploads]) {
-        if (r.key && !seen.has(r.key)) {
-          seen.add(r.key);
-          merged.push(r);
-        }
-      }
-      chat.fileReferences = merged;
 
       // Default a bare `/transcript` to `/transcript report` (design decision B1).
       input = normalizeTranscriptCommand(input);
@@ -326,11 +302,9 @@
       selectedMentions = [];
       // Clear file references after submission (both the local mirror
       // that drives the pill row and the file-context's payload source).
+      references = [];
       if (file.references?.length) {
         file.references = [];
-      }
-      if (uploadedReferences.length > 0) {
-        uploadedReferences = [];
       }
       chat.scrollToBottom();
     }
@@ -384,21 +358,29 @@
   }
 
   function selectMention(mention: any) {
-    // File mentions render as chip pills above the input — skip text
-    // insertion. The mention still flows through `selectedMentions` so
-    // it's bundled into the request body on submit and the server-side
-    // merge in `workflow-params.ts` folds it into `fileReferences`.
+    // File mentions: add to both FilesContext (for submit bridge) and local
+    // references (for reactive template render).
     if (mention.category === "file") {
       showMentions = false;
-      selectedMentions = [
-        ...selectedMentions,
-        {
-          category: mention.category,
-          id: mention.id,
-          name: mention.name,
-          parentContext: mention.parentContext,
-        },
-      ];
+      file.addReference({
+        key: String(mention.id),
+        name: mention.name,
+        type: "file",
+        mimeType: mention.mimeType,
+      });
+      if (!references.find((r) => r.key === String(mention.id))) {
+        references = [...references, {
+          key: String(mention.id), name: mention.name, type: "file",
+          mimeType: mention.mimeType, status: "ready" as const,
+        }];
+      }
+      // Strip the `@file <query>` text from the input so the stale
+      // trigger doesn't re-open the MentionPopup on the next focus.
+      const cursor = textareaRef?.selectionStart || 0;
+      const beforeCursor = input.substring(0, cursor);
+      const afterCursor = input.substring(cursor);
+      const newBefore = beforeCursor.replace(/@(?:file)?\s*\w*$/, "");
+      input = newBefore + afterCursor;
       textareaRef?.focus();
       return;
     }
@@ -424,33 +406,28 @@
     textareaRef?.focus();
   }
 
-  function removeFileMention(id: string | number): void {
-    selectedMentions = selectedMentions.filter((m) => m.id !== id);
-  }
-
   /**
-   * Maps a `MentionPayload` for a file mention to the icon + badge that
-   * should appear in the chip pill. Mirrors the `fileCategoryIcon`
+   * Derives the icon + badge for a file pill from the workspace path.
+   * Shared by both filestore refs (?refs=) and @file mentions.
+   * Mirrors the `fileCategoryIcon`
    * helper in `MentionDropdown.svelte` so the chip and the dropdown row
    * stay in sync. Falls back to a generic file icon for unknown kinds.
    */
-  function fileChipMeta(mention: MentionPayload): {
+  function chipMeta(key: string): {
     Icon: typeof FileTextIcon;
     badge: string;
   } {
-    const id = String(mention.id ?? "");
-    const ext = id.split(".").pop()?.toLowerCase() ?? "";
+    const ext = key.split(".").pop()?.toLowerCase() ?? "";
     const looksLikeImage = ["jpg", "jpeg", "png", "gif", "webp", "bmp", "tiff"].includes(ext);
-    const parent = mention.parentContext ?? "";
     let badge = "FILE";
     let Icon: typeof FileTextIcon = FileTextIcon;
-    if (parent.includes("/marksheets/")) {
+    if (key.includes("/marksheets/")) {
       badge = "MARKSHEET";
       Icon = BookTextIcon;
-    } else if (parent.includes("/transcripts/")) {
+    } else if (key.includes("/transcripts/")) {
       badge = "TRANSCRIPT";
       Icon = BookTextIcon;
-    } else if (parent.includes("/notes/")) {
+    } else if (key.includes("/notes/")) {
       badge = "NOTE";
       Icon = BookTextIcon;
     } else if (ext === "pdf") {
@@ -468,10 +445,6 @@
     }
     return { Icon, badge };
   }
-
-  const selectedFileMentions = $derived(
-    selectedMentions.filter((m) => m.category === "file")
-  );
 
   function closeAllMenus(): void {
     mainMenuOpen = false;
@@ -543,20 +516,21 @@
           size: json.size,
           name: f.name,
         };
-        file.addReference({
-          key: json.contentHash,
-          name: f.name,
-          type: "file" as const,
-          mimeType: json.mimeType,
-        });
-        // Mirror to local $state so the pill re-renders (see comment at declaration).
-        if (!uploadedReferences.find((r) => r.key === json.contentHash)) {
-          uploadedReferences = [
-            ...uploadedReferences,
-            { key: json.contentHash, name: f.name, type: "file", mimeType: json.mimeType, status: "ready" }
-          ];
+        if (!dismissedKeys.has(json.contentHash)) {
+          file.addReference({
+            key: json.contentHash,
+            name: f.name,
+            type: "file" as const,
+            mimeType: json.mimeType,
+          });
+          // Mirror to local $state so the template re-renders.
+          if (!references.find((r) => r.key === json.contentHash)) {
+            references = [
+              ...references,
+              { key: json.contentHash, name: f.name, type: "file", mimeType: json.mimeType, status: "ready" as const }
+            ];
+          }
         }
-        // Photo fileReference stored — chat composer will render chip; user can later type /update photo @student to commit
       } catch (err) {
         toast.error(`Failed to upload ${f.name}`);
       }
@@ -590,10 +564,10 @@
       // Optimistic pill: add with status='uploading' immediately so the
       // indicator shows up before the fetch resolves.
       const tempKey = `pending-${f.name}-${Date.now()}-${Math.random()}`;
-      if (!uploadedReferences.find((r) => r.key === tempKey)) {
-        uploadedReferences = [
-          ...uploadedReferences,
-          { key: tempKey, name: f.name, type: "file", status: "uploading" }
+      if (!references.find((r) => r.key === tempKey)) {
+        references = [
+          ...references,
+          { key: tempKey, name: f.name, type: "file", status: "uploading" as const }
         ];
       }
       try {
@@ -610,20 +584,23 @@
         });
 
         if (!res.ok) {
-          uploadedReferences = uploadedReferences.map((r) =>
-            r.key === tempKey ? { ...r, status: "error", error: `HTTP ${res.status}` } : r
+          references = references.map((r) =>
+            r.key === tempKey ? { ...r, status: "error" as const, error: `HTTP ${res.status}` } : r
           );
           toast.error(`Failed to upload ${f.name}`);
           continue;
         }
         const json = await res.json();
         if (json.kind !== "document") {
-          uploadedReferences = uploadedReferences.map((r) =>
-            r.key === tempKey ? { ...r, status: "error", error: "Unexpected response kind" } : r
+          references = references.map((r) =>
+            r.key === tempKey ? { ...r, status: "error" as const, error: "Unexpected response kind" } : r
           );
           toast.error(`Unexpected response for ${f.name}`);
           continue;
         }
+
+        // If this upload was dismissed, don't re-add the reference
+        if (dismissedKeys.has(tempKey)) continue;
 
         file.addReference({
           key: json.contentHash,
@@ -632,14 +609,15 @@
           fileId: json.fileId,
           contentHash: json.contentHash,
         });
+
         // Replace the optimistic pill with the real one keyed by contentHash,
         // carrying the OCR status from the server.
-        const finalStatus: UploadedRef["status"] =
+        const finalStatus: LocalRef["status"] =
           json.ocrStatus === "ready" ? "ready"
           : json.ocrStatus === "error" ? "error"
           : json.ocrStatus === "skipped" ? "skipped"
           : "ready";
-        uploadedReferences = uploadedReferences
+        references = references
           .filter((r) => r.key !== tempKey)
           .concat({
             key: json.contentHash,
@@ -650,6 +628,7 @@
             status: finalStatus,
             error: json.ocrError ?? undefined
           });
+        dismissedKeys = new Set([...dismissedKeys, json.contentHash]);
         toast.success(
           finalStatus === "ready"
             ? `Uploaded ${f.name} — OCR complete.`
@@ -658,8 +637,8 @@
             : `Uploaded ${f.name}.`
         );
       } catch (err) {
-        uploadedReferences = uploadedReferences.map((r) =>
-          r.key === tempKey ? { ...r, status: "error", error: err instanceof Error ? err.message : String(err) } : r
+        references = references.map((r) =>
+          r.key === tempKey ? { ...r, status: "error" as const, error: err instanceof Error ? err.message : String(err) } : r
         );
         toast.error(`Failed to upload ${f.name}`);
       }
@@ -781,7 +760,7 @@
   {onSubmit}
 >
   <!-- Attachment Tray (Top Layer) -->
-  {#if file.files.length > 0 || chat.studentData || uploadedReferences.length > 0 || (file.references && file.references.length > 0) || selectedFileMentions.length > 0}
+  {#if references.length > 0 || chat.studentData}
     <div class="flex flex-wrap gap-2 px-4 pt-4 pb-2 transition-all duration-500 ease-out">
       {#if chat.studentData}
         <div
@@ -799,89 +778,47 @@
         </div>
       {/if}
 
-      {#each file.files as f, i}
+      {#each references as ref (ref.key)}
+        {@const meta = chipMeta(ref.key)}
         <div
-          class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary/10 border border-primary/20 text-[11px] font-bold tracking-wide text-primary group shadow-sm"
+          class="group flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/60 border border-white/5 text-[11px] font-bold tracking-wide text-foreground/70 group shadow-sm"
+          data-status={ref.status}
+          title={ref.error ?? ref.name}
         >
-          <PaperclipIcon class="size-3.5 opacity-70" />
-          <span class="max-w-[150px] truncate uppercase tracking-tighter">{f.name}</span>
+          {#if ref.status === "uploading"}
+            <span class="size-3 rounded-full border-2 border-primary/40 border-t-primary animate-spin" aria-label="uploading"></span>
+          {:else if ref.status === "error"}
+            <AlertCircleIcon class="size-3.5 text-destructive" />
+          {:else}
+            <meta.Icon class="size-3.5 opacity-80" />
+          {/if}
+          <span class="max-w-[150px] truncate uppercase tracking-tighter">{ref.name}</span>
+          <span class="shrink-0 px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider bg-primary/15 text-primary/80">
+            {meta.badge}
+          </span>
           <button
-            onclick={() => file.remove(i)}
-            class="opacity-40 group-hover:opacity-100 hover:text-foreground transition-all ml-1 min-h-12 min-w-12 sm:min-h-8 sm:min-w-8 flex items-center justify-center"
-            aria-label={`Remove ${f.name}`}
+            onclick={() => {
+              dismissedKeys = new Set([...dismissedKeys, ref.key]);
+              references = references.filter((r) => r.key !== ref.key);
+              file.removeReference(ref.key);
+            }}
+            class="opacity-40 group-hover:opacity-100 hover:text-destructive transition-all ml-1 min-h-12 min-w-12 sm:min-h-8 sm:min-w-8 flex items-center justify-center"
+            aria-label={`Remove ${ref.name}`}
           >
             <XIcon class="size-3" />
           </button>
         </div>
       {/each}
 
-      {#if uploadedReferences.length > 0}
-        {#each uploadedReferences as ref (ref.key)}
-          <div
-            class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/60 border border-white/5 text-[11px] font-bold tracking-wide text-foreground/70 group shadow-sm"
-            data-status={ref.status}
-            title={ref.error ?? ref.status}
-          >
-            {#if ref.status === "uploading"}
-              <span class="size-3 rounded-full border-2 border-primary/40 border-t-primary animate-spin" aria-label="uploading"></span>
-            {:else if ref.status === "ready"}
-              <CheckCircleIcon class="size-3.5 text-emerald-400" />
-            {:else if ref.status === "error"}
-              <AlertCircleIcon class="size-3.5 text-destructive" />
-            {:else}
-              <PaperclipIcon class="size-3.5 opacity-50" />
-            {/if}
-            {#if ref.type === "dir"}
-              <FolderOpenIcon class="size-3.5 opacity-50" />
-            {:else if ref.status !== "uploading"}
-              <PaperclipIcon class="size-3.5 opacity-50" />
-            {/if}
-            <span class="max-w-[150px] truncate uppercase tracking-tighter">{ref.name}</span>
-            <button
-              onclick={() => {
-                uploadedReferences = uploadedReferences.filter((r) => r.key !== ref.key);
-                file.removeReference(ref.key);
-              }}
-              class="opacity-40 group-hover:opacity-100 hover:text-destructive transition-all ml-1 min-h-12 min-w-12 sm:min-h-8 sm:min-w-8 flex items-center justify-center"
-              aria-label={`Remove reference ${ref.name}`}
-            >
-              <XIcon class="size-3" />
-            </button>
-          </div>
-        {/each}
-        {#each selectedFileMentions as fm (String(fm.id) + "-file-mention")}
-          {@const meta = fileChipMeta(fm)}
-          <div
-            class="group flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/60 border border-white/5 text-[11px] font-bold tracking-wide text-foreground/70 group shadow-sm"
-            data-status="file-mention"
-            title={fm.parentContext ?? fm.name}
-            aria-label={`Mentioned file ${fm.name}`}
-          >
-            <meta.Icon class="size-3.5 opacity-80" />
-            <span class="max-w-[150px] truncate uppercase tracking-tighter">{fm.name}</span>
-            <span class="shrink-0 px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider bg-primary/15 text-primary/80">
-              {meta.badge}
-            </span>
-            <button
-              type="button"
-              onclick={() => removeFileMention(fm.id)}
-              class="opacity-40 group-hover:opacity-100 hover:text-destructive transition-all ml-1 min-h-12 min-w-12 sm:min-h-8 sm:min-w-8 flex items-center justify-center"
-              aria-label={`Remove mention ${fm.name}`}
-            >
-              <XIcon class="size-3" />
-            </button>
-          </div>
-        {/each}
-        {#if imageContext.isCompressing}
-          <div
-            class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/60 border border-white/5 text-[11px] font-bold tracking-wide text-foreground/70 shadow-sm"
-            data-status="compressing"
-            aria-label="compressing image"
-          >
-            <span class="size-3 rounded-full border-2 border-primary/40 border-t-primary animate-spin"></span>
-            <span class="uppercase tracking-tighter">Compressing…</span>
-          </div>
-        {/if}
+      {#if imageContext.isCompressing}
+        <div
+          class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/60 border border-white/5 text-[11px] font-bold tracking-wide text-foreground/70 shadow-sm"
+          data-status="compressing"
+          aria-label="compressing image"
+        >
+          <span class="size-3 rounded-full border-2 border-primary/40 border-t-primary animate-spin"></span>
+          <span class="uppercase tracking-tighter">Compressing…</span>
+        </div>
       {/if}
     </div>
   {/if}

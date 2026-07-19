@@ -163,7 +163,7 @@ export const load: LayoutServerLoad = async ({ cookies, locals, url }) => {
   let assignedSection: ClassSection | null = null;
   if (user?.designation === "class_teacher" && assessment) {
     // Slice 13c: per-request provider (built above)
-    assignedSection = (await assessment.getAssignedClassSection(user.staffId || 1)) as ClassSection | null;
+    assignedSection = (await assessment.getAssignedClassSection({ staffId: user.staffId || 1 })) as ClassSection | null;
     if (assignedSection && !token) {
       token = `${assignedSection.className}(${assignedSection.sectionName})`
         .toLowerCase()

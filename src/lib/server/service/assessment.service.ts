@@ -857,8 +857,10 @@ export class AssessmentService {
     return this.result().getClassSections();
   }
 
-  async getAssignedClassSection(staffId: number) {
-    return this.result().getAssignedClassSection(staffId);
+  async getAssignedClassSection(
+    params: { staffId?: number; classId?: number; sectionId?: number } = {}
+  ) {
+    return this.result().getAssignedClassSection(params);
   }
 
   async getStaffByClassSection(params: { classId: number; sectionId: number }) {
@@ -873,31 +875,22 @@ export class AssessmentService {
     return this.student().getStudentsByClassSection(params);
   }
 
-  async getMappingData(staffId: number, classId?: number, sectionId?: number) {
+  async getMappingData(classId: number, sectionId: number) {
     const [examTypes, studentCategories, subjects, classSection] = await Promise.all([
       this.result().getCurrentTerm(),
       this.result().getStudentCategories(),
-      this.result().getSubjectsAssignedToStaff(staffId),
-      this.result().getAssignedClassSection(staffId),
+      this.result().getSubjectsByClass(classId, sectionId),
+      this.result().getAssignedClassSection({ classId, sectionId }),
     ]);
 
-    // If classId/sectionId provided (Admin view), use those, else use teacher's assigned ones
-    const activeClassId = classId || classSection?.classId;
-    const activeSectionId = sectionId || classSection?.sectionId;
-
-    let examSetups: Partial<ExamSetup>[] = [];
-    if (activeClassId && activeSectionId) {
-      examSetups = await this.result().getExamSetupsByClassSection(activeClassId, activeSectionId);
-    } else {
-      examSetups = await this.result().getExamSetupsByStaffId(staffId);
-    }
+    const examSetups = await this.result().getExamSetupsByClassSection(classId, sectionId);
 
     return {
       examSetups,
       examTypes,
       studentCategories,
       subjects,
-      classSection: classSection || { classId: activeClassId, sectionId: activeSectionId },
+      classSection,
       studentData: {},
     };
   }

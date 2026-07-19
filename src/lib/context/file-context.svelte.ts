@@ -69,7 +69,8 @@ export class FilesContext {
   };
 
   removeReference = (key: string) => {
-    this.#state.references = this.#state.references.filter((r) => r.key !== key);
+    console.debug('[file-context] removeReference called:', key);
+    this.references = this.references.filter((r) => r.key !== key);
   };
 
   #selectedContext: SelectedClass;

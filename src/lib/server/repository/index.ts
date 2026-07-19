@@ -2,6 +2,7 @@ import { BaseRepository } from "./base.repo";
 import { AuthRepository } from "./auth.repo";
 import { ParentRepository } from "./parent.repo";
 import { ResultsRepository } from "./result.repo";
+import { SchoolRepository } from "./school.repo";
 import { StaffRepository } from "./staff.repo";
 import { StudentRepository } from "./student.repo";
 import { TimelineRepository } from "./timeline.repo";
@@ -18,6 +19,7 @@ export * from "./base.repo";
 export * from "./auth.repo";
 export * from "./parent.repo";
 export * from "./result.repo";
+export * from "./school.repo";
 export * from "./staff.repo";
 export * from "./student.repo";
 export * from "./timeline.repo";
@@ -28,6 +30,7 @@ export {
   BaseRepository,
   ParentRepository,
   ResultsRepository,
+  SchoolRepository,
   StaffRepository,
   StudentRepository,
   TimelineRepository,

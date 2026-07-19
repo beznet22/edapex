@@ -8,4 +8,5 @@ export { editorEditAgent } from './editor-edit';
 export { editorGenerateAgent } from './editor-generate';
 export { editorCopilotAgent } from './editor-copilot';
 export { documentAgent } from './document';
+export { formatAgent } from './format';
 export { requestContextSchema, type RequestContextValues, DEFAULT_MODEL, DEFAULT_TITLE_MODEL } from './shared';

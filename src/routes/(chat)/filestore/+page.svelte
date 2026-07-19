@@ -41,7 +41,7 @@
 		backgroundTasks,
 		serializeTenant,
 	} from "$lib/state/background-tasks.svelte";
-	import type { SerializedTenant } from "$lib/types/background-tasks";
+	import { deriveKind, deriveCategory } from "$lib/utils/artifact-kind";
 	import { cn } from "$lib/utils/shadcn";
 	import { toast } from "svelte-sonner";
 	import type { PageData } from "./$types";
@@ -76,7 +76,9 @@
 	let fileInputRef = $state<HTMLInputElement | null>(null);
 	let deleteDialogOpen = $state(false);
 	let isExtracting = $state(false);
+	let isFormatting = $state(false);
 	let isStartingChat = $state(false);
+	let optimisticFiles = $state(new Map<string, Artifact>());
 
 	$effect(() => {
 		if (activeTermId !== data.activeTermId) {
@@ -101,6 +103,74 @@
 		return () => {
 			document.removeEventListener("drop", onDrop);
 		};
+	});
+
+	// Sync optimistic files from background task progress
+	$effect(() => {
+		const tasks = backgroundTasks.tasks;
+		const prev = optimisticFiles;
+		const next = new Map(prev);
+		let changed = false;
+
+		for (const task of tasks) {
+			if (task.spec.kind === "process-files" || task.spec.kind === "format-batch") {
+				// Live file updates — add new entries AND propagate manifestStatus
+				if (task.files) {
+					for (const fileState of task.files) {
+						if (!fileState.key) continue;
+						const url = `/api/file/${fileState.key}`;
+						const existing = next.get(url);
+
+						if (existing) {
+							if (fileState.manifestStatus && fileState.manifestStatus !== existing.manifestStatus) {
+								next.set(url, {
+									...existing,
+									manifestStatus: fileState.manifestStatus,
+									status: fileState.status === "completed" ? "success" : existing.status,
+								});
+								changed = true;
+							}
+						} else {
+							if (fileState.status !== "completed" && fileState.status !== "formatting") continue;
+							next.set(url, {
+								id: url,
+								title: fileState.name,
+								kind: deriveKind(fileState.name),
+								category: deriveCategory(fileState.name),
+								source: "uploaded",
+								url,
+								saveUrl: url,
+								size: fileState.compressedSize ?? fileState.originalSize,
+								modifiedAt: Date.now(),
+								examTypeId: task.spec.kind === "process-files" ? task.spec.examTypeId ?? undefined : undefined,
+								status: "processing",
+								manifestStatus: fileState.manifestStatus,
+							});
+							changed = true;
+						}
+					}
+				}
+
+				// Terminal result update
+				if (task.status === "completed" && task.result) {
+					for (const result of task.result.results) {
+						const url = `/api/file/${result.key}`;
+						const existing = next.get(url);
+						if (!existing) continue;
+						if (existing.manifestStatus === result.manifestStatus) continue;
+
+						next.set(url, {
+							...existing,
+							status: result.status === "success" ? "success" : "error",
+							manifestStatus: result.manifestStatus,
+						});
+						changed = true;
+					}
+				}
+			}
+		}
+
+		if (changed) optimisticFiles = next;
 	});
 
 	function selectTerm(id: number) {
@@ -149,9 +219,18 @@
 		}
 	}
 
+	const mergedFiles = $derived.by(() => {
+		const map = new Map<string, Artifact>();
+		for (const f of data.files) map.set(f.url ?? f.id, f);
+		for (const [, f] of optimisticFiles) {
+			if (!map.has(f.url ?? f.id)) map.set(f.url ?? f.id, f);
+		}
+		return [...map.values()];
+	});
+
 	const filteredFiles = $derived.by(() => {
 		const q = searchQuery.trim().toLowerCase();
-		const matched = data.files.filter((f) => {
+		const matched = mergedFiles.filter((f) => {
 			if (q && !f.title.toLowerCase().includes(q)) return false;
 			if (categoryFilter === "images" && f.kind !== "image") return false;
 			if (categoryFilter === "files" && f.kind === "image") return false;
@@ -253,7 +332,33 @@
 		}
 	}
 
+	function badgeConfig(file: Artifact): { label: string; cls: string; pulse?: boolean } | null {
+		const ms = file.manifestStatus;
+		if (ms === "Failed") return { label: "Failed", cls: "bg-rose-400/15 text-rose-300", pulse: false };
+		if (ms === "Uploaded") return { label: "Processing", cls: "bg-amber-400/15 text-amber-300", pulse: true };
+		if (ms === "Extracted") return { label: "Extracted", cls: "bg-sky-400/15 text-sky-300" };
+		if (ms === "Formatted") return { label: "Ready", cls: "bg-emerald-400/15 text-emerald-300" };
+		if (ms === "Validated") return { label: "Validated", cls: "bg-emerald-400/15 text-emerald-300" };
+		if (ms === "Committed") return { label: "Committed", cls: "bg-emerald-400/15 text-emerald-300" };
+		if (ms === "Generated") return { label: "Generated", cls: "bg-emerald-400/15 text-emerald-300" };
+		if (ms === "Published") return { label: "Published", cls: "bg-emerald-400/15 text-emerald-300" };
+		if (file.status === "processing") return { label: "Processing", cls: "bg-amber-400/15 text-amber-300", pulse: true };
+		return null;
+	}
+
+	function taskBadge(task: { phase?: string; status: string; rateLimitInfo?: { countdownEnd: number }; message?: string }): { label: string; cls: string; pulse?: boolean } | null {
+		if (task.rateLimitInfo) {
+			const remaining = Math.max(0, Math.ceil((task.rateLimitInfo.countdownEnd - Date.now()) / 1000));
+			return { label: `Rate limited — retry in ${remaining}s`, cls: "bg-amber-400/15 text-amber-300", pulse: true };
+		}
+		if (task.phase === "format" && task.status === "running") return { label: "Formatting…", cls: "bg-amber-400/15 text-amber-300", pulse: true };
+		if (task.phase === "ocr" && task.status === "running") return { label: "Extracting…", cls: "bg-amber-400/15 text-amber-300", pulse: true };
+		if (task.status === "running") return { label: "Processing…", cls: "bg-amber-400/15 text-amber-300", pulse: true };
+		return null;
+	}
+
 	function openFile(file: Artifact) {
+		if (file.status === "processing") return; // not ready to open yet
 		inspector.openFilestoreArtifact(file);
 		if (isMobile.current) {
 			mobileUiState.viewerKey = file.id;
@@ -291,7 +396,7 @@
 	}
 
 	function termPrefix(): string {
-		return `exams/examType-${activeTermId}/uploads/`;
+		return `exams/examType-${activeTermId}/notes/`;
 	}
 
 	function slugify(name: string): string {
@@ -349,7 +454,7 @@
 		try {
 			const path = termPrefix() + slugify(noteName) + ".md";
 			const res = await fetch(
-				`/api/file/${path}?examTypeId=${activeTermId}`,
+				`/api/file/${path}?examTypeId=${activeTermId}&kind=note`,
 				{
 					method: "PUT",
 					headers: { "Content-Type": "text/markdown" },
@@ -379,7 +484,18 @@
 				selectedIds.has(f.id),
 			);
 			const keys = selectedFiles
-				.map((f) => f.id)
+				.map((f) => {
+					const relPath = (f as any).url?.replace("/api/file/", "") ?? f.id;
+					const ch = (f as any).contentHash ?? relPath;
+					return btoa(JSON.stringify({
+						k: ch,
+						p: relPath,
+						n: f.title,
+						m: (f as any).mimeType ?? "application/octet-stream",
+						c: ch,
+						d: (f as any).documentId ?? ch,
+					}));
+				})
 				.map(encodeURIComponent)
 				.join(",");
 			clearSelection();
@@ -390,10 +506,8 @@
 	}
 
 	async function extractSelected() {
-		if (selectedIds.size === 0) return;
-		const keys = filteredFiles
-			.filter((f) => selectedIds.has(f.id))
-			.map((f) => f.id);
+		if (eligibleExtractFiles.length === 0) return;
+		const keys = eligibleExtractFiles.map((f) => f.id);
 		isExtracting = true;
 		try {
 			const tenant = serializeTenant({
@@ -409,8 +523,6 @@
 				sectionName: data.tenant.sectionName,
 				academicYearTitle: data.tenant.academicYearTitle,
 			});
-			// Route through background worker: small batches use direct OCR,
-			// large batches use the Mistral batch API.
 			backgroundTasks.runTask({ kind: "ocr-batch", keys, tenant });
 			toast.info(
 				`Queued ${keys.length} file${keys.length === 1 ? "" : "s"} for OCR`,
@@ -421,6 +533,40 @@
 			toast.error(`Failed to queue extraction: ${message}`);
 		} finally {
 			isExtracting = false;
+		}
+	}
+
+	async function formatSelected() {
+		if (eligibleFormatFiles.length === 0) return;
+		const keys = eligibleFormatFiles.map((f) => f.id);
+		const contentHashes = Object.fromEntries(
+			eligibleFormatFiles.filter((f) => f.contentHash).map((f) => [f.id, f.contentHash!])
+		);
+		isFormatting = true;
+		try {
+			const tenant = serializeTenant({
+				schoolId: data.tenant.schoolId,
+				userId: data.tenant.userId,
+				designationId: data.tenant.designationId,
+				staffId: data.tenant.staffId,
+				classId: data.tenant.classId,
+				sectionId: data.tenant.sectionId,
+				examTypeId: activeTermId,
+				academicId: data.tenant.academicId,
+				className: data.tenant.className,
+				sectionName: data.tenant.sectionName,
+				academicYearTitle: data.tenant.academicYearTitle,
+			});
+			backgroundTasks.runTask({ kind: "format-batch", keys, contentHashes, tenant });
+			toast.info(
+				`Queued ${keys.length} file${keys.length === 1 ? "" : "s"} for formatting`,
+			);
+			clearSelection();
+		} catch (err) {
+			const message = err instanceof Error ? err.message : String(err);
+			toast.error(`Failed to queue formatting: ${message}`);
+		} finally {
+			isFormatting = false;
 		}
 	}
 
@@ -450,6 +596,12 @@
 		}
 	}
 
+	const eligibleExtractFiles = $derived(
+		filteredFiles.filter((f) => selectedIds.has(f.id) && f.manifestStatus === "Uploaded")
+	);
+	const eligibleFormatFiles = $derived(
+		filteredFiles.filter((f) => selectedIds.has(f.id) && f.manifestStatus === "Extracted")
+	);
 	const activeFilterCount = $derived(sourceFilter.size + categoryMulti.size);
 	const bulkActionsVisible = $derived(selectedIds.size > 0);
 </script>
@@ -590,11 +742,27 @@
 						variant="secondary"
 						size="sm"
 						class="h-9 px-3.5 rounded-full gap-1.5 text-xs font-bold"
-						disabled={isExtracting}
+						disabled={isExtracting || eligibleExtractFiles.length === 0}
 						onclick={extractSelected}
 					>
 						<ScanSearch class="size-3.5" />
 						Extract
+						{#if eligibleExtractFiles.length > 0 && eligibleExtractFiles.length < selectedIds.size}
+							<span class="text-muted-foreground/60">({eligibleExtractFiles.length})</span>
+						{/if}
+					</Button>
+					<Button
+						variant="secondary"
+						size="sm"
+						class="h-9 px-3.5 rounded-full gap-1.5 text-xs font-bold"
+						disabled={isFormatting || eligibleFormatFiles.length === 0}
+						onclick={formatSelected}
+					>
+						<Sparkles class="size-3.5" />
+						Format
+						{#if eligibleFormatFiles.length > 0 && eligibleFormatFiles.length < selectedIds.size}
+							<span class="text-muted-foreground/60">({eligibleFormatFiles.length})</span>
+						{/if}
 					</Button>
 					<Button
 						variant="default"
@@ -906,6 +1074,7 @@
 							inspector.filestoreArtifact?.id === file.id}
 						{@const isSelected = selectedIds.has(file.id)}
 						{@const displayName = file.title.replace(/\.[a-z0-9]+$/i, "")}
+						{@const badge = badgeConfig(file)}
 						<div
 							role="button"
 							tabindex="0"
@@ -982,13 +1151,23 @@
 								<span class="text-white/60 drop-shadow-sm"
 									>{categoryLabel(file.category)}</span
 								>
-								<span class="text-white/40" aria-hidden="true"
-									>·</span
-								>
-								<span
-									class="tabular-nums text-white/60 drop-shadow-sm"
-									>{formatSize(file.size) || "—"}</span
-								>
+								{#if badge}
+									<span class="text-white/40 drop-shadow-sm">·</span>
+									<span
+										class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md tabular-nums drop-shadow-sm {badge.cls}"
+									>
+										{#if badge.pulse}
+											<span class="size-1.5 rounded-full bg-amber-400 animate-pulse" />
+										{/if}
+										{badge.label}
+									</span>
+								{:else}
+									<span class="text-white/40" aria-hidden="true">·</span>
+									<span
+										class="tabular-nums text-white/60 drop-shadow-sm"
+										>{formatSize(file.size) || "—"}</span
+									>
+								{/if}
 							</div>
 						</div>
 					{/each}
@@ -1066,6 +1245,7 @@
 							{@const isActive =
 								inspector.filestoreArtifact?.id === file.id}
 							{@const isSelected = selectedIds.has(file.id)}
+							{@const badge = badgeConfig(file)}
 							<li
 								class={cn(
 									"grid grid-cols-[1fr_auto] sm:grid-cols-[auto_1fr_140px_120px_60px] items-center gap-4 px-2 sm:px-4 py-2 transition-colors rounded-lg",
@@ -1134,10 +1314,21 @@
 								>
 									{formatDate(file.modifiedAt)}
 								</span>
-								<span
-									class="hidden sm:inline text-sm text-muted-foreground tabular-nums"
-								>
-									{formatSize(file.size) || "—"}
+								<span class="hidden sm:inline">
+									{#if badge}
+										<span
+											class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-xs font-medium {badge.cls}"
+										>
+											{#if badge.pulse}
+												<span class="size-1.5 rounded-full bg-amber-400 animate-pulse" />
+											{/if}
+											{badge.label}
+										</span>
+									{:else}
+										<span class="text-sm tabular-nums text-muted-foreground">
+											{formatSize(file.size) || "—"}
+										</span>
+									{/if}
 								</span>
 
 								<DropdownMenu.Root>

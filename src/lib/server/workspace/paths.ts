@@ -135,3 +135,12 @@ export function transcriptMarkdownPath(studentId: number, examTypeId?: number | 
 export function transcriptPdfPath(studentId: number, examTypeId?: number | null): string {
   return `${examPrefix(examTypeId)}pdfs/transcript-${studentId}.pdf`;
 }
+
+/**
+ * Photo file path, flat at class root (not exam-scoped). Photos span all
+ * exam types within a class/section — the same photo is visible across
+ * every per-exam manifest via readAllManifests.
+ */
+export function photoPath(contentHash: string, ext: string): string {
+  return `photos/${contentHash}.${ext}`;
+}

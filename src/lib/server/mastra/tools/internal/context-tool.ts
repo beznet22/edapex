@@ -36,21 +36,22 @@ export const getContextTool = createTool({
 
         try {
             if (types.includes('assessment')) {
-                const [examTypes, subjects, classSection] = await Promise.all([
+                const [examTypes, classSection] = await Promise.all([
                     resultRepo.getCurrentTerm(),
-                    resultRepo.getSubjectsAssignedToStaff(staffId),
-                    resultRepo.getAssignedClassSection(staffId),
+                    resultRepo.getAssignedClassSection({ staffId }),
                 ]);
 
                 const activeClassId = ctx.classId || classSection?.classId;
                 const activeSectionId = ctx.sectionId || classSection?.sectionId;
 
-                let examSetups: any[] = [];
-                if (activeClassId && activeSectionId) {
-                    examSetups = await resultRepo.getExamSetupsByClassSection(activeClassId, activeSectionId);
-                } else {
-                    examSetups = await resultRepo.getExamSetupsByStaffId(staffId);
-                }
+                const [subjects, examSetups] = await Promise.all([
+                    activeClassId && activeSectionId
+                        ? resultRepo.getSubjectsByClass(activeClassId, activeSectionId)
+                        : Promise.resolve([]),
+                    activeClassId && activeSectionId
+                        ? resultRepo.getExamSetupsByClassSection(activeClassId, activeSectionId)
+                        : resultRepo.getExamSetupsByStaffId(staffId),
+                ]);
 
                 results.assessment = {
                     examTypes,
@@ -87,7 +88,7 @@ export const getContextTool = createTool({
             }
 
             if (types.includes('class')) {
-                const classSection = await resultRepo.getAssignedClassSection(staffId);
+                const classSection = await resultRepo.getAssignedClassSection({ staffId, classId: ctx.classId, sectionId: ctx.sectionId });
                 results.classAssignment = {
                     assignedClassSection: classSection,
                 };

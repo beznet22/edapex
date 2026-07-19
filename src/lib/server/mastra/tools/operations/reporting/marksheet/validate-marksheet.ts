@@ -1,21 +1,20 @@
 import { createTool } from '@mastra/core/tools';
 import { z } from 'zod';
-import { eq } from 'drizzle-orm';
 import { type StreamWriterLike } from '$lib/server/mastra/agent-stream-retry';
 import { tenantWorkspace } from '$lib/server/workspace';
 import { buildWorkspaceRequestContext } from '$lib/server/helpers/chat-helper';
 import { marksheetSchema } from '$lib/schema/marksheet';
 import { marksheetJsonPath, marksheetMarkdownPath } from '$lib/server/workspace/paths';
-import { addEntry, removeEntry, updateEntryStatus } from '$lib/server/workspace/manifest';
+import { addEntry, readManifest as readWorkspaceManifest, removeEntry, updateEntry, updateEntryStatus } from '$lib/server/workspace/manifest';
 import { resolveMentionsInMarkdown } from '$lib/server/mastra/editor/mention-resolver';
 import { createAssessmentServiceForRequest } from '$lib/server/service/assessment.service';
 import { bridgeToolContext } from '$lib/server/mastra/tools/internal/bridge';
+import { ParentRepository, SchoolRepository } from '$lib/server/repository';
 import type { TenantContext } from '$lib/server/mastra/tenant-context';
 import type { WorkspaceFilesystem } from '@mastra/core/workspace';
 import type { RequestContext } from '@mastra/core/request-context';
 import type { ResolvedMention } from '$lib/server/mastra/editor/schemas';
-import { getDatabase } from '$lib/server/db';
-import { smStudents, smParents, smSchools } from '$lib/server/db/sms-schema';
+import type { ParseContext } from '$lib/utils/marksheet-ast-parser';
 
 interface MarksheetToolContext {
 	requestContext?: {
@@ -24,6 +23,8 @@ interface MarksheetToolContext {
 	};
 	writer?: StreamWriterLike;
 	abortSignal?: AbortSignal;
+	// Matches MastraToolContext.getRepo from tenant-context.ts
+	getRepo: <T>(RepoClass: { name?: string; new(...args: any[]): T }) => T;
 }
 
 interface MissingIdField {
@@ -233,17 +234,12 @@ export const validateMarksheetTool = createTool({
 		// All required IDs resolved. Read raw.json (pre-parsed by editor auto-save).
 		const assessment = await createAssessmentServiceForRequest(tenant);
 		const mapping = await assessment.getMappingData(
-			tenant.staffId,
-			tenant.classId ?? undefined,
-			tenant.sectionId ?? undefined
+			tenant.classId!,
+			tenant.sectionId!
 		);
 
-		const subjectMap = new Map<string, number>();
-		for (const s of mapping.subjects) {
-			if (s.subjectCode && s.id != null) {
-				subjectMap.set(s.subjectCode.toUpperCase(), s.id);
-			}
-		}
+		console.log("Mapping", mapping.subjects);
+		const schoolInfo = await context.getRepo(SchoolRepository).getSchoolInfo(tenant.schoolId);
 
 		const rawJsonPath = input.currentMarkdownPath.replace(/\.md$/, '.raw.json');
 		let jsonData: Record<string, unknown>;
@@ -254,43 +250,38 @@ export const validateMarksheetTool = createTool({
 		} else {
 			// Fallback: parse markdown directly if raw.json doesn't exist yet
 			const { parseMarksheetMarkdown } = await import('$lib/utils/marksheet-ast-parser');
-			jsonData = parseMarksheetMarkdown(correctedMarkdown) as unknown as Record<string, unknown>;
+			const parseContext: ParseContext = {
+				tenant: {
+					schoolId: tenant.schoolId,
+					classId: tenant.classId ?? undefined,
+					sectionId: tenant.sectionId ?? undefined,
+					examTypeId: effective.examTypeId ?? tenant.examTypeId ?? undefined,
+					academicId: effective.academicId ?? tenant.academicId ?? undefined,
+					studentId: effective.studentId ?? tenant.studentId ?? undefined,
+					className: tenant.className ?? undefined,
+					sectionName: tenant.sectionName ?? undefined,
+					academicYearTitle: tenant.academicYearTitle ?? undefined,
+					fullName: effective.studentName ?? undefined,
+				},
+				school: schoolInfo
+					? {
+						name: schoolInfo.schoolName ?? undefined,
+						email: schoolInfo.email ?? undefined,
+						phone: schoolInfo.phone ?? undefined,
+					}
+					: undefined,
+				mapping: {
+					subjects: mapping.subjects
+						.filter((s): s is { id: number; subjectCode: string; subjectName: string; teacherId: number } => s.id != null && !!s.subjectCode && !!s.teacherId && !!s.subjectName)
+						.map((s) => ({ id: s.id, subjectCode: s.subjectCode, subjectName: s.subjectName, teacherId: s.teacherId })),
+				},
+			};
+			jsonData = parseMarksheetMarkdown(correctedMarkdown, parseContext) as unknown as Record<string, unknown>;
 		}
 
-		// Override resolved IDs onto the parsed data
-		if (effective.studentId != null) (jsonData.student as Record<string, unknown>).id = effective.studentId;
+		// Merge effective student fields not covered by mergeContext
 		if (effective.adminNo != null) (jsonData.student as Record<string, unknown>).adminNo = effective.adminNo;
 		if (effective.studentName != null) (jsonData.student as Record<string, unknown>).fullName = effective.studentName;
-		if (effective.examTypeId != null) {
-			jsonData.examType = { ...(jsonData.examType as Record<string, unknown> ?? {}), id: effective.examTypeId };
-		}
-		for (const record of (jsonData.records as Array<Record<string, unknown>>) ?? []) {
-			const sid = subjectMap.get(String(record.subjectCode ?? '').toUpperCase());
-			record.subjectId = sid ?? 0;
-			record.studentId = effective.studentId ?? 0;
-		}
-		for (const subj of (jsonData.subjects as Array<Record<string, unknown>>) ?? []) {
-			const code = String(subj.subjectCode ?? '');
-			subj.subjectId = code ? (subjectMap.get(code.toUpperCase()) ?? null) : null;
-		}
-
-		// Inject school info, gender, sessionYear from DB (these are removed from agent output)
-		const db = await getDatabase();
-		const schoolRow = await db
-			.select({ schoolName: smSchools.schoolName, email: smSchools.email, phone: smSchools.phone })
-			.from(smSchools)
-			.where(eq(smSchools.id, tenant.schoolId))
-			.limit(1)
-			.then((rows) => rows[0] ?? null);
-		if (schoolRow) {
-			(jsonData.school as Record<string, unknown>).id = tenant.schoolId;
-			(jsonData.school as Record<string, unknown>).name = schoolRow.schoolName ?? '';
-			(jsonData.school as Record<string, unknown>).email = schoolRow.email ?? '';
-			(jsonData.school as Record<string, unknown>).phone = schoolRow.phone ?? '';
-		}
-		if (effective.studentId != null && !(jsonData.student as Record<string, unknown>).sessionYear) {
-			(jsonData.student as Record<string, unknown>).sessionYear = tenant.academicYearTitle ?? '';
-		}
 
 		const validationResult = await marksheetSchema.safeParseAsync(jsonData);
 		// No LLM fallback — template is structurally sound (auto-fixed browser-side).
@@ -311,6 +302,7 @@ export const validateMarksheetTool = createTool({
 				{
 					path: jsonPath,
 					kind: 'marksheet-json',
+					status: 'Validated',
 					studentId: finalJson.student.id,
 					examTypeId,
 					uploadedAt: new Date().toISOString(),
@@ -336,6 +328,7 @@ export const validateMarksheetTool = createTool({
 				{
 					path: canonicalMarkdownPath,
 					kind: 'marksheet-markdown',
+					status: 'Validated',
 					documentId: String(finalJson.student.id),
 					fileName: canonicalMarkdownPath.split('/').pop(),
 					studentId: finalJson.student.id,
@@ -349,6 +342,18 @@ export const validateMarksheetTool = createTool({
 			await updateEntryStatus(tenant, jsonPath, 'validated', examTypeId);
 			await updateEntryStatus(tenant, canonicalMarkdownPath, 'validated', examTypeId);
 
+			const draftManifest = await readWorkspaceManifest(tenant, examTypeId);
+			const draftEntry = draftManifest.entries[input.currentMarkdownPath];
+			const userFileEntry = Object.values(draftManifest.entries).find(
+				(e) =>
+					e.kind === 'user-file' &&
+					(e.documentId === draftEntry?.documentId ||
+						(draftEntry?.contentHash && e.contentHash === draftEntry.contentHash))
+			);
+			if (userFileEntry) {
+				await updateEntry(tenant, userFileEntry.path, { status: 'Validated' }, examTypeId);
+			}
+
 			if (input.currentMarkdownPath !== canonicalMarkdownPath) {
 				if (await fs.exists(input.currentMarkdownPath)) {
 					await fs.deleteFile(input.currentMarkdownPath);
@@ -356,30 +361,9 @@ export const validateMarksheetTool = createTool({
 				await removeEntry(tenant, input.currentMarkdownPath, examTypeId);
 			}
 
-			const db = await getDatabase();
-			const studentRow = await db
-				.select({ parentId: smStudents.parentId })
-				.from(smStudents)
-				.where(eq(smStudents.id, finalJson.student.id))
-				.limit(1)
-				.then((rows) => rows[0] ?? null);
-			let parentName: string | null = null;
-			let parentEmail: string | null = null;
-			if (studentRow?.parentId != null) {
-				const parent = await db
-					.select({
-						guardiansName: smParents.guardiansName,
-						guardiansEmail: smParents.guardiansEmail,
-					})
-					.from(smParents)
-					.where(eq(smParents.id, studentRow.parentId))
-					.limit(1)
-					.then((rows) => rows[0] ?? null);
-				if (parent) {
-					parentName = parent.guardiansName;
-					parentEmail = parent.guardiansEmail;
-				}
-			}
+			const parentRow = await context.getRepo(ParentRepository).findParentByStudentId(finalJson.student.id);
+			const parentName = parentRow?.guardiansName ?? null;
+			const parentEmail = parentRow?.guardiansEmail ?? null;
 
 			return {
 				ok: true as const,
@@ -397,6 +381,22 @@ export const validateMarksheetTool = createTool({
 			message: issue.message,
 			code: issue.code
 		}));
+
+		if (tenant.examTypeId != null) {
+			try {
+				const failManifest = await readWorkspaceManifest(tenant, tenant.examTypeId);
+				const failDraft = failManifest.entries[input.currentMarkdownPath];
+				const failSource = Object.values(failManifest.entries).find(
+					(e) =>
+						e.kind === 'user-file' &&
+						(e.documentId === failDraft?.documentId ||
+							(failDraft?.contentHash && e.contentHash === failDraft.contentHash))
+				);
+				if (failSource) {
+					await updateEntry(tenant, failSource.path, { status: 'Failed', error: finalValidationIssues.map(i => i.message).join('; ') }, tenant.examTypeId);
+				}
+			} catch { /* best-effort */ }
+		}
 
 		return {
 			ok: false as const,

@@ -221,6 +221,7 @@ async function renderAndWriteResultPdf(args: CoreRenderArgs): Promise<CoreRender
     {
       path: storagePath,
       kind: 'marksheet-pdf',
+      status: 'Generated',
       studentId: student.studentId,
       examTypeId,
       uploadedAt: new Date().toISOString(),

@@ -11,7 +11,7 @@ import { createAssessmentOcrServiceForRequest } from "$lib/server/service/assess
 import { createAssessmentServiceForRequest } from "$lib/server/service/assessment.service";
 import { createTenantContext } from "$lib/server/mastra/tenant-context";
 import { resolveTenantWorkspace } from "$lib/server/workspace/scope";
-import { readManifest, addEntry } from "$lib/server/workspace/manifest";
+import { readManifest, addEntry, updateEntry } from "$lib/server/workspace/manifest";
 import { render } from "svelte/server";
 import z from "zod";
 
@@ -98,9 +98,15 @@ export const publishResult = command(
             try {
               await addEntry(
                 tenant,
-                { ...entry, marksheetStatus: "published", modifiedAt: new Date().toISOString() },
+                { ...entry, marksheetStatus: "published", status: "Published", modifiedAt: new Date().toISOString() },
                 examTypeId
               );
+              const pubSource = Object.values(manifest.entries).find(
+                (e) => e.kind === 'user-file' && e.studentId === studentId
+              );
+              if (pubSource) {
+                await updateEntry(tenant, pubSource.path, { status: 'Published' }, examTypeId);
+              }
             } catch {
               // ignore manifest write errors
             }

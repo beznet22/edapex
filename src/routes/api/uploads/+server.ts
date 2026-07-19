@@ -4,7 +4,7 @@ import { smGeneralSettings, smStudents } from "$lib/server/db/sms-schema";
 import { getDatabase } from "$lib/server/db";
 import { createTenantContext } from "$lib/server/mastra/tenant-context";
 import { OcrWorkspaceStore } from "$lib/server/mastra/storage/ocr/ocr-workspace-store";
-import { addEntry as addWorkspaceEntry, removeEntry as removeWorkspaceEntry, readAllManifests, clearExamArtifacts } from "$lib/server/workspace/manifest";
+import { addEntry as addWorkspaceEntry, updateEntry, removeEntry as removeWorkspaceEntry, readAllManifests, clearExamArtifacts } from "$lib/server/workspace/manifest";
 import { uploadPath, ocrMarkdownPath, ocrMetaPath, marksheetJsonPath, marksheetMarkdownPath, marksheetPdfPath, transcriptJsonPath, transcriptMarkdownPath, transcriptPdfPath } from "$lib/server/workspace/paths";
 import { resolveTenantFilesystem } from "$lib/server/workspace";
 import { resolveTenantWorkspace } from "$lib/server/workspace/scope";
@@ -125,6 +125,30 @@ export const POST: RequestHandler = async ({ request, locals, cookies }) => {
   }
 
   if (kind === "photo") {
+    const examTypeId = tenant.examTypeId;
+    if (examTypeId == null) {
+      error(400, 'EXAM_TYPE_REQUIRED: cannot upload a photo without an active examTypeId');
+    }
+    const requestContext = buildWorkspaceRequestContext(tenant);
+    const fs = await resolveTenantFilesystem({ requestContext: requestContext as never });
+    const photoRelPath = `photos/${contentHash}.${ext}`;
+    await fs.writeFile(photoRelPath, buffer, { recursive: true });
+    await addWorkspaceEntry(
+      tenant,
+      {
+        path: photoRelPath,
+        kind: 'photo',
+        status: 'Uploaded',
+        contentHash,
+        fileName: filename,
+        examTypeId,
+        uploadedAt: new Date().toISOString(),
+        modifiedAt: new Date().toISOString(),
+        mimeType: file.type,
+        sizeBytes: file.size,
+      },
+      examTypeId
+    );
     return json({
       success: true,
       kind: "photo" as const,
@@ -241,11 +265,13 @@ export const POST: RequestHandler = async ({ request, locals, cookies }) => {
   await fs.writeFile(uploadPath(filename, examTypeId), buffer, { recursive: true });
 
   // Register the upload in the per-exam manifest (kind: user-file).
+  const uploadRelPath = uploadPath(filename, examTypeId);
   await addWorkspaceEntry(
     tenant,
     {
-      path: uploadPath(filename, examTypeId),
+      path: uploadRelPath,
       kind: "user-file",
+      status: "Uploaded",
       documentId,
       fileName: filename,
       contentHash,
@@ -343,6 +369,12 @@ export const POST: RequestHandler = async ({ request, locals, cookies }) => {
     console.error('[uploads] OCR failed for', filename, err);
   }
 
+  if (ocrStatus === 'ready') {
+    await updateEntry(tenant, uploadRelPath, { status: 'Extracted' }, examTypeId).catch(() => {});
+  } else if (ocrStatus === 'error') {
+    await updateEntry(tenant, uploadRelPath, { status: 'Failed', error: ocrError ?? 'OCR failed' }, examTypeId).catch(() => {});
+  }
+
   return json({
     success: true,
     kind: "document" as const,
@@ -350,7 +382,8 @@ export const POST: RequestHandler = async ({ request, locals, cookies }) => {
     contentHash,
     fileId: contentHash,
     ocrStatus,
-    ocrError
+    ocrError,
+    manifestStatus: ocrStatus === 'ready' ? 'Extracted' : ocrStatus === 'error' ? 'Failed' : undefined,
   });
 };
 
@@ -445,7 +478,7 @@ export const DELETE: RequestHandler = async ({ url, locals, cookies }) => {
         const entryExamTypeId = entry.examTypeId ?? m.examTypeId;
         if (entry.studentId !== undefined) {
           pathsToDelete.push(marksheetJsonPath(entry.studentId, entryExamTypeId));
-          pathsToDelete.push(marksheetMarkdownPath({ studentId: entry.studentId }));
+          pathsToDelete.push(marksheetMarkdownPath({ studentId: entry.studentId, examTypeId: entryExamTypeId }));
           pathsToDelete.push(marksheetPdfPath(entry.studentId, undefined, undefined, entryExamTypeId));
           pathsToDelete.push(transcriptJsonPath(entry.studentId, entryExamTypeId));
           pathsToDelete.push(transcriptMarkdownPath(entry.studentId, entryExamTypeId));

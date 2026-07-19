@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { tenantWorkspace } from '$lib/server/workspace';
 import { buildWorkspaceRequestContext } from '$lib/server/helpers/chat-helper';
 import { marksheetJsonPath } from '$lib/server/workspace/paths';
-import { addEntry, updateEntryStatus } from '$lib/server/workspace/manifest';
+import { addEntry, readManifest as readWorkspaceManifest, updateEntry, updateEntryStatus } from '$lib/server/workspace/manifest';
 import { createAssessmentServiceForRequest } from '$lib/server/service/assessment.service';
 import { marksheetSchema, type Marksheet } from '$lib/schema/marksheet';
 import type { TenantContext } from '$lib/server/mastra/tenant-context';
@@ -57,7 +57,8 @@ export const commitMarksheetTool = createTool({
 			ok: z.literal(true),
 			artifactId: z.string(),
 			recordId: z.number(),
-			studentName: z.string()
+			studentName: z.string(),
+			marksheetStatus: z.string().describe('Current lifecycle status: committed.')
 		}),
 		z.object({
 			ok: z.literal(false),
@@ -165,6 +166,7 @@ export const commitMarksheetTool = createTool({
 			{
 				path: jsonPath,
 				kind: 'marksheet-json',
+				status: 'Committed',
 				studentId: input.studentId,
 				examTypeId,
 				recordId,
@@ -176,7 +178,15 @@ export const commitMarksheetTool = createTool({
 		);
 		await updateEntryStatus(tenant, jsonPath, 'committed', examTypeId);
 
+		const commitManifest = await readWorkspaceManifest(tenant, examTypeId);
+		const commitSource = Object.values(commitManifest.entries).find(
+			(e) => e.kind === 'user-file' && e.studentId === input.studentId
+		);
+		if (commitSource) {
+			await updateEntry(tenant, commitSource.path, { status: 'Committed' }, examTypeId);
+		}
+
 		const studentName = validated.student?.fullName ?? 'Unknown';
-		return { ok: true as const, artifactId, recordId, studentName };
+		return { ok: true as const, artifactId, recordId, studentName, marksheetStatus: 'committed' as const };
 	}
 });

@@ -60,3 +60,4 @@ reference/
 storage/edapex-mastra.db
 storage/edapex-mastra.db-wal
 storage/edapex-mastra.db-shm
+.cookie

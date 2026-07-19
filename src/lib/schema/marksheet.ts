@@ -37,8 +37,8 @@ export const studentSchema = z.object({
   category: z
     .enum(["DAYCARE", "NURSERY", "GRADEK", "LOWERBASIC", "MIDDLEBASIC"])
     .describe("The category of the student"),
-  className: z.string().describe("The class name of the student"),
-  sectionName: z.string().describe("The section name of the student"),
+  className: z.string().min(1).describe("The class name of the student"),
+  sectionName: z.string().min(1).describe("The section name of the student"),
   adminNo: z.number().describe("The admission number of the student"),
   sessionYear: z.string().describe("The session year of the exam"),
   daysOpened: z.number().describe("The number of days opened"),
@@ -57,7 +57,7 @@ export const recordSchema = z
   .object({
     studentId: z.number().describe("The ID of the student"),
     resultId: z.number().describe("The ID of the result"),
-    subjectId: z.number().describe("The ID of the subject"),
+    subjectId: z.number().positive().describe("The ID of the subject"),
     subject: z.string().describe("The name of the subject"),
     subjectCode: z.string().describe("The code of the subject"),
     objectives: z.array(z.string()).nullable().describe("The objectives of the subject"),

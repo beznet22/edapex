@@ -34,7 +34,7 @@ import { createTool } from '@mastra/core/tools';
 import { z } from 'zod';
 import { appendFileSync } from 'fs';
 import { streamWithAutoRetry, type StreamWriterLike } from '$lib/server/mastra/agent-stream-retry';
-import { readManifest as readWorkspaceManifest, addEntry, updateEntryStatus } from '$lib/server/workspace/manifest';
+import { readManifest as readWorkspaceManifest, addEntry, updateEntry, updateEntryStatus } from '$lib/server/workspace/manifest';
 import { ocrMarkdownPath } from '$lib/server/workspace/paths';
 import {
   getTenant,
@@ -73,21 +73,25 @@ export function deriveDocumentId(input: { contentHash: string }): string {
 }
 
 /**
- * Derives the working title and the editor's auto-save path from the
- * uploaded filename. Both are deterministic functions of `fileName` and
+ * Derive a display title and a safe initial on-disk path from the
+ * original upload filename. The tool is deterministic given the same
  * `contentHash` — no LLM call, no DB lookup, no OCR parsing.
  *
  * Title: stripped of extension and sanitized (e.g., "adakole.jpg.jpeg" → "adakole").
- * Path: marksheets/<safe>-<shortHash>.md where shortHash = first 8 chars
- * of contentHash. The short hash prevents collisions when the same
- * filename is uploaded twice with different OCR content; re-uploads of the
- * exact same file land on the same path and PUT-overwrites atomically.
+ * Path: exams/examType-<examTypeId>/marksheets/<safe>-<shortHash>.md
+ * where shortHash = first 8 chars of contentHash. When examTypeId is
+ * absent, the path falls back to marksheets/<safe>-<shortHash>.md (class
+ * root) for backward compatibility.
+ *
+ * The short hash prevents collisions when the same filename is uploaded
+ * twice with different OCR content; re-uploads of the exact same file
+ * land on the same path and PUT-overwrites atomically.
  *
  * validate-marksheet renames the path to the canonical
  * `marksheets/ADM<adminNo>-<examTypeId>-<studentName>.md` form once the
  * student identity is known.
  */
-export function deriveInitialFilename(fileName: string, contentHash: string): {
+export function deriveInitialFilename(fileName: string, contentHash: string, examTypeId?: number | null): {
   title: string;
   initialMarkdownPath: string;
 } {
@@ -95,9 +99,10 @@ export function deriveInitialFilename(fileName: string, contentHash: string): {
   const safeBase = baseName.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 40);
   const shortHash = contentHash.slice(0, 8);
   const initialFilename = `${safeBase}-${shortHash}.md`;
+  const prefix = examTypeId != null ? `exams/examType-${examTypeId}/` : '';
   return {
     title: safeBase,
-    initialMarkdownPath: `marksheets/${initialFilename}`,
+    initialMarkdownPath: `${prefix}marksheets/${initialFilename}`,
   };
 }
 
@@ -132,7 +137,7 @@ export const streamDocumentTool = createTool({
       throw new Error(`MANIFEST_ENTRY_NOT_FOUND: contentHash=${contentHash}`);
     }
 
-    const { title, initialMarkdownPath } = deriveInitialFilename(entry.fileName, contentHash);
+    const { title, initialMarkdownPath } = deriveInitialFilename(entry.fileName, contentHash, examTypeId);
 
     const mdRelPath = ocrMarkdownPath(entry.fileName, examTypeId);
     if (!(await fs.exists(mdRelPath))) {
@@ -147,9 +152,8 @@ export const streamDocumentTool = createTool({
     // Fetch subject mapping + roster for context
     const assessment = await createAssessmentServiceForRequest(tenant);
     const mapping = await assessment.getMappingData(
-      tenant.staffId,
-      tenant.classId ?? undefined,
-      tenant.sectionId ?? undefined
+      tenant.classId!,
+      tenant.sectionId!
     );
 
     const examTypeTitle = Array.isArray(mapping.examTypes)
@@ -266,21 +270,25 @@ MIDDLEBASIC: Subject Code | MTA (30) | CA (10) | REPORT (10) | EXAM (50)`;
     // `validate-marksheet.ts`, which renames this draft away.
     const formattedDocumentId = entry.documentId ?? documentId;
     await fs.writeFile(initialMarkdownPath, markdown, { recursive: true });
-    await addEntry(
-      tenant,
-      {
-        path: initialMarkdownPath,
-        kind: 'marksheet-markdown',
-        documentId: formattedDocumentId,
-        fileName: entry.fileName,
-        contentHash,
-        studentId: studentId ?? undefined,
-        uploadedAt: new Date().toISOString(),
-        modifiedAt: new Date().toISOString()
-      },
-      examTypeId
-    );
+      await addEntry(
+        tenant,
+        {
+          path: initialMarkdownPath,
+          kind: 'marksheet-markdown',
+          status: 'Formatted',
+          documentId: formattedDocumentId,
+          fileName: entry.fileName,
+          contentHash,
+          studentId: studentId ?? undefined,
+          uploadedAt: new Date().toISOString(),
+          modifiedAt: new Date().toISOString()
+        },
+        examTypeId
+      );
     await updateEntryStatus(tenant, initialMarkdownPath, 'formatted', examTypeId);
+    if (entry.path) {
+      await updateEntry(tenant, entry.path, { status: 'Formatted' }, examTypeId);
+    }
 
     return {
       artifactId,

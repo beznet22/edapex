@@ -105,3 +105,9 @@ export const DEFAULT_COPILOT_MODEL = groqProvider.chatModel('llama-3.1-8b-instan
  * without leaking surrounding document content.
  */
 export const DEFAULT_EDITOR_MODEL = groqProvider.chatModel('llama-3.3-70b-versatile');
+
+
+/**
+ * Default formatter agent model — uses Qwen 3.6 27B for instruction-following on inline edits.
+ */
+export const DEFAULT_FORMATTER_MODEL = groqProvider.chatModel('qwen/qwen3.6-27b');

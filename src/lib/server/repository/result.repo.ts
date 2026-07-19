@@ -103,7 +103,7 @@ export class ResultsRepository extends BaseRepository {
         .groupBy(schema.smAssignSubjects.teacherId)
         .limit(1);
       if (!assigned || !assigned.teacherId) return [];
-      return await this.db
+      const rows = await this.db
         .select({
           subjectId: schema.smAssignSubjects.subjectId,
           subjectCode: schema.smSubjects.subjectCode,
@@ -120,12 +120,23 @@ export class ResultsRepository extends BaseRepository {
           )
         )
         .groupBy(schema.smAssignSubjects.subjectId);
+
+      return rows.filter((row): row is SubjectAssigned => row.subjectId !== null);
     }, "getAssignedSubjects");
   }
 
-  async getAssignedClassSection(staffId: number) {
+  async getAssignedClassSection(
+    { staffId, classId, sectionId }: { staffId?: number; classId?: number; sectionId?: number } = {}
+  ) {
     return this.withErrorHandling(async () => {
       const academicId = await this.getAcademicId();
+      const filters: any[] = [
+        eq(schema.smAssignSubjects.activeStatus, 1),
+        eq(schema.smAssignSubjects.academicId, academicId),
+      ];
+      if (staffId !== undefined) filters.push(eq(schema.smAssignSubjects.teacherId, staffId));
+      if (classId !== undefined) filters.push(eq(schema.smAssignSubjects.classId, classId));
+      if (sectionId !== undefined) filters.push(eq(schema.smAssignSubjects.sectionId, sectionId));
       const [classSection] = await this.db
         .select({
           id: schema.smClassSections.id,
@@ -145,13 +156,7 @@ export class ResultsRepository extends BaseRepository {
             eq(schema.smClassSections.academicId, academicId)
           )
         )
-        .where(
-          and(
-            eq(schema.smAssignSubjects.teacherId, staffId),
-            eq(schema.smAssignSubjects.activeStatus, 1),
-            eq(schema.smAssignSubjects.academicId, academicId)
-          )
-        )
+        .where(and(...filters))
         .limit(1);
       return classSection as ClassSection | null;
     }, "getAssignedClassSection");
@@ -161,7 +166,7 @@ export class ResultsRepository extends BaseRepository {
     return this.withErrorHandling(async () => {
       const db = tx || this.db;
       const { id, createdAt, updatedAt, ...data } = attendance;
-      if(!data.studentId || !data.examTypeId){
+      if (!data.studentId || !data.examTypeId) {
         return null;
       }
       const academicId = await this.getAcademicId();
@@ -270,7 +275,7 @@ export class ResultsRepository extends BaseRepository {
     examTermId: number;
     schoolId: number;
   }, tx?: MySQLDrizzleClient) {
-    if(params.recordId === 0){
+    if (params.recordId === 0) {
       return;
     }
     return this.withErrorHandling(async () => {
@@ -538,23 +543,23 @@ export class ResultsRepository extends BaseRepository {
 
       const classResults =
         p.student.classId !== null && p.student.classId !== undefined &&
-        p.student.sectionId !== null && p.student.sectionId !== undefined
+          p.student.sectionId !== null && p.student.sectionId !== undefined
           ? await this.db
-              .select({
-                studentId: schema.smResultStores.studentId,
-                examTypeId: schema.smResultStores.examTypeId,
-                totalMarks: schema.smResultStores.totalMarks,
-              })
-              .from(schema.smResultStores)
-              .where(
-                and(
-                  eq(schema.smResultStores.classId, p.student.classId),
-                  eq(schema.smResultStores.sectionId, p.student.sectionId),
-                  eq(schema.smResultStores.academicId, p.academicId),
-                  eq(schema.smResultStores.activeStatus, 1),
-                  inArray(schema.smResultStores.examTypeId, termIds),
-                ),
-              )
+            .select({
+              studentId: schema.smResultStores.studentId,
+              examTypeId: schema.smResultStores.examTypeId,
+              totalMarks: schema.smResultStores.totalMarks,
+            })
+            .from(schema.smResultStores)
+            .where(
+              and(
+                eq(schema.smResultStores.classId, p.student.classId),
+                eq(schema.smResultStores.sectionId, p.student.sectionId),
+                eq(schema.smResultStores.academicId, p.academicId),
+                eq(schema.smResultStores.activeStatus, 1),
+                inArray(schema.smResultStores.examTypeId, termIds),
+              ),
+            )
           : [];
 
       return {
@@ -923,23 +928,29 @@ export class ResultsRepository extends BaseRepository {
     }, "getStudentCategories");
   }
 
-  async getSubjectsAssignedToStaff(staffId: number): Promise<Partial<Subject>[]> {
+  async getSubjectsByClass(classId: number, sectionId: number) {
     return this.withErrorHandling(async () => {
       const academicId = await this.getAcademicId();
       const subjects = await this.db
-        .select({ id: schema.smSubjects.id, subjectCode: schema.smSubjects.subjectCode, subjectName: schema.smSubjects.subjectName })
+        .select({
+          id: schema.smSubjects.id,
+          subjectCode: schema.smSubjects.subjectCode,
+          subjectName: schema.smSubjects.subjectName,
+          teacherId: schema.smAssignSubjects.teacherId
+        })
         .from(schema.smSubjects)
         .leftJoin(schema.smAssignSubjects, eq(schema.smSubjects.id, schema.smAssignSubjects.subjectId))
         .where(
           and(
-            eq(schema.smAssignSubjects.teacherId, staffId),
+            eq(schema.smAssignSubjects.classId, classId),
+            eq(schema.smAssignSubjects.sectionId, sectionId),
             eq(schema.smAssignSubjects.academicId, academicId),
             eq(schema.smSubjects.activeStatus, 1)
           )
         )
         .orderBy(asc(schema.smSubjects.subjectName));
       return subjects;
-    }, "getAssignedSubjects");
+    }, "getSubjectsByClass");
   }
 }
 

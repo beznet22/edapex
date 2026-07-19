@@ -260,11 +260,11 @@ async function runOcrDirect(
 
 	postProgress(taskId, 0.95, "Persisting result…");
 
-	await res.json();
+	const ocrResult = await res.json() as { manifestStatus?: string };
 	postCompleted(taskId, {
 		succeeded: 1,
 		failed: 0,
-		results: [{ key, status: "success" }],
+		results: [{ key, status: "success", manifestStatus: ocrResult.manifestStatus ?? 'Extracted' }],
 	});
 }
 
@@ -418,8 +418,13 @@ async function runFilePipeline(
 						throw new Error(msg);
 					}
 
+					const ocrResult = await res.json() as { manifestStatus?: string; contentHash?: string };
 					const s = states.find((st) => st.key === key);
-					if (s) { s.status = "completed"; }
+					if (s) {
+						s.status = "completed";
+						s.manifestStatus = ocrResult.manifestStatus;
+						s.contentHash = ocrResult.contentHash;
+					}
 					emitFiles();
 				} catch (err) {
 					if (err instanceof DOMException && err.name === "AbortError") {
@@ -443,6 +448,95 @@ async function runFilePipeline(
 		await Promise.all(ocrWorkers);
 	}
 
+	// ── Phase 3: Format queue for extracted files ───────────────────────────
+	const extractedKeys = states
+		.filter((s) => s.status === "completed" && s.manifestStatus === "Extracted" && s.contentHash)
+		.map((s) => s.key);
+
+	if (extractedKeys.length > 0) {
+		emit({ type: "phase-change", taskId, phase: "format" });
+		postProgress(taskId, 0.8, `Formatting ${extractedKeys.length} file(s)…`);
+
+		for (const key of extractedKeys) {
+			if (cancelledTasks.has(taskId)) { postCancelled(taskId); return; }
+			const s = states.find((st) => st.key === key);
+			if (!s || !s.contentHash) continue;
+			s.status = "formatting";
+			emitFiles();
+
+			const fileName = s.name;
+			const contentHash = s.contentHash;
+
+			let formatAttempt = 0;
+			const maxFormatAttempts = 3;
+			let formatSuccess = false;
+
+			while (formatAttempt < maxFormatAttempts && !formatSuccess) {
+				if (cancelledTasks.has(taskId)) { postCancelled(taskId); return; }
+
+				try {
+					const formatRes = await fetchWithTimeout(
+						"/api/format-document",
+						{
+							method: "POST",
+							headers: { "Content-Type": "application/json" },
+							body: JSON.stringify({ contentHash, fileName, examTypeId: tenant.examTypeId }),
+							signal: abortController.signal,
+						},
+						120000,
+					);
+
+					const formatBody = await formatRes.json() as {
+						success?: boolean;
+						rateLimited?: boolean;
+						retryAfterSeconds?: number;
+						resetAt?: string;
+						error?: string;
+						manifestStatus?: string;
+					};
+
+					if (formatBody.rateLimited) {
+						const waitSecs = formatBody.retryAfterSeconds ?? 5;
+						emit({ type: "rate-limited", taskId, retryAfterSeconds: waitSecs, resetAt: formatBody.resetAt ?? new Date(Date.now() + waitSecs * 1000).toISOString() });
+						if (cancelledTasks.has(taskId)) { postCancelled(taskId); return; }
+						await new Promise<void>((r) => setTimeout(r, waitSecs * 1000));
+						formatAttempt++;
+						continue;
+					}
+
+					if (!formatRes.ok || !formatBody.success) {
+						s.status = "error";
+						s.error = formatBody.error ?? `HTTP ${formatRes.status}`;
+						emitFiles();
+						formatSuccess = true; // don't retry non-rate-limit errors
+						break;
+					}
+
+					s.status = "completed";
+					s.manifestStatus = formatBody.manifestStatus ?? "Formatted";
+					emitFiles();
+					formatSuccess = true;
+				} catch (err) {
+					if (err instanceof DOMException && (err.name === "AbortError" || err.name === "TimeoutError")) {
+						postCancelled(taskId);
+						return;
+					}
+					s.status = "error";
+					s.error = err instanceof Error ? err.message : String(err);
+					emitFiles();
+					formatSuccess = true;
+					break;
+				}
+			}
+
+			if (!formatSuccess) {
+				s.status = "error";
+				s.error = `Format failed after ${maxFormatAttempts} retries (rate limited)`;
+				emitFiles();
+			}
+		}
+	}
+
 	// ── Result ──────────────────────────────────────────────────────────────
 	if (cancelledTasks.has(taskId)) {
 		postCancelled(taskId);
@@ -457,6 +551,8 @@ async function runFilePipeline(
 			key: s.key,
 			status: s.status === "completed" ? "success" as const : "error" as const,
 			error: s.error,
+			manifestStatus: s.manifestStatus,
+			contentHash: s.contentHash,
 		}));
 
 	if (failed > 0) {
@@ -474,6 +570,132 @@ async function runOcrSingle(
   await runOcrBatch(taskId, [key], tenant);
 }
 
+/**
+ * Run format-document for a batch of extracted files. Processes sequentially
+ * (1 file at a time) to respect Groq's rate limits. Handles 429 rate-limit
+ * responses with automatic retry and emits `rate-limited` events for the
+ * main-thread countdown UI.
+ */
+async function runFormatBatch(
+  taskId: string,
+  keys: string[],
+  tenant: SerializedTenant,
+  contentHashes?: Record<string, string>,
+): Promise<void> {
+  const abortController = new AbortController();
+  abortControllers.set(taskId, abortController);
+  postProgress(taskId, 0, `Formatting ${keys.length} file(s)…`);
+
+  // Build per-file state so we can emit progress
+  const states: UploadFileState[] = keys.map((key) => ({
+    key,
+    name: key.split('/').pop() ?? key,
+    status: "formatting" as const,
+  }));
+  emit({ type: "file-update", taskId, files: states.map((s) => ({ ...s })) });
+
+  const results: BatchExtractResult[] = [];
+  let succeededCount = 0;
+  let failedCount = 0;
+
+  for (const key of keys) {
+    if (cancelledTasks.has(taskId)) { postCancelled(taskId, { succeeded: succeededCount, failed: failedCount, results }); return; }
+
+    const s = states.find((st) => st.key === key);
+    if (!s) continue;
+
+    s.status = "formatting";
+    emit({ type: "file-update", taskId, files: states.map((x) => ({ ...x })) });
+
+    const fileName = s.name;
+    const hash = contentHashes?.[key] ?? key;
+
+    let formatAttempt = 0;
+    const maxFormatAttempts = 3;
+    let formatSuccess = false;
+
+    while (formatAttempt < maxFormatAttempts && !formatSuccess) {
+      if (cancelledTasks.has(taskId)) { postCancelled(taskId, { succeeded: succeededCount, failed: failedCount, results }); return; }
+
+      try {
+        const formatRes = await fetchWithTimeout(
+          "/api/format-document",
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ contentHash: hash, fileName, examTypeId: tenant.examTypeId }),
+            signal: abortController.signal,
+          },
+          120000,
+        );
+
+        const formatBody = await formatRes.json() as {
+          success?: boolean;
+          rateLimited?: boolean;
+          retryAfterSeconds?: number;
+          resetAt?: string;
+          error?: string;
+          manifestStatus?: string;
+        };
+
+        if (formatBody.rateLimited) {
+          const waitSecs = formatBody.retryAfterSeconds ?? 5;
+          emit({ type: "rate-limited", taskId, retryAfterSeconds: waitSecs, resetAt: formatBody.resetAt ?? new Date(Date.now() + waitSecs * 1000).toISOString() });
+          if (cancelledTasks.has(taskId)) { postCancelled(taskId, { succeeded: succeededCount, failed: failedCount, results }); return; }
+          await new Promise<void>((r) => setTimeout(r, waitSecs * 1000));
+          formatAttempt++;
+          continue;
+        }
+
+        if (!formatRes.ok || !formatBody.success) {
+          s.status = "error";
+          s.error = formatBody.error ?? `HTTP ${formatRes.status}`;
+          emit({ type: "file-update", taskId, files: states.map((x) => ({ ...x })) });
+          results.push({ key, status: "error", error: s.error });
+          failedCount++;
+          formatSuccess = true;
+          break;
+        }
+
+        s.status = "completed";
+        s.manifestStatus = formatBody.manifestStatus ?? "Formatted";
+        emit({ type: "file-update", taskId, files: states.map((x) => ({ ...x })) });
+        results.push({ key, status: "success", manifestStatus: s.manifestStatus });
+        succeededCount++;
+        formatSuccess = true;
+      } catch (err) {
+        if (err instanceof DOMException && (err.name === "AbortError" || err.name === "TimeoutError")) {
+          postCancelled(taskId, { succeeded: succeededCount, failed: failedCount, results });
+          return;
+        }
+        s.status = "error";
+        s.error = err instanceof Error ? err.message : String(err);
+        emit({ type: "file-update", taskId, files: states.map((x) => ({ ...x })) });
+        results.push({ key, status: "error", error: s.error });
+        failedCount++;
+        formatSuccess = true;
+        break;
+      }
+    }
+
+    if (!formatSuccess) {
+      s.status = "error";
+      s.error = `Format failed after ${maxFormatAttempts} retries (rate limited)`;
+      emit({ type: "file-update", taskId, files: states.map((x) => ({ ...x })) });
+      results.push({ key, status: "error", error: s.error });
+      failedCount++;
+    }
+
+    postProgress(taskId, (succeededCount + failedCount) / keys.length, `${succeededCount} formatted, ${failedCount} failed`);
+  }
+
+  if (failedCount > 0) {
+    postFailed(taskId, `${failedCount} of ${keys.length} failed`, { succeeded: succeededCount, failed: failedCount, results });
+  } else {
+    postCompleted(taskId, { succeeded: succeededCount, failed: failedCount, results });
+  }
+}
+
 async function runTask(taskId: string, spec: TaskSpec): Promise<void> {
 	postStarted(taskId);
 	try {
@@ -489,6 +711,9 @@ async function runTask(taskId: string, spec: TaskSpec): Promise<void> {
 				break;
 			case "process-files":
 				await runFilePipeline(taskId, spec.files, spec.tenant, spec.prefix, spec.examTypeId);
+				break;
+			case "format-batch":
+				await runFormatBatch(taskId, spec.keys, spec.tenant, spec.contentHashes);
 				break;
 		}
 	} catch (err) {

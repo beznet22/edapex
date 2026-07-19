@@ -18,6 +18,7 @@
 	import { flip } from "svelte/animate";
 	import { backOut } from "svelte/easing";
 	import { formatBytes } from "$lib/compression.utils";
+	import Confetti from "$lib/components/Confetti.svelte";
 
 	let tasks = $state(backgroundTasks.tasks);
 	let activeCount = $state(
@@ -71,6 +72,7 @@
 
 	let isOpen = $state(false);
 	let wasActive = $state(false);
+	let confettiTrigger = $state(0);
 
 	const footerSummary = $derived.by(() => {
 		const parts: string[] = [];
@@ -86,7 +88,18 @@
 			wasActive = true;
 		}
 		if (activeCount === 0 && wasActive) {
+			confettiTrigger++;
 			wasActive = false;
+		}
+	});
+
+	// Live countdown ticker — re-evaluates every second so rate-limit
+	// countdowns update in real time without manual interval management.
+	let countdownTick = $state(0);
+	$effect(() => {
+		if (tasks.some((t) => t.rateLimitInfo)) {
+			const interval = setInterval(() => countdownTick++, 1000);
+			return () => clearInterval(interval);
 		}
 	});
 
@@ -98,6 +111,7 @@
 				const n = task.spec.files.length;
 				const phase = task.phase;
 				if (phase === "ocr") return `Extracting — ${n} file${n === 1 ? "" : "s"}`;
+				if (phase === "format") return `Formatting — ${n} file${n === 1 ? "" : "s"}`;
 				return `Upload — ${n} file${n === 1 ? "" : "s"}`;
 			}
 			case "ocr-batch": {
@@ -111,6 +125,10 @@
 			case "ocr-direct": {
 				const name = task.spec.key.split("/").pop() ?? task.spec.key;
 				return `OCR — ${name}`;
+			}
+			case "format-batch": {
+				const n = task.spec.keys.length;
+				return `Format — ${n} file${n === 1 ? "" : "s"}`;
 			}
 		}
 	}
@@ -159,6 +177,7 @@
 		if (s.status === "compressing") return Loader2Icon;
 		if (s.status === "uploading") return UploadIcon;
 		if (s.status === "ocr") return Loader2Icon;
+		if (s.status === "formatting") return Loader2Icon;
 		if (s.status === "completed") return CheckCircle2Icon;
 		return XCircleIcon;
 	}
@@ -167,6 +186,7 @@
 		if (s.status === "compressing") return "text-amber-400 compress-shimmer bg-amber-400/10";
 		if (s.status === "uploading") return "text-primary bg-primary/10";
 		if (s.status === "ocr") return "text-amber-400 bg-amber-400/10";
+		if (s.status === "formatting") return "text-amber-400 bg-amber-400/10";
 		if (s.status === "completed") return "text-emerald-400 bg-emerald-400/10";
 		return "text-destructive bg-destructive/10";
 	}
@@ -346,7 +366,13 @@
 							</div>
 
 							<p class="text-[10px] text-muted-foreground/70 leading-relaxed line-clamp-2">
-								{task.message}
+								{#if task.rateLimitInfo}
+									<span class="text-amber-400">
+										Rate limited — retry in {Math.max(0, Math.ceil((task.rateLimitInfo.countdownEnd - Date.now()) / 1000))}s…
+									</span>
+								{:else}
+									{task.message}
+								{/if}
 							</p>
 
 							{#if task.status === "failed" && task.result}
@@ -360,7 +386,7 @@
 								</p>
 							{/if}
 
-							{#if task.spec.kind === "process-files" && task.files && task.files.length > 0}
+							{#if (task.spec.kind === "process-files" || task.spec.kind === "format-batch") && task.files && task.files.length > 0}
 								<div class="mt-2.5 pt-2.5 border-t border-border/20">
 									<ul class="space-y-1">
 										{#each task.files as fileState (fileState.key || fileState.name)}
@@ -380,7 +406,7 @@
 														transition-all duration-300 ring-1 ring-inset ring-border/20
 														{fileStatusClass(fileState)}"
 												>
-													{#if fileState.status === "compressing" || fileState.status === "ocr"}
+													{#if fileState.status === "compressing" || fileState.status === "ocr" || fileState.status === "formatting"}
 														<StatusIcon class="size-3.5 animate-spin" />
 													{:else if fileState.status === "uploading"}
 														<StatusIcon class="size-3.5 animate-pulse" />
@@ -399,6 +425,8 @@
 															<span class="text-primary font-medium">Uploading…</span>
 														{:else if fileState.status === "ocr"}
 															<span class="text-amber-400 font-medium">Extracting text…</span>
+														{:else if fileState.status === "formatting"}
+															<span class="text-amber-400 font-medium">Formatting…</span>
 														{:else if fileState.status === "error" && fileState.error}
 															<span class="text-destructive">{fileState.error}</span>
 														{:else if reduction !== null && fileState.compressedSize}
@@ -410,19 +438,19 @@
 													</p>
 												</div>
 												<div class="w-10 h-1 rounded-full bg-foreground/5 overflow-hidden shrink-0">
-													<div
-														class="h-full rounded-full transition-all duration-500 ease-out
-															{fileState.status === 'completed'
-																? 'bg-gradient-to-r from-emerald-400 to-emerald-300'
-																: fileState.status === 'error'
-																	? 'bg-gradient-to-r from-destructive to-destructive/70'
-																	: fileState.status === 'ocr'
-																		? 'bg-gradient-to-r from-amber-400 to-amber-300'
-																		: fileState.status === 'uploading'
-																			? 'bg-gradient-to-r from-primary to-primary/60'
-																			: 'bg-gradient-to-r from-amber-400/70 to-amber-300/50'}"
-														style="width: {fileState.status === 'completed' || fileState.status === 'error' ? 100 : fileState.status === 'compressing' ? 30 : 70}%"
-													></div>
+												<div
+													class="h-full rounded-full transition-all duration-500 ease-out
+														{fileState.status === 'completed'
+															? 'bg-gradient-to-r from-emerald-400 to-emerald-300'
+															: fileState.status === 'error'
+																? 'bg-gradient-to-r from-destructive to-destructive/70'
+																: fileState.status === 'ocr' || fileState.status === 'formatting'
+																	? 'bg-gradient-to-r from-amber-400 to-amber-300'
+																	: fileState.status === 'uploading'
+																		? 'bg-gradient-to-r from-primary to-primary/60'
+																		: 'bg-gradient-to-r from-amber-400/70 to-amber-300/50'}"
+														style="width: {fileState.status === 'completed' || fileState.status === 'error' ? 100 : fileState.status === 'compressing' ? 30 : fileState.status === 'formatting' ? 50 : 70}%"
+												></div>
 												</div>
 											</li>
 										{/each}
@@ -447,3 +475,5 @@
 		</footer>
 	</Popover.Content>
 </Popover.Root>
+
+<Confetti trigger={confettiTrigger} />

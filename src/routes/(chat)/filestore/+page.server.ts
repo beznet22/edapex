@@ -193,25 +193,40 @@ export const load: PageServerLoad = async ({ url, locals, cookies }) => {
 		files = files.filter((f) => threadFileKeys.has(f.id));
 	}
 
-	// Merge marksheetStatus from every per-exam manifest into artifacts
+	// Merge manifest metadata into artifacts
 	const manifests = await readAllManifests(tenant);
 	if (manifests.length > 0) {
-		const pathToStatus = new Map<string, string>();
+		const pathToMarksheetStatus = new Map<string, string>();
+		const pathToManifestStatus = new Map<string, string>();
+		const pathToError = new Map<string, string>();
+		const pathToContentHash = new Map<string, string>();
+		const pathToDocumentId = new Map<string, string>();
+		const pathToMimeType = new Map<string, string>();
 		for (const manifest of manifests) {
 			for (const [relPath, entry] of Object.entries(manifest.entries)) {
-				if (entry.marksheetStatus) {
-					pathToStatus.set(relPath, entry.marksheetStatus);
-				}
+				if (entry.marksheetStatus) pathToMarksheetStatus.set(relPath, entry.marksheetStatus);
+				if (entry.status) pathToManifestStatus.set(relPath, entry.status);
+				if (entry.error) pathToError.set(relPath, entry.error);
+				if (entry.contentHash) pathToContentHash.set(relPath, entry.contentHash);
+				if (entry.documentId) pathToDocumentId.set(relPath, entry.documentId);
+				if (entry.mimeType) pathToMimeType.set(relPath, entry.mimeType);
 			}
 		}
-		if (pathToStatus.size > 0) {
-			for (const f of files) {
-				const relKey = f.url.replace("/api/file/", "");
-				const status = pathToStatus.get(relKey);
-				if (status) {
-					(f as Artifact & { marksheetStatus?: string }).marksheetStatus = status;
-				}
-			}
+		for (const f of files) {
+			const relKey = f.url?.replace("/api/file/", "");
+			if (!relKey) continue;
+			const ms = pathToMarksheetStatus.get(relKey);
+			if (ms) (f as Artifact & { marksheetStatus?: string }).marksheetStatus = ms;
+			const manifestStatus = pathToManifestStatus.get(relKey);
+			if (manifestStatus) (f as any).manifestStatus = manifestStatus;
+			const manifestError = pathToError.get(relKey);
+			if (manifestError) (f as any).manifestError = manifestError;
+			const ch = pathToContentHash.get(relKey);
+			if (ch) (f as any).contentHash = ch;
+			const did = pathToDocumentId.get(relKey);
+			if (did) (f as any).documentId = did;
+			const mt = pathToMimeType.get(relKey);
+			if (mt) (f as any).mimeType = mt;
 		}
 	}
 

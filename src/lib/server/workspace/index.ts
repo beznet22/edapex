@@ -43,6 +43,6 @@ export {
 	clearExamArtifacts
 } from './manifest';
 export type { WorkspaceManifest, ManifestEntry, ArtifactKind, MarksheetStatus } from './manifest';
-export { isMentionableFile, filterMentionableFiles, EXCLUDED_DIR_PREFIXES } from './file-filters';
+export { isMentionableFile, filterMentionableFiles } from './file-filters';
 export { FilesSDKFilesystem } from './files-sdk-filesystem';
 export type { FilesSDKFilesystemOptions } from './files-sdk-filesystem';

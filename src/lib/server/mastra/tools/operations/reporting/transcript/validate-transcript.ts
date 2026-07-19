@@ -5,7 +5,7 @@ import { tenantWorkspace } from '$lib/server/workspace';
 import { buildWorkspaceRequestContext } from '$lib/server/helpers/chat-helper';
 import { transcriptSchema } from '$lib/schema/transcript';
 import { transcriptJsonPath, transcriptMarkdownPath } from '$lib/server/workspace/paths';
-import { addEntry, removeEntry } from '$lib/server/workspace/manifest';
+import { addEntry, readManifest as readWorkspaceManifest, removeEntry, updateEntry } from '$lib/server/workspace/manifest';
 import { resolveMentionsInMarkdown } from '$lib/server/mastra/editor/mention-resolver';
 import { createAssessmentServiceForRequest } from '$lib/server/service/assessment.service';
 import type { TenantContext } from '$lib/server/mastra/tenant-context';
@@ -335,9 +335,8 @@ export const validateTranscriptTool = createTool({
 		// proceed with the existing documentAgent re-derivation pipeline.
 		const assessment = await createAssessmentServiceForRequest(tenant);
 		const mapping = await assessment.getMappingData(
-			tenant.staffId,
-			tenant.classId ?? undefined,
-			tenant.sectionId ?? undefined
+			tenant.classId!,
+			tenant.sectionId!
 		);
 		const documentAgent = await getDocumentAgent();
 
@@ -461,6 +460,7 @@ export const validateTranscriptTool = createTool({
 						{
 							path: jsonPath,
 							kind: 'transcript-json',
+							status: 'Validated',
 							studentId: input.studentId,
 							academicId: parsed.data.academicYear.id,
 							examTypeId,
@@ -482,6 +482,7 @@ export const validateTranscriptTool = createTool({
 						{
 							path: canonicalMarkdownPath,
 							kind: 'transcript-markdown',
+							status: 'Validated',
 							documentId: String(parsed.data.student.id),
 							fileName: canonicalMarkdownPath.split('/').pop(),
 							studentId: parsed.data.student.id,
@@ -498,6 +499,14 @@ export const validateTranscriptTool = createTool({
 							await fs.deleteFile(input.currentMarkdownPath);
 						}
 						await removeEntry(tenant, input.currentMarkdownPath, examTypeId);
+					}
+
+					const transcriptManifest = await readWorkspaceManifest(tenant, examTypeId);
+					const transcriptSource = Object.values(transcriptManifest.entries).find(
+						(e) => e.kind === 'user-file' && e.studentId === input.studentId
+					);
+					if (transcriptSource) {
+						await updateEntry(tenant, transcriptSource.path, { status: 'Validated' }, examTypeId);
 					}
 
 					return {

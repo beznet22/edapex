@@ -119,7 +119,7 @@ export async function seedMarksheetFixture(params: {
 			modifiedAt: new Date().toISOString(),
 			mimeType,
 			sizeBytes: bytes.byteLength
-		});
+		}, params.tenant.examTypeId ?? 0);
 		// Mirror the live OcrWorkspaceStore behavior — register OCR entries
 		// in the single manifest.json so they're discoverable.
 		await addWorkspaceEntry(params.tenant, {
@@ -130,7 +130,7 @@ export async function seedMarksheetFixture(params: {
 			uploadedAt: cachedMarkdown.meta.createdAt,
 			modifiedAt: cachedMarkdown.meta.createdAt,
 			mimeType: 'text/markdown'
-		});
+		}, params.tenant.examTypeId ?? 0);
 		await addWorkspaceEntry(params.tenant, {
 			path: metaPath,
 			kind: 'ocr-meta',
@@ -139,7 +139,7 @@ export async function seedMarksheetFixture(params: {
 			uploadedAt: cachedMarkdown.meta.createdAt,
 			modifiedAt: cachedMarkdown.meta.createdAt,
 			mimeType: 'application/json'
-		});
+		}, params.tenant.examTypeId ?? 0);
 		persisted = { ...cachedMarkdown.meta, markdown: cachedMarkdown.markdown };
 	} else {
 		persisted = await OcrWorkspaceStore.getOrCreate({
@@ -180,7 +180,7 @@ export async function seedMarksheetFixture(params: {
 				modifiedAt: new Date().toISOString(),
 				mimeType,
 				sizeBytes: bytes.byteLength
-			});
+			}, params.tenant.examTypeId ?? 0);
 		}
 	}
 
@@ -198,7 +198,7 @@ export async function seedMarksheetFixture(params: {
 		modifiedAt: new Date().toISOString(),
 		mimeType,
 		sizeBytes: bytes.byteLength
-	});
+	}, params.tenant.examTypeId ?? 0);
 
 	return {
 		documentId,

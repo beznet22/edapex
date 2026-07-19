@@ -18,7 +18,7 @@ import {
   studentCriteriaBase,
 } from "$lib/server/mastra/tools/operations/reporting/_shared";
 import { transcriptPdfPath } from "$lib/server/workspace/paths";
-import { addEntry } from "$lib/server/workspace/manifest";
+import { addEntry, readManifest as readWorkspaceManifest, updateEntry } from "$lib/server/workspace/manifest";
 import { type MemoryContext } from "$lib/server/mastra/utils/chat-utils";
 
 const reportPdfInputSchema = z.object({
@@ -155,7 +155,9 @@ async function renderAndWriteTranscriptPdf(args: CoreRenderArgs): Promise<CoreRe
     {
       path: storagePath,
       kind: 'transcript-pdf',
+      status: 'Generated',
       studentId: student.studentId,
+      examTypeId,
       academicId,
       uploadedAt: new Date().toISOString(),
       modifiedAt: new Date().toISOString(),
@@ -163,6 +165,14 @@ async function renderAndWriteTranscriptPdf(args: CoreRenderArgs): Promise<CoreRe
     },
     examTypeId
   );
+
+  const genManifest = await readWorkspaceManifest(tenant, examTypeId);
+  const genSource = Object.values(genManifest.entries).find(
+    (e) => e.kind === 'user-file' && e.studentId === student.studentId
+  );
+  if (genSource) {
+    await updateEntry(tenant, genSource.path, { status: 'Committed' }, examTypeId);
+  }
 
   const tokenPayload = { studentId: student.studentId, academicId, kind: "transcript" as const };
   const token = base64url(JSON.stringify(tokenPayload));

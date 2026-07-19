@@ -24,8 +24,8 @@ import {
   resolveStudent,
   sanitizeForFilename,
 } from "$lib/server/mastra/tools/operations/reporting/_shared";
-import { transcriptPdfPath } from "$lib/server/workspace/paths";
-import { addEntry } from "$lib/server/workspace/manifest";
+import { transcriptPdfPath, transcriptJsonPath, transcriptMarkdownPath } from "$lib/server/workspace/paths";
+import { addEntry, readManifest as readWorkspaceManifest, updateEntry } from "$lib/server/workspace/manifest";
 import { type MemoryContext } from "$lib/server/mastra/utils/chat-utils";
 
 const CONFIRM_CONTEXT_KEY = "transcriptPublishConfirm";
@@ -411,6 +411,21 @@ export const publishTranscriptPdfTool = createTool({
         storagePath: stored.storagePath,
         previewUrl: stored.previewUrl,
       });
+
+      if (tenant.examTypeId != null) {
+        const pubManifest = await readWorkspaceManifest(tenant, tenant.examTypeId);
+        const pubSource = Object.values(pubManifest.entries).find(
+          (e) => e.kind === 'user-file' && e.studentId === stored.studentId
+        );
+        if (pubSource) {
+          await updateEntry(tenant, pubSource.path, { status: 'Published' }, tenant.examTypeId);
+        }
+        const tJsonPath = transcriptJsonPath(stored.studentId, tenant.examTypeId);
+        const tMdPath = transcriptMarkdownPath(stored.studentId, tenant.examTypeId);
+        await updateEntry(tenant, tJsonPath, { status: 'Published' }, tenant.examTypeId).catch(() => {});
+        await updateEntry(tenant, tMdPath, { status: 'Published' }, tenant.examTypeId).catch(() => {});
+        await updateEntry(tenant, stored.storagePath, { status: 'Published' }, tenant.examTypeId).catch(() => {});
+      }
 
       return {
         status: "published" as const,
