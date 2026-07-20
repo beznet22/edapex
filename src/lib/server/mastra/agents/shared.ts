@@ -6,7 +6,7 @@
  */
 import { z } from 'zod';
 import { env } from '$env/dynamic/private';
-import type { MastraModelConfig, OpenAICompatibleConfig } from '@mastra/core/llm';
+import type { MastraModelConfig } from '@mastra/core/llm';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import { BUILTIN_PROVIDERS } from '$lib/provider/catalog';
 import type { ProviderId } from '$lib/provider/types';
@@ -115,7 +115,7 @@ const PER_ROLE_MODEL: Readonly<Record<ModelRole, PerRoleModel>> = {
 export function buildDefaultModelForRole(
 	role: ModelRole,
 	envIn: Record<string, string | undefined> = process.env
-): OpenAICompatibleConfig {
+): MastraModelConfig {
 	const cfg = PER_ROLE_MODEL[role];
 	const info = BUILTIN_PROVIDERS[cfg.providerId];
 	let apiKey: string | undefined;
@@ -161,7 +161,7 @@ const openCodeProvider = createOpenAICompatible({
 // `agent.generate(...)`. New code should use `buildDefaultModelForRole`.
 export { openCodeProvider };
 
-export const DEFAULT_MODEL: OpenAICompatibleConfig = {
+export const DEFAULT_MODEL: MastraModelConfig = {
 	id: 'opencode/deepseek-v4-flash',
 	url: 'https://opencode.ai/zen/v1',
 	apiKey: env.OPENCODE_API_KEY ?? '',

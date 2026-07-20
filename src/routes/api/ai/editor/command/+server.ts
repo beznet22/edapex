@@ -15,6 +15,10 @@ import { handleWorkflowStream } from '@mastra/ai-sdk';
 import { createUIMessageStreamResponse, type UIMessageChunk } from 'ai';
 import { buildWorkspaceRequestContext, resolveWorkspaceContext } from '$lib/server/helpers/chat-helper';
 import type { RequestContext } from '@mastra/core/request-context';
+import { resolveModelForRequest, pickDefaultModelId } from '$lib/server/mastra/provider';
+import { resolveUserRole } from '$lib/server/mastra/provider/role-resolver';
+import { getAppDb } from '$lib/server/mastra/storage/libsql/app-db';
+import { env } from '$env/dynamic/private';
 
 // Hard cap on document markdown sent as backgroundData. The full doc is sent
 // on every AI request — uncapped this can OOM the server when streaming a 70B
@@ -48,7 +52,47 @@ export const POST: RequestHandler = async ({ request, locals: { user }, cookies 
 		designationId: (user as { designationId?: number }).designationId ?? null,
 		roleId: (user as { roleId?: number | null }).roleId ?? null,
 	});
-	const requestContext = buildWorkspaceRequestContext(tenantContext);
+
+	// Resolve the user's per-request model through the 4-tier router so
+	// the editor agents (editorEdit / editorGenerate) use the user's own
+	// key (tier 1) before pool (tier 2) and env (tier 3). Failure is
+	// non-fatal: agents fall through to their per-call env default.
+	const cookieModel = cookies.get('selected-model') ?? '';
+	const db = getAppDb();
+	const envKeys = env as Record<string, string | undefined>;
+	const traceContext = {
+		userId: user.id,
+		schoolId: tenantContext.schoolId,
+		actorStaffId: tenantContext.staffId,
+		userRole: resolveUserRole(tenantContext.designationId),
+		todayTokenUsage: 0
+	};
+	let modelConfig: Awaited<ReturnType<typeof resolveModelForRequest>> | null = null;
+	try {
+		if (cookieModel) {
+			modelConfig = await resolveModelForRequest(
+				user.id, cookieModel, db, undefined, traceContext
+			);
+		} else {
+			const defaultId = await pickDefaultModelId(db, envKeys, {
+				userId: user.id,
+				schoolId: tenantContext.schoolId,
+				userRole: traceContext.userRole
+			});
+			if (defaultId) {
+				modelConfig = await resolveModelForRequest(
+					user.id, defaultId, db, undefined, traceContext
+				);
+			}
+		}
+	} catch (err) {
+		console.warn('[editor-command] model resolution skipped:', err instanceof Error ? err.message : err);
+	}
+
+	const requestContext = buildWorkspaceRequestContext(
+		tenantContext,
+		modelConfig ? { config: modelConfig.config, providerOptions: modelConfig.providerOptions } : undefined
+	);
 
 	try {
 		const stream = await handleWorkflowStream({

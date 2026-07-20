@@ -28,6 +28,14 @@ export type SerializedTenant = {
   className: string | null;
   sectionName: string | null;
   academicYearTitle: string | null;
+  /**
+   * Resolved user-role string (e.g. 'class_teacher') from
+   * `DESIGNATIONS[designationId]`. Used by the Mistral OCR key
+   * resolver's school-pool tier so the `consumerRoles` allowlist
+   * gate fires for batch/file-OCR routes — same string the chat
+   * pipeline uses. Null when not set (then the pool is skipped).
+   */
+  userRole: string | null;
 };
 
 /**

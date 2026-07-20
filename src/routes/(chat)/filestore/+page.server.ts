@@ -8,6 +8,7 @@ import {
 import { resolveActiveClassScope } from "$lib/server/helpers/class-scope";
 import { ALLOWED_DESIGNATIONS } from "$lib/types/sms-types";
 import { resolveTenantWorkspace } from "$lib/server/workspace/scope";
+import { resolveUserRole } from "$lib/server/mastra/provider/role-resolver";
 import { getMemory } from "$lib/server/mastra";
 import { toAISdkMessages } from "@mastra/ai-sdk/ui";
 import { deriveCategory, deriveKind, deriveSource } from "$lib/utils/artifact-kind";
@@ -113,6 +114,7 @@ export const load: PageServerLoad = async ({ url, locals, cookies }) => {
 		className: tenant.className,
 		sectionName: tenant.sectionName,
 		academicYearTitle: tenant.academicYearTitle,
+		userRole: resolveUserRole(tenant.designationId),
 	};
 
 	// Scan the entire workspace root recursively, filtering out:

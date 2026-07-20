@@ -149,24 +149,10 @@ export const BUILTIN_MODELS: Record<ModelId, ModelInfo> = {
 		cost: { input: 0, output: 0, cache: { read: 0, write: 0 } },
 		description: 'Meta open model on Groq inference'
 	},
-	'groq/llama-3.1-8b-instant': {
-		id: 'groq/llama-3.1-8b-instant' as ModelId,
+	'groq/qwen/qwen3.6-27b': {
+		id: 'groq/qwen/qwen3.6-27b' as ModelId,
 		providerId: 'groq' as ProviderId,
-		name: 'Llama 3.1 8B Instant',
-		capabilities: { tools: true, input: ['text/*'], output: ['text/*'], reasoning: false, thinkingEffort: false, vision: false },
-		request: { headers: {}, body: {}, generation: {}, options: {} },
-		variants: [],
-		status: 'active',
-		enabled: true,
-		limit: { context: 128_000, output: 16_384 },
-		tier: 'low',
-		cost: { input: 0, output: 0, cache: { read: 0, write: 0 } },
-		description: 'Llama 3.1 8B Instant on Groq'
-	},
-	'groq/qwen/qwen3-32b': {
-		id: 'groq/qwen/qwen3-32b' as ModelId,
-		providerId: 'groq' as ProviderId,
-		name: 'Qwen3 32B',
+		name: 'Qwen3.6 27B',
 		capabilities: { tools: true, input: ['text/*'], output: ['text/*'], reasoning: true, thinkingEffort: true, vision: false },
 		request: { headers: {}, body: {}, generation: {}, options: {} },
 		variants: THINKING_VARIANTS,
@@ -421,7 +407,7 @@ export const POPULAR_PROVIDER_IDS: ProviderId[] = ['groq', 'deepseek', 'opencode
  * model served via Groq at low cost, suitable as a first-paint default
  * before the user picks a preferred model.
  */
-export const DEFAULT_MODEL_ID: ModelId = 'groq/openai/gpt-oss-120b' as ModelId;
+export const DEFAULT_MODEL_ID: ModelId = 'opencode/deepseek-v4-flash-free' as ModelId;
 
 /**
  * Platform-provided providers and models.

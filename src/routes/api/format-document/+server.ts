@@ -7,7 +7,11 @@ import { getClassRoster } from '$lib/server/mastra/agents/skill-instructions';
 import { extractRateLimitFromHeaders } from '$lib/provider/rate-limit';
 import { deriveInitialFilename } from '$lib/server/mastra/tools/operations/reporting/marksheet/stream-document';
 import { ALLOWED_DESIGNATIONS } from '$lib/types/sms-types';
-import { openCodeProvider } from '$lib/server/mastra/agents/shared';
+import { GROQ_FORMAT_MODEL } from '$lib/server/mastra/agents/format';
+import { resolveModelForRequest } from '$lib/server/mastra/provider';
+import { resolveUserRole } from '$lib/server/mastra/provider/role-resolver';
+import { getAppDb } from '$lib/server/mastra/storage/libsql/app-db';
+import { env } from '$env/dynamic/private';
 
 export const POST: RequestHandler = async ({ request, locals, cookies }) => {
   try {
@@ -36,6 +40,41 @@ export const POST: RequestHandler = async ({ request, locals, cookies }) => {
   });
   if (!fs) {
     return json({ success: false, error: 'WORKSPACE_UNAVAILABLE' }, { status: 500 });
+  }
+
+  // PRIMARY CALL — the format agent always runs on Groq. Use the
+  // canonical GROQ_FORMAT_MODEL constant (from agents/format.ts) so
+  // the tier-1/2/3 router walks the user's Groq credentials on
+  // every request. The `selected-model` cookie is intentionally
+  // NOT consulted here — it is reserved for the rate-limit
+  // fallback below.
+  //
+  // Failure is non-fatal: if no Groq credential can be resolved
+  // (no user key, no pool, no env), the agent's `model` callback
+  // falls through to its built-in `buildDefaultModelForRole('formatter')`
+  // which uses `env.GROQ_API_KEY` at call time — preserving the
+  // prior behavior.
+  const cookieModel = cookies.get('selected-model') ?? '';
+  const db = getAppDb();
+  const traceContext = {
+    userId: user.id,
+    schoolId: tenant.schoolId,
+    actorStaffId: tenant.staffId,
+    userRole: resolveUserRole(tenant.designationId),
+    todayTokenUsage: 0
+  };
+  try {
+    const resolved = await resolveModelForRequest(
+      user.id, GROQ_FORMAT_MODEL, db, undefined, traceContext
+    );
+    requestContext.set('modelConfig', resolved.config as never);
+    if (resolved.providerOptions) {
+      requestContext.set('providerOptions', resolved.providerOptions as never);
+    }
+  } catch (err) {
+    // Resolution failed (e.g. AllTiersFailedError) — leave modelConfig
+    // unset so the agent falls through to its per-call env default.
+    console.warn('[format-document] model resolution skipped:', err instanceof Error ? err.message : err);
   }
 
   const examTypeId = bodyExamTypeId ?? tenant.examTypeId;
@@ -182,8 +221,6 @@ MIDDLEBASIC: Subject Code | MTA (30) | CA (10) | REPORT (10) | EXAM (50)`;
     return json({ success: false, error: 'AGENT_NOT_REGISTERED: format agent is not registered on the Mastra instance' }, { status: 500 });
   }
 
-  const selectedModel = cookies.get('selected-model') ?? '';
-
   let markdown: string;
   try {
     const result = await agent.generate(prompt, {
@@ -198,14 +235,21 @@ MIDDLEBASIC: Subject Code | MTA (30) | CA (10) | REPORT (10) | EXAM (50)`;
       const groqRetryAfterSeconds = rl.retryAfterSeconds ?? 15;
       const groqResetAt = new Date(Date.now() + groqRetryAfterSeconds * 1000);
 
-      const fallbackProvider = selectedModel.split('/')[0];
-      if (selectedModel && fallbackProvider && fallbackProvider !== 'groq') {
+      // RATE-LIMIT FALLBACK — re-resolve the user's `cookieModel`
+      // (the `selected-model` cookie) through the tier 1/2/3 router
+      // so the user's own key for that provider wins over pool/env.
+      // No module-level env capture — the resolver reads the key
+      // per-request. If resolution fails (e.g. no cookie, no
+      // credential anywhere), surface the 429 to the client.
+      if (cookieModel) {
         try {
-          const model = openCodeProvider.chatModel(selectedModel.split('/')[1]);
+          const fallbackResolved = await resolveModelForRequest(
+            user.id, cookieModel, db, undefined, traceContext
+          );
           const result = await agent.generate(prompt, {
             ...(requestContext ? { requestContext: requestContext as never } : {}),
-            model,
-            providerOptions: { deepseek: { reasoningEffort: 'none' } } as never
+            model: fallbackResolved.config as never,
+            providerOptions: (fallbackResolved.providerOptions ?? { deepseek: { reasoningEffort: 'none' } }) as never
           });
           markdown = result.text;
         } catch {
@@ -218,10 +262,11 @@ MIDDLEBASIC: Subject Code | MTA (30) | CA (10) | REPORT (10) | EXAM (50)`;
           }, { status: 429 });
         }
       } else {
+        const remaining = Math.max(1, Math.ceil((groqResetAt.getTime() - Date.now()) / 1000));
         return json({
           success: false,
           rateLimited: true,
-          retryAfterSeconds: groqRetryAfterSeconds,
+          retryAfterSeconds: remaining,
           resetAt: groqResetAt.toISOString(),
         }, { status: 429 });
       }

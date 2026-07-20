@@ -76,7 +76,7 @@ export class OcrBatchService {
       db,
       userId: tenant.userId,
       schoolId: tenant.schoolId,
-      userRole: null,
+      userRole: tenant.userRole ?? null,
       env: env as Record<string, string | undefined>
     });
     return new Mistral({ apiKey });

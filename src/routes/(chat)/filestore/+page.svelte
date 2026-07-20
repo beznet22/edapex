@@ -499,6 +499,7 @@
 			className: data.tenant.className,
 			sectionName: data.tenant.sectionName,
 			academicYearTitle: data.tenant.academicYearTitle,
+			userRole: data.tenant.userRole,
 		});
 
 		backgroundTasks.runTask({
@@ -591,6 +592,7 @@
 				className: data.tenant.className,
 				sectionName: data.tenant.sectionName,
 				academicYearTitle: data.tenant.academicYearTitle,
+				userRole: data.tenant.userRole,
 			});
 			backgroundTasks.runTask({ kind: "ocr-batch", keys, tenant });
 			toast.info(
@@ -625,6 +627,7 @@
 				className: data.tenant.className,
 				sectionName: data.tenant.sectionName,
 				academicYearTitle: data.tenant.academicYearTitle,
+				userRole: data.tenant.userRole,
 			});
 			backgroundTasks.runTask({ kind: "format-batch", keys, contentHashes, tenant });
 			toast.info(

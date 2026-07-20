@@ -120,14 +120,27 @@ export async function buildRequestContext(params: {
 
 /**
  * Build a minimal `RequestContext` for non-chat routes that only need
- * the workspace filesystem resolver. Skips model resolution and
- * slash-command classification.
+ * the workspace filesystem resolver.
+ *
+ * If `modelConfig` is supplied, the pre-resolved `MastraModelConfig`
+ * (from the 4-tier router — tier 1 user key wins) and optional variant
+ * `providerOptions` are written into the context so agent `model`
+ * callbacks prefer the user's own credential. The shape matches
+ * `resolveModelForRequest`'s return so callers can pass it through
+ * without reshaping.
  */
 export function buildWorkspaceRequestContext(
   context: TenantContext,
+  modelConfig?: { config: MastraModelConfig; providerOptions?: Record<string, Record<string, unknown>> }
 ): RequestContext<unknown> {
   const requestContext = new RequestContext<unknown>();
   requestContext.set('tenantContext', context);
+  if (modelConfig) {
+    requestContext.set('modelConfig', modelConfig.config);
+    if (modelConfig.providerOptions) {
+      requestContext.set('providerOptions', modelConfig.providerOptions);
+    }
+  }
   return requestContext;
 }
 

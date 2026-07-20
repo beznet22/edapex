@@ -9,6 +9,17 @@ import { StreamErrorRetryProcessor } from '@mastra/core/processors';
 import { buildDefaultModelForRole } from './shared';
 import type { MastraModelConfig } from '@mastra/core/llm';
 
+/**
+ * Default Groq model for the format-document route. Used by the
+ * primary `agent.generate` call in
+ * `routes/api/format-document/+server.ts` so the format agent
+ * always runs on Groq. The rate-limit fallback at the same route
+ * uses the user's `selected-model` cookie (per-provider) instead.
+ * Both call sites resolve the user's tier 1/2/3 key per-request —
+ * no module-level env capture.
+ */
+export const GROQ_FORMAT_MODEL = 'groq/qwen/qwen3.6-27b' as const;
+
 export const formatAgent = new Agent({
 	id: 'format',
 	name: 'Format Agent',

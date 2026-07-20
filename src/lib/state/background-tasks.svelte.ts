@@ -311,5 +311,6 @@ export function serializeTenant(t: SerializedTenant): SerializedTenant {
     className: t.className,
     sectionName: t.sectionName,
     academicYearTitle: t.academicYearTitle,
+    userRole: t.userRole ?? null,
   };
 }

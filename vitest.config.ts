@@ -19,7 +19,8 @@ export default defineConfig({
 							'src/lib/utils/**/*.test.ts',
 							'src/lib/context/**/*.test.ts',
 							'src/lib/server/mastra/agents/**/*.test.ts',
-							'src/lib/server/helpers/**/*.test.ts'
+							'src/lib/server/helpers/**/*.test.ts',
+							'src/lib/server/service/**/*.test.ts'
 						],
 						environment: 'node',
 						globals: true,

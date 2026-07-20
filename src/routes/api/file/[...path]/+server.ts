@@ -37,6 +37,7 @@ import { generateText } from 'ai';
 import { env } from '$env/dynamic/private';
 import type { SerializedTenant } from '$lib/types/background-tasks';
 import type { FileEntry } from '@mastra/core/workspace';
+import { resolveUserRole } from '$lib/server/mastra/provider/role-resolver';
 
 function contentTypeFor(filename: string): string {
   const ext = filename.split('.').pop()?.toLowerCase();
@@ -228,7 +229,7 @@ export const POST: RequestHandler = async ({ params, url, request, locals, cooki
         db: getAppDb(),
         userId: tContext.userId,
         schoolId: tContext.schoolId,
-        userRole: null
+        userRole: resolveUserRole(tContext.designationId)
       });
       const pages = (ocrResponse as { pages?: Array<{ markdown?: string }> }).pages ?? [];
       const markdown = pages.map((p) => p.markdown ?? '').filter(Boolean).join('\n\n');
@@ -519,5 +520,6 @@ function emptySerializedTenant(tenant: ReturnType<typeof import('$lib/server/mas
     className: tenant.className,
     sectionName: tenant.sectionName,
     academicYearTitle: tenant.academicYearTitle,
+    userRole: resolveUserRole(tenant.designationId),
   };
 }
