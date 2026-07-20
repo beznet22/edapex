@@ -45,6 +45,51 @@ interface UsageLike {
 }
 
 /**
+ * Emit a transient `data-credentialTrace` stream part so the dev console
+ * (and any client-side listeners) can see which credential source served
+ * the request. Reads the `modelConfig` written by `buildRequestContext`
+ * in `chat-helper.ts` — its id is `<providerId>/<modelName>`. The actual
+ * `apiKey` is the one the assistant step is about to use, so the
+ * fingerprint here matches the upstream's view of the request.
+ */
+async function writeCredentialTrace(
+	writer: unknown,
+	requestContext: { get<T = unknown>(key: string): T | undefined } | undefined,
+	memCtx: { threadId: string; resourceId: string } | undefined,
+	runId: string | undefined
+): Promise<void> {
+	try {
+		const cfg = requestContext?.get('modelConfig') as
+			| { id?: string; url?: string; apiKey?: string }
+			| undefined;
+		if (!cfg) return;
+		const slashIdx = cfg.id?.indexOf('/') ?? -1;
+		const providerId = slashIdx > 0 ? cfg.id!.slice(0, slashIdx) : null;
+		const apiKey = cfg.apiKey ?? '';
+		const fingerprint = apiKey
+			? `${apiKey.slice(0, 4)}…${apiKey.slice(-4)}`
+			: '(empty)';
+		await writeDataPart(writer as never, {
+			data: {
+				type: 'data-credentialTrace',
+				id: `cred-trace-${runId ?? Date.now()}`,
+				data: {
+					providerId,
+					baseUrl: cfg.url,
+					keyFingerprint: fingerprint,
+					keySource: apiKey ? 'user' : 'env-fallback',
+					tier: apiKey ? 1 : 3
+				}
+			},
+			memory: memCtx,
+			transient: true
+		});
+	} catch {
+		// best-effort diagnostic — never break the stream
+	}
+}
+
+/**
  * Measure-only tracker: records wall-clock seconds per reasoning block.
  * Emits nothing during the stream — the caller flushes durations after
  * `pipeTo` so memory persistence can attach to the assistant message.
@@ -162,6 +207,11 @@ export const assistantStep = createStep({
 		});
 
 		await stream.fullStream.pipeTo(writer);
+
+		// Emit a credential trace once the stream succeeded — gives the
+		// dev console a way to confirm which credential source served
+		// the request (tier 1 user key vs tier 2 pool vs tier 3 env).
+		await writeCredentialTrace(writer, requestContext, memCtx, runId);
 		reasoning.close();
 
 		// Assistant message now exists in memory — safe to persist durable meta.

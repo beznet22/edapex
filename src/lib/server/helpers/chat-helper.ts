@@ -229,6 +229,13 @@ export async function resolveWorkspaceContext(
 /**
  * Generate a short title for the thread using the titler agent.
  * Streams the title to the client via a custom stream part, then persists it.
+ *
+ * The caller MUST pass the workflow's `requestContext` so the title
+ * agent uses the same per-request `modelConfig` (carrying the user's
+ * personal key from the 4-tier router) as the main chat agent. Without
+ * it, the title agent falls back to a per-call Groq config built from
+ * `env.GROQ_API_KEY` — which is the correct fallback when the env
+ * key is set, but NOT the user's preferred credential.
  */
 export async function generateThreadTitle({
   resourceId,
@@ -236,12 +243,14 @@ export async function generateThreadTitle({
   threadId,
   prompt,
   writer,
+  requestContext
 }: {
   resourceId: string;
   memory: MastraMemory | undefined;
   threadId: string;
   prompt: string;
   writer: ToolStream;
+  requestContext?: RequestContext<unknown>;
 }): Promise<string> {
   if (!memory) return "";
 
@@ -256,7 +265,9 @@ export async function generateThreadTitle({
   let finalTitle = thread.title;
   if (isNew || finalTitle === 'New Chat') {
     const titleAgent = mastra.getAgent('title');
-    const result = await titleAgent.generate(`Summarize: "${prompt}"`);
+    const result = await titleAgent.generate(`Summarize: "${prompt}"`, {
+      ...(requestContext ? { requestContext } : {})
+    });
     if (result.error) {
       throw result.error;
     }

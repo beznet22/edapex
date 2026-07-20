@@ -235,6 +235,55 @@ describe('resolveModelForRequest edge cases', () => {
 		);
 	});
 
+	it('writes keyFingerprint to the audit entry on success', async () => {
+		const defaultModel = DEFAULT_MODEL_ID;
+		vi.mocked(tierRouter.resolveProviderKeyWithTrace).mockResolvedValue({
+			apiKey: 'gsk-this-is-a-long-secret-key-1234567890',
+			source: 'user',
+			tier: 1,
+			credentialEnabled: true,
+			trace: [{ tier: 1, status: 'served', source: 'user' }]
+		});
+		vi.mocked(auditLog.log).mockClear();
+
+		await resolveModelForRequest(42, `${defaultModel}`, db, {
+			actorStaffId: 5,
+			schoolId: 7
+		});
+
+		const accessCall = vi
+			.mocked(auditLog.log)
+			.mock.calls.find((c) => c[0].entityType === 'providerKey');
+		expect(accessCall).toBeDefined();
+		const after = accessCall![0].after as Record<string, unknown>;
+		expect(after.keyFingerprint).toBe('gsk-…7890');
+		expect(after.source).toBe('user');
+		expect(after.tier).toBe(1);
+	});
+
+	it('writes keyFingerprint: "(empty)" when no apiKey is resolved', async () => {
+		const defaultModel = DEFAULT_MODEL_ID;
+		vi.mocked(tierRouter.resolveProviderKeyWithTrace).mockResolvedValue({
+			apiKey: '',
+			source: 'user',
+			tier: 1,
+			credentialEnabled: true,
+			trace: [{ tier: 1, status: 'served', source: 'user' }]
+		});
+		vi.mocked(auditLog.log).mockClear();
+
+		await resolveModelForRequest(42, `${defaultModel}`, db, {
+			actorStaffId: 5,
+			schoolId: 7
+		});
+
+		const accessCall = vi
+			.mocked(auditLog.log)
+			.mock.calls.find((c) => c[0].entityType === 'providerKey');
+		const after = accessCall![0].after as Record<string, unknown>;
+		expect(after.keyFingerprint).toBe('(empty)');
+	});
+
 	it('writes a structured providerResolution trace when resolveContext is provided', async () => {
 		const defaultModel = DEFAULT_MODEL_ID;
 		vi.mocked(tierRouter.resolveProviderKeyWithTrace).mockResolvedValue({
@@ -244,6 +293,7 @@ describe('resolveModelForRequest edge cases', () => {
 			credentialEnabled: null,
 			trace: []
 		});
+		vi.mocked(auditLog.log).mockClear();
 
 		await resolveModelForRequest(
 			42,

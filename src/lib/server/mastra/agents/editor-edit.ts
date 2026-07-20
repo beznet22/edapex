@@ -11,9 +11,9 @@
  */
 import { Agent } from '@mastra/core/agent';
 import { StreamErrorRetryProcessor } from '@mastra/core/processors';
-import { DEFAULT_EDITOR_MODEL } from './shared';
+import { buildDefaultModelForRole, type RequestContextValues } from './shared';
 import type { RequestContext } from '@mastra/core/request-context';
-import type { RequestContextValues } from './shared';
+import type { MastraModelConfig } from '@mastra/core/llm';
 
 export type EditorEditOption = 'edit' | 'improve' | 'fix' | 'shorter' | 'longer';
 
@@ -60,6 +60,12 @@ CRITICAL RULES — VIOLATING ANY OF THESE BREAKS THE EDITOR:
 
 Your entire output is inserted back into the document in place of the original <Selection>. Anything outside the replacement text will appear as duplicated content.`;
 	},
-	model: DEFAULT_EDITOR_MODEL,
+	model: ({ requestContext }) => {
+		const v2Config = requestContext?.get('modelConfig') as MastraModelConfig | undefined;
+		if (v2Config) return v2Config;
+		const modelId = requestContext?.get('modelId') as string | undefined;
+		if (modelId) return modelId;
+		return buildDefaultModelForRole('editor');
+	},
 	errorProcessors: [new StreamErrorRetryProcessor()]
 });

@@ -7,7 +7,7 @@ export const titleStep = createStep({
 	id: 'title',
 	inputSchema: chatWorkflowInputSchema,
 	outputSchema: z.object({}),
-	execute: async ({ inputData, writer, mastra: m }) => {
+	execute: async ({ inputData, requestContext, writer, mastra: m }) => {
 		const agent = m?.getAgent('assistant');
 		const memory = agent ? await agent.getMemory() : undefined;
 		try {
@@ -17,8 +17,8 @@ export const titleStep = createStep({
 				threadId: inputData.threadId,
 				prompt: inputData.promptText,
 				writer,
+				requestContext
 			});
-
 		} catch (err) {
 			console.error('Failed to generate thread title:', err);
 		}
@@ -26,4 +26,3 @@ export const titleStep = createStep({
 		return {};
 	}
 });
-

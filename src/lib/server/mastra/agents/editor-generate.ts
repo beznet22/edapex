@@ -7,9 +7,9 @@
  */
 import { Agent } from '@mastra/core/agent';
 import { StreamErrorRetryProcessor } from '@mastra/core/processors';
-import { DEFAULT_EDITOR_MODEL } from './shared';
+import { buildDefaultModelForRole, type RequestContextValues } from './shared';
 import type { RequestContext } from '@mastra/core/request-context';
-import type { RequestContextValues } from './shared';
+import type { MastraModelConfig } from '@mastra/core/llm';
 
 export const editorGenerateAgent = new Agent({
 	id: 'editorGenerate',
@@ -32,6 +32,12 @@ CRITICAL RULES — VIOLATING ANY OF THESE BREAKS THE EDITOR:
 6. Do not add leading or trailing newlines unless structurally required.
 7. If the user asked to continue writing, pick up exactly where the document leaves off.`;
 	},
-	model: DEFAULT_EDITOR_MODEL,
+	model: ({ requestContext }) => {
+		const v2Config = requestContext?.get('modelConfig') as MastraModelConfig | undefined;
+		if (v2Config) return v2Config;
+		const modelId = requestContext?.get('modelId') as string | undefined;
+		if (modelId) return modelId;
+		return buildDefaultModelForRole('editor');
+	},
 	errorProcessors: [new StreamErrorRetryProcessor()]
 });

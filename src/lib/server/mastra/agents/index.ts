@@ -9,4 +9,10 @@ export { editorGenerateAgent } from './editor-generate';
 export { editorCopilotAgent } from './editor-copilot';
 export { documentAgent } from './document';
 export { formatAgent } from './format';
-export { requestContextSchema, type RequestContextValues, DEFAULT_MODEL, DEFAULT_TITLE_MODEL } from './shared';
+export {
+	requestContextSchema,
+	type RequestContextValues,
+	type ModelRole,
+	buildDefaultModelForRole,
+	DEFAULT_MODEL
+} from './shared';

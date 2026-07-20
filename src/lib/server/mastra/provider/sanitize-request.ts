@@ -12,6 +12,15 @@
  *      `content: null` when the assistant turn is purely tool calls with
  *      no preceding text. Some providers (notably DeepSeek) reject the
  *      request with a 400 on `content: null`.
+ *   3. Every `role: "assistant"` message that carries a
+ *      `reasoning_content` or `reasoning` field has those fields
+ *      stripped. Groq's OpenAI-compatible endpoint rejects
+ *      `reasoning_content` as an unsupported property on assistant
+ *      messages with a 400. The AI SDK emits the field for
+ *      reasoning-capable models (DeepSeek-R1, Kimchi reasoning
+ *      models, OpenCode Zen's `gpt-oss-120b`); the chat history
+ *      persisted in Mastra memory keeps the field, but the next
+ *      request must not forward it.
  *
  * Previously these workarounds lived in `patches/@ai-sdk__openai-compatible@2.0.47.patch`,
  * a pnpm patch that broke on every upstream SDK version bump. In-tree code
@@ -59,14 +68,32 @@ export function sanitizeProviderRequestBody(body: unknown): unknown {
 			return { ...msg, content: coerced };
 		}
 
-		if (
-			msg.role === 'assistant' &&
-			Array.isArray(msg.tool_calls) &&
-			msg.tool_calls.length > 0 &&
-			typeof msg.content !== 'string'
-		) {
-			changed = true;
-			return { ...msg, content: '' };
+		if (msg.role === 'assistant') {
+			let next: Record<string, unknown> = msg;
+
+			// Strip reasoning_content / reasoning — Groq rejects these
+			// on assistant messages with a 400. The AI SDK persists the
+			// field for reasoning-capable models; we hold the reasoning
+			// for the client to render but never forward it to the
+			// upstream. The fields are private chain-of-thought; the
+			// model produced the assistant `content` without needing them
+			// back as input.
+			if ('reasoning_content' in next || 'reasoning' in next) {
+				const { reasoning_content: _rc, reasoning: _r, ...rest } = next;
+				next = rest;
+				changed = true;
+			}
+
+			if (
+				Array.isArray(next.tool_calls) &&
+				next.tool_calls.length > 0 &&
+				typeof next.content !== 'string'
+			) {
+				next = { ...next, content: '' };
+				changed = true;
+			}
+
+			return next;
 		}
 
 		return message;

@@ -15,7 +15,6 @@ import { parentAssistantAgent } from './agents/parent-assistant';
 import { chatWorkflow, editorCommandWorkflow } from './workflows';
 import { createMastraStorage } from '$lib/server/mastra/storage/libsql/mastra-storage';
 import { tenantWorkspace } from '$lib/server/workspace';
-import { testAgent, testWorkflow } from './agents/assistant';
 
 // ─── Singleton Mastra Instance ──────────────────────────────────────────────
 
@@ -33,7 +32,6 @@ import { testAgent, testWorkflow } from './agents/assistant';
  */
 export const mastra = new Mastra({
   agents: {
-    testAgent: testAgent,
     assistant: assistantAgent,
     format: formatAgent,
     title: titleAgent,
@@ -45,8 +43,7 @@ export const mastra = new Mastra({
   },
   workflows: {
     editorCommandWorkflow,
-    chatWorkflow,
-    testWorkflow
+    chatWorkflow
   },
   storage: createMastraStorage(),
   server: {

@@ -187,7 +187,8 @@ MIDDLEBASIC: Subject Code | MTA (30) | CA (10) | REPORT (10) | EXAM (50)`;
   let markdown: string;
   try {
     const result = await agent.generate(prompt, {
-      providerOptions: { groq: { reasoningEffort: 'none' } } as never,
+      ...(requestContext ? { requestContext: requestContext as never } : {}),
+      providerOptions: { groq: { reasoningEffort: 'none' } } as never
     });
     markdown = result.text;
   } catch (err: unknown) {
@@ -202,8 +203,9 @@ MIDDLEBASIC: Subject Code | MTA (30) | CA (10) | REPORT (10) | EXAM (50)`;
         try {
           const model = openCodeProvider.chatModel(selectedModel.split('/')[1]);
           const result = await agent.generate(prompt, {
+            ...(requestContext ? { requestContext: requestContext as never } : {}),
             model,
-            providerOptions: { deepseek: { reasoningEffort: 'none' } } as never,
+            providerOptions: { deepseek: { reasoningEffort: 'none' } } as never
           });
           markdown = result.text;
         } catch {

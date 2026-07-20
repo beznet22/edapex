@@ -79,6 +79,113 @@ describe('sanitizeProviderRequestBody', () => {
 			expect(userMsg.content).toBe('hi');
 		}
 	});
+
+	describe('reasoning_content / reasoning strip (Groq compatibility)', () => {
+		it("strips `reasoning_content` from an assistant message", () => {
+			const body = {
+				messages: [
+					{
+						role: 'assistant',
+						content: 'final answer',
+						reasoning_content: 'private chain of thought that Groq rejects'
+					}
+				]
+			};
+			const sanitized = sanitizeProviderRequestBody(body) as typeof body;
+			expect(sanitized.messages[0]).not.toHaveProperty('reasoning_content');
+			expect(sanitized.messages[0].content).toBe('final answer');
+		});
+
+		it("strips `reasoning` (alternate key) from an assistant message", () => {
+			const body = {
+				messages: [{ role: 'assistant', content: 'final', reasoning: 'private' }]
+			};
+			const sanitized = sanitizeProviderRequestBody(body) as typeof body;
+			expect(sanitized.messages[0]).not.toHaveProperty('reasoning');
+			expect(sanitized.messages[0].content).toBe('final');
+		});
+
+		it('strips both reasoning_content and reasoning when both are present', () => {
+			const body = {
+				messages: [
+					{
+						role: 'assistant',
+						content: 'final',
+						reasoning_content: 'rc',
+						reasoning: 'r'
+					}
+				]
+			};
+			const sanitized = sanitizeProviderRequestBody(body) as typeof body;
+			expect(sanitized.messages[0]).not.toHaveProperty('reasoning_content');
+			expect(sanitized.messages[0]).not.toHaveProperty('reasoning');
+		});
+
+		it('strips reasoning_content even when tool_calls are present (and fills empty content)', () => {
+			const body = {
+				messages: [
+					{
+						role: 'assistant',
+						content: null,
+						reasoning_content: 'rc',
+						tool_calls: [{ id: '1' }]
+					}
+				]
+			};
+			const sanitized = sanitizeProviderRequestBody(body) as typeof body;
+			const msg = sanitized.messages[0];
+			expect(msg).not.toHaveProperty('reasoning_content');
+			expect(msg.content).toBe('');
+			expect(msg.tool_calls).toEqual([{ id: '1' }]);
+		});
+
+		it('does not strip reasoning_content from non-assistant messages', () => {
+			const body = {
+				messages: [
+					{ role: 'user', content: 'hi', reasoning_content: 'should be kept' }
+				]
+			};
+			expect(sanitizeProviderRequestBody(body)).toBe(body);
+		});
+
+		it('is idempotent — sanitizing twice is a no-op', () => {
+			const body = {
+				messages: [
+					{
+						role: 'assistant',
+						content: 'final',
+						reasoning_content: 'rc'
+					}
+				]
+			};
+			const once = sanitizeProviderRequestBody(body) as typeof body;
+			const twice = sanitizeProviderRequestBody(once) as typeof once;
+			expect(twice).toBe(once);
+		});
+
+		it('preserves content, role, tool_calls, and other fields untouched', () => {
+			const body = {
+				messages: [
+					{
+						role: 'assistant',
+						content: 'final',
+						name: 'assistant',
+						reasoning_content: 'rc',
+						annotations: ['a', 'b'],
+						tool_calls: [{ id: '1' }]
+					}
+				]
+			};
+			const sanitized = sanitizeProviderRequestBody(body) as typeof body;
+			const msg = sanitized.messages[0];
+			expect(msg.role).toBe('assistant');
+			expect(msg.content).toBe('final');
+			expect(msg.name).toBe('assistant');
+			expect(msg.annotations).toEqual(['a', 'b']);
+			expect(msg.tool_calls).toEqual([{ id: '1' }]);
+			expect(msg).not.toHaveProperty('reasoning_content');
+		});
+	});
 });
 
 describe('sanitizeRequestInit', () => {

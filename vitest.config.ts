@@ -17,7 +17,9 @@ export default defineConfig({
 							'src/lib/server/mastra/provider/**/*.test.ts',
 							'src/lib/server/mastra/storage/libsql/**/*.test.ts',
 							'src/lib/utils/**/*.test.ts',
-							'src/lib/context/**/*.test.ts'
+							'src/lib/context/**/*.test.ts',
+							'src/lib/server/mastra/agents/**/*.test.ts',
+							'src/lib/server/helpers/**/*.test.ts'
 						],
 						environment: 'node',
 						globals: true,

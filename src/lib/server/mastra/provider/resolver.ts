@@ -177,7 +177,13 @@ export async function resolveModelForRequest(
 					tier: resolved.tier,
 					providerId,
 					modelId,
-					variantId
+					variantId,
+					// Non-reversible fingerprint so the operator can correlate
+					// the audit entry with the user's input without leaking
+					// the key. First 4 + last 4 chars; '(empty)' if no key.
+					keyFingerprint: resolved.apiKey
+						? `${resolved.apiKey.slice(0, 4)}…${resolved.apiKey.slice(-4)}`
+						: '(empty)'
 				}
 			});
 		}
