@@ -1,13 +1,13 @@
 import { z } from "zod";
-import { eq } from "drizzle-orm";
 import { createTool } from "@mastra/core/tools";
 import type { ToolExecutionContext } from "@mastra/core/tools";
+import { bridgeToolContext } from "../../internal/bridge";
+import { parseDateOfBirth, formatToolOutput } from "../../internal/write-tool-utils";
 import {
   validateRoleWhitelist,
   type MastraToolContext,
 } from "../../../tenant-context";
 import { StaffRepository } from "../../../../repository/staff.repo";
-import { smStaffs, users } from "../../../../db/sms-schema";
 
 export const updateStaffBiodataSchema = z.object({
   staffId: z.number().optional().describe("Numeric ID of the staff member"),
@@ -22,13 +22,6 @@ export const updateStaffBiodataSchema = z.object({
 });
 
 export type UpdateStaffBiodataPayload = z.infer<typeof updateStaffBiodataSchema>;
-
-function parseDateOfBirth(value: string | undefined): Date | undefined {
-  if (!value) return undefined;
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return undefined;
-  return date;
-}
 
 async function findStaffByIdOrEmail(
   staffRepo: StaffRepository,
@@ -46,17 +39,7 @@ async function findStaffByIdOrEmail(
   }
 
   if (params.email) {
-    const [staff] = await staffRepo.db
-      .select({
-        id: smStaffs.id,
-        userId: smStaffs.userId,
-        firstName: smStaffs.firstName,
-        lastName: smStaffs.lastName,
-      })
-      .from(smStaffs)
-      .where(eq(smStaffs.email, params.email))
-      .limit(1);
-
+    const staff = await staffRepo.getStaffByEmail(params.email);
     if (!staff) return null;
     return {
       staffId: staff.id,
@@ -124,17 +107,15 @@ export const updateStaffBiodataLogic = async (
   }
 
   try {
-    await staffRepo.db
-      .update(smStaffs)
-      .set(staffUpdate)
-      .where(eq(smStaffs.id, staff.staffId));
-
-    if (staff.userId && (params.firstName !== undefined || params.lastName !== undefined) && fullName) {
-      await staffRepo.db
-        .update(users)
-        .set({ fullName })
-        .where(eq(users.id, staff.userId));
-    }
+    await staffRepo.updateStaff({
+      staffId: staff.staffId,
+      firstName: params.firstName,
+      lastName: params.lastName,
+      mobile: params.mobile,
+      qualification: params.qualification,
+      experience: params.experience,
+      dateOfBirth: parseDateOfBirth(params.dateOfBirth),
+    });
 
     return {
       status: "SUCCESS" as const,
@@ -151,47 +132,14 @@ export const updateStaffBiodataLogic = async (
   }
 };
 
-function assertMastraToolContext(context: ToolExecutionContext): asserts context is MastraToolContext & ToolExecutionContext {
-  if (!("tenantContext" in context) || !("getRepo" in context)) {
-    throw new Error("Invalid tool execution context: expected MastraToolContext");
-  }
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
-}
-
-function hasStringStatus(value: Record<string, unknown>): value is Record<string, unknown> & { status: string } {
-  return typeof value.status === "string";
-}
-
-function formatToolOutput(output: unknown): unknown {
-  if (!isRecord(output) || !hasStringStatus(output)) {
-    return JSON.stringify(output);
-  }
-
-  if (output.status === "SUCCESS") {
-    const staffId = output.staffId;
-    const userId = output.userId;
-    const email = output.email;
-    const password = output.temporaryPassword;
-    if (typeof staffId === "number" && typeof userId === "number" && typeof email === "string" && typeof password === "string") {
-      return `Staff enrolled successfully. Staff ID: ${staffId}, User ID: ${userId}, Email: ${email}, Temporary Password: ${password}`;
-    }
-    return typeof output.message === "string" ? output.message : "Staff operation completed successfully.";
-  }
-
-  return typeof output.message === "string" ? output.message : JSON.stringify(output);
-}
-
 export const updateStaffBiodataTool = createTool({
   id: "update-staff-biodata",
   description: "Update an existing staff member's personal details.",
   inputSchema: updateStaffBiodataSchema,
   requireApproval: true,
   execute: async (inputData: UpdateStaffBiodataPayload, context: ToolExecutionContext) => {
-    assertMastraToolContext(context);
-    return updateStaffBiodataLogic(context, inputData);
+    const ctx = await bridgeToolContext(context);
+    return updateStaffBiodataLogic(ctx, inputData);
   },
   toModelOutput: (output: unknown) => formatToolOutput(output),
 });

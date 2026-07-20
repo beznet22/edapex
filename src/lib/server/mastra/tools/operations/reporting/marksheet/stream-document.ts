@@ -210,7 +210,7 @@ MIDDLEBASIC: Subject Code | MTA (30) | CA (10) | REPORT (10) | EXAM (50)`;
       '',
       'STUDENT ROSTER (admissionNo here is AUTHORITATIVE):',
       rosterLines || '  (no roster available)',
-      'Match the student Full Name from the OCR to this roster, then use the roster admissionNo in the Admission No field — NOT the value from the OCR.',
+		'If exactly one name matches, use the roster admissionNo in the Admission No field — NOT the value from the OCR. If multiple students share the same name, PRESERVE the admissionNo from the OCR input to disambiguate.',
       '',
       'SUBJECT CODES:',
       subjectLines || '  (no subjects available)',
@@ -290,6 +290,32 @@ MIDDLEBASIC: Subject Code | MTA (30) | CA (10) | REPORT (10) | EXAM (50)`;
       await updateEntry(tenant, entry.path, { status: 'Formatted' }, examTypeId);
     }
 
+    // Parse generated marksheet to resolve student identity
+    const { parseMarksheetMarkdown } = await import('$lib/utils/marksheet-ast-parser');
+    let resolvedStudentId = studentId;
+    let resolvedAdmNo: number | null = null;
+    let resolvedFullName: string | null = null;
+    try {
+      const parsed = parseMarksheetMarkdown(markdown);
+      const parsedAdmNo = parsed.student?.adminNo != null ? Number(parsed.student.adminNo) : null;
+      resolvedFullName = parsed.student?.fullName ?? null;
+      if (parsedAdmNo) {
+        const match = roster.find(
+          (r) => r.admissionNo != null && Number(r.admissionNo) === parsedAdmNo
+        );
+        if (match) {
+          resolvedStudentId = match.id;
+          resolvedAdmNo = parsedAdmNo;
+          await updateEntry(tenant, initialMarkdownPath, { studentId: match.id, admissionNo: parsedAdmNo }, examTypeId);
+          if (entry.path) {
+            await updateEntry(tenant, entry.path, { studentId: match.id, admissionNo: parsedAdmNo }, examTypeId);
+          }
+        }
+      }
+    } catch {
+      // Parsing is best-effort
+    }
+
     return {
       artifactId,
       documentId,
@@ -297,11 +323,11 @@ MIDDLEBASIC: Subject Code | MTA (30) | CA (10) | REPORT (10) | EXAM (50)`;
       fileName: entry.fileName,
       initialMarkdownPath,
       title,
-      studentId,
+      studentId: resolvedStudentId,
       examTypeId: tenant.examTypeId ?? null,
       academicId: tenant.academicId ?? null,
-      studentFullName: null,
-      adminNo: null,
+      studentFullName: resolvedFullName,
+      adminNo: resolvedAdmNo,
     };
   }
 });

@@ -1,8 +1,5 @@
 import { z } from "zod";
 import { createTool, type ToolExecutionContext } from "@mastra/core/tools";
-import { eq } from "drizzle-orm";
-import { getDatabase } from "$lib/server/db";
-import { smStudents } from "$lib/server/db/sms-schema";
 import { StudentRepository } from "../../../../repository/student.repo";
 import { TimelineRepository } from "../../../../repository/timeline.repo";
 import {
@@ -48,28 +45,6 @@ function isPromotionResult(value: unknown): value is PromotionResult {
   );
 }
 
-async function resolveStudentIdentifier(
-  identifier: { studentId?: number },
-): Promise<{ id: number; fullName: string | null; classId: number | null; sectionId: number | null } | null> {
-  const db = await getDatabase();
-
-  if (identifier.studentId != null) {
-    const [student] = await db
-      .select({
-        id: smStudents.id,
-        fullName: smStudents.fullName,
-        classId: smStudents.classId,
-        sectionId: smStudents.sectionId,
-      })
-      .from(smStudents)
-      .where(eq(smStudents.id, identifier.studentId))
-      .limit(1);
-    return student ?? null;
-  }
-
-  return null;
-}
-
 export const promoteStudentLogic = async (
   context: MastraToolContext,
   input: PromoteStudentInput,
@@ -84,7 +59,7 @@ export const promoteStudentLogic = async (
   const audit = context.audit;
 
   try {
-    const student = await resolveStudentIdentifier({ studentId: input.studentId });
+    const student = await studentRepo.getById(input.studentId);
     if (!student) {
       return {
         status: "ERROR",
@@ -145,14 +120,6 @@ export const promoteStudentLogic = async (
     };
   }
 };
-
-function assertMastraToolContext(
-  context: ToolExecutionContext,
-): asserts context is MastraToolContext & ToolExecutionContext {
-  if (!("tenantContext" in context) || !("getRepo" in context)) {
-    throw new Error("Invalid tool execution context: expected MastraToolContext");
-  }
-}
 
 export const promoteStudentTool = createTool({
   id: "promote-student",

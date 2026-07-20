@@ -1,58 +1,116 @@
 import { error, json } from "@sveltejs/kit";
-import { createTenantContext } from "$lib/server/mastra/tenant-context";
-import { buildWorkspaceRequestContext } from "$lib/server/helpers/chat-helper";
-import { resolveActiveClassScope, resolveClassNamesByIds } from "$lib/server/helpers/class-scope";
+import { resolveWorkspaceContext } from "$lib/server/helpers/chat-helper";
 import { ALLOWED_DESIGNATIONS } from "$lib/types/sms-types";
 import { generateResultPdfTool } from "$lib/server/mastra/tools/operations/reporting/generate-result-pdf";
 import { getDatabase } from "$lib/server/db";
-import { smStudents, smParents } from "$lib/server/db/sms-schema";
-import { eq } from "drizzle-orm";
+import { StudentRepository } from "$lib/server/repository";
+import { readManifest, updateEntry } from "$lib/server/workspace/manifest";
+import { getClassRoster } from "$lib/server/mastra/agents/skill-instructions";
+import type { TenantContext } from "$lib/server/mastra/tenant-context";
 import type { RequestHandler } from "@sveltejs/kit";
+import type { AuthUser } from "$lib/types/auth-types";
+
+function extractExamTypeFromPath(filePath: string): number | null {
+	const match = filePath.match(/examType-(\d+)/);
+	return match ? Number(match[1]) : null;
+}
+
+function extractNameFromMarksheetPath(filePath: string): string | null {
+	const match = filePath.match(/marksheets\/(.+?)\.md$/);
+	if (!match) return null;
+	const base = match[1];
+	const withoutHash = base.replace(/-[a-f0-9]{6,}$/, '');
+	const cleaned = withoutHash.replace(/_(jpg|png|jpeg|gif|bmp|webp)$/, '');
+	return cleaned.replace(/_/g, ' ').trim() || null;
+}
+
+async function resolveStudentFromFilePath(
+	filePath: string,
+	tenant: TenantContext,
+	studentRepo: { getStudentById: (id: number, isAdminNo?: boolean) => Promise<{ studentId: number; admissionNo?: number | null; fullName?: string | null } | null> },
+): Promise<{ studentId: number; admissionNo?: number; fullName?: string } | null> {
+	const examTypeId = extractExamTypeFromPath(filePath);
+	if (!examTypeId) return null;
+
+	const manifest = await readManifest(tenant, examTypeId);
+	const entry = manifest.entries[filePath];
+
+	if (entry) {
+		if (entry.studentId) {
+			const student = await studentRepo.getStudentById(entry.studentId);
+			if (student) {
+				return { studentId: student.studentId, admissionNo: student.admissionNo ?? undefined, fullName: student.fullName ?? undefined };
+			}
+		}
+		if (entry.admissionNo) {
+			const student = await studentRepo.getStudentById(entry.admissionNo, true);
+			if (student) {
+				return { studentId: student.studentId, admissionNo: student.admissionNo ?? undefined, fullName: student.fullName ?? undefined };
+			}
+		}
+	}
+
+	const studentName = extractNameFromMarksheetPath(filePath);
+	if (studentName) {
+		const roster = await getClassRoster({
+			classId: tenant.classId ?? undefined,
+			sectionId: tenant.sectionId ?? undefined,
+			academicId: tenant.academicId ?? undefined,
+		});
+		const match = roster.find(
+			(r) => r.name.toLowerCase().includes(studentName.toLowerCase()) || studentName.toLowerCase().includes(r.name.toLowerCase())
+		);
+		if (match) {
+			const admissionNoNum = match.admissionNo ? Number(match.admissionNo) : undefined;
+			return { studentId: match.id, admissionNo: admissionNoNum, fullName: match.name };
+		}
+	}
+
+	return null;
+}
 
 export const POST: RequestHandler = async ({ request, locals, cookies }) => {
   try {
     if (!locals.user) throw error(401, "Unauthorized");
 
+    const { id, schoolId, staffId } = locals.user as AuthUser;
     const body = await request.json() as {
-      studentId: number;
-      examTypeId: number;
-      academicId?: number;
       admissionNo?: number;
-      fullName?: string;
+      studentId?: number;
+      filePath?: string;
+      includePdfBuffer?: boolean;
     };
 
-    const scope = await resolveActiveClassScope({
-      schoolId: locals.user.schoolId ?? 1,
-      staffId: (locals.user as { staffId?: number })?.staffId,
-      selectedClassCookie: cookies.get("selected-class"),
+    const { tenant, requestContext } = await resolveWorkspaceContext(cookies, {
+      id, schoolId, staffId,
+      designationId: ALLOWED_DESIGNATIONS.IT,
     });
 
-    const displayNames = scope
-      ? await resolveClassNamesByIds({
-          schoolId: locals.user.schoolId ?? 1,
-          classId: scope.classId,
-          sectionId: scope.sectionId,
-          academicId: scope.academicId,
-        })
-      : { className: null, sectionName: null, academicYearTitle: null };
-
-    const tenant = createTenantContext({
-      schoolId: locals.user.schoolId ?? 1,
-      userId: locals.user.id ?? 1,
-      designationId: (locals.user as { designationId?: number })?.designationId ?? ALLOWED_DESIGNATIONS.IT,
-      staffId: (locals.user as { staffId?: number })?.staffId ?? 1,
-      classId: scope?.classId ?? null,
-      sectionId: scope?.sectionId ?? null,
-      examId: null,
-      examTypeId: body.examTypeId,
-      academicId: scope?.academicId ?? null,
-      className: displayNames.className,
-      sectionName: displayNames.sectionName,
-      academicYearTitle: displayNames.academicYearTitle,
-    });
-
-    const requestContext = buildWorkspaceRequestContext(tenant);
-    requestContext.set("tenantContext", tenant);
+    const db = await getDatabase();
+    const studentRepo = await StudentRepository.build(db, tenant);
+    let student;
+    if (body.admissionNo) {
+      student = await studentRepo.getStudentById(body.admissionNo, true);
+    } else if (body.studentId) {
+      student = await studentRepo.getStudentById(body.studentId);
+    } else if (body.filePath) {
+      const resolved = await resolveStudentFromFilePath(body.filePath, tenant, studentRepo);
+      if (!resolved) {
+        throw new Error("STUDENT_NOT_RESOLVED: could not resolve student identity from file path");
+      }
+      student = await studentRepo.getStudentById(resolved.studentId);
+      if (!student) {
+        // If getStudentById didn't find the student (rare), use the resolved data directly
+        student = {
+          studentId: resolved.studentId,
+          admissionNo: resolved.admissionNo ?? null,
+          fullName: resolved.fullName ?? null,
+        } as NonNullable<typeof student>;
+      }
+    } else {
+      throw new Error("STUDENT_IDENTIFIER_REQUIRED: provide admissionNo, studentId, or filePath");
+    }
+    if (!student?.studentId) throw new Error("Student not found");
 
     const executeFn = generateResultPdfTool.execute;
     if (typeof executeFn !== "function") {
@@ -60,13 +118,14 @@ export const POST: RequestHandler = async ({ request, locals, cookies }) => {
     }
     const result = await executeFn(
       {
-        studentId: body.studentId,
-        examTypeId: body.examTypeId,
-        academicId: body.academicId ?? scope?.academicId ?? undefined,
-        admissionNo: body.admissionNo,
-        fullName: body.fullName,
+        studentId: student.studentId,
+        admissionNo: student.admissionNo ?? undefined,
+        fullName: student.fullName ?? undefined,
+        classId: tenant.classId ?? undefined,
+        sectionId: tenant.sectionId ?? undefined,
+        examTypeId: tenant.examTypeId ?? undefined,
         republish: true,
-        includePdfBuffer: true,
+        includePdfBuffer: body.includePdfBuffer ?? false,
       },
       { requestContext: requestContext as never } as never,
     );
@@ -75,8 +134,20 @@ export const POST: RequestHandler = async ({ request, locals, cookies }) => {
       return json({ error: (result as { error?: string }).error ?? "PDF generation failed" }, { status: 500 });
     }
 
+    // Backfill manifest with resolved identity
+    if (body.filePath) {
+      const examTypeId = extractExamTypeFromPath(body.filePath);
+      if (examTypeId && (student.admissionNo || student.studentId)) {
+        const backfill: Record<string, unknown> = {};
+        if (student.studentId) backfill.studentId = student.studentId;
+        if (student.admissionNo) backfill.admissionNo = student.admissionNo;
+        await updateEntry(tenant, body.filePath, backfill as Partial<import('$lib/server/workspace/manifest').ManifestEntry>, examTypeId).catch((e: unknown) => {
+          console.error("[generate-pdf] backfill failed:", e);
+        });
+      }
+    }
+
     const successResult = result as {
-      artifactId: string;
       storagePath?: string;
       previewUrl?: string;
       pdfBase64?: string;
@@ -84,36 +155,11 @@ export const POST: RequestHandler = async ({ request, locals, cookies }) => {
       title?: string;
     };
 
-    const db = await getDatabase();
-    const studentRow = await db
-      .select({ parentId: smStudents.parentId })
-      .from(smStudents)
-      .where(eq(smStudents.id, body.studentId))
-      .limit(1)
-      .then((rows) => rows[0] ?? null);
-
-    let parentName: string | null = null;
-    let parentEmail: string | null = null;
-    if (studentRow?.parentId != null) {
-      const parent = await db
-        .select({ guardiansName: smParents.guardiansName, guardiansEmail: smParents.guardiansEmail })
-        .from(smParents)
-        .where(eq(smParents.id, studentRow.parentId))
-        .limit(1)
-        .then((rows) => rows[0] ?? null);
-      if (parent) {
-        parentName = parent.guardiansName;
-        parentEmail = parent.guardiansEmail;
-      }
-    }
-
     return json({
       storagePath: successResult.storagePath,
       previewUrl: successResult.previewUrl,
       pdfBase64: successResult.pdfBase64,
       filename: successResult.filename ?? successResult.title ?? "result.pdf",
-      parentName,
-      parentEmail,
     });
   } catch (e) {
     console.error("[generate-pdf]", e);

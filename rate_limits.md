@@ -1,3 +1,2 @@
-Audit the current  workspace scoping, the intended behavior is that files are grouped by file kind (see src/lib/server/mastra/storage/workspaces/manifest-store.ts) under exams/examTypeId inside the .workspaces/1/AY4-2025/2026/12-c_5-a.
-
-i also don't understand why we are having two workspace dir (src/lib/server/mastra/storage/workspaces and src/lib/server/workspace) this is confucing should be just one possibly in src/lib/server/workspace
+```
+mysql_config_editor set --login-path=local_automation --host=localhost --user=root --password

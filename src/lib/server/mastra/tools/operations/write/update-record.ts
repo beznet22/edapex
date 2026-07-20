@@ -1,6 +1,7 @@
 import { z } from "zod";
-import { eq } from "drizzle-orm";
 import { createTool, type ToolExecutionContext } from "@mastra/core/tools";
+import { bridgeToolContext } from "../../internal/bridge";
+import { parseDateOfBirth } from "../../internal/write-tool-utils";
 import {
   validateRoleWhitelist,
   validateWorkspaceLock,
@@ -11,7 +12,6 @@ import {
 import { StudentRepository } from "../../../../repository/student.repo";
 import { StaffRepository } from "../../../../repository/staff.repo";
 import { TimelineRepository } from "../../../../repository/timeline.repo";
-import { smStaffs, users } from "../../../../db/sms-schema";
 
 export const updateRecordSchema = z.object({
   entityType: z
@@ -50,13 +50,6 @@ function isUpdateRecordResult(value: unknown): value is UpdateRecordResult {
     "entityId" in value && typeof value.entityId === "number" &&
     "message" in value && typeof value.message === "string"
   );
-}
-
-function parseDateOfBirth(value: string | undefined): Date | undefined {
-  if (!value) return undefined;
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return undefined;
-  return date;
 }
 
 async function updateStudentRecord(
@@ -208,29 +201,17 @@ async function updateStaffRecord(
 
   try {
     if (hasBiodataChanges) {
-      await staffRepo.db
-        .update(smStaffs)
-        .set(staffUpdate)
-        .where(eq(smStaffs.id, targetStaffId));
-
-      if (staff.userId && (payload.firstName !== undefined || payload.lastName !== undefined)) {
-        const firstName = payload.firstName ?? staff.firstName ?? "";
-        const lastName = payload.lastName ?? staff.lastName ?? "";
-        const fullName = `${firstName} ${lastName}`.trim();
-        if (fullName) {
-          await staffRepo.db
-            .update(users)
-            .set({ fullName })
-            .where(eq(users.id, staff.userId));
-        }
-      }
+      await staffRepo.updateStaff({
+        staffId: targetStaffId,
+        firstName: payload.firstName,
+        lastName: payload.lastName,
+        mobile: payload.mobile,
+        dateOfBirth: parseDateOfBirth(payload.dateOfBirth),
+      });
     }
 
     if (hasPhotoChange && payload.photoPath !== undefined) {
-      await staffRepo.db
-        .update(smStaffs)
-        .set({ staffPhoto: payload.photoPath })
-        .where(eq(smStaffs.id, targetStaffId));
+      await staffRepo.updateStaffPhoto(targetStaffId, payload.photoPath);
     }
 
     const auditDescription = JSON.stringify({
@@ -309,14 +290,6 @@ export const updateRecordLogic = async (
   return updateStaffRecord(context, payload, selfStaffId, true);
 };
 
-function assertMastraToolContext(
-  context: ToolExecutionContext,
-): asserts context is MastraToolContext & ToolExecutionContext {
-  if (!("tenantContext" in context) || !("getRepo" in context)) {
-    throw new Error("Invalid tool execution context: expected MastraToolContext");
-  }
-}
-
 export const updateRecordTool = createTool({
   id: "update-record",
   description:
@@ -324,8 +297,8 @@ export const updateRecordTool = createTool({
   inputSchema: updateRecordSchema,
   requireApproval: true,
   execute: async (input: UpdateRecordPayload, context: ToolExecutionContext) => {
-    assertMastraToolContext(context);
-    return updateRecordLogic(context, input);
+    const ctx = await bridgeToolContext(context);
+    return updateRecordLogic(ctx, input);
   },
   toModelOutput: (output: unknown) => {
     if (!isUpdateRecordResult(output)) {

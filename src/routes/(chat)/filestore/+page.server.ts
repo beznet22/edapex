@@ -199,17 +199,26 @@ export const load: PageServerLoad = async ({ url, locals, cookies }) => {
 		const pathToMarksheetStatus = new Map<string, string>();
 		const pathToManifestStatus = new Map<string, string>();
 		const pathToError = new Map<string, string>();
+		const pathToValidationErrors = new Map<string, string[]>();
+		const pathToValidationErrorCount = new Map<string, number>();
 		const pathToContentHash = new Map<string, string>();
 		const pathToDocumentId = new Map<string, string>();
 		const pathToMimeType = new Map<string, string>();
+		const pathToStudentId = new Map<string, number>();
+		const pathToAdmissionNo = new Map<string, number>();
 		for (const manifest of manifests) {
 			for (const [relPath, entry] of Object.entries(manifest.entries)) {
+				console.log('[filestore] manifest entry', relPath, { studentId: entry.studentId, admissionNo: entry.admissionNo, kind: entry.kind, status: entry.status, path: entry.path });
 				if (entry.marksheetStatus) pathToMarksheetStatus.set(relPath, entry.marksheetStatus);
 				if (entry.status) pathToManifestStatus.set(relPath, entry.status);
 				if (entry.error) pathToError.set(relPath, entry.error);
+				if (entry.validationErrors) pathToValidationErrors.set(relPath, entry.validationErrors);
+				if (entry.validationErrorCount) pathToValidationErrorCount.set(relPath, entry.validationErrorCount);
 				if (entry.contentHash) pathToContentHash.set(relPath, entry.contentHash);
 				if (entry.documentId) pathToDocumentId.set(relPath, entry.documentId);
 				if (entry.mimeType) pathToMimeType.set(relPath, entry.mimeType);
+				if (entry.studentId) pathToStudentId.set(relPath, entry.studentId);
+				if (entry.admissionNo) pathToAdmissionNo.set(relPath, entry.admissionNo);
 			}
 		}
 		for (const f of files) {
@@ -222,18 +231,29 @@ export const load: PageServerLoad = async ({ url, locals, cookies }) => {
 				candidates.push(relKey.replace("/uploads/", "/notes/"));
 			}
 			for (const key of candidates) {
+				if (key === relKey && !pathToStudentId.has(key) && !pathToAdmissionNo.has(key)) {
+					console.log('[filestore] NO identity in manifest for', { title: f.title, relKey, manifestSid: pathToStudentId.get(key), manifestAdm: pathToAdmissionNo.get(key), sidKeys: Array.from(pathToStudentId.keys()), admKeys: Array.from(pathToAdmissionNo.keys()) });
+				}
 				const ms = pathToMarksheetStatus.get(key);
 				if (ms && !f.marksheetStatus) f.marksheetStatus = ms;
 				const manifestStatus = pathToManifestStatus.get(key);
 				if (manifestStatus && !f.manifestStatus) f.manifestStatus = manifestStatus;
 				const manifestError = pathToError.get(key);
 				if (manifestError && !f.manifestError) f.manifestError = manifestError;
+				const ve = pathToValidationErrors.get(key);
+				if (ve && !f.validationErrors) f.validationErrors = ve;
+				const vec = pathToValidationErrorCount.get(key);
+				if (vec && !f.validationErrorCount) f.validationErrorCount = vec;
 				const ch = pathToContentHash.get(key);
 				if (ch && !f.contentHash) f.contentHash = ch;
 				const did = pathToDocumentId.get(key);
 				if (did && !f.documentId) f.documentId = did;
 				const mt = pathToMimeType.get(key);
 				if (mt && !f.mimeType) f.mimeType = mt;
+				const sid = pathToStudentId.get(key);
+				if (sid && !f.studentId) f.studentId = sid;
+				const adm = pathToAdmissionNo.get(key);
+				if (adm && !f.admissionNo) f.admissionNo = adm;
 			}
 		}
 	}

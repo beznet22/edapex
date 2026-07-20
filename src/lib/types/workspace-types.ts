@@ -25,7 +25,11 @@ export interface Artifact {
 	category?: ArtifactCategory;
 	modifiedAt?: number;
 	examTypeId?: number;
+	studentId?: number;
+	admissionNo?: number;
 	contentHash?: string;
 	documentId?: string;
 	mimeType?: string;
+	validationErrors?: string[];
+	validationErrorCount?: number;
 }

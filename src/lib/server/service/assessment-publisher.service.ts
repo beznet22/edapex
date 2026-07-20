@@ -36,6 +36,7 @@ import { env } from "$env/dynamic/private";
 import { AssessmentService } from "./assessment.service";
 import ResultTemplate from "$lib/components/template/ResultTemplate.svelte";
 import ResultEmail from "$lib/components/template/result-email.svelte";
+import { dev } from "$app/environment";
 
 export interface PublishResultsParams {
   studentIds: number[];
@@ -232,7 +233,7 @@ export class AssessmentPublisherService {
 
         return {
           from: `"${school.name}" <${school.email}>`,
-          to: student.parentEmail,
+          to: dev ? env.SMTP_TO : student.parentEmail,
           subject: reportSettings.resultEmailSubject,
           html,
           attachments: [

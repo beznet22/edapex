@@ -17,7 +17,7 @@
 	import { toast } from "svelte-sonner";
 	import { SelectedClass } from "$lib/context/sync.svelte";
 	import { DESIGNATIONS } from "$lib/types/sms-types";
-	import { parseMarksheetMarkdown, autoFixStructure } from "$lib/utils/marksheet-ast-parser";
+	import { parseMarksheetMarkdown } from "$lib/utils/marksheet-ast-parser";
 
 	import { usePdfiumEngine } from "@embedpdf/engines/svelte";
 	import { EmbedPDF } from "@embedpdf/core/svelte";
@@ -48,6 +48,7 @@
 		type = "text",
 		editorMode = $bindable("wysiwyg"),
 		isSaving = $bindable(false),
+		validationState = $bindable({ errors: [], errorCount: 0 }),
 		streaming = false,
 		user,
 		artifactId = "",
@@ -61,6 +62,7 @@
 		type?: "text" | "image" | "pdf";
 		editorMode?: "wysiwyg" | "raw";
 		isSaving?: boolean;
+		validationState?: { errors: string[]; errorCount: number };
 		streaming?: boolean;
 		user?: { designation?: string };
 		artifactId?: string;
@@ -213,7 +215,7 @@
 		}
 	});
 
-	let parseStatus = $state<"idle" | "ok" | "error">("idle");
+	let showParseBar = $state(false);
 
 	$effect(() => {
 		const md = wysiwygContent;
@@ -225,39 +227,32 @@
 		if (saveDebounceTimer) clearTimeout(saveDebounceTimer);
 		saveDebounceTimer = setTimeout(async () => {
 			try {
-				const res = await fetch(url, {
+				const urlExamTypeMatch = url.match(/examType-(\d+)/);
+			const resolvedExamTypeId = examTypeId ?? (urlExamTypeMatch ? Number(urlExamTypeMatch[1]) : null);
+			const saveTarget = resolvedExamTypeId ? `${url}${url.includes('?') ? '&' : '?'}examTypeId=${resolvedExamTypeId}` : url;
+				const res = await fetch(saveTarget, {
 					method: "PUT",
 					body: new Blob([md], { type: "text/markdown" }),
 				});
 				if (!res.ok) return;
+				const data = await res.json();
 				lastSavedContent = md;
 
-				// Parse — auto-fix structural issues if template is corrupted
+				if (data.validation) {
+					validationState = data.validation;
+					showParseBar = true;
+				}
+
 				try {
 					const parsed = parseMarksheetMarkdown(md);
-					parseStatus = "ok";
 					const rawJsonUrl = url.replace(/\.md$/, ".raw.json");
-					await fetch(rawJsonUrl, {
+					const rawJsonTarget = resolvedExamTypeId ? `${rawJsonUrl}${rawJsonUrl.includes('?') ? '&' : '?'}examTypeId=${resolvedExamTypeId}` : rawJsonUrl;
+					await fetch(rawJsonTarget, {
 						method: "PUT",
 						body: new Blob([JSON.stringify(parsed, null, 2)], { type: "application/json" }),
 					}).catch(() => {});
-				} catch (parseErr) {
-					// Parser failed — template corrupted. Auto-fix structure.
-					const result = autoFixStructure(md);
-					if (result.fixes.length > 0 && result.fixedMd !== md) {
-						// Replace editor content with fixed version
-						wysiwygContent = result.fixedMd;
-						editContent = result.fixedMd;
-						const rawJsonUrl = url.replace(/\.md$/, ".raw.json");
-						const reparsed = parseMarksheetMarkdown(result.fixedMd);
-						await fetch(rawJsonUrl, {
-							method: "PUT",
-							body: new Blob([JSON.stringify(reparsed, null, 2)], { type: "application/json" }),
-						}).catch(() => {});
-						parseStatus = "ok";
-					} else {
-						parseStatus = "error";
-					}
+				} catch {
+					// raw.json is a fast-path cache; skip if parsing fails
 				}
 			} catch (err) {
 				const msg = err instanceof Error ? err.message : String(err);
@@ -395,17 +390,17 @@
 						/>
 					{/key}
 				</div>
-				{#if parseStatus !== "idle"}
+				{#if showParseBar}
 					<div
-						class="h-5 px-3 flex items-center gap-1.5 text-[10px] font-medium border-t {parseStatus === 'ok' ? 'bg-green-50/50' : 'bg-red-50/50'}"
+						class="h-5 px-3 flex items-center gap-1.5 text-[10px] font-medium border-t {validationState.errorCount === 0 ? 'bg-green-50/50' : 'bg-red-50/50'}"
 					>
 						<div
-							class="size-1.5 rounded-full {parseStatus === 'ok' ? 'bg-green-500' : 'bg-red-500'}"
+							class="size-1.5 rounded-full {validationState.errorCount === 0 ? 'bg-green-500' : 'bg-red-500'}"
 						></div>
 						<span
-							class={parseStatus === "ok" ? "text-green-700" : "text-red-700"}
+							class={validationState.errorCount === 0 ? "text-green-700" : "text-red-700"}
 						>
-							{parseStatus === "ok" ? "Template OK" : "Template error — could not auto-fix"}
+							{validationState.errorCount === 0 ? "Template OK" : `${validationState.errorCount} validation error${validationState.errorCount === 1 ? '' : 's'}`}
 						</span>
 					</div>
 				{/if}
@@ -479,22 +474,23 @@
 										{#snippet renderPage(
 											page: RenderPageProps,
 										)}
-											{@const pageScale = containerWidth
-												? containerWidth / page.width
-												: 1}
-											<div
-												style:width="{page.width *
-													pageScale}px"
-												style:height="{page.height *
-													pageScale}px"
-												class="bg-white origin-top transition-all duration-300"
-											>
-												<RenderLayer
-													{documentId}
-													pageIndex={page.pageIndex}
-													scale={pageScale}
-												/>
-											</div>
+									{@const pageScale = containerWidth
+										? containerWidth / page.width
+										: 1}
+									<div
+										style:width="{page.width *
+											pageScale}px"
+										style:height="{page.height *
+											pageScale}px"
+										class="bg-white origin-top"
+									>
+										<RenderLayer
+											{documentId}
+											pageIndex={page.pageIndex}
+											scale={pageScale}
+											dpr={Math.max(window.devicePixelRatio, 2)}
+										/>
+									</div>
 										{/snippet}
 										<Viewport
 											{documentId}

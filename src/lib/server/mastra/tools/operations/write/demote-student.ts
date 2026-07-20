@@ -1,9 +1,7 @@
 import { z } from "zod";
 import { createTool, type ToolExecutionContext } from "@mastra/core/tools";
-import { and, desc, eq } from "drizzle-orm";
-import { getDatabase } from "$lib/server/db";
-import { smStudents, smStudentPromotions, studentRecords } from "$lib/server/db/sms-schema";
 import { TimelineRepository } from "../../../../repository/timeline.repo";
+import { StudentRepository } from "../../../../repository/student.repo";
 import {
   validateRoleWhitelist,
   validateWorkspaceLock,
@@ -49,24 +47,12 @@ export const demoteStudentLogic = async (
 
   validateRoleWhitelist(tenantContext, [1, 5, 8]);
 
-  const db = await getDatabase();
+  const studentRepo = getRepo(StudentRepository);
   const timelineRepo = getRepo(TimelineRepository);
   const audit = context.audit;
 
   try {
-    const [student] = await db
-      .select({
-        id: smStudents.id,
-        classId: smStudents.classId,
-        sectionId: smStudents.sectionId,
-        sessionId: smStudents.sessionId,
-        academicId: smStudents.academicId,
-        rollNo: smStudents.rollNo,
-      })
-      .from(smStudents)
-      .where(eq(smStudents.id, input.studentId))
-      .limit(1);
-
+    const student = await studentRepo.getRawStudentById(input.studentId);
     if (!student) {
       return {
         status: "ERROR",
@@ -77,13 +63,7 @@ export const demoteStudentLogic = async (
 
     validateWorkspaceLock(tenantContext, student.classId, student.sectionId);
 
-    const [latestPromotion] = await db
-      .select()
-      .from(smStudentPromotions)
-      .where(eq(smStudentPromotions.studentId, input.studentId))
-      .orderBy(desc(smStudentPromotions.id))
-      .limit(1);
-
+    const latestPromotion = await studentRepo.getLatestPromotion(input.studentId);
     if (!latestPromotion) {
       return {
         status: "ERROR",
@@ -114,62 +94,16 @@ export const demoteStudentLogic = async (
       };
     }
 
-    await db.transaction(async (tx) => {
-      const [currentRecord] = await tx
-        .select({ id: studentRecords.id })
-        .from(studentRecords)
-        .where(
-          and(
-            eq(studentRecords.studentId, input.studentId),
-            eq(studentRecords.classId, currentClassId),
-            eq(studentRecords.sectionId, currentSectionId),
-            eq(studentRecords.academicId, currentSessionId),
-            eq(studentRecords.isDefault, 1),
-          ),
-        )
-        .limit(1);
-
-      const [previousRecord] = await tx
-        .select({ id: studentRecords.id })
-        .from(studentRecords)
-        .where(
-          and(
-            eq(studentRecords.studentId, input.studentId),
-            eq(studentRecords.classId, previousClassId),
-            eq(studentRecords.sectionId, previousSectionId),
-            eq(studentRecords.academicId, previousSessionId),
-          ),
-        )
-        .limit(1);
-
-      if (currentRecord) {
-        await tx
-          .update(studentRecords)
-          .set({ isDefault: 0, activeStatus: 0 })
-          .where(eq(studentRecords.id, currentRecord.id));
-      }
-
-      if (previousRecord) {
-        await tx
-          .update(studentRecords)
-          .set({ isDefault: 1, isPromote: 0, activeStatus: 1 })
-          .where(eq(studentRecords.id, previousRecord.id));
-      }
-
-      await tx
-        .update(smStudents)
-        .set({
-          classId: previousClassId,
-          sectionId: previousSectionId,
-          sessionId: previousSessionId,
-          academicId: previousSessionId,
-          rollNo: latestPromotion.previousRollNumber,
-        })
-        .where(eq(smStudents.id, input.studentId));
-
-      await tx
-        .delete(smStudentPromotions)
-        .where(eq(smStudentPromotions.id, latestPromotion.id));
+    await studentRepo.demoteStudent({
+      studentId: input.studentId,
+      promotionId: latestPromotion.id,
+      currentClassId,
+      currentSectionId,
+      currentSessionId,
+      previousClassId,
+      previousSectionId,
+      previousSessionId,
+      previousRollNumber: latestPromotion.previousRollNumber,
     });
 
     const auditDescription = JSON.stringify({
@@ -209,14 +143,6 @@ export const demoteStudentLogic = async (
     };
   }
 };
-
-function assertMastraToolContext(
-  context: ToolExecutionContext,
-): asserts context is MastraToolContext & ToolExecutionContext {
-  if (!("tenantContext" in context) || !("getRepo" in context)) {
-    throw new Error("Invalid tool execution context: expected MastraToolContext");
-  }
-}
 
 export const demoteStudentTool = createTool({
   id: "demote-student",

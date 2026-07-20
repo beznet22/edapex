@@ -29,13 +29,15 @@ const CATEGORY_MAP: Record<string, Category> = {
   middlebasic: "MIDDLEBASIC",
 };
 
-function parseMentions(md: string): {
+export interface MentionData {
   studentId: number | null;
   examTypeId: number | null;
   academicId: number | null;
   admissionNo: number | null;
   studentName: string | null;
-} {
+}
+
+export function parseMentions(md: string): MentionData {
   let match: RegExpExecArray | null;
   const result = { studentId: null, examTypeId: null, academicId: null, admissionNo: null, studentName: null } as Record<string, number | string | null>;
   while ((match = MENTION_SPAN_RE.exec(md)) !== null) {
@@ -387,6 +389,7 @@ export interface ParseContextTenant {
   examTypeId?: number;
   academicId?: number;
   studentId?: number;
+  admissionNo?: number;
   className?: string;
   sectionName?: string;
   academicYearTitle?: string;
@@ -430,19 +433,49 @@ function mergeContext(result: Marksheet, context?: ParseContext): Marksheet {
 
   // Resolve student from roster
   let resolvedStudentId = tenant?.studentId ?? null;
-  const studentName = result.student.fullName;
-  const studentAdmNo = result.student.adminNo;
-  if (!resolvedStudentId && roster && roster.length > 0) {
-    const byName = roster.find(
-      (r) => r.name.toUpperCase() === studentName.toUpperCase(),
-    );
-    const byAdm = studentAdmNo
-      ? roster.find(
-          (r) => String(r.admissionNo ?? "") === String(studentAdmNo),
-        )
-      : null;
-    const match = byName ?? byAdm;
-    if (match) resolvedStudentId = match.id;
+  let rosterMatch: ParseContextRosterEntry | undefined;
+
+  if (tenant?.admissionNo != null) {
+    // Stage 3: @mention admissionNo is authoriative, skip roster
+    resolvedStudentId = tenant.studentId ?? null;
+  } else if (roster && roster.length > 0) {
+    const studentName = result.student.fullName;
+    const studentAdmNo = result.student.adminNo;
+
+    // Token-subset matching — handles reversed/misordered names
+    const normalizeTokens = (s: string) =>
+      s.toLowerCase().replace(/[,.-]+/g, '').replace(/[\u200b-\u200d\ufeff]/g, '').split(/\s+/).filter(Boolean);
+    const nameTokens = normalizeTokens(studentName);
+    const ranked = roster.map((r) => {
+      const rosterTokens = normalizeTokens(r.name);
+
+      // Admission number match → highest score
+      const admMatch = studentAdmNo && r.admissionNo != null
+        ? String(studentAdmNo) === String(r.admissionNo) : false;
+
+      const markdownInRoster = nameTokens.length > 0 && rosterTokens.length > 0
+        && nameTokens.every((t) => rosterTokens.includes(t));
+      const rosterInMarkdown = nameTokens.length > 0 && rosterTokens.length > 0
+        && rosterTokens.every((t) => nameTokens.includes(t));
+
+      const score = admMatch ? 3
+        : (markdownInRoster && rosterInMarkdown) ? 2
+        : (markdownInRoster || rosterInMarkdown) ? 1
+        : 0;
+      return { entry: r, score };
+    }).filter((r) => r.score > 0).sort((a, b) => b.score - a.score);
+
+    const topScore = ranked[0]?.score;
+    if (topScore != null) {
+      const tied = ranked.filter((r) => r.score === topScore);
+      // Ambiguous: multiple same-name students at score 2 (bidirectional).
+      if (topScore === 2 && tied.length > 1) {
+        rosterMatch = undefined;
+      } else {
+        rosterMatch = tied[0].entry;
+      }
+    }
+    if (rosterMatch) resolvedStudentId = rosterMatch.id;
   }
 
   // Build subjectCode → id map
@@ -475,6 +508,12 @@ function mergeContext(result: Marksheet, context?: ParseContext): Marksheet {
   if (tenant?.fullName) student.fullName = tenant.fullName;
   if (tenant?.academicYearTitle && !student.sessionYear) {
     student.sessionYear = tenant.academicYearTitle;
+  }
+  // adminNo chain: table (stage 1) → roster (stage 2) → mentions (stage 3)
+  if (tenant?.admissionNo != null) {
+    student.adminNo = tenant.admissionNo;
+  } else if (rosterMatch?.admissionNo != null) {
+    student.adminNo = Number(rosterMatch.admissionNo) || 0;
   }
   student.token = `token-${student.adminNo || 0}`;
 
@@ -1096,4 +1135,98 @@ export function autoFixStructure(md: string, context?: ParseContext): AutoFixRes
     unresolved: finalDiags.filter((d) => d.severity === "error"),
     parsed,
   };
+}
+
+// ─── Markdown Generator ───────────────────────────────────────────────────────
+
+function escMd(val: string): string {
+  return val.replace(/\|/g, '\\|');
+}
+
+export function extractTableField(md: string, label: string): string | null {
+  const escapedLabel = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const re = new RegExp(`\\|\\s*${escapedLabel}\\s*\\|\\s*(.+?)\\s*\\|`, 'i');
+  const m = re.exec(md);
+  return m ? m[1].trim() : null;
+}
+
+export function generateMarksheetMarkdown(m: Marksheet): string {
+  const lines: string[] = [];
+
+  // H1 heading
+  const h1Title = m.student.title ? `${m.student.fullName} \u2014 ${m.student.title}` : m.student.fullName;
+  lines.push(`# ${h1Title}`, '');
+
+  // Student Information
+  lines.push('## Student Information', '');
+  lines.push('| Field | Details |');
+  lines.push('| --- | --- |');
+  const studentFields: [string, string][] = [
+    ['Full Name', m.student.fullName],
+    ['Admission No', String(m.student.adminNo)],
+    ['Class', m.student.className],
+    ['Section', m.student.sectionName],
+    ['Category', m.student.category],
+    ['Term', m.student.term],
+    ['Academic Year', m.student.sessionYear],
+    ['Days Open', String(m.student.daysOpened)],
+    ['Days Present', String(m.student.daysPresent)],
+    ['Days Absent', String(m.student.daysAbsent)],
+  ];
+  for (const [label, val] of studentFields) {
+    lines.push(`| ${escMd(label)} | ${escMd(val)} |`);
+  }
+  lines.push('');
+
+  // Academic Performance
+  lines.push('## Academic Performance', '');
+  const hasTitles = m.records[0]?.titles?.length > 0;
+
+  if (!hasTitles) {
+    lines.push('| Subject Code | Learning Outcome |');
+    lines.push('| --- | --- |');
+    for (const rec of m.records) {
+      const lo = rec.learningOutcome ?? '';
+      lines.push(`| ${escMd(rec.subjectCode)} | ${escMd(lo)} |`);
+    }
+  } else {
+    const titles = m.records[0]?.titles ?? [];
+    const fullMarks = m.records[0]?.fullMarks ?? [];
+    const headerCells = ['Subject Code'];
+    for (let i = 0; i < titles.length; i++) {
+      const maxStr = fullMarks[i] != null && fullMarks[i] > 0 ? ` (${fullMarks[i]})` : '';
+      headerCells.push(`${escMd(titles[i])}${maxStr}`);
+    }
+    lines.push(`| ${headerCells.join(' | ')} |`);
+    lines.push(`| ${headerCells.map(() => '---').join(' | ')} |`);
+    for (const rec of m.records) {
+      const rowCells = [escMd(rec.subjectCode)];
+      for (let i = 0; i < titles.length; i++) {
+        rowCells.push(String(rec.marks[i] ?? ''));
+      }
+      lines.push(`| ${rowCells.join(' | ')} |`);
+    }
+  }
+  lines.push('');
+
+  // Learner's Rating
+  if (m.ratings && m.ratings.length > 0) {
+    lines.push("## Learner's Rating", '');
+    lines.push('| Trait | Rating |');
+    lines.push('| --- | --- |');
+    for (const r of m.ratings) {
+      const attr = r.attribute ?? '';
+      const rate = r.rate != null ? String(r.rate) : '';
+      lines.push(`| ${escMd(attr)} | ${rate} |`);
+    }
+    lines.push('');
+  }
+
+  // Teacher's Remark
+  if (m.remark?.remark) {
+    lines.push("## Teacher's Remark", '');
+    lines.push(`> ${m.remark.remark}`);
+  }
+
+  return lines.join('\n');
 }

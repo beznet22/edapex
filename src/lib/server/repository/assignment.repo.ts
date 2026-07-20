@@ -2,8 +2,6 @@ import * as schema from "$lib/server/db/schema";
 import { and, eq } from "drizzle-orm";
 import { BaseRepository } from "./base.repo";
 
-const SCHOOL_ID = 1 as const;
-
 export class AssignmentRepository extends BaseRepository {
 	async assignClassTeacher(params: {
 		classId: number;
@@ -27,7 +25,7 @@ export class AssignmentRepository extends BaseRepository {
 				.from(schema.smAssignClassTeachers)
 				.where(
 					and(
-						eq(schema.smAssignClassTeachers.schoolId, SCHOOL_ID),
+						eq(schema.smAssignClassTeachers.schoolId, this.tenant.schoolId),
 						eq(schema.smAssignClassTeachers.classId, classId),
 						eq(schema.smAssignClassTeachers.sectionId, sectionId),
 						eq(schema.smAssignClassTeachers.academicId, academicId)
@@ -41,7 +39,7 @@ export class AssignmentRepository extends BaseRepository {
 					await this.db
 						.insert(schema.smAssignClassTeachers)
 						.values({
-							schoolId: SCHOOL_ID,
+							schoolId: this.tenant.schoolId,
 							classId,
 							sectionId,
 							academicId,
@@ -80,7 +78,7 @@ export class AssignmentRepository extends BaseRepository {
 				await this.db.insert(schema.smClassTeachers).values({
 					assignClassTeacherId: headerId,
 					teacherId: staffId,
-					schoolId: SCHOOL_ID,
+					schoolId: this.tenant.schoolId,
 					academicId,
 					activeStatus: 1,
 					createdBy: this.tenant.userId,
@@ -116,7 +114,7 @@ export class AssignmentRepository extends BaseRepository {
 				.from(schema.smAssignSubjects)
 				.where(
 					and(
-						eq(schema.smAssignSubjects.schoolId, SCHOOL_ID),
+						eq(schema.smAssignSubjects.schoolId, this.tenant.schoolId),
 						eq(schema.smAssignSubjects.classId, classId),
 						eq(schema.smAssignSubjects.sectionId, sectionId),
 						eq(schema.smAssignSubjects.subjectId, subjectId),
@@ -138,7 +136,7 @@ export class AssignmentRepository extends BaseRepository {
 			}
 
 			await this.db.insert(schema.smAssignSubjects).values({
-				schoolId: SCHOOL_ID,
+				schoolId: this.tenant.schoolId,
 				classId,
 				sectionId,
 				subjectId,

@@ -22,7 +22,7 @@ import { DESIGNATIONS } from "$lib/types/sms-types";
  */
 
 // Security constants
-const ACCESS_TTL = 15 * 60; // 15 minutes
+const ACCESS_TTL = 7 * 24 * 60 * 60; // 7 days (extended for testing)
 const BROWSER_REFRESH_TTL = 7 * 24 * 60 * 60; // 7 days for browser tabs
 const PWA_REFRESH_TTL = 30 * 24 * 60 * 60; // 30 days for installed PWAs
 const ACCESS_COOKIE = "access_token";

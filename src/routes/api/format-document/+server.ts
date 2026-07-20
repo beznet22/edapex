@@ -90,8 +90,9 @@ export const POST: RequestHandler = async ({ request, locals, cookies }) => {
     examTypeId,
   });
 
-  if (entry.status === 'Formatted') {
-    return json({ success: true, manifestStatus: 'Formatted', contentHash });
+	if (entry.status === 'Formatted') {
+		console.log('[format-document] already formatted, post-format identity:', { studentId: entry.studentId, admissionNo: entry.admissionNo, path: entry.path });
+		return json({ success: true, manifestStatus: 'Formatted', contentHash });
   }
 
   const mdRelPath = ocrMarkdownPath(entry.fileName!, examTypeId);
@@ -166,7 +167,7 @@ MIDDLEBASIC: Subject Code | MTA (30) | CA (10) | REPORT (10) | EXAM (50)`;
     '',
     'STUDENT ROSTER (admissionNo here is AUTHORITATIVE):',
     rosterLines || '  (no roster available)',
-    'Match the student Full Name from the OCR to this roster, then use the roster admissionNo in the Admission No field — NOT the value from the OCR.',
+    'If exactly one name matches, use the roster admissionNo in the Admission No field — NOT the value from the OCR. If multiple students share the same name, PRESERVE the admissionNo from the OCR input to disambiguate.',
     '',
     'SUBJECT CODES:',
     subjectLines || '  (no subjects available)',
@@ -253,11 +254,61 @@ MIDDLEBASIC: Subject Code | MTA (30) | CA (10) | REPORT (10) | EXAM (50)`;
     await updateEntry(tenant, entry.path, { status: 'Formatted' }, examTypeId);
   }
 
+  // Parse generated marksheet to resolve student identity
+  const { parseMarksheetMarkdown } = await import('$lib/utils/marksheet-ast-parser');
+  let parsedAdmNo: number | null = null;
+  let resolvedStudentId: number | null = entry.studentId ?? null;
+  let resolvedAdmNo: number | null = null;
+  let studentFullName: string | null = null;
+  let resolutionError: string | null = null;
+  try {
+    const parsed = parseMarksheetMarkdown(markdown);
+    parsedAdmNo = parsed.student?.adminNo != null ? Number(parsed.student.adminNo) : null;
+    studentFullName = parsed.student?.fullName ?? null;
+    console.log('[format-document] post-format parse result', { parsedAdmNo, studentFullName, adminNoRaw: parsed.student?.adminNo });
+    if (parsedAdmNo) {
+      const roster = await getClassRoster({
+        classId: tenant.classId ?? undefined,
+        sectionId: tenant.sectionId ?? undefined,
+        academicId: tenant.academicId ?? undefined,
+      });
+      const match = roster.find(
+        (r: { admissionNo?: string | number | null }) => r.admissionNo != null && Number(r.admissionNo) === parsedAdmNo
+      );
+      if (match) {
+        resolvedStudentId = match.id;
+        resolvedAdmNo = parsedAdmNo;
+      } else {
+        resolutionError = `Student with Admission No ${parsedAdmNo} not found in class roster`;
+      }
+    }
+  } catch {
+    // Parsing is best-effort — don't block the format response
+  }
+
+  const entryUpdate: Record<string, unknown> = {};
+  if (resolvedStudentId) entryUpdate.studentId = resolvedStudentId;
+  if (resolvedAdmNo) entryUpdate.admissionNo = resolvedAdmNo;
+  if (resolutionError) {
+    entryUpdate.validationErrors = [resolutionError];
+    entryUpdate.validationErrorCount = 1;
+  }
+  if (Object.keys(entryUpdate).length > 0) {
+    await updateEntry(tenant, initialMarkdownPath, entryUpdate as Partial<import('$lib/server/workspace/manifest').ManifestEntry>, examTypeId);
+    if (entry.path) {
+      await updateEntry(tenant, entry.path, entryUpdate as Partial<import('$lib/server/workspace/manifest').ManifestEntry>, examTypeId);
+    }
+  }
+
   return json({
     success: true,
     manifestStatus: 'Formatted',
     contentHash,
     initialMarkdownPath,
+    studentId: resolvedStudentId,
+    admissionNo: resolvedAdmNo,
+    studentFullName,
+    error: resolutionError,
   });
   } catch (e: unknown) {
     const message = e instanceof Error ? e.message : String(e);

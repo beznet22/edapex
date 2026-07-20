@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { createTool } from "@mastra/core/tools";
 import type { ToolExecutionContext } from "@mastra/core/tools";
+import { bridgeToolContext } from "../../internal/bridge";
 import {
   validateRoleWhitelist,
   type MastraToolContext,
@@ -72,14 +73,6 @@ export const assignStaffToClassLogic = async (
   }
 };
 
-function assertMastraToolContext(
-  context: ToolExecutionContext,
-): asserts context is MastraToolContext & ToolExecutionContext {
-  if (!("tenantContext" in context) || !("getRepo" in context)) {
-    throw new Error("Invalid tool execution context: expected MastraToolContext");
-  }
-}
-
 export const assignStaffToClassTool = createTool({
   id: "assign-staff-to-class",
   description:
@@ -87,8 +80,8 @@ export const assignStaffToClassTool = createTool({
   inputSchema: assignStaffToClassSchema,
   requireApproval: true,
   execute: async (input: AssignStaffToClassPayload, context: ToolExecutionContext) => {
-    assertMastraToolContext(context);
-    return assignStaffToClassLogic(context, input);
+    const ctx = await bridgeToolContext(context);
+    return assignStaffToClassLogic(ctx, input);
   },
   toModelOutput: (output: unknown) => formatAssignmentOutput(output),
 });

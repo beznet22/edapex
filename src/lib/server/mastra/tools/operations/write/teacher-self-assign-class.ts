@@ -1,10 +1,10 @@
 import { z } from "zod";
 import { createTool } from "@mastra/core/tools";
 import type { ToolExecutionContext } from "@mastra/core/tools";
+import { bridgeToolContext } from "../../internal/bridge";
 import {
-  ForbiddenError,
+  validateRoleWhitelist,
   type MastraToolContext,
-  type TenantContext,
 } from "../../../tenant-context";
 import { AssignmentRepository } from "../../../../repository/assignment.repo";
 
@@ -28,12 +28,6 @@ type AssignmentError = {
 };
 
 type AssignmentResult = AssignmentSuccess | AssignmentError;
-
-function validateIsStaff(context: TenantContext): void {
-  if (context.staffId <= 0) {
-    throw new ForbiddenError();
-  }
-}
 
 function formatAssignmentOutput(output: unknown): string {
   if (
@@ -60,7 +54,7 @@ export const teacherSelfAssignClassLogic = async (
   context: MastraToolContext,
   params: TeacherSelfAssignClassPayload,
 ): Promise<AssignmentResult> => {
-  validateIsStaff(context.tenantContext);
+  validateRoleWhitelist(context.tenantContext, [1, 5, 8]);
 
   const repo = context.getRepo(AssignmentRepository);
   try {
@@ -78,14 +72,6 @@ export const teacherSelfAssignClassLogic = async (
   }
 };
 
-function assertMastraToolContext(
-  context: ToolExecutionContext,
-): asserts context is MastraToolContext & ToolExecutionContext {
-  if (!("tenantContext" in context) || !("getRepo" in context)) {
-    throw new Error("Invalid tool execution context: expected MastraToolContext");
-  }
-}
-
 export const teacherSelfAssignClassTool = createTool({
   id: "teacher-self-assign-class",
   description:
@@ -93,8 +79,8 @@ export const teacherSelfAssignClassTool = createTool({
   inputSchema: teacherSelfAssignClassSchema,
   requireApproval: true,
   execute: async (input: TeacherSelfAssignClassPayload, context: ToolExecutionContext) => {
-    assertMastraToolContext(context);
-    return teacherSelfAssignClassLogic(context, input);
+    const ctx = await bridgeToolContext(context);
+    return teacherSelfAssignClassLogic(ctx, input);
   },
   toModelOutput: (output: unknown) => formatAssignmentOutput(output),
 });

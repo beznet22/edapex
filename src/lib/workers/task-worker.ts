@@ -563,11 +563,11 @@ async function runFilePipeline(
 }
 
 async function runOcrSingle(
-  taskId: string,
-  key: string,
-  tenant: SerializedTenant,
+	taskId: string,
+	key: string,
+	tenant: SerializedTenant,
 ): Promise<void> {
-  await runOcrBatch(taskId, [key], tenant);
+	await runOcrBatch(taskId, [key], tenant);
 }
 
 /**
@@ -577,123 +577,123 @@ async function runOcrSingle(
  * main-thread countdown UI.
  */
 async function runFormatBatch(
-  taskId: string,
-  keys: string[],
-  tenant: SerializedTenant,
-  contentHashes?: Record<string, string>,
+	taskId: string,
+	keys: string[],
+	tenant: SerializedTenant,
+	contentHashes?: Record<string, string>,
 ): Promise<void> {
-  const abortController = new AbortController();
-  abortControllers.set(taskId, abortController);
-  postProgress(taskId, 0, `Formatting ${keys.length} file(s)…`);
+	const abortController = new AbortController();
+	abortControllers.set(taskId, abortController);
+	postProgress(taskId, 0, `Formatting ${keys.length} file(s)…`);
 
-  // Build per-file state so we can emit progress
-  const states: UploadFileState[] = keys.map((key) => ({
-    key,
-    name: key.split('/').pop() ?? key,
-    status: "formatting" as const,
-  }));
-  emit({ type: "file-update", taskId, files: states.map((s) => ({ ...s })) });
+	// Build per-file state so we can emit progress
+	const states: UploadFileState[] = keys.map((key) => ({
+		key,
+		name: key.split('/').pop() ?? key,
+		status: "formatting" as const,
+	}));
+	emit({ type: "file-update", taskId, files: states.map((s) => ({ ...s })) });
 
-  const results: BatchExtractResult[] = [];
-  let succeededCount = 0;
-  let failedCount = 0;
+	const results: BatchExtractResult[] = [];
+	let succeededCount = 0;
+	let failedCount = 0;
 
-  for (const key of keys) {
-    if (cancelledTasks.has(taskId)) { postCancelled(taskId, { succeeded: succeededCount, failed: failedCount, results }); return; }
+	for (const key of keys) {
+		if (cancelledTasks.has(taskId)) { postCancelled(taskId, { succeeded: succeededCount, failed: failedCount, results }); return; }
 
-    const s = states.find((st) => st.key === key);
-    if (!s) continue;
+		const s = states.find((st) => st.key === key);
+		if (!s) continue;
 
-    s.status = "formatting";
-    emit({ type: "file-update", taskId, files: states.map((x) => ({ ...x })) });
+		s.status = "formatting";
+		emit({ type: "file-update", taskId, files: states.map((x) => ({ ...x })) });
 
-    const fileName = s.name;
-    const hash = contentHashes?.[key] ?? key;
+		const fileName = s.name;
+		const hash = contentHashes?.[key] ?? key;
 
-    let formatAttempt = 0;
-    const maxFormatAttempts = 3;
-    let formatSuccess = false;
+		let formatAttempt = 0;
+		const maxFormatAttempts = 3;
+		let formatSuccess = false;
 
-    while (formatAttempt < maxFormatAttempts && !formatSuccess) {
-      if (cancelledTasks.has(taskId)) { postCancelled(taskId, { succeeded: succeededCount, failed: failedCount, results }); return; }
+		while (formatAttempt < maxFormatAttempts && !formatSuccess) {
+			if (cancelledTasks.has(taskId)) { postCancelled(taskId, { succeeded: succeededCount, failed: failedCount, results }); return; }
 
-      try {
-        const formatRes = await fetchWithTimeout(
-          "/api/format-document",
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ contentHash: hash, fileName, examTypeId: tenant.examTypeId }),
-            signal: abortController.signal,
-          },
-          120000,
-        );
+			try {
+				const formatRes = await fetchWithTimeout(
+					"/api/format-document",
+					{
+						method: "POST",
+						headers: { "Content-Type": "application/json" },
+						body: JSON.stringify({ contentHash: hash, fileName, examTypeId: tenant.examTypeId }),
+						signal: abortController.signal,
+					},
+					120000,
+				);
 
-        const formatBody = await formatRes.json() as {
-          success?: boolean;
-          rateLimited?: boolean;
-          retryAfterSeconds?: number;
-          resetAt?: string;
-          error?: string;
-          manifestStatus?: string;
-        };
+				const formatBody = await formatRes.json() as {
+					success?: boolean;
+					rateLimited?: boolean;
+					retryAfterSeconds?: number;
+					resetAt?: string;
+					error?: string;
+					manifestStatus?: string;
+				};
 
-        if (formatBody.rateLimited) {
-          const waitSecs = formatBody.retryAfterSeconds ?? 5;
-          emit({ type: "rate-limited", taskId, retryAfterSeconds: waitSecs, resetAt: formatBody.resetAt ?? new Date(Date.now() + waitSecs * 1000).toISOString() });
-          if (cancelledTasks.has(taskId)) { postCancelled(taskId, { succeeded: succeededCount, failed: failedCount, results }); return; }
-          await new Promise<void>((r) => setTimeout(r, waitSecs * 1000));
-          formatAttempt++;
-          continue;
-        }
+				if (formatBody.rateLimited) {
+					const waitSecs = formatBody.retryAfterSeconds ?? 5;
+					emit({ type: "rate-limited", taskId, retryAfterSeconds: waitSecs, resetAt: formatBody.resetAt ?? new Date(Date.now() + waitSecs * 1000).toISOString() });
+					if (cancelledTasks.has(taskId)) { postCancelled(taskId, { succeeded: succeededCount, failed: failedCount, results }); return; }
+					await new Promise<void>((r) => setTimeout(r, waitSecs * 1000));
+					formatAttempt++;
+					continue;
+				}
 
-        if (!formatRes.ok || !formatBody.success) {
-          s.status = "error";
-          s.error = formatBody.error ?? `HTTP ${formatRes.status}`;
-          emit({ type: "file-update", taskId, files: states.map((x) => ({ ...x })) });
-          results.push({ key, status: "error", error: s.error });
-          failedCount++;
-          formatSuccess = true;
-          break;
-        }
+				if (!formatRes.ok || !formatBody.success) {
+					s.status = "error";
+					s.error = formatBody.error ?? `HTTP ${formatRes.status}`;
+					emit({ type: "file-update", taskId, files: states.map((x) => ({ ...x })) });
+					results.push({ key, status: "error", error: s.error });
+					failedCount++;
+					formatSuccess = true;
+					break;
+				}
 
-        s.status = "completed";
-        s.manifestStatus = formatBody.manifestStatus ?? "Formatted";
-        emit({ type: "file-update", taskId, files: states.map((x) => ({ ...x })) });
-        results.push({ key, status: "success", manifestStatus: s.manifestStatus });
-        succeededCount++;
-        formatSuccess = true;
-      } catch (err) {
-        if (err instanceof DOMException && (err.name === "AbortError" || err.name === "TimeoutError")) {
-          postCancelled(taskId, { succeeded: succeededCount, failed: failedCount, results });
-          return;
-        }
-        s.status = "error";
-        s.error = err instanceof Error ? err.message : String(err);
-        emit({ type: "file-update", taskId, files: states.map((x) => ({ ...x })) });
-        results.push({ key, status: "error", error: s.error });
-        failedCount++;
-        formatSuccess = true;
-        break;
-      }
-    }
+				s.status = "completed";
+				s.manifestStatus = formatBody.manifestStatus ?? "Formatted";
+				emit({ type: "file-update", taskId, files: states.map((x) => ({ ...x })) });
+				results.push({ key, status: "success", manifestStatus: s.manifestStatus });
+				succeededCount++;
+				formatSuccess = true;
+			} catch (err) {
+				if (err instanceof DOMException && (err.name === "AbortError" || err.name === "TimeoutError")) {
+					postCancelled(taskId, { succeeded: succeededCount, failed: failedCount, results });
+					return;
+				}
+				s.status = "error";
+				s.error = err instanceof Error ? err.message : String(err);
+				emit({ type: "file-update", taskId, files: states.map((x) => ({ ...x })) });
+				results.push({ key, status: "error", error: s.error });
+				failedCount++;
+				formatSuccess = true;
+				break;
+			}
+		}
 
-    if (!formatSuccess) {
-      s.status = "error";
-      s.error = `Format failed after ${maxFormatAttempts} retries (rate limited)`;
-      emit({ type: "file-update", taskId, files: states.map((x) => ({ ...x })) });
-      results.push({ key, status: "error", error: s.error });
-      failedCount++;
-    }
+		if (!formatSuccess) {
+			s.status = "error";
+			s.error = `Format failed after ${maxFormatAttempts} retries (rate limited)`;
+			emit({ type: "file-update", taskId, files: states.map((x) => ({ ...x })) });
+			results.push({ key, status: "error", error: s.error });
+			failedCount++;
+		}
 
-    postProgress(taskId, (succeededCount + failedCount) / keys.length, `${succeededCount} formatted, ${failedCount} failed`);
-  }
+		postProgress(taskId, (succeededCount + failedCount) / keys.length, `${succeededCount} formatted, ${failedCount} failed`);
+	}
 
-  if (failedCount > 0) {
-    postFailed(taskId, `${failedCount} of ${keys.length} failed`, { succeeded: succeededCount, failed: failedCount, results });
-  } else {
-    postCompleted(taskId, { succeeded: succeededCount, failed: failedCount, results });
-  }
+	if (failedCount > 0) {
+		postFailed(taskId, `${failedCount} of ${keys.length} failed`, { succeeded: succeededCount, failed: failedCount, results });
+	} else {
+		postCompleted(taskId, { succeeded: succeededCount, failed: failedCount, results });
+	}
 }
 
 async function runTask(taskId: string, spec: TaskSpec): Promise<void> {

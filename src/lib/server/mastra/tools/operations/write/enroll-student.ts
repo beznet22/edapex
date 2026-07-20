@@ -132,9 +132,9 @@ export const onboardEntityLogic = async (
       guardiansEmail: payload.guardianDetails.email,
     };
 
-    const result = await studentRepo.creatStudentIfNotExists(createInput);
+    const result = await studentRepo.createStudentIfNotExists(createInput);
 
-    const resultRecord = result as { id: number; admissionNo: number | null };
+    const resultRecord = result;
 
     const auditDescription = JSON.stringify({
       action: "onboard",
@@ -177,14 +177,6 @@ export const onboardEntityLogic = async (
     };
   }
 };
-
-function assertMastraToolContext(
-  context: ToolExecutionContext,
-): asserts context is MastraToolContext & ToolExecutionContext {
-  if (!("tenantContext" in context) || !("getRepo" in context)) {
-    throw new Error("Invalid tool execution context: expected MastraToolContext");
-  }
-}
 
 export const enrollStudentTool = createTool({
   id: "enroll-student",

@@ -106,14 +106,6 @@ export const assignEntityLogic = async (
   }
 };
 
-function assertMastraToolContext(
-  context: ToolExecutionContext,
-): asserts context is MastraToolContext & ToolExecutionContext {
-  if (!("tenantContext" in context) || !("getRepo" in context)) {
-    throw new Error("Invalid tool execution context: expected MastraToolContext");
-  }
-}
-
 export const transferStudentTool = createTool({
   id: "transfer-student",
   description: "Transfer an enrolled student to a different class or section within the active school.",

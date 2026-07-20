@@ -1,22 +1,14 @@
 import { z } from "zod";
-import { eq } from "drizzle-orm";
 import { createTool } from "@mastra/core/tools";
 import type { ToolExecutionContext } from "@mastra/core/tools";
+import { bridgeToolContext } from "../../internal/bridge";
+import { parseDateOfBirth, formatToolOutput } from "../../internal/write-tool-utils";
 import {
   validateRoleWhitelist,
   type MastraToolContext,
 } from "../../../tenant-context";
 import { StaffRepository } from "../../../../repository/staff.repo";
 import { StudentRepository } from "../../../../repository/student.repo";
-import { smStaffs, smDesignations, smHumanDepartments } from "../../../../db/sms-schema";
-
-const DESIGNATION_SLUG_TO_ID: Record<string, number> = {
-  it: 1,
-  coordinator: 5,
-  class_teacher: 8,
-  principal: 3,
-  admin: 4,
-} as const;
 
 const DESIGNATION_TO_ROLE_ID: Record<number, number> = {
   1: 1,
@@ -46,13 +38,6 @@ function normalizeSlug(value: string): string {
   return value.trim().toLowerCase().replace(/\s+/g, "_");
 }
 
-function parseDateOfBirth(value: string | undefined): Date | undefined {
-  if (!value) return undefined;
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return undefined;
-  return date;
-}
-
 async function resolveGenderId(context: MastraToolContext, gender: string): Promise<number | null> {
   const studentRepo = context.getRepo(StudentRepository);
   return studentRepo.resolveGenderId(gender);
@@ -62,30 +47,14 @@ async function resolveDesignationId(
   staffRepo: StaffRepository,
   designation: string,
 ): Promise<number | null> {
-  const slug = normalizeSlug(designation);
-  const mapped = DESIGNATION_SLUG_TO_ID[slug];
-  if (mapped) return mapped;
-
-  const [row] = await staffRepo.db
-    .select({ id: smDesignations.id })
-    .from(smDesignations)
-    .where(eq(smDesignations.title, designation))
-    .limit(1);
-
-  return row?.id ?? null;
+  return staffRepo.resolveDesignationId(designation);
 }
 
 async function resolveDepartmentId(
   staffRepo: StaffRepository,
   department: string,
 ): Promise<number | null> {
-  const [row] = await staffRepo.db
-    .select({ id: smHumanDepartments.id })
-    .from(smHumanDepartments)
-    .where(eq(smHumanDepartments.name, department))
-    .limit(1);
-
-  return row?.id ?? null;
+  return staffRepo.resolveDepartmentId(department);
 }
 
 function resolveRoleId(designationId: number): number {
@@ -141,16 +110,9 @@ export const enrollStaffLogic = async (
       genderId,
       qualification: params.qualification,
       experience: params.experience,
+      dateOfBirth: parseDateOfBirth(params.dateOfBirth),
       schoolId: context.tenantContext.schoolId,
     });
-
-    const dob = parseDateOfBirth(params.dateOfBirth);
-    if (dob && result.id) {
-      await staffRepo.db
-        .update(smStaffs)
-        .set({ dateOfBirth: dob })
-        .where(eq(smStaffs.id, result.id));
-    }
 
     return {
       status: "SUCCESS" as const,
@@ -176,47 +138,14 @@ export const enrollStaffLogic = async (
   }
 };
 
-function assertMastraToolContext(context: ToolExecutionContext): asserts context is MastraToolContext & ToolExecutionContext {
-  if (!("tenantContext" in context) || !("getRepo" in context)) {
-    throw new Error("Invalid tool execution context: expected MastraToolContext");
-  }
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
-}
-
-function hasStringStatus(value: Record<string, unknown>): value is Record<string, unknown> & { status: string } {
-  return typeof value.status === "string";
-}
-
-function formatToolOutput(output: unknown): unknown {
-  if (!isRecord(output) || !hasStringStatus(output)) {
-    return JSON.stringify(output);
-  }
-
-  if (output.status === "SUCCESS") {
-    const staffId = output.staffId;
-    const userId = output.userId;
-    const email = output.email;
-    const password = output.temporaryPassword;
-    if (typeof staffId === "number" && typeof userId === "number" && typeof email === "string" && typeof password === "string") {
-      return `Staff enrolled successfully. Staff ID: ${staffId}, User ID: ${userId}, Email: ${email}, Temporary Password: ${password}`;
-    }
-    return typeof output.message === "string" ? output.message : "Staff operation completed successfully.";
-  }
-
-  return typeof output.message === "string" ? output.message : JSON.stringify(output);
-}
-
 export const enrollStaffTool = createTool({
   id: "enroll-staff",
   description: "Enroll a new staff member into the school with a temporary password.",
   inputSchema: enrollStaffSchema,
   requireApproval: true,
   execute: async (inputData: EnrollStaffPayload, context: ToolExecutionContext) => {
-    assertMastraToolContext(context);
-    return enrollStaffLogic(context, inputData);
+    const ctx = await bridgeToolContext(context);
+    return enrollStaffLogic(ctx, inputData);
   },
   toModelOutput: (output: unknown) => formatToolOutput(output),
 });

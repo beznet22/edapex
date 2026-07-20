@@ -111,6 +111,7 @@ export class StaffRepository extends BaseRepository {
     genderId: number;
     qualification?: string;
     experience?: string;
+    dateOfBirth?: Date;
     schoolId?: number;
   }) {
     // Check if user already exists outside withErrorHandling to avoid generic DB error wrapping
@@ -149,6 +150,7 @@ export class StaffRepository extends BaseRepository {
         departmentId: input.departmentId,
         roleId: input.roleId,
         genderId: input.genderId,
+        dateOfBirth: input.dateOfBirth,
         userId: userId,
         schoolId,
         activeStatus: 1,
@@ -162,6 +164,107 @@ export class StaffRepository extends BaseRepository {
         password, // Return plain password for the UI to show once
       };
     }, "createStaff");
+  }
+
+  async updateStaff(params: {
+    staffId: number;
+    firstName?: string;
+    lastName?: string;
+    mobile?: string;
+    email?: string;
+    qualification?: string;
+    experience?: string;
+    dateOfBirth?: Date;
+  }) {
+    return this.withErrorHandling(async () => {
+      const { staffId, firstName, lastName, mobile, email, qualification, experience, dateOfBirth } = params;
+      const [staff] = await this.db.select().from(smStaffs).where(eq(smStaffs.id, staffId)).limit(1);
+      if (!staff) throw new Error("STAFF_NOT_FOUND");
+
+      const staffUpdate: Record<string, unknown> = {};
+      if (firstName !== undefined) staffUpdate.firstName = firstName;
+      if (lastName !== undefined) staffUpdate.lastName = lastName;
+      if (mobile !== undefined) staffUpdate.mobile = mobile;
+      if (email !== undefined) staffUpdate.email = email;
+      if (qualification !== undefined) staffUpdate.qualification = qualification;
+      if (experience !== undefined) staffUpdate.experience = experience;
+      if (dateOfBirth !== undefined) staffUpdate.dateOfBirth = dateOfBirth;
+
+      const resolvedFirstName = firstName ?? staff.firstName;
+      const resolvedLastName = lastName ?? staff.lastName;
+      const fullName = `${resolvedFirstName} ${resolvedLastName}`.trim();
+      if (firstName !== undefined || lastName !== undefined) {
+        staffUpdate.fullName = fullName;
+      }
+
+      if (Object.keys(staffUpdate).length > 0) {
+        await this.db.update(smStaffs).set(staffUpdate).where(eq(smStaffs.id, staffId));
+      }
+
+      const userUpdate: Record<string, unknown> = {};
+      if (firstName !== undefined || lastName !== undefined) userUpdate.fullName = fullName;
+      if (email !== undefined) userUpdate.email = email;
+      if (mobile !== undefined) userUpdate.phoneNumber = mobile;
+
+      if (Object.keys(userUpdate).length > 0 && staff.userId) {
+        await this.db.update(users).set(userUpdate).where(eq(users.id, staff.userId));
+      }
+
+      return { success: true, staffId, fullName };
+    }, "updateStaff");
+  }
+
+  async updateStaffPhoto(staffId: number, photoPath: string) {
+    const [updated] = await this.db
+      .update(smStaffs)
+      .set({ staffPhoto: photoPath })
+      .where(eq(smStaffs.id, staffId));
+    return updated.affectedRows > 0;
+  }
+
+  async resolveDesignationId(name: string): Promise<number | null> {
+    if (!name) return null;
+    return this.withErrorHandling(async () => {
+      const normalized = name.trim().toLowerCase().replace(/\s+/g, "_");
+      const [row] = await this.db
+        .select({ id: smDesignations.id })
+        .from(smDesignations)
+        .where(
+          and(
+            eq(smDesignations.activeStatus, 1),
+            eq(smDesignations.title, normalized),
+          ),
+        )
+        .limit(1);
+      return row?.id ?? null;
+    }, "resolveDesignationId");
+  }
+
+  async resolveDepartmentId(name: string): Promise<number | null> {
+    if (!name) return null;
+    return this.withErrorHandling(async () => {
+      const [row] = await this.db
+        .select({ id: smHumanDepartments.id })
+        .from(smHumanDepartments)
+        .where(
+          and(
+            eq(smHumanDepartments.activeStatus, 1),
+            eq(smHumanDepartments.name, name),
+          ),
+        )
+        .limit(1);
+      return row?.id ?? null;
+    }, "resolveDepartmentId");
+  }
+
+  async getStaffByEmail(email: string): Promise<StaffRow | null> {
+    if (!email) return null;
+    const [staff] = await this.db
+      .select()
+      .from(smStaffs)
+      .where(eq(smStaffs.email, email))
+      .limit(1);
+    return staff ?? null;
   }
 
   async searchStaff(filters: { departmentId?: number; designationId?: number }) {

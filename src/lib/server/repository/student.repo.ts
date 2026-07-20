@@ -1,6 +1,6 @@
 // /src/lib/server/repository/student.repo.ts
 
-import { and, count, eq, isNotNull, ne, sql, like, or, desc, asc, inArray } from "drizzle-orm";
+import { and, count, eq, isNotNull, ne, sql, like, or, desc, asc, inArray, type InferInsertModel } from "drizzle-orm";
 import { type MySQLDrizzleClient } from "./base.repo";
 import {
   classAttendances,
@@ -100,7 +100,7 @@ export class StudentRepository extends BaseRepository {
    * @param input - Minimal required data for creating a student
    * @returns The existing or newly created student record
    */
-  async creatStudentIfNotExists(input: CreateStudentInput) {
+  async createStudentIfNotExists(input: CreateStudentInput): Promise<typeof smStudents.$inferSelect & { studentPassword: string; parentPassword: string | undefined }> {
     const {
       admissionNo,
       firstName,
@@ -632,6 +632,114 @@ export class StudentRepository extends BaseRepository {
   /** Alias for test compatibility and Mastra tool contracts */
   async getById(id?: number, isAdminNo = false): Promise<StudentDetails | null> {
     return this.getStudentById(id, isAdminNo);
+  }
+
+  /**
+   * Returns a full raw student row by id (not the detailed join StudentDetails).
+   * Used by demoteStudentTool to get current class/section/session.
+   */
+  async getRawStudentById(studentId: number): Promise<typeof smStudents.$inferSelect | null> {
+    if (!studentId) return null;
+    const [student] = await this.db
+      .select()
+      .from(smStudents)
+      .where(eq(smStudents.id, studentId))
+      .limit(1);
+    return student ?? null;
+  }
+
+  /**
+   * Get the latest promotion record for a student.
+   */
+  async getLatestPromotion(studentId: number): Promise<typeof smStudentPromotions.$inferSelect | null> {
+    const [record] = await this.db
+      .select()
+      .from(smStudentPromotions)
+      .where(eq(smStudentPromotions.studentId, studentId))
+      .orderBy(desc(smStudentPromotions.id))
+      .limit(1);
+    return record ?? null;
+  }
+
+  /**
+   * Revert a student promotion: deactivates the current default record,
+   * reactivates the previous record, and updates smStudents back.
+   * Returns the promotion details needed for audit logging.
+   */
+  async demoteStudent(params: {
+    studentId: number;
+    promotionId: number;
+    currentClassId: number;
+    currentSectionId: number;
+    currentSessionId: number;
+    previousClassId: number;
+    previousSectionId: number;
+    previousSessionId: number;
+    previousRollNumber: number | null;
+  }) {
+    return this.withErrorHandling(async () => {
+      const { studentId, promotionId, currentClassId, currentSectionId, currentSessionId, previousClassId, previousSectionId, previousSessionId, previousRollNumber } = params;
+
+      await this.db.transaction(async (tx) => {
+        const [currentRecord] = await tx
+          .select({ id: studentRecords.id })
+          .from(studentRecords)
+          .where(
+            and(
+              eq(studentRecords.studentId, studentId),
+              eq(studentRecords.classId, currentClassId),
+              eq(studentRecords.sectionId, currentSectionId),
+              eq(studentRecords.academicId, currentSessionId),
+              eq(studentRecords.isDefault, 1),
+            ),
+          )
+          .limit(1);
+
+        const [previousRecord] = await tx
+          .select({ id: studentRecords.id })
+          .from(studentRecords)
+          .where(
+            and(
+              eq(studentRecords.studentId, studentId),
+              eq(studentRecords.classId, previousClassId),
+              eq(studentRecords.sectionId, previousSectionId),
+              eq(studentRecords.academicId, previousSessionId),
+            ),
+          )
+          .limit(1);
+
+        if (currentRecord) {
+          await tx
+            .update(studentRecords)
+            .set({ isDefault: 0, activeStatus: 0 })
+            .where(eq(studentRecords.id, currentRecord.id));
+        }
+
+        if (previousRecord) {
+          await tx
+            .update(studentRecords)
+            .set({ isDefault: 1, isPromote: 0, activeStatus: 1 })
+            .where(eq(studentRecords.id, previousRecord.id));
+        }
+
+        await tx
+          .update(smStudents)
+          .set({
+            classId: previousClassId,
+            sectionId: previousSectionId,
+            sessionId: previousSessionId,
+            academicId: previousSessionId,
+            rollNo: previousRollNumber,
+          })
+          .where(eq(smStudents.id, studentId));
+
+        await tx
+          .delete(smStudentPromotions)
+          .where(eq(smStudentPromotions.id, promotionId));
+      });
+
+      return { success: true, studentId, previousClassId, previousSectionId, previousSessionId };
+    }, "demoteStudent");
   }
 
   /** Slice 1: Resolve a genderId from a human-readable gender name. Returns null if not found. */

@@ -31,6 +31,8 @@
 		type DocumentStreamEntry,
 	} from "$lib/context/thread-data.svelte";
 	import Markdown from "$lib/components/prompt-kit/markdown/Markdown.svelte";
+	import AlertCircleIcon from "@lucide/svelte/icons/alert-circle";
+	import RefreshCwIcon from "@lucide/svelte/icons/refresh-cw";
 	import { autoFixStructure } from "$lib/utils/marksheet-ast-parser";
 
 	let {
@@ -206,13 +208,9 @@
 		return `/api/file/${swapped}`;
 	});
 
-	let viewMode = $state<"markdown" | "validate" | "pdf">("markdown");
+	let viewMode = $state<"markdown" | "pdf">("markdown");
 	let pdfAvailable = $state(false);
 	let pdfProbeSeq = 0;
-
-	let validateLoading = $state(false);
-	let validateLoadingText = $state("");
-	let validationExplanation = $state<string | null>(null);
 
 	$effect(() => {
 		const url = pdfUrl;
@@ -265,59 +263,24 @@
 		}
 	}
 
-	function extractStudentIds(): {
-		studentId: number | null;
-		examTypeId: number | null;
-		academicId: number | null;
-		studentFullName: string | null;
-		adminNo: number | null;
-	} {
-		if (toolOutput) {
-			return {
-				studentId: toolOutput.studentId ?? null,
-				examTypeId: toolOutput.examTypeId ?? null,
-				academicId: toolOutput.academicId ?? null,
-				studentFullName: toolOutput.studentFullName ?? null,
-				adminNo: toolOutput.adminNo ?? null,
-			};
-		}
-		if (current?.id) {
-			const match = current.id.match(/^pdf-(\d+)-(\d+)$/);
-			if (match) {
-				return {
-					studentId: Number(match[1]),
-					examTypeId: Number(match[2]),
-					academicId: null,
-					studentFullName: null,
-					adminNo: null,
-				};
-			}
-		}
-		const path = persistedMarkdownPath ?? validatePath;
+	function extractStudentIdentifier(): { admissionNo?: number; studentId?: number; filePath?: string } {
+		if (toolOutput?.adminNo) return { admissionNo: toolOutput.adminNo };
+		if (toolOutput?.studentId) return { studentId: toolOutput.studentId };
+		if (current?.admissionNo) return { admissionNo: current.admissionNo };
+		if (current?.studentId) return { studentId: current.studentId };
+		const path = persistedMarkdownPath ?? current?.url;
 		if (path) {
-			const match = path.match(/ADM(\d+)-(\d+)-(.+?)\.md$/);
-			if (match) {
-				return {
-					adminNo: Number(match[1]),
-					studentId: null,
-					examTypeId: Number(match[2]),
-					academicId: null,
-					studentFullName: match[3].replace(/_/g, " ") ?? null,
-				};
-			}
+			const m = path.match(/ADM(\d+)/);
+			if (m) return { admissionNo: Number(m[1]) };
+			const filePath = path.replace(/^\/api\/file\//, "");
+			return { filePath };
 		}
-		return {
-			studentId: null,
-			examTypeId: null,
-			academicId: null,
-			studentFullName: null,
-			adminNo: null,
-		};
+		return {};
 	}
 
 	async function handleDownload() {
-		const ids = extractStudentIds();
-		if (!ids.studentId || !ids.examTypeId) {
+		const identifier = extractStudentIdentifier();
+		if (!identifier.admissionNo && !identifier.studentId && !identifier.filePath) {
 			if (current?.url) {
 				handleDownloadRaw();
 				return;
@@ -335,13 +298,7 @@
 			const res = await fetch("/api/results/generate-pdf", {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({
-					studentId: ids.studentId,
-					examTypeId: ids.examTypeId,
-					academicId: ids.academicId,
-					fullName: ids.studentFullName,
-					admissionNo: ids.adminNo,
-				}),
+				body: JSON.stringify({ ...identifier, includePdfBuffer: true }),
 			});
 			if (!res.ok) throw new Error(`HTTP ${res.status}`);
 			const data = await res.json();
@@ -374,50 +331,43 @@
 	}
 
 	async function handleToggleView() {
-		if (viewMode === "pdf" || viewMode === "validate") {
+		if (viewMode === "pdf") {
 			viewMode = "markdown";
-			return;
-		}
-		const committedOrPublished =
-			marksheetStatus === "committed" || marksheetStatus === "published";
-		if (!committedOrPublished) {
-			viewMode = "validate";
 			return;
 		}
 		if (pdfAvailable && pdfUrl) {
 			viewMode = "pdf";
 			return;
 		}
-		const ids = extractStudentIds();
-		if (!ids.studentId || !ids.examTypeId) {
+		if (current?.validationErrors?.some(e => e.includes("not found in class roster"))) {
 			import("svelte-sonner").then((m) =>
-				m.toast.error(
-					"No student data available — cannot generate PDF",
-				),
+				m.toast.error("Fix student admission number error before generating PDF"),
+			);
+			return;
+		}
+		const identifier = extractStudentIdentifier();
+		if (!identifier.admissionNo && !identifier.studentId && !identifier.filePath) {
+			import("svelte-sonner").then((m) =>
+				m.toast.error("No student data available — cannot generate PDF"),
 			);
 			return;
 		}
 
 		pdfGenerating = true;
+		viewMode = "pdf";
 		try {
 			const res = await fetch("/api/results/generate-pdf", {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({
-					studentId: ids.studentId,
-					examTypeId: ids.examTypeId,
-					academicId: ids.academicId,
-					fullName: ids.studentFullName,
-					admissionNo: ids.adminNo,
-				}),
+				body: JSON.stringify(identifier),
 			});
 			if (!res.ok) throw new Error(`HTTP ${res.status}`);
 			const data = await res.json();
 			if (data.error) throw new Error(data.error);
 
 			pdfStoragePath = data.storagePath;
-			viewMode = "pdf";
 		} catch (e) {
+			viewMode = "markdown";
 			import("svelte-sonner").then((m) =>
 				m.toast.error(
 					e instanceof Error ? e.message : "Failed to generate PDF",
@@ -425,59 +375,6 @@
 			);
 		} finally {
 			pdfGenerating = false;
-		}
-	}
-
-	async function handleValidate() {
-		const path = validatePath;
-		if (!path) {
-			import("svelte-sonner").then((m) =>
-				m.toast.error("No marksheet markdown to validate"),
-			);
-			return;
-		}
-
-		const ids = extractStudentIds();
-
-		validateLoading = true;
-		validateLoadingText = "Validating marksheet...";
-		validationExplanation = null;
-		try {
-			const res = await fetch("/api/results/validate-marksheet", {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({
-					studentId: ids.studentId,
-					examTypeId: ids.examTypeId,
-					academicId: ids.academicId,
-					admissionNo: ids.adminNo,
-					fullName: ids.studentFullName,
-					currentMarkdownPath: path,
-				}),
-			});
-			if (!res.ok) throw new Error(`HTTP ${res.status}`);
-			const data = await res.json();
-			if (data.ok) {
-				viewMode = "markdown";
-				import("svelte-sonner").then((m) =>
-					m.toast.success("Marksheet validated successfully"),
-				);
-			} else if (data.explanation) {
-				validationExplanation = data.explanation;
-			} else {
-				import("svelte-sonner").then((m) =>
-					m.toast.error(data.error ?? "Validation failed"),
-				);
-			}
-		} catch (e) {
-			import("svelte-sonner").then((m) =>
-				m.toast.error(
-					e instanceof Error ? e.message : "Validation failed",
-				),
-			);
-		} finally {
-			validateLoading = false;
-			validateLoadingText = "";
 		}
 	}
 
@@ -549,6 +446,70 @@
 		}
 	}
 
+	let validationState = $state<{ errors: string[]; errorCount: number }>({ errors: [], errorCount: 0 });
+	let aiFixing = $state(false);
+	let showValidationViewer = $state(false);
+
+	$effect(() => {
+		const a = current;
+		if (a?.validationErrors !== undefined || a?.validationErrorCount !== undefined) {
+			const errs = a.validationErrors ?? [];
+			validationState = { errors: errs, errorCount: a.validationErrorCount ?? errs.length };
+		}
+	});
+
+	const computedExamTypeId = $derived.by(() => {
+		if (toolOutput?.examTypeId) return toolOutput.examTypeId;
+		if (current?.examTypeId) return current.examTypeId;
+		const path = persistedMarkdownPath ?? validatePath;
+		if (path) {
+			const admMatch = path.match(/ADM(\d+)-(\d+)-(.+?)\.md$/);
+			if (admMatch) return Number(admMatch[2]);
+			const examTypeMatch = path.match(/examType-(\d+)/);
+			if (examTypeMatch) return Number(examTypeMatch[1]);
+		}
+		return null;
+	});
+
+	const computedArtifactId = $derived(
+		toolOutput?.artifactId ?? current?.id ?? ""
+	);
+
+	const marksheetFileUrl = $derived(
+		persistedMarkdownPath ?? validatePath ?? null
+	);
+
+	const isMarksheetFile = $derived(
+		(marksheetFileUrl ?? "").includes("marksheets/") ||
+		(marksheetFileUrl ?? "").match(/ADM\d+-\d+-.+\.md$/) !== null
+	);
+
+	const autoFixPath = $derived(
+		persistedMarkdownPath ?? validatePath ?? (current?.url?.replace(/^\/api\/file\//, "") ?? null)
+	);
+
+	async function handleAutoFix() {
+		if (!autoFixPath || !computedExamTypeId || aiFixing) return;
+		aiFixing = true;
+		try {
+			const res = await fetch(
+				`/api/file/${autoFixPath}?action=auto-fix&examTypeId=${computedExamTypeId}`,
+				{ method: "POST" }
+			);
+			if (!res.ok) return;
+			const data = await res.json();
+			const errors: string[] = data.errors ?? [];
+			validationState = { errors, errorCount: errors.length };
+			if (errors.length > 0) {
+				showValidationViewer = true;
+			}
+		} catch {
+			// silent
+		} finally {
+			aiFixing = false;
+		}
+	}
+
 	let publishDialogOpen = $state(false);
 	let publishState = $state<{
 		parentName: string;
@@ -581,27 +542,19 @@
 	}
 
 	async function handlePublishConfirm() {
-		if (!toolOutput) return;
-		const { studentId, examTypeId, academicId, studentFullName, adminNo } =
-			toolOutput;
-		if (!studentId || !examTypeId) return;
-
+		if (!toolOutput?.examTypeId) return;
+		if (!persistedMarkdownPath) return;
 		if (!publishState) return;
+
 		publishState.loading = true;
 		publishState.loadingText = "Generating PDF...";
 
 		try {
-			const res = await fetch("/api/results/publish-pdf", {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({
-					studentId,
-					examTypeId,
-					academicId,
-					fullName: studentFullName,
-					admissionNo: adminNo,
-				}),
+			const params = new URLSearchParams({
+				filePath: persistedMarkdownPath,
+				examTypeId: String(toolOutput.examTypeId),
 			});
+			const res = await fetch(`/api/publish?${params}`);
 			if (!res.ok) throw new Error(`HTTP ${res.status}`);
 			const data = await res.json();
 			publishDialogOpen = false;
@@ -836,18 +789,12 @@
 								class="size-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/40 disabled:opacity-40 disabled:pointer-events-none"
 								onclick={handleToggleView}
 								disabled={isStreaming ||
-									pdfGenerating ||
-									validateLoading}
-								aria-label={viewMode === "markdown"
-									? marksheetStatus === "committed" ||
-										marksheetStatus === "published"
-										? "View PDF"
-										: "Validate marksheet"
-									: "View markdown"}
+									pdfGenerating}
+								aria-label={viewMode === "pdf"
+									? "View markdown"
+									: "View PDF"}
 							>
 								{#if viewMode === "pdf"}
-									<EyeOffIcon class="size-4" />
-								{:else if viewMode === "validate"}
 									<EyeOffIcon class="size-4" />
 								{:else}
 									<EyeIcon class="size-4" />
@@ -858,14 +805,9 @@
 					<Tooltip.Content>
 						{viewMode === "pdf"
 							? "View markdown"
-							: viewMode === "validate"
-								? "View markdown"
-								: pdfGenerating
-									? "Generating PDF…"
-									: marksheetStatus === "committed" ||
-										  marksheetStatus === "published"
-										? "View PDF"
-										: "Validate marksheet"}
+							: pdfGenerating
+								? "Generating PDF…"
+								: "View PDF"}
 					</Tooltip.Content>
 				</Tooltip.Root>
 
@@ -955,47 +897,14 @@
 	</header>
 
 	<div class="flex-1 h-full relative group">
-		{#if viewMode === "validate"}
-			<div
-				class="h-full flex flex-col items-center justify-center gap-6 px-8"
-			>
-				{#if validateLoading}
-					<div class="flex flex-col items-center gap-3">
-						<div
-							class="size-6 border-2 border-primary border-t-transparent rounded-full animate-spin"
-						/>
-						<p class="text-sm text-muted-foreground">
-							{validateLoadingText}
-						</p>
-					</div>
-				{:else if validationExplanation}
-					<ScrollArea class="h-full w-full">
-						<div class="p-6 max-w-3xl mx-auto">
-							<Markdown content={validationExplanation} />
-						</div>
-					</ScrollArea>
-					<div class="pb-6 shrink-0">
-						<Button onclick={handleValidate}>
-							<CheckIcon class="size-4 mr-2" />
-							Retry validation
-						</Button>
-					</div>
-				{:else}
-					<div
-						class="flex flex-col items-center gap-4 max-w-md text-center"
-					>
-						<p class="text-sm text-muted-foreground">
-							Validate this marksheet to check for errors and
-							persist the structured data.
-						</p>
-						<Button size="lg" onclick={handleValidate}>
-							<CheckIcon class="size-4 mr-2" />
-							Validate marksheet
-						</Button>
-					</div>
-				{/if}
+		{#if viewMode === "pdf" && pdfGenerating}
+			<div class="h-full flex items-center justify-center">
+				<div class="flex flex-col items-center gap-3 text-muted-foreground">
+					<div class="size-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+					<span class="text-sm">Generating PDF…</span>
+				</div>
 			</div>
-		{:else if persistedMarkdownPath && viewMode === "pdf" && pdfAvailable && pdfUrl}
+		{:else if viewMode === "pdf" && pdfUrl && (pdfAvailable || pdfStoragePath)}
 			<ScrollArea class="h-full w-full">
 				<div class="p-6 max-w-3xl mx-auto">
 					<EditorCanvas
@@ -1009,26 +918,84 @@
 				</div>
 			</ScrollArea>
 		{:else if persistedMarkdownPath}
-			<ScrollArea class="h-full w-full">
+			<div class="relative group">
+				<ScrollArea class="h-full w-full">
+					<div
+						class="flex flex-col p-6 max-w-3xl mx-auto relative pb-20"
+					>
+						<EditorCanvas
+							bind:this={editorRef}
+							editorMode="wysiwyg"
+							filename={persistedMarkdownPath.split("/").pop() ??
+								displayTitle}
+							title={displayTitle}
+							url={`/api/file/${persistedMarkdownPath}`}
+							saveUrl={`/api/file/${persistedMarkdownPath}`}
+							content={entry?.content ?? ""}
+							type="text"
+							streaming={isStreaming}
+							{user}
+							artifactId={toolOutput?.artifactId ?? ""}
+							bind:validationState
+							examTypeId={computedExamTypeId}
+						/>
+					</div>
+				</ScrollArea>
+				{#if isMarksheetFile}
+					<div
+						class="fixed bottom-6 right-6 z-50 opacity-0 group-hover:opacity-100 scale-95 group-hover:scale-100 transition-all duration-500 ease-out"
+					>
+						<button
+							onclick={handleAutoFix}
+							disabled={aiFixing || !computedExamTypeId}
+							class="flex items-center gap-1.5 px-3 py-1.5 rounded-full shadow-lg border border-white/20 text-white text-xs font-medium transition-all duration-200 hover:scale-105 active:scale-95 {validationState.errorCount > 0 ? 'bg-red-500 hover:bg-red-600' : 'bg-emerald-500'} {validationState.errorCount > 0 ? 'animate-pulse' : ''}"
+						>
+							{#if aiFixing}
+								<RefreshCwIcon class="size-3.5 animate-spin" />
+								Fixing...
+							{:else if validationState.errorCount > 0}
+								<AlertCircleIcon class="size-3.5" />
+								{validationState.errorCount} error{validationState.errorCount === 1 ? '' : 's'}
+							{:else}
+								<CheckIcon class="size-3.5" />
+								Valid
+							{/if}
+						</button>
+					</div>
+				{/if}
+			</div>
+			{#if showValidationViewer && validationState.errors.length > 0}
 				<div
-					class="flex flex-col p-6 max-w-3xl mx-auto relative pb-20 group"
+					class="fixed inset-0 z-50 flex items-start justify-center pt-24"
+					role="dialog"
 				>
-					<EditorCanvas
-						bind:this={editorRef}
-						editorMode="wysiwyg"
-						filename={persistedMarkdownPath.split("/").pop() ??
-							displayTitle}
-						title={displayTitle}
-						url={`/api/file/${persistedMarkdownPath}`}
-						saveUrl={`/api/file/${persistedMarkdownPath}`}
-						content={entry?.content ?? ""}
-						type="text"
-						streaming={isStreaming}
-						{user}
-						artifactId={toolOutput?.artifactId ?? ""}
-					/>
+					<div
+						class="bg-background border rounded-lg shadow-xl max-w-lg w-full mx-4 max-h-80 overflow-auto"
+					>
+						<div
+							class="flex items-center justify-between px-4 py-3 border-b"
+						>
+							<h3 class="text-sm font-semibold">
+								Validation Errors ({validationState.errorCount})
+							</h3>
+							<button
+								onclick={() => (showValidationViewer = false)}
+								class="text-muted-foreground hover:text-foreground text-sm"
+							>
+								&times;
+							</button>
+						</div>
+						<ul class="p-4 space-y-2">
+							{#each validationState.errors as error}
+								<li
+									class="text-xs text-red-600 bg-red-50 px-2 py-1 rounded"
+								>{error}</li
+								>
+							{/each}
+						</ul>
+					</div>
 				</div>
-			</ScrollArea>
+			{/if}
 		{:else if entry?.content}
 			<ScrollArea class="h-full">
 				<div class="p-6 max-w-3xl mx-auto">
@@ -1079,21 +1046,80 @@
 				{/if}
 			</div>
 		{:else if current.kind === "document"}
-			<ScrollArea class="h-full w-full mb-20">
-				<div class="p-6 max-w-3xl mx-auto">
-					<EditorCanvas
-						bind:this={editorRef}
-						editorMode="wysiwyg"
-						filename={current.title}
-						url={current.url ?? ""}
-						saveUrl={current.saveUrl ?? current.url}
-						content={current.content ?? ""}
-						type="text"
-						streaming={isStreaming}
-						{user}
-					/>
+			<div class="relative group h-full w-full">
+				<ScrollArea class="h-full w-full mb-20">
+					<div class="p-6 max-w-3xl mx-auto">
+						<EditorCanvas
+							bind:this={editorRef}
+							editorMode="wysiwyg"
+							filename={current.title}
+							url={current.url ?? ""}
+							saveUrl={current.saveUrl ?? current.url}
+							content={current.content ?? ""}
+							type="text"
+							streaming={isStreaming}
+							{user}
+							bind:validationState
+							examTypeId={computedExamTypeId}
+							artifactId={computedArtifactId}
+						/>
+					</div>
+				</ScrollArea>
+				{#if isMarksheetFile}
+					<div
+						class="fixed bottom-6 right-6 z-50 opacity-0 group-hover:opacity-100 scale-95 group-hover:scale-100 transition-all duration-500 ease-out"
+					>
+						<button
+							onclick={handleAutoFix}
+							disabled={aiFixing || !computedExamTypeId}
+							class="flex items-center gap-1.5 px-3 py-1.5 rounded-full shadow-lg border border-white/20 text-white text-xs font-medium transition-all duration-200 hover:scale-105 active:scale-95 {validationState.errorCount > 0 ? 'bg-red-500 hover:bg-red-600' : 'bg-emerald-500'} {validationState.errorCount > 0 ? 'animate-pulse' : ''}"
+						>
+							{#if aiFixing}
+								<RefreshCwIcon class="size-3.5 animate-spin" />
+								Fixing...
+							{:else if validationState.errorCount > 0}
+								<AlertCircleIcon class="size-3.5" />
+								{validationState.errorCount} error{validationState.errorCount === 1 ? '' : 's'}
+							{:else}
+								<CheckIcon class="size-3.5" />
+								Valid
+							{/if}
+						</button>
+					</div>
+				{/if}
+			</div>
+			{#if showValidationViewer && validationState.errors.length > 0}
+				<div
+					class="fixed inset-0 z-50 flex items-start justify-center pt-24"
+					role="dialog"
+				>
+					<div
+						class="bg-background border rounded-lg shadow-xl max-w-lg w-full mx-4 max-h-80 overflow-auto"
+					>
+						<div
+							class="flex items-center justify-between px-4 py-3 border-b"
+						>
+							<h3 class="text-sm font-semibold">
+								Validation Errors ({validationState.errorCount})
+							</h3>
+							<button
+								onclick={() => (showValidationViewer = false)}
+								class="text-muted-foreground hover:text-foreground text-sm"
+							>
+								&times;
+							</button>
+						</div>
+						<ul class="p-4 space-y-2">
+							{#each validationState.errors as error}
+								<li
+									class="text-xs text-red-600 bg-red-50 px-2 py-1 rounded"
+								>{error}</li
+								>
+							{/each}
+						</ul>
+					</div>
 				</div>
-			</ScrollArea>
+			{/if}
 		{:else if current.kind === "pdf"}
 			<ScrollArea class="h-full w-full">
 				<div class="p-6 max-w-3xl mx-auto">

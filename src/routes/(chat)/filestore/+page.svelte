@@ -464,6 +464,10 @@
 		return `exams/examType-${activeTermId}/notes/`;
 	}
 
+	function uploadPrefix(): string {
+		return `exams/examType-${activeTermId}/uploads/`;
+	}
+
 	function slugify(name: string): string {
 		return name
 			.toLowerCase()
@@ -482,7 +486,7 @@
 	function queueUpload(files: File[]): void {
 		if (files.length === 0) return;
 
-		const prefix = termPrefix();
+		const prefix = uploadPrefix();
 		const tenant = serializeTenant({
 			schoolId: data.tenant.schoolId,
 			userId: data.tenant.userId,

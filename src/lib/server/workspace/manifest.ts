@@ -55,6 +55,7 @@ export interface ManifestEntry {
   fileName?: string;
   contentHash?: string;
   studentId?: number;
+  admissionNo?: number;
   examTypeId?: number;
   academicId?: number;
   recordId?: number;
@@ -62,6 +63,11 @@ export interface ManifestEntry {
   uploadedAt: string;
   modifiedAt: string;
   mimeType?: string;
+  /** Zod validation errors from the most recent auto-save parse+validate.
+   *  Populated server-side during PUT; consumed client-side for the
+   *  floating validation pill and validation viewer. */
+  validationErrors?: string[];
+  validationErrorCount?: number;
 }
 
 export interface WorkspaceManifest {

@@ -26,8 +26,17 @@ import { ocrBatchService } from '$lib/server/service/ocr-batch.service';
 import { mistralOcrService } from '$lib/server/service/mistral-ocr.service';
 import { OcrWorkspaceStore } from '$lib/server/mastra/storage/ocr/ocr-workspace-store';
 import { addEntry as addWorkspaceEntry, updateEntry } from '$lib/server/workspace/manifest';
-import { uploadPath } from '$lib/server/workspace/paths';
+
+import { getDatabase } from '$lib/server/db';
 import { getAppDb } from '$lib/server/mastra/storage/libsql/app-db';
+import { marksheetSchema } from '$lib/schema/marksheet';
+import { parseMentions, extractTableField, type ParseContext, type ParseContextRosterEntry } from '$lib/utils/marksheet-ast-parser';
+import { getClassRoster } from '$lib/server/mastra/agents/skill-instructions';
+import { createAssessmentServiceForRequest } from '$lib/server/service/assessment.service';
+import { SchoolRepository } from '$lib/server/repository';
+import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
+import { generateText } from 'ai';
+import { env } from '$env/dynamic/private';
 import type { SerializedTenant } from '$lib/types/background-tasks';
 import type { FileEntry } from '@mastra/core/workspace';
 
@@ -271,6 +280,60 @@ export const POST: RequestHandler = async ({ params, url, request, locals, cooki
       return json({ success: true });
     }
 
+    if (action === 'auto-fix') {
+      if (!params.path) throw error(400, 'Path parameter required for auto-fix');
+      if (!tenant.examTypeId) throw error(400, 'EXAM_TYPE_REQUIRED for auto-fix');
+      const raw = await fs.readFile(resolvedPath);
+      const markdown = typeof raw === 'string' ? raw : new TextDecoder().decode(raw);
+      const { parseMarksheetMarkdown, generateMarksheetMarkdown } = await import('$lib/utils/marksheet-ast-parser');
+      const parseContext = await buildMarksheetParseContext(markdown, tenant);
+      const parsed = parseMarksheetMarkdown(markdown, parseContext);
+      const result = await marksheetSchema.safeParseAsync(parsed);
+
+      const enteredAdmNo = extractTableField(markdown, 'admission no');
+      const hasAdmNoMismatch = enteredAdmNo != null && Number(enteredAdmNo) !== parsed.student.adminNo;
+
+      if (result.success && !hasAdmNoMismatch) {
+        await updateEntry(tenant, params.path!, { validationErrors: [], validationErrorCount: 0 }, tenant.examTypeId);
+        return json({ fixed: false, errors: [] });
+      }
+
+      if (result.success && hasAdmNoMismatch) {
+        const canonicalMd = generateMarksheetMarkdown(parsed);
+        const fixedBytes = new TextEncoder().encode(canonicalMd);
+        await fs.writeFile(resolvedPath, fixedBytes, { overwrite: true });
+        await updateEntry(tenant, params.path!, { validationErrors: [], validationErrorCount: 0 }, tenant.examTypeId);
+        return json({
+          fixed: true,
+          errors: [],
+          originalErrors: [`Admission No mismatch: file has ${enteredAdmNo}, roster records ${parsed.student.adminNo}`],
+        });
+      }
+
+      const zodErrors = result.error?.issues.map(i => `${i.path.join('.')}: ${i.message}`) ?? [];
+      if (hasAdmNoMismatch) {
+        zodErrors.push(`Admission No mismatch: file has ${enteredAdmNo}, roster records ${parsed.student.adminNo}`);
+      }
+      const groqProvider = createOpenAICompatible({
+        name: 'groq',
+        apiKey: env.GROQ_API_KEY,
+        baseURL: env.GROQ_BASE_URL || 'https://api.groq.com/openai/v1',
+      });
+      const model = groqProvider.chatModel('llama-3.3-70b-versatile');
+      const systemPrompt = 'You are a marksheet data fixer. Given a marksheet markdown file and validation errors, fix the markdown to pass all validation rules. Return ONLY the corrected markdown with no explanations, code fences, or extra text. Preserve all existing data that is correct.';
+      const userPrompt = `Current marksheet markdown:\n\n${markdown}\n\nValidation errors:\n${zodErrors.join('\n')}`;
+      const response = await generateText({ model, system: systemPrompt, prompt: userPrompt });
+      const fixedMarkdown = response.text.trim();
+      const fixedParsed = parseMarksheetMarkdown(fixedMarkdown, parseContext);
+      const canonicalMd = generateMarksheetMarkdown(fixedParsed);
+      const fixedBytes = new TextEncoder().encode(canonicalMd);
+      await fs.writeFile(resolvedPath, fixedBytes, { overwrite: true });
+      const reResult = await marksheetSchema.safeParseAsync(fixedParsed);
+      const remainingErrors = reResult.success ? [] : reResult.error.issues.map(i => `${i.path.join('.')}: ${i.message}`);
+      await updateEntry(tenant, params.path!, { validationErrors: remainingErrors, validationErrorCount: remainingErrors.length }, tenant.examTypeId);
+      return json({ fixed: !reResult.success, errors: remainingErrors, originalErrors: zodErrors });
+    }
+
     const contentType = request.headers.get('content-type') || '';
     let bytes: Uint8Array;
     if (contentType.includes('multipart/form-data')) {
@@ -293,7 +356,7 @@ export const POST: RequestHandler = async ({ params, url, request, locals, cooki
       await addWorkspaceEntry(
         tenant,
         {
-          path: resolvedPath,
+          path: params.path ?? '',
           kind: 'user-file',
           status: 'Uploaded',
           documentId: randomUUID(),
@@ -350,7 +413,6 @@ export const DELETE: RequestHandler = async ({ params, url, locals, cookies }) =
 export const PUT: RequestHandler = async ({ params, request, locals, cookies, url }) => {
   try {
     if (!locals.user) throw error(401, 'Unauthorized');
-
     const examTypeIdParam = url.searchParams.get('examTypeId');
     const parsedExamTypeId = examTypeIdParam ? parseInt(examTypeIdParam, 10) : null;
     const entryKind = url.searchParams.get('kind') ?? 'user-file';
@@ -391,9 +453,8 @@ export const PUT: RequestHandler = async ({ params, request, locals, cookies, ur
     if (tenant.examTypeId == null) {
       throw error(400, 'EXAM_TYPE_REQUIRED: cannot register a workspace upload without an active examTypeId');
     }
-    const manifestRelPath = entryKind === 'note'
-      ? (params.path ?? '')
-      : uploadPath(fileName, tenant.examTypeId);
+    const manifestRelPath = params.path ?? '';
+
     await addWorkspaceEntry(
       tenant,
       {
@@ -412,7 +473,35 @@ export const PUT: RequestHandler = async ({ params, request, locals, cookies, ur
       tenant.examTypeId
     );
 
-    return json({ success: true, path: resolvedPath });
+    // ── Marksheet validation ──
+    let validationErrors: string[] = [];
+    if (manifestRelPath.includes('marksheets/') && manifestRelPath.endsWith('.md')) {
+      try {
+        const { parseMarksheetMarkdown } = await import('$lib/utils/marksheet-ast-parser');
+        const content = new TextDecoder().decode(bytes);
+        const parseContext = await buildMarksheetParseContext(content, tenant);
+        const parsed = parseMarksheetMarkdown(content, parseContext);
+
+        const enteredAdmNo = extractTableField(content, 'admission no');
+        if (enteredAdmNo && Number(enteredAdmNo) !== parsed.student.adminNo) {
+          validationErrors.push(
+            `Admission No mismatch: file has ${enteredAdmNo}, but roster records ${parsed.student.adminNo}. The roster value will be used on reload.`
+          );
+        }
+
+        const result = await marksheetSchema.safeParseAsync(parsed);
+        if (!result.success) {
+          validationErrors.push(...result.error.issues.map(i => `${i.path.join('.')}: ${i.message}`));
+        }
+        await updateEntry(tenant, manifestRelPath, { validationErrors, validationErrorCount: validationErrors.length }, tenant.examTypeId);
+      } catch (parseErr) {
+        console.error('[file-api] marksheet validation error', parseErr);
+        validationErrors = [`Parse error: ${parseErr instanceof Error ? parseErr.message : String(parseErr)}`];
+      }
+    }
+
+    console.info('[file-api] PUT validationErrors:', validationErrors);
+    return json({ success: true, path: resolvedPath, validation: { errors: validationErrors, errorCount: validationErrors.length } });
   } catch (e: unknown) {
     if (e instanceof WorkspaceScopeError) {
       return json({ success: false, error: 'WORKSPACE_SCOPE_VIOLATION', message: e.message }, { status: 403 });
@@ -421,6 +510,78 @@ export const PUT: RequestHandler = async ({ params, request, locals, cookies, ur
     return json({ success: false, error: message }, { status: 400 });
   }
 };
+
+async function buildMarksheetParseContext(
+  markdown: string,
+  tenant: ReturnType<typeof import('$lib/server/mastra/tenant-context')['createTenantContext']>,
+): Promise<ParseContext> {
+  const mentions = parseMentions(markdown);
+
+  let mappingSubjects: Array<{ id: number; subjectCode: string; subjectName: string; teacherId: number }> | undefined;
+  let schoolInfo: { name?: string; email?: string; phone?: string } | undefined;
+  let roster: ParseContextRosterEntry[] | undefined;
+
+  if (tenant.classId != null && tenant.sectionId != null) {
+    try {
+      const assessment = await createAssessmentServiceForRequest(tenant);
+      const mapping = await assessment.getMappingData(tenant.classId, tenant.sectionId);
+      mappingSubjects = mapping.subjects
+        .filter((s): s is { id: number; subjectCode: string; subjectName: string; teacherId: number } =>
+          s.id != null && !!s.subjectCode && !!s.teacherId && !!s.subjectName
+        )
+        .map((s) => ({ id: s.id, subjectCode: s.subjectCode, subjectName: s.subjectName, teacherId: s.teacherId }));
+    } catch { /* best-effort */ }
+  }
+
+  try {
+    const mysqlDb = await getDatabase();
+    const repo = new SchoolRepository(mysqlDb, tenant);
+    const info = await repo.getSchoolInfo(tenant.schoolId);
+    if (info) {
+      schoolInfo = {
+        name: info.schoolName ?? undefined,
+        email: info.email ?? undefined,
+        phone: info.phone ?? undefined,
+      };
+    }
+  } catch { /* best-effort */ }
+
+  // Fetch roster only when no @mention admissionNo (stage 2 fallback)
+  if (mentions.admissionNo == null && mentions.studentId == null) {
+    try {
+      const classRoster = await getClassRoster({
+        schoolId: tenant.schoolId,
+        classId: tenant.classId ?? undefined,
+        sectionId: tenant.sectionId ?? undefined,
+        academicId: tenant.academicId ?? undefined,
+      });
+      roster = classRoster.map((r) => ({
+        id: r.id,
+        name: r.name,
+        admissionNo: r.admissionNo != null ? Number(r.admissionNo) : undefined,
+      }));
+    } catch { /* best-effort */ }
+  }
+
+  return {
+    tenant: {
+      schoolId: tenant.schoolId,
+      classId: tenant.classId ?? undefined,
+      sectionId: tenant.sectionId ?? undefined,
+      examTypeId: mentions.examTypeId ?? tenant.examTypeId ?? undefined,
+      academicId: mentions.academicId ?? tenant.academicId ?? undefined,
+      studentId: mentions.studentId ?? tenant.studentId ?? undefined,
+      admissionNo: mentions.admissionNo ?? undefined,
+      className: tenant.className ?? undefined,
+      sectionName: tenant.sectionName ?? undefined,
+      academicYearTitle: tenant.academicYearTitle ?? undefined,
+      fullName: mentions.studentName ?? undefined,
+    },
+    school: schoolInfo,
+    mapping: mappingSubjects ? { subjects: mappingSubjects } : undefined,
+    roster,
+  };
+}
 
 function emptySerializedTenant(tenant: ReturnType<typeof import('$lib/server/mastra/tenant-context')['createTenantContext']>): SerializedTenant {
   return {

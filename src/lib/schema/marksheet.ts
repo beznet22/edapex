@@ -39,7 +39,7 @@ export const studentSchema = z.object({
     .describe("The category of the student"),
   className: z.string().min(1).describe("The class name of the student"),
   sectionName: z.string().min(1).describe("The section name of the student"),
-  adminNo: z.number().describe("The admission number of the student"),
+  adminNo: z.number().positive().describe("The admission number of the student"),
   sessionYear: z.string().describe("The session year of the exam"),
   daysOpened: z.number().describe("The number of days opened"),
   daysAbsent: z.number().describe("The number of days absent"),
