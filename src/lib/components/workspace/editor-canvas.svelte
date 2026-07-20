@@ -109,6 +109,93 @@
 	let lastSavedContent = $state<string>("");
 	let saveDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 
+	type CommitState = 'idle' | 'pending' | 'committing' | 'committed' | 'failed';
+	let commitState: CommitState = $state('idle');
+	let commitSecondsLeft = $state(0);
+	let commitError: string | null = $state(null);
+	let commitDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+	let commitTickInterval: ReturnType<typeof setInterval> | null = null;
+	let commitAutoResetTimer: ReturnType<typeof setTimeout> | null = null;
+	let lastCommitTarget: { path: string; examTypeId: number } | null = $state(null);
+	let lastCommittedRecordId: number | null = $state(null);
+	const COMMIT_DEBOUNCE_MS = 8000;
+
+	function commitManifestRelPathFromUrl(targetUrl: string): string {
+		try {
+			const u = new URL(targetUrl, typeof window !== 'undefined' ? window.location.origin : 'http://localhost');
+			const m = u.pathname.match(/\/api\/file\/(.+?)(?:\/?$|\?)/);
+			return m ? decodeURIComponent(m[1]) : targetUrl;
+		} catch {
+			const idx = targetUrl.indexOf('/api/file/');
+			if (idx >= 0) {
+				const after = targetUrl.slice(idx + '/api/file/'.length);
+				return after.split('?')[0] ?? after;
+			}
+			return targetUrl;
+		}
+	}
+
+	function scheduleCommit(manifestRelPath: string, examTypeIdValue: number) {
+		if (commitDebounceTimer) clearTimeout(commitDebounceTimer);
+		if (commitTickInterval) { clearInterval(commitTickInterval); commitTickInterval = null; }
+		if (commitAutoResetTimer) { clearTimeout(commitAutoResetTimer); commitAutoResetTimer = null; }
+		lastCommitTarget = { path: manifestRelPath, examTypeId: examTypeIdValue };
+		commitError = null;
+		commitState = 'pending';
+		commitSecondsLeft = Math.floor(COMMIT_DEBOUNCE_MS / 1000);
+		commitDebounceTimer = setTimeout(() => {
+			commitDebounceTimer = null;
+			fireCommit();
+		}, COMMIT_DEBOUNCE_MS);
+	}
+
+	function cancelCommit() {
+		if (commitDebounceTimer) { clearTimeout(commitDebounceTimer); commitDebounceTimer = null; }
+		if (commitTickInterval) { clearInterval(commitTickInterval); commitTickInterval = null; }
+		commitState = 'idle';
+		commitSecondsLeft = 0;
+		commitError = null;
+		lastCommitTarget = null;
+	}
+
+	async function fireCommit() {
+		const target = lastCommitTarget;
+		if (!target) return;
+		commitDebounceTimer = null;
+		if (commitTickInterval) { clearInterval(commitTickInterval); commitTickInterval = null; }
+		commitState = 'committing';
+		try {
+			const res = await fetch('/api/commit', {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({
+					path: target.path,
+					examTypeId: target.examTypeId,
+					reason: 'Auto-commit',
+				}),
+			});
+			const data = await res.json().catch(() => null);
+			if (res.ok && data && data.ok) {
+				lastCommittedRecordId = data.recordId ?? null;
+				commitError = null;
+				commitState = 'committed';
+				commitAutoResetTimer = setTimeout(() => {
+					if (commitState === 'committed') {
+						commitState = 'idle';
+						commitAutoResetTimer = null;
+					}
+				}, 3000);
+			} else {
+				const firstErr = data?.errors?.[0];
+				commitError = firstErr?.message ?? `HTTP ${res.status}`;
+				commitState = 'failed';
+			}
+		} catch (err) {
+			commitError = err instanceof Error ? err.message : String(err);
+			commitState = 'failed';
+		}
+	}
+
 	function handleWysiwygUpdate(markdown: string) {
 		wysiwygContent = markdown;
 		editContent = markdown;
@@ -243,6 +330,13 @@
 					showParseBar = true;
 				}
 
+				if (resolvedExamTypeId != null) {
+					const relPath = commitManifestRelPathFromUrl(saveTarget);
+					if (relPath.startsWith('marksheets/') && relPath.endsWith('.md')) {
+						scheduleCommit(relPath, resolvedExamTypeId);
+					}
+				}
+
 				try {
 					const parsed = parseMarksheetMarkdown(md);
 					const rawJsonUrl = url.replace(/\.md$/, ".raw.json");
@@ -265,7 +359,23 @@
 				clearTimeout(saveDebounceTimer);
 				saveDebounceTimer = null;
 			}
+			if (commitDebounceTimer) { clearTimeout(commitDebounceTimer); commitDebounceTimer = null; }
+			if (commitTickInterval) { clearInterval(commitTickInterval); commitTickInterval = null; }
+			if (commitAutoResetTimer) { clearTimeout(commitAutoResetTimer); commitAutoResetTimer = null; }
 		};
+	});
+
+	$effect(() => {
+		if (commitState !== 'pending') {
+			if (commitTickInterval) { clearInterval(commitTickInterval); commitTickInterval = null; }
+			return;
+		}
+		if (commitTickInterval) return;
+		commitTickInterval = setInterval(() => {
+			if (commitState === 'pending' && commitSecondsLeft > 0) {
+				commitSecondsLeft = commitSecondsLeft - 1;
+			}
+		}, 1000);
 	});
 
 	$effect(() => {
@@ -391,17 +501,44 @@
 					{/key}
 				</div>
 				{#if showParseBar}
+					{@const commitMode = commitState !== 'idle'}
+					{@const pillDot = commitMode
+						? (commitState === 'committed' ? 'bg-green-500' : commitState === 'failed' ? 'bg-red-500' : 'bg-amber-500')
+						: (validationState.errorCount === 0 ? 'bg-green-500' : 'bg-red-500')}
+					{@const pillText = commitMode
+						? (commitState === 'committed' ? 'text-green-700' : commitState === 'failed' ? 'text-red-700' : 'text-amber-700')
+						: (validationState.errorCount === 0 ? 'text-green-700' : 'text-red-700')}
+					{@const pillBg = commitMode
+						? (commitState === 'committed' ? 'bg-green-50/50' : commitState === 'failed' ? 'bg-red-50/50' : 'bg-amber-50/50')
+						: (validationState.errorCount === 0 ? 'bg-green-50/50' : 'bg-red-50/50')}
+					{@const pillLabel = commitMode
+						? (commitState === 'pending'
+							? `Committing in ${commitSecondsLeft}s…`
+							: commitState === 'committing'
+								? 'Committing…'
+								: commitState === 'committed'
+									? 'Committed ✓'
+									: `Commit failed${commitError ? `: ${commitError}` : ''}`)
+						: (validationState.errorCount === 0
+							? 'Template OK'
+							: `${validationState.errorCount} validation error${validationState.errorCount === 1 ? '' : 's'}`)}
 					<div
-						class="h-5 px-3 flex items-center gap-1.5 text-[10px] font-medium border-t {validationState.errorCount === 0 ? 'bg-green-50/50' : 'bg-red-50/50'}"
+						class="h-5 px-3 flex items-center gap-1.5 text-[10px] font-medium border-t {pillBg}"
 					>
-						<div
-							class="size-1.5 rounded-full {validationState.errorCount === 0 ? 'bg-green-500' : 'bg-red-500'}"
-						></div>
-						<span
-							class={validationState.errorCount === 0 ? "text-green-700" : "text-red-700"}
-						>
-							{validationState.errorCount === 0 ? "Template OK" : `${validationState.errorCount} validation error${validationState.errorCount === 1 ? '' : 's'}`}
-						</span>
+						{#if commitState === 'committing'}
+							<Spinner class="size-2.5" />
+						{:else}
+							<div class="size-1.5 rounded-full {pillDot}"></div>
+						{/if}
+						<span class={pillText}>{pillLabel}</span>
+						{#if commitState === 'pending'}
+							<button
+								type="button"
+								onclick={cancelCommit}
+								class="ml-auto text-[10px] text-amber-700/70 hover:text-amber-700 hover:bg-amber-100 rounded px-1 leading-none"
+								aria-label="Cancel pending commit"
+							>×</button>
+						{/if}
 					</div>
 				{/if}
 			</div>

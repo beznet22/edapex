@@ -38,6 +38,228 @@ const marksheetCommitErrorSchema = z.object({
 	code: z.string()
 });
 
+export type CommitMarksheetError = z.infer<typeof marksheetCommitErrorSchema>;
+
+export type CommitMarksheetOutput =
+	| {
+		ok: true;
+		artifactId: string;
+		recordId: number;
+		studentName: string;
+		marksheetStatus: 'committed';
+	}
+	| { ok: false; errors: CommitMarksheetError[] };
+
+export interface CommitMarksheetInput {
+	studentId: number;
+	reason: string;
+	/** Required when skipJsonWrite is true; ignored otherwise. The
+	 *  auto-commit endpoint pre-validates and passes the Marksheet in. */
+	marksheet?: Marksheet;
+}
+
+export interface CommitMarksheetOptions {
+	/** When true, do not write the canonical marksheets/<studentId>.json,
+	 *  do not rename the draft .md, and do not add a `marksheet-json` entry.
+	 *  Caller MUST supply `input.marksheet`. */
+	skipJsonWrite?: boolean;
+	/** When set, use this path directly for the source-entry update
+	 *  instead of scanning the manifest for kind==='user-file' matching
+	 *  by studentId. */
+	sourcePath?: string;
+}
+
+export async function commitMarksheetLogic(
+	tenant: TenantContext,
+	input: CommitMarksheetInput,
+	options: CommitMarksheetOptions = {}
+): Promise<CommitMarksheetOutput> {
+	if (tenant.staffId <= 0) {
+		return {
+			ok: false,
+			errors: [
+				{
+					path: 'tenant.staffId',
+					message:
+						'STAFF_ID_REQUIRED: committing a marksheet requires a valid staffId in TenantContext',
+					code: 'STAFF_ID_REQUIRED'
+				}
+			]
+		};
+	}
+
+	if (tenant.examTypeId == null) {
+		return {
+			ok: false,
+			errors: [
+				{
+					path: 'tenant.examTypeId',
+					message: 'EXAM_TYPE_REQUIRED: committing a marksheet requires an active examTypeId',
+					code: 'EXAM_TYPE_REQUIRED'
+				}
+			]
+		};
+	}
+	const examTypeId = tenant.examTypeId;
+	const skipJsonWrite = options.skipJsonWrite === true;
+
+	if (!skipJsonWrite && !input.marksheet) {
+		const fs = await resolveTenantFilesystem(tenant);
+		const jsonPath = marksheetJsonPath(input.studentId, examTypeId);
+		if (!(await fs.exists(jsonPath))) {
+			return {
+				ok: false,
+				errors: [
+					{
+						path: 'jsonPath',
+						message: `MARKSHEET_JSON_NOT_FOUND: no JSON at ${jsonPath} for studentId=${input.studentId}`,
+						code: 'MARKSHEET_JSON_NOT_FOUND'
+					}
+				]
+			};
+		}
+	}
+
+	let validated: Marksheet;
+	if (skipJsonWrite) {
+		if (!input.marksheet) {
+			return {
+				ok: false,
+				errors: [
+					{
+						path: 'input.marksheet',
+						message: 'MARKSHEET_REQUIRED: skipJsonWrite requires a pre-validated marksheet',
+						code: 'MARKSHEET_REQUIRED'
+					}
+				]
+			};
+		}
+		try {
+			validated = await marksheetSchema.parseAsync(input.marksheet);
+		} catch (err) {
+			if (err instanceof z.ZodError) {
+				return {
+					ok: false,
+					errors: err.issues.map((issue) => ({
+						path: issue.path.join('.'),
+						message: issue.message,
+						code: 'ZOD_' + String(issue.code).toUpperCase()
+					}))
+				};
+			}
+			return {
+				ok: false,
+				errors: [
+					{
+						path: 'input.marksheet',
+						message: 'MARKSHEET_INVALID: ' + (err instanceof Error ? err.message : String(err)),
+						code: 'MARKSHEET_INVALID'
+					}
+				]
+			};
+		}
+	} else {
+		const fs = await resolveTenantFilesystem(tenant);
+		const jsonPath = marksheetJsonPath(input.studentId, examTypeId);
+		const raw = await fs.readFile(jsonPath, { encoding: 'utf-8' });
+		const text = typeof raw === 'string' ? raw : raw.toString('utf-8');
+		try {
+			validated = await marksheetSchema.parseAsync(JSON.parse(text));
+		} catch (err) {
+			if (err instanceof z.ZodError) {
+				return {
+					ok: false,
+					errors: err.issues.map((issue) => ({
+						path: issue.path.join('.'),
+						message: issue.message,
+						code: 'ZOD_' + String(issue.code).toUpperCase()
+					}))
+				};
+			}
+			return {
+				ok: false,
+				errors: [
+					{
+						path: 'jsonPath',
+						message:
+							'MARKSHEET_JSON_MALFORMED: ' + (err instanceof Error ? err.message : String(err)),
+						code: 'MARKSHEET_JSON_MALFORMED'
+					}
+				]
+			};
+		}
+	}
+
+	const artifactId = `artifact-student-${input.studentId}`;
+	let recordId: number;
+	try {
+		const service = await createAssessmentServiceForRequest(tenant);
+		const response = await service.upsertMarksheet(validated, tenant.staffId);
+		recordId = response.recordId ?? validated.student?.id ?? input.studentId;
+	} catch (err) {
+		const message = err instanceof Error ? err.message : String(err);
+		let code: string = 'UPSERT_FAILED';
+		if (message.includes('STAFF_ID_REQUIRED')) code = 'STAFF_ID_REQUIRED';
+		else if (message.includes('missing required class/section/record/category linkage'))
+			code = 'MISSING_LINKAGE';
+		else if (message.includes('No marks or results were processed')) code = 'NO_MARKS_PROCESSED';
+		else if (message.includes('Failed to process marks')) code = 'PROCESS_MARKS_FAILED';
+		return {
+			ok: false,
+			errors: [{ path: 'upsertMarksheet', message, code }]
+		};
+	}
+
+	if (!skipJsonWrite) {
+		const fs = await resolveTenantFilesystem(tenant);
+		const jsonPath = marksheetJsonPath(input.studentId, examTypeId);
+		await addEntry(
+			tenant,
+			{
+				path: jsonPath,
+				kind: 'marksheet-json',
+				status: 'Committed',
+				studentId: input.studentId,
+				examTypeId,
+				recordId,
+				uploadedAt: new Date().toISOString(),
+				modifiedAt: new Date().toISOString(),
+				mimeType: 'application/json'
+			},
+			examTypeId
+		);
+		await updateEntryStatus(tenant, jsonPath, 'committed', examTypeId);
+	}
+
+	if (options.sourcePath) {
+		const admissionNo =
+			validated.student?.adminNo != null ? Number(validated.student.adminNo) : undefined;
+		await updateEntry(
+			tenant,
+			options.sourcePath,
+			{
+				status: 'Committed',
+				marksheetStatus: 'committed',
+				recordId,
+				studentId: input.studentId,
+				...(admissionNo != null ? { admissionNo } : {})
+			},
+			examTypeId
+		);
+	} else {
+		const commitManifest = await readWorkspaceManifest(tenant, examTypeId);
+		const commitSource = Object.values(commitManifest.entries).find(
+			(e) => e.kind === 'user-file' && e.studentId === input.studentId
+		);
+		if (commitSource) {
+			await updateEntry(tenant, commitSource.path, { status: 'Committed' }, examTypeId);
+		}
+	}
+
+	const studentName = validated.student?.fullName ?? 'Unknown';
+	return { ok: true, artifactId, recordId, studentName, marksheetStatus: 'committed' };
+}
+
 export const commitMarksheetTool = createTool({
 	id: 'commit-marksheet',
 	description:
@@ -68,125 +290,6 @@ export const commitMarksheetTool = createTool({
 	execute: async (input, ctx) => {
 		const context = ctx as MarksheetToolContext;
 		const tenant = getTenant(context);
-
-		if (tenant.staffId <= 0) {
-			return {
-				ok: false as const,
-				errors: [
-					{
-						path: 'tenant.staffId',
-						message:
-							'STAFF_ID_REQUIRED: committing a marksheet requires a valid staffId in TenantContext',
-						code: 'STAFF_ID_REQUIRED'
-					}
-				]
-			};
-		}
-
-		const fs = await resolveTenantFilesystem(tenant);
-		if (tenant.examTypeId == null) {
-			return {
-				ok: false as const,
-				errors: [
-					{
-						path: 'tenant.examTypeId',
-						message: 'EXAM_TYPE_REQUIRED: committing a marksheet requires an active examTypeId',
-						code: 'EXAM_TYPE_REQUIRED'
-					}
-				]
-			};
-		}
-		const examTypeId = tenant.examTypeId;
-		const jsonPath = marksheetJsonPath(input.studentId, examTypeId);
-		if (!(await fs.exists(jsonPath))) {
-			return {
-				ok: false as const,
-				errors: [
-					{
-						path: 'jsonPath',
-						message: `MARKSHEET_JSON_NOT_FOUND: no JSON at ${jsonPath} for studentId=${input.studentId}`,
-						code: 'MARKSHEET_JSON_NOT_FOUND'
-					}
-				]
-			};
-		}
-
-		const raw = await fs.readFile(jsonPath, { encoding: 'utf-8' });
-		const text = typeof raw === 'string' ? raw : raw.toString('utf-8');
-
-		let validated: Marksheet;
-		try {
-			validated = await marksheetSchema.parseAsync(JSON.parse(text));
-		} catch (err) {
-			if (err instanceof z.ZodError) {
-				return {
-					ok: false as const,
-					errors: err.issues.map((issue) => ({
-						path: issue.path.join('.'),
-						message: issue.message,
-						code: 'ZOD_' + String(issue.code).toUpperCase()
-					}))
-				};
-			}
-			return {
-				ok: false as const,
-				errors: [
-					{
-						path: 'jsonPath',
-						message:
-							'MARKSHEET_JSON_MALFORMED: ' + (err instanceof Error ? err.message : String(err)),
-						code: 'MARKSHEET_JSON_MALFORMED'
-					}
-				]
-			};
-		}
-
-		const artifactId = `artifact-student-${input.studentId}`;
-		let recordId: number;
-		try {
-			const service = await createAssessmentServiceForRequest(tenant);
-			const response = await service.upsertMarksheet(validated, tenant.staffId);
-			recordId = response.recordId ?? validated.student?.id ?? input.studentId;
-		} catch (err) {
-			const message = err instanceof Error ? err.message : String(err);
-			let code: string = 'UPSERT_FAILED';
-			if (message.includes('STAFF_ID_REQUIRED')) code = 'STAFF_ID_REQUIRED';
-			else if (message.includes('missing required class/section/record/category linkage'))
-				code = 'MISSING_LINKAGE';
-			else if (message.includes('No marks or results were processed')) code = 'NO_MARKS_PROCESSED';
-			else if (message.includes('Failed to process marks')) code = 'PROCESS_MARKS_FAILED';
-			return {
-				ok: false as const,
-				errors: [{ path: 'upsertMarksheet', message, code }]
-			};
-		}
-
-		await addEntry(
-			tenant,
-			{
-				path: jsonPath,
-				kind: 'marksheet-json',
-				status: 'Committed',
-				studentId: input.studentId,
-				examTypeId,
-				recordId,
-				uploadedAt: new Date().toISOString(),
-				modifiedAt: new Date().toISOString(),
-				mimeType: 'application/json'
-			},
-			examTypeId
-		);
-		await updateEntryStatus(tenant, jsonPath, 'committed', examTypeId);
-
-		const commitManifest = await readWorkspaceManifest(tenant, examTypeId);
-		const commitSource = Object.values(commitManifest.entries).find(
-			(e) => e.kind === 'user-file' && e.studentId === input.studentId
-		);
-		if (commitSource) {
-			await updateEntry(tenant, commitSource.path, { status: 'Committed' }, examTypeId);
-		}
-
-		const studentName = validated.student?.fullName ?? 'Unknown';
-		return { ok: true as const, artifactId, recordId, studentName, marksheetStatus: 'committed' as const };
+		return commitMarksheetLogic(tenant, input);
 	}
 });
