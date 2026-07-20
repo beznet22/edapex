@@ -943,12 +943,12 @@
 				</ScrollArea>
 				{#if isMarksheetFile}
 					<div
-						class="fixed bottom-6 right-6 z-50 opacity-0 group-hover:opacity-100 scale-95 group-hover:scale-100 transition-all duration-500 ease-out"
+						class="fixed bottom-[calc(1.5rem+env(safe-area-inset-bottom))] right-4 sm:right-6 z-50 opacity-100 scale-100 md:opacity-0 md:scale-95 md:group-hover:opacity-100 md:group-hover:scale-100 transition-all duration-500 ease-out"
 					>
 						<button
 							onclick={handleAutoFix}
 							disabled={aiFixing || !computedExamTypeId}
-							class="flex items-center gap-1.5 px-3 py-1.5 rounded-full shadow-lg border border-white/20 text-white text-xs font-medium transition-all duration-200 hover:scale-105 active:scale-95 {validationState.errorCount > 0 ? 'bg-red-500 hover:bg-red-600' : 'bg-emerald-500'} {validationState.errorCount > 0 ? 'animate-pulse' : ''}"
+							class="flex items-center gap-1.5 min-h-12 px-3 sm:min-h-0 sm:py-1.5 rounded-full shadow-lg border border-white/20 text-white text-xs font-medium transition-all duration-200 hover:scale-105 active:scale-95 {validationState.errorCount > 0 ? 'bg-red-500 hover:bg-red-600' : 'bg-emerald-500'} {validationState.errorCount > 0 ? 'animate-pulse' : ''}"
 						>
 							{#if aiFixing}
 								<RefreshCwIcon class="size-3.5 animate-spin" />
@@ -1067,12 +1067,12 @@
 				</ScrollArea>
 				{#if isMarksheetFile}
 					<div
-						class="fixed bottom-6 right-6 z-50 opacity-0 group-hover:opacity-100 scale-95 group-hover:scale-100 transition-all duration-500 ease-out"
+						class="fixed bottom-[calc(1.5rem+env(safe-area-inset-bottom))] right-4 sm:right-6 z-50 opacity-100 scale-100 md:opacity-0 md:scale-95 md:group-hover:opacity-100 md:group-hover:scale-100 transition-all duration-500 ease-out"
 					>
 						<button
 							onclick={handleAutoFix}
 							disabled={aiFixing || !computedExamTypeId}
-							class="flex items-center gap-1.5 px-3 py-1.5 rounded-full shadow-lg border border-white/20 text-white text-xs font-medium transition-all duration-200 hover:scale-105 active:scale-95 {validationState.errorCount > 0 ? 'bg-red-500 hover:bg-red-600' : 'bg-emerald-500'} {validationState.errorCount > 0 ? 'animate-pulse' : ''}"
+							class="flex items-center gap-1.5 min-h-12 px-3 sm:min-h-0 sm:py-1.5 rounded-full shadow-lg border border-white/20 text-white text-xs font-medium transition-all duration-200 hover:scale-105 active:scale-95 {validationState.errorCount > 0 ? 'bg-red-500 hover:bg-red-600' : 'bg-emerald-500'} {validationState.errorCount > 0 ? 'animate-pulse' : ''}"
 						>
 							{#if aiFixing}
 								<RefreshCwIcon class="size-3.5 animate-spin" />
