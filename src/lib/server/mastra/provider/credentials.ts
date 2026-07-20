@@ -22,6 +22,9 @@ import { encrypt as encryptText, decrypt as decryptText, maskKey, getEncryptionK
 import { DecryptionError } from '$lib/provider/errors';
 import { CustomProviderEncryptedDataSchema } from './spec';
 import { log as writeAudit } from '$lib/server/audit-log';
+import { BUILTIN_PROVIDERS } from '$lib/provider/catalog';
+import { verifyApiKey, VerificationError } from './verify-key';
+import type { ModelInfo } from '$lib/provider/spec';
 
 export interface CredentialAuditContext {
 	actorStaffId: number;
@@ -46,6 +49,23 @@ export interface SaveUserCredentialInput {
 	models?: Array<{ id: string; displayName: string }>;
 	headers?: Array<{ name: string; value: string }>;
 	displayName?: string;
+	/**
+	 * Override the `fetch` implementation for verification. Used by tests.
+	 * Production callers leave this undefined and the global `fetch` is used.
+	 */
+	fetchImpl?: typeof fetch;
+}
+
+/**
+ * Result of a credential save. `warning` is set when verification
+ * succeeded for authentication but the upstream returned a recoverable
+ * failure (5xx, 429, network). The credential IS persisted in that case
+ * and the warning is surfaced to the UI so the user knows their model
+ * list may be stale.
+ */
+export interface SaveUserCredentialResult {
+	credential: EncryptedCredential;
+	warning?: string;
 }
 
 const SaveUserCredentialInputSchema = z.object({
@@ -61,6 +81,9 @@ const SaveUserCredentialInputSchema = z.object({
 		.optional(),
 	headers: z.array(z.object({ name: z.string().min(1), value: z.string().min(1) })).optional(),
 	displayName: z.string().min(1).optional()
+	// `fetchImpl` is test-only and not part of the public schema. Callers
+	// pass it directly to `saveUserCredentialFn` for unit tests, bypassing
+	// the Zod parse via the `fetchImpl` parameter on the function signature.
 });
 
 function credentialKindFromType(type: 'credential' | 'custom'): UserCredentialKind {
@@ -72,13 +95,49 @@ export async function saveUserCredential(
 	env: Record<string, string | undefined>,
 	input: SaveUserCredentialInput,
 	audit?: CredentialAuditContext
-): Promise<EncryptedCredential> {
+): Promise<SaveUserCredentialResult> {
 	const validated = SaveUserCredentialInputSchema.parse(input);
 	const encryptionKey = getEncryptionKey(env);
 	const existing = await getUserCredential(db, env, validated.userId, validated.providerId);
 
 	const credentialKind = credentialKindFromType(validated.credentialType);
 	let encryptedData: string;
+
+	// ─── Pre-save key verification (hard gate) ──────────────────────────
+	// Only verify when a NEW apiKey is being supplied. Enable/priority/
+	// display-name updates skip the round-trip.
+	let verificationWarning: string | undefined;
+	let preDiscoveredModels: ModelInfo[] = [];
+
+	if (validated.apiKey !== undefined) {
+		const verificationBaseUrl = resolveVerificationBaseUrl(validated, existing, env);
+		if (!verificationBaseUrl) {
+			throw new VerificationError(
+				'not_found',
+				'No base URL is available for verification. Set a base URL in the custom-provider form.'
+			);
+		}
+
+		const result = await verifyApiKey({
+			providerId: validated.providerId,
+			baseUrl: verificationBaseUrl,
+			apiKey: validated.apiKey,
+			fetchImpl: input.fetchImpl
+		});
+
+		if (!result.ok) {
+			if (!result.recoverable) {
+				// 4xx — the key is bad. Do NOT persist. Caller catches the
+				// thrown VerificationError and surfaces the message inline.
+				throw new VerificationError(result.reason, result.message, result.status);
+			}
+			// Recoverable (5xx, 429, network). Continue with the save, but
+			// remember the warning so the UI can surface it.
+			verificationWarning = result.message;
+		} else {
+			preDiscoveredModels = result.models;
+		}
+	}
 
 	if (validated.credentialType === 'credential') {
 		if (validated.apiKey) {
@@ -167,26 +226,96 @@ export async function saveUserCredential(
 		});
 	}
 
-	// Discover and persist models synchronously so the API caller can
-	// immediately re-read the discovered set without racing the
-	// discovery worker. The discovery step has its own timeout + retry
-	// caps (see `DISCOVERY_TIMEOUT_MS` / `DISCOVERY_ATTEMPTS` in
-	// `discovery.ts`) and is best-effort: a failure is logged but does
-	// not roll back the credential write.
+	// Persist the discovered models from the verification call (or run a
+	// fresh discovery when verification was skipped or failed recoverably).
+	// The discovery step is best-effort: a failure is logged but does not
+	// roll back the credential write.
 	try {
-		await discoverAndPersist(db, env, written);
+		if (preDiscoveredModels.length > 0) {
+			const nowIso = new Date().toISOString();
+			await persistDiscoveredModelsForCredential(
+				db,
+				env,
+				validated.userId,
+				validated.providerId,
+				preDiscoveredModels,
+				nowIso
+			);
+			written.discoveredModels = encryptText(
+				JSON.stringify(preDiscoveredModels),
+				getEncryptionKey(env)
+			);
+			written.discoveredAt = nowIso;
+		} else if (validated.apiKey !== undefined) {
+			// Verification was skipped, failed recoverably, or returned no
+			// models. Run the existing discovery path as a fallback.
+			const fallback = await discoverAndPersist(db, env, written, input.fetchImpl);
+			if (fallback) {
+				written.discoveredModels = fallback.discoveredModels;
+				written.discoveredAt = fallback.discoveredAt;
+			}
+		}
 	} catch (err) {
 		console.error(`[credentials] model discovery failed for ${validated.providerId}:`, err);
 	}
 
-	return written;
+	return verificationWarning
+		? { credential: written, warning: verificationWarning }
+		: { credential: written };
+}
+
+/**
+ * Resolve the URL used for `/models` verification. Built-in providers
+ * use their catalog URL; custom providers use the user-supplied
+ * baseUrl (falling back to the previously-stored one when only
+ * meta-fields are being updated).
+ */
+function resolveVerificationBaseUrl(
+	validated: z.infer<typeof SaveUserCredentialInputSchema>,
+	existing: EncryptedCredential | null,
+	env: Record<string, string | undefined>
+): string | null {
+	if (validated.credentialType === 'custom') {
+		if (validated.baseUrl && validated.baseUrl.length > 0) return validated.baseUrl;
+		const prior = safeParseCustom(existing?.encryptedData ?? null, env);
+		return prior?.baseUrl && prior.baseUrl.length > 0 ? prior.baseUrl : null;
+	}
+	const info = BUILTIN_PROVIDERS[validated.providerId];
+	return info?.api?.url ?? null;
+}
+
+async function persistDiscoveredModelsForCredential(
+	db: LibSQLDatabase<any>,
+	env: Record<string, string | undefined>,
+	userId: number,
+	providerId: ProviderId,
+	models: ReadonlyArray<ModelInfo>,
+	nowIso: string
+): Promise<void> {
+	const encryptionKey = getEncryptionKey(env);
+	const encrypted = encryptText(JSON.stringify(models), encryptionKey);
+	const { sql } = await import('drizzle-orm');
+	await db
+		.update(encryptedCredentials)
+		.set({
+			discoveredModels: encrypted,
+			discoveredAt: sql`(datetime('now'))`
+		})
+		.where(
+			and(
+				eq(encryptedCredentials.scope, 'user'),
+				eq(encryptedCredentials.userId, userId),
+				eq(encryptedCredentials.providerId, providerId)
+			)
+		);
 }
 
 async function discoverAndPersist(
 	db: LibSQLDatabase<any>,
 	env: Record<string, string | undefined>,
-	credential: EncryptedCredential
-): Promise<void> {
+	credential: EncryptedCredential,
+	fetchImpl?: typeof fetch
+): Promise<EncryptedCredential | null> {
 	const { discoverProviderModels, persistDiscoveredModels } = await import('./discovery');
 	const synthetic: UserCredentialAdapter = {
 		userId: credential.userId ?? 0,
@@ -194,8 +323,8 @@ async function discoverAndPersist(
 		credentialKind: credential.credentialKind,
 		encryptedData: credential.encryptedData
 	};
-	const models = await discoverProviderModels(synthetic, env);
-	if (models.length === 0) return;
+	const models = await discoverProviderModels(synthetic, env, fetchImpl);
+	if (models.length === 0) return null;
 	await persistDiscoveredModels(
 		db,
 		env,
@@ -203,6 +332,12 @@ async function discoverAndPersist(
 		credential.providerId,
 		models
 	);
+	const encryptionKey = getEncryptionKey(env);
+	return {
+		...credential,
+		discoveredModels: encryptText(JSON.stringify(models), encryptionKey),
+		discoveredAt: new Date().toISOString()
+	};
 }
 
 interface UserCredentialAdapter {

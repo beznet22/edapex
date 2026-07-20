@@ -15,7 +15,8 @@ import { getPotluckConfig } from './potluck';
 import type { ProviderId, ModelId } from './types';
 
 export interface RequestCache {
-	/** userId:providerId → credential row */
+	/** userId:providerId → credential row (null is a real cached value, not
+	 *  "uncached") */
 	credentials: Map<string, EncryptedCredential | null>;
 	/** userId → hidden model ids */
 	visibility: Map<string, Set<ModelId>>;
@@ -64,8 +65,13 @@ export async function getCachedUserCredential(
 		return getUserCredential(db, env, userId, providerId);
 	}
 	const key = credentialKey(userId, providerId);
-	const cached = cache.credentials.get(key);
-	if (cached !== undefined) return cached;
+	if (cache.credentials.has(key)) {
+		// Stored value is a real `null` when the DB confirmed no credential
+		// exists, or the row when one was found. Either way we honour the
+		// cache — including the "no credential" sentinel — so subsequent
+		// calls don't re-query for the same (userId, providerId) pair.
+		return cache.credentials.get(key) ?? null;
+	}
 	const fetched = await getUserCredential(db, env, userId, providerId);
 	cache.credentials.set(key, fetched);
 	return fetched;
@@ -80,8 +86,9 @@ export async function getCachedHiddenModelIdsForUser(
 		return getHiddenModelIdsForUser(db, userId);
 	}
 	const key = visibilityKey(userId);
-	const cached = cache.visibility.get(key);
-	if (cached !== undefined) return cached;
+	if (cache.visibility.has(key)) {
+		return cache.visibility.get(key) ?? new Set();
+	}
 	const fetched = await getHiddenModelIdsForUser(db, userId);
 	cache.visibility.set(key, fetched);
 	return fetched;
@@ -96,8 +103,9 @@ export async function getCachedEnabledModelIdsForUser(
 		return getEnabledModelIdsForUser(db, userId);
 	}
 	const key = visibilityKey(userId);
-	const cached = cache.enabledModels.get(key);
-	if (cached !== undefined) return cached;
+	if (cache.enabledModels.has(key)) {
+		return cache.enabledModels.get(key) ?? new Set();
+	}
 	const fetched = await getEnabledModelIdsForUser(db, userId);
 	cache.enabledModels.set(key, fetched);
 	return fetched;
@@ -112,8 +120,9 @@ export async function getCachedPotluckConfig(
 		return getPotluckConfig(db, schoolId);
 	}
 	const key = potluckKey(schoolId);
-	const cached = cache.potluck.get(key);
-	if (cached !== undefined) return cached;
+	if (cache.potluck.has(key)) {
+		return cache.potluck.get(key) ?? null;
+	}
 	const fetched = await getPotluckConfig(db, schoolId);
 	cache.potluck.set(key, fetched);
 	return fetched;
@@ -138,6 +147,23 @@ export function invalidateCachedPotluckConfig(schoolId: number): void {
 export function invalidateCachedVisibility(userId: number): void {
 	const cache = getRequestCache();
 	if (!cache) return;
+	cache.visibility.delete(visibilityKey(userId));
+	cache.enabledModels.delete(visibilityKey(userId));
+}
+
+/**
+ * Drop every cached entry that belongs to a single user (credentials,
+ * hiddenIds, enabledIds). Called from the credentials command after a
+ * save or delete so the same request lifecycle (or the next one) sees
+ * the fresh row. Safe to call with or without an active request cache.
+ */
+export function invalidateAllForUser(userId: number): void {
+	const cache = getRequestCache();
+	if (!cache) return;
+	const prefix = `${userId}:`;
+	for (const key of cache.credentials.keys()) {
+		if (key.startsWith(prefix)) cache.credentials.delete(key);
+	}
 	cache.visibility.delete(visibilityKey(userId));
 	cache.enabledModels.delete(visibilityKey(userId));
 }

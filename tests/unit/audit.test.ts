@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import fs from "fs/promises";
 import path from "path";
 import { and, eq } from "drizzle-orm";
@@ -22,6 +22,18 @@ const ACTOR = 1;
 const ENCRYPTION_KEY = "edapex-default-encryption-key-32ch";
 const auditFileFor = (schoolId: number): string =>
 	path.join(process.cwd(), "data", "audit-log", `${schoolId}.jsonl`);
+
+// Mock fetch for credential save verification — every test in this
+// file goes through `saveUserCredential` which now verifies the key
+// against the provider's `/models` endpoint. Returning 200 + empty
+// data[] is a valid "ok" response.
+const okFetch = vi.fn(
+	async () =>
+		new Response(JSON.stringify({ data: [] }), {
+			status: 200,
+			headers: { "Content-Type": "application/json" }
+		})
+) as unknown as typeof fetch;
 
 async function removeAuditFile(): Promise<void> {
 	await fs.rm(auditFileFor(SCHOOL), { force: true });
@@ -64,7 +76,8 @@ describe("audit-log: credential CRUD writes audit entries with exact counts", ()
 				userId: USER_ID,
 				providerId: "groq",
 				credentialType: "credential",
-				apiKey: "sk-test-1234"
+				apiKey: "sk-test-1234",
+				fetchImpl: okFetch
 			},
 			{ actorStaffId: ACTOR, schoolId: SCHOOL }
 		);
@@ -88,13 +101,13 @@ describe("audit-log: credential CRUD writes audit entries with exact counts", ()
 		await saveUserCredential(
 			db,
 			env,
-			{ userId: USER_ID, providerId: "groq", credentialType: "credential", apiKey: "sk-first" },
+			{ userId: USER_ID, providerId: "groq", credentialType: "credential", apiKey: "sk-first", fetchImpl: okFetch },
 			{ actorStaffId: ACTOR, schoolId: SCHOOL }
 		);
 		await saveUserCredential(
 			db,
 			env,
-			{ userId: USER_ID, providerId: "groq", credentialType: "credential", apiKey: "sk-second" },
+			{ userId: USER_ID, providerId: "groq", credentialType: "credential", apiKey: "sk-second", fetchImpl: okFetch },
 			{ actorStaffId: ACTOR, schoolId: SCHOOL }
 		);
 
@@ -110,7 +123,7 @@ describe("audit-log: credential CRUD writes audit entries with exact counts", ()
 		await saveUserCredential(
 			db,
 			env,
-			{ userId: USER_ID, providerId: "groq", credentialType: "credential", apiKey: "sk-test" },
+			{ userId: USER_ID, providerId: "groq", credentialType: "credential", apiKey: "sk-test", fetchImpl: okFetch },
 			{ actorStaffId: ACTOR, schoolId: SCHOOL }
 		);
 		await updateUserCredentialEnabled(
@@ -145,7 +158,7 @@ describe("audit-log: credential CRUD writes audit entries with exact counts", ()
 		await saveUserCredential(
 			db,
 			env,
-			{ userId: USER_ID, providerId: "groq", credentialType: "credential", apiKey: "sk-secret-1234" },
+			{ userId: USER_ID, providerId: "groq", credentialType: "credential", apiKey: "sk-secret-1234", fetchImpl: okFetch },
 			{ actorStaffId: ACTOR, schoolId: SCHOOL }
 		);
 		await deleteUserCredential(db, USER_ID, "groq", { actorStaffId: ACTOR, schoolId: SCHOOL });
@@ -244,8 +257,7 @@ describe("audit-log: credential CRUD writes audit entries with exact counts", ()
 			userId: USER_ID,
 			providerId: "groq",
 			credentialType: "credential",
-			apiKey: "sk-test"
-		});
+			apiKey: "sk-test", fetchImpl: okFetch});
 		await deleteUserCredential(db, USER_ID, "groq");
 		await updateUserCredentialEnabled(db, USER_ID, "groq", false);
 

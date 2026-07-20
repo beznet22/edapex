@@ -3,8 +3,12 @@
  * same precedence as the chat layout:
  *
  *   1. Explicit `?className=&sectionName=` query params
- *   2. The persisted `selected-class` cookie (set by `class-selector.svelte`)
- *   3. The staff member's `sm_class_teachers` assignment
+ *   2. The persisted `selected-class` cookie (auto-seeded by the chat
+ *      layout for users with a single resolvable class; otherwise set
+ *      manually by `class-selector.svelte` or the SharedChatView modal)
+ *   3. The staff member's `sm_assign_subjects` row(s) for the active
+ *      academic year — same source the layout's `getAssignedClassSection`
+ *      reads, so cookie-seed and fallback cannot disagree.
  *
  * The filestore page and file API both call this so the per-tenant
  * workspace is rooted at the same class directory regardless of which
@@ -16,8 +20,7 @@ import {
 	smClasses,
 	smSections,
 	smClassSections,
-	smClassTeachers,
-	smAssignClassTeachers,
+	smAssignSubjects,
 	smAcademicYears,
 } from "$lib/server/db/sms-schema";
 import type { ClassSection } from "$lib/types/result-types";
@@ -105,7 +108,7 @@ export async function resolveActiveClassScope({
 		}
 	}
 	if (staffId) {
-		const assigned = await resolveAssignedClass(schoolId, staffId);
+		const assigned = await resolveAssignedClass(schoolId, staffId, academicId);
 		if (assigned) return { ...assigned, academicId };
 	}
 	return null;
@@ -180,27 +183,24 @@ async function resolveClassIdByName(
 async function resolveAssignedClass(
 	schoolId: number,
 	staffId: number,
+	academicId: number,
 ): Promise<{ classId: number; sectionId: number } | null> {
 	const db = await getDatabase();
-	const rows = await db
+	const [row] = await db
 		.select({
-			classId: smAssignClassTeachers.classId,
-			sectionId: smAssignClassTeachers.sectionId,
+			classId: smAssignSubjects.classId,
+			sectionId: smAssignSubjects.sectionId,
 		})
-		.from(smClassTeachers)
-		.innerJoin(
-			smAssignClassTeachers,
-			eq(smAssignClassTeachers.id, smClassTeachers.assignClassTeacherId),
-		)
+		.from(smAssignSubjects)
 		.where(
 			and(
-				eq(smClassTeachers.teacherId, staffId),
-				eq(smClassTeachers.activeStatus, 1),
-				eq(smAssignClassTeachers.schoolId, schoolId),
-				eq(smAssignClassTeachers.activeStatus, 1),
+				eq(smAssignSubjects.teacherId, staffId),
+				eq(smAssignSubjects.schoolId, schoolId),
+				eq(smAssignSubjects.academicId, academicId),
+				eq(smAssignSubjects.activeStatus, 1),
 			),
 		)
 		.limit(1);
-	if (rows.length === 0) return null;
-	return { classId: rows[0].classId!, sectionId: rows[0].sectionId! };
+	if (!row || row.classId == null || row.sectionId == null) return null;
+	return { classId: row.classId, sectionId: row.sectionId };
 }

@@ -46,6 +46,13 @@ describe('concurrent provider table writes', () => {
 	it('encrypted_credentials: 50 concurrent saves for the same key leave exactly one row', async () => {
 		const db = getAppDb();
 		const env = { TOKEN_ENCRYPTION_KEY: ENCRYPTION_KEY };
+		const okFetch = vi.fn(
+			async () =>
+				new Response(JSON.stringify({ data: [] }), {
+					status: 200,
+					headers: { 'Content-Type': 'application/json' }
+				})
+		) as unknown as typeof fetch;
 
 		const writes = Array.from({ length: 50 }, () =>
 			saveUserCredential(db, env, {
@@ -54,7 +61,8 @@ describe('concurrent provider table writes', () => {
 				credentialType: 'credential',
 				apiKey: 'sk-concurrent-test',
 				priority: 1,
-				enabled: true
+				enabled: true,
+				fetchImpl: okFetch
 			})
 		);
 

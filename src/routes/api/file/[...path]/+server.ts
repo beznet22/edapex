@@ -424,9 +424,6 @@ export const PUT: RequestHandler = async ({ params, request, locals, cookies, ur
       examTypeId: parsedExamTypeId,
     });
     if (!fs) throw error(500, 'Workspace filesystem unavailable');
-    if (tenant.classId === null || tenant.sectionId === null) {
-      throw error(400, 'Active class context required for upload. Please select a class.');
-    }
 
     const resolvedPath = resolveScopedPath(tenant, params.path);
     const blob = await request.blob();

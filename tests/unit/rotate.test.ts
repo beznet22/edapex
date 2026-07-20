@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import fs from "fs/promises";
 import path from "path";
 import { and, eq } from "drizzle-orm";
@@ -17,6 +17,14 @@ const USER_ID = 9702;
 const ACTOR = 1;
 const OLD_KEY = "edapex-default-encryption-key-32ch";
 const NEW_KEY = "edapex-rotated-encryption-key-32ch";
+
+const okFetch = vi.fn(
+	async () =>
+		new Response(JSON.stringify({ data: [] }), {
+			status: 200,
+			headers: { "Content-Type": "application/json" }
+		})
+) as unknown as typeof fetch;
 
 const auditFileFor = (schoolId: number): string =>
 	path.join(process.cwd(), "data", "audit-log", `${schoolId}.jsonl`);
@@ -41,7 +49,7 @@ async function seedCredential(): Promise<void> {
 			userId: USER_ID,
 			providerId: "groq",
 			credentialType: "credential",
-			apiKey: "sk-rotate-me-12345"
+			apiKey: "sk-rotate-me-12345", fetchImpl: okFetch
 		},
 		{ actorStaffId: ACTOR, schoolId: SCHOOL }
 	);

@@ -23,6 +23,12 @@
 		metaClass?: string;
 		metaLineClamp?: boolean;
 		description?: string;
+		/**
+		 * Source-aware status subtitle (e.g. "Your key — overrides platform").
+		 * Renders below `meta` so the user can see at a glance whether
+		 * this row is user-driven or platform-default.
+		 */
+		status?: Snippet;
 		onConnect?: () => void;
 		connectLabel?: string;
 		connectContent?: Snippet;
@@ -42,6 +48,7 @@
 		metaClass = "text-[10px] text-muted-foreground/70 leading-snug",
 		metaLineClamp = true,
 		description,
+		status,
 		onConnect,
 		connectLabel = "Connect",
 		connectContent,
@@ -93,6 +100,9 @@
 		{#if meta}
 			<p class="{metaClass}{metaLineClamp ? ' line-clamp-1' : ''}">{meta}</p>
 		{/if}
+		{#if status}
+			{@render status()}
+		{/if}
 		{#if description}
 			<p class="text-[10px] text-muted-foreground/70 leading-snug line-clamp-1">
 				{description}
@@ -116,3 +126,4 @@
 		</Button>
 	{/if}
 </div>
+

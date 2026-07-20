@@ -24,9 +24,9 @@
 import { drizzle, type LibSQLDatabase } from 'drizzle-orm/libsql';
 import { createClient, type Client } from '@libsql/client';
 import * as schema from './app-db.schema';
+import { resolveDbUrl } from './db-url';
 
-const DEFAULT_DB_URL = 'file:./mastra.db';
-const DB_URL = process.env.MASTRA_DB_URL ?? DEFAULT_DB_URL;
+const DB_URL = resolveDbUrl();
 
 let _sharedClient: Client | null = null;
 let _sharedDb: LibSQLDatabase<typeof schema> | null = null;

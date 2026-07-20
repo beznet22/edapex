@@ -7,7 +7,8 @@ import {
 	getCachedPotluckConfig,
 	invalidateCachedCredential,
 	invalidateCachedPotluckConfig,
-	invalidateCachedVisibility
+	invalidateCachedVisibility,
+	invalidateAllForUser
 } from './cache';
 import * as credentials from './credentials';
 import * as visibility from './visibility';
@@ -18,7 +19,8 @@ vi.mock('./credentials', () => ({
 }));
 
 vi.mock('./visibility', () => ({
-	getHiddenModelIdsForUser: vi.fn()
+	getHiddenModelIdsForUser: vi.fn(),
+	getEnabledModelIdsForUser: vi.fn()
 }));
 
 vi.mock('./potluck', () => ({
@@ -147,6 +149,39 @@ describe('getCachedPotluckConfig', () => {
 			invalidateCachedPotluckConfig(1);
 			await getCachedPotluckConfig(db, 1);
 			expect(potluck.getPotluckConfig).toHaveBeenCalledTimes(2);
+		});
+	});
+});
+
+describe('invalidateAllForUser', () => {
+	beforeEach(() => {
+		vi.mocked(credentials.getUserCredential).mockReset();
+		vi.mocked(visibility.getHiddenModelIdsForUser).mockReset();
+		vi.mocked(visibility.getEnabledModelIdsForUser).mockReset();
+	});
+
+	it('drops every credential + visibility entry for a user in one call', async () => {
+		const db = {} as import('drizzle-orm/libsql').LibSQLDatabase<any>;
+		vi.mocked(credentials.getUserCredential).mockResolvedValue(null);
+		vi.mocked(visibility.getHiddenModelIdsForUser).mockResolvedValue(new Set() as any);
+		vi.mocked(visibility.getEnabledModelIdsForUser).mockResolvedValue(new Set() as any);
+
+		await runWithCache(async () => {
+			await getCachedUserCredential(db, {}, 1, 'groq');
+			await getCachedUserCredential(db, {}, 1, 'deepseek');
+			await getCachedUserCredential(db, {}, 2, 'groq');
+			await getCachedHiddenModelIdsForUser(db, 1);
+			invalidateAllForUser(1);
+			await getCachedUserCredential(db, {}, 1, 'groq');
+			await getCachedUserCredential(db, {}, 1, 'deepseek');
+			await getCachedUserCredential(db, {}, 2, 'groq');
+			await getCachedHiddenModelIdsForUser(db, 1);
+
+			// user 1 → 2 providers re-fetched (the initial 2 + the 2 after invalidation)
+			// user 2 → still cached (1 call total)
+			// visibility → re-fetched once
+			expect(credentials.getUserCredential).toHaveBeenCalledTimes(5);
+			expect(visibility.getHiddenModelIdsForUser).toHaveBeenCalledTimes(2);
 		});
 	});
 });

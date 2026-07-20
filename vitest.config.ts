@@ -16,7 +16,8 @@ export default defineConfig({
 							'tests/unit/**/*.test.ts',
 							'src/lib/server/mastra/provider/**/*.test.ts',
 							'src/lib/server/mastra/storage/libsql/**/*.test.ts',
-							'src/lib/utils/**/*.test.ts'
+							'src/lib/utils/**/*.test.ts',
+							'src/lib/context/**/*.test.ts'
 						],
 						environment: 'node',
 						globals: true,

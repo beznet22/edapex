@@ -20,8 +20,9 @@
 import { createClient, type Client } from '@libsql/client';
 import { MIGRATIONS, type Migration } from './registry';
 import { BOOTSTRAP_MIGRATION_ID, BOOTSTRAP_MIGRATION_NAME, MIGRATION_001_INIT_SQL } from './001-init';
+import { resolveDbUrl } from '../db-url';
 
-const DB_URL = process.env.MASTRA_DB_URL ?? 'file:./mastra.db';
+const DB_URL = resolveDbUrl();
 
 async function ensureMigrationsTable(client: Client): Promise<void> {
 	await client.execute(MIGRATION_001_INIT_SQL);

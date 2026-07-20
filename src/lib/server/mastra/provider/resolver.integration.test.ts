@@ -46,6 +46,8 @@ async function cleanup(): Promise<void> {
 		);
 }
 
+const okFetch = vi.fn(async () => new Response(JSON.stringify({ data: [] }), { status: 200, headers: { 'Content-Type': 'application/json' } })) as unknown as typeof fetch;
+
 async function seedPersonalCredential(providerId: ProviderId = 'groq'): Promise<void> {
 	await saveUserCredential(
 		getAppDb(),
@@ -55,7 +57,8 @@ async function seedPersonalCredential(providerId: ProviderId = 'groq'): Promise<
 			providerId,
 			credentialType: 'credential',
 			apiKey: `personal-${providerId}-key`,
-			enabled: true
+			enabled: true,
+			fetchImpl: okFetch
 		}
 	);
 }
@@ -202,7 +205,8 @@ describe('resolver 4-table integration', () => {
 				providerId: 'groq',
 				credentialType: 'credential',
 				apiKey: 'personal-groq-key',
-				enabled: false
+				enabled: false,
+				fetchImpl: okFetch
 			}
 		);
 

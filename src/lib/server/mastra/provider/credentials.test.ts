@@ -27,6 +27,19 @@ vi.mock('$lib/server/audit-log', () => ({
 const envKey = getEncryptionKey({ TOKEN_ENCRYPTION_KEY: 'test-encryption-key-32bytes!' });
 const env = { TOKEN_ENCRYPTION_KEY: envKey };
 
+/**
+ * Default mock `fetch` for credential save tests. Every test calls
+ * `saveUserCredential` (which now verifies the key against the provider's
+ * `/models` endpoint). Tests that want a different response — 4xx,
+ * network error, etc. — override the `fetchImpl` in their input.
+ */
+const mockFetch: typeof fetch = vi.fn(async () => {
+	return new Response(
+		JSON.stringify({ data: [{ id: 'test-model', name: 'Test Model' }] }),
+		{ status: 200, headers: { 'Content-Type': 'application/json' } }
+	);
+}) as unknown as typeof fetch;
+
 async function cleanupUser(userId: number): Promise<void> {
 	const db = getAppDb();
 	await db
@@ -40,6 +53,7 @@ function buildCredentialInput(overrides: Partial<SaveUserCredentialInput> = {}):
 		providerId: 'groq' as ProviderId,
 		credentialType: 'credential',
 		apiKey: 'sk-test-1234567890',
+		fetchImpl: mockFetch,
 		...overrides
 	};
 }
@@ -65,7 +79,7 @@ describe('saveUserCredential', () => {
 	});
 
 	it('creates a credential-type credential and writes an audit log', async () => {
-		const written = await saveUserCredential(getAppDb(), env, buildCredentialInput(), audit);
+		const written = await saveUserCredential(getAppDb(), env, buildCredentialInput(), audit).then((r) => r.credential);
 		expect(written.userId).toBe(1);
 		expect(written.providerId).toBe('groq');
 		expect(written.credentialKind).toBe('personal');
@@ -86,13 +100,13 @@ describe('saveUserCredential', () => {
 	});
 
 	it('updates an existing credential preserving prior encrypted data when no apiKey is supplied', async () => {
-		const first = await saveUserCredential(getAppDb(), env, buildCredentialInput());
-		const second = await saveUserCredential(
+		const first = await saveUserCredential(getAppDb(), env, buildCredentialInput()).then((r) => r.credential);
+		const second = (await saveUserCredential(
 			getAppDb(),
 			env,
 			buildCredentialInput({ apiKey: undefined, priority: 7, enabled: false }),
 			audit
-		);
+)).credential;
 
 		expect(second.id).toBe(first.id);
 		expect(second.priority).toBe(7);
@@ -115,7 +129,7 @@ describe('saveUserCredential', () => {
 	});
 
 	it('creates a custom-type credential with encrypted payload', async () => {
-		const written = await saveUserCredential(
+		const written = (await saveUserCredential(
 			getAppDb(),
 			env,
 			buildCredentialInput({
@@ -126,7 +140,7 @@ describe('saveUserCredential', () => {
 				models: [{ id: 'm1', displayName: 'Model One' }],
 				headers: [{ name: 'X-Custom', value: 'value' }]
 			})
-		);
+)).credential;
 		expect(written.credentialKind).toBe('custom');
 		const decrypted = JSON.parse(decryptText(written.encryptedData!, envKey));
 		expect(decrypted).toMatchObject({
@@ -138,7 +152,7 @@ describe('saveUserCredential', () => {
 	});
 
 	it('merges partial updates into existing custom credential data', async () => {
-		const first = await saveUserCredential(
+		const first = (await saveUserCredential(
 			getAppDb(),
 			env,
 			buildCredentialInput({
@@ -148,9 +162,9 @@ describe('saveUserCredential', () => {
 				displayName: 'Original',
 				models: [{ id: 'm1', displayName: 'Model One' }]
 			})
-		);
+)).credential;
 
-		const second = await saveUserCredential(
+		const second = (await saveUserCredential(
 			getAppDb(),
 			env,
 			buildCredentialInput({
@@ -158,7 +172,7 @@ describe('saveUserCredential', () => {
 				apiKey: undefined,
 				displayName: 'Updated'
 			})
-		);
+)).credential;
 
 		expect(second.id).toBe(first.id);
 		const decrypted = JSON.parse(decryptText(second.encryptedData!, envKey));
@@ -251,11 +265,11 @@ describe('deleteUserCredential', () => {
 	});
 
 	it('deletes the credential and writes an audit log', async () => {
-		const written = await saveUserCredential(
+		const written = (await saveUserCredential(
 			getAppDb(),
 			env,
 			buildCredentialInput({ userId: 3, providerId: 'groq' as ProviderId })
-		);
+)).credential;
 		await deleteUserCredential(getAppDb(), 3, 'groq' as ProviderId, audit);
 		const result = await getUserCredential(getAppDb(), env, 3, 'groq' as ProviderId);
 		expect(result).toBeNull();

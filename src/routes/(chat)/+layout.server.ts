@@ -91,7 +91,7 @@ export const load: LayoutServerLoad = async ({ cookies, locals, url }) => {
     }
   }
 
-  const selectedClassRaw = cookies.get("selected-class");
+  let selectedClassRaw = cookies.get("selected-class");
   const selectedAgentId = cookies.get("selected-agent") || "";
   const potluckAlwaysDonate = cookies.get("potluck-always-donate") || "";
 
@@ -168,6 +168,36 @@ export const load: LayoutServerLoad = async ({ cookies, locals, url }) => {
       token = `${assignedSection.className}(${assignedSection.sectionName})`
         .toLowerCase()
         .replaceAll(" ", "_");
+    }
+  }
+
+  // Auto-seed the `selected-class` cookie for users with a determinable
+  // active class so the workspace resolver always has a classId/sectionId.
+  // Precedence: never overwrite an explicit user choice. Only seed when
+  // the cookie is empty AND the user has a single resolvable class.
+  //   - class_teacher with `assignedSection` → seed with that section
+  //   - IT / admin with exactly one class in `classes` → seed with it
+  //   - everything else (multi-class users, users with no assignment)
+  //     falls through to the sidebar dropdown / onboarding modal flow.
+  if (user && !selectedClassRaw) {
+    const seedSection =
+      assignedSection ??
+      ((user.designation === "it" || user.designation === "admin") &&
+      classes.length === 1
+        ? classes[0]
+        : null);
+    if (
+      seedSection &&
+      typeof seedSection.classId === "number" &&
+      typeof seedSection.sectionId === "number"
+    ) {
+      cookies.set("selected-class", JSON.stringify(seedSection), {
+        path: "/",
+        sameSite: "lax",
+        httpOnly: true,
+        maxAge: CONFIG_COOKIE_MAX_AGE_SEC,
+      });
+      selectedClassRaw = JSON.stringify(seedSection);
     }
   }
   let uploadPath = join(UPLOADS_DIR, token);

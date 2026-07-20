@@ -39,6 +39,12 @@ async function cleanup(): Promise<void> {
 
 async function seedCredential(providerId: string, enabled = true): Promise<void> {
 	const db = getAppDb();
+	const fetchImpl = vi.fn(async () =>
+		new Response(JSON.stringify({ data: [] }), {
+			status: 200,
+			headers: { 'Content-Type': 'application/json' }
+		})
+	) as unknown as typeof fetch;
 	await saveUserCredential(
 		db,
 		{ TOKEN_ENCRYPTION_KEY: ENCRYPTION_KEY },
@@ -47,7 +53,8 @@ async function seedCredential(providerId: string, enabled = true): Promise<void>
 			providerId: providerId as import('./types').ProviderId,
 			credentialType: 'credential',
 			apiKey: `key-${providerId}`,
-			enabled
+			enabled,
+			fetchImpl
 		}
 	);
 }

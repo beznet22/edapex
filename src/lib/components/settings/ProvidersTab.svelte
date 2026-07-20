@@ -206,6 +206,7 @@
 					{#each userConnectedProviders as cred (cred.provider)}
 						{@const badge = badgeForCredential(cred)}
 						{@const info = BUILTIN_PROVIDERS[cred.provider as ProviderId]}
+						{@const isPlatform = cred.source === 'platform'}
 						<ProviderCard
 							providerId={cred.provider}
 							providerName={info?.name ?? cred.provider}
@@ -218,6 +219,17 @@
 							connectVariant="ghost"
 							connectDisabled={removingProviderId === cred.provider}
 						>
+							{#snippet status()}
+								<p
+									class="text-[10px] font-black uppercase tracking-widest leading-snug {isPlatform
+										? 'text-blue-700 dark:text-blue-300'
+										: 'text-emerald-700 dark:text-emerald-300'}"
+								>
+									{isPlatform
+										? 'Platform default (no key)'
+										: 'Your key — overrides platform'}
+								</p>
+							{/snippet}
 							{#snippet connectContent()}
 								{#if removingProviderId === cred.provider}
 									<Spinner class="size-3" />

@@ -89,6 +89,12 @@
 				>Provider config docs</a
 			>
 		{/if}
+		<p
+			class="text-[11px] font-bold text-amber-700 dark:text-amber-300 leading-snug mt-2"
+		>
+			Saving this key will override any platform default for {provider.name}. Your
+			key is encrypted and isolated to your account.
+		</p>
 	</div>
 
 	<Separator class="bg-sidebar-border/10" />

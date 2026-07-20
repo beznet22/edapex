@@ -148,7 +148,12 @@
   });
 
   onMount(() => {
-    if (userContext.isTeacher && !userContext.assignedSection) open = true;
+    if (
+      !userContext.assignedSection &&
+      (userContext.isTeacher || userContext.isCoordinator)
+    ) {
+      open = true;
+    }
   });
 
   const handleLogout = async () => {
@@ -226,7 +231,7 @@
           {`${userContext.getDesignationTitle(userContext.designation)} Onboarding`}
         </AlertDialog.Title>
         <AlertDialog.Description>
-          You are not assigned to any class. Please select a class to work on.
+          Pick the class you'll be working on for this session.
         </AlertDialog.Description>
       </AlertDialog.Header>
       <div class="grid gap-4">

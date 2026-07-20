@@ -96,6 +96,13 @@ async function tryTier1Personal(
 	}
 	const apiKey = resolveApiKeyForCredential(credential, env, providerId);
 	if (!apiKey) {
+		// User has a credential and it is enabled, but the stored key
+		// decrypted to an empty string. Treat this as a HARD user failure:
+		// the key is broken or the encryption key changed. We must not
+		// silently fall through to tier 2/3 because that would route the
+		// user's request through a key they did not choose. The caller
+		// surfaces `empty_api_key` to the UI so the user is prompted to
+		// update their key in Settings.
 		return {
 			result: null,
 			trace: { tier: 1, status: 'failed', reason: 'empty_api_key' }
@@ -288,6 +295,19 @@ export async function resolveProviderKeyWithTrace(
 		};
 		await maybeWriteAuditLog(args, resolved);
 		return resolved;
+	}
+
+	// STRICT tier 1: if the user has a credential but the stored key is
+	// empty/broken, do NOT fall through to tier 2 (pool) or tier 3 (env).
+	// The user explicitly chose to provide their own key — silently
+	// routing through a pool donation or the platform env key would
+	// (a) misattribute the request and (b) leave the user unaware that
+	// their own key is broken. Surface a NoCredentialError so the chat
+	// pipeline can render "Your key is invalid — update it in Settings."
+	if (tier1.trace.reason === 'empty_api_key') {
+		const trace = [tier1.trace];
+		await maybeWriteAuditLog(args, null, trace);
+		throw new AllTiersFailedError(providerId, trace);
 	}
 
 	const tier2 = await tryTier2Pool({

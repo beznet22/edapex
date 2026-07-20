@@ -11,6 +11,8 @@ import {
   getUserCredential,
   getCustomCredentialBaseUrl
 } from "$lib/server/mastra/provider/credentials";
+import { VerificationError } from "$lib/server/mastra/provider/verify-key";
+import { invalidateAllForUser } from "$lib/server/mastra/provider/cache";
 import {
   setModelVisibility,
   setAllModelVisibility as setAllModelVisibilityFn,
@@ -113,11 +115,11 @@ interface ProviderSummary {
 }
 
 type SaveCredentialResult =
-  | { success: true; message: string }
+  | { success: true; message: string; warning?: string }
   | { success: false; message: string };
 
 type SimpleResult =
-  | { success: true }
+  | { success: true; warning?: string }
   | { success: false; message: string };
 
 type GetUserCredentialsResult =
@@ -176,7 +178,7 @@ export const saveUserCredential = command(
         });
       }
 
-      await saveUserCredentialFn(db, envKeys, {
+      const result = await saveUserCredentialFn(db, envKeys, {
         userId: auth.user.id,
         providerId: input.providerId,
         credentialType: input.credentialType,
@@ -189,8 +191,18 @@ export const saveUserCredential = command(
         displayName: input.displayName
       });
 
-      return { success: true, message: 'Provider saved' };
+      // Drop any cached credential/visibility entries for this user so
+      // the next resolve in the same request lifecycle (or the next
+      // request) sees the fresh row instead of a stale `null`.
+      invalidateAllForUser(auth.user.id);
+
+      return result.warning
+        ? { success: true, message: 'Provider saved', warning: result.warning }
+        : { success: true, message: 'Provider saved' };
     } catch (err) {
+      if (err instanceof VerificationError) {
+        return { success: false, message: err.message };
+      }
       if (err instanceof z.ZodError) {
         const issues = err.issues.map(i => i.message).join(', ');
         return { success: false, message: `Invalid custom provider data: ${issues}` };
@@ -216,6 +228,7 @@ export const deleteUserCredential = command(
     try {
       const db = getAppDb();
       await deleteUserCredentialFn(db, auth.user.id, providerId);
+      invalidateAllForUser(auth.user.id);
       return { success: true };
     } catch (err) {
       console.error(`[deleteUserCredential:${providerId}] Failed to delete:`, err);
@@ -298,7 +311,7 @@ export const updateUserCredential = command(
         ? existing.credentialKind
         : 'credential';
 
-      await saveUserCredentialFn(db, envKeys, {
+      const result = await saveUserCredentialFn(db, envKeys, {
         userId: auth.user.id,
         providerId: input.providerId,
         credentialType: input.credentialType ?? credentialType,
@@ -311,8 +324,15 @@ export const updateUserCredential = command(
         displayName: input.displayName
       });
 
-      return { success: true };
+      invalidateAllForUser(auth.user.id);
+
+      return result.warning
+        ? { success: true, warning: result.warning }
+        : { success: true };
     } catch (err) {
+      if (err instanceof VerificationError) {
+        return { success: false, message: err.message };
+      }
       console.error(`[updateUserCredential:${input.providerId}] Failed to update:`, err);
       return { success: false, message: 'Failed to update' };
     }
@@ -335,6 +355,7 @@ export const updateModelVisibility = command(
     try {
       const db = getAppDb();
       await setModelVisibility(db, auth.user.id, modelId, visible);
+      invalidateAllForUser(auth.user.id);
       return { success: true };
     } catch (err) {
       console.error(`[updateModelVisibility:${modelId}] Failed:`, err);
@@ -359,6 +380,7 @@ export const setAllModelVisibility = command(
     try {
       const db = getAppDb();
       await setAllModelVisibilityFn(db, auth.user.id, modelIds, visible);
+      invalidateAllForUser(auth.user.id);
       return { success: true };
     } catch (err) {
       console.error("[setAllModelVisibility] Failed:", err);

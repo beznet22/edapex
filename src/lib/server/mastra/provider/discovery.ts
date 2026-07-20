@@ -203,12 +203,14 @@ function extractModelsFromResponse(json: unknown): RawModel[] {
 
 async function fetchModelsOnce(
 	baseUrl: string,
-	apiKey: string | undefined
+	apiKey: string | undefined,
+	fetchImpl?: typeof fetch
 ): Promise<RawModel[]> {
 	const headers: Record<string, string> = { Accept: 'application/json' };
 	if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
 
-	const response = await fetch(`${baseUrl}/models`, {
+	const doFetch = fetchImpl ?? fetch;
+	const response = await doFetch(`${baseUrl}/models`, {
 		method: 'GET',
 		headers,
 		signal: AbortSignal.timeout(DISCOVERY_TIMEOUT_MS)
@@ -230,10 +232,11 @@ async function fetchModelsOnce(
 
 async function fetchModels(
 	baseUrl: string,
-	apiKey: string | undefined
+	apiKey: string | undefined,
+	fetchImpl?: typeof fetch
 ): Promise<RawModel[]> {
 	return withExponentialBackoff(
-		() => fetchModelsOnce(baseUrl, apiKey),
+		() => fetchModelsOnce(baseUrl, apiKey, fetchImpl),
 		{
 			attempts: DISCOVERY_ATTEMPTS,
 			baseMs: DISCOVERY_BACKOFF_BASE_MS,
@@ -250,7 +253,8 @@ async function fetchModels(
 
 export async function discoverProviderModels(
 	credential: EncryptedCredential | UserCredentialAdapter,
-	env: Record<string, string | undefined>
+	env: Record<string, string | undefined>,
+	fetchImpl?: typeof fetch
 ): Promise<ModelInfo[]> {
 	const providerId = credential.providerId as ProviderId;
 	if (SKIP_DISCOVERY_PROVIDERS.has(providerId)) return [];
@@ -281,7 +285,7 @@ export async function discoverProviderModels(
 
 	let rawModels: RawModel[];
 	try {
-		rawModels = await fetchModels(baseUrl, apiKey);
+		rawModels = await fetchModels(baseUrl, apiKey, fetchImpl);
 	} catch (err) {
 		console.warn(
 			`[discoverProviderModels:${providerId}] Fetch failed for ${baseUrl}/models:`,

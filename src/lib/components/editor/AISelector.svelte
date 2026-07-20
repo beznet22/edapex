@@ -98,6 +98,14 @@
 		if (hasCompletion || isLoading) return;
 		handleGenerate();
 	}
+
+	function handleInputKeyDown(e: KeyboardEvent) {
+		if (e.key !== "Enter" || e.shiftKey) return;
+		if (e.isComposing || e.keyCode === 229) return;
+		e.preventDefault();
+		e.stopPropagation();
+		handleSubmit();
+	}
 </script>
 
 <Command.Root class="w-[350px]">
@@ -118,6 +126,7 @@
 		<div class="relative">
 			<Command.Input
 				bind:value={inputValue}
+				onkeydown={handleInputKeyDown}
 				placeholder={hasCompletion ? "Tell AI what to do next" : "Ask AI to edit or generate…"}
 			/>
 			<Button

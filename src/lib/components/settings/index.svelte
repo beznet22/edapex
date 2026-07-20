@@ -469,16 +469,11 @@
 	 */
 	const enabledModelIds = $derived(availableModelsHolder.enabledIds);
 	/**
-	 * Returns true if the model is currently selected for the chat
-	 * model-selector.
-	 *   - catalog-known: enabled unless hidden
-	 *   - non-catalog:   enabled only if explicitly in `enabledModelIds`
+	 * Delegate the visibility decision to the holder so the chat
+	 * model-selector and the Models tab agree on every model.
 	 */
 	function isModelEnabled(model: AugmentedModelInfo): boolean {
-		if (model.isCatalogKnown) {
-			return !availableModelsHolder.hiddenIds.has(model.id);
-		}
-		return enabledModelIds.has(model.id);
+		return availableModelsHolder.isEnabled(model);
 	}
 	/**
 	 * Set of model ids currently enabled for the model-selector. Used by
