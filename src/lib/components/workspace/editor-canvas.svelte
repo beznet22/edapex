@@ -565,7 +565,7 @@
 		</ScrollArea>
 	{:else if type === "pdf"}
 		<div
-			class="h-full w-full overflow-hidden border border-red-500"
+			class="h-full w-full overflow-hidden borde"
 			bind:this={containerRef}
 		>
 			{#if pdfEngine.isLoading || !pdfEngine.engine}
