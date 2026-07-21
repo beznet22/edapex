@@ -7,6 +7,8 @@ import { getDatabase } from "$lib/server/db";
 import { StudentRepository } from "$lib/server/repository";
 import { readManifest, updateEntry } from "$lib/server/workspace/manifest";
 import { getClassRoster } from "$lib/server/mastra/agents/skill-instructions";
+import { resolveFilesystem } from "$lib/server/mastra/tools/operations/reporting/_shared";
+import { parseMarksheetMarkdown } from "$lib/utils/marksheet-ast-parser";
 import type { TenantContext } from "$lib/server/mastra/tenant-context";
 import type { RequestHandler } from "@sveltejs/kit";
 import type { AuthUser } from "$lib/types/auth-types";
@@ -122,6 +124,73 @@ async function resolveStudentFromArtifact(
 				const fromRelated = await studentFromEntry(related, studentRepo);
 				if (fromRelated) return fromRelated;
 			}
+		}
+	}
+
+	// Last resort before reading the file: try a filename-stem match across
+	// all manifest entries. Directly-uploaded marksheets have no `fileName`
+	// link, but they share a stem with the related upload entry (e.g.
+	// `marksheets/WhatsApp_Image_..._PM-{hash}.md` ↔ `uploads/WhatsApp
+	// Image ... PM.jpg`). Strip hash + extension from the marksheet name
+	// and look for any other entry whose basename contains that stem.
+	if (identifier.filePath) {
+		const basename = identifier.filePath.split("/").pop() ?? identifier.filePath;
+		const stem = basename
+			.replace(/\.(md|json|mdx)$/i, "")
+			.replace(/-[a-f0-9]{6,}$/i, "")
+			.trim();
+		if (stem.length >= 8) {
+			const related = entries.find(
+				(e) => e !== undefined && e.path !== identifier.filePath && e.path.includes(stem),
+			);
+			if (related) {
+				const fromStem = await studentFromEntry(related, studentRepo);
+				if (fromStem) return fromStem;
+			}
+		}
+	}
+
+	// Final fallback: read the marksheet file content and parse admissionNo
+	// out of the markdown. Same pattern format-document uses after generation.
+	if (identifier.filePath && /\.md$/i.test(identifier.filePath)) {
+		try {
+			const fs = await resolveFilesystem(tenant);
+			const raw = await fs.readFile(identifier.filePath);
+			const md = typeof raw === "string" ? raw : Buffer.from(raw).toString("utf-8");
+			const parsed = parseMarksheetMarkdown(md);
+			const admNo =
+				typeof parsed.student?.adminNo === "number"
+					? parsed.student.adminNo
+					: parsed.student?.adminNo
+						? Number(parsed.student.adminNo)
+						: null;
+			if (admNo && Number.isFinite(admNo)) {
+				const student = await studentRepo.getStudentById(admNo, true);
+				if (student) {
+					return {
+						studentId: student.studentId,
+						admissionNo: student.admissionNo ?? admNo,
+						fullName: student.fullName ?? parsed.student?.fullName ?? undefined,
+					};
+				}
+			}
+			const name = parsed.student?.fullName;
+			if (name) {
+				const roster = await getClassRoster({
+					classId: tenant.classId ?? undefined,
+					sectionId: tenant.sectionId ?? undefined,
+					academicId: tenant.academicId ?? undefined,
+				});
+				const match = roster.find(
+					(r) => r.name.toLowerCase() === name.toLowerCase(),
+				);
+				if (match) {
+					const admissionNoNum = match.admissionNo ? Number(match.admissionNo) : undefined;
+					return { studentId: match.id, admissionNo: admissionNoNum, fullName: match.name };
+				}
+			}
+		} catch (err) {
+			console.warn("[generate-pdf] parse-from-file fallback failed:", err);
 		}
 	}
 
