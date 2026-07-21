@@ -565,7 +565,7 @@
 		</ScrollArea>
 	{:else if type === "pdf"}
 		<div
-			class="flex-1 overflow-hidden relative bg-white"
+			class="h-full w-full overflow-hidden relative"
 			bind:this={containerRef}
 		>
 			{#if pdfEngine.isLoading || !pdfEngine.engine}
@@ -619,7 +619,7 @@
 											pageScale}px"
 										style:height="{page.height *
 											pageScale}px"
-										class="bg-white origin-top"
+										class="origin-top"
 									>
 										<RenderLayer
 											{documentId}
