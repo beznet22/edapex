@@ -565,7 +565,7 @@
 		</ScrollArea>
 	{:else if type === "pdf"}
 		<div
-			class="h-full w-full overflow-hidden relative"
+			class="h-full w-full overflow-hidden border border-red-500"
 			bind:this={containerRef}
 		>
 			{#if pdfEngine.isLoading || !pdfEngine.engine}
@@ -614,6 +614,7 @@
 									{@const pageScale = containerWidth
 										? containerWidth / page.width
 										: 1}
+										{console.log({pageScale, page: page.width, height: page.height, containerWidth})}
 									<div
 										style:width="{page.width *
 											pageScale}px"

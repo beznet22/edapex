@@ -297,6 +297,7 @@ async function runFilePipeline(
 		key: "",
 		name: f.name,
 		status: "compressing",
+		source: "upload",
 	}));
 
 	function emitFiles(): void {
@@ -486,13 +487,16 @@ async function runFilePipeline(
 						120000,
 					);
 
-					const formatBody = await formatRes.json() as {
+					const formatBody = (await formatRes.json()) as {
 						success?: boolean;
 						rateLimited?: boolean;
 						retryAfterSeconds?: number;
 						resetAt?: string;
 						error?: string;
 						manifestStatus?: string;
+						contentHash?: string;
+						initialMarkdownPath?: string;
+						studentFullName?: string | null;
 					};
 
 					if (formatBody.rateLimited) {
@@ -516,6 +520,26 @@ async function runFilePipeline(
 					s.manifestStatus = formatBody.manifestStatus ?? "Formatted";
 					emitFiles();
 					formatSuccess = true;
+
+					// Push the new marksheet file as a fresh state entry so the
+					// page's optimistic library shows it the moment format-document
+					// returns. The terminal result aggregator below already keys
+					// off `states[].key` so the new entry flows into `results[]`
+					// and the prune step on the page removes its optimistic
+					// counterpart.
+					if (formatBody.initialMarkdownPath) {
+						const newName =
+							formatBody.initialMarkdownPath.split("/").pop() ??
+							formatBody.studentFullName ?? s.name;
+						states.push({
+							key: formatBody.initialMarkdownPath,
+							name: newName,
+							status: "completed",
+							manifestStatus: formatBody.manifestStatus ?? "Formatted",
+							source: "format-output",
+						});
+						emitFiles();
+					}
 				} catch (err) {
 					if (err instanceof DOMException && (err.name === "AbortError" || err.name === "TimeoutError")) {
 						postCancelled(taskId);
@@ -591,6 +615,7 @@ async function runFormatBatch(
 		key,
 		name: key.split('/').pop() ?? key,
 		status: "formatting" as const,
+		source: "upload" as const,
 	}));
 	emit({ type: "file-update", taskId, files: states.map((s) => ({ ...s })) });
 
@@ -629,13 +654,16 @@ async function runFormatBatch(
 					120000,
 				);
 
-				const formatBody = await formatRes.json() as {
+				const formatBody = (await formatRes.json()) as {
 					success?: boolean;
 					rateLimited?: boolean;
 					retryAfterSeconds?: number;
 					resetAt?: string;
 					error?: string;
 					manifestStatus?: string;
+					contentHash?: string;
+					initialMarkdownPath?: string;
+					studentFullName?: string | null;
 				};
 
 				if (formatBody.rateLimited) {
@@ -663,6 +691,26 @@ async function runFormatBatch(
 				results.push({ key, status: "success", manifestStatus: s.manifestStatus });
 				succeededCount++;
 				formatSuccess = true;
+
+				// Push the new marksheet file as a fresh state entry so the
+				// optimistic library shows it the moment format-document
+				// returns. The terminal result aggregator below already
+				// keys off `states[].key` so the new entry flows into
+				// `results[]` and the prune step on the page removes its
+				// optimistic counterpart.
+				if (formatBody.initialMarkdownPath) {
+					const newName =
+						formatBody.initialMarkdownPath.split("/").pop() ??
+						formatBody.studentFullName ?? s.name;
+					states.push({
+						key: formatBody.initialMarkdownPath,
+						name: newName,
+						status: "completed",
+						manifestStatus: formatBody.manifestStatus ?? "Formatted",
+						source: "format-output",
+					});
+					emit({ type: "file-update", taskId, files: states.map((x) => ({ ...x })) });
+				}
 			} catch (err) {
 				if (err instanceof DOMException && (err.name === "AbortError" || err.name === "TimeoutError")) {
 					postCancelled(taskId, { succeeded: succeededCount, failed: failedCount, results });

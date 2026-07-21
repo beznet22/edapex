@@ -56,14 +56,15 @@ export type BatchExtractResult = {
  * Updated incrementally via `file-update` events from the worker.
  */
 export type UploadFileState = {
-  key: string;
-  name: string;
-  status: "compressing" | "uploading" | "ocr" | "formatting" | "completed" | "error";
-  error?: string;
-  compressedSize?: number;
-  originalSize?: number;
-  manifestStatus?: string;
-  contentHash?: string;
+	key: string;
+	name: string;
+	status: "compressing" | "uploading" | "ocr" | "formatting" | "completed" | "error";
+	error?: string;
+	compressedSize?: number;
+	originalSize?: number;
+	manifestStatus?: string;
+	contentHash?: string;
+	source?: "upload" | "format-output";
 };
 
 export type TaskPhase = "upload" | "ocr" | "format";

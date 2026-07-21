@@ -70,6 +70,20 @@
 	const isPulsing = $derived(hasActivity);
 	const hasCompletedAny = $derived(completedCount + failedCount > 0);
 
+	// Most recently completed task (by `completedAt`). Used to decide
+	// whether the activeCount 1→0 transition is a "leaf" completion
+	// (fire confetti) or an intermediate one (skip confetti because
+	// an auto-chained follow-up task will fire on its own).
+	const lastCompletedTask = $derived.by(() => {
+		const done = tasks.filter(
+			(t) => t.status === "completed" && t.completedAt !== undefined,
+		);
+		if (done.length === 0) return null;
+		return done.reduce((a, b) =>
+			(a.completedAt ?? 0) >= (b.completedAt ?? 0) ? a : b,
+		);
+	});
+
 	let isOpen = $state(false);
 	let wasActive = $state(false);
 	let confettiTrigger = $state(0);
@@ -95,7 +109,19 @@
 			wasActive = true;
 		}
 		if (activeCount === 0 && wasActive) {
-			confettiTrigger++;
+			// `ocr-batch` is always auto-chained to `format-batch` in the
+			// store. The user's mental model is "one Extract operation =
+			// one celebration", so the intermediate ocr-batch completion
+			// is silent — the format-batch completion fires the confetti.
+			const isIntermediateChainStep =
+				lastCompletedTask?.spec.kind === "ocr-batch";
+			// Only fire confetti when the popover is open. On pages where
+			// the popover isn't the focus (e.g. the filestore library),
+			// the user is mid-task on the page and confetti interrupts
+			// them. If they closed the popover, no confetti.
+			if (!isIntermediateChainStep && isOpen) {
+				confettiTrigger++;
+			}
 			wasActive = false;
 		}
 	});

@@ -280,7 +280,9 @@
 		const path = persistedMarkdownPath ?? current?.url;
 		const filePath = path?.replace(/^\/api\/file\//, "") ?? undefined;
 		return {
-			...(current?.contentHash ? { contentHash: current.contentHash } : {}),
+			...(current?.contentHash
+				? { contentHash: current.contentHash }
+				: {}),
 			...(current?.examTypeId ? { examTypeId: current.examTypeId } : {}),
 			...(filePath ? { filePath } : {}),
 		};
@@ -288,7 +290,11 @@
 
 	async function handleDownload() {
 		const identifier = extractStudentIdentifier();
-		if (!identifier.admissionNo && !identifier.studentId && !identifier.filePath) {
+		if (
+			!identifier.admissionNo &&
+			!identifier.studentId &&
+			!identifier.filePath
+		) {
 			if (current?.url) {
 				handleDownloadRaw();
 				return;
@@ -347,16 +353,28 @@
 			viewMode = "pdf";
 			return;
 		}
-		if (current?.validationErrors?.some(e => e.includes("not found in class roster"))) {
+		if (
+			current?.validationErrors?.some((e) =>
+				e.includes("not found in class roster"),
+			)
+		) {
 			import("svelte-sonner").then((m) =>
-				m.toast.error("Fix student admission number error before generating PDF"),
+				m.toast.error(
+					"Fix student admission number error before generating PDF",
+				),
 			);
 			return;
 		}
 		const identifier = extractStudentIdentifier();
-		if (!identifier.admissionNo && !identifier.studentId && !identifier.filePath) {
+		if (
+			!identifier.admissionNo &&
+			!identifier.studentId &&
+			!identifier.filePath
+		) {
 			import("svelte-sonner").then((m) =>
-				m.toast.error("No student data available — cannot generate PDF"),
+				m.toast.error(
+					"No student data available — cannot generate PDF",
+				),
 			);
 			return;
 		}
@@ -465,15 +483,24 @@
 		}
 	}
 
-	let validationState = $state<{ errors: string[]; errorCount: number }>({ errors: [], errorCount: 0 });
+	let validationState = $state<{ errors: string[]; errorCount: number }>({
+		errors: [],
+		errorCount: 0,
+	});
 	let aiFixing = $state(false);
 	let showValidationViewer = $state(false);
 
 	$effect(() => {
 		const a = current;
-		if (a?.validationErrors !== undefined || a?.validationErrorCount !== undefined) {
+		if (
+			a?.validationErrors !== undefined ||
+			a?.validationErrorCount !== undefined
+		) {
 			const errs = a.validationErrors ?? [];
-			validationState = { errors: errs, errorCount: a.validationErrorCount ?? errs.length };
+			validationState = {
+				errors: errs,
+				errorCount: a.validationErrorCount ?? errs.length,
+			};
 		}
 	});
 
@@ -491,20 +518,23 @@
 	});
 
 	const computedArtifactId = $derived(
-		toolOutput?.artifactId ?? current?.id ?? ""
+		toolOutput?.artifactId ?? current?.id ?? "",
 	);
 
 	const marksheetFileUrl = $derived(
-		persistedMarkdownPath ?? validatePath ?? null
+		persistedMarkdownPath ?? validatePath ?? null,
 	);
 
 	const isMarksheetFile = $derived(
 		(marksheetFileUrl ?? "").includes("marksheets/") ||
-		(marksheetFileUrl ?? "").match(/ADM\d+-\d+-.+\.md$/) !== null
+			(marksheetFileUrl ?? "").match(/ADM\d+-\d+-.+\.md$/) !== null,
 	);
 
 	const autoFixPath = $derived(
-		persistedMarkdownPath ?? validatePath ?? (current?.url?.replace(/^\/api\/file\//, "") ?? null)
+		persistedMarkdownPath ??
+			validatePath ??
+			current?.url?.replace(/^\/api\/file\//, "") ??
+			null,
 	);
 
 	async function handleAutoFix() {
@@ -513,7 +543,7 @@
 		try {
 			const res = await fetch(
 				`/api/file/${autoFixPath}?action=auto-fix&examTypeId=${computedExamTypeId}`,
-				{ method: "POST" }
+				{ method: "POST" },
 			);
 			if (!res.ok) return;
 			const data = await res.json();
@@ -807,8 +837,7 @@
 								size="icon"
 								class="size-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/40 disabled:opacity-40 disabled:pointer-events-none"
 								onclick={handleToggleView}
-								disabled={isStreaming ||
-									pdfGenerating}
+								disabled={isStreaming || pdfGenerating}
 								aria-label={viewMode === "pdf"
 									? "View markdown"
 									: "View PDF"}
@@ -915,11 +944,15 @@
 		</div>
 	</header>
 
-	<div class="flex-1 h-full relative group">
+	<div class="h-full relative group">
 		{#if viewMode === "pdf" && pdfGenerating}
 			<div class="h-full flex items-center justify-center">
-				<div class="flex flex-col items-center gap-3 text-muted-foreground">
-					<div class="size-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+				<div
+					class="flex flex-col items-center gap-3 text-muted-foreground"
+				>
+					<div
+						class="size-8 border-2 border-primary border-t-transparent rounded-full animate-spin"
+					/>
 					<span class="text-sm">Generating PDF…</span>
 				</div>
 			</div>
@@ -967,14 +1000,23 @@
 						<button
 							onclick={handleAutoFix}
 							disabled={aiFixing || !computedExamTypeId}
-							class="flex items-center gap-1.5 min-h-12 px-3 sm:min-h-0 sm:py-1.5 rounded-full shadow-lg border border-white/20 text-white text-xs font-medium transition-all duration-200 hover:scale-105 active:scale-95 {validationState.errorCount > 0 ? 'bg-red-500 hover:bg-red-600' : 'bg-emerald-500'} {validationState.errorCount > 0 ? 'animate-pulse' : ''}"
+							class="flex items-center gap-1.5 min-h-12 px-3 sm:min-h-0 sm:py-1.5 rounded-full shadow-lg border border-white/20 text-white text-xs font-medium transition-all duration-200 hover:scale-105 active:scale-95 {validationState.errorCount >
+							0
+								? 'bg-red-500 hover:bg-red-600'
+								: 'bg-emerald-500'} {validationState.errorCount >
+							0
+								? 'animate-pulse'
+								: ''}"
 						>
 							{#if aiFixing}
 								<RefreshCwIcon class="size-3.5 animate-spin" />
 								Fixing...
 							{:else if validationState.errorCount > 0}
 								<AlertCircleIcon class="size-3.5" />
-								{validationState.errorCount} error{validationState.errorCount === 1 ? '' : 's'}
+								{validationState.errorCount} error{validationState.errorCount ===
+								1
+									? ""
+									: "s"}
 							{:else}
 								<CheckIcon class="size-3.5" />
 								Valid
@@ -1008,8 +1050,9 @@
 							{#each validationState.errors as error}
 								<li
 									class="text-xs text-red-600 bg-red-50 px-2 py-1 rounded"
-								>{error}</li
 								>
+									{error}
+								</li>
 							{/each}
 						</ul>
 					</div>
@@ -1091,14 +1134,23 @@
 						<button
 							onclick={handleAutoFix}
 							disabled={aiFixing || !computedExamTypeId}
-							class="flex items-center gap-1.5 min-h-12 px-3 sm:min-h-0 sm:py-1.5 rounded-full shadow-lg border border-white/20 text-white text-xs font-medium transition-all duration-200 hover:scale-105 active:scale-95 {validationState.errorCount > 0 ? 'bg-red-500 hover:bg-red-600' : 'bg-emerald-500'} {validationState.errorCount > 0 ? 'animate-pulse' : ''}"
+							class="flex items-center gap-1.5 min-h-12 px-3 sm:min-h-0 sm:py-1.5 rounded-full shadow-lg border border-white/20 text-white text-xs font-medium transition-all duration-200 hover:scale-105 active:scale-95 {validationState.errorCount >
+							0
+								? 'bg-red-500 hover:bg-red-600'
+								: 'bg-emerald-500'} {validationState.errorCount >
+							0
+								? 'animate-pulse'
+								: ''}"
 						>
 							{#if aiFixing}
 								<RefreshCwIcon class="size-3.5 animate-spin" />
 								Fixing...
 							{:else if validationState.errorCount > 0}
 								<AlertCircleIcon class="size-3.5" />
-								{validationState.errorCount} error{validationState.errorCount === 1 ? '' : 's'}
+								{validationState.errorCount} error{validationState.errorCount ===
+								1
+									? ""
+									: "s"}
 							{:else}
 								<CheckIcon class="size-3.5" />
 								Valid
@@ -1132,24 +1184,23 @@
 							{#each validationState.errors as error}
 								<li
 									class="text-xs text-red-600 bg-red-50 px-2 py-1 rounded"
-								>{error}</li
 								>
+									{error}
+								</li>
 							{/each}
 						</ul>
 					</div>
 				</div>
 			{/if}
 		{:else if current.kind === "pdf"}
-			<ScrollArea class="h-full w-full">
-				<div class="p-6 max-w-3xl mx-auto">
+		
 					<EditorCanvas
 						filename={current.title}
 						url={current.url ?? ""}
 						type="pdf"
 						streaming={false}
 					/>
-				</div>
-			</ScrollArea>
+	
 		{:else if current.kind === "image"}
 			<ScrollArea class="h-full">
 				<div class="flex items-center justify-center p-4 min-h-full">

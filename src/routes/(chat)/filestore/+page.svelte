@@ -137,18 +137,19 @@
 							}
 						} else {
 							if (fileState.status !== "completed" && fileState.status !== "formatting") continue;
+							const isFormatOutput = fileState.source === "format-output";
 							next.set(url, {
 								id: url,
 								title: fileState.name,
 								kind: deriveKind(fileState.name),
 								category: deriveCategory(fileState.name),
-								source: "uploaded",
+								source: isFormatOutput ? "generated" : "uploaded",
 								url,
 								saveUrl: url,
 								size: fileState.compressedSize ?? fileState.originalSize,
 								modifiedAt: Date.now(),
 								examTypeId: task.spec.kind === "process-files" ? task.spec.examTypeId ?? undefined : undefined,
-								status: "processing",
+								status: isFormatOutput ? "success" : "processing",
 								manifestStatus: fileState.manifestStatus,
 								contentHash: fileState.contentHash,
 							});
@@ -170,7 +171,7 @@
 								title: name,
 								kind: deriveKind(name),
 								category: deriveCategory(name),
-								source: "uploaded",
+								source: result.manifestStatus === "Formatted" || result.manifestStatus === "Validated" || result.manifestStatus === "Committed" || result.manifestStatus === "Generated" || result.manifestStatus === "Published" ? "generated" : "uploaded",
 								url,
 								saveUrl: url,
 								modifiedAt: Date.now(),
@@ -191,6 +192,16 @@
 							next.set(url, { ...existing, ...updates });
 							changed = true;
 						}
+					}
+
+					// Successful results mean the server has the file. Prune the
+					// optimistic entry so the freshly-loaded `data.files` wins
+					// on the next render (with full manifest metadata instead
+					// of the partial optimistic state).
+					for (const result of task.result.results) {
+						if (result.status !== "success" || !result.key) continue;
+						const url = `/api/file/${result.key}`;
+						if (next.delete(url)) changed = true;
 					}
 				}
 			}

@@ -25,7 +25,7 @@ import { ALLOWED_DESIGNATIONS } from "$lib/types/sms-types";
 import { ocrBatchService } from '$lib/server/service/ocr-batch.service';
 import { mistralOcrService } from '$lib/server/service/mistral-ocr.service';
 import { OcrWorkspaceStore } from '$lib/server/mastra/storage/ocr/ocr-workspace-store';
-import { addEntry as addWorkspaceEntry, updateEntry } from '$lib/server/workspace/manifest';
+import { addEntry as addWorkspaceEntry, readAllManifests, updateEntry, writeManifest } from '$lib/server/workspace/manifest';
 
 import { getAppDb } from '$lib/server/mastra/storage/libsql/app-db';
 import { marksheetSchema } from '$lib/schema/marksheet';
@@ -399,7 +399,70 @@ export const DELETE: RequestHandler = async ({ params, url, locals, cookies }) =
 
     const resolvedPath = resolveScopedPath(tenant, params.path);
     await fs.deleteFile(resolvedPath);
-    return json({ success: true });
+
+    // Best-effort manifest cleanup across every exam this tenant owns.
+    // Manifest writes are scoped per-exam; we strip the entry from every
+    // manifest that references it so the next load() does not surface a
+    // ghost artifact (file gone, manifest still claiming it exists).
+    //
+    // If the deleted path is a generated marksheet (kind = "marksheet-markdown"
+    // or a "user-file" that was promoted to Formatted), we additionally
+    // revert the linked source upload's status to "Extracted" so the user
+    // can re-trigger formatting without re-uploading the image.
+    const relPath = params.path ?? '';
+    let manifestTouched = 0;
+    let sourceReverted = 0;
+    try {
+      const manifests = await readAllManifests(tenant);
+      let documentId: string | undefined;
+      for (const m of manifests) {
+        if (!m.entries[relPath] && !manifestReferencesPath(m, relPath)) continue;
+        const entry = m.entries[relPath];
+        if (entry?.documentId) documentId = entry.documentId;
+        delete m.entries[relPath];
+        m.byKind.ocrUploads = m.byKind.ocrUploads.filter(
+          (x) => !relPath.endsWith(`ocr/${x.fileName}.md`),
+        );
+        m.byKind.marksheets = m.byKind.marksheets.filter(
+          (x) => !relPath.endsWith(`marksheets/${x.studentId}.json`),
+        );
+        m.byKind.transcripts = m.byKind.transcripts.filter(
+          (x) => !relPath.endsWith(`transcripts/${x.studentId}.json`),
+        );
+        m.byKind.pdfs = m.byKind.pdfs.filter((x) => x.name !== relPath);
+        m.byKind.notes = m.byKind.notes.filter((x) => x.path !== relPath);
+        m.byKind.photos = m.byKind.photos.filter((x) => x.path !== relPath);
+        await writeManifest(tenant, m, m.examTypeId);
+        manifestTouched += 1;
+      }
+
+      // Revert the linked source upload to "Extracted" so the user can
+      // re-run format-document without re-uploading the image.
+      if (documentId) {
+        for (const m of manifests) {
+          const source = Object.values(m.entries).find(
+            (e) => e.documentId === documentId && e.kind === "user-file",
+          );
+          if (source) {
+            await updateEntry(
+              tenant,
+              source.path,
+              { status: "Extracted" },
+              m.examTypeId,
+            );
+            sourceReverted += 1;
+            break;
+          }
+        }
+      }
+    } catch (cleanupErr) {
+      console.warn('[file-api] DELETE manifest cleanup failed', {
+        relPath,
+        err: cleanupErr,
+      });
+    }
+
+    return json({ success: true, path: resolvedPath, manifestTouched, sourceReverted });
   } catch (e: unknown) {
     if (e instanceof WorkspaceScopeError) {
       return json({ success: false, error: 'WORKSPACE_SCOPE_VIOLATION', message: e.message }, { status: 403 });
@@ -408,6 +471,19 @@ export const DELETE: RequestHandler = async ({ params, url, locals, cookies }) =
     return json({ success: false, error: message }, { status: 400 });
   }
 };
+
+function manifestReferencesPath(
+  m: import('$lib/server/workspace/manifest').WorkspaceManifest,
+  relPath: string,
+): boolean {
+  if (m.byKind.ocrUploads.some((x) => relPath.endsWith(`ocr/${x.fileName}.md`))) return true;
+  if (m.byKind.marksheets.some((x) => relPath.endsWith(`marksheets/${x.studentId}.json`))) return true;
+  if (m.byKind.transcripts.some((x) => relPath.endsWith(`transcripts/${x.studentId}.json`))) return true;
+  if (m.byKind.pdfs.some((x) => x.name === relPath)) return true;
+  if (m.byKind.notes.some((x) => x.path === relPath)) return true;
+  if (m.byKind.photos.some((x) => x.path === relPath)) return true;
+  return false;
+}
 
 export const PUT: RequestHandler = async ({ params, request, locals, cookies, url }) => {
   try {

@@ -130,11 +130,8 @@ export const load: PageServerLoad = async ({ url, locals, cookies }) => {
 
 	const filteredEntries = filterMentionableFiles(entries);
 
-	const workspaceClassPrefix = `${tenant.schoolId}/${tenant.classId}-${tenant.sectionId}_AY${tenant.academicId ?? 0}`;
-
 	let files: Artifact[] = await Promise.all(
 		filteredEntries.map(async (e) => {
-			const key = `${workspaceClassPrefix}/${e.name}`;
 			let modifiedAt: number | undefined;
 			try {
 				const s = await fs.stat(e.name);
@@ -143,7 +140,7 @@ export const load: PageServerLoad = async ({ url, locals, cookies }) => {
 				modifiedAt = undefined;
 			}
 			return {
-				id: key,
+				id: e.name,
 				title: e.name.split('/').pop() ?? e.name,
 				kind: deriveKind(e.name),
 				category: deriveCategory(e.name),
@@ -180,9 +177,9 @@ export const load: PageServerLoad = async ({ url, locals, cookies }) => {
 							) {
 								const ext = part.type === "data-generatePDF" ? ".pdf" : ".md";
 								const safeTitle = part.data.title.replace(/[^a-zA-Z0-9._-]/g, "_");
-								// Thread files are created under the active term's exam dir
+								// Thread files are created under the active term's exam dir.
 								threadFileKeys.add(
-									`${workspaceClassPrefix}/exams/examType-${activeTermId || examTypeId || 0}/${safeTitle}${ext}`
+									`exams/examType-${activeTermId || examTypeId || 0}/${safeTitle}${ext}`
 								);
 							}
 						}
