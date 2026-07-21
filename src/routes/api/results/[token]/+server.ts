@@ -8,11 +8,10 @@ import { base64url } from "jose";
 import { render } from "svelte/server";
 import { error, json } from "@sveltejs/kit";
 import { pageToHtml } from "$lib/server/helpers";
-export const GET: RequestHandler = async ({ url, params }) => {
+export const GET: RequestHandler = async ({ params }) => {
   try {
     const { token } = params;
     if (!token) return new Response("Invalid token", { status: 400 });
-    const preview = url.searchParams.get("preview") !== null;
 
     const decoded = base64url.decode(token.split(".")[0]);
     const jsonString = new TextDecoder().decode(decoded);
@@ -60,30 +59,17 @@ export const GET: RequestHandler = async ({ url, params }) => {
       fileName = `res_${student.fullName}_a${student.adminNo}_e${examId}_${Date.now()}`;
     }
 
-    const pdfResult = await generate(html, fileName, preview);
+    const pdfResult = await generate({ htmlContent: html, fileName });
     if (!pdfResult.success) throw new Error(pdfResult.error || "Failed to generate document");
 
-    if (preview) {
-      // Return ZIP file containing both images and PDF
-      if (!pdfResult.zipBuffer) throw new Error("ZIP buffer not found in preview mode");
+    if (!pdfResult.pdfBuffer) throw new Error("PDF buffer not found in PDF mode");
 
-      return new Response(new Uint8Array(pdfResult.zipBuffer), {
-        headers: {
-          "Content-Type": "application/zip",
-          "Content-Disposition": `attachment; filename=${fileName}_files.zip`,
-        },
-      });
-    } else {
-      // Return PDF file
-      if (!pdfResult.pdfBuffer) throw new Error("PDF buffer not found in PDF mode");
-
-      return new Response(new Uint8Array(pdfResult.pdfBuffer), {
-        headers: {
-          "Content-Type": "application/pdf",
-          "Content-Disposition": `inline; filename=${fileName}.pdf`,
-        },
-      });
-    }
+    return new Response(new Uint8Array(pdfResult.pdfBuffer), {
+      headers: {
+        "Content-Type": "application/pdf",
+        "Content-Disposition": `inline; filename=${fileName}.pdf`,
+      },
+    });
   } catch (e) {
     console.error(e);
     return error(500, "Failed to generate document");

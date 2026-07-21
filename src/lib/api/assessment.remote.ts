@@ -34,7 +34,7 @@ export const generateResultPdf = command(
 
       const html = pageToHtml(body, head);
       const fileName = `result_${studentId}_${examId}_${Date.now()}`;
-      const pdfResult = await generate(html, fileName);
+      const pdfResult = await generate({ htmlContent: html, fileName });
       if (!pdfResult.success || !pdfResult.pdfBuffer)
         throw new Error(pdfResult.error || "Failed to generate PDF");
 

@@ -4,6 +4,13 @@ html {
   font-family: "DejaVu Sans", "Liberation Sans", Arial, sans-serif !important;
 }
 
+/* Explicit page geometry — matches the --page-size A4 and --margins 4,2,2,2
+   flags passed to bin/html2pdf so the renderer uses the correct page box. */
+@page {
+  size: A4;
+  margin: 4mm 2mm 2mm 2mm;
+}
+
 .bg-custom {
   background-color: #ffffff;
   /* Position watermark for better PDF output */

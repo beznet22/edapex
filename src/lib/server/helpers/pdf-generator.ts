@@ -5,7 +5,6 @@ import { fileURLToPath } from "url";
 import { execFile } from "child_process";
 import { promisify } from "util";
 import { randomUUID } from "crypto";
-import JSZip from "jszip";
 
 const execFileAsync = promisify(execFile);
 
@@ -19,9 +18,7 @@ let sweepPerformed = false;
 interface GenerationResult {
   success: boolean;
   pdfBuffer?: Buffer;
-  imageBuffers?: Buffer[]; // Add support for multiple image buffers
-  zipBuffer?: Buffer; // Add support for ZIP buffer when previewing
-  filePath?: string; // Add support for returning absolute filepath
+  filePath?: string;
   error?: string;
 }
 
@@ -72,52 +69,19 @@ export async function cleanup(dirPath: string) {
 }
 
 /**
- * Generate PDF or image preview from HTML content using html2pdf binary
- * @param params - Configuration object OR htmlContent string
- * @param fileName - The name for the temporary files (without extension) if first param is string
- * @param preview - If true, returns the first page as a JPEG image for preview
- * @param returnPath - If true, returns the absolute path to the generated file instead of buffer
- * @returns Promise with PDF buffer, image buffer(s), file path, or error
+ * Generate PDF from HTML content using the html2pdf binary.
+ *
+ * @param params.htmlContent - The HTML string to render
+ * @param params.fileName - The base name for temp files (without extension)
+ * @param params.returnPath - If true, returns the absolute path to the PDF instead of the buffer
+ * @returns GenerationResult with either pdfBuffer / filePath on success, or error on failure
  */
-export async function generate(
-  params: {
-    htmlContent: string;
-    fileName: string;
-    preview?: boolean;
-    returnPath?: boolean;
-  }
-): Promise<GenerationResult>;
-
-export async function generate(
-  htmlContent: string,
-  fileName: string,
-  preview?: boolean,
-  returnPath?: boolean
-): Promise<GenerationResult>;
-
-
-export async function generate(
-  first: string | { htmlContent: string; fileName: string; preview?: boolean; returnPath?: boolean },
-  second?: string,
-  third?: boolean,
-  fourth?: boolean
-): Promise<GenerationResult> {
-  let htmlContent: string;
-  let fileName: string;
-  let preview: boolean | undefined;
-  let returnPath = false;
-
-  if (typeof first === "object") {
-    htmlContent = first.htmlContent;
-    fileName = first.fileName;
-    preview = first.preview;
-    returnPath = !!first.returnPath;
-  } else {
-    htmlContent = first;
-    fileName = second!;
-    preview = third;
-    returnPath = !!fourth;
-  }
+export async function generate(params: {
+  htmlContent: string;
+  fileName: string;
+  returnPath?: boolean;
+}): Promise<GenerationResult> {
+  const { htmlContent, fileName, returnPath = false } = params;
 
   // Validate inputs
   if (!htmlContent || typeof htmlContent !== "string") {
@@ -155,39 +119,25 @@ export async function generate(
     const tempHtmlFile = join(uniqueTempDir, `${sanitizedFileName}.html`);
     await writeFile(tempHtmlFile, htmlContent, "utf-8");
 
-    // We can't predefine output filenames for "all pages" rasterization easily,
-    // so we'll rely on reading the directory after execution.
-    let expectedExtension = "";
-    let commandArgs: string[] = [];
+    const tempPdfFile = join(uniqueTempDir, `${sanitizedFileName}.pdf`);
+    // Flags accepted by bin/html2pdf (see cli.rs Commands::Convert):
+    //   --page-size A4     : matches the school's expected paper size
+    //   --margins 4,2,2,2  : top,right,bottom,left in mm comma-separated
+    //                        (replaces the dead --page-margin flag the binary never accepted)
+    //   --background       : print CSS backgrounds (watermark SVG, .bg-custom)
+    //   --scale 1.5        : 1.5× rendering → images rasterized at ~144 DPI
+    //                        (binary's internal DPI is hardcoded at 96; --scale is the only
+    //                         available multiplier, range 0.1-2.0)
+    const commandArgs = [
+      "--page-size", "A4",
+      "--margins", "4,2,2,2",
+      "--background",
+      "--scale", "1.5",
+      "-o", tempPdfFile,
+      tempHtmlFile,
+    ];
+
     let lastStderr = "";
-
-    if (preview) {
-      expectedExtension = ".jpeg";
-      // Use a template for multiple page output: page number padded to 2 digits
-      const outputTemplate = join(uniqueTempDir, `${sanitizedFileName}_page_%02d${expectedExtension}`);
-
-      // Command for ALL pages: remove --raster-pages=first
-      commandArgs = [
-        "--page-margin",
-        "4mm 2mm 2mm 2mm",
-        "--raster-output",
-        outputTemplate,
-        "--raster-dpi",
-        "150",
-        tempHtmlFile,
-      ];
-    } else {
-      expectedExtension = ".pdf";
-      const tempPdfFile = join(uniqueTempDir, `${sanitizedFileName}${expectedExtension}`);
-      commandArgs = [
-        "--page-margin",
-        "4mm 2mm 2mm 2mm",
-        "-o",
-        tempPdfFile,
-        tempHtmlFile,
-      ];
-    }
-
     try {
       const { stderr } = await execFileAsync(html2pdfPath, commandArgs, {
         shell: false,
@@ -196,68 +146,25 @@ export async function generate(
       });
       lastStderr = Buffer.isBuffer(stderr) ? stderr.toString("utf-8") : stderr;
 
-      // After execution, find the relevant files in the temp directory
-      const createdFiles = readdirSync(uniqueTempDir)
-        .filter((file) => file.startsWith(sanitizedFileName) && file.endsWith(expectedExtension))
-        .map((file) => join(uniqueTempDir, file))
-        .sort(); // Sort to ensure pages are in order
-
-      if (createdFiles.length > 0) {
-        if (preview) {
-          // Get all files in the temp directory (PDF and images)
-          const allFiles = readdirSync(uniqueTempDir);
-
-          // Create a ZIP file containing all files
-          const zip = new JSZip();
-
-          for (const file of allFiles) {
-            if (file.endsWith(".html")) continue;
-            const filePath = join(uniqueTempDir, file);
-            const fileBuffer = readFileSync(filePath);
-            zip.file(file, fileBuffer);
-          }
-
-          if (returnPath) {
-            const zipPath = join(uniqueTempDir, `${sanitizedFileName}_files.zip`);
-            const zipBuffer = await zip.generateAsync({ type: "nodebuffer" });
-            await writeFile(zipPath, zipBuffer);
-            // Do NOT clean up directory as the user needs the file
-            return { success: true, filePath: zipPath };
-          }
-
-          const zipBuffer = await zip.generateAsync({ type: "nodebuffer" });
-
-          // Clean up the entire unique temp directory
-          await cleanup(uniqueTempDir);
-          return { success: true, zipBuffer };
-        } else {
-          // For PDF mode, we expect exactly one file
-          const pdfPath = createdFiles[0];
-
-          if (returnPath) {
-            // Do NOT clean up directory
-            return { success: true, filePath: pdfPath };
-          }
-
-          const pdfBuffer = readFileSync(pdfPath);
-          // Clean up the entire unique temp directory
-          await cleanup(uniqueTempDir);
-          return { success: true, pdfBuffer };
+      if (existsSync(tempPdfFile)) {
+        if (returnPath) {
+          // Do NOT clean up directory — caller needs the file path
+          return { success: true, filePath: tempPdfFile };
         }
-      } else {
-        // Cleanup the entire unique temp directory if no output was generated
+        const pdfBuffer = readFileSync(tempPdfFile);
         await cleanup(uniqueTempDir);
-        return {
-          success: false,
-          error: lastStderr
-            ? `html2pdf produced no output. stderr: ${lastStderr.trim()}`
-            : `html2pdf produced no output (no stderr captured).`,
-        };
+        return { success: true, pdfBuffer };
       }
-    } catch (execError: unknown) {
-      // Cleanup the entire unique temp directory on execution error
+
       await cleanup(uniqueTempDir);
-      // A more robust cleanup might involve searching for all generated files again
+      return {
+        success: false,
+        error: lastStderr
+          ? `html2pdf produced no output. stderr: ${lastStderr.trim()}`
+          : `html2pdf produced no output (no stderr captured).`,
+      };
+    } catch (execError: unknown) {
+      await cleanup(uniqueTempDir);
       const stderr =
         typeof execError === "object" && execError !== null && "stderr" in execError
           ? Buffer.isBuffer((execError as { stderr?: unknown }).stderr)
@@ -275,8 +182,7 @@ export async function generate(
           : `html2pdf execution failed: ${message}`,
       };
     }
-  } catch (error: any) {
-    // Ensure cleanup happens even if there's an unexpected error
+  } catch (error: unknown) {
     try {
       if (existsSync(uniqueTempDir)) {
         await cleanup(uniqueTempDir);
@@ -284,9 +190,10 @@ export async function generate(
     } catch (cleanupError) {
       console.error("Error during cleanup in catch block:", cleanupError);
     }
+    const message = error instanceof Error ? error.message : String(error);
     return {
       success: false,
-      error: `Generation failed: ${error.message}`,
+      error: `Generation failed: ${message}`,
     };
   }
 }
