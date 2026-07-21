@@ -30,11 +30,33 @@ async function resolveStudentFromFilePath(
 	tenant: TenantContext,
 	studentRepo: { getStudentById: (id: number, isAdminNo?: boolean) => Promise<{ studentId: number; admissionNo?: number | null; fullName?: string | null } | null> },
 ): Promise<{ studentId: number; admissionNo?: number; fullName?: string } | null> {
-	const examTypeId = extractExamTypeFromPath(filePath);
-	if (!examTypeId) return null;
+	// Use the tenant's resolved examTypeId rather than extracting it from the
+	// path — marksheet paths (`marksheets/{name}-{hash}.md`) don't carry the
+	// `examType-{id}` marker that `extractExamTypeFromPath` looks for, so
+	// that strategy fails for the most common case.
+	const examTypeId = tenant.examTypeId;
+	if (examTypeId === null || examTypeId === undefined) return null;
 
 	const manifest = await readManifest(tenant, examTypeId);
-	const entry = manifest.entries[filePath];
+	const entries = Object.values(manifest.entries);
+
+	// Manifest keys are relative paths like `marksheets/ADM{admNo}-{examTypeId}-{name}.md`
+	// or `marksheets/{name}-{hash}.md`. The client may send either:
+	//   - the raw manifest key (streamed marksheets)
+	//   - the workspace-prefixed path from `/api/file/` (filestore artifacts)
+	//   - just a filename as a last resort
+	const basename = filePath.split("/").pop() ?? filePath;
+	const candidates = [
+		filePath,
+		filePath.replace(/^\/?workspaces\/[^/]+\/exams\/[^/]+\//, ""),
+		filePath.replace(/^\/?api\/file\//, ""),
+		basename,
+	];
+	const entry =
+		candidates
+			.map((c) => manifest.entries[c])
+			.find((e) => e !== undefined) ??
+		entries.find((e) => (e.path.split("/").pop() ?? e.path) === basename);
 
 	if (entry) {
 		if (entry.studentId) {
