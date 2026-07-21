@@ -82,6 +82,16 @@ async function resolveStudentFromArtifact(
 
 	if (examTypeId === null || examTypeId === undefined) return null;
 
+	// The manifest is keyed by (schoolId, classId, sectionId, examTypeId).
+	// Without classId/sectionId the workspace filesystem can't locate the
+	// manifest directory, so fail fast with a clear message instead of a
+	// downstream filesystem error.
+	if (tenant.classId === null || tenant.sectionId === null) {
+		throw new Error(
+			"ACTIVE_CLASS_REQUIRED: cannot locate manifest without classId/sectionId — select a class via class-selector",
+		);
+	}
+
 	let manifest;
 	try {
 		manifest = await readManifest(tenant, examTypeId);
