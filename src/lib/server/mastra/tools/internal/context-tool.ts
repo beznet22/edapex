@@ -88,7 +88,7 @@ export const getContextTool = createTool({
             }
 
             if (types.includes('class')) {
-                const classSection = await resultRepo.getAssignedClassSection({ staffId, classId: ctx.classId, sectionId: ctx.sectionId });
+                const classSection = await resultRepo.getAssignedClassSection({ staffId, classId: ctx.classId ?? undefined, sectionId: ctx.sectionId ?? undefined });
                 results.classAssignment = {
                     assignedClassSection: classSection,
                 };

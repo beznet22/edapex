@@ -99,10 +99,11 @@ async function resolveStudent(
     if (classId === null || sectionId === null) {
       throw new Error("STUDENT_NOT_FOUND: name-based lookup requires classId and sectionId");
     }
-    const matches = (await studentRepo.getStudentsByClassSection(
+    const rawMatches = await studentRepo.getStudentsByClassSection(
       { classId, sectionId },
       criteria.fullName ?? undefined
-    )) as Array<{ id: number; fullName: string | null }>;
+    );
+    const matches = rawMatches?.map((r) => ({ id: r.id, fullName: r.name })) ?? [];
     if (!matches || matches.length === 0) {
       const label = criteria.fullName ?? "";
       throw new Error(`STUDENT_NOT_FOUND: no active student matching "${label}" in classId=${classId}/sectionId=${sectionId}`);

@@ -1,7 +1,7 @@
 import { describe, test, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import type { ParseContext, Marksheet } from '$lib/utils/marksheet-ast-parser';
+import type { ParseContext } from '$lib/utils/marksheet-ast-parser';
 import { parseMarksheetMarkdown, generateMarksheetMarkdown } from '$lib/utils/marksheet-ast-parser';
 import { marksheetSchema } from '$lib/schema/marksheet';
 

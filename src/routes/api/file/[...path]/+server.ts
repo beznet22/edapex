@@ -25,7 +25,7 @@ import { ALLOWED_DESIGNATIONS } from "$lib/types/sms-types";
 import { ocrBatchService } from '$lib/server/service/ocr-batch.service';
 import { mistralOcrService } from '$lib/server/service/mistral-ocr.service';
 import { OcrWorkspaceStore } from '$lib/server/mastra/storage/ocr/ocr-workspace-store';
-import { addEntry as addWorkspaceEntry, readAllManifests, updateEntry, writeManifest } from '$lib/server/workspace/manifest';
+import { addEntry as addWorkspaceEntry, readAllManifests, updateEntry, writeManifest, type FileStatus } from '$lib/server/workspace/manifest';
 
 import { getAppDb } from '$lib/server/mastra/storage/libsql/app-db';
 import { marksheetSchema } from '$lib/schema/marksheet';
@@ -595,6 +595,7 @@ export const PUT: RequestHandler = async ({ params, request, locals, cookies, ur
 
     // ── Marksheet validation ──
     let validationErrors: string[] = [];
+    let status: string | undefined;
     if (manifestRelPath.includes('marksheets/') && manifestRelPath.endsWith('.md')) {
       try {
         const { parseMarksheetMarkdown } = await import('$lib/utils/marksheet-ast-parser');

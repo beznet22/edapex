@@ -160,7 +160,7 @@ describe('validate-marksheet retry-with-feedback', () => {
     const result = await runTool(
       {
         currentMarkdownPath: 'marksheets/188-aaaaaaaa.md',
-        student: { id: 188, name: 'Test Student', admissionNo: 225 },
+        student: { id: 188, fullName: 'Test Student', admissionNo: 225 },
         reason: 'test',
         title: 'Test'
       },
@@ -187,7 +187,7 @@ describe('validate-marksheet retry-with-feedback', () => {
     const result = await runTool(
       {
         currentMarkdownPath: 'marksheets/188-aaaaaaaa.md',
-        student: { id: 188, name: 'Test Student', admissionNo: 225 },
+        student: { id: 188, fullName: 'Test Student', admissionNo: 225 },
         reason: 'test',
         title: 'Test'
       },
@@ -216,7 +216,7 @@ describe('validate-marksheet retry-with-feedback', () => {
     const result = await runTool(
       {
         currentMarkdownPath: 'marksheets/188-aaaaaaaa.md',
-        student: { id: 188, name: 'Test Student', admissionNo: 225 },
+        student: { id: 188, fullName: 'Test Student', admissionNo: 225 },
         reason: 'test',
         title: 'Test'
       },
@@ -238,7 +238,7 @@ describe('validate-marksheet retry-with-feedback', () => {
     const result = await runTool(
       {
         currentMarkdownPath: 'marksheets/188-aaaaaaaa.md',
-        student: { id: 188, name: 'Test Student', admissionNo: 225 },
+        student: { id: 188, fullName: 'Test Student', admissionNo: 225 },
         reason: 'test',
         title: 'Test'
       },
@@ -271,7 +271,7 @@ describe('validate-marksheet retry-with-feedback', () => {
     const result = await runTool(
       {
         currentMarkdownPath: 'marksheets/188-aaaaaaaa.md',
-        student: { id: 188, name: 'Test Student', admissionNo: 225 },
+        student: { id: 188, fullName: 'Test Student', admissionNo: 225 },
         reason: 'test',
         title: 'Test'
       },
