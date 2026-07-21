@@ -7,6 +7,7 @@ import { getClassRoster } from '$lib/server/mastra/agents/skill-instructions';
 import { extractRateLimitFromHeaders } from '$lib/provider/rate-limit';
 import { deriveInitialFilename } from '$lib/server/mastra/tools/operations/reporting/marksheet/stream-document';
 import { commitMarksheetLogic } from '$lib/server/mastra/tools/operations/reporting/marksheet/commit-marksheet';
+import { buildMarksheetParseContext } from '$lib/server/mastra/tools/operations/reporting/marksheet/parse-context';
 import { marksheetSchema, type Marksheet } from '$lib/schema/marksheet';
 import { ALLOWED_DESIGNATIONS } from '$lib/types/sms-types';
 import { GROQ_FORMAT_MODEL } from '$lib/server/mastra/agents/format';
@@ -303,8 +304,11 @@ MIDDLEBASIC: Subject Code | MTA (30) | CA (10) | REPORT (10) | EXAM (50)`;
     await updateEntry(tenant, entry.path, { status: 'Formatted' }, examTypeId);
   }
 
-  // Parse generated marksheet to resolve student identity
-  const { parseMarksheetMarkdown } = await import('$lib/utils/marksheet-ast-parser');
+  // Parse generated marksheet to resolve student identity.
+  // Use the shared parse-context builder so subjectId is resolved from
+  // the school subject mapping, school info from the SchoolRepository, and
+  // roster is available for name-based student resolution. This matches
+  // the pipeline used by /api/file/[...path] PUT validation and /api/commit.
   let parsedAdmNo: number | null = null;
   let resolvedStudentId: number | null = entry.studentId ?? null;
   let resolvedAdmNo: number | null = null;
@@ -312,11 +316,18 @@ MIDDLEBASIC: Subject Code | MTA (30) | CA (10) | REPORT (10) | EXAM (50)`;
   let resolutionError: string | null = null;
   let parsedMarksheet: Marksheet | null = null;
   try {
-    parsedMarksheet = parseMarksheetMarkdown(markdown);
+    const { parseMarksheetMarkdown } = await import('$lib/utils/marksheet-ast-parser');
+    const parseContext = await buildMarksheetParseContext(markdown, tenant);
+    parsedMarksheet = parseMarksheetMarkdown(markdown, parseContext);
     const parsed = parsedMarksheet;
     parsedAdmNo = parsed.student?.adminNo != null ? Number(parsed.student.adminNo) : null;
     studentFullName = parsed.student?.fullName ?? null;
-    console.log('[format-document] post-format parse result', { parsedAdmNo, studentFullName, adminNoRaw: parsed.student?.adminNo });
+    console.log('[format-document] post-format parse result', {
+      parsedAdmNo,
+      studentFullName,
+      adminNoRaw: parsed.student?.adminNo,
+      subjectIdSample: parsed.records?.[0]?.subjectId,
+    });
     if (parsedAdmNo) {
       const roster = await getClassRoster({
         classId: tenant.classId ?? undefined,
