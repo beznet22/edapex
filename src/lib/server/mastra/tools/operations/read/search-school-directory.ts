@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { createTool } from "@mastra/core/tools";
 import { like } from "drizzle-orm";
-import type { TenantContext } from "tenant-context";
+import type { TenantContext } from "$lib/server/mastra/tenant-context";
 import { StudentRepository } from "../../../../repository/student.repo";
 import { StaffRepository } from "../../../../repository/staff.repo";
 import { smStaffs } from "../../../../db/sms-schema";

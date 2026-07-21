@@ -61,7 +61,7 @@
 
 	let activeTermId = $state(data.activeTermId);
 	let searchQuery = $state("");
-	let categoryFilter = $state<"all" | "images" | "files">("images");
+	let categoryFilter = $state<"all" | "images" | "files">("files");
 	let sourceFilter = $state<Set<ArtifactSource>>(new Set());
 	let categoryMulti = $state<Set<ArtifactCategory>>(new Set());
 	let viewMode = $state<"grid" | "list">("grid");
