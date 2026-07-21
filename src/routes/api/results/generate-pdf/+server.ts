@@ -30,35 +30,48 @@ async function resolveStudentFromFilePath(
 	tenant: TenantContext,
 	studentRepo: { getStudentById: (id: number, isAdminNo?: boolean) => Promise<{ studentId: number; admissionNo?: number | null; fullName?: string | null } | null> },
 ): Promise<{ studentId: number; admissionNo?: number; fullName?: string } | null> {
-	// Use the tenant's resolved examTypeId rather than extracting it from the
-	// path — marksheet paths (`marksheets/{name}-{hash}.md`) don't carry the
-	// `examType-{id}` marker that `extractExamTypeFromPath` looks for, so
-	// that strategy fails for the most common case.
-	const examTypeId = tenant.examTypeId;
-	if (examTypeId === null || examTypeId === undefined) return null;
-
-	const manifest = await readManifest(tenant, examTypeId);
-	const entries = Object.values(manifest.entries);
-
-	// Manifest keys are relative paths like `marksheets/ADM{admNo}-{examTypeId}-{name}.md`
-	// or `marksheets/{name}-{hash}.md`. The client may send either:
-	//   - the raw manifest key (streamed marksheets)
-	//   - the workspace-prefixed path from `/api/file/` (filestore artifacts)
-	//   - just a filename as a last resort
 	const basename = filePath.split("/").pop() ?? filePath;
-	const candidates = [
+	const candidateShapes = [
 		filePath,
 		filePath.replace(/^\/?workspaces\/[^/]+\/exams\/[^/]+\//, ""),
 		filePath.replace(/^\/?api\/file\//, ""),
 		basename,
 	];
-	const entry =
-		candidates
-			.map((c) => manifest.entries[c])
-			.find((e) => e !== undefined) ??
-		entries.find((e) => (e.path.split("/").pop() ?? e.path) === basename);
 
-	if (entry) {
+	const examTypeIdsToProbe = new Set<number>();
+	if (tenant.examTypeId !== null && tenant.examTypeId !== undefined) {
+		examTypeIdsToProbe.add(tenant.examTypeId);
+	}
+	// Fallback: also probe all exam types for the active school, in case
+	// the marksheet was generated under a different term than the active one.
+	try {
+		const allExamTypes = await readAllExamTypeIds(tenant);
+		for (const id of allExamTypes) examTypeIdsToProbe.add(id);
+	} catch (err) {
+		console.warn("[generate-pdf] readAllExamTypeIds failed:", err);
+	}
+
+	let bestEntry: { entry: NonNullable<ReturnType<typeof pickEntry>>; examTypeId: number } | null = null;
+
+	for (const examTypeId of examTypeIdsToProbe) {
+		let manifest;
+		try {
+			manifest = await readManifest(tenant, examTypeId);
+		} catch {
+			continue;
+		}
+		const found = pickEntry(manifest, candidateShapes, basename);
+		if (found && hasIdentity(found)) {
+			bestEntry = { entry: found, examTypeId };
+			break;
+		}
+		if (found && !bestEntry) {
+			bestEntry = { entry: found, examTypeId };
+		}
+	}
+
+	if (bestEntry) {
+		const { entry } = bestEntry;
 		if (entry.studentId) {
 			const student = await studentRepo.getStudentById(entry.studentId);
 			if (student) {
@@ -72,6 +85,13 @@ async function resolveStudentFromFilePath(
 			}
 		}
 	}
+
+	console.warn("[generate-pdf] resolveStudentFromFilePath: no match", {
+		filePath,
+		basename,
+		tenantExamTypeId: tenant.examTypeId,
+		probedExamTypeCount: examTypeIdsToProbe.size,
+	});
 
 	const studentName = extractNameFromMarksheetPath(filePath);
 	if (studentName) {
@@ -90,6 +110,35 @@ async function resolveStudentFromFilePath(
 	}
 
 	return null;
+}
+
+function pickEntry(
+	manifest: Awaited<ReturnType<typeof readManifest>>,
+	candidates: string[],
+	basename: string,
+) {
+	for (const c of candidates) {
+		if (manifest.entries[c]) return manifest.entries[c];
+	}
+	const entries = Object.values(manifest.entries);
+	return entries.find((e) => (e.path.split("/").pop() ?? e.path) === basename);
+}
+
+function hasIdentity(entry: { studentId?: number; admissionNo?: number }): boolean {
+	return typeof entry.studentId === "number" || typeof entry.admissionNo === "number";
+}
+
+async function readAllExamTypeIds(tenant: TenantContext): Promise<number[]> {
+	const { smExamTypes } = await import("$lib/server/db/sms-schema");
+	const { getDatabase } = await import("$lib/server/db");
+	const { desc, eq } = await import("drizzle-orm");
+	const db = await getDatabase();
+	const rows = await db
+		.select({ id: smExamTypes.id })
+		.from(smExamTypes)
+		.where(eq(smExamTypes.schoolId, tenant.schoolId))
+		.orderBy(desc(smExamTypes.id));
+	return rows.map((r) => r.id);
 }
 
 export const POST: RequestHandler = async ({ request, locals, cookies }) => {
