@@ -120,19 +120,16 @@ export async function generate(params: {
     await writeFile(tempHtmlFile, htmlContent, "utf-8");
 
     const tempPdfFile = join(uniqueTempDir, `${sanitizedFileName}.pdf`);
-    // Flags accepted by bin/html2pdf (see cli.rs Commands::Convert):
-    //   --page-size A4     : matches the school's expected paper size
-    //   --margins 4,2,2,2  : top,right,bottom,left in mm comma-separated
-    //                        (replaces the dead --page-margin flag the binary never accepted)
-    //   --background       : print CSS backgrounds (watermark SVG, .bg-custom)
-    //   --scale 1.5        : 1.5× rendering → images rasterized at ~144 DPI
-    //                        (binary's internal DPI is hardcoded at 96; --scale is the only
-    //                         available multiplier, range 0.1-2.0)
+    // Flags accepted by the deployed bin/html2pdf (verified via --help):
+    //   --page-size A4                      A4, A3, A5, Letter, Legal, Tabloid,
+    //                                       or custom like '210mmx297mm'
+    //   --page-margin "4mm 2mm 2mm 2mm"     1/2/4 values; binary accepts mm directly
+    //                                       (--page-margin singular — the binary does
+    //                                       NOT accept --margins or --scale or --background)
+    //   -o <PATH>                           output path; defaults to <input>.pdf alongside input
     const commandArgs = [
       "--page-size", "A4",
-      "--margins", "4,2,2,2",
-      "--background",
-      "--scale", "1.5",
+      "--page-margin", "4mm 2mm 2mm 2mm",
       "-o", tempPdfFile,
       tempHtmlFile,
     ];
