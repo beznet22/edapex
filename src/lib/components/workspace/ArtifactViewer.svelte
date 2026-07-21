@@ -263,19 +263,27 @@
 		}
 	}
 
-	function extractStudentIdentifier(): { admissionNo?: number; studentId?: number; filePath?: string } {
+	function extractStudentIdentifier(): {
+		admissionNo?: number;
+		studentId?: number;
+		contentHash?: string;
+		filePath?: string;
+		examTypeId?: number;
+	} {
+		// Send what the artifact already carries from the manifest (loaded by
+		// the filestore page server at +page.server.ts:210-260). No path
+		// derivation needed — the server does the manifest lookup.
 		if (toolOutput?.adminNo) return { admissionNo: toolOutput.adminNo };
 		if (toolOutput?.studentId) return { studentId: toolOutput.studentId };
 		if (current?.admissionNo) return { admissionNo: current.admissionNo };
 		if (current?.studentId) return { studentId: current.studentId };
 		const path = persistedMarkdownPath ?? current?.url;
-		if (path) {
-			const m = path.match(/ADM(\d+)/);
-			if (m) return { admissionNo: Number(m[1]) };
-			const filePath = path.replace(/^\/api\/file\//, "");
-			return { filePath };
-		}
-		return {};
+		const filePath = path?.replace(/^\/api\/file\//, "") ?? undefined;
+		return {
+			...(current?.contentHash ? { contentHash: current.contentHash } : {}),
+			...(current?.examTypeId ? { examTypeId: current.examTypeId } : {}),
+			...(filePath ? { filePath } : {}),
+		};
 	}
 
 	async function handleDownload() {
@@ -361,7 +369,18 @@
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify(identifier),
 			});
-			if (!res.ok) throw new Error(`HTTP ${res.status}`);
+			if (!res.ok) {
+				let serverMessage = `HTTP ${res.status}`;
+				try {
+					const errorBody = (await res.json()) as { error?: unknown };
+					if (typeof errorBody.error === "string") {
+						serverMessage = errorBody.error;
+					}
+				} catch {
+					// body was not JSON or unreadable; fall back to HTTP status
+				}
+				throw new Error(serverMessage);
+			}
 			const data = await res.json();
 			if (data.error) throw new Error(data.error);
 

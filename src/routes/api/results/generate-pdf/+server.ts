@@ -10,135 +10,144 @@ import { getClassRoster } from "$lib/server/mastra/agents/skill-instructions";
 import type { TenantContext } from "$lib/server/mastra/tenant-context";
 import type { RequestHandler } from "@sveltejs/kit";
 import type { AuthUser } from "$lib/types/auth-types";
+import type { ManifestEntry } from "$lib/server/workspace/manifest";
 
-function extractExamTypeFromPath(filePath: string): number | null {
-	const match = filePath.match(/examType-(\d+)/);
-	return match ? Number(match[1]) : null;
-}
+type ResolvedStudent = {
+	studentId: number;
+	admissionNo?: number;
+	fullName?: string;
+};
+
+type StudentRepoLike = {
+	getStudentById: (
+		id: number,
+		isAdminNo?: boolean,
+	) => Promise<{ studentId: number; admissionNo?: number | null; fullName?: string | null } | null>;
+};
 
 function extractNameFromMarksheetPath(filePath: string): string | null {
 	const match = filePath.match(/marksheets\/(.+?)\.md$/);
 	if (!match) return null;
 	const base = match[1];
-	const withoutHash = base.replace(/-[a-f0-9]{6,}$/, '');
-	const cleaned = withoutHash.replace(/_(jpg|png|jpeg|gif|bmp|webp)$/, '');
-	return cleaned.replace(/_/g, ' ').trim() || null;
+	const withoutHash = base.replace(/-[a-f0-9]{6,}$/, "");
+	const cleaned = withoutHash.replace(/_(jpg|png|jpeg|gif|bmp|webp)$/, "");
+	return cleaned.replace(/_/g, " ").trim() || null;
 }
 
-async function resolveStudentFromFilePath(
-	filePath: string,
+async function studentFromEntry(
+	entry: ManifestEntry,
+	studentRepo: StudentRepoLike,
+): Promise<ResolvedStudent | null> {
+	if (typeof entry.studentId === "number") {
+		const student = await studentRepo.getStudentById(entry.studentId);
+		if (student) {
+			return {
+				studentId: student.studentId,
+				admissionNo: student.admissionNo ?? undefined,
+				fullName: student.fullName ?? undefined,
+			};
+		}
+	}
+	if (typeof entry.admissionNo === "number") {
+		const student = await studentRepo.getStudentById(entry.admissionNo, true);
+		if (student) {
+			return {
+				studentId: student.studentId,
+				admissionNo: student.admissionNo ?? undefined,
+				fullName: student.fullName ?? undefined,
+			};
+		}
+	}
+	return null;
+}
+
+/**
+ * Resolve a student identity from an artifact-style identifier. Mirrors the
+ * lookup pattern in `format-document`: prefer `contentHash`, then direct
+ * `filePath` key, then basename. If the matched entry has no identity yet
+ * (e.g. the marksheet entry pre-format-document), follow its `fileName`
+ * field to find a related user-file/upload entry that does.
+ */
+async function resolveStudentFromArtifact(
+	identifier: { contentHash?: string; filePath?: string; examTypeId?: number },
 	tenant: TenantContext,
-	studentRepo: { getStudentById: (id: number, isAdminNo?: boolean) => Promise<{ studentId: number; admissionNo?: number | null; fullName?: string | null } | null> },
-): Promise<{ studentId: number; admissionNo?: number; fullName?: string } | null> {
-	const basename = filePath.split("/").pop() ?? filePath;
-	const candidateShapes = [
-		filePath,
-		filePath.replace(/^\/?workspaces\/[^/]+\/exams\/[^/]+\//, ""),
-		filePath.replace(/^\/?api\/file\//, ""),
-		basename,
-	];
+	studentRepo: StudentRepoLike,
+): Promise<ResolvedStudent | null> {
+	const examTypeId =
+		typeof identifier.examTypeId === "number" && identifier.examTypeId > 0
+			? identifier.examTypeId
+			: tenant.examTypeId;
 
-	const examTypeIdsToProbe = new Set<number>();
-	if (tenant.examTypeId !== null && tenant.examTypeId !== undefined) {
-		examTypeIdsToProbe.add(tenant.examTypeId);
-	}
-	// Fallback: also probe all exam types for the active school, in case
-	// the marksheet was generated under a different term than the active one.
+	if (examTypeId === null || examTypeId === undefined) return null;
+
+	let manifest;
 	try {
-		const allExamTypes = await readAllExamTypeIds(tenant);
-		for (const id of allExamTypes) examTypeIdsToProbe.add(id);
+		manifest = await readManifest(tenant, examTypeId);
 	} catch (err) {
-		console.warn("[generate-pdf] readAllExamTypeIds failed:", err);
+		console.warn("[generate-pdf] readManifest failed:", err);
+		return null;
+	}
+	const entries = Object.values(manifest.entries);
+
+	const candidates: ManifestEntry[] = [];
+
+	if (identifier.contentHash) {
+		const byHash = entries.find((e) => e.contentHash === identifier.contentHash);
+		if (byHash) candidates.push(byHash);
 	}
 
-	let bestEntry: { entry: NonNullable<ReturnType<typeof pickEntry>>; examTypeId: number } | null = null;
-
-	for (const examTypeId of examTypeIdsToProbe) {
-		let manifest;
-		try {
-			manifest = await readManifest(tenant, examTypeId);
-		} catch {
-			continue;
-		}
-		const found = pickEntry(manifest, candidateShapes, basename);
-		if (found && hasIdentity(found)) {
-			bestEntry = { entry: found, examTypeId };
-			break;
-		}
-		if (found && !bestEntry) {
-			bestEntry = { entry: found, examTypeId };
+	if (identifier.filePath) {
+		const direct = manifest.entries[identifier.filePath];
+		if (direct && !candidates.includes(direct)) candidates.push(direct);
+		if (!direct) {
+			const basename = identifier.filePath.split("/").pop() ?? identifier.filePath;
+			const byBasename = entries.find(
+				(e) => (e.path.split("/").pop() ?? e.path) === basename,
+			);
+			if (byBasename && !candidates.includes(byBasename)) candidates.push(byBasename);
 		}
 	}
 
-	if (bestEntry) {
-		const { entry } = bestEntry;
-		if (entry.studentId) {
-			const student = await studentRepo.getStudentById(entry.studentId);
-			if (student) {
-				return { studentId: student.studentId, admissionNo: student.admissionNo ?? undefined, fullName: student.fullName ?? undefined };
+	for (const entry of candidates) {
+		const resolved = await studentFromEntry(entry, studentRepo);
+		if (resolved) return resolved;
+
+		// Entry exists but has no identity yet. Mirror format-document's
+		// fallback: find a related user-file entry by matching `fileName`.
+		if (entry.fileName) {
+			const related = entries.find(
+				(e) => e !== entry && e.fileName === entry.fileName,
+			);
+			if (related) {
+				const fromRelated = await studentFromEntry(related, studentRepo);
+				if (fromRelated) return fromRelated;
 			}
 		}
-		if (entry.admissionNo) {
-			const student = await studentRepo.getStudentById(entry.admissionNo, true);
-			if (student) {
-				return { studentId: student.studentId, admissionNo: student.admissionNo ?? undefined, fullName: student.fullName ?? undefined };
-			}
-		}
 	}
 
-	console.warn("[generate-pdf] resolveStudentFromFilePath: no match", {
-		filePath,
-		basename,
-		tenantExamTypeId: tenant.examTypeId,
-		probedExamTypeCount: examTypeIdsToProbe.size,
-	});
-
-	const studentName = extractNameFromMarksheetPath(filePath);
-	if (studentName) {
-		const roster = await getClassRoster({
-			classId: tenant.classId ?? undefined,
-			sectionId: tenant.sectionId ?? undefined,
-			academicId: tenant.academicId ?? undefined,
-		});
-		const match = roster.find(
-			(r) => r.name.toLowerCase().includes(studentName.toLowerCase()) || studentName.toLowerCase().includes(r.name.toLowerCase())
-		);
-		if (match) {
-			const admissionNoNum = match.admissionNo ? Number(match.admissionNo) : undefined;
-			return { studentId: match.id, admissionNo: admissionNoNum, fullName: match.name };
+	// Last resort: extract a name from the marksheet path and look it up in
+	// the class roster.
+	if (identifier.filePath) {
+		const studentName = extractNameFromMarksheetPath(identifier.filePath);
+		if (studentName) {
+			const roster = await getClassRoster({
+				classId: tenant.classId ?? undefined,
+				sectionId: tenant.sectionId ?? undefined,
+				academicId: tenant.academicId ?? undefined,
+			});
+			const match = roster.find(
+				(r) =>
+					r.name.toLowerCase().includes(studentName.toLowerCase()) ||
+					studentName.toLowerCase().includes(r.name.toLowerCase()),
+			);
+			if (match) {
+				const admissionNoNum = match.admissionNo ? Number(match.admissionNo) : undefined;
+				return { studentId: match.id, admissionNo: admissionNoNum, fullName: match.name };
+			}
 		}
 	}
 
 	return null;
-}
-
-function pickEntry(
-	manifest: Awaited<ReturnType<typeof readManifest>>,
-	candidates: string[],
-	basename: string,
-) {
-	for (const c of candidates) {
-		if (manifest.entries[c]) return manifest.entries[c];
-	}
-	const entries = Object.values(manifest.entries);
-	return entries.find((e) => (e.path.split("/").pop() ?? e.path) === basename);
-}
-
-function hasIdentity(entry: { studentId?: number; admissionNo?: number }): boolean {
-	return typeof entry.studentId === "number" || typeof entry.admissionNo === "number";
-}
-
-async function readAllExamTypeIds(tenant: TenantContext): Promise<number[]> {
-	const { smExamTypes } = await import("$lib/server/db/sms-schema");
-	const { getDatabase } = await import("$lib/server/db");
-	const { desc, eq } = await import("drizzle-orm");
-	const db = await getDatabase();
-	const rows = await db
-		.select({ id: smExamTypes.id })
-		.from(smExamTypes)
-		.where(eq(smExamTypes.schoolId, tenant.schoolId))
-		.orderBy(desc(smExamTypes.id));
-	return rows.map((r) => r.id);
 }
 
 export const POST: RequestHandler = async ({ request, locals, cookies }) => {
@@ -146,10 +155,12 @@ export const POST: RequestHandler = async ({ request, locals, cookies }) => {
     if (!locals.user) throw error(401, "Unauthorized");
 
     const { id, schoolId, staffId } = locals.user as AuthUser;
-    const body = await request.json() as {
+    const body = (await request.json()) as {
       admissionNo?: number;
       studentId?: number;
+      contentHash?: string;
       filePath?: string;
+      examTypeId?: number;
       includePdfBuffer?: boolean;
     };
 
@@ -159,25 +170,36 @@ export const POST: RequestHandler = async ({ request, locals, cookies }) => {
       userId: id,
       staffId,
       designationId: ALLOWED_DESIGNATIONS.IT,
-      selectedClassCookie: cookies.get('selected-class'),
+      selectedClassCookie: cookies.get("selected-class"),
       examTypeId: resolvedExamTypeId,
     });
 
     const db = await getDatabase();
     const studentRepo = await StudentRepository.build(db, tenant);
+
     let student;
     if (body.admissionNo) {
       student = await studentRepo.getStudentById(body.admissionNo, true);
     } else if (body.studentId) {
       student = await studentRepo.getStudentById(body.studentId);
-    } else if (body.filePath) {
-      const resolved = await resolveStudentFromFilePath(body.filePath, tenant, studentRepo);
+    } else if (body.contentHash || body.filePath) {
+      const resolved = await resolveStudentFromArtifact(body, tenant, studentRepo);
       if (!resolved) {
-        throw new Error("STUDENT_NOT_RESOLVED: could not resolve student identity from file path");
+        const diagnostic = {
+          contentHash: body.contentHash ?? null,
+          filePath: body.filePath ?? null,
+          examTypeId: body.examTypeId ?? tenant.examTypeId ?? null,
+          artifactContentHash: body.contentHash ?? null,
+          artifactAdmissionNo: body.admissionNo ?? null,
+          artifactStudentId: body.studentId ?? null,
+        };
+        console.warn("[generate-pdf] STUDENT_NOT_RESOLVED:", diagnostic);
+        throw new Error(
+          `STUDENT_NOT_RESOLVED: could not resolve student identity from ${body.contentHash ? "contentHash" : "filePath"}`,
+        );
       }
       student = await studentRepo.getStudentById(resolved.studentId);
       if (!student) {
-        // If getStudentById didn't find the student (rare), use the resolved data directly
         student = {
           studentId: resolved.studentId,
           admissionNo: resolved.admissionNo ?? null,
@@ -185,7 +207,9 @@ export const POST: RequestHandler = async ({ request, locals, cookies }) => {
         } as NonNullable<typeof student>;
       }
     } else {
-      throw new Error("STUDENT_IDENTIFIER_REQUIRED: provide admissionNo, studentId, or filePath");
+      throw new Error(
+        "STUDENT_IDENTIFIER_REQUIRED: provide admissionNo, studentId, contentHash, filePath, or examTypeId",
+      );
     }
     if (!student?.studentId) throw new Error("Student not found");
 
@@ -211,14 +235,22 @@ export const POST: RequestHandler = async ({ request, locals, cookies }) => {
       return json({ error: (result as { error?: string }).error ?? "PDF generation failed" }, { status: 500 });
     }
 
-    // Backfill manifest with resolved identity
-    if (body.filePath) {
-      const examTypeId = extractExamTypeFromPath(body.filePath);
-      if (examTypeId && (student.admissionNo || student.studentId)) {
-        const backfill: Record<string, unknown> = {};
-        if (student.studentId) backfill.studentId = student.studentId;
-        if (student.admissionNo) backfill.admissionNo = student.admissionNo;
-        await updateEntry(tenant, body.filePath, backfill as Partial<import('$lib/server/workspace/manifest').ManifestEntry>, examTypeId).catch((e: unknown) => {
+    if (tenant.examTypeId !== null && tenant.examTypeId !== undefined && (student.admissionNo || student.studentId)) {
+      const backfill: Record<string, unknown> = {};
+      if (student.studentId) backfill.studentId = student.studentId;
+      if (student.admissionNo) backfill.admissionNo = student.admissionNo;
+      const manifestKey = body.filePath
+        ? (body.filePath.split("/").pop() ?? body.filePath)
+        : body.contentHash
+          ? null
+          : null;
+      if (manifestKey) {
+        await updateEntry(
+          tenant,
+          manifestKey,
+          backfill as Partial<ManifestEntry>,
+          tenant.examTypeId,
+        ).catch((e: unknown) => {
           console.error("[generate-pdf] backfill failed:", e);
         });
       }
