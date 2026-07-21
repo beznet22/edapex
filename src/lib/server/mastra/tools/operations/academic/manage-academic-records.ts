@@ -123,7 +123,7 @@ export type ManageResultsInput = {
 export const manageResultsLogic = async (
   context: MastraToolContext,
   input: ManageResultsInput,
-): Promise<{ status: string; message?: string; errorCode?: string }> => {
+): Promise<{ status: "SUCCESS" | "FAILED"; message: string }> => {
   const { tenantContext, getRepo, audit } = context;
 
   validateRoleWhitelist(tenantContext, [1, 5, 8]);
@@ -132,13 +132,13 @@ export const manageResultsLogic = async (
   const student = await studentRepo.getById(input.studentId);
 
   if (!student) {
-    return { status: "ERROR", errorCode: "STUDENT_NOT_FOUND" };
+    return { status: "FAILED", message: "STUDENT_NOT_FOUND" };
   }
 
   validateWorkspaceLock(tenantContext, student.classId, student.sectionId);
 
   if (tenantContext.examId === null) {
-    return { status: "ERROR", errorCode: "MISSING_EXAM_CONTEXT" };
+    return { status: "FAILED", message: "MISSING_EXAM_CONTEXT" };
   }
 
   const resultRepo = getRepo(ResultsRepository);

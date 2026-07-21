@@ -441,13 +441,13 @@ export const validateTranscriptTool = createTool({
 				if (parsed.success) {
 					const fs = await resolveTenantFilesystem(tenant);
 					if (tenant.examTypeId == null) {
-						return {
-							ok: false as const,
-							errors: [
-								{ path: 'tenant.examTypeId', message: 'EXAM_TYPE_REQUIRED: validate-transcript needs an active examTypeId', code: 'EXAM_TYPE_REQUIRED' }
-							],
-							attempt
-						};
+					return {
+						ok: false as const,
+						errors: [
+							{ path: 'tenant.examTypeId', message: 'EXAM_TYPE_REQUIRED: validate-transcript needs an active examTypeId', code: 'EXAM_TYPE_REQUIRED' }
+						],
+						unresolvedErrors: []
+					};
 					}
 					const examTypeId = tenant.examTypeId;
 
