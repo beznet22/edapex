@@ -1,5 +1,6 @@
 import { error, json } from "@sveltejs/kit";
 import { resolveTenantWorkspace } from "$lib/server/workspace/scope";
+import { resolveExamTypeId } from "$lib/server/mastra/tenant-context";
 import { ALLOWED_DESIGNATIONS } from "$lib/types/sms-types";
 import { generateResultPdfTool } from "$lib/server/mastra/tools/operations/reporting/generate-result-pdf";
 import { getDatabase } from "$lib/server/db";
@@ -81,12 +82,14 @@ export const POST: RequestHandler = async ({ request, locals, cookies }) => {
       includePdfBuffer?: boolean;
     };
 
+    const resolvedExamTypeId = await resolveExamTypeId(schoolId ?? 1, null);
     const { tenant, requestContext } = await resolveTenantWorkspace({
       schoolId: schoolId ?? 1,
       userId: id,
       staffId,
       designationId: ALLOWED_DESIGNATIONS.IT,
       selectedClassCookie: cookies.get('selected-class'),
+      examTypeId: resolvedExamTypeId,
     });
 
     const db = await getDatabase();
