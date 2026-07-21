@@ -35,10 +35,41 @@ import { resolveActiveClassScope, resolveClassNamesByIds } from '$lib/server/hel
 import { ALLOWED_DESIGNATIONS } from '$lib/types/sms-types';
 
 export class WorkspaceScopeError extends Error {
-  constructor(message: string = 'WORKSPACE_SCOPE_VIOLATION') {
+  readonly code: string;
+  constructor(message: string = 'WORKSPACE_SCOPE_VIOLATION', code: string = 'WORKSPACE_SCOPE_VIOLATION') {
     super(message);
     this.name = 'WorkspaceScopeError';
+    this.code = code;
   }
+}
+
+/**
+ * Thrown by `resolveTenantFilesystem` when the active tenant context is
+ * missing the fields required to scope a workspace (`classId`,
+ * `sectionId`, or `academicId`). Callers should catch this explicitly
+ * and surface a "pick a class" prompt to the user — there is no
+ * `_system/` fallback. Extends `WorkspaceScopeError` so existing
+ * scope-error handlers continue to match.
+ */
+export class MissingTenantScopeError extends WorkspaceScopeError {
+  constructor(
+    message: string = 'Pick a class and section to continue.',
+    missing: ReadonlyArray<'classId' | 'sectionId' | 'academicId'> = []
+  ) {
+    super(message, 'TENANT_SCOPE_REQUIRED');
+    this.name = 'MissingTenantScopeError';
+    this.missing = missing;
+  }
+  readonly missing: ReadonlyArray<'classId' | 'sectionId' | 'academicId'>;
+}
+
+/**
+ * Type-narrowing predicate for `MissingTenantScopeError`. Re-exported
+ * from the workspace barrel so tool/service code can branch without
+ * importing the file directly.
+ */
+export function isMissingTenantScopeError(err: unknown): err is MissingTenantScopeError {
+  return err instanceof MissingTenantScopeError;
 }
 
 export function buildWorkspaceRoot(tenant: TenantContext): string {

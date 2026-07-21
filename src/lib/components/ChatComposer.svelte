@@ -549,8 +549,8 @@
     if (!input.files?.length) return;
 
     // Pull classId/sectionId from the active selected class so the
-    // server can scope the upload to the right workspace (instead of
-    // falling back to _system/).
+    // server can scope the upload to the right tenant workspace. The
+    // server returns 422 TENANT_SCOPE_REQUIRED if no class is active.
     const selectedClass = file.selectedClass;
     const classId = selectedClass?.classId ?? null;
     const sectionId = selectedClass?.sectionId ?? null;

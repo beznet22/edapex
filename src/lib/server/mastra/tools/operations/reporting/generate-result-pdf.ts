@@ -94,7 +94,8 @@ async function renderAndWriteResultPdf(args: CoreRenderArgs): Promise<CoreRender
   );
 
   // If the tenant lacks classId/sectionId/schoolId, resolve them from student_records
-  // so the PDF lands in the correct class sandbox instead of _system/.
+  // so the PDF lands in the correct class sandbox instead of failing with
+  // a MissingTenantScopeError.
   let resolvedTenant = tenant;
   if (tenant.classId === null || tenant.sectionId === null || tenant.schoolId === 0) {
     const session = await _resolveStudentSession(student.studentId, tenant.academicId);
@@ -114,7 +115,8 @@ async function renderAndWriteResultPdf(args: CoreRenderArgs): Promise<CoreRender
       }
     } else {
       // Bug 3 fix: emit NO_STUDENT_SESSION error event instead of silently
-      // writing the PDF to the _system/ fallback sandbox.
+      // writing the PDF. (Replaces the legacy fallback that wrote to a
+      // shared `_system/` sandbox.)
       const fullName = student.fullName ?? "student";
       const title = `${sanitizeForFilename(fullName)}.pdf`;
       const artifactId = `pdf-${student.studentId}-${examTypeId}`;

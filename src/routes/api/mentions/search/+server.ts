@@ -527,8 +527,11 @@ export const GET: RequestHandler = async ({ url, locals, cookies }) => {
 
 	// Resolve tenant workspace with full 3-fallback class resolution
 	// (query param → cookie → teacher DB table), matching the filestore
-	// page's logic. When no class is selected, classId/sectionId are null
-	// and file search falls back to _system/ (empty results).
+	// page's logic. When no class is selected, the resolver throws
+	// MissingTenantScopeError and we return the canonical 422 envelope so
+	// the chat UI can prompt the user to pick a class. The 422 envelope
+	// shape is `{ error: 'TENANT_SCOPE_REQUIRED', message: 'Pick a class
+	// and section to continue.' }`.
 	const { tenant: tenantContext } = await resolveTenantWorkspace({
 		schoolId: user.schoolId ?? 1,
 		userId: user.id ?? 1,

@@ -9,11 +9,10 @@
 export { tenantWorkspace } from './tenant-workspace';
 export { resolveTenantFilesystem } from './resolve-filesystem';
 export { verifyTeacherAssignment } from './verify-teacher';
-export { buildWorkspaceRoot, resolveTenantWorkspace, assertPathAgentVisible, WorkspaceScopeError } from './scope';
+export { buildWorkspaceRoot, resolveTenantWorkspace, assertPathAgentVisible, WorkspaceScopeError, MissingTenantScopeError, isMissingTenantScopeError } from './scope';
 export {
 	classDir,
 	WORKSPACE_ROOT,
-	SYSTEM_WORKSPACE,
 	ocrMarkdownPath,
 	uploadPath,
 	ocrMetaPath,

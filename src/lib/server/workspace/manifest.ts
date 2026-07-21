@@ -5,8 +5,10 @@
  *   .workspaces/<schoolId>/AY<id>/<classId>_<sectionId>/exams/examType-<id>/manifest.json
  *
  * There is NO class-root manifest. Every workspace write — including
- * notes/shared/scratch — is scoped to an examTypeId. Admin tools without
- * an active class use the separate SYSTEM_WORKSPACE at .workspaces/_system/.
+ * notes/shared/scratch — is scoped to an examTypeId. The resolver rejects
+ * writes when classId/sectionId/academicId are missing — there is no
+ * `_system/` fallback. Use `MissingTenantScopeError` to detect this
+ * condition in callers and surface a "pick a class" prompt.
  *
  * Tracks every artifact in the per-exam scope. Indexed by relative path
  * AND by kind for fast lookups within the exam. Writes are atomic via
@@ -121,15 +123,16 @@ export class WorkspaceScopeError extends Error {
 
 /**
  * Strict validation: every write function requires a non-null examTypeId.
- * The class root has no manifest. Admin/system tools without an active
- * class use SYSTEM_WORKSPACE directly.
+ * The class root has no manifest. Admin tools without an active class
+ * must surface a `MissingTenantScopeError` instead of falling back to a
+ * shared `_system/` directory.
  */
 function requireExamTypeId(examTypeId: number | null | undefined, op: string): number {
   if (examTypeId == null) {
     throw new WorkspaceScopeError(
       `${op} requires an explicit examTypeId. ` +
         `All workspace files (including notes/shared/scratch) must be scoped to an exam. ` +
-        `Use SYSTEM_WORKSPACE at .workspaces/_system/ for admin tools without an active class.`
+        `For admin tools without an active class, surface a MissingTenantScopeError to prompt the user.`
     );
   }
   return examTypeId;

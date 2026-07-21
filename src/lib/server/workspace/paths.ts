@@ -23,8 +23,11 @@
  *       scratch/                       — per-exam temporary work
  *
  * Every workspace write (including notes/shared/scratch) must be scoped
- * to an examTypeId. Admin tools without an active class use the separate
- * SYSTEM_WORKSPACE at .workspaces/_system/.
+ * to an examTypeId. The resolver rejects writes when classId/sectionId/
+ * academicId are missing — there is no `_system/` fallback. The
+ * `SYSTEM_WORKSPACE` constant below is retained as an internal path
+ * marker for tooling/migration scripts and is NOT exported from the
+ * public barrel.
  *
  * The path builders (ocrMarkdownPath, uploadPath, etc.) keep an optional
  * `examTypeId` for callers that legitimately need to compute a path

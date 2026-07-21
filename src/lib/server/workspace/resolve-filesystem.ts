@@ -2,7 +2,8 @@ import { LocalFilesystem } from "@mastra/core/workspace";
 import type { RequestContext } from "@mastra/core/request-context";
 import type { TenantContext } from "$lib/server/mastra/tenant-context";
 import { verifyTeacherAssignment } from "./verify-teacher";
-import { classDir, SYSTEM_WORKSPACE } from "./paths";
+import { classDir } from "./paths";
+import { MissingTenantScopeError } from "./scope";
 
 const verificationCache = new WeakMap<RequestContext, Promise<void>>();
 
@@ -17,19 +18,33 @@ function cacheVerification(requestContext: RequestContext, tenant: TenantContext
   return next;
 }
 
+function requireTenantScope(tenant: TenantContext | undefined): asserts tenant is TenantContext {
+  if (!tenant) {
+    throw new MissingTenantScopeError('Pick a class and section to continue.', []);
+  }
+  const missing: Array<'classId' | 'sectionId' | 'academicId'> = [];
+  if (tenant.classId === null) missing.push('classId');
+  if (tenant.sectionId === null) missing.push('sectionId');
+  if (tenant.academicId === null) missing.push('academicId');
+  if (missing.length > 0) {
+    throw new MissingTenantScopeError('Pick a class and section to continue.', missing);
+  }
+}
+
 /**
  * Resolves the per-request `LocalFilesystem` for a tenant.
  *
  * Tenant isolation is enforced by:
- *   1. Reading the active `tenantContext` from the request context
- *   2. Verifying that the staff member is actively assigned to the target
- *      `(classId, sectionId, academicId)` tuple (cached per request)
- *   3. Returning a `LocalFilesystem` rooted at the canonical workspace
- *      directory with `contained: true` so paths cannot escape the sandbox
- *
- * Fallback cases:
- *   - No tenant context (system call) -> `_system/` workspace
- *   - Missing class/section context (admin) -> `_system/` workspace + warning
+ *   1. Reading the active `tenantContext` from the request context.
+ *   2. Requiring `classId`, `sectionId`, and `academicId` to be present.
+ *      A missing scope throws `MissingTenantScopeError` — there is no
+ *      `_system/` fallback. Callers MUST handle this error and surface
+ *      a "pick a class" prompt to the user (HTTP 422 envelope, or a
+ *      `data-notification` stream part for tools).
+ *   3. Verifying that the staff member is actively assigned to the target
+ *      `(classId, sectionId, academicId)` tuple (cached per request).
+ *   4. Returning a `LocalFilesystem` rooted at the canonical workspace
+ *      directory with `contained: true` so paths cannot escape the sandbox.
  */
 export async function resolveTenantFilesystem({
   requestContext
@@ -37,16 +52,7 @@ export async function resolveTenantFilesystem({
   requestContext: RequestContext;
 }): Promise<LocalFilesystem> {
   const tenant = requestContext.get("tenantContext") as TenantContext | undefined;
-
-  if (!tenant || tenant.classId === null || tenant.sectionId === null) {
-    if (process.env.NODE_ENV !== "production") {
-      console.warn(
-        `[resolveTenantFilesystem] tenant lacks classId/sectionId; falling back to _system/. ` +
-          `This usually indicates a missing class-selector cookie or admin operating without an active class.`
-      );
-    }
-    return new LocalFilesystem({ id: "tenant-fs", basePath: SYSTEM_WORKSPACE, contained: true });
-  }
+  requireTenantScope(tenant);
 
   await cacheVerification(requestContext, tenant);
 
