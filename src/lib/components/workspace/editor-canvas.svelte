@@ -625,7 +625,6 @@
 											{documentId}
 											pageIndex={page.pageIndex}
 											scale={pageScale}
-											dpr={Math.max(window.devicePixelRatio, 2)}
 										/>
 									</div>
 										{/snippet}
