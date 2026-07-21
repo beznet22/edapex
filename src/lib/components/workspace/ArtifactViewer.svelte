@@ -539,16 +539,16 @@
 		}
 	});
 
-	let validatingEffectRan = $state(false);
+	let lastValidatedPath = $state<string | null>(null);
 	$effect(() => {
 		const vPath = autoFixPath;
 		const eid = computedExamTypeId;
 		if (mode !== 'filestore') return;
 		if (!vPath?.includes('marksheets/') || !vPath.endsWith('.md')) return;
-		if (validating || validatingEffectRan) return;
+		if (validating || vPath === lastValidatedPath) return;
 
 		validating = true;
-		validatingEffectRan = true;
+		lastValidatedPath = vPath;
 		fetch(`/api/file/${vPath}?action=validate&examTypeId=${eid}`, { method: 'POST' })
 			.then(r => r.ok ? r.json() : null)
 			.then(data => {

@@ -202,9 +202,10 @@ export async function buildMastraToolContext<T = unknown>(
     };
   }
 
-  const tenant = (requestContext.get("tenantContext") as TenantContext | undefined) ?? DEFAULT_TENANT;
-  const threadId = requestContext.get("threadId") as string | undefined;
-  const modelId = requestContext.get("modelId") as string | undefined;
+  const rc = requestContext as RequestContext<Record<string, any>>;
+  const tenant = (rc.get("tenantContext") as TenantContext | undefined) ?? DEFAULT_TENANT;
+  const threadId = rc.get("threadId") as string | undefined;
+  const modelId = rc.get("modelId") as string | undefined;
 
   const db = await getDatabase();
   const provider = new ScopedRepositoryProvider(db, tenant);
