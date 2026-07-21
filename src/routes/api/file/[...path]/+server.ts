@@ -293,7 +293,7 @@ export const POST: RequestHandler = async ({ params, url, request, locals, cooki
       const hasAdmNoMismatch = enteredAdmNo != null && Number(enteredAdmNo) !== parsed.student.adminNo;
 
       if (result.success && !hasAdmNoMismatch) {
-        await updateEntry(tenant, params.path!, { validationErrors: [], validationErrorCount: 0 }, tenant.examTypeId);
+        await updateEntry(tenant, params.path!, { validationErrors: [], validationErrorCount: 0, status: 'Validated' }, tenant.examTypeId);
         return json({ fixed: false, errors: [] });
       }
 
@@ -301,7 +301,7 @@ export const POST: RequestHandler = async ({ params, url, request, locals, cooki
         const canonicalMd = generateMarksheetMarkdown(parsed);
         const fixedBytes = new TextEncoder().encode(canonicalMd);
         await fs.writeFile(resolvedPath, fixedBytes, { overwrite: true });
-        await updateEntry(tenant, params.path!, { validationErrors: [], validationErrorCount: 0 }, tenant.examTypeId);
+        await updateEntry(tenant, params.path!, { validationErrors: [], validationErrorCount: 0, status: 'Validated' }, tenant.examTypeId);
         return json({
           fixed: true,
           errors: [],
@@ -328,9 +328,57 @@ export const POST: RequestHandler = async ({ params, url, request, locals, cooki
       const fixedBytes = new TextEncoder().encode(canonicalMd);
       await fs.writeFile(resolvedPath, fixedBytes, { overwrite: true });
       const reResult = await marksheetSchema.safeParseAsync(fixedParsed);
-      const remainingErrors = reResult.success ? [] : reResult.error.issues.map(i => `${i.path.join('.')}: ${i.message}`);
-      await updateEntry(tenant, params.path!, { validationErrors: remainingErrors, validationErrorCount: remainingErrors.length }, tenant.examTypeId);
-      return json({ fixed: !reResult.success, errors: remainingErrors, originalErrors: zodErrors });
+      const fixSucceeded = reResult.success;
+      const remainingErrors = fixSucceeded ? [] : reResult.error.issues.map(i => `${i.path.join('.')}: ${i.message}`);
+      await updateEntry(tenant, params.path!, {
+        validationErrors: remainingErrors,
+        validationErrorCount: remainingErrors.length,
+        status: fixSucceeded ? 'Validated' : 'Failed',
+      }, tenant.examTypeId);
+      return json({ fixed: fixSucceeded, errors: remainingErrors, originalErrors: zodErrors });
+    }
+
+    if (action === 'validate') {
+      if (!params.path) throw error(400, 'Path parameter required for validate');
+      if (!tenant.examTypeId) throw error(400, 'EXAM_TYPE_REQUIRED for validate');
+      const raw = await fs.readFile(resolvedPath);
+      const markdown = typeof raw === 'string' ? raw : new TextDecoder().decode(raw);
+
+      let validationErrors: string[] = [];
+      if (params.path.includes('marksheets/') && params.path.endsWith('.md')) {
+        try {
+          const { parseMarksheetMarkdown } = await import('$lib/utils/marksheet-ast-parser');
+          const parseContext = await buildMarksheetParseContext(markdown, tenant);
+          const parsed = parseMarksheetMarkdown(markdown, parseContext);
+
+          const enteredAdmNo = extractTableField(markdown, 'admission no');
+          if (enteredAdmNo && Number(enteredAdmNo) !== parsed.student.adminNo) {
+            validationErrors.push(
+              `Admission No mismatch: file has ${enteredAdmNo}, but roster records ${parsed.student.adminNo}. The roster value will be used on reload.`
+            );
+          }
+
+          const result = await marksheetSchema.safeParseAsync(parsed);
+          if (!result.success) {
+            validationErrors.push(...result.error.issues.map(i => `${i.path.join('.')}: ${i.message}`));
+          }
+
+          await updateEntry(
+            tenant, params.path,
+            { validationErrors, validationErrorCount: validationErrors.length, status: validationErrors.length > 0 ? 'Failed' : 'Validated' },
+            tenant.examTypeId
+          );
+        } catch (parseErr) {
+          validationErrors = [`Parse error: ${parseErr instanceof Error ? parseErr.message : String(parseErr)}`];
+        }
+      }
+
+      const validateStatus = validationErrors.length > 0 ? 'Failed' : 'Validated';
+      return json({
+        success: true,
+        validation: { errors: validationErrors, errorCount: validationErrors.length },
+        manifestStatus: validateStatus
+      });
     }
 
     const contentType = request.headers.get('content-type') || '';
@@ -565,15 +613,20 @@ export const PUT: RequestHandler = async ({ params, request, locals, cookies, ur
         if (!result.success) {
           validationErrors.push(...result.error.issues.map(i => `${i.path.join('.')}: ${i.message}`));
         }
-        await updateEntry(tenant, manifestRelPath, { validationErrors, validationErrorCount: validationErrors.length }, tenant.examTypeId);
+        const status = validationErrors.length > 0 ? 'Failed' : 'Validated';
+        console.info('[file-api] validationErrors:', validationErrors, status);
+        await updateEntry(
+          tenant, manifestRelPath,
+          { validationErrors, validationErrorCount: validationErrors.length, status },
+          tenant.examTypeId
+        );
       } catch (parseErr) {
         console.error('[file-api] marksheet validation error', parseErr);
         validationErrors = [`Parse error: ${parseErr instanceof Error ? parseErr.message : String(parseErr)}`];
       }
     }
 
-    console.info('[file-api] PUT validationErrors:', validationErrors);
-    return json({ success: true, path: resolvedPath, validation: { errors: validationErrors, errorCount: validationErrors.length } });
+    return json({ success: true, path: resolvedPath, validation: { errors: validationErrors, errorCount: validationErrors.length }, manifestStatus: status });
   } catch (e: unknown) {
     if (e instanceof WorkspaceScopeError) {
       return json({ success: false, error: 'WORKSPACE_SCOPE_VIOLATION', message: e.message }, { status: 403 });

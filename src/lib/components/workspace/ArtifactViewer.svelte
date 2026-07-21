@@ -34,6 +34,7 @@
 	import AlertCircleIcon from "@lucide/svelte/icons/alert-circle";
 	import RefreshCwIcon from "@lucide/svelte/icons/refresh-cw";
 	import { autoFixStructure } from "$lib/utils/marksheet-ast-parser";
+	import { patchFile } from "$lib/state/manifest-patches.svelte";
 
 	let {
 		artifacts,
@@ -208,7 +209,7 @@
 		return `/api/file/${swapped}`;
 	});
 
-	let viewMode = $state<"markdown" | "pdf">("markdown");
+	let viewMode = $state<"markdown" | "pdf" | "validation">("markdown");
 	let pdfAvailable = $state(false);
 	let pdfProbeSeq = 0;
 
@@ -488,21 +489,98 @@
 		errorCount: 0,
 	});
 	let aiFixing = $state(false);
-	let showValidationViewer = $state(false);
+	let validating = $state(false);
+
+	/** Tracks whether the manifest entry has ever reported validation data.
+	 *  Set to true the first time `current.validationErrors` or
+	 *  `current.validationErrorCount` is defined. Lets the pill renderer
+	 *  distinguish "valid" from "unknown — never validated" so a marksheet
+	 *  that never went through the editor (chat-pipeline upload → click
+	 *  EyeIcon) doesn't silently render the green "Valid" state when the
+	 *  underlying markdown is structurally broken. */
+	let hasManifestValidationData = $state(false);
+
+	/** Tri-state for the validation pill.
+	 *  - 'invalid': manifest has validationErrors[] with length > 0 (red)
+	 *  - 'valid':   manifest has validationErrors[] with length === 0 (green)
+	 *  - 'unknown': manifest never reported validation data (amber) — surface
+	 *               explicitly so the user clicks the pill to open the editor
+	 *               and trigger auto-validation, instead of clicking EyeIcon
+	 *               and getting a ZodError toast from a "Valid"-looking state. */
+	type ValidationStatus = "valid" | "invalid" | "unknown";
+	const validationStatus: ValidationStatus = $derived.by(() => {
+		if (!hasManifestValidationData) return "unknown";
+		return validationState.errorCount > 0 ? "invalid" : "valid";
+	});
+
+	/** Tailwind classes for each pill state. Kept here so the button class
+	 *  attribute stays a single template expression. */
+	const pillClasses: Record<ValidationStatus, string> = {
+		valid: "bg-emerald-500 hover:bg-emerald-600",
+		invalid: "bg-red-500 hover:bg-red-600 animate-pulse",
+		unknown: "bg-amber-500 hover:bg-amber-600",
+	};
 
 	$effect(() => {
 		const a = current;
-		if (
-			a?.validationErrors !== undefined ||
-			a?.validationErrorCount !== undefined
-		) {
-			const errs = a.validationErrors ?? [];
-			validationState = {
-				errors: errs,
-				errorCount: a.validationErrorCount ?? errs.length,
-			};
+		const vPath = autoFixPath;
+		if (mode !== 'filestore' || !vPath?.includes('marksheets/') || !vPath.endsWith('.md')) {
+			if (
+				a?.validationErrors !== undefined ||
+				a?.validationErrorCount !== undefined
+			) {
+				const errs = a.validationErrors ?? [];
+				validationState = {
+					errors: errs,
+					errorCount: a.validationErrorCount ?? errs.length,
+				};
+				hasManifestValidationData = true;
+			}
 		}
 	});
+
+	let validatingEffectRan = $state(false);
+	$effect(() => {
+		const vPath = autoFixPath;
+		const eid = computedExamTypeId;
+		if (mode !== 'filestore') return;
+		if (!vPath?.includes('marksheets/') || !vPath.endsWith('.md')) return;
+		if (validating || validatingEffectRan) return;
+
+		validating = true;
+		validatingEffectRan = true;
+		fetch(`/api/file/${vPath}?action=validate&examTypeId=${eid}`, { method: 'POST' })
+			.then(r => r.ok ? r.json() : null)
+			.then(data => {
+				if (data?.validation) {
+					validationState = { errors: data.validation.errors ?? [], errorCount: data.validation.errorCount ?? 0 };
+					hasManifestValidationData = true;
+				}
+				if (data?.manifestStatus) {
+					patchFile(`/api/file/${vPath}`, {
+						manifestStatus: data.manifestStatus,
+						validationErrors: data.validation?.errors ?? [],
+						validationErrorCount: data.validation?.errorCount ?? 0,
+					});
+				}
+			})
+			.catch(() => {})
+			.finally(() => { validating = false; });
+	});
+
+	async function handlePillClick() {
+		// 'valid' is a no-op — clicking the green pill does nothing because
+		// there is nothing for the user to act on. For 'invalid' and 'unknown'
+		// switch viewMode to 'validation' so the validation panel replaces
+		// the markdown/pdf render area. The 'unknown' branch additionally
+		// triggers auto-fix so the next PUT populates validationErrors and
+		// the pill flips to its real state.
+		if (validationStatus === 'valid') return;
+		viewMode = 'validation';
+		if (validationStatus === 'unknown') {
+			await handleAutoFix();
+		}
+	}
 
 	const computedExamTypeId = $derived.by(() => {
 		if (toolOutput?.examTypeId) return toolOutput.examTypeId;
@@ -550,7 +628,7 @@
 			const errors: string[] = data.errors ?? [];
 			validationState = { errors, errorCount: errors.length };
 			if (errors.length > 0) {
-				showValidationViewer = true;
+				viewMode = 'validation';
 			}
 		} catch {
 			// silent
@@ -945,7 +1023,51 @@
 	</header>
 
 	<div class="h-full relative group">
-		{#if viewMode === "pdf" && pdfGenerating}
+		{#if viewMode === "validation"}
+			<ScrollArea class="h-full w-full">
+				<div class="p-6 max-w-3xl mx-auto space-y-4">
+					<div class="flex items-center gap-2">
+						{#if validationStatus === 'invalid'}
+							<AlertCircleIcon class="size-5 text-red-500" />
+							<h2 class="text-base font-semibold">
+								Validation Errors ({validationState.errorCount})
+							</h2>
+						{:else}
+							<AlertCircleIcon class="size-5 text-amber-500" />
+							<h2 class="text-base font-semibold">Not Yet Validated</h2>
+						{/if}
+					</div>
+					{#if validationStatus === 'invalid'}
+						<p class="text-sm text-muted-foreground">
+							Fix the issues below in the editor, then save — validation runs on every save.
+						</p>
+						<ul class="space-y-2">
+							{#each validationState.errors as error}
+								<li class="text-xs text-red-600 bg-red-50 px-3 py-2 rounded">
+									{error}
+								</li>
+							{/each}
+						</ul>
+					{:else}
+						<p class="text-sm text-muted-foreground">
+							This marksheet hasn't been validated yet. Open the editor and save the file —
+							validation runs automatically on every save.
+						</p>
+						<p class="text-sm text-muted-foreground">
+							Validation runs against the schema for this class category (e.g. NURSERY expects 5
+							subject records). Any structural mismatch surfaces here so you can fix it before
+							generating the PDF.
+						</p>
+					{/if}
+					<button
+						onclick={() => (viewMode = 'markdown')}
+						class="text-xs text-muted-foreground hover:text-foreground underline"
+					>
+						← Back to editor
+					</button>
+				</div>
+			</ScrollArea>
+		{:else if viewMode === "pdf" && pdfGenerating}
 			<div class="h-full flex items-center justify-center">
 				<div
 					class="flex flex-col items-center gap-3 text-muted-foreground"
@@ -998,66 +1120,30 @@
 						class="fixed bottom-[calc(1.5rem+env(safe-area-inset-bottom))] right-4 sm:right-6 z-50 opacity-100 scale-100 md:opacity-0 md:scale-95 md:group-hover:opacity-100 md:group-hover:scale-100 transition-all duration-500 ease-out"
 					>
 						<button
-							onclick={handleAutoFix}
+							onclick={handlePillClick}
 							disabled={aiFixing || !computedExamTypeId}
-							class="flex items-center gap-1.5 min-h-12 px-3 sm:min-h-0 sm:py-1.5 rounded-full shadow-lg border border-white/20 text-white text-xs font-medium transition-all duration-200 hover:scale-105 active:scale-95 {validationState.errorCount >
-							0
-								? 'bg-red-500 hover:bg-red-600'
-								: 'bg-emerald-500'} {validationState.errorCount >
-							0
-								? 'animate-pulse'
-								: ''}"
+							class="flex items-center gap-1.5 min-h-12 px-3 sm:min-h-0 sm:py-1.5 rounded-full shadow-lg border border-white/20 text-white text-xs font-medium transition-all duration-200 hover:scale-105 active:scale-95 {pillClasses[validationStatus]}"
 						>
 							{#if aiFixing}
 								<RefreshCwIcon class="size-3.5 animate-spin" />
 								Fixing...
-							{:else if validationState.errorCount > 0}
+							{:else if validationStatus === 'invalid'}
 								<AlertCircleIcon class="size-3.5" />
 								{validationState.errorCount} error{validationState.errorCount ===
 								1
 									? ""
 									: "s"}
-							{:else}
+							{:else if validationStatus === 'valid'}
 								<CheckIcon class="size-3.5" />
 								Valid
+							{:else}
+								<AlertCircleIcon class="size-3.5" />
+								Not validated
 							{/if}
 						</button>
 					</div>
 				{/if}
 			</div>
-			{#if showValidationViewer && validationState.errors.length > 0}
-				<div
-					class="fixed inset-0 z-50 flex items-start justify-center pt-24"
-					role="dialog"
-				>
-					<div
-						class="bg-background border rounded-lg shadow-xl max-w-lg w-full mx-4 max-h-80 overflow-auto"
-					>
-						<div
-							class="flex items-center justify-between px-4 py-3 border-b"
-						>
-							<h3 class="text-sm font-semibold">
-								Validation Errors ({validationState.errorCount})
-							</h3>
-							<button
-								onclick={() => (showValidationViewer = false)}
-								class="text-muted-foreground hover:text-foreground text-sm"
-							>
-								&times;
-							</button>
-						</div>
-						<ul class="p-4 space-y-2">
-							{#each validationState.errors as error}
-								<li
-									class="text-xs text-red-600 bg-red-50 px-2 py-1 rounded"
-								>
-									{error}
-								</li>
-							{/each}
-						</ul>
-					</div>
-				</div>
-			{/if}
 		{:else if entry?.content}
 			<ScrollArea class="h-full">
 				<div class="p-6 max-w-3xl mx-auto">
@@ -1132,66 +1218,30 @@
 						class="fixed bottom-[calc(1.5rem+env(safe-area-inset-bottom))] right-4 sm:right-6 z-50 opacity-100 scale-100 md:opacity-0 md:scale-95 md:group-hover:opacity-100 md:group-hover:scale-100 transition-all duration-500 ease-out"
 					>
 						<button
-							onclick={handleAutoFix}
+							onclick={handlePillClick}
 							disabled={aiFixing || !computedExamTypeId}
-							class="flex items-center gap-1.5 min-h-12 px-3 sm:min-h-0 sm:py-1.5 rounded-full shadow-lg border border-white/20 text-white text-xs font-medium transition-all duration-200 hover:scale-105 active:scale-95 {validationState.errorCount >
-							0
-								? 'bg-red-500 hover:bg-red-600'
-								: 'bg-emerald-500'} {validationState.errorCount >
-							0
-								? 'animate-pulse'
-								: ''}"
+							class="flex items-center gap-1.5 min-h-12 px-3 sm:min-h-0 sm:py-1.5 rounded-full shadow-lg border border-white/20 text-white text-xs font-medium transition-all duration-200 hover:scale-105 active:scale-95 {pillClasses[validationStatus]}"
 						>
 							{#if aiFixing}
 								<RefreshCwIcon class="size-3.5 animate-spin" />
 								Fixing...
-							{:else if validationState.errorCount > 0}
+							{:else if validationStatus === 'invalid'}
 								<AlertCircleIcon class="size-3.5" />
 								{validationState.errorCount} error{validationState.errorCount ===
 								1
 									? ""
 									: "s"}
-							{:else}
+							{:else if validationStatus === 'valid'}
 								<CheckIcon class="size-3.5" />
 								Valid
+							{:else}
+								<AlertCircleIcon class="size-3.5" />
+								Not validated
 							{/if}
 						</button>
 					</div>
 				{/if}
 			</div>
-			{#if showValidationViewer && validationState.errors.length > 0}
-				<div
-					class="fixed inset-0 z-50 flex items-start justify-center pt-24"
-					role="dialog"
-				>
-					<div
-						class="bg-background border rounded-lg shadow-xl max-w-lg w-full mx-4 max-h-80 overflow-auto"
-					>
-						<div
-							class="flex items-center justify-between px-4 py-3 border-b"
-						>
-							<h3 class="text-sm font-semibold">
-								Validation Errors ({validationState.errorCount})
-							</h3>
-							<button
-								onclick={() => (showValidationViewer = false)}
-								class="text-muted-foreground hover:text-foreground text-sm"
-							>
-								&times;
-							</button>
-						</div>
-						<ul class="p-4 space-y-2">
-							{#each validationState.errors as error}
-								<li
-									class="text-xs text-red-600 bg-red-50 px-2 py-1 rounded"
-								>
-									{error}
-								</li>
-							{/each}
-						</ul>
-					</div>
-				</div>
-			{/if}
 		{:else if current.kind === "pdf"}
 		
 					<EditorCanvas

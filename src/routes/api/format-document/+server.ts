@@ -6,9 +6,9 @@ import { createAssessmentServiceForRequest } from '$lib/server/service/assessmen
 import { getClassRoster } from '$lib/server/mastra/agents/skill-instructions';
 import { extractRateLimitFromHeaders } from '$lib/provider/rate-limit';
 import { deriveInitialFilename } from '$lib/server/mastra/tools/operations/reporting/marksheet/stream-document';
-import { commitMarksheetLogic } from '$lib/server/mastra/tools/operations/reporting/marksheet/commit-marksheet';
 import { buildMarksheetParseContext } from '$lib/server/mastra/tools/operations/reporting/marksheet/parse-context';
-import { marksheetSchema, type Marksheet } from '$lib/schema/marksheet';
+import { ensureMarksheetCommitted } from '$lib/server/mastra/tools/operations/reporting/marksheet/ensure-committed';
+import { type Marksheet } from '$lib/schema/marksheet';
 import { ALLOWED_DESIGNATIONS } from '$lib/types/sms-types';
 import { GROQ_FORMAT_MODEL } from '$lib/server/mastra/agents/format';
 import { resolveModelForRequest } from '$lib/server/mastra/provider';
@@ -355,6 +355,7 @@ MIDDLEBASIC: Subject Code | MTA (30) | CA (10) | REPORT (10) | EXAM (50)`;
     entryUpdate.validationErrors = [resolutionError];
     entryUpdate.validationErrorCount = 1;
   }
+
   if (Object.keys(entryUpdate).length > 0) {
     await updateEntry(tenant, initialMarkdownPath, entryUpdate as Partial<import('$lib/server/workspace/manifest').ManifestEntry>, examTypeId);
     if (entry.path) {
@@ -362,31 +363,31 @@ MIDDLEBASIC: Subject Code | MTA (30) | CA (10) | REPORT (10) | EXAM (50)`;
     }
   }
 
+    
+
   // Server-side commit when validation passed. This runs synchronously
   // inside format-document so the marksheet record exists in student_records
   // by the time this response returns — eliminates the round-trip the
   // client used to need (and the MARKSHEET_NOT_FOUND error it caused).
+  // Delegates to `ensureMarksheetCommitted` (also used by
+  // `generate-result-pdf` before PDF rendering) so the read-parse-validate-commit
+  // pipeline has a single source of truth and the two call sites stay in lock-step.
   let recordId: number | null = null;
-  if (!resolutionError && resolvedStudentId && parsedMarksheet) {
-    try {
-      const validated: Marksheet = await marksheetSchema.parseAsync(parsedMarksheet);
-      const commitResult = await commitMarksheetLogic(
-        tenant,
-        {
-          studentId: resolvedStudentId,
-          reason: 'Auto-commit after format-document validation',
-          marksheet: validated,
-        },
-        { skipJsonWrite: true, sourcePath: initialMarkdownPath },
-      );
-      if (commitResult.ok) {
-        recordId = commitResult.recordId;
-        console.log('[format-document] immediate commit succeeded', { recordId, studentId: resolvedStudentId });
-      } else {
-        console.warn('[format-document] immediate commit failed:', commitResult.errors);
-      }
-    } catch (err) {
-      console.warn('[format-document] immediate commit threw (non-fatal):', err);
+  if (!resolutionError && resolvedStudentId) {
+    const commitResult = await ensureMarksheetCommitted(
+      tenant,
+      {
+        studentId: resolvedStudentId,
+        markdownPath: initialMarkdownPath,
+        reason: 'Auto-commit after format-document validation',
+      },
+      { throwOnFailure: false }
+    );
+    if (commitResult.ok) {
+      recordId = commitResult.recordId;
+      console.log('[format-document] immediate commit succeeded', { recordId, studentId: resolvedStudentId });
+    } else {
+      console.warn('[format-document] immediate commit failed:', commitResult.errors);
     }
   }
 

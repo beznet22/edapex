@@ -608,7 +608,7 @@ export class AssessmentService {
       ratings,
       remark,
       examType,
-      recordId: studentData.studentRecordId ?? null,
+      recordId: studentData.studentRecordId,
     };
   }
 

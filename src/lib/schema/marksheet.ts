@@ -212,7 +212,7 @@ export const marksheetSchema = z
     ratings: ratingSchema,
     remark: remarkSchema,
     examType: examType.optional(),
-    recordId: z.number().int().positive().nullable().optional(),
+    recordId: z.int().nullable().optional(),
   })
   .superRefine(async (data, ctx) => {
     if (data.student.category === "DAYCARE") return;

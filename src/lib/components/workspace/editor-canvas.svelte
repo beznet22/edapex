@@ -18,6 +18,7 @@
 	import { SelectedClass } from "$lib/context/sync.svelte";
 	import { DESIGNATIONS } from "$lib/types/sms-types";
 	import { parseMarksheetMarkdown } from "$lib/utils/marksheet-ast-parser";
+	import { patchFile } from "$lib/state/manifest-patches.svelte";
 
 	import { usePdfiumEngine } from "@embedpdf/engines/svelte";
 	import { EmbedPDF } from "@embedpdf/core/svelte";
@@ -328,6 +329,14 @@
 				if (data.validation) {
 					validationState = data.validation;
 					showParseBar = true;
+				}
+
+				if (data.manifestStatus) {
+					patchFile(url, {
+						manifestStatus: data.manifestStatus,
+						validationErrors: data.validation?.errors ?? [],
+						validationErrorCount: data.validation?.errorCount ?? 0,
+					});
 				}
 
 				if (resolvedExamTypeId != null) {

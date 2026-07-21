@@ -36,6 +36,7 @@
 	import { generateId } from "ai";
 	import { useInspector } from "$lib/context/inspector-context.svelte";
 	import { mobileUiState } from "$lib/state/mobile-ui.svelte";
+	import { getPatches } from "$lib/state/manifest-patches.svelte";
 	import { IsMobile } from "$lib/hooks/is-mobile.svelte";
 	import {
 		backgroundTasks,
@@ -52,7 +53,6 @@
 	} from "$lib/types/workspace-types";
 
 	let { data }: { data: PageData } = $props();
-
 	const inspector = useInspector();
 	const isMobile = new IsMobile();
 	const isThreadScoped = $derived(
@@ -80,7 +80,7 @@
 	let isStartingChat = $state(false);
 	let optimisticFiles = $state(new Map<string, Artifact>());
 	let lastCompletedTime = $state(0);
-
+	
 	$effect(() => {
 		if (activeTermId !== data.activeTermId) {
 			goto("?term=" + activeTermId, {
@@ -114,7 +114,10 @@
 		let changed = false;
 
 		for (const task of tasks) {
-			if (task.spec.kind === "process-files" || task.spec.kind === "format-batch") {
+			if (
+				task.spec.kind === "process-files" ||
+				task.spec.kind === "format-batch"
+			) {
 				// Live file updates — add new entries AND propagate manifestStatus
 				if (task.files) {
 					for (const fileState of task.files) {
@@ -123,33 +126,60 @@
 						const existing = next.get(url);
 
 						if (existing) {
-							if (fileState.manifestStatus && fileState.manifestStatus !== existing.manifestStatus) {
+							if (
+								fileState.manifestStatus &&
+								fileState.manifestStatus !==
+									existing.manifestStatus
+							) {
 								next.set(url, {
 									...existing,
 									manifestStatus: fileState.manifestStatus,
-									status: fileState.status === "completed" ? "success" : existing.status,
+									status:
+										fileState.status === "completed"
+											? "success"
+											: existing.status,
 								});
 								changed = true;
 							}
-							if (fileState.contentHash && fileState.contentHash !== existing.contentHash) {
-								next.set(url, { ...existing, contentHash: fileState.contentHash });
+							if (
+								fileState.contentHash &&
+								fileState.contentHash !== existing.contentHash
+							) {
+								next.set(url, {
+									...existing,
+									contentHash: fileState.contentHash,
+								});
 								changed = true;
 							}
 						} else {
-							if (fileState.status !== "completed" && fileState.status !== "formatting") continue;
-							const isFormatOutput = fileState.source === "format-output";
+							if (
+								fileState.status !== "completed" &&
+								fileState.status !== "formatting"
+							)
+								continue;
+							const isFormatOutput =
+								fileState.source === "format-output";
 							next.set(url, {
 								id: url,
 								title: fileState.name,
 								kind: deriveKind(fileState.name),
 								category: deriveCategory(fileState.name),
-								source: isFormatOutput ? "generated" : "uploaded",
+								source: isFormatOutput
+									? "generated"
+									: "uploaded",
 								url,
 								saveUrl: url,
-								size: fileState.compressedSize ?? fileState.originalSize,
+								size:
+									fileState.compressedSize ??
+									fileState.originalSize,
 								modifiedAt: Date.now(),
-								examTypeId: task.spec.kind === "process-files" ? task.spec.examTypeId ?? undefined : undefined,
-								status: isFormatOutput ? "success" : "processing",
+								examTypeId:
+									task.spec.kind === "process-files"
+										? (task.spec.examTypeId ?? undefined)
+										: undefined,
+								status: isFormatOutput
+									? "success"
+									: "processing",
 								manifestStatus: fileState.manifestStatus,
 								contentHash: fileState.contentHash,
 							});
@@ -165,17 +195,28 @@
 						const url = `/api/file/${result.key}`;
 						const existing = next.get(url);
 						if (!existing) {
-							const name = result.key.split("/").pop() ?? result.key;
+							const name =
+								result.key.split("/").pop() ?? result.key;
 							next.set(url, {
 								id: url,
 								title: name,
 								kind: deriveKind(name),
 								category: deriveCategory(name),
-								source: result.manifestStatus === "Formatted" || result.manifestStatus === "Validated" || result.manifestStatus === "Committed" || result.manifestStatus === "Generated" || result.manifestStatus === "Published" ? "generated" : "uploaded",
+								source:
+									result.manifestStatus === "Formatted" ||
+									result.manifestStatus === "Validated" ||
+									result.manifestStatus === "Committed" ||
+									result.manifestStatus === "Generated" ||
+									result.manifestStatus === "Published"
+										? "generated"
+										: "uploaded",
 								url,
 								saveUrl: url,
 								modifiedAt: Date.now(),
-								status: result.status === "success" ? "success" : "error",
+								status:
+									result.status === "success"
+										? "success"
+										: "error",
 								manifestStatus: result.manifestStatus,
 								contentHash: result.contentHash,
 							});
@@ -184,9 +225,21 @@
 						}
 
 						const updates: Partial<Artifact> = {};
-						if (result.status === "success" && existing.status !== "success") updates.status = "success";
-						if (result.manifestStatus && result.manifestStatus !== existing.manifestStatus) updates.manifestStatus = result.manifestStatus;
-						if (result.contentHash && result.contentHash !== existing.contentHash) updates.contentHash = result.contentHash;
+						if (
+							result.status === "success" &&
+							existing.status !== "success"
+						)
+							updates.status = "success";
+						if (
+							result.manifestStatus &&
+							result.manifestStatus !== existing.manifestStatus
+						)
+							updates.manifestStatus = result.manifestStatus;
+						if (
+							result.contentHash &&
+							result.contentHash !== existing.contentHash
+						)
+							updates.contentHash = result.contentHash;
 
 						if (Object.keys(updates).length > 0) {
 							next.set(url, { ...existing, ...updates });
@@ -199,7 +252,8 @@
 					// on the next render (with full manifest metadata instead
 					// of the partial optimistic state).
 					for (const result of task.result.results) {
-						if (result.status !== "success" || !result.key) continue;
+						if (result.status !== "success" || !result.key)
+							continue;
 						const url = `/api/file/${result.key}`;
 						if (next.delete(url)) changed = true;
 					}
@@ -207,24 +261,41 @@
 			}
 
 			// OCR tasks — no live file states, only terminal results
-			if (task.spec.kind === "ocr-batch" || task.spec.kind === "ocr-single" || task.spec.kind === "ocr-direct") {
+			if (
+				task.spec.kind === "ocr-batch" ||
+				task.spec.kind === "ocr-single" ||
+				task.spec.kind === "ocr-direct"
+			) {
 				if (task.status === "completed" && task.result) {
 					for (const result of task.result.results) {
 						if (!result.key) continue;
 						const url = `/api/file/${result.key}`;
 						const existing = next.get(url);
 
-						if (result.status === "success" && result.manifestStatus === "Extracted") {
+						if (
+							result.status === "success" &&
+							result.manifestStatus === "Extracted"
+						) {
 							if (existing) {
 								const updates: Partial<Artifact> = {};
-								if (existing.manifestStatus !== result.manifestStatus) updates.manifestStatus = result.manifestStatus;
-								if (result.contentHash && result.contentHash !== existing.contentHash) updates.contentHash = result.contentHash;
+								if (
+									existing.manifestStatus !==
+									result.manifestStatus
+								)
+									updates.manifestStatus =
+										result.manifestStatus;
+								if (
+									result.contentHash &&
+									result.contentHash !== existing.contentHash
+								)
+									updates.contentHash = result.contentHash;
 								if (Object.keys(updates).length > 0) {
 									next.set(url, { ...existing, ...updates });
 									changed = true;
 								}
 							} else {
-								const name = result.key.split("/").pop() ?? result.key;
+								const name =
+									result.key.split("/").pop() ?? result.key;
 								next.set(url, {
 									id: url,
 									title: name,
@@ -300,6 +371,12 @@
 		for (const f of data.files) map.set(f.url ?? f.id, f);
 		for (const [, f] of optimisticFiles) {
 			map.set(f.url ?? f.id, f);
+		}
+		for (const [url, patch] of Object.entries(getPatches())) {
+			const existing = map.get(url);
+			if (existing) {
+				map.set(url, { ...existing, ...patch });
+			}
 		}
 		return [...map.values()];
 	});
@@ -408,28 +485,95 @@
 		}
 	}
 
-	function badgeConfig(file: Artifact): { label: string; cls: string; pulse?: boolean } | null {
+	function badgeConfig(
+		file: Artifact,
+	): { label: string; cls: string; pulse?: boolean } | null {
 		const ms = file.manifestStatus ?? file.marksheetStatus;
-		if (ms === "Failed") return { label: "Failed", cls: "bg-rose-400/15 text-rose-300", pulse: false };
-		if (ms === "Uploaded") return { label: "Processing", cls: "bg-amber-400/15 text-amber-300", pulse: true };
-		if (ms === "Extracted") return { label: "Extracted", cls: "bg-sky-400/15 text-sky-300" };
-		if (ms === "Formatted" || ms === "formatted") return { label: "Ready", cls: "bg-emerald-400/15 text-emerald-300" };
-		if (ms === "Validated" || ms === "validated") return { label: "Validated", cls: "bg-emerald-400/15 text-emerald-300" };
-		if (ms === "Committed" || ms === "committed") return { label: "Committed", cls: "bg-emerald-400/15 text-emerald-300" };
-		if (ms === "Generated") return { label: "Generated", cls: "bg-emerald-400/15 text-emerald-300" };
-		if (ms === "Published") return { label: "Published", cls: "bg-emerald-400/15 text-emerald-300" };
-		if (file.status === "processing") return { label: "Processing", cls: "bg-amber-400/15 text-amber-300", pulse: true };
+		if (ms === "Failed")
+			return {
+				label: "Failed",
+				cls: "bg-rose-400/15 text-rose-300",
+				pulse: false,
+			};
+		if (ms === "Uploaded")
+			return {
+				label: "Processing",
+				cls: "bg-amber-400/15 text-amber-300",
+				pulse: true,
+			};
+		if (ms === "Extracted")
+			return { label: "Extracted", cls: "bg-sky-400/15 text-sky-300" };
+		if (ms === "Formatted" || ms === "formatted")
+			return {
+				label: "Ready",
+				cls: "bg-emerald-400/15 text-emerald-300",
+			};
+		if (ms === "Validated" || ms === "validated")
+			return {
+				label: "Validated",
+				cls: "bg-emerald-400/15 text-emerald-300",
+			};
+		if (ms === "Committed" || ms === "committed")
+			return {
+				label: "Committed",
+				cls: "bg-emerald-400/15 text-emerald-300",
+			};
+		if (ms === "Generated")
+			return {
+				label: "Generated",
+				cls: "bg-emerald-400/15 text-emerald-300",
+			};
+		if (ms === "Published")
+			return {
+				label: "Published",
+				cls: "bg-emerald-400/15 text-emerald-300",
+			};
+		if (file.status === "processing")
+			return {
+				label: "Processing",
+				cls: "bg-amber-400/15 text-amber-300",
+				pulse: true,
+			};
 		return null;
 	}
 
-	function taskBadge(task: { phase?: string; status: string; rateLimitInfo?: { countdownEnd: number }; message?: string }): { label: string; cls: string; pulse?: boolean } | null {
+	function taskBadge(task: {
+		phase?: string;
+		status: string;
+		rateLimitInfo?: { countdownEnd: number };
+		message?: string;
+	}): { label: string; cls: string; pulse?: boolean } | null {
 		if (task.rateLimitInfo) {
-			const remaining = Math.max(0, Math.ceil((task.rateLimitInfo.countdownEnd - Date.now()) / 1000));
-			return { label: `Rate limited — retry in ${remaining}s`, cls: "bg-amber-400/15 text-amber-300", pulse: true };
+			const remaining = Math.max(
+				0,
+				Math.ceil(
+					(task.rateLimitInfo.countdownEnd - Date.now()) / 1000,
+				),
+			);
+			return {
+				label: `Rate limited — retry in ${remaining}s`,
+				cls: "bg-amber-400/15 text-amber-300",
+				pulse: true,
+			};
 		}
-		if (task.phase === "format" && task.status === "running") return { label: "Formatting…", cls: "bg-amber-400/15 text-amber-300", pulse: true };
-		if (task.phase === "ocr" && task.status === "running") return { label: "Extracting…", cls: "bg-amber-400/15 text-amber-300", pulse: true };
-		if (task.status === "running") return { label: "Processing…", cls: "bg-amber-400/15 text-amber-300", pulse: true };
+		if (task.phase === "format" && task.status === "running")
+			return {
+				label: "Formatting…",
+				cls: "bg-amber-400/15 text-amber-300",
+				pulse: true,
+			};
+		if (task.phase === "ocr" && task.status === "running")
+			return {
+				label: "Extracting…",
+				cls: "bg-amber-400/15 text-amber-300",
+				pulse: true,
+			};
+		if (task.status === "running")
+			return {
+				label: "Processing…",
+				cls: "bg-amber-400/15 text-amber-300",
+				pulse: true,
+			};
 		return null;
 	}
 
@@ -566,16 +710,21 @@
 			);
 			const keys = selectedFiles
 				.map((f) => {
-					const relPath = (f as any).url?.replace("/api/file/", "") ?? f.id;
+					const relPath =
+						(f as any).url?.replace("/api/file/", "") ?? f.id;
 					const ch = (f as any).contentHash ?? relPath;
-					return btoa(JSON.stringify({
-						k: ch,
-						p: relPath,
-						n: f.title,
-						m: (f as any).mimeType ?? "application/octet-stream",
-						c: ch,
-						d: (f as any).documentId ?? ch,
-					}));
+					return btoa(
+						JSON.stringify({
+							k: ch,
+							p: relPath,
+							n: f.title,
+							m:
+								(f as any).mimeType ??
+								"application/octet-stream",
+							c: ch,
+							d: (f as any).documentId ?? ch,
+						}),
+					);
 				})
 				.map(encodeURIComponent)
 				.join(",");
@@ -622,7 +771,9 @@
 		if (eligibleFormatFiles.length === 0) return;
 		const keys = eligibleFormatFiles.map((f) => f.id);
 		const contentHashes = Object.fromEntries(
-			eligibleFormatFiles.filter((f) => f.contentHash).map((f) => [f.id, f.contentHash!])
+			eligibleFormatFiles
+				.filter((f) => f.contentHash)
+				.map((f) => [f.id, f.contentHash!]),
 		);
 		isFormatting = true;
 		try {
@@ -640,7 +791,12 @@
 				academicYearTitle: data.tenant.academicYearTitle,
 				userRole: data.tenant.userRole,
 			});
-			backgroundTasks.runTask({ kind: "format-batch", keys, contentHashes, tenant });
+			backgroundTasks.runTask({
+				kind: "format-batch",
+				keys,
+				contentHashes,
+				tenant,
+			});
 			toast.info(
 				`Queued ${keys.length} file${keys.length === 1 ? "" : "s"} for formatting`,
 			);
@@ -680,10 +836,14 @@
 	}
 
 	const eligibleExtractFiles = $derived(
-		filteredFiles.filter((f) => selectedIds.has(f.id) && f.manifestStatus === "Uploaded")
+		filteredFiles.filter(
+			(f) => selectedIds.has(f.id) && f.manifestStatus === "Uploaded",
+		),
 	);
 	const eligibleFormatFiles = $derived(
-		filteredFiles.filter((f) => selectedIds.has(f.id) && f.manifestStatus === "Extracted")
+		filteredFiles.filter(
+			(f) => selectedIds.has(f.id) && f.manifestStatus === "Extracted",
+		),
 	);
 	const activeFilterCount = $derived(sourceFilter.size + categoryMulti.size);
 	const bulkActionsVisible = $derived(selectedIds.size > 0);
@@ -825,26 +985,32 @@
 						variant="secondary"
 						size="sm"
 						class="h-9 px-3.5 rounded-full gap-1.5 text-xs font-bold"
-						disabled={isExtracting || eligibleExtractFiles.length === 0}
+						disabled={isExtracting ||
+							eligibleExtractFiles.length === 0}
 						onclick={extractSelected}
 					>
 						<ScanSearch class="size-3.5" />
 						Extract
 						{#if eligibleExtractFiles.length > 0 && eligibleExtractFiles.length < selectedIds.size}
-							<span class="text-muted-foreground/60">({eligibleExtractFiles.length})</span>
+							<span class="text-muted-foreground/60"
+								>({eligibleExtractFiles.length})</span
+							>
 						{/if}
 					</Button>
 					<Button
 						variant="secondary"
 						size="sm"
 						class="h-9 px-3.5 rounded-full gap-1.5 text-xs font-bold"
-						disabled={isFormatting || eligibleFormatFiles.length === 0}
+						disabled={isFormatting ||
+							eligibleFormatFiles.length === 0}
 						onclick={formatSelected}
 					>
 						<Sparkles class="size-3.5" />
 						Format
 						{#if eligibleFormatFiles.length > 0 && eligibleFormatFiles.length < selectedIds.size}
-							<span class="text-muted-foreground/60">({eligibleFormatFiles.length})</span>
+							<span class="text-muted-foreground/60"
+								>({eligibleFormatFiles.length})</span
+							>
 						{/if}
 					</Button>
 					<Button
@@ -1156,7 +1322,10 @@
 						{@const isActive =
 							inspector.filestoreArtifact?.id === file.id}
 						{@const isSelected = selectedIds.has(file.id)}
-						{@const displayName = file.title.replace(/\.[a-z0-9]+$/i, "")}
+						{@const displayName = file.title.replace(
+							/\.[a-z0-9]+$/i,
+							"",
+						)}
 						{@const badge = badgeConfig(file)}
 						<div
 							role="button"
@@ -1240,12 +1409,17 @@
 										class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md tabular-nums drop-shadow-sm {badge.cls}"
 									>
 										{#if badge.pulse}
-											<span class="size-1.5 rounded-full bg-amber-400 animate-pulse" />
+											<span
+												class="size-1.5 rounded-full bg-amber-400 animate-pulse"
+											></span>
 										{/if}
 										{badge.label}
 									</span>
 								{:else}
-									<span class="text-white/40" aria-hidden="true">·</span>
+									<span
+										class="text-white/40"
+										aria-hidden="true">·</span
+									>
 									<span
 										class="tabular-nums text-white/60 drop-shadow-sm"
 										>{formatSize(file.size) || "—"}</span
@@ -1403,12 +1577,16 @@
 											class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-xs font-medium {badge.cls}"
 										>
 											{#if badge.pulse}
-												<span class="size-1.5 rounded-full bg-amber-400 animate-pulse" />
+												<span
+													class="size-1.5 rounded-full bg-amber-400 animate-pulse"
+												/>
 											{/if}
 											{badge.label}
 										</span>
 									{:else}
-										<span class="text-sm tabular-nums text-muted-foreground">
+										<span
+											class="text-sm tabular-nums text-muted-foreground"
+										>
 											{formatSize(file.size) || "—"}
 										</span>
 									{/if}
