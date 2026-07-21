@@ -6,6 +6,8 @@ import { createAssessmentServiceForRequest } from '$lib/server/service/assessmen
 import { getClassRoster } from '$lib/server/mastra/agents/skill-instructions';
 import { extractRateLimitFromHeaders } from '$lib/provider/rate-limit';
 import { deriveInitialFilename } from '$lib/server/mastra/tools/operations/reporting/marksheet/stream-document';
+import { commitMarksheetLogic } from '$lib/server/mastra/tools/operations/reporting/marksheet/commit-marksheet';
+import { marksheetSchema, type Marksheet } from '$lib/schema/marksheet';
 import { ALLOWED_DESIGNATIONS } from '$lib/types/sms-types';
 import { GROQ_FORMAT_MODEL } from '$lib/server/mastra/agents/format';
 import { resolveModelForRequest } from '$lib/server/mastra/provider';
@@ -308,8 +310,10 @@ MIDDLEBASIC: Subject Code | MTA (30) | CA (10) | REPORT (10) | EXAM (50)`;
   let resolvedAdmNo: number | null = null;
   let studentFullName: string | null = null;
   let resolutionError: string | null = null;
+  let parsedMarksheet: Marksheet | null = null;
   try {
-    const parsed = parseMarksheetMarkdown(markdown);
+    parsedMarksheet = parseMarksheetMarkdown(markdown);
+    const parsed = parsedMarksheet;
     parsedAdmNo = parsed.student?.adminNo != null ? Number(parsed.student.adminNo) : null;
     studentFullName = parsed.student?.fullName ?? null;
     console.log('[format-document] post-format parse result', { parsedAdmNo, studentFullName, adminNoRaw: parsed.student?.adminNo });
@@ -347,6 +351,34 @@ MIDDLEBASIC: Subject Code | MTA (30) | CA (10) | REPORT (10) | EXAM (50)`;
     }
   }
 
+  // Server-side commit when validation passed. This runs synchronously
+  // inside format-document so the marksheet record exists in student_records
+  // by the time this response returns — eliminates the round-trip the
+  // client used to need (and the MARKSHEET_NOT_FOUND error it caused).
+  let recordId: number | null = null;
+  if (!resolutionError && resolvedStudentId && parsedMarksheet) {
+    try {
+      const validated: Marksheet = await marksheetSchema.parseAsync(parsedMarksheet);
+      const commitResult = await commitMarksheetLogic(
+        tenant,
+        {
+          studentId: resolvedStudentId,
+          reason: 'Auto-commit after format-document validation',
+          marksheet: validated,
+        },
+        { skipJsonWrite: true, sourcePath: initialMarkdownPath },
+      );
+      if (commitResult.ok) {
+        recordId = commitResult.recordId;
+        console.log('[format-document] immediate commit succeeded', { recordId, studentId: resolvedStudentId });
+      } else {
+        console.warn('[format-document] immediate commit failed:', commitResult.errors);
+      }
+    } catch (err) {
+      console.warn('[format-document] immediate commit threw (non-fatal):', err);
+    }
+  }
+
   return json({
     success: true,
     manifestStatus: 'Formatted',
@@ -356,6 +388,7 @@ MIDDLEBASIC: Subject Code | MTA (30) | CA (10) | REPORT (10) | EXAM (50)`;
     admissionNo: resolvedAdmNo,
     studentFullName,
     error: resolutionError,
+    recordId,
   });
   } catch (e: unknown) {
     const message = e instanceof Error ? e.message : String(e);

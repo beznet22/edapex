@@ -118,7 +118,6 @@
 	let commitAutoResetTimer: ReturnType<typeof setTimeout> | null = null;
 	let lastCommitTarget: { path: string; examTypeId: number } | null = $state(null);
 	let lastCommittedRecordId: number | null = $state(null);
-	let autoCommitAttempted = $state(false);
 	const COMMIT_DEBOUNCE_MS = 8000;
 
 	function commitManifestRelPathFromUrl(targetUrl: string): string {
@@ -377,38 +376,6 @@
 				commitSecondsLeft = commitSecondsLeft - 1;
 			}
 		}, 1000);
-	});
-
-	// Auto-commit on load. Directly-uploaded marksheets (kind='user-file',
-	// status='Uploaded') never get committed by the edit-triggered debounced
-	// path because the user doesn't edit them — but getStudentResult still
-	// needs a record. When the file is freshly loaded, valid, and recognised
-	// as a marksheet, fire commit immediately (no 8s debounce).
-	$effect(() => {
-		const md = wysiwygContent;
-		if (!md || streaming || autoCommitAttempted) return;
-		if (!url) return;
-		if (commitState !== "idle") return;
-
-		const relPath = commitManifestRelPathFromUrl(url);
-		if (!relPath.startsWith("marksheets/") || !relPath.endsWith(".md")) return;
-
-		const urlExamTypeMatch = url.match(/examType-(\d+)/);
-		const resolvedExamTypeId =
-			examTypeId ?? (urlExamTypeMatch ? Number(urlExamTypeMatch[1]) : null);
-		if (resolvedExamTypeId == null) return;
-
-		// Wait for validation to settle. validationState defaults to
-		// { errors: [], errorCount: 0 } before any PUT has run, so a freshly-
-		// loaded marksheet with no validation will pass immediately. If a
-		// prior validation surfaced errors, hold off — the user is still
-		// editing and the debounced path will handle the eventual commit.
-		if (validationState.errorCount > 0) return;
-
-		autoCommitAttempted = true;
-		lastCommitTarget = { path: relPath, examTypeId: resolvedExamTypeId };
-		commitError = null;
-		fireCommit();
 	});
 
 	$effect(() => {
