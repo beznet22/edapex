@@ -7,7 +7,7 @@ import { getClassRoster } from '$lib/server/mastra/agents/skill-instructions';
 import { extractRateLimitFromHeaders } from '$lib/provider/rate-limit';
 import { deriveInitialFilename } from '$lib/server/mastra/tools/operations/reporting/marksheet/stream-document';
 import { buildMarksheetParseContext } from '$lib/server/mastra/tools/operations/reporting/marksheet/parse-context';
-import { ensureMarksheetCommitted } from '$lib/server/mastra/tools/operations/reporting/marksheet/ensure-committed';
+import { crossReferenceSubjects } from '$lib/server/mastra/tools/operations/reporting/marksheet/validate-cross-ref';
 import { type Marksheet } from '$lib/schema/marksheet';
 import { ALLOWED_DESIGNATIONS } from '$lib/types/sms-types';
 import { GROQ_FORMAT_MODEL } from '$lib/server/mastra/agents/format';
@@ -365,30 +365,23 @@ MIDDLEBASIC: Subject Code | MTA (30) | CA (10) | REPORT (10) | EXAM (50)`;
 
     
 
-  // Server-side commit when validation passed. This runs synchronously
-  // inside format-document so the marksheet record exists in student_records
-  // by the time this response returns — eliminates the round-trip the
-  // client used to need (and the MARKSHEET_NOT_FOUND error it caused).
-  // Delegates to `ensureMarksheetCommitted` (also used by
-  // `generate-result-pdf` before PDF rendering) so the read-parse-validate-commit
-  // pipeline has a single source of truth and the two call sites stay in lock-step.
-  let recordId: number | null = null;
-  if (!resolutionError && resolvedStudentId) {
-    const commitResult = await ensureMarksheetCommitted(
-      tenant,
-      {
-        studentId: resolvedStudentId,
-        markdownPath: initialMarkdownPath,
-        reason: 'Auto-commit after format-document validation',
-      },
-      { throwOnFailure: false }
-    );
-    if (commitResult.ok) {
-      recordId = commitResult.recordId;
-      console.log('[format-document] immediate commit succeeded', { recordId, studentId: resolvedStudentId });
-    } else {
-      console.warn('[format-document] immediate commit failed:', commitResult.errors);
-    }
+  // Cross-reference validation against assigned subjects (soft warnings)
+  let crossRefWarnings: string[] = [];
+  if (!resolutionError && tenant.classId != null && tenant.sectionId != null && parsedMarksheet) {
+    try {
+      const assessment = await createAssessmentServiceForRequest(tenant);
+      const assigned = await assessment.getAssignedSubjects(tenant.classId, tenant.sectionId);
+      crossRefWarnings = crossReferenceSubjects(parsedMarksheet, assigned);
+    } catch { /* best-effort */ }
+  }
+
+  if (crossRefWarnings.length > 0) {
+    try {
+      await updateEntry(tenant, initialMarkdownPath, {
+        validationWarnings: crossRefWarnings,
+        validationWarningCount: crossRefWarnings.length,
+      }, examTypeId);
+    } catch { /* best-effort */ }
   }
 
   return json({
@@ -400,7 +393,7 @@ MIDDLEBASIC: Subject Code | MTA (30) | CA (10) | REPORT (10) | EXAM (50)`;
     admissionNo: resolvedAdmNo,
     studentFullName,
     error: resolutionError,
-    recordId,
+    warnings: crossRefWarnings,
   });
   } catch (e: unknown) {
     const message = e instanceof Error ? e.message : String(e);

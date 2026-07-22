@@ -70,6 +70,10 @@ export interface ManifestEntry {
    *  floating validation pill and validation viewer. */
   validationErrors?: string[];
   validationErrorCount?: number;
+  /** Cross-reference warnings — assigned subjects missing from the marksheet.
+   *  Non-blocking: the user is warned but the operation proceeds. */
+  validationWarnings?: string[];
+  validationWarningCount?: number;
 }
 
 export interface WorkspaceManifest {

@@ -290,7 +290,45 @@
 		};
 	}
 
+	async function commitBeforePdf(): Promise<string | null> {
+		const filePath = autoFixPath ?? validatePath;
+		if (!filePath || !computedExamTypeId) return null;
+		if (editorRef) {
+			try { await editorRef.save(); } catch { /* best-effort */ }
+		}
+		try {
+			const res = await fetch('/api/commit', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					path: filePath,
+					examTypeId: computedExamTypeId,
+					reason: 'Pre-PDF commit',
+				}),
+			});
+			if (!res.ok) {
+				const errBody = await res.json().catch(() => ({}));
+				const msg = (errBody as { errors?: Array<{ message: string }> }).errors?.[0]?.message ?? `HTTP ${res.status}`;
+				return msg;
+			}
+			const data = await res.json();
+			if (!data.ok) {
+				return data.errors?.[0]?.message ?? 'Commit failed';
+			}
+			return null;
+		} catch (e) {
+			return e instanceof Error ? e.message : 'Commit failed';
+		}
+	}
+
 	async function handleDownload() {
+		const commitError = await commitBeforePdf();
+		if (commitError) {
+			import("svelte-sonner").then((m) =>
+				m.toast.error(`Cannot generate PDF: ${commitError}`),
+			);
+			return;
+		}
 		const identifier = extractStudentIdentifier();
 		if (
 			!identifier.admissionNo &&
@@ -364,6 +402,13 @@
 				m.toast.error(
 					"Fix student admission number error before generating PDF",
 				),
+			);
+			return;
+		}
+		const commitError = await commitBeforePdf();
+		if (commitError) {
+			import("svelte-sonner").then((m) =>
+				m.toast.error(`Cannot generate PDF: ${commitError}`),
 			);
 			return;
 		}
@@ -485,9 +530,11 @@
 		}
 	}
 
-	let validationState = $state<{ errors: string[]; errorCount: number }>({
+	let validationState = $state<{ errors: string[]; errorCount: number; warnings: string[]; warningCount: number }>({
 		errors: [],
 		errorCount: 0,
+		warnings: [],
+		warningCount: 0,
 	});
 	let aiFixing = $state(false);
 	let llmAdvice = $state('');
@@ -502,17 +549,20 @@
 	 *  underlying markdown is structurally broken. */
 	let hasManifestValidationData = $state(false);
 
-	/** Tri-state for the validation pill.
+	/** Tri-state + warning for the validation pill.
 	 *  - 'invalid': manifest has validationErrors[] with length > 0 (red)
-	 *  - 'valid':   manifest has validationErrors[] with length === 0 (green)
-	 *  - 'unknown': manifest never reported validation data (amber) — surface
+	 *  - 'valid':   manifest has validationErrors[] with length === 0 and no warnings (green)
+	 *  - 'warning': manifest has warnings but no errors (amber, distinct from unknown)
+	 *  - 'unknown': manifest never reported validation data (muted amber) — surface
 	 *               explicitly so the user clicks the pill to open the editor
 	 *               and trigger auto-validation, instead of clicking EyeIcon
 	 *               and getting a ZodError toast from a "Valid"-looking state. */
-	type ValidationStatus = "valid" | "invalid" | "unknown";
+	type ValidationStatus = "valid" | "invalid" | "unknown" | "warning";
 	const validationStatus: ValidationStatus = $derived.by(() => {
 		if (!hasManifestValidationData) return "unknown";
-		return validationState.errorCount > 0 ? "invalid" : "valid";
+		if (validationState.errorCount > 0) return "invalid";
+		if (validationState.warningCount > 0) return "warning";
+		return "valid";
 	});
 
 	/** Tailwind classes for each pill state. Kept here so the button class
@@ -520,7 +570,8 @@
 	const pillClasses: Record<ValidationStatus, string> = {
 		valid: "bg-emerald-500 hover:bg-emerald-600",
 		invalid: "bg-red-500 hover:bg-red-600 animate-pulse",
-		unknown: "bg-amber-500 hover:bg-amber-600",
+		warning: "bg-amber-500 hover:bg-amber-600",
+		unknown: "bg-amber-500/60 hover:bg-amber-600/60",
 	};
 
 	$effect(() => {
@@ -529,12 +580,16 @@
 		if (mode !== 'filestore' || !vPath?.includes('marksheets/') || !vPath.endsWith('.md')) {
 			if (
 				a?.validationErrors !== undefined ||
-				a?.validationErrorCount !== undefined
+				a?.validationErrorCount !== undefined ||
+				a?.validationWarnings !== undefined
 			) {
 				const errs = a.validationErrors ?? [];
+				const warns = a.validationWarnings ?? [];
 				validationState = {
 					errors: errs,
 					errorCount: a.validationErrorCount ?? errs.length,
+					warnings: warns,
+					warningCount: a.validationWarningCount ?? warns.length,
 				};
 				hasManifestValidationData = true;
 			}
@@ -545,7 +600,6 @@
 	$effect(() => {
 		const vPath = autoFixPath;
 		const eid = computedExamTypeId;
-		if (mode !== 'filestore') return;
 		if (!vPath?.includes('marksheets/') || !vPath.endsWith('.md')) return;
 		if (validating || vPath === lastValidatedPath) return;
 
@@ -555,7 +609,13 @@
 			.then(r => r.ok ? r.json() : null)
 			.then(data => {
 				if (data?.validation) {
-					validationState = { errors: data.validation.errors ?? [], errorCount: data.validation.errorCount ?? 0 };
+					const warns = data.validation.warnings ?? [];
+					validationState = {
+						errors: data.validation.errors ?? [],
+						errorCount: data.validation.errorCount ?? 0,
+						warnings: warns,
+						warningCount: data.validation.warningCount ?? warns.length,
+					};
 					hasManifestValidationData = true;
 				}
 				if (data?.manifestStatus) {
@@ -563,6 +623,8 @@
 						manifestStatus: data.manifestStatus,
 						validationErrors: data.validation?.errors ?? [],
 						validationErrorCount: data.validation?.errorCount ?? 0,
+						validationWarnings: data.validation?.warnings ?? [],
+						validationWarningCount: data.validation?.warningCount ?? 0,
 					});
 				}
 			})
@@ -575,7 +637,7 @@
 		if (validationStatus === 'valid' && editorRef) {
 			return;
 		}
-		if (validationState.errorCount > 0 || llmAdvice) {
+		if (validationState.errorCount > 0 || validationState.warningCount > 0 || llmAdvice) {
 			viewMode = 'validation';
 		}
 	}
@@ -625,14 +687,15 @@
 			if (!res.ok) return;
 			const data = await res.json();
 			const errors: string[] = data.errors ?? [];
-			validationState = { errors, errorCount: errors.length };
+			const warns: string[] = data.warnings ?? [];
+			validationState = { errors, errorCount: errors.length, warnings: warns, warningCount: warns.length };
 			if (data.markdown && errors.length === 0 && editorRef) {
 				editorRef.setContent(data.markdown);
 			}
 			if (data.diagnostics) {
 				llmAdvice = data.diagnostics;
 			}
-			if (errors.length > 0) {
+			if (errors.length > 0 || warns.length > 0) {
 				viewMode = 'validation';
 			}
 		} catch {
@@ -677,6 +740,15 @@
 		if (!toolOutput?.examTypeId) return;
 		if (!persistedMarkdownPath) return;
 		if (!publishState) return;
+
+		const commitError = await commitBeforePdf();
+		if (commitError) {
+			publishDialogOpen = false;
+			import("svelte-sonner").then((m) =>
+				m.toast.error(`Cannot publish: ${commitError}`),
+			);
+			return;
+		}
 
 		publishState.loading = true;
 		publishState.loadingText = "Generating PDF...";
@@ -1039,13 +1111,23 @@
 								<p class="text-xs text-muted-foreground/60">Running diagnostic checks…</p>
 							</div>
 						</div>
-					{:else if validationState.errorCount > 0 || llmAdvice}
-						<div class="flex items-center gap-3 pb-1">
-							<span class="size-2 rounded-full bg-destructive pop-once" />
-							<h2 class="text-sm font-semibold text-foreground">
-								{validationState.errorCount} validation error{validationState.errorCount === 1 ? '' : 's'}
-							</h2>
-						</div>
+					{:else if validationState.errorCount > 0 || validationState.warningCount > 0 || llmAdvice}
+						{#if validationState.errorCount > 0}
+							<div class="flex items-center gap-3 pb-1">
+								<span class="size-2 rounded-full bg-destructive pop-once" />
+								<h2 class="text-sm font-semibold text-foreground">
+									{validationState.errorCount} validation error{validationState.errorCount === 1 ? '' : 's'}
+								</h2>
+							</div>
+						{/if}
+						{#if validationState.warningCount > 0}
+							<div class="flex items-center gap-3 pb-1">
+								<span class="size-2 rounded-full bg-amber-500 pop-once" />
+								<h2 class="text-sm font-semibold text-foreground">
+									{validationState.warningCount} warning{validationState.warningCount === 1 ? '' : 's'}
+								</h2>
+							</div>
+						{/if}
 						{#if llmAdvice}
 							<div class="p-4 rounded-xl bg-primary/5 border border-primary/10 shadow-sm transition-spring">
 								<p class="text-xs font-semibold text-primary uppercase tracking-wider mb-3">AI Diagnosis</p>
@@ -1054,21 +1136,40 @@
 								</div>
 							</div>
 						{/if}
-						<details class="group">
-							<summary class="flex items-center gap-1.5 text-xs font-medium text-muted-foreground cursor-pointer hover:text-foreground transition-colors select-none py-1.5 list-none">
-								<svg class="size-3.5 transition-transform duration-200 group-open:rotate-90" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-									<path d="M9 18l6-6-6-6" />
-								</svg>
-								Raw validation errors
-							</summary>
-							<div class="mt-2 space-y-1.5 transition-spring">
-								<ul class="space-y-1">
-									{#each validationState.errors as error}
-										<li class="text-[11px] font-mono text-destructive/80 bg-destructive/5 px-3 py-2 rounded-lg border border-destructive/10 leading-relaxed">{error}</li>
-									{/each}
-								</ul>
-							</div>
-						</details>
+						{#if validationState.errorCount > 0}
+							<details class="group">
+								<summary class="flex items-center gap-1.5 text-xs font-medium text-muted-foreground cursor-pointer hover:text-foreground transition-colors select-none py-1.5 list-none">
+									<svg class="size-3.5 transition-transform duration-200 group-open:rotate-90" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+										<path d="M9 18l6-6-6-6" />
+									</svg>
+									Raw validation errors
+								</summary>
+								<div class="mt-2 space-y-1.5 transition-spring">
+									<ul class="space-y-1">
+										{#each validationState.errors as error}
+											<li class="text-[11px] font-mono text-destructive/80 bg-destructive/5 px-3 py-2 rounded-lg border border-destructive/10 leading-relaxed">{error}</li>
+										{/each}
+									</ul>
+								</div>
+							</details>
+						{/if}
+						{#if validationState.warningCount > 0}
+							<details class="group">
+								<summary class="flex items-center gap-1.5 text-xs font-medium text-muted-foreground cursor-pointer hover:text-foreground transition-colors select-none py-1.5 list-none">
+									<svg class="size-3.5 transition-transform duration-200 group-open:rotate-90" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+										<path d="M9 18l6-6-6-6" />
+									</svg>
+									Warnings
+								</summary>
+								<div class="mt-2 space-y-1.5 transition-spring">
+									<ul class="space-y-1">
+										{#each validationState.warnings as warning}
+											<li class="text-[11px] font-mono text-amber-600/80 bg-amber-500/5 px-3 py-2 rounded-lg border border-amber-500/10 leading-relaxed">{warning}</li>
+										{/each}
+									</ul>
+								</div>
+							</details>
+						{/if}
 						<button
 							onclick={() => (viewMode = 'markdown')}
 							class="text-xs text-muted-foreground/60 hover:text-foreground transition-colors underline underline-offset-2"
@@ -1147,6 +1248,12 @@
 							{:else if validationStatus === 'valid'}
 								<CheckIcon class="size-3.5" />
 								Valid
+							{:else if validationStatus === 'warning'}
+								<AlertCircleIcon class="size-3.5" />
+								{validationState.warningCount} warning{validationState.warningCount ===
+								1
+									? ""
+									: "s"}
 							{:else}
 								<AlertCircleIcon class="size-3.5" />
 								Not validated
@@ -1245,6 +1352,12 @@
 							{:else if validationStatus === 'valid'}
 								<CheckIcon class="size-3.5" />
 								Valid
+							{:else if validationStatus === 'warning'}
+								<AlertCircleIcon class="size-3.5" />
+								{validationState.warningCount} warning{validationState.warningCount ===
+								1
+									? ""
+									: "s"}
 							{:else}
 								<AlertCircleIcon class="size-3.5" />
 								Not validated

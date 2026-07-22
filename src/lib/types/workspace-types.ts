@@ -32,4 +32,6 @@ export interface Artifact {
 	mimeType?: string;
 	validationErrors?: string[];
 	validationErrorCount?: number;
+	validationWarnings?: string[];
+	validationWarningCount?: number;
 }

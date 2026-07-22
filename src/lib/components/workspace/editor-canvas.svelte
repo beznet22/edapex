@@ -350,7 +350,7 @@
 
 				if (resolvedExamTypeId != null) {
 					const relPath = commitManifestRelPathFromUrl(saveTarget);
-					if (relPath.startsWith('marksheets/') && relPath.endsWith('.md')) {
+					if (/marksheets\/.*\.md$/.test(relPath)) {
 						scheduleCommit(relPath, resolvedExamTypeId);
 					}
 				}

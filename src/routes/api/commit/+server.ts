@@ -31,12 +31,14 @@ import { readManifest, updateEntry } from '$lib/server/workspace/manifest';
 import { marksheetSchema, type Marksheet } from '$lib/schema/marksheet';
 import { buildMarksheetParseContext } from '$lib/server/mastra/tools/operations/reporting/marksheet/parse-context';
 import { commitMarksheetLogic } from '$lib/server/mastra/tools/operations/reporting/marksheet/commit-marksheet';
+import { crossReferenceSubjects, padMissingRecords } from '$lib/server/mastra/tools/operations/reporting/marksheet/validate-cross-ref';
+import { createAssessmentServiceForRequest } from '$lib/server/service/assessment.service';
 import { StudentRepository } from '$lib/server/repository';
 import { getDatabase } from '$lib/server/db';
 import { parseMarksheetMarkdown } from '$lib/utils/marksheet-ast-parser';
 
 const bodySchema = z.object({
-	path: z.string().regex(/^marksheets\/.*\.md$/, 'path must point to a marksheets/*.md file'),
+	path: z.string().regex(/marksheets\/.*\.md$/, 'path must point to a marksheets/*.md file'),
 	examTypeId: z.number().int().positive(),
 	reason: z.string().optional(),
 });
@@ -199,6 +201,27 @@ export const POST: RequestHandler = async ({ request, locals, cookies }) => {
 		} catch (err) {
 			console.warn('[commit] manifest backfill failed (non-fatal)', err);
 		}
+	}
+
+	// Pad missing subjects so all assigned subjects have DB records
+	// and compute cross-reference warnings
+	const commitMarksheet = parsedMarksheet;
+	let crossRefWarnings: string[] = [];
+	if (tenant.classId != null && tenant.sectionId != null) {
+		try {
+			const assessment = await createAssessmentServiceForRequest(tenant);
+			const assigned = await assessment.getAssignedSubjects(tenant.classId, tenant.sectionId);
+			crossRefWarnings = crossReferenceSubjects(commitMarksheet, assigned);
+			parsedMarksheet = padMissingRecords(commitMarksheet, assigned);
+		} catch { /* best-effort */ }
+	}
+	if (crossRefWarnings.length > 0) {
+		try {
+			await updateEntry(tenant, manifestRelPath, {
+				validationWarnings: crossRefWarnings,
+				validationWarningCount: crossRefWarnings.length,
+			}, examTypeId);
+		} catch { /* best-effort */ }
 	}
 
 	const result = await commitMarksheetLogic(

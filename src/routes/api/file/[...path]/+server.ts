@@ -34,6 +34,7 @@ import { buildMarksheetParseContext } from '$lib/server/mastra/tools/operations/
 import { createAssessmentServiceForRequest } from '$lib/server/service/assessment.service';
 import { DIAGNOSTIC_MODEL } from '$lib/server/mastra/agents/diagnostic';
 import { resolveModelForRequest } from '$lib/server/mastra/provider';
+import { crossReferenceSubjects } from '$lib/server/mastra/tools/operations/reporting/marksheet/validate-cross-ref';
 import type { SerializedTenant } from '$lib/types/background-tasks';
 import type { FileEntry } from '@mastra/core/workspace';
 import { resolveUserRole } from '$lib/server/mastra/provider/role-resolver';
@@ -297,6 +298,14 @@ export const POST: RequestHandler = async ({ params, url, request, locals, cooki
 
       let zodErrors: string[] = [];
       let writeFailed = false;
+      let validationWarnings: string[] = [];
+      if (tenant.classId != null && tenant.sectionId != null) {
+        try {
+          const assessment = await createAssessmentServiceForRequest(tenant);
+          const assigned = await assessment.getAssignedSubjects(tenant.classId, tenant.sectionId);
+          validationWarnings = crossReferenceSubjects(parsed, assigned);
+        } catch { /* best-effort */ }
+      }
       if (result.success) {
         const canonicalMd = generateMarksheetMarkdown(parsed);
         const reParsed = parseMarksheetMarkdown(canonicalMd, parseContext);
@@ -305,12 +314,19 @@ export const POST: RequestHandler = async ({ params, url, request, locals, cooki
         if (reValid) {
           const fixedBytes = new TextEncoder().encode(canonicalMd);
           await fs.writeFile(resolvedPath, fixedBytes, { overwrite: true });
-          await updateEntry(tenant, params.path!, { validationErrors: [], validationErrorCount: 0, status: 'Validated' }, tenant.examTypeId);
+          await updateEntry(tenant, params.path!, {
+            validationErrors: [],
+            validationErrorCount: 0,
+            validationWarnings: validationWarnings.length > 0 ? validationWarnings : undefined,
+            validationWarningCount: validationWarnings.length > 0 ? validationWarnings.length : undefined,
+            status: 'Validated',
+          }, tenant.examTypeId);
           return json({
             fixed: hasAdmNoMismatch,
             errors: [],
             markdown: canonicalMd,
             ...(originalErrors.length > 0 ? { originalErrors } : {}),
+            ...(validationWarnings.length > 0 ? { warnings: validationWarnings } : {}),
           });
         }
         zodErrors = !reResult.success
@@ -354,9 +370,11 @@ export const POST: RequestHandler = async ({ params, url, request, locals, cooki
       await updateEntry(tenant, params.path!, {
         validationErrors: allErrors,
         validationErrorCount: allErrors.length,
+        validationWarnings: validationWarnings.length > 0 ? validationWarnings : undefined,
+        validationWarningCount: validationWarnings.length > 0 ? validationWarnings.length : undefined,
         status: 'Failed',
       }, tenant.examTypeId);
-      return json({ fixed: false, errors: allErrors, originalErrors: allErrors, diagnostics: llmAdvice, status: 'Failed' });
+      return json({ fixed: false, errors: allErrors, originalErrors: allErrors, diagnostics: llmAdvice, warnings: validationWarnings, status: 'Failed' });
     }
 
     if (action === 'validate') {
@@ -366,6 +384,7 @@ export const POST: RequestHandler = async ({ params, url, request, locals, cooki
       const markdown = typeof raw === 'string' ? raw : new TextDecoder().decode(raw);
 
       let validationErrors: string[] = [];
+      let validationWarnings: string[] = [];
       if (params.path.includes('marksheets/') && params.path.endsWith('.md')) {
         try {
           const { parseMarksheetMarkdown } = await import('$lib/utils/marksheet-ast-parser');
@@ -384,9 +403,23 @@ export const POST: RequestHandler = async ({ params, url, request, locals, cooki
             validationErrors.push(...result.error.issues.map(i => `${i.path.join('.')}: ${i.message}`));
           }
 
+          if (tenant.classId != null && tenant.sectionId != null && result.success) {
+            try {
+              const assessment = await createAssessmentServiceForRequest(tenant);
+              const assigned = await assessment.getAssignedSubjects(tenant.classId, tenant.sectionId);
+              validationWarnings = crossReferenceSubjects(result.data, assigned);
+            } catch { /* best-effort */ }
+          }
+
           await updateEntry(
             tenant, params.path,
-            { validationErrors, validationErrorCount: validationErrors.length, status: validationErrors.length > 0 ? 'Failed' : 'Validated' },
+            {
+              validationErrors,
+              validationErrorCount: validationErrors.length,
+              validationWarnings: validationWarnings.length > 0 ? validationWarnings : undefined,
+              validationWarningCount: validationWarnings.length > 0 ? validationWarnings.length : undefined,
+              status: validationErrors.length > 0 ? 'Failed' : 'Validated',
+            },
             tenant.examTypeId
           );
         } catch (parseErr) {
@@ -397,7 +430,7 @@ export const POST: RequestHandler = async ({ params, url, request, locals, cooki
       const validateStatus = validationErrors.length > 0 ? 'Failed' : 'Validated';
       return json({
         success: true,
-        validation: { errors: validationErrors, errorCount: validationErrors.length },
+        validation: { errors: validationErrors, errorCount: validationErrors.length, warnings: validationWarnings, warningCount: validationWarnings.length },
         manifestStatus: validateStatus
       });
     }
@@ -616,7 +649,8 @@ export const PUT: RequestHandler = async ({ params, request, locals, cookies, ur
 
     // ── Marksheet validation ──
     let validationErrors: string[] = [];
-    let status: string | undefined;
+    let validationWarnings: string[] = [];
+    let status: FileStatus | undefined;
     if (manifestRelPath.includes('marksheets/') && manifestRelPath.endsWith('.md')) {
       try {
         const { parseMarksheetMarkdown } = await import('$lib/utils/marksheet-ast-parser');
@@ -635,11 +669,24 @@ export const PUT: RequestHandler = async ({ params, request, locals, cookies, ur
         if (!result.success) {
           validationErrors.push(...result.error.issues.map(i => `${i.path.join('.')}: ${i.message}`));
         }
-        const status = validationErrors.length > 0 ? 'Failed' : 'Validated';
-        console.info('[file-api] validationErrors:', validationErrors, status);
+        if (tenant.classId != null && tenant.sectionId != null && result.success) {
+          try {
+            const assessment = await createAssessmentServiceForRequest(tenant);
+            const assigned = await assessment.getAssignedSubjects(tenant.classId, tenant.sectionId);
+            validationWarnings = crossReferenceSubjects(result.data, assigned);
+          } catch { /* best-effort */ }
+        }
+        status = validationErrors.length > 0 ? 'Failed' : 'Validated';
+        console.info('[file-api] validationErrors:', validationErrors, 'warnings:', validationWarnings, status);
         await updateEntry(
           tenant, manifestRelPath,
-          { validationErrors, validationErrorCount: validationErrors.length, status },
+          {
+            validationErrors,
+            validationErrorCount: validationErrors.length,
+            validationWarnings: validationWarnings.length > 0 ? validationWarnings : undefined,
+            validationWarningCount: validationWarnings.length > 0 ? validationWarnings.length : undefined,
+            status,
+          },
           tenant.examTypeId
         );
       } catch (parseErr) {
@@ -648,7 +695,7 @@ export const PUT: RequestHandler = async ({ params, request, locals, cookies, ur
       }
     }
 
-    return json({ success: true, path: resolvedPath, validation: { errors: validationErrors, errorCount: validationErrors.length }, manifestStatus: status });
+    return json({ success: true, path: resolvedPath, validation: { errors: validationErrors, errorCount: validationErrors.length, warnings: validationWarnings, warningCount: validationWarnings.length }, manifestStatus: status });
   } catch (e: unknown) {
     if (e instanceof WorkspaceScopeError) {
       return json({ success: false, error: 'WORKSPACE_SCOPE_VIOLATION', message: e.message }, { status: 403 });

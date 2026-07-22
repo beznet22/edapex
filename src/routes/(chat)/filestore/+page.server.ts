@@ -207,7 +207,6 @@ export const load: PageServerLoad = async ({ url, locals, cookies }) => {
 		const pathToAdmissionNo = new Map<string, number>();
 		for (const manifest of manifests) {
 			for (const [relPath, entry] of Object.entries(manifest.entries)) {
-				console.log('[filestore] manifest entry', relPath, { studentId: entry.studentId, admissionNo: entry.admissionNo, kind: entry.kind, status: entry.status, path: entry.path });
 				if (entry.marksheetStatus) pathToMarksheetStatus.set(relPath, entry.marksheetStatus);
 				if (entry.status) pathToManifestStatus.set(relPath, entry.status);
 				if (entry.error) pathToError.set(relPath, entry.error);
@@ -230,9 +229,6 @@ export const load: PageServerLoad = async ({ url, locals, cookies }) => {
 				candidates.push(relKey.replace("/uploads/", "/notes/"));
 			}
 			for (const key of candidates) {
-				if (key === relKey && !pathToStudentId.has(key) && !pathToAdmissionNo.has(key)) {
-					console.log('[filestore] NO identity in manifest for', { title: f.title, relKey, manifestSid: pathToStudentId.get(key), manifestAdm: pathToAdmissionNo.get(key), sidKeys: Array.from(pathToStudentId.keys()), admKeys: Array.from(pathToAdmissionNo.keys()) });
-				}
 				const ms = pathToMarksheetStatus.get(key);
 				if (ms && !f.marksheetStatus) f.marksheetStatus = ms;
 				const manifestStatus = pathToManifestStatus.get(key);

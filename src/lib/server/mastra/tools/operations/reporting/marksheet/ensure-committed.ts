@@ -51,6 +51,8 @@ import {
 } from './commit-marksheet';
 import { resolveFilesystem } from '../_shared';
 import { updateEntry } from '$lib/server/workspace/manifest';
+import { createAssessmentServiceForRequest } from '$lib/server/service/assessment.service';
+import { crossReferenceSubjects, padMissingRecords } from './validate-cross-ref';
 import type { TenantContext } from '$lib/server/mastra/tenant-context';
 
 export interface EnsureCommittedInput {
@@ -156,13 +158,27 @@ export async function ensureMarksheetCommitted(
 	}
 
 	let parsedMarksheet: Marksheet;
+	let crossRefWarnings: string[] = [];
 	try {
 		const raw = await fs.readFile(markdownPath, { encoding: 'utf-8' });
 		const text = typeof raw === 'string' ? raw : raw.toString('utf-8');
 		const parseContext = await buildMarksheetParseContext(text, tenant);
 		const parsed = parseMarksheetMarkdown(text, parseContext);
 		const validated = await marksheetSchema.parseAsync(parsed);
-		parsedMarksheet = validated;
+
+		// Pad missing subjects before commit so all assigned subjects have DB records
+		if (tenant.classId != null && tenant.sectionId != null) {
+			try {
+				const assessment = await createAssessmentServiceForRequest(tenant);
+				const assigned = await assessment.getAssignedSubjects(tenant.classId, tenant.sectionId);
+				crossRefWarnings = crossReferenceSubjects(validated, assigned);
+				parsedMarksheet = padMissingRecords(validated, assigned);
+			} catch {
+				parsedMarksheet = validated;
+			}
+		} else {
+			parsedMarksheet = validated;
+		}
 	} catch (err) {
 		const message = err instanceof Error ? err.message : String(err);
 		const code =
@@ -171,6 +187,16 @@ export async function ensureMarksheetCommitted(
 		await persistValidationErrorsToManifest(tenant, markdownPath, result.errors);
 		if (throwOnFailure) throw new Error(message);
 		return result;
+	}
+
+	// Persist cross-reference warnings on manifest entry
+	if (crossRefWarnings.length > 0 && tenant.examTypeId != null) {
+		try {
+			await updateEntry(tenant, markdownPath, {
+				validationWarnings: crossRefWarnings,
+				validationWarningCount: crossRefWarnings.length,
+			}, tenant.examTypeId);
+		} catch { /* best-effort */ }
 	}
 
 	const result = await commitMarksheetLogic(

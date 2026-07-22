@@ -2,6 +2,8 @@ export type FilePatch = {
 	manifestStatus?: string;
 	validationErrors?: string[];
 	validationErrorCount?: number;
+	validationWarnings?: string[];
+	validationWarningCount?: number;
 };
 
 let _patches: Record<string, FilePatch> = $state({});

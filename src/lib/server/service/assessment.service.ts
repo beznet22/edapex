@@ -875,6 +875,10 @@ export class AssessmentService {
     return this.student().getStudentsByClassSection(params);
   }
 
+  async getAssignedSubjects(classId: number, sectionId: number) {
+    return this.result().getAssignedSubjects(classId, sectionId);
+  }
+
   async getMappingData(classId: number, sectionId: number) {
     const [examTypes, studentCategories, subjects, classSection] = await Promise.all([
       this.result().getCurrentTerm(),
