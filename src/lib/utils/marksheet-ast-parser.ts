@@ -234,7 +234,7 @@ function parseStudentInfoFromTree(tree: Root, md: string, mentions: ReturnType<t
     parentEmail: read("parent email"),
     parentName: read("parent name"),
     term: read("term"),
-    title: h1Title || examTitle || "",
+			title: examTitle || "",
     category: parsedCategory,
     className: read("class"),
     sectionName: read("section"),

@@ -571,10 +571,12 @@
 	});
 
 	async function handlePillClick() {
-		viewMode = 'validation';
 		await handleAutoFix();
 		if (validationStatus === 'valid' && editorRef) {
-			viewMode = 'markdown';
+			return;
+		}
+		if (validationState.errorCount > 0 || llmAdvice) {
+			viewMode = 'validation';
 		}
 	}
 

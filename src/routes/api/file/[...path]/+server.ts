@@ -290,31 +290,41 @@ export const POST: RequestHandler = async ({ params, url, request, locals, cooki
 
       const enteredAdmNo = extractTableField(markdown, 'admission no');
       const hasAdmNoMismatch = enteredAdmNo != null && Number(enteredAdmNo) !== parsed.student.adminNo;
-
-      if (result.success && !hasAdmNoMismatch) {
-        const canonicalMd = generateMarksheetMarkdown(parsed);
-        const fixedBytes = new TextEncoder().encode(canonicalMd);
-        await fs.writeFile(resolvedPath, fixedBytes, { overwrite: true });
-        await updateEntry(tenant, params.path!, { validationErrors: [], validationErrorCount: 0, status: 'Validated' }, tenant.examTypeId);
-        return json({ fixed: false, errors: [], markdown: canonicalMd });
-      }
-
-      if (result.success && hasAdmNoMismatch) {
-        const canonicalMd = generateMarksheetMarkdown(parsed);
-        const fixedBytes = new TextEncoder().encode(canonicalMd);
-        await fs.writeFile(resolvedPath, fixedBytes, { overwrite: true });
-        await updateEntry(tenant, params.path!, { validationErrors: [], validationErrorCount: 0, status: 'Validated' }, tenant.examTypeId);
-        return json({
-          fixed: true,
-          errors: [],
-          markdown: canonicalMd,
-          originalErrors: [`Admission No mismatch: file has ${enteredAdmNo}, roster records ${parsed.student.adminNo}`],
-        });
-      }
-
-      const zodErrors = result.error?.issues.map(i => `${i.path.join('.')}: ${i.message}`) ?? [];
+      const originalErrors: string[] = [];
       if (hasAdmNoMismatch) {
-        zodErrors.push(`Admission No mismatch: file has ${enteredAdmNo}, roster records ${parsed.student.adminNo}`);
+        originalErrors.push(`Admission No mismatch: file has ${enteredAdmNo}, roster records ${parsed.student.adminNo}`);
+      }
+
+      let zodErrors: string[] = [];
+      let writeFailed = false;
+      if (result.success) {
+        const canonicalMd = generateMarksheetMarkdown(parsed);
+        const reParsed = parseMarksheetMarkdown(canonicalMd, parseContext);
+        const reResult = await marksheetSchema.safeParseAsync(reParsed);
+        const reValid = reResult.success && reParsed.student.adminNo === parsed.student.adminNo && reParsed.records.length === parsed.records.length && canonicalMd.length > 0;
+        if (reValid) {
+          const fixedBytes = new TextEncoder().encode(canonicalMd);
+          await fs.writeFile(resolvedPath, fixedBytes, { overwrite: true });
+          await updateEntry(tenant, params.path!, { validationErrors: [], validationErrorCount: 0, status: 'Validated' }, tenant.examTypeId);
+          return json({
+            fixed: hasAdmNoMismatch,
+            errors: [],
+            markdown: canonicalMd,
+            ...(originalErrors.length > 0 ? { originalErrors } : {}),
+          });
+        }
+        zodErrors = !reResult.success
+          ? reResult.error.issues.map(i => `${i.path.join('.')}: ${i.message}`)
+          : [];
+        if (canonicalMd.length === 0) zodErrors.push('Generated marksheet markdown is empty — no changes written');
+        if (reParsed.student.adminNo !== parsed.student.adminNo) zodErrors.push(`Regeneration altered student identity: adminNo changed from ${parsed.student.adminNo} to ${reParsed.student.adminNo}`);
+        if (reParsed.records.length !== parsed.records.length) zodErrors.push(`Regeneration altered record count: ${parsed.records.length} → ${reParsed.records.length}`);
+        writeFailed = true;
+      } else {
+        zodErrors = result.error?.issues.map(i => `${i.path.join('.')}: ${i.message}`) ?? [];
+        if (hasAdmNoMismatch) {
+          zodErrors.push(`Admission No mismatch: file has ${enteredAdmNo}, roster records ${parsed.student.adminNo}`);
+        }
       }
 
       let llmAdvice = '';
@@ -330,7 +340,8 @@ export const POST: RequestHandler = async ({ params, url, request, locals, cooki
         const resolved = await resolveModelForRequest(locals.user.id, DIAGNOSTIC_MODEL, db, undefined, traceContext);
         const { mastra } = await import('$lib/server/mastra');
         const agent = mastra.getAgent('diagnostic');
-        const userPrompt = `Current marksheet markdown:\n\n${markdown}\n\nValidation errors:\n${zodErrors.join('\n')}`;
+        const contextErrors = [...zodErrors, ...originalErrors].filter(Boolean);
+        const userPrompt = `Current marksheet markdown:\n\n${markdown}\n\nValidation errors:\n${contextErrors.join('\n')}`;
         const result = await agent.generate(userPrompt, {
           model: resolved.config as never,
         });
@@ -339,12 +350,13 @@ export const POST: RequestHandler = async ({ params, url, request, locals, cooki
         llmAdvice = '';
       }
 
+      const allErrors = [...zodErrors, ...(writeFailed ? originalErrors : [])];
       await updateEntry(tenant, params.path!, {
-        validationErrors: zodErrors,
-        validationErrorCount: zodErrors.length,
+        validationErrors: allErrors,
+        validationErrorCount: allErrors.length,
         status: 'Failed',
       }, tenant.examTypeId);
-      return json({ fixed: false, errors: zodErrors, originalErrors: zodErrors, diagnostics: llmAdvice, status: 'Failed' });
+      return json({ fixed: false, errors: allErrors, originalErrors: allErrors, diagnostics: llmAdvice, status: 'Failed' });
     }
 
     if (action === 'validate') {
