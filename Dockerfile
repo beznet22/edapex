@@ -24,27 +24,29 @@ COPY . .
 # Build the SvelteKit application
 RUN pnpm run build
 
-# Production stage - Use slim (Debian) for glibc compatibility and smaller size
-FROM node:22-slim AS production
+# Production stage - Use Ubuntu Noble for GLIBC 2.39 (required by bin/html2pdf)
+FROM ubuntu:noble AS production
 
-# Enable pnpm via corepack
-RUN corepack enable
+# Install Node.js 22, pnpm, and system libraries for html2pdf in one layer
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    curl \
+    gnupg \
+    fontconfig \
+    fonts-liberation \
+    libglib2.0-0 \
+    && curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
+    && apt-get install -y nodejs \
+    && corepack enable \
+    && rm -rf /var/lib/apt/lists/*
 
 # Set working directory and environment
 WORKDIR /app
 ENV NODE_ENV=production
 
-# Install necessary libraries for html2pdf and rendering in one layer
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates \
-    fontconfig \
-    fonts-liberation \
-    libglib2.0-0 \
-    && rm -rf /var/lib/apt/lists/*
-
-# Create non-root user first
-RUN groupadd -g 1001 nodejs && \
-    useradd -m -u 1001 -g nodejs nodejs
+# Create non-root user
+RUN addgroup --gid 1001 nodejs && \
+    adduser --uid 1001 --gid 1001 --disabled-password --gecos "" nodejs
 
 # Create necessary directories first
 RUN mkdir -p /app/storage/uploads /app/storage/cache /app/storage/private /app/.workspaces /app/temp && \

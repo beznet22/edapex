@@ -1,17 +1,16 @@
 import { writeFile, mkdir, readdir, rm, stat } from "fs/promises";
 import { readFileSync, existsSync, readdirSync } from "fs";
 import { join } from "path";
-import { fileURLToPath } from "url";
 import { execFile } from "child_process";
 import { promisify } from "util";
 import { randomUUID } from "crypto";
 
 const execFileAsync = promisify(execFile);
 
-// Resolve filesystem paths relative to this module's location so the helper
-// works regardless of the working directory it is invoked from.
-const html2pdfPath = fileURLToPath(new URL("../../../../bin/html2pdf", import.meta.url));
-const baseTempDir = fileURLToPath(new URL("../../../../temp", import.meta.url));
+// Resolve filesystem paths relative to process.cwd() so the helper works
+// regardless of build depth (src/ in dev vs build/server/chunks/ in prod).
+const html2pdfPath = join(process.cwd(), "bin", "html2pdf");
+const baseTempDir = join(process.cwd(), "temp");
 const TEMP_DIR_TTL_MS = 60 * 60 * 1000;
 let sweepPerformed = false;
 
