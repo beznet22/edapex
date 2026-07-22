@@ -23,6 +23,7 @@
 	import EyeOffIcon from "@lucide/svelte/icons/eye-off";
 	import SendIcon from "@lucide/svelte/icons/send";
 	import EditorCanvas from "./editor-canvas.svelte";
+	import { Spinner } from "$lib/components/ui/spinner/index.js";
 	import { useInspector } from "$lib/context/inspector-context.svelte";
 	import { useChat } from "$lib/context/chat-context.svelte";
 	import {
@@ -570,16 +571,11 @@
 	});
 
 	async function handlePillClick() {
-		const status = validationStatus;
-		if (status === 'valid') return;
-		if (status === 'unknown') {
-			await handleAutoFix();
-			if (validationStatus === 'valid' && editorRef) {
-				viewMode = 'markdown';
-				return;
-			}
-		}
 		viewMode = 'validation';
+		await handleAutoFix();
+		if (validationStatus === 'valid' && editorRef) {
+			viewMode = 'markdown';
+		}
 	}
 
 	const computedExamTypeId = $derived.by(() => {
@@ -1033,6 +1029,12 @@
 		{#if viewMode === "validation"}
 			<ScrollArea class="h-full w-full">
 				<div class="p-6 max-w-3xl mx-auto space-y-4">
+					{#if aiFixing}
+						<div class="flex items-center gap-3 text-muted-foreground py-16 justify-center">
+							<Spinner class="size-5" />
+							<span class="text-sm">Analyzing marksheet…</span>
+						</div>
+					{:else}
 					<div class="flex items-center gap-2">
 						{#if validationStatus === 'invalid'}
 							<AlertCircleIcon class="size-5 text-red-500" />
@@ -1082,6 +1084,7 @@
 					>
 						← Back to editor
 					</button>
+					{/if}
 				</div>
 			</ScrollArea>
 		{:else if viewMode === "pdf" && pdfGenerating}

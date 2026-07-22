@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { eq, and } from 'drizzle-orm';
 import { getAppDb } from '$lib/server/mastra/storage/libsql/app-db';
 import {

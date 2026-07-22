@@ -126,7 +126,7 @@
 		>
 			<Checkbox
 				checked={donateChecked}
-				onCheckedChange={(v: boolean) => onDonateChange(!!v)}
+				onCheckedChange={(v: boolean) => onDonateChange?.(!!v)}
 				disabled={isSavingApiKey || alwaysDonateEnabled}
 			/>
 			<div class="flex flex-col gap-0.5 text-xs">

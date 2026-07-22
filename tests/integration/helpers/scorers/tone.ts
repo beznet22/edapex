@@ -15,6 +15,8 @@
  * assistant agent's own production output (passes today, fails if the model
  * regresses).
  */
+import type { MastraDBMessage } from '@mastra/core/agent';
+import type { ScorerRunInputForAgent, ScorerRunOutputForAgent } from '@mastra/core/evals';
 import { createToneScorer } from '@mastra/evals/scorers/prebuilt';
 
 const TONE_SCORER = createToneScorer({
@@ -37,18 +39,25 @@ export interface ToneScore {
  * or an array of messages in the shape Mastra's `MastraScorer.run()` expects.
  */
 export async function scoreTone(input: string | { output: Array<{ role: string; content: string }> }): Promise<ToneScore> {
-	const runInput =
-		typeof input === 'string'
-			? {
-					input: {
-						inputMessages: [{ role: 'user', content: '' }]
-					},
-					output: [{ role: 'assistant', content: input }]
-				}
-			: {
-					input: { inputMessages: [] },
-					output: input.output
-				};
+	const runInput = (typeof input === 'string'
+		? {
+			input: {
+				inputMessages: [],
+				rememberedMessages: [],
+				systemMessages: [],
+				taggedSystemMessages: {}
+			},
+			output: [{ role: 'assistant' as const, content: input }]
+		}
+		: {
+			input: {
+				inputMessages: [],
+				rememberedMessages: [],
+				systemMessages: [],
+				taggedSystemMessages: {}
+			},
+			output: input.output
+		}) as unknown as { input: ScorerRunInputForAgent; output: ScorerRunOutputForAgent };
 
 	const result = await TONE_SCORER.run(runInput);
 	const pre = (result as { preprocessStepResult?: { score: number; avgSentiment?: number; sentimentVariance?: number } })

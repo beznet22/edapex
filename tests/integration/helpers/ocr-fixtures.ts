@@ -39,6 +39,7 @@ import { OcrWorkspaceStore } from '$lib/server/mastra/storage/ocr/ocr-workspace-
 import { addEntry as addWorkspaceEntry } from '$lib/server/workspace/manifest';
 import { tenantWorkspace } from '$lib/server/workspace';
 import { buildWorkspaceRequestContext } from '$lib/server/helpers/chat-helper';
+import { getAppDb } from '$lib/server/mastra/storage/libsql/app-db';
 import {
 	ocrMarkdownPath,
 	ocrMetaPath
@@ -146,7 +147,9 @@ export async function seedMarksheetFixture(params: {
 			tenant: params.tenant,
 			file: new Blob([uint8], { type: mimeType }),
 			fileName: params.fileName,
-			mimeType
+			mimeType,
+			db: getAppDb(),
+			userId: params.tenant.userId
 		});
 		await writeCache('markdown', params.fileName, bytes, {
 			markdown: persisted.markdown,
