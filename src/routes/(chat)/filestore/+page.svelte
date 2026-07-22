@@ -32,6 +32,10 @@
 	import Calendar from "@lucide/svelte/icons/calendar";
 	import ScanSearch from "@lucide/svelte/icons/scan-search";
 	import MessageSquare from "@lucide/svelte/icons/message-square";
+	import AlertCircle from "@lucide/svelte/icons/alert-circle";
+	import CheckCheck from "@lucide/svelte/icons/check-check";
+	import GitCommit from "@lucide/svelte/icons/git-commit";
+	import BookOpen from "@lucide/svelte/icons/book-open";
 	import { generateId } from "ai";
 	import { useInspector } from "$lib/context/inspector-context.svelte";
 	import { mobileUiState } from "$lib/state/mobile-ui.svelte";
@@ -48,7 +52,6 @@
 	import type {
 		Artifact,
 		ArtifactCategory,
-		ArtifactSource,
 	} from "$lib/types/workspace-types";
 
 	let { data }: { data: PageData } = $props();
@@ -60,9 +63,14 @@
 
 	let activeTermId = $state(data.activeTermId);
 	let searchQuery = $state("");
-	let categoryFilter = $state<"all" | "images" | "files">("files");
-	let sourceFilter = $state<Set<ArtifactSource>>(new Set());
-	let categoryMulti = $state<Set<ArtifactCategory>>(new Set());
+	let categoryFilter = $state<
+		"all" | "images" | "pdf" | "marksheet" | "files"
+	>("marksheet");
+	let statusFilter = $state<Set<string>>(new Set());
+	// TODO: re-plan categoryMulti filter — placeholder stubs to satisfy
+	// type checking of the disabled dropdown section below.
+	const categoryMulti = new Set<ArtifactCategory>();
+	const toggleCategory = (_c: ArtifactCategory) => {};
 	let viewMode = $state<"grid" | "list">("grid");
 	let sortBy = $state<"name" | "modified" | "size">("modified");
 	let sortDir = $state<"asc" | "desc">("desc");
@@ -323,19 +331,59 @@
 		activeTermId = id;
 	}
 
-	function toggleSource(s: ArtifactSource) {
-		const next = new Set(sourceFilter);
-		if (next.has(s)) next.delete(s);
-		else next.add(s);
-		sourceFilter = next;
+	function toggleStatus(label: string) {
+		const next = new Set(statusFilter);
+		if (next.has(label)) next.delete(label);
+		else next.add(label);
+		statusFilter = next;
 	}
 
-	function toggleCategory(c: ArtifactCategory) {
-		const next = new Set(categoryMulti);
-		if (next.has(c)) next.delete(c);
-		else next.add(c);
-		categoryMulti = next;
+	// TODO: re-plan categoryMulti filter
+	// function toggleCategory(c: ArtifactCategory) {
+	// 	const next = new Set(categoryMulti);
+	// 	if (next.has(c)) next.delete(c);
+	// 	else next.add(c);
+	// 	categoryMulti = next;
+	// }
+
+	function matchStatus(label: string, file: Artifact): boolean {
+		const raw = file.manifestStatus ?? file.marksheetStatus ?? "";
+		switch (label) {
+			case "Failed":
+				return raw === "Failed";
+			case "Processing":
+				return raw === "Uploaded" || file.status === "processing";
+			case "Extracted":
+				return raw === "Extracted";
+			case "Ready":
+				return raw === "Formatted" || raw === "formatted";
+			case "Validated":
+				return raw === "Validated" || raw === "validated";
+			case "Committed":
+				return raw === "Committed" || raw === "committed";
+			case "Generated":
+				return raw === "Generated";
+			case "Published":
+				return raw === "Published";
+			default:
+				return false;
+		}
 	}
+
+	const STATUS_FILTER_ITEMS: ReadonlyArray<{
+		id: string;
+		label: string;
+		Icon: typeof AlertCircle;
+	}> = [
+		{ id: "Failed", label: "Failed", Icon: AlertCircle },
+		{ id: "Processing", label: "Processing", Icon: Upload },
+		{ id: "Extracted", label: "Extracted", Icon: ScanSearch },
+		{ id: "Ready", label: "Ready", Icon: Check },
+		{ id: "Validated", label: "Validated", Icon: CheckCheck },
+		{ id: "Committed", label: "Committed", Icon: GitCommit },
+		{ id: "Generated", label: "Generated", Icon: Sparkles },
+		{ id: "Published", label: "Published", Icon: BookOpen },
+	];
 
 	function clearSelection() {
 		selectedIds = new Set();
@@ -385,17 +433,30 @@
 		const matched = mergedFiles.filter((f) => {
 			if (q && !f.title.toLowerCase().includes(q)) return false;
 			if (categoryFilter === "images" && f.kind !== "image") return false;
-			if (categoryFilter === "files" && f.kind === "image") return false;
+			if (categoryFilter === "pdf" && f.kind !== "pdf") return false;
 			if (
-				sourceFilter.size > 0 &&
-				(!f.source || !sourceFilter.has(f.source))
+				categoryFilter === "marksheet" &&
+				!f.url?.includes("/marksheets/")
 			)
 				return false;
 			if (
-				categoryMulti.size > 0 &&
-				(!f.category || !categoryMulti.has(f.category))
+				categoryFilter === "files" &&
+				(f.kind === "image" ||
+					f.kind === "pdf" ||
+					f.url?.includes("/marksheets/"))
 			)
 				return false;
+			if (
+				statusFilter.size > 0 &&
+				![...statusFilter].some((label) => matchStatus(label, f))
+			)
+				return false;
+			// TODO: re-plan categoryMulti filter
+			// if (
+			// 	categoryMulti.size > 0 &&
+			// 	(!f.category || !categoryMulti.has(f.category))
+			// )
+			// 	return false;
 			if (
 				data.activeTermId &&
 				data.activeTermId > 0 &&
@@ -844,7 +905,7 @@
 			(f) => selectedIds.has(f.id) && f.manifestStatus === "Extracted",
 		),
 	);
-	const activeFilterCount = $derived(sourceFilter.size + categoryMulti.size);
+	const activeFilterCount = $derived(statusFilter.size);
 	const bulkActionsVisible = $derived(selectedIds.size > 0);
 </script>
 
@@ -1039,7 +1100,7 @@
 						class="flex items-center gap-1 sm:gap-2"
 						aria-label="File categories"
 					>
-						{#each [{ id: "all", label: "All" }, { id: "images", label: "Images" }, { id: "files", label: "Files" }] as tab (tab.id)}
+						{#each [{ id: "all", label: "All" }, { id: "images", label: "Images" }, { id: "pdf", label: "PDF" }, { id: "marksheet", label: "MarkSheet" }, { id: "files", label: "Files" }] as tab (tab.id)}
 							<button
 								type="button"
 								onclick={() =>
@@ -1132,47 +1193,13 @@
 									<DropdownMenu.GroupHeading
 										class="px-3 py-2 text-[10px] font-black uppercase tracking-widest text-muted-foreground/70"
 									>
-										Source
+										Status
 									</DropdownMenu.GroupHeading>
-									<DropdownMenu.CheckboxItem
-										checked={sourceFilter.has("uploaded")}
-										onCheckedChange={() =>
-											toggleSource("uploaded")}
-										class="px-3 py-2.5 rounded-lg text-sm font-medium cursor-pointer"
-									>
-										<Upload
-											class="h-4 w-4 mr-3 text-muted-foreground"
-										/>
-										Uploaded
-									</DropdownMenu.CheckboxItem>
-									<DropdownMenu.CheckboxItem
-										checked={sourceFilter.has("generated")}
-										onCheckedChange={() =>
-											toggleSource("generated")}
-										class="px-3 py-2.5 rounded-lg text-sm font-medium cursor-pointer"
-									>
-										<Sparkles
-											class="h-4 w-4 mr-3 text-muted-foreground"
-										/>
-										Generated
-									</DropdownMenu.CheckboxItem>
-								</DropdownMenu.Group>
-
-								<DropdownMenu.Separator
-									class="my-2 h-px bg-border/60"
-								/>
-
-								<DropdownMenu.Group>
-									<DropdownMenu.GroupHeading
-										class="px-3 py-2 text-[10px] font-black uppercase tracking-widest text-muted-foreground/70"
-									>
-										File type
-									</DropdownMenu.GroupHeading>
-									{#each [{ id: "image" as const, label: "Images", Icon: FileImage }, { id: "document" as const, label: "Documents", Icon: FileText }, { id: "spreadsheet" as const, label: "Spreadsheets", Icon: Table2 }, { id: "presentation" as const, label: "Presentations", Icon: Presentation }, { id: "pdf" as const, label: "PDFs", Icon: FileText }] as item (item.id)}
+									{#each STATUS_FILTER_ITEMS as item (item.id)}
 										<DropdownMenu.CheckboxItem
-											checked={categoryMulti.has(item.id)}
+											checked={statusFilter.has(item.id)}
 											onCheckedChange={() =>
-												toggleCategory(item.id)}
+												toggleStatus(item.id)}
 											class="px-3 py-2.5 rounded-lg text-sm font-medium cursor-pointer"
 										>
 											<item.Icon
@@ -1182,6 +1209,36 @@
 										</DropdownMenu.CheckboxItem>
 									{/each}
 								</DropdownMenu.Group>
+
+								<!-- TODO: re-plan categoryMulti filter -->
+								{#if false}
+									<DropdownMenu.Separator
+										class="my-2 h-px bg-border/60"
+									/>
+
+									<DropdownMenu.Group>
+										<DropdownMenu.GroupHeading
+											class="px-3 py-2 text-[10px] font-black uppercase tracking-widest text-muted-foreground/70"
+										>
+											File type
+										</DropdownMenu.GroupHeading>
+										{#each [{ id: "image" as const, label: "Images", Icon: FileImage }, { id: "document" as const, label: "Documents", Icon: FileText }, { id: "spreadsheet" as const, label: "Spreadsheets", Icon: Table2 }, { id: "presentation" as const, label: "Presentations", Icon: Presentation }, { id: "pdf" as const, label: "PDFs", Icon: FileText }] as item (item.id)}
+											<DropdownMenu.CheckboxItem
+												checked={categoryMulti.has(
+													item.id,
+												)}
+												onCheckedChange={() =>
+													toggleCategory(item.id)}
+												class="px-3 py-2.5 rounded-lg text-sm font-medium cursor-pointer"
+											>
+												<item.Icon
+													class="h-4 w-4 mr-3 text-muted-foreground"
+												/>
+												{item.label}
+											</DropdownMenu.CheckboxItem>
+										{/each}
+									</DropdownMenu.Group>
+								{/if}
 							</DropdownMenu.Content>
 						</DropdownMenu.Root>
 
