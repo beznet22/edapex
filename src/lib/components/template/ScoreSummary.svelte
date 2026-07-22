@@ -21,6 +21,7 @@
   );
 </script>
 
+{#if score}
 <table
   class="min-w-max w-full table-fixed mb-5 rounded print:break-inside-avoid"
 >
@@ -81,3 +82,4 @@
     </tr>
   </tbody>
 </table>
+{/if}
