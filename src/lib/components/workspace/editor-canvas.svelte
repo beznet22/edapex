@@ -51,6 +51,7 @@
 		isSaving = $bindable(false),
 		validationState = $bindable({ errors: [], errorCount: 0 }),
 		streaming = false,
+		readOnly = false,
 		user,
 		artifactId = "",
 		title = "",
@@ -65,6 +66,7 @@
 		isSaving?: boolean;
 		validationState?: { errors: string[]; errorCount: number };
 		streaming?: boolean;
+		readOnly?: boolean;
 		user?: { designation?: string };
 		artifactId?: string;
 		title?: string;
@@ -99,9 +101,7 @@
 		selectedClass?.data?.sectionName ?? "",
 	);
 
-	// Editor is always editable; validation approval is handled via the tool
-	// approval flow (ActionBar) and does not lock the canvas.
-	const editable = $derived(true);
+	const editable = $derived(!readOnly);
 
 	const isMarkdownFile = $derived(
 		filename.endsWith(".md") || filename.endsWith(".markdown"),
@@ -566,7 +566,7 @@
 			>
 				<textarea
 					bind:value={editContent}
-					readonly={streaming}
+					readonly={streaming || readOnly}
 					class="w-full min-h-full absolute inset-0 p-4 text-[0.7rem] font-mono leading-relaxed bg-transparent resize-none outline-none border-none focus:ring-0"
 				></textarea>
 			</ScrollArea>

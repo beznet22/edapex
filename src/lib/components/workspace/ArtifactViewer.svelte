@@ -22,6 +22,8 @@
 	import EyeIcon from "@lucide/svelte/icons/eye";
 	import EyeOffIcon from "@lucide/svelte/icons/eye-off";
 	import SendIcon from "@lucide/svelte/icons/send";
+	import LockIcon from "@lucide/svelte/icons/lock";
+	import PenSquareIcon from "@lucide/svelte/icons/pen-square";
 	import EditorCanvas from "./editor-canvas.svelte";
 	import { Spinner } from "$lib/components/ui/spinner/index.js";
 	import { useInspector } from "$lib/context/inspector-context.svelte";
@@ -503,6 +505,11 @@
 		return null;
 	});
 
+	let forceEditable = $state(false);
+	let published = $state(false);
+	const isPublished = $derived(marksheetStatus === 'Published' || published);
+	const readOnly = $derived(isPublished && !forceEditable);
+
 	/** Path to the marksheet file for validation. Falls back to current.url
 	 *  in filestore mode where toolOutput is not available. */
 	const validatePath = $derived(
@@ -735,6 +742,9 @@
 				.then(r => r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)))
 				.then(data => {
 					if (data.status === "published") {
+						published = true;
+						forceEditable = false;
+						patchFile(`/api/file/${filePath}`, { manifestStatus: 'Published' });
 						import("svelte-sonner").then((m) => m.toast.success(`Result published to ${data.parentEmail}`));
 					} else if (data.status === "skipped_already_published" || (data.status === "failed" && data.error?.toLowerCase().includes("already sent"))) {
 						setGlobalProgress(false);
@@ -828,6 +838,7 @@
 			const r = await fetch(`/api/publish?${params}`);
 			const data = await r.json();
 			if (data.status === "published") {
+				patchFile(`/api/file/${resendData.filePath}`, { manifestStatus: 'Published' });
 				import("svelte-sonner").then((m) => m.toast.success(`Result published to ${data.parentEmail}`));
 			} else {
 				import("svelte-sonner").then((m) => m.toast.error(data.error ?? "Publish failed"));
@@ -1030,34 +1041,47 @@
 						align="end"
 						class="w-44 bg-popover backdrop-blur-xl border border-border/60 rounded-xl shadow-2xl"
 					>
+					<DropdownMenu.Item
+						onclick={handleSave}
+						disabled={isStreaming || isPublished}
+					>
+						<SaveIcon class="size-3.5 mr-2" />
+						Save
+					</DropdownMenu.Item>
+					<DropdownMenu.Item
+						onclick={handleShare}
+						disabled={isStreaming}
+					>
+						<Share2Icon class="size-3.5 mr-2" />
+						Share
+					</DropdownMenu.Item>
+					<DropdownMenu.Item
+						onclick={handlePrint}
+						disabled={isStreaming}
+					>
+						<PrinterIcon class="size-3.5 mr-2" />
+						Print
+					</DropdownMenu.Item>
+					<DropdownMenu.Item
+						onclick={handlePublishClick}
+						disabled={isStreaming}
+					>
+						<SendIcon class="size-3.5 mr-2" />
+						Publish
+					</DropdownMenu.Item>
+					{#if isPublished}
 						<DropdownMenu.Item
-							onclick={handleSave}
-							disabled={isStreaming}
+							onclick={() => forceEditable = !forceEditable}
 						>
-							<SaveIcon class="size-3.5 mr-2" />
-							Save
+							{#if forceEditable}
+								<LockIcon class="size-3.5 mr-2" />
+								Revert to Read-Only
+							{:else}
+								<PenSquareIcon class="size-3.5 mr-2" />
+								Edit Anyway
+							{/if}
 						</DropdownMenu.Item>
-						<DropdownMenu.Item
-							onclick={handleShare}
-							disabled={isStreaming}
-						>
-							<Share2Icon class="size-3.5 mr-2" />
-							Share
-						</DropdownMenu.Item>
-						<DropdownMenu.Item
-							onclick={handlePrint}
-							disabled={isStreaming}
-						>
-							<PrinterIcon class="size-3.5 mr-2" />
-							Print
-						</DropdownMenu.Item>
-						<DropdownMenu.Item
-							onclick={handlePublishClick}
-							disabled={isStreaming}
-						>
-							<SendIcon class="size-3.5 mr-2" />
-							Publish
-						</DropdownMenu.Item>
+					{/if}
 					</DropdownMenu.Content>
 				</DropdownMenu.Root>
 			{/if}
@@ -1234,6 +1258,7 @@
 							bind:validationState
 							examTypeId={computedExamTypeId}
 							artifactId={computedArtifactId}
+							{readOnly}
 						/>
 					</div>
 				</ScrollArea>
