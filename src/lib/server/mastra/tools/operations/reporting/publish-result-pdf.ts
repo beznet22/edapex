@@ -63,6 +63,7 @@ const reportPdfPublishOutputSchema = z.object({
   messageId: z.string().optional(),
   parentEmail: z.string().optional(),
   parentName: z.string().optional(),
+  studentName: z.string().optional(),
   error: z.string().optional(),
 });
 
@@ -171,6 +172,7 @@ export const publishResultPdfTool = createTool({
         parentEmail: undefined,
         parentName: parentName ?? undefined,
         error: "PARENT_EMAIL_MISSING: student has no linked parent with an email address",
+        studentName: student.fullName ?? undefined,
       };
     }
 
@@ -194,6 +196,7 @@ export const publishResultPdfTool = createTool({
         parentEmail,
         parentName: parentName ?? undefined,
         error: message,
+        studentName: student.fullName ?? undefined,
       };
     }
 
@@ -219,6 +222,7 @@ export const publishResultPdfTool = createTool({
       messageId: firstResult?.messageId,
       parentEmail,
       parentName: parentName ?? undefined,
+      studentName: student.fullName ?? undefined,
     };
   },
 });

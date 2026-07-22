@@ -6,7 +6,6 @@
 	import { Skeleton } from "$lib/components/ui/skeleton";
 	import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
 	import * as Dialog from "$lib/components/ui/dialog";
-	import * as AlertDialog from "$lib/components/ui/alert-dialog";
 	import { Textarea } from "$lib/components/ui/textarea";
 	import ChatHeader from "$lib/components/chat-header.svelte";
 	import Search from "@lucide/svelte/icons/search";
@@ -1694,29 +1693,33 @@
 	</Dialog.Content>
 </Dialog.Root>
 
-<AlertDialog.Root bind:open={deleteDialogOpen}>
-	<AlertDialog.Content
-		class="bg-background/95 backdrop-blur-3xl border border-border/60 rounded-3xl p-6 shadow-2xl max-w-sm"
-	>
-		<AlertDialog.Header>
-			<AlertDialog.Title
-				>Delete {selectedIds.size} file{selectedIds.size === 1
-					? ""
-					: "s"}?</AlertDialog.Title
-			>
-			<AlertDialog.Description>
-				This action cannot be undone. The selected files will be
-				permanently removed from your library.
-			</AlertDialog.Description>
-		</AlertDialog.Header>
-		<AlertDialog.Footer class="gap-2">
-			<AlertDialog.Cancel>Cancel</AlertDialog.Cancel>
-			<AlertDialog.Action
+<Dialog.Root bind:open={deleteDialogOpen}>
+	<Dialog.Content class="sm:max-w-md p-0 gap-0 overflow-hidden [&>button]:hidden" showCloseButton={false}>
+		<div class="p-6 sm:p-8">
+			<div class="mx-auto flex size-12 sm:size-14 items-center justify-center rounded-full bg-destructive/10 mb-4 sm:mb-5 shrink-0">
+				<Trash2 class="size-5 sm:size-6 text-destructive" />
+			</div>
+			<Dialog.Header class="text-center sm:text-center gap-1.5">
+				<Dialog.Title class="text-base sm:text-lg font-semibold">
+					Delete {selectedIds.size} file{selectedIds.size === 1 ? "" : "s"}?
+				</Dialog.Title>
+				<Dialog.Description class="text-sm text-muted-foreground leading-relaxed">
+					This action cannot be undone. The selected files will be permanently removed from your library.
+				</Dialog.Description>
+			</Dialog.Header>
+		</div>
+		<Dialog.Footer class="px-6 sm:px-8 pb-6 sm:pb-8 pt-0 sm:pt-0 flex-col-reverse sm:flex-row gap-2.5">
+			<button
+				onclick={() => (deleteDialogOpen = false)}
+				class="flex-1 sm:flex-none inline-flex items-center justify-center rounded-lg border border-border bg-background px-4 py-2.5 text-sm font-medium text-foreground shadow-sm transition-all duration-200 hover:bg-muted hover:border-border/80 active:scale-[0.98]"
+			>Cancel</button>
+			<button
 				onclick={confirmDelete}
-				class="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+				class="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 rounded-lg bg-destructive px-4 py-2.5 text-sm font-medium text-destructive-foreground shadow-sm transition-all duration-200 hover:brightness-110 active:scale-[0.98]"
 			>
+				<Trash2 class="size-3.5" />
 				Delete
-			</AlertDialog.Action>
-		</AlertDialog.Footer>
-	</AlertDialog.Content>
-</AlertDialog.Root>
+			</button>
+		</Dialog.Footer>
+	</Dialog.Content>
+</Dialog.Root>

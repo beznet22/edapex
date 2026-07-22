@@ -58,7 +58,7 @@ export const GET: RequestHandler = async ({ url, locals, cookies }) => {
     );
 
     if (typeof result === "object" && result !== null && "status" in result) {
-      const r = result as { status: string; artifactId: string; publicationUrl?: string; messageId?: string; parentEmail?: string; parentName?: string; error?: string };
+      const r = result as { status: string; artifactId: string; publicationUrl?: string; messageId?: string; parentEmail?: string; parentName?: string; studentName?: string; error?: string };
       return json({
         status: r.status,
         artifactId: r.artifactId,
@@ -66,6 +66,7 @@ export const GET: RequestHandler = async ({ url, locals, cookies }) => {
         messageId: r.messageId,
         parentEmail: r.parentEmail,
         parentName: r.parentName,
+        studentName: r.studentName,
         error: r.error,
       });
     }

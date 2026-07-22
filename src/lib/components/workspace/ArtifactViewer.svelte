@@ -17,7 +17,6 @@
 	import MoreVerticalIcon from "@lucide/svelte/icons/more-vertical";
 	import Share2Icon from "@lucide/svelte/icons/share-2";
 	import PrinterIcon from "@lucide/svelte/icons/printer";
-	import Trash2Icon from "@lucide/svelte/icons/trash-2";
 	import FileQuestionIcon from "@lucide/svelte/icons/file-question";
 	import ArrowLeftIcon from "@lucide/svelte/icons/arrow-left";
 	import EyeIcon from "@lucide/svelte/icons/eye";
@@ -733,9 +732,9 @@
 				.then(data => {
 					if (data.status === "published") {
 						import("svelte-sonner").then((m) => m.toast.success(`Result published to ${data.parentEmail}`));
-					} else if (data.status === "skipped_already_published") {
+					} else if (data.status === "skipped_already_published" || (data.status === "failed" && data.error?.toLowerCase().includes("already sent"))) {
 						setGlobalProgress(false);
-						resendData = { filePath, examTypeId: computedExamTypeId!, parentEmail: data.parentEmail };
+						resendData = { filePath, examTypeId: computedExamTypeId!, parentEmail: data.parentEmail, parentName: data.parentName, title: data.studentName };
 						resendDialogOpen = true;
 						return;
 					} else {
@@ -809,10 +808,8 @@
 		win.print();
 	}
 
-	let deleteOpen = $state(false);
-
 	let resendDialogOpen = $state(false);
-	let resendData = $state<{ filePath: string; examTypeId: number; parentEmail: string } | null>(null);
+	let resendData = $state<{ filePath: string; examTypeId: number; parentEmail: string; parentName?: string; title?: string } | null>(null);
 
 	async function handleResendConfirm() {
 		if (!resendData) return;
@@ -839,18 +836,6 @@
 		}
 	}
 
-	async function handleDelete() {
-		if (!current?.url) return;
-		try {
-			const res = await fetch(current.url, { method: "DELETE" });
-			if (!res.ok) throw new Error("Delete failed");
-			inspector.close();
-		} catch {
-			import("svelte-sonner").then((m) =>
-				m.toast.error("Failed to delete file"),
-			);
-		}
-	}
 </script>
 
 <div class="flex flex-col h-full min-h-0 bg-background">
@@ -1068,15 +1053,6 @@
 						>
 							<SendIcon class="size-3.5 mr-2" />
 							Publish
-						</DropdownMenu.Item>
-						<DropdownMenu.Separator />
-						<DropdownMenu.Item
-							onclick={() => (deleteOpen = true)}
-							class="text-destructive focus:text-destructive"
-							disabled={isStreaming}
-						>
-							<Trash2Icon class="size-3.5 mr-2" />
-							Delete
 						</DropdownMenu.Item>
 					</DropdownMenu.Content>
 				</DropdownMenu.Root>
@@ -1326,8 +1302,9 @@
 			<Dialog.Header class="text-center sm:text-center gap-1.5">
 				<Dialog.Title class="text-base sm:text-lg font-semibold">Already Published</Dialog.Title>
 				<Dialog.Description class="text-sm text-muted-foreground leading-relaxed">
-					This result was already sent to
-					<span class="font-medium text-foreground">{resendData?.parentEmail ?? "the parent"}</span>.
+					This result for <span class="font-medium text-foreground">{resendData?.title ?? "this student"}</span>
+					was already sent to
+					<span class="font-medium text-foreground">{resendData?.parentName ?? resendData?.parentEmail ?? "the parent"}</span>.
 					Would you like to send it again?
 				</Dialog.Description>
 			</Dialog.Header>
@@ -1347,21 +1324,4 @@
 		</Dialog.Footer>
 	</Dialog.Content>
 </Dialog.Root>
-
-<AlertDialog.Root bind:open={deleteOpen}>
-	<AlertDialog.Content>
-		<AlertDialog.Header>
-			<AlertDialog.Title>Delete this file?</AlertDialog.Title>
-			<AlertDialog.Description>
-				This action cannot be undone.
-			</AlertDialog.Description>
-		</AlertDialog.Header>
-		<AlertDialog.Footer>
-			<AlertDialog.Cancel>Cancel</AlertDialog.Cancel>
-			<AlertDialog.Action onclick={handleDelete}
-				>Delete</AlertDialog.Action
-			>
-		</AlertDialog.Footer>
-	</AlertDialog.Content>
-</AlertDialog.Root>
 
