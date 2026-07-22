@@ -22,7 +22,7 @@ export const GET: RequestHandler = async ({ params }) => {
       kind?: "result" | "transcript";
     };
     const renderKind: "result" | "transcript" = kind ?? "result";
-    console.log({ studentId, examId, academicId, renderKind });
+    // console.log({ studentId, examId, academicId, renderKind });
 
     // Slice 10: per-request provider
     const assessment = await createAssessmentServiceForRequest(

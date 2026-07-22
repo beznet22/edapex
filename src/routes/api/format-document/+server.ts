@@ -121,19 +121,19 @@ export const POST: RequestHandler = async ({ request, locals, cookies }) => {
     (e) => e.kind === 'user-file' && e.fileName === contentEntry.fileName
   ) ?? contentEntry;
 
-  console.log('[format-document] found entry', {
-    contentHash,
-    matchedKind: contentEntry.kind,
-    matchedPath: contentEntry.path,
-    entryPath: entry.path,
-    entryStatus: entry.status,
-    entryKind: entry.kind,
-    fileName,
-    examTypeId,
-  });
+  // console.log('[format-document] found entry', {
+  //   contentHash,
+  //   matchedKind: contentEntry.kind,
+  //   matchedPath: contentEntry.path,
+  //   entryPath: entry.path,
+  //   entryStatus: entry.status,
+  //   entryKind: entry.kind,
+  //   fileName,
+  //   examTypeId,
+  // });
 
 	if (entry.status === 'Formatted') {
-		console.log('[format-document] already formatted, post-format identity:', { studentId: entry.studentId, admissionNo: entry.admissionNo, path: entry.path });
+		// console.log('[format-document] already formatted, post-format identity:', { studentId: entry.studentId, admissionNo: entry.admissionNo, path: entry.path });
 		return json({ success: true, manifestStatus: 'Formatted', contentHash });
   }
 
@@ -322,12 +322,12 @@ MIDDLEBASIC: Subject Code | MTA (30) | CA (10) | REPORT (10) | EXAM (50)`;
     const parsed = parsedMarksheet;
     parsedAdmNo = parsed.student?.adminNo != null ? Number(parsed.student.adminNo) : null;
     studentFullName = parsed.student?.fullName ?? null;
-    console.log('[format-document] post-format parse result', {
-      parsedAdmNo,
-      studentFullName,
-      adminNoRaw: parsed.student?.adminNo,
-      subjectIdSample: parsed.records?.[0]?.subjectId,
-    });
+    // console.log('[format-document] post-format parse result', {
+    //   parsedAdmNo,
+    //   studentFullName,
+    //   adminNoRaw: parsed.student?.adminNo,
+    //   subjectIdSample: parsed.records?.[0]?.subjectId,
+    // });
     if (parsedAdmNo) {
       const roster = await getClassRoster({
         classId: tenant.classId ?? undefined,

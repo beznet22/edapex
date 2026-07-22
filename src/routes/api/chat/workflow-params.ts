@@ -374,11 +374,11 @@ export async function resumeAgentToolCall({
     requestContext: RequestContext<unknown>;
     abortSignal?: AbortSignal;
 }) {
-    console.log('[api/chat] resuming agent tool approval', {
-        runId: approval.runId,
-        toolCallId: approval.toolCallId,
-        approved: approval.approved
-    });
+    // console.log('[api/chat] resuming agent tool approval', {
+    //     runId: approval.runId,
+    //     toolCallId: approval.toolCallId,
+    //     approved: approval.approved
+    // });
 
     const agent = mastra.getAgent('assistant');
     if (!agent) {

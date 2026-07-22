@@ -95,12 +95,12 @@ export const POST: RequestHandler = async ({ request, locals, cookies }) => {
   // (the helper already returns nulls in that case).
   if (tenant.classId === null && formClassId !== null) (tenant as { classId: number | null }).classId = formClassId;
   if (tenant.sectionId === null && formSectionId !== null) (tenant as { sectionId: number | null }).sectionId = formSectionId;
-  console.log('[uploads] workspace scoping:', {
-    classId: tenant.classId,
-    sectionId: tenant.sectionId,
-    academicId: tenant.academicId,
-    academicYearTitle: tenant.academicYearTitle
-  });
+  // console.log('[uploads] workspace scoping:', {
+  //   classId: tenant.classId,
+  //   sectionId: tenant.sectionId,
+  //   academicId: tenant.academicId,
+  //   academicYearTitle: tenant.academicYearTitle
+  // });
 
   const buffer = Buffer.from(await file.arrayBuffer());
   const contentHash = createHash("md5").update(buffer).digest("hex");
