@@ -25,6 +25,21 @@ import type { TenantContext } from "$lib/server/mastra/tenant-context";
 import { buildWorkspaceRequestContext } from "$lib/server/helpers/chat-helper";
 import { tenantWorkspace } from "$lib/server/workspace";
 
+/**
+ * Per-examTypeId async mutex for manifest writes. Since all manifest
+ * mutation follows a read-modify-write pattern with no file-level locking,
+ * concurrent operations race and lose entries. This simple promise-chain
+ * serialises writes per exam so only one write is in-flight at a time.
+ */
+const manifestLocks = new Map<number, Promise<void>>();
+
+function withManifestLock<T>(examTypeId: number, fn: () => Promise<T>): Promise<T> {
+  const prev = manifestLocks.get(examTypeId) ?? Promise.resolve();
+  const next = prev.then(() => fn(), () => fn());
+  manifestLocks.set(examTypeId, next.then(() => undefined));
+  return next;
+}
+
 export type MarksheetStatus = 'extracted' | 'formatted' | 'validated' | 'committed' | 'published';
 
 export type ArtifactKind =
@@ -200,6 +215,7 @@ export async function addEntry(
   examTypeId: number
 ): Promise<WorkspaceManifest> {
   const validated = requireExamTypeId(examTypeId, "addEntry");
+  return withManifestLock(validated, async () => {
   const m = await readManifest(tenant, validated);
   m.entries[entry.path] = entry;
   // Maintain byKind indexes. Within a single per-exam manifest, the
@@ -250,6 +266,7 @@ export async function addEntry(
   }
   await writeManifest(tenant, m, validated);
   return m;
+  });
 }
 
 export async function removeEntry(
@@ -258,6 +275,7 @@ export async function removeEntry(
   examTypeId: number
 ): Promise<WorkspaceManifest> {
   const validated = requireExamTypeId(examTypeId, "removeEntry");
+  return withManifestLock(validated, async () => {
   const m = await readManifest(tenant, validated);
   delete m.entries[relPath];
   m.byKind.ocrUploads = m.byKind.ocrUploads.filter((x) => !relPath.endsWith(`ocr/${x.fileName}.md`));
@@ -267,6 +285,7 @@ export async function removeEntry(
   m.byKind.notes = m.byKind.notes.filter((x) => x.path !== relPath);
   await writeManifest(tenant, m, validated);
   return m;
+  });
 }
 
 export async function updateEntryStatus(
@@ -276,6 +295,7 @@ export async function updateEntryStatus(
   examTypeId: number
 ): Promise<WorkspaceManifest> {
   const validated = requireExamTypeId(examTypeId, "updateEntryStatus");
+  return withManifestLock(validated, async () => {
   const m = await readManifest(tenant, validated);
   const entry = m.entries[relPath];
   if (entry) {
@@ -285,6 +305,7 @@ export async function updateEntryStatus(
   }
   await writeManifest(tenant, m, validated);
   return m;
+  });
 }
 
 export async function updateEntry(
@@ -294,6 +315,7 @@ export async function updateEntry(
   examTypeId: number
 ): Promise<WorkspaceManifest> {
   const validated = requireExamTypeId(examTypeId, "updateEntry");
+  return withManifestLock(validated, async () => {
   const m = await readManifest(tenant, validated);
   const entry = m.entries[relPath];
   if (entry) {
@@ -301,6 +323,7 @@ export async function updateEntry(
   }
   await writeManifest(tenant, m, validated);
   return m;
+  });
 }
 
 /**

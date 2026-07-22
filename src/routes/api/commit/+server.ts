@@ -235,6 +235,11 @@ export const POST: RequestHandler = async ({ request, locals, cookies }) => {
 	);
 
 	if (!result.ok) {
+		try {
+			await updateEntry(tenant, manifestRelPath, {
+				status: "Committed"
+			}, examTypeId);
+		} catch {/* best-effort */}
 		return json(result, { status: 422 });
 	}
 	return json(result, { status: 200 });

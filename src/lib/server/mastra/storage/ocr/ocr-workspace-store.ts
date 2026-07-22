@@ -16,7 +16,7 @@ import { buildWorkspaceRequestContext } from '$lib/server/helpers/chat-helper';
 import type { TenantContext } from '$lib/server/mastra/tenant-context';
 import { mistralOcrService } from '$lib/server/service/mistral-ocr.service';
 import { ocrMarkdownPath, ocrMetaPath, uploadPath } from '$lib/server/workspace/paths';
-import { addEntry, updateEntry } from '$lib/server/workspace/manifest';
+import { addEntry, updateEntry, readManifest } from '$lib/server/workspace/manifest';
 
 export interface OcrMeta {
   contentHash: string;
@@ -131,6 +131,38 @@ export class OcrWorkspaceStore {
     if (await fs.exists(ocrMarkdownPath(params.fileName, examTypeId))) {
       const existing = await readMeta(fs, params.tenant, params.fileName);
       if (existing) {
+        const mdPath = ocrMarkdownPath(params.fileName, examTypeId);
+        const localMetaPath = ocrMetaPath(params.fileName, examTypeId);
+        const manifest = await readManifest(params.tenant, examTypeId);
+        if (!manifest.entries[mdPath]) {
+          await addEntry(params.tenant, {
+            path: mdPath,
+            kind: 'ocr-markdown',
+            fileName: params.fileName,
+            contentHash: existing.contentHash,
+            examTypeId,
+            uploadedAt: existing.createdAt,
+            modifiedAt: existing.createdAt,
+            mimeType: 'text/markdown'
+          }, examTypeId);
+        }
+        if (!manifest.entries[localMetaPath]) {
+          await addEntry(params.tenant, {
+            path: localMetaPath,
+            kind: 'ocr-meta',
+            fileName: params.fileName,
+            contentHash: existing.contentHash,
+            examTypeId,
+            uploadedAt: existing.createdAt,
+            modifiedAt: existing.createdAt,
+            mimeType: 'application/json'
+          }, examTypeId);
+        }
+        const sourcePath = uploadPath(params.fileName, examTypeId);
+        const sourceEntry = manifest.entries[sourcePath];
+        if (sourceEntry && sourceEntry.status !== 'Extracted') {
+          await updateEntry(params.tenant, sourcePath, { status: 'Extracted' }, examTypeId);
+        }
         const markdown = await readMarkdownViaFs(fs, params.fileName, examTypeId);
         return { ...existing, markdown };
       }

@@ -103,7 +103,7 @@ export const POST: RequestHandler = async ({ request, locals, cookies }) => {
   // });
 
   const buffer = Buffer.from(await file.arrayBuffer());
-  const contentHash = createHash("md5").update(buffer).digest("hex");
+  const contentHash = createHash("sha256").update(buffer).digest("hex");
   const ext = filename.split(".").pop() ?? "bin";
 
   if (kind === "studentPhoto") {

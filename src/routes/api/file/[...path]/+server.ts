@@ -453,7 +453,7 @@ export const POST: RequestHandler = async ({ params, url, request, locals, cooki
 
     if (tenant.examTypeId != null) {
       const fileName = resolvedPath.split('/').pop() ?? 'file';
-      const contentHash = createHash('md5').update(bytes).digest('hex');
+      const contentHash = createHash('sha256').update(bytes).digest('hex');
       await addWorkspaceEntry(
         tenant,
         {
@@ -623,7 +623,7 @@ export const PUT: RequestHandler = async ({ params, request, locals, cookies, ur
     await fs.writeFile(resolvedPath, bytes, { recursive: true, overwrite: true });
 
     const fileName = resolvedPath.split('/').pop() ?? 'upload';
-    const contentHash = createHash('md5').update(bytes).digest('hex');
+    const contentHash = createHash('sha256').update(bytes).digest('hex');
     if (tenant.examTypeId == null) {
       throw error(400, 'EXAM_TYPE_REQUIRED: cannot register a workspace upload without an active examTypeId');
     }

@@ -88,9 +88,8 @@ export const POST: RequestHandler = async ({ request, locals, cookies }) => {
   const manifest = await readManifest(tenant, examTypeId);
   const entriesList = Object.values(manifest.entries);
 
-  // The contentHash may belong to the OCR markdown entry (SHA256 of markdown)
-  // or the upload entry (MD5 of original file). Find by contentHash first,
-  // then locate the user-file entry by matching fileName.
+  // Find by contentHash first (all content hashes are SHA-256 since the
+  // hash unification), then locate the user-file entry by matching fileName.
   const contentEntry = entriesList.find((e) => e.contentHash === contentHash);
   if (!contentEntry?.fileName) {
     console.error('[format-document] MANIFEST_ENTRY_NOT_FOUND', {
