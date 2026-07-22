@@ -1,7 +1,7 @@
 import { error, json } from "@sveltejs/kit";
 import type { RequestHandler } from "@sveltejs/kit";
 import { resolveTenantWorkspace } from "$lib/server/workspace/scope";
-import { readManifest } from "$lib/server/workspace/manifest";
+import { readManifest, updateEntry } from "$lib/server/workspace/manifest";
 import { publishResultPdfTool } from "$lib/server/mastra/tools/operations/reporting/publish-result-pdf";
 import { ALLOWED_DESIGNATIONS } from "$lib/types/sms-types";
 
@@ -59,6 +59,11 @@ export const GET: RequestHandler = async ({ url, locals, cookies }) => {
 
     if (typeof result === "object" && result !== null && "status" in result) {
       const r = result as { status: string; artifactId: string; publicationUrl?: string; messageId?: string; parentEmail?: string; parentName?: string; studentName?: string; error?: string };
+      if (r.status === "published") {
+        await updateEntry(tenant, filePath, {
+          status: "Published"
+        }, examTypeId);
+      }
       return json({
         status: r.status,
         artifactId: r.artifactId,
