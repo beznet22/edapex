@@ -51,7 +51,6 @@ export async function buildMarksheetParseContext(
 			};
 		}
 	} catch { /* best-effort */ }
-
 	if (mentions.admissionNo == null && mentions.studentId == null) {
 		try {
 			const classRoster = await getClassRoster({

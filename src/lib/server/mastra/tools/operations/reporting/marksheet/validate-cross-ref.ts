@@ -5,12 +5,15 @@ export function crossReferenceSubjects(
 	assignedSubjects: SubjectAssigned[],
 ): string[] {
 	const parsedSubjectIds = new Set(parsed.subjects.map(s => s.subjectId));
+	console.log('parsedSubjects', parsed.subjects);
+	console.log('assignedSubjects', assignedSubjects);
 	const warnings: string[] = [];
 	for (const sub of assignedSubjects) {
 		if (sub.subjectId != null && !parsedSubjectIds.has(sub.subjectId)) {
 			warnings.push(`Missing subject in marksheet: ${sub.subjectCode ?? `id=${sub.subjectId}`} (assigned to class but not present in marksheet)`);
 		}
 	}
+	console.log('warnings', warnings);
 	return warnings;
 }
 

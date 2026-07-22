@@ -120,16 +120,16 @@ export const POST: RequestHandler = async ({ request, locals, cookies }) => {
       (e) => e.kind === 'user-file' && e.fileName === contentEntry.fileName
     ) ?? contentEntry;
 
-    // console.log('[format-document] found entry', {
-    //   contentHash,
-    //   matchedKind: contentEntry.kind,
-    //   matchedPath: contentEntry.path,
-    //   entryPath: entry.path,
-    //   entryStatus: entry.status,
-    //   entryKind: entry.kind,
-    //   fileName,
-    //   examTypeId,
-    // });
+    console.log('[format-document] found entry', {
+      contentHash,
+      matchedKind: contentEntry.kind,
+      matchedPath: contentEntry.path,
+      entryPath: entry.path,
+      entryStatus: entry.status,
+      entryKind: entry.kind,
+      fileName,
+      examTypeId,
+    });
 
     if (entry.status === 'Formatted') {
       // console.log('[format-document] already formatted, post-format identity:', { studentId: entry.studentId, admissionNo: entry.admissionNo, path: entry.path });

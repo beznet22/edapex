@@ -2,40 +2,30 @@
  * Auto-Commit Endpoint — EdApex Workspace
  *
  * Receives `{ path, examTypeId, reason? }` from the editor after 8 s of
- * typing silence (see `editor-canvas.svelte`'s commit debounce). Resolves
- * the marksheet's student identity from the manifest (with `.raw.json`
- * sidecar + re-parse fallbacks), validates the parsed JSON against
- * `marksheetSchema`, and forwards to `commitMarksheetLogic` with
- * `skipJsonWrite: true` so the canonical `<studentId>.json` and renamed
- * `<studentId>-<slug>.md` are not produced — only the MySQL write
- * (`AssessmentService.upsertMarksheet`) and the manifest entry update.
+ * typing silence (see `editor-canvas.svelte`'s commit debounce).
  *
- * Resolution cascade (in order):
- *   1. `entries[path].studentId` from the per-exam manifest (set by
- *      `stream-document` after the first format run).
- *   2. `entries[path].admissionNo` + `StudentRepository.getStudentById(..., true)`
- *      to resolve the studentId.
- *   3. Sibling `<path>.raw.json` sidecar written by the editor's PUT.
- *   4. Re-parse the .md via `parseMarksheetMarkdown` + the lifted
- *      `buildMarksheetParseContext`.
- *   5. Hard fail with `STUDENT_ID_UNRESOLVED` if all four miss.
+ * First validates the marksheet exactly like the `action=validate` flow:
+ *   1. Parse the .md via `parseMarksheetMarkdown` + `buildMarksheetParseContext`.
+ *   2. Check admission‑no mismatch against roster.
+ *   3. Validate against `marksheetSchema`.
+ *   4. Cross‑reference assigned subjects — missing subjects are blocking errors.
  *
- * Steps 3 and 4 backfill the resolved `studentId` + `admissionNo` onto
- * the manifest entry so subsequent commits are manifest-fast.
+ * If validation passes, resolves `studentId` from the validated marksheet,
+ * backfills it onto the manifest entry, then calls `commitMarksheetLogic`
+ * with `skipJsonWrite: true` so only the MySQL write and manifest update
+ * are produced (no canonical `<studentId>.json` or renamed `.md`).
  */
 import { json, error, type RequestHandler } from '@sveltejs/kit';
 import { z } from 'zod';
 import { resolveTenantWorkspace } from '$lib/server/workspace/scope';
 import { ALLOWED_DESIGNATIONS } from '$lib/types/sms-types';
-import { readManifest, updateEntry } from '$lib/server/workspace/manifest';
-import { marksheetSchema, type Marksheet } from '$lib/schema/marksheet';
+import { updateEntry } from '$lib/server/workspace/manifest';
+import { marksheetSchema } from '$lib/schema/marksheet';
 import { buildMarksheetParseContext } from '$lib/server/mastra/tools/operations/reporting/marksheet/parse-context';
 import { commitMarksheetLogic } from '$lib/server/mastra/tools/operations/reporting/marksheet/commit-marksheet';
-import { crossReferenceSubjects, padMissingRecords } from '$lib/server/mastra/tools/operations/reporting/marksheet/validate-cross-ref';
+import { crossReferenceSubjects } from '$lib/server/mastra/tools/operations/reporting/marksheet/validate-cross-ref';
 import { createAssessmentServiceForRequest } from '$lib/server/service/assessment.service';
-import { StudentRepository } from '$lib/server/repository';
-import { getDatabase } from '$lib/server/db';
-import { parseMarksheetMarkdown } from '$lib/utils/marksheet-ast-parser';
+import { parseMarksheetMarkdown, extractTableField } from '$lib/utils/marksheet-ast-parser';
 
 const bodySchema = z.object({
 	path: z.string().regex(/marksheets\/.*\.md$/, 'path must point to a marksheets/*.md file'),
@@ -84,163 +74,86 @@ export const POST: RequestHandler = async ({ request, locals, cookies }) => {
 		);
 	}
 
-	const manifest = await readManifest(tenant, examTypeId);
-	const manifestEntry = manifest.entries[manifestRelPath];
+	// ── Validate: matches action='validate' flow exactly ──
+	const raw = await fs.readFile(manifestRelPath, { encoding: 'utf-8' });
+	const markdown = typeof raw === 'string' ? raw : raw.toString('utf-8');
 
-	let studentId: number | null = manifestEntry?.studentId ?? null;
-	let resolvedAdmissionNo: number | null =
-		manifestEntry?.admissionNo != null ? Number(manifestEntry.admissionNo) : null;
+	let validationErrors: string[] = [];
+	let validationWarnings: string[] = [];
 
-	let parsedMarksheet: Marksheet | null = null;
-	let backfill: { studentId: number; admissionNo: number | null } | null = null;
-
-	if (studentId == null && resolvedAdmissionNo != null) {
+	if (manifestRelPath.includes('marksheets/') && manifestRelPath.endsWith('.md')) {
 		try {
-			const db = await getDatabase();
-			const repo = await StudentRepository.build(db, tenant);
-			const student = await repo.getStudentById(resolvedAdmissionNo, true);
-			if (student?.studentId) {
-				studentId = student.studentId;
-				backfill = { studentId, admissionNo: resolvedAdmissionNo };
-			}
-		} catch (err) {
-			console.warn('[commit] StudentRepository lookup failed', err);
-		}
-	}
+			const parseContext = await buildMarksheetParseContext(markdown, tenant);
+			const parsed = parseMarksheetMarkdown(markdown, parseContext);
 
-	const rawJsonPath = manifestRelPath.replace(/\.md$/, '.raw.json');
-	if (parsedMarksheet == null && (await fs.exists(rawJsonPath))) {
-		try {
-			const raw = await fs.readFile(rawJsonPath, { encoding: 'utf-8' });
-			const text = typeof raw === 'string' ? raw : raw.toString('utf-8');
-			const candidate = JSON.parse(text) as unknown;
-			const result = await marksheetSchema.safeParseAsync(candidate);
-			if (result.success) {
-				parsedMarksheet = result.data;
-				if (studentId == null) {
-					const idFromJson = parsedMarksheet.student?.id;
-					if (typeof idFromJson === 'number' && idFromJson > 0) {
-						studentId = idFromJson;
-						const adm =
-							parsedMarksheet.student?.adminNo != null
-								? Number(parsedMarksheet.student.adminNo)
-								: null;
-						resolvedAdmissionNo = adm;
-						backfill = { studentId, admissionNo: adm };
-					}
-				}
-			} else {
-				console.warn('[commit] .raw.json failed schema validation; will re-parse .md', {
-					issues: result.error.issues.map((i) => i.message),
-				});
-			}
-		} catch (err) {
-			console.warn('[commit] failed to read/parse .raw.json sidecar; will re-parse .md', err);
-		}
-	}
-
-	if (parsedMarksheet == null) {
-		try {
-			const raw = await fs.readFile(manifestRelPath, { encoding: 'utf-8' });
-			const text = typeof raw === 'string' ? raw : raw.toString('utf-8');
-			const parseContext = await buildMarksheetParseContext(text, tenant);
-			const parsed = parseMarksheetMarkdown(text, parseContext) as unknown;
-			const result = await marksheetSchema.safeParseAsync(parsed);
-			if (!result.success) {
-				return failResponse(
-					'MARKSHEET_INVALID',
-					`marksheetSchema rejected the .md: ${result.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ')}`,
-					manifestRelPath,
-					422
+			const enteredAdmNo = extractTableField(markdown, 'admission no');
+			if (enteredAdmNo && Number(enteredAdmNo) !== parsed.student.adminNo) {
+				validationErrors.push(
+					`Admission No mismatch: file has ${enteredAdmNo}, but roster records ${parsed.student.adminNo}. The roster value will be used on reload.`
 				);
 			}
-			parsedMarksheet = result.data;
-			if (studentId == null) {
-				const idFromParse = parsedMarksheet.student?.id;
-				if (typeof idFromParse === 'number' && idFromParse > 0) {
-					studentId = idFromParse;
-					const adm =
-						parsedMarksheet.student?.adminNo != null
-							? Number(parsedMarksheet.student.adminNo)
-							: null;
-					resolvedAdmissionNo = adm;
-					backfill = { studentId, admissionNo: adm };
-				}
+
+			const result = await marksheetSchema.safeParseAsync(parsed);
+			if (!result.success) {
+				validationErrors.push(...result.error.issues.map(i => `${i.path.join('.')}: ${i.message}`));
 			}
+
+			if (tenant.classId != null && tenant.sectionId != null && result.success) {
+				try {
+					const assessment = await createAssessmentServiceForRequest(tenant);
+					const assigned = await assessment.getAssignedSubjects(tenant.classId, tenant.sectionId);
+					const missing = crossReferenceSubjects(result.data, assigned);
+					if (missing.length > 0) {
+						validationErrors.push(...missing);
+					}
+				} catch { /* best-effort */ }
+			}
+
+			const validateStatus = validationErrors.length > 0 ? 'Failed' : 'Validated';
+			await updateEntry(tenant, manifestRelPath, {
+				validationErrors,
+				validationErrorCount: validationErrors.length,
+				validationWarnings: validationWarnings.length > 0 ? validationWarnings : undefined,
+				validationWarningCount: validationWarnings.length > 0 ? validationWarnings.length : undefined,
+				status: validateStatus,
+			}, examTypeId);
+
+			if (validationErrors.length > 0) {
+				return failResponse('VALIDATION_FAILED', validationErrors.join('; '), manifestRelPath, 422);
+			}
+
+			// result.success is guaranteed true here (would have errors otherwise)
+			if (!result.success) {
+				return failResponse('VALIDATION_FAILED', 'marksheetSchema rejected the parsed marksheet', manifestRelPath, 422);
+			}
+			const marksheet = result.data;
+			const studentId = marksheet.student.id;
+			if (!studentId || studentId <= 0) {
+				return failResponse('STUDENT_ID_UNRESOLVED', 'Student ID is invalid in validated marksheet', 'marksheet.student.id', 422);
+			}
+
+			// Backfill studentId + admissionNo to manifest so subsequent commits are fast
+			const admNo = marksheet.student.adminNo;
+			await updateEntry(tenant, manifestRelPath, {
+				studentId,
+				...(admNo != null ? { admissionNo: Number(admNo) } : {}),
+			}, examTypeId).catch(err => console.warn('[commit] manifest backfill failed (non-fatal)', err));
+
+			const commitResult = await commitMarksheetLogic(
+				tenant,
+				{ studentId, reason: reason ?? 'Auto-commit after idle', marksheet },
+				{ skipJsonWrite: true, sourcePath: manifestRelPath }
+			);
+
+			if (!commitResult.ok) {
+				return json(commitResult, { status: 422 });
+			}
+			return json(commitResult, { status: 200 });
 		} catch (err) {
 			const message = err instanceof Error ? err.message : String(err);
-			return failResponse(
-				'PARSE_FAILED',
-				`Failed to re-parse ${manifestRelPath}: ${message}`,
-				manifestRelPath,
-				422
-			);
+			return failResponse('PARSE_FAILED', `Failed to parse ${manifestRelPath}: ${message}`, manifestRelPath, 422);
 		}
 	}
 
-	if (studentId == null || parsedMarksheet == null) {
-		return failResponse(
-			'STUDENT_ID_UNRESOLVED',
-			`Could not resolve a studentId for ${manifestRelPath} (manifest, .raw.json, and re-parse all failed)`,
-			'manifest.studentId',
-			422
-		);
-	}
-
-	if (backfill) {
-		try {
-			await updateEntry(
-				tenant,
-				manifestRelPath,
-				{
-					studentId: backfill.studentId,
-					...(backfill.admissionNo != null ? { admissionNo: backfill.admissionNo } : {}),
-				},
-				examTypeId
-			);
-		} catch (err) {
-			console.warn('[commit] manifest backfill failed (non-fatal)', err);
-		}
-	}
-
-	// Pad missing subjects so all assigned subjects have DB records
-	// and compute cross-reference warnings
-	const commitMarksheet = parsedMarksheet;
-	let crossRefWarnings: string[] = [];
-	if (tenant.classId != null && tenant.sectionId != null) {
-		try {
-			const assessment = await createAssessmentServiceForRequest(tenant);
-			const assigned = await assessment.getAssignedSubjects(tenant.classId, tenant.sectionId);
-			crossRefWarnings = crossReferenceSubjects(commitMarksheet, assigned);
-			parsedMarksheet = padMissingRecords(commitMarksheet, assigned);
-		} catch { /* best-effort */ }
-	}
-	if (crossRefWarnings.length > 0) {
-		try {
-			await updateEntry(tenant, manifestRelPath, {
-				validationWarnings: crossRefWarnings,
-				validationWarningCount: crossRefWarnings.length,
-			}, examTypeId);
-		} catch { /* best-effort */ }
-	}
-
-	const result = await commitMarksheetLogic(
-		tenant,
-		{
-			studentId,
-			reason: reason ?? 'Auto-commit after idle',
-			marksheet: parsedMarksheet,
-		},
-		{ skipJsonWrite: true, sourcePath: manifestRelPath }
-	);
-
-	if (!result.ok) {
-		try {
-			await updateEntry(tenant, manifestRelPath, {
-				status: "Committed"
-			}, examTypeId);
-		} catch {/* best-effort */}
-		return json(result, { status: 422 });
-	}
-	return json(result, { status: 200 });
+	return failResponse('NOT_A_MARKSHEET', 'path must point to a marksheets/*.md file', manifestRelPath, 400);
 };

@@ -100,7 +100,7 @@ function findSection(tree: Root, headingName: string): any[] | null {
     const node = tree.children[i];
     if (node.type !== "heading") continue;
     const text = getNodeText(node);
-    if (text === headingName) {
+    if (text === headingName || text.startsWith(headingName + ' (')) {
       const start = i + 1;
       let end = tree.children.length;
       for (let j = start; j < tree.children.length; j++) {

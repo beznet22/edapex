@@ -316,6 +316,10 @@
 			if (!data.ok) {
 				return data.errors?.[0]?.message ?? 'Commit failed';
 			}
+			const commitUrl = `/api/file/${filePath}`;
+			patchFile(commitUrl, {
+				manifestStatus: data.marksheetStatus ?? 'Committed'
+			});
 			return null;
 		} catch (e) {
 			return e instanceof Error ? e.message : 'Commit failed';

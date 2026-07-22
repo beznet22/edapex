@@ -284,12 +284,42 @@ export const POST: RequestHandler = async ({ params, url, request, locals, cooki
       if (!tenant.examTypeId) throw error(400, 'EXAM_TYPE_REQUIRED for auto-fix');
       const raw = await fs.readFile(resolvedPath);
       const markdown = typeof raw === 'string' ? raw : new TextDecoder().decode(raw);
-      const { parseMarksheetMarkdown, generateMarksheetMarkdown } = await import('$lib/utils/marksheet-ast-parser');
+      const { parseMarksheetMarkdown, generateMarksheetMarkdown, parseMentions } = await import('$lib/utils/marksheet-ast-parser');
       const parseContext = await buildMarksheetParseContext(markdown, tenant);
       const parsed = parseMarksheetMarkdown(markdown, parseContext);
+      const mentions = parseMentions(markdown);
+      const enteredAdmNo = extractTableField(markdown, 'admission no');
+      console.log('[marksheet-debug]', JSON.stringify({
+        action: 'auto-fix-parse',
+        path: params.path,
+        tenant: {
+          classId: tenant.classId,
+          sectionId: tenant.sectionId,
+          academicId: tenant.academicId,
+          examTypeId: tenant.examTypeId,
+          schoolId: tenant.schoolId,
+          staffId: tenant.staffId,
+          className: tenant.className,
+          sectionName: tenant.sectionName,
+          academicYearTitle: tenant.academicYearTitle,
+        },
+        mentions,
+        contextTenant: parseContext.tenant,
+        roster: parseContext.roster,
+        student: parsed.student,
+        recordsCount: parsed.records.length,
+        records: parsed.records.map(r => ({
+          subjectCode: r.subjectCode,
+          marks: r.marks,
+          titles: r.titles,
+          fullMarks: r.fullMarks,
+        })),
+        enteredAdmNo,
+        markdownLength: markdown.length,
+        markdownPreview: markdown.slice(0, 600),
+      }, null, 2));
       const result = await marksheetSchema.safeParseAsync(parsed);
 
-      const enteredAdmNo = extractTableField(markdown, 'admission no');
       const hasAdmNoMismatch = enteredAdmNo != null && Number(enteredAdmNo) !== parsed.student.adminNo;
       const originalErrors: string[] = [];
       if (hasAdmNoMismatch) {
@@ -310,6 +340,25 @@ export const POST: RequestHandler = async ({ params, url, request, locals, cooki
         const canonicalMd = generateMarksheetMarkdown(parsed);
         const reParsed = parseMarksheetMarkdown(canonicalMd, parseContext);
         const reResult = await marksheetSchema.safeParseAsync(reParsed);
+        console.log('[marksheet-debug]', JSON.stringify({
+          action: 'auto-fix-reparse',
+          path: params.path,
+          canonicalMdLength: canonicalMd.length,
+          reResultSuccess: reResult.success,
+          reValid: reResult.success && reParsed.student.adminNo === parsed.student.adminNo && reParsed.records.length === parsed.records.length && canonicalMd.length > 0,
+          errors: !reResult.success ? reResult.error.issues.map(i => `${i.path.join('.')}: ${i.message}`) : [],
+          reParsedStudent: reParsed.student,
+          reParsedRecordsCount: reParsed.records.length,
+          reParsedRecords: reParsed.records.map(r => ({
+            subjectCode: r.subjectCode,
+            marks: r.marks,
+            titles: r.titles,
+            fullMarks: r.fullMarks,
+          })),
+          identityChanged: reParsed.student.adminNo !== parsed.student.adminNo,
+          recordCountChanged: reParsed.records.length !== parsed.records.length,
+          markdownEmpty: canonicalMd.length === 0,
+        }, null, 2));
         const reValid = reResult.success && reParsed.student.adminNo === parsed.student.adminNo && reParsed.records.length === parsed.records.length && canonicalMd.length > 0;
         if (reValid) {
           const fixedBytes = new TextEncoder().encode(canonicalMd);
@@ -387,11 +436,42 @@ export const POST: RequestHandler = async ({ params, url, request, locals, cooki
       let validationWarnings: string[] = [];
       if (params.path.includes('marksheets/') && params.path.endsWith('.md')) {
         try {
-          const { parseMarksheetMarkdown } = await import('$lib/utils/marksheet-ast-parser');
+          const { parseMarksheetMarkdown, parseMentions } = await import('$lib/utils/marksheet-ast-parser');
           const parseContext = await buildMarksheetParseContext(markdown, tenant);
           const parsed = parseMarksheetMarkdown(markdown, parseContext);
 
           const enteredAdmNo = extractTableField(markdown, 'admission no');
+          const mentions = parseMentions(markdown);
+          console.log('[marksheet-debug]', JSON.stringify({
+            action: 'validate',
+            path: params.path,
+            tenant: {
+              classId: tenant.classId,
+              sectionId: tenant.sectionId,
+              academicId: tenant.academicId,
+              examTypeId: tenant.examTypeId,
+              schoolId: tenant.schoolId,
+              staffId: tenant.staffId,
+              className: tenant.className,
+              sectionName: tenant.sectionName,
+              academicYearTitle: tenant.academicYearTitle,
+            },
+            mentions,
+            contextTenant: parseContext.tenant,
+            roster: parseContext.roster,
+            student: parsed.student,
+            recordsCount: parsed.records.length,
+            records: parsed.records.map(r => ({
+              subjectCode: r.subjectCode,
+              marks: r.marks,
+              titles: r.titles,
+              fullMarks: r.fullMarks,
+              learningOutcome: r.learningOutcome,
+            })),
+            enteredAdmNo,
+            markdownLength: markdown.length,
+            markdownPreview: markdown.slice(0, 600),
+          }, null, 2));
           if (enteredAdmNo && Number(enteredAdmNo) !== parsed.student.adminNo) {
             validationErrors.push(
               `Admission No mismatch: file has ${enteredAdmNo}, but roster records ${parsed.student.adminNo}. The roster value will be used on reload.`
@@ -402,12 +482,16 @@ export const POST: RequestHandler = async ({ params, url, request, locals, cooki
           if (!result.success) {
             validationErrors.push(...result.error.issues.map(i => `${i.path.join('.')}: ${i.message}`));
           }
-
+          console.log({ validationErrors });
           if (tenant.classId != null && tenant.sectionId != null && result.success) {
             try {
               const assessment = await createAssessmentServiceForRequest(tenant);
               const assigned = await assessment.getAssignedSubjects(tenant.classId, tenant.sectionId);
-              validationWarnings = crossReferenceSubjects(result.data, assigned);
+              const missing = crossReferenceSubjects(result.data, assigned);
+              console.log('Missing subjects:', missing);
+              if (missing.length > 0) {
+                validationErrors.push(...missing);
+              }
             } catch { /* best-effort */ }
           }
 
@@ -653,12 +737,42 @@ export const PUT: RequestHandler = async ({ params, request, locals, cookies, ur
     let status: FileStatus | undefined;
     if (manifestRelPath.includes('marksheets/') && manifestRelPath.endsWith('.md')) {
       try {
-        const { parseMarksheetMarkdown } = await import('$lib/utils/marksheet-ast-parser');
+        const { parseMarksheetMarkdown, parseMentions } = await import('$lib/utils/marksheet-ast-parser');
         const content = new TextDecoder().decode(bytes);
         const parseContext = await buildMarksheetParseContext(content, tenant);
         const parsed = parseMarksheetMarkdown(content, parseContext);
 
+        const mentions = parseMentions(content);
         const enteredAdmNo = extractTableField(content, 'admission no');
+        console.log('[marksheet-debug]', JSON.stringify({
+          action: 'put',
+          path: manifestRelPath,
+          tenant: {
+            classId: tenant.classId,
+            sectionId: tenant.sectionId,
+            academicId: tenant.academicId,
+            examTypeId: tenant.examTypeId,
+            schoolId: tenant.schoolId,
+            staffId: tenant.staffId,
+            className: tenant.className,
+            sectionName: tenant.sectionName,
+            academicYearTitle: tenant.academicYearTitle,
+          },
+          mentions,
+          contextTenant: parseContext.tenant,
+          roster: parseContext.roster,
+          student: parsed.student,
+          recordsCount: parsed.records.length,
+          records: parsed.records.map(r => ({
+            subjectCode: r.subjectCode,
+            marks: r.marks,
+            titles: r.titles,
+            fullMarks: r.fullMarks,
+          })),
+          enteredAdmNo,
+          contentLength: content.length,
+          contentPreview: content.slice(0, 600),
+        }, null, 2));
         if (enteredAdmNo && Number(enteredAdmNo) !== parsed.student.adminNo) {
           validationErrors.push(
             `Admission No mismatch: file has ${enteredAdmNo}, but roster records ${parsed.student.adminNo}. The roster value will be used on reload.`
@@ -673,7 +787,10 @@ export const PUT: RequestHandler = async ({ params, request, locals, cookies, ur
           try {
             const assessment = await createAssessmentServiceForRequest(tenant);
             const assigned = await assessment.getAssignedSubjects(tenant.classId, tenant.sectionId);
-            validationWarnings = crossReferenceSubjects(result.data, assigned);
+            const missing = crossReferenceSubjects(result.data, assigned);
+            if (missing.length > 0) {
+              validationErrors.push(...missing);
+            }
           } catch { /* best-effort */ }
         }
         status = validationErrors.length > 0 ? 'Failed' : 'Validated';

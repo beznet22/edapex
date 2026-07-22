@@ -950,35 +950,39 @@ export class AssessmentService {
 
       // DAYCARE Handling
       if (category === "DAYCARE") {
-        resultsToInsert.push({
-          studentRecordId: recordId,
-          studentId,
-          classId,
-          sectionId,
-          subjectId,
-          examId,
-          examTypeId,
-          totalMarks: 0,
-          teacherRemarks: store.learningOutcome || null,
-          academicId,
-          schoolId,
-          activeStatus: 1,
-        });
+        if (!store.examTitles || store.examTitles.length === 0) {
+          resultsToInsert.push({
+            studentRecordId: recordId,
+            studentId,
+            classId,
+            sectionId,
+            subjectId,
+            examId,
+            examTypeId,
+            totalMarks: 0,
+            teacherRemarks: store.learningOutcome || null,
+            academicId,
+            schoolId,
+            activeStatus: 1,
+          });
 
-        marksInput.push({
-          subjectId,
-          examTypeId,
-          marks: 0,
-          fullMarks: 0,
-          totalMarks: 0,
-          percentage: 0,
-          grade: "",
-          gpa: 0,
-          isAbsent: false,
-          teacherRemarks: store.learningOutcome || undefined
-        });
+          marksInput.push({
+            subjectId,
+            examTypeId,
+            marks: 0,
+            fullMarks: 0,
+            totalMarks: 0,
+            percentage: 0,
+            grade: "",
+            gpa: 0,
+            isAbsent: false,
+            teacherRemarks: store.learningOutcome || undefined
+          });
 
-        continue;
+          continue;
+        }
+        // DAYCARE with exam titles — fall through to graded assessment
+        // The learning outcome is included in the result record below
       }
 
       // Graded Assessment Handling
@@ -1043,6 +1047,7 @@ export class AssessmentService {
         academicId,
         schoolId,
         activeStatus: 1,
+        ...(category === "DAYCARE" && store.learningOutcome ? { teacherRemarks: store.learningOutcome } : {}),
       });
 
       marksInput.push({
