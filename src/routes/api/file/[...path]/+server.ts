@@ -32,9 +32,8 @@ import { marksheetSchema } from '$lib/schema/marksheet';
 import { extractTableField } from '$lib/utils/marksheet-ast-parser';
 import { buildMarksheetParseContext } from '$lib/server/mastra/tools/operations/reporting/marksheet/parse-context';
 import { createAssessmentServiceForRequest } from '$lib/server/service/assessment.service';
-import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
-import { generateText } from 'ai';
-import { env } from '$env/dynamic/private';
+import { DIAGNOSTIC_MODEL } from '$lib/server/mastra/agents/diagnostic';
+import { resolveModelForRequest } from '$lib/server/mastra/provider';
 import type { SerializedTenant } from '$lib/types/background-tasks';
 import type { FileEntry } from '@mastra/core/workspace';
 import { resolveUserRole } from '$lib/server/mastra/provider/role-resolver';
@@ -293,8 +292,11 @@ export const POST: RequestHandler = async ({ params, url, request, locals, cooki
       const hasAdmNoMismatch = enteredAdmNo != null && Number(enteredAdmNo) !== parsed.student.adminNo;
 
       if (result.success && !hasAdmNoMismatch) {
+        const canonicalMd = generateMarksheetMarkdown(parsed);
+        const fixedBytes = new TextEncoder().encode(canonicalMd);
+        await fs.writeFile(resolvedPath, fixedBytes, { overwrite: true });
         await updateEntry(tenant, params.path!, { validationErrors: [], validationErrorCount: 0, status: 'Validated' }, tenant.examTypeId);
-        return json({ fixed: false, errors: [] });
+        return json({ fixed: false, errors: [], markdown: canonicalMd });
       }
 
       if (result.success && hasAdmNoMismatch) {
@@ -305,6 +307,7 @@ export const POST: RequestHandler = async ({ params, url, request, locals, cooki
         return json({
           fixed: true,
           errors: [],
+          markdown: canonicalMd,
           originalErrors: [`Admission No mismatch: file has ${enteredAdmNo}, roster records ${parsed.student.adminNo}`],
         });
       }
@@ -313,29 +316,35 @@ export const POST: RequestHandler = async ({ params, url, request, locals, cooki
       if (hasAdmNoMismatch) {
         zodErrors.push(`Admission No mismatch: file has ${enteredAdmNo}, roster records ${parsed.student.adminNo}`);
       }
-      const groqProvider = createOpenAICompatible({
-        name: 'groq',
-        apiKey: env.GROQ_API_KEY,
-        baseURL: env.GROQ_BASE_URL || 'https://api.groq.com/openai/v1',
-      });
-      const model = groqProvider.chatModel('llama-3.3-70b-versatile');
-      const systemPrompt = 'You are a marksheet data fixer. Given a marksheet markdown file and validation errors, fix the markdown to pass all validation rules. Return ONLY the corrected markdown with no explanations, code fences, or extra text. Preserve all existing data that is correct.';
-      const userPrompt = `Current marksheet markdown:\n\n${markdown}\n\nValidation errors:\n${zodErrors.join('\n')}`;
-      const response = await generateText({ model, system: systemPrompt, prompt: userPrompt });
-      const fixedMarkdown = response.text.trim();
-      const fixedParsed = parseMarksheetMarkdown(fixedMarkdown, parseContext);
-      const canonicalMd = generateMarksheetMarkdown(fixedParsed);
-      const fixedBytes = new TextEncoder().encode(canonicalMd);
-      await fs.writeFile(resolvedPath, fixedBytes, { overwrite: true });
-      const reResult = await marksheetSchema.safeParseAsync(fixedParsed);
-      const fixSucceeded = reResult.success;
-      const remainingErrors = fixSucceeded ? [] : reResult.error.issues.map(i => `${i.path.join('.')}: ${i.message}`);
+
+      let llmAdvice = '';
+      try {
+        const db = getAppDb();
+        const traceContext = {
+          userId: locals.user.id,
+          schoolId: tenant.schoolId,
+          actorStaffId: tenant.staffId,
+          userRole: resolveUserRole(tenant.designationId),
+          todayTokenUsage: 0,
+        };
+        const resolved = await resolveModelForRequest(locals.user.id, DIAGNOSTIC_MODEL, db, undefined, traceContext);
+        const { mastra } = await import('$lib/server/mastra');
+        const agent = mastra.getAgent('diagnostic');
+        const userPrompt = `Current marksheet markdown:\n\n${markdown}\n\nValidation errors:\n${zodErrors.join('\n')}`;
+        const result = await agent.generate(userPrompt, {
+          model: resolved.config as never,
+        });
+        llmAdvice = result.text;
+      } catch (err) {
+        llmAdvice = `Diagnostic LLM unavailable: ${err instanceof Error ? err.message : String(err)}`;
+      }
+
       await updateEntry(tenant, params.path!, {
-        validationErrors: remainingErrors,
-        validationErrorCount: remainingErrors.length,
-        status: fixSucceeded ? 'Validated' : 'Failed',
+        validationErrors: zodErrors,
+        validationErrorCount: zodErrors.length,
+        status: 'Failed',
       }, tenant.examTypeId);
-      return json({ fixed: fixSucceeded, errors: remainingErrors, originalErrors: zodErrors });
+      return json({ fixed: false, errors: zodErrors, originalErrors: zodErrors, diagnostics: llmAdvice, status: 'Failed' });
     }
 
     if (action === 'validate') {

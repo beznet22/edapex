@@ -9,7 +9,7 @@
  * The `requestContext` mechanism provides tenant isolation without per-request instantiation.
  */
 import { Mastra } from '@mastra/core';
-import { assistantAgent, titleAgent, documentAgent, formatAgent } from './agents';
+import { assistantAgent, titleAgent, documentAgent, formatAgent, diagnosticAgent } from './agents';
 import { editorEditAgent, editorGenerateAgent, editorCopilotAgent } from './agents';
 import { parentAssistantAgent } from './agents/parent-assistant';
 import { chatWorkflow, editorCommandWorkflow } from './workflows';
@@ -34,6 +34,7 @@ export const mastra = new Mastra({
   agents: {
     assistant: assistantAgent,
     format: formatAgent,
+    diagnostic: diagnosticAgent,
     title: titleAgent,
     editorEdit: editorEditAgent,
     editorGenerate: editorGenerateAgent,
@@ -100,7 +101,7 @@ export function createMastraInstance(params: { dbUrl: string }): {
 /**
  * Retrieves a registered agent by ID from the singleton Mastra instance.
  */
-export function getAgent(id: 'assistant' | 'title' | 'editorEdit' | 'editorGenerate' | 'editorCopilot' | 'document' | 'parent-assistant') {
+export function getAgent(id: 'assistant' | 'title' | 'editorEdit' | 'editorGenerate' | 'editorCopilot' | 'document' | 'parent-assistant' | 'diagnostic') {
   return mastra.getAgent(id);
 }
 

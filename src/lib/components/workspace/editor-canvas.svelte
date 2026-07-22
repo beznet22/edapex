@@ -108,6 +108,7 @@
 	);
 	let wysiwygContent = $state("");
 	let lastSavedContent = $state<string>("");
+	let contentVersion = $state(0);
 	let saveDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 
 	type CommitState = 'idle' | 'pending' | 'committing' | 'committed' | 'failed';
@@ -239,6 +240,14 @@
 
 	export function toggleMode() {
 		editorMode = editorMode === "wysiwyg" ? "raw" : "wysiwyg";
+	}
+
+	export function setContent(md: string) {
+		textContent = md;
+		editContent = md;
+		wysiwygContent = md;
+		lastSavedContent = md;
+		contentVersion++;
 	}
 
 	const pdfEngine = usePdfiumEngine();
@@ -496,7 +505,7 @@
 					class="flex-1 min-h-0 overflow-hidden"
 					bind:this={textContainerRef}
 				>
-					{#key url}
+					{#key `${url}-v${contentVersion}`}
 						<WysiwygEditor
 							content={textContent}
 							onUpdate={handleWysiwygUpdate}

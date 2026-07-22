@@ -103,7 +103,7 @@ export async function resolveTenantWorkspace(params: {
 }): Promise<{
   tenant: TenantContext;
   requestContext: import('@mastra/core/request-context').RequestContext<unknown>;
-  fs: import('@mastra/core/workspace').LocalFilesystem;
+  fs: import('@mastra/core/workspace').WorkspaceFilesystem;
 }> {
   const scope = await resolveActiveClassScope({
     schoolId: params.schoolId,
@@ -142,6 +142,9 @@ export async function resolveTenantWorkspace(params: {
   const fs = await tenantWorkspace.resolveFilesystem({
     requestContext: requestContext as never,
   });
+  if (!fs) {
+    throw new Error('WORKSPACE_FILESYSTEM_UNAVAILABLE');
+  }
 
   return { tenant, requestContext, fs };
 }

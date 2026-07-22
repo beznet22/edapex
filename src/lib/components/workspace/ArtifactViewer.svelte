@@ -234,7 +234,7 @@
 	});
 
 	let editorRef = $state<
-		{ save: () => Promise<boolean> | void; copy: () => void } | undefined
+		{ save: () => Promise<boolean> | void; copy: () => void; setContent: (md: string) => void } | undefined
 	>(undefined);
 
 	async function triggerDownload(path: string, filename: string) {
@@ -489,6 +489,7 @@
 		errorCount: 0,
 	});
 	let aiFixing = $state(false);
+	let llmAdvice = $state('');
 	let validating = $state(false);
 
 	/** Tracks whether the manifest entry has ever reported validation data.
@@ -569,17 +570,16 @@
 	});
 
 	async function handlePillClick() {
-		// 'valid' is a no-op — clicking the green pill does nothing because
-		// there is nothing for the user to act on. For 'invalid' and 'unknown'
-		// switch viewMode to 'validation' so the validation panel replaces
-		// the markdown/pdf render area. The 'unknown' branch additionally
-		// triggers auto-fix so the next PUT populates validationErrors and
-		// the pill flips to its real state.
-		if (validationStatus === 'valid') return;
-		viewMode = 'validation';
-		if (validationStatus === 'unknown') {
+		const status = validationStatus;
+		if (status === 'valid') return;
+		if (status === 'unknown') {
 			await handleAutoFix();
+			if (validationStatus === 'valid' && editorRef) {
+				viewMode = 'markdown';
+				return;
+			}
 		}
+		viewMode = 'validation';
 	}
 
 	const computedExamTypeId = $derived.by(() => {
@@ -618,6 +618,7 @@
 	async function handleAutoFix() {
 		if (!autoFixPath || !computedExamTypeId || aiFixing) return;
 		aiFixing = true;
+		llmAdvice = '';
 		try {
 			const res = await fetch(
 				`/api/file/${autoFixPath}?action=auto-fix&examTypeId=${computedExamTypeId}`,
@@ -627,6 +628,12 @@
 			const data = await res.json();
 			const errors: string[] = data.errors ?? [];
 			validationState = { errors, errorCount: errors.length };
+			if (data.markdown && errors.length === 0 && editorRef) {
+				editorRef.setContent(data.markdown);
+			}
+			if (data.diagnostics) {
+				llmAdvice = data.diagnostics;
+			}
 			if (errors.length > 0) {
 				viewMode = 'validation';
 			}
@@ -1048,6 +1055,16 @@
 								</li>
 							{/each}
 						</ul>
+						{#if llmAdvice}
+							<div class="mt-4 p-3 rounded-lg bg-blue-50 border border-blue-200">
+								<p class="text-xs font-semibold text-blue-800 mb-1">
+									AI Diagnostic Advice
+								</p>
+								<p class="text-xs text-blue-700 leading-relaxed whitespace-pre-wrap">
+									{llmAdvice}
+								</p>
+							</div>
+						{/if}
 					{:else}
 						<p class="text-sm text-muted-foreground">
 							This marksheet hasn't been validated yet. Open the editor and save the file —

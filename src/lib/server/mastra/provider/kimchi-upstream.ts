@@ -148,7 +148,7 @@ export async function getKimchiHeaders(): Promise<Record<string, string>> {
 				})
 				.catch(() => {
 					inflight = null;
-				});
+				}) as Promise<CachedHeaders>;
 		}
 		return { ...cache.headers };
 	} catch (err) {
