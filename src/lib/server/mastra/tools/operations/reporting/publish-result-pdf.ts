@@ -45,7 +45,6 @@ async function resolveParentForStudent(student: StudentDetails): Promise<ParentL
 
 const reportPdfInputSchema = z.object({
   ...studentCriteriaBase,
-  republish: z.boolean().optional(),
 });
 
 const reportPdfPublishInputSchema = z.object({
@@ -89,7 +88,6 @@ async function ensureResultPdf(
     admissionNo: undefined,
     fullName: undefined,
     partialName: undefined,
-    republish: true,
   } satisfies z.infer<typeof reportPdfInputSchema>;
   const inner = generateResultPdfTool.execute;
   if (typeof inner !== "function") {

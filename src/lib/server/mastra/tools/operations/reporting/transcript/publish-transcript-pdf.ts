@@ -140,9 +140,8 @@ async function ensureTranscriptPdf(args: RenderArgs): Promise<RenderResult> {
     admissionNo: undefined,
     fullName: undefined,
     partialName: undefined,
-    republish: true,
-  };
-  type InnerOutput =
+    };
+    type InnerOutput =
     | {
       artifactId: string;
       kind: "pdf";
@@ -167,7 +166,6 @@ async function ensureTranscriptPdf(args: RenderArgs): Promise<RenderResult> {
     admissionNo?: number;
     fullName?: string;
     partialName?: string;
-    republish?: boolean;
   };
   const innerResultRaw: unknown = await (inner as (
     input: InnerInput,

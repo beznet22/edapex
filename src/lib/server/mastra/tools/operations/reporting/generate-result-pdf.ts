@@ -28,7 +28,6 @@ import { type MemoryContext } from "$lib/server/mastra/utils/chat-utils";
 
 const reportPdfInputSchema = z.object({
   ...studentCriteriaBase,
-  republish: z.boolean().optional(),
   includePdfBuffer: z.boolean().optional(),
 });
 
@@ -48,7 +47,6 @@ type CoreRenderArgs = {
   tenant: TenantContext;
   writer: StreamWriterLike | undefined;
   input: z.infer<typeof reportPdfInputSchema>;
-  republish?: boolean;
 };
 
 type CoreRenderResult = {
@@ -73,7 +71,7 @@ async function readPdfBuffer(
 }
 
 async function renderAndWriteResultPdf(args: CoreRenderArgs): Promise<CoreRenderResult> {
-  const { tenant, writer, input, republish } = args;
+  const { tenant, writer, input } = args;
 
   const examTypeId = input.examTypeId ?? tenant.examTypeId;
   if (examTypeId === null || examTypeId === undefined) {
@@ -149,15 +147,13 @@ async function renderAndWriteResultPdf(args: CoreRenderArgs): Promise<CoreRender
   const storagePath = marksheetPdfPath(student.studentId, student.admissionNo, student.fullName, examTypeId);
   const fs = await resolveFilesystem(resolvedTenant);
 
-  if (!republish) {
-    await emitPdfPart(writer, undefined, artifactId, {
-      status: "processing",
-      data: "",
-      title,
-      id: artifactId,
-      storagePath,
-    });
-  }
+  await emitPdfPart(writer, undefined, artifactId, {
+    status: "processing",
+    data: "",
+    title,
+    id: artifactId,
+    storagePath,
+  });
 
   const assessment = await createAssessmentServiceForRequest(resolvedTenant);
   const fullResult = await assessment.getStudentResult({
@@ -221,16 +217,14 @@ async function renderAndWriteResultPdf(args: CoreRenderArgs): Promise<CoreRender
   const token = base64url(JSON.stringify({ studentId: student.studentId, examTypeId }));
   const previewUrl = `/api/results/${token}`;
 
-  if (!republish) {
-    await emitPdfPart(writer, undefined, artifactId, {
-      status: "success",
-      data: previewUrl,
-      title,
-      id: artifactId,
-      storagePath,
-      previewUrl,
-    });
-  }
+  await emitPdfPart(writer, undefined, artifactId, {
+    status: "success",
+    data: previewUrl,
+    title,
+    id: artifactId,
+    storagePath,
+    previewUrl,
+  });
 
   const result: CoreRenderResult = {
     ok: true,
@@ -263,7 +257,6 @@ export const generateResultPdfTool = createTool({
       ? { threadId, resourceId }
       : undefined;
 
-    const republish = input.republish === true;
     const examTypeId = input.examTypeId ?? tenant.examTypeId;
     const previewTitle = sanitizeForFilename(input.fullName ?? "student");
     const provisionalArtifactId = `pdf-${input.studentId ?? input.admissionNo ?? 0}-${examTypeId ?? 0}`;
@@ -274,7 +267,6 @@ export const generateResultPdfTool = createTool({
         tenant,
         writer,
         input,
-        republish,
       });
       return {
         artifactId: rendered.artifactId,

@@ -30,7 +30,11 @@ export const GET: RequestHandler = async ({ url, locals, cookies }) => {
 
     const manifest = await readManifest(tenant, examTypeId);
     const entry = manifest.entries[filePath];
-    if (!entry) throw error(404, "Entry not found in manifest");
+    if (!entry) throw error(404, "Entry not found in manifest — has the marksheet been saved?");
+
+    if (!filePath.includes("marksheets/") || !filePath.endsWith(".md")) {
+      throw error(400, "filePath must reference a marksheet (.md) file in the marksheets/ directory");
+    }
 
     if (!entry.studentId) throw error(400, "Entry has no studentId");
 

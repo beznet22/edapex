@@ -23,7 +23,6 @@ import { type MemoryContext } from "$lib/server/mastra/utils/chat-utils";
 
 const reportPdfInputSchema = z.object({
   ...studentCriteriaBase,
-  republish: z.boolean().optional(),
 });
 
 const reportPdfOutputSchema = z.object({
@@ -40,7 +39,6 @@ type CoreRenderArgs = {
   tenant: TenantContext;
   writer: StreamWriterLike | undefined;
   input: z.infer<typeof reportPdfInputSchema>;
-  republish?: boolean;
 };
 
 type CoreRenderResult = {
@@ -54,7 +52,7 @@ type CoreRenderResult = {
 };
 
 async function renderAndWriteTranscriptPdf(args: CoreRenderArgs): Promise<CoreRenderResult> {
-  const { tenant, writer, input, republish } = args;
+  const { tenant, writer, input } = args;
 
   const academicId = input.academicId ?? tenant.academicId;
   if (academicId === null || academicId === undefined) {
@@ -86,15 +84,13 @@ async function renderAndWriteTranscriptPdf(args: CoreRenderArgs): Promise<CoreRe
 
   const fs = await resolveFilesystem(tenant);
 
-  if (!republish) {
-    await emitPdfPart(writer, undefined, artifactId, {
-      status: "processing",
-      data: "",
-      title,
-      id: artifactId,
-      storagePath,
-    });
-  }
+  await emitPdfPart(writer, undefined, artifactId, {
+    status: "processing",
+    data: "",
+    title,
+    id: artifactId,
+    storagePath,
+  });
 
   const assessment = await createAssessmentServiceForRequest(tenant);
   const transcript = await assessment.getTranscript({
@@ -153,16 +149,14 @@ async function renderAndWriteTranscriptPdf(args: CoreRenderArgs): Promise<CoreRe
   const token = base64url(JSON.stringify(tokenPayload));
   const previewUrl = `/api/results/${token}`;
 
-  if (!republish) {
-    await emitPdfPart(writer, undefined, artifactId, {
-      status: "success",
-      data: previewUrl,
-      title,
-      id: artifactId,
-      storagePath,
-      previewUrl,
-    });
-  }
+  await emitPdfPart(writer, undefined, artifactId, {
+    status: "success",
+    data: previewUrl,
+    title,
+    id: artifactId,
+    storagePath,
+    previewUrl,
+  });
 
   return {
     ok: true,
@@ -191,7 +185,6 @@ export const generateTranscriptPdfTool = createTool({
       ? { threadId, resourceId }
       : undefined;
 
-    const republish = input.republish === true;
     const academicId = input.academicId ?? tenant.academicId;
     const previewTitle = sanitizeForFilename(input.fullName ?? "student");
     const provisionalArtifactId = `pdf-transcript-${input.studentId ?? input.admissionNo ?? 0}-${academicId ?? 0}`;
@@ -202,7 +195,6 @@ export const generateTranscriptPdfTool = createTool({
         tenant,
         writer,
         input,
-        republish,
       });
       return {
         artifactId: rendered.artifactId,

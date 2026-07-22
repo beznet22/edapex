@@ -304,7 +304,6 @@ export const POST: RequestHandler = async ({ request, locals, cookies }) => {
         classId: tenant.classId ?? undefined,
         sectionId: tenant.sectionId ?? undefined,
         examTypeId: tenant.examTypeId ?? undefined,
-        republish: true,
         includePdfBuffer: body.includePdfBuffer ?? false,
       },
       { requestContext: requestContext as never } as never,

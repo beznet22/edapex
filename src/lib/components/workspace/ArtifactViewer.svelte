@@ -4,6 +4,7 @@
 	import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
 	import * as Tooltip from "$lib/components/ui/tooltip";
 	import * as AlertDialog from "$lib/components/ui/alert-dialog";
+	import * as Dialog from "$lib/components/ui/dialog";
 	import { ScrollArea } from "$lib/components/ui/scroll-area";
 	import { cn } from "$lib/utils/shadcn";
 	import FileIcon from "@lucide/svelte/icons/file";
@@ -712,6 +713,10 @@
 			import("svelte-sonner").then((m) => m.toast.error("Cannot publish: missing file path or exam type"));
 			return;
 		}
+		if (!isMarksheetFile) {
+			import("svelte-sonner").then((m) => m.toast.error("Cannot publish: selected file is not a marksheet"));
+			return;
+		}
 		setGlobalProgress(true);
 		commitBeforePdf().then(commitError => {
 			if (commitError) {
@@ -729,7 +734,10 @@
 					if (data.status === "published") {
 						import("svelte-sonner").then((m) => m.toast.success(`Result published to ${data.parentEmail}`));
 					} else if (data.status === "skipped_already_published") {
-						import("svelte-sonner").then((m) => m.toast.info(`Result already published to ${data.parentEmail}`));
+						setGlobalProgress(false);
+						resendData = { filePath, examTypeId: computedExamTypeId!, parentEmail: data.parentEmail };
+						resendDialogOpen = true;
+						return;
 					} else {
 						import("svelte-sonner").then((m) => m.toast.error(data.error ?? "Publish failed"));
 					}
@@ -802,6 +810,34 @@
 	}
 
 	let deleteOpen = $state(false);
+
+	let resendDialogOpen = $state(false);
+	let resendData = $state<{ filePath: string; examTypeId: number; parentEmail: string } | null>(null);
+
+	async function handleResendConfirm() {
+		if (!resendData) return;
+		resendDialogOpen = false;
+		setGlobalProgress(true);
+		const params = new URLSearchParams({
+			filePath: resendData.filePath,
+			examTypeId: String(resendData.examTypeId),
+			resend: "true",
+		});
+		try {
+			const r = await fetch(`/api/publish?${params}`);
+			const data = await r.json();
+			if (data.status === "published") {
+				import("svelte-sonner").then((m) => m.toast.success(`Result published to ${data.parentEmail}`));
+			} else {
+				import("svelte-sonner").then((m) => m.toast.error(data.error ?? "Publish failed"));
+			}
+		} catch (e) {
+			import("svelte-sonner").then((m) => m.toast.error(e instanceof Error ? e.message : "Publish failed"));
+		} finally {
+			setGlobalProgress(false);
+			resendData = null;
+		}
+	}
 
 	async function handleDelete() {
 		if (!current?.url) return;
@@ -1210,7 +1246,7 @@
 							editorMode="wysiwyg"
 							filename={current.url?.split("/").pop() ?? current.title}
 							url={current.url ?? ""}
-							saveUrl={current.saveUrl ?? current.url}
+							saveUrl={`${current.saveUrl ?? current.url}?examTypeId=${computedExamTypeId}`}
 							content={current.content ?? ""}
 							type="text"
 							streaming={isStreaming}
@@ -1280,6 +1316,37 @@
 		{/if}
 	</div>
 </div>
+
+<Dialog.Root bind:open={resendDialogOpen}>
+	<Dialog.Content class="sm:max-w-md p-0 gap-0 overflow-hidden [&>button]:hidden" showCloseButton={false}>
+		<div class="p-6 sm:p-8">
+			<div class="mx-auto flex size-12 sm:size-14 items-center justify-center rounded-full bg-primary/10 gold-glow mb-4 sm:mb-5 shrink-0">
+				<SendIcon class="size-5 sm:size-6 text-primary" />
+			</div>
+			<Dialog.Header class="text-center sm:text-center gap-1.5">
+				<Dialog.Title class="text-base sm:text-lg font-semibold">Already Published</Dialog.Title>
+				<Dialog.Description class="text-sm text-muted-foreground leading-relaxed">
+					This result was already sent to
+					<span class="font-medium text-foreground">{resendData?.parentEmail ?? "the parent"}</span>.
+					Would you like to send it again?
+				</Dialog.Description>
+			</Dialog.Header>
+		</div>
+		<Dialog.Footer class="px-6 sm:px-8 pb-6 sm:pb-8 pt-0 sm:pt-0 flex-col-reverse sm:flex-row gap-2.5">
+			<button
+				onclick={() => { resendDialogOpen = false; resendData = null; }}
+				class="flex-1 sm:flex-none inline-flex items-center justify-center rounded-lg border border-border bg-background px-4 py-2.5 text-sm font-medium text-foreground shadow-sm transition-all duration-200 hover:bg-muted hover:border-border/80 active:scale-[0.98]"
+			>Cancel</button>
+			<button
+				onclick={handleResendConfirm}
+				class="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground shadow-sm transition-all duration-200 hover:brightness-110 active:scale-[0.98] gold-glow"
+			>
+				<SendIcon class="size-3.5" />
+				Send Again
+			</button>
+		</Dialog.Footer>
+	</Dialog.Content>
+</Dialog.Root>
 
 <AlertDialog.Root bind:open={deleteOpen}>
 	<AlertDialog.Content>
