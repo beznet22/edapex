@@ -108,9 +108,9 @@ export const POST: RequestHandler = async ({ request, locals, cookies }) => {
 
   if (kind === "studentPhoto") {
     if (!studentId) error(400, "studentId required for studentPhoto kind");
-    const relativePath = `public/uploads/students/${contentHash}.${ext}`;
+    const relativePath = `uploads/students/${contentHash}.${ext}`;
     const fullPath = join(STATIC_DIR, relativePath);
-    mkdirSync(join(STATIC_DIR, "public/uploads/students"), { recursive: true });
+    mkdirSync(join(STATIC_DIR, "uploads/students"), { recursive: true });
     writeFileSync(fullPath, buffer);
     const photoUrl = `/uploads/students/${contentHash}.${ext}`;
     await db

@@ -163,27 +163,27 @@ async function renderAndWriteResultPdf(args: CoreRenderArgs): Promise<CoreRender
     withImages: true,
   });
 
-	if (!fullResult) {
-		throw new Error(
-			`MARKSHEET_NOT_FOUND: no marksheet data for studentId=${student.studentId}, examId=${examTypeId}`,
-		);
-	}
+  if (!fullResult) {
+    throw new Error(
+      `MARKSHEET_NOT_FOUND: no marksheet data for studentId=${student.studentId}, examId=${examTypeId}`,
+    );
+  }
 
-	// Pad missing records so the PDF includes all assigned subjects,
-	// even if the commit didn't create records for recently-added subjects
-	let validated: Marksheet;
-	if (resolvedTenant.classId != null && resolvedTenant.sectionId != null) {
-		try {
-			const assigned = await assessment.getAssignedSubjects(resolvedTenant.classId, resolvedTenant.sectionId);
-			const padded = padMissingRecords(fullResult as Marksheet, assigned);
-			validated = await marksheetSchema.parseAsync(padded);
-		} catch {
-			validated = await marksheetSchema.parseAsync(fullResult);
-		}
-	} else {
-		validated = await marksheetSchema.parseAsync(fullResult);
-	}
-	const { body, head } = render(ResultTemplate, { props: { data: validated } });
+  // Pad missing records so the PDF includes all assigned subjects,
+  // even if the commit didn't create records for recently-added subjects
+  let validated: Marksheet;
+  if (resolvedTenant.classId != null && resolvedTenant.sectionId != null) {
+    try {
+      const assigned = await assessment.getAssignedSubjects(resolvedTenant.classId, resolvedTenant.sectionId);
+      const padded = padMissingRecords(fullResult as Marksheet, assigned);
+      validated = await marksheetSchema.parseAsync(padded);
+    } catch {
+      validated = await marksheetSchema.parseAsync(fullResult);
+    }
+  } else {
+    validated = await marksheetSchema.parseAsync(fullResult);
+  }
+  const { body, head } = render(ResultTemplate, { props: { data: validated } });
   const html = pageToHtml(body, head);
   const fileBase = `res_${sanitizeForFilename(fullName)}_a${student.admissionNo ?? 0}_e${examTypeId}_${Date.now()}`;
 
