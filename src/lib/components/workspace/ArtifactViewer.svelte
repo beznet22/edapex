@@ -1028,62 +1028,51 @@
 	<div class="h-full relative group">
 		{#if viewMode === "validation"}
 			<ScrollArea class="h-full w-full">
-				<div class="p-6 max-w-3xl mx-auto space-y-4">
+				<div class="p-4 sm:p-6 max-w-lg mx-auto space-y-4 animate-in fade-in duration-300">
 					{#if aiFixing}
-						<div class="flex items-center gap-3 text-muted-foreground py-16 justify-center">
-							<Spinner class="size-5" />
-							<span class="text-sm">Analyzing marksheet…</span>
+						<div class="flex flex-col items-center gap-4 py-20 text-muted-foreground">
+							<div class="size-10 rounded-full border-2 border-primary border-t-transparent animate-spin gold-glow" />
+							<div class="text-center space-y-1">
+								<p class="text-sm font-semibold">Analyzing marksheet</p>
+								<p class="text-xs text-muted-foreground/60">Running diagnostic checks…</p>
+							</div>
 						</div>
-					{:else}
-					<div class="flex items-center gap-2">
-						{#if validationStatus === 'invalid'}
-							<AlertCircleIcon class="size-5 text-red-500" />
-							<h2 class="text-base font-semibold">
-								Validation Errors ({validationState.errorCount})
+					{:else if validationState.errorCount > 0 || llmAdvice}
+						<div class="flex items-center gap-3 pb-1">
+							<span class="size-2 rounded-full bg-destructive pop-once" />
+							<h2 class="text-sm font-semibold text-foreground">
+								{validationState.errorCount} validation error{validationState.errorCount === 1 ? '' : 's'}
 							</h2>
-						{:else}
-							<AlertCircleIcon class="size-5 text-amber-500" />
-							<h2 class="text-base font-semibold">Not Yet Validated</h2>
-						{/if}
-					</div>
-					{#if validationStatus === 'invalid'}
-						<p class="text-sm text-muted-foreground">
-							Fix the issues below in the editor, then save — validation runs on every save.
-						</p>
-						<ul class="space-y-2">
-							{#each validationState.errors as error}
-								<li class="text-xs text-red-600 bg-red-50 px-3 py-2 rounded">
-									{error}
-								</li>
-							{/each}
-						</ul>
+						</div>
 						{#if llmAdvice}
-							<div class="mt-4 p-3 rounded-lg bg-blue-50 border border-blue-200">
-								<p class="text-xs font-semibold text-blue-800 mb-1">
-									AI Diagnostic Advice
-								</p>
-								<p class="text-xs text-blue-700 leading-relaxed whitespace-pre-wrap">
-									{llmAdvice}
-								</p>
+							<div class="p-4 rounded-xl bg-primary/5 border border-primary/10 shadow-sm transition-spring">
+								<p class="text-xs font-semibold text-primary uppercase tracking-wider mb-3">AI Diagnosis</p>
+								<div class="prose prose-sm max-w-none text-foreground/85 leading-relaxed [&_p]:mb-1.5">
+									<Markdown content={llmAdvice} />
+								</div>
 							</div>
 						{/if}
-					{:else}
-						<p class="text-sm text-muted-foreground">
-							This marksheet hasn't been validated yet. Open the editor and save the file —
-							validation runs automatically on every save.
-						</p>
-						<p class="text-sm text-muted-foreground">
-							Validation runs against the schema for this class category (e.g. NURSERY expects 5
-							subject records). Any structural mismatch surfaces here so you can fix it before
-							generating the PDF.
-						</p>
-					{/if}
-					<button
-						onclick={() => (viewMode = 'markdown')}
-						class="text-xs text-muted-foreground hover:text-foreground underline"
-					>
-						← Back to editor
-					</button>
+						<details class="group">
+							<summary class="flex items-center gap-1.5 text-xs font-medium text-muted-foreground cursor-pointer hover:text-foreground transition-colors select-none py-1.5 list-none">
+								<svg class="size-3.5 transition-transform duration-200 group-open:rotate-90" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+									<path d="M9 18l6-6-6-6" />
+								</svg>
+								Raw validation errors
+							</summary>
+							<div class="mt-2 space-y-1.5 transition-spring">
+								<ul class="space-y-1">
+									{#each validationState.errors as error}
+										<li class="text-[11px] font-mono text-destructive/80 bg-destructive/5 px-3 py-2 rounded-lg border border-destructive/10 leading-relaxed">{error}</li>
+									{/each}
+								</ul>
+							</div>
+						</details>
+						<button
+							onclick={() => (viewMode = 'markdown')}
+							class="text-xs text-muted-foreground/60 hover:text-foreground transition-colors underline underline-offset-2"
+						>
+							← Back to editor
+						</button>
 					{/if}
 				</div>
 			</ScrollArea>

@@ -335,8 +335,8 @@ export const POST: RequestHandler = async ({ params, url, request, locals, cooki
           model: resolved.config as never,
         });
         llmAdvice = result.text;
-      } catch (err) {
-        llmAdvice = `Diagnostic LLM unavailable: ${err instanceof Error ? err.message : String(err)}`;
+      } catch {
+        llmAdvice = '';
       }
 
       await updateEntry(tenant, params.path!, {
