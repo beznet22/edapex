@@ -122,84 +122,69 @@ async function ensureTranscriptPdf(args: RenderArgs): Promise<RenderResult> {
   const artifactId = `pdf-transcript-${student.studentId}-${academicId}`;
   const storagePath = transcriptPdfPath(student.studentId, tenant.examTypeId);
   const fsHandle = await resolveFilesystem(tenant);
-  const pdfExists = await fsHandle.exists(storagePath);
 
   let previewUrl = "";
   let pdfBytes: Buffer = Buffer.alloc(0);
 
-  if (!pdfExists || input.forceRegenerate) {
-    await emitNotification(
-      writer,
-      undefined,
-      input.forceRegenerate
-        ? "Re-rendering transcript PDF (forceRegenerate=true)…"
-        : "Transcript PDF not found; rendering now…",
-      "info",
-    );
-    const inner = generateTranscriptPdfTool.execute;
-    if (typeof inner !== "function") {
-      throw new Error("INNER_TOOL_UNAVAILABLE: generateTranscriptPdfTool.execute is not bound");
-    }
-    const generateInput = {
-      schoolId: input.schoolId,
-      academicId,
-      classId: input.classId,
-      sectionId: input.sectionId,
-      studentId: student.studentId,
-      admissionNo: undefined,
-      fullName: undefined,
-      partialName: undefined,
-      republish: true,
-    };
-    type InnerOutput =
-      | {
-        artifactId: string;
-        kind: "pdf";
-        status: "success";
-        title?: string;
-        storagePath?: string;
-        previewUrl?: string;
-      }
-      | {
-        artifactId: string;
-        kind: "pdf";
-        status: "error";
-        title?: string;
-        error?: string;
-      };
-    type InnerInput = {
-      schoolId?: number;
-      academicId?: number;
-      classId?: number;
-      sectionId?: number;
-      studentId?: number;
-      admissionNo?: number;
-      fullName?: string;
-      partialName?: string;
-      republish?: boolean;
-    };
-    const innerResultRaw: unknown = await (inner as (
-      input: InnerInput,
-      ctx: never,
-    ) => Promise<unknown>)(generateInput, args.ctx as never);
-    if (isValidationError(innerResultRaw)) {
-      throw new Error(innerResultRaw.message || "Transcript PDF regeneration failed validation");
-    }
-    const innerResult = innerResultRaw as InnerOutput;
-    if (innerResult.status !== "success") {
-      const errMsg =
-        typeof innerResult.error === "string"
-          ? innerResult.error
-          : "Transcript PDF regeneration failed";
-      throw new Error(errMsg);
-    }
-    previewUrl = innerResult.previewUrl ?? "";
-  } else {
-    const token = base64url(
-      JSON.stringify({ studentId: student.studentId, academicId, kind: "transcript" as const }),
-    );
-    previewUrl = `/api/results/${token}`;
+  await emitNotification(writer, undefined, "Rendering transcript PDF…", "info");
+  const inner = generateTranscriptPdfTool.execute;
+  if (typeof inner !== "function") {
+    throw new Error("INNER_TOOL_UNAVAILABLE: generateTranscriptPdfTool.execute is not bound");
   }
+  const generateInput = {
+    schoolId: input.schoolId,
+    academicId,
+    classId: input.classId,
+    sectionId: input.sectionId,
+    studentId: student.studentId,
+    admissionNo: undefined,
+    fullName: undefined,
+    partialName: undefined,
+    republish: true,
+  };
+  type InnerOutput =
+    | {
+      artifactId: string;
+      kind: "pdf";
+      status: "success";
+      title?: string;
+      storagePath?: string;
+      previewUrl?: string;
+    }
+    | {
+      artifactId: string;
+      kind: "pdf";
+      status: "error";
+      title?: string;
+      error?: string;
+    };
+  type InnerInput = {
+    schoolId?: number;
+    academicId?: number;
+    classId?: number;
+    sectionId?: number;
+    studentId?: number;
+    admissionNo?: number;
+    fullName?: string;
+    partialName?: string;
+    republish?: boolean;
+  };
+  const innerResultRaw: unknown = await (inner as (
+    input: InnerInput,
+    ctx: never,
+  ) => Promise<unknown>)(generateInput, args.ctx as never);
+  if (isValidationError(innerResultRaw)) {
+    throw new Error(innerResultRaw.message || "Transcript PDF regeneration failed validation");
+  }
+  const innerResult = innerResultRaw as InnerOutput;
+  if (innerResult.status !== "success") {
+    const errMsg =
+      typeof innerResult.error === "string"
+        ? innerResult.error
+        : "Transcript PDF regeneration failed";
+    throw new Error(errMsg);
+  }
+  previewUrl = innerResult.previewUrl ?? "";
 
   const readResult = await fsHandle.readFile(storagePath);
   pdfBytes = Buffer.isBuffer(readResult)
@@ -233,7 +218,7 @@ const reportPdfPublishInputSchema = z.object({
   admissionNo: z.number().optional(),
   fullName: z.string().optional(),
   partialName: z.string().optional(),
-  forceRegenerate: z.boolean().optional(),
+
   confirmed: z.boolean().optional(),
   confirmationToken: z.string().optional(),
   reason: z.string().describe("Human-readable action summary for user approval."),

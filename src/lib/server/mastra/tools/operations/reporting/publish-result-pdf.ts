@@ -50,7 +50,6 @@ const reportPdfInputSchema = z.object({
 
 const reportPdfPublishInputSchema = z.object({
   ...studentCriteriaBase,
-  forceRegenerate: z.boolean().optional(),
   resend: z.boolean().optional().describe('Skip the already-sent check and resend the email.'),
 });
 
@@ -79,58 +78,37 @@ async function ensureResultPdf(
   storagePath: string,
   ctx: unknown,
 ): Promise<{ artifactId: string; title: string; storagePath: string; previewUrl: string; regenerated: boolean }> {
-  const fs = await resolveFilesystem(tenant);
-  const pdfExists = await fs.exists(storagePath);
-
-  let regenerated = false;
-  let previewUrl = "";
-
-  if (!pdfExists || input.forceRegenerate) {
-    await emitNotification(
-      writer,
-      undefined,
-      input.forceRegenerate
-        ? "Re-rendering PDF (forceRegenerate=true)…"
-        : "PDF not found; rendering now…",
-      "info",
-    );
-    const generateInput = {
-      schoolId: input.schoolId,
-      academicYear: input.academicYear,
-      examTypeId,
-      classId: input.classId,
-      sectionId: input.sectionId,
-      studentId: student.studentId,
-      admissionNo: undefined,
-      fullName: undefined,
-      partialName: undefined,
-      republish: true,
-    } satisfies z.infer<typeof reportPdfInputSchema>;
-    const inner = generateResultPdfTool.execute;
-    if (typeof inner !== "function") {
-      throw new Error("INNER_TOOL_UNAVAILABLE: generateResultPdfTool.execute is not bound");
-    }
-    const innerResult = await inner(generateInput, ctx as never);
-    if (isValidationError(innerResult)) {
-      throw new Error(innerResult.message || "PDF regeneration failed validation");
-    }
-    if (innerResult.status !== "success") {
-      const errMsg =
-        typeof innerResult.error === "string"
-          ? innerResult.error
-          : "PDF regeneration failed";
-      throw new Error(errMsg);
-    }
-    regenerated = true;
-    previewUrl = innerResult.previewUrl ?? "";
-  } else {
-    const token = base64url(
-      JSON.stringify({ studentId: student.studentId, examTypeId }),
-    );
-    previewUrl = `/api/results/${token}`;
+  await emitNotification(writer, undefined, "Rendering PDF…", "info");
+  const generateInput = {
+    schoolId: input.schoolId,
+    academicYear: input.academicYear,
+    examTypeId,
+    classId: input.classId,
+    sectionId: input.sectionId,
+    studentId: student.studentId,
+    admissionNo: undefined,
+    fullName: undefined,
+    partialName: undefined,
+    republish: true,
+  } satisfies z.infer<typeof reportPdfInputSchema>;
+  const inner = generateResultPdfTool.execute;
+  if (typeof inner !== "function") {
+    throw new Error("INNER_TOOL_UNAVAILABLE: generateResultPdfTool.execute is not bound");
   }
+  const innerResult = await inner(generateInput, ctx as never);
+  if (isValidationError(innerResult)) {
+    throw new Error(innerResult.message || "PDF regeneration failed validation");
+  }
+  if (innerResult.status !== "success") {
+    const errMsg =
+      typeof innerResult.error === "string"
+        ? innerResult.error
+        : "PDF regeneration failed";
+    throw new Error(errMsg);
+  }
+  const previewUrl = innerResult.previewUrl ?? "";
 
-  return { artifactId, title, storagePath, previewUrl, regenerated };
+  return { artifactId, title, storagePath, previewUrl, regenerated: true };
 }
 
 export const publishResultPdfTool = createTool({

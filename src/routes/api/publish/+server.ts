@@ -18,7 +18,6 @@ export const GET: RequestHandler = async ({ url, locals, cookies }) => {
     if (!Number.isFinite(examTypeId)) throw error(400, "Invalid examTypeId");
 
     const resend = url.searchParams.get("resend") === "true";
-    const regenerate = url.searchParams.get("regenerate") === "true";
 
     const { tenant, requestContext } = await resolveTenantWorkspace({
       schoolId: locals.user.schoolId ?? 1,
@@ -48,7 +47,7 @@ export const GET: RequestHandler = async ({ url, locals, cookies }) => {
         admissionNo: entry.admissionNo ?? undefined,
         examTypeId,
         academicId: entry.academicId ?? undefined,
-        forceRegenerate: regenerate,
+
         resend,
       },
       { requestContext: requestContext as never } as never,

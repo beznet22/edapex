@@ -149,8 +149,6 @@ async function renderAndWriteResultPdf(args: CoreRenderArgs): Promise<CoreRender
   const storagePath = marksheetPdfPath(student.studentId, student.admissionNo, student.fullName, examTypeId);
   const fs = await resolveFilesystem(resolvedTenant);
 
-  const pdfExists = await fs.exists(storagePath);
-
   if (!republish) {
     await emitPdfPart(writer, undefined, artifactId, {
       status: "processing",
@@ -161,39 +159,12 @@ async function renderAndWriteResultPdf(args: CoreRenderArgs): Promise<CoreRender
     });
   }
 
-  if (pdfExists && !input.republish) {
-    const token = base64url(JSON.stringify({ studentId: student.studentId, examTypeId }));
-    const previewUrl = `/api/results/${token}`;
-    if (!republish) {
-      await emitPdfPart(writer, undefined, artifactId, {
-        status: "success",
-        data: previewUrl,
-        title,
-        id: artifactId,
-        storagePath,
-        previewUrl,
-      });
-    }
-    const result: CoreRenderResult = {
-      ok: true,
-      artifactId,
-      title,
-      storagePath,
-      previewUrl,
-      pdfExists: true,
-    };
-    if (input.includePdfBuffer === true) {
-      result.pdfBuffer = await readPdfBuffer(fs, storagePath);
-    }
-    return result;
-  }
-
   const assessment = await createAssessmentServiceForRequest(resolvedTenant);
   const fullResult = await assessment.getStudentResult({
     id: student.studentId,
     examId: examTypeId,
     isAdminNo: false,
-    withImages: false,
+    withImages: true,
   });
 
 	if (!fullResult) {

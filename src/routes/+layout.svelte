@@ -8,6 +8,7 @@
   import SettingsModal from "$lib/components/settings/index.svelte";
   import { onMount } from "svelte";
   import { toast } from "svelte-sonner";
+  import { isActive } from "$lib/state/global-context.svelte";
 
   let { children } = $props();
 
@@ -47,6 +48,21 @@
   <PWAInstallPrompt />
   <Toaster position="bottom-right" />
   <SettingsModal />
+  {#if isActive()}
+    <div class="fixed top-0 left-0 w-full h-0.5 z-[9999] overflow-hidden bg-primary/20">
+      <div class="h-full w-2/5 bg-primary progress-indeterminate" />
+    </div>
+  {/if}
   {@render children()}
 </ThemeProvider>
+
+<style>
+  @keyframes progress-indeterminate {
+    from { transform: translateX(-100%); }
+    to { transform: translateX(400%); }
+  }
+  .progress-indeterminate {
+    animation: progress-indeterminate 3s ease-in-out infinite;
+  }
+</style>
 

@@ -186,7 +186,7 @@ export class AssessmentPublisherService {
           }
         }
 
-        const marksheet = await this.assessmentService.getStudentResult({ id: studentId, examId });
+        const marksheet = await this.assessmentService.getStudentResult({ id: studentId, examId, withImages: true });
         if (!marksheet) {
           processingErrors.push(`Student ${studentId}: Result validation failed`);
           return null;
@@ -277,7 +277,7 @@ export class AssessmentPublisherService {
           secure: Number(env.SMTP_PORT || 587) === 465,
           auth: { user: env.SMTP_USER || "", pass: env.SMTP_PASS || "" },
         });
-        const result = await smtp.from(message.from).to(message.to).subject(message.subject).html(message.html).send();
+        const result = await smtp.from(message.from).to(message.to).subject(message.subject).html(message.html).attachments(message.attachments).send();
         if (!result.success) {
           emailErrors.push(result.message);
           continue;

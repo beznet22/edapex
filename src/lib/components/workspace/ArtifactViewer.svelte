@@ -36,6 +36,7 @@
 	import RefreshCwIcon from "@lucide/svelte/icons/refresh-cw";
 	import { autoFixStructure } from "$lib/utils/marksheet-ast-parser";
 	import { patchFile } from "$lib/state/manifest-patches.svelte";
+	import { setActive as setGlobalProgress } from "$lib/state/global-context.svelte";
 
 	let {
 		artifacts,
@@ -705,91 +706,39 @@
 		}
 	}
 
-	let publishDialogOpen = $state(false);
-	let publishState = $state<{
-		parentName: string;
-		parentEmail: string;
-		studentName: string;
-		loading: boolean;
-		loadingText: string;
-	} | null>(null);
-
 	function handlePublishClick() {
-		if (!toolOutput?.parentName && !toolOutput?.parentEmail) {
-			import("svelte-sonner").then((m) =>
-				m.toast.error(
-					"No parent contact info available for this student",
-				),
-			);
+		const filePath = current?.url?.replace(/^\/api\/file\//, "");
+		if (!filePath || !computedExamTypeId) {
+			import("svelte-sonner").then((m) => m.toast.error("Cannot publish: missing file path or exam type"));
 			return;
 		}
-		publishState = {
-			parentName: toolOutput?.parentName ?? "Parent/Guardian",
-			parentEmail: toolOutput?.parentEmail ?? "",
-			studentName:
-				toolOutput?.studentFullName ??
-				toolOutput?.validatedTitle ??
-				"Student",
-			loading: false,
-			loadingText: "",
-		};
-		publishDialogOpen = true;
-	}
-
-	async function handlePublishConfirm() {
-		if (!toolOutput?.examTypeId) return;
-		if (!persistedMarkdownPath) return;
-		if (!publishState) return;
-
-		const commitError = await commitBeforePdf();
-		if (commitError) {
-			publishDialogOpen = false;
-			import("svelte-sonner").then((m) =>
-				m.toast.error(`Cannot publish: ${commitError}`),
-			);
-			return;
-		}
-
-		publishState.loading = true;
-		publishState.loadingText = "Generating PDF...";
-
-		try {
+		setGlobalProgress(true);
+		commitBeforePdf().then(commitError => {
+			if (commitError) {
+				setGlobalProgress(false);
+				import("svelte-sonner").then((m) => m.toast.error(`Cannot publish: ${commitError}`));
+				return;
+			}
 			const params = new URLSearchParams({
-				filePath: persistedMarkdownPath,
-				examTypeId: String(toolOutput.examTypeId),
+				filePath,
+				examTypeId: String(computedExamTypeId),
 			});
-			const res = await fetch(`/api/publish?${params}`);
-			if (!res.ok) throw new Error(`HTTP ${res.status}`);
-			const data = await res.json();
-			publishDialogOpen = false;
-			if (data.status === "published") {
-				import("svelte-sonner").then((m) =>
-					m.toast.success(`Result published to ${data.parentEmail}`),
-				);
-			} else if (data.status === "skipped_already_published") {
-				import("svelte-sonner").then((m) =>
-					m.toast.info(
-						`Result already published to ${data.parentEmail}`,
-					),
-				);
-			} else {
-				import("svelte-sonner").then((m) =>
-					m.toast.error(data.error ?? "Publish failed"),
-				);
-			}
-		} catch (e) {
-			publishDialogOpen = false;
-			import("svelte-sonner").then((m) =>
-				m.toast.error(
-					e instanceof Error ? e.message : "Publish failed",
-				),
-			);
-		} finally {
-			if (publishState) {
-				publishState.loading = false;
-				publishState.loadingText = "";
-			}
-		}
+			fetch(`/api/publish?${params}`)
+				.then(r => r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)))
+				.then(data => {
+					if (data.status === "published") {
+						import("svelte-sonner").then((m) => m.toast.success(`Result published to ${data.parentEmail}`));
+					} else if (data.status === "skipped_already_published") {
+						import("svelte-sonner").then((m) => m.toast.info(`Result already published to ${data.parentEmail}`));
+					} else {
+						import("svelte-sonner").then((m) => m.toast.error(data.error ?? "Publish failed"));
+					}
+				})
+				.catch((e) => {
+					import("svelte-sonner").then((m) => m.toast.error(e instanceof Error ? e.message : "Publish failed"));
+				})
+				.finally(() => setGlobalProgress(false));
+		});
 	}
 
 	function handleDownloadRaw() {
@@ -1203,65 +1152,6 @@
 					/>
 				</div>
 			</ScrollArea>
-		{:else if persistedMarkdownPath}
-			<div class="relative group">
-				<ScrollArea class="h-full w-full">
-					<div
-						class="flex flex-col p-6 max-w-3xl mx-auto relative pb-20"
-					>
-						<EditorCanvas
-							bind:this={editorRef}
-							editorMode="wysiwyg"
-							filename={persistedMarkdownPath.split("/").pop() ??
-								displayTitle}
-							title={displayTitle}
-							url={`/api/file/${persistedMarkdownPath}`}
-							saveUrl={`/api/file/${persistedMarkdownPath}`}
-							content={entry?.content ?? ""}
-							type="text"
-							streaming={isStreaming}
-							{user}
-							artifactId={toolOutput?.artifactId ?? ""}
-							bind:validationState
-							examTypeId={computedExamTypeId}
-						/>
-					</div>
-				</ScrollArea>
-				{#if isMarksheetFile}
-					<div
-						class="fixed bottom-[calc(1.5rem+env(safe-area-inset-bottom))] right-4 sm:right-6 z-50 opacity-100 scale-100 md:opacity-0 md:scale-95 md:group-hover:opacity-100 md:group-hover:scale-100 transition-all duration-500 ease-out"
-					>
-						<button
-							onclick={handlePillClick}
-							disabled={aiFixing || !computedExamTypeId}
-							class="flex items-center gap-1.5 min-h-12 px-3 sm:min-h-0 sm:py-1.5 rounded-full shadow-lg border border-white/20 text-white text-xs font-medium transition-all duration-200 hover:scale-105 active:scale-95 {pillClasses[validationStatus]}"
-						>
-							{#if aiFixing}
-								<RefreshCwIcon class="size-3.5 animate-spin" />
-								Fixing...
-							{:else if validationStatus === 'invalid'}
-								<AlertCircleIcon class="size-3.5" />
-								{validationState.errorCount} error{validationState.errorCount ===
-								1
-									? ""
-									: "s"}
-							{:else if validationStatus === 'valid'}
-								<CheckIcon class="size-3.5" />
-								Valid
-							{:else if validationStatus === 'warning'}
-								<AlertCircleIcon class="size-3.5" />
-								{validationState.warningCount} warning{validationState.warningCount ===
-								1
-									? ""
-									: "s"}
-							{:else}
-								<AlertCircleIcon class="size-3.5" />
-								Not validated
-							{/if}
-						</button>
-					</div>
-				{/if}
-			</div>
 		{:else if entry?.content}
 			<ScrollArea class="h-full">
 				<div class="p-6 max-w-3xl mx-auto">
@@ -1318,7 +1208,7 @@
 						<EditorCanvas
 							bind:this={editorRef}
 							editorMode="wysiwyg"
-							filename={current.title}
+							filename={current.url?.split("/").pop() ?? current.title}
 							url={current.url ?? ""}
 							saveUrl={current.saveUrl ?? current.url}
 							content={current.content ?? ""}
@@ -1408,37 +1298,3 @@
 	</AlertDialog.Content>
 </AlertDialog.Root>
 
-<AlertDialog.Root bind:open={publishDialogOpen}>
-	<AlertDialog.Content>
-		<AlertDialog.Header>
-			<AlertDialog.Title>Publish result</AlertDialog.Title>
-			<AlertDialog.Description>
-				{#if publishState}
-					Publish result for <strong
-						>{publishState.studentName}</strong
-					>
-					to
-					<strong>{publishState.parentName}</strong>
-					({publishState.parentEmail})?
-				{/if}
-			</AlertDialog.Description>
-		</AlertDialog.Header>
-		<AlertDialog.Footer>
-			{#if publishState?.loading}
-				<div
-					class="flex items-center gap-2 text-sm text-muted-foreground"
-				>
-					<div
-						class="size-4 border-2 border-primary border-t-transparent rounded-full animate-spin"
-					/>
-					{publishState.loadingText}
-				</div>
-			{:else}
-				<AlertDialog.Cancel>Cancel</AlertDialog.Cancel>
-				<AlertDialog.Action onclick={handlePublishConfirm}
-					>Publish</AlertDialog.Action
-				>
-			{/if}
-		</AlertDialog.Footer>
-	</AlertDialog.Content>
-</AlertDialog.Root>

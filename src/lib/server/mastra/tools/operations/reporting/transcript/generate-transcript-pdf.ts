@@ -85,7 +85,6 @@ async function renderAndWriteTranscriptPdf(args: CoreRenderArgs): Promise<CoreRe
   const storagePath = transcriptPdfPath(student.studentId, examTypeId);
 
   const fs = await resolveFilesystem(tenant);
-  const pdfExists = await fs.exists(storagePath);
 
   if (!republish) {
     await emitPdfPart(writer, undefined, artifactId, {
@@ -97,35 +96,11 @@ async function renderAndWriteTranscriptPdf(args: CoreRenderArgs): Promise<CoreRe
     });
   }
 
-  if (pdfExists && !input.republish) {
-    const tokenPayload = { studentId: student.studentId, academicId, kind: "transcript" as const };
-    const token = base64url(JSON.stringify(tokenPayload));
-    const previewUrl = `/api/results/${token}`;
-    if (!republish) {
-      await emitPdfPart(writer, undefined, artifactId, {
-        status: "success",
-        data: previewUrl,
-        title,
-        id: artifactId,
-        storagePath,
-        previewUrl,
-      });
-    }
-    return {
-      ok: true,
-      artifactId,
-      title,
-      storagePath,
-      previewUrl,
-      pdfExists: true,
-    };
-  }
-
   const assessment = await createAssessmentServiceForRequest(tenant);
   const transcript = await assessment.getTranscript({
     studentId: student.studentId,
     academicId,
-    withImages: false,
+    withImages: true,
   });
 
   if (!transcript) {

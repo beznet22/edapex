@@ -56,17 +56,18 @@ class SMTPError extends Error {
 }
 
 export class SMTPClient {
-  #host: string = "localhost";
-  #port: number = 25;
-  #secure: boolean = false;
-  #auth?: SMTPAuth;
-  #from: string = "";
-  #to: Recipient = [];
-  #cc?: Recipient;
-  #bcc?: Recipient;
-  #subject: string = "";
-  #text: string = "";
-  #html: string = "";
+	#host: string = "localhost";
+	#port: number = 25;
+	#secure: boolean = false;
+	#auth?: SMTPAuth;
+	#from: string = "";
+	#to: Recipient = [];
+	#cc?: Recipient;
+	#bcc?: Recipient;
+	#subject: string = "";
+	#text: string = "";
+	#html: string = "";
+	#attachments?: Array<{ filename: string; path?: string; content?: Buffer; cid?: string }>;
 
   constructor(options?: SMTPOptions) {
     if (options) {
@@ -137,12 +138,17 @@ export class SMTPClient {
     return this;
   }
 
-  html(html: string): this {
-    this.#html = html;
-    return this;
-  }
+	html(html: string): this {
+		this.#html = html;
+		return this;
+	}
 
-  async send(): Promise<SMTPResult> {
+	attachments(arr: Array<{ filename: string; path?: string; content?: Buffer; cid?: string }>): this {
+		this.#attachments = arr;
+		return this;
+	}
+
+	async send(): Promise<SMTPResult> {
     try {
       if (!this.#from) throw new SMTPError("Missing sender address");
       if (!this.#to || (Array.isArray(this.#to) && this.#to.length === 0))
@@ -159,11 +165,14 @@ export class SMTPClient {
         html: this.#html,
       };
 
-      // Add cc and bcc if present
-      if (this.#cc) mailOptions.cc = this.#cc;
-      if (this.#bcc) mailOptions.bcc = this.#bcc;
+		// Add cc and bcc if present
+		if (this.#cc) mailOptions.cc = this.#cc;
+		if (this.#bcc) mailOptions.bcc = this.#bcc;
 
-      // Send the email
+		// Add attachments if present
+		if (this.#attachments) mailOptions.attachments = this.#attachments;
+
+		// Send the email
       const info = await transporter.sendMail(mailOptions);
 
       return {
