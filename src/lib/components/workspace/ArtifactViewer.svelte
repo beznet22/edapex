@@ -1,6 +1,9 @@
 <script lang="ts">
 	import type { Artifact } from "$lib/types/workspace-types";
 	import { Button } from "$lib/components/ui/button";
+	import { Badge } from "$lib/components/ui/badge";
+	import * as Card from "$lib/components/ui/card";
+	import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "$lib/components/ui/collapsible";
 	import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
 	import * as Tooltip from "$lib/components/ui/tooltip";
 	import * as AlertDialog from "$lib/components/ui/alert-dialog";
@@ -23,6 +26,11 @@
 	import EyeOffIcon from "@lucide/svelte/icons/eye-off";
 	import SendIcon from "@lucide/svelte/icons/send";
 	import LockIcon from "@lucide/svelte/icons/lock";
+	import AlertCircleIcon from "@lucide/svelte/icons/alert-circle";
+	import CheckCircleIcon from "@lucide/svelte/icons/check-circle";
+	import XCircleIcon from "@lucide/svelte/icons/x-circle";
+	import AlertTriangleIcon from "@lucide/svelte/icons/alert-triangle";
+	import ChevronRightIcon from "@lucide/svelte/icons/chevron-right";
 	import PenSquareIcon from "@lucide/svelte/icons/pen-square";
 	import EditorCanvas from "./editor-canvas.svelte";
 	import { Spinner } from "$lib/components/ui/spinner/index.js";
@@ -34,7 +42,6 @@
 		type DocumentStreamEntry,
 	} from "$lib/context/thread-data.svelte";
 	import Markdown from "$lib/components/prompt-kit/markdown/Markdown.svelte";
-	import AlertCircleIcon from "@lucide/svelte/icons/alert-circle";
 	import RefreshCwIcon from "@lucide/svelte/icons/refresh-cw";
 	import { autoFixStructure } from "$lib/utils/marksheet-ast-parser";
 	import { patchFile } from "$lib/state/manifest-patches.svelte";
@@ -548,6 +555,9 @@
 		warnings: [],
 		warningCount: 0,
 	});
+	let omittedSubjectIds = $state<number[]>([]);
+	let allowedSubjectIds = $state<number[]>([]);
+	let crossRefErrors = $state<Array<{ subjectId: number; subjectCode: string | null; message: string; status?: 'unresolved' | 'allowed' }>>([]);
 	let aiFixing = $state(false);
 	let llmAdvice = $state('');
 	let validating = $state(false);
@@ -576,6 +586,27 @@
 		if (validationState.warningCount > 0) return "warning";
 		return "valid";
 	});
+
+	type ValidationItem = {
+		type: 'error' | 'warning';
+		message: string;
+		cref: { subjectId: number; subjectCode: string | null; message: string; status?: 'unresolved' | 'allowed' } | null;
+	};
+	const validationItems: ValidationItem[] = $derived.by(() => {
+		const items: ValidationItem[] = [];
+		for (const error of validationState.errors) {
+			const cref = crossRefErrors.find(c => error.includes(c.subjectCode ?? `id=${c.subjectId}`));
+			items.push({ type: 'error', message: error, cref: cref ? { ...cref, status: cref.status ?? 'unresolved' } : null });
+		}
+		for (const warning of validationState.warnings) {
+			const cref = crossRefErrors.find(c => warning.includes(c.subjectCode ?? `id=${c.subjectId}`));
+			items.push({ type: 'warning', message: warning, cref: cref ? { ...cref, status: cref.status ?? 'unresolved' } : null });
+		}
+		return items;
+	});
+
+	const crossRefItems = $derived(validationItems.filter(i => i.cref));
+	const zodItems = $derived(validationItems.filter(i => !i.cref && i.type === 'error'));
 
 	/** Tailwind classes for each pill state. Kept here so the button class
 	 *  attribute stays a single template expression. */
@@ -606,6 +637,9 @@
 				hasManifestValidationData = true;
 			}
 		}
+		omittedSubjectIds = a?.omittedSubjectIds ?? [];
+		allowedSubjectIds = a?.allowedSubjectIds ?? [];
+		crossRefErrors = a?.crossRefErrors ?? [];
 	});
 
 	let lastValidatedPath = $state<string | null>(null);
@@ -628,6 +662,9 @@
 						warnings: warns,
 						warningCount: data.validation.warningCount ?? warns.length,
 					};
+					crossRefErrors = data.validation?.crossRefErrors ?? [];
+					omittedSubjectIds = data.omittedSubjectIds ?? [];
+					allowedSubjectIds = data.allowedSubjectIds ?? [];
 					hasManifestValidationData = true;
 				}
 				if (data?.manifestStatus) {
@@ -637,6 +674,9 @@
 						validationErrorCount: data.validation?.errorCount ?? 0,
 						validationWarnings: data.validation?.warnings ?? [],
 						validationWarningCount: data.validation?.warningCount ?? 0,
+						crossRefErrors: data.validation?.crossRefErrors ?? [],
+						omittedSubjectIds: data.omittedSubjectIds ?? [],
+						allowedSubjectIds: data.allowedSubjectIds ?? [],
 					});
 				}
 			})
@@ -687,6 +727,102 @@
 			null,
 	);
 
+	async function omitSubject(subjectId: number) {
+		const vPath = autoFixPath;
+		const eid = computedExamTypeId;
+		if (!vPath || !eid) return;
+		try {
+			const res = await fetch(
+				`/api/file/${vPath}?action=omit-subject&examTypeId=${eid}`,
+				{
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ subjectId, omit: true }),
+				},
+			);
+			if (!res.ok) return;
+			const data = await res.json();
+			if (data?.validation) {
+				const warns = data.validation.warnings ?? [];
+				validationState = {
+					errors: data.validation.errors ?? [],
+					errorCount: data.validation.errorCount ?? 0,
+					warnings: warns,
+					warningCount: data.validation.warningCount ?? warns.length,
+				};
+				crossRefErrors = data.validation?.crossRefErrors ?? [];
+				omittedSubjectIds = data.omittedSubjectIds ?? [];
+				allowedSubjectIds = data.allowedSubjectIds ?? [];
+				hasManifestValidationData = true;
+			}
+			if (data?.manifestStatus) {
+				patchFile(`/api/file/${vPath}`, {
+					manifestStatus: data.manifestStatus,
+					validationErrors: data.validation?.errors ?? [],
+					validationErrorCount: data.validation?.errorCount ?? 0,
+					validationWarnings: data.validation?.warnings ?? [],
+					validationWarningCount: data.validation?.warningCount ?? 0,
+					crossRefErrors: data.validation?.crossRefErrors ?? [],
+					omittedSubjectIds: data.omittedSubjectIds ?? [],
+					allowedSubjectIds: data.allowedSubjectIds ?? [],
+				});
+			}
+			if (validationState.errorCount === 0 && validationState.warningCount === 0 && !llmAdvice) {
+				viewMode = 'markdown';
+			}
+		} catch {
+			// silent
+		}
+	}
+
+	async function allowSubject(subjectId: number) {
+		const vPath = autoFixPath;
+		const eid = computedExamTypeId;
+		if (!vPath || !eid) return;
+		try {
+			const res = await fetch(
+				`/api/file/${vPath}?action=allow-subject&examTypeId=${eid}`,
+				{
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ subjectId, allow: true }),
+				},
+			);
+			if (!res.ok) return;
+			const data = await res.json();
+			if (data?.validation) {
+				const warns = data.validation.warnings ?? [];
+				validationState = {
+					errors: data.validation.errors ?? [],
+					errorCount: data.validation.errorCount ?? 0,
+					warnings: warns,
+					warningCount: data.validation.warningCount ?? warns.length,
+				};
+				crossRefErrors = data.validation?.crossRefErrors ?? [];
+				omittedSubjectIds = data.omittedSubjectIds ?? [];
+				allowedSubjectIds = data.allowedSubjectIds ?? [];
+				hasManifestValidationData = true;
+			}
+			if (data?.manifestStatus) {
+				patchFile(`/api/file/${vPath}`, {
+					manifestStatus: data.manifestStatus,
+					validationErrors: data.validation?.errors ?? [],
+					validationErrorCount: data.validation?.errorCount ?? 0,
+					validationWarnings: data.validation?.warnings ?? [],
+					validationWarningCount: data.validation?.warningCount ?? 0,
+					crossRefErrors: data.validation?.crossRefErrors ?? [],
+					omittedSubjectIds: data.omittedSubjectIds ?? [],
+					allowedSubjectIds: data.allowedSubjectIds ?? [],
+				});
+			}
+			if (validationState.errorCount === 0 && validationState.warningCount === 0 && !llmAdvice) {
+				viewMode = 'markdown';
+			}
+		} catch {
+			// silent
+		}
+	}
+
 	async function handleAutoFix() {
 		if (!autoFixPath || !computedExamTypeId || aiFixing) return;
 		aiFixing = true;
@@ -701,6 +837,9 @@
 			const errors: string[] = data.errors ?? [];
 			const warns: string[] = data.warnings ?? [];
 			validationState = { errors, errorCount: errors.length, warnings: warns, warningCount: warns.length };
+			crossRefErrors = data.crossRefErrors ?? [];
+			omittedSubjectIds = data.omittedSubjectIds ?? [];
+			allowedSubjectIds = data.allowedSubjectIds ?? [];
 			if (data.markdown && errors.length === 0 && editorRef) {
 				editorRef.setContent(data.markdown);
 			}
@@ -1101,70 +1240,151 @@
 							</div>
 						</div>
 					{:else if validationState.errorCount > 0 || validationState.warningCount > 0 || llmAdvice}
-						{#if validationState.errorCount > 0}
-							<div class="flex items-center gap-3 pb-1">
-								<span class="size-2 rounded-full bg-destructive pop-once" />
-								<h2 class="text-sm font-semibold text-foreground">
-									{validationState.errorCount} validation error{validationState.errorCount === 1 ? '' : 's'}
-								</h2>
-							</div>
-						{/if}
-						{#if validationState.warningCount > 0}
-							<div class="flex items-center gap-3 pb-1">
-								<span class="size-2 rounded-full bg-amber-500 pop-once" />
-								<h2 class="text-sm font-semibold text-foreground">
-									{validationState.warningCount} warning{validationState.warningCount === 1 ? '' : 's'}
-								</h2>
-							</div>
-						{/if}
-						{#if llmAdvice}
-							<div class="p-4 rounded-xl bg-primary/5 border border-primary/10 shadow-sm transition-spring">
-								<p class="text-xs font-semibold text-primary uppercase tracking-wider mb-3">AI Diagnosis</p>
-								<div class="prose prose-sm max-w-none text-foreground/85 leading-relaxed [&_p]:mb-1.5">
-									<Markdown content={llmAdvice} />
+						<Card.Root class="border-border/60 shadow-sm overflow-hidden">
+							<Card.Header class="pb-3 flex-row items-center justify-between gap-4 flex-wrap">
+								<Card.Title class="text-sm font-semibold">Validation Results</Card.Title>
+								<div class="flex items-center gap-1.5 flex-wrap">
+									{#if validationState.errorCount > 0}
+										<Badge variant="destructive" class="text-[10px] h-5 px-1.5 gap-1 cursor-default pop-once">
+											<AlertCircleIcon class="size-2.5" />
+											{validationState.errorCount} error{validationState.errorCount === 1 ? '' : 's'}
+										</Badge>
+									{/if}
+									{#if validationState.warningCount > 0}
+										<Badge variant="outline" class="text-[10px] h-5 px-1.5 gap-1 text-amber-600 border-amber-500/30 cursor-default pop-once">
+											<AlertTriangleIcon class="size-2.5" />
+											{validationState.warningCount} warning{validationState.warningCount === 1 ? '' : 's'}
+										</Badge>
+									{/if}
 								</div>
-							</div>
-						{/if}
-						{#if validationState.errorCount > 0}
-							<details class="group">
-								<summary class="flex items-center gap-1.5 text-xs font-medium text-muted-foreground cursor-pointer hover:text-foreground transition-colors select-none py-1.5 list-none">
-									<svg class="size-3.5 transition-transform duration-200 group-open:rotate-90" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-										<path d="M9 18l6-6-6-6" />
-									</svg>
-									Raw validation errors
-								</summary>
-								<div class="mt-2 space-y-1.5 transition-spring">
-									<ul class="space-y-1">
-										{#each validationState.errors as error}
-											<li class="text-[11px] font-mono text-destructive/80 bg-destructive/5 px-3 py-2 rounded-lg border border-destructive/10 leading-relaxed">{error}</li>
-										{/each}
-									</ul>
-								</div>
-							</details>
-						{/if}
-						{#if validationState.warningCount > 0}
-							<details class="group">
-								<summary class="flex items-center gap-1.5 text-xs font-medium text-muted-foreground cursor-pointer hover:text-foreground transition-colors select-none py-1.5 list-none">
-									<svg class="size-3.5 transition-transform duration-200 group-open:rotate-90" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-										<path d="M9 18l6-6-6-6" />
-									</svg>
-									Warnings
-								</summary>
-								<div class="mt-2 space-y-1.5 transition-spring">
-									<ul class="space-y-1">
-										{#each validationState.warnings as warning}
-											<li class="text-[11px] font-mono text-amber-600/80 bg-amber-500/5 px-3 py-2 rounded-lg border border-amber-500/10 leading-relaxed">{warning}</li>
-										{/each}
-									</ul>
-								</div>
-							</details>
-						{/if}
-						<button
-							onclick={() => (viewMode = 'markdown')}
-							class="text-xs text-muted-foreground/60 hover:text-foreground transition-colors underline underline-offset-2"
-						>
-							← Back to editor
-						</button>
+							</Card.Header>
+
+							<Card.Content class="space-y-3 pt-0">
+								{#if crossRefItems.length > 0}
+									<Collapsible open={true}>
+										<CollapsibleTrigger class="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors select-none py-1 cursor-pointer w-full">
+											<ChevronRightIcon class="size-3 transition-transform duration-200 data-[state=open]:rotate-90" />
+											Unresolved subjects ({crossRefItems.length})
+										</CollapsibleTrigger>
+										<CollapsibleContent class="transition-spring">
+											<div class="mt-2 space-y-1.5">
+												{#each crossRefItems as item}
+													{@const isOmitted = item.cref && omittedSubjectIds.includes(item.cref.subjectId)}
+													{@const isAllowed = item.cref && allowedSubjectIds.includes(item.cref.subjectId)}
+													{@const isUnresolvedError = item.cref && item.type === 'error' && item.cref.status === 'unresolved'}
+													{@const isAllowedWarning = item.cref && item.type === 'warning' && item.cref.status === 'allowed'}
+													<div
+														class={cn(
+															"flex items-start gap-2 text-[11px] font-mono leading-relaxed px-3 py-2.5 rounded-lg border animate-in fade-in slide-in-from-bottom-1 duration-200",
+															item.type === 'error' && 'bg-destructive/5 border-destructive/10 text-destructive/80',
+															item.type === 'warning' && isAllowedWarning && 'bg-emerald-500/5 border-emerald-500/10 text-emerald-700/80',
+															item.type === 'warning' && !isAllowedWarning && 'bg-amber-500/5 border-amber-500/10 text-amber-600/80',
+														)}
+													>
+														<span class="flex-1 min-w-0 break-words">{item.message}</span>
+														{#if !isOmitted}
+															{#if isUnresolvedError}
+																<div class="flex items-center gap-1 shrink-0">
+																	<Tooltip.Root>
+																		<Tooltip.Trigger>
+																			<Button
+																				variant="default"
+																				size="xs"
+																				onclick={() => allowSubject(item.cref!.subjectId)}
+																				class="cursor-pointer h-6 gap-1 px-1.5 text-[10px] font-semibold bg-emerald-600/15 text-emerald-600 hover:bg-emerald-600/25 hover:scale-105 transition-all"
+																			>
+																				<CheckCircleIcon class="size-3" />
+																				Allow
+																			</Button>
+																		</Tooltip.Trigger>
+																		<Tooltip.Content side="top" class="text-[10px] px-2 py-1">
+																			Auto-fill missing subject on commit
+																		</Tooltip.Content>
+																	</Tooltip.Root>
+																	<Tooltip.Root>
+																		<Tooltip.Trigger>
+																			<Button
+																				variant="destructive"
+																				size="xs"
+																				onclick={() => omitSubject(item.cref!.subjectId)}
+																				class="cursor-pointer h-6 gap-1 px-1.5 text-[10px] font-semibold hover:scale-105 transition-all"
+																			>
+																				<XCircleIcon class="size-3" />
+																				Omit
+																			</Button>
+																		</Tooltip.Trigger>
+																		<Tooltip.Content side="top" class="text-[10px] px-2 py-1">
+																			Exclude subject from result
+																		</Tooltip.Content>
+																	</Tooltip.Root>
+																</div>
+															{:else if isAllowedWarning}
+																<Tooltip.Root>
+																	<Tooltip.Trigger>
+																		<Button
+																			variant="ghost"
+																			size="xs"
+																			onclick={() => omitSubject(item.cref!.subjectId)}
+																			class="cursor-pointer h-6 gap-1 px-1.5 text-[10px] font-semibold text-muted-foreground/60 hover:text-foreground hover:bg-muted/40 hover:scale-105 transition-all"
+																		>
+																			<XCircleIcon class="size-3" />
+																			Undo
+																		</Button>
+																	</Tooltip.Trigger>
+																	<Tooltip.Content side="top" class="text-[10px] px-2 py-1">
+																		Revoke auto-fill — subject will be omitted instead
+																	</Tooltip.Content>
+																</Tooltip.Root>
+															{/if}
+														{/if}
+													</div>
+												{/each}
+											</div>
+										</CollapsibleContent>
+									</Collapsible>
+								{/if}
+
+								{#if zodItems.length > 0}
+									<Collapsible open={true}>
+										<CollapsibleTrigger class="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors select-none py-1 cursor-pointer w-full">
+											<ChevronRightIcon class="size-3 transition-transform duration-200 data-[state=open]:rotate-90" />
+											Schema errors ({zodItems.length})
+										</CollapsibleTrigger>
+										<CollapsibleContent class="transition-spring">
+											<div class="mt-2 space-y-1.5">
+												{#each zodItems as item}
+													<div class="flex items-start gap-2 text-[11px] font-mono text-destructive/80 leading-relaxed px-3 py-2 rounded-lg border border-destructive/10 bg-destructive/5 animate-in fade-in slide-in-from-bottom-1 duration-200">
+														<AlertCircleIcon class="size-3 mt-0.5 shrink-0" />
+														<span class="flex-1 min-w-0 break-words">{item.message}</span>
+													</div>
+												{/each}
+											</div>
+										</CollapsibleContent>
+									</Collapsible>
+								{/if}
+
+								{#if llmAdvice}
+									<div class="p-3.5 rounded-xl bg-primary/5 border border-primary/10 shadow-sm transition-spring animate-in fade-in duration-300">
+										<p class="text-[11px] font-semibold text-primary uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
+											<AlertCircleIcon class="size-3" />
+											AI Diagnosis
+										</p>
+										<div class="prose prose-sm max-w-none text-foreground/85 leading-relaxed [&_p]:mb-1.5 text-[13px]">
+											<Markdown content={llmAdvice} />
+										</div>
+									</div>
+								{/if}
+							</Card.Content>
+
+							<Card.Footer class="pt-0">
+								<button
+									onclick={() => (viewMode = 'markdown')}
+									class="text-xs text-muted-foreground/50 hover:text-foreground transition-colors underline underline-offset-2 cursor-pointer"
+								>
+									← Back to editor
+								</button>
+							</Card.Footer>
+						</Card.Root>
 					{/if}
 				</div>
 			</ScrollArea>
