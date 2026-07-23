@@ -1011,6 +1011,14 @@
 			return file ? (file.url ?? file.id) : id;
 		});
 		optimisticallyRemoved = new Set([...optimisticallyRemoved, ...keys]);
+		const removedOptimistic: Array<[string, Artifact]> = [];
+		for (const key of keys) {
+			const existing = optimisticFiles.get(key);
+			if (existing) {
+				removedOptimistic.push([key, existing]);
+				optimisticFiles.delete(key);
+			}
+		}
 		deleteDialogOpen = false;
 		clearSelection();
 		try {
@@ -1024,6 +1032,9 @@
 			);
 		} catch (err) {
 			optimisticallyRemoved = new Set([...optimisticallyRemoved].filter((k) => !keys.includes(k)));
+			for (const [key, entry] of removedOptimistic) {
+				optimisticFiles.set(key, entry);
+			}
 			const message = err instanceof Error ? err.message : String(err);
 			toast.error(`Failed to delete: ${message}`);
 		}
