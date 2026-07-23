@@ -12,6 +12,9 @@ export { verifyTeacherAssignment } from './verify-teacher';
 export { buildWorkspaceRoot, resolveTenantWorkspace, assertPathAgentVisible, WorkspaceScopeError, MissingTenantScopeError, isMissingTenantScopeError } from './scope';
 export {
 	classDir,
+	academicYearDir,
+	sharedDir,
+	sharedPhotosDir,
 	WORKSPACE_ROOT,
 	ocrMarkdownPath,
 	uploadPath,

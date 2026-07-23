@@ -744,6 +744,101 @@ async function runFormatBatch(
 	}
 }
 
+/**
+ * Import photos to the shared/photos/ pool at the academic year root.
+ *
+ * Per file: compress via `compressImage`, compute SHA-256 content hash,
+ * build a sidecar JSON, then PUT to `/api/file/shared/photos/<hash>.<ext>`
+ * with multipart `file` + `metadata` fields. Non-image files are counted
+ * as `skipped` and never reach the server. The PUT endpoint enforces the
+ * IT/Admin/Coordinator/IT-Support designation gate, so the worker simply
+ * surfaces upstream 403s as failures.
+ */
+async function runImportPhotos(
+	taskId: string,
+	files: Array<{ file: File; name: string }>,
+	tenant: SerializedTenant,
+): Promise<void> {
+	const results: BatchExtractResult[] = [];
+	let succeeded = 0;
+	let failed = 0;
+	const skipped = files.filter(f => !/\.(jpe?g|png|webp)$/i.test(f.name)).length;
+	const imageFiles = files.filter(f => /\.(jpe?g|png|webp)$/i.test(f.name));
+	const total = imageFiles.length;
+
+	if (total === 0) {
+		const summary = skipped > 0 ? `No images found (${skipped} skipped)` : "No images found";
+		postCompleted(taskId, { succeeded: 0, failed: 0, results });
+		postProgress(taskId, 1, summary);
+		return;
+	}
+
+	for (let i = 0; i < imageFiles.length; i++) {
+		if (cancelledTasks.has(taskId)) {
+			postCancelled(taskId, { succeeded, failed, results });
+			return;
+		}
+
+		const { file, name } = imageFiles[i];
+		const key = name;
+		try {
+			postProgress(taskId, i / total, `Compressing ${name} (${i + 1}/${total})…`);
+			const result = await compressImage(file);
+			const compressed = result.file;
+			const filename = filenameForMime(name, compressed.type);
+			const ext = (filename.split(".").pop() ?? compressed.type.split("/").pop() ?? "jpg").toLowerCase();
+
+			const contentHash = await sha256Hex(compressed);
+			const sidecar = JSON.stringify({
+				originalName: name,
+				size: result.stats.compressedSize,
+				uploadedAt: new Date().toISOString(),
+				uploadedBy: tenant.staffId,
+			});
+
+			postProgress(taskId, i / total, `Uploading ${name} (${i + 1}/${total})…`);
+			const form = new FormData();
+			form.set("file", compressed, `${contentHash}.${ext}`);
+			form.set("metadata", sidecar);
+			const url = `/api/file/shared/photos/${contentHash}.${ext}`;
+			const res = await fetch(url, { method: "PUT", body: form });
+			if (!res.ok) throw new Error(`Upload failed: ${res.status} ${await res.text().catch(() => "")}`);
+
+			succeeded++;
+			results.push({ key, status: "success", contentHash });
+			postProgress(taskId, (i + 1) / total, `Imported ${succeeded}/${total}`);
+		} catch (err) {
+			failed++;
+			const message = err instanceof Error ? err.message : String(err);
+			results.push({ key, status: "error", error: message });
+		}
+	}
+
+	const tail = skipped > 0 ? ` (${skipped} skipped)` : "";
+	if (failed > 0) {
+		postFailed(taskId, `Imported ${succeeded}/${total}, ${failed} failed${tail}`, {
+			succeeded,
+			failed,
+			results,
+		});
+	} else {
+		postCompleted(taskId, { succeeded, failed, results });
+	}
+}
+
+/** SHA-256 of a Blob as a lowercase hex string. */
+async function sha256Hex(blob: Blob): Promise<string> {
+	const buf = await blob.arrayBuffer();
+	const digest = await crypto.subtle.digest("SHA-256", buf);
+	const bytes = new Uint8Array(digest);
+	let out = "";
+	for (let i = 0; i < bytes.length; i++) {
+		const hex = bytes[i].toString(16);
+		out += hex.length === 1 ? `0${hex}` : hex;
+	}
+	return out;
+}
+
 async function runTask(taskId: string, spec: TaskSpec): Promise<void> {
 	postStarted(taskId);
 	try {
@@ -762,6 +857,9 @@ async function runTask(taskId: string, spec: TaskSpec): Promise<void> {
 				break;
 			case "format-batch":
 				await runFormatBatch(taskId, spec.keys, spec.tenant, spec.contentHashes);
+				break;
+			case "import-photos":
+				await runImportPhotos(taskId, spec.files, spec.tenant);
 				break;
 		}
 	} catch (err) {

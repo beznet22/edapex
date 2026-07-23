@@ -97,6 +97,11 @@ export type TaskSpec =
       keys: string[];
       contentHashes?: Record<string, string>;
       tenant: SerializedTenant;
+    }
+  | {
+      kind: "import-photos";
+      files: Array<{ file: File; name: string }>;
+      tenant: SerializedTenant;
     };
 
 export type TaskEvent =

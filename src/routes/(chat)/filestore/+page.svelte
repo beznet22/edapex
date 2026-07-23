@@ -36,6 +36,13 @@
 	import CheckCheck from "@lucide/svelte/icons/check-check";
 	import GitCommit from "@lucide/svelte/icons/git-commit";
 	import BookOpen from "@lucide/svelte/icons/book-open";
+	import ImageUp from "@lucide/svelte/icons/image-up";
+	import FolderUp from "@lucide/svelte/icons/folder-up";
+	import UserPlus from "@lucide/svelte/icons/user-plus";
+	import Users from "@lucide/svelte/icons/users";
+	import SearchablePicker, {
+		type SearchableItem,
+	} from "$lib/components/library";
 	import { generateId } from "ai";
 	import { useInspector } from "$lib/context/inspector-context.svelte";
 	import { mobileUiState } from "$lib/state/mobile-ui.svelte";
@@ -64,7 +71,7 @@
 	let activeTermId = $state(data.activeTermId);
 	let searchQuery = $state("");
 	let categoryFilter = $state<
-		"all" | "images" | "pdf" | "marksheet" | "files"
+		"all" | "images" | "pdf" | "marksheet" | "shared" | "files"
 	>("marksheet");
 	let statusFilter = $state<Set<string>>(new Set());
 	// TODO: re-plan categoryMulti filter — placeholder stubs to satisfy
@@ -81,12 +88,42 @@
 	let noteBody = $state("");
 	let noteSaving = $state(false);
 	let fileInputRef = $state<HTMLInputElement | null>(null);
+	let importPhotosInputRef = $state<HTMLInputElement | null>(null);
+	let importPhotosFolderInputRef = $state<HTMLInputElement | null>(null);
 	let deleteDialogOpen = $state(false);
 	let isExtracting = $state(false);
 	let isFormatting = $state(false);
 	let isStartingChat = $state(false);
+	let isClaiming = $state(false);
 	let optimisticFiles = $state(new Map<string, Artifact>());
 	let lastCompletedTime = $state(0);
+
+	// Designation IDs allowed to bulk-import to the shared pool. Mirrors the
+	// server-side gate in `+server.ts` for `/api/file/[...path]/PUT` so the
+	// menu items don't show to users who would get a 403 anyway.
+	const IMPORT_ALLOWED = new Set([1, 4, 5, 9]); // IT, Admin, Coordinator, IT Support
+	const canImportShared = $derived(IMPORT_ALLOWED.has(data.tenant.designationId));
+	const isSharedPhoto = (id: string) => id.startsWith("shared/photos/");
+	const selectedPhotoCount = $derived(
+		[...selectedIds].filter(isSharedPhoto).length,
+	);
+
+	function getInitials(name: string | null | undefined): string {
+		if (!name) return "?";
+		const parts = name.trim().split(/\s+/).filter(Boolean);
+		const letters = parts.slice(0, 2).map((p) => p[0]?.toUpperCase() ?? "").join("");
+		return letters || "?";
+	}
+
+	const studentPickerItems = $derived<SearchableItem[]>(
+		(data.classStudents ?? []).map((s) => ({
+			id: s.id,
+			label: s.name ?? "Unnamed",
+			secondary: s.admissionNo ? `ADM${s.admissionNo}` : undefined,
+			initials: getInitials(s.name),
+			searchValue: `${s.name ?? ""} ${s.admissionNo ?? ""}`,
+		})),
+	);
 	
 	$effect(() => {
 		if (activeTermId !== data.activeTermId) {
@@ -390,6 +427,12 @@
 	}
 
 	function toggleSelect(id: string) {
+		if (isSharedPhoto(id)) {
+			// Single-select for claimable photos. Clicking a different photo
+			// replaces the selection; clicking the same photo deselects.
+			selectedIds = selectedIds.has(id) ? new Set() : new Set([id]);
+			return;
+		}
 		const next = new Set(selectedIds);
 		if (next.has(id)) next.delete(id);
 		else next.add(id);
@@ -439,11 +482,13 @@
 				!f.url?.includes("/marksheets/")
 			)
 				return false;
+			if (categoryFilter === "shared" && !f.id?.startsWith("shared/")) return false;
 			if (
 				categoryFilter === "files" &&
 				(f.kind === "image" ||
 					f.kind === "pdf" ||
-					f.url?.includes("/marksheets/"))
+					f.url?.includes("/marksheets/") ||
+					f.id?.startsWith("shared/"))
 			)
 				return false;
 			if (
@@ -696,6 +741,64 @@
 		const files = Array.from(input.files);
 		if (input) input.value = "";
 		await queueUpload(files);
+	}
+
+	async function handleImportPhotos(event: Event) {
+		const input = event.currentTarget as HTMLInputElement;
+		if (!input.files || input.files.length === 0) return;
+		const files = Array.from(input.files).map((f) => ({ file: f, name: f.name }));
+		input.value = ""; // reset so the same files can be re-picked
+		if (files.length === 0) return;
+		const tenant = serializeTenant({
+			schoolId: data.tenant.schoolId,
+			userId: data.tenant.userId,
+			designationId: data.tenant.designationId,
+			staffId: data.tenant.staffId,
+			classId: data.tenant.classId,
+			sectionId: data.tenant.sectionId,
+			examTypeId: data.tenant.examTypeId,
+			academicId: data.tenant.academicId,
+			className: data.tenant.className,
+			sectionName: data.tenant.sectionName,
+			academicYearTitle: data.tenant.academicYearTitle,
+			userRole: data.tenant.userRole,
+		});
+		backgroundTasks.runTask({
+			kind: "import-photos",
+			files,
+			tenant,
+		});
+		toast.info(
+			`Importing ${files.length} file${files.length === 1 ? "" : "s"} to shared/photos/…`,
+		);
+	}
+
+	async function handleClaim(item: SearchableItem) {
+		if (isClaiming) return;
+		const photoId = [...selectedIds][0];
+		const photo = filteredFiles.find((f) => f.id === photoId);
+		if (!photo) return;
+		isClaiming = true;
+		try {
+			const res = await fetch("/api/photos/claim", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ url: photo.url, studentId: item.id }),
+			});
+			if (!res.ok) {
+				const body = await res.text().catch(() => "");
+				throw new Error(body || `Claim failed: ${res.status}`);
+			}
+			const data2 = (await res.json()) as { photoUrl?: string };
+			clearSelection();
+			await invalidateAll();
+			toast.success(`Claimed ${photo.title} for ${item.label}`);
+		} catch (err) {
+			const message = err instanceof Error ? err.message : String(err);
+			toast.error(`Failed to claim: ${message}`);
+		} finally {
+			isClaiming = false;
+		}
 	}
 
 	function queueUpload(files: File[]): void {
@@ -998,6 +1101,29 @@
 								/>
 								Upload files
 							</DropdownMenu.Item>
+							{#if canImportShared}
+								<DropdownMenu.Separator
+									class="my-2 h-px bg-border/60"
+								/>
+								<DropdownMenu.Item
+									onclick={() => importPhotosInputRef?.click()}
+									class="px-3 py-2.5 rounded-lg text-sm font-medium cursor-pointer"
+								>
+									<ImageUp
+										class="h-4 w-4 mr-3 text-muted-foreground"
+									/>
+									Import photos
+								</DropdownMenu.Item>
+								<DropdownMenu.Item
+									onclick={() => importPhotosFolderInputRef?.click()}
+									class="px-3 py-2.5 rounded-lg text-sm font-medium cursor-pointer"
+								>
+									<FolderUp
+										class="h-4 w-4 mr-3 text-muted-foreground"
+									/>
+									Import photo folder
+								</DropdownMenu.Item>
+							{/if}
 							<DropdownMenu.Item
 								onclick={() => (noteDialogOpen = true)}
 								class="px-3 py-2.5 rounded-lg text-sm font-medium cursor-pointer"
@@ -1015,6 +1141,21 @@
 						multiple
 						class="hidden"
 						onchange={handleFileUpload}
+					/>
+					<input
+						bind:this={importPhotosInputRef}
+						type="file"
+						accept="image/*"
+						multiple
+						class="hidden"
+						onchange={handleImportPhotos}
+					/>
+					<input
+						bind:this={importPhotosFolderInputRef}
+						type="file"
+						webkitdirectory
+						class="hidden"
+						onchange={handleImportPhotos}
 					/>
 				</div>
 			</header>
@@ -1083,6 +1224,18 @@
 						<MessageSquare class="size-3.5" />
 						Start chat
 					</Button>
+					{#if selectedPhotoCount === 1}
+						<SearchablePicker
+							items={studentPickerItems}
+							triggerLabel="Claim for student"
+							triggerIcon={UserPlus}
+							onSelect={handleClaim}
+							placeholder="Search by name or ADM…"
+							emptyText="No student found."
+							disabled={isClaiming}
+							class="h-9 px-3.5 rounded-full gap-1.5 text-xs font-bold"
+						/>
+					{/if}
 					<span class="flex-1" aria-hidden="true"></span>
 					<Button
 						variant="destructive"
@@ -1100,7 +1253,7 @@
 						class="flex items-center gap-1 sm:gap-2"
 						aria-label="File categories"
 					>
-						{#each [{ id: "all", label: "All" }, { id: "images", label: "Images" }, { id: "pdf", label: "PDF" }, { id: "marksheet", label: "MarkSheet" }, { id: "files", label: "Files" }] as tab (tab.id)}
+						{#each [{ id: "all", label: "All" }, { id: "images", label: "Images" }, { id: "pdf", label: "PDF" }, { id: "marksheet", label: "MarkSheet" }, { id: "shared", label: "Shared" }, { id: "files", label: "Files" }] as tab (tab.id)}
 							<button
 								type="button"
 								onclick={() =>
@@ -1354,6 +1507,8 @@
 					>
 						{#if isThreadScoped}
 							No artifacts yet for this thread
+						{:else if categoryFilter === "shared"}
+							No shared files yet. {canImportShared ? "Use 'Import photos' from the New menu to add some." : ""}
 						{:else if searchQuery || activeFilterCount > 0 || categoryFilter !== "all"}
 							No matches
 						{:else}

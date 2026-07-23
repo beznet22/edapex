@@ -17,8 +17,9 @@
  */
 import { json, error, type RequestHandler } from '@sveltejs/kit';
 import { createHash, randomUUID } from 'node:crypto';
+import path from 'node:path';
 import { auth } from '$lib/server/service/auth.service';
-import { tenantWorkspace } from '$lib/server/workspace';
+import { tenantWorkspace, sharedDir } from '$lib/server/workspace';
 import { assertPathAgentVisible, resolveTenantWorkspace, WorkspaceScopeError } from '$lib/server/workspace/scope';
 import { buildWorkspaceRequestContext } from '$lib/server/helpers/chat-helper';
 import { ALLOWED_DESIGNATIONS } from "$lib/types/sms-types";
@@ -76,6 +77,50 @@ function resolveScopedPath(
   }
 }
 
+/**
+ * Designation IDs allowed to write to or delete from `<yearRoot>/shared/`.
+ * Sourced from `$lib/types/sms-types.ts` (1 = IT, 4 = Admin, 5 = Coordinator,
+ * 9 = IT Support). Read access is open to any authenticated user; writes are
+ * restricted to the same gate that gates bulk photo imports.
+ */
+const ALLOWED_SHARED_DESIGNATIONS: ReadonlySet<number> = new Set([
+  ALLOWED_DESIGNATIONS.IT,
+  4, // Admin
+  ALLOWED_DESIGNATIONS.COORDINATOR,
+  9, // IT Support
+]);
+
+function assertSharedWriteAuthorized(
+  tenant: ReturnType<typeof import('$lib/server/mastra/tenant-context')['createTenantContext']>,
+): void {
+  if (!ALLOWED_SHARED_DESIGNATIONS.has(tenant.designationId)) {
+    throw error(403, 'Only IT, Admin, Coordinator, or IT Support can modify shared files');
+  }
+}
+
+/**
+ * Resolve a `shared/...` path to its absolute disk location under the
+ * academic year root, verifying the path stays within `<yearRoot>/shared/`.
+ * Returns `{ root, absolute, rel }` so callers can write to disk via raw
+ * `fs.promises` and still report a URL-safe relative path back to the client.
+ */
+function resolveSharedPath(
+  tenant: ReturnType<typeof import('$lib/server/mastra/tenant-context')['createTenantContext']>,
+  paramsPath: string | undefined,
+): { root: string; absolute: string; rel: string } {
+  const rel = safeRelPath(paramsPath);
+  if (!rel.startsWith('shared/')) {
+    throw new Error('resolveSharedPath called with non-shared path');
+  }
+  const within = rel.slice('shared/'.length);
+  const root = sharedDir(tenant);
+  const absolute = path.resolve(root, within);
+  if (!absolute.startsWith(root + path.sep) && absolute !== root) {
+    throw error(403, 'Path traversal blocked');
+  }
+  return { root, absolute, rel };
+}
+
 function entryToWire(entry: FileEntry): {
   name: string;
   type: 'file' | 'directory';
@@ -105,6 +150,20 @@ export const GET: RequestHandler = async ({ params, url, locals, cookies }) => {
 
     const resolvedPath = resolveScopedPath(tenant, params.path);
     const action = url.searchParams.get('action');
+
+    if (safeRelPath(params.path).startsWith('shared/')) {
+      const { absolute } = resolveSharedPath(tenant, params.path);
+      const fsModule = await import('node:fs/promises');
+      const content = await fsModule.readFile(absolute);
+      const buffer = typeof content === 'string' ? new TextEncoder().encode(content) : new Uint8Array(content);
+      return new Response(buffer, {
+        headers: {
+          'Content-Type': contentTypeFor(absolute),
+          'Content-Length': buffer.length.toString(),
+          'Cache-Control': 'public, max-age=3600, immutable',
+        },
+      });
+    }
 
     if (action === 'list') {
       const entries = await fs.readdir(resolvedPath, { recursive: true });
@@ -503,6 +562,19 @@ export const DELETE: RequestHandler = async ({ params, url, locals, cookies }) =
     });
     if (!fs) throw error(500, 'Workspace filesystem unavailable');
 
+    if (safeRelPath(params.path).startsWith('shared/')) {
+      assertSharedWriteAuthorized(tenant);
+      const { absolute, rel } = resolveSharedPath(tenant, params.path);
+      const fsModule = await import('node:fs/promises');
+      await fsModule.unlink(absolute);
+      let sidecarDeleted = false;
+      if (rel.startsWith('photos/') && !rel.endsWith('.json')) {
+        const sidecarPath = absolute.replace(/\.\w+$/, '.json');
+        try { await fsModule.unlink(sidecarPath); sidecarDeleted = true; } catch { /* no sidecar */ }
+      }
+      return json({ success: true, path: rel, sidecarDeleted });
+    }
+
     const resolvedPath = resolveScopedPath(tenant, params.path);
     await fs.deleteFile(resolvedPath);
 
@@ -607,6 +679,27 @@ export const PUT: RequestHandler = async ({ params, request, locals, cookies, ur
       examTypeId: parsedExamTypeId,
     });
     if (!fs) throw error(500, 'Workspace filesystem unavailable');
+
+    if (safeRelPath(params.path).startsWith('shared/')) {
+      assertSharedWriteAuthorized(tenant);
+      const { absolute, rel } = resolveSharedPath(tenant, params.path);
+      const fsModule = await import('node:fs/promises');
+      const form = await request.formData();
+      const file = form.get('file');
+      if (!(file instanceof File)) throw error(400, 'Missing file field');
+      const fileBytes = new Uint8Array(await file.arrayBuffer());
+      await fsModule.mkdir(path.dirname(absolute), { recursive: true } as Parameters<typeof fsModule.mkdir>[1]);
+      await fsModule.writeFile(absolute, fileBytes, { recursive: true, overwrite: true } as Parameters<typeof fsModule.writeFile>[2]);
+      let sidecarWritten = false;
+      const metadata = form.get('metadata');
+      if (typeof metadata === 'string' && metadata.length > 0 && rel.startsWith('photos/') && !rel.endsWith('.json')) {
+        const sidecarPath = absolute.replace(/\.\w+$/, '.json');
+        await fsModule.writeFile(sidecarPath, metadata, { recursive: true, overwrite: true } as Parameters<typeof fsModule.writeFile>[2]);
+        sidecarWritten = true;
+      }
+      const contentHash = createHash('sha256').update(fileBytes).digest('hex');
+      return json({ success: true, url: `/api/file/${rel}`, contentHash, sidecarWritten });
+    }
 
     const resolvedPath = resolveScopedPath(tenant, params.path);
     const blob = await request.blob();

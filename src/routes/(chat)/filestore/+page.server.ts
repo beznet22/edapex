@@ -8,15 +8,19 @@ import {
 import { resolveActiveClassScope } from "$lib/server/helpers/class-scope";
 import { ALLOWED_DESIGNATIONS } from "$lib/types/sms-types";
 import { resolveTenantWorkspace } from "$lib/server/workspace/scope";
+import { sharedDir } from "$lib/server/workspace/paths";
 import { resolveUserRole } from "$lib/server/mastra/provider/role-resolver";
 import { getMemory } from "$lib/server/mastra";
 import { toAISdkMessages } from "@mastra/ai-sdk/ui";
 import { deriveCategory, deriveKind, deriveSource } from "$lib/utils/artifact-kind";
 import { readAllManifests } from "$lib/server/workspace/manifest";
 import { filterMentionableFiles } from "$lib/server/workspace/file-filters";
+import { StudentRepository } from "$lib/server/repository/student.repo";
 import type { PageServerLoad } from "./$types";
 import type { Artifact } from "$lib/types/workspace-types";
 import type { SerializedTenant } from "$lib/types/background-tasks";
+import nodeFs from "node:fs/promises";
+import nodePath from "node:path";
 
 function extractExamTypeFromPath(relPath: string): number | null {
 	const match = relPath.match(/\bexamType-(\d+)\//);
@@ -192,6 +196,81 @@ export const load: PageServerLoad = async ({ url, locals, cookies }) => {
 		files = files.filter((f) => threadFileKeys.has(f.id));
 	}
 
+	// List the year-level `<yearRoot>/shared/` pool so any class in the
+	// active academic year can see cross-class files. Read directly via
+	// `node:fs/promises` because the workspace filesystem is rooted at
+	// `classDir(tenant)` and cannot see the year root. Shared files are
+	// NOT subject to the threadId filter — they are global within the year.
+	const sharedFiles: Artifact[] = [];
+	try {
+		const root = sharedDir(tenant);
+		const entries = await nodeFs.readdir(root, { recursive: true, withFileTypes: true });
+		for (const entry of entries) {
+			if (!entry.isFile()) continue;
+			if (entry.name.endsWith(".json")) continue;
+			const fullPath = nodePath.join(entry.parentPath ?? root, entry.name);
+			const rel = nodePath.relative(root, fullPath);
+			let originalName = entry.name;
+			let size = 0;
+			let mtimeMs: number | undefined;
+			try {
+				const stat = await nodeFs.stat(fullPath);
+				size = stat.size;
+				mtimeMs = stat.mtimeMs;
+			} catch { /* keep defaults */ }
+			const sidecarPath = fullPath.replace(/\.[^./\\]+$/, ".json");
+			try {
+				const sidecarRaw = await nodeFs.readFile(sidecarPath, "utf-8");
+				const sidecar = JSON.parse(sidecarRaw) as { originalName?: string };
+				if (sidecar.originalName) originalName = sidecar.originalName;
+			} catch {
+				try {
+					await nodeFs.writeFile(sidecarPath, JSON.stringify({
+						originalName: entry.name,
+						size,
+						uploadedAt: new Date(mtimeMs ?? Date.now()).toISOString(),
+						uploadedBy: null,
+					}));
+				} catch { /* best-effort */ }
+			}
+			sharedFiles.push({
+				id: `shared/${rel}`,
+				title: originalName,
+				kind: deriveKind(rel),
+				category: deriveCategory(rel),
+				source: "uploaded",
+				url: `/api/file/shared/${rel}`,
+				saveUrl: `/api/file/shared/${rel}`,
+				size,
+				modifiedAt: mtimeMs,
+				contentHash: rel.startsWith("photos/") ? entry.name.split(".")[0] : undefined,
+			});
+		}
+	} catch (err) {
+		console.warn("[filestore] failed to list shared dir", err);
+	}
+	files = [...files, ...sharedFiles];
+
+	// Active class roster — used by the Shared tab's claim UI. Loaded only
+	// when the tenant has an assigned class+section so an unassigned user
+	// (admin/IT) doesn't pull a full school roster.
+	let classStudents: Array<{ id: number; name: string | null; admissionNo: number | null }> = [];
+	if (tenant.classId && tenant.sectionId) {
+		try {
+			const roster = await new StudentRepository(db, tenant).getStudentsByClassSection({
+				classId: tenant.classId,
+				sectionId: tenant.sectionId,
+			});
+			classStudents = (roster ?? []).map((s) => ({
+				id: s.id,
+				name: s.name ?? null,
+				admissionNo: s.admissionNo ?? null,
+			}));
+		} catch (err) {
+			console.warn("[filestore] failed to load class roster", err);
+		}
+	}
+
 	// Merge manifest metadata into artifacts
 	const manifests = await readAllManifests(tenant);
 	if (manifests.length > 0) {
@@ -262,5 +341,6 @@ export const load: PageServerLoad = async ({ url, locals, cookies }) => {
 		tenant: tenantForSerialization,
 		activeClassId: scope?.classId ?? null,
 		activeSectionId: scope?.sectionId ?? null,
+		classStudents,
 	};
 };

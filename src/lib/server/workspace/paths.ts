@@ -147,3 +147,33 @@ export function transcriptPdfPath(studentId: number, examTypeId?: number | null)
 export function photoPath(contentHash: string, ext: string): string {
   return `photos/${contentHash}.${ext}`;
 }
+
+/**
+ * Academic year root directory — one level above the class root. Shared
+ * resources (e.g. cross-class photo pools, shared documents) live here so
+ * they span every class/section within a single academic year.
+ *
+ *   .workspaces/<schoolId>/AY<academicId>-<year-slug>/
+ */
+export function academicYearDir(tenant: TenantContext): string {
+	const yearSeg = `AY${tenant.academicId ?? 0}-${academicYearSlug(tenant.academicYearTitle, tenant.academicId ?? 0)}`;
+	return path.join(WORKSPACE_ROOT, String(tenant.schoolId), yearSeg);
+}
+
+/**
+ * Shared directory at the academic year root. General-purpose home for any
+ * file that should be visible to every class in the same academic year.
+ * The `shared/photos/` subdir holds the cross-class photo claim pool.
+ */
+export function sharedDir(tenant: TenantContext): string {
+	return path.join(academicYearDir(tenant), "shared");
+}
+
+/**
+ * Photos subdirectory within the shared dir. Files here are imported via
+ * `kind: "import-photos"` (see `$lib/workers/task-worker.ts`) and claimed
+ * to a specific student via `POST /api/photos/claim`.
+ */
+export function sharedPhotosDir(tenant: TenantContext): string {
+	return path.join(sharedDir(tenant), "photos");
+}

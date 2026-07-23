@@ -163,6 +163,10 @@
 				const n = task.spec.keys.length;
 				return `Format — ${n} file${n === 1 ? "" : "s"}`;
 			}
+			case "import-photos": {
+				const n = task.spec.files.length;
+				return `Importing — ${n} file${n === 1 ? "" : "s"}`;
+			}
 		}
 	}
 
