@@ -26,7 +26,7 @@ import { ALLOWED_DESIGNATIONS } from "$lib/types/sms-types";
 import { ocrBatchService } from '$lib/server/service/ocr-batch.service';
 import { mistralOcrService } from '$lib/server/service/mistral-ocr.service';
 import { OcrWorkspaceStore } from '$lib/server/mastra/storage/ocr/ocr-workspace-store';
-import { addEntry as addWorkspaceEntry, readAllManifests, updateEntry, writeManifest, type FileStatus } from '$lib/server/workspace/manifest';
+import { addEntry as addWorkspaceEntry, readAllManifests, readManifest, updateEntry, writeManifest, type FileStatus } from '$lib/server/workspace/manifest';
 
 import { getAppDb } from '$lib/server/mastra/storage/libsql/app-db';
 import { marksheetSchema } from '$lib/schema/marksheet';
@@ -359,11 +359,22 @@ export const POST: RequestHandler = async ({ params, url, request, locals, cooki
       let zodErrors: string[] = [];
       let writeFailed = false;
       let validationWarnings: string[] = [];
+      let crossRefErrors: Array<{ subjectId: number; subjectCode: string | null; message: string }> | undefined;
       if (tenant.classId != null && tenant.sectionId != null) {
         try {
           const assessment = await createAssessmentServiceForRequest(tenant);
           const assigned = await assessment.getAssignedSubjects(tenant.classId, tenant.sectionId);
-          validationWarnings = crossReferenceSubjects(parsed, assigned);
+          let omitSet: Set<number> | undefined;
+          try {
+            const m = await readManifest(tenant, tenant.examTypeId);
+            const e = m.entries[params.path!];
+            if (e?.omittedSubjectIds?.length) omitSet = new Set(e.omittedSubjectIds);
+          } catch { /* best-effort */ }
+          const warnings = crossReferenceSubjects(parsed, assigned, omitSet);
+          if (warnings.length > 0) {
+            crossRefErrors = warnings;
+            validationWarnings = warnings.map(w => w.message);
+          }
         } catch { /* best-effort */ }
       }
       if (result.success) {
@@ -379,6 +390,7 @@ export const POST: RequestHandler = async ({ params, url, request, locals, cooki
             validationErrorCount: 0,
             validationWarnings: validationWarnings.length > 0 ? validationWarnings : undefined,
             validationWarningCount: validationWarnings.length > 0 ? validationWarnings.length : undefined,
+            crossRefErrors,
             status: 'Validated',
           }, tenant.examTypeId);
           return json({
@@ -432,9 +444,99 @@ export const POST: RequestHandler = async ({ params, url, request, locals, cooki
         validationErrorCount: allErrors.length,
         validationWarnings: validationWarnings.length > 0 ? validationWarnings : undefined,
         validationWarningCount: validationWarnings.length > 0 ? validationWarnings.length : undefined,
+        crossRefErrors,
         status: 'Failed',
       }, tenant.examTypeId);
       return json({ fixed: false, errors: allErrors, originalErrors: allErrors, diagnostics: llmAdvice, warnings: validationWarnings, status: 'Failed' });
+    }
+
+    if (action === 'omit-subject') {
+      if (!params.path) throw error(400, 'Path parameter required for omit-subject');
+      if (!tenant.examTypeId) throw error(400, 'EXAM_TYPE_REQUIRED for omit-subject');
+      const body = (await request.json()) as { subjectId: number; omit: boolean };
+      if (typeof body.subjectId !== 'number' || typeof body.omit !== 'boolean') {
+        throw error(400, 'Body must contain subjectId (number) and omit (boolean)');
+      }
+
+      // Read manifest, update omittedSubjectIds
+      const m = await readManifest(tenant, tenant.examTypeId);
+      const entry = m.entries[params.path];
+      const current = entry?.omittedSubjectIds ?? [];
+      const omitted = new Set(current);
+      if (body.omit) omitted.add(body.subjectId);
+      else omitted.delete(body.subjectId);
+      const newOmitted = [...omitted];
+
+      await updateEntry(tenant, params.path!, {
+        omittedSubjectIds: newOmitted,
+      }, tenant.examTypeId);
+
+      // Re-validate (same logic as action=validate)
+      const raw = await fs.readFile(resolvedPath);
+      const markdown = typeof raw === 'string' ? raw : new TextDecoder().decode(raw);
+      let validationErrors: string[] = [];
+      let validationWarnings: string[] = [];
+      let crossRefErrors: Array<{ subjectId: number; subjectCode: string | null; message: string }> | undefined;
+      if (params.path.includes('marksheets/') && params.path.endsWith('.md')) {
+        try {
+          const { parseMarksheetMarkdown, parseMentions } = await import('$lib/utils/marksheet-ast-parser');
+          const parseContext = await buildMarksheetParseContext(markdown, tenant);
+          const parsed = parseMarksheetMarkdown(markdown, parseContext);
+          const enteredAdmNo = extractTableField(markdown, 'admission no');
+          const mentions = parseMentions(markdown);
+          if (enteredAdmNo && Number(enteredAdmNo) !== parsed.student.adminNo) {
+            validationErrors.push(
+              `Admission No mismatch: file has ${enteredAdmNo}, but roster records ${parsed.student.adminNo}. The roster value will be used on reload.`
+            );
+          }
+          const result = await marksheetSchema.safeParseAsync(parsed);
+          if (!result.success) {
+            validationErrors.push(...result.error.issues.map(i => `${i.path.join('.')}: ${i.message}`));
+          }
+          if (tenant.classId != null && tenant.sectionId != null && result.success) {
+            try {
+              const assessment = await createAssessmentServiceForRequest(tenant);
+              const assigned = await assessment.getAssignedSubjects(tenant.classId, tenant.sectionId);
+              const missing = crossReferenceSubjects(result.data, assigned, omitted);
+              if (missing.length > 0) {
+                crossRefErrors = missing;
+                validationErrors.push(...missing.map(w => w.message));
+              }
+            } catch { /* best-effort */ }
+          }
+
+          const validateStatus = validationErrors.length > 0 ? 'Failed' : 'Validated';
+          await updateEntry(tenant, params.path!, {
+            validationErrors,
+            validationErrorCount: validationErrors.length,
+            validationWarnings: validationWarnings.length > 0 ? validationWarnings : undefined,
+            validationWarningCount: validationWarnings.length > 0 ? validationWarnings.length : undefined,
+            crossRefErrors,
+            omittedSubjectIds: newOmitted,
+            status: validateStatus,
+          }, tenant.examTypeId);
+
+          return json({
+            success: true,
+            validation: { errors: validationErrors, errorCount: validationErrors.length, warnings: validationWarnings, warningCount: validationWarnings.length, crossRefErrors },
+            manifestStatus: validateStatus,
+            omittedSubjectIds: newOmitted,
+          });
+        } catch (parseErr) {
+          return json({
+            success: false,
+            validation: { errors: [`Parse error: ${parseErr instanceof Error ? parseErr.message : String(parseErr)}`], errorCount: 1, warnings: [], warningCount: 0 },
+            manifestStatus: 'Failed',
+            omittedSubjectIds: newOmitted,
+          });
+        }
+      }
+      return json({
+        success: true,
+        validation: { errors: [], errorCount: 0, warnings: [], warningCount: 0 },
+        manifestStatus: 'Validated',
+        omittedSubjectIds: newOmitted,
+      });
     }
 
     if (action === 'validate') {
@@ -445,6 +547,7 @@ export const POST: RequestHandler = async ({ params, url, request, locals, cooki
 
       let validationErrors: string[] = [];
       let validationWarnings: string[] = [];
+      let crossRefErrors: Array<{ subjectId: number; subjectCode: string | null; message: string }> | undefined;
       if (params.path.includes('marksheets/') && params.path.endsWith('.md')) {
         try {
           const { parseMarksheetMarkdown, parseMentions } = await import('$lib/utils/marksheet-ast-parser');
@@ -467,22 +570,31 @@ export const POST: RequestHandler = async ({ params, url, request, locals, cooki
             try {
               const assessment = await createAssessmentServiceForRequest(tenant);
               const assigned = await assessment.getAssignedSubjects(tenant.classId, tenant.sectionId);
-              const missing = crossReferenceSubjects(result.data, assigned);
+              let omitSet: Set<number> | undefined;
+              try {
+                const m = await readManifest(tenant, tenant.examTypeId);
+                const e = m.entries[params.path!];
+                if (e?.omittedSubjectIds?.length) omitSet = new Set(e.omittedSubjectIds);
+              } catch { /* best-effort */ }
+              const missing = crossReferenceSubjects(result.data, assigned, omitSet);
               if (missing.length > 0) {
-                validationErrors.push(...missing);
+                crossRefErrors = missing;
+                validationErrors.push(...missing.map(w => w.message));
               }
             } catch { /* best-effort */ }
           }
 
+          const entryUpdate: Record<string, unknown> = {
+            validationErrors,
+            validationErrorCount: validationErrors.length,
+            validationWarnings: validationWarnings.length > 0 ? validationWarnings : undefined,
+            validationWarningCount: validationWarnings.length > 0 ? validationWarnings.length : undefined,
+            crossRefErrors,
+            status: validationErrors.length > 0 ? 'Failed' : 'Validated',
+          };
           await updateEntry(
             tenant, params.path,
-            {
-              validationErrors,
-              validationErrorCount: validationErrors.length,
-              validationWarnings: validationWarnings.length > 0 ? validationWarnings : undefined,
-              validationWarningCount: validationWarnings.length > 0 ? validationWarnings.length : undefined,
-              status: validationErrors.length > 0 ? 'Failed' : 'Validated',
-            },
+            entryUpdate as Partial<import('$lib/server/workspace/manifest').ManifestEntry>,
             tenant.examTypeId
           );
         } catch (parseErr) {
@@ -493,7 +605,7 @@ export const POST: RequestHandler = async ({ params, url, request, locals, cooki
       const validateStatus = validationErrors.length > 0 ? 'Failed' : 'Validated';
       return json({
         success: true,
-        validation: { errors: validationErrors, errorCount: validationErrors.length, warnings: validationWarnings, warningCount: validationWarnings.length },
+        validation: { errors: validationErrors, errorCount: validationErrors.length, warnings: validationWarnings, warningCount: validationWarnings.length, crossRefErrors },
         manifestStatus: validateStatus
       });
     }
@@ -568,7 +680,7 @@ export const DELETE: RequestHandler = async ({ params, url, locals, cookies }) =
       const fsModule = await import('node:fs/promises');
       await fsModule.unlink(absolute);
       let sidecarDeleted = false;
-      if (rel.startsWith('photos/') && !rel.endsWith('.json')) {
+      if (rel.startsWith('shared/photos/') && !rel.endsWith('.json')) {
         const sidecarPath = absolute.replace(/\.\w+$/, '.json');
         try { await fsModule.unlink(sidecarPath); sidecarDeleted = true; } catch { /* no sidecar */ }
       }
@@ -692,7 +804,7 @@ export const PUT: RequestHandler = async ({ params, request, locals, cookies, ur
       await fsModule.writeFile(absolute, fileBytes, { recursive: true, overwrite: true } as Parameters<typeof fsModule.writeFile>[2]);
       let sidecarWritten = false;
       const metadata = form.get('metadata');
-      if (typeof metadata === 'string' && metadata.length > 0 && rel.startsWith('photos/') && !rel.endsWith('.json')) {
+      if (typeof metadata === 'string' && metadata.length > 0 && rel.startsWith('shared/photos/') && !rel.endsWith('.json')) {
         const sidecarPath = absolute.replace(/\.\w+$/, '.json');
         await fsModule.writeFile(sidecarPath, metadata, { recursive: true, overwrite: true } as Parameters<typeof fsModule.writeFile>[2]);
         sidecarWritten = true;
@@ -748,6 +860,7 @@ export const PUT: RequestHandler = async ({ params, request, locals, cookies, ur
     let validationErrors: string[] = [];
     let validationWarnings: string[] = [];
     let status: FileStatus | undefined;
+    let crossRefErrors: Array<{ subjectId: number; subjectCode: string | null; message: string }> | undefined;
     if (manifestRelPath.includes('marksheets/') && manifestRelPath.endsWith('.md')) {
       try {
         const { parseMarksheetMarkdown, parseMentions } = await import('$lib/utils/marksheet-ast-parser');
@@ -771,9 +884,16 @@ export const PUT: RequestHandler = async ({ params, request, locals, cookies, ur
           try {
             const assessment = await createAssessmentServiceForRequest(tenant);
             const assigned = await assessment.getAssignedSubjects(tenant.classId, tenant.sectionId);
-            const missing = crossReferenceSubjects(result.data, assigned);
+            let omitSet: Set<number> | undefined;
+            try {
+              const m = await readManifest(tenant, tenant.examTypeId!);
+              const e = m.entries[manifestRelPath];
+              if (e?.omittedSubjectIds?.length) omitSet = new Set(e.omittedSubjectIds);
+            } catch { /* best-effort */ }
+            const missing = crossReferenceSubjects(result.data, assigned, omitSet);
             if (missing.length > 0) {
-              validationErrors.push(...missing);
+              crossRefErrors = missing;
+              validationErrors.push(...missing.map(w => w.message));
             }
           } catch { /* best-effort */ }
         }
@@ -785,6 +905,7 @@ export const PUT: RequestHandler = async ({ params, request, locals, cookies, ur
             validationErrorCount: validationErrors.length,
             validationWarnings: validationWarnings.length > 0 ? validationWarnings : undefined,
             validationWarningCount: validationWarnings.length > 0 ? validationWarnings.length : undefined,
+            crossRefErrors,
             status,
           },
           tenant.examTypeId

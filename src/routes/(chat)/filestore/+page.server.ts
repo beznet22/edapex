@@ -224,14 +224,11 @@ export const load: PageServerLoad = async ({ url, locals, cookies }) => {
 				const sidecar = JSON.parse(sidecarRaw) as { originalName?: string };
 				if (sidecar.originalName) originalName = sidecar.originalName;
 			} catch {
-				try {
-					await nodeFs.writeFile(sidecarPath, JSON.stringify({
-						originalName: entry.name,
-						size,
-						uploadedAt: new Date(mtimeMs ?? Date.now()).toISOString(),
-						uploadedBy: null,
-					}));
-				} catch { /* best-effort */ }
+				// No sidecar present — keep the hash as the title. The worker
+				// is the source of truth for originalName during upload; a
+				// missing sidecar means the file was added outside the
+				// import pipeline (e.g. manual copy) and we should not
+				// invent a name by writing a sidecar that lies about it.
 			}
 			sharedFiles.push({
 				id: `shared/${rel}`,
