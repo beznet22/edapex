@@ -809,6 +809,8 @@
 		if (!photo) return;
 		const key = photo.url ?? photo.id;
 		optimisticallyRemoved = new Set([...optimisticallyRemoved, key]);
+		const removedEntry = optimisticFiles.get(key);
+		if (removedEntry) optimisticFiles.delete(key);
 		clearSelection();
 		isClaiming = true;
 		try {
@@ -826,6 +828,7 @@
 			toast.success(`Claimed ${photo.title} for ${item.label}`);
 		} catch (err) {
 			optimisticallyRemoved = new Set([...optimisticallyRemoved].filter((k) => k !== key));
+			if (removedEntry) optimisticFiles.set(key, removedEntry);
 			const message = err instanceof Error ? err.message : String(err);
 			toast.error(`Failed to claim: ${message}`);
 		} finally {
