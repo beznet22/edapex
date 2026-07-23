@@ -46,6 +46,7 @@ export type BatchExtractResult = {
   key: string;
   status: "success" | "error";
   contentHash?: string;
+  ext?: string;
   mistralFileId?: string;
   error?: string;
   manifestStatus?: string;

@@ -805,7 +805,7 @@ async function runImportPhotos(
 			if (!res.ok) throw new Error(`Upload failed: ${res.status} ${await res.text().catch(() => "")}`);
 
 			succeeded++;
-			results.push({ key, status: "success", contentHash });
+			results.push({ key: name, status: "success", contentHash, ext });
 			postProgress(taskId, (i + 1) / total, `Imported ${succeeded}/${total}`);
 		} catch (err) {
 			failed++;

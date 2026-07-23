@@ -360,6 +360,34 @@
 					}
 				}
 			}
+
+			// import-photos tasks — add results to optimisticFiles on
+			// completion so the Shared tab shows the photo immediately
+			// without waiting for a reload.
+			if (task.spec.kind === "import-photos") {
+				if (task.status === "completed" && task.result) {
+					for (const result of task.result.results) {
+						if (result.status !== "success" || !result.contentHash || !result.ext) continue;
+						const ext = result.ext;
+						const url = `/api/file/shared/photos/${result.contentHash}.${ext}`;
+						const existing = next.get(url);
+						if (!existing) {
+							next.set(url, {
+								id: `shared/photos/${result.contentHash}.${ext}`,
+								title: result.key,
+								kind: "image",
+								category: "image",
+								source: "uploaded",
+								url,
+								saveUrl: url,
+								modifiedAt: Date.now(),
+								status: "success",
+							});
+							changed = true;
+						}
+					}
+				}
+			}
 		}
 
 		if (changed) optimisticFiles = next;
