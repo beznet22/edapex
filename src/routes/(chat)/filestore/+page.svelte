@@ -500,6 +500,29 @@
 		return [...map.values()].filter((f) => !optimisticallyRemoved.has(f.url ?? f.id));
 	});
 
+	// Re-enrich the inspector's filestore artifact with fresh data when the
+	// filestore load completes. This handles two cases:
+	//  1. Page reload: the inspector restores from sessionStorage with a
+	//     minimal Artifact (no studentName). Once data.files is available
+	//     with the live roster lookup, we replace the inspector's artifact
+	//     with the matching fresh file so the header shows the right name.
+	//  2. Stale data: if a student was renamed in the school, the live
+	//     lookup yields a fresh name that supersedes the persisted one.
+	$effect(() => {
+		const restored = inspector.filestoreArtifact;
+		if (!restored) return;
+		const fresh = data.files.find((f) => f.id === restored.id || f.url === restored.url);
+		if (!fresh) return;
+		if (
+			fresh.studentName === restored.studentName &&
+			fresh.studentId === restored.studentId &&
+			fresh.admissionNo === restored.admissionNo
+		) {
+			return;
+		}
+		inspector.openFilestoreArtifact(fresh);
+	});
+
 	const filteredFiles = $derived.by(() => {
 		const q = searchQuery.trim().toLowerCase();
 		const matched = mergedFiles.filter((f) => {

@@ -205,10 +205,6 @@
 			null,
 	);
 
-	const displayTitle = $derived(
-		toolOutput?.validatedTitle ?? toolOutput?.title ?? "Untitled",
-	);
-
 	// PDF URL: either derived from the API response (after generate) or probed.
 	let pdfStoragePath = $state<string | null>(null);
 	let pdfGenerating = $state(false);
@@ -477,6 +473,20 @@
 	}
 
 	const viewingId = $derived(activeId ?? artifacts[0]?.id ?? null);
+
+	// Reset per-artifact PDF state when the active artifact changes so the
+	// newly opened file is always rendered in markdown view. Without this,
+	// `pdfStoragePath` and `viewMode === "pdf"` from the previous file leak
+	// into the new one, showing the wrong PDF (or stuck in PDF mode).
+	let lastViewingId: string | null | undefined = undefined;
+	$effect(() => {
+		if (viewingId === lastViewingId) return;
+		lastViewingId = viewingId;
+		viewMode = "markdown";
+		pdfStoragePath = null;
+		pdfGenerating = false;
+	});
+
 	const current = $derived.by((): Artifact | null => {
 		const found = artifacts.find((a) => a.id === viewingId);
 		if (found) return found;
@@ -505,6 +515,14 @@
 		}
 		return null;
 	});
+
+	const displayTitle = $derived(
+		current?.studentName ??
+			toolOutput?.validatedTitle ??
+			toolOutput?.studentFullName ??
+			toolOutput?.title ??
+			"Untitled",
+	);
 
 	const marksheetStatus = $derived.by((): string | null => {
 		if (toolOutput?.marksheetStatus) return toolOutput.marksheetStatus;

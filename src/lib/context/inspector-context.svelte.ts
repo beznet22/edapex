@@ -9,6 +9,9 @@ interface SavedState {
 	activeChatArtifactId: string | null;
 	activeChatArtifactUrl?: string;
 	activeChatArtifactTitle?: string;
+	activeChatArtifactStudentName?: string;
+	activeChatArtifactStudentId?: number;
+	activeChatArtifactAdmissionNo?: number;
 }
 
 export class InspectorContext {
@@ -40,6 +43,15 @@ export class InspectorContext {
 			if (this.activeSource === "filestore" && this.filestoreArtifact) {
 				payload.activeChatArtifactUrl = this.filestoreArtifact.url;
 				payload.activeChatArtifactTitle = this.filestoreArtifact.title;
+				if (this.filestoreArtifact.studentName) {
+					payload.activeChatArtifactStudentName = this.filestoreArtifact.studentName;
+				}
+				if (this.filestoreArtifact.studentId != null) {
+					payload.activeChatArtifactStudentId = this.filestoreArtifact.studentId;
+				}
+				if (this.filestoreArtifact.admissionNo != null) {
+					payload.activeChatArtifactAdmissionNo = this.filestoreArtifact.admissionNo;
+				}
 			}
 			sessionStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
 		} catch {
@@ -76,6 +88,15 @@ export class InspectorContext {
 					status: "success",
 					kind: "document",
 				};
+				if (state.activeChatArtifactStudentName) {
+					artifact.studentName = state.activeChatArtifactStudentName;
+				}
+				if (state.activeChatArtifactStudentId != null) {
+					artifact.studentId = state.activeChatArtifactStudentId;
+				}
+				if (state.activeChatArtifactAdmissionNo != null) {
+					artifact.admissionNo = state.activeChatArtifactAdmissionNo;
+				}
 				this.filestoreArtifact = artifact;
 				this.chatArtifacts = [artifact];
 			}
