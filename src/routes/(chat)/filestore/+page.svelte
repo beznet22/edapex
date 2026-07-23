@@ -504,8 +504,8 @@
 		const q = searchQuery.trim().toLowerCase();
 		const matched = mergedFiles.filter((f) => {
 			if (q && !f.title.toLowerCase().includes(q)) return false;
-			if (categoryFilter === "images" && f.kind !== "image") return false;
-			if (categoryFilter === "pdf" && f.kind !== "pdf") return false;
+			if (categoryFilter === "images" && (f.kind !== "image" || f.id?.startsWith("shared/"))) return false;
+			if (categoryFilter === "pdf" && (f.kind !== "pdf" || f.id?.startsWith("shared/"))) return false;
 			if (
 				categoryFilter === "marksheet" &&
 				!f.url?.includes("/marksheets/")
