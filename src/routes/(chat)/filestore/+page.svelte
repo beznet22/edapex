@@ -96,6 +96,7 @@
 	let isStartingChat = $state(false);
 	let isClaiming = $state(false);
 	let optimisticFiles = $state(new Map<string, Artifact>());
+	let optimisticallyRemoved = $state(new Set<string>());
 	let lastCompletedTime = $state(0);
 
 	// Designation IDs allowed to bulk-import to the shared pool. Mirrors the
@@ -468,7 +469,7 @@
 				map.set(url, { ...existing, ...patch });
 			}
 		}
-		return [...map.values()];
+		return [...map.values()].filter((f) => !optimisticallyRemoved.has(f.url ?? f.id));
 	});
 
 	const filteredFiles = $derived.by(() => {
@@ -778,6 +779,9 @@
 		const photoId = [...selectedIds][0];
 		const photo = filteredFiles.find((f) => f.id === photoId);
 		if (!photo) return;
+		const key = photo.url ?? photo.id;
+		optimisticallyRemoved = new Set([...optimisticallyRemoved, key]);
+		clearSelection();
 		isClaiming = true;
 		try {
 			const res = await fetch("/api/photos/claim", {
@@ -789,11 +793,11 @@
 				const body = await res.text().catch(() => "");
 				throw new Error(body || `Claim failed: ${res.status}`);
 			}
-			const data2 = (await res.json()) as { photoUrl?: string };
-			clearSelection();
 			await invalidateAll();
+			optimisticallyRemoved = new Set([...optimisticallyRemoved].filter((k) => k !== key));
 			toast.success(`Claimed ${photo.title} for ${item.label}`);
 		} catch (err) {
+			optimisticallyRemoved = new Set([...optimisticallyRemoved].filter((k) => k !== key));
 			const message = err instanceof Error ? err.message : String(err);
 			toast.error(`Failed to claim: ${message}`);
 		} finally {
