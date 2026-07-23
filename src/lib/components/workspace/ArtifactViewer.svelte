@@ -47,6 +47,7 @@
 	import { patchFile } from "$lib/state/manifest-patches.svelte";
 	import { setActive as setGlobalProgress } from "$lib/state/global-context.svelte";
 
+
 	let {
 		artifacts,
 		activeId,

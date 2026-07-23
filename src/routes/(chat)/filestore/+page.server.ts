@@ -13,7 +13,7 @@ import { resolveUserRole } from "$lib/server/mastra/provider/role-resolver";
 import { getMemory } from "$lib/server/mastra";
 import { toAISdkMessages } from "@mastra/ai-sdk/ui";
 import { deriveCategory, deriveKind, deriveSource } from "$lib/utils/artifact-kind";
-import { readAllManifests } from "$lib/server/workspace/manifest";
+import { readAllManifests, addEntry, updateEntry } from "$lib/server/workspace/manifest";
 import { filterMentionableFiles } from "$lib/server/workspace/file-filters";
 import { StudentRepository } from "$lib/server/repository/student.repo";
 import type { PageServerLoad } from "./$types";
@@ -334,6 +334,64 @@ export const load: PageServerLoad = async ({ url, locals, cookies }) => {
 				const sname = pathToStudentName.get(key);
 				if (sname && !f.studentName) f.studentName = sname;
 			}
+		}
+	}
+
+	// Auto-heal: marksheet .md files without studentId may have a .raw.json
+	// sidecar (auto-saved by the editor) that contains the validated marksheet
+	// data including student.id, student.fullName, and student.adminNo.
+	// Read the sidecar, extract student identity, and write a manifest entry
+	// so subsequent resolutions (roster, direct DB) can enrich the name.
+	// This also persists the entry to disk so the fix survives page reloads.
+	for (const f of files) {
+		if (!f.id?.includes("marksheets/") || !f.id.endsWith(".md")) continue;
+		if (f.studentId != null) continue;
+
+		const fileExamTypeId = extractExamTypeFromPath(f.id);
+		if (!fileExamTypeId) continue;
+
+		const rawJsonPath = f.id.replace(/\.md$/, '.raw.json');
+		try {
+			if (!(await fs.exists(rawJsonPath))) continue;
+
+			const raw = await fs.readFile(rawJsonPath, { encoding: 'utf-8' });
+			const text = typeof raw === 'string' ? raw : raw.toString('utf-8');
+			const parsed = JSON.parse(text) as {
+				student?: { id?: number; fullName?: string; adminNo?: number };
+			};
+			const studentId = parsed?.student?.id;
+			const studentName = parsed?.student?.fullName?.trim();
+			if (studentId == null || !studentName) continue;
+			const admissionNo = parsed?.student?.adminNo;
+
+			const relKey = f.id;
+
+			// Persist to manifest (addEntry if new, updateEntry if existing)
+			const hasEntry = manifests.some((m) => m.entries[relKey] != null);
+			if (hasEntry) {
+				await updateEntry(tenant, relKey, { studentId, studentName, admissionNo }, fileExamTypeId);
+			} else {
+				await addEntry(
+					tenant,
+					{
+						path: relKey,
+						kind: 'marksheet-markdown',
+						studentId,
+						studentName,
+						admissionNo: admissionNo ?? undefined,
+						uploadedAt: new Date().toISOString(),
+						modifiedAt: new Date().toISOString(),
+					},
+					fileExamTypeId,
+				);
+			}
+
+			// Set on the artifact immediately so subsequent passes enrich the name
+			f.studentId = studentId;
+			f.studentName = studentName;
+			f.admissionNo = admissionNo ?? undefined;
+		} catch (err) {
+			console.warn(`[filestore] auto-heal failed for ${f.id}`, err);
 		}
 	}
 

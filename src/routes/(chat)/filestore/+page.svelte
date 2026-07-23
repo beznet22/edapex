@@ -45,6 +45,7 @@
 	} from "$lib/components/library";
 	import { generateId } from "ai";
 	import { useInspector } from "$lib/context/inspector-context.svelte";
+
 	import { mobileUiState } from "$lib/state/mobile-ui.svelte";
 	import { getPatches } from "$lib/state/manifest-patches.svelte";
 	import { IsMobile } from "$lib/hooks/is-mobile.svelte";
