@@ -1006,17 +1006,24 @@
 
 	async function confirmDelete() {
 		const ids = [...selectedIds];
+		const keys = ids.map((id) => {
+			const file = filteredFiles.find((f) => f.id === id);
+			return file ? (file.url ?? file.id) : id;
+		});
+		optimisticallyRemoved = new Set([...optimisticallyRemoved, ...keys]);
 		deleteDialogOpen = false;
+		clearSelection();
 		try {
 			await Promise.all(
 				ids.map((id) => fetch(`/api/file/${id}`, { method: "DELETE" })),
 			);
-			clearSelection();
 			await invalidateAll();
+			optimisticallyRemoved = new Set([...optimisticallyRemoved].filter((k) => !keys.includes(k)));
 			toast.success(
 				`Deleted ${ids.length} file${ids.length === 1 ? "" : "s"}`,
 			);
 		} catch (err) {
+			optimisticallyRemoved = new Set([...optimisticallyRemoved].filter((k) => !keys.includes(k)));
 			const message = err instanceof Error ? err.message : String(err);
 			toast.error(`Failed to delete: ${message}`);
 		}
