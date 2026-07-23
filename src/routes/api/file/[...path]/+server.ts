@@ -36,6 +36,7 @@ import { createAssessmentServiceForRequest } from '$lib/server/service/assessmen
 import { DIAGNOSTIC_MODEL } from '$lib/server/mastra/agents/diagnostic';
 import { resolveModelForRequest } from '$lib/server/mastra/provider';
 import { crossReferenceSubjects } from '$lib/server/mastra/tools/operations/reporting/marksheet/validate-cross-ref';
+import type { CrossRefWarning } from '$lib/server/mastra/tools/operations/reporting/marksheet/validate-cross-ref';
 import type { SerializedTenant } from '$lib/types/background-tasks';
 import type { FileEntry } from '@mastra/core/workspace';
 import { resolveUserRole } from '$lib/server/mastra/provider/role-resolver';
@@ -358,22 +359,28 @@ export const POST: RequestHandler = async ({ params, url, request, locals, cooki
 
       let zodErrors: string[] = [];
       let writeFailed = false;
+      let validationErrors: string[] = [];
       let validationWarnings: string[] = [];
-      let crossRefErrors: Array<{ subjectId: number; subjectCode: string | null; message: string }> | undefined;
+      let crossRefErrors: CrossRefWarning[] | undefined;
+      let omitSet: Set<number> | undefined;
+      let allowSet: Set<number> | undefined;
       if (tenant.classId != null && tenant.sectionId != null) {
         try {
           const assessment = await createAssessmentServiceForRequest(tenant);
           const assigned = await assessment.getAssignedSubjects(tenant.classId, tenant.sectionId);
-          let omitSet: Set<number> | undefined;
           try {
             const m = await readManifest(tenant, tenant.examTypeId);
             const e = m.entries[params.path!];
             if (e?.omittedSubjectIds?.length) omitSet = new Set(e.omittedSubjectIds);
+            if (e?.allowedSubjectIds?.length) allowSet = new Set(e.allowedSubjectIds);
           } catch { /* best-effort */ }
-          const warnings = crossReferenceSubjects(parsed, assigned, omitSet);
+          const warnings = crossReferenceSubjects(parsed, assigned, omitSet, allowSet);
           if (warnings.length > 0) {
             crossRefErrors = warnings;
-            validationWarnings = warnings.map(w => w.message);
+            for (const w of warnings) {
+              if (w.status === 'unresolved') validationErrors.push(w.message);
+              else validationWarnings.push(w.message);
+            }
           }
         } catch { /* best-effort */ }
       }
@@ -385,20 +392,27 @@ export const POST: RequestHandler = async ({ params, url, request, locals, cooki
         if (reValid) {
           const fixedBytes = new TextEncoder().encode(canonicalMd);
           await fs.writeFile(resolvedPath, fixedBytes, { overwrite: true });
+          const hasBlockingErrors = validationErrors.length > 0 || originalErrors.length > 0;
+          const status = hasBlockingErrors ? 'Failed' : 'Validated';
           await updateEntry(tenant, params.path!, {
-            validationErrors: [],
-            validationErrorCount: 0,
+            validationErrors: hasBlockingErrors ? validationErrors : [],
+            validationErrorCount: hasBlockingErrors ? validationErrors.length : 0,
             validationWarnings: validationWarnings.length > 0 ? validationWarnings : undefined,
             validationWarningCount: validationWarnings.length > 0 ? validationWarnings.length : undefined,
             crossRefErrors,
-            status: 'Validated',
+            omittedSubjectIds: omitSet ? [...omitSet] : undefined,
+            allowedSubjectIds: allowSet ? [...allowSet] : undefined,
+            status,
           }, tenant.examTypeId);
           return json({
             fixed: hasAdmNoMismatch,
-            errors: [],
+            errors: validationErrors,
+            warnings: validationWarnings,
             markdown: canonicalMd,
             ...(originalErrors.length > 0 ? { originalErrors } : {}),
-            ...(validationWarnings.length > 0 ? { warnings: validationWarnings } : {}),
+            crossRefErrors,
+            omittedSubjectIds: omitSet ? [...omitSet] : undefined,
+            allowedSubjectIds: allowSet ? [...allowSet] : undefined,
           });
         }
         zodErrors = !reResult.success
@@ -438,16 +452,18 @@ export const POST: RequestHandler = async ({ params, url, request, locals, cooki
         llmAdvice = '';
       }
 
-      const allErrors = [...zodErrors, ...(writeFailed ? originalErrors : [])];
+      const allErrors = [...zodErrors, ...validationErrors, ...(writeFailed ? originalErrors : [])];
       await updateEntry(tenant, params.path!, {
         validationErrors: allErrors,
         validationErrorCount: allErrors.length,
         validationWarnings: validationWarnings.length > 0 ? validationWarnings : undefined,
         validationWarningCount: validationWarnings.length > 0 ? validationWarnings.length : undefined,
         crossRefErrors,
+        omittedSubjectIds: omitSet ? [...omitSet] : undefined,
+        allowedSubjectIds: allowSet ? [...allowSet] : undefined,
         status: 'Failed',
       }, tenant.examTypeId);
-      return json({ fixed: false, errors: allErrors, originalErrors: allErrors, diagnostics: llmAdvice, warnings: validationWarnings, status: 'Failed' });
+      return json({ fixed: false, errors: allErrors, originalErrors: allErrors, diagnostics: llmAdvice, warnings: validationWarnings, status: 'Failed', crossRefErrors, omittedSubjectIds: omitSet ? [...omitSet] : undefined, allowedSubjectIds: allowSet ? [...allowSet] : undefined });
     }
 
     if (action === 'omit-subject') {
@@ -458,32 +474,40 @@ export const POST: RequestHandler = async ({ params, url, request, locals, cooki
         throw error(400, 'Body must contain subjectId (number) and omit (boolean)');
       }
 
-      // Read manifest, update omittedSubjectIds
-      const m = await readManifest(tenant, tenant.examTypeId);
-      const entry = m.entries[params.path];
-      const current = entry?.omittedSubjectIds ?? [];
-      const omitted = new Set(current);
-      if (body.omit) omitted.add(body.subjectId);
-      else omitted.delete(body.subjectId);
+      // Read manifest, update omittedSubjectIds (mutual-exclude with allowed)
+      const m2 = await readManifest(tenant, tenant.examTypeId);
+      const entry2 = m2.entries[params.path];
+      const currentOmitted = entry2?.omittedSubjectIds ?? [];
+      const currentAllowed = entry2?.allowedSubjectIds ?? [];
+      const omitted = new Set(currentOmitted);
+      const allowed = new Set(currentAllowed);
+      if (body.omit) {
+        omitted.add(body.subjectId);
+        allowed.delete(body.subjectId);
+      } else {
+        omitted.delete(body.subjectId);
+      }
       const newOmitted = [...omitted];
+      const newAllowed = [...allowed];
 
       await updateEntry(tenant, params.path!, {
         omittedSubjectIds: newOmitted,
+        allowedSubjectIds: newAllowed,
       }, tenant.examTypeId);
 
       // Re-validate (same logic as action=validate)
-      const raw = await fs.readFile(resolvedPath);
-      const markdown = typeof raw === 'string' ? raw : new TextDecoder().decode(raw);
+      const raw2 = await fs.readFile(resolvedPath);
+      const markdown2 = typeof raw2 === 'string' ? raw2 : new TextDecoder().decode(raw2);
       let validationErrors: string[] = [];
       let validationWarnings: string[] = [];
-      let crossRefErrors: Array<{ subjectId: number; subjectCode: string | null; message: string }> | undefined;
+      let crossRefErrors: CrossRefWarning[] | undefined;
       if (params.path.includes('marksheets/') && params.path.endsWith('.md')) {
         try {
           const { parseMarksheetMarkdown, parseMentions } = await import('$lib/utils/marksheet-ast-parser');
-          const parseContext = await buildMarksheetParseContext(markdown, tenant);
-          const parsed = parseMarksheetMarkdown(markdown, parseContext);
-          const enteredAdmNo = extractTableField(markdown, 'admission no');
-          const mentions = parseMentions(markdown);
+          const parseContext = await buildMarksheetParseContext(markdown2, tenant);
+          const parsed = parseMarksheetMarkdown(markdown2, parseContext);
+          const enteredAdmNo = extractTableField(markdown2, 'admission no');
+          const mentions = parseMentions(markdown2);
           if (enteredAdmNo && Number(enteredAdmNo) !== parsed.student.adminNo) {
             validationErrors.push(
               `Admission No mismatch: file has ${enteredAdmNo}, but roster records ${parsed.student.adminNo}. The roster value will be used on reload.`
@@ -493,14 +517,18 @@ export const POST: RequestHandler = async ({ params, url, request, locals, cooki
           if (!result.success) {
             validationErrors.push(...result.error.issues.map(i => `${i.path.join('.')}: ${i.message}`));
           }
-          if (tenant.classId != null && tenant.sectionId != null && result.success) {
+          if (tenant.classId != null && tenant.sectionId != null) {
             try {
               const assessment = await createAssessmentServiceForRequest(tenant);
               const assigned = await assessment.getAssignedSubjects(tenant.classId, tenant.sectionId);
-              const missing = crossReferenceSubjects(result.data, assigned, omitted);
+              const marksheetData = result.success ? result.data : parsed;
+              const missing = crossReferenceSubjects(marksheetData, assigned, omitted.size > 0 ? omitted : undefined, allowed.size > 0 ? allowed : undefined);
               if (missing.length > 0) {
                 crossRefErrors = missing;
-                validationErrors.push(...missing.map(w => w.message));
+                for (const w of missing) {
+                  if (w.status === 'unresolved') validationErrors.push(w.message);
+                  else validationWarnings.push(w.message);
+                }
               }
             } catch { /* best-effort */ }
           }
@@ -513,6 +541,7 @@ export const POST: RequestHandler = async ({ params, url, request, locals, cooki
             validationWarningCount: validationWarnings.length > 0 ? validationWarnings.length : undefined,
             crossRefErrors,
             omittedSubjectIds: newOmitted,
+            allowedSubjectIds: newAllowed,
             status: validateStatus,
           }, tenant.examTypeId);
 
@@ -521,6 +550,7 @@ export const POST: RequestHandler = async ({ params, url, request, locals, cooki
             validation: { errors: validationErrors, errorCount: validationErrors.length, warnings: validationWarnings, warningCount: validationWarnings.length, crossRefErrors },
             manifestStatus: validateStatus,
             omittedSubjectIds: newOmitted,
+            allowedSubjectIds: newAllowed,
           });
         } catch (parseErr) {
           return json({
@@ -528,6 +558,7 @@ export const POST: RequestHandler = async ({ params, url, request, locals, cooki
             validation: { errors: [`Parse error: ${parseErr instanceof Error ? parseErr.message : String(parseErr)}`], errorCount: 1, warnings: [], warningCount: 0 },
             manifestStatus: 'Failed',
             omittedSubjectIds: newOmitted,
+            allowedSubjectIds: newAllowed,
           });
         }
       }
@@ -536,6 +567,112 @@ export const POST: RequestHandler = async ({ params, url, request, locals, cooki
         validation: { errors: [], errorCount: 0, warnings: [], warningCount: 0 },
         manifestStatus: 'Validated',
         omittedSubjectIds: newOmitted,
+        allowedSubjectIds: newAllowed,
+      });
+    }
+
+    if (action === 'allow-subject') {
+      if (!params.path) throw error(400, 'Path parameter required for allow-subject');
+      if (!tenant.examTypeId) throw error(400, 'EXAM_TYPE_REQUIRED for allow-subject');
+      const body3 = (await request.json()) as { subjectId: number; allow: boolean };
+      if (typeof body3.subjectId !== 'number' || typeof body3.allow !== 'boolean') {
+        throw error(400, 'Body must contain subjectId (number) and allow (boolean)');
+      }
+
+      // Read manifest, update allowedSubjectIds (mutual-exclude with omitted)
+      const m3 = await readManifest(tenant, tenant.examTypeId);
+      const entry3 = m3.entries[params.path];
+      const currentOmitted2 = entry3?.omittedSubjectIds ?? [];
+      const currentAllowed2 = entry3?.allowedSubjectIds ?? [];
+      const omitted3 = new Set(currentOmitted2);
+      const allowed3 = new Set(currentAllowed2);
+      if (body3.allow) {
+        allowed3.add(body3.subjectId);
+        omitted3.delete(body3.subjectId);
+      } else {
+        allowed3.delete(body3.subjectId);
+      }
+      const newOmitted3 = [...omitted3];
+      const newAllowed3 = [...allowed3];
+
+      await updateEntry(tenant, params.path!, {
+        omittedSubjectIds: newOmitted3,
+        allowedSubjectIds: newAllowed3,
+      }, tenant.examTypeId);
+
+      // Re-validate
+      const raw3 = await fs.readFile(resolvedPath);
+      const markdown3 = typeof raw3 === 'string' ? raw3 : new TextDecoder().decode(raw3);
+      let validationErrors3: string[] = [];
+      let validationWarnings3: string[] = [];
+      let crossRefErrors3: CrossRefWarning[] | undefined;
+      if (params.path.includes('marksheets/') && params.path.endsWith('.md')) {
+        try {
+          const { parseMarksheetMarkdown, parseMentions } = await import('$lib/utils/marksheet-ast-parser');
+          const parseContext = await buildMarksheetParseContext(markdown3, tenant);
+          const parsed = parseMarksheetMarkdown(markdown3, parseContext);
+          const enteredAdmNo = extractTableField(markdown3, 'admission no');
+          const mentions = parseMentions(markdown3);
+          if (enteredAdmNo && Number(enteredAdmNo) !== parsed.student.adminNo) {
+            validationErrors3.push(
+              `Admission No mismatch: file has ${enteredAdmNo}, but roster records ${parsed.student.adminNo}. The roster value will be used on reload.`
+            );
+          }
+          const result3 = await marksheetSchema.safeParseAsync(parsed);
+          if (!result3.success) {
+            validationErrors3.push(...result3.error.issues.map(i => `${i.path.join('.')}: ${i.message}`));
+          }
+          if (tenant.classId != null && tenant.sectionId != null) {
+            try {
+              const assessment = await createAssessmentServiceForRequest(tenant);
+              const assigned = await assessment.getAssignedSubjects(tenant.classId, tenant.sectionId);
+              const marksheetData = result3.success ? result3.data : parsed;
+              const missing3 = crossReferenceSubjects(marksheetData, assigned, omitted3.size > 0 ? omitted3 : undefined, allowed3.size > 0 ? allowed3 : undefined);
+              if (missing3.length > 0) {
+                crossRefErrors3 = missing3;
+                for (const w of missing3) {
+                  if (w.status === 'unresolved') validationErrors3.push(w.message);
+                  else validationWarnings3.push(w.message);
+                }
+              }
+            } catch { /* best-effort */ }
+          }
+
+          const validateStatus3 = validationErrors3.length > 0 ? 'Failed' : 'Validated';
+          await updateEntry(tenant, params.path!, {
+            validationErrors: validationErrors3,
+            validationErrorCount: validationErrors3.length,
+            validationWarnings: validationWarnings3.length > 0 ? validationWarnings3 : undefined,
+            validationWarningCount: validationWarnings3.length > 0 ? validationWarnings3.length : undefined,
+            crossRefErrors: crossRefErrors3,
+            omittedSubjectIds: newOmitted3,
+            allowedSubjectIds: newAllowed3,
+            status: validateStatus3,
+          }, tenant.examTypeId);
+
+          return json({
+            success: true,
+            validation: { errors: validationErrors3, errorCount: validationErrors3.length, warnings: validationWarnings3, warningCount: validationWarnings3.length, crossRefErrors: crossRefErrors3 },
+            manifestStatus: validateStatus3,
+            omittedSubjectIds: newOmitted3,
+            allowedSubjectIds: newAllowed3,
+          });
+        } catch (parseErr) {
+          return json({
+            success: false,
+            validation: { errors: [`Parse error: ${parseErr instanceof Error ? parseErr.message : String(parseErr)}`], errorCount: 1, warnings: [], warningCount: 0 },
+            manifestStatus: 'Failed',
+            omittedSubjectIds: newOmitted3,
+            allowedSubjectIds: newAllowed3,
+          });
+        }
+      }
+      return json({
+        success: true,
+        validation: { errors: [], errorCount: 0, warnings: [], warningCount: 0 },
+        manifestStatus: 'Validated',
+        omittedSubjectIds: newOmitted3,
+        allowedSubjectIds: newAllowed3,
       });
     }
 
@@ -547,7 +684,7 @@ export const POST: RequestHandler = async ({ params, url, request, locals, cooki
 
       let validationErrors: string[] = [];
       let validationWarnings: string[] = [];
-      let crossRefErrors: Array<{ subjectId: number; subjectCode: string | null; message: string }> | undefined;
+      let crossRefErrors: CrossRefWarning[] | undefined;
       if (params.path.includes('marksheets/') && params.path.endsWith('.md')) {
         try {
           const { parseMarksheetMarkdown, parseMentions } = await import('$lib/utils/marksheet-ast-parser');
@@ -566,20 +703,26 @@ export const POST: RequestHandler = async ({ params, url, request, locals, cooki
           if (!result.success) {
             validationErrors.push(...result.error.issues.map(i => `${i.path.join('.')}: ${i.message}`));
           }
-          if (tenant.classId != null && tenant.sectionId != null && result.success) {
+          let omitSet: Set<number> | undefined;
+          let allowSet: Set<number> | undefined;
+          if (tenant.classId != null && tenant.sectionId != null) {
             try {
               const assessment = await createAssessmentServiceForRequest(tenant);
               const assigned = await assessment.getAssignedSubjects(tenant.classId, tenant.sectionId);
-              let omitSet: Set<number> | undefined;
               try {
                 const m = await readManifest(tenant, tenant.examTypeId);
                 const e = m.entries[params.path!];
                 if (e?.omittedSubjectIds?.length) omitSet = new Set(e.omittedSubjectIds);
+                if (e?.allowedSubjectIds?.length) allowSet = new Set(e.allowedSubjectIds);
               } catch { /* best-effort */ }
-              const missing = crossReferenceSubjects(result.data, assigned, omitSet);
+              const marksheetData = result.success ? result.data : parsed;
+              const missing = crossReferenceSubjects(marksheetData, assigned, omitSet, allowSet);
               if (missing.length > 0) {
                 crossRefErrors = missing;
-                validationErrors.push(...missing.map(w => w.message));
+                for (const w of missing) {
+                  if (w.status === 'unresolved') validationErrors.push(w.message);
+                  else validationWarnings.push(w.message);
+                }
               }
             } catch { /* best-effort */ }
           }
@@ -590,6 +733,8 @@ export const POST: RequestHandler = async ({ params, url, request, locals, cooki
             validationWarnings: validationWarnings.length > 0 ? validationWarnings : undefined,
             validationWarningCount: validationWarnings.length > 0 ? validationWarnings.length : undefined,
             crossRefErrors,
+            omittedSubjectIds: omitSet?.size ? [...omitSet] : undefined,
+            allowedSubjectIds: allowSet?.size ? [...allowSet] : undefined,
             status: validationErrors.length > 0 ? 'Failed' : 'Validated',
           };
           await updateEntry(
@@ -629,6 +774,7 @@ export const POST: RequestHandler = async ({ params, url, request, locals, cooki
     if (tenant.examTypeId != null) {
       const fileName = resolvedPath.split('/').pop() ?? 'file';
       const contentHash = createHash('sha256').update(bytes).digest('hex');
+      const existingEntry = (await readManifest(tenant, tenant.examTypeId)).entries[params.path ?? ''];
       await addWorkspaceEntry(
         tenant,
         {
@@ -643,6 +789,8 @@ export const POST: RequestHandler = async ({ params, url, request, locals, cooki
           modifiedAt: new Date().toISOString(),
           mimeType: contentTypeFor(resolvedPath),
           sizeBytes: bytes.length,
+          ...(existingEntry?.omittedSubjectIds ? { omittedSubjectIds: existingEntry.omittedSubjectIds } : {}),
+          ...(existingEntry?.allowedSubjectIds ? { allowedSubjectIds: existingEntry.allowedSubjectIds } : {}),
         },
         tenant.examTypeId
       );
@@ -838,6 +986,7 @@ export const PUT: RequestHandler = async ({ params, request, locals, cookies, ur
     }
     const manifestRelPath = params.path ?? '';
 
+    const existingEntry = (await readManifest(tenant, tenant.examTypeId)).entries[manifestRelPath];
     await addWorkspaceEntry(
       tenant,
       {
@@ -852,6 +1001,8 @@ export const PUT: RequestHandler = async ({ params, request, locals, cookies, ur
         modifiedAt: new Date().toISOString(),
         mimeType: contentTypeFor(resolvedPath),
         sizeBytes: bytes.length,
+        ...(existingEntry?.omittedSubjectIds ? { omittedSubjectIds: existingEntry.omittedSubjectIds } : {}),
+        ...(existingEntry?.allowedSubjectIds ? { allowedSubjectIds: existingEntry.allowedSubjectIds } : {}),
       },
       tenant.examTypeId
     );
@@ -860,7 +1011,7 @@ export const PUT: RequestHandler = async ({ params, request, locals, cookies, ur
     let validationErrors: string[] = [];
     let validationWarnings: string[] = [];
     let status: FileStatus | undefined;
-    let crossRefErrors: Array<{ subjectId: number; subjectCode: string | null; message: string }> | undefined;
+    let crossRefErrors: CrossRefWarning[] | undefined;
     if (manifestRelPath.includes('marksheets/') && manifestRelPath.endsWith('.md')) {
       try {
         const { parseMarksheetMarkdown, parseMentions } = await import('$lib/utils/marksheet-ast-parser');
@@ -880,21 +1031,27 @@ export const PUT: RequestHandler = async ({ params, request, locals, cookies, ur
         if (!result.success) {
           validationErrors.push(...result.error.issues.map(i => `${i.path.join('.')}: ${i.message}`));
         }
-        if (tenant.classId != null && tenant.sectionId != null && result.success) {
+        if (tenant.classId != null && tenant.sectionId != null) {
           try {
             const assessment = await createAssessmentServiceForRequest(tenant);
             const assigned = await assessment.getAssignedSubjects(tenant.classId, tenant.sectionId);
             let omitSet: Set<number> | undefined;
+            let allowSet: Set<number> | undefined;
             try {
               const m = await readManifest(tenant, tenant.examTypeId!);
               const e = m.entries[manifestRelPath];
               if (e?.omittedSubjectIds?.length) omitSet = new Set(e.omittedSubjectIds);
+              if (e?.allowedSubjectIds?.length) allowSet = new Set(e.allowedSubjectIds);
             } catch { /* best-effort */ }
-            const missing = crossReferenceSubjects(result.data, assigned, omitSet);
-            if (missing.length > 0) {
-              crossRefErrors = missing;
-              validationErrors.push(...missing.map(w => w.message));
-            }
+            const marksheetData = result.success ? result.data : parsed;
+            const missing = crossReferenceSubjects(marksheetData, assigned, omitSet, allowSet);
+              if (missing.length > 0) {
+                crossRefErrors = missing;
+                for (const w of missing) {
+                  if (w.status === 'unresolved') validationErrors.push(w.message);
+                  else validationWarnings.push(w.message);
+                }
+              }
           } catch { /* best-effort */ }
         }
         status = validationErrors.length > 0 ? 'Failed' : 'Validated';

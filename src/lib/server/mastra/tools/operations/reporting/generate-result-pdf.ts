@@ -22,7 +22,7 @@ import {
   type PdfArtifactData,
 } from "$lib/server/mastra/tools/operations/reporting/_shared";
 import { marksheetPdfPath } from "$lib/server/workspace/paths";
-import { addEntry } from "$lib/server/workspace/manifest";
+import { addEntry, readManifest } from "$lib/server/workspace/manifest";
 import type { WorkspaceFilesystem } from "@mastra/core/workspace";
 import { type MemoryContext } from "$lib/server/mastra/utils/chat-utils";
 
@@ -170,12 +170,24 @@ async function renderAndWriteResultPdf(args: CoreRenderArgs): Promise<CoreRender
   }
 
   // Pad missing records so the PDF includes all assigned subjects,
-  // even if the commit didn't create records for recently-added subjects
+  // even if the commit didn't create records for recently-added subjects.
+  // Omitted subjects are stripped before rendering.
   let validated: Marksheet;
   if (resolvedTenant.classId != null && resolvedTenant.sectionId != null) {
     try {
       const assigned = await assessment.getAssignedSubjects(resolvedTenant.classId, resolvedTenant.sectionId);
-      const padded = padMissingRecords(fullResult as Marksheet, assigned);
+      // Read omitted/allowed subject IDs from manifest
+      let omitSet: Set<number> | undefined;
+      let allowSet: Set<number> | undefined;
+      try {
+        const m = await readManifest(resolvedTenant, examTypeId);
+        const entry = Object.values(m.entries).find(
+          e => e.studentId === student.studentId && e.path?.includes('/marksheets/') && e.path?.endsWith('.md'),
+        );
+        if (entry?.omittedSubjectIds?.length) omitSet = new Set(entry.omittedSubjectIds);
+        if (entry?.allowedSubjectIds?.length) allowSet = new Set(entry.allowedSubjectIds);
+      } catch { /* best-effort */ }
+      const padded = padMissingRecords(fullResult as Marksheet, assigned, omitSet);
       validated = await marksheetSchema.parseAsync(padded);
     } catch {
       validated = await marksheetSchema.parseAsync(fullResult);
@@ -183,6 +195,7 @@ async function renderAndWriteResultPdf(args: CoreRenderArgs): Promise<CoreRender
   } else {
     validated = await marksheetSchema.parseAsync(fullResult);
   }
+
   const { body, head } = render(ResultTemplate, { props: { data: validated } });
   const html = pageToHtml(body, head);
   const fileBase = `res_${sanitizeForFilename(fullName)}_a${student.admissionNo ?? 0}_e${examTypeId}_${Date.now()}`;

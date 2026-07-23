@@ -177,10 +177,22 @@ export const publishResultPdfTool = createTool({
     }
 
     const publisher = await createAssessmentPublisherServiceForRequest(tenant);
+    // Read omittedSubjectIds from manifest so they are stripped from the emailed PDF
+    let omitSubjectIds: Set<number> | undefined;
+    try {
+      const manifest = await readWorkspaceManifest(tenant, examTypeId);
+      const mdPath = marksheetMarkdownPath({ studentId: student.studentId, examTypeId });
+      const entry = manifest.entries[mdPath]
+        ?? Object.values(manifest.entries).find(
+          e => e.studentId === student.studentId && e.path?.includes('/marksheets/') && e.path?.endsWith('.md'),
+        );
+      if (entry?.omittedSubjectIds?.length) omitSubjectIds = new Set(entry.omittedSubjectIds);
+    } catch { /* best-effort */ }
     const publishResult = await publisher.publishResults({
       studentIds: [student.studentId],
       examId: examTypeId,
       resend: input.resend ?? false,
+      omitSubjectIds,
     });
 
     if (!publishResult.success) {

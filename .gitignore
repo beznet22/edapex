@@ -57,6 +57,9 @@ reference/
 
 # Logo uploads (per-school, populated by PlatformTab logo upload)
 /static/uploads/logos/
+
+# (storage/ is fully ignored by storage/.gitignore; photo-archive manifests
+#  live under storage/stale-photos/ as runtime output)
 storage/edapex-mastra.db
 storage/edapex-mastra.db-wal
 storage/edapex-mastra.db-shm

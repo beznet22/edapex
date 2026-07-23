@@ -50,7 +50,7 @@ import {
   type CommitMarksheetOutput,
 } from './commit-marksheet';
 import { resolveFilesystem } from '../_shared';
-import { updateEntry } from '$lib/server/workspace/manifest';
+import { readManifest, updateEntry } from '$lib/server/workspace/manifest';
 import { createAssessmentServiceForRequest } from '$lib/server/service/assessment.service';
 import { crossReferenceSubjects, padMissingRecords } from './validate-cross-ref';
 import type { TenantContext } from '$lib/server/mastra/tenant-context';
@@ -158,7 +158,8 @@ export async function ensureMarksheetCommitted(
 	}
 
 	let parsedMarksheet: Marksheet;
-	let crossRefWarnings: string[] = [];
+	let omitSet: Set<number> | undefined;
+	let allowSet: Set<number> | undefined;
 	try {
 		const raw = await fs.readFile(markdownPath, { encoding: 'utf-8' });
 		const text = typeof raw === 'string' ? raw : raw.toString('utf-8');
@@ -166,13 +167,31 @@ export async function ensureMarksheetCommitted(
 		const parsed = parseMarksheetMarkdown(text, parseContext);
 		const validated = await marksheetSchema.parseAsync(parsed);
 
-		// Pad missing subjects before commit so all assigned subjects have DB records
+		// Read omitted and allowed subject IDs from manifest
+		if (tenant.examTypeId != null) {
+			try {
+				const m = await readManifest(tenant, tenant.examTypeId);
+				const entry = m.entries[markdownPath];
+				if (entry?.omittedSubjectIds?.length) omitSet = new Set(entry.omittedSubjectIds);
+				if (entry?.allowedSubjectIds?.length) allowSet = new Set(entry.allowedSubjectIds);
+			} catch { /* best-effort */ }
+		}
+
+		// Block commit if there are unresolved missing subjects
+		// (subjects not in either omitSet or allowSet)
 		if (tenant.classId != null && tenant.sectionId != null) {
 			try {
 				const assessment = await createAssessmentServiceForRequest(tenant);
 				const assigned = await assessment.getAssignedSubjects(tenant.classId, tenant.sectionId);
-				crossRefWarnings = crossReferenceSubjects(validated, assigned);
-				parsedMarksheet = padMissingRecords(validated, assigned);
+				const crossRefWarnings = crossReferenceSubjects(validated, assigned, omitSet, allowSet);
+				const unresolved = crossRefWarnings.filter(w => w.status === 'unresolved');
+				if (unresolved.length > 0) {
+					const result = fail('CROSS_REF_ERROR', unresolved.map(w => w.message).join('; '), markdownPath);
+					await persistValidationErrorsToManifest(tenant, markdownPath, result.errors);
+					if (throwOnFailure) throw new Error(result.errors[0].message);
+					return result;
+				}
+				parsedMarksheet = padMissingRecords(validated, assigned, omitSet);
 			} catch {
 				parsedMarksheet = validated;
 			}
@@ -189,13 +208,19 @@ export async function ensureMarksheetCommitted(
 		return result;
 	}
 
-	// Persist cross-reference warnings on manifest entry
-	if (crossRefWarnings.length > 0 && tenant.examTypeId != null) {
+	// Persist omitted/allowed subject IDs on manifest entry
+	if (tenant.examTypeId != null) {
 		try {
-			await updateEntry(tenant, markdownPath, {
-				validationWarnings: crossRefWarnings,
-				validationWarningCount: crossRefWarnings.length,
-			}, tenant.examTypeId);
+			const patch: Partial<import('$lib/server/workspace/manifest').ManifestEntry> = {};
+			if (omitSet != null && omitSet.size > 0) {
+				patch.omittedSubjectIds = [...omitSet];
+			}
+			if (allowSet != null && allowSet.size > 0) {
+				patch.allowedSubjectIds = [...allowSet];
+			}
+			if (Object.keys(patch).length > 0) {
+				await updateEntry(tenant, markdownPath, patch, tenant.examTypeId);
+			}
 		} catch { /* best-effort */ }
 	}
 

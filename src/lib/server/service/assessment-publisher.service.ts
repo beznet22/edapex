@@ -34,6 +34,8 @@ import { smSchools } from "$lib/server/db/sms-schema";
 import { getDatabase } from "$lib/server/db";
 import { env } from "$env/dynamic/private";
 import { AssessmentService } from "./assessment.service";
+import { padMissingRecords } from "$lib/server/mastra/tools/operations/reporting/marksheet/validate-cross-ref";
+import type { SubjectAssigned } from "$lib/schema/marksheet";
 import ResultTemplate from "$lib/components/template/ResultTemplate.svelte";
 import ResultEmail from "$lib/components/template/result-email.svelte";
 import { dev } from "$app/environment";
@@ -42,6 +44,7 @@ export interface PublishResultsParams {
   studentIds: number[];
   examId: number;
   resend?: boolean;
+  omitSubjectIds?: Set<number>;
 }
 
 export interface PublishResultsResult {
@@ -161,7 +164,7 @@ export class AssessmentPublisherService {
   }
 
   async publishResults(params: PublishResultsParams): Promise<PublishResultsResult> {
-    const { studentIds, examId, resend = false } = params;
+    const { studentIds, examId, resend = false, omitSubjectIds } = params;
     const messages: Array<{
       from: string;
       to: string;
@@ -191,9 +194,23 @@ export class AssessmentPublisherService {
           processingErrors.push(`Student ${studentId}: Result validation failed`);
           return null;
         }
-        const { student, school } = marksheet;
 
-        const pdfProps = { data: marksheet };
+        // Strip omitted subjects before rendering the PDF for email
+        let data = marksheet;
+        if (omitSubjectIds && omitSubjectIds.size > 0) {
+          try {
+            const tenant = this.provider.getTenant();
+            const assigned = await this.assessmentService.getAssignedSubjects(
+              tenant.classId ?? 0,
+              tenant.sectionId ?? 0,
+            );
+            data = padMissingRecords(marksheet, assigned, omitSubjectIds);
+          } catch { /* best-effort — render as-is */ }
+        }
+
+        const { student, school } = data;
+
+        const pdfProps = { data };
         let { body, head } = render(ResultTemplate, { props: pdfProps });
         let html = pageToHtml(body, head);
         const fileName = `res_${student.fullName}_a${student.adminNo}_e${examId}_${Date.now()}`;

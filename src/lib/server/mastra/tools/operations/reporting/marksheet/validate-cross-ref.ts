@@ -1,27 +1,59 @@
 import type { Marksheet, SubjectAssigned, MarksRecord } from '$lib/schema/marksheet';
 
+export interface CrossRefWarning {
+	subjectId: number;
+	subjectCode: string | null;
+	message: string;
+	/** `unresolved` — blocking error the user must Allow or Omit.
+	 *  `allowed` — user has allowed auto-fill; non-blocking info. */
+	status: 'unresolved' | 'allowed';
+}
+
 export function crossReferenceSubjects(
 	parsed: Marksheet,
 	assignedSubjects: SubjectAssigned[],
-): string[] {
+	omitSubjectIds?: Set<number>,
+	allowSubjectIds?: Set<number>,
+): CrossRefWarning[] {
 	const parsedSubjectIds = new Set(parsed.subjects.map(s => s.subjectId));
-	const warnings: string[] = [];
+	const warnings: CrossRefWarning[] = [];
 	for (const sub of assignedSubjects) {
-		if (sub.subjectId != null && !parsedSubjectIds.has(sub.subjectId)) {
-			warnings.push(`Missing subject in marksheet: ${sub.subjectCode ?? `id=${sub.subjectId}`} (assigned to class but not present in marksheet)`);
+		if (sub.subjectId == null) continue;
+		if (omitSubjectIds?.has(sub.subjectId)) continue;
+		if (!parsedSubjectIds.has(sub.subjectId)) {
+			const isAllowed = allowSubjectIds?.has(sub.subjectId) ?? false;
+			warnings.push({
+				subjectId: sub.subjectId,
+				subjectCode: sub.subjectCode,
+				message: isAllowed
+					? `Subject ${sub.subjectCode ?? `id=${sub.subjectId}`} will be auto-filled on commit`
+					: `Missing subject in marksheet: ${sub.subjectCode ?? `id=${sub.subjectId}`} (assigned to class but not present in marksheet)`,
+				status: isAllowed ? 'allowed' : 'unresolved',
+			});
 		}
 	}
-	console.log('warnings', warnings);
 	return warnings;
 }
 
 export function padMissingRecords(
 	marksheet: Marksheet,
 	assignedSubjects: SubjectAssigned[],
+	omitSubjectIds?: Set<number>,
 ): Marksheet {
+	if (omitSubjectIds && omitSubjectIds.size > 0) {
+		marksheet = {
+			...marksheet,
+			records: marksheet.records.filter(
+				r => r.subjectId == null || !omitSubjectIds.has(r.subjectId),
+			),
+			subjects: marksheet.subjects.filter(
+				s => s.subjectId == null || !omitSubjectIds.has(s.subjectId),
+			),
+		};
+	}
 	const existingSubjectIds = new Set(marksheet.records.map(r => r.subjectId));
 	const missing = assignedSubjects.filter(
-		s => s.subjectId != null && !existingSubjectIds.has(s.subjectId),
+		s => s.subjectId != null && !existingSubjectIds.has(s.subjectId) && !(omitSubjectIds?.has(s.subjectId)),
 	);
 	if (missing.length === 0) return marksheet;
 

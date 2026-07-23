@@ -34,4 +34,12 @@ export interface Artifact {
 	validationErrorCount?: number;
 	validationWarnings?: string[];
 	validationWarningCount?: number;
+	omittedSubjectIds?: number[];
+	allowedSubjectIds?: number[];
+	crossRefErrors?: Array<{
+		subjectId: number;
+		subjectCode: string | null;
+		message: string;
+		status?: 'unresolved' | 'allowed';
+	}>;
 }

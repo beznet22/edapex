@@ -89,6 +89,22 @@ export interface ManifestEntry {
    *  Non-blocking: the user is warned but the operation proceeds. */
   validationWarnings?: string[];
   validationWarningCount?: number;
+  /** Subject IDs the user has chosen to omit from cross-reference validation.
+   *  These subjects are skipped by crossReferenceSubjects and stripped by
+   *  padMissingRecords before commit/PDF generation. */
+  omittedSubjectIds?: number[];
+  /** Subject IDs the user has chosen to allow (auto-fill via padding).
+   *  These subjects are skipped by crossReferenceSubjects (not flagged as
+   *  missing) and will be padded in by padMissingRecords on commit. */
+  allowedSubjectIds?: number[];
+  /** Structured cross-reference errors for omit-eligible validation failures.
+   *  Populated alongside validationErrors so the client can render Omit buttons. */
+  crossRefErrors?: Array<{
+    subjectId: number;
+    subjectCode: string | null;
+    message: string;
+    status?: 'unresolved' | 'allowed';
+  }>;
 }
 
 export interface WorkspaceManifest {

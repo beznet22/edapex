@@ -19,7 +19,7 @@ import { json, error, type RequestHandler } from '@sveltejs/kit';
 import { z } from 'zod';
 import { resolveTenantWorkspace } from '$lib/server/workspace/scope';
 import { ALLOWED_DESIGNATIONS } from '$lib/types/sms-types';
-import { updateEntry } from '$lib/server/workspace/manifest';
+import { readManifest, updateEntry } from '$lib/server/workspace/manifest';
 import { marksheetSchema } from '$lib/schema/marksheet';
 import { buildMarksheetParseContext } from '$lib/server/mastra/tools/operations/reporting/marksheet/parse-context';
 import { commitMarksheetLogic } from '$lib/server/mastra/tools/operations/reporting/marksheet/commit-marksheet';
@@ -98,13 +98,21 @@ export const POST: RequestHandler = async ({ request, locals, cookies }) => {
 				validationErrors.push(...result.error.issues.map(i => `${i.path.join('.')}: ${i.message}`));
 			}
 
-			if (tenant.classId != null && tenant.sectionId != null && result.success) {
+			if (tenant.classId != null && tenant.sectionId != null) {
 				try {
 					const assessment = await createAssessmentServiceForRequest(tenant);
 					const assigned = await assessment.getAssignedSubjects(tenant.classId, tenant.sectionId);
-					const missing = crossReferenceSubjects(result.data, assigned);
+					const m = await readManifest(tenant, examTypeId);
+					const entry = m.entries[manifestRelPath];
+					const omitSet = new Set(entry?.omittedSubjectIds ?? []);
+					const allowSet = new Set(entry?.allowedSubjectIds ?? []);
+					const marksheetData = result.success ? result.data : parsed;
+					const missing = crossReferenceSubjects(marksheetData, assigned, omitSet.size > 0 ? omitSet : undefined, allowSet.size > 0 ? allowSet : undefined);
 					if (missing.length > 0) {
-						validationErrors.push(...missing);
+						for (const w of missing) {
+							if (w.status === 'unresolved') validationErrors.push(w.message);
+							else validationWarnings.push(w.message);
+						}
 					}
 				} catch { /* best-effort */ }
 			}

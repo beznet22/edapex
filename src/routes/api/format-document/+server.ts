@@ -8,6 +8,7 @@ import { extractRateLimitFromHeaders } from '$lib/provider/rate-limit';
 import { deriveInitialFilename } from '$lib/server/mastra/tools/operations/reporting/marksheet/stream-document';
 import { buildMarksheetParseContext } from '$lib/server/mastra/tools/operations/reporting/marksheet/parse-context';
 import { crossReferenceSubjects } from '$lib/server/mastra/tools/operations/reporting/marksheet/validate-cross-ref';
+import type { CrossRefWarning } from '$lib/server/mastra/tools/operations/reporting/marksheet/validate-cross-ref';
 import { type Marksheet } from '$lib/schema/marksheet';
 import { ALLOWED_DESIGNATIONS } from '$lib/types/sms-types';
 import { GROQ_FORMAT_MODEL } from '$lib/server/mastra/agents/format';
@@ -366,19 +367,32 @@ export const POST: RequestHandler = async ({ request, locals, cookies }) => {
 
     // Cross-reference validation against assigned subjects (soft warnings)
     let crossRefWarnings: string[] = [];
+    let crossRefErrors: CrossRefWarning[] | undefined;
     if (!resolutionError && tenant.classId != null && tenant.sectionId != null && parsedMarksheet) {
       try {
         const assessment = await createAssessmentServiceForRequest(tenant);
         const assigned = await assessment.getAssignedSubjects(tenant.classId, tenant.sectionId);
-        crossRefWarnings = crossReferenceSubjects(parsedMarksheet, assigned);
+        let omitSet: Set<number> | undefined;
+        let allowSet: Set<number> | undefined;
+        const mdEntry = manifest.entries[initialMarkdownPath];
+        if (mdEntry?.omittedSubjectIds?.length) omitSet = new Set(mdEntry.omittedSubjectIds);
+        if (!omitSet && entry?.omittedSubjectIds?.length) omitSet = new Set(entry.omittedSubjectIds);
+        if (mdEntry?.allowedSubjectIds?.length) allowSet = new Set(mdEntry.allowedSubjectIds);
+        if (!allowSet && entry?.allowedSubjectIds?.length) allowSet = new Set(entry.allowedSubjectIds);
+        const warnings = crossReferenceSubjects(parsedMarksheet, assigned, omitSet, allowSet);
+        if (warnings.length > 0) {
+          crossRefErrors = warnings;
+          crossRefWarnings = warnings.map(w => w.message);
+        }
       } catch { /* best-effort */ }
     }
 
-    if (crossRefWarnings.length > 0) {
+    if (crossRefWarnings.length > 0 || crossRefErrors) {
       try {
         await updateEntry(tenant, initialMarkdownPath, {
-          validationWarnings: crossRefWarnings,
-          validationWarningCount: crossRefWarnings.length,
+          validationWarnings: crossRefWarnings.length > 0 ? crossRefWarnings : undefined,
+          validationWarningCount: crossRefWarnings.length > 0 ? crossRefWarnings.length : undefined,
+          crossRefErrors,
         }, examTypeId);
       } catch { /* best-effort */ }
     }
