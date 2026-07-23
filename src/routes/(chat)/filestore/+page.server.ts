@@ -247,7 +247,11 @@ export const load: PageServerLoad = async ({ url, locals, cookies }) => {
 			});
 		}
 	} catch (err) {
-		console.warn("[filestore] failed to list shared dir", err);
+		// ENOENT is expected when the shared dir has never been created
+		// (e.g. no imports yet). Any other error is worth logging.
+		if ((err as NodeJS.ErrnoException).code !== "ENOENT") {
+			console.warn("[filestore] failed to list shared dir", err);
+		}
 	}
 	files = [...files, ...sharedFiles];
 
