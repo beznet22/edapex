@@ -317,6 +317,7 @@ export const POST: RequestHandler = async ({ request, locals, cookies }) => {
       const backfill: Record<string, unknown> = {};
       if (student.studentId) backfill.studentId = student.studentId;
       if (student.admissionNo) backfill.admissionNo = student.admissionNo;
+      if (student.fullName) backfill.studentName = student.fullName;
       const manifestKey = body.filePath
         ? (body.filePath.split("/").pop() ?? body.filePath)
         : body.contentHash

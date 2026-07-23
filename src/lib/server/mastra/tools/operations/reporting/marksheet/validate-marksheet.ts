@@ -332,6 +332,7 @@ export const validateMarksheetTool = createTool({
 					documentId: String(finalJson.student.id),
 					fileName: canonicalMarkdownPath.split('/').pop(),
 					studentId: finalJson.student.id,
+					studentName: finalJson.student.fullName ?? undefined,
 					examTypeId,
 					uploadedAt: new Date().toISOString(),
 					modifiedAt: new Date().toISOString(),

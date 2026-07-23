@@ -306,9 +306,9 @@ MIDDLEBASIC: Subject Code | MTA (30) | CA (10) | REPORT (10) | EXAM (50)`;
         if (match) {
           resolvedStudentId = match.id;
           resolvedAdmNo = parsedAdmNo;
-          await updateEntry(tenant, initialMarkdownPath, { studentId: match.id, admissionNo: parsedAdmNo }, examTypeId);
+          await updateEntry(tenant, initialMarkdownPath, { studentId: match.id, admissionNo: parsedAdmNo, ...(resolvedFullName ? { studentName: resolvedFullName } : {}) }, examTypeId);
           if (entry.path) {
-            await updateEntry(tenant, entry.path, { studentId: match.id, admissionNo: parsedAdmNo }, examTypeId);
+            await updateEntry(tenant, entry.path, { studentId: match.id, admissionNo: parsedAdmNo, ...(resolvedFullName ? { studentName: resolvedFullName } : {}) }, examTypeId);
           }
         }
       }

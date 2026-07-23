@@ -351,6 +351,7 @@ export const POST: RequestHandler = async ({ request, locals, cookies }) => {
     const entryUpdate: Record<string, unknown> = {};
     if (resolvedStudentId) entryUpdate.studentId = resolvedStudentId;
     if (resolvedAdmNo) entryUpdate.admissionNo = resolvedAdmNo;
+    if (studentFullName) entryUpdate.studentName = studentFullName;
     if (resolutionError) {
       entryUpdate.validationErrors = [resolutionError];
       entryUpdate.validationErrorCount = 1;

@@ -73,6 +73,12 @@ export interface ManifestEntry {
   contentHash?: string;
   studentId?: number;
   admissionNo?: number;
+  /** Denormalised student display name. Set on marksheet/transcript/photo
+   *  entries when identity is resolved during format/validate. The
+   *  filestore load function prefers a live `studentId -> students.fullName`
+   *  lookup and falls back to this value when the roster no longer has
+   *  the student (e.g. the student was deleted). */
+  studentName?: string;
   examTypeId?: number;
   academicId?: number;
   recordId?: number;

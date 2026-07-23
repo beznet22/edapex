@@ -503,7 +503,7 @@
 	const filteredFiles = $derived.by(() => {
 		const q = searchQuery.trim().toLowerCase();
 		const matched = mergedFiles.filter((f) => {
-			if (q && !f.title.toLowerCase().includes(q)) return false;
+			if (q && !displayTitle(f).toLowerCase().includes(q)) return false;
 			if (categoryFilter === "images" && (f.kind !== "image" || f.id?.startsWith("shared/"))) return false;
 			if (categoryFilter === "pdf" && (f.kind !== "pdf" || f.id?.startsWith("shared/"))) return false;
 			if (
@@ -544,7 +544,7 @@
 		const dir = sortDir === "asc" ? 1 : -1;
 		const sorted = [...matched].sort((a, b) => {
 			if (sortBy === "name") {
-				return a.title.localeCompare(b.title) * dir;
+				return displayTitle(a).localeCompare(displayTitle(b)) * dir;
 			}
 			if (sortBy === "size") {
 				return ((a.size ?? 0) - (b.size ?? 0)) * dir;
@@ -723,7 +723,7 @@
 		if (!file.url) return;
 		const a = document.createElement("a");
 		a.href = file.url;
-		a.download = file.title;
+		a.download = displayTitle(file);
 		document.body.appendChild(a);
 		a.click();
 		document.body.removeChild(a);
@@ -762,6 +762,10 @@
 			.toLowerCase()
 			.replace(/[^a-z0-9._-]+/g, "-")
 			.replace(/^-+|-+$/g, "");
+	}
+
+	function displayTitle(f: Artifact): string {
+		return f.studentName ?? f.title;
 	}
 
 	async function handleFileUpload(event: Event) {
@@ -915,7 +919,7 @@
 						JSON.stringify({
 							k: ch,
 							p: relPath,
-							n: f.title,
+							n: displayTitle(f),
 							m:
 								(f as any).mimeType ??
 								"application/octet-stream",
@@ -1586,7 +1590,7 @@
 						{@const isActive =
 							inspector.filestoreArtifact?.id === file.id}
 						{@const isSelected = selectedIds.has(file.id)}
-						{@const displayName = file.title.replace(
+						{@const displayName = displayTitle(file).replace(
 							/\.[a-z0-9]+$/i,
 							"",
 						)}
@@ -1657,7 +1661,7 @@
 
 							<h3
 								class="absolute capitalize text-base top-3 left-3 right-12 font-bold leading-tight line-clamp-2 text-white drop-shadow-sm pointer-events-none"
-								title={file.title}
+								title={displayTitle(file)}
 							>
 								{displayName}
 							</h3>
@@ -1820,7 +1824,7 @@
 										<span
 											class="truncate text-sm font-medium text-foreground/90"
 										>
-											{file.title}
+											{displayTitle(file)}
 										</span>
 										<span
 											class="truncate text-xs text-muted-foreground sm:hidden"

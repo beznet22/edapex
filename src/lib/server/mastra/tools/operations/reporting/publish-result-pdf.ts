@@ -216,9 +216,10 @@ export const publishResultPdfTool = createTool({
     const jsonPath = marksheetJsonPath(student.studentId, examTypeId);
     await updateEntryStatus(tenant, jsonPath, 'published', examTypeId);
     const mdPath = marksheetMarkdownPath({ studentId: student.studentId, examTypeId });
-    await updateEntry(tenant, jsonPath, { status: 'Published' }, examTypeId);
-    await updateEntry(tenant, mdPath, { status: 'Published' }, examTypeId);
-    await updateEntry(tenant, storagePath, { status: 'Published' }, examTypeId);
+    const publishedName = student.fullName ?? undefined;
+    await updateEntry(tenant, jsonPath, { status: 'Published', ...(publishedName ? { studentName: publishedName, studentId: student.studentId, admissionNo: student.admissionNo ?? undefined } : {}) }, examTypeId);
+    await updateEntry(tenant, mdPath, { status: 'Published', ...(publishedName ? { studentName: publishedName, studentId: student.studentId, admissionNo: student.admissionNo ?? undefined } : {}) }, examTypeId);
+    await updateEntry(tenant, storagePath, { status: 'Published', ...(publishedName ? { studentName: publishedName, studentId: student.studentId, admissionNo: student.admissionNo ?? undefined } : {}) }, examTypeId);
 
     await emitNotification(
       writer,

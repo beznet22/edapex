@@ -234,6 +234,7 @@ export async function commitMarksheetLogic(
 	if (options.sourcePath) {
 		const admissionNo =
 			validated.student?.adminNo != null ? Number(validated.student.adminNo) : undefined;
+		const studentName = validated.student?.fullName ?? undefined;
 		await updateEntry(
 			tenant,
 			options.sourcePath,
@@ -242,7 +243,8 @@ export async function commitMarksheetLogic(
 				marksheetStatus: 'committed',
 				recordId,
 				studentId: input.studentId,
-				...(admissionNo != null ? { admissionNo } : {})
+				...(admissionNo != null ? { admissionNo } : {}),
+				...(studentName ? { studentName } : {})
 			},
 			examTypeId
 		);

@@ -27,6 +27,11 @@ export interface Artifact {
 	examTypeId?: number;
 	studentId?: number;
 	admissionNo?: number;
+	/** Resolved student display name. Set on marksheet/transcript files
+	 *  via the live `studentId -> students.fullName` lookup in the
+	 *  filestore load, falling back to the denormalised manifest value
+	 *  when the student is no longer in the roster. */
+	studentName?: string;
 	contentHash?: string;
 	documentId?: string;
 	mimeType?: string;

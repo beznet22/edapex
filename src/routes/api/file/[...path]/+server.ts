@@ -791,6 +791,9 @@ export const POST: RequestHandler = async ({ params, url, request, locals, cooki
           sizeBytes: bytes.length,
           ...(existingEntry?.omittedSubjectIds ? { omittedSubjectIds: existingEntry.omittedSubjectIds } : {}),
           ...(existingEntry?.allowedSubjectIds ? { allowedSubjectIds: existingEntry.allowedSubjectIds } : {}),
+          ...(existingEntry?.studentName ? { studentName: existingEntry.studentName } : {}),
+          ...(existingEntry?.studentId ? { studentId: existingEntry.studentId } : {}),
+          ...(existingEntry?.admissionNo ? { admissionNo: existingEntry.admissionNo } : {}),
         },
         tenant.examTypeId
       );
@@ -1003,6 +1006,9 @@ export const PUT: RequestHandler = async ({ params, request, locals, cookies, ur
         sizeBytes: bytes.length,
         ...(existingEntry?.omittedSubjectIds ? { omittedSubjectIds: existingEntry.omittedSubjectIds } : {}),
         ...(existingEntry?.allowedSubjectIds ? { allowedSubjectIds: existingEntry.allowedSubjectIds } : {}),
+        ...(existingEntry?.studentName ? { studentName: existingEntry.studentName } : {}),
+        ...(existingEntry?.studentId ? { studentId: existingEntry.studentId } : {}),
+        ...(existingEntry?.admissionNo ? { admissionNo: existingEntry.admissionNo } : {}),
       },
       tenant.examTypeId
     );

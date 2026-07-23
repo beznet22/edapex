@@ -1,7 +1,7 @@
 import { error } from "@sveltejs/kit";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray, isNotNull } from "drizzle-orm";
 import { getDatabase } from "$lib/server/db";
-import { smAcademicYears, smExamTypes } from "$lib/server/db/sms-schema";
+import { smAcademicYears, smExamTypes, smStudents } from "$lib/server/db/sms-schema";
 import {
 	resolveExamTypeId,
 } from "$lib/server/mastra/tenant-context";
@@ -285,6 +285,7 @@ export const load: PageServerLoad = async ({ url, locals, cookies }) => {
 		const pathToMimeType = new Map<string, string>();
 		const pathToStudentId = new Map<string, number>();
 		const pathToAdmissionNo = new Map<string, number>();
+		const pathToStudentName = new Map<string, string>();
 		for (const manifest of manifests) {
 			for (const [relPath, entry] of Object.entries(manifest.entries)) {
 				if (entry.marksheetStatus) pathToMarksheetStatus.set(relPath, entry.marksheetStatus);
@@ -297,6 +298,7 @@ export const load: PageServerLoad = async ({ url, locals, cookies }) => {
 				if (entry.mimeType) pathToMimeType.set(relPath, entry.mimeType);
 				if (entry.studentId) pathToStudentId.set(relPath, entry.studentId);
 				if (entry.admissionNo) pathToAdmissionNo.set(relPath, entry.admissionNo);
+				if (entry.studentName) pathToStudentName.set(relPath, entry.studentName);
 			}
 		}
 		for (const f of files) {
@@ -329,7 +331,72 @@ export const load: PageServerLoad = async ({ url, locals, cookies }) => {
 				if (sid && !f.studentId) f.studentId = sid;
 				const adm = pathToAdmissionNo.get(key);
 				if (adm && !f.admissionNo) f.admissionNo = adm;
+				const sname = pathToStudentName.get(key);
+				if (sname && !f.studentName) f.studentName = sname;
 			}
+		}
+	}
+
+	// Prefer live student names from the class roster over the denormalised
+	// manifest value. Old entries without a denormalised name get enriched
+	// here too; entries whose student was removed from the roster keep
+	// their denormalised value (assigned above), so no name is ever lost.
+	if (classStudents.length > 0) {
+		const liveNameById = new Map<number, string>();
+		for (const s of classStudents) {
+			if (s.name) liveNameById.set(s.id, s.name);
+		}
+		for (const f of files) {
+			if (f.studentId != null) {
+				const live = liveNameById.get(f.studentId);
+				if (live) f.studentName = live;
+			}
+		}
+	}
+
+	// Fallback: any file whose `studentId` is set but whose name was not
+	// resolved by the class-roster lookup (e.g. the student was promoted,
+	// transferred to another section, or the roster query returned an empty
+	// result because the active academic year differs from the records'
+	// academic year) gets a direct name lookup against `sm_students`. This
+	// bypasses the strict student_records join in
+	// StudentRepository.getStudentsByClassSection and works for any student
+	// in the school. Best-effort — failure does not break the page.
+	const missingIds = new Set<number>();
+	for (const f of files) {
+		if (f.studentId != null && !f.studentName) {
+			missingIds.add(f.studentId);
+		}
+	}
+	if (missingIds.size > 0) {
+		try {
+			const rows = await db
+				.select({
+					id: smStudents.id,
+					fullName: smStudents.fullName,
+					firstName: smStudents.firstName,
+					lastName: smStudents.lastName,
+				})
+				.from(smStudents)
+				.where(
+					and(
+						inArray(smStudents.id, [...missingIds]),
+						isNotNull(smStudents.fullName)
+					)
+				);
+			const nameById = new Map<number, string>();
+			for (const r of rows) {
+				const name = r.fullName ?? [r.firstName, r.lastName].filter(Boolean).join(" ").trim();
+				if (name) nameById.set(r.id, name);
+			}
+			for (const f of files) {
+				if (f.studentId != null && !f.studentName) {
+					const direct = nameById.get(f.studentId);
+					if (direct) f.studentName = direct;
+				}
+			}
+		} catch (err) {
+			console.warn("[filestore] direct sm_students lookup failed", err);
 		}
 	}
 
