@@ -505,7 +505,7 @@ function mergeContext(result: Marksheet, context?: ParseContext): Marksheet {
   if (tenant?.examTypeId != null) student.examTypeId = tenant.examTypeId;
   if (tenant?.className) student.className = tenant.className;
   if (tenant?.sectionName) student.sectionName = tenant.sectionName;
-  if (tenant?.fullName) student.fullName = tenant.fullName;
+  if (tenant?.fullName && !student.fullName?.trim()) student.fullName = tenant.fullName;
   if (tenant?.academicYearTitle && !student.sessionYear) {
     student.sessionYear = tenant.academicYearTitle;
   }

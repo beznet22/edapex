@@ -381,6 +381,12 @@ export class AssessmentService {
       );
     }
 
+    const marksheetName = marksheet.student.fullName?.trim();
+    const dbName = studentRecord.fullName?.trim();
+    if (marksheetName && dbName && marksheetName !== dbName) {
+      await this.student().updateStudent({ studentId, fullName: marksheetName });
+    }
+
     return await this.result().db.transaction(async (tx: MySQLDrizzleClient) => {
       const category = categoryEnum.parse(marksheet.student.category);
       const academicId = await this.result().getAcademicId();
