@@ -200,7 +200,7 @@ describe('discoverProviderModels', () => {
 							id: 'm2',
 							name: 'Model Two',
 							context_length: 8192,
-							supported_parameters: ['reasoning', 'reasoning_effort'],
+							supported_parameters: ['reasoning', 'reasoningEffort'],
 							architecture: { input_modalities: ['image', 'file'], output_modalities: ['text'] },
 							pricing: { prompt: '0', completion: '0' }
 						}

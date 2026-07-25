@@ -69,6 +69,7 @@
 
   // Context
   const chat = $derived(useChat());
+  $inspect("Chat Messages", chat.messages);
   const userContext = UserContext.fromContext();
 
   let copyMessage = (content: string, role: string) => {

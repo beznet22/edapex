@@ -209,6 +209,25 @@ export const potluckConfig = sqliteTable('potluck_config', {
 });
 
 /**
+ * Parent Auth Codes Table
+ *
+ * One-time class-level shared codes for the /connect flow. A teacher generates
+ * a 6-digit code for their class; any parent whose child is in that class can
+ * use it to link their Telegram account. Codes expire after 7 days.
+ * The raw 6-digit code is shown to the teacher once; only the bcrypt hash is
+ * stored. Consumption tracking is unnecessary — the code is a class-level
+ * shared secret, and telegram_parent_link provides the audit trail.
+ */
+export const parentAuthCodes = sqliteTable('parent_auth_codes', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  classId: integer('class_id').notNull(),
+  codeHash: text('code_hash').notNull(),
+  generatedBy: integer('generated_by').notNull(),
+  expiresAt: text('expires_at').notNull(),
+  createdAt: text('created_at').notNull().default(sql`(datetime('now'))`),
+});
+
+/**
  * Telegram Parent Link Table
  *
  * Maps a Telegram chat_id to a parent record with denormalized school contact

@@ -5,7 +5,7 @@
 	"packageManager": "pnpm@9.15.0",
 	"type": "module",
 	"scripts": {
-		"dev": "vite dev",
+		"dev": "NODE_OPTIONS='--dns-result-order=ipv4first' vite dev",
 		"build": "vite build",
 		"preview": "vite preview",
 		"start": "node build/index.js",

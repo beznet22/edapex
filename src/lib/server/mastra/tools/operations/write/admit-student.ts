@@ -10,7 +10,7 @@ import { StudentRepository } from "../../../../repository/student.repo";
 import { TimelineRepository } from "../../../../repository/timeline.repo";
 import { bridgeToolContext } from "../../internal/bridge";
 
-export const onboardEntitySchema = z.object({
+export const admitStudentSchema = z.object({
   studentDetails: z.object({
     firstName: z.string().describe("The student's first name"),
     lastName: z.string().describe("The student's last name"),
@@ -30,13 +30,13 @@ export const onboardEntitySchema = z.object({
   reason: z.string().describe("Human-readable action summary for user approval."),
 });
 
-export type OnboardEntityPayload = z.infer<typeof onboardEntitySchema>;
+export type AdmitStudentPayload = z.infer<typeof admitStudentSchema>;
 
-type EnrollStudentResult =
+type AdmitStudentResult =
   | { status: "SUCCESS"; studentId: number; admissionNumber: number | null; message: string }
   | { status: "ERROR"; errorCode: string; message: string; suggestion?: string };
 
-function isEnrollStudentResult(value: unknown): value is EnrollStudentResult {
+function isAdmitStudentResult(value: unknown): value is AdmitStudentResult {
   if (typeof value !== "object" || value === null) return false;
   if (!("status" in value)) return false;
   const status = value.status;
@@ -69,11 +69,11 @@ export const getRegistrationOptions = async (context?: MastraToolContext) => {
   return await studentRepo.getStudentRegistrationOptions();
 };
 
-export const onboardEntityLogic = async (
+export const admitStudentLogic = async (
   context: MastraToolContext,
-  payload: OnboardEntityPayload,
+  payload: AdmitStudentPayload,
   options: { simulateUserExists?: boolean } = {},
-): Promise<EnrollStudentResult> => {
+): Promise<AdmitStudentResult> => {
   const { tenantContext, getRepo } = context;
 
   if (options.simulateUserExists) {
@@ -137,8 +137,8 @@ export const onboardEntityLogic = async (
     const resultRecord = result;
 
     const auditDescription = JSON.stringify({
-      action: "onboard",
-      type: "onboardEntity",
+      action: "admit",
+      type: "admitStudent",
       studentId: resultRecord.id,
       threadId: audit?.threadId,
       modelId: audit?.modelId,
@@ -178,17 +178,17 @@ export const onboardEntityLogic = async (
   }
 };
 
-export const enrollStudentTool = createTool({
-  id: "enroll-student",
+export const admitStudentTool = createTool({
+  id: "admit-student",
   description: "Enroll a new student into a class, with their guardian record, in the active academic context.",
-  inputSchema: onboardEntitySchema,
+  inputSchema: admitStudentSchema,
   requireApproval: true,
-  execute: async (input: OnboardEntityPayload, context: ToolExecutionContext) => {
+  execute: async (input: AdmitStudentPayload, context: ToolExecutionContext) => {
     const ctx = await bridgeToolContext(context);
-    return onboardEntityLogic(ctx, input);
+    return admitStudentLogic(ctx, input);
   },
   toModelOutput: (output: unknown) => {
-    if (!isEnrollStudentResult(output)) {
+    if (!isAdmitStudentResult(output)) {
       return JSON.stringify(output);
     }
     if (output.status === "ERROR") {

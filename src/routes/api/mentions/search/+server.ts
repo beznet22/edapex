@@ -454,7 +454,7 @@ async function searchEntities(
 ): Promise<ExtendedMentionSearchResult[]> {
 	const clampedLimit = Math.min(limit, 10);
 	if (category === 'students') return searchStudents(query, tenant, clampedLimit, classId, sectionId);
-	if (category === 'class_section') return searchClassSection(query, tenant, clampedLimit, classId);
+	if (category === 'class_section') return searchClassSection(query, tenant, clampedLimit, null);
 	if (category === 'exam') return searchExam(query, tenant, clampedLimit);
 	if (category === 'academic_year') return searchAcademicYear(query, tenant, clampedLimit);
 	if (category === 'file') return searchFile(query, tenant, clampedLimit);

@@ -128,7 +128,7 @@ It reads `tenantContext`, `threadId`, `modelId` from the request context, awaits
 
 ### 4.4 Workspace lock
 
-`validateWorkspaceLock(context, targetClassId, targetSectionId)` (`tenant-context.ts:68`) throws `WorkspaceMismatchError` if the target class/section is outside the caller's active workspace. Called from destructive tools (`onboardEntity`, `patchEntity`, `assignEntity`) before any state mutation.
+`validateWorkspaceLock(context, targetClassId, targetSectionId)` (`tenant-context.ts:68`) throws `WorkspaceMismatchError` if the target class/section is outside the caller's active workspace. Called from destructive tools (`admitStudent`, `patchEntity`, `assignEntity`) before any state mutation.
 
 ### 4.5 Role whitelist
 

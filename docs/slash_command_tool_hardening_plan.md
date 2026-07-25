@@ -5,7 +5,7 @@
 
 ## 0. Executive Summary
 
-Eight back-end slash-command tools (`searchEntity`, `manageResults`, `onboardEntity`, `assignEntity`, `patchEntity`, `manageAccess`, `switchWorkspace`, `systemStatus`) and **four** workflow tools (`extract`, `generate`, `validate`, `publish`) ship today, but a critical review reveals **twelve concrete bug classes** that prevent them from returning real data at runtime. The fourth workflow tool, `generate`, is in an even worse state than the other three: `generateWorkflow` is registered in the Mastra instance (`src/lib/server/mastra/index.ts:18,48`) but **no `generateTool`, `generateLogic`, or `generateSchema` exists in `tools/workflow-tools.ts`** and `tools/index.ts` does not export one. `/generate` is therefore not just a stub — it does not exist as a tool at all.
+Eight back-end slash-command tools (`searchEntity`, `manageResults`, `admitStudent`, `assignEntity`, `patchEntity`, `manageAccess`, `switchWorkspace`, `systemStatus`) and **four** workflow tools (`extract`, `generate`, `validate`, `publish`) ship today, but a critical review reveals **twelve concrete bug classes** that prevent them from returning real data at runtime. The fourth workflow tool, `generate`, is in an even worse state than the other three: `generateWorkflow` is registered in the Mastra instance (`src/lib/server/mastra/index.ts:18,48`) but **no `generateTool`, `generateLogic`, or `generateSchema` exists in `tools/workflow-tools.ts`** and `tools/index.ts` does not export one. `/generate` is therefore not just a stub — it does not exist as a tool at all.
 
 The right fix is **not** a new abstraction layer — the existing `ScopedRepositoryProvider` and `AssessmentService` are sufficient. The fix is a **single, well-defined bridge** between the Mastra `ToolExecutionContext` (which carries `requestContext`) and the `MastraToolContext` shape our logic functions consume, plus a small set of `AssessmentService` extensions for the gaps that the tools hit at runtime.
 
@@ -125,7 +125,7 @@ Each bug is keyed to a file:line and a slash command. Bugs are ordered by severi
 - **Impact:** Reaches past the `StaffRepository` abstraction into raw Drizzle, importing `smStaffs` directly. Breaks the `BaseRepository.withErrorHandling` envelope, so Drizzle errors propagate as raw exceptions instead of `DbInternalError`. Also bypasses the configuration cache and any future cross-cutting concern (e.g., read-replica routing) added to the repo.
 - **Fix:** Add `StaffRepository.getById(teacherId)` mirroring `StudentRepository.getById`, and call it.
 
-### B11. **[MEDIUM · contract drift]** `onboardEntityLogic` queries `smBaseGroups` / `smBaseSetups` / `smStudentCategories` via raw Drizzle
+### B11. **[MEDIUM · contract drift]** `admitStudentLogic` queries `smBaseGroups` / `smBaseSetups` / `smStudentCategories` via raw Drizzle
 - **Where:** `src/lib/server/mastra/tools/onboard-tools.ts:74-119`
 - **Impact:** Same as B10 — bypasses repository, no error envelope, no caching, and duplicates the SQL already inside `studentRepo.getStudentRegistrationOptions` (`student.repo.ts:648-693`).
 - **Fix:** Replace the inline `studentRepo.db.select...` calls with calls to `studentRepo.resolveGenderId(name)` and `studentRepo.resolveStudentCategoryId(name)` (new methods we will add — see §3.1) that mirror the registration-options query and live behind `withErrorHandling`.
@@ -141,7 +141,7 @@ These fill the gaps that the slash-command tools hit at runtime.
 | Method | Signature | Used by | Notes |
 |---|---|---|---|
 | `upsertMarksForClassSection` | `(params: { classId, sectionId, examTypeId, marks: Array<{ studentId, subjectId, score, ... }>, staffId }) => Promise<{ count: number; errors: string[] }>` | new "bulk grade entry" use case (not in any current tool, but referenced in `slash_command_specs.md` §2.1 step 5) | atomic transaction |
-| `resolveGenderAndCategory` | `(params: { genderName, categoryName }) => Promise<{ genderId?: number; studentCategoryId?: number }>` | `onboardEntityLogic` (replaces B11's raw Drizzle) | uses `studentRepo.getStudentRegistrationOptions` |
+ | `resolveGenderAndCategory` | `(params: { genderName, categoryName }) => Promise<{ genderId?: number; studentCategoryId?: number }>` | `admitStudentLogic` (replaces B11's raw Drizzle) | uses `studentRepo.getStudentRegistrationOptions` |
 | `runExtractionForTool` | `(params: { provider: ScopedRepositoryProvider, userId, teacherId, file, classId, sectionId, studentId?, fullName?, admissionNo?, originalName? })` | `extractLogic` (B3) | drops the hard-coded `schoolId: 1` from B1 |
 | `runGenerateForTool` | `(params: { provider: ScopedRepositoryProvider, fileIds: string[], classId, sectionId, staffId })` | `generateLogic` (B12) | resolves `generateWorkflow` from `mastra` via `context.mastra` and invokes it; tenant comes from `provider` |
 | `getStudentResultForTool` | `(provider, params)` | any future read tool (none today, but `slash_command_specs.md` implies a `/result` read) | tenant-bound |
@@ -170,8 +170,8 @@ The `globalFallback()` path keeps backward compatibility for callers that do not
 
 | Method | Purpose | Replaces |
 |---|---|---|
-| `resolveGenderId(genderName: string): Promise<number \| null>` | B11 | raw Drizzle in `onboardEntityLogic` |
-| `resolveStudentCategoryId(categoryName: string): Promise<number \| null>` | B11 | raw Drizzle in `onboardEntityLogic` |
+| `resolveGenderId(genderName: string): Promise<number \| null>` | B11 | raw Drizzle in `admitStudentLogic` |
+| `resolveStudentCategoryId(categoryName: string): Promise<number \| null>` | B11 | raw Drizzle in `admitStudentLogic` |
 | `getRollNoAndAdmissionNo(studentId): Promise<{ rollNo: number \| null; admissionNo: number \| null }>` | B4 | hard-coded `1`s in `gradingTool` |
 | `getById(id)` already exists — `StudentRepository.getById:633-635` is the alias | — | — |
 
@@ -193,7 +193,7 @@ These methods and refactors are introduced by Slices 3, 6, 9, and 10. Listed her
 
 | Repo | Method or change | Triggered by | Notes |
 |---|---|---|---|
-| `StudentRepository` | `resolveGenderId(name)` / `resolveStudentCategoryId(name)` | B11 / Slice 6 | replaces raw Drizzle in `onboardEntityLogic` |
+| `StudentRepository` | `resolveGenderId(name)` / `resolveStudentCategoryId(name)` | B11 / Slice 6 | replaces raw Drizzle in `admitStudentLogic` |
 | `StudentRepository` | `getRollNoAndAdmissionNo(studentId)` | B4 / Slice 3 | replaces hard-coded `1`s in `gradingTool` academic case |
 | `StudentRepository` | `updateStudentClassSection({ studentId, targetClassId, targetSectionId })` | B9 / Slice 5 | adds the source-side workspace lock before mutation |
 | `StaffRepository` | `getById(teacherId)` | B10 / Slice 6 | replaces raw `staffRepo.db.select` in `manageAccessLogic` |
@@ -297,11 +297,11 @@ Each slice is one commit, fully complete (interface + repo + service + tool + te
 1. After fetching the student, call `validateWorkspaceLock(tenantContext, student.classId, student.sectionId)`.
 2. Test: assign a student from class 99 to class 10, with the teacher locked to class 10 — expect `WorkspaceMismatchError`.
 
-### Slice 6 — Replace raw Drizzle in `manageAccessLogic` and `onboardEntityLogic` (B10, B11)
+### Slice 6 — Replace raw Drizzle in `manageAccessLogic` and `admitStudentLogic` (B10, B11)
 **Files touched:** `src/lib/server/mastra/tools/gov-tools.ts`, `src/lib/server/mastra/tools/onboard-tools.ts`
 
 1. Replace `staffRepo.db.select` with `staffRepo.getById(targetId)` (uses the new B10 method).
-2. Replace the `smBaseGroups` / `smBaseSetups` / `smStudentCategories` raw Drizzle in `onboardEntityLogic` with `studentRepo.resolveGenderId` and `studentRepo.resolveStudentCategoryId`.
+2. Replace the `smBaseGroups` / `smBaseSetups` / `smStudentCategories` raw Drizzle in `admitStudentLogic` with `studentRepo.resolveGenderId` and `studentRepo.resolveStudentCategoryId`.
 3. Tests: assert that the `getRegistrationOptions` shape from `studentRepo` is the source of truth (no divergence between the registration options and the resolution).
 
 ### Slice 7 — End-to-end bridge test
@@ -619,7 +619,7 @@ This section formalises an academic and domain-specific vocabulary for every Mas
 
 | # | Current tool id | New tool id | Current schema | New schema | Description (academic voice) |
 |---|---|---|---|---|---|
-| 1 | `onboard-entity` | **`enroll-student`** | `onboardEntitySchema` | `enrollStudentSchema` | "Process new student admissions and enrollment, linking guardians to their wards and assigning initial class and section placements." |
+| 1 | `onboard-entity` | **`admit-student`** | `admitStudentSchema` | `admitStudentSchema` | "Process new student admissions and enrollment, linking guardians to their wards and assigning initial class and section placements." |
 | 2 | `patch-entity` | **`update-student-biodata`** | `patchEntitySchema` | `updateStudentBiodataSchema` | "Modify core student biographical data, including names, date of birth, gender, and assigned roll numbers within a class." |
 | 3 | `assign-entity` | **`transfer-student`** | `assignEntitySchema` | `transferStudentSchema` | "Process student promotions or administrative transfers between different academic classes and sections within the school." |
 | 4 | `search-entity` | **`search-school-directory`** | `searchEntitySchema` | `searchSchoolDirectorySchema` | "Query the school directory to locate students and academic staff by partial names, full names, or unique admission numbers." |
@@ -642,7 +642,7 @@ Audited against the repository layer (B10 + B11 were the trigger for this sectio
 |---|---|---|
 | `get-academic-context` (ex `system-status`) | `tenantContext` is read-only — no DB write. Reads the `TenantContext` keys `academicId`, `examId`, `classId`, `sectionId` plus the `smAcademicYears` / `smExamTypes` / `smClasses` / `smSections` names from the configuration cache. | Drop the `health: 'operational'` literal from the tool output (it has no DB meaning). |
 | `manage-account-access` (ex `manage-access`) | `update` → `StudentRepository.updateStudent` / `StaffRepository.updateStudent`-equivalent; `suspend`/`ban` → `StudentRepository.updateStudentStatus({ active: false })` / `StaffRepository.updateStaffStatus({ active: false })`; `delete` → `StudentRepository.deleteStudent` / `StaffRepository.deleteStaff`; `reset` → `AuthRepository.updateUserPassword`. | All four actions are tenant-bound; the active branch is selected by the `action` discriminator in the input schema. |
-| `enroll-student` (ex `onboard-entity`) | `StudentRepository.getStudentRegistrationOptions` (resolves `genderId` / `studentCategoryId` / `classId` / `sectionId` from human names — replaces B11's raw Drizzle); `StudentRepository.createStudent`; `AuthRepository.createUser`. | `studentRegistrationOptions` is now the single source of truth for class / section / category lookups. |
+| `admit-student` (ex `onboard-entity`) | `StudentRepository.getStudentRegistrationOptions` (resolves `genderId` / `studentCategoryId` / `classId` / `sectionId` from human names — replaces B11's raw Drizzle); `StudentRepository.createStudent`; `AuthRepository.createUser`. | `studentRegistrationOptions` is now the single source of truth for class / section / category lookups. |
 | `update-student-biodata` (ex `patch-entity`) | `StudentRepository.updateStudent` on columns `firstName`, `lastName`, `dateOfBirth`, `genderId`, `studentCategoryId`, `rollNo`. | The schema does **not** allow `classId` / `sectionId` / `schoolId` / `staffId` / `userId` renames. Protected fields rejected with `PROTECTED_FIELD`. |
 | `transfer-student` (ex `assign-entity`) | `StudentRepository.updateStudentClassSection({ studentId, targetClassId, targetSectionId })` after `validateWorkspaceLock(tenantContext, student.classId, student.sectionId)` (B9). | Adds the source-side workspace lock. |
 | `search-school-directory` (ex `search-entity`) | `StudentRepository.getStudentsByClassSection` and `StaffRepository.getStaffByName`; `input.classId ?? tenantContext.classId` (B8). | Returns up to 10 candidates; teacher disambiguates. |
@@ -701,7 +701,7 @@ tools:
 
 # after
 tools:
-  - enroll-student
+  - admit-student
   - transfer-student
 ```
 

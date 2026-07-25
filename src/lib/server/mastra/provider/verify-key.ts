@@ -126,7 +126,7 @@ function buildModelInfo(
 	const tools =
 		supportedParams.includes('tools') || raw.capabilities?.function_calling === true;
 	const reasoning =
-		supportedParams.includes('reasoning') || supportedParams.includes('reasoning_effort');
+		supportedParams.includes('reasoning') || supportedParams.includes('reasoningEffort');
 	const vision = inputModalities.includes('image') || inputModalities.includes('file');
 
 	const candidate = {

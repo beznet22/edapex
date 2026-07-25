@@ -73,8 +73,28 @@ async function tryTier1Personal(
 	userId: number,
 	providerId: ProviderId
 ): Promise<{ result: { apiKey: string; credentialEnabled: boolean } | null; trace: TierTrace }> {
-	const credential = await getCachedUserCredential(db, env, userId, providerId);
+	let credential: Awaited<ReturnType<typeof getCachedUserCredential>> | null = null;
+	for (let attempt = 0; attempt < 2; attempt++) {
+		try {
+			credential = await getCachedUserCredential(db, env, userId, providerId);
+			break;
+		} catch (err) {
+			if (attempt === 0) {
+				console.warn(
+					`[tier-router] tier1 DB query failed (attempt ${attempt + 1}/2)`,
+					{ userId, providerId, error: err instanceof Error ? err.message : String(err) }
+				);
+				await new Promise((r) => setTimeout(r, 200));
+				continue;
+			}
+			return {
+				result: null,
+				trace: { tier: 1, status: 'failed', reason: 'db_error' }
+			};
+		}
+	}
 	if (!credential) {
+		console.debug(`[tier-router] tier1: no credential for user=${userId} provider=${providerId}`);
 		return {
 			result: null,
 			trace: {
@@ -85,6 +105,7 @@ async function tryTier1Personal(
 		};
 	}
 	if (credential.enabled !== 1) {
+		console.debug(`[tier-router] tier1: credential disabled for user=${userId} provider=${providerId}`);
 		return {
 			result: { apiKey: '', credentialEnabled: false as const },
 			trace: {
@@ -96,18 +117,18 @@ async function tryTier1Personal(
 	}
 	const apiKey = resolveApiKeyForCredential(credential, env, providerId);
 	if (!apiKey) {
-		// User has a credential and it is enabled, but the stored key
-		// decrypted to an empty string. Treat this as a HARD user failure:
-		// the key is broken or the encryption key changed. We must not
-		// silently fall through to tier 2/3 because that would route the
-		// user's request through a key they did not choose. The caller
-		// surfaces `empty_api_key` to the UI so the user is prompted to
-		// update their key in Settings.
+		console.warn(
+			`[tier-router] tier1: empty_api_key for user=${userId} provider=${providerId} — key decryption returned empty`
+		);
 		return {
 			result: null,
 			trace: { tier: 1, status: 'failed', reason: 'empty_api_key' }
 		};
 	}
+	console.debug(
+		`[tier-router] tier1: served user key for user=${userId} provider=${providerId}`,
+		{ fingerprint: `${apiKey.slice(0, 4)}…${apiKey.slice(-4)}` }
+	);
 	return {
 		result: { apiKey, credentialEnabled: true },
 		trace: { tier: 1, status: 'served', source: 'user' }
@@ -283,9 +304,11 @@ export async function resolveProviderKeyWithTrace(
 ): Promise<ResolvedProviderKeyWithTrace> {
 	const { db, env, userId, providerId, schoolId, userRole } = args;
 	const todayTokenUsage = args.todayTokenUsage ?? 0;
+	const startMs = Date.now();
 
 	const tier1 = await tryTier1Personal(db, env, userId, providerId);
 	if (tier1.result) {
+		const elapsed = Date.now() - startMs;
 		const resolved = {
 			apiKey: tier1.result.apiKey,
 			source: 'user' as const,
@@ -293,6 +316,7 @@ export async function resolveProviderKeyWithTrace(
 			credentialEnabled: tier1.result.credentialEnabled,
 			trace: [tier1.trace]
 		};
+		console.debug(`[tier-router] resolved user=${userId} provider=${providerId} tier=1 source=user duration=${elapsed}ms`);
 		await maybeWriteAuditLog(args, resolved);
 		return resolved;
 	}
@@ -305,6 +329,8 @@ export async function resolveProviderKeyWithTrace(
 	// their own key is broken. Surface a NoCredentialError so the chat
 	// pipeline can render "Your key is invalid — update it in Settings."
 	if (tier1.trace.reason === 'empty_api_key') {
+		const elapsed = Date.now() - startMs;
+		console.warn(`[tier-router] all-tiers-failed user=${userId} provider=${providerId} reason=empty_api_key duration=${elapsed}ms`);
 		const trace = [tier1.trace];
 		await maybeWriteAuditLog(args, null, trace);
 		throw new AllTiersFailedError(providerId, trace);
@@ -320,6 +346,8 @@ export async function resolveProviderKeyWithTrace(
 		todayTokenUsage
 	});
 	if (tier2.result) {
+		const elapsed = Date.now() - startMs;
+		console.debug(`[tier-router] resolved user=${userId} provider=${providerId} tier=2 source=pool duration=${elapsed}ms`);
 		const resolved = {
 			apiKey: tier2.result.apiKey,
 			source: 'pool' as const,
@@ -333,6 +361,8 @@ export async function resolveProviderKeyWithTrace(
 
 	const tier3 = tryTier3Platform(env, providerId, null);
 	if (tier3.result) {
+		const elapsed = Date.now() - startMs;
+		console.debug(`[tier-router] resolved user=${userId} provider=${providerId} tier=3 source=env duration=${elapsed}ms`);
 		const resolved = {
 			apiKey: tier3.result.apiKey,
 			source: 'env' as const,
@@ -344,7 +374,12 @@ export async function resolveProviderKeyWithTrace(
 		return resolved;
 	}
 
+	const elapsed = Date.now() - startMs;
 	const trace = [tier1.trace, tier2.trace, tier3.trace];
+	console.error(
+		`[tier-router] all-tiers-failed user=${userId} provider=${providerId} duration=${elapsed}ms`,
+		{ trace }
+	);
 	await maybeWriteAuditLog(args, null, trace);
 	throw new AllTiersFailedError(providerId, trace);
 }

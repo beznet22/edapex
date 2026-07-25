@@ -95,6 +95,11 @@
   let textareaRef = $state<HTMLTextAreaElement | null>(null);
   let photoFileInput = $state<HTMLInputElement | null>(null);
   let documentFileInput = $state<HTMLInputElement | null>(null);
+  // Synchronous in-flight flag. Closes the race window between user action
+  // and `chat.status` transitioning to 'submitted' — without this, rapid
+  // double-clicks or Enter presses can fire two `sendMessage` calls before
+  // the status guard kicks in. Reset in onFinish/onError callbacks below.
+  let isSubmitting = $state(false);
   // Single local $state mirror of all file references shown as chips
   // in the composer tray. Fed from three sources:
   //   1. file.references (FilesContext — ?refs= from SharedChatView, @file mentions)
@@ -268,6 +273,10 @@
       return;
     }
 
+    if (isSubmitting) {
+      return;
+    }
+
     if (input.trim() && chat.status === "ready") {
       blockedWorkflowMessage = null;
       // Pass selected mentions to the chat context for inclusion in request body
@@ -291,6 +300,13 @@
 
       // Default a bare `/transcript` to `/transcript report` (design decision B1).
       input = normalizeTranscriptCommand(input);
+
+      // Set the in-flight flag synchronously so any subsequent Enter or
+      // click (within the same microtask or the next user gesture) is
+      // short-circuited by the guard above. The $effect below clears
+      // it when chat.status returns to 'ready' (stream finished, errored,
+      // or was stopped by the user).
+      isSubmitting = true;
 
       chat.client.sendMessage({
         text: input,
@@ -729,6 +745,18 @@
     }
   });
 
+  // Clear the synchronous in-flight flag once the stream settles (success,
+  // error, or user-initiated stop). chat.status returns to 'ready' in all
+  // three cases. This effect is the single source of truth for clearing
+  // isSubmitting — keeping the flag aligned with the AI SDK's actual
+  // stream state across the `ready → submitted → streaming → ready`
+  // lifecycle.
+  $effect(() => {
+    if (isSubmitting && chat.status === "ready" && !chat.loading) {
+      isSubmitting = false;
+    }
+  });
+
   onMount(() => {
     window.addEventListener("chat:requestValidation", handleRequestValidation);
   });
@@ -1120,7 +1148,7 @@
           (!input.trim() || inputDisabled) && !chat.loading && "opacity-50 grayscale cursor-not-allowed",
         )}
         onclick={onSubmit}
-        disabled={inputDisabled || (!input.trim() && !chat.loading)}
+        disabled={inputDisabled || isSubmitting || (!input.trim() && !chat.loading)}
       >
         <!-- Dynamic Core Glow (Warming effect) -->
         <div

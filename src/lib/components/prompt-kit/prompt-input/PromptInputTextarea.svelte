@@ -41,7 +41,6 @@
   ) {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      context.onSubmit?.();
     }
     onkeydown?.(e);
   }

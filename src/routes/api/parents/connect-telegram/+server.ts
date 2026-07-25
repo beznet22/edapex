@@ -9,9 +9,9 @@ export const POST: RequestHandler = async ({ request, locals }) => {
     error(401, "Unauthorized");
   }
 
-  let body: { parentId?: number } = {};
+  let body: { parentId?: number; schoolId?: number } = {};
   try {
-    body = (await request.json()) as { parentId?: number };
+    body = (await request.json()) as { parentId?: number; schoolId?: number };
   } catch {
     body = {};
   }
@@ -35,9 +35,18 @@ export const POST: RequestHandler = async ({ request, locals }) => {
     error(404, "Parent record not found");
   }
 
+  // schoolId defaults to 1 (single-school deployment). When the body
+  // includes a schoolId, it MUST match the parent's record — this
+  // prevents a request issued for school A from being honored for a
+  // parent whose data lives in school B.
+  const expectedSchoolId = body.schoolId ?? parent.schoolId ?? 1;
+  if (parent.schoolId !== null && parent.schoolId !== expectedSchoolId) {
+    error(403, "Parent belongs to a different school");
+  }
+
   const token = await ConnectTokenStore.getInstance().createToken(
     parent.id,
-    parent.schoolId ?? 1,
+    expectedSchoolId,
     24,
   );
 

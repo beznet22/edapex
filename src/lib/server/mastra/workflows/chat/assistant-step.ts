@@ -15,6 +15,8 @@
 import { createStep, type ChunkType } from '@mastra/core/workflows';
 import type { ToolsetsInput } from '@mastra/core/agent';
 import { z } from 'zod';
+import { join } from 'path';
+import { appendFile, mkdir } from 'fs/promises';
 import { chatWorkflowOutputSchema, workflowEnvelopeSchema } from '../../utils/chat-schemas';
 import { writeDataPart } from '../../utils/chat-utils';
 import { streamWithAutoRetry } from '../../agent-stream-retry';
@@ -36,12 +38,43 @@ interface ReasoningDurationTracker {
 	getDurations: () => number[];
 }
 
-/** Subset of AI SDK `LanguageModelUsage` fields consumed by the onFinish callback. */
-interface UsageLike {
-	inputTokens?: number;
-	outputTokens?: number;
-	reasoningTokens?: number;
-	cachedInputTokens?: number;
+const WRITE_TOOL_IDS = new Set([
+	'admit-student',
+	'transfer-student',
+	'update-record',
+	'update-staff-biodata',
+	'update-photo',
+	'assign-staff-to-class',
+	'assign-staff-to-subject',
+	'promote-student',
+	'demote-student',
+	'enroll-staff',
+	'teacher-self-assign-class',
+]);
+
+const WRITE_TOOL_LOG = join(process.cwd(), 'data/debug/write-tool.log');
+
+function hasWriteToolInMessages(messages: unknown): boolean {
+	if (!Array.isArray(messages)) return false;
+	for (const msg of messages) {
+		const m = msg as Record<string, unknown>;
+		const content = m.content as Record<string, unknown> | undefined;
+		const invocations = content?.toolInvocations as Array<{ toolName?: string }> | undefined;
+		if (!invocations) continue;
+		for (const inv of invocations) {
+			if (inv.toolName && WRITE_TOOL_IDS.has(inv.toolName)) return true;
+		}
+	}
+	return false;
+}
+
+async function logAgentTurn(entry: object): Promise<void> {
+	try {
+		await mkdir(join(process.cwd(), 'data/debug'), { recursive: true });
+		await appendFile(WRITE_TOOL_LOG, JSON.stringify(entry) + '\n', 'utf-8');
+	} catch {
+		// best-effort — never break the stream
+	}
 }
 
 /**
@@ -149,54 +182,6 @@ export const assistantStep = createStep({
 			memory: { thread: inputData.threadId, resource: inputData.resourceId },
 			maxSteps: 30,
 			onChunk: (chunk: any) => reasoning.onChunk(chunk),
-			onFinish: (event: { usage: UsageLike }) => {
-				const { usage } = event;
-				reasoning.close();
-				// Token usage is conversation-scoped, not message-attached — fire-and-forget.
-				writeDataPart(writer, {
-					data: {
-						type: 'data-usage',
-						id: `usage-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-						data: {
-							inputTokens: usage.inputTokens ?? 0,
-							outputTokens: usage.outputTokens ?? 0,
-							reasoningTokens: usage.reasoningTokens ?? 0,
-							cachedInputTokens: usage.cachedInputTokens ?? 0
-						}
-					},
-					memory: memCtx,
-					transient: true
-				}).catch(() => { });
-
-				// Persist today's per-user usage so the 4-tier router's tier-2
-				// `perUserDailyTokenCap` check can fire on the next request.
-				// Resolve the provider from the modelConfig the chat-helper
-				// stored in requestContext (Mastra's config id is
-				// `<providerId>/<modelName>`). Fire-and-forget — a failed
-				// write must never crash the response stream.
-				const totalTokens =
-					(usage.inputTokens ?? 0) +
-					(usage.outputTokens ?? 0) +
-					(usage.reasoningTokens ?? 0);
-				if (totalTokens > 0) {
-					const modelConfig = requestContext?.get('modelConfig') as
-						| { id?: string }
-						| undefined;
-					const slashIdx = modelConfig?.id?.indexOf('/') ?? -1;
-					const providerId = slashIdx > 0 ? modelConfig!.id!.slice(0, slashIdx) : null;
-					const userId = Number(inputData.resourceId);
-					if (providerId && Number.isFinite(userId) && userId > 0) {
-						recordUsage({
-							db: getAppDb(),
-							userId,
-							providerId,
-							tokens: totalTokens
-						}).catch((err) =>
-							console.error('[assistant-step] recordUsage failed', err)
-						);
-					}
-				}
-			}
 		};
 
 		const stream = await streamWithAutoRetry({
@@ -207,6 +192,65 @@ export const assistantStep = createStep({
 		});
 
 		await stream.fullStream.pipeTo(writer);
+
+		// Retrieve full output after stream completes — includes all messages
+		// (input, memory history, response) with tool calls and results.
+		const fullOutput = await stream.getFullOutput();
+		const messages = fullOutput.messages;
+
+		if (hasWriteToolInMessages(messages)) {
+			logAgentTurn({
+				ts: new Date().toISOString(),
+				threadId: memCtx.threadId,
+				runId: fullOutput.runId ?? null,
+				finishReason: fullOutput.finishReason,
+				usage: fullOutput.usage,
+				totalUsage: fullOutput.totalUsage,
+				messages,
+			});
+		}
+
+		// Token usage is conversation-scoped, not message-attached — fire-and-forget.
+		const totalUsage = fullOutput.totalUsage ?? fullOutput.usage;
+		writeDataPart(writer, {
+			data: {
+				type: 'data-usage',
+				id: `usage-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+				data: {
+					inputTokens: totalUsage?.inputTokens ?? 0,
+					outputTokens: totalUsage?.outputTokens ?? 0,
+					reasoningTokens: totalUsage?.reasoningTokens ?? 0,
+					cachedInputTokens: totalUsage?.cachedInputTokens ?? 0
+				}
+			},
+			memory: memCtx,
+			transient: true
+		}).catch(() => { });
+
+		// Persist today's per-user usage so the 4-tier router's tier-2
+		// `perUserDailyTokenCap` check can fire on the next request.
+		const totalTokens =
+			(totalUsage?.inputTokens ?? 0) +
+			(totalUsage?.outputTokens ?? 0) +
+			(totalUsage?.reasoningTokens ?? 0);
+		if (totalTokens > 0) {
+			const modelConfig = requestContext?.get('modelConfig') as
+				| { id?: string }
+				| undefined;
+			const slashIdx = modelConfig?.id?.indexOf('/') ?? -1;
+			const providerId = slashIdx > 0 ? modelConfig!.id!.slice(0, slashIdx) : null;
+			const userId = Number(inputData.resourceId);
+			if (providerId && Number.isFinite(userId) && userId > 0) {
+				recordUsage({
+					db: getAppDb(),
+					userId,
+					providerId,
+					tokens: totalTokens
+				}).catch((err) =>
+					console.error('[assistant-step] recordUsage failed', err)
+				);
+			}
+		}
 
 		// Emit a credential trace once the stream succeeded — gives the
 		// dev console a way to confirm which credential source served
@@ -235,7 +279,7 @@ export const assistantStep = createStep({
 		}
 
 		return {
-			text: await stream.text,
+			text: fullOutput.text,
 			resolvedFiles: inputData.fileItems
 		};
 	}

@@ -117,7 +117,9 @@
 
 <Sidebar.Provider bind:open={sidebarOpen}>
   <AppSidebar user={data.user ?? undefined} />
-  <Sidebar.Inset class="overflow-hidden min-h-0">
+  <Sidebar.Inset
+    class={isChatRoute ? "min-h-0 overflow-hidden" : "min-h-0 overflow-y-auto"}
+  >
     <InspectorProvider>
       {#if isChatRoute}
         {@render children()}

@@ -43,6 +43,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Set working directory and environment
 WORKDIR /app
 ENV NODE_ENV=production
+ENV NODE_OPTIONS=--dns-result-order=ipv4first
 
 # Create non-root user
 RUN addgroup --gid 1001 nodejs && \

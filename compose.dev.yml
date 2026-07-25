@@ -17,6 +17,7 @@ services:
       - SMTP_FROM_NAME=${SMTP_FROM_NAME}
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
       - TELEGRAM_BOT_USERNAME=${TELEGRAM_BOT_USERNAME}
+      - NODE_OPTIONS=--dns-result-order=ipv4first
       - MASTRA_DB_URL=file:/app/storage/edapex-mastra.db
       - BODY_SIZE_LIMIT=25M
     volumes:

@@ -189,11 +189,26 @@ export class ChatContext {
   }
 
   // Chat properties
-  client: Chat<xUIMessage>;
-  messages: xUIMessage[];
-  lastMessage?: xUIMessage;
+  // The Chat instance is created ONCE per ChatContext and never re-derived.
+  // Earlier code used `this.client = $derived(new Chat({...}))` inside the
+  // constructor; that pattern is non-idiomatic in Svelte 5 (the `$derived`
+  // rune is meant for class-field declarations that depend on reactive
+  // state). When used in a constructor body, the derivation runs on every
+  // access in some runtimes — each read of `this.client` could yield a
+  // fresh `Chat` instance with its own `messages` array, breaking
+  // hydration and producing duplicate sends.
+  //
+  // The `Chat` constructor itself doesn't depend on any reactive state
+  // (only the constructor args), so a plain class-field initializer is
+  // both correct and reactive-safe.
+  client!: Chat<xUIMessage>;
+  // `status` and `messages` ARE derived from `client` (which is itself a
+  // reactive proxy when accessed through `$state`), so we keep them as
+  // `$derived` getters at the field level.
+  status = $derived(this.client?.status);
+  messages = $derived(this.client?.messages ?? []);
+  lastMessage = $derived(this.messages.at(-1));
   parts?: xUIMessagePart[];
-  status: ChatStatus;
   threadData: ThreadData;
   get chatData() {
     return this.threadData.chatData;
@@ -225,26 +240,21 @@ export class ChatContext {
     rateLimit.clear();
 
     const effectiveId = chatId ?? chatData?.threadId;
-    this.client = $derived(
-      new Chat<xUIMessage>({
-        id: effectiveId,
-        messages: initialMessages,
-        sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithApprovalResponses,
-        transport: new DefaultChatTransport({
-          api,
-          prepareSendMessagesRequest: this.#prepareSendMessagesRequest.bind(this),
-        }),
-        onFinish: this.#onFinish.bind(this),
-        onData: this.#onData.bind(this),
-        onError: this.#onError.bind(this),
-        onToolCall: this.#onToolCall.bind(this),
+    this.client = new Chat<xUIMessage>({
+      id: effectiveId,
+      messages: initialMessages,
+      sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithApprovalResponses,
+      transport: new DefaultChatTransport({
+        api,
+        prepareSendMessagesRequest: this.#prepareSendMessagesRequest.bind(this),
       }),
-    );
+      onFinish: this.#onFinish.bind(this),
+      onData: this.#onData.bind(this),
+      onError: this.#onError.bind(this),
+      onToolCall: this.#onToolCall.bind(this),
+    });
 
     this.threadData = $state(new ThreadData(chatData));
-    this.status = $derived(this.client.status);
-    this.messages = $derived(this.client?.messages ?? []);
-    this.lastMessage = $derived(this.messages.at(-1));
     this.#selectedClass = selectedClass;
   }
 

@@ -1,4 +1,4 @@
-export { enrollStudentTool } from "./enroll-student";
+export { admitStudentTool } from "./admit-student";
 export { transferStudentTool } from "./transfer-student";
 export { updateRecordTool } from "./update-record";
 export { promoteStudentTool } from "./promote-student";
@@ -10,7 +10,7 @@ export { assignStaffToSubjectTool } from "./assign-staff-to-subject";
 export { teacherSelfAssignClassTool } from "./teacher-self-assign-class";
 export { updatePhotoTool } from "./update-photo";
 
-import { enrollStudentTool } from "./enroll-student";
+import { admitStudentTool } from "./admit-student";
 import { transferStudentTool } from "./transfer-student";
 import { updateRecordTool } from "./update-record";
 import { promoteStudentTool } from "./promote-student";
@@ -23,7 +23,7 @@ import { teacherSelfAssignClassTool } from "./teacher-self-assign-class";
 import { updatePhotoTool } from "./update-photo";
 
 export const writeTools = {
-  enrollStudentTool,
+  admitStudentTool,
   transferStudentTool,
   updateRecordTool,
   promoteStudentTool,

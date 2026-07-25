@@ -7,11 +7,14 @@
  *      around SDK bugs in unpatched `@ai-sdk/openai-compatible` providers
  *      (DeepSeek, Groq, OpenCode Zen, Kimchi) that leave `content` undefined
  *      when a tool result has an unhandled or empty output type.
- *   2. Every `role: "assistant"` message that carries `tool_calls` has a
- *      string `content` field — works around the upstream SDK emitting
- *      `content: null` when the assistant turn is purely tool calls with
- *      no preceding text. Some providers (notably DeepSeek) reject the
- *      request with a 400 on `content: null`.
+ *   2. Every `role: "assistant"` message has a string `content` field —
+ *      required by every OpenAI-compatible endpoint. Earlier the sanitizer
+ *      only filled `content: ''` when the message carried `tool_calls`, but
+ *      an assistant turn that produced only reasoning (no text, no tool
+ *      calls) still ends up with `content: null` or no content at all.
+ *      Kimchi (vLLM-based) rejects this with `messages[N]: missing field
+ *      content`; DeepSeek, Groq, and OpenCode Zen also 400 on `content: null`.
+ *      Force the field to a string unconditionally.
  *   3. Every `role: "assistant"` message that carries a
  *      `reasoning_content` or `reasoning` field has those fields
  *      stripped. Groq's OpenAI-compatible endpoint rejects
@@ -38,8 +41,12 @@ export function coerceToString(value: unknown): string {
  *
  * - Returns the original body if it is not an object or has no `messages` array.
  * - Mutates tool messages where `content` is missing or not a string.
- * - Mutates assistant messages carrying `tool_calls` where `content` is
- *   null/missing (replaces with `''`).
+ * - Mutates assistant messages where `content` is not a string (replaces
+ *   with `''`). Previously gated on `tool_calls`; now unconditional so
+ *   reasoning-only turns (no text, no tool calls) don't get rejected by
+ *   Kimchi/vLLM.
+ * - Strips `reasoning_content` / `reasoning` from assistant messages so
+ *   Groq and other strict providers don't 400 on the field.
  */
 export function sanitizeProviderRequestBody(body: unknown): unknown {
 	if (typeof body !== 'object' || body === null || Array.isArray(body)) {
@@ -52,7 +59,7 @@ export function sanitizeProviderRequestBody(body: unknown): unknown {
 	}
 
 	let changed = false;
-	const messages = record.messages.map((message: unknown) => {
+	const messages = record.messages.map((message: unknown, idx: number) => {
 		if (typeof message !== 'object' || message === null) {
 			return message;
 		}
@@ -70,6 +77,8 @@ export function sanitizeProviderRequestBody(body: unknown): unknown {
 
 		if (msg.role === 'assistant') {
 			let next: Record<string, unknown> = msg;
+			const hadReasoningContent = 'reasoning_content' in next;
+			const hadReasoning = 'reasoning' in next;
 
 			// Strip reasoning_content / reasoning — Groq rejects these
 			// on assistant messages with a 400. The AI SDK persists the
@@ -78,19 +87,30 @@ export function sanitizeProviderRequestBody(body: unknown): unknown {
 			// upstream. The fields are private chain-of-thought; the
 			// model produced the assistant `content` without needing them
 			// back as input.
-			if ('reasoning_content' in next || 'reasoning' in next) {
+			if (hadReasoningContent || hadReasoning) {
 				const { reasoning_content: _rc, reasoning: _r, ...rest } = next;
 				next = rest;
 				changed = true;
+				console.debug(
+					`[sanitize] stripped reasoning from assistant msg[${idx}] hadReasoningContent=${hadReasoningContent} hadReasoning=${hadReasoning}`
+				);
 			}
 
-			if (
-				Array.isArray(next.tool_calls) &&
-				next.tool_calls.length > 0 &&
-				typeof next.content !== 'string'
-			) {
+			// Ensure every assistant message has a string `content` field.
+			// Kimchi (vLLM-based) rejects messages with missing/empty content
+			// with `messages[N]: missing field content`. Earlier the sanitizer
+			// only filled `content: ''` when the message carried `tool_calls`,
+			// but an assistant turn that produced only reasoning (no text, no
+			// tool calls) still ends up with `content: null` or no content at
+			// all. Force the field to a string unconditionally so the wire
+			// format satisfies every OpenAI-compatible endpoint.
+			if (typeof next.content !== 'string') {
+				const previousContent = next.content;
 				next = { ...next, content: '' };
 				changed = true;
+				console.debug(
+					`[sanitize] coerced assistant msg[${idx}] content to '' (was ${previousContent === null ? 'null' : previousContent === undefined ? 'undefined' : Array.isArray(previousContent) ? 'array' : typeof previousContent})`
+				);
 			}
 
 			return next;
@@ -162,5 +182,6 @@ export function sanitizeRequestInit(init: RequestInit | undefined): RequestInit 
 		return init;
 	}
 
+	console.info(`[sanitize] rewrote body (${body.length}→${sanitizedJson.length} bytes)`);
 	return { ...init, body: sanitizedJson };
 }

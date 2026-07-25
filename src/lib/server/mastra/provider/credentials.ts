@@ -259,6 +259,7 @@ export async function saveUserCredential(
 		console.error(`[credentials] model discovery failed for ${validated.providerId}:`, err);
 	}
 
+	invalidateCredentialCache(validated.userId, validated.providerId);
 	return verificationWarning
 		? { credential: written, warning: verificationWarning }
 		: { credential: written };
@@ -392,12 +393,33 @@ export function getCustomCredentialBaseUrl(
 	return customData?.baseUrl ?? '';
 }
 
+const _credentialCache = new Map<string, { row: EncryptedCredential | null; expiresAt: number }>();
+const CREDENTIAL_CACHE_TTL_MS = 30_000;
+
+function _credentialCacheKey(userId: number, providerId: string): string {
+	return `${userId}:${providerId}`;
+}
+
+/**
+ * Invalidate the in-memory credential cache for a specific user+provider.
+ * Called after a credential save/delete so the next request re-queries.
+ */
+export function invalidateCredentialCache(userId: number, providerId: string): void {
+	const key = _credentialCacheKey(userId, providerId);
+	_credentialCache.delete(key);
+}
+
 export async function getUserCredential(
 	db: LibSQLDatabase<any>,
 	env: Record<string, string | undefined>,
 	userId: number,
 	providerId: ProviderId
 ): Promise<EncryptedCredential | null> {
+	const cacheKey = _credentialCacheKey(userId, providerId);
+	const cached = _credentialCache.get(cacheKey);
+	if (cached && Date.now() < cached.expiresAt) {
+		return cached.row;
+	}
 	const rows = await db
 		.select()
 		.from(encryptedCredentials)
@@ -409,7 +431,9 @@ export async function getUserCredential(
 			)
 		)
 		.limit(1);
-	return rows[0] ?? null;
+	const row = rows[0] ?? null;
+	_credentialCache.set(cacheKey, { row, expiresAt: Date.now() + CREDENTIAL_CACHE_TTL_MS });
+	return row;
 }
 
 export const PLATFORM_ENV_KEYS: Partial<Record<ProviderId, string>> = {
@@ -531,6 +555,7 @@ export async function deleteUserCredential(
 			}
 		});
 	}
+	invalidateCredentialCache(userId, providerId);
 }
 
 export async function updateUserCredentialEnabled(
@@ -562,6 +587,7 @@ export async function updateUserCredentialEnabled(
 			after: { enabled }
 		});
 	}
+	invalidateCredentialCache(userId, providerId);
 }
 
 export interface RotateCredentialInput {

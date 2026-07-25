@@ -52,10 +52,8 @@ const CASES: SlashCase[] = [
 	{ command: '/search', expectedSkill: 'default', requiredTools: ['search-school-directory'] },
 
 	// write skill — student + staff lifecycle
-	{ command: '/enroll', expectedSkill: 'write', requiredTools: ['enroll-student'] },
-	{ command: '/enroll @Alice', expectedSkill: 'write', requiredTools: ['enroll-student'] },
-	{ command: '/admit', expectedSkill: 'write', requiredTools: ['enroll-student'] },
-	{ command: '/admit @new-student', expectedSkill: 'write', requiredTools: ['enroll-student'] },
+	{ command: '/admit', expectedSkill: 'write', requiredTools: ['admit-student'] },
+	{ command: '/admit @new-student', expectedSkill: 'write', requiredTools: ['admit-student'] },
 	{ command: '/transfer @Alice', expectedSkill: 'write', requiredTools: ['transfer-student'] },
 	{ command: '/promote @Alice', expectedSkill: 'write', requiredTools: ['promote-student'] },
 	{ command: '/demote @Alice', expectedSkill: 'write', requiredTools: ['demote-student'] },
@@ -159,7 +157,7 @@ describe('resolveToolsForMessage', () => {
 		const FORBIDDEN_FOR_PLAIN_CHAT = [
 			'validate-marksheet',
 			'commit-marksheet',
-			'enroll-student',
+			'admit-student',
 			'transfer-student',
 			'promote-student',
 			'list-my-children',
@@ -312,7 +310,7 @@ describe('resolveToolsForMessage - natural-language intents', () => {
 		{
 			command: '/enroll this new student that just transferred from another school yesterday afternoon',
 			expectedSkill: 'write',
-			requiredTools: ['enroll-student'],
+			requiredTools: ['admit-student'],
 			reason: 'long natural-language sentence around /enroll'
 		},
 		{

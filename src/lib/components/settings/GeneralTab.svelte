@@ -5,6 +5,7 @@
 	import CalendarClockIcon from "@lucide/svelte/icons/calendar-clock";
 	import ShieldCheckIcon from "@lucide/svelte/icons/shield-check";
 	import UserIcon from "@lucide/svelte/icons/user";
+	import BotIcon from "@lucide/svelte/icons/bot";
 
 	import { Input } from "$lib/components/ui/input/index.js";
 	import { Label } from "$lib/components/ui/label/index.js";
@@ -16,9 +17,10 @@
 		AccordionTrigger
 	} from "$lib/components/ui/accordion/index.js";
 
-	import SchoolIdentitySection from "./platform/SchoolIdentitySection.svelte";
-	import ReportTemplatesSection from "./platform/ReportTemplatesSection.svelte";
-	import AcademicCalendarSection from "./platform/AcademicCalendarSection.svelte";
+import SchoolIdentitySection from "./platform/SchoolIdentitySection.svelte";
+import ReportTemplatesSection from "./platform/ReportTemplatesSection.svelte";
+import AcademicCalendarSection from "./platform/AcademicCalendarSection.svelte";
+import TelegramBotSection from "./platform/TelegramBotSection.svelte";
 
 	interface Props {
 		designation: string | null | undefined;
@@ -33,7 +35,7 @@
 			(allowedDesignations as readonly string[]).includes(designation)
 	);
 
-	type SectionId = "school-identity" | "report-templates" | "academic-calendar";
+	type SectionId = "school-identity" | "report-templates" | "academic-calendar" | "telegram-bot";
 
 	interface SectionConfig {
 		id: SectionId;
@@ -43,6 +45,12 @@
 	}
 
 	const sections: readonly SectionConfig[] = [
+		{
+			id: "telegram-bot",
+			title: "Telegram Bot",
+			description: "Register or check the bot webhook URL for parent Telegram notifications.",
+			icon: BotIcon
+		},
 		{
 			id: "school-identity",
 			title: "School Identity",
@@ -64,7 +72,7 @@
 		}
 	] as const;
 
-	let openSection = $state<SectionId | undefined>("school-identity");
+	let openSection = $state<SectionId | undefined>("telegram-bot");
 </script>
 
 <div class="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-300 pb-12">
@@ -169,8 +177,10 @@
 									<SchoolIdentitySection />
 								{:else if section.id === "report-templates"}
 									<ReportTemplatesSection />
-								{:else}
+								{:else if section.id === "academic-calendar"}
 									<AcademicCalendarSection />
+								{:else}
+									<TelegramBotSection />
 								{/if}
 							</div>
 						</AccordionContent>

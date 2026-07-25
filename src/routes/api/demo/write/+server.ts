@@ -4,7 +4,7 @@ import type { RequestHandler } from "@sveltejs/kit";
 import { ALLOWED_DESIGNATIONS } from "$lib/types/sms-types";
 import type { AuthUser } from "$lib/types/auth-types";
 
-import { enrollStudentTool } from "$lib/server/mastra/tools/operations/write/enroll-student";
+import { admitStudentTool } from "$lib/server/mastra/tools/operations/write/admit-student";
 import { transferStudentTool } from "$lib/server/mastra/tools/operations/write/transfer-student";
 import { updateRecordTool } from "$lib/server/mastra/tools/operations/write/update-record";
 import { promoteStudentTool } from "$lib/server/mastra/tools/operations/write/promote-student";
@@ -17,7 +17,7 @@ import { teacherSelfAssignClassTool } from "$lib/server/mastra/tools/operations/
 import { updatePhotoTool } from "$lib/server/mastra/tools/operations/write/update-photo";
 
 const toolMap: Record<string, { execute: (...args: any[]) => any }> = {
-  "enroll-student": enrollStudentTool as any,
+  "admit-student": admitStudentTool as any,
   "transfer-student": transferStudentTool as any,
   "update-record": updateRecordTool as any,
   "promote-student": promoteStudentTool as any,

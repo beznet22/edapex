@@ -24,7 +24,7 @@ import type { ProviderId, ModelId } from './types';
  * Unified thinking-effort variants shared across every reasoning-capable
  * model in the catalog. These are abstract, provider-agnostic shapes; the
  * per-provider request resolver maps them onto provider-specific API
- * options at request time (e.g. DeepSeek `reasoning_effort`, Kimchi
+ * options at request time (e.g. DeepSeek `reasoningEffort`, Kimchi
  * `thinking.type`, OpenAI/Anthropic native toggles).
  *
  * The three-mode abstraction maps onto the user mental model regardless of
@@ -225,9 +225,9 @@ export const BUILTIN_MODELS: Record<ModelId, ModelInfo> = {
 		id: 'opencode/deepseek-v4-flash-free' as ModelId,
 		providerId: 'opencode' as ProviderId,
 		name: 'DeepSeek V4 Flash Free',
-		capabilities: { tools: true, input: ['text/*'], output: ['text/*'], reasoning: true, thinkingEffort: true, vision: false },
+		capabilities: { tools: true, input: ['text/*'], output: ['text/*'], reasoning: false, thinkingEffort: false, vision: false },
 		request: { headers: {}, body: {}, generation: {}, options: {} },
-		variants: THINKING_VARIANTS,
+		variants: [],
 		status: 'active',
 		enabled: true,
 		limit: { context: 200_000, output: 200_000 },

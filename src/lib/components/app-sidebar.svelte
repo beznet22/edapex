@@ -30,8 +30,9 @@
   import MoonIcon from "@lucide/svelte/icons/moon";
   import SunIcon from "@lucide/svelte/icons/sun";
   import PlusIcon from "@lucide/svelte/icons/plus";
-  import LibraryIcon from "@lucide/svelte/icons/library";
-  import { goto, invalidateAll, pushState } from "$app/navigation";
+import LibraryIcon from "@lucide/svelte/icons/library";
+import PhoneIcon from "@lucide/svelte/icons/phone";
+import { goto, invalidateAll, pushState } from "$app/navigation";
   import { UserContext } from "$lib/context/user-context.svelte";
 
   type SidebarProps = {
@@ -102,6 +103,19 @@
             >
               <LibraryIcon class="size-4 text-primary" />
               <span>Library</span>
+            </Sidebar.MenuButton>
+          </Sidebar.MenuItem>
+          <Sidebar.MenuItem>
+            <Sidebar.MenuButton
+              tooltipContent="Yahoo Parents"
+              onclick={() => {
+                sidebar.setOpenMobile(false);
+                goto("/admin/parents");
+              }}
+              class="text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent transition-colors font-medium"
+            >
+              <PhoneIcon class="size-4 text-primary" />
+              <span>Yahoo Parents</span>
             </Sidebar.MenuButton>
           </Sidebar.MenuItem>
         </Sidebar.Menu>

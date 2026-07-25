@@ -355,7 +355,7 @@ curl -X POST http://localhost:5173/api/uploads -F "file=@static/marksheets/LB2B/
 > into LOWER BASIC 2 B.
 
 **Expected behaviour:**
-- `enroll-student` validates the input (name, gender, admissionNo, classId)
+- `admit-student` validates the input (name, gender, classId, sectionId, guardian details)
 - Asks for parent email via `request-selection` if not provided
 
 ### 8.2 Promote student
@@ -428,7 +428,7 @@ tool set to that skill's tools only.
 **Expected behaviour:**
 - `skillCommandMap` lookup → `reporting` skill → only reporting tools loaded
 - Plus `baseTools` (search-school-directory, get-context)
-- No `read/view-student-result`, no `write/enroll-student`, etc.
+- No `read/view-student-result`, no `write/admit-student`, etc.
 
 ### 11.2 Verify /transcript loads only transcript tools
 
@@ -444,7 +444,7 @@ tool set to that skill's tools only.
 > /write enroll a new student named Fatima
 
 **Expected behaviour:**
-- Only write tools loaded (enroll-student, transfer-student, etc.)
+- Only write tools loaded (admit-student, transfer-student, etc.)
 
 ### 11.4 Verify plain chat loads base tools
 

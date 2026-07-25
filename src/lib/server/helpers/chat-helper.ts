@@ -87,10 +87,15 @@ export async function buildRequestContext(params: {
       undefined,
       traceContext
     );
-    requestContext.set('modelConfig', resolved.config as MastraModelConfig);
+    const config = resolved.config as MastraModelConfig;
+    requestContext.set('modelConfig', config);
     if (resolved.providerOptions) {
       requestContext.set('providerOptions', resolved.providerOptions);
     }
+    const cfg = config as { apiKey?: string };
+    console.info(
+      `[chat-helper] model resolved modelId=${modelId} provider=${modelId.split('/')[0]} key=${cfg.apiKey ? `${cfg.apiKey.slice(0, 4)}…${cfg.apiKey.slice(-4)}` : '(empty)'}`
+    );
   } else {
     const defaultId = await pickDefaultModelId(db, envKeys, {
       userId,
@@ -109,10 +114,15 @@ export async function buildRequestContext(params: {
       undefined,
       traceContext
     );
-    requestContext.set('modelConfig', resolved.config as MastraModelConfig);
+    const config = resolved.config as MastraModelConfig;
+    requestContext.set('modelConfig', config);
     if (resolved.providerOptions) {
       requestContext.set('providerOptions', resolved.providerOptions);
     }
+    const cfg = config as { apiKey?: string };
+    console.info(
+      `[chat-helper] model resolved modelId=${defaultId} provider=${defaultId.split('/')[0]} key=${cfg.apiKey ? `${cfg.apiKey.slice(0, 4)}…${cfg.apiKey.slice(-4)}` : '(empty)'}`
+    );
   }
 
   return requestContext;

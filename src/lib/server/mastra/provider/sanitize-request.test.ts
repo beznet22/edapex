@@ -52,14 +52,32 @@ describe('sanitizeProviderRequestBody', () => {
 		expect(sanitized.messages[2].content).toBe('text');
 	});
 
-	it('ignores assistant messages without tool_calls', () => {
+	it('coerces assistant message content to empty string when null and no tool_calls', () => {
 		const body = { messages: [{ role: 'assistant', content: null }] };
-		expect(sanitizeProviderRequestBody(body)).toBe(body);
+		const sanitized = sanitizeProviderRequestBody(body) as typeof body;
+		expect(sanitized.messages[0].content).toBe('');
 	});
 
-	it('ignores empty tool_calls array', () => {
+	it('coerces assistant message content to empty string when null and empty tool_calls array', () => {
 		const body = { messages: [{ role: 'assistant', content: null, tool_calls: [] }] };
-		expect(sanitizeProviderRequestBody(body)).toBe(body);
+		const sanitized = sanitizeProviderRequestBody(body) as typeof body;
+		expect(sanitized.messages[0].content).toBe('');
+	});
+
+	it('coerces assistant message content to empty string when content is undefined', () => {
+		const body: { messages: Array<Record<string, unknown>> } = {
+			messages: [{ role: 'assistant' }]
+		};
+		const sanitized = sanitizeProviderRequestBody(body) as typeof body;
+		expect(sanitized.messages[0].content).toBe('');
+	});
+
+	it('coerces assistant message content to empty string when content is an array', () => {
+		const body: { messages: Array<Record<string, unknown>> } = {
+			messages: [{ role: 'assistant', content: [] }]
+		};
+		const sanitized = sanitizeProviderRequestBody(body) as typeof body;
+		expect(sanitized.messages[0].content).toBe('');
 	});
 
 	it('returns the same object when no changes are needed', () => {

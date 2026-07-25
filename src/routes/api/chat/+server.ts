@@ -8,6 +8,7 @@ import { handleWorkflowStream } from "@mastra/ai-sdk";
 import { toAISdkV5Messages } from "@mastra/ai-sdk/ui";
 import { WorkspaceMismatchError } from "$lib/server/mastra/tenant-context";
 import { mastra } from "$lib/server/mastra";
+import { runWithCache } from "$lib/server/mastra/provider/cache";
 import {
 	buildApprovalContext,
 	buildWorkflowParams,
@@ -26,43 +27,45 @@ export const POST: RequestHandler = async ({ request, locals: { user, session },
 	if ((!user || !session) && !allowAnonymousChats) error(401, "Unauthorized");
 	if (!user) error(401, "User session required for provider resolution");
 
-	const approvalResponse = findToolApprovalResponse(payload.messages ?? []);
-	if (approvalResponse) {
-		const { requestContext } = await buildApprovalContext(user, cookies);
-		const stream = await resumeAgentToolCall({
-			approval: approvalResponse,
-			requestContext,
-			abortSignal: request.signal
-		});
-		return createUIMessageStreamResponse({ stream });
-	}
+	return runWithCache(async () => {
+		const approvalResponse = findToolApprovalResponse(payload.messages ?? []);
+		if (approvalResponse) {
+			const { requestContext } = await buildApprovalContext(user, cookies);
+			const stream = await resumeAgentToolCall({
+				approval: approvalResponse,
+				requestContext,
+				abortSignal: request.signal
+			});
+			return createUIMessageStreamResponse({ stream });
+		}
 
-	try {
-		const params = await buildWorkflowParams(user, session, payload, cookies);
-		const stream = await handleWorkflowStream({
-			version: 'v6',
-			mastra,
-			workflowId: 'chatWorkflow',
-			params,
-			sendReasoning: true,
-			sendSources: true
-		});
-		return createUIMessageStreamResponse({ stream });
-	} catch (e) {
-		if (e instanceof WorkspaceMismatchError) {
-			return new Response(
-				JSON.stringify({ error: 'WORKSPACE_MISMATCH', message: e.message }),
-				{ status: 403, headers: { 'Content-Type': 'application/json' } }
-			);
+		try {
+			const params = await buildWorkflowParams(user, session, payload, cookies);
+			const stream = await handleWorkflowStream({
+				version: 'v6',
+				mastra,
+				workflowId: 'chatWorkflow',
+				params,
+				sendReasoning: true,
+				sendSources: true
+			});
+			return createUIMessageStreamResponse({ stream });
+		} catch (e) {
+			if (e instanceof WorkspaceMismatchError) {
+				return new Response(
+					JSON.stringify({ error: 'WORKSPACE_MISMATCH', message: e.message }),
+					{ status: 403, headers: { 'Content-Type': 'application/json' } }
+				);
+			}
+			const msg = e instanceof Error ? e.message : String(e);
+			if (msg.includes('AbortError') || msg.includes('aborted')) {
+				console.info('[api/chat] Stream aborted by client');
+			} else {
+				console.error(`[api/chat] Error starting workflow: ${msg}`);
+			}
+			throw e;
 		}
-		const msg = e instanceof Error ? e.message : String(e);
-		if (msg.includes('AbortError') || msg.includes('aborted')) {
-			console.info('[api/chat] Stream aborted by client');
-		} else {
-			console.error(`[api/chat] Error starting workflow: ${msg}`);
-		}
-		throw e;
-	}
+	});
 };
 
 /**
