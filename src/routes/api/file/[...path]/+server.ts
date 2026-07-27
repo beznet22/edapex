@@ -30,7 +30,7 @@ import { addEntry as addWorkspaceEntry, readAllManifests, readManifest, updateEn
 
 import { getAppDb } from '$lib/server/mastra/storage/libsql/app-db';
 import { marksheetSchema } from '$lib/schema/marksheet';
-import { extractTableField } from '$lib/utils/marksheet-ast-parser';
+import { extractTableField, type ParseContextRosterEntry } from '$lib/utils/marksheet-ast-parser';
 import { buildMarksheetParseContext } from '$lib/server/mastra/tools/operations/reporting/marksheet/parse-context';
 import { createAssessmentServiceForRequest } from '$lib/server/service/assessment.service';
 import { DIAGNOSTIC_MODEL } from '$lib/server/mastra/agents/diagnostic';
@@ -62,6 +62,18 @@ function contentTypeFor(filename: string): string {
 
 function safeRelPath(rawPath: string | undefined): string {
   return (rawPath ?? '').replace(/^\/+/, '');
+}
+
+function getRosterAdmissionNo(roster: ParseContextRosterEntry[] | undefined, studentName: string): number | undefined {
+  if (!roster || !studentName) return undefined;
+  const normalize = (s: string) => s.toLowerCase().replace(/[,.\s-]+/g, ' ').trim();
+  const normalizedName = normalize(studentName);
+  for (const r of roster) {
+    if (normalize(r.name) === normalizedName) {
+      return r.admissionNo != null ? Number(r.admissionNo) : undefined;
+    }
+  }
+  return undefined;
 }
 
 function resolveScopedPath(
@@ -351,10 +363,12 @@ export const POST: RequestHandler = async ({ params, url, request, locals, cooki
       const enteredAdmNo = extractTableField(markdown, 'admission no');
       const result = await marksheetSchema.safeParseAsync(parsed);
 
-      const hasAdmNoMismatch = enteredAdmNo != null && Number(enteredAdmNo) !== parsed.student.adminNo;
+      const rosterAdmNo = getRosterAdmissionNo(parseContext.roster, parsed.student.fullName);
+      const effectiveAdmNo = rosterAdmNo ?? parsed.student.adminNo;
+      const hasAdmNoMismatch = enteredAdmNo != null && Number(enteredAdmNo) !== effectiveAdmNo;
       const originalErrors: string[] = [];
       if (hasAdmNoMismatch) {
-        originalErrors.push(`Admission No mismatch: file has ${enteredAdmNo}, roster records ${parsed.student.adminNo}`);
+        originalErrors.push(`Admission No mismatch: file has ${enteredAdmNo}, roster records ${effectiveAdmNo}`);
       }
 
       let zodErrors: string[] = [];
@@ -385,6 +399,9 @@ export const POST: RequestHandler = async ({ params, url, request, locals, cooki
         } catch { /* best-effort */ }
       }
       if (result.success) {
+        if (hasAdmNoMismatch && rosterAdmNo != null) {
+          parsed.student.adminNo = rosterAdmNo;
+        }
         const canonicalMd = generateMarksheetMarkdown(parsed);
         const reParsed = parseMarksheetMarkdown(canonicalMd, parseContext);
         const reResult = await marksheetSchema.safeParseAsync(reParsed);
@@ -425,7 +442,7 @@ export const POST: RequestHandler = async ({ params, url, request, locals, cooki
       } else {
         zodErrors = result.error?.issues.map(i => `${i.path.join('.')}: ${i.message}`) ?? [];
         if (hasAdmNoMismatch) {
-          zodErrors.push(`Admission No mismatch: file has ${enteredAdmNo}, roster records ${parsed.student.adminNo}`);
+          zodErrors.push(`Admission No mismatch: file has ${enteredAdmNo}, roster records ${effectiveAdmNo}`);
         }
       }
 
@@ -508,9 +525,10 @@ export const POST: RequestHandler = async ({ params, url, request, locals, cooki
           const parsed = parseMarksheetMarkdown(markdown2, parseContext);
           const enteredAdmNo = extractTableField(markdown2, 'admission no');
           const mentions = parseMentions(markdown2);
-          if (enteredAdmNo && Number(enteredAdmNo) !== parsed.student.adminNo) {
+          const rosterAdmNo = getRosterAdmissionNo(parseContext.roster, parsed.student.fullName);
+          if (enteredAdmNo && Number(enteredAdmNo) !== (rosterAdmNo ?? parsed.student.adminNo)) {
             validationErrors.push(
-              `Admission No mismatch: file has ${enteredAdmNo}, but roster records ${parsed.student.adminNo}. The roster value will be used on reload.`
+              `Admission No mismatch: file has ${enteredAdmNo}, but roster records ${rosterAdmNo ?? parsed.student.adminNo}. The roster value will be used on reload.`
             );
           }
           const result = await marksheetSchema.safeParseAsync(parsed);
@@ -613,9 +631,10 @@ export const POST: RequestHandler = async ({ params, url, request, locals, cooki
           const parsed = parseMarksheetMarkdown(markdown3, parseContext);
           const enteredAdmNo = extractTableField(markdown3, 'admission no');
           const mentions = parseMentions(markdown3);
-          if (enteredAdmNo && Number(enteredAdmNo) !== parsed.student.adminNo) {
+          const rosterAdmNo = getRosterAdmissionNo(parseContext.roster, parsed.student.fullName);
+          if (enteredAdmNo && Number(enteredAdmNo) !== (rosterAdmNo ?? parsed.student.adminNo)) {
             validationErrors3.push(
-              `Admission No mismatch: file has ${enteredAdmNo}, but roster records ${parsed.student.adminNo}. The roster value will be used on reload.`
+              `Admission No mismatch: file has ${enteredAdmNo}, but roster records ${rosterAdmNo ?? parsed.student.adminNo}. The roster value will be used on reload.`
             );
           }
           const result3 = await marksheetSchema.safeParseAsync(parsed);
@@ -693,9 +712,10 @@ export const POST: RequestHandler = async ({ params, url, request, locals, cooki
 
           const enteredAdmNo = extractTableField(markdown, 'admission no');
           const mentions = parseMentions(markdown);
-          if (enteredAdmNo && Number(enteredAdmNo) !== parsed.student.adminNo) {
+          const rosterAdmNo = getRosterAdmissionNo(parseContext.roster, parsed.student.fullName);
+          if (enteredAdmNo && Number(enteredAdmNo) !== (rosterAdmNo ?? parsed.student.adminNo)) {
             validationErrors.push(
-              `Admission No mismatch: file has ${enteredAdmNo}, but roster records ${parsed.student.adminNo}. The roster value will be used on reload.`
+              `Admission No mismatch: file has ${enteredAdmNo}, but roster records ${rosterAdmNo ?? parsed.student.adminNo}. The roster value will be used on reload.`
             );
           }
 
@@ -1027,10 +1047,14 @@ export const PUT: RequestHandler = async ({ params, request, locals, cookies, ur
 
         const mentions = parseMentions(content);
         const enteredAdmNo = extractTableField(content, 'admission no');
-        if (enteredAdmNo && Number(enteredAdmNo) !== parsed.student.adminNo) {
+        const rosterAdmNo = getRosterAdmissionNo(parseContext.roster, parsed.student.fullName);
+        console.log('[file-api] Roster', {roster:parseContext.roster});
+        console.log('[file-api] marksheet validation', { enteredAdmNo, rosterAdmNo, parsedAdmNo: parsed.student.adminNo, fullName: parsed.student.fullName });
+        if (enteredAdmNo && Number(enteredAdmNo) !== (rosterAdmNo ?? parsed.student.adminNo)) {
           validationErrors.push(
-            `Admission No mismatch: file has ${enteredAdmNo}, but roster records ${parsed.student.adminNo}. The roster value will be used on reload.`
+            `Admission No mismatch: file has ${enteredAdmNo}, but roster records ${rosterAdmNo ?? parsed.student.adminNo}. The roster value will be used on reload.`
           );
+          console.warn('[file-api] marksheet validation: admission no mismatch', { enteredAdmNo, rosterAdmNo, parsedAdmNo: parsed.student.adminNo, fullName: parsed.student.fullName });
         }
 
         const result = await marksheetSchema.safeParseAsync(parsed);
@@ -1051,13 +1075,13 @@ export const PUT: RequestHandler = async ({ params, request, locals, cookies, ur
             } catch { /* best-effort */ }
             const marksheetData = result.success ? result.data : parsed;
             const missing = crossReferenceSubjects(marksheetData, assigned, omitSet, allowSet);
-              if (missing.length > 0) {
-                crossRefErrors = missing;
-                for (const w of missing) {
-                  if (w.status === 'unresolved') validationErrors.push(w.message);
-                  else validationWarnings.push(w.message);
-                }
+            if (missing.length > 0) {
+              crossRefErrors = missing;
+              for (const w of missing) {
+                if (w.status === 'unresolved') validationErrors.push(w.message);
+                else validationWarnings.push(w.message);
               }
+            }
           } catch { /* best-effort */ }
         }
         status = validationErrors.length > 0 ? 'Failed' : 'Validated';
