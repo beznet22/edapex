@@ -16,6 +16,7 @@ export const admitStudentSchema = z.object({
     lastName: z.string().describe("The student's last name"),
     gender: z.enum(["Male", "Female"]).describe("The student's gender"),
     category: z.string().describe("Student category (e.g., DAYCARE, LOWER BASIC)"),
+    dateOfBirth: z.string().optional().describe("Student's date of birth (e.g., 2020-03-03)"),
   }).describe("Core student biographical information"),
   guardianDetails: z.object({
     relation: z.enum(["Father", "Mother", "Other"]).describe("Guardian's relationship to the student"),
@@ -130,6 +131,7 @@ export const admitStudentLogic = async (
       guardiansName: payload.guardianDetails.guardianName,
       guardiansMobile: payload.guardianDetails.phone,
       guardiansEmail: payload.guardianDetails.email,
+      ...(payload.studentDetails.dateOfBirth ? { dateOfBirth: payload.studentDetails.dateOfBirth } : {}),
     };
 
     const result = await studentRepo.createStudentIfNotExists(createInput);
