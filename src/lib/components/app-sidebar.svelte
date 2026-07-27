@@ -32,6 +32,7 @@
   import PlusIcon from "@lucide/svelte/icons/plus";
 import LibraryIcon from "@lucide/svelte/icons/library";
 import PhoneIcon from "@lucide/svelte/icons/phone";
+import UsersIcon from "@lucide/svelte/icons/users";
 import { goto, invalidateAll, pushState } from "$app/navigation";
   import { UserContext } from "$lib/context/user-context.svelte";
 
@@ -116,6 +117,19 @@ import { goto, invalidateAll, pushState } from "$app/navigation";
             >
               <PhoneIcon class="size-4 text-primary" />
               <span>Yahoo Parents</span>
+            </Sidebar.MenuButton>
+          </Sidebar.MenuItem>
+          <Sidebar.MenuItem>
+            <Sidebar.MenuButton
+              tooltipContent="Class Roster"
+              onclick={() => {
+                sidebar.setOpenMobile(false);
+                goto("/class-roster");
+              }}
+              class="text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent transition-colors font-medium"
+            >
+              <UsersIcon class="size-4 text-primary" />
+              <span>Class Roster</span>
             </Sidebar.MenuButton>
           </Sidebar.MenuItem>
         </Sidebar.Menu>

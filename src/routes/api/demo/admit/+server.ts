@@ -83,22 +83,22 @@ export const POST: RequestHandler = async ({ request }) => {
 
   const categories = catalog.categories.map((c) => c.name).join(", ");
 
-  const instructions = `You are a structured data extraction specialist. Extract student admission data from a plain-text template and output ONLY a JSON object — no markdown fences, no commentary, no extra text.
+   const instructions = `You are a structured data extraction specialist. Extract student admission data from a plain-text template and output ONLY a JSON object — no markdown fences, no commentary, no extra text.
 
 Output keys:
 - studentDetails: object with firstName, lastName, gender ("Male"|"Female"), category (one of: ${categories}), and optional dateOfBirth (YYYY-MM-DD)
 - guardianDetails: object with relation ("Father"|"Mother"|"Other"), guardianName, phone, email
 - enrollmentDetails: object with classId (number) and sectionId (number)
-- resolvedClass: object with className and sectionName matching the matched catalog entry
 - reason: a short human-readable summary like "Admit firstName lastName to className [sectionName]"
 
 Extraction rules:
-- Split the template's firstName field on the first space: firstName is the part before, lastName is the part after.
+- firstName: use the template's firstName field directly (it may contain the full given name).
+- lastName: use the template's lastName field directly. If the template does NOT have a lastName field, split the firstName field on the first space — the part before is firstName, the part after is lastName.
 - gender: normalize to "Male" or "Female".
 - category: use one of: ${categories}.
 - dateOfBirth: parse from "Date of Birth:" line if present. Output as YYYY-MM-DD. Omit if absent.
 - guardianRelation: normalize to "Father", "Mother", or "Other".
-- assignedClass: match against the AVAILABLE CLASSES to find classId and sectionId. Output BOTH the resolved classId/sectionId AND the className/sectionName in resolvedClass.
+- assignedClass: match against the AVAILABLE CLASSES to find classId and sectionId and output them in enrollmentDetails.
 - reason: a short human-readable summary.`;
 
   const prompt = [
@@ -133,12 +133,14 @@ Extraction rules:
 
   const parsed = admitStudentSchema.safeParse(rawJson);
   if (!parsed.success) {
+    console.error("Schema validation failed", parsed.error.issues, { rawJson });
     return json({
       error: "Schema validation failed",
       issues: parsed.error.issues.map((i) => ({ path: i.path.join("."), message: i.message })),
       raw: rawJson,
     }, { status: 422 });
   }
+  console.log("Parsed admission data", parsed.data);
 
   const executeFn = admitStudentTool.execute;
   if (typeof executeFn !== "function") throw new Error("admitStudentTool.execute is not bound");
