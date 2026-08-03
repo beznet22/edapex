@@ -25,6 +25,7 @@ export type ClassSection = {
   className: string | null;
   sectionId: number | null;
   sectionName: string | null;
+  academicId: number | null;
 };
 
 export type MarkStoreResult = typeof schema.smMarkStores.$inferSelect & {

@@ -196,6 +196,7 @@ export async function resolveWorkspaceContext(
   let sectionId: number | null = null;
   let className: string | null = null;
   let sectionName: string | null = null;
+  let cookieAcademicId: number | null = null;
   const cookieRaw = cookies.get('selected-class');
   if (cookieRaw) {
     try {
@@ -205,6 +206,7 @@ export async function resolveWorkspaceContext(
         sectionId?: number;
         className?: string;
         sectionName?: string;
+        academicId?: number | null;
       };
       classId = typeof parsed.classId === 'number' ? parsed.classId
         : typeof parsed.id === 'number' ? parsed.id
@@ -212,6 +214,9 @@ export async function resolveWorkspaceContext(
       sectionId = typeof parsed.sectionId === 'number' ? parsed.sectionId : null;
       className = typeof parsed.className === 'string' ? parsed.className : null;
       sectionName = typeof parsed.sectionName === 'string' ? parsed.sectionName : null;
+      cookieAcademicId = typeof parsed.academicId === 'number' && parsed.academicId > 0
+        ? parsed.academicId
+        : null;
     } catch {
       // ignore parse error, fall through with nulls
     }
@@ -230,6 +235,14 @@ export async function resolveWorkspaceContext(
   const activeYear = await baseRepo.getActiveAcademicYear().catch(() => null);
   const currentTerm = await baseRepo.getCurrentTerm().catch(() => null);
 
+  // The cookie pins the academic year the class was selected under. When it
+  // is present, resolve its title so the workspace path stays consistent
+  // (AY<id>-<title>) even after the globally active year rolls over.
+  const yearForTenant =
+    cookieAcademicId != null
+      ? (await baseRepo.getAcademicYearById(cookieAcademicId).catch(() => null)) ?? activeYear
+      : activeYear;
+
   const tenant: TenantContext = createTenantContext({
     schoolId: user?.schoolId ?? 1,
     userId: user?.id ?? 1,
@@ -242,8 +255,8 @@ export async function resolveWorkspaceContext(
     sectionName,
     examTypeId: currentTerm?.id ?? null,
     examId: currentTerm?.id ?? null,
-    academicId: activeYear?.id ?? null,
-    academicYearTitle: activeYear?.title ?? null
+    academicId: yearForTenant?.id ?? null,
+    academicYearTitle: yearForTenant?.title ?? null
   });
 
   return { tenant, requestContext: buildWorkspaceRequestContext(tenant) };

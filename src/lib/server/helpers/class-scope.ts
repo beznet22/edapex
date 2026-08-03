@@ -14,7 +14,7 @@
  * workspace is rooted at the same class directory regardless of which
  * entry point the user came from.
  */
-import { and, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { getDatabase } from "$lib/server/db";
 import {
 	smClasses,
@@ -97,10 +97,18 @@ export async function resolveActiveClassScope({
 		try {
 			const parsed = JSON.parse(selectedClassCookie) as ClassSection;
 			if (parsed.classId && parsed.sectionId) {
+				// The cookie carries the academic year the class was chosen
+				// under; trust it so a mid-session year rollover does not
+				// silently re-root the workspace into an empty dir. Stale
+				// cookies without academicId fall back to the active year.
+				const cookieAcademicId =
+					typeof parsed.academicId === "number" && parsed.academicId > 0
+						? parsed.academicId
+						: academicId;
 				return {
 					classId: parsed.classId,
 					sectionId: parsed.sectionId,
-					academicId,
+					academicId: cookieAcademicId,
 				};
 			}
 		} catch {
@@ -125,7 +133,7 @@ async function resolveActiveAcademicId(schoolId: number): Promise<number | null>
 		})
 		.from(smAcademicYears)
 		.where(eq(smAcademicYears.schoolId, schoolId))
-		.orderBy(smAcademicYears.id);
+		.orderBy(desc(smAcademicYears.id));
 
 	const today = new Date();
 	today.setHours(0, 0, 0, 0);

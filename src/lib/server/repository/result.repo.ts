@@ -43,6 +43,7 @@ export class ResultsRepository extends BaseRepository {
           className: schema.smClasses.className,
           sectionId: schema.smClassSections.sectionId,
           sectionName: schema.smSections.sectionName,
+          academicId: schema.smClassSections.academicId,
         })
         .from(schema.smClassSections)
         .leftJoin(schema.smClasses, eq(schema.smClassSections.classId, schema.smClasses.id))
@@ -69,6 +70,7 @@ export class ResultsRepository extends BaseRepository {
           className: schema.smClasses.className,
           sectionId: schema.smClassSections.sectionId,
           sectionName: schema.smSections.sectionName,
+          academicId: schema.smClassSections.academicId,
         })
         .from(schema.smClassSections)
         .leftJoin(schema.smClasses, eq(schema.smClassSections.classId, schema.smClasses.id))
@@ -144,6 +146,7 @@ export class ResultsRepository extends BaseRepository {
           className: schema.smClasses.className,
           sectionId: schema.smAssignSubjects.sectionId,
           sectionName: schema.smSections.sectionName,
+          academicId: schema.smClassSections.academicId,
         })
         .from(schema.smAssignSubjects)
         .leftJoin(schema.smClasses, eq(schema.smAssignSubjects.classId, schema.smClasses.id))

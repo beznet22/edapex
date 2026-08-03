@@ -183,6 +183,7 @@ describe('SelectedClass', () => {
 				className: 'Grade 5',
 				sectionId: 5,
 				sectionName: 'A',
+				academicId: 4,
 			};
 			const selected = new SelectedClass(JSON.stringify(payload));
 			expect(selected.data).toEqual(payload);
@@ -205,6 +206,7 @@ describe('SelectedClass', () => {
 				className: 'Grade 1',
 				sectionId: 3,
 				sectionName: 'B',
+				academicId: 1,
 			};
 			const selected = new SelectedClass('');
 			selected.rehydrate(JSON.stringify(payload));

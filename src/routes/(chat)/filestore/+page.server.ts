@@ -458,7 +458,7 @@ export const load: PageServerLoad = async ({ url, locals, cookies }) => {
 		}
 	}
 
-	return {
+		return {
 		termOptions,
 		activeTermId,
 		activeAcademicTitle,

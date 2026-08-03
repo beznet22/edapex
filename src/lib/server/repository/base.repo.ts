@@ -62,7 +62,13 @@ export class BaseRepository {
     const today = new Date();
     today.setHours(0, 0, 0, 0); // Reset time to midnight for accurate date comparison
 
-    for (const year of academicYears) {
+    // Newest first: when a year's date range has just ended (rollover) and
+    // multiple years are still flagged activeStatus=1, first-by-id would pick
+    // an arbitrarily old year. Preferring the newest year keeps the school on
+    // its most recent session until the next one is created.
+    const newestFirst = [...academicYears].sort((a, b) => b.id - a.id);
+
+    for (const year of newestFirst) {
       if (!year.startingDate || !year.endingDate) continue;
 
       const startDate = new Date(year.startingDate);
@@ -78,8 +84,8 @@ export class BaseRepository {
       }
     }
 
-    // Fallback: return the year with activeStatus = 1 if no date match
-    return academicYears.find((year: AcademicYearData) => year.activeStatus === 1) || null;
+    // Fallback: return the NEWEST year with activeStatus = 1 if no date match
+    return newestFirst.find((year: AcademicYearData) => year.activeStatus === 1) || null;
   }
 
   /**
