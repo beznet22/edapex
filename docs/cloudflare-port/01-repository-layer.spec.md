@@ -405,7 +405,7 @@ Every repository method documents its **own** statement count; methods that exce
 
 | Layer | Runs against | Covers |
 |---|---|---|
-| Unit | `@cloudflare/vitest-pool-workers` with local D1 | Query shape, chunking boundaries, mapping |
+| Unit | `@cloudflare/vitest-plugin` with local D1 | Query shape, chunking boundaries, mapping |
 | Parity | Local D1 seeded from a fixture | Stage 1 behaviour matches the MySQL implementation for the same fixture |
 | Isolation | Local D1 | No query returns rows from another `school_id` |
 | Migration | `wrangler d1 migrations apply --local` | Index counts, column counts, FK validity |

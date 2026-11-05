@@ -103,8 +103,8 @@ for (let i = 0; i <= 9; i += 1) {
   if (!roadmap.includes(`### Phase ${i} —`)) failures.push(`ROADMAP: phase ${i} brief missing`);
 }
 if (!readme.includes("ROADMAP.md")) failures.push("README: roadmap not referenced");
-if (!readme.includes("Repo extraction")) failures.push("README: extraction decision missing");
-if (!roadmap.includes("Part 5 — Future extraction")) failures.push("ROADMAP: extraction contract missing");
+if (!readme.includes("Repository layout")) failures.push("README: repository layout decision missing");
+if (!roadmap.includes("Part 5 — Repository layout")) failures.push("ROADMAP: repository layout contract missing");
 
 // Progress tracker and the port workspace must exist and stay wired together.
 const progress = fs.readFileSync(path.join(DIR, "PROGRESS.md"), "utf8");
@@ -124,9 +124,21 @@ if (!fs.existsSync(workspaceAgents)) {
   const text = fs.readFileSync(workspaceAgents, "utf8");
   if (!text.includes("All port code goes here")) failures.push("cloudflare/AGENTS.md: workspace scope statement missing");
   if (!text.includes("PROGRESS.md")) failures.push("cloudflare/AGENTS.md: does not require progress updates");
-  if (!text.includes("## Future extraction")) failures.push("cloudflare/AGENTS.md: extraction contract missing");
+  if (!text.includes("## Repository layout")) failures.push("cloudflare/AGENTS.md: repository layout section missing");
   if (!text.includes("EdApex API backend")) failures.push("cloudflare/AGENTS.md: backend identity missing");
-  if (!/permalink/i.test(text)) failures.push("cloudflare/AGENTS.md: permalink caveat missing");
+  if (!text.includes("workspace package")) failures.push("cloudflare/AGENTS.md: workspace placement missing");
+  if (!/no extraction/i.test(text)) failures.push("cloudflare/AGENTS.md: no-extraction decision missing");
+}
+
+const layoutText = [
+  readme,
+  roadmap,
+  fs.existsSync(workspaceAgents) ? fs.readFileSync(workspaceAgents, "utf8") : ""
+].join("\n");
+for (const forbidden of ["Future extraction", "Repo extraction", "standalone deployment repository", "permalink"]) {
+  if (layoutText.toLowerCase().includes(forbidden.toLowerCase())) {
+    failures.push(`repository layout: obsolete extraction wording — ${forbidden}`);
+  }
 }
 
 const workspaceReadme = path.resolve(DIR, "..", "..", "cloudflare", "README.md");

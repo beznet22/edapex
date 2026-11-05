@@ -61,7 +61,7 @@ If two specs conflict, **stop and report**. Do not pick one silently.
 
 - Create the Hono app entry (`src/worker.ts`) and `src/lib/server/http/app.ts` with only `/health`.
 - Configure `wrangler.jsonc`: `d1_databases` binding `DB`, `nodejs_compat`, explicit `compatibility_date`.
-- Add the test harness (`@cloudflare/vitest-pool-workers`) and a CI job running typecheck, tests, and both verifier scripts.
+- Add the test harness (`@cloudflare/vitest-plugin`) and a CI job running typecheck, tests, and both verifier scripts.
 - Add import-boundary scaffolding (a lint rule or test) that will later ban `repository`/`db` imports inside route handlers.
 
 **Do not:** implement routes, repositories, or schema beyond a placeholder.
@@ -258,22 +258,16 @@ P7 cannot start until P6 exists, because archiving history is part of the migrat
 - [ ] **`PROGRESS.md` updated**: status row, gate checkboxes, change-log entry.
 - [ ] PR description contains the phase gate output and the report format from §1.3.
 
-## Part 5 — Future extraction into its own repository
+## Part 5 — Repository layout
 
-`cloudflare/` is the **new EdApex API backend** and is intended to become a standalone deployment repository **after Phase 9**. Nothing moves today; the constraints below apply from now on so the split stays cheap.
+`cloudflare/` is the **EdApex API backend**. It stays in this repository and is planned to become a package in a pnpm workspace; there is no separate repository and no extraction step. The rules below keep the package deployable on its own and the spec suite single-sourced.
 
-| Constraint | Why | Enforced by |
+| Rule | Why | Enforced by |
 |---|---|---|
-| No runtime import resolves outside `cloudflare/` after Phase 8 | the extracted repo cannot resolve `../src` | dependency scan in the extraction PR |
-| Deployment config lives in `cloudflare/` | a new repo must build and deploy without the parent | clean-clone deploy dry-run |
-| The spec suite moves as one unit, never forked | two copies drift immediately | move `docs/cloudflare-port/` into `cloudflare/docs/` in a single commit |
-| Legacy source anchors are converted to permalinks first | `../../src/...` links die in the new repo | link check after the move |
-| Extraction only after Phase 9 | migrating and splitting simultaneously is unrecoverable | this roadmap's phase order |
+| Deployment config lives in `cloudflare/` (`package.json`, lockfile, `wrangler.jsonc`) | the package must build and deploy without depending on the parent app | clean-clone `pnpm install && pnpm exec vitest && pnpm exec wrangler deploy --dry-run` |
+| Runtime code does not import the legacy `src/` tree | the port is a rewrite, not a shared-code refactor; imports into `../src` would couple the Worker to SvelteKit | dependency scan in CI |
+| The spec suite stays in `docs/cloudflare-port/`, one copy | two copies drift immediately | both verifier scripts |
+| Workspace wiring happens after Phase 9 | migrating and reorganising the build simultaneously is unrecoverable | this roadmap's phase order |
+| Source anchors remain relative to `docs/cloudflare-port/` | the repository is not split, so `../../src/...` links keep resolving | link check in `verify-port-specs.mjs` |
 
-At extraction time:
-
-1. Convert every `../../src/...#Lnn` anchor to a permalink pinned to a frozen legacy commit, or remove it from the extracted copy and record the removal.
-2. Move `docs/cloudflare-port/` to `cloudflare/docs/`; rewrite the relative prefixes.
-3. Update `DIR` and `CATALOG` in both verifier scripts and run them in the new repository.
-4. Recreate secrets with `wrangler secret put`; confirm `.dev.vars` is absent.
-5. Tag the legacy repository and set it read-only.
+When the repository adopts a pnpm workspace, add `cloudflare/` as a workspace package, keep its deployment scripts, and run the verifiers from the repository root. Do not fork the spec suite or move it under `cloudflare/`.

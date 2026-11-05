@@ -407,7 +407,7 @@ if (!res.ok) {
 
 | Layer | Tool | Covers |
 |---|---|---|
-| Route unit | `app.request()` under `@cloudflare/vitest-pool-workers` | Validation, status codes, DTO shape |
+| Route unit | `app.request()` under `@cloudflare/vitest-plugin` | Validation, status codes, DTO shape |
 | Contract | same | Every status in §5.3, including the exact 422 body |
 | Type | `tsc` | `hc<AppType>` exposes every route |
 | Boundary | static | No `repository/` or `db/` import inside `http/routes/**` |

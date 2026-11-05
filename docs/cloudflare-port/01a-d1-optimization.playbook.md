@@ -217,7 +217,7 @@ Worst index gaps, by count:
 - *Done when:* re-running the seed changes nothing.
 
 **O23 · Test against real D1**
-- *Action:* `@cloudflare/vitest-pool-workers`.
+- *Action:* `@cloudflare/vitest-plugin`.
 - *Evidence:* `BEGIN` rejection, bind limits, and FK enforcement do not reproduce on `node:sqlite`.
 - *Done when:* the port's test suite runs in the Workers pool.
 

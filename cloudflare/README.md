@@ -15,7 +15,7 @@ Only the catalog-backed backend: the 62 legacy SMS tables, the redesigned tables
 
 ## Prerequisites
 
-- Node.js 20 or newer
+- Node.js 22 or newer
 - `pnpm`
 - A Cloudflare account with a D1 database (Workers **Paid** for arbitrary-recipient email)
 - `wrangler` available through the workspace (no global install required)
@@ -79,7 +79,7 @@ The full set is in [AGENTS.md](./AGENTS.md); these are the ones that break build
 
 ## Testing
 
-- Unit and contract tests run under `@cloudflare/vitest-pool-workers`, against a local D1.
+- Unit and contract tests run under `@cloudflare/vitest-plugin`, against a local D1.
 - Route tests use `app.request()` — no server, no port.
 - Migration tests assert table count, column caps, index count, and `PRAGMA foreign_key_check`.
 

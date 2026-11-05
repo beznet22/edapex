@@ -21,7 +21,7 @@ cloudflare/
   src/lib/server/services/  # context/, ports/, adapters/, domain/, assessment/, auth/, ...
   src/lib/server/db/        # schema, migrations, seed
   src/lib/http/client.ts    # hc<AppType>
-  tests/                    # vitest-pool-workers
+  tests/                    # vitest-plugin
 ```
 
 `src/lib/...` inside `cloudflare/` is intentional: it keeps the aliases identical to the legacy tree so the repository map (`01b`) transfers without rewriting imports.
@@ -34,7 +34,7 @@ Run from `cloudflare/`:
 pnpm install
 pnpm exec wrangler dev                       # local Worker + local D1
 pnpm exec wrangler d1 migrations apply DB --local
-pnpm exec vitest                             # @cloudflare/vitest-pool-workers
+pnpm exec vitest                             # @cloudflare/vitest-plugin
 pnpm exec tsc --noEmit
 ```
 
@@ -62,23 +62,24 @@ node scripts/verify-schema-catalog.mjs
 - Do not add caching, telemetry, or refactors outside the current phase.
 - Do not mark a phase done without pasting its gate output into `PROGRESS.md`.
 
-## Future extraction
+## Repository layout
 
-This directory is the **new EdApex API backend** and is planned to become its **own repository** after cutover. Keep it extractable at all times:
+This directory is the **EdApex API backend**. It stays in this repository and is planned to become a package in a pnpm workspace; there is no separate repository and no extraction step.
 
 - **No runtime import may resolve outside `cloudflare/`.** Relative imports into `../src` are tolerated only while porting and must be gone by Phase 8.
 - **All deployment config lives here:** `package.json`, lockfile, `wrangler.jsonc`, CI workflow. Nothing required to build or deploy may sit in the parent repo.
-- **The spec suite moves with this directory before extraction.** Do not fork it; one copy, moved once.
-- **Source anchors will not survive the move.** The specs link to the legacy tree with relative paths; those break in a new repository. Before extraction, convert them to permalinks at a frozen legacy commit (or drop them deliberately and record the removal).
-- **Extraction happens after Phase 9**, never during a migration or cutover window.
+- **The spec suite stays in `../docs/cloudflare-port/`.** Do not fork it; one copy, verified from the repository root.
+- **Source anchors stay relative** to `docs/cloudflare-port/`; the repository is not split, so they keep resolving.
+- **Workspace wiring happens after Phase 9**, never during a migration or cutover window.
 
-Extraction checklist:
+When the repository adopts a pnpm workspace, add `cloudflare/` as a workspace package, keep its deployment scripts, and run the verifiers from the repository root. Do not move or fork the spec suite.
+
+Clean-clone check:
 
 1. Dependency scan shows zero imports into `../src` and zero workspace aliases pointing outside.
 2. `pnpm install && pnpm exec vitest && pnpm exec wrangler deploy --dry-run` succeeds from a clean clone.
-3. `docs/cloudflare-port/` moved in, links rewritten, both verifiers green in the new repo.
-4. Secrets recreated with `wrangler secret put`; no `.dev.vars` copied.
-5. Legacy repository archived or set read-only.
+3. Both verifiers pass from the repository root.
+4. Secrets are set with `wrangler secret put`; no `.dev.vars` is committed.
 
 ## Reporting
 

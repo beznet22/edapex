@@ -101,7 +101,7 @@ Port code lands in [`cloudflare/`](../../cloudflare/AGENTS.md).
 - [ ] Password digests nulled, column dropped later
 - [ ] Retention sweep dry-run matches expectations
 - [ ] Session archives 1–4 manifest verified
-- [ ] Extraction preconditions verified (roadmap Part 5); the workspace becomes the standalone **EdApex API backend** repository
+- [ ] Workspace package wiring verified (roadmap Part 5); `cloudflare/` remains the in-repo **EdApex API backend**
 
 ## Change log
 
@@ -115,7 +115,7 @@ Port code lands in [`cloudflare/`](../../cloudflare/AGENTS.md).
 |---|---|---|---|
 | Terms 2 and 3 calendars | Phase 7 (terms endpoint only) | waiting on school | — |
 | Term-date confirmation for FIRST TERM | Phase 7 | fixed from `assets/calendar.jpeg` (2026-09-14 → 2026-12-11); confirm against official notice | — |
-| Repository extraction | Phase 9 completion | planned — `cloudflare/` becomes the EdApex API backend repo after cutover; the spec suite moves with it, anchors converted to permalinks | — |
+| Repository layout | Phase 9 completion | decided — `cloudflare/` stays in this repository and becomes a pnpm workspace package; no standalone extraction | — |
 
 ## Notes
 

@@ -38,7 +38,7 @@ Rules, to prevent scope drift between code, schema, and migration:
 | Grade changes | Locked after term closure; admin override requires a reason and writes an audit row |
 | Retention | Transcripts permanent; attendance/homework/chat ~7 years; parents read-only |
 | Archive deletion | Two admins + typed confirmation + audit; blocked during restores |
-| Repo extraction | Planned after Phase 9: `cloudflare/` becomes the standalone **EdApex API backend** repository; the spec suite moves once, with source anchors converted to permalinks |
+| Repository layout | `cloudflare/` stays in this repository as the **EdApex API backend** and becomes a pnpm workspace package; no separate repository or extraction step |
 
 ## Spec index
 
