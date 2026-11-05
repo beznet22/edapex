@@ -24,13 +24,13 @@ Port code lands in [`cloudflare/`](../../cloudflare/AGENTS.md).
 
 ## Current focus
 
-**Phase 0 — Scaffolding and guards.** No phase has started. The migration cannot start until Phase 7; do not jump ahead.
+**Phase 0 — Scaffolding and guards.** Implementation and local gates are complete on `phase-0-scaffolding`; the remote CI run is pending the branch push. Phase 1 has not started. The migration cannot start until Phase 7; do not jump ahead.
 
 ## Phase status
 
 | Phase | Name | Status | Owner | Started | Completed | Gate evidence |
 |---|---|---|---|---|---|---|
-| 0 | Scaffolding and guards | not started | — | — | — | — |
+| 0 | Scaffolding and guards | in progress | Kimchi | 2026-11-05 | — | Local: `/health` 200, D1 `0000_scaffold` ✅, typecheck + Workers test + boundary ✅, both verifiers 0. Remote CI pending push. |
 | 1 | D1 schema and migrations | not started | — | — | — | — |
 | 2 | Repository layer | not started | — | — | — | — |
 | 3 | Service layer | not started | — | — | — | — |
@@ -44,10 +44,10 @@ Port code lands in [`cloudflare/`](../../cloudflare/AGENTS.md).
 ## Gate checklists
 
 ### Phase 0 — Scaffolding
-- [ ] `wrangler dev` serves `/health`
-- [ ] D1 binding declared; local migration applies
+- [x] `wrangler dev` serves `/health`
+- [x] D1 binding declared; local migration applies
 - [ ] CI runs typecheck, tests, both verifiers
-- [ ] Import-boundary test scaffolded
+- [x] Import-boundary test scaffolded
 
 ### Phase 1 — Schema
 - [ ] 62 legacy tables + redesigned tables created
@@ -108,6 +108,7 @@ Port code lands in [`cloudflare/`](../../cloudflare/AGENTS.md).
 | Date | Phase | Change | Agent |
 |---|---|---|---|
 | 2026-11-05 | — | Spec suite, roadmap, and progress tracker created; no implementation started | — |
+| 2026-11-05 | 0 | Worker scaffold, `/health`, D1 binding + `0000_scaffold`, vitest Workers harness, import-boundary guard, CI workflow; local gates green, CI pending push | Kimchi |
 
 ## Blockers and decisions
 

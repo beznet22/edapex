@@ -4,7 +4,7 @@ The Hono API on Cloudflare Workers with D1. This directory is the **target appli
 
 | | |
 |---|---|
-| Phase | **0 — not started** ([PROGRESS](../docs/cloudflare-port/PROGRESS.md)) |
+| Phase | **0 — in progress** (local gates green; CI pending push) ([PROGRESS](../docs/cloudflare-port/PROGRESS.md)) |
 | Plan | [ROADMAP](../docs/cloudflare-port/ROADMAP.md) |
 | Agent rules | [AGENTS.md](./AGENTS.md) |
 | Specs | [docs/cloudflare-port](../docs/cloudflare-port/README.md) |
@@ -22,7 +22,7 @@ Only the catalog-backed backend: the 62 legacy SMS tables, the redesigned tables
 
 ## Quickstart
 
-These commands become runnable once Phase 0 creates `package.json` and `wrangler.jsonc`.
+These commands run from `cloudflare/`. The pinned toolchain is installed by `pnpm install`; the D1 `database_id` in `wrangler.jsonc` is a placeholder until the production database exists (Phase 7/8).
 
 ```bash
 # install
@@ -95,4 +95,4 @@ Then update [PROGRESS.md](../docs/cloudflare-port/PROGRESS.md): status row, gate
 
 ## Status
 
-Nothing is implemented yet. Phase 0 (scaffolding and guards) is the starting point; see the roadmap for its gate.
+Phase 0 (scaffolding and guards) is implemented: the Worker serves `/health`, the D1 binding and local migration path work, the Workers-pool harness passes, and both verifiers are green locally. The remote CI run is pending the branch push. Phase 1 (D1 schema and migrations) is next.
