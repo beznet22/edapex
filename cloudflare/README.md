@@ -4,7 +4,7 @@ The Hono API on Cloudflare Workers with D1. This directory is the **target appli
 
 | | |
 |---|---|
-| Phase | **0 — in progress** (local gates green; CI pending push) ([PROGRESS](../docs/cloudflare-port/PROGRESS.md)) |
+| Phase | **0 — done** ([PROGRESS](../docs/cloudflare-port/PROGRESS.md)) |
 | Plan | [ROADMAP](../docs/cloudflare-port/ROADMAP.md) |
 | Agent rules | [AGENTS.md](./AGENTS.md) |
 | Specs | [docs/cloudflare-port](../docs/cloudflare-port/README.md) |
@@ -95,4 +95,4 @@ Then update [PROGRESS.md](../docs/cloudflare-port/PROGRESS.md): status row, gate
 
 ## Status
 
-Phase 0 (scaffolding and guards) is implemented: the Worker serves `/health`, the D1 binding and local migration path work, the Workers-pool harness passes, and both verifiers are green locally. The remote CI run is pending the branch push. Phase 1 (D1 schema and migrations) is next.
+Phase 0 (scaffolding and guards) is complete: the Worker serves `/health`, the D1 binding and local migration path work, the Workers-pool harness passes, and both verifiers are green locally and in CI. Phase 1 (D1 schema and migrations) is next.

@@ -24,13 +24,13 @@ Port code lands in [`cloudflare/`](../../cloudflare/AGENTS.md).
 
 ## Current focus
 
-**Phase 0 — Scaffolding and guards.** Implementation and local gates are complete on `phase-0-scaffolding`; the remote CI run is pending the branch push. Phase 1 has not started. The migration cannot start until Phase 7; do not jump ahead.
+**Phase 0 — Scaffolding and guards.** Complete. PR #1 checks are green. Phase 1 (D1 schema and migrations) is next; the migration cannot start until Phase 7, so do not jump ahead.
 
 ## Phase status
 
 | Phase | Name | Status | Owner | Started | Completed | Gate evidence |
 |---|---|---|---|---|---|---|
-| 0 | Scaffolding and guards | in progress | Kimchi | 2026-11-05 | — | Local: `/health` 200, D1 `0000_scaffold` ✅, typecheck + Workers test + boundary ✅, both verifiers 0. Remote CI pending push. |
+| 0 | Scaffolding and guards | done | Kimchi | 2026-11-05 | 2026-11-05 | PR #1 check `port` green ([run 42083953037](https://github.com/beznet22/edapex/actions/runs/42083953037)): typecheck, boundary + self-test, Workers test, D1 apply, both verifiers. Local: `/health` 200. |
 | 1 | D1 schema and migrations | not started | — | — | — | — |
 | 2 | Repository layer | not started | — | — | — | — |
 | 3 | Service layer | not started | — | — | — | — |
@@ -46,7 +46,7 @@ Port code lands in [`cloudflare/`](../../cloudflare/AGENTS.md).
 ### Phase 0 — Scaffolding
 - [x] `wrangler dev` serves `/health`
 - [x] D1 binding declared; local migration applies
-- [ ] CI runs typecheck, tests, both verifiers
+- [x] CI runs typecheck, tests, both verifiers
 - [x] Import-boundary test scaffolded
 
 ### Phase 1 — Schema
@@ -109,6 +109,7 @@ Port code lands in [`cloudflare/`](../../cloudflare/AGENTS.md).
 |---|---|---|---|
 | 2026-11-05 | — | Spec suite, roadmap, and progress tracker created; no implementation started | — |
 | 2026-11-05 | 0 | Worker scaffold, `/health`, D1 binding + `0000_scaffold`, vitest Workers harness, import-boundary guard, CI workflow; local gates green, CI pending push | Kimchi |
+| 2026-11-05 | 0 | Phase 0 gate passed: CI run 42083953037 green; PR #1 updated with the evidence | Kimchi |
 
 ## Blockers and decisions
 
@@ -122,3 +123,4 @@ Port code lands in [`cloudflare/`](../../cloudflare/AGENTS.md).
 
 - The measured baseline in [README.md](./README.md) is a snapshot of the remote dump. Refresh `docs/cloudflare-port/audit/db-inventory.json` before Phase 7 and update the numbers if they moved.
 - Phase gates are cumulative: a later phase passing does not excuse an earlier gate that was skipped.
+- Phase 0 landed on `phase-0-scaffolding` (PR #1). `main` was not pushed because Dokploy deploys on commit; the branch carries the preflight spec-suite commit `b83de20`. Do not push `main` until the Dokploy trigger is confirmed blocked.
