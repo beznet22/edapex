@@ -1,0 +1,1 @@
+-- Phase 0 scaffold. Schema migrations begin in Phase 1.
