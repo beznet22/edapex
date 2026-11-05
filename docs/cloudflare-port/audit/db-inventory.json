@@ -1,0 +1,5658 @@
+{
+  "connection": "mysql://devuser:***@127.0.0.1:3306/devdb",
+  "serverVersion": "11.5.2-MariaDB-ubu2404",
+  "database": "devdb",
+  "generatedAt": "2026-11-03T11:18:24.418Z",
+  "schemaTableCount": 316,
+  "portedTableCount": 62,
+  "catalogTableCount": 49,
+  "closureTableCount": 13,
+  "closure": [
+    "languages",
+    "smBankAccounts",
+    "smClassRooms",
+    "smClassTimes",
+    "smDateFormats",
+    "smDormitoryLists",
+    "smFeesDiscounts",
+    "smLanguages",
+    "smRoomLists",
+    "smRoomTypes",
+    "smRoutes",
+    "smStudentGroups",
+    "smVehicles"
+  ],
+  "totals": {
+    "allTablesBytes": 169574400,
+    "portedBytes": 77561856,
+    "indexesInDb": 1041,
+    "indexesMissingFromSchema": 222,
+    "foreignKeysInDb": 706,
+    "tablesWithNoIndex": [
+      "chat_group_users",
+      "exam_merit_positions",
+      "sm_schools"
+    ]
+  },
+  "overColumnCap": [
+    {
+      "dbName": "sm_general_settings",
+      "columns": 106
+    }
+  ],
+  "tables": [
+    {
+      "var": "smMarkStores",
+      "dbName": "sm_mark_stores",
+      "inCatalog": true,
+      "inClosure": false,
+      "columns": 20,
+      "rows": 119484,
+      "rowsEstimate": 116555,
+      "dataBytes": 15220736,
+      "indexBytes": 30031872,
+      "dbIndexes": [
+        {
+          "name": "sm_mark_stores_academic_id_foreign",
+          "unique": false,
+          "columns": [
+            "academic_id"
+          ]
+        },
+        {
+          "name": "sm_mark_stores_class_id_foreign",
+          "unique": false,
+          "columns": [
+            "class_id"
+          ]
+        },
+        {
+          "name": "sm_mark_stores_exam_setup_id_foreign",
+          "unique": false,
+          "columns": [
+            "exam_setup_id"
+          ]
+        },
+        {
+          "name": "sm_mark_stores_exam_term_id_foreign",
+          "unique": false,
+          "columns": [
+            "exam_term_id"
+          ]
+        },
+        {
+          "name": "sm_mark_stores_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        },
+        {
+          "name": "sm_mark_stores_section_id_foreign",
+          "unique": false,
+          "columns": [
+            "section_id"
+          ]
+        },
+        {
+          "name": "sm_mark_stores_student_id_foreign",
+          "unique": false,
+          "columns": [
+            "student_id"
+          ]
+        },
+        {
+          "name": "sm_mark_stores_student_record_id_foreign",
+          "unique": false,
+          "columns": [
+            "student_record_id"
+          ]
+        },
+        {
+          "name": "sm_mark_stores_subject_id_foreign",
+          "unique": false,
+          "columns": [
+            "subject_id"
+          ]
+        }
+      ],
+      "declaredIndexes": [],
+      "indexesMissingFromSchema": [
+        {
+          "name": "sm_mark_stores_academic_id_foreign",
+          "unique": false,
+          "columns": [
+            "academic_id"
+          ]
+        },
+        {
+          "name": "sm_mark_stores_class_id_foreign",
+          "unique": false,
+          "columns": [
+            "class_id"
+          ]
+        },
+        {
+          "name": "sm_mark_stores_exam_setup_id_foreign",
+          "unique": false,
+          "columns": [
+            "exam_setup_id"
+          ]
+        },
+        {
+          "name": "sm_mark_stores_exam_term_id_foreign",
+          "unique": false,
+          "columns": [
+            "exam_term_id"
+          ]
+        },
+        {
+          "name": "sm_mark_stores_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        },
+        {
+          "name": "sm_mark_stores_section_id_foreign",
+          "unique": false,
+          "columns": [
+            "section_id"
+          ]
+        },
+        {
+          "name": "sm_mark_stores_student_id_foreign",
+          "unique": false,
+          "columns": [
+            "student_id"
+          ]
+        },
+        {
+          "name": "sm_mark_stores_student_record_id_foreign",
+          "unique": false,
+          "columns": [
+            "student_record_id"
+          ]
+        },
+        {
+          "name": "sm_mark_stores_subject_id_foreign",
+          "unique": false,
+          "columns": [
+            "subject_id"
+          ]
+        }
+      ],
+      "dbForeignKeys": [
+        {
+          "name": "sm_mark_stores_academic_id_foreign",
+          "column": "academic_id",
+          "target": "sm_academic_years",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_mark_stores_class_id_foreign",
+          "column": "class_id",
+          "target": "sm_classes",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_mark_stores_exam_setup_id_foreign",
+          "column": "exam_setup_id",
+          "target": "sm_exam_setups",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_mark_stores_exam_term_id_foreign",
+          "column": "exam_term_id",
+          "target": "sm_exam_types",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_mark_stores_school_id_foreign",
+          "column": "school_id",
+          "target": "sm_schools",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_mark_stores_section_id_foreign",
+          "column": "section_id",
+          "target": "sm_sections",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_mark_stores_student_id_foreign",
+          "column": "student_id",
+          "target": "sm_students",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_mark_stores_student_record_id_foreign",
+          "column": "student_record_id",
+          "target": "student_records",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_mark_stores_subject_id_foreign",
+          "column": "subject_id",
+          "target": "sm_subjects",
+          "targetColumn": "id"
+        }
+      ]
+    },
+    {
+      "var": "smResultStores",
+      "dbName": "sm_result_stores",
+      "inCatalog": true,
+      "inClosure": false,
+      "columns": 22,
+      "rows": 30775,
+      "rowsEstimate": 30643,
+      "dataBytes": 4734976,
+      "indexBytes": 8667136,
+      "dbIndexes": [
+        {
+          "name": "sm_result_stores_academic_id_foreign",
+          "unique": false,
+          "columns": [
+            "academic_id"
+          ]
+        },
+        {
+          "name": "sm_result_stores_class_id_foreign",
+          "unique": false,
+          "columns": [
+            "class_id"
+          ]
+        },
+        {
+          "name": "sm_result_stores_exam_setup_id_foreign",
+          "unique": false,
+          "columns": [
+            "exam_setup_id"
+          ]
+        },
+        {
+          "name": "sm_result_stores_exam_type_id_foreign",
+          "unique": false,
+          "columns": [
+            "exam_type_id"
+          ]
+        },
+        {
+          "name": "sm_result_stores_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        },
+        {
+          "name": "sm_result_stores_section_id_foreign",
+          "unique": false,
+          "columns": [
+            "section_id"
+          ]
+        },
+        {
+          "name": "sm_result_stores_student_id_foreign",
+          "unique": false,
+          "columns": [
+            "student_id"
+          ]
+        },
+        {
+          "name": "sm_result_stores_student_record_id_foreign",
+          "unique": false,
+          "columns": [
+            "student_record_id"
+          ]
+        },
+        {
+          "name": "sm_result_stores_subject_id_foreign",
+          "unique": false,
+          "columns": [
+            "subject_id"
+          ]
+        }
+      ],
+      "declaredIndexes": [],
+      "indexesMissingFromSchema": [
+        {
+          "name": "sm_result_stores_academic_id_foreign",
+          "unique": false,
+          "columns": [
+            "academic_id"
+          ]
+        },
+        {
+          "name": "sm_result_stores_class_id_foreign",
+          "unique": false,
+          "columns": [
+            "class_id"
+          ]
+        },
+        {
+          "name": "sm_result_stores_exam_setup_id_foreign",
+          "unique": false,
+          "columns": [
+            "exam_setup_id"
+          ]
+        },
+        {
+          "name": "sm_result_stores_exam_type_id_foreign",
+          "unique": false,
+          "columns": [
+            "exam_type_id"
+          ]
+        },
+        {
+          "name": "sm_result_stores_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        },
+        {
+          "name": "sm_result_stores_section_id_foreign",
+          "unique": false,
+          "columns": [
+            "section_id"
+          ]
+        },
+        {
+          "name": "sm_result_stores_student_id_foreign",
+          "unique": false,
+          "columns": [
+            "student_id"
+          ]
+        },
+        {
+          "name": "sm_result_stores_student_record_id_foreign",
+          "unique": false,
+          "columns": [
+            "student_record_id"
+          ]
+        },
+        {
+          "name": "sm_result_stores_subject_id_foreign",
+          "unique": false,
+          "columns": [
+            "subject_id"
+          ]
+        }
+      ],
+      "dbForeignKeys": [
+        {
+          "name": "sm_result_stores_academic_id_foreign",
+          "column": "academic_id",
+          "target": "sm_academic_years",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_result_stores_class_id_foreign",
+          "column": "class_id",
+          "target": "sm_classes",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_result_stores_exam_setup_id_foreign",
+          "column": "exam_setup_id",
+          "target": "sm_exam_setups",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_result_stores_exam_type_id_foreign",
+          "column": "exam_type_id",
+          "target": "sm_exam_types",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_result_stores_school_id_foreign",
+          "column": "school_id",
+          "target": "sm_schools",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_result_stores_section_id_foreign",
+          "column": "section_id",
+          "target": "sm_sections",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_result_stores_student_id_foreign",
+          "column": "student_id",
+          "target": "sm_students",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_result_stores_student_record_id_foreign",
+          "column": "student_record_id",
+          "target": "student_records",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_result_stores_subject_id_foreign",
+          "column": "subject_id",
+          "target": "sm_subjects",
+          "targetColumn": "id"
+        }
+      ]
+    },
+    {
+      "var": "studentRatings",
+      "dbName": "student_ratings",
+      "inCatalog": true,
+      "inClosure": false,
+      "columns": 10,
+      "rows": 13334,
+      "rowsEstimate": 13144,
+      "dataBytes": 1589248,
+      "indexBytes": 2048000,
+      "dbIndexes": [
+        {
+          "name": "student_id_exam_type_id_attribute",
+          "unique": true,
+          "columns": [
+            "student_id",
+            "exam_type_id",
+            "attribute"
+          ]
+        },
+        {
+          "name": "student_ratings_academic_id_foreign",
+          "unique": false,
+          "columns": [
+            "academic_id"
+          ]
+        },
+        {
+          "name": "student_ratings_exam_type_id_foreign",
+          "unique": false,
+          "columns": [
+            "exam_type_id"
+          ]
+        }
+      ],
+      "declaredIndexes": [
+        "student_id_exam_type_id_attribute"
+      ],
+      "indexesMissingFromSchema": [
+        {
+          "name": "student_ratings_academic_id_foreign",
+          "unique": false,
+          "columns": [
+            "academic_id"
+          ]
+        },
+        {
+          "name": "student_ratings_exam_type_id_foreign",
+          "unique": false,
+          "columns": [
+            "exam_type_id"
+          ]
+        }
+      ],
+      "dbForeignKeys": [
+        {
+          "name": "student_ratings_academic_id_foreign",
+          "column": "academic_id",
+          "target": "sm_academic_years",
+          "targetColumn": "id"
+        },
+        {
+          "name": "student_ratings_exam_type_id_foreign",
+          "column": "exam_type_id",
+          "target": "sm_exam_types",
+          "targetColumn": "id"
+        },
+        {
+          "name": "student_ratings_student_id_foreign",
+          "column": "student_id",
+          "target": "sm_students",
+          "targetColumn": "id"
+        }
+      ]
+    },
+    {
+      "var": "teacherRemarks",
+      "dbName": "teacher_remarks",
+      "inCatalog": true,
+      "inClosure": false,
+      "columns": 8,
+      "rows": 3699,
+      "rowsEstimate": 3728,
+      "dataBytes": 1589248,
+      "indexBytes": 425984,
+      "dbIndexes": [
+        {
+          "name": "teacher_remarks_academic_id_foreign",
+          "unique": false,
+          "columns": [
+            "academic_id"
+          ]
+        },
+        {
+          "name": "teacher_remarks_exam_type_id_foreign",
+          "unique": false,
+          "columns": [
+            "exam_type_id"
+          ]
+        },
+        {
+          "name": "teacher_remarks_teacher_id_foreign",
+          "unique": false,
+          "columns": [
+            "teacher_id"
+          ]
+        },
+        {
+          "name": "tr_student_exam_academic_unq",
+          "unique": true,
+          "columns": [
+            "student_id",
+            "exam_type_id",
+            "academic_id"
+          ]
+        }
+      ],
+      "declaredIndexes": [
+        "tr_student_exam_academic_unq"
+      ],
+      "indexesMissingFromSchema": [
+        {
+          "name": "teacher_remarks_academic_id_foreign",
+          "unique": false,
+          "columns": [
+            "academic_id"
+          ]
+        },
+        {
+          "name": "teacher_remarks_exam_type_id_foreign",
+          "unique": false,
+          "columns": [
+            "exam_type_id"
+          ]
+        },
+        {
+          "name": "teacher_remarks_teacher_id_foreign",
+          "unique": false,
+          "columns": [
+            "teacher_id"
+          ]
+        }
+      ],
+      "dbForeignKeys": [
+        {
+          "name": "teacher_remarks_academic_id_foreign",
+          "column": "academic_id",
+          "target": "sm_academic_years",
+          "targetColumn": "id"
+        },
+        {
+          "name": "teacher_remarks_exam_type_id_foreign",
+          "column": "exam_type_id",
+          "target": "sm_exam_types",
+          "targetColumn": "id"
+        },
+        {
+          "name": "teacher_remarks_student_id_foreign",
+          "column": "student_id",
+          "target": "sm_students",
+          "targetColumn": "id"
+        },
+        {
+          "name": "teacher_remarks_teacher_id_foreign",
+          "column": "teacher_id",
+          "target": "sm_staffs",
+          "targetColumn": "id"
+        }
+      ]
+    },
+    {
+      "var": "smStudentTimelines",
+      "dbName": "sm_student_timelines",
+      "inCatalog": true,
+      "inClosure": false,
+      "columns": 15,
+      "rows": 7452,
+      "rowsEstimate": 7446,
+      "dataBytes": 1589248,
+      "indexBytes": 294912,
+      "dbIndexes": [
+        {
+          "name": "sm_student_timelines_academic_id_foreign",
+          "unique": false,
+          "columns": [
+            "academic_id"
+          ]
+        },
+        {
+          "name": "sm_student_timelines_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        }
+      ],
+      "declaredIndexes": [],
+      "indexesMissingFromSchema": [
+        {
+          "name": "sm_student_timelines_academic_id_foreign",
+          "unique": false,
+          "columns": [
+            "academic_id"
+          ]
+        },
+        {
+          "name": "sm_student_timelines_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        }
+      ],
+      "dbForeignKeys": [
+        {
+          "name": "sm_student_timelines_academic_id_foreign",
+          "column": "academic_id",
+          "target": "sm_academic_years",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_student_timelines_school_id_foreign",
+          "column": "school_id",
+          "target": "sm_schools",
+          "targetColumn": "id"
+        }
+      ]
+    },
+    {
+      "var": "smStudentPromotions",
+      "dbName": "sm_student_promotions",
+      "inCatalog": true,
+      "inClosure": false,
+      "columns": 20,
+      "rows": 501,
+      "rowsEstimate": 420,
+      "dataBytes": 1589248,
+      "indexBytes": 147456,
+      "dbIndexes": [
+        {
+          "name": "sm_student_promotions_academic_id_foreign",
+          "unique": false,
+          "columns": [
+            "academic_id"
+          ]
+        },
+        {
+          "name": "sm_student_promotions_current_class_id_foreign",
+          "unique": false,
+          "columns": [
+            "current_class_id"
+          ]
+        },
+        {
+          "name": "sm_student_promotions_current_section_id_foreign",
+          "unique": false,
+          "columns": [
+            "current_section_id"
+          ]
+        },
+        {
+          "name": "sm_student_promotions_current_session_id_foreign",
+          "unique": false,
+          "columns": [
+            "current_session_id"
+          ]
+        },
+        {
+          "name": "sm_student_promotions_previous_class_id_foreign",
+          "unique": false,
+          "columns": [
+            "previous_class_id"
+          ]
+        },
+        {
+          "name": "sm_student_promotions_previous_section_id_foreign",
+          "unique": false,
+          "columns": [
+            "previous_section_id"
+          ]
+        },
+        {
+          "name": "sm_student_promotions_previous_session_id_foreign",
+          "unique": false,
+          "columns": [
+            "previous_session_id"
+          ]
+        },
+        {
+          "name": "sm_student_promotions_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        },
+        {
+          "name": "sm_student_promotions_student_id_foreign",
+          "unique": false,
+          "columns": [
+            "student_id"
+          ]
+        }
+      ],
+      "declaredIndexes": [],
+      "indexesMissingFromSchema": [
+        {
+          "name": "sm_student_promotions_academic_id_foreign",
+          "unique": false,
+          "columns": [
+            "academic_id"
+          ]
+        },
+        {
+          "name": "sm_student_promotions_current_class_id_foreign",
+          "unique": false,
+          "columns": [
+            "current_class_id"
+          ]
+        },
+        {
+          "name": "sm_student_promotions_current_section_id_foreign",
+          "unique": false,
+          "columns": [
+            "current_section_id"
+          ]
+        },
+        {
+          "name": "sm_student_promotions_current_session_id_foreign",
+          "unique": false,
+          "columns": [
+            "current_session_id"
+          ]
+        },
+        {
+          "name": "sm_student_promotions_previous_class_id_foreign",
+          "unique": false,
+          "columns": [
+            "previous_class_id"
+          ]
+        },
+        {
+          "name": "sm_student_promotions_previous_section_id_foreign",
+          "unique": false,
+          "columns": [
+            "previous_section_id"
+          ]
+        },
+        {
+          "name": "sm_student_promotions_previous_session_id_foreign",
+          "unique": false,
+          "columns": [
+            "previous_session_id"
+          ]
+        },
+        {
+          "name": "sm_student_promotions_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        },
+        {
+          "name": "sm_student_promotions_student_id_foreign",
+          "unique": false,
+          "columns": [
+            "student_id"
+          ]
+        }
+      ],
+      "dbForeignKeys": [
+        {
+          "name": "sm_student_promotions_academic_id_foreign",
+          "column": "academic_id",
+          "target": "sm_academic_years",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_student_promotions_current_class_id_foreign",
+          "column": "current_class_id",
+          "target": "sm_classes",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_student_promotions_current_section_id_foreign",
+          "column": "current_section_id",
+          "target": "sm_sections",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_student_promotions_current_session_id_foreign",
+          "column": "current_session_id",
+          "target": "sm_academic_years",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_student_promotions_previous_class_id_foreign",
+          "column": "previous_class_id",
+          "target": "sm_classes",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_student_promotions_previous_section_id_foreign",
+          "column": "previous_section_id",
+          "target": "sm_sections",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_student_promotions_previous_session_id_foreign",
+          "column": "previous_session_id",
+          "target": "sm_academic_years",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_student_promotions_school_id_foreign",
+          "column": "school_id",
+          "target": "sm_schools",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_student_promotions_student_id_foreign",
+          "column": "student_id",
+          "target": "sm_students",
+          "targetColumn": "id"
+        }
+      ]
+    },
+    {
+      "var": "smExamSetups",
+      "dbName": "sm_exam_setups",
+      "inCatalog": true,
+      "inClosure": false,
+      "columns": 15,
+      "rows": 6026,
+      "rowsEstimate": 5968,
+      "dataBytes": 540672,
+      "indexBytes": 1081344,
+      "dbIndexes": [
+        {
+          "name": "sm_exam_setups_academic_id_foreign",
+          "unique": false,
+          "columns": [
+            "academic_id"
+          ]
+        },
+        {
+          "name": "sm_exam_setups_class_id_foreign",
+          "unique": false,
+          "columns": [
+            "class_id"
+          ]
+        },
+        {
+          "name": "sm_exam_setups_exam_id_foreign",
+          "unique": false,
+          "columns": [
+            "exam_id"
+          ]
+        },
+        {
+          "name": "sm_exam_setups_exam_term_id_foreign",
+          "unique": false,
+          "columns": [
+            "exam_term_id"
+          ]
+        },
+        {
+          "name": "sm_exam_setups_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        },
+        {
+          "name": "sm_exam_setups_section_id_foreign",
+          "unique": false,
+          "columns": [
+            "section_id"
+          ]
+        },
+        {
+          "name": "sm_exam_setups_subject_id_foreign",
+          "unique": false,
+          "columns": [
+            "subject_id"
+          ]
+        }
+      ],
+      "declaredIndexes": [],
+      "indexesMissingFromSchema": [
+        {
+          "name": "sm_exam_setups_academic_id_foreign",
+          "unique": false,
+          "columns": [
+            "academic_id"
+          ]
+        },
+        {
+          "name": "sm_exam_setups_class_id_foreign",
+          "unique": false,
+          "columns": [
+            "class_id"
+          ]
+        },
+        {
+          "name": "sm_exam_setups_exam_id_foreign",
+          "unique": false,
+          "columns": [
+            "exam_id"
+          ]
+        },
+        {
+          "name": "sm_exam_setups_exam_term_id_foreign",
+          "unique": false,
+          "columns": [
+            "exam_term_id"
+          ]
+        },
+        {
+          "name": "sm_exam_setups_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        },
+        {
+          "name": "sm_exam_setups_section_id_foreign",
+          "unique": false,
+          "columns": [
+            "section_id"
+          ]
+        },
+        {
+          "name": "sm_exam_setups_subject_id_foreign",
+          "unique": false,
+          "columns": [
+            "subject_id"
+          ]
+        }
+      ],
+      "dbForeignKeys": [
+        {
+          "name": "sm_exam_setups_academic_id_foreign",
+          "column": "academic_id",
+          "target": "sm_academic_years",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_exam_setups_class_id_foreign",
+          "column": "class_id",
+          "target": "sm_classes",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_exam_setups_exam_id_foreign",
+          "column": "exam_id",
+          "target": "sm_exams",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_exam_setups_exam_term_id_foreign",
+          "column": "exam_term_id",
+          "target": "sm_exam_types",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_exam_setups_school_id_foreign",
+          "column": "school_id",
+          "target": "sm_schools",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_exam_setups_section_id_foreign",
+          "column": "section_id",
+          "target": "sm_sections",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_exam_setups_subject_id_foreign",
+          "column": "subject_id",
+          "target": "sm_subjects",
+          "targetColumn": "id"
+        }
+      ]
+    },
+    {
+      "var": "chatGroupUsers",
+      "dbName": "chat_group_users",
+      "inCatalog": true,
+      "inClosure": false,
+      "columns": 9,
+      "rows": 10740,
+      "rowsEstimate": 10487,
+      "dataBytes": 1589248,
+      "indexBytes": 0,
+      "dbIndexes": [],
+      "declaredIndexes": [],
+      "indexesMissingFromSchema": [],
+      "dbForeignKeys": []
+    },
+    {
+      "var": "classAttendances",
+      "dbName": "class_attendances",
+      "inCatalog": true,
+      "inClosure": false,
+      "columns": 10,
+      "rows": 3654,
+      "rowsEstimate": 3654,
+      "dataBytes": 262144,
+      "indexBytes": 442368,
+      "dbIndexes": [
+        {
+          "name": "class_attendances_academic_id_foreign",
+          "unique": false,
+          "columns": [
+            "academic_id"
+          ]
+        },
+        {
+          "name": "class_attendances_exam_type_id_foreign",
+          "unique": false,
+          "columns": [
+            "exam_type_id"
+          ]
+        },
+        {
+          "name": "class_attendances_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        },
+        {
+          "name": "student_exam_unique",
+          "unique": true,
+          "columns": [
+            "student_id",
+            "exam_type_id"
+          ]
+        }
+      ],
+      "declaredIndexes": [
+        "student_exam_unique"
+      ],
+      "indexesMissingFromSchema": [
+        {
+          "name": "class_attendances_academic_id_foreign",
+          "unique": false,
+          "columns": [
+            "academic_id"
+          ]
+        },
+        {
+          "name": "class_attendances_exam_type_id_foreign",
+          "unique": false,
+          "columns": [
+            "exam_type_id"
+          ]
+        },
+        {
+          "name": "class_attendances_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        }
+      ],
+      "dbForeignKeys": [
+        {
+          "name": "class_attendances_academic_id_foreign",
+          "column": "academic_id",
+          "target": "sm_academic_years",
+          "targetColumn": "id"
+        },
+        {
+          "name": "class_attendances_exam_type_id_foreign",
+          "column": "exam_type_id",
+          "target": "sm_exam_types",
+          "targetColumn": "id"
+        },
+        {
+          "name": "class_attendances_school_id_foreign",
+          "column": "school_id",
+          "target": "sm_schools",
+          "targetColumn": "id"
+        },
+        {
+          "name": "class_attendances_student_id_foreign",
+          "column": "student_id",
+          "target": "sm_students",
+          "targetColumn": "id"
+        }
+      ]
+    },
+    {
+      "var": "smStudents",
+      "dbName": "sm_students",
+      "inCatalog": true,
+      "inClosure": false,
+      "columns": 55,
+      "rows": 900,
+      "rowsEstimate": 900,
+      "dataBytes": 212992,
+      "indexBytes": 278528,
+      "dbIndexes": [
+        {
+          "name": "sm_students_academic_id_foreign",
+          "unique": false,
+          "columns": [
+            "academic_id"
+          ]
+        },
+        {
+          "name": "sm_students_bloodgroup_id_foreign",
+          "unique": false,
+          "columns": [
+            "bloodgroup_id"
+          ]
+        },
+        {
+          "name": "sm_students_class_id_foreign",
+          "unique": false,
+          "columns": [
+            "class_id"
+          ]
+        },
+        {
+          "name": "sm_students_dormitory_id_foreign",
+          "unique": false,
+          "columns": [
+            "dormitory_id"
+          ]
+        },
+        {
+          "name": "sm_students_gender_id_foreign",
+          "unique": false,
+          "columns": [
+            "gender_id"
+          ]
+        },
+        {
+          "name": "sm_students_parent_id_foreign",
+          "unique": false,
+          "columns": [
+            "parent_id"
+          ]
+        },
+        {
+          "name": "sm_students_religion_id_foreign",
+          "unique": false,
+          "columns": [
+            "religion_id"
+          ]
+        },
+        {
+          "name": "sm_students_role_id_foreign",
+          "unique": false,
+          "columns": [
+            "role_id"
+          ]
+        },
+        {
+          "name": "sm_students_room_id_foreign",
+          "unique": false,
+          "columns": [
+            "room_id"
+          ]
+        },
+        {
+          "name": "sm_students_route_list_id_foreign",
+          "unique": false,
+          "columns": [
+            "route_list_id"
+          ]
+        },
+        {
+          "name": "sm_students_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        },
+        {
+          "name": "sm_students_section_id_foreign",
+          "unique": false,
+          "columns": [
+            "section_id"
+          ]
+        },
+        {
+          "name": "sm_students_session_id_foreign",
+          "unique": false,
+          "columns": [
+            "session_id"
+          ]
+        },
+        {
+          "name": "sm_students_student_category_id_foreign",
+          "unique": false,
+          "columns": [
+            "student_category_id"
+          ]
+        },
+        {
+          "name": "sm_students_student_group_id_foreign",
+          "unique": false,
+          "columns": [
+            "student_group_id"
+          ]
+        },
+        {
+          "name": "sm_students_user_id_foreign",
+          "unique": false,
+          "columns": [
+            "user_id"
+          ]
+        },
+        {
+          "name": "sm_students_vechile_id_foreign",
+          "unique": false,
+          "columns": [
+            "vechile_id"
+          ]
+        }
+      ],
+      "declaredIndexes": [],
+      "indexesMissingFromSchema": [
+        {
+          "name": "sm_students_academic_id_foreign",
+          "unique": false,
+          "columns": [
+            "academic_id"
+          ]
+        },
+        {
+          "name": "sm_students_bloodgroup_id_foreign",
+          "unique": false,
+          "columns": [
+            "bloodgroup_id"
+          ]
+        },
+        {
+          "name": "sm_students_class_id_foreign",
+          "unique": false,
+          "columns": [
+            "class_id"
+          ]
+        },
+        {
+          "name": "sm_students_dormitory_id_foreign",
+          "unique": false,
+          "columns": [
+            "dormitory_id"
+          ]
+        },
+        {
+          "name": "sm_students_gender_id_foreign",
+          "unique": false,
+          "columns": [
+            "gender_id"
+          ]
+        },
+        {
+          "name": "sm_students_parent_id_foreign",
+          "unique": false,
+          "columns": [
+            "parent_id"
+          ]
+        },
+        {
+          "name": "sm_students_religion_id_foreign",
+          "unique": false,
+          "columns": [
+            "religion_id"
+          ]
+        },
+        {
+          "name": "sm_students_role_id_foreign",
+          "unique": false,
+          "columns": [
+            "role_id"
+          ]
+        },
+        {
+          "name": "sm_students_room_id_foreign",
+          "unique": false,
+          "columns": [
+            "room_id"
+          ]
+        },
+        {
+          "name": "sm_students_route_list_id_foreign",
+          "unique": false,
+          "columns": [
+            "route_list_id"
+          ]
+        },
+        {
+          "name": "sm_students_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        },
+        {
+          "name": "sm_students_section_id_foreign",
+          "unique": false,
+          "columns": [
+            "section_id"
+          ]
+        },
+        {
+          "name": "sm_students_session_id_foreign",
+          "unique": false,
+          "columns": [
+            "session_id"
+          ]
+        },
+        {
+          "name": "sm_students_student_category_id_foreign",
+          "unique": false,
+          "columns": [
+            "student_category_id"
+          ]
+        },
+        {
+          "name": "sm_students_student_group_id_foreign",
+          "unique": false,
+          "columns": [
+            "student_group_id"
+          ]
+        },
+        {
+          "name": "sm_students_user_id_foreign",
+          "unique": false,
+          "columns": [
+            "user_id"
+          ]
+        },
+        {
+          "name": "sm_students_vechile_id_foreign",
+          "unique": false,
+          "columns": [
+            "vechile_id"
+          ]
+        }
+      ],
+      "dbForeignKeys": [
+        {
+          "name": "sm_students_academic_id_foreign",
+          "column": "academic_id",
+          "target": "sm_academic_years",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_students_bloodgroup_id_foreign",
+          "column": "bloodgroup_id",
+          "target": "sm_base_setups",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_students_class_id_foreign",
+          "column": "class_id",
+          "target": "sm_classes",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_students_dormitory_id_foreign",
+          "column": "dormitory_id",
+          "target": "sm_dormitory_lists",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_students_gender_id_foreign",
+          "column": "gender_id",
+          "target": "sm_base_setups",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_students_parent_id_foreign",
+          "column": "parent_id",
+          "target": "sm_parents",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_students_religion_id_foreign",
+          "column": "religion_id",
+          "target": "sm_base_setups",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_students_role_id_foreign",
+          "column": "role_id",
+          "target": "infix_roles",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_students_room_id_foreign",
+          "column": "room_id",
+          "target": "sm_room_lists",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_students_route_list_id_foreign",
+          "column": "route_list_id",
+          "target": "sm_routes",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_students_school_id_foreign",
+          "column": "school_id",
+          "target": "sm_schools",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_students_section_id_foreign",
+          "column": "section_id",
+          "target": "sm_sections",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_students_session_id_foreign",
+          "column": "session_id",
+          "target": "sm_academic_years",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_students_student_category_id_foreign",
+          "column": "student_category_id",
+          "target": "sm_student_categories",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_students_student_group_id_foreign",
+          "column": "student_group_id",
+          "target": "sm_student_groups",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_students_user_id_foreign",
+          "column": "user_id",
+          "target": "users",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_students_vechile_id_foreign",
+          "column": "vechile_id",
+          "target": "sm_vehicles",
+          "targetColumn": "id"
+        }
+      ]
+    },
+    {
+      "var": "studentRecords",
+      "dbName": "student_records",
+      "inCatalog": true,
+      "inClosure": false,
+      "columns": 14,
+      "rows": 1434,
+      "rowsEstimate": 1434,
+      "dataBytes": 131072,
+      "indexBytes": 360448,
+      "dbIndexes": [
+        {
+          "name": "student_records_academic_id_foreign",
+          "unique": false,
+          "columns": [
+            "academic_id"
+          ]
+        },
+        {
+          "name": "student_records_class_id_foreign",
+          "unique": false,
+          "columns": [
+            "class_id"
+          ]
+        },
+        {
+          "name": "student_records_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        },
+        {
+          "name": "student_records_section_id_foreign",
+          "unique": false,
+          "columns": [
+            "section_id"
+          ]
+        },
+        {
+          "name": "student_records_session_id_foreign",
+          "unique": false,
+          "columns": [
+            "session_id"
+          ]
+        },
+        {
+          "name": "student_records_student_id_foreign",
+          "unique": false,
+          "columns": [
+            "student_id"
+          ]
+        }
+      ],
+      "declaredIndexes": [],
+      "indexesMissingFromSchema": [
+        {
+          "name": "student_records_academic_id_foreign",
+          "unique": false,
+          "columns": [
+            "academic_id"
+          ]
+        },
+        {
+          "name": "student_records_class_id_foreign",
+          "unique": false,
+          "columns": [
+            "class_id"
+          ]
+        },
+        {
+          "name": "student_records_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        },
+        {
+          "name": "student_records_section_id_foreign",
+          "unique": false,
+          "columns": [
+            "section_id"
+          ]
+        },
+        {
+          "name": "student_records_session_id_foreign",
+          "unique": false,
+          "columns": [
+            "session_id"
+          ]
+        },
+        {
+          "name": "student_records_student_id_foreign",
+          "unique": false,
+          "columns": [
+            "student_id"
+          ]
+        }
+      ],
+      "dbForeignKeys": [
+        {
+          "name": "student_records_academic_id_foreign",
+          "column": "academic_id",
+          "target": "sm_academic_years",
+          "targetColumn": "id"
+        },
+        {
+          "name": "student_records_class_id_foreign",
+          "column": "class_id",
+          "target": "sm_classes",
+          "targetColumn": "id"
+        },
+        {
+          "name": "student_records_school_id_foreign",
+          "column": "school_id",
+          "target": "sm_schools",
+          "targetColumn": "id"
+        },
+        {
+          "name": "student_records_section_id_foreign",
+          "column": "section_id",
+          "target": "sm_sections",
+          "targetColumn": "id"
+        },
+        {
+          "name": "student_records_session_id_foreign",
+          "column": "session_id",
+          "target": "sm_academic_years",
+          "targetColumn": "id"
+        },
+        {
+          "name": "student_records_student_id_foreign",
+          "column": "student_id",
+          "target": "sm_students",
+          "targetColumn": "id"
+        }
+      ]
+    },
+    {
+      "var": "smExams",
+      "dbName": "sm_exams",
+      "inCatalog": true,
+      "inClosure": false,
+      "columns": 15,
+      "rows": 1433,
+      "rowsEstimate": 1433,
+      "dataBytes": 147456,
+      "indexBytes": 294912,
+      "dbIndexes": [
+        {
+          "name": "sm_exams_academic_id_foreign",
+          "unique": false,
+          "columns": [
+            "academic_id"
+          ]
+        },
+        {
+          "name": "sm_exams_class_id_foreign",
+          "unique": false,
+          "columns": [
+            "class_id"
+          ]
+        },
+        {
+          "name": "sm_exams_exam_type_id_foreign",
+          "unique": false,
+          "columns": [
+            "exam_type_id"
+          ]
+        },
+        {
+          "name": "sm_exams_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        },
+        {
+          "name": "sm_exams_section_id_foreign",
+          "unique": false,
+          "columns": [
+            "section_id"
+          ]
+        },
+        {
+          "name": "sm_exams_subject_id_foreign",
+          "unique": false,
+          "columns": [
+            "subject_id"
+          ]
+        }
+      ],
+      "declaredIndexes": [],
+      "indexesMissingFromSchema": [
+        {
+          "name": "sm_exams_academic_id_foreign",
+          "unique": false,
+          "columns": [
+            "academic_id"
+          ]
+        },
+        {
+          "name": "sm_exams_class_id_foreign",
+          "unique": false,
+          "columns": [
+            "class_id"
+          ]
+        },
+        {
+          "name": "sm_exams_exam_type_id_foreign",
+          "unique": false,
+          "columns": [
+            "exam_type_id"
+          ]
+        },
+        {
+          "name": "sm_exams_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        },
+        {
+          "name": "sm_exams_section_id_foreign",
+          "unique": false,
+          "columns": [
+            "section_id"
+          ]
+        },
+        {
+          "name": "sm_exams_subject_id_foreign",
+          "unique": false,
+          "columns": [
+            "subject_id"
+          ]
+        }
+      ],
+      "dbForeignKeys": [
+        {
+          "name": "sm_exams_academic_id_foreign",
+          "column": "academic_id",
+          "target": "sm_academic_years",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_exams_class_id_foreign",
+          "column": "class_id",
+          "target": "sm_classes",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_exams_exam_type_id_foreign",
+          "column": "exam_type_id",
+          "target": "sm_exam_types",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_exams_school_id_foreign",
+          "column": "school_id",
+          "target": "sm_schools",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_exams_section_id_foreign",
+          "column": "section_id",
+          "target": "sm_sections",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_exams_subject_id_foreign",
+          "column": "subject_id",
+          "target": "sm_subjects",
+          "targetColumn": "id"
+        }
+      ]
+    },
+    {
+      "var": "users",
+      "dbName": "users",
+      "inCatalog": true,
+      "inClosure": false,
+      "columns": 31,
+      "rows": 1610,
+      "rowsEstimate": 1590,
+      "dataBytes": 344064,
+      "indexBytes": 98304,
+      "dbIndexes": [
+        {
+          "name": "users_role_id_foreign",
+          "unique": false,
+          "columns": [
+            "role_id"
+          ]
+        },
+        {
+          "name": "users_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        }
+      ],
+      "declaredIndexes": [],
+      "indexesMissingFromSchema": [
+        {
+          "name": "users_role_id_foreign",
+          "unique": false,
+          "columns": [
+            "role_id"
+          ]
+        },
+        {
+          "name": "users_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        }
+      ],
+      "dbForeignKeys": [
+        {
+          "name": "users_role_id_foreign",
+          "column": "role_id",
+          "target": "infix_roles",
+          "targetColumn": "id"
+        },
+        {
+          "name": "users_school_id_foreign",
+          "column": "school_id",
+          "target": "sm_schools",
+          "targetColumn": "id"
+        }
+      ]
+    },
+    {
+      "var": "chatGroups",
+      "dbName": "chat_groups",
+      "inCatalog": true,
+      "inClosure": false,
+      "columns": 16,
+      "rows": 402,
+      "rowsEstimate": 402,
+      "dataBytes": 98304,
+      "indexBytes": 294912,
+      "dbIndexes": [
+        {
+          "name": "chat_groups_academic_id_foreign",
+          "unique": false,
+          "columns": [
+            "academic_id"
+          ]
+        },
+        {
+          "name": "chat_groups_class_id_foreign",
+          "unique": false,
+          "columns": [
+            "class_id"
+          ]
+        },
+        {
+          "name": "chat_groups_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        },
+        {
+          "name": "chat_groups_section_id_foreign",
+          "unique": false,
+          "columns": [
+            "section_id"
+          ]
+        },
+        {
+          "name": "chat_groups_subject_id_foreign",
+          "unique": false,
+          "columns": [
+            "subject_id"
+          ]
+        },
+        {
+          "name": "chat_groups_teacher_id_foreign",
+          "unique": false,
+          "columns": [
+            "teacher_id"
+          ]
+        }
+      ],
+      "declaredIndexes": [],
+      "indexesMissingFromSchema": [
+        {
+          "name": "chat_groups_academic_id_foreign",
+          "unique": false,
+          "columns": [
+            "academic_id"
+          ]
+        },
+        {
+          "name": "chat_groups_class_id_foreign",
+          "unique": false,
+          "columns": [
+            "class_id"
+          ]
+        },
+        {
+          "name": "chat_groups_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        },
+        {
+          "name": "chat_groups_section_id_foreign",
+          "unique": false,
+          "columns": [
+            "section_id"
+          ]
+        },
+        {
+          "name": "chat_groups_subject_id_foreign",
+          "unique": false,
+          "columns": [
+            "subject_id"
+          ]
+        },
+        {
+          "name": "chat_groups_teacher_id_foreign",
+          "unique": false,
+          "columns": [
+            "teacher_id"
+          ]
+        }
+      ],
+      "dbForeignKeys": [
+        {
+          "name": "chat_groups_academic_id_foreign",
+          "column": "academic_id",
+          "target": "sm_academic_years",
+          "targetColumn": "id"
+        },
+        {
+          "name": "chat_groups_class_id_foreign",
+          "column": "class_id",
+          "target": "sm_classes",
+          "targetColumn": "id"
+        },
+        {
+          "name": "chat_groups_school_id_foreign",
+          "column": "school_id",
+          "target": "sm_schools",
+          "targetColumn": "id"
+        },
+        {
+          "name": "chat_groups_section_id_foreign",
+          "column": "section_id",
+          "target": "sm_sections",
+          "targetColumn": "id"
+        },
+        {
+          "name": "chat_groups_subject_id_foreign",
+          "column": "subject_id",
+          "target": "sm_subjects",
+          "targetColumn": "id"
+        },
+        {
+          "name": "chat_groups_teacher_id_foreign",
+          "column": "teacher_id",
+          "target": "sm_staffs",
+          "targetColumn": "id"
+        }
+      ]
+    },
+    {
+      "var": "smExamSchedules",
+      "dbName": "sm_exam_schedules",
+      "inCatalog": true,
+      "inClosure": false,
+      "columns": 19,
+      "rows": 859,
+      "rowsEstimate": 859,
+      "dataBytes": 114688,
+      "indexBytes": 147456,
+      "dbIndexes": [
+        {
+          "name": "sm_exam_schedules_academic_id_foreign",
+          "unique": false,
+          "columns": [
+            "academic_id"
+          ]
+        },
+        {
+          "name": "sm_exam_schedules_class_id_foreign",
+          "unique": false,
+          "columns": [
+            "class_id"
+          ]
+        },
+        {
+          "name": "sm_exam_schedules_exam_id_foreign",
+          "unique": false,
+          "columns": [
+            "exam_id"
+          ]
+        },
+        {
+          "name": "sm_exam_schedules_exam_period_id_foreign",
+          "unique": false,
+          "columns": [
+            "exam_period_id"
+          ]
+        },
+        {
+          "name": "sm_exam_schedules_exam_term_id_foreign",
+          "unique": false,
+          "columns": [
+            "exam_term_id"
+          ]
+        },
+        {
+          "name": "sm_exam_schedules_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        },
+        {
+          "name": "sm_exam_schedules_section_id_foreign",
+          "unique": false,
+          "columns": [
+            "section_id"
+          ]
+        },
+        {
+          "name": "sm_exam_schedules_subject_id_foreign",
+          "unique": false,
+          "columns": [
+            "subject_id"
+          ]
+        },
+        {
+          "name": "sm_exam_schedules_teacher_id_foreign",
+          "unique": false,
+          "columns": [
+            "teacher_id"
+          ]
+        }
+      ],
+      "declaredIndexes": [],
+      "indexesMissingFromSchema": [
+        {
+          "name": "sm_exam_schedules_academic_id_foreign",
+          "unique": false,
+          "columns": [
+            "academic_id"
+          ]
+        },
+        {
+          "name": "sm_exam_schedules_class_id_foreign",
+          "unique": false,
+          "columns": [
+            "class_id"
+          ]
+        },
+        {
+          "name": "sm_exam_schedules_exam_id_foreign",
+          "unique": false,
+          "columns": [
+            "exam_id"
+          ]
+        },
+        {
+          "name": "sm_exam_schedules_exam_period_id_foreign",
+          "unique": false,
+          "columns": [
+            "exam_period_id"
+          ]
+        },
+        {
+          "name": "sm_exam_schedules_exam_term_id_foreign",
+          "unique": false,
+          "columns": [
+            "exam_term_id"
+          ]
+        },
+        {
+          "name": "sm_exam_schedules_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        },
+        {
+          "name": "sm_exam_schedules_section_id_foreign",
+          "unique": false,
+          "columns": [
+            "section_id"
+          ]
+        },
+        {
+          "name": "sm_exam_schedules_subject_id_foreign",
+          "unique": false,
+          "columns": [
+            "subject_id"
+          ]
+        },
+        {
+          "name": "sm_exam_schedules_teacher_id_foreign",
+          "unique": false,
+          "columns": [
+            "teacher_id"
+          ]
+        }
+      ],
+      "dbForeignKeys": [
+        {
+          "name": "sm_exam_schedules_academic_id_foreign",
+          "column": "academic_id",
+          "target": "sm_academic_years",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_exam_schedules_class_id_foreign",
+          "column": "class_id",
+          "target": "sm_classes",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_exam_schedules_exam_id_foreign",
+          "column": "exam_id",
+          "target": "sm_exams",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_exam_schedules_exam_period_id_foreign",
+          "column": "exam_period_id",
+          "target": "sm_class_times",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_exam_schedules_exam_term_id_foreign",
+          "column": "exam_term_id",
+          "target": "sm_exam_types",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_exam_schedules_school_id_foreign",
+          "column": "school_id",
+          "target": "sm_schools",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_exam_schedules_section_id_foreign",
+          "column": "section_id",
+          "target": "sm_sections",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_exam_schedules_subject_id_foreign",
+          "column": "subject_id",
+          "target": "sm_subjects",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_exam_schedules_teacher_id_foreign",
+          "column": "teacher_id",
+          "target": "sm_staffs",
+          "targetColumn": "id"
+        }
+      ]
+    },
+    {
+      "var": "smAssignSubjects",
+      "dbName": "sm_assign_subjects",
+      "inCatalog": true,
+      "inClosure": false,
+      "columns": 13,
+      "rows": 463,
+      "rowsEstimate": 463,
+      "dataBytes": 65536,
+      "indexBytes": 98304,
+      "dbIndexes": [
+        {
+          "name": "sm_assign_subjects_academic_id_foreign",
+          "unique": false,
+          "columns": [
+            "academic_id"
+          ]
+        },
+        {
+          "name": "sm_assign_subjects_class_id_foreign",
+          "unique": false,
+          "columns": [
+            "class_id"
+          ]
+        },
+        {
+          "name": "sm_assign_subjects_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        },
+        {
+          "name": "sm_assign_subjects_section_id_foreign",
+          "unique": false,
+          "columns": [
+            "section_id"
+          ]
+        },
+        {
+          "name": "sm_assign_subjects_subject_id_foreign",
+          "unique": false,
+          "columns": [
+            "subject_id"
+          ]
+        },
+        {
+          "name": "sm_assign_subjects_teacher_id_foreign",
+          "unique": false,
+          "columns": [
+            "teacher_id"
+          ]
+        }
+      ],
+      "declaredIndexes": [],
+      "indexesMissingFromSchema": [
+        {
+          "name": "sm_assign_subjects_academic_id_foreign",
+          "unique": false,
+          "columns": [
+            "academic_id"
+          ]
+        },
+        {
+          "name": "sm_assign_subjects_class_id_foreign",
+          "unique": false,
+          "columns": [
+            "class_id"
+          ]
+        },
+        {
+          "name": "sm_assign_subjects_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        },
+        {
+          "name": "sm_assign_subjects_section_id_foreign",
+          "unique": false,
+          "columns": [
+            "section_id"
+          ]
+        },
+        {
+          "name": "sm_assign_subjects_subject_id_foreign",
+          "unique": false,
+          "columns": [
+            "subject_id"
+          ]
+        },
+        {
+          "name": "sm_assign_subjects_teacher_id_foreign",
+          "unique": false,
+          "columns": [
+            "teacher_id"
+          ]
+        }
+      ],
+      "dbForeignKeys": [
+        {
+          "name": "sm_assign_subjects_academic_id_foreign",
+          "column": "academic_id",
+          "target": "sm_academic_years",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_assign_subjects_class_id_foreign",
+          "column": "class_id",
+          "target": "sm_classes",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_assign_subjects_school_id_foreign",
+          "column": "school_id",
+          "target": "sm_schools",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_assign_subjects_section_id_foreign",
+          "column": "section_id",
+          "target": "sm_sections",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_assign_subjects_subject_id_foreign",
+          "column": "subject_id",
+          "target": "sm_subjects",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_assign_subjects_teacher_id_foreign",
+          "column": "teacher_id",
+          "target": "sm_staffs",
+          "targetColumn": "id"
+        }
+      ]
+    },
+    {
+      "var": "smParents",
+      "dbName": "sm_parents",
+      "inCatalog": true,
+      "inClosure": false,
+      "columns": 24,
+      "rows": 567,
+      "rowsEstimate": 567,
+      "dataBytes": 114688,
+      "indexBytes": 49152,
+      "dbIndexes": [
+        {
+          "name": "sm_parents_academic_id_foreign",
+          "unique": false,
+          "columns": [
+            "academic_id"
+          ]
+        },
+        {
+          "name": "sm_parents_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        },
+        {
+          "name": "sm_parents_user_id_foreign",
+          "unique": false,
+          "columns": [
+            "user_id"
+          ]
+        }
+      ],
+      "declaredIndexes": [],
+      "indexesMissingFromSchema": [
+        {
+          "name": "sm_parents_academic_id_foreign",
+          "unique": false,
+          "columns": [
+            "academic_id"
+          ]
+        },
+        {
+          "name": "sm_parents_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        },
+        {
+          "name": "sm_parents_user_id_foreign",
+          "unique": false,
+          "columns": [
+            "user_id"
+          ]
+        }
+      ],
+      "dbForeignKeys": [
+        {
+          "name": "sm_parents_academic_id_foreign",
+          "column": "academic_id",
+          "target": "sm_academic_years",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_parents_school_id_foreign",
+          "column": "school_id",
+          "target": "sm_schools",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_parents_user_id_foreign",
+          "column": "user_id",
+          "target": "users",
+          "targetColumn": "id"
+        }
+      ]
+    },
+    {
+      "var": "smStudentAttendances",
+      "dbName": "sm_student_attendances",
+      "inCatalog": true,
+      "inClosure": false,
+      "columns": 16,
+      "rows": 509,
+      "rowsEstimate": 509,
+      "dataBytes": 81920,
+      "indexBytes": 81920,
+      "dbIndexes": [
+        {
+          "name": "sm_student_attendances_academic_id_foreign",
+          "unique": false,
+          "columns": [
+            "academic_id"
+          ]
+        },
+        {
+          "name": "sm_student_attendances_class_id_foreign",
+          "unique": false,
+          "columns": [
+            "class_id"
+          ]
+        },
+        {
+          "name": "sm_student_attendances_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        },
+        {
+          "name": "sm_student_attendances_section_id_foreign",
+          "unique": false,
+          "columns": [
+            "section_id"
+          ]
+        },
+        {
+          "name": "sm_student_attendances_student_id_foreign",
+          "unique": false,
+          "columns": [
+            "student_id"
+          ]
+        }
+      ],
+      "declaredIndexes": [],
+      "indexesMissingFromSchema": [
+        {
+          "name": "sm_student_attendances_academic_id_foreign",
+          "unique": false,
+          "columns": [
+            "academic_id"
+          ]
+        },
+        {
+          "name": "sm_student_attendances_class_id_foreign",
+          "unique": false,
+          "columns": [
+            "class_id"
+          ]
+        },
+        {
+          "name": "sm_student_attendances_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        },
+        {
+          "name": "sm_student_attendances_section_id_foreign",
+          "unique": false,
+          "columns": [
+            "section_id"
+          ]
+        },
+        {
+          "name": "sm_student_attendances_student_id_foreign",
+          "unique": false,
+          "columns": [
+            "student_id"
+          ]
+        }
+      ],
+      "dbForeignKeys": [
+        {
+          "name": "sm_student_attendances_academic_id_foreign",
+          "column": "academic_id",
+          "target": "sm_academic_years",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_student_attendances_class_id_foreign",
+          "column": "class_id",
+          "target": "sm_classes",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_student_attendances_school_id_foreign",
+          "column": "school_id",
+          "target": "sm_schools",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_student_attendances_section_id_foreign",
+          "column": "section_id",
+          "target": "sm_sections",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_student_attendances_student_id_foreign",
+          "column": "student_id",
+          "target": "sm_students",
+          "targetColumn": "id"
+        }
+      ]
+    },
+    {
+      "var": "smClassRoutineUpdates",
+      "dbName": "sm_class_routine_updates",
+      "inCatalog": true,
+      "inClosure": false,
+      "columns": 18,
+      "rows": 0,
+      "rowsEstimate": 0,
+      "dataBytes": 16384,
+      "indexBytes": 131072,
+      "dbIndexes": [
+        {
+          "name": "sm_class_routine_updates_academic_id_foreign",
+          "unique": false,
+          "columns": [
+            "academic_id"
+          ]
+        },
+        {
+          "name": "sm_class_routine_updates_class_id_foreign",
+          "unique": false,
+          "columns": [
+            "class_id"
+          ]
+        },
+        {
+          "name": "sm_class_routine_updates_class_period_id_foreign",
+          "unique": false,
+          "columns": [
+            "class_period_id"
+          ]
+        },
+        {
+          "name": "sm_class_routine_updates_room_id_foreign",
+          "unique": false,
+          "columns": [
+            "room_id"
+          ]
+        },
+        {
+          "name": "sm_class_routine_updates_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        },
+        {
+          "name": "sm_class_routine_updates_section_id_foreign",
+          "unique": false,
+          "columns": [
+            "section_id"
+          ]
+        },
+        {
+          "name": "sm_class_routine_updates_subject_id_foreign",
+          "unique": false,
+          "columns": [
+            "subject_id"
+          ]
+        },
+        {
+          "name": "sm_class_routine_updates_teacher_id_foreign",
+          "unique": false,
+          "columns": [
+            "teacher_id"
+          ]
+        }
+      ],
+      "declaredIndexes": [],
+      "indexesMissingFromSchema": [
+        {
+          "name": "sm_class_routine_updates_academic_id_foreign",
+          "unique": false,
+          "columns": [
+            "academic_id"
+          ]
+        },
+        {
+          "name": "sm_class_routine_updates_class_id_foreign",
+          "unique": false,
+          "columns": [
+            "class_id"
+          ]
+        },
+        {
+          "name": "sm_class_routine_updates_class_period_id_foreign",
+          "unique": false,
+          "columns": [
+            "class_period_id"
+          ]
+        },
+        {
+          "name": "sm_class_routine_updates_room_id_foreign",
+          "unique": false,
+          "columns": [
+            "room_id"
+          ]
+        },
+        {
+          "name": "sm_class_routine_updates_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        },
+        {
+          "name": "sm_class_routine_updates_section_id_foreign",
+          "unique": false,
+          "columns": [
+            "section_id"
+          ]
+        },
+        {
+          "name": "sm_class_routine_updates_subject_id_foreign",
+          "unique": false,
+          "columns": [
+            "subject_id"
+          ]
+        },
+        {
+          "name": "sm_class_routine_updates_teacher_id_foreign",
+          "unique": false,
+          "columns": [
+            "teacher_id"
+          ]
+        }
+      ],
+      "dbForeignKeys": [
+        {
+          "name": "sm_class_routine_updates_academic_id_foreign",
+          "column": "academic_id",
+          "target": "sm_academic_years",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_class_routine_updates_class_id_foreign",
+          "column": "class_id",
+          "target": "sm_classes",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_class_routine_updates_class_period_id_foreign",
+          "column": "class_period_id",
+          "target": "sm_class_times",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_class_routine_updates_room_id_foreign",
+          "column": "room_id",
+          "target": "sm_class_rooms",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_class_routine_updates_school_id_foreign",
+          "column": "school_id",
+          "target": "sm_schools",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_class_routine_updates_section_id_foreign",
+          "column": "section_id",
+          "target": "sm_sections",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_class_routine_updates_subject_id_foreign",
+          "column": "subject_id",
+          "target": "sm_subjects",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_class_routine_updates_teacher_id_foreign",
+          "column": "teacher_id",
+          "target": "sm_staffs",
+          "targetColumn": "id"
+        }
+      ]
+    },
+    {
+      "var": "smStaffs",
+      "dbName": "sm_staffs",
+      "inCatalog": true,
+      "inClosure": false,
+      "columns": 57,
+      "rows": 87,
+      "rowsEstimate": 87,
+      "dataBytes": 49152,
+      "indexBytes": 98304,
+      "dbIndexes": [
+        {
+          "name": "sm_staffs_department_id_foreign",
+          "unique": false,
+          "columns": [
+            "department_id"
+          ]
+        },
+        {
+          "name": "sm_staffs_designation_id_foreign",
+          "unique": false,
+          "columns": [
+            "designation_id"
+          ]
+        },
+        {
+          "name": "sm_staffs_gender_id_foreign",
+          "unique": false,
+          "columns": [
+            "gender_id"
+          ]
+        },
+        {
+          "name": "sm_staffs_role_id_foreign",
+          "unique": false,
+          "columns": [
+            "role_id"
+          ]
+        },
+        {
+          "name": "sm_staffs_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        },
+        {
+          "name": "sm_staffs_user_id_foreign",
+          "unique": false,
+          "columns": [
+            "user_id"
+          ]
+        }
+      ],
+      "declaredIndexes": [],
+      "indexesMissingFromSchema": [
+        {
+          "name": "sm_staffs_department_id_foreign",
+          "unique": false,
+          "columns": [
+            "department_id"
+          ]
+        },
+        {
+          "name": "sm_staffs_designation_id_foreign",
+          "unique": false,
+          "columns": [
+            "designation_id"
+          ]
+        },
+        {
+          "name": "sm_staffs_gender_id_foreign",
+          "unique": false,
+          "columns": [
+            "gender_id"
+          ]
+        },
+        {
+          "name": "sm_staffs_role_id_foreign",
+          "unique": false,
+          "columns": [
+            "role_id"
+          ]
+        },
+        {
+          "name": "sm_staffs_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        },
+        {
+          "name": "sm_staffs_user_id_foreign",
+          "unique": false,
+          "columns": [
+            "user_id"
+          ]
+        }
+      ],
+      "dbForeignKeys": [
+        {
+          "name": "sm_staffs_department_id_foreign",
+          "column": "department_id",
+          "target": "sm_human_departments",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_staffs_designation_id_foreign",
+          "column": "designation_id",
+          "target": "sm_designations",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_staffs_gender_id_foreign",
+          "column": "gender_id",
+          "target": "sm_base_setups",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_staffs_role_id_foreign",
+          "column": "role_id",
+          "target": "infix_roles",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_staffs_school_id_foreign",
+          "column": "school_id",
+          "target": "sm_schools",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_staffs_user_id_foreign",
+          "column": "user_id",
+          "target": "users",
+          "targetColumn": "id"
+        }
+      ]
+    },
+    {
+      "var": "smFeesPayments",
+      "dbName": "sm_fees_payments",
+      "inCatalog": true,
+      "inClosure": false,
+      "columns": 25,
+      "rows": 0,
+      "rowsEstimate": 0,
+      "dataBytes": 16384,
+      "indexBytes": 114688,
+      "dbIndexes": [
+        {
+          "name": "sm_fees_payments_academic_id_foreign",
+          "unique": false,
+          "columns": [
+            "academic_id"
+          ]
+        },
+        {
+          "name": "sm_fees_payments_assign_id_foreign",
+          "unique": false,
+          "columns": [
+            "assign_id"
+          ]
+        },
+        {
+          "name": "sm_fees_payments_bank_id_foreign",
+          "unique": false,
+          "columns": [
+            "bank_id"
+          ]
+        },
+        {
+          "name": "sm_fees_payments_fees_discount_id_foreign",
+          "unique": false,
+          "columns": [
+            "fees_discount_id"
+          ]
+        },
+        {
+          "name": "sm_fees_payments_fees_type_id_foreign",
+          "unique": false,
+          "columns": [
+            "fees_type_id"
+          ]
+        },
+        {
+          "name": "sm_fees_payments_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        },
+        {
+          "name": "sm_fees_payments_student_id_foreign",
+          "unique": false,
+          "columns": [
+            "student_id"
+          ]
+        }
+      ],
+      "declaredIndexes": [],
+      "indexesMissingFromSchema": [
+        {
+          "name": "sm_fees_payments_academic_id_foreign",
+          "unique": false,
+          "columns": [
+            "academic_id"
+          ]
+        },
+        {
+          "name": "sm_fees_payments_assign_id_foreign",
+          "unique": false,
+          "columns": [
+            "assign_id"
+          ]
+        },
+        {
+          "name": "sm_fees_payments_bank_id_foreign",
+          "unique": false,
+          "columns": [
+            "bank_id"
+          ]
+        },
+        {
+          "name": "sm_fees_payments_fees_discount_id_foreign",
+          "unique": false,
+          "columns": [
+            "fees_discount_id"
+          ]
+        },
+        {
+          "name": "sm_fees_payments_fees_type_id_foreign",
+          "unique": false,
+          "columns": [
+            "fees_type_id"
+          ]
+        },
+        {
+          "name": "sm_fees_payments_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        },
+        {
+          "name": "sm_fees_payments_student_id_foreign",
+          "unique": false,
+          "columns": [
+            "student_id"
+          ]
+        }
+      ],
+      "dbForeignKeys": [
+        {
+          "name": "sm_fees_payments_academic_id_foreign",
+          "column": "academic_id",
+          "target": "sm_academic_years",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_fees_payments_assign_id_foreign",
+          "column": "assign_id",
+          "target": "sm_fees_assigns",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_fees_payments_bank_id_foreign",
+          "column": "bank_id",
+          "target": "sm_bank_accounts",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_fees_payments_fees_discount_id_foreign",
+          "column": "fees_discount_id",
+          "target": "sm_fees_discounts",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_fees_payments_fees_type_id_foreign",
+          "column": "fees_type_id",
+          "target": "sm_fees_types",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_fees_payments_school_id_foreign",
+          "column": "school_id",
+          "target": "sm_schools",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_fees_payments_student_id_foreign",
+          "column": "student_id",
+          "target": "sm_students",
+          "targetColumn": "id"
+        }
+      ]
+    },
+    {
+      "var": "smClassRoutines",
+      "dbName": "sm_class_routines",
+      "inCatalog": true,
+      "inClosure": false,
+      "columns": 39,
+      "rows": 0,
+      "rowsEstimate": 0,
+      "dataBytes": 16384,
+      "indexBytes": 81920,
+      "dbIndexes": [
+        {
+          "name": "sm_class_routines_academic_id_foreign",
+          "unique": false,
+          "columns": [
+            "academic_id"
+          ]
+        },
+        {
+          "name": "sm_class_routines_class_id_foreign",
+          "unique": false,
+          "columns": [
+            "class_id"
+          ]
+        },
+        {
+          "name": "sm_class_routines_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        },
+        {
+          "name": "sm_class_routines_section_id_foreign",
+          "unique": false,
+          "columns": [
+            "section_id"
+          ]
+        },
+        {
+          "name": "sm_class_routines_subject_id_foreign",
+          "unique": false,
+          "columns": [
+            "subject_id"
+          ]
+        }
+      ],
+      "declaredIndexes": [],
+      "indexesMissingFromSchema": [
+        {
+          "name": "sm_class_routines_academic_id_foreign",
+          "unique": false,
+          "columns": [
+            "academic_id"
+          ]
+        },
+        {
+          "name": "sm_class_routines_class_id_foreign",
+          "unique": false,
+          "columns": [
+            "class_id"
+          ]
+        },
+        {
+          "name": "sm_class_routines_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        },
+        {
+          "name": "sm_class_routines_section_id_foreign",
+          "unique": false,
+          "columns": [
+            "section_id"
+          ]
+        },
+        {
+          "name": "sm_class_routines_subject_id_foreign",
+          "unique": false,
+          "columns": [
+            "subject_id"
+          ]
+        }
+      ],
+      "dbForeignKeys": [
+        {
+          "name": "sm_class_routines_academic_id_foreign",
+          "column": "academic_id",
+          "target": "sm_academic_years",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_class_routines_class_id_foreign",
+          "column": "class_id",
+          "target": "sm_classes",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_class_routines_school_id_foreign",
+          "column": "school_id",
+          "target": "sm_schools",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_class_routines_section_id_foreign",
+          "column": "section_id",
+          "target": "sm_sections",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_class_routines_subject_id_foreign",
+          "column": "subject_id",
+          "target": "sm_subjects",
+          "targetColumn": "id"
+        }
+      ]
+    },
+    {
+      "var": "smFeesAssigns",
+      "dbName": "sm_fees_assigns",
+      "inCatalog": true,
+      "inClosure": false,
+      "columns": 16,
+      "rows": 0,
+      "rowsEstimate": 0,
+      "dataBytes": 16384,
+      "indexBytes": 81920,
+      "dbIndexes": [
+        {
+          "name": "sm_fees_assigns_academic_id_foreign",
+          "unique": false,
+          "columns": [
+            "academic_id"
+          ]
+        },
+        {
+          "name": "sm_fees_assigns_fees_discount_id_foreign",
+          "unique": false,
+          "columns": [
+            "fees_discount_id"
+          ]
+        },
+        {
+          "name": "sm_fees_assigns_fees_master_id_foreign",
+          "unique": false,
+          "columns": [
+            "fees_master_id"
+          ]
+        },
+        {
+          "name": "sm_fees_assigns_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        },
+        {
+          "name": "sm_fees_assigns_student_id_foreign",
+          "unique": false,
+          "columns": [
+            "student_id"
+          ]
+        }
+      ],
+      "declaredIndexes": [],
+      "indexesMissingFromSchema": [
+        {
+          "name": "sm_fees_assigns_academic_id_foreign",
+          "unique": false,
+          "columns": [
+            "academic_id"
+          ]
+        },
+        {
+          "name": "sm_fees_assigns_fees_discount_id_foreign",
+          "unique": false,
+          "columns": [
+            "fees_discount_id"
+          ]
+        },
+        {
+          "name": "sm_fees_assigns_fees_master_id_foreign",
+          "unique": false,
+          "columns": [
+            "fees_master_id"
+          ]
+        },
+        {
+          "name": "sm_fees_assigns_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        },
+        {
+          "name": "sm_fees_assigns_student_id_foreign",
+          "unique": false,
+          "columns": [
+            "student_id"
+          ]
+        }
+      ],
+      "dbForeignKeys": [
+        {
+          "name": "sm_fees_assigns_academic_id_foreign",
+          "column": "academic_id",
+          "target": "sm_academic_years",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_fees_assigns_fees_discount_id_foreign",
+          "column": "fees_discount_id",
+          "target": "sm_fees_discounts",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_fees_assigns_fees_master_id_foreign",
+          "column": "fees_master_id",
+          "target": "sm_fees_masters",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_fees_assigns_school_id_foreign",
+          "column": "school_id",
+          "target": "sm_schools",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_fees_assigns_student_id_foreign",
+          "column": "student_id",
+          "target": "sm_students",
+          "targetColumn": "id"
+        }
+      ]
+    },
+    {
+      "var": "smGeneralSettings",
+      "dbName": "sm_general_settings",
+      "inCatalog": true,
+      "inClosure": false,
+      "columns": 106,
+      "rows": 1,
+      "rowsEstimate": 0,
+      "dataBytes": 16384,
+      "indexBytes": 81920,
+      "dbIndexes": [
+        {
+          "name": "sm_general_settings_academic_id_foreign",
+          "unique": false,
+          "columns": [
+            "academic_id"
+          ]
+        },
+        {
+          "name": "sm_general_settings_date_format_id_foreign",
+          "unique": false,
+          "columns": [
+            "date_format_id"
+          ]
+        },
+        {
+          "name": "sm_general_settings_language_id_foreign",
+          "unique": false,
+          "columns": [
+            "language_id"
+          ]
+        },
+        {
+          "name": "sm_general_settings_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        },
+        {
+          "name": "sm_general_settings_session_id_foreign",
+          "unique": false,
+          "columns": [
+            "session_id"
+          ]
+        }
+      ],
+      "declaredIndexes": [],
+      "indexesMissingFromSchema": [
+        {
+          "name": "sm_general_settings_academic_id_foreign",
+          "unique": false,
+          "columns": [
+            "academic_id"
+          ]
+        },
+        {
+          "name": "sm_general_settings_date_format_id_foreign",
+          "unique": false,
+          "columns": [
+            "date_format_id"
+          ]
+        },
+        {
+          "name": "sm_general_settings_language_id_foreign",
+          "unique": false,
+          "columns": [
+            "language_id"
+          ]
+        },
+        {
+          "name": "sm_general_settings_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        },
+        {
+          "name": "sm_general_settings_session_id_foreign",
+          "unique": false,
+          "columns": [
+            "session_id"
+          ]
+        }
+      ],
+      "dbForeignKeys": [
+        {
+          "name": "sm_general_settings_academic_id_foreign",
+          "column": "academic_id",
+          "target": "sm_academic_years",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_general_settings_date_format_id_foreign",
+          "column": "date_format_id",
+          "target": "sm_date_formats",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_general_settings_language_id_foreign",
+          "column": "language_id",
+          "target": "sm_languages",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_general_settings_school_id_foreign",
+          "column": "school_id",
+          "target": "sm_schools",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_general_settings_session_id_foreign",
+          "column": "session_id",
+          "target": "sm_academic_years",
+          "targetColumn": "id"
+        }
+      ]
+    },
+    {
+      "var": "smHomeworks",
+      "dbName": "sm_homeworks",
+      "inCatalog": true,
+      "inClosure": false,
+      "columns": 22,
+      "rows": 0,
+      "rowsEstimate": 0,
+      "dataBytes": 16384,
+      "indexBytes": 81920,
+      "dbIndexes": [
+        {
+          "name": "sm_homeworks_academic_id_foreign",
+          "unique": false,
+          "columns": [
+            "academic_id"
+          ]
+        },
+        {
+          "name": "sm_homeworks_class_id_foreign",
+          "unique": false,
+          "columns": [
+            "class_id"
+          ]
+        },
+        {
+          "name": "sm_homeworks_evaluated_by_foreign",
+          "unique": false,
+          "columns": [
+            "evaluated_by"
+          ]
+        },
+        {
+          "name": "sm_homeworks_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        },
+        {
+          "name": "sm_homeworks_subject_id_foreign",
+          "unique": false,
+          "columns": [
+            "subject_id"
+          ]
+        }
+      ],
+      "declaredIndexes": [],
+      "indexesMissingFromSchema": [
+        {
+          "name": "sm_homeworks_academic_id_foreign",
+          "unique": false,
+          "columns": [
+            "academic_id"
+          ]
+        },
+        {
+          "name": "sm_homeworks_class_id_foreign",
+          "unique": false,
+          "columns": [
+            "class_id"
+          ]
+        },
+        {
+          "name": "sm_homeworks_evaluated_by_foreign",
+          "unique": false,
+          "columns": [
+            "evaluated_by"
+          ]
+        },
+        {
+          "name": "sm_homeworks_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        },
+        {
+          "name": "sm_homeworks_subject_id_foreign",
+          "unique": false,
+          "columns": [
+            "subject_id"
+          ]
+        }
+      ],
+      "dbForeignKeys": [
+        {
+          "name": "sm_homeworks_academic_id_foreign",
+          "column": "academic_id",
+          "target": "sm_academic_years",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_homeworks_class_id_foreign",
+          "column": "class_id",
+          "target": "sm_classes",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_homeworks_evaluated_by_foreign",
+          "column": "evaluated_by",
+          "target": "users",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_homeworks_school_id_foreign",
+          "column": "school_id",
+          "target": "sm_schools",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_homeworks_subject_id_foreign",
+          "column": "subject_id",
+          "target": "sm_subjects",
+          "targetColumn": "id"
+        }
+      ]
+    },
+    {
+      "var": "smAssignClassTeachers",
+      "dbName": "sm_assign_class_teachers",
+      "inCatalog": true,
+      "inClosure": false,
+      "columns": 10,
+      "rows": 21,
+      "rowsEstimate": 21,
+      "dataBytes": 16384,
+      "indexBytes": 65536,
+      "dbIndexes": [
+        {
+          "name": "sm_assign_class_teachers_academic_id_foreign",
+          "unique": false,
+          "columns": [
+            "academic_id"
+          ]
+        },
+        {
+          "name": "sm_assign_class_teachers_class_id_foreign",
+          "unique": false,
+          "columns": [
+            "class_id"
+          ]
+        },
+        {
+          "name": "sm_assign_class_teachers_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        },
+        {
+          "name": "sm_assign_class_teachers_section_id_foreign",
+          "unique": false,
+          "columns": [
+            "section_id"
+          ]
+        }
+      ],
+      "declaredIndexes": [],
+      "indexesMissingFromSchema": [
+        {
+          "name": "sm_assign_class_teachers_academic_id_foreign",
+          "unique": false,
+          "columns": [
+            "academic_id"
+          ]
+        },
+        {
+          "name": "sm_assign_class_teachers_class_id_foreign",
+          "unique": false,
+          "columns": [
+            "class_id"
+          ]
+        },
+        {
+          "name": "sm_assign_class_teachers_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        },
+        {
+          "name": "sm_assign_class_teachers_section_id_foreign",
+          "unique": false,
+          "columns": [
+            "section_id"
+          ]
+        }
+      ],
+      "dbForeignKeys": [
+        {
+          "name": "sm_assign_class_teachers_academic_id_foreign",
+          "column": "academic_id",
+          "target": "sm_academic_years",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_assign_class_teachers_class_id_foreign",
+          "column": "class_id",
+          "target": "sm_classes",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_assign_class_teachers_school_id_foreign",
+          "column": "school_id",
+          "target": "sm_schools",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_assign_class_teachers_section_id_foreign",
+          "column": "section_id",
+          "target": "sm_sections",
+          "targetColumn": "id"
+        }
+      ]
+    },
+    {
+      "var": "smClassSections",
+      "dbName": "sm_class_sections",
+      "inCatalog": true,
+      "inClosure": false,
+      "columns": 9,
+      "rows": 71,
+      "rowsEstimate": 71,
+      "dataBytes": 16384,
+      "indexBytes": 65536,
+      "dbIndexes": [
+        {
+          "name": "sm_class_sections_academic_id_foreign",
+          "unique": false,
+          "columns": [
+            "academic_id"
+          ]
+        },
+        {
+          "name": "sm_class_sections_class_id_section_id_index",
+          "unique": false,
+          "columns": [
+            "class_id",
+            "section_id"
+          ]
+        },
+        {
+          "name": "sm_class_sections_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        },
+        {
+          "name": "sm_class_sections_section_id_foreign",
+          "unique": false,
+          "columns": [
+            "section_id"
+          ]
+        }
+      ],
+      "declaredIndexes": [
+        "sm_class_sections_class_id_section_id_index"
+      ],
+      "indexesMissingFromSchema": [
+        {
+          "name": "sm_class_sections_academic_id_foreign",
+          "unique": false,
+          "columns": [
+            "academic_id"
+          ]
+        },
+        {
+          "name": "sm_class_sections_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        },
+        {
+          "name": "sm_class_sections_section_id_foreign",
+          "unique": false,
+          "columns": [
+            "section_id"
+          ]
+        }
+      ],
+      "dbForeignKeys": [
+        {
+          "name": "sm_class_sections_academic_id_foreign",
+          "column": "academic_id",
+          "target": "sm_academic_years",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_class_sections_class_id_foreign",
+          "column": "class_id",
+          "target": "sm_classes",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_class_sections_school_id_foreign",
+          "column": "school_id",
+          "target": "sm_schools",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_class_sections_section_id_foreign",
+          "column": "section_id",
+          "target": "sm_sections",
+          "targetColumn": "id"
+        }
+      ]
+    },
+    {
+      "var": "smClassTeachers",
+      "dbName": "sm_class_teachers",
+      "inCatalog": true,
+      "inClosure": false,
+      "columns": 10,
+      "rows": 18,
+      "rowsEstimate": 18,
+      "dataBytes": 16384,
+      "indexBytes": 65536,
+      "dbIndexes": [
+        {
+          "name": "sm_class_teachers_academic_id_foreign",
+          "unique": false,
+          "columns": [
+            "academic_id"
+          ]
+        },
+        {
+          "name": "sm_class_teachers_assign_class_teacher_id_foreign",
+          "unique": false,
+          "columns": [
+            "assign_class_teacher_id"
+          ]
+        },
+        {
+          "name": "sm_class_teachers_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        },
+        {
+          "name": "sm_class_teachers_teacher_id_foreign",
+          "unique": false,
+          "columns": [
+            "teacher_id"
+          ]
+        }
+      ],
+      "declaredIndexes": [],
+      "indexesMissingFromSchema": [
+        {
+          "name": "sm_class_teachers_academic_id_foreign",
+          "unique": false,
+          "columns": [
+            "academic_id"
+          ]
+        },
+        {
+          "name": "sm_class_teachers_assign_class_teacher_id_foreign",
+          "unique": false,
+          "columns": [
+            "assign_class_teacher_id"
+          ]
+        },
+        {
+          "name": "sm_class_teachers_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        },
+        {
+          "name": "sm_class_teachers_teacher_id_foreign",
+          "unique": false,
+          "columns": [
+            "teacher_id"
+          ]
+        }
+      ],
+      "dbForeignKeys": [
+        {
+          "name": "sm_class_teachers_academic_id_foreign",
+          "column": "academic_id",
+          "target": "sm_academic_years",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_class_teachers_assign_class_teacher_id_foreign",
+          "column": "assign_class_teacher_id",
+          "target": "sm_assign_class_teachers",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_class_teachers_school_id_foreign",
+          "column": "school_id",
+          "target": "sm_schools",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_class_teachers_teacher_id_foreign",
+          "column": "teacher_id",
+          "target": "sm_staffs",
+          "targetColumn": "id"
+        }
+      ]
+    },
+    {
+      "var": "smFeesMasters",
+      "dbName": "sm_fees_masters",
+      "inCatalog": true,
+      "inClosure": false,
+      "columns": 15,
+      "rows": 0,
+      "rowsEstimate": 0,
+      "dataBytes": 16384,
+      "indexBytes": 65536,
+      "dbIndexes": [
+        {
+          "name": "sm_fees_masters_academic_id_foreign",
+          "unique": false,
+          "columns": [
+            "academic_id"
+          ]
+        },
+        {
+          "name": "sm_fees_masters_fees_group_id_foreign",
+          "unique": false,
+          "columns": [
+            "fees_group_id"
+          ]
+        },
+        {
+          "name": "sm_fees_masters_fees_type_id_foreign",
+          "unique": false,
+          "columns": [
+            "fees_type_id"
+          ]
+        },
+        {
+          "name": "sm_fees_masters_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        }
+      ],
+      "declaredIndexes": [],
+      "indexesMissingFromSchema": [
+        {
+          "name": "sm_fees_masters_academic_id_foreign",
+          "unique": false,
+          "columns": [
+            "academic_id"
+          ]
+        },
+        {
+          "name": "sm_fees_masters_fees_group_id_foreign",
+          "unique": false,
+          "columns": [
+            "fees_group_id"
+          ]
+        },
+        {
+          "name": "sm_fees_masters_fees_type_id_foreign",
+          "unique": false,
+          "columns": [
+            "fees_type_id"
+          ]
+        },
+        {
+          "name": "sm_fees_masters_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        }
+      ],
+      "dbForeignKeys": [
+        {
+          "name": "sm_fees_masters_academic_id_foreign",
+          "column": "academic_id",
+          "target": "sm_academic_years",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_fees_masters_fees_group_id_foreign",
+          "column": "fees_group_id",
+          "target": "sm_fees_groups",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_fees_masters_fees_type_id_foreign",
+          "column": "fees_type_id",
+          "target": "sm_fees_types",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_fees_masters_school_id_foreign",
+          "column": "school_id",
+          "target": "sm_schools",
+          "targetColumn": "id"
+        }
+      ]
+    },
+    {
+      "var": "smHomeworkStudents",
+      "dbName": "sm_homework_students",
+      "inCatalog": true,
+      "inClosure": false,
+      "columns": 13,
+      "rows": 0,
+      "rowsEstimate": 0,
+      "dataBytes": 16384,
+      "indexBytes": 65536,
+      "dbIndexes": [
+        {
+          "name": "sm_homework_students_academic_id_foreign",
+          "unique": false,
+          "columns": [
+            "academic_id"
+          ]
+        },
+        {
+          "name": "sm_homework_students_homework_id_foreign",
+          "unique": false,
+          "columns": [
+            "homework_id"
+          ]
+        },
+        {
+          "name": "sm_homework_students_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        },
+        {
+          "name": "sm_homework_students_student_id_foreign",
+          "unique": false,
+          "columns": [
+            "student_id"
+          ]
+        }
+      ],
+      "declaredIndexes": [],
+      "indexesMissingFromSchema": [
+        {
+          "name": "sm_homework_students_academic_id_foreign",
+          "unique": false,
+          "columns": [
+            "academic_id"
+          ]
+        },
+        {
+          "name": "sm_homework_students_homework_id_foreign",
+          "unique": false,
+          "columns": [
+            "homework_id"
+          ]
+        },
+        {
+          "name": "sm_homework_students_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        },
+        {
+          "name": "sm_homework_students_student_id_foreign",
+          "unique": false,
+          "columns": [
+            "student_id"
+          ]
+        }
+      ],
+      "dbForeignKeys": [
+        {
+          "name": "sm_homework_students_academic_id_foreign",
+          "column": "academic_id",
+          "target": "sm_academic_years",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_homework_students_homework_id_foreign",
+          "column": "homework_id",
+          "target": "sm_homeworks",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_homework_students_school_id_foreign",
+          "column": "school_id",
+          "target": "sm_schools",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_homework_students_student_id_foreign",
+          "column": "student_id",
+          "target": "sm_students",
+          "targetColumn": "id"
+        }
+      ]
+    },
+    {
+      "var": "smRoomLists",
+      "dbName": "sm_room_lists",
+      "inCatalog": false,
+      "inClosure": true,
+      "columns": 14,
+      "rows": 0,
+      "rowsEstimate": 0,
+      "dataBytes": 16384,
+      "indexBytes": 65536,
+      "dbIndexes": [
+        {
+          "name": "sm_room_lists_academic_id_foreign",
+          "unique": false,
+          "columns": [
+            "academic_id"
+          ]
+        },
+        {
+          "name": "sm_room_lists_dormitory_id_foreign",
+          "unique": false,
+          "columns": [
+            "dormitory_id"
+          ]
+        },
+        {
+          "name": "sm_room_lists_room_type_id_foreign",
+          "unique": false,
+          "columns": [
+            "room_type_id"
+          ]
+        },
+        {
+          "name": "sm_room_lists_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        }
+      ],
+      "declaredIndexes": [],
+      "indexesMissingFromSchema": [
+        {
+          "name": "sm_room_lists_academic_id_foreign",
+          "unique": false,
+          "columns": [
+            "academic_id"
+          ]
+        },
+        {
+          "name": "sm_room_lists_dormitory_id_foreign",
+          "unique": false,
+          "columns": [
+            "dormitory_id"
+          ]
+        },
+        {
+          "name": "sm_room_lists_room_type_id_foreign",
+          "unique": false,
+          "columns": [
+            "room_type_id"
+          ]
+        },
+        {
+          "name": "sm_room_lists_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        }
+      ],
+      "dbForeignKeys": [
+        {
+          "name": "sm_room_lists_academic_id_foreign",
+          "column": "academic_id",
+          "target": "sm_academic_years",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_room_lists_dormitory_id_foreign",
+          "column": "dormitory_id",
+          "target": "sm_dormitory_lists",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_room_lists_room_type_id_foreign",
+          "column": "room_type_id",
+          "target": "sm_room_types",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_room_lists_school_id_foreign",
+          "column": "school_id",
+          "target": "sm_schools",
+          "targetColumn": "id"
+        }
+      ]
+    },
+    {
+      "var": "smFeesTypes",
+      "dbName": "sm_fees_types",
+      "inCatalog": true,
+      "inClosure": false,
+      "columns": 12,
+      "rows": 0,
+      "rowsEstimate": 0,
+      "dataBytes": 16384,
+      "indexBytes": 49152,
+      "dbIndexes": [
+        {
+          "name": "sm_fees_types_academic_id_foreign",
+          "unique": false,
+          "columns": [
+            "academic_id"
+          ]
+        },
+        {
+          "name": "sm_fees_types_fees_group_id_foreign",
+          "unique": false,
+          "columns": [
+            "fees_group_id"
+          ]
+        },
+        {
+          "name": "sm_fees_types_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        }
+      ],
+      "declaredIndexes": [],
+      "indexesMissingFromSchema": [
+        {
+          "name": "sm_fees_types_academic_id_foreign",
+          "unique": false,
+          "columns": [
+            "academic_id"
+          ]
+        },
+        {
+          "name": "sm_fees_types_fees_group_id_foreign",
+          "unique": false,
+          "columns": [
+            "fees_group_id"
+          ]
+        },
+        {
+          "name": "sm_fees_types_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        }
+      ],
+      "dbForeignKeys": [
+        {
+          "name": "sm_fees_types_academic_id_foreign",
+          "column": "academic_id",
+          "target": "sm_academic_years",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_fees_types_fees_group_id_foreign",
+          "column": "fees_group_id",
+          "target": "sm_fees_groups",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_fees_types_school_id_foreign",
+          "column": "school_id",
+          "target": "sm_schools",
+          "targetColumn": "id"
+        }
+      ]
+    },
+    {
+      "var": "smHumanDepartments",
+      "dbName": "sm_human_departments",
+      "inCatalog": true,
+      "inClosure": false,
+      "columns": 9,
+      "rows": 9,
+      "rowsEstimate": 9,
+      "dataBytes": 16384,
+      "indexBytes": 49152,
+      "dbIndexes": [
+        {
+          "name": "sm_human_departments_created_by_foreign",
+          "unique": false,
+          "columns": [
+            "created_by"
+          ]
+        },
+        {
+          "name": "sm_human_departments_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        },
+        {
+          "name": "sm_human_departments_updated_by_foreign",
+          "unique": false,
+          "columns": [
+            "updated_by"
+          ]
+        }
+      ],
+      "declaredIndexes": [],
+      "indexesMissingFromSchema": [
+        {
+          "name": "sm_human_departments_created_by_foreign",
+          "unique": false,
+          "columns": [
+            "created_by"
+          ]
+        },
+        {
+          "name": "sm_human_departments_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        },
+        {
+          "name": "sm_human_departments_updated_by_foreign",
+          "unique": false,
+          "columns": [
+            "updated_by"
+          ]
+        }
+      ],
+      "dbForeignKeys": [
+        {
+          "name": "sm_human_departments_created_by_foreign",
+          "column": "created_by",
+          "target": "users",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_human_departments_school_id_foreign",
+          "column": "school_id",
+          "target": "sm_schools",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_human_departments_updated_by_foreign",
+          "column": "updated_by",
+          "target": "users",
+          "targetColumn": "id"
+        }
+      ]
+    },
+    {
+      "var": "smBaseSetups",
+      "dbName": "sm_base_setups",
+      "inCatalog": true,
+      "inClosure": false,
+      "columns": 9,
+      "rows": 16,
+      "rowsEstimate": 16,
+      "dataBytes": 16384,
+      "indexBytes": 32768,
+      "dbIndexes": [
+        {
+          "name": "sm_base_setups_base_group_id_foreign",
+          "unique": false,
+          "columns": [
+            "base_group_id"
+          ]
+        },
+        {
+          "name": "sm_base_setups_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        }
+      ],
+      "declaredIndexes": [],
+      "indexesMissingFromSchema": [
+        {
+          "name": "sm_base_setups_base_group_id_foreign",
+          "unique": false,
+          "columns": [
+            "base_group_id"
+          ]
+        },
+        {
+          "name": "sm_base_setups_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        }
+      ],
+      "dbForeignKeys": [
+        {
+          "name": "sm_base_setups_base_group_id_foreign",
+          "column": "base_group_id",
+          "target": "sm_base_groups",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_base_setups_school_id_foreign",
+          "column": "school_id",
+          "target": "sm_schools",
+          "targetColumn": "id"
+        }
+      ]
+    },
+    {
+      "var": "smClasses",
+      "dbName": "sm_classes",
+      "inCatalog": true,
+      "inClosure": false,
+      "columns": 11,
+      "rows": 22,
+      "rowsEstimate": 22,
+      "dataBytes": 16384,
+      "indexBytes": 32768,
+      "dbIndexes": [
+        {
+          "name": "sm_classes_academic_id_foreign",
+          "unique": false,
+          "columns": [
+            "academic_id"
+          ]
+        },
+        {
+          "name": "sm_classes_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        }
+      ],
+      "declaredIndexes": [],
+      "indexesMissingFromSchema": [
+        {
+          "name": "sm_classes_academic_id_foreign",
+          "unique": false,
+          "columns": [
+            "academic_id"
+          ]
+        },
+        {
+          "name": "sm_classes_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        }
+      ],
+      "dbForeignKeys": [
+        {
+          "name": "sm_classes_academic_id_foreign",
+          "column": "academic_id",
+          "target": "sm_academic_years",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_classes_school_id_foreign",
+          "column": "school_id",
+          "target": "sm_schools",
+          "targetColumn": "id"
+        }
+      ]
+    },
+    {
+      "var": "smEvents",
+      "dbName": "sm_events",
+      "inCatalog": true,
+      "inClosure": false,
+      "columns": 17,
+      "rows": 0,
+      "rowsEstimate": 0,
+      "dataBytes": 16384,
+      "indexBytes": 32768,
+      "dbIndexes": [
+        {
+          "name": "sm_events_academic_id_foreign",
+          "unique": false,
+          "columns": [
+            "academic_id"
+          ]
+        },
+        {
+          "name": "sm_events_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        }
+      ],
+      "declaredIndexes": [],
+      "indexesMissingFromSchema": [
+        {
+          "name": "sm_events_academic_id_foreign",
+          "unique": false,
+          "columns": [
+            "academic_id"
+          ]
+        },
+        {
+          "name": "sm_events_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        }
+      ],
+      "dbForeignKeys": [
+        {
+          "name": "sm_events_academic_id_foreign",
+          "column": "academic_id",
+          "target": "sm_academic_years",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_events_school_id_foreign",
+          "column": "school_id",
+          "target": "sm_schools",
+          "targetColumn": "id"
+        }
+      ]
+    },
+    {
+      "var": "smExamTypes",
+      "dbName": "sm_exam_types",
+      "inCatalog": true,
+      "inClosure": false,
+      "columns": 14,
+      "rows": 7,
+      "rowsEstimate": 7,
+      "dataBytes": 16384,
+      "indexBytes": 32768,
+      "dbIndexes": [
+        {
+          "name": "sm_exam_types_academic_id_foreign",
+          "unique": false,
+          "columns": [
+            "academic_id"
+          ]
+        },
+        {
+          "name": "sm_exam_types_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        }
+      ],
+      "declaredIndexes": [],
+      "indexesMissingFromSchema": [
+        {
+          "name": "sm_exam_types_academic_id_foreign",
+          "unique": false,
+          "columns": [
+            "academic_id"
+          ]
+        },
+        {
+          "name": "sm_exam_types_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        }
+      ],
+      "dbForeignKeys": [
+        {
+          "name": "sm_exam_types_academic_id_foreign",
+          "column": "academic_id",
+          "target": "sm_academic_years",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_exam_types_school_id_foreign",
+          "column": "school_id",
+          "target": "sm_schools",
+          "targetColumn": "id"
+        }
+      ]
+    },
+    {
+      "var": "smFeesGroups",
+      "dbName": "sm_fees_groups",
+      "inCatalog": true,
+      "inClosure": false,
+      "columns": 15,
+      "rows": 0,
+      "rowsEstimate": 0,
+      "dataBytes": 16384,
+      "indexBytes": 32768,
+      "dbIndexes": [
+        {
+          "name": "sm_fees_groups_academic_id_foreign",
+          "unique": false,
+          "columns": [
+            "academic_id"
+          ]
+        },
+        {
+          "name": "sm_fees_groups_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        }
+      ],
+      "declaredIndexes": [],
+      "indexesMissingFromSchema": [
+        {
+          "name": "sm_fees_groups_academic_id_foreign",
+          "unique": false,
+          "columns": [
+            "academic_id"
+          ]
+        },
+        {
+          "name": "sm_fees_groups_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        }
+      ],
+      "dbForeignKeys": [
+        {
+          "name": "sm_fees_groups_academic_id_foreign",
+          "column": "academic_id",
+          "target": "sm_academic_years",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_fees_groups_school_id_foreign",
+          "column": "school_id",
+          "target": "sm_schools",
+          "targetColumn": "id"
+        }
+      ]
+    },
+    {
+      "var": "smHolidays",
+      "dbName": "sm_holidays",
+      "inCatalog": true,
+      "inClosure": false,
+      "columns": 13,
+      "rows": 0,
+      "rowsEstimate": 0,
+      "dataBytes": 16384,
+      "indexBytes": 32768,
+      "dbIndexes": [
+        {
+          "name": "sm_holidays_academic_id_foreign",
+          "unique": false,
+          "columns": [
+            "academic_id"
+          ]
+        },
+        {
+          "name": "sm_holidays_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        }
+      ],
+      "declaredIndexes": [],
+      "indexesMissingFromSchema": [
+        {
+          "name": "sm_holidays_academic_id_foreign",
+          "unique": false,
+          "columns": [
+            "academic_id"
+          ]
+        },
+        {
+          "name": "sm_holidays_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        }
+      ],
+      "dbForeignKeys": [
+        {
+          "name": "sm_holidays_academic_id_foreign",
+          "column": "academic_id",
+          "target": "sm_academic_years",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_holidays_school_id_foreign",
+          "column": "school_id",
+          "target": "sm_schools",
+          "targetColumn": "id"
+        }
+      ]
+    },
+    {
+      "var": "smMarksGrades",
+      "dbName": "sm_marks_grades",
+      "inCatalog": true,
+      "inClosure": false,
+      "columns": 15,
+      "rows": 7,
+      "rowsEstimate": 7,
+      "dataBytes": 16384,
+      "indexBytes": 32768,
+      "dbIndexes": [
+        {
+          "name": "sm_marks_grades_academic_id_foreign",
+          "unique": false,
+          "columns": [
+            "academic_id"
+          ]
+        },
+        {
+          "name": "sm_marks_grades_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        }
+      ],
+      "declaredIndexes": [],
+      "indexesMissingFromSchema": [
+        {
+          "name": "sm_marks_grades_academic_id_foreign",
+          "unique": false,
+          "columns": [
+            "academic_id"
+          ]
+        },
+        {
+          "name": "sm_marks_grades_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        }
+      ],
+      "dbForeignKeys": [
+        {
+          "name": "sm_marks_grades_academic_id_foreign",
+          "column": "academic_id",
+          "target": "sm_academic_years",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_marks_grades_school_id_foreign",
+          "column": "school_id",
+          "target": "sm_schools",
+          "targetColumn": "id"
+        }
+      ]
+    },
+    {
+      "var": "smNoticeBoards",
+      "dbName": "sm_notice_boards",
+      "inCatalog": true,
+      "inClosure": false,
+      "columns": 14,
+      "rows": 5,
+      "rowsEstimate": 5,
+      "dataBytes": 16384,
+      "indexBytes": 32768,
+      "dbIndexes": [
+        {
+          "name": "sm_notice_boards_academic_id_foreign",
+          "unique": false,
+          "columns": [
+            "academic_id"
+          ]
+        },
+        {
+          "name": "sm_notice_boards_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        }
+      ],
+      "declaredIndexes": [],
+      "indexesMissingFromSchema": [
+        {
+          "name": "sm_notice_boards_academic_id_foreign",
+          "unique": false,
+          "columns": [
+            "academic_id"
+          ]
+        },
+        {
+          "name": "sm_notice_boards_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        }
+      ],
+      "dbForeignKeys": [
+        {
+          "name": "sm_notice_boards_academic_id_foreign",
+          "column": "academic_id",
+          "target": "sm_academic_years",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_notice_boards_school_id_foreign",
+          "column": "school_id",
+          "target": "sm_schools",
+          "targetColumn": "id"
+        }
+      ]
+    },
+    {
+      "var": "smSections",
+      "dbName": "sm_sections",
+      "inCatalog": true,
+      "inClosure": false,
+      "columns": 11,
+      "rows": 7,
+      "rowsEstimate": 7,
+      "dataBytes": 16384,
+      "indexBytes": 32768,
+      "dbIndexes": [
+        {
+          "name": "sm_sections_academic_id_foreign",
+          "unique": false,
+          "columns": [
+            "academic_id"
+          ]
+        },
+        {
+          "name": "sm_sections_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        }
+      ],
+      "declaredIndexes": [],
+      "indexesMissingFromSchema": [
+        {
+          "name": "sm_sections_academic_id_foreign",
+          "unique": false,
+          "columns": [
+            "academic_id"
+          ]
+        },
+        {
+          "name": "sm_sections_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        }
+      ],
+      "dbForeignKeys": [
+        {
+          "name": "sm_sections_academic_id_foreign",
+          "column": "academic_id",
+          "target": "sm_academic_years",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_sections_school_id_foreign",
+          "column": "school_id",
+          "target": "sm_schools",
+          "targetColumn": "id"
+        }
+      ]
+    },
+    {
+      "var": "smStudentCategories",
+      "dbName": "sm_student_categories",
+      "inCatalog": true,
+      "inClosure": false,
+      "columns": 8,
+      "rows": 5,
+      "rowsEstimate": 5,
+      "dataBytes": 16384,
+      "indexBytes": 32768,
+      "dbIndexes": [
+        {
+          "name": "sm_student_categories_academic_id_foreign",
+          "unique": false,
+          "columns": [
+            "academic_id"
+          ]
+        },
+        {
+          "name": "sm_student_categories_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        }
+      ],
+      "declaredIndexes": [],
+      "indexesMissingFromSchema": [
+        {
+          "name": "sm_student_categories_academic_id_foreign",
+          "unique": false,
+          "columns": [
+            "academic_id"
+          ]
+        },
+        {
+          "name": "sm_student_categories_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        }
+      ],
+      "dbForeignKeys": [
+        {
+          "name": "sm_student_categories_academic_id_foreign",
+          "column": "academic_id",
+          "target": "sm_academic_years",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_student_categories_school_id_foreign",
+          "column": "school_id",
+          "target": "sm_schools",
+          "targetColumn": "id"
+        }
+      ]
+    },
+    {
+      "var": "smSubjects",
+      "dbName": "sm_subjects",
+      "inCatalog": true,
+      "inClosure": false,
+      "columns": 13,
+      "rows": 39,
+      "rowsEstimate": 39,
+      "dataBytes": 16384,
+      "indexBytes": 32768,
+      "dbIndexes": [
+        {
+          "name": "sm_subjects_academic_id_foreign",
+          "unique": false,
+          "columns": [
+            "academic_id"
+          ]
+        },
+        {
+          "name": "sm_subjects_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        }
+      ],
+      "declaredIndexes": [],
+      "indexesMissingFromSchema": [
+        {
+          "name": "sm_subjects_academic_id_foreign",
+          "unique": false,
+          "columns": [
+            "academic_id"
+          ]
+        },
+        {
+          "name": "sm_subjects_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        }
+      ],
+      "dbForeignKeys": [
+        {
+          "name": "sm_subjects_academic_id_foreign",
+          "column": "academic_id",
+          "target": "sm_academic_years",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_subjects_school_id_foreign",
+          "column": "school_id",
+          "target": "sm_schools",
+          "targetColumn": "id"
+        }
+      ]
+    },
+    {
+      "var": "smRoutes",
+      "dbName": "sm_routes",
+      "inCatalog": false,
+      "inClosure": true,
+      "columns": 10,
+      "rows": 0,
+      "rowsEstimate": 0,
+      "dataBytes": 16384,
+      "indexBytes": 32768,
+      "dbIndexes": [
+        {
+          "name": "sm_routes_academic_id_foreign",
+          "unique": false,
+          "columns": [
+            "academic_id"
+          ]
+        },
+        {
+          "name": "sm_routes_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        }
+      ],
+      "declaredIndexes": [],
+      "indexesMissingFromSchema": [
+        {
+          "name": "sm_routes_academic_id_foreign",
+          "unique": false,
+          "columns": [
+            "academic_id"
+          ]
+        },
+        {
+          "name": "sm_routes_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        }
+      ],
+      "dbForeignKeys": [
+        {
+          "name": "sm_routes_academic_id_foreign",
+          "column": "academic_id",
+          "target": "sm_academic_years",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_routes_school_id_foreign",
+          "column": "school_id",
+          "target": "sm_schools",
+          "targetColumn": "id"
+        }
+      ]
+    },
+    {
+      "var": "smDormitoryLists",
+      "dbName": "sm_dormitory_lists",
+      "inCatalog": false,
+      "inClosure": true,
+      "columns": 13,
+      "rows": 0,
+      "rowsEstimate": 0,
+      "dataBytes": 16384,
+      "indexBytes": 32768,
+      "dbIndexes": [
+        {
+          "name": "sm_dormitory_lists_academic_id_foreign",
+          "unique": false,
+          "columns": [
+            "academic_id"
+          ]
+        },
+        {
+          "name": "sm_dormitory_lists_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        }
+      ],
+      "declaredIndexes": [],
+      "indexesMissingFromSchema": [
+        {
+          "name": "sm_dormitory_lists_academic_id_foreign",
+          "unique": false,
+          "columns": [
+            "academic_id"
+          ]
+        },
+        {
+          "name": "sm_dormitory_lists_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        }
+      ],
+      "dbForeignKeys": [
+        {
+          "name": "sm_dormitory_lists_academic_id_foreign",
+          "column": "academic_id",
+          "target": "sm_academic_years",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_dormitory_lists_school_id_foreign",
+          "column": "school_id",
+          "target": "sm_schools",
+          "targetColumn": "id"
+        }
+      ]
+    },
+    {
+      "var": "smVehicles",
+      "dbName": "sm_vehicles",
+      "inCatalog": false,
+      "inClosure": true,
+      "columns": 13,
+      "rows": 0,
+      "rowsEstimate": 0,
+      "dataBytes": 16384,
+      "indexBytes": 32768,
+      "dbIndexes": [
+        {
+          "name": "sm_vehicles_academic_id_foreign",
+          "unique": false,
+          "columns": [
+            "academic_id"
+          ]
+        },
+        {
+          "name": "sm_vehicles_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        }
+      ],
+      "declaredIndexes": [],
+      "indexesMissingFromSchema": [
+        {
+          "name": "sm_vehicles_academic_id_foreign",
+          "unique": false,
+          "columns": [
+            "academic_id"
+          ]
+        },
+        {
+          "name": "sm_vehicles_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        }
+      ],
+      "dbForeignKeys": [
+        {
+          "name": "sm_vehicles_academic_id_foreign",
+          "column": "academic_id",
+          "target": "sm_academic_years",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_vehicles_school_id_foreign",
+          "column": "school_id",
+          "target": "sm_schools",
+          "targetColumn": "id"
+        }
+      ]
+    },
+    {
+      "var": "smStudentGroups",
+      "dbName": "sm_student_groups",
+      "inCatalog": false,
+      "inClosure": true,
+      "columns": 9,
+      "rows": 0,
+      "rowsEstimate": 0,
+      "dataBytes": 16384,
+      "indexBytes": 32768,
+      "dbIndexes": [
+        {
+          "name": "sm_student_groups_academic_id_foreign",
+          "unique": false,
+          "columns": [
+            "academic_id"
+          ]
+        },
+        {
+          "name": "sm_student_groups_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        }
+      ],
+      "declaredIndexes": [],
+      "indexesMissingFromSchema": [
+        {
+          "name": "sm_student_groups_academic_id_foreign",
+          "unique": false,
+          "columns": [
+            "academic_id"
+          ]
+        },
+        {
+          "name": "sm_student_groups_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        }
+      ],
+      "dbForeignKeys": [
+        {
+          "name": "sm_student_groups_academic_id_foreign",
+          "column": "academic_id",
+          "target": "sm_academic_years",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_student_groups_school_id_foreign",
+          "column": "school_id",
+          "target": "sm_schools",
+          "targetColumn": "id"
+        }
+      ]
+    },
+    {
+      "var": "smRoomTypes",
+      "dbName": "sm_room_types",
+      "inCatalog": false,
+      "inClosure": true,
+      "columns": 10,
+      "rows": 1,
+      "rowsEstimate": 0,
+      "dataBytes": 16384,
+      "indexBytes": 32768,
+      "dbIndexes": [
+        {
+          "name": "sm_room_types_academic_id_foreign",
+          "unique": false,
+          "columns": [
+            "academic_id"
+          ]
+        },
+        {
+          "name": "sm_room_types_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        }
+      ],
+      "declaredIndexes": [],
+      "indexesMissingFromSchema": [
+        {
+          "name": "sm_room_types_academic_id_foreign",
+          "unique": false,
+          "columns": [
+            "academic_id"
+          ]
+        },
+        {
+          "name": "sm_room_types_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        }
+      ],
+      "dbForeignKeys": [
+        {
+          "name": "sm_room_types_academic_id_foreign",
+          "column": "academic_id",
+          "target": "sm_academic_years",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_room_types_school_id_foreign",
+          "column": "school_id",
+          "target": "sm_schools",
+          "targetColumn": "id"
+        }
+      ]
+    },
+    {
+      "var": "smLanguages",
+      "dbName": "sm_languages",
+      "inCatalog": false,
+      "inClosure": true,
+      "columns": 11,
+      "rows": 4,
+      "rowsEstimate": 4,
+      "dataBytes": 16384,
+      "indexBytes": 32768,
+      "dbIndexes": [
+        {
+          "name": "sm_languages_lang_id_foreign",
+          "unique": false,
+          "columns": [
+            "lang_id"
+          ]
+        },
+        {
+          "name": "sm_languages_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        }
+      ],
+      "declaredIndexes": [],
+      "indexesMissingFromSchema": [
+        {
+          "name": "sm_languages_lang_id_foreign",
+          "unique": false,
+          "columns": [
+            "lang_id"
+          ]
+        },
+        {
+          "name": "sm_languages_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        }
+      ],
+      "dbForeignKeys": [
+        {
+          "name": "sm_languages_lang_id_foreign",
+          "column": "lang_id",
+          "target": "languages",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_languages_school_id_foreign",
+          "column": "school_id",
+          "target": "sm_schools",
+          "targetColumn": "id"
+        }
+      ]
+    },
+    {
+      "var": "smBankAccounts",
+      "dbName": "sm_bank_accounts",
+      "inCatalog": false,
+      "inClosure": true,
+      "columns": 15,
+      "rows": 0,
+      "rowsEstimate": 0,
+      "dataBytes": 16384,
+      "indexBytes": 32768,
+      "dbIndexes": [
+        {
+          "name": "sm_bank_accounts_academic_id_foreign",
+          "unique": false,
+          "columns": [
+            "academic_id"
+          ]
+        },
+        {
+          "name": "sm_bank_accounts_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        }
+      ],
+      "declaredIndexes": [],
+      "indexesMissingFromSchema": [
+        {
+          "name": "sm_bank_accounts_academic_id_foreign",
+          "unique": false,
+          "columns": [
+            "academic_id"
+          ]
+        },
+        {
+          "name": "sm_bank_accounts_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        }
+      ],
+      "dbForeignKeys": [
+        {
+          "name": "sm_bank_accounts_academic_id_foreign",
+          "column": "academic_id",
+          "target": "sm_academic_years",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_bank_accounts_school_id_foreign",
+          "column": "school_id",
+          "target": "sm_schools",
+          "targetColumn": "id"
+        }
+      ]
+    },
+    {
+      "var": "smFeesDiscounts",
+      "dbName": "sm_fees_discounts",
+      "inCatalog": false,
+      "inClosure": true,
+      "columns": 14,
+      "rows": 0,
+      "rowsEstimate": 0,
+      "dataBytes": 16384,
+      "indexBytes": 32768,
+      "dbIndexes": [
+        {
+          "name": "sm_fees_discounts_academic_id_foreign",
+          "unique": false,
+          "columns": [
+            "academic_id"
+          ]
+        },
+        {
+          "name": "sm_fees_discounts_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        }
+      ],
+      "declaredIndexes": [],
+      "indexesMissingFromSchema": [
+        {
+          "name": "sm_fees_discounts_academic_id_foreign",
+          "unique": false,
+          "columns": [
+            "academic_id"
+          ]
+        },
+        {
+          "name": "sm_fees_discounts_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        }
+      ],
+      "dbForeignKeys": [
+        {
+          "name": "sm_fees_discounts_academic_id_foreign",
+          "column": "academic_id",
+          "target": "sm_academic_years",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_fees_discounts_school_id_foreign",
+          "column": "school_id",
+          "target": "sm_schools",
+          "targetColumn": "id"
+        }
+      ]
+    },
+    {
+      "var": "smClassTimes",
+      "dbName": "sm_class_times",
+      "inCatalog": false,
+      "inClosure": true,
+      "columns": 10,
+      "rows": 0,
+      "rowsEstimate": 0,
+      "dataBytes": 16384,
+      "indexBytes": 32768,
+      "dbIndexes": [
+        {
+          "name": "sm_class_times_academic_id_foreign",
+          "unique": false,
+          "columns": [
+            "academic_id"
+          ]
+        },
+        {
+          "name": "sm_class_times_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        }
+      ],
+      "declaredIndexes": [],
+      "indexesMissingFromSchema": [
+        {
+          "name": "sm_class_times_academic_id_foreign",
+          "unique": false,
+          "columns": [
+            "academic_id"
+          ]
+        },
+        {
+          "name": "sm_class_times_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        }
+      ],
+      "dbForeignKeys": [
+        {
+          "name": "sm_class_times_academic_id_foreign",
+          "column": "academic_id",
+          "target": "sm_academic_years",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_class_times_school_id_foreign",
+          "column": "school_id",
+          "target": "sm_schools",
+          "targetColumn": "id"
+        }
+      ]
+    },
+    {
+      "var": "smClassRooms",
+      "dbName": "sm_class_rooms",
+      "inCatalog": false,
+      "inClosure": true,
+      "columns": 10,
+      "rows": 1,
+      "rowsEstimate": 0,
+      "dataBytes": 16384,
+      "indexBytes": 32768,
+      "dbIndexes": [
+        {
+          "name": "sm_class_rooms_academic_id_foreign",
+          "unique": false,
+          "columns": [
+            "academic_id"
+          ]
+        },
+        {
+          "name": "sm_class_rooms_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        }
+      ],
+      "declaredIndexes": [],
+      "indexesMissingFromSchema": [
+        {
+          "name": "sm_class_rooms_academic_id_foreign",
+          "unique": false,
+          "columns": [
+            "academic_id"
+          ]
+        },
+        {
+          "name": "sm_class_rooms_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        }
+      ],
+      "dbForeignKeys": [
+        {
+          "name": "sm_class_rooms_academic_id_foreign",
+          "column": "academic_id",
+          "target": "sm_academic_years",
+          "targetColumn": "id"
+        },
+        {
+          "name": "sm_class_rooms_school_id_foreign",
+          "column": "school_id",
+          "target": "sm_schools",
+          "targetColumn": "id"
+        }
+      ]
+    },
+    {
+      "var": "infixRoles",
+      "dbName": "infix_roles",
+      "inCatalog": true,
+      "inClosure": false,
+      "columns": 10,
+      "rows": 10,
+      "rowsEstimate": 10,
+      "dataBytes": 16384,
+      "indexBytes": 16384,
+      "dbIndexes": [
+        {
+          "name": "infix_roles_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        }
+      ],
+      "declaredIndexes": [],
+      "indexesMissingFromSchema": [
+        {
+          "name": "infix_roles_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        }
+      ],
+      "dbForeignKeys": [
+        {
+          "name": "infix_roles_school_id_foreign",
+          "column": "school_id",
+          "target": "sm_schools",
+          "targetColumn": "id"
+        }
+      ]
+    },
+    {
+      "var": "smAcademicYears",
+      "dbName": "sm_academic_years",
+      "inCatalog": true,
+      "inClosure": false,
+      "columns": 12,
+      "rows": 3,
+      "rowsEstimate": 3,
+      "dataBytes": 16384,
+      "indexBytes": 16384,
+      "dbIndexes": [
+        {
+          "name": "sm_academic_years_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        }
+      ],
+      "declaredIndexes": [],
+      "indexesMissingFromSchema": [
+        {
+          "name": "sm_academic_years_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        }
+      ],
+      "dbForeignKeys": [
+        {
+          "name": "sm_academic_years_school_id_foreign",
+          "column": "school_id",
+          "target": "sm_schools",
+          "targetColumn": "id"
+        }
+      ]
+    },
+    {
+      "var": "smBaseGroups",
+      "dbName": "sm_base_groups",
+      "inCatalog": true,
+      "inClosure": false,
+      "columns": 8,
+      "rows": 3,
+      "rowsEstimate": 3,
+      "dataBytes": 16384,
+      "indexBytes": 16384,
+      "dbIndexes": [
+        {
+          "name": "sm_base_groups_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        }
+      ],
+      "declaredIndexes": [],
+      "indexesMissingFromSchema": [
+        {
+          "name": "sm_base_groups_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        }
+      ],
+      "dbForeignKeys": [
+        {
+          "name": "sm_base_groups_school_id_foreign",
+          "column": "school_id",
+          "target": "sm_schools",
+          "targetColumn": "id"
+        }
+      ]
+    },
+    {
+      "var": "smDesignations",
+      "dbName": "sm_designations",
+      "inCatalog": true,
+      "inClosure": false,
+      "columns": 9,
+      "rows": 16,
+      "rowsEstimate": 16,
+      "dataBytes": 16384,
+      "indexBytes": 16384,
+      "dbIndexes": [
+        {
+          "name": "sm_designations_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        }
+      ],
+      "declaredIndexes": [],
+      "indexesMissingFromSchema": [
+        {
+          "name": "sm_designations_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        }
+      ],
+      "dbForeignKeys": [
+        {
+          "name": "sm_designations_school_id_foreign",
+          "column": "school_id",
+          "target": "sm_schools",
+          "targetColumn": "id"
+        }
+      ]
+    },
+    {
+      "var": "smDateFormats",
+      "dbName": "sm_date_formats",
+      "inCatalog": false,
+      "inClosure": true,
+      "columns": 9,
+      "rows": 15,
+      "rowsEstimate": 15,
+      "dataBytes": 16384,
+      "indexBytes": 16384,
+      "dbIndexes": [
+        {
+          "name": "sm_date_formats_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        }
+      ],
+      "declaredIndexes": [],
+      "indexesMissingFromSchema": [
+        {
+          "name": "sm_date_formats_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        }
+      ],
+      "dbForeignKeys": [
+        {
+          "name": "sm_date_formats_school_id_foreign",
+          "column": "school_id",
+          "target": "sm_schools",
+          "targetColumn": "id"
+        }
+      ]
+    },
+    {
+      "var": "languages",
+      "dbName": "languages",
+      "inCatalog": false,
+      "inClosure": true,
+      "columns": 9,
+      "rows": 114,
+      "rowsEstimate": 114,
+      "dataBytes": 16384,
+      "indexBytes": 16384,
+      "dbIndexes": [
+        {
+          "name": "languages_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        }
+      ],
+      "declaredIndexes": [],
+      "indexesMissingFromSchema": [
+        {
+          "name": "languages_school_id_foreign",
+          "unique": false,
+          "columns": [
+            "school_id"
+          ]
+        }
+      ],
+      "dbForeignKeys": [
+        {
+          "name": "languages_school_id_foreign",
+          "column": "school_id",
+          "target": "sm_schools",
+          "targetColumn": "id"
+        }
+      ]
+    },
+    {
+      "var": "examMeritPositions",
+      "dbName": "exam_merit_positions",
+      "inCatalog": true,
+      "inClosure": false,
+      "columns": 15,
+      "rows": 0,
+      "rowsEstimate": 0,
+      "dataBytes": 16384,
+      "indexBytes": 0,
+      "dbIndexes": [],
+      "declaredIndexes": [],
+      "indexesMissingFromSchema": [],
+      "dbForeignKeys": []
+    },
+    {
+      "var": "smSchools",
+      "dbName": "sm_schools",
+      "inCatalog": true,
+      "inClosure": false,
+      "columns": 20,
+      "rows": 1,
+      "rowsEstimate": 0,
+      "dataBytes": 16384,
+      "indexBytes": 0,
+      "dbIndexes": [],
+      "declaredIndexes": [],
+      "indexesMissingFromSchema": [],
+      "dbForeignKeys": []
+    }
+  ]
+}

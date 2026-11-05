@@ -1,0 +1,6818 @@
+[
+  {
+    "var": "chatGroups",
+    "dbName": "chat_groups",
+    "startLine": 181,
+    "endLine": 245,
+    "usageSites": [
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 23
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 1091
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 1092
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 1095
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 1096
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 1097
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 1114
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 1115
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 1118
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 1119
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 1120
+      }
+    ]
+  },
+  {
+    "var": "chatGroupUsers",
+    "dbName": "chat_group_users",
+    "startLine": 268,
+    "endLine": 278,
+    "usageSites": [
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 24
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 1102
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 1105
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 1108
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 1125
+      }
+    ]
+  },
+  {
+    "var": "classAttendances",
+    "dbName": "class_attendances",
+    "startLine": 313,
+    "endLine": 358,
+    "usageSites": [
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 184
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 185
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 188
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 189
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 195
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 197
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 200
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 352
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 354
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 355
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 356
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 423
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 425
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 6
+      },
+      {
+        "file": "src/lib/types/result-types.ts",
+        "line": 20
+      },
+      {
+        "file": "src/lib/types/result-types.ts",
+        "line": 115
+      }
+    ]
+  },
+  {
+    "var": "examMeritPositions",
+    "dbName": "exam_merit_positions",
+    "startLine": 980,
+    "endLine": 996,
+    "usageSites": [
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/child-performance-trend.ts",
+        "line": 84
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/child-performance-trend.ts",
+        "line": 85
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/child-performance-trend.ts",
+        "line": 86
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/child-performance-trend.ts",
+        "line": 88
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/child-performance-trend.ts",
+        "line": 91
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/child-performance-trend.ts",
+        "line": 92
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/child-performance-trend.ts",
+        "line": 93
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/child-performance-trend.ts",
+        "line": 94
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/child-ranking.ts",
+        "line": 55
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/child-ranking.ts",
+        "line": 56
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/child-ranking.ts",
+        "line": 57
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/child-ranking.ts",
+        "line": 59
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/child-ranking.ts",
+        "line": 62
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/child-ranking.ts",
+        "line": 63
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/child-ranking.ts",
+        "line": 64
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/child-ranking.ts",
+        "line": 65
+      }
+    ]
+  },
+  {
+    "var": "infixRoles",
+    "dbName": "infix_roles",
+    "startLine": 1689,
+    "endLine": 1705,
+    "usageSites": [
+      {
+        "file": "src/lib/server/repository/staff.repo.ts",
+        "line": 5
+      },
+      {
+        "file": "src/lib/server/repository/staff.repo.ts",
+        "line": 85
+      },
+      {
+        "file": "src/lib/server/repository/staff.repo.ts",
+        "line": 86
+      },
+      {
+        "file": "src/lib/server/repository/staff.repo.ts",
+        "line": 87
+      }
+    ]
+  },
+  {
+    "var": "smAcademicYears",
+    "dbName": "sm_academic_years",
+    "startLine": 2353,
+    "endLine": 2375,
+    "usageSites": [
+      {
+        "file": "src/lib/server/helpers/class-scope.ts",
+        "line": 24
+      },
+      {
+        "file": "src/lib/server/helpers/class-scope.ts",
+        "line": 65
+      },
+      {
+        "file": "src/lib/server/helpers/class-scope.ts",
+        "line": 66
+      },
+      {
+        "file": "src/lib/server/helpers/class-scope.ts",
+        "line": 67
+      },
+      {
+        "file": "src/lib/server/helpers/class-scope.ts",
+        "line": 129
+      },
+      {
+        "file": "src/lib/server/helpers/class-scope.ts",
+        "line": 130
+      },
+      {
+        "file": "src/lib/server/helpers/class-scope.ts",
+        "line": 131
+      },
+      {
+        "file": "src/lib/server/helpers/class-scope.ts",
+        "line": 132
+      },
+      {
+        "file": "src/lib/server/helpers/class-scope.ts",
+        "line": 134
+      },
+      {
+        "file": "src/lib/server/helpers/class-scope.ts",
+        "line": 135
+      },
+      {
+        "file": "src/lib/server/helpers/class-scope.ts",
+        "line": 136
+      },
+      {
+        "file": "src/lib/server/mastra/agents/skill-instructions.ts",
+        "line": 9
+      },
+      {
+        "file": "src/lib/server/mastra/agents/skill-instructions.ts",
+        "line": 95
+      },
+      {
+        "file": "src/lib/server/mastra/agents/skill-instructions.ts",
+        "line": 96
+      },
+      {
+        "file": "src/lib/server/mastra/agents/skill-instructions.ts",
+        "line": 97
+      },
+      {
+        "file": "src/lib/server/mastra/editor/mention-resolver.ts",
+        "line": 211
+      },
+      {
+        "file": "src/lib/server/mastra/editor/mention-resolver.ts",
+        "line": 212
+      },
+      {
+        "file": "src/lib/server/mastra/editor/mention-resolver.ts",
+        "line": 213
+      },
+      {
+        "file": "src/lib/server/mastra/editor/mention-resolver.ts",
+        "line": 215
+      },
+      {
+        "file": "src/lib/server/mastra/editor/mention-resolver.ts",
+        "line": 216
+      },
+      {
+        "file": "src/lib/server/mastra/editor/mention-resolver.ts",
+        "line": 432
+      },
+      {
+        "file": "src/lib/server/mastra/editor/mention-resolver.ts",
+        "line": 433
+      },
+      {
+        "file": "src/lib/server/mastra/editor/mention-resolver.ts",
+        "line": 434
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/reporting/_shared.ts",
+        "line": 336
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/reporting/_shared.ts",
+        "line": 339
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/reporting/_shared.ts",
+        "line": 340
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/reporting/_shared.ts",
+        "line": 341
+      },
+      {
+        "file": "src/lib/server/repository/base.repo.ts",
+        "line": 14
+      },
+      {
+        "file": "src/lib/server/repository/base.repo.ts",
+        "line": 113
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 502
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 503
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 504
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 506
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 507
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 25
+      },
+      {
+        "file": "src/lib/server/service/settings.service.ts",
+        "line": 6
+      },
+      {
+        "file": "src/lib/server/service/settings.service.ts",
+        "line": 174
+      },
+      {
+        "file": "src/lib/server/service/settings.service.ts",
+        "line": 182
+      },
+      {
+        "file": "src/lib/server/service/settings.service.ts",
+        "line": 183
+      },
+      {
+        "file": "src/lib/server/service/settings.service.ts",
+        "line": 184
+      },
+      {
+        "file": "src/lib/server/service/settings.service.ts",
+        "line": 201
+      },
+      {
+        "file": "src/lib/server/service/settings.service.ts",
+        "line": 215
+      },
+      {
+        "file": "src/lib/server/service/settings.service.ts",
+        "line": 218
+      },
+      {
+        "file": "src/lib/server/service/settings.service.ts",
+        "line": 219
+      },
+      {
+        "file": "src/lib/server/service/settings.service.ts",
+        "line": 232
+      },
+      {
+        "file": "src/lib/server/service/settings.service.ts",
+        "line": 234
+      },
+      {
+        "file": "src/lib/server/service/settings.service.ts",
+        "line": 236
+      },
+      {
+        "file": "src/lib/server/service/settings.service.ts",
+        "line": 240
+      },
+      {
+        "file": "src/lib/server/service/settings.service.ts",
+        "line": 241
+      },
+      {
+        "file": "src/lib/server/telegram/pdf/load-children.ts",
+        "line": 82
+      },
+      {
+        "file": "src/lib/server/telegram/pdf/load-children.ts",
+        "line": 83
+      },
+      {
+        "file": "src/lib/server/telegram/pdf/load-children.ts",
+        "line": 84
+      },
+      {
+        "file": "src/lib/server/telegram/pdf/load-children.ts",
+        "line": 85
+      },
+      {
+        "file": "src/lib/server/telegram/pdf/resolveTerm.ts",
+        "line": 110
+      },
+      {
+        "file": "src/lib/server/telegram/pdf/resolveTerm.ts",
+        "line": 111
+      },
+      {
+        "file": "src/lib/server/telegram/pdf/resolveTerm.ts",
+        "line": 114
+      },
+      {
+        "file": "src/lib/types/result-types.ts",
+        "line": 35
+      },
+      {
+        "file": "src/routes/(chat)/filestore/+page.server.ts",
+        "line": 48
+      },
+      {
+        "file": "src/routes/(chat)/filestore/+page.server.ts",
+        "line": 49
+      },
+      {
+        "file": "src/routes/(chat)/filestore/+page.server.ts",
+        "line": 50
+      },
+      {
+        "file": "src/routes/(chat)/filestore/+page.server.ts",
+        "line": 51
+      },
+      {
+        "file": "src/routes/(chat)/filestore/+page.server.ts",
+        "line": 52
+      },
+      {
+        "file": "src/routes/(chat)/filestore/+page.server.ts",
+        "line": 53
+      },
+      {
+        "file": "src/routes/(chat)/filestore/+page.server.ts",
+        "line": 55
+      },
+      {
+        "file": "src/routes/(chat)/filestore/+page.server.ts",
+        "line": 56
+      },
+      {
+        "file": "src/routes/(chat)/filestore/+page.server.ts",
+        "line": 57
+      }
+    ]
+  },
+  {
+    "var": "smAssignClassTeachers",
+    "dbName": "sm_assign_class_teachers",
+    "startLine": 2573,
+    "endLine": 2617,
+    "usageSites": [
+      {
+        "file": "src/lib/server/repository/assignment.repo.ts",
+        "line": 24
+      },
+      {
+        "file": "src/lib/server/repository/assignment.repo.ts",
+        "line": 25
+      },
+      {
+        "file": "src/lib/server/repository/assignment.repo.ts",
+        "line": 28
+      },
+      {
+        "file": "src/lib/server/repository/assignment.repo.ts",
+        "line": 29
+      },
+      {
+        "file": "src/lib/server/repository/assignment.repo.ts",
+        "line": 30
+      },
+      {
+        "file": "src/lib/server/repository/assignment.repo.ts",
+        "line": 31
+      },
+      {
+        "file": "src/lib/server/repository/assignment.repo.ts",
+        "line": 40
+      },
+      {
+        "file": "src/lib/server/workspace/verify-teacher.ts",
+        "line": 5
+      },
+      {
+        "file": "src/lib/server/workspace/verify-teacher.ts",
+        "line": 37
+      },
+      {
+        "file": "src/lib/server/workspace/verify-teacher.ts",
+        "line": 38
+      },
+      {
+        "file": "src/lib/server/workspace/verify-teacher.ts",
+        "line": 44
+      },
+      {
+        "file": "src/lib/server/workspace/verify-teacher.ts",
+        "line": 45
+      },
+      {
+        "file": "src/lib/server/workspace/verify-teacher.ts",
+        "line": 46
+      },
+      {
+        "file": "src/lib/server/workspace/verify-teacher.ts",
+        "line": 47
+      },
+      {
+        "file": "src/lib/server/workspace/verify-teacher.ts",
+        "line": 48
+      },
+      {
+        "file": "src/routes/(chat)/admin/connect-codes/+page.server.ts",
+        "line": 28
+      },
+      {
+        "file": "src/routes/(chat)/admin/connect-codes/+page.server.ts",
+        "line": 33
+      },
+      {
+        "file": "src/routes/(chat)/admin/connect-codes/+page.server.ts",
+        "line": 34
+      },
+      {
+        "file": "src/routes/(chat)/admin/connect-codes/+page.server.ts",
+        "line": 35
+      },
+      {
+        "file": "src/routes/(chat)/admin/connect-codes/+page.server.ts",
+        "line": 40
+      }
+    ]
+  },
+  {
+    "var": "smAssignSubjects",
+    "dbName": "sm_assign_subjects",
+    "startLine": 2619,
+    "endLine": 2663,
+    "usageSites": [
+      {
+        "file": "src/lib/server/helpers/class-scope.ts",
+        "line": 23
+      },
+      {
+        "file": "src/lib/server/helpers/class-scope.ts",
+        "line": 199
+      },
+      {
+        "file": "src/lib/server/helpers/class-scope.ts",
+        "line": 200
+      },
+      {
+        "file": "src/lib/server/helpers/class-scope.ts",
+        "line": 202
+      },
+      {
+        "file": "src/lib/server/helpers/class-scope.ts",
+        "line": 205
+      },
+      {
+        "file": "src/lib/server/helpers/class-scope.ts",
+        "line": 206
+      },
+      {
+        "file": "src/lib/server/helpers/class-scope.ts",
+        "line": 207
+      },
+      {
+        "file": "src/lib/server/helpers/class-scope.ts",
+        "line": 208
+      },
+      {
+        "file": "src/lib/server/repository/assignment.repo.ts",
+        "line": 113
+      },
+      {
+        "file": "src/lib/server/repository/assignment.repo.ts",
+        "line": 114
+      },
+      {
+        "file": "src/lib/server/repository/assignment.repo.ts",
+        "line": 117
+      },
+      {
+        "file": "src/lib/server/repository/assignment.repo.ts",
+        "line": 118
+      },
+      {
+        "file": "src/lib/server/repository/assignment.repo.ts",
+        "line": 119
+      },
+      {
+        "file": "src/lib/server/repository/assignment.repo.ts",
+        "line": 120
+      },
+      {
+        "file": "src/lib/server/repository/assignment.repo.ts",
+        "line": 121
+      },
+      {
+        "file": "src/lib/server/repository/assignment.repo.ts",
+        "line": 128
+      },
+      {
+        "file": "src/lib/server/repository/assignment.repo.ts",
+        "line": 134
+      },
+      {
+        "file": "src/lib/server/repository/assignment.repo.ts",
+        "line": 138
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 31
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 97
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 100
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 101
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 102
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 105
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 110
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 112
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 114
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 115
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 118
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 119
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 120
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 121
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 124
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 136
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 137
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 139
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 140
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 141
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 145
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 147
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 151
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 152
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 153
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 157
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 158
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 807
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 810
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 811
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 812
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 825
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 828
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 829
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 942
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 945
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 948
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 949
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 950
+      },
+      {
+        "file": "src/lib/server/repository/staff.repo.ts",
+        "line": 6
+      },
+      {
+        "file": "src/lib/server/repository/staff.repo.ts",
+        "line": 380
+      },
+      {
+        "file": "src/lib/server/repository/staff.repo.ts",
+        "line": 381
+      },
+      {
+        "file": "src/lib/server/repository/staff.repo.ts",
+        "line": 382
+      },
+      {
+        "file": "src/lib/server/repository/staff.repo.ts",
+        "line": 383
+      },
+      {
+        "file": "src/lib/server/repository/staff.repo.ts",
+        "line": 385
+      },
+      {
+        "file": "src/lib/server/repository/staff.repo.ts",
+        "line": 388
+      },
+      {
+        "file": "src/lib/server/repository/staff.repo.ts",
+        "line": 389
+      },
+      {
+        "file": "src/lib/server/repository/staff.repo.ts",
+        "line": 390
+      },
+      {
+        "file": "src/lib/server/repository/staff.repo.ts",
+        "line": 391
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 7
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 393
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 396
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 397
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 398
+      },
+      {
+        "file": "src/lib/types/result-types.ts",
+        "line": 18
+      }
+    ]
+  },
+  {
+    "var": "smBaseGroups",
+    "dbName": "sm_base_groups",
+    "startLine": 2835,
+    "endLine": 2849,
+    "usageSites": [
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 8
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 752
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 755
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 832
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 835
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 836
+      }
+    ]
+  },
+  {
+    "var": "smBaseSetups",
+    "dbName": "sm_base_setups",
+    "startLine": 2851,
+    "endLine": 2871,
+    "usageSites": [
+      {
+        "file": "src/lib/server/repository/staff.repo.ts",
+        "line": 7
+      },
+      {
+        "file": "src/lib/server/repository/staff.repo.ts",
+        "line": 90
+      },
+      {
+        "file": "src/lib/server/repository/staff.repo.ts",
+        "line": 91
+      },
+      {
+        "file": "src/lib/server/repository/staff.repo.ts",
+        "line": 92
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 9
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 593
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 612
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 750
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 751
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 752
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 756
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 757
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 830
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 831
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 834
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 835
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 836
+      }
+    ]
+  },
+  {
+    "var": "smClasses",
+    "dbName": "sm_classes",
+    "startLine": 3007,
+    "endLine": 3029,
+    "usageSites": [
+      {
+        "file": "src/lib/server/helpers/class-scope.ts",
+        "line": 20
+      },
+      {
+        "file": "src/lib/server/helpers/class-scope.ts",
+        "line": 55
+      },
+      {
+        "file": "src/lib/server/helpers/class-scope.ts",
+        "line": 56
+      },
+      {
+        "file": "src/lib/server/helpers/class-scope.ts",
+        "line": 57
+      },
+      {
+        "file": "src/lib/server/helpers/class-scope.ts",
+        "line": 160
+      },
+      {
+        "file": "src/lib/server/helpers/class-scope.ts",
+        "line": 161
+      },
+      {
+        "file": "src/lib/server/helpers/class-scope.ts",
+        "line": 162
+      },
+      {
+        "file": "src/lib/server/mastra/agents/skill-instructions.ts",
+        "line": 6
+      },
+      {
+        "file": "src/lib/server/mastra/agents/skill-instructions.ts",
+        "line": 77
+      },
+      {
+        "file": "src/lib/server/mastra/agents/skill-instructions.ts",
+        "line": 78
+      },
+      {
+        "file": "src/lib/server/mastra/agents/skill-instructions.ts",
+        "line": 79
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/list-my-children.ts",
+        "line": 44
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/list-my-children.ts",
+        "line": 51
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-timetable.ts",
+        "line": 6
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-timetable.ts",
+        "line": 89
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-timetable.ts",
+        "line": 90
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-timetable.ts",
+        "line": 91
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 43
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 49
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 54
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 70
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 76
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 146
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 152
+      },
+      {
+        "file": "src/lib/server/repository/staff.repo.ts",
+        "line": 8
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 10
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 601
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 624
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 812
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 813
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 814
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 863
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 867
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 871
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 873
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 876
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 893
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 896
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 903
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 905
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 906
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 913
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 914
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 919
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 1194
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 1200
+      },
+      {
+        "file": "src/routes/(chat)/admin/connect-codes/+page.server.ts",
+        "line": 29
+      },
+      {
+        "file": "src/routes/(chat)/admin/connect-codes/+page.server.ts",
+        "line": 34
+      },
+      {
+        "file": "src/routes/(chat)/admin/connect-codes/+page.server.ts",
+        "line": 43
+      },
+      {
+        "file": "src/routes/(chat)/admin/parents/+page.server.ts",
+        "line": 7
+      },
+      {
+        "file": "src/routes/(chat)/admin/parents/+page.server.ts",
+        "line": 38
+      },
+      {
+        "file": "src/routes/(chat)/admin/parents/+page.server.ts",
+        "line": 55
+      },
+      {
+        "file": "src/routes/(chat)/admin/parents/+page.server.ts",
+        "line": 64
+      },
+      {
+        "file": "src/routes/api/mentions/search/+server.ts",
+        "line": 10
+      },
+      {
+        "file": "src/routes/api/mentions/search/+server.ts",
+        "line": 172
+      },
+      {
+        "file": "src/routes/api/mentions/search/+server.ts",
+        "line": 188
+      },
+      {
+        "file": "src/routes/api/mentions/search/+server.ts",
+        "line": 189
+      },
+      {
+        "file": "src/routes/api/mentions/search/+server.ts",
+        "line": 193
+      },
+      {
+        "file": "src/routes/api/mentions/search/+server.ts",
+        "line": 198
+      },
+      {
+        "file": "src/routes/api/mentions/search/+server.ts",
+        "line": 206
+      },
+      {
+        "file": "src/routes/api/mentions/search/+server.ts",
+        "line": 207
+      },
+      {
+        "file": "src/routes/api/mentions/search/+server.ts",
+        "line": 211
+      },
+      {
+        "file": "src/routes/api/mentions/search/+server.ts",
+        "line": 212
+      }
+    ]
+  },
+  {
+    "var": "smClassRoutines",
+    "dbName": "sm_class_routines",
+    "startLine": 3102,
+    "endLine": 3167,
+    "usageSites": [
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-timetable.ts",
+        "line": 8
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-timetable.ts",
+        "line": 54
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-timetable.ts",
+        "line": 138
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-timetable.ts",
+        "line": 139
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-timetable.ts",
+        "line": 140
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-timetable.ts",
+        "line": 141
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-timetable.ts",
+        "line": 142
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-timetable.ts",
+        "line": 143
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-timetable.ts",
+        "line": 144
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-timetable.ts",
+        "line": 145
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-timetable.ts",
+        "line": 146
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-timetable.ts",
+        "line": 147
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-timetable.ts",
+        "line": 148
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-timetable.ts",
+        "line": 149
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-timetable.ts",
+        "line": 150
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-timetable.ts",
+        "line": 151
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-timetable.ts",
+        "line": 152
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-timetable.ts",
+        "line": 153
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-timetable.ts",
+        "line": 154
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-timetable.ts",
+        "line": 155
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-timetable.ts",
+        "line": 156
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-timetable.ts",
+        "line": 157
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-timetable.ts",
+        "line": 158
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-timetable.ts",
+        "line": 159
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-timetable.ts",
+        "line": 160
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-timetable.ts",
+        "line": 161
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-timetable.ts",
+        "line": 162
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-timetable.ts",
+        "line": 163
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-timetable.ts",
+        "line": 164
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-timetable.ts",
+        "line": 165
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-timetable.ts",
+        "line": 167
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-timetable.ts",
+        "line": 170
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-timetable.ts",
+        "line": 171
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-timetable.ts",
+        "line": 172
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-timetable.ts",
+        "line": 173
+      }
+    ]
+  },
+  {
+    "var": "smClassRoutineUpdates",
+    "dbName": "sm_class_routine_updates",
+    "startLine": 3169,
+    "endLine": 3228,
+    "usageSites": [
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-timetable.ts",
+        "line": 7
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-timetable.ts",
+        "line": 53
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-timetable.ts",
+        "line": 101
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-timetable.ts",
+        "line": 102
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-timetable.ts",
+        "line": 103
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-timetable.ts",
+        "line": 104
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-timetable.ts",
+        "line": 105
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-timetable.ts",
+        "line": 109
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-timetable.ts",
+        "line": 110
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-timetable.ts",
+        "line": 111
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-timetable.ts",
+        "line": 114
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-timetable.ts",
+        "line": 115
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-timetable.ts",
+        "line": 116
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-timetable.ts",
+        "line": 117
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-timetable.ts",
+        "line": 120
+      }
+    ]
+  },
+  {
+    "var": "smClassSections",
+    "dbName": "sm_class_sections",
+    "startLine": 3230,
+    "endLine": 3264,
+    "usageSites": [
+      {
+        "file": "src/lib/server/helpers/class-scope.ts",
+        "line": 22
+      },
+      {
+        "file": "src/lib/server/helpers/class-scope.ts",
+        "line": 175
+      },
+      {
+        "file": "src/lib/server/helpers/class-scope.ts",
+        "line": 176
+      },
+      {
+        "file": "src/lib/server/helpers/class-scope.ts",
+        "line": 178
+      },
+      {
+        "file": "src/lib/server/helpers/class-scope.ts",
+        "line": 181
+      },
+      {
+        "file": "src/lib/server/helpers/class-scope.ts",
+        "line": 182
+      },
+      {
+        "file": "src/lib/server/helpers/class-scope.ts",
+        "line": 183
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 41
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 42
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 44
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 46
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 48
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 49
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 50
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 53
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 56
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 59
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 68
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 69
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 71
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 73
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 75
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 76
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 77
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 80
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 81
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 82
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 83
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 144
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 149
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 155
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 157
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 158
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 159
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 14
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 866
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 867
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 868
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 875
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 895
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 918
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 919
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 920
+      }
+    ]
+  },
+  {
+    "var": "smClassTeachers",
+    "dbName": "sm_class_teachers",
+    "startLine": 3266,
+    "endLine": 3306,
+    "usageSites": [
+      {
+        "file": "src/lib/server/repository/assignment.repo.ts",
+        "line": 55
+      },
+      {
+        "file": "src/lib/server/repository/assignment.repo.ts",
+        "line": 56
+      },
+      {
+        "file": "src/lib/server/repository/assignment.repo.ts",
+        "line": 58
+      },
+      {
+        "file": "src/lib/server/repository/assignment.repo.ts",
+        "line": 61
+      },
+      {
+        "file": "src/lib/server/repository/assignment.repo.ts",
+        "line": 62
+      },
+      {
+        "file": "src/lib/server/repository/assignment.repo.ts",
+        "line": 70
+      },
+      {
+        "file": "src/lib/server/repository/assignment.repo.ts",
+        "line": 75
+      },
+      {
+        "file": "src/lib/server/repository/assignment.repo.ts",
+        "line": 78
+      },
+      {
+        "file": "src/lib/server/workspace/verify-teacher.ts",
+        "line": 4
+      },
+      {
+        "file": "src/lib/server/workspace/verify-teacher.ts",
+        "line": 35
+      },
+      {
+        "file": "src/lib/server/workspace/verify-teacher.ts",
+        "line": 38
+      },
+      {
+        "file": "src/lib/server/workspace/verify-teacher.ts",
+        "line": 42
+      },
+      {
+        "file": "src/lib/server/workspace/verify-teacher.ts",
+        "line": 43
+      },
+      {
+        "file": "src/routes/(chat)/admin/connect-codes/+page.server.ts",
+        "line": 32
+      },
+      {
+        "file": "src/routes/(chat)/admin/connect-codes/+page.server.ts",
+        "line": 33
+      },
+      {
+        "file": "src/routes/(chat)/admin/connect-codes/+page.server.ts",
+        "line": 38
+      },
+      {
+        "file": "src/routes/(chat)/admin/connect-codes/+page.server.ts",
+        "line": 39
+      }
+    ]
+  },
+  {
+    "var": "smDesignations",
+    "dbName": "sm_designations",
+    "startLine": 3666,
+    "endLine": 3681,
+    "usageSites": [
+      {
+        "file": "src/lib/server/repository/staff.repo.ts",
+        "line": 9
+      },
+      {
+        "file": "src/lib/server/repository/staff.repo.ts",
+        "line": 75
+      },
+      {
+        "file": "src/lib/server/repository/staff.repo.ts",
+        "line": 76
+      },
+      {
+        "file": "src/lib/server/repository/staff.repo.ts",
+        "line": 77
+      },
+      {
+        "file": "src/lib/server/repository/staff.repo.ts",
+        "line": 230
+      },
+      {
+        "file": "src/lib/server/repository/staff.repo.ts",
+        "line": 231
+      },
+      {
+        "file": "src/lib/server/repository/staff.repo.ts",
+        "line": 234
+      },
+      {
+        "file": "src/lib/server/repository/staff.repo.ts",
+        "line": 235
+      },
+      {
+        "file": "src/lib/server/repository/staff.repo.ts",
+        "line": 285
+      },
+      {
+        "file": "src/lib/server/repository/staff.repo.ts",
+        "line": 289
+      }
+    ]
+  },
+  {
+    "var": "smEvents",
+    "dbName": "sm_events",
+    "startLine": 3813,
+    "endLine": 3843,
+    "usageSites": [
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-school-events.ts",
+        "line": 40
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-school-events.ts",
+        "line": 41
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-school-events.ts",
+        "line": 42
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-school-events.ts",
+        "line": 43
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-school-events.ts",
+        "line": 44
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-school-events.ts",
+        "line": 45
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-school-events.ts",
+        "line": 46
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-school-events.ts",
+        "line": 47
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-school-events.ts",
+        "line": 49
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-school-events.ts",
+        "line": 52
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-school-events.ts",
+        "line": 53
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-school-events.ts",
+        "line": 54
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-school-events.ts",
+        "line": 57
+      }
+    ]
+  },
+  {
+    "var": "smExams",
+    "dbName": "sm_exams",
+    "startLine": 3845,
+    "endLine": 3891,
+    "usageSites": [
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-exam-schedule.ts",
+        "line": 54
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-exam-schedule.ts",
+        "line": 57
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 786
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 789
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 790
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 791
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 792
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 793
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 794
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 799
+      },
+      {
+        "file": "src/lib/types/result-types.ts",
+        "line": 19
+      }
+    ]
+  },
+  {
+    "var": "smExamSchedules",
+    "dbName": "sm_exam_schedules",
+    "startLine": 4052,
+    "endLine": 4118,
+    "usageSites": [
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-exam-schedule.ts",
+        "line": 46
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-exam-schedule.ts",
+        "line": 49
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-exam-schedule.ts",
+        "line": 50
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-exam-schedule.ts",
+        "line": 51
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-exam-schedule.ts",
+        "line": 52
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-exam-schedule.ts",
+        "line": 56
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-exam-schedule.ts",
+        "line": 57
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-exam-schedule.ts",
+        "line": 58
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-exam-schedule.ts",
+        "line": 59
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-exam-schedule.ts",
+        "line": 60
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-exam-schedule.ts",
+        "line": 63
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-exam-schedule.ts",
+        "line": 64
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-exam-schedule.ts",
+        "line": 65
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-exam-schedule.ts",
+        "line": 66
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-exam-schedule.ts",
+        "line": 67
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-exam-schedule.ts",
+        "line": 70
+      }
+    ]
+  },
+  {
+    "var": "smExamSetups",
+    "dbName": "sm_exam_setups",
+    "startLine": 4201,
+    "endLine": 4252,
+    "usageSites": [
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 365
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 404
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 405
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 412
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 581
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 584
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 586
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 604
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 606
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 607
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 701
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 705
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 706
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 707
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 708
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 709
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 721
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 722
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 725
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 726
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 727
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 728
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 729
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 730
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 731
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 736
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 739
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 845
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 846
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 847
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 848
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 849
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 850
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 852
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 855
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 856
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 857
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 858
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 866
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 872
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 875
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 876
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 877
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 878
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 879
+      },
+      {
+        "file": "src/lib/types/result-types.ts",
+        "line": 9
+      },
+      {
+        "file": "src/lib/types/result-types.ts",
+        "line": 15
+      }
+    ]
+  },
+  {
+    "var": "smExamTypes",
+    "dbName": "sm_exam_types",
+    "startLine": 4275,
+    "endLine": 4300,
+    "usageSites": [
+      {
+        "file": "src/lib/server/mastra/agents/skill-instructions.ts",
+        "line": 8
+      },
+      {
+        "file": "src/lib/server/mastra/agents/skill-instructions.ts",
+        "line": 104
+      },
+      {
+        "file": "src/lib/server/mastra/agents/skill-instructions.ts",
+        "line": 105
+      },
+      {
+        "file": "src/lib/server/mastra/agents/skill-instructions.ts",
+        "line": 106
+      },
+      {
+        "file": "src/lib/server/mastra/editor/mention-resolver.ts",
+        "line": 244
+      },
+      {
+        "file": "src/lib/server/mastra/editor/mention-resolver.ts",
+        "line": 245
+      },
+      {
+        "file": "src/lib/server/mastra/editor/mention-resolver.ts",
+        "line": 247
+      },
+      {
+        "file": "src/lib/server/mastra/editor/mention-resolver.ts",
+        "line": 248
+      },
+      {
+        "file": "src/lib/server/mastra/editor/mention-resolver.ts",
+        "line": 453
+      },
+      {
+        "file": "src/lib/server/mastra/editor/mention-resolver.ts",
+        "line": 454
+      },
+      {
+        "file": "src/lib/server/mastra/editor/mention-resolver.ts",
+        "line": 455
+      },
+      {
+        "file": "src/lib/server/mastra/tenant-context.ts",
+        "line": 73
+      },
+      {
+        "file": "src/lib/server/mastra/tenant-context.ts",
+        "line": 74
+      },
+      {
+        "file": "src/lib/server/mastra/tenant-context.ts",
+        "line": 75
+      },
+      {
+        "file": "src/lib/server/mastra/tenant-context.ts",
+        "line": 76
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/child-performance-trend.ts",
+        "line": 39
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/child-performance-trend.ts",
+        "line": 44
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-exam-schedule.ts",
+        "line": 47
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-exam-schedule.ts",
+        "line": 58
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-result.ts",
+        "line": 53
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-result.ts",
+        "line": 63
+      },
+      {
+        "file": "src/lib/server/repository/base.repo.ts",
+        "line": 15
+      },
+      {
+        "file": "src/lib/server/repository/base.repo.ts",
+        "line": 114
+      },
+      {
+        "file": "src/lib/server/repository/base.repo.ts",
+        "line": 191
+      },
+      {
+        "file": "src/lib/server/repository/base.repo.ts",
+        "line": 192
+      },
+      {
+        "file": "src/lib/server/repository/base.repo.ts",
+        "line": 193
+      },
+      {
+        "file": "src/lib/server/repository/base.repo.ts",
+        "line": 194
+      },
+      {
+        "file": "src/lib/server/repository/base.repo.ts",
+        "line": 195
+      },
+      {
+        "file": "src/lib/server/repository/base.repo.ts",
+        "line": 196
+      },
+      {
+        "file": "src/lib/server/repository/base.repo.ts",
+        "line": 198
+      },
+      {
+        "file": "src/lib/server/repository/base.repo.ts",
+        "line": 199
+      },
+      {
+        "file": "src/lib/server/repository/base.repo.ts",
+        "line": 203
+      },
+      {
+        "file": "src/lib/server/repository/base.repo.ts",
+        "line": 206
+      },
+      {
+        "file": "src/lib/server/repository/base.repo.ts",
+        "line": 207
+      },
+      {
+        "file": "src/lib/server/repository/base.repo.ts",
+        "line": 208
+      },
+      {
+        "file": "src/lib/server/repository/base.repo.ts",
+        "line": 209
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 486
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 487
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 488
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 490
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 493
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 494
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 495
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 498
+      },
+      {
+        "file": "src/lib/server/service/settings.service.ts",
+        "line": 7
+      },
+      {
+        "file": "src/lib/server/service/settings.service.ts",
+        "line": 174
+      },
+      {
+        "file": "src/lib/server/service/settings.service.ts",
+        "line": 251
+      },
+      {
+        "file": "src/lib/server/service/settings.service.ts",
+        "line": 254
+      },
+      {
+        "file": "src/lib/server/service/settings.service.ts",
+        "line": 255
+      },
+      {
+        "file": "src/lib/server/service/settings.service.ts",
+        "line": 258
+      },
+      {
+        "file": "src/lib/server/service/settings.service.ts",
+        "line": 271
+      },
+      {
+        "file": "src/lib/server/service/settings.service.ts",
+        "line": 286
+      },
+      {
+        "file": "src/lib/server/service/settings.service.ts",
+        "line": 289
+      },
+      {
+        "file": "src/lib/server/service/settings.service.ts",
+        "line": 290
+      },
+      {
+        "file": "src/lib/server/service/settings.service.ts",
+        "line": 301
+      },
+      {
+        "file": "src/lib/server/service/settings.service.ts",
+        "line": 304
+      },
+      {
+        "file": "src/lib/server/service/settings.service.ts",
+        "line": 305
+      },
+      {
+        "file": "src/lib/server/service/settings.service.ts",
+        "line": 312
+      },
+      {
+        "file": "src/lib/server/service/settings.service.ts",
+        "line": 316
+      },
+      {
+        "file": "src/lib/server/service/settings.service.ts",
+        "line": 317
+      },
+      {
+        "file": "src/lib/server/telegram/pdf/resolveTerm.ts",
+        "line": 107
+      },
+      {
+        "file": "src/lib/server/telegram/pdf/resolveTerm.ts",
+        "line": 108
+      },
+      {
+        "file": "src/lib/server/telegram/pdf/resolveTerm.ts",
+        "line": 109
+      },
+      {
+        "file": "src/lib/server/telegram/pdf/resolveTerm.ts",
+        "line": 113
+      },
+      {
+        "file": "src/lib/server/telegram/pdf/resolveTerm.ts",
+        "line": 114
+      },
+      {
+        "file": "src/lib/server/telegram/pdf/resolveTerm.ts",
+        "line": 117
+      },
+      {
+        "file": "src/lib/server/telegram/pdf/resolveTerm.ts",
+        "line": 118
+      },
+      {
+        "file": "src/lib/server/telegram/pdf/resolveTerm.ts",
+        "line": 119
+      },
+      {
+        "file": "src/lib/server/telegram/pdf/resolveTerm.ts",
+        "line": 122
+      },
+      {
+        "file": "src/lib/types/result-types.ts",
+        "line": 36
+      },
+      {
+        "file": "src/routes/(chat)/admin/parents/+page.server.ts",
+        "line": 9
+      },
+      {
+        "file": "src/routes/(chat)/admin/parents/+page.server.ts",
+        "line": 67
+      },
+      {
+        "file": "src/routes/(chat)/admin/parents/+page.server.ts",
+        "line": 68
+      },
+      {
+        "file": "src/routes/(chat)/admin/parents/+page.server.ts",
+        "line": 69
+      },
+      {
+        "file": "src/routes/(chat)/filestore/+page.server.ts",
+        "line": 76
+      },
+      {
+        "file": "src/routes/(chat)/filestore/+page.server.ts",
+        "line": 77
+      },
+      {
+        "file": "src/routes/(chat)/filestore/+page.server.ts",
+        "line": 80
+      },
+      {
+        "file": "src/routes/(chat)/filestore/+page.server.ts",
+        "line": 81
+      },
+      {
+        "file": "src/routes/(chat)/filestore/+page.server.ts",
+        "line": 84
+      }
+    ]
+  },
+  {
+    "var": "smFeesAssigns",
+    "dbName": "sm_fees_assigns",
+    "startLine": 4341,
+    "endLine": 4386,
+    "usageSites": [
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-fees.ts",
+        "line": 6
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-fees.ts",
+        "line": 49
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-fees.ts",
+        "line": 50
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-fees.ts",
+        "line": 53
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-fees.ts",
+        "line": 55
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-fees.ts",
+        "line": 56
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-fees.ts",
+        "line": 61
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-fees.ts",
+        "line": 62
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 22
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 1077
+      }
+    ]
+  },
+  {
+    "var": "smFeesGroups",
+    "dbName": "sm_fees_groups",
+    "startLine": 4497,
+    "endLine": 4526,
+    "usageSites": [
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-fees.ts",
+        "line": 7
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-fees.ts",
+        "line": 52
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-fees.ts",
+        "line": 58
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-fees.ts",
+        "line": 73
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-fees.ts",
+        "line": 77
+      }
+    ]
+  },
+  {
+    "var": "smFeesMasters",
+    "dbName": "sm_fees_masters",
+    "startLine": 4528,
+    "endLine": 4565,
+    "usageSites": [
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-fees.ts",
+        "line": 8
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-fees.ts",
+        "line": 56
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-fees.ts",
+        "line": 57
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 21
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 1067
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 1070
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 1071
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 1072
+      }
+    ]
+  },
+  {
+    "var": "smFeesPayments",
+    "dbName": "sm_fees_payments",
+    "startLine": 4567,
+    "endLine": 4629,
+    "usageSites": [
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-fees.ts",
+        "line": 9
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-fees.ts",
+        "line": 68
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-fees.ts",
+        "line": 69
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-fees.ts",
+        "line": 70
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-fees.ts",
+        "line": 71
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-fees.ts",
+        "line": 75
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-fees.ts",
+        "line": 76
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-fees.ts",
+        "line": 80
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-fees.ts",
+        "line": 81
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-fees.ts",
+        "line": 82
+      }
+    ]
+  },
+  {
+    "var": "smFeesTypes",
+    "dbName": "sm_fees_types",
+    "startLine": 4631,
+    "endLine": 4659,
+    "usageSites": [
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-fees.ts",
+        "line": 10
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-fees.ts",
+        "line": 51
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-fees.ts",
+        "line": 57
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-fees.ts",
+        "line": 58
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-fees.ts",
+        "line": 72
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-fees.ts",
+        "line": 76
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-fees.ts",
+        "line": 77
+      }
+    ]
+  },
+  {
+    "var": "smGeneralSettings",
+    "dbName": "sm_general_settings",
+    "startLine": 4695,
+    "endLine": 4833,
+    "usageSites": [
+      {
+        "file": "src/lib/api/agent.remote.ts",
+        "line": 579
+      },
+      {
+        "file": "src/lib/api/agent.remote.ts",
+        "line": 580
+      },
+      {
+        "file": "src/lib/api/agent.remote.ts",
+        "line": 581
+      },
+      {
+        "file": "src/lib/server/repository/base.repo.ts",
+        "line": 16
+      },
+      {
+        "file": "src/lib/server/repository/base.repo.ts",
+        "line": 112
+      },
+      {
+        "file": "src/lib/server/service/settings.service.ts",
+        "line": 8
+      },
+      {
+        "file": "src/lib/server/service/settings.service.ts",
+        "line": 137
+      },
+      {
+        "file": "src/lib/server/service/settings.service.ts",
+        "line": 144
+      },
+      {
+        "file": "src/lib/server/service/settings.service.ts",
+        "line": 145
+      },
+      {
+        "file": "src/lib/server/service/settings.service.ts",
+        "line": 167
+      },
+      {
+        "file": "src/lib/server/service/settings.service.ts",
+        "line": 169
+      },
+      {
+        "file": "src/routes/api/uploads/+server.ts",
+        "line": 174
+      },
+      {
+        "file": "src/routes/api/uploads/+server.ts",
+        "line": 180
+      },
+      {
+        "file": "src/routes/api/uploads/+server.ts",
+        "line": 181
+      },
+      {
+        "file": "src/routes/api/uploads/+server.ts",
+        "line": 182
+      },
+      {
+        "file": "src/routes/api/uploads/+server.ts",
+        "line": 185
+      },
+      {
+        "file": "src/routes/api/uploads/+server.ts",
+        "line": 218
+      },
+      {
+        "file": "src/routes/api/uploads/+server.ts",
+        "line": 220
+      },
+      {
+        "file": "src/routes/api/uploads/+server.ts",
+        "line": 229
+      },
+      {
+        "file": "src/routes/api/uploads/+server.ts",
+        "line": 230
+      },
+      {
+        "file": "src/routes/api/uploads/+server.ts",
+        "line": 231
+      },
+      {
+        "file": "src/routes/api/uploads/+server.ts",
+        "line": 237
+      }
+    ]
+  },
+  {
+    "var": "smHolidays",
+    "dbName": "sm_holidays",
+    "startLine": 4856,
+    "endLine": 4882,
+    "usageSites": [
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-holidays.ts",
+        "line": 40
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-holidays.ts",
+        "line": 41
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-holidays.ts",
+        "line": 42
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-holidays.ts",
+        "line": 43
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-holidays.ts",
+        "line": 44
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-holidays.ts",
+        "line": 46
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-holidays.ts",
+        "line": 49
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-holidays.ts",
+        "line": 50
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-holidays.ts",
+        "line": 51
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-holidays.ts",
+        "line": 52
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-holidays.ts",
+        "line": 55
+      }
+    ]
+  },
+  {
+    "var": "smHomeworks",
+    "dbName": "sm_homeworks",
+    "startLine": 4884,
+    "endLine": 4932,
+    "usageSites": [
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-homework.ts",
+        "line": 48
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-homework.ts",
+        "line": 49
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-homework.ts",
+        "line": 50
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-homework.ts",
+        "line": 53
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-homework.ts",
+        "line": 55
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-homework.ts",
+        "line": 59
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-homework.ts",
+        "line": 61
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-homework.ts",
+        "line": 62
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-homework.ts",
+        "line": 63
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-homework.ts",
+        "line": 64
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-homework.ts",
+        "line": 69
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-homework.ts",
+        "line": 70
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-homework.ts",
+        "line": 74
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-homework.ts",
+        "line": 79
+      }
+    ]
+  },
+  {
+    "var": "smHomeworkStudents",
+    "dbName": "sm_homework_students",
+    "startLine": 4934,
+    "endLine": 4968,
+    "usageSites": [
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-homework.ts",
+        "line": 65
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-homework.ts",
+        "line": 66
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-homework.ts",
+        "line": 67
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-homework.ts",
+        "line": 72
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-homework.ts",
+        "line": 74
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-homework.ts",
+        "line": 75
+      }
+    ]
+  },
+  {
+    "var": "smHumanDepartments",
+    "dbName": "sm_human_departments",
+    "startLine": 5124,
+    "endLine": 5143,
+    "usageSites": [
+      {
+        "file": "src/lib/server/repository/staff.repo.ts",
+        "line": 10
+      },
+      {
+        "file": "src/lib/server/repository/staff.repo.ts",
+        "line": 80
+      },
+      {
+        "file": "src/lib/server/repository/staff.repo.ts",
+        "line": 81
+      },
+      {
+        "file": "src/lib/server/repository/staff.repo.ts",
+        "line": 82
+      },
+      {
+        "file": "src/lib/server/repository/staff.repo.ts",
+        "line": 247
+      },
+      {
+        "file": "src/lib/server/repository/staff.repo.ts",
+        "line": 248
+      },
+      {
+        "file": "src/lib/server/repository/staff.repo.ts",
+        "line": 251
+      },
+      {
+        "file": "src/lib/server/repository/staff.repo.ts",
+        "line": 252
+      },
+      {
+        "file": "src/lib/server/repository/staff.repo.ts",
+        "line": 286
+      },
+      {
+        "file": "src/lib/server/repository/staff.repo.ts",
+        "line": 290
+      }
+    ]
+  },
+  {
+    "var": "smMarksGrades",
+    "dbName": "sm_marks_grades",
+    "startLine": 5829,
+    "endLine": 5855,
+    "usageSites": [
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 910
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 911
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 914
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 915
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 916
+      }
+    ]
+  },
+  {
+    "var": "smMarkStores",
+    "dbName": "sm_mark_stores",
+    "startLine": 5986,
+    "endLine": 6052,
+    "usageSites": [
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 265
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 267
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 268
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 314
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 315
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 317
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 320
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 321
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 322
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 323
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 324
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 325
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 326
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 332
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 333
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 400
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 401
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 403
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 407
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 410
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 411
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 412
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 415
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 416
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 417
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 580
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 593
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 598
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 599
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 601
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 602
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 606
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 607
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 611
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 613
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 632
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 633
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 636
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 637
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 638
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 639
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 640
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 641
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 642
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 648
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 650
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 653
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 748
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 890
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 891
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 894
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 895
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 896
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 897
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 898
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 899
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 11
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 413
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 415
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 416
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 417
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 418
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 419
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 420
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 421
+      },
+      {
+        "file": "src/lib/types/result-types.ts",
+        "line": 7
+      },
+      {
+        "file": "src/lib/types/result-types.ts",
+        "line": 10
+      },
+      {
+        "file": "src/lib/types/result-types.ts",
+        "line": 14
+      },
+      {
+        "file": "src/lib/types/result-types.ts",
+        "line": 31
+      }
+    ]
+  },
+  {
+    "var": "smNoticeBoards",
+    "dbName": "sm_notice_boards",
+    "startLine": 6233,
+    "endLine": 6260,
+    "usageSites": [
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-notice-board.ts",
+        "line": 36
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-notice-board.ts",
+        "line": 37
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-notice-board.ts",
+        "line": 38
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-notice-board.ts",
+        "line": 39
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-notice-board.ts",
+        "line": 40
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-notice-board.ts",
+        "line": 41
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-notice-board.ts",
+        "line": 43
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-notice-board.ts",
+        "line": 46
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-notice-board.ts",
+        "line": 47
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-notice-board.ts",
+        "line": 50
+      }
+    ]
+  },
+  {
+    "var": "smParents",
+    "dbName": "sm_parents",
+    "startLine": 6596,
+    "endLine": 6633,
+    "usageSites": [
+      {
+        "file": "src/lib/server/mastra/tools/operations/reporting/publish-result-pdf.ts",
+        "line": 36
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/reporting/publish-result-pdf.ts",
+        "line": 37
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/reporting/publish-result-pdf.ts",
+        "line": 38
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/reporting/publish-result-pdf.ts",
+        "line": 40
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/reporting/publish-result-pdf.ts",
+        "line": 41
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/reporting/transcript/publish-transcript-pdf.ts",
+        "line": 74
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/reporting/transcript/publish-transcript-pdf.ts",
+        "line": 75
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/reporting/transcript/publish-transcript-pdf.ts",
+        "line": 76
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/reporting/transcript/publish-transcript-pdf.ts",
+        "line": 78
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/reporting/transcript/publish-transcript-pdf.ts",
+        "line": 79
+      },
+      {
+        "file": "src/lib/server/repository/parent.repo.ts",
+        "line": 3
+      },
+      {
+        "file": "src/lib/server/repository/parent.repo.ts",
+        "line": 9
+      },
+      {
+        "file": "src/lib/server/repository/parent.repo.ts",
+        "line": 17
+      },
+      {
+        "file": "src/lib/server/repository/parent.repo.ts",
+        "line": 18
+      },
+      {
+        "file": "src/lib/server/repository/parent.repo.ts",
+        "line": 19
+      },
+      {
+        "file": "src/lib/server/repository/parent.repo.ts",
+        "line": 20
+      },
+      {
+        "file": "src/lib/server/repository/parent.repo.ts",
+        "line": 22
+      },
+      {
+        "file": "src/lib/server/repository/parent.repo.ts",
+        "line": 23
+      },
+      {
+        "file": "src/lib/server/repository/parent.repo.ts",
+        "line": 31
+      },
+      {
+        "file": "src/lib/server/repository/parent.repo.ts",
+        "line": 32
+      },
+      {
+        "file": "src/lib/server/repository/parent.repo.ts",
+        "line": 33
+      },
+      {
+        "file": "src/lib/server/repository/parent.repo.ts",
+        "line": 34
+      },
+      {
+        "file": "src/lib/server/repository/parent.repo.ts",
+        "line": 37
+      },
+      {
+        "file": "src/lib/server/repository/parent.repo.ts",
+        "line": 38
+      },
+      {
+        "file": "src/lib/server/repository/parent.repo.ts",
+        "line": 47
+      },
+      {
+        "file": "src/lib/server/repository/parent.repo.ts",
+        "line": 48
+      },
+      {
+        "file": "src/lib/server/repository/parent.repo.ts",
+        "line": 49
+      },
+      {
+        "file": "src/lib/server/repository/parent.repo.ts",
+        "line": 50
+      },
+      {
+        "file": "src/lib/server/repository/parent.repo.ts",
+        "line": 53
+      },
+      {
+        "file": "src/lib/server/repository/parent.repo.ts",
+        "line": 54
+      },
+      {
+        "file": "src/lib/server/repository/parent.repo.ts",
+        "line": 64
+      },
+      {
+        "file": "src/lib/server/repository/parent.repo.ts",
+        "line": 65
+      },
+      {
+        "file": "src/lib/server/repository/parent.repo.ts",
+        "line": 66
+      },
+      {
+        "file": "src/lib/server/repository/parent.repo.ts",
+        "line": 70
+      },
+      {
+        "file": "src/lib/server/repository/parent.repo.ts",
+        "line": 71
+      },
+      {
+        "file": "src/lib/server/repository/parent.repo.ts",
+        "line": 80
+      },
+      {
+        "file": "src/lib/server/repository/parent.repo.ts",
+        "line": 81
+      },
+      {
+        "file": "src/lib/server/repository/parent.repo.ts",
+        "line": 82
+      },
+      {
+        "file": "src/lib/server/repository/parent.repo.ts",
+        "line": 83
+      },
+      {
+        "file": "src/lib/server/repository/parent.repo.ts",
+        "line": 84
+      },
+      {
+        "file": "src/lib/server/repository/parent.repo.ts",
+        "line": 86
+      },
+      {
+        "file": "src/lib/server/repository/parent.repo.ts",
+        "line": 89
+      },
+      {
+        "file": "src/lib/server/repository/parent.repo.ts",
+        "line": 91
+      },
+      {
+        "file": "src/lib/server/repository/parent.repo.ts",
+        "line": 92
+      },
+      {
+        "file": "src/lib/server/repository/parent.repo.ts",
+        "line": 93
+      },
+      {
+        "file": "src/lib/server/repository/parent.repo.ts",
+        "line": 104
+      },
+      {
+        "file": "src/lib/server/repository/parent.repo.ts",
+        "line": 105
+      },
+      {
+        "file": "src/lib/server/repository/parent.repo.ts",
+        "line": 107
+      },
+      {
+        "file": "src/lib/server/repository/parent.repo.ts",
+        "line": 108
+      },
+      {
+        "file": "src/lib/server/repository/parent.repo.ts",
+        "line": 137
+      },
+      {
+        "file": "src/lib/server/repository/parent.repo.ts",
+        "line": 139
+      },
+      {
+        "file": "src/lib/server/repository/parent.repo.ts",
+        "line": 150
+      },
+      {
+        "file": "src/lib/server/repository/parent.repo.ts",
+        "line": 152
+      },
+      {
+        "file": "src/lib/server/repository/staff.repo.ts",
+        "line": 11
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 12
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 142
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 147
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 150
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 161
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 162
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 204
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 207
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 259
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 341
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 342
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 344
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 345
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 347
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 589
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 590
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 596
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 597
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 598
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 613
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 1263
+      },
+      {
+        "file": "src/lib/server/telegram/gateway.ts",
+        "line": 290
+      },
+      {
+        "file": "src/lib/server/telegram/gateway.ts",
+        "line": 291
+      },
+      {
+        "file": "src/lib/server/telegram/gateway.ts",
+        "line": 292
+      },
+      {
+        "file": "src/lib/server/telegram/gateway.ts",
+        "line": 294
+      },
+      {
+        "file": "src/lib/server/telegram/gateway.ts",
+        "line": 295
+      },
+      {
+        "file": "src/lib/server/telegram/gateway.ts",
+        "line": 399
+      },
+      {
+        "file": "src/lib/server/telegram/gateway.ts",
+        "line": 401
+      },
+      {
+        "file": "src/lib/server/telegram/gateway.ts",
+        "line": 442
+      },
+      {
+        "file": "src/lib/server/telegram/gateway.ts",
+        "line": 444
+      },
+      {
+        "file": "src/routes/(chat)/admin/parents/+page.server.ts",
+        "line": 6
+      },
+      {
+        "file": "src/routes/(chat)/admin/parents/+page.server.ts",
+        "line": 40
+      },
+      {
+        "file": "src/routes/(chat)/admin/parents/+page.server.ts",
+        "line": 41
+      },
+      {
+        "file": "src/routes/(chat)/admin/parents/+page.server.ts",
+        "line": 42
+      },
+      {
+        "file": "src/routes/(chat)/admin/parents/+page.server.ts",
+        "line": 43
+      },
+      {
+        "file": "src/routes/(chat)/admin/parents/+page.server.ts",
+        "line": 57
+      },
+      {
+        "file": "src/routes/(chat)/admin/parents/+page.server.ts",
+        "line": 60
+      },
+      {
+        "file": "src/routes/(chat)/admin/parents/+page.server.ts",
+        "line": 97
+      },
+      {
+        "file": "src/routes/(chat)/admin/parents/+page.server.ts",
+        "line": 99
+      },
+      {
+        "file": "src/routes/api/parents/connect-telegram/+server.ts",
+        "line": 22
+      },
+      {
+        "file": "src/routes/api/parents/connect-telegram/+server.ts",
+        "line": 23
+      },
+      {
+        "file": "src/routes/api/parents/connect-telegram/+server.ts",
+        "line": 24
+      },
+      {
+        "file": "src/routes/api/parents/connect-telegram/+server.ts",
+        "line": 28
+      },
+      {
+        "file": "src/routes/api/parents/connect-telegram/+server.ts",
+        "line": 29
+      },
+      {
+        "file": "src/routes/api/parents/connect-telegram/+server.ts",
+        "line": 30
+      }
+    ]
+  },
+  {
+    "var": "smResultStores",
+    "dbName": "sm_result_stores",
+    "startLine": 6944,
+    "endLine": 7012,
+    "usageSites": [
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/child-performance-trend.ts",
+        "line": 38
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/child-performance-trend.ts",
+        "line": 40
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/child-performance-trend.ts",
+        "line": 41
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/child-performance-trend.ts",
+        "line": 43
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/child-performance-trend.ts",
+        "line": 44
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/child-performance-trend.ts",
+        "line": 47
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/child-performance-trend.ts",
+        "line": 48
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/child-performance-trend.ts",
+        "line": 49
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/child-performance-trend.ts",
+        "line": 52
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-result.ts",
+        "line": 51
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-result.ts",
+        "line": 52
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-result.ts",
+        "line": 54
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-result.ts",
+        "line": 56
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-result.ts",
+        "line": 57
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-result.ts",
+        "line": 58
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-result.ts",
+        "line": 59
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-result.ts",
+        "line": 61
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-result.ts",
+        "line": 62
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-result.ts",
+        "line": 63
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-result.ts",
+        "line": 66
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-result.ts",
+        "line": 67
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-result.ts",
+        "line": 68
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-result.ts",
+        "line": 71
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 255
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 257
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 258
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 291
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 292
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 295
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 296
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 297
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 298
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 299
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 300
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 301
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 307
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 308
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 381
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 382
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 383
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 386
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 388
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 389
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 392
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 393
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 394
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 434
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 437
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 438
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 439
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 440
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 463
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 464
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 466
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 469
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 470
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 471
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 474
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 528
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 529
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 530
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 533
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 534
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 536
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 537
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 540
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 541
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 542
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 543
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 552
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 553
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 554
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 556
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 559
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 560
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 561
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 562
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 563
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 766
+      },
+      {
+        "file": "src/lib/server/telegram/pdf/resolveTerm.ts",
+        "line": 88
+      },
+      {
+        "file": "src/lib/server/telegram/pdf/resolveTerm.ts",
+        "line": 89
+      },
+      {
+        "file": "src/lib/server/telegram/pdf/resolveTerm.ts",
+        "line": 92
+      },
+      {
+        "file": "src/lib/server/telegram/pdf/resolveTerm.ts",
+        "line": 93
+      },
+      {
+        "file": "src/lib/server/telegram/pdf/resolveTerm.ts",
+        "line": 94
+      },
+      {
+        "file": "src/lib/types/result-types.ts",
+        "line": 4
+      },
+      {
+        "file": "src/lib/types/result-types.ts",
+        "line": 8
+      },
+      {
+        "file": "src/lib/types/result-types.ts",
+        "line": 11
+      }
+    ]
+  },
+  {
+    "var": "smSchools",
+    "dbName": "sm_schools",
+    "startLine": 7121,
+    "endLine": 7144,
+    "usageSites": [
+      {
+        "file": "src/lib/server/mastra/agents/skill-instructions.ts",
+        "line": 5
+      },
+      {
+        "file": "src/lib/server/mastra/agents/skill-instructions.ts",
+        "line": 68
+      },
+      {
+        "file": "src/lib/server/mastra/agents/skill-instructions.ts",
+        "line": 69
+      },
+      {
+        "file": "src/lib/server/mastra/agents/skill-instructions.ts",
+        "line": 70
+      },
+      {
+        "file": "src/lib/server/repository/school.repo.ts",
+        "line": 15
+      },
+      {
+        "file": "src/lib/server/repository/school.repo.ts",
+        "line": 16
+      },
+      {
+        "file": "src/lib/server/repository/school.repo.ts",
+        "line": 17
+      },
+      {
+        "file": "src/lib/server/repository/school.repo.ts",
+        "line": 19
+      },
+      {
+        "file": "src/lib/server/repository/school.repo.ts",
+        "line": 20
+      },
+      {
+        "file": "src/lib/server/service/assessment-publisher.service.ts",
+        "line": 115
+      },
+      {
+        "file": "src/lib/server/service/assessment-publisher.service.ts",
+        "line": 116
+      },
+      {
+        "file": "src/lib/server/service/assessment-publisher.service.ts",
+        "line": 117
+      },
+      {
+        "file": "src/lib/server/service/assessment-publisher.service.ts",
+        "line": 119
+      },
+      {
+        "file": "src/lib/server/service/assessment-publisher.service.ts",
+        "line": 120
+      }
+    ]
+  },
+  {
+    "var": "smSections",
+    "dbName": "sm_sections",
+    "startLine": 7222,
+    "endLine": 7244,
+    "usageSites": [
+      {
+        "file": "src/lib/server/helpers/class-scope.ts",
+        "line": 21
+      },
+      {
+        "file": "src/lib/server/helpers/class-scope.ts",
+        "line": 60
+      },
+      {
+        "file": "src/lib/server/helpers/class-scope.ts",
+        "line": 61
+      },
+      {
+        "file": "src/lib/server/helpers/class-scope.ts",
+        "line": 62
+      },
+      {
+        "file": "src/lib/server/helpers/class-scope.ts",
+        "line": 166
+      },
+      {
+        "file": "src/lib/server/helpers/class-scope.ts",
+        "line": 167
+      },
+      {
+        "file": "src/lib/server/helpers/class-scope.ts",
+        "line": 169
+      },
+      {
+        "file": "src/lib/server/mastra/agents/skill-instructions.ts",
+        "line": 7
+      },
+      {
+        "file": "src/lib/server/mastra/agents/skill-instructions.ts",
+        "line": 86
+      },
+      {
+        "file": "src/lib/server/mastra/agents/skill-instructions.ts",
+        "line": 87
+      },
+      {
+        "file": "src/lib/server/mastra/agents/skill-instructions.ts",
+        "line": 88
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/list-my-children.ts",
+        "line": 46
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/list-my-children.ts",
+        "line": 52
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-timetable.ts",
+        "line": 9
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-timetable.ts",
+        "line": 94
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-timetable.ts",
+        "line": 95
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-timetable.ts",
+        "line": 96
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 45
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 50
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 55
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 72
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 77
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 148
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 153
+      },
+      {
+        "file": "src/lib/server/repository/staff.repo.ts",
+        "line": 12
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 13
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 602
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 625
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 818
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 819
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 820
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 864
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 868
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 872
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 874
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 894
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 904
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 905
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 906
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 915
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 916
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 920
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 1195
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 1201
+      },
+      {
+        "file": "src/routes/(chat)/admin/connect-codes/+page.server.ts",
+        "line": 30
+      },
+      {
+        "file": "src/routes/(chat)/admin/connect-codes/+page.server.ts",
+        "line": 35
+      },
+      {
+        "file": "src/routes/(chat)/admin/parents/+page.server.ts",
+        "line": 8
+      },
+      {
+        "file": "src/routes/(chat)/admin/parents/+page.server.ts",
+        "line": 39
+      },
+      {
+        "file": "src/routes/(chat)/admin/parents/+page.server.ts",
+        "line": 56
+      },
+      {
+        "file": "src/routes/(chat)/admin/parents/+page.server.ts",
+        "line": 64
+      },
+      {
+        "file": "src/routes/api/mentions/search/+server.ts",
+        "line": 11
+      },
+      {
+        "file": "src/routes/api/mentions/search/+server.ts",
+        "line": 172
+      },
+      {
+        "file": "src/routes/api/mentions/search/+server.ts",
+        "line": 190
+      },
+      {
+        "file": "src/routes/api/mentions/search/+server.ts",
+        "line": 199
+      },
+      {
+        "file": "src/routes/api/mentions/search/+server.ts",
+        "line": 208
+      },
+      {
+        "file": "src/routes/api/mentions/search/+server.ts",
+        "line": 209
+      },
+      {
+        "file": "src/routes/api/mentions/search/+server.ts",
+        "line": 212
+      }
+    ]
+  },
+  {
+    "var": "smStaffs",
+    "dbName": "sm_staffs",
+    "startLine": 7373,
+    "endLine": 7463,
+    "usageSites": [
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-exam-schedule.ts",
+        "line": 53
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-exam-schedule.ts",
+        "line": 60
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-timetable.ts",
+        "line": 10
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-timetable.ts",
+        "line": 107
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-timetable.ts",
+        "line": 111
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/read/search-school-directory.ts",
+        "line": 169
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/read/search-school-directory.ts",
+        "line": 170
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/read/search-school-directory.ts",
+        "line": 171
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/read/search-school-directory.ts",
+        "line": 173
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/read/search-school-directory.ts",
+        "line": 174
+      },
+      {
+        "file": "src/lib/server/repository/auth.repo.ts",
+        "line": 7
+      },
+      {
+        "file": "src/lib/server/repository/auth.repo.ts",
+        "line": 27
+      },
+      {
+        "file": "src/lib/server/repository/staff.repo.ts",
+        "line": 13
+      },
+      {
+        "file": "src/lib/server/repository/staff.repo.ts",
+        "line": 56
+      },
+      {
+        "file": "src/lib/server/repository/staff.repo.ts",
+        "line": 59
+      },
+      {
+        "file": "src/lib/server/repository/staff.repo.ts",
+        "line": 65
+      },
+      {
+        "file": "src/lib/server/repository/staff.repo.ts",
+        "line": 66
+      },
+      {
+        "file": "src/lib/server/repository/staff.repo.ts",
+        "line": 141
+      },
+      {
+        "file": "src/lib/server/repository/staff.repo.ts",
+        "line": 181
+      },
+      {
+        "file": "src/lib/server/repository/staff.repo.ts",
+        "line": 201
+      },
+      {
+        "file": "src/lib/server/repository/staff.repo.ts",
+        "line": 219
+      },
+      {
+        "file": "src/lib/server/repository/staff.repo.ts",
+        "line": 221
+      },
+      {
+        "file": "src/lib/server/repository/staff.repo.ts",
+        "line": 264
+      },
+      {
+        "file": "src/lib/server/repository/staff.repo.ts",
+        "line": 265
+      },
+      {
+        "file": "src/lib/server/repository/staff.repo.ts",
+        "line": 276
+      },
+      {
+        "file": "src/lib/server/repository/staff.repo.ts",
+        "line": 277
+      },
+      {
+        "file": "src/lib/server/repository/staff.repo.ts",
+        "line": 278
+      },
+      {
+        "file": "src/lib/server/repository/staff.repo.ts",
+        "line": 282
+      },
+      {
+        "file": "src/lib/server/repository/staff.repo.ts",
+        "line": 283
+      },
+      {
+        "file": "src/lib/server/repository/staff.repo.ts",
+        "line": 284
+      },
+      {
+        "file": "src/lib/server/repository/staff.repo.ts",
+        "line": 288
+      },
+      {
+        "file": "src/lib/server/repository/staff.repo.ts",
+        "line": 289
+      },
+      {
+        "file": "src/lib/server/repository/staff.repo.ts",
+        "line": 290
+      },
+      {
+        "file": "src/lib/server/repository/staff.repo.ts",
+        "line": 314
+      },
+      {
+        "file": "src/lib/server/repository/staff.repo.ts",
+        "line": 330
+      },
+      {
+        "file": "src/lib/server/repository/staff.repo.ts",
+        "line": 350
+      },
+      {
+        "file": "src/lib/server/repository/staff.repo.ts",
+        "line": 361
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 15
+      },
+      {
+        "file": "src/lib/server/repository/timeline.repo.ts",
+        "line": 7
+      }
+    ]
+  },
+  {
+    "var": "smStudentAttendances",
+    "dbName": "sm_student_attendances",
+    "startLine": 7712,
+    "endLine": 7755,
+    "usageSites": [
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/child-attendance.ts",
+        "line": 39
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/child-attendance.ts",
+        "line": 40
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/child-attendance.ts",
+        "line": 41
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/child-attendance.ts",
+        "line": 43
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/child-attendance.ts",
+        "line": 46
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/child-attendance.ts",
+        "line": 47
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/child-attendance.ts",
+        "line": 48
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/child-attendance.ts",
+        "line": 49
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/child-attendance.ts",
+        "line": 52
+      }
+    ]
+  },
+  {
+    "var": "smStudentCategories",
+    "dbName": "sm_student_categories",
+    "startLine": 7800,
+    "endLine": 7819,
+    "usageSites": [
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 928
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 929
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 930
+      },
+      {
+        "file": "src/lib/server/repository/staff.repo.ts",
+        "line": 14
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 16
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 594
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 614
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 770
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 771
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 772
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 824
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 825
+      }
+    ]
+  },
+  {
+    "var": "smStudentPromotions",
+    "dbName": "sm_student_promotions",
+    "startLine": 8051,
+    "endLine": 8117,
+    "usageSites": [
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 20
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 654
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 657
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 658
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 659
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 737
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 738
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 1008
+      }
+    ]
+  },
+  {
+    "var": "smStudents",
+    "dbName": "sm_students",
+    "startLine": 7565,
+    "endLine": 7710,
+    "usageSites": [
+      {
+        "file": "src/lib/server/mastra/agents/skill-instructions.ts",
+        "line": 10
+      },
+      {
+        "file": "src/lib/server/mastra/agents/skill-instructions.ts",
+        "line": 123
+      },
+      {
+        "file": "src/lib/server/mastra/agents/skill-instructions.ts",
+        "line": 135
+      },
+      {
+        "file": "src/lib/server/mastra/agents/skill-instructions.ts",
+        "line": 136
+      },
+      {
+        "file": "src/lib/server/mastra/agents/skill-instructions.ts",
+        "line": 137
+      },
+      {
+        "file": "src/lib/server/mastra/agents/skill-instructions.ts",
+        "line": 139
+      },
+      {
+        "file": "src/lib/server/mastra/agents/skill-instructions.ts",
+        "line": 140
+      },
+      {
+        "file": "src/lib/server/mastra/agents/skill-instructions.ts",
+        "line": 148
+      },
+      {
+        "file": "src/lib/server/mastra/agents/skill-instructions.ts",
+        "line": 151
+      },
+      {
+        "file": "src/lib/server/mastra/editor/mention-resolver.ts",
+        "line": 17
+      },
+      {
+        "file": "src/lib/server/mastra/editor/mention-resolver.ts",
+        "line": 85
+      },
+      {
+        "file": "src/lib/server/mastra/editor/mention-resolver.ts",
+        "line": 108
+      },
+      {
+        "file": "src/lib/server/mastra/editor/mention-resolver.ts",
+        "line": 109
+      },
+      {
+        "file": "src/lib/server/mastra/editor/mention-resolver.ts",
+        "line": 110
+      },
+      {
+        "file": "src/lib/server/mastra/editor/mention-resolver.ts",
+        "line": 111
+      },
+      {
+        "file": "src/lib/server/mastra/editor/mention-resolver.ts",
+        "line": 113
+      },
+      {
+        "file": "src/lib/server/mastra/editor/mention-resolver.ts",
+        "line": 114
+      },
+      {
+        "file": "src/lib/server/mastra/editor/mention-resolver.ts",
+        "line": 142
+      },
+      {
+        "file": "src/lib/server/mastra/editor/mention-resolver.ts",
+        "line": 162
+      },
+      {
+        "file": "src/lib/server/mastra/editor/mention-resolver.ts",
+        "line": 163
+      },
+      {
+        "file": "src/lib/server/mastra/editor/mention-resolver.ts",
+        "line": 164
+      },
+      {
+        "file": "src/lib/server/mastra/editor/mention-resolver.ts",
+        "line": 165
+      },
+      {
+        "file": "src/lib/server/mastra/editor/mention-resolver.ts",
+        "line": 167
+      },
+      {
+        "file": "src/lib/server/mastra/editor/mention-resolver.ts",
+        "line": 170
+      },
+      {
+        "file": "src/lib/server/mastra/editor/mention-resolver.ts",
+        "line": 171
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/child-performance-trend.ts",
+        "line": 98
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/child-performance-trend.ts",
+        "line": 99
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/child-performance-trend.ts",
+        "line": 100
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/child-ranking.ts",
+        "line": 46
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/child-ranking.ts",
+        "line": 48
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/child-ranking.ts",
+        "line": 49
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/index.ts",
+        "line": 48
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/index.ts",
+        "line": 49
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/index.ts",
+        "line": 50
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/index.ts",
+        "line": 61
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/index.ts",
+        "line": 62
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/index.ts",
+        "line": 63
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/index.ts",
+        "line": 65
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/index.ts",
+        "line": 66
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/index.ts",
+        "line": 78
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/index.ts",
+        "line": 79
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/index.ts",
+        "line": 80
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/list-my-children.ts",
+        "line": 40
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/list-my-children.ts",
+        "line": 41
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/list-my-children.ts",
+        "line": 42
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/list-my-children.ts",
+        "line": 43
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/list-my-children.ts",
+        "line": 45
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/list-my-children.ts",
+        "line": 47
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/list-my-children.ts",
+        "line": 48
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/list-my-children.ts",
+        "line": 50
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/list-my-children.ts",
+        "line": 51
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/list-my-children.ts",
+        "line": 52
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/list-my-children.ts",
+        "line": 55
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/list-my-children.ts",
+        "line": 56
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/list-my-children.ts",
+        "line": 57
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/list-my-children.ts",
+        "line": 60
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/read/view-student-result.ts",
+        "line": 49
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/read/view-student-result.ts",
+        "line": 50
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/read/view-student-result.ts",
+        "line": 74
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/read/view-student-result.ts",
+        "line": 75
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/read/view-student-result.ts",
+        "line": 96
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/read/view-student-result.ts",
+        "line": 101
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/read/view-student-result.ts",
+        "line": 102
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/read/view-student-result.ts",
+        "line": 103
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/read/view-student-result.ts",
+        "line": 110
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/read/view-student-result.ts",
+        "line": 113
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/read/view-student-result.ts",
+        "line": 118
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/read/view-student-result.ts",
+        "line": 152
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/reporting/_shared.ts",
+        "line": 198
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/reporting/transcript/transcript-report.ts",
+        "line": 127
+      },
+      {
+        "file": "src/lib/server/repository/parent.repo.ts",
+        "line": 4
+      },
+      {
+        "file": "src/lib/server/repository/parent.repo.ts",
+        "line": 35
+      },
+      {
+        "file": "src/lib/server/repository/parent.repo.ts",
+        "line": 38
+      },
+      {
+        "file": "src/lib/server/repository/parent.repo.ts",
+        "line": 39
+      },
+      {
+        "file": "src/lib/server/repository/parent.repo.ts",
+        "line": 51
+      },
+      {
+        "file": "src/lib/server/repository/parent.repo.ts",
+        "line": 54
+      },
+      {
+        "file": "src/lib/server/repository/parent.repo.ts",
+        "line": 55
+      },
+      {
+        "file": "src/lib/server/repository/parent.repo.ts",
+        "line": 67
+      },
+      {
+        "file": "src/lib/server/repository/parent.repo.ts",
+        "line": 68
+      },
+      {
+        "file": "src/lib/server/repository/parent.repo.ts",
+        "line": 71
+      },
+      {
+        "file": "src/lib/server/repository/parent.repo.ts",
+        "line": 72
+      },
+      {
+        "file": "src/lib/server/repository/staff.repo.ts",
+        "line": 15
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 17
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 103
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 149
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 150
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 151
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 284
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 323
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 324
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 337
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 338
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 339
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 340
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 345
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 346
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 362
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 369
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 370
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 377
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 378
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 379
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 381
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 382
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 384
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 406
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 407
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 408
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 409
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 411
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 415
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 421
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 424
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 430
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 433
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 486
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 487
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 488
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 491
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 510
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 511
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 517
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 518
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 519
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 520
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 522
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 526
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 532
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 552
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 554
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 562
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 564
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 571
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 573
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 580
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 584
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 585
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 586
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 587
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 588
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 591
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 592
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 595
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 606
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 607
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 608
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 609
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 611
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 612
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 613
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 614
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 618
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 626
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 641
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 645
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 646
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 666
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 726
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 734
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 783
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 784
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 785
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 797
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 798
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 968
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 992
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 1054
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 1062
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 1147
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 1148
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 1151
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 1152
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 1153
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 1156
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 1168
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 1169
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 1170
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 1180
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 1191
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 1192
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 1193
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 1196
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 1198
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 1199
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 1212
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 1221
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 1246
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 1256
+      },
+      {
+        "file": "src/lib/server/telegram/gateway.ts",
+        "line": 306
+      },
+      {
+        "file": "src/lib/server/telegram/gateway.ts",
+        "line": 307
+      },
+      {
+        "file": "src/lib/server/telegram/gateway.ts",
+        "line": 310
+      },
+      {
+        "file": "src/lib/server/telegram/gateway.ts",
+        "line": 311
+      },
+      {
+        "file": "src/lib/server/telegram/gateway.ts",
+        "line": 314
+      },
+      {
+        "file": "src/lib/server/telegram/gateway.ts",
+        "line": 315
+      },
+      {
+        "file": "src/lib/server/telegram/gateway.ts",
+        "line": 321
+      },
+      {
+        "file": "src/lib/server/telegram/gateway.ts",
+        "line": 361
+      },
+      {
+        "file": "src/lib/server/telegram/gateway.ts",
+        "line": 362
+      },
+      {
+        "file": "src/lib/server/telegram/gateway.ts",
+        "line": 363
+      },
+      {
+        "file": "src/lib/server/telegram/gateway.ts",
+        "line": 366
+      },
+      {
+        "file": "src/lib/server/telegram/gateway.ts",
+        "line": 367
+      },
+      {
+        "file": "src/lib/server/telegram/pdf/load-children.ts",
+        "line": 45
+      },
+      {
+        "file": "src/lib/server/telegram/pdf/load-children.ts",
+        "line": 46
+      },
+      {
+        "file": "src/lib/server/telegram/pdf/load-children.ts",
+        "line": 47
+      },
+      {
+        "file": "src/lib/server/telegram/pdf/load-children.ts",
+        "line": 49
+      },
+      {
+        "file": "src/lib/server/telegram/pdf/load-children.ts",
+        "line": 50
+      },
+      {
+        "file": "src/lib/server/telegram/pdf/load-children.ts",
+        "line": 53
+      },
+      {
+        "file": "src/lib/server/telegram/pdf/load-children.ts",
+        "line": 54
+      },
+      {
+        "file": "src/lib/server/telegram/pdf/load-children.ts",
+        "line": 61
+      },
+      {
+        "file": "src/routes/(chat)/admin/parents/+page.server.ts",
+        "line": 5
+      },
+      {
+        "file": "src/routes/(chat)/admin/parents/+page.server.ts",
+        "line": 34
+      },
+      {
+        "file": "src/routes/(chat)/admin/parents/+page.server.ts",
+        "line": 35
+      },
+      {
+        "file": "src/routes/(chat)/admin/parents/+page.server.ts",
+        "line": 36
+      },
+      {
+        "file": "src/routes/(chat)/admin/parents/+page.server.ts",
+        "line": 45
+      },
+      {
+        "file": "src/routes/(chat)/admin/parents/+page.server.ts",
+        "line": 49
+      },
+      {
+        "file": "src/routes/(chat)/admin/parents/+page.server.ts",
+        "line": 57
+      },
+      {
+        "file": "src/routes/(chat)/admin/parents/+page.server.ts",
+        "line": 61
+      },
+      {
+        "file": "src/routes/(chat)/admin/parents/+page.server.ts",
+        "line": 64
+      },
+      {
+        "file": "src/routes/(chat)/class-roster/+page.server.ts",
+        "line": 39
+      },
+      {
+        "file": "src/routes/(chat)/class-roster/+page.server.ts",
+        "line": 40
+      },
+      {
+        "file": "src/routes/(chat)/class-roster/+page.server.ts",
+        "line": 41
+      },
+      {
+        "file": "src/routes/(chat)/class-roster/+page.server.ts",
+        "line": 42
+      },
+      {
+        "file": "src/routes/(chat)/class-roster/+page.server.ts",
+        "line": 44
+      },
+      {
+        "file": "src/routes/(chat)/class-roster/+page.server.ts",
+        "line": 48
+      },
+      {
+        "file": "src/routes/(chat)/class-roster/+page.server.ts",
+        "line": 55
+      },
+      {
+        "file": "src/routes/(chat)/filestore/+page.server.ts",
+        "line": 433
+      },
+      {
+        "file": "src/routes/(chat)/filestore/+page.server.ts",
+        "line": 434
+      },
+      {
+        "file": "src/routes/(chat)/filestore/+page.server.ts",
+        "line": 435
+      },
+      {
+        "file": "src/routes/(chat)/filestore/+page.server.ts",
+        "line": 436
+      },
+      {
+        "file": "src/routes/(chat)/filestore/+page.server.ts",
+        "line": 438
+      },
+      {
+        "file": "src/routes/(chat)/filestore/+page.server.ts",
+        "line": 441
+      },
+      {
+        "file": "src/routes/(chat)/filestore/+page.server.ts",
+        "line": 442
+      },
+      {
+        "file": "src/routes/api/mentions/search/+server.ts",
+        "line": 8
+      },
+      {
+        "file": "src/routes/api/mentions/search/+server.ts",
+        "line": 83
+      },
+      {
+        "file": "src/routes/api/mentions/search/+server.ts",
+        "line": 104
+      },
+      {
+        "file": "src/routes/api/mentions/search/+server.ts",
+        "line": 112
+      },
+      {
+        "file": "src/routes/api/mentions/search/+server.ts",
+        "line": 120
+      },
+      {
+        "file": "src/routes/api/mentions/search/+server.ts",
+        "line": 121
+      },
+      {
+        "file": "src/routes/api/mentions/search/+server.ts",
+        "line": 132
+      },
+      {
+        "file": "src/routes/api/mentions/search/+server.ts",
+        "line": 133
+      },
+      {
+        "file": "src/routes/api/mentions/search/+server.ts",
+        "line": 134
+      },
+      {
+        "file": "src/routes/api/mentions/search/+server.ts",
+        "line": 136
+      },
+      {
+        "file": "src/routes/api/mentions/search/+server.ts",
+        "line": 137
+      },
+      {
+        "file": "src/routes/api/mentions/search/+server.ts",
+        "line": 139
+      },
+      {
+        "file": "src/routes/api/mentions/search/+server.ts",
+        "line": 143
+      },
+      {
+        "file": "src/routes/api/mentions/search/+server.ts",
+        "line": 144
+      },
+      {
+        "file": "src/routes/api/mentions/search/+server.ts",
+        "line": 145
+      },
+      {
+        "file": "src/routes/api/mentions/search/+server.ts",
+        "line": 147
+      },
+      {
+        "file": "src/routes/api/mentions/search/+server.ts",
+        "line": 149
+      },
+      {
+        "file": "src/routes/api/uploads/+server.ts",
+        "line": 117
+      },
+      {
+        "file": "src/routes/api/uploads/+server.ts",
+        "line": 119
+      }
+    ]
+  },
+  {
+    "var": "smStudentTimelines",
+    "dbName": "sm_student_timelines",
+    "startLine": 8290,
+    "endLine": 8317,
+    "usageSites": [
+      {
+        "file": "src/lib/server/repository/timeline.repo.ts",
+        "line": 8
+      },
+      {
+        "file": "src/lib/server/repository/timeline.repo.ts",
+        "line": 14
+      },
+      {
+        "file": "src/lib/server/repository/timeline.repo.ts",
+        "line": 26
+      },
+      {
+        "file": "src/lib/server/repository/timeline.repo.ts",
+        "line": 29
+      },
+      {
+        "file": "src/lib/server/repository/timeline.repo.ts",
+        "line": 30
+      },
+      {
+        "file": "src/lib/server/repository/timeline.repo.ts",
+        "line": 31
+      },
+      {
+        "file": "src/lib/server/repository/timeline.repo.ts",
+        "line": 45
+      },
+      {
+        "file": "src/lib/server/repository/timeline.repo.ts",
+        "line": 47
+      },
+      {
+        "file": "src/lib/server/repository/timeline.repo.ts",
+        "line": 57
+      },
+      {
+        "file": "src/lib/server/repository/timeline.repo.ts",
+        "line": 58
+      },
+      {
+        "file": "src/lib/server/repository/timeline.repo.ts",
+        "line": 65
+      },
+      {
+        "file": "src/lib/server/repository/timeline.repo.ts",
+        "line": 73
+      },
+      {
+        "file": "src/lib/server/repository/timeline.repo.ts",
+        "line": 74
+      },
+      {
+        "file": "src/lib/server/repository/timeline.repo.ts",
+        "line": 97
+      },
+      {
+        "file": "src/lib/server/repository/timeline.repo.ts",
+        "line": 100
+      },
+      {
+        "file": "src/lib/server/repository/timeline.repo.ts",
+        "line": 101
+      },
+      {
+        "file": "src/lib/server/repository/timeline.repo.ts",
+        "line": 102
+      }
+    ]
+  },
+  {
+    "var": "smSubjects",
+    "dbName": "sm_subjects",
+    "startLine": 8353,
+    "endLine": 8377,
+    "usageSites": [
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-exam-schedule.ts",
+        "line": 48
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-exam-schedule.ts",
+        "line": 59
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-homework.ts",
+        "line": 60
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-homework.ts",
+        "line": 70
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-result.ts",
+        "line": 55
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-result.ts",
+        "line": 62
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-timetable.ts",
+        "line": 11
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-timetable.ts",
+        "line": 106
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/parent/view-child-timetable.ts",
+        "line": 110
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 111
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 115
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 384
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 385
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 389
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 402
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 406
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 408
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 411
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 531
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 532
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 537
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 594
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 595
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 602
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 939
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 940
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 941
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 944
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 945
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 951
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 954
+      },
+      {
+        "file": "src/lib/types/result-types.ts",
+        "line": 17
+      }
+    ]
+  },
+  {
+    "var": "studentRatings",
+    "dbName": "student_ratings",
+    "startLine": 8967,
+    "endLine": 8999,
+    "usageSites": [
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 213
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 214
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 215
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 216
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 218
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 221
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 222
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 223
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 345
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 347
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 348
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 349
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 663
+      },
+      {
+        "file": "src/lib/types/result-types.ts",
+        "line": 6
+      },
+      {
+        "file": "src/lib/types/result-types.ts",
+        "line": 13
+      }
+    ]
+  },
+  {
+    "var": "studentRecords",
+    "dbName": "student_records",
+    "startLine": 9001,
+    "endLine": 9047,
+    "usageSites": [
+      {
+        "file": "src/lib/server/mastra/agents/skill-instructions.ts",
+        "line": 11
+      },
+      {
+        "file": "src/lib/server/mastra/agents/skill-instructions.ts",
+        "line": 123
+      },
+      {
+        "file": "src/lib/server/mastra/agents/skill-instructions.ts",
+        "line": 140
+      },
+      {
+        "file": "src/lib/server/mastra/agents/skill-instructions.ts",
+        "line": 143
+      },
+      {
+        "file": "src/lib/server/mastra/agents/skill-instructions.ts",
+        "line": 144
+      },
+      {
+        "file": "src/lib/server/mastra/agents/skill-instructions.ts",
+        "line": 145
+      },
+      {
+        "file": "src/lib/server/mastra/agents/skill-instructions.ts",
+        "line": 146
+      },
+      {
+        "file": "src/lib/server/mastra/agents/skill-instructions.ts",
+        "line": 147
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/reporting/_shared.ts",
+        "line": 349
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/reporting/_shared.ts",
+        "line": 350
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/reporting/_shared.ts",
+        "line": 351
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/reporting/_shared.ts",
+        "line": 352
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/reporting/_shared.ts",
+        "line": 354
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/reporting/_shared.ts",
+        "line": 357
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/reporting/_shared.ts",
+        "line": 358
+      },
+      {
+        "file": "src/lib/server/mastra/tools/operations/reporting/_shared.ts",
+        "line": 359
+      },
+      {
+        "file": "src/lib/server/repository/staff.repo.ts",
+        "line": 16
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 18
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 308
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 358
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 359
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 360
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 361
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 363
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 382
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 424
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 427
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 428
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 429
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 447
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 450
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 451
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 452
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 453
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 454
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 455
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 460
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 485
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 490
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 491
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 494
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 495
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 496
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 497
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 498
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 499
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 512
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 513
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 514
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 515
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 516
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 524
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 526
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 527
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 528
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 529
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 599
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 600
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 603
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 604
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 605
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 616
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 618
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 619
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 620
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 621
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 624
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 625
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 685
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 686
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 689
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 690
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 691
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 692
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 693
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 699
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 700
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 703
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 704
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 705
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 706
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 713
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 715
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 720
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 722
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 944
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 945
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 946
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 951
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 953
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 955
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 997
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 1000
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 1001
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 1002
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 1031
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 1033
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 1038
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 1181
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 1184
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 1187
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 1199
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 1200
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 1201
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 1225
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 1227
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 1253
+      },
+      {
+        "file": "src/lib/server/telegram/gateway.ts",
+        "line": 308
+      },
+      {
+        "file": "src/lib/server/telegram/gateway.ts",
+        "line": 311
+      },
+      {
+        "file": "src/lib/server/telegram/gateway.ts",
+        "line": 316
+      },
+      {
+        "file": "src/lib/server/telegram/gateway.ts",
+        "line": 317
+      },
+      {
+        "file": "src/lib/server/telegram/gateway.ts",
+        "line": 318
+      },
+      {
+        "file": "src/lib/server/telegram/gateway.ts",
+        "line": 363
+      },
+      {
+        "file": "src/lib/server/telegram/gateway.ts",
+        "line": 368
+      },
+      {
+        "file": "src/lib/server/telegram/gateway.ts",
+        "line": 369
+      },
+      {
+        "file": "src/lib/server/telegram/gateway.ts",
+        "line": 370
+      },
+      {
+        "file": "src/lib/server/telegram/pdf/load-children.ts",
+        "line": 50
+      },
+      {
+        "file": "src/lib/server/telegram/pdf/load-children.ts",
+        "line": 55
+      },
+      {
+        "file": "src/lib/server/telegram/pdf/load-children.ts",
+        "line": 56
+      },
+      {
+        "file": "src/lib/server/telegram/pdf/load-children.ts",
+        "line": 57
+      },
+      {
+        "file": "src/lib/server/telegram/pdf/load-children.ts",
+        "line": 58
+      },
+      {
+        "file": "src/routes/(chat)/admin/parents/+page.server.ts",
+        "line": 10
+      },
+      {
+        "file": "src/routes/(chat)/admin/parents/+page.server.ts",
+        "line": 37
+      },
+      {
+        "file": "src/routes/(chat)/admin/parents/+page.server.ts",
+        "line": 47
+      },
+      {
+        "file": "src/routes/(chat)/admin/parents/+page.server.ts",
+        "line": 49
+      },
+      {
+        "file": "src/routes/(chat)/admin/parents/+page.server.ts",
+        "line": 50
+      },
+      {
+        "file": "src/routes/(chat)/admin/parents/+page.server.ts",
+        "line": 51
+      },
+      {
+        "file": "src/routes/(chat)/admin/parents/+page.server.ts",
+        "line": 52
+      },
+      {
+        "file": "src/routes/(chat)/admin/parents/+page.server.ts",
+        "line": 55
+      },
+      {
+        "file": "src/routes/(chat)/admin/parents/+page.server.ts",
+        "line": 56
+      },
+      {
+        "file": "src/routes/(chat)/class-roster/+page.server.ts",
+        "line": 46
+      },
+      {
+        "file": "src/routes/(chat)/class-roster/+page.server.ts",
+        "line": 48
+      },
+      {
+        "file": "src/routes/(chat)/class-roster/+page.server.ts",
+        "line": 49
+      },
+      {
+        "file": "src/routes/(chat)/class-roster/+page.server.ts",
+        "line": 50
+      },
+      {
+        "file": "src/routes/(chat)/class-roster/+page.server.ts",
+        "line": 51
+      },
+      {
+        "file": "src/routes/(chat)/class-roster/+page.server.ts",
+        "line": 52
+      },
+      {
+        "file": "src/routes/api/mentions/search/+server.ts",
+        "line": 9
+      },
+      {
+        "file": "src/routes/api/mentions/search/+server.ts",
+        "line": 83
+      },
+      {
+        "file": "src/routes/api/mentions/search/+server.ts",
+        "line": 108
+      },
+      {
+        "file": "src/routes/api/mentions/search/+server.ts",
+        "line": 109
+      },
+      {
+        "file": "src/routes/api/mentions/search/+server.ts",
+        "line": 110
+      },
+      {
+        "file": "src/routes/api/mentions/search/+server.ts",
+        "line": 111
+      },
+      {
+        "file": "src/routes/api/mentions/search/+server.ts",
+        "line": 113
+      },
+      {
+        "file": "src/routes/api/mentions/search/+server.ts",
+        "line": 126
+      },
+      {
+        "file": "src/routes/api/mentions/search/+server.ts",
+        "line": 137
+      }
+    ]
+  },
+  {
+    "var": "teacherRemarks",
+    "dbName": "teacher_remarks",
+    "startLine": 9108,
+    "endLine": 9141,
+    "usageSites": [
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 239
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 240
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 243
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 244
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 245
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 246
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 338
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 340
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 341
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 342
+      },
+      {
+        "file": "src/lib/server/repository/result.repo.ts",
+        "line": 682
+      },
+      {
+        "file": "src/lib/types/result-types.ts",
+        "line": 5
+      },
+      {
+        "file": "src/lib/types/result-types.ts",
+        "line": 12
+      },
+      {
+        "file": "src/lib/types/result-types.ts",
+        "line": 16
+      }
+    ]
+  },
+  {
+    "var": "users",
+    "dbName": "users",
+    "startLine": 9209,
+    "endLine": 9251,
+    "usageSites": [
+      {
+        "file": "src/lib/server/repository/auth.repo.ts",
+        "line": 6
+      },
+      {
+        "file": "src/lib/server/repository/auth.repo.ts",
+        "line": 14
+      },
+      {
+        "file": "src/lib/server/repository/auth.repo.ts",
+        "line": 17
+      },
+      {
+        "file": "src/lib/server/repository/auth.repo.ts",
+        "line": 50
+      },
+      {
+        "file": "src/lib/server/repository/auth.repo.ts",
+        "line": 53
+      },
+      {
+        "file": "src/lib/server/repository/auth.repo.ts",
+        "line": 57
+      },
+      {
+        "file": "src/lib/server/repository/auth.repo.ts",
+        "line": 138
+      },
+      {
+        "file": "src/lib/server/repository/auth.repo.ts",
+        "line": 145
+      },
+      {
+        "file": "src/lib/server/repository/auth.repo.ts",
+        "line": 153
+      },
+      {
+        "file": "src/lib/server/repository/parent.repo.ts",
+        "line": 5
+      },
+      {
+        "file": "src/lib/server/repository/parent.repo.ts",
+        "line": 120
+      },
+      {
+        "file": "src/lib/server/repository/parent.repo.ts",
+        "line": 143
+      },
+      {
+        "file": "src/lib/server/repository/parent.repo.ts",
+        "line": 145
+      },
+      {
+        "file": "src/lib/server/repository/staff.repo.ts",
+        "line": 17
+      },
+      {
+        "file": "src/lib/server/repository/staff.repo.ts",
+        "line": 118
+      },
+      {
+        "file": "src/lib/server/repository/staff.repo.ts",
+        "line": 128
+      },
+      {
+        "file": "src/lib/server/repository/staff.repo.ts",
+        "line": 210
+      },
+      {
+        "file": "src/lib/server/repository/staff.repo.ts",
+        "line": 312
+      },
+      {
+        "file": "src/lib/server/repository/staff.repo.ts",
+        "line": 316
+      },
+      {
+        "file": "src/lib/server/repository/staff.repo.ts",
+        "line": 326
+      },
+      {
+        "file": "src/lib/server/repository/staff.repo.ts",
+        "line": 327
+      },
+      {
+        "file": "src/lib/server/repository/staff.repo.ts",
+        "line": 348
+      },
+      {
+        "file": "src/lib/server/repository/staff.repo.ts",
+        "line": 352
+      },
+      {
+        "file": "src/lib/server/repository/staff.repo.ts",
+        "line": 363
+      },
+      {
+        "file": "src/lib/server/repository/staff.repo.ts",
+        "line": 364
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 19
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 131
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 177
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 178
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 179
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 188
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 209
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 210
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 211
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 224
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 268
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 1231
+      },
+      {
+        "file": "src/lib/server/repository/student.repo.ts",
+        "line": 1260
+      }
+    ]
+  }
+]

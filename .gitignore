@@ -65,3 +65,8 @@ storage/edapex-mastra.db-wal
 storage/edapex-mastra.db-shm
 .cookie
 .opencode
+.commandcode/
+
+# Local database dumps — contain student/parent/user PII, never commit
+/edapexdb.sql
+/*.sql
