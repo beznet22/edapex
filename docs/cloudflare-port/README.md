@@ -127,7 +127,7 @@ Numbers below come from read-only introspection of the development database, not
 | Password hashes to retire | 1,566 | auth probe |
 | SHA-256 / PBKDF2-10k cost | **0.004 ms** / **6.1 ms** | local benchmark |
 
-Raw inventory: `.kimchi/docs/db-inventory.json`.
+Raw inventory: `docs/cloudflare-port/audit/db-inventory.json`.
 
 ## Reading order
 

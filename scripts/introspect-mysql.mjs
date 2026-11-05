@@ -27,8 +27,8 @@ import {
 } from "./lib/schema-parse.mjs";
 
 const SCHEMA = "src/lib/server/db/sms-schema.ts";
-const USAGE = ".kimchi/docs/schema-usage.json";
-const OUT = ".kimchi/docs/db-inventory.json";
+const USAGE = "docs/cloudflare-port/audit/schema-usage.json";
+const OUT = "docs/cloudflare-port/audit/db-inventory.json";
 
 /** Parse a mysql:// DSN. Passwords may contain '@', so the password group is greedy. */
 function parseDsn(dsn) {

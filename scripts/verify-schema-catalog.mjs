@@ -3,7 +3,7 @@
  * Validates docs/schema-catalog.md against the generated audit data.
  *
  * Checks, in order:
- *   1. every used table in .kimchi/docs/schema-usage.json has exactly one row
+ *   1. every used table in docs/cloudflare-port/audit/schema-usage.json has exactly one row
  *   2. no row references a table outside the used set, and no duplicates
  *   3. every "Source File" anchor resolves to the line declaring that table
  *   4. every usage link resolves to a real file and an in-range line
@@ -14,7 +14,7 @@ import { join } from "node:path";
 
 const ROOT = process.cwd();
 const CATALOG = "docs/cloudflare-port/schema-catalog.md";
-const USAGE = ".kimchi/docs/schema-usage.json";
+const USAGE = "docs/cloudflare-port/audit/schema-usage.json";
 import { dirname } from "node:path";
 /** Links in the catalog are relative to the catalog file, not the repo root. */
 const CATALOG_DIR = dirname(CATALOG);

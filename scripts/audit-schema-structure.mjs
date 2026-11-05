@@ -2,7 +2,7 @@
 /**
  * EdApex schema structure extraction.
  *
- * Enriches the used-table inventory (.kimchi/docs/schema-usage.json) with
+ * Enriches the used-table inventory (docs/cloudflare-port/audit/schema-usage.json) with
  * primary keys, declared foreign keys, and Drizzle relations, drawn from two
  * independent authoritative sources:
  *
@@ -28,7 +28,7 @@ import {
 const ROOT = process.cwd();
 const SCHEMA_FILE = "src/lib/server/db/sms-schema.ts";
 const RELATIONS_FILE = "src/lib/server/db/sms-relations.ts";
-const USAGE_FILE = ".kimchi/docs/schema-usage.json";
+const USAGE_FILE = "docs/cloudflare-port/audit/schema-usage.json";
 const OUT_FILE = ".kimchi/docs/schema-structure.json";
 
 const schemaSource = readFileSync(join(ROOT, SCHEMA_FILE), "utf8");

@@ -11,7 +11,7 @@
  * and db/schema.ts re-exports the entire module, so counting them as consumers
  * would mark every table as "used" and defeat the audit.
  *
- * Writes .kimchi/docs/schema-usage.json and exits non-zero if any invariant
+ * Writes docs/cloudflare-port/audit/schema-usage.json and exits non-zero if any invariant
  * described in the plan's Chunk 1 acceptance criteria is violated.
  */
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
@@ -31,7 +31,7 @@ import {
 
 const ROOT = process.cwd();
 const SCHEMA_FILE = "src/lib/server/db/sms-schema.ts";
-const OUT_FILE = ".kimchi/docs/schema-usage.json";
+const OUT_FILE = "docs/cloudflare-port/audit/schema-usage.json";
 
 const schemaSource = readFileSync(join(ROOT, SCHEMA_FILE), "utf8");
 const tables = parseTables(schemaSource);
@@ -117,7 +117,7 @@ const entries = tables
   .filter((t) => t.usageSites.length > 0)
   .sort((a, b) => a.var.localeCompare(b.var));
 
-mkdirSync(join(ROOT, ".kimchi/docs"), { recursive: true });
+mkdirSync(join(ROOT, "docs/cloudflare-port/audit"), { recursive: true });
 writeFileSync(join(ROOT, OUT_FILE), `${JSON.stringify(entries, null, 2)}\n`);
 
 const failures = [];

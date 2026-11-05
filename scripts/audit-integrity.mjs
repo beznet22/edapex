@@ -10,6 +10,7 @@
  * Read-only: parses the dump, never writes to a database.
  */
 import fs from "node:fs";
+import { createHash } from "node:crypto";
 
 const FILE = process.argv[2] ?? "edapexdb.sql";
 
@@ -81,8 +82,13 @@ const studentIds = ids("sm_students");
 const parentIds = ids("sm_parents");
 
 const findings = [];
+const redactSample = (value) => {
+  const text = String(value);
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(text)) return text;
+  return `email:${createHash("sha256").update(text.toLowerCase()).digest("hex").slice(0, 12)}`;
+};
 const add = (id, label, list, fix) =>
-  findings.push({ id, label, count: list.length, sample: list.slice(0, 5).map((x) => Array.isArray(x) ? x[0] : String(x)), fix });
+  findings.push({ id, label, count: list.length, sample: list.slice(0, 5).map((x) => redactSample(Array.isArray(x) ? x[0] : x)), fix });
 
 // --- profile <-> user ---
 const studentsWithoutUser = students.filter((r) => {
@@ -213,5 +219,6 @@ const report = [
 console.log(report.join("\n"));
 
 const out = `# Integrity audit\n\nSource: \`${FILE}\`\n\n${report.join("\n")}\n`;
-fs.writeFileSync(".kimchi/docs/integrity-report.md", out);
-console.log("\nwrote .kimchi/docs/integrity-report.md");
+fs.mkdirSync("docs/cloudflare-port/audit", { recursive: true });
+fs.writeFileSync("docs/cloudflare-port/audit/integrity-report.md", out);
+console.log("\nwrote docs/cloudflare-port/audit/integrity-report.md");

@@ -80,7 +80,7 @@ If two specs conflict, **stop and report**. Do not pick one silently.
 
 - Translate the 62 legacy tables using [05 §4](./05-d1-migration.spec.md) transforms: `academic_id` canonical, `session_id` dropped, booleans/timestamps/dates/decimals as specified, `sm_general_settings` split, `chat_groups` primary key.
 - Create the redesigned tables: `academic_years` additions, `classes` ladder columns, `students` current record/status, `student_records` status chain, terms columns, plus `auth_*`, `promotion_*`, `archive_objects`, `session_jobs`, `session_result_summary`, `migration_resolutions`.
-- Recover the **222 indexes** from `.kimchi/docs/db-inventory.json`; lead composites with `school_id`.
+- Recover the **222 indexes** from `docs/cloudflare-port/audit/db-inventory.json`; lead composites with `school_id`.
 - Generate migrations with drizzle-kit and apply locally with `wrangler d1 migrations apply --local`.
 
 **Do not:** load any data; do not create the 253 non-ported tables.
@@ -190,7 +190,7 @@ If two specs conflict, **stop and report**. Do not pick one silently.
 
 **Goal:** move the remote snapshot into D1 and create 2026/27.
 
-**Read first:** [05](./05-d1-migration.spec.md), [.kimchi/docs/integrity-report.md](../../.kimchi/docs/integrity-report.md), [.kimchi/docs/migration-order.md](../../.kimchi/docs/migration-order.md).
+**Read first:** [05](./05-d1-migration.spec.md), [docs/cloudflare-port/audit/integrity-report.md](./audit/integrity-report.md), [docs/cloudflare-port/audit/migration-order.md](./audit/migration-order.md).
 
 **Do:**
 

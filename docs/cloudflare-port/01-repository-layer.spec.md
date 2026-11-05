@@ -415,7 +415,7 @@ Every repository method documents its **own** statement count; methods that exce
 1. **Tenant isolation** — for every public read method, seed two schools and assert only the caller's rows are returned. This is the test that catches a missing `school_id` predicate, which is the failure mode with the highest blast radius.
 2. **Chunk boundary** — `chunkedInArray` with 0, 1, 95, 96, 190, 191 ids; `chunkedInsert` at exactly 100 binds and at 101.
 3. **Batch atomicity** — a statement failure mid-batch leaves no partial write.
-4. **Index presence** — per-table counts against `.kimchi/docs/db-inventory.json`.
+4. **Index presence** — per-table counts against `docs/cloudflare-port/audit/db-inventory.json`.
 5. **Column cap** — every table ≤100 columns.
 
 ### 10.3 Acceptance criteria for the port

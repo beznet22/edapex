@@ -119,5 +119,5 @@ Port code lands in [`cloudflare/`](../../cloudflare/AGENTS.md).
 
 ## Notes
 
-- The measured baseline in [README.md](./README.md) is a snapshot of the remote dump. Refresh `.kimchi/docs/db-inventory.json` before Phase 7 and update the numbers if they moved.
+- The measured baseline in [README.md](./README.md) is a snapshot of the remote dump. Refresh `docs/cloudflare-port/audit/db-inventory.json` before Phase 7 and update the numbers if they moved.
 - Phase gates are cumulative: a later phase passing does not excuse an earlier gate that was skipped.

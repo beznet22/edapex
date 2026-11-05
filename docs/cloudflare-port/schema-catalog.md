@@ -21,7 +21,7 @@ Every Drizzle table declared in `src/lib/server/db/sms-schema.ts` that is actual
 ## Reproducing this document
 
 ```bash
-node scripts/audit-schema-usage.mjs      # writes .kimchi/docs/schema-usage.json
+node scripts/audit-schema-usage.mjs      # writes docs/cloudflare-port/audit/schema-usage.json
 node scripts/audit-schema-structure.mjs  # writes .kimchi/docs/schema-structure.json
 node scripts/verify-schema-catalog.mjs   # validates this file against both
 ```

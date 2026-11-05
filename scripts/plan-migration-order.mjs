@@ -18,8 +18,8 @@ import {
 
 const SCHEMA = "src/lib/server/db/sms-schema.ts";
 const BASE_SCHEMA = "src/lib/server/db/schema.ts";
-const USAGE = ".kimchi/docs/schema-usage.json";
-const OUT = ".kimchi/docs/migration-order.md";
+const USAGE = "docs/cloudflare-port/audit/schema-usage.json";
+const OUT = "docs/cloudflare-port/audit/migration-order.md";
 
 const src = fs.readFileSync(SCHEMA, "utf8");
 const all = parseTables(src);
@@ -127,6 +127,7 @@ for (const lvl of [...tiers.keys()].sort((a, b) => a - b)) {
   lines.push("");
 }
 
+fs.mkdirSync("docs/cloudflare-port/audit", { recursive: true });
 fs.writeFileSync(OUT, lines.join("\n"));
 
 console.log(`ported SMS tables: ${tables.length}`);

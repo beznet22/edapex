@@ -48,7 +48,7 @@ The difference is a 20× budget, so it is measured rather than assumed.
 
 ## 3. Measured baseline
 
-Read-only introspection of the development database. Raw data: `.kimchi/docs/db-inventory.json`.
+Read-only introspection of the development database. Raw data: `docs/cloudflare-port/audit/db-inventory.json`.
 
 | Metric | Value |
 |---|---|
@@ -312,7 +312,7 @@ Rules:
 ## 8. Reproduction
 
 ```bash
-node scripts/introspect-mysql.mjs     # refreshes .kimchi/docs/db-inventory.json
+node scripts/introspect-mysql.mjs     # refreshes docs/cloudflare-port/audit/db-inventory.json
 ```
 
 The script is read-only: `SELECT` and `SHOW` only, credentials from `.env`, never printed.
