@@ -1,4 +1,4 @@
-# EdApex — Cloudflare port
+# EdApex — API
 
 The Hono API on Cloudflare Workers with D1. This directory is the **target application**; the legacy SvelteKit app remains in `../src` until cutover.
 
@@ -22,7 +22,7 @@ Only the catalog-backed backend: the 62 legacy SMS tables, the redesigned tables
 
 ## Quickstart
 
-These commands run from `cloudflare/`. The pinned toolchain is installed by `pnpm install`; the D1 `database_id` in `wrangler.jsonc` is a placeholder until the production database exists (Phase 7/8).
+These commands run from `api/`. The pinned toolchain is installed by `pnpm install`; the D1 `database_id` in `wrangler.jsonc` is a placeholder until the production database exists (Phase 7/8).
 
 ```bash
 # install

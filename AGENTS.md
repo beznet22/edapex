@@ -69,6 +69,6 @@ Run `pnpm run svelte-check --workspace path/to/file.svelte` and `pnpm run lint p
 
 Any work on the Hono + Cloudflare + D1 port must start at [`docs/cloudflare-port/ROADMAP.md`](docs/cloudflare-port/ROADMAP.md). It contains the coding-agent working agreement and one brief per phase; the suite's own rules (62 legacy tables, D1 batching, tenant scoping, line caps) apply to port code even where this file is silent.
 
-Port code lands in [`cloudflare/`](cloudflare/AGENTS.md) — read that file before adding anything there. Phase status is tracked in [`docs/cloudflare-port/PROGRESS.md`](docs/cloudflare-port/PROGRESS.md) and must be updated in the same PR.
+Port code lands in [`api/`](api/AGENTS.md) — read that file before adding anything there. Phase status is tracked in [`docs/cloudflare-port/PROGRESS.md`](docs/cloudflare-port/PROGRESS.md) and must be updated in the same PR.
 
 Before opening a port PR, run `node scripts/verify-port-specs.mjs` and `node scripts/verify-schema-catalog.mjs`, and paste the output in the description.
