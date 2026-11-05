@@ -1,6 +1,8 @@
-# AGENTS.md — API backend workspace
+# AGENTS.md — API service workspace
 
 This directory is where the Hono + Cloudflare Workers + D1 application lands. **All port code goes here.** The legacy SvelteKit application stays in `src/` and is not moved.
+
+`apps/api` is the **API service**: a deployable, UI-less backend consumed by `apps/web`, `apps/desktop`, and `apps/mobile`. `apps/` is the deployable bucket, not a frontend-only bucket.
 
 ## Read before coding
 
@@ -13,7 +15,7 @@ Authority: the catalog wins for legacy tables, `05` wins for migration, the laye
 ## Expected layout
 
 ```text
-api/
+apps/api/
   wrangler.jsonc            # D1 binding, nodejs_compat, compatibility_date
   src/worker.ts             # export default app
   src/lib/server/http/      # app.ts, middleware/, routes/, schemas/, dto/
@@ -24,11 +26,11 @@ api/
   tests/                    # vitest-plugin
 ```
 
-`src/lib/...` inside `api/` is intentional: it keeps the aliases identical to the legacy tree so the repository map (`01b`) transfers without rewriting imports.
+`src/lib/...` inside `apps/api/` is intentional: it keeps the aliases identical to the legacy tree so the repository map (`01b`) transfers without rewriting imports.
 
 ## Commands
 
-Run from `api/`:
+Run from `apps/api/`:
 
 ```bash
 pnpm install
@@ -64,15 +66,15 @@ node scripts/verify-schema-catalog.mjs
 
 ## Repository layout
 
-This directory is the **EdApex API backend**. It stays in this repository and is planned to become a package in a pnpm workspace; there is no separate repository and no extraction step.
+This directory is the **EdApex API service** — the backend for the frontend apps. It stays in this repository and is planned to become a package in a pnpm workspace; there is no separate repository and no extraction step.
 
-- **No runtime import may resolve outside `api/`.** Relative imports into `../src` are tolerated only while porting and must be gone by Phase 8.
+- **No runtime import may resolve outside `apps/api/`.** Relative imports into `../src` are tolerated only while porting and must be gone by Phase 8.
 - **All deployment config lives here:** `package.json`, lockfile, `wrangler.jsonc`, CI workflow. Nothing required to build or deploy may sit in the parent repo.
 - **The spec suite stays in `../docs/cloudflare-port/`.** Do not fork it; one copy, verified from the repository root.
 - **Source anchors stay relative** to `docs/cloudflare-port/`; the repository is not split, so they keep resolving.
 - **Workspace wiring happens after Phase 9**, never during a migration or cutover window.
 
-When the repository adopts a pnpm workspace, add `api/` as a workspace package, keep its deployment scripts, and run the verifiers from the repository root. Do not move or fork the spec suite.
+When the repository adopts a pnpm workspace, add `apps/api/` as a workspace package, keep its deployment scripts, and run the verifiers from the repository root. Do not move or fork the spec suite.
 
 Clean-clone check:
 

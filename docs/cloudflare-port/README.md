@@ -2,7 +2,7 @@
 
 Low-level specs for porting the EdApex backend to a Hono API on Cloudflare Workers with D1. Each document is written to be implementable without reference to the conversation that produced it.
 
-**Implementing the port?** Start with [ROADMAP.md](./ROADMAP.md) — it contains the working agreement for coding agents and one executable brief per phase, with gates. **Progress** is tracked in [PROGRESS.md](./PROGRESS.md); **port code** lands in [`api/`](../../api/README.md) (workspace README, agent rules in [api/AGENTS.md](../../api/AGENTS.md)).
+**Implementing the port?** Start with [ROADMAP.md](./ROADMAP.md) — it contains the working agreement for coding agents and one executable brief per phase, with gates. **Progress** is tracked in [PROGRESS.md](./PROGRESS.md); **port code** lands in [`apps/api/`](../../apps/api/README.md) (service README, agent rules in [apps/api/AGENTS.md](../../apps/api/AGENTS.md)).
 
 ## Porting scope is defined by the catalog
 
@@ -38,7 +38,7 @@ Rules, to prevent scope drift between code, schema, and migration:
 | Grade changes | Locked after term closure; admin override requires a reason and writes an audit row |
 | Retention | Transcripts permanent; attendance/homework/chat ~7 years; parents read-only |
 | Archive deletion | Two admins + typed confirmation + audit; blocked during restores |
-| Repository layout | `api/` stays in this repository as the **EdApex API backend** and becomes a pnpm workspace package; no separate repository or extraction step |
+| Repository layout | `apps/api/` is the **EdApex API service** — a deployable, UI-less backend consumed by the frontend apps — and becomes a pnpm workspace package. `apps/` is the deployable bucket; no separate repository or extraction step |
 
 ## Spec index
 

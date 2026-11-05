@@ -2,7 +2,7 @@
 
 Live status for the implementation phases defined in [ROADMAP.md](./ROADMAP.md). The roadmap says **what** each phase is; this file says **where we are**.
 
-Port code lands in [`api/`](../../api/AGENTS.md).
+Port code lands in [`apps/api/`](../../apps/api/AGENTS.md).
 
 ## How to update this file
 
@@ -101,7 +101,7 @@ Port code lands in [`api/`](../../api/AGENTS.md).
 - [ ] Password digests nulled, column dropped later
 - [ ] Retention sweep dry-run matches expectations
 - [ ] Session archives 1–4 manifest verified
-- [ ] Workspace package wiring verified (roadmap Part 5); `api/` remains the in-repo **EdApex API backend**
+- [ ] Workspace package wiring verified (roadmap Part 5); `apps/api/` remains the in-repo **EdApex API service**
 
 ## Change log
 
@@ -111,6 +111,7 @@ Port code lands in [`api/`](../../api/AGENTS.md).
 | 2026-11-05 | 0 | Worker scaffold, `/health`, D1 binding + `0000_scaffold`, vitest Workers harness, import-boundary guard, CI workflow; local gates green, CI pending push | Kimchi |
 | 2026-11-05 | 0 | Phase 0 gate passed: CI run 42083953037 green; PR #1 updated with the evidence | Kimchi |
 | 2026-11-05 | — | Renamed the port package `cloudflare/` → `api/`; updated specs, verifier paths, and CI filters for the workspace layout | Kimchi |
+| 2026-11-05 | — | Moved `api/` → `apps/api/`; documented `apps/` as the deployable bucket and the API as the UI-less service consumed by `apps/web`, `apps/desktop`, and `apps/mobile` | Kimchi |
 
 ## Blockers and decisions
 
@@ -118,7 +119,7 @@ Port code lands in [`api/`](../../api/AGENTS.md).
 |---|---|---|---|
 | Terms 2 and 3 calendars | Phase 7 (terms endpoint only) | waiting on school | — |
 | Term-date confirmation for FIRST TERM | Phase 7 | fixed from `assets/calendar.jpeg` (2026-09-14 → 2026-12-11); confirm against official notice | — |
-| Repository layout | Phase 9 completion | decided — `api/` stays in this repository and becomes a pnpm workspace package; no standalone extraction | — |
+| Repository layout | Phase 9 completion | decided — `apps/api/` is the API service and becomes a pnpm workspace package; `apps/` is the deployable bucket; no standalone extraction | — |
 
 ## Notes
 

@@ -3,7 +3,7 @@ name: API (Cloudflare)
 on:
   pull_request:
     paths:
-      - "api/**"
+      - "apps/api/**"
       - "docs/cloudflare-port/**"
       - "scripts/verify-port-specs.mjs"
       - "scripts/verify-schema-catalog.mjs"
@@ -12,7 +12,7 @@ on:
     branches:
       - main
     paths:
-      - "api/**"
+      - "apps/api/**"
       - "docs/cloudflare-port/**"
       - "scripts/verify-port-specs.mjs"
       - "scripts/verify-schema-catalog.mjs"
@@ -27,7 +27,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: api
+        working-directory: apps/api
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -42,7 +42,7 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
-          cache-dependency-path: api/pnpm-lock.yaml
+          cache-dependency-path: apps/api/pnpm-lock.yaml
 
       - name: Install
         run: pnpm install --frozen-lockfile
