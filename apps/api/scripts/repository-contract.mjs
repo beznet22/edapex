@@ -10,6 +10,8 @@ export const AGGREGATES = {
   accounts: [
     "users",
     "infixRoles",
+    // §6.3 pre-tenant path: login resolves the staff persona before a tenant exists.
+    "smStaffs",
     "authSessions",
     "authIdentities",
     "authEvents",
