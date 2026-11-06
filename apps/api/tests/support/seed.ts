@@ -7,6 +7,7 @@ import type {
   smAcademicYears,
   smBaseGroups,
   smBaseSetups,
+  smClassSections,
   smClasses,
   smDesignations,
   smExamTypes,
@@ -42,6 +43,7 @@ export interface SeededSchool {
   readonly studentId: number;
   readonly recordId: number;
   readonly settingsId: number;
+  readonly classSectionId: number;
 }
 
 export interface SeedOptions {
@@ -92,6 +94,7 @@ export async function seedSchool(
   const recordId = base + 15;
   const termId = base + 16;
   const settingsId = base + 17;
+  const classSectionId = base + 18;
 
   await db.insert(smSchools).values({
     id: schoolId,
@@ -139,7 +142,7 @@ export async function seedSchool(
   });
   await db.insert(smClasses).values({
     id: classId,
-    className: options.className ?? `Class ${schoolId}`,
+    className: options.className ?? `CLASS ${schoolId}`,
     schoolId,
     academicId,
     stage: "LOWER_BASIC",
@@ -237,6 +240,14 @@ export async function seedSchool(
     address: `${schoolId} School Road`,
     identity: ""
   });
+  await db.insert(smClassSections).values({
+    id: classSectionId,
+    classId,
+    sectionId,
+    schoolId,
+    academicId,
+    activeStatus: 1
+  });
 
   return {
     schoolId,
@@ -256,7 +267,8 @@ export async function seedSchool(
     parentId,
     studentId,
     recordId,
-    settingsId
+    settingsId,
+    classSectionId
   };
 }
 
