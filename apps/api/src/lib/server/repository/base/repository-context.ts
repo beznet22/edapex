@@ -11,6 +11,25 @@ export type AcademicYearRow = typeof smAcademicYears.$inferSelect;
 export type GeneralSettingRow = typeof smGeneralSettings.$inferSelect;
 
 /**
+ * The 12-column active settings surface (`01a §6`). `extras` is deliberately
+ * absent so the hot read never touches the 95-column tail.
+ */
+export interface CachedGeneralSetting {
+  readonly id: number;
+  readonly schoolId: number | null;
+  readonly academicId: number | null;
+  readonly sessionId: number | null;
+  readonly languageId: number | null;
+  readonly dateFormatId: number | null;
+  readonly schoolName: string | null;
+  readonly phone: string | null;
+  readonly email: string | null;
+  readonly address: string | null;
+  readonly logo: string | null;
+  readonly identity: string | null;
+}
+
+/**
  * Resolved once per authenticated request (`01 §6.1`) and frozen. There is no
  * fallback tenant: a missing school is a programming error, not a school 1.
  */
@@ -31,7 +50,7 @@ export interface TenantContext {
  * lifetime in Phase 3.
  */
 export interface ConfigCache {
-  generalSettings: readonly GeneralSettingRow[] | null;
+  generalSettings: readonly CachedGeneralSetting[] | null;
   academicYears: readonly AcademicYearRow[] | null;
   activeAcademicYear: AcademicYearRow | null;
   loadedAt: number | null;

@@ -10,6 +10,7 @@ import type {
   smClasses,
   smDesignations,
   smExamTypes,
+  smGeneralSettings,
   smHumanDepartments,
   smParents,
   smSchools,
@@ -40,6 +41,7 @@ export interface SeededSchool {
   readonly parentId: number;
   readonly studentId: number;
   readonly recordId: number;
+  readonly settingsId: number;
 }
 
 export interface SeedOptions {
@@ -89,8 +91,14 @@ export async function seedSchool(
   const studentId = base + 14;
   const recordId = base + 15;
   const termId = base + 16;
+  const settingsId = base + 17;
 
-  await db.insert(smSchools).values({ id: schoolId, schoolName: `School ${schoolId}` });
+  await db.insert(smSchools).values({
+    id: schoolId,
+    schoolName: `School ${schoolId}`,
+    email: `office${schoolId}@example.test`,
+    phone: `070000000${schoolId}`
+  });
   await db.insert(infixRoles).values({ id: roleId, name: "Teacher", schoolId });
   await db.insert(users).values({
     id: userId,
@@ -115,7 +123,7 @@ export async function seedSchool(
     baseGroupId,
     schoolId
   });
-  await db.insert(smDesignations).values({ id: designationId, title: "Teacher", schoolId });
+  await db.insert(smDesignations).values({ id: designationId, title: "teacher", schoolId });
   await db.insert(smHumanDepartments).values({
     id: departmentId,
     name: "Academic",
@@ -216,6 +224,19 @@ export async function seedSchool(
     startsOn: "2026-09-14",
     endsOn: "2026-12-11"
   });
+  await db.insert(smGeneralSettings).values({
+    id: settingsId,
+    schoolId,
+    academicId,
+    sessionId: academicId,
+    languageId: null,
+    dateFormatId: null,
+    schoolName: `School ${schoolId}`,
+    phone: `070000000${schoolId}`,
+    email: `office${schoolId}@example.test`,
+    address: `${schoolId} School Road`,
+    identity: ""
+  });
 
   return {
     schoolId,
@@ -234,7 +255,8 @@ export async function seedSchool(
     staffId,
     parentId,
     studentId,
-    recordId
+    recordId,
+    settingsId
   };
 }
 
