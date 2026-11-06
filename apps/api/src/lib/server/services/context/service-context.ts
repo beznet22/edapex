@@ -33,6 +33,14 @@ export interface ServiceEnv {
   readonly MISTRAL_API_KEY?: string;
   readonly MISTRAL_OCR_MODEL?: string;
   readonly MISTRAL_API_BASE_URL?: string;
+  readonly CLAIM_ENABLED?: string;
+  readonly CLAIM_PASSWORD_DIGEST?: string;
+  readonly LEGACY_PASSWORD_LOGIN?: string;
+  readonly AUTH_COOKIE_SECRET?: string;
+  readonly GOOGLE_CLIENT_ID?: string;
+  readonly GOOGLE_CLIENT_SECRET?: string;
+  readonly GOOGLE_REDIRECT_URI?: string;
+  readonly POST_LOGIN_REDIRECT?: string;
 }
 
 /**

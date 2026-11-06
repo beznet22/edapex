@@ -10,7 +10,9 @@ import { listStudentsByClassSection } from "../../repository/profiles";
 import { findReportSettings, upsertReportSettings } from "../../repository/school";
 import { CloudflareEmailAdapter } from "../adapters/cloudflare-email.adapter";
 import { D1ReportSettingsAdapter } from "../adapters/d1-report-settings.adapter";
+import { createAuthConfig } from "../adapters/env-auth-config.adapter";
 import { GmailEmailAdapter } from "../adapters/gmail-email.adapter";
+import { createGoogleOAuth } from "../adapters/google-oauth.adapter";
 import { MistralOcrAdapter } from "../adapters/mistral-ocr.adapter";
 import { createPhotoStore } from "../adapters/r2-photo-store.adapter";
 import { TenantScopeError } from "../errors";
@@ -118,7 +120,9 @@ function createPorts(env: ServiceEnv, repos: RepositoryAccess): ServicePorts {
     reportSettings,
     clock: systemClock,
     students,
-    photos: createPhotoStore(env.MEDIA)
+    photos: createPhotoStore(env.MEDIA),
+    authConfig: createAuthConfig(env),
+    google: createGoogleOAuth(env)
   };
 }
 
