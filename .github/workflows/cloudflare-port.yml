@@ -62,6 +62,11 @@ jobs:
       - name: Apply local D1 migrations
         run: pnpm run db:migrate:local
 
+      - name: Schema drift
+        run: |
+          pnpm exec drizzle-kit generate
+          git diff --exit-code -- src/lib/server/db/migrations
+
       - name: Verify port specs
         working-directory: .
         run: node scripts/verify-port-specs.mjs

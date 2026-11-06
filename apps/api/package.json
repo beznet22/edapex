@@ -14,15 +14,20 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "cf-typegen": "wrangler types",
+    "db:generate": "drizzle-kit generate",
+    "db:expectations": "node scripts/gen-schema-expectations.mjs",
     "db:migrate:local": "wrangler d1 migrations apply DB --local",
+    "check:schema-drift": "drizzle-kit generate && git diff --exit-code -- src/lib/server/db/migrations",
     "check:boundaries": "node scripts/check-import-boundaries.mjs",
     "check:boundaries:self": "node scripts/check-import-boundaries.mjs --self-test"
   },
   "dependencies": {
+    "drizzle-orm": "^0.44.7",
     "hono": "^4.13.16"
   },
   "devDependencies": {
     "@cloudflare/vitest-plugin": "^1.6.0",
+    "drizzle-kit": "^0.31.7",
     "typescript": "^5.9.3",
     "vite": "7.3.3",
     "vitest": "4.1.10",
