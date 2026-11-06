@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   CloudflareEmailAdapter,
   D1ReportSettingsAdapter,
+  GmailEmailAdapter,
   MistralOcrAdapter
 } from "../../src/lib/server/services/adapters";
 import { constantTimeEqual, randomToken, sha256Hex } from "../../src/lib/server/services";
@@ -178,6 +179,175 @@ describe("mistral OCR adapter", () => {
       })
     ).rejects.toBeInstanceOf(PortError);
     expect(calls.some((call) => call.startsWith("DELETE "))).toBe(true);
+  });
+});
+
+describe("gmail OAuth2 email adapter", () => {
+  const decodeBase64Url = (value: string): string => {
+    const normalized = value.replaceAll("-", "+").replaceAll("_", "/");
+    const padded = normalized + "=".repeat((4 - (normalized.length % 4)) % 4);
+    return atob(padded);
+  };
+
+  it("exchanges the refresh token and sends raw MIME through the Gmail API", async () => {
+    const urls: string[] = [];
+    let tokenCalls = 0;
+    let sendCalls = 0;
+    let lastRaw = "";
+    const fakeFetch: typeof fetch = async (input, init) => {
+      const url =
+        typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+      urls.push(url);
+      if (url === "https://oauth2.googleapis.com/token") {
+        tokenCalls += 1;
+        return new Response(
+          JSON.stringify({ access_token: `token-${tokenCalls}`, expires_in: 3600 }),
+          { status: 200 }
+        );
+      }
+      if (url.includes("/messages/send")) {
+        sendCalls += 1;
+        const body: unknown = typeof init?.body === "string" ? JSON.parse(init.body) : null;
+        if (isRecord(body) && typeof body["raw"] === "string") {
+          lastRaw = decodeBase64Url(body["raw"]);
+        }
+        return new Response(JSON.stringify({ id: `gmail-${sendCalls}` }), { status: 200 });
+      }
+      return new Response("", { status: 404 });
+    };
+
+    const adapter = new GmailEmailAdapter({
+      clientId: "client-id",
+      clientSecret: "client-secret",
+      refreshToken: "refresh-token",
+      senderEmail: "school@example.test",
+      senderName: "EdApex",
+      fetchImpl: fakeFetch
+    });
+
+    const first = await adapter.send({
+      template: "result",
+      to: "parent@example.test",
+      data: {
+        schoolName: "Test School",
+        studentName: "Student 1",
+        principal: "Principal",
+        resultEmailSubject: "Results are ready"
+      }
+    });
+    const second = await adapter.send({
+      template: "result",
+      to: "parent@example.test",
+      data: { schoolName: "Test School", studentName: "Student 1" }
+    });
+
+    expect(first.messageId).toBe("gmail-1");
+    expect(second.messageId).toBe("gmail-2");
+    expect(tokenCalls).toBe(1);
+    expect(lastRaw).toContain('From: "EdApex" <school@example.test>');
+    expect(lastRaw).toContain("To: parent@example.test");
+    expect(lastRaw).toContain("Content-Type: multipart/alternative");
+    expect(urls[0]).toBe("https://oauth2.googleapis.com/token");
+  });
+
+  it("refreshes and retries once after a 401", async () => {
+    let tokenCalls = 0;
+    let sendCalls = 0;
+    const fakeFetch: typeof fetch = async (input) => {
+      const url =
+        typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+      if (url === "https://oauth2.googleapis.com/token") {
+        tokenCalls += 1;
+        return new Response(
+          JSON.stringify({ access_token: `token-${tokenCalls}`, expires_in: 3600 }),
+          { status: 200 }
+        );
+      }
+      sendCalls += 1;
+      if (sendCalls === 1) return new Response("", { status: 401 });
+      return new Response(JSON.stringify({ id: "gmail-retry" }), { status: 200 });
+    };
+
+    const adapter = new GmailEmailAdapter({
+      clientId: "client-id",
+      clientSecret: "client-secret",
+      refreshToken: "refresh-token",
+      senderEmail: "school@example.test",
+      fetchImpl: fakeFetch
+    });
+
+    const result = await adapter.send({
+      template: "result",
+      to: "parent@example.test",
+      data: { studentName: "Student 1" }
+    });
+
+    expect(result.messageId).toBe("gmail-retry");
+    expect(sendCalls).toBe(2);
+    expect(tokenCalls).toBe(2);
+  });
+
+  it("encodes a non-ASCII transcript subject and rejects missing config", async () => {
+    let lastRaw = "";
+    const fakeFetch: typeof fetch = async (input, init) => {
+      const url =
+        typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+      if (url === "https://oauth2.googleapis.com/token") {
+        return new Response(
+          JSON.stringify({ access_token: "token", expires_in: 3600 }),
+          { status: 200 }
+        );
+      }
+      const body: unknown = typeof init?.body === "string" ? JSON.parse(init.body) : null;
+      if (isRecord(body) && typeof body["raw"] === "string") {
+        lastRaw = decodeBase64Url(body["raw"]);
+      }
+      return new Response(JSON.stringify({ id: "gmail-transcript" }), { status: 200 });
+    };
+
+    const adapter = new GmailEmailAdapter({
+      clientId: "client-id",
+      clientSecret: "client-secret",
+      refreshToken: "refresh-token",
+      senderEmail: "school@example.test",
+      fetchImpl: fakeFetch
+    });
+    await adapter.send({
+      template: "transcript",
+      to: "parent@example.test",
+      data: { studentName: "Student 1", academicYear: "2026/1" }
+    });
+    expect(lastRaw).toContain("Subject: =?UTF-8?B?");
+
+    const unconfigured = new GmailEmailAdapter({
+      clientId: undefined,
+      clientSecret: undefined,
+      refreshToken: undefined,
+      senderEmail: undefined
+    });
+    await expect(
+      unconfigured.send({
+        template: "result",
+        to: "parent@example.test",
+        data: {}
+      })
+    ).rejects.toBeInstanceOf(PortError);
+  });
+
+  it("marks invalid_grant as non-retryable", async () => {
+    const fakeFetch: typeof fetch = async () =>
+      new Response(JSON.stringify({ error: "invalid_grant" }), { status: 400 });
+    const adapter = new GmailEmailAdapter({
+      clientId: "client-id",
+      clientSecret: "client-secret",
+      refreshToken: "expired",
+      senderEmail: "school@example.test",
+      fetchImpl: fakeFetch
+    });
+
+    await expect(
+      adapter.send({ template: "result", to: "parent@example.test", data: {} })
+    ).rejects.toMatchObject({ port: "email", retryable: false });
   });
 });
 

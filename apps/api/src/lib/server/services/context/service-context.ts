@@ -24,6 +24,11 @@ export interface ServiceEnv {
   readonly DB: D1Database;
   readonly EMAIL?: unknown;
   readonly EMAIL_FROM?: string;
+  readonly GMAIL_CLIENT_ID?: string;
+  readonly GMAIL_CLIENT_SECRET?: string;
+  readonly GMAIL_REFRESH_TOKEN?: string;
+  readonly GMAIL_SENDER_EMAIL?: string;
+  readonly GMAIL_SENDER_NAME?: string;
   readonly MISTRAL_API_KEY?: string;
   readonly MISTRAL_OCR_MODEL?: string;
   readonly MISTRAL_API_BASE_URL?: string;

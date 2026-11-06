@@ -8,6 +8,10 @@ import {
   ServiceCache
 } from "../../src/lib/server/services/context";
 import type { ServiceContext } from "../../src/lib/server/services/context";
+import {
+  CloudflareEmailAdapter,
+  GmailEmailAdapter
+} from "../../src/lib/server/services/adapters";
 import { TenantScopeError } from "../../src/lib/server/services/errors";
 import { database, seedTwoSchools, tenantOf } from "../support/seed";
 import type { SeededSchool } from "../support/seed";
@@ -102,5 +106,22 @@ describe("service context", () => {
     });
     expect(ctx.ports.clock.now()).toBe(42);
     expect(ctx.ports.email).toBeDefined();
+  });
+
+  it("selects Gmail when its OAuth variables are present and Cloudflare otherwise", () => {
+    const gmail = createServiceContext(
+      {
+        DB: env.DB,
+        GMAIL_CLIENT_ID: "client-id",
+        GMAIL_CLIENT_SECRET: "client-secret",
+        GMAIL_REFRESH_TOKEN: "refresh-token",
+        GMAIL_SENDER_EMAIL: "school@example.test"
+      },
+      null
+    );
+    const fallback = createServiceContext({ DB: env.DB }, null);
+
+    expect(gmail.ports.email).toBeInstanceOf(GmailEmailAdapter);
+    expect(fallback.ports.email).toBeInstanceOf(CloudflareEmailAdapter);
   });
 });
