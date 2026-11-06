@@ -5,4 +5,5 @@ export * from "./student-details";
 export * from "./exam-setups";
 export * from "./result-read";
 export * from "./transcript";
+export * from "./objectives";
 export * from "./registration-options";

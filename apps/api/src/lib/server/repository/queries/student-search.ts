@@ -78,6 +78,31 @@ export async function listStudentsByStaffId(
   }, "listStudentsByStaffId");
 }
 
+/** Students of one parent; the legacy synchronous helper was missed by 01b. */
+export async function listStudentsByParentId(
+  ctx: ScopedRepositoryContext,
+  parentId: number
+): Promise<readonly StaffStudentRow[]> {
+  return withErrorHandling(
+    async () =>
+      ctx.db
+        .select({
+          id: smStudents.id,
+          name: smStudents.fullName,
+          admissionNo: smStudents.admissionNo
+        })
+        .from(smStudents)
+        .where(
+          and(
+            eq(smStudents.parentId, parentId),
+            eq(smStudents.activeStatus, 1),
+            eq(smStudents.schoolId, ctx.tenant.schoolId)
+          )
+        ),
+    "listStudentsByParentId"
+  );
+}
+
 /** One row per parent with its (first) student, matching the legacy grouping. */
 export async function listStudentsGroupedByParent(
   ctx: ScopedRepositoryContext
