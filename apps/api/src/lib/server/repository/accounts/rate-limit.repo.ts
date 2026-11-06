@@ -43,6 +43,39 @@ export async function incrementRateLimit(
   }, "incrementRateLimit");
 }
 
+export interface RateLimitEntry {
+  readonly key: string;
+  readonly windowStart: number;
+}
+
+/**
+ * All of a request's windows increment in one D1 round trip. The claim path
+ * has four windows, so batching removes four sequential round trips
+ * (`01a O15`).
+ */
+export async function incrementRateLimits(
+  ctx: UnscopedRepositoryContext,
+  entries: readonly RateLimitEntry[]
+): Promise<readonly number[]> {
+  if (entries.length === 0) return [];
+  return withErrorHandling(async () => {
+    const statements = entries.map((entry) =>
+      ctx.db
+        .insert(authRateLimits)
+        .values({ key: entry.key, windowStart: entry.windowStart, count: 1 })
+        .onConflictDoUpdate({
+          target: [authRateLimits.key, authRateLimits.windowStart],
+          set: { count: sql`${authRateLimits.count} + 1` }
+        })
+        .returning({ count: authRateLimits.count })
+    );
+    const [first, ...rest] = statements;
+    if (first === undefined) return [];
+    const results = await ctx.db.batch([first, ...rest]);
+    return results.map((rows) => rows[0]?.count ?? 1);
+  }, "incrementRateLimits");
+}
+
 export async function deleteRateLimitsBefore(
   ctx: UnscopedRepositoryContext,
   before: number

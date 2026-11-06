@@ -1,6 +1,6 @@
 import type { ServiceContext } from "../context";
-import { consumeLimit } from "./rate-limit-policy";
-import type { RateLimitRule } from "./rate-limit-policy";
+import { consumeLimits } from "./rate-limit-policy";
+import type { RateLimitAttempt, RateLimitRule } from "./rate-limit-policy";
 
 export const CLAIM_TICKET_TTL_SECONDS = 10 * 60;
 export const OAUTH_STATE_TTL_SECONDS = 10 * 60;
@@ -18,11 +18,6 @@ export const CODE_LIMITS = {
   ipMinute: { limit: 10, windowSeconds: 60 },
   prefixMinute: { limit: 10, windowSeconds: 60 }
 } as const satisfies Record<string, RateLimitRule>;
-
-export interface RateLimitAttempt {
-  readonly key: string;
-  readonly rule: RateLimitRule;
-}
 
 const identity = (value: string | null): string => value ?? "unknown";
 
@@ -56,9 +51,7 @@ export async function consumeClaimAttempt(
   ip: string | null,
   now: number
 ): Promise<void> {
-  for (const attempt of claimRateLimits(email, ip)) {
-    await consumeLimit(ctx, attempt.key, attempt.rule, now);
-  }
+  await consumeLimits(ctx, claimRateLimits(email, ip), now);
 }
 
 export async function consumeCodeAttempt(
@@ -67,9 +60,7 @@ export async function consumeCodeAttempt(
   ip: string | null,
   now: number
 ): Promise<void> {
-  for (const attempt of codeRateLimits(prefix, ip)) {
-    await consumeLimit(ctx, attempt.key, attempt.rule, now);
-  }
+  await consumeLimits(ctx, codeRateLimits(prefix, ip), now);
 }
 
 export const codePrefixOf = (normalised: string): string =>
