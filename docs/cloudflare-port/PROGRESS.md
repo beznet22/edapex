@@ -24,14 +24,14 @@ Port code lands in [`apps/api/`](../../apps/api/AGENTS.md).
 
 ## Current focus
 
-**Phase 1 — D1 schema and migrations.** Local gate passed on `phase-1-schema`; CI pending push. Phase 2 (repository layer) is next.
+**Phase 1 — D1 schema and migrations.** Complete; Phase 2 (repository layer) is next.
 
 ## Phase status
 
 | Phase | Name | Status | Owner | Started | Completed | Gate evidence |
 |---|---|---|---|---|---|---|
 | 0 | Scaffolding and guards | done | Kimchi | 2026-11-05 | 2026-11-05 | PR #1 check `port` green ([run 42083953037](https://github.com/beznet22/edapex/actions/runs/42083953037)): typecheck, boundary + self-test, Workers test, D1 apply, both verifiers. Local: `/health` 200. |
-| 1 | D1 schema and migrations | in progress | Kimchi | 2026-11-06 | — | Local gate green on `phase-1-schema`: 74 tables (62 legacy + 12 registered), 226 recovered + 5 spec indexes, `PRAGMA foreign_key_check` zero rows; typecheck, boundaries, tests, drift, dry-run deploy, both verifiers pass. CI run pending push. |
+| 1 | D1 schema and migrations | done | Kimchi | 2026-11-06 | 2026-11-06 | PR #2 check `port` green ([run 42181282784](https://github.com/beznet22/edapex/actions/runs/42181282784)): typecheck, boundaries, 17 Workers-pool tests, local D1 apply, drift, both verifiers. Gate: 74 tables (62 legacy + 12 registered), 226 recovered + 5 spec indexes, every table ≤100 columns, `PRAGMA foreign_key_check` zero rows. |
 | 2 | Repository layer | not started | — | — | — | — |
 | 3 | Service layer | not started | — | — | — | — |
 | 4 | HTTP layer | not started | — | — | — | — |
@@ -113,6 +113,7 @@ Port code lands in [`apps/api/`](../../apps/api/AGENTS.md).
 | 2026-11-05 | — | Renamed the port package `cloudflare/` → `api/`; updated specs, verifier paths, and CI filters for the workspace layout | Kimchi |
 | 2026-11-05 | — | Moved `api/` → `apps/api/`; documented `apps/` as the deployable bucket and the API as the UI-less service consumed by `apps/web`, `apps/desktop`, and `apps/mobile` | Kimchi |
 | 2026-11-06 | 1 | Drizzle/SQLite schema for 74 tables (62 legacy per `05 §4` transforms + 12 registered), 226 recovered indexes + 5 spec-mandated, drizzle-kit baseline `0000_edapex_schema.sql`, Workers-pool schema gate + shape tests, expectations fixture generator, CI drift step; `0000_scaffold.sql` deleted (comment-only placeholder) | Kimchi |
+| 2026-11-06 | 1 | Phase 1 gate passed: CI run 42181282784 green on PR #2; vitest config de-noded so typecheck needs no node types | Kimchi |
 
 ## Blockers and decisions
 
