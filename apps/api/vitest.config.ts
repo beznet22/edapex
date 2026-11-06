@@ -1,9 +1,8 @@
-import path from "node:path";
-
 import { cloudflareTest, readD1Migrations } from "@cloudflare/vitest-plugin";
 import { defineConfig } from "vitest/config";
 
-const MIGRATIONS_DIR = path.join(import.meta.dirname, "src/lib/server/db/migrations");
+// Relative to the vitest working directory (apps/api), not the config file.
+const MIGRATIONS_DIR = "src/lib/server/db/migrations";
 
 export default defineConfig(async () => {
   const migrations = await readD1Migrations(MIGRATIONS_DIR);
