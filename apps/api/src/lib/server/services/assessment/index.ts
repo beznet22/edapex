@@ -4,5 +4,6 @@ export * from "./feedback.service";
 export * from "./marksheet-query";
 export * from "./ocr-extraction";
 export * from "./ocr.service";
+export * from "./publish.service";
 export * from "./query.service";
 export * from "./roster-query.service";

@@ -15,6 +15,54 @@ import { validateSource } from "./service-rule-engine.mjs";
 const ROOT = path.resolve(import.meta.dirname, "..");
 const SERVICES_SUFFIX = path.join("src", "lib", "server", "services");
 
+const REQUIRED_TREE = [
+  "context/service-context.ts",
+  "context/create-service-context.ts",
+  "context/create-service.ts",
+  "context/logger.ts",
+  "context/index.ts",
+  "ports/email-sender.port.ts",
+  "ports/ocr-client.port.ts",
+  "ports/report-settings-store.port.ts",
+  "ports/clock.port.ts",
+  "ports/student-directory.port.ts",
+  "ports/index.ts",
+  "adapters/cloudflare-email.adapter.ts",
+  "adapters/mistral-ocr.adapter.ts",
+  "adapters/d1-report-settings.adapter.ts",
+  "adapters/index.ts",
+  "domain/marks.ts",
+  "domain/marks-types.ts",
+  "domain/grades.ts",
+  "domain/student-matcher.ts",
+  "domain/marksheet-validation.ts",
+  "domain/index.ts",
+  "assessment/entry.service.ts",
+  "assessment/query.service.ts",
+  "assessment/roster-query.service.ts",
+  "assessment/feedback.service.ts",
+  "assessment/ocr.service.ts",
+  "assessment/publish.service.ts",
+  "assessment/capture.service.ts",
+  "assessment/index.ts",
+  "attendance/attendance.service.ts",
+  "attendance/index.ts",
+  "settings/general.service.ts",
+  "settings/academic.service.ts",
+  "settings/report.service.ts",
+  "settings/index.ts",
+  "auth/auth.service.ts",
+  "auth/session.service.ts",
+  "auth/rate-limit.service.ts",
+  "auth/profile.service.ts",
+  "auth/index.ts",
+  "authorization/authorization.service.ts",
+  "authorization/index.ts",
+  "students/student-lifecycle.service.ts",
+  "students/index.ts",
+  "index.ts"
+];
+
 function listTypeScriptFiles(dir) {
   if (!existsSync(dir)) return [];
   const files = [];
@@ -119,9 +167,23 @@ function selfTest() {
   console.log(`service rule self-test passed: ${fixtures.length} seeded violations detected`);
 }
 
+function requireTree() {
+  const servicesDir = path.join(ROOT, SERVICES_SUFFIX);
+  const missing = REQUIRED_TREE.filter(
+    (relative) => !existsSync(path.join(servicesDir, relative))
+  );
+  if (missing.length > 0) {
+    console.error("service tree is incomplete:");
+    for (const relative of missing) console.error(`  missing ${relative}`);
+    process.exit(1);
+  }
+  console.log(`service tree passed: ${REQUIRED_TREE.length} required file(s) present`);
+}
+
 if (process.argv.includes("--self-test")) {
   selfTest();
 } else {
+  requireTree();
   const { files, violations } = scan();
   if (violations.length > 0) {
     console.error("service rule check failed:");

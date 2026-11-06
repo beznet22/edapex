@@ -26,6 +26,17 @@ export async function findUserByEmail(
   }, "findUserByEmail");
 }
 
+/** Used by the claim/login ambiguity guard (`04 §5`). */
+export async function listUsersByEmail(
+  ctx: UnscopedRepositoryContext,
+  email: string
+): Promise<readonly UserRow[]> {
+  return withErrorHandling(
+    async () => ctx.db.select().from(users).where(eq(users.email, email)),
+    "listUsersByEmail"
+  );
+}
+
 export async function findUserByUsername(
   ctx: UnscopedRepositoryContext,
   username: string

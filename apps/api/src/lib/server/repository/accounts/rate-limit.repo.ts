@@ -55,3 +55,15 @@ export async function deleteRateLimitsBefore(
     return deleted.length;
   }, "deleteRateLimitsBefore");
 }
+
+export async function deleteRateLimit(
+  ctx: UnscopedRepositoryContext,
+  key: string
+): Promise<void> {
+  await withErrorHandling(
+    async () => {
+      await ctx.db.delete(authRateLimits).where(eq(authRateLimits.key, key));
+    },
+    "deleteRateLimit"
+  );
+}

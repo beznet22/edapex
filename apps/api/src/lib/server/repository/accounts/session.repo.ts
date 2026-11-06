@@ -27,7 +27,7 @@ export async function createSession(
 export async function validateSession(
   ctx: UnscopedRepositoryContext,
   tokenHash: string,
-  currentFingerprint: string,
+  currentFingerprint: string | null,
   now: number = Math.floor(Date.now() / 1000)
 ): Promise<SessionWithUser | null> {
   return withErrorHandling(async () => {
@@ -44,7 +44,7 @@ export async function validateSession(
     if (session.expiresAt <= now) return null;
     if (user.activeStatus !== 1) return null;
 
-    if (session.deviceFingerprint !== currentFingerprint) {
+    if (currentFingerprint !== null && session.deviceFingerprint !== currentFingerprint) {
       await ctx.db.delete(authSessions).where(eq(authSessions.id, session.id));
       return null;
     }

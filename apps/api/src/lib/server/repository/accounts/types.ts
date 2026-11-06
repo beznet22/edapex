@@ -27,6 +27,9 @@ export type UserPatch = Partial<
     | "language"
     | "roleId"
     | "isRegistered"
+    | "styleId"
+    | "rtlLtl"
+    | "deviceToken"
   >
 >;
 

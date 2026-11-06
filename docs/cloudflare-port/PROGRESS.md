@@ -24,7 +24,7 @@ Port code lands in [`apps/api/`](../../apps/api/AGENTS.md).
 
 ## Current focus
 
-**Phase 2 — Repository layer.** Complete on `phase-2-repository` (PR #3); Phase 3 (service layer) is next.
+**Phase 3 — Service layer.** Complete on `phase-3-services`; Phase 4 (HTTP layer) is next.
 
 ## Phase status
 
@@ -33,7 +33,7 @@ Port code lands in [`apps/api/`](../../apps/api/AGENTS.md).
 | 0 | Scaffolding and guards | done | Kimchi | 2026-11-05 | 2026-11-05 | PR #1 check `port` green ([run 42083953037](https://github.com/beznet22/edapex/actions/runs/42083953037)): typecheck, boundary + self-test, Workers test, D1 apply, both verifiers. Local: `/health` 200. |
 | 1 | D1 schema and migrations | done | Kimchi | 2026-11-06 | 2026-11-06 | PR #2 check `port` green ([run 42181282784](https://github.com/beznet22/edapex/actions/runs/42181282784)): typecheck, boundaries, 17 Workers-pool tests, local D1 apply, drift, both verifiers. Gate: 74 tables (62 legacy + 12 registered), 226 recovered + 5 spec indexes, every table ≤100 columns, `PRAGMA foreign_key_check` zero rows. |
 | 2 | Repository layer | done | Kimchi | 2026-11-06 | 2026-11-06 | PR #3 check `port` green ([run 42233886498](https://github.com/beznet22/edapex/actions/runs/42233886498)): typecheck, boundaries, repository rules + self-test, map completeness, 139 Workers-pool tests, local D1 apply, drift, both verifiers. Gate: 108 `01b` rows (103 implemented + 4 retired + 2 non-async), zero `db.transaction(`, zero `any`, 66 guarded files ≤300 lines, tenant-isolation suite green. |
-| 3 | Service layer | not started | — | — | — | — |
+| 3 | Service layer | done | Kimchi | 2026-11-06 | 2026-11-06 | Local gate: typecheck, 54 test files / 281 tests, boundaries, repository + service guards (53 service files, 45-file tree), method map 53/53 (37 mapped + 2 merged + 7 deleted + 5 retired + 2 out of scope), 77 tables, drift clean, both verifiers, report-settings import 1 file → 1 row verified. CI pending PR. |
 | 4 | HTTP layer | not started | — | — | — | — |
 | 5 | Auth cutover flow | not started | — | — | — | — |
 | 6 | Archive and retrieval | not started | — | — | — | — |
@@ -64,10 +64,10 @@ Port code lands in [`apps/api/`](../../apps/api/AGENTS.md).
 - [x] Barrel completeness and cross-aggregate import rules enforced by `check:repository`
 
 ### Phase 3 — Services
-- [ ] 53 methods mapped per `02`
-- [ ] `ServiceContext` built once per request
-- [ ] No `getDatabase` / `fs` / service-to-service imports
-- [ ] Report-settings imported from JSON and verified by count
+- [x] 53 methods mapped per `02`: 37 unique + 2 duplicate merges + 7 deleted + 5 retired + 2 out of scope
+- [x] `ServiceContext` built once per request by `createServiceContext`; `createService` is the only construction path
+- [x] No `getDatabase` / `fs` / `node:crypto` / service-to-service imports; `check:services` + self-test
+- [x] Report-settings imported from JSON and verified by count (1 file → 1 row, payload deep-equal)
 
 ### Phase 4 — HTTP
 - [ ] 20 in-scope endpoints implemented; demo endpoints retired
@@ -118,6 +118,10 @@ Port code lands in [`apps/api/`](../../apps/api/AGENTS.md).
 | 2026-11-06 | 2 | Repository layer implemented: `base/` (frozen context, D1 chunk/batch helpers, keyset pagination), 11 aggregate folders, 6 query modules; 103 `01b` methods implemented + 4 retired; 66 source files under the rule guard; 18 repository test files covering parity, tenant isolation, chunk boundaries and batch atomicity | Kimchi |
 | 2026-11-06 | 2 | Phase 2 gate passed: CI run 42233886498 green on PR #3; 139 tests, 66 repository files guarded, map 108/108, schema drift clean, both verifiers pass | Kimchi |
 | 2026-11-06 | 2 | Schema unchanged (O2 tenant-leading composites deferred to Phase 7 after data load); `01b` placement overridden by aggregate ownership where they conflict (timeline, designation/department, sessions, objectives); seven assessment-service passthroughs recorded as Phase 3 work | Kimchi |
+| 2026-11-06 | 3 | Service foundation: request-scoped context, ports/adapters, error taxonomy, Web Crypto helpers, 53-row service method map, boundary/rule guards and a 45-file tree check | Kimchi |
+| 2026-11-06 | 3 | Domain: named-mark OCR annotation contract, marks/grades computation, pure roster matcher, semantic completeness/accuracy validation; the legacy markdown linter/parser is deliberately not ported | Kimchi |
+| 2026-11-06 | 3 | Assessment entry/query/roster/publish, attendance, content-addressed OCR cache + capture binding, settings (general/academic/report), auth/session/profile/rate-limit/authorization and student lifecycle | Kimchi |
+| 2026-11-06 | 3 | Phase 3 gate passed locally: 281 tests, typecheck, all guards, 77 tables, both verifiers, report-settings import verified; CI pending PR | Kimchi |
 
 ## Blockers and decisions
 
@@ -132,9 +136,16 @@ Port code lands in [`apps/api/`](../../apps/api/AGENTS.md).
 | Cross-aggregate repository reads | Phase 2+ | decided — `repository/queries/` modules; repositories may read the declared reference dictionaries but never write them | — |
 | Guardian email update | Phase 2+ | decided — `updateParentEmail` writes `sm_parents` + `users` in one batch per `01 §8` site 3; creating a missing parent user stays in Phase 3 | — |
 | Student promotion orchestration | Phase 3 | decided — repository keeps batched data primitives; fees assignment and chat-group migration move to `student-lifecycle.service` | — |
+| Phase 3 new tables | Phase 3+ | decided — `report_settings`, `ocr_cache`, `marksheet_captures`; schema 74 → 77 (62 legacy + 15 registered). Cache key is `(school, content hash, parser version)`, never filename/student/exam | — |
+| OCR markdown linter/parser | Phase 3+ | decided — not ported; the OCR annotation JSON is the machine contract and markdown stays raw evidence; the legacy parser remains in `src/` for the legacy app | — |
+| Admission-number identity | Phase 3+ | decided — evidence only, never authority; an explicit student slot or roster match plus `confirmCapture` is required; no auto-bind on admission number | — |
+| Phase 3 method count | Phase 3 | decided — 37 unique destinations + 2 duplicate merges + 7 deleted + 5 retired + 2 out of scope = 53; the `02` prose “30 moved” is arithmetically impossible | — |
+| `getExtractedAssessment` signature | Phase 3 | decided — renamed to `getCachedExtraction(contentHash)`; no call sites; recorded in `scripts/service-method-map.mjs` | — |
+| Phase 3 repository additions | Phase 3+ | decided — settings/exam-type writes, OCR cache/captures, auth events/rate limits, session rotation, fee assignment, atomic marks/results replacement; recorded as Phase 3 deviations | — |
 
 ## Notes
 
 - The measured baseline in [README.md](./README.md) is a snapshot of the remote dump. Refresh `docs/cloudflare-port/audit/db-inventory.json` before Phase 7 and update the numbers if they moved.
 - Phase gates are cumulative: a later phase passing does not excuse an earlier gate that was skipped.
+- Phase 3 landed on `phase-3-services` with `phase-2-repository` as the PR base. CI evidence is appended when the pull request checks complete.
 - Phase 0 landed on `phase-0-scaffolding` (PR #1). `main` was not pushed because Dokploy deploys on commit; the branch carries the preflight spec-suite commit `b83de20`. Do not push `main` until the Dokploy trigger is confirmed blocked.
