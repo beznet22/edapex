@@ -58,6 +58,22 @@ export async function findIdentitiesByUserId(
   );
 }
 
+export async function touchIdentityUsed(
+  ctx: UnscopedRepositoryContext,
+  identityId: string,
+  lastUsedAt: number
+): Promise<void> {
+  await withErrorHandling(
+    async () => {
+      await ctx.db
+        .update(authIdentities)
+        .set({ lastUsedAt })
+        .where(eq(authIdentities.id, identityId));
+    },
+    "touchIdentityUsed"
+  );
+}
+
 /** The id is supplied by the caller so linking can join an atomic batch. */
 export async function linkIdentity(
   ctx: UnscopedRepositoryContext,

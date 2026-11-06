@@ -1,11 +1,9 @@
+import { base64UrlEncode } from "../crypto/digest";
+
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 
-const toBase64Url = (bytes: Uint8Array): string => {
-  let binary = "";
-  for (const byte of bytes) binary += String.fromCharCode(byte);
-  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-};
+const toBase64Url = base64UrlEncode;
 
 const fromBase64Url = (value: string): Uint8Array | null => {
   try {
