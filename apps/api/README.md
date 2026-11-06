@@ -60,6 +60,16 @@ The refresh token is created once with `access_type=offline`, `prompt=consent`, 
 
 If the `GMAIL_*` variables are absent, the service falls back to the Cloudflare Email Routing `send_email` binding (`EMAIL` / `EMAIL_FROM`). The current Gmail configuration is deployment-level (one sending account); per-school Gmail connections require encrypted credential storage and an OAuth callback in a later phase. Gmail sending quotas and app-verification requirements apply.
 
+### Student photos
+
+Student photos live in R2 Standard bucket `edapex-media` (binding `MEDIA`) under the key `uploads/students/<sha256>.<ext>`. The database keeps the unchanged relative URL `/uploads/students/<sha256>.<ext>`, and a public content-addressed route serves it with immutable caching. The bucket stays private.
+
+```bash
+pnpm exec wrangler r2 bucket create edapex-media
+```
+
+`static/uploads/students` remains the legacy fallback until the Phase 7 migration; only images are in scope. The directory also contains PDFs, which are not student photos and are excluded — see `05 §5.1`.
+
 ## Deploy
 
 ```bash
@@ -112,4 +122,4 @@ Then update [PROGRESS.md](../docs/cloudflare-port/PROGRESS.md): status row, gate
 
 ## Status
 
-Phase 0 (scaffolding and guards), Phase 1 (D1 schema and migrations), Phase 2 (repository layer) and Phase 3 (service layer) are complete. Phase 3 adds the request-scoped service context, ports/adapters, pure domain and semantic validation, the five catalog-facing service groups, OCR cache/capture binding, settings, auth/session/profile/rate limiting, authorization and student lifecycle. The local and CI gates report 54 test files / 286 tests, 77 tables (62 legacy + 15 registered), 53/53 mapped service methods, clean boundaries/repository/service guards, schema drift clean, both verifiers green and the report-settings import verified.
+Phase 0 (scaffolding and guards), Phase 1 (D1 schema and migrations), Phase 2 (repository layer) and Phase 3 (service layer) are complete. Phase 3 adds the request-scoped service context, ports/adapters, pure domain and semantic validation, the five catalog-facing service groups, OCR cache/capture binding, settings, auth/session/profile/rate limiting, authorization and student lifecycle. The local and CI gates report 55 test files / 292 tests, 77 tables (62 legacy + 15 registered), 53/53 mapped service methods, clean boundaries/repository/service guards, schema drift clean, both verifiers green and the report-settings import verified.

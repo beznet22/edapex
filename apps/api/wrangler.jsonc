@@ -12,5 +12,12 @@
       "database_id": "00000000-0000-0000-0000-000000000000",
       "migrations_dir": "src/lib/server/db/migrations"
     }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "MEDIA",
+      // Create with: pnpm exec wrangler r2 bucket create edapex-media
+      "bucket_name": "edapex-media"
+    }
   ]
 }

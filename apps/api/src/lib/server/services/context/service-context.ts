@@ -22,6 +22,7 @@ import type { Logger } from "./logger";
 /** The environment keys the service layer consumes; the rest stays in HTTP. */
 export interface ServiceEnv {
   readonly DB: D1Database;
+  readonly MEDIA?: R2Bucket;
   readonly EMAIL?: unknown;
   readonly EMAIL_FROM?: string;
   readonly GMAIL_CLIENT_ID?: string;

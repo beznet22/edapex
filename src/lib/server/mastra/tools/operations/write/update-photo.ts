@@ -52,9 +52,9 @@ export const updatePhotoTool = createTool({
       return { ok: false as const, error: `PHOTO_NOT_FOUND: ${sourceRelative} not found in workspace` };
     }
 
-    const destRelative = `public/uploads/students/${input.contentHash}.${input.ext}`;
+    const destRelative = `uploads/students/${input.contentHash}.${input.ext}`;
     const destFullPath = join(STATIC_DIR, destRelative);
-    const destDir = join(STATIC_DIR, 'public/uploads/students');
+    const destDir = join(STATIC_DIR, 'uploads/students');
     if (!existsSync(destDir)) {
       await mkdir(destDir, { recursive: true });
     }

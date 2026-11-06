@@ -12,6 +12,7 @@ import { CloudflareEmailAdapter } from "../adapters/cloudflare-email.adapter";
 import { D1ReportSettingsAdapter } from "../adapters/d1-report-settings.adapter";
 import { GmailEmailAdapter } from "../adapters/gmail-email.adapter";
 import { MistralOcrAdapter } from "../adapters/mistral-ocr.adapter";
+import { createPhotoStore } from "../adapters/r2-photo-store.adapter";
 import { TenantScopeError } from "../errors";
 import { systemClock } from "../ports";
 import type { ReportSettingsStore, ServicePorts, StudentDirectory } from "../ports";
@@ -116,7 +117,8 @@ function createPorts(env: ServiceEnv, repos: RepositoryAccess): ServicePorts {
     }),
     reportSettings,
     clock: systemClock,
-    students
+    students,
+    photos: createPhotoStore(env.MEDIA)
   };
 }
 
