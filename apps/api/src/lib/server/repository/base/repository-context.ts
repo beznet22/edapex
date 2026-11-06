@@ -78,6 +78,17 @@ export interface UnscopedRepositoryContext {
 
 export type RepositoryContext = ScopedRepositoryContext | UnscopedRepositoryContext;
 
+/**
+ * Academic-scoped reads require the request's academic year. A null value is
+ * a wiring error, never an invitation to pick the "current" year implicitly.
+ */
+export function requireAcademicId(ctx: ScopedRepositoryContext): number {
+  if (ctx.tenant.academicId === null) {
+    throw new DbInternalError("Tenant academicId is required for this operation");
+  }
+  return ctx.tenant.academicId;
+}
+
 const assertOptionalId = (value: number | null, field: string): void => {
   if (value === null) return;
   if (!Number.isInteger(value) || value < 0) {

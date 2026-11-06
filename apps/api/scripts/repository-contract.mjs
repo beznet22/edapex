@@ -26,7 +26,11 @@ export const AGGREGATES = {
     "smStudentTimelines"
   ],
   "profiles/staff": ["smStaffs"],
-  "profiles/parent": ["smParents"],
+  "profiles/parent": [
+    "smParents",
+    // 01 §8 site 3 requires the guardian email and its user row to commit together.
+    "users"
+  ],
   reference: [
     "smBaseGroups",
     "smBaseSetups",

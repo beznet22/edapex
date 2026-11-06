@@ -3,7 +3,7 @@ import { and, eq } from "drizzle-orm";
 import { authIdentities, smStaffs, users } from "../../db/schema";
 import { withErrorHandling } from "../base/error-handling";
 import type { UnscopedRepositoryContext } from "../base/repository-context";
-import type { AuthIdentityRow, NewAuthIdentity, StaffRow } from "./types";
+import type { AuthIdentityRow, AuthStaffRow, NewAuthIdentity } from "./types";
 
 /**
  * Staff persona for a user id, resolved before a tenant exists. This is the
@@ -12,7 +12,7 @@ import type { AuthIdentityRow, NewAuthIdentity, StaffRow } from "./types";
 export async function findStaffByUserId(
   ctx: UnscopedRepositoryContext,
   userId: number
-): Promise<StaffRow | null> {
+): Promise<AuthStaffRow | null> {
   return withErrorHandling(async () => {
     const [row] = await ctx.db
       .select()

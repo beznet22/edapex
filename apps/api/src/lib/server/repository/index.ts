@@ -4,5 +4,7 @@
  */
 export * from "./base";
 export * from "./accounts";
+export * from "./profiles";
+export * from "./queries";
 export * from "./school";
 export * from "./reference";
