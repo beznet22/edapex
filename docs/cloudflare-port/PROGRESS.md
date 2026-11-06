@@ -33,7 +33,7 @@ Port code lands in [`apps/api/`](../../apps/api/AGENTS.md).
 | 0 | Scaffolding and guards | done | Kimchi | 2026-11-05 | 2026-11-05 | PR #1 check `port` green ([run 42083953037](https://github.com/beznet22/edapex/actions/runs/42083953037)): typecheck, boundary + self-test, Workers test, D1 apply, both verifiers. Local: `/health` 200. |
 | 1 | D1 schema and migrations | done | Kimchi | 2026-11-06 | 2026-11-06 | PR #2 check `port` green ([run 42181282784](https://github.com/beznet22/edapex/actions/runs/42181282784)): typecheck, boundaries, 17 Workers-pool tests, local D1 apply, drift, both verifiers. Gate: 74 tables (62 legacy + 12 registered), 226 recovered + 5 spec indexes, every table ≤100 columns, `PRAGMA foreign_key_check` zero rows. |
 | 2 | Repository layer | done | Kimchi | 2026-11-06 | 2026-11-06 | PR #3 check `port` green ([run 42233886498](https://github.com/beznet22/edapex/actions/runs/42233886498)): typecheck, boundaries, repository rules + self-test, map completeness, 139 Workers-pool tests, local D1 apply, drift, both verifiers. Gate: 108 `01b` rows (103 implemented + 4 retired + 2 non-async), zero `db.transaction(`, zero `any`, 66 guarded files ≤300 lines, tenant-isolation suite green. |
-| 3 | Service layer | done | Kimchi | 2026-11-06 | 2026-11-06 | Local gate: typecheck, 54 test files / 281 tests, boundaries, repository + service guards (53 service files, 45-file tree), method map 53/53 (37 mapped + 2 merged + 7 deleted + 5 retired + 2 out of scope), 77 tables, drift clean, both verifiers, report-settings import 1 file → 1 row verified. CI pending PR. |
+| 3 | Service layer | done | Kimchi | 2026-11-06 | 2026-11-06 | PR #4 check `port` green ([run 42265759924](https://github.com/beznet22/edapex/actions/runs/42265759924)): typecheck, 281 tests (54 files), boundaries, repository + service guards (53 service files, 45-file tree), method map 53/53 (37 mapped + 2 merged + 7 deleted + 5 retired + 2 out of scope), 77 tables, drift clean, both verifiers, report-settings import 1 file → 1 row verified. |
 | 4 | HTTP layer | not started | — | — | — | — |
 | 5 | Auth cutover flow | not started | — | — | — | — |
 | 6 | Archive and retrieval | not started | — | — | — | — |
@@ -121,7 +121,7 @@ Port code lands in [`apps/api/`](../../apps/api/AGENTS.md).
 | 2026-11-06 | 3 | Service foundation: request-scoped context, ports/adapters, error taxonomy, Web Crypto helpers, 53-row service method map, boundary/rule guards and a 45-file tree check | Kimchi |
 | 2026-11-06 | 3 | Domain: named-mark OCR annotation contract, marks/grades computation, pure roster matcher, semantic completeness/accuracy validation; the legacy markdown linter/parser is deliberately not ported | Kimchi |
 | 2026-11-06 | 3 | Assessment entry/query/roster/publish, attendance, content-addressed OCR cache + capture binding, settings (general/academic/report), auth/session/profile/rate-limit/authorization and student lifecycle | Kimchi |
-| 2026-11-06 | 3 | Phase 3 gate passed locally: 281 tests, typecheck, all guards, 77 tables, both verifiers, report-settings import verified; CI pending PR | Kimchi |
+| 2026-11-06 | 3 | Phase 3 gate passed: PR #4 check `port` green (run 42265759924); 281 tests, typecheck, all guards, 77 tables, both verifiers, report-settings import verified | Kimchi |
 
 ## Blockers and decisions
 
@@ -147,5 +147,5 @@ Port code lands in [`apps/api/`](../../apps/api/AGENTS.md).
 
 - The measured baseline in [README.md](./README.md) is a snapshot of the remote dump. Refresh `docs/cloudflare-port/audit/db-inventory.json` before Phase 7 and update the numbers if they moved.
 - Phase gates are cumulative: a later phase passing does not excuse an earlier gate that was skipped.
-- Phase 3 landed on `phase-3-services` with `phase-2-repository` as the PR base. CI evidence is appended when the pull request checks complete.
+- Phase 3 landed on `phase-3-services` (PR #4) with `phase-2-repository` as the PR base; the `port` check is green on run 42265759924.
 - Phase 0 landed on `phase-0-scaffolding` (PR #1). `main` was not pushed because Dokploy deploys on commit; the branch carries the preflight spec-suite commit `b83de20`. Do not push `main` until the Dokploy trigger is confirmed blocked.
