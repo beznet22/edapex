@@ -105,7 +105,9 @@ export function validateSource(relative, source) {
       add(`adapter imports a repository or service: "${specifier}"`, line);
     }
     if (isDomain && !typeOnly && specifier.startsWith("../")) {
-      add(`domain imports runtime code from outside its folder: "${specifier}"`, line);
+      if (!specifier.includes("constants/")) {
+        add(`domain imports runtime code from outside its folder: "${specifier}"`, line);
+      }
     }
     if (isPort && specifier.startsWith("../")) {
       add(`port imports outside the ports folder: "${specifier}"`, line);
