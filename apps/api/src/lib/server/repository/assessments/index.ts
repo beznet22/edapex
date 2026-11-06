@@ -1,6 +1,7 @@
 export * from "./exam.repo";
 export * from "./exam-setup.repo";
 export * from "./exam-type.repo";
+export * from "./assessment-write.repo";
 export * from "./marks.repo";
 export * from "./results.repo";
 export * from "./feedback.repo";

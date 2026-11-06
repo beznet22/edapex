@@ -6,7 +6,7 @@ import {
 import type { MarksheetAnnotation } from "../../../schema/marksheet-annotation";
 import { getGrade, subjectPercentageMark } from "./grades";
 
-export interface ValidationIssue {
+export interface MarksheetValidationIssue {
   readonly code: string;
   readonly path: string;
   readonly message: string;
@@ -22,8 +22,8 @@ export interface ComputedSubject {
 }
 
 export interface MarksheetValidationReport {
-  readonly errors: readonly ValidationIssue[];
-  readonly warnings: readonly ValidationIssue[];
+  readonly errors: readonly MarksheetValidationIssue[];
+  readonly warnings: readonly MarksheetValidationIssue[];
   readonly computed: readonly ComputedSubject[];
   readonly hasErrors: boolean;
 }
@@ -41,8 +41,8 @@ export function validateMarksheetAnnotation(
   annotation: MarksheetAnnotation,
   context: ValidationContext
 ): MarksheetValidationReport {
-  const errors: ValidationIssue[] = [];
-  const warnings: ValidationIssue[] = [];
+  const errors: MarksheetValidationIssue[] = [];
+  const warnings: MarksheetValidationIssue[] = [];
   const computed: ComputedSubject[] = [];
   const error = (code: string, path: string, message: string): void => {
     errors.push({ code, path, message, severity: "error" });
