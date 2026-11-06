@@ -34,6 +34,27 @@ export async function listDuplicateEmailGroups(
   );
 }
 
+export async function findAccountInTenant(
+  ctx: ScopedRepositoryContext,
+  userId: number
+): Promise<DuplicateAccountRow | null> {
+  return withErrorHandling(async () => {
+    const [row] = await ctx.db
+      .select({
+        userId: users.id,
+        fullName: users.fullName,
+        email: users.email,
+        activeStatus: users.activeStatus,
+        claimStatus: users.claimStatus,
+        isAdministrator: users.isAdministrator
+      })
+      .from(users)
+      .where(and(eq(users.id, userId), eq(users.schoolId, ctx.tenant.schoolId)))
+      .limit(1);
+    return row ?? null;
+  }, "findAccountInTenant");
+}
+
 export async function listAccountsForEmails(
   ctx: ScopedRepositoryContext,
   emails: readonly string[]

@@ -196,7 +196,7 @@ describe("duplicate email repository", () => {
       }
     ]);
 
-    await mergeAccounts(scoped, { keepUserId: 131, loserUserIds: [130] });
+    await mergeAccounts(scoped, { keepUserId: 131, loserUserIds: [130], email: DUPLICATE });
 
     const [identity] = await db
       .select({ userId: authIdentities.userId })

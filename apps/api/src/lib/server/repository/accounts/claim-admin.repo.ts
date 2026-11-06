@@ -1,4 +1,4 @@
-import { and, count, eq, isNotNull } from "drizzle-orm";
+import { and, count, eq, isNotNull, isNull, or } from "drizzle-orm";
 
 import { users } from "../../db/schema";
 import { withErrorHandling } from "../base/error-handling";
@@ -40,7 +40,13 @@ export async function resetClaimDigests(
     const rows = await ctx.db
       .update(users)
       .set({ password: digest, claimStatus: "pending" })
-      .where(and(eq(users.schoolId, ctx.tenant.schoolId), isNotNull(users.email)))
+      .where(
+        and(
+          eq(users.schoolId, ctx.tenant.schoolId),
+          isNotNull(users.email),
+          or(isNull(users.claimStatus), eq(users.claimStatus, "pending"))
+        )
+      )
       .returning({ id: users.id });
     return rows.length;
   }, "resetClaimDigests");

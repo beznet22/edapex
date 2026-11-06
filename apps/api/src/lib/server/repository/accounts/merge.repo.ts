@@ -10,6 +10,7 @@ import type { ClaimStatus } from "./types";
 export interface MergeAccountsInput {
   readonly keepUserId: number;
   readonly loserUserIds: readonly number[];
+  readonly email: string;
 }
 
 /**
@@ -27,7 +28,7 @@ export async function mergeAccounts(
       const statements: BatchItem<"sqlite">[] = [
         ctx.db
           .update(users)
-          .set({ claimStatus: "pending" })
+          .set({ claimStatus: "pending", email: input.email })
           .where(
             and(eq(users.id, input.keepUserId), eq(users.schoolId, ctx.tenant.schoolId))
           )

@@ -3,14 +3,14 @@ import type { BatchItem } from "drizzle-orm/batch";
 import { authEvents } from "../../db/schema";
 import { batchOrThrow, chunkedInsert } from "../base/d1-helpers";
 import { withErrorHandling } from "../base/error-handling";
-import type { RepositoryContext, UnscopedRepositoryContext } from "../base/repository-context";
+import type { RepositoryContext } from "../base/repository-context";
 import type { NewAuthEvent } from "./types";
 
 export type AuthEventRow = typeof authEvents.$inferSelect;
 
 /** Auth events are global by design: login happens before a tenant exists. */
 export async function createAuthEvent(
-  ctx: UnscopedRepositoryContext,
+  ctx: RepositoryContext,
   event: NewAuthEvent
 ): Promise<void> {
   await withErrorHandling(

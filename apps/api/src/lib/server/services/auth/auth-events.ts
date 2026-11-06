@@ -1,4 +1,3 @@
-import { requireUnscopedContext } from "../context";
 import type { ServiceContext } from "../context";
 
 export const AUTH_EVENT_TYPES = [
@@ -44,8 +43,7 @@ export async function emitAuthEvent(
   input: AuthEventInput,
   now: number
 ): Promise<void> {
-  const unscoped = requireUnscopedContext(ctx.repos.ctx);
-  await ctx.repos.accounts.createAuthEvent(unscoped, {
+  await ctx.repos.accounts.createAuthEvent(ctx.repos.ctx, {
     id: crypto.randomUUID(),
     type: input.type,
     userId: input.userId ?? null,
