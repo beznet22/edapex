@@ -158,6 +158,7 @@ export function createServiceContext(
     config: repositoryCtx.config,
     cache: overrides.cache ?? new ServiceCache(),
     logger: overrides.logger ?? consoleLogger,
-    tenant: repositoryCtx.tenant
+    tenant: repositoryCtx.tenant,
+    tokenSecret: env.ARCHIVE_TOKEN_SECRET ?? null
   });
 }

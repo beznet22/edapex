@@ -2,6 +2,8 @@ import type { ServiceContext } from "../context";
 import { requireScopedContext } from "../context";
 import { ConflictError, NotFoundError } from "../errors";
 import { runArchiveSlice } from "./archive-job";
+import { runRestoreSlice } from "./restore-job";
+import { runWipeSlice } from "./wipe-job";
 import type { SessionJobView } from "./job-progress";
 
 /**
@@ -19,7 +21,9 @@ export async function runJobSlice(
     case "archive":
       return runArchiveSlice(ctx, jobId);
     case "restore":
+      return runRestoreSlice(ctx, jobId);
     case "wipe":
+      return runWipeSlice(ctx, jobId);
     case "promotion":
     case "bootstrap":
       throw new ConflictError(`A ${job.kind} job is not runnable yet`);

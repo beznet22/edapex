@@ -176,6 +176,47 @@ export async function listArchiveObjectsBySessions(
   }, "listArchiveObjectsBySessions");
 }
 
+export async function listArchiveObjectsForSessionsPage(
+  ctx: ScopedRepositoryContext,
+  params: {
+    readonly academicIds: readonly number[];
+    readonly afterId: number;
+    readonly limit: number;
+  }
+): Promise<readonly ArchiveObjectRow[]> {
+  return withErrorHandling(async () => {
+    const predicates = chunkedInArray(archiveObjects.academicId, params.academicIds);
+    if (predicates.length === 0) return [];
+    return ctx.db
+      .select()
+      .from(archiveObjects)
+      .where(
+        and(
+          scoped(ctx),
+          or(...predicates),
+          sql`${archiveObjects.id} > ${params.afterId}`
+        )
+      )
+      .orderBy(asc(archiveObjects.id))
+      .limit(params.limit);
+  }, "listArchiveObjectsForSessionsPage");
+}
+
+export async function deleteArchiveObjectsByIds(
+  ctx: ScopedRepositoryContext,
+  ids: readonly number[]
+): Promise<void> {
+  await withErrorHandling(async () => {
+    if (ids.length === 0) return;
+    await batchOrThrow(
+      ctx.db,
+      chunkedInArray(archiveObjects.id, ids).map((predicate) =>
+        ctx.db.delete(archiveObjects).where(and(scoped(ctx), predicate))
+      )
+    );
+  }, "deleteArchiveObjectsByIds");
+}
+
 export async function countArchiveObjectsForSession(
   ctx: ScopedRepositoryContext,
   academicId: number

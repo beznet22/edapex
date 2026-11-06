@@ -28,6 +28,7 @@ const progressSchema = z.object({
   totalStudents: z.number().int().nonnegative(),
   processedStudents: z.number().int().nonnegative(),
   lastStudentId: z.number().int().nonnegative(),
+  lastObjectId: z.number().int().nonnegative().default(0),
   objectsWritten: z.number().int().nonnegative(),
   quarantined: z.number().int().nonnegative(),
   deletedRows: rowCountsSchema.default({}),
@@ -56,6 +57,7 @@ export const initialProgress = (
   totalStudents,
   processedStudents: 0,
   lastStudentId: 0,
+  lastObjectId: 0,
   objectsWritten: 0,
   quarantined: 0,
   deletedRows: {},
@@ -95,6 +97,8 @@ export function parseJobResult(json: string | null): ArchiveJobResult | null {
     return null;
   }
 }
+
+export const WIPE_APPROVAL_TTL_SECONDS = 5 * 60;
 
 export interface SessionJobLike {
   readonly id: string;

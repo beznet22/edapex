@@ -113,6 +113,7 @@ export interface ServiceContext {
   readonly cache: ServiceCache;
   readonly logger: Logger;
   readonly tenant: TenantContext | null;
+  readonly tokenSecret: string | null;
 }
 
 export function requireScopedContext(ctx: RepositoryContext): ScopedRepositoryContext {
@@ -141,6 +142,7 @@ export function withTenantContext(ctx: ServiceContext, tenant: TenantContext): S
     config: ctx.config,
     cache: ctx.cache,
     logger: ctx.logger,
-    tenant: repositoryCtx.tenant
+    tenant: repositoryCtx.tenant,
+    tokenSecret: ctx.tokenSecret
   });
 }

@@ -4,8 +4,11 @@ import type { MiddlewareHandler } from "hono";
 import type { AppContext } from "../env";
 import { requireAdmin } from "../middleware/authorize";
 import { adminAuth } from "./admin-auth.routes";
+import { adminArchive } from "./admin-archive.routes";
 import { adminDuplicateActions } from "./admin-duplicate-actions.routes";
 import { adminDuplicateEmails } from "./admin-duplicate-emails.routes";
+import { adminJobs } from "./admin-jobs.routes";
+import { adminSessions } from "./admin-sessions.routes";
 import { adminStudentCodes } from "./admin-student-codes.routes";
 import { assessmentCaptures } from "./assessment-captures.routes";
 import { assessmentFeedback } from "./assessment-feedback.routes";
@@ -58,4 +61,7 @@ export const createProtectedRoutes = (
     .route("/admin", adminStudentCodes)
     .route("/admin", adminDuplicateEmails)
     .route("/admin", adminDuplicateActions)
-    .route("/admin", adminAuth);
+    .route("/admin", adminAuth)
+    .route("/admin", adminSessions)
+    .route("/admin", adminJobs)
+    .route("/admin", adminArchive);

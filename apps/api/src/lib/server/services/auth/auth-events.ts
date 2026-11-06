@@ -19,7 +19,8 @@ export const AUTH_EVENT_TYPES = [
   "password_reset_bulk",
   "account_merge",
   "account_reassign",
-  "account_flagged"
+  "account_flagged",
+  "archive_wipe"
 ] as const;
 
 export type AuthEventType = (typeof AUTH_EVENT_TYPES)[number];

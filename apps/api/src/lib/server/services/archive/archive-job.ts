@@ -271,7 +271,7 @@ export async function sessionObjectStats(
   };
 }
 
-async function listAllStudentIds(ctx: ServiceContext, sessionId: number): Promise<number[]> {
+export async function listAllStudentIds(ctx: ServiceContext, sessionId: number): Promise<number[]> {
   const sctx = requireScopedContext(ctx.repos.ctx);
   const ids: number[] = [];
   let afterStudentId: number | undefined;
@@ -289,7 +289,7 @@ async function listAllStudentIds(ctx: ServiceContext, sessionId: number): Promis
   return ids;
 }
 
-async function listLatestObjects(
+export async function listLatestObjects(
   ctx: ServiceContext,
   sessionId: number
 ): Promise<ManifestObjectInput[]> {
