@@ -165,7 +165,7 @@ export const rawClassAttendanceRowSchema = z.object({
 });
 
 export const rawSummaryRowSchema = z.object({
-  id: z.number().int().positive(),
+  id: z.number().int().nonnegative(),
   schoolId: z.number().int(),
   academicId: z.number().int(),
   studentId: z.number().int(),
@@ -190,6 +190,13 @@ export const archiveRawSchema = z.object({
   summaries: z.array(rawSummaryRowSchema)
 });
 export type ArchiveRaw = z.infer<typeof archiveRawSchema>;
+export type RawMarkRow = z.infer<typeof rawMarkRowSchema>;
+export type RawResultRow = z.infer<typeof rawResultRowSchema>;
+export type RawRatingRow = z.infer<typeof rawRatingRowSchema>;
+export type RawRemarkRow = z.infer<typeof rawRemarkRowSchema>;
+export type RawStudentAttendanceRow = z.infer<typeof rawStudentAttendanceRowSchema>;
+export type RawClassAttendanceRow = z.infer<typeof rawClassAttendanceRowSchema>;
+export type RawSummaryRow = z.infer<typeof rawSummaryRowSchema>;
 
 export const archiveDocumentSchema = z.object({
   schemaVersion: z.literal(ARCHIVE_SCHEMA_VERSION),

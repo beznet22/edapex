@@ -10,3 +10,4 @@ export * from "./result-read";
 export * from "./transcript";
 export * from "./objectives";
 export * from "./registration-options";
+export * from "./archive-students";
