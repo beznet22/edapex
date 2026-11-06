@@ -1,0 +1,42 @@
+{
+  "student": {
+    "fullName": "TEST STUDENT",
+    "admissionNo": null,
+    "className": "1C",
+    "sectionName": null,
+    "category": "NURSERY",
+    "term": "THIRD TERM EXAMINATION",
+    "academicYear": "2025/2026"
+  },
+  "attendance": {
+    "daysOpened": 126,
+    "daysPresent": 126,
+    "daysAbsent": 0
+  },
+  "subjects": [
+    {
+      "subjectCode": "BIBLE",
+      "marks": [
+        { "title": "HW", "value": 10 },
+        { "title": "CA", "value": 30 },
+        { "title": "PSYCHO", "value": 5 },
+        { "title": "ORAL", "value": 5 },
+        { "title": "EXAM", "value": 50 }
+      ],
+      "learningOutcome": null
+    },
+    {
+      "subjectCode": "CLL/JP",
+      "marks": [
+        { "title": "HW", "value": 10 },
+        { "title": "CA", "value": 15 },
+        { "title": "PSYCHO", "value": 4 },
+        { "title": "ORAL", "value": 4 },
+        { "title": "EXAM", "value": 38 }
+      ],
+      "learningOutcome": null
+    }
+  ],
+  "ratings": [],
+  "remark": "Synthetic fixture modeled on a blank-admission NURSERY marksheet; not a real learner."
+}

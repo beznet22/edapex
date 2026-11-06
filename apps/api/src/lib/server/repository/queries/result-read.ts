@@ -22,6 +22,8 @@ export interface ResultRecordReadRow {
   readonly subjectName: string | null;
   readonly subjectCode: string | null;
   readonly teacherRemarks: string | null;
+  readonly examTypeId?: number | null;
+  readonly totalMarks?: number | null;
 }
 
 export interface MarkReadRow {

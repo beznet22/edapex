@@ -14,7 +14,7 @@ export interface TableIndexExpectation extends IndexExpectation {
 export const RECOVERED_INDEX_TOTAL = 226;
 export const SPEC_EXTRA_TOTAL = 5;
 export const LEGACY_INDEX_TOTAL = 231;
-export const NEW_TABLE_INDEX_TOTAL = 19;
+export const NEW_TABLE_INDEX_TOTAL = 26;
 
 export const LEGACY_TABLES: readonly string[] = [
   "chat_group_users",
@@ -1858,7 +1858,10 @@ export const NEW_TABLES: readonly string[] = [
   "migration_resolutions",
   "session_jobs",
   "archive_objects",
-  "session_result_summary"
+  "session_result_summary",
+  "report_settings",
+  "ocr_cache",
+  "marksheet_captures"
 ];
 
 export const NEW_TABLE_INDEXES: Readonly<Record<string, readonly IndexExpectation[]>> = {
@@ -2031,6 +2034,75 @@ export const NEW_TABLE_INDEXES: Readonly<Record<string, readonly IndexExpectatio
       "columns": [
         "school_id",
         "student_id"
+      ]
+    }
+  ],
+  "report_settings": [],
+  "ocr_cache": [
+    {
+      "name": "ocr_cache_expires_at_index",
+      "unique": false,
+      "columns": [
+        "expires_at"
+      ]
+    }
+  ],
+  "marksheet_captures": [
+    {
+      "name": "marksheet_captures_school_status_index",
+      "unique": false,
+      "columns": [
+        "school_id",
+        "status"
+      ]
+    },
+    {
+      "name": "marksheet_captures_class_exam_index",
+      "unique": false,
+      "columns": [
+        "school_id",
+        "class_id",
+        "section_id",
+        "exam_type_id"
+      ]
+    },
+    {
+      "name": "marksheet_captures_ocr_index",
+      "unique": false,
+      "columns": [
+        "school_id",
+        "ocr_content_sha256",
+        "ocr_parser_version"
+      ]
+    },
+    {
+      "name": "marksheet_captures_student_exam_index",
+      "unique": false,
+      "columns": [
+        "school_id",
+        "student_id",
+        "exam_type_id"
+      ]
+    },
+    {
+      "name": "marksheet_captures_student_exam_unique",
+      "unique": true,
+      "columns": [
+        "school_id",
+        "student_id",
+        "exam_type_id"
+      ]
+    },
+    {
+      "name": "marksheet_captures_file_unique",
+      "unique": true,
+      "columns": [
+        "school_id",
+        "class_id",
+        "section_id",
+        "exam_type_id",
+        "ocr_content_sha256",
+        "ocr_parser_version"
       ]
     }
   ]

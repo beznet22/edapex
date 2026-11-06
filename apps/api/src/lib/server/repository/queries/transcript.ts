@@ -133,7 +133,9 @@ export async function getTranscriptData(
             subjectId: smResultStores.subjectId,
             subjectName: smSubjects.subjectName,
             subjectCode: smSubjects.subjectCode,
-            teacherRemarks: smResultStores.teacherRemarks
+            teacherRemarks: smResultStores.teacherRemarks,
+            examTypeId: smResultStores.examTypeId,
+            totalMarks: smResultStores.totalMarks
           })
           .from(smResultStores)
           .leftJoin(smSubjects, eq(smResultStores.subjectId, smSubjects.id))

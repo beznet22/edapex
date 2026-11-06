@@ -146,3 +146,34 @@ export async function ensureExam(
     return inserted.id;
   }, "ensureExam");
 }
+
+export interface ExamSummary {
+  readonly id: number;
+  readonly subjectId: number | null;
+}
+
+/** One read for every exam in a class/section/term; avoids per-subject lookups. */
+export async function listExamsByClassSection(
+  ctx: ScopedRepositoryContext,
+  classId: number,
+  sectionId: number,
+  examTypeId: number
+): Promise<readonly ExamSummary[]> {
+  return withErrorHandling(
+    async () =>
+      ctx.db
+        .select({ id: smExams.id, subjectId: smExams.subjectId })
+        .from(smExams)
+        .where(
+          and(
+            eq(smExams.classId, classId),
+            eq(smExams.sectionId, sectionId),
+            eq(smExams.examTypeId, examTypeId),
+            eq(smExams.academicId, requireAcademicId(ctx)),
+            eq(smExams.schoolId, ctx.tenant.schoolId),
+            eq(smExams.activeStatus, 1)
+          )
+        ),
+    "listExamsByClassSection"
+  );
+}

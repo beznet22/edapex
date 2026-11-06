@@ -165,6 +165,33 @@ Mechanics:
 - Split files by tier, chain with `&&`, make each idempotent (`INSERT OR REPLACE`).
 - Preserve original numeric ids; after load set `sqlite_sequence` so new inserts do not collide.
 
+### 5.1 Student photos (R2)
+
+Student photos are binary artifacts, not D1 rows. They migrate in the same phase but through R2, and the database URL must not change.
+
+**Source inventory (2026-11-06):** `static/uploads/students` contains 2,747 files. Only the **1,058 images** are in scope — 934 JPG/JPG, 19 JPEG and 105 PNG, about **214 MB**. The other **1,684 PDFs (~862 MB) are excluded** from the photo migration and must be classified separately. The write paths were inconsistent before this phase: the upload and photo-claim routes used `static/uploads/students`, while `update-photo.ts` wrote `static/public/uploads/students` but stored the `/uploads/students/...` URL. Phase 3 corrected both writers to the canonical path.
+
+**Storage contract:**
+
+| Item | Value |
+|---|---|
+| Bucket | R2 Standard `edapex-media`, binding `MEDIA` |
+| Object key | the database URL without its leading slash: `uploads/students/<sha256>.<ext>` |
+| Public read | `GET /uploads/students/<sha256>.<ext>` (private bucket, public route) |
+| Cache | `Cache-Control: public, max-age=31536000, immutable`, `ETag`, `X-Content-Type-Options: nosniff` |
+| Database value | unchanged relative URL `/uploads/students/<sha256>.<ext>` |
+
+**Migration steps:**
+
+1. Read every `sm_students.student_photo` value. Count distinct URLs, extensions and missing files. Flag any value that is not an image; a `.pdf` value is a bad data row to fix or quarantine, never a photo to upload.
+2. Upload only the referenced image files. Use the original filename (including extension case) as the key so the existing URL resolves without a rewrite.
+3. Compute SHA-256 during upload and verify it equals the filename hash; store it in `customMetadata.sha256`. Reject a mismatch instead of overwriting.
+4. Verify object count, total bytes and a sample of full-object hashes. Smoke-test the public route for the same sample.
+5. Keep `static/uploads/students` as a read-only fallback until the route is verified, then remove the image files. Do not delete the PDFs as part of this step.
+6. Before cutover, run a delta migration for images uploaded between the first copy and the cutover; content-addressed keys make the delta idempotent.
+
+**Free-plan check:** R2 Standard includes 10 GB-month storage, 1M Class A operations, 10M Class B operations and free egress. The image set is about 214 MB and 1,058 writes — well inside the allowance. The public route consumes Worker requests; cache immutable responses and monitor the Workers request limit separately. Do not use R2 Infrequent Access for this bucket (it has no free tier).
+
 ---
 
 ## 6. Bootstrap: fresh session as a slate
@@ -388,6 +415,7 @@ Two categories, one print-ready document grouped by class: `NO_CURRENT_RECORD` (
 - [ ] 7 grade bands for year 5
 - [ ] 654 promotions recorded; 24 DAYCARE retained; 222 quarantined and reported
 - [ ] Archived objects verified by checksum; live tables hold no historical marks
+- [ ] Student photos: every referenced image is in R2 at its unchanged `/uploads/students/...` URL; the public route returns 200; PDFs are excluded or flagged
 - [ ] Readiness test passes end-to-end
 
 ---
@@ -404,3 +432,4 @@ Everything this spec introduces, in one place:
 | Promotion | `POST /api/v1/admin/sessions/:id/promote` · `GET /api/v1/admin/sessions/:id/promotion/:jobId` · `POST /api/v1/admin/promotion/batches/:batchId/reverse` |
 | Quarantine | `GET /api/v1/admin/sessions/:id/promotion/quarantine.pdf` · `GET …/quarantine.csv` |
 | Archive handoff | `POST /api/v1/admin/sessions/:id/archive` and the rest of [06 §6](./06-archive-and-retrieval.spec.md) |
+| Student photos | `GET /uploads/students/:file` (public, content-addressed) |

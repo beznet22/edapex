@@ -16,17 +16,22 @@
     "cf-typegen": "wrangler types",
     "db:generate": "drizzle-kit generate",
     "db:expectations": "node scripts/gen-schema-expectations.mjs",
+    "db:import-report-settings": "node scripts/import-report-settings.mjs",
     "db:migrate:local": "wrangler d1 migrations apply DB --local",
     "check:schema-drift": "drizzle-kit generate && git diff --exit-code -- src/lib/server/db/migrations",
     "check:boundaries": "node scripts/check-import-boundaries.mjs",
     "check:boundaries:self": "node scripts/check-import-boundaries.mjs --self-test",
     "check:repository": "node scripts/check-repository-rules.mjs",
     "check:repository:self": "node scripts/check-repository-rules.mjs --self-test",
-    "check:repository-map": "node scripts/check-repository-map.mjs"
+    "check:repository-map": "node scripts/check-repository-map.mjs",
+    "check:services": "node scripts/check-service-rules.mjs",
+    "check:services:self": "node scripts/check-service-rules.mjs --self-test",
+    "check:service-map": "node scripts/check-service-map.mjs"
   },
   "dependencies": {
     "drizzle-orm": "^0.44.7",
-    "hono": "^4.13.16"
+    "hono": "^4.13.16",
+    "zod": "^4.1.13"
   },
   "devDependencies": {
     "@cloudflare/vitest-plugin": "^1.6.0",

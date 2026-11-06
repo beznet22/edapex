@@ -74,7 +74,9 @@ export const AGGREGATES = {
     "teacherRemarks",
     "studentRatings",
     "smHomeworks",
-    "smHomeworkStudents"
+    "smHomeworkStudents",
+    "ocrCache",
+    "marksheetCaptures"
   ],
   attendance: ["smStudentAttendances", "classAttendances"],
   fees: [
@@ -86,7 +88,7 @@ export const AGGREGATES = {
     "smFeesDiscounts",
     "smBankAccounts"
   ],
-  school: ["smSchools", "smGeneralSettings", "smAcademicYears"],
+  school: ["smSchools", "smGeneralSettings", "smAcademicYears", "reportSettings"],
   communications: ["chatGroups", "chatGroupUsers", "smEvents", "smHolidays", "smNoticeBoards"],
   queries: null
 };

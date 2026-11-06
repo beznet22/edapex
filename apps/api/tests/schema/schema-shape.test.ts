@@ -10,7 +10,7 @@ import {
 } from "../fixtures/schema-expectations";
 import type { IndexExpectation } from "../fixtures/schema-expectations";
 
-const DECLARED_TABLE_COUNT = 74;
+const DECLARED_TABLE_COUNT = 77;
 
 interface DeclaredIndex {
   readonly name: string;
@@ -51,7 +51,7 @@ describe("declared Drizzle schema", () => {
     expect(unknown).toEqual([]);
   });
 
-  it("declares exactly the registry: 62 legacy tables plus 12 new tables", () => {
+  it("declares exactly the registry: 62 legacy tables plus 15 new tables", () => {
     const declared = allTables.map(tableName).sort();
     const expected = [...ALL_TABLES].sort();
     expect(declared).toEqual(expected);

@@ -7,6 +7,7 @@ import { financeTables } from "./finance";
 import { homeworkTables } from "./homework";
 import { lifecycleTables } from "./lifecycle";
 import { peopleTables } from "./people";
+import { portServiceTables } from "./port-services";
 import { tenancyTables } from "./tenancy";
 import { timetableTables } from "./timetable";
 
@@ -17,6 +18,7 @@ export * from "./finance";
 export * from "./homework";
 export * from "./lifecycle";
 export * from "./people";
+export * from "./port-services";
 export * from "./tenancy";
 export * from "./timetable";
 
@@ -33,5 +35,6 @@ export const allTables: readonly SQLiteTable[] = [
   ...homeworkTables,
   ...financeTables,
   ...authTables,
-  ...lifecycleTables
+  ...lifecycleTables,
+  ...portServiceTables
 ];
