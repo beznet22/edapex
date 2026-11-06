@@ -22,11 +22,15 @@
     "check:boundaries:self": "node scripts/check-import-boundaries.mjs --self-test",
     "check:repository": "node scripts/check-repository-rules.mjs",
     "check:repository:self": "node scripts/check-repository-rules.mjs --self-test",
-    "check:repository-map": "node scripts/check-repository-map.mjs"
+    "check:repository-map": "node scripts/check-repository-map.mjs",
+    "check:services": "node scripts/check-service-rules.mjs",
+    "check:services:self": "node scripts/check-service-rules.mjs --self-test",
+    "check:service-map": "node scripts/check-service-map.mjs"
   },
   "dependencies": {
     "drizzle-orm": "^0.44.7",
-    "hono": "^4.13.16"
+    "hono": "^4.13.16",
+    "zod": "^4.1.13"
   },
   "devDependencies": {
     "@cloudflare/vitest-plugin": "^1.6.0",
