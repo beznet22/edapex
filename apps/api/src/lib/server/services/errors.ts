@@ -11,7 +11,8 @@ export type ServiceErrorCode =
   | "TENANT_SCOPE_REQUIRED"
   | "AMBIGUOUS_EMAIL"
   | "RATE_LIMITED"
-  | "UPSTREAM_FAILURE";
+  | "UPSTREAM_FAILURE"
+  | "NOT_FOUND";
 
 export interface ValidationIssue {
   readonly path: string;
@@ -68,6 +69,23 @@ export class WorkspaceMismatchError extends ServiceError {
 export class TenantScopeError extends ServiceError {
   constructor(message = "A tenant context is required for this operation") {
     super("TENANT_SCOPE_REQUIRED", message);
+  }
+}
+
+export class TenantMismatchError extends ServiceError {
+  constructor(message = "The requested scope does not belong to this school") {
+    super("TENANT_MISMATCH", message);
+  }
+}
+
+export class NotFoundError extends ServiceError {
+  readonly entity: string;
+  readonly entityId: string | number;
+
+  constructor(entity: string, entityId: string | number) {
+    super("NOT_FOUND", `${entity} '${entityId}' not found`);
+    this.entity = entity;
+    this.entityId = entityId;
   }
 }
 

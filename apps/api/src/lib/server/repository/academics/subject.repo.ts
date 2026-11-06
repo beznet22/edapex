@@ -12,6 +12,27 @@ export interface SubjectByClassRow {
   readonly teacherId: number | null;
 }
 
+export async function findSubjectById(
+  ctx: ScopedRepositoryContext,
+  subjectId: number
+): Promise<{ readonly id: number } | null> {
+  if (subjectId <= 0) return null;
+  return withErrorHandling(async () => {
+    const [row] = await ctx.db
+      .select({ id: smSubjects.id })
+      .from(smSubjects)
+      .where(
+        and(
+          eq(smSubjects.id, subjectId),
+          eq(smSubjects.schoolId, ctx.tenant.schoolId),
+          eq(smSubjects.activeStatus, 1)
+        )
+      )
+      .limit(1);
+    return row ?? null;
+  }, "findSubjectById");
+}
+
 export async function listSubjectsByClass(
   ctx: ScopedRepositoryContext,
   classId: number,

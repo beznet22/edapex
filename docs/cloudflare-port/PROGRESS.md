@@ -24,7 +24,7 @@ Port code lands in [`apps/api/`](../../apps/api/AGENTS.md).
 
 ## Current focus
 
-**Phase 3 — Service layer.** Complete on `phase-3-services`; Phase 4 (HTTP layer) is next.
+**Phase 4 — HTTP layer.** Complete on `phase-4-http` (PR #5, check `port` green); Phase 5 (auth cutover) is next.
 
 ## Phase status
 
@@ -34,7 +34,7 @@ Port code lands in [`apps/api/`](../../apps/api/AGENTS.md).
 | 1 | D1 schema and migrations | done | Kimchi | 2026-11-06 | 2026-11-06 | PR #2 check `port` green ([run 42181282784](https://github.com/beznet22/edapex/actions/runs/42181282784)): typecheck, boundaries, 17 Workers-pool tests, local D1 apply, drift, both verifiers. Gate: 74 tables (62 legacy + 12 registered), 226 recovered + 5 spec indexes, every table ≤100 columns, `PRAGMA foreign_key_check` zero rows. |
 | 2 | Repository layer | done | Kimchi | 2026-11-06 | 2026-11-06 | PR #3 check `port` green ([run 42233886498](https://github.com/beznet22/edapex/actions/runs/42233886498)): typecheck, boundaries, repository rules + self-test, map completeness, 139 Workers-pool tests, local D1 apply, drift, both verifiers. Gate: 108 `01b` rows (103 implemented + 4 retired + 2 non-async), zero `db.transaction(`, zero `any`, 66 guarded files ≤300 lines, tenant-isolation suite green. |
 | 3 | Service layer | done | Kimchi | 2026-11-06 | 2026-11-06 | PR #4 check `port` green ([run 42265759924](https://github.com/beznet22/edapex/actions/runs/42265759924)): typecheck, 292 tests (55 files), boundaries, repository + service guards (53 service files, 45-file tree), method map 53/53 (37 mapped + 2 merged + 7 deleted + 5 retired + 2 out of scope), 77 tables, drift clean, both verifiers, report-settings import 1 file → 1 row verified. |
-| 4 | HTTP layer | not started | — | — | — | — |
+| 4 | HTTP layer | done | Kimchi | 2026-11-06 | 2026-11-06 | PR #5 check `port` green ([run 42280594997](https://github.com/beznet22/edapex/actions/runs/42280594997)): typecheck, 399 tests / 80 files, boundary/repository/service/HTTP guards + self-tests, repository map 108/108, service map 53/53, D1 apply, drift, deploy dry-run, both verifiers. Gate: 19 route modules / 42 handlers, 422 byte-compatible, `hc<AppType>` type test, CORS/tenant/dropped-route suites green. |
 | 5 | Auth cutover flow | not started | — | — | — | — |
 | 6 | Archive and retrieval | not started | — | — | — | — |
 | 7 | Migration execution | not started | — | — | — | — |
@@ -70,10 +70,23 @@ Port code lands in [`apps/api/`](../../apps/api/AGENTS.md).
 - [x] Report-settings imported from JSON and verified by count (1 file → 1 row, payload deep-equal)
 
 ### Phase 4 — HTTP
-- [ ] 20 in-scope endpoints implemented; demo endpoints retired
-- [ ] Flat envelope; 422 body byte-compatible
-- [ ] `AppType` + `hc<AppType>` type test green
-- [ ] CORS and public-router isolation tests green
+- [x] Service-led surface: 19 route modules / 42 handlers; every route maps to a named service method; legacy URL shapes absent
+- [x] Flat envelope; 422 body byte-compatible and without `requestId`
+- [x] `AppType` + `hc<AppType>` type test green
+- [x] CORS, preflight-before-auth, public isolation, tenant isolation, middleware order and dropped-route tests green
+
+#### Phase 4 service-led route matrix
+
+| Aggregate | Routes | Service methods |
+|---|---|---|
+| Auth / session / profile | `POST /auth/login`, `POST /auth/mobile/login`, `POST /auth/logout`, `POST /auth/logout-all`, `POST /auth/refresh`, `POST /auth/mobile/refresh`, `POST /auth/mobile/logout`, `GET /me`, `PATCH /me` | `AuthService.login`; `SessionService` refresh/logout/logoutAll/mobile; `ProfileService.updateProfile` |
+| Students | `GET /students`, `PATCH /students/:id/status`, `POST /students/:id/promotions`, `POST /students/:id/demotions`, `PUT /students/:id/photo`, `POST /students/:id/photo/claim`, `DELETE /students/:id/photo` | `StudentSearchService`, `StudentLifecycleService`, `StudentPhotoService` |
+| Academics / attendance | `POST /subjects/assignments`, `PUT /attendance` | `SubjectAssignmentService`, `AttendanceService` |
+| Assessments | `POST /assessments/marksheets`, `PUT /assessments/results`, `GET /assessments/results/:identifier/:examId`, `GET /assessments/transcripts/:studentId/:academicId`, `PUT /assessments/feedback/remarks`, `PUT /assessments/feedback/ratings`, `POST /assessments/ocr/extractions`, `DELETE /assessments/ocr/cache`, `POST /assessments/captures`, `POST /assessments/captures/:id/confirmation`, `POST /assessments/publish/results`, `POST /assessments/publish/transcript` | `AssessmentEntryService`, `AssessmentQueryService`, `AssessmentFeedbackService`, `AssessmentOcrService`, `MarksheetCaptureService`, `AssessmentPublishService` |
+| Settings | `GET/PATCH /settings/general`, `GET/POST /settings/academic-years`, `GET/PUT /settings/academic-years/active`, `GET/POST /settings/exam-types`, `PATCH /settings/exam-types/:id/active`, `GET/PATCH /settings/report-templates` | `GeneralSettingsService`, `AcademicSettingsService`, `ReportSettingsService` |
+| Public | `GET /health`, `GET /uploads/students/:file` | liveness; existing R2 photo route |
+
+**Dropped:** `/api/parents/connect-telegram`, `/api/results/generate-pdf`, `/api/demo/*`, `/api/[authType]`, `/google`. **Deferred:** `/claim` and the Google callback (Phase 5), `/r/:token` (Phase 6). PDF rendering is client-side via ironpress; the API keeps result/transcript email publishing.
 
 ### Phase 5 — Auth cutover
 - [ ] `/claim` end-to-end on local D1
@@ -124,6 +137,12 @@ Port code lands in [`apps/api/`](../../apps/api/AGENTS.md).
 | 2026-11-06 | 3 | Phase 3 gate passed: PR #4 check `port` green (run 42265759924); 292 tests, typecheck, all guards, 77 tables, both verifiers, report-settings import verified | Kimchi |
 | 2026-11-06 | 3 | Student photo storage moved to R2 Standard (`MEDIA` / `edapex-media`): key = unchanged `/uploads/students/<sha256>.<ext>`, public content-addressed route with immutable caching; 1,058 images / ~214 MB in scope, 1,684 PDFs excluded; migration details added to `05 §5.1` | Kimchi |
 | 2026-11-06 | 3 | Email delivery switched to Gmail OAuth2 by default: fetch-only refresh-token grant + `gmail/v1/users/{sender}/messages/send` raw MIME; Cloudflare Email Routing remains an optional fallback | Kimchi |
+| 2026-11-06 | 4 | HTTP foundation: request-id/logger/CORS/body-limit/rate-limit/auth/tenant chain, flat error envelope with the byte-identical 422 body, typed validators, `createApp` composition and the `baseCtx`/`ctx` split | Kimchi |
+| 2026-11-06 | 4 | Service-led routes: auth/session/profile, students (search/status/photos/lifecycle), subject assignments, attendance, assessments (entry/query/feedback/OCR/captures/publish) and settings; telegram and PDF dropped, claim/OAuth and `/r/:token` deferred | Kimchi |
+| 2026-11-06 | 4 | Typed `hc<AppType>` client, `check:http` guard + self-test, CORS/preflight/type/tenant/dropped-route tests; 80 test files / 399 tests | Kimchi |
+| 2026-11-06 | 4 | Local gate green: typecheck, 399 tests, all guards, D1 apply, schema drift, deploy dry-run and both verifiers | Kimchi |
+| 2026-11-06 | 4 | Phase 4 gate passed: PR #5 check `port` green ([run 42280594997](https://github.com/beznet22/edapex/actions/runs/42280594997)); 80 test files / 399 tests, 19 route modules, all guards, D1 drift clean, both verifiers | Kimchi |
+| 2026-11-06 | 4 | Deviations: the service-led surface supersedes the legacy 20-row HTTP map; thin Phase 4 service/repository additions (`StudentSearchService`, `SubjectAssignmentService`, `TenantScopeService`, photo claim/remove, `setActiveStatus`, `RateLimitService.consume`, `findSubjectById`); no schema change | Kimchi |
 
 ## Blockers and decisions
 
@@ -146,10 +165,17 @@ Port code lands in [`apps/api/`](../../apps/api/AGENTS.md).
 | Phase 3 repository additions | Phase 3+ | decided — settings/exam-type writes, OCR cache/captures, auth events/rate limits, session rotation, fee assignment, atomic marks/results replacement; recorded as Phase 3 deviations | — |
 | Email provider | Phase 3+ | decided — Gmail OAuth2 is the default when `GMAIL_CLIENT_ID` / `GMAIL_CLIENT_SECRET` / `GMAIL_REFRESH_TOKEN` / `GMAIL_SENDER_EMAIL` are set; Cloudflare Email Routing is the fallback. Deployment-level account for now; per-school Gmail connections need encrypted credential storage + OAuth callback in a later phase. Gmail quota and app-verification limits apply | — |
 | Student photos | Phase 7 migration | decided — R2 Standard `edapex-media` (binding `MEDIA`), key = the unchanged DB URL path, public content-addressed route with immutable caching; images only (1,058 images / ~214 MB), 1,684 PDFs excluded; storage/route now, data migration in Phase 7 with `05 §5.1`. Public access was chosen explicitly; the hash is unguessable and auth can be added without changing URLs | — |
+| Phase 4 route surface | Phase 4+ | decided — service-led, not the legacy 20-row shape; telegram and PDF generation dropped (ironpress renders client-side), claim/OAuth deferred to Phase 5 and `/r/:token` to Phase 6; `03b` remains the legacy inventory | — |
+| Phase 4 contexts | Phase 4+ | decided — `baseCtx` (unscoped) for auth/session/profile/rate-limit/authorization; `ctx` (scoped) for tenant services; one cache/logger per request | — |
+| Phase 4 service/repository additions | Phase 4+ | decided — `StudentSearchService`, `SubjectAssignmentService`, `TenantScopeService`, `NotFoundError`, `TenantMismatchError`, photo claim/remove, `setActiveStatus`, `RateLimitService.consume`, `findSubjectById`; recorded as Phase 4 deviations | — |
+| Phase 4 email/PDF boundary | Phase 4+ | decided — `publishResults` and `publishTranscript` stay on the API; PDF rendering is client-side via ironpress; no PDF route or dependency in `apps/api` | — |
+| Phase 4 uploads | Phase 4+ | decided — `PUT`/`DELETE /students/:id/photo` for student photos; `POST /assessments/captures` for OCR intake; no `/api/uploads` | — |
+| Phase 4 tenant guard placement | Phase 4+ | decided — path-scoped tenant middleware; `/me` and `/auth/*` skip tenant; unknown root paths return 404 rather than 401 | — |
 
 ## Notes
 
 - The measured baseline in [README.md](./README.md) is a snapshot of the remote dump. Refresh `docs/cloudflare-port/audit/db-inventory.json` before Phase 7 and update the numbers if they moved.
 - Phase gates are cumulative: a later phase passing does not excuse an earlier gate that was skipped.
 - Phase 3 landed on `phase-3-services` (PR #4) with `phase-2-repository` as the PR base; the `port` check is green on run 42265759924.
+- Phase 4 landed on `phase-4-http` (PR #5) with `phase-3-services` as the PR base; the `port` check is green on run 42280594997.
 - Phase 0 landed on `phase-0-scaffolding` (PR #1). `main` was not pushed because Dokploy deploys on commit; the branch carries the preflight spec-suite commit `b83de20`. Do not push `main` until the Dokploy trigger is confirmed blocked.

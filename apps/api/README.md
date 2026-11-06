@@ -4,7 +4,7 @@ The Hono API on Cloudflare Workers with D1. This directory is the **API service*
 
 | | |
 |---|---|
-| Phase | **3 — service layer complete; PR #4** ([PROGRESS](../docs/cloudflare-port/PROGRESS.md)) |
+| Phase | **4 — HTTP layer complete; PR #5** ([PROGRESS](../docs/cloudflare-port/PROGRESS.md)) |
 | Plan | [ROADMAP](../docs/cloudflare-port/ROADMAP.md) |
 | Agent rules | [AGENTS.md](./AGENTS.md) |
 | Specs | [docs/cloudflare-port](../docs/cloudflare-port/README.md) |
@@ -40,6 +40,10 @@ pnpm exec vitest
 
 # typecheck
 pnpm exec tsc --noEmit
+
+# HTTP surface guard
+pnpm run check:http
+pnpm run check:http:self
 ```
 
 Local secrets go in `.dev.vars` (gitignored): session signing key, email provider key, Google OAuth client. Production secrets are set with `wrangler secret put`. **Never** commit `.dev.vars` or any data dump.
@@ -104,6 +108,10 @@ The full set is in [AGENTS.md](./AGENTS.md); these are the ones that break build
 - Every query is tenant-scoped; no fallback tenant.
 - Repository ≤300 lines, service ≤400, route module ≤300, domain ~200.
 
+## HTTP surface
+
+The API is service-led: each route maps to one service method under `/api/v1`, and the browser client is `hc<AppType>` from `src/lib/http/client.ts`. Tenant scope travels in `X-Academic-Id`, `X-Class-Id`, and `X-Section-Id`; the public surface is `/health` and the content-addressed `/uploads/students/:file` route. PDF rendering is client-side; the API owns result and transcript email publishing only.
+
 ## Testing
 
 - Unit and contract tests run under `@cloudflare/vitest-plugin`, against a local D1.
@@ -122,4 +130,4 @@ Then update [PROGRESS.md](../docs/cloudflare-port/PROGRESS.md): status row, gate
 
 ## Status
 
-Phase 0 (scaffolding and guards), Phase 1 (D1 schema and migrations), Phase 2 (repository layer) and Phase 3 (service layer) are complete. Phase 3 adds the request-scoped service context, ports/adapters, pure domain and semantic validation, the five catalog-facing service groups, OCR cache/capture binding, settings, auth/session/profile/rate limiting, authorization and student lifecycle. The local and CI gates report 55 test files / 292 tests, 77 tables (62 legacy + 15 registered), 53/53 mapped service methods, clean boundaries/repository/service guards, schema drift clean, both verifiers green and the report-settings import verified.
+Phases 0–4 are complete. Phase 3 added the request-scoped service context, ports/adapters, pure domain and semantic validation, the five catalog-facing service groups, OCR cache/capture binding, settings, auth/session/profile/rate limiting, authorization and student lifecycle. Phase 4 adds the service-led `/api/v1` surface, the flat error envelope, the `baseCtx`/`ctx` split, the `hc<AppType>` client and the HTTP guard. The local gate reports 80 test files / 399 tests, 77 tables (62 legacy + 15 registered), 53/53 mapped service methods, 19 HTTP route modules, clean boundaries/repository/service/HTTP guards, schema drift clean and both verifiers green.

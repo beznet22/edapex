@@ -1,6 +1,6 @@
 import type { ServiceContext } from "../context";
 import { requireScopedContext } from "../context";
-import { ValidationError } from "../errors";
+import { NotFoundError, TenantScopeError, ValidationError } from "../errors";
 import { sha256Hex } from "../crypto/digest";
 
 export const MAX_STUDENT_PHOTO_BYTES = 5 * 1024 * 1024;
@@ -17,6 +17,19 @@ export interface StudentPhotoResult {
   readonly bytes: number;
   readonly cached: boolean;
 }
+
+export interface StudentPhotoClaimInput {
+  readonly studentId: number;
+  readonly url: string;
+}
+
+export interface StudentPhotoClaimResult {
+  readonly studentId: number;
+  readonly photoUrl: string;
+}
+
+const PHOTO_URL_PATTERN =
+  /^\/uploads\/students\/([a-f0-9]{64})\.(jpe?g|png|webp)$/i;
 
 interface ImageType {
   readonly contentType: string;
@@ -107,5 +120,62 @@ export class StudentPhotoService {
       bytes: bytes.byteLength,
       cached
     };
+  }
+
+  async claim(input: StudentPhotoClaimInput): Promise<StudentPhotoClaimResult> {
+    if (!Number.isInteger(input.studentId) || input.studentId <= 0) {
+      throw new ValidationError("A positive student id is required", "studentId");
+    }
+    const match = PHOTO_URL_PATTERN.exec(input.url);
+    const hash = match?.[1];
+    const extension = match?.[2];
+    if (hash === undefined || extension === undefined) {
+      throw new ValidationError(
+        "Photo URL must be a content-addressed student photo",
+        "url"
+      );
+    }
+    const key = `uploads/students/${hash}.${extension}`;
+    if (!(await this.ctx.ports.photos.head(key))) {
+      throw new NotFoundError("Photo", key);
+    }
+
+    const scoped = requireScopedContext(this.ctx.repos.ctx);
+    if (
+      scoped.tenant.classId === null ||
+      scoped.tenant.sectionId === null ||
+      scoped.tenant.academicId === null
+    ) {
+      throw new TenantScopeError("Class and section are required to claim a photo");
+    }
+    const roster = await this.ctx.ports.students.listRoster({
+      classId: scoped.tenant.classId,
+      sectionId: scoped.tenant.sectionId,
+      academicId: scoped.tenant.academicId
+    });
+    if (!roster.some((entry) => entry.id === input.studentId)) {
+      throw new ValidationError("Student is not in the class roster", "studentId");
+    }
+
+    const updated = await this.ctx.repos.profiles.updateStudentPhoto(
+      scoped,
+      input.studentId,
+      input.url
+    );
+    if (!updated) throw new NotFoundError("Student", input.studentId);
+    return { studentId: input.studentId, photoUrl: input.url };
+  }
+
+  async remove(studentId: number): Promise<void> {
+    if (!Number.isInteger(studentId) || studentId <= 0) {
+      throw new ValidationError("A positive student id is required", "studentId");
+    }
+    const scoped = requireScopedContext(this.ctx.repos.ctx);
+    const updated = await this.ctx.repos.profiles.updateStudentPhoto(
+      scoped,
+      studentId,
+      null
+    );
+    if (!updated) throw new NotFoundError("Student", studentId);
   }
 }

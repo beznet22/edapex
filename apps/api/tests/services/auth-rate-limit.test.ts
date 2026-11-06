@@ -39,6 +39,18 @@ describe("rate limit service", () => {
     await expect(service.assertAvailable(key, now)).resolves.toBeUndefined();
   });
 
+  it("consumes a fixed window and rejects over the limit", async () => {
+    const consumeKey = "test:http:consume";
+    await service.consume(consumeKey, { limit: 2, windowSeconds: 60 }, now);
+    await service.consume(consumeKey, { limit: 2, windowSeconds: 60 }, now + 1);
+    await expect(
+      service.consume(consumeKey, { limit: 2, windowSeconds: 60 }, now + 2)
+    ).rejects.toBeInstanceOf(RateLimitError);
+    await expect(
+      service.consume(consumeKey, { limit: 2, windowSeconds: 60 }, now + 61)
+    ).resolves.toBeUndefined();
+  });
+
   it("purges old windows and rejects a blank key", async () => {
     await service.recordFailure("test:purge-window", now);
     await expect(service.purge(now + RATE_LIMIT_WINDOW_SECONDS * 2)).resolves.toBeGreaterThanOrEqual(

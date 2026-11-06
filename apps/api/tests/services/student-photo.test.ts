@@ -9,7 +9,7 @@ import {
   createServiceContext
 } from "../../src/lib/server/services/context";
 import { StudentPhotoService } from "../../src/lib/server/services/media";
-import { PortError, ValidationError } from "../../src/lib/server/services/errors";
+import { NotFoundError, PortError, ValidationError } from "../../src/lib/server/services/errors";
 import { sha256Hex } from "../../src/lib/server/services";
 import { database, seedTwoSchools, tenantOf } from "../support/seed";
 import type { SeededSchool } from "../support/seed";
@@ -68,6 +68,32 @@ describe("student photo storage", () => {
 
     expect(second.cached).toBe(true);
     expect(second.photoUrl).toBe(first.photoUrl);
+  });
+
+  it("claims an existing object and clears the reference", async () => {
+    const saved = await service.save({
+      studentId: school.studentId,
+      file: new Blob([pngBytes], { type: "image/png" })
+    });
+    const claimed = await service.claim({
+      studentId: school.studentId,
+      url: saved.photoUrl
+    });
+    expect(claimed).toEqual({ studentId: school.studentId, photoUrl: saved.photoUrl });
+
+    await service.remove(school.studentId);
+    const rows = await db
+      .select({ studentPhoto: smStudents.studentPhoto })
+      .from(smStudents)
+      .where(eq(smStudents.id, school.studentId));
+    expect(rows[0]?.studentPhoto).toBeNull();
+
+    await expect(
+      service.claim({
+        studentId: school.studentId,
+        url: `/uploads/students/${"a".repeat(64)}.png`
+      })
+    ).rejects.toBeInstanceOf(NotFoundError);
   });
 
   it("rejects PDFs and non-images", async () => {

@@ -26,7 +26,9 @@
     "check:repository-map": "node scripts/check-repository-map.mjs",
     "check:services": "node scripts/check-service-rules.mjs",
     "check:services:self": "node scripts/check-service-rules.mjs --self-test",
-    "check:service-map": "node scripts/check-service-map.mjs"
+    "check:service-map": "node scripts/check-service-map.mjs",
+    "check:http": "node scripts/check-http-rules.mjs",
+    "check:http:self": "node scripts/check-http-rules.mjs --self-test"
   },
   "dependencies": {
     "drizzle-orm": "^0.44.7",
