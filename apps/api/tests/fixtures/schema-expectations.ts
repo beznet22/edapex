@@ -14,7 +14,7 @@ export interface TableIndexExpectation extends IndexExpectation {
 export const RECOVERED_INDEX_TOTAL = 226;
 export const SPEC_EXTRA_TOTAL = 6;
 export const LEGACY_INDEX_TOTAL = 232;
-export const NEW_TABLE_INDEX_TOTAL = 26;
+export const NEW_TABLE_INDEX_TOTAL = 33;
 
 export const LEGACY_TABLES: readonly string[] = [
   "chat_group_users",
@@ -1870,7 +1870,9 @@ export const NEW_TABLES: readonly string[] = [
   "session_result_summary",
   "report_settings",
   "ocr_cache",
-  "marksheet_captures"
+  "marksheet_captures",
+  "grade_change_audit",
+  "public_document_tokens"
 ];
 
 export const NEW_TABLE_INDEXES: Readonly<Record<string, readonly IndexExpectation[]>> = {
@@ -2017,12 +2019,32 @@ export const NEW_TABLE_INDEXES: Readonly<Record<string, readonly IndexExpectatio
       ]
     },
     {
-      "name": "archive_objects_school_academic_student_unique",
+      "name": "archive_objects_school_academic_student_version_unique",
       "unique": true,
       "columns": [
         "school_id",
         "academic_id",
-        "student_id"
+        "student_id",
+        "version"
+      ]
+    },
+    {
+      "name": "archive_objects_session_status_index",
+      "unique": false,
+      "columns": [
+        "school_id",
+        "academic_id",
+        "status"
+      ]
+    },
+    {
+      "name": "archive_objects_student_term_index",
+      "unique": false,
+      "columns": [
+        "school_id",
+        "academic_id",
+        "student_id",
+        "exam_type_id"
       ]
     }
   ],
@@ -2112,6 +2134,51 @@ export const NEW_TABLE_INDEXES: Readonly<Record<string, readonly IndexExpectatio
         "exam_type_id",
         "ocr_content_sha256",
         "ocr_parser_version"
+      ]
+    }
+  ],
+  "grade_change_audit": [
+    {
+      "name": "grade_change_audit_result_index",
+      "unique": false,
+      "columns": [
+        "school_id",
+        "result_id"
+      ]
+    },
+    {
+      "name": "grade_change_audit_student_term_index",
+      "unique": false,
+      "columns": [
+        "school_id",
+        "student_id",
+        "academic_id",
+        "exam_type_id"
+      ]
+    }
+  ],
+  "public_document_tokens": [
+    {
+      "name": "public_document_tokens_jti_unique",
+      "unique": true,
+      "columns": [
+        "jti"
+      ]
+    },
+    {
+      "name": "public_document_tokens_hash_unique",
+      "unique": true,
+      "columns": [
+        "token_hash"
+      ]
+    },
+    {
+      "name": "public_document_tokens_student_index",
+      "unique": false,
+      "columns": [
+        "school_id",
+        "student_id",
+        "academic_id"
       ]
     }
   ]

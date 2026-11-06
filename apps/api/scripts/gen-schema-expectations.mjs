@@ -88,7 +88,9 @@ const NEW_TABLES = [
   "session_result_summary",
   "report_settings",
   "ocr_cache",
-  "marksheet_captures"
+  "marksheet_captures",
+  "grade_change_audit",
+  "public_document_tokens"
 ];
 
 const NEW_TABLE_INDEXES = {
@@ -128,7 +130,9 @@ const NEW_TABLE_INDEXES = {
   ],
   archive_objects: [
     { name: "archive_objects_object_key_unique", unique: true, columns: ["object_key"] },
-    { name: "archive_objects_school_academic_student_unique", unique: true, columns: ["school_id", "academic_id", "student_id"] }
+    { name: "archive_objects_school_academic_student_version_unique", unique: true, columns: ["school_id", "academic_id", "student_id", "version"] },
+    { name: "archive_objects_session_status_index", unique: false, columns: ["school_id", "academic_id", "status"] },
+    { name: "archive_objects_student_term_index", unique: false, columns: ["school_id", "academic_id", "student_id", "exam_type_id"] }
   ],
   session_result_summary: [
     { name: "session_result_summary_term_unique", unique: true, columns: ["school_id", "academic_id", "student_id", "term_id"] },
@@ -145,6 +149,15 @@ const NEW_TABLE_INDEXES = {
     { name: "marksheet_captures_student_exam_index", unique: false, columns: ["school_id", "student_id", "exam_type_id"] },
     { name: "marksheet_captures_student_exam_unique", unique: true, columns: ["school_id", "student_id", "exam_type_id"] },
     { name: "marksheet_captures_file_unique", unique: true, columns: ["school_id", "class_id", "section_id", "exam_type_id", "ocr_content_sha256", "ocr_parser_version"] }
+  ],
+  grade_change_audit: [
+    { name: "grade_change_audit_result_index", unique: false, columns: ["school_id", "result_id"] },
+    { name: "grade_change_audit_student_term_index", unique: false, columns: ["school_id", "student_id", "academic_id", "exam_type_id"] }
+  ],
+  public_document_tokens: [
+    { name: "public_document_tokens_jti_unique", unique: true, columns: ["jti"] },
+    { name: "public_document_tokens_hash_unique", unique: true, columns: ["token_hash"] },
+    { name: "public_document_tokens_student_index", unique: false, columns: ["school_id", "student_id", "academic_id"] }
   ]
 };
 
@@ -220,4 +233,4 @@ console.log(`written: ${path.relative(ROOT, OUT)}`);
 if (legacyTables.length !== 62) throw new Error(`expected 62 legacy tables, found ${legacyTables.length}`);
 if (recovered !== 226) throw new Error(`expected 226 recovered indexes, found ${recovered}`);
 if (legacySecondary !== 232) throw new Error(`expected 232 legacy secondary indexes, found ${legacySecondary}`);
-if (NEW_TABLES.length !== 15) throw new Error(`expected 15 new tables, found ${NEW_TABLES.length}`);
+if (NEW_TABLES.length !== 17) throw new Error(`expected 17 new tables, found ${NEW_TABLES.length}`);

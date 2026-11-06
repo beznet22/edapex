@@ -60,6 +60,10 @@ export const recordSchema = z
     titles: z.array(z.string()).default([]).describe("The titles of the marks"),
     markIds: z.array(z.number()).default([]).describe("The IDs of the marks"),
     marks: z.array(z.number()).default([]).describe("The marks for the subject"),
+    absent: z
+      .array(z.boolean())
+      .optional()
+      .describe("Per-mark absence flags; true renders ABS and is excluded from averages"),
     fullMarks: z.array(z.number()).default([]).describe("The maximum marks per exam title"),
     totalScore: z.number().max(100.0).optional().describe("The total score for the subject"),
     grade: z.string().describe("The grade for the subject"),
@@ -84,6 +88,18 @@ export const recordSchema = z
           code: "custom",
           message: "Number of marks must match number of titles",
           path: ["marks"],
+          continue: true
+        });
+      }
+      if (
+        data.absent !== undefined &&
+        data.absent.length !== 0 &&
+        data.absent.length !== data.marks.length
+      ) {
+        ctx.addIssue({
+          code: "custom",
+          message: "Number of absence flags must match number of marks",
+          path: ["absent"],
           continue: true
         });
       }

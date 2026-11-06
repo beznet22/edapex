@@ -49,6 +49,7 @@ const buildRecords = (
       objectives: [],
       titles: [],
       marks: [],
+      absent: [],
       grade: "",
       learningOutcome: result.teacherRemarks
     }));
@@ -69,8 +70,11 @@ const buildRecords = (
       subjectMarks.reduce((sum, mark) => sum + (mark.totalMarks || 0), 0)
     );
     const marksByName: Record<string, number> = {};
+    const absentByName: Record<string, boolean> = {};
     for (const mark of subjectMarks) {
-      marksByName[mark.examTitle ?? "Unknown"] = mark.totalMarks;
+      const title = mark.examTitle ?? "Unknown";
+      marksByName[title] = mark.totalMarks;
+      absentByName[title] = mark.isAbsent === 1;
     }
     const first = subjectMarks[0];
     const objective = objectives.find((entry) => entry.name === first?.subjectCode);
@@ -93,6 +97,7 @@ const buildRecords = (
       objectives: [],
       titles: Object.keys(marksByName),
       marks: Object.values(marksByName),
+      absent: Object.values(absentByName),
       grade: grade.grade,
       color: grade.color,
       ...(objective === undefined ? {} : { learningOutcome: null })

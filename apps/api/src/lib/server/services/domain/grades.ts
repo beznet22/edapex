@@ -47,12 +47,16 @@ export function getGrade(
   return match ? { grade: match.grade, color: match.color } : { grade: "N/A", color: "bg-gray-200" };
 }
 
-/** Parity with the legacy `getClassAverages`, including `Math.fround`. */
+/**
+ * Class averages exclude students whose result is unassessed (`06 §4`): a
+ * missing mark is not a zero, so it must not drag the minimum down.
+ */
 export function computeClassAverages(results: readonly ClassResult[]): ClassAverage {
   const byStudent = new Map<number, number[]>();
   for (const result of results) {
+    if (result.totalMarks === null) continue;
     const values = byStudent.get(result.studentId) ?? [];
-    values.push(result.totalMarks ?? 0);
+    values.push(result.totalMarks);
     byStudent.set(result.studentId, values);
   }
 
