@@ -24,7 +24,7 @@ Port code lands in [`apps/api/`](../../apps/api/AGENTS.md).
 
 ## Current focus
 
-**Phase 1 — D1 schema and migrations.** Complete; Phase 2 (repository layer) is next.
+**Phase 2 — Repository layer.** In progress on `phase-2-repository` (PR targets `phase-1-schema`).
 
 ## Phase status
 
@@ -32,7 +32,7 @@ Port code lands in [`apps/api/`](../../apps/api/AGENTS.md).
 |---|---|---|---|---|---|---|
 | 0 | Scaffolding and guards | done | Kimchi | 2026-11-05 | 2026-11-05 | PR #1 check `port` green ([run 42083953037](https://github.com/beznet22/edapex/actions/runs/42083953037)): typecheck, boundary + self-test, Workers test, D1 apply, both verifiers. Local: `/health` 200. |
 | 1 | D1 schema and migrations | done | Kimchi | 2026-11-06 | 2026-11-06 | PR #2 check `port` green ([run 42181282784](https://github.com/beznet22/edapex/actions/runs/42181282784)): typecheck, boundaries, 17 Workers-pool tests, local D1 apply, drift, both verifiers. Gate: 74 tables (62 legacy + 12 registered), 226 recovered + 5 spec indexes, every table ≤100 columns, `PRAGMA foreign_key_check` zero rows. |
-| 2 | Repository layer | not started | — | — | — | — |
+| 2 | Repository layer | in progress | Kimchi | 2026-11-06 | — | — |
 | 3 | Service layer | not started | — | — | — | — |
 | 4 | HTTP layer | not started | — | — | — | — |
 | 5 | Auth cutover flow | not started | — | — | — | — |

@@ -56,6 +56,12 @@ jobs:
       - name: Import boundary self-test
         run: pnpm run check:boundaries:self
 
+      - name: Repository rules
+        run: pnpm run check:repository
+
+      - name: Repository rule self-test
+        run: pnpm run check:repository:self
+
       - name: Tests
         run: pnpm test
 
