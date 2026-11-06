@@ -1,4 +1,7 @@
+import { and, count, eq } from "drizzle-orm";
+
 import { classAttendances } from "../../db/schema";
+import { batchOrThrow, chunkedInsertIgnore, MAX_BATCH_STATEMENTS } from "../base/d1-helpers";
 import { withErrorHandling } from "../base/error-handling";
 import { requireAcademicId } from "../base/repository-context";
 import type { ScopedRepositoryContext } from "../base/repository-context";
@@ -55,4 +58,93 @@ export async function upsertClassAttendance(
     const [row] = rows;
     return row?.id ?? null;
   }, "upsertClassAttendance");
+}
+
+export type ClassAttendanceRow = typeof classAttendances.$inferSelect;
+
+export async function readClassAttendanceForStudent(
+  ctx: ScopedRepositoryContext,
+  params: { readonly studentId: number; readonly academicId: number }
+): Promise<readonly ClassAttendanceRow[]> {
+  return withErrorHandling(
+    async () =>
+      ctx.db
+        .select()
+        .from(classAttendances)
+        .where(
+          and(
+            eq(classAttendances.schoolId, ctx.tenant.schoolId),
+            eq(classAttendances.academicId, params.academicId),
+            eq(classAttendances.studentId, params.studentId)
+          )
+        ),
+    "readClassAttendanceForStudent"
+  );
+}
+
+export async function countClassAttendanceForStudent(
+  ctx: ScopedRepositoryContext,
+  params: { readonly studentId: number; readonly academicId: number }
+): Promise<number> {
+  return withErrorHandling(async () => {
+    const [row] = await ctx.db
+      .select({ value: count() })
+      .from(classAttendances)
+      .where(
+        and(
+          eq(classAttendances.schoolId, ctx.tenant.schoolId),
+          eq(classAttendances.academicId, params.academicId),
+          eq(classAttendances.studentId, params.studentId)
+        )
+      );
+    return Number(row?.value ?? 0);
+  }, "countClassAttendanceForStudent");
+}
+
+export async function countClassAttendanceForSession(
+  ctx: ScopedRepositoryContext,
+  academicId: number
+): Promise<number> {
+  return withErrorHandling(async () => {
+    const [row] = await ctx.db
+      .select({ value: count() })
+      .from(classAttendances)
+      .where(
+        and(
+          eq(classAttendances.schoolId, ctx.tenant.schoolId),
+          eq(classAttendances.academicId, academicId)
+        )
+      );
+    return Number(row?.value ?? 0);
+  }, "countClassAttendanceForSession");
+}
+
+export async function purgeClassAttendanceForSession(
+  ctx: ScopedRepositoryContext,
+  academicId: number
+): Promise<number> {
+  const removed = await countClassAttendanceForSession(ctx, academicId);
+  await withErrorHandling(async () => {
+    await ctx.db
+      .delete(classAttendances)
+      .where(
+        and(
+          eq(classAttendances.schoolId, ctx.tenant.schoolId),
+          eq(classAttendances.academicId, academicId)
+        )
+      );
+  }, "purgeClassAttendanceForSession");
+  return removed;
+}
+
+export async function restoreClassAttendance(
+  ctx: ScopedRepositoryContext,
+  rows: readonly ClassAttendanceRow[]
+): Promise<void> {
+  await withErrorHandling(async () => {
+    const statements = chunkedInsertIgnore(ctx.db, classAttendances, [...rows], 1);
+    for (let index = 0; index < statements.length; index += MAX_BATCH_STATEMENTS) {
+      await batchOrThrow(ctx.db, statements.slice(index, index + MAX_BATCH_STATEMENTS));
+    }
+  }, "restoreClassAttendance");
 }

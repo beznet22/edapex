@@ -10,3 +10,4 @@ export * from "./ocr-cache.repo";
 export * from "./marksheet-captures.repo";
 export * from "./results-types";
 export * from "./terms";
+export * from "./archive-raw.repo";

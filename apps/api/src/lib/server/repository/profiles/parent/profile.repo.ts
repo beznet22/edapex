@@ -117,3 +117,20 @@ export async function updateParentEmail(
     return true;
   }, "updateParentEmail");
 }
+
+/** Resolves the guardian behind the authenticated user for parent-scoped reads. */
+export async function findParentByUserId(
+  ctx: ScopedRepositoryContext,
+  userId: number
+): Promise<{ readonly parentId: number } | null> {
+  return withErrorHandling(async () => {
+    const [row] = await ctx.db
+      .select({ parentId: smParents.id })
+      .from(smParents)
+      .where(
+        and(eq(smParents.userId, userId), eq(smParents.schoolId, ctx.tenant.schoolId))
+      )
+      .limit(1);
+    return row ?? null;
+  }, "findParentByUserId");
+}

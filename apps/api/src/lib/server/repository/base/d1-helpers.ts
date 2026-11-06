@@ -47,6 +47,40 @@ export function chunkedInsert<TTable extends SQLiteTable>(
   rows: readonly InferInsertModel<TTable>[],
   paramsPerRow: number
 ): BatchItem<"sqlite">[] {
+  if (rows.length === 0) return [];
+  const rowsPerStatement = rowsPerInsert(table, paramsPerRow);
+  const statements: BatchItem<"sqlite">[] = [];
+  for (let index = 0; index < rows.length; index += rowsPerStatement) {
+    const chunk = rows.slice(index, index + rowsPerStatement);
+    statements.push(db.insert(table).values([...chunk]));
+  }
+  return statements;
+}
+
+/**
+ * Same bind math as `chunkedInsert`, but conflicts are ignored so restore is
+ * idempotent. Nullable-key unique indexes still treat NULLs as distinct.
+ */
+export function chunkedInsertIgnore<TTable extends SQLiteTable>(
+  db: RepositoryDb,
+  table: TTable,
+  rows: readonly InferInsertModel<TTable>[],
+  paramsPerRow: number
+): BatchItem<"sqlite">[] {
+  if (rows.length === 0) return [];
+  const rowsPerStatement = rowsPerInsert(table, paramsPerRow);
+  const statements: BatchItem<"sqlite">[] = [];
+  for (let index = 0; index < rows.length; index += rowsPerStatement) {
+    const chunk = rows.slice(index, index + rowsPerStatement);
+    statements.push(db.insert(table).values([...chunk]).onConflictDoNothing());
+  }
+  return statements;
+}
+
+function rowsPerInsert<TTable extends SQLiteTable>(
+  table: TTable,
+  paramsPerRow: number
+): number {
   if (!Number.isInteger(paramsPerRow) || paramsPerRow < 1) {
     throw new RangeError("paramsPerRow must be a positive integer");
   }
@@ -55,7 +89,6 @@ export function chunkedInsert<TTable extends SQLiteTable>(
       `paramsPerRow (${paramsPerRow}) exceeds the D1 bind limit of ${MAX_BINDS}`
     );
   }
-  if (rows.length === 0) return [];
 
   // Drizzle emits every table column for a multi-row insert, including columns
   // the caller omitted. The real bind count per row is therefore the column
@@ -68,13 +101,7 @@ export function chunkedInsert<TTable extends SQLiteTable>(
     );
   }
 
-  const rowsPerStatement = Math.max(1, Math.floor(MAX_BINDS / effectiveParamsPerRow));
-  const statements: BatchItem<"sqlite">[] = [];
-  for (let index = 0; index < rows.length; index += rowsPerStatement) {
-    const chunk = rows.slice(index, index + rowsPerStatement);
-    statements.push(db.insert(table).values([...chunk]));
-  }
-  return statements;
+  return Math.max(1, Math.floor(MAX_BINDS / effectiveParamsPerRow));
 }
 
 /**

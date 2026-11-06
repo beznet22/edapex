@@ -1,5 +1,6 @@
 import * as academics from "../../repository/academics";
 import * as accounts from "../../repository/accounts";
+import * as archive from "../../repository/archive";
 import * as assessments from "../../repository/assessments";
 import * as attendance from "../../repository/attendance";
 import * as communications from "../../repository/communications";
@@ -15,6 +16,7 @@ import type {
   TenantContext,
   UnscopedRepositoryContext
 } from "../../repository/base/repository-context";
+import { createRepositoryContext } from "../../repository/base/repository-context";
 import { TenantScopeError } from "../errors";
 import type { ServicePorts } from "../ports";
 import type { Logger } from "./logger";
@@ -41,6 +43,7 @@ export interface ServiceEnv {
   readonly GOOGLE_CLIENT_SECRET?: string;
   readonly GOOGLE_REDIRECT_URI?: string;
   readonly POST_LOGIN_REDIRECT?: string;
+  readonly ARCHIVE_TOKEN_SECRET?: string;
 }
 
 /**
@@ -59,6 +62,7 @@ export interface RepositoryAccess {
   readonly reference: typeof reference;
   readonly queries: typeof queries;
   readonly fees: typeof fees;
+  readonly archive: typeof archive;
 }
 
 export function createRepositoryAccess(ctx: RepositoryContext): RepositoryAccess {
@@ -73,7 +77,8 @@ export function createRepositoryAccess(ctx: RepositoryContext): RepositoryAccess
     communications,
     reference,
     queries,
-    fees
+    fees,
+    archive
   });
 }
 
@@ -122,4 +127,20 @@ export function requireUnscopedContext(ctx: RepositoryContext): UnscopedReposito
     throw new TenantScopeError("This operation requires a pre-tenant context");
   }
   return ctx;
+}
+
+/**
+ * Rebuilds a request context around a verified tenant. Only the public document
+ * route uses it: the school comes from the signed token row, never a header.
+ */
+export function withTenantContext(ctx: ServiceContext, tenant: TenantContext): ServiceContext {
+  const repositoryCtx = createRepositoryContext(ctx.repos.ctx.db, tenant, ctx.config);
+  return Object.freeze({
+    repos: createRepositoryAccess(repositoryCtx),
+    ports: ctx.ports,
+    config: ctx.config,
+    cache: ctx.cache,
+    logger: ctx.logger,
+    tenant: repositoryCtx.tenant
+  });
 }

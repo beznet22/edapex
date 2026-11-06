@@ -1,7 +1,7 @@
 import { and, avg, eq, or, sql } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
 
-import { smExamSetups, smMarksGrades, smResultStores } from "../../db/schema";
+import { smExamSetups, smMarkStores, smMarksGrades, smResultStores } from "../../db/schema";
 import { batchOrThrow, chunkedInArray, chunkedInsert } from "../base/d1-helpers";
 import { withErrorHandling } from "../base/error-handling";
 import { requireAcademicId } from "../base/repository-context";
@@ -141,3 +141,89 @@ const uniqueNumbers = (values: readonly (number | null | undefined)[]): number[]
   }
   return [...set];
 };
+
+export type ResultStoreRow = typeof smResultStores.$inferSelect;
+
+export async function findResultById(
+  ctx: ScopedRepositoryContext,
+  resultId: number
+): Promise<ResultStoreRow | null> {
+  return withErrorHandling(async () => {
+    const [row] = await ctx.db
+      .select()
+      .from(smResultStores)
+      .where(
+        and(
+          eq(smResultStores.id, resultId),
+          eq(smResultStores.schoolId, ctx.tenant.schoolId)
+        )
+      )
+      .limit(1);
+    return row ?? null;
+  }, "findResultById");
+}
+
+export interface OverrideResultInput {
+  readonly resultId: number;
+  readonly studentId: number;
+  readonly academicId: number;
+  readonly examSetupId: number | null;
+  readonly totalMarks: number;
+  readonly totalGpaPoint: number | null;
+  readonly totalGpaGrade: string | null;
+  readonly isAbsent: number;
+  readonly teacherRemarks: string | null;
+  readonly updatedBy: number;
+}
+
+/**
+ * Writes the result and its underlying mark together. An audited correction is
+ * worthless if the two rows disagree, so both statements share one batch.
+ */
+export async function overrideResultAndMark(
+  ctx: ScopedRepositoryContext,
+  input: OverrideResultInput
+): Promise<void> {
+  await withErrorHandling(async () => {
+    const statements: BatchItem<"sqlite">[] = [
+      ctx.db
+        .update(smResultStores)
+        .set({
+          totalMarks: input.totalMarks,
+          totalGpaPoint: input.totalGpaPoint,
+          totalGpaGrade: input.totalGpaGrade,
+          isAbsent: input.isAbsent,
+          teacherRemarks: input.teacherRemarks,
+          updatedBy: input.updatedBy
+        })
+        .where(
+          and(
+            eq(smResultStores.id, input.resultId),
+            eq(smResultStores.schoolId, ctx.tenant.schoolId),
+            eq(smResultStores.academicId, input.academicId)
+          )
+        )
+    ];
+    if (input.examSetupId !== null) {
+      statements.push(
+        ctx.db
+          .update(smMarkStores)
+          .set({
+            totalMarks: input.totalMarks,
+            isAbsent: input.isAbsent,
+            teacherRemarks: input.teacherRemarks,
+            updatedBy: input.updatedBy
+          })
+          .where(
+            and(
+              eq(smMarkStores.examSetupId, input.examSetupId),
+              eq(smMarkStores.studentId, input.studentId),
+              eq(smMarkStores.schoolId, ctx.tenant.schoolId),
+              eq(smMarkStores.academicId, input.academicId)
+            )
+          )
+      );
+    }
+    await batchOrThrow(ctx.db, statements);
+  }, "overrideResultAndMark");
+}
