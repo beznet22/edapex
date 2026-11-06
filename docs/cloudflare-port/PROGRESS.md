@@ -24,7 +24,7 @@ Port code lands in [`apps/api/`](../../apps/api/AGENTS.md).
 
 ## Current focus
 
-**Phase 5 — Auth cutover flow.** Complete on `phase-5-auth` (PR #6, check `port` green); Phase 6 (archive and retrieval) is next.
+**Phase 6 — Archive and retrieval.** In progress on `phase-6-archive` (PR into `phase-5-auth`); Phase 7 (migration execution) is next.
 
 ## Phase status
 
@@ -36,7 +36,7 @@ Port code lands in [`apps/api/`](../../apps/api/AGENTS.md).
 | 3 | Service layer | done | Kimchi | 2026-11-06 | 2026-11-06 | PR #4 check `port` green ([run 42265759924](https://github.com/beznet22/edapex/actions/runs/42265759924)): typecheck, 292 tests (55 files), boundaries, repository + service guards (53 service files, 45-file tree), method map 53/53 (37 mapped + 2 merged + 7 deleted + 5 retired + 2 out of scope), 77 tables, drift clean, both verifiers, report-settings import 1 file → 1 row verified. |
 | 4 | HTTP layer | done | Kimchi | 2026-11-06 | 2026-11-06 | PR #5 check `port` green ([run 42280594997](https://github.com/beznet22/edapex/actions/runs/42280594997)): typecheck, 399 tests / 80 files, boundary/repository/service/HTTP guards + self-tests, repository map 108/108, service map 53/53, D1 apply, drift, deploy dry-run, both verifiers. Gate: 19 route modules / 42 handlers, 422 byte-compatible, `hc<AppType>` type test, CORS/tenant/dropped-route suites green. |
 | 5 | Auth cutover flow | done | Kimchi | 2026-11-06 | 2026-11-06 | PR #6 check `port` green ([run 42288628524](https://github.com/beznet22/edapex/actions/runs/42288628524)): typecheck, 505 tests / 100 files, all guards + self-tests, 0002 apply + drift, deploy dry-run, both verifiers. Gate: claim → Google → session on local D1, 409 `AMBIGUOUS_EMAIL`, reissue revokes sessions, claim CPU 0.055 ms/attempt (Workers pool); `wrangler dev` handler p50 ~17 ms wall clock. |
-| 6 | Archive and retrieval | not started | — | — | — | — |
+| 6 | Archive and retrieval | in progress | Kimchi | 2026-11-06 | — | Local gate: typecheck, full Workers suite, all guards, 0003 apply + drift, deploy dry-run, both verifiers. CI pending on the PR. |
 | 7 | Migration execution | not started | — | — | — | — |
 | 8 | Cutover | not started | — | — | — | — |
 | 9 | Post-cutover | not started | — | — | — | — |
@@ -95,10 +95,10 @@ Port code lands in [`apps/api/`](../../apps/api/AGENTS.md).
 - [x] Claim flow under 10 ms CPU on `wrangler dev` — 0.055 ms/attempt in the Workers pool; `wrangler dev` handler p50 ~17 ms (D1 I/O + dev proxy), see the decision log
 
 ### Phase 6 — Archive
-- [ ] Archive/restore round-trip on a fixture
-- [ ] Checksum mismatch quarantines without aborting
-- [ ] Published versions immutable; supersede creates *n+1*
-- [ ] Wipe blocked without the second admin token
+- [x] Archive/restore round-trip on a fixture — `tests/services/restore.test.ts`
+- [x] Checksum mismatch quarantines without aborting — `tests/services/archive-job.test.ts`
+- [x] Published versions immutable; supersede creates *n+1* — `tests/services/report-card.test.ts`
+- [x] Wipe blocked without the second admin token — `tests/services/wipe.test.ts`
 
 ### Phase 7 — Migration
 - [ ] Integrity gate zero (or audited waiver)
@@ -150,6 +150,12 @@ Port code lands in [`apps/api/`](../../apps/api/AGENTS.md).
 | 2026-11-06 | 5 | Local gate: typecheck, 505 tests / 100 files, all guards + self-tests, migration apply + drift, deploy dry-run, both verifiers (365 links, 219 anchors, 62 tables, 0 failures) | Kimchi |
 | 2026-11-06 | 5 | Benchmark: claim CPU 0.055 ms/attempt (Workers pool); `wrangler dev` valid p50 35.6 ms, unknown p50 28.5 ms wall clock after batching the four rate-limit windows into one D1 round trip | Kimchi |
 | 2026-11-06 | 5 | Phase 5 gate passed: PR #6 check `port` green ([run 42288628524](https://github.com/beznet22/edapex/actions/runs/42288628524)); 505 tests, all guards, 0002 apply + drift, dry-run and both verifiers | Kimchi |
+| 2026-11-06 | 6 | Schema: `archive_objects` gains `exam_type_id`, `status`, `published_at`, `published_by`, `reason`, `error` and a version-scoped unique index; `session_jobs` is rebuilt with `wipe`, `cancelled`, `awaiting_approval` and actor/approval columns; `grade_change_audit` and `public_document_tokens` added (77 → 79 tables) | Kimchi |
+| 2026-11-06 | 6 | Repositories: archive aggregate (objects, jobs, summaries, grade audit, tokens), raw assessment/attendance capture, idempotent restore helpers, R2 archive-store port; signed payloads move to `services/crypto/signed-payload.ts` | Kimchi |
+| 2026-11-06 | 6 | Services: student-session capture, resumable archive job, manifest, purge, read-only restore, job control, dual-admin wipe, retrieval (live/archive marksheet, per-session and cross-session transcript, versions), JSON render payloads, public token/route, review/publish/supersede/override and session write rejection | Kimchi |
+| 2026-11-06 | 6 | HTTP: `/students/:id/marksheets*`, `/students/:id/transcripts*`, the four `…/pdf` payload routes, `/r/:token`, `/admin/sessions/*`, `/admin/jobs/*`, `/admin/archive`, `/admin/tokens/:tokenId/revoke`, `/admin/results/:id/override`; `24` route modules and `42+` handlers now inspected by `check:http` | Kimchi |
+| 2026-11-06 | 6 | Local gate: typecheck, full Workers suite, repository/service/HTTP/boundary guards + self-tests, migration 0003 apply on a populated `session_jobs` table, drift, deploy dry-run, both verifiers | Kimchi |
+| 2026-11-06 | 6 | Deviations: `…/pdf` returns a JSON render payload (ironpress stays client-side; its Node binding is filesystem-bound and not Workers-ready); retention sweep/policy deferred to Phase 9; `archive-objects` split into a maintenance repo to stay under the 300-line cap; `class_attendances` stays in the assessment archive raw rows; `session-writable` is a free guard (service-to-service imports are banned) | Kimchi |
 
 ## Blockers and decisions
 
@@ -185,6 +191,15 @@ Port code lands in [`apps/api/`](../../apps/api/AGENTS.md).
 | Phase 5 merge guard | Phase 5+ | decided — a merge loser that still owns a `sm_students`/`sm_staffs`/`sm_parents` row is refused with 409, because the persona FK cascades on user delete; reassign the email first | — |
 | Phase 5 reset scope | Phase 5+ | decided — the D1 reset is school-scoped, idempotent, and skips `claimed`/`flagged`; the source-MySQL step uses `gen-claim-reset-sql.mjs` and is not automatic | — |
 | Phase 5 CPU gate | Phase 5+ | decided — `04 §1` and `04a §7` define the 10 ms figure as CPU. Measured 0.055 ms/attempt in the Workers pool. `wrangler dev` wall clock is ~28 ms p50 (three D1 round trips plus the dev proxy) and is not the CPU budget | — |
+| Phase 6 PDF boundary | Phase 6+ | decided — spec `06 §5` lists `…/pdf` routes, but ironpress is a client-side Rust/WASM renderer and its Node binding loads the WASM through the filesystem. The API returns `{ templateVersion, version, publishedAt, filename, document }`; no binary and no new dependency. Deviation recorded in the PR | — |
+| Phase 6 version unit | Phase 6+ | decided — one `archive_objects` row per student-session snapshot, with `version` scoped by `(school, academic, student, version)`. `draft` is the absence of a row, `reviewed` is a snapshot, `publish` flips it, `supersede` writes *n+1* and marks *n* `superseded` | — |
+| Phase 6 public tokens | Phase 6+ | decided — HMAC-signed payload (`studentId`, `sessionId`, `examTypeId`, `version`, `jti`, `exp`) plus a `public_document_tokens` row for revocation and the `:tokenId` endpoint. Tokens are 30 days, single-purpose, revocable | — |
+| Phase 6 purge scope | Phase 6+ | decided — purge removes marks, results, ratings, remarks, student attendance and class attendance for the session; term/exam/setup definitions and the archive index/summaries stay, so restore is insert-only | — |
+| Phase 6 retention | Phase 6/9 | deferred — `06 §7.1` sweep and policy endpoints stay Phase 9 work; Phase 6 owns archive, retrieval, versioning and controlled deletion only | — |
+| Phase 6 R2 namespace | Phase 6+ | decided — archive objects reuse the `MEDIA` bucket under `schools/{schoolId}/sessions/{sessionId}/students/{studentId}/v{n}.json`; no new binding | — |
+| Phase 6 `session_jobs` rebuild | Phase 6+ | decided — the kind/status CHECKs cannot be altered in place; the table has no dependents, so migration 0003 rebuilds it with `PRAGMA defer_foreign_keys=on` and preserves rows (verified on a populated scratch DB) | — |
+| Phase 6 read-only restore | Phase 6+ | decided — `assertSessionWritable` (a free guard, because service-to-service imports are banned) rejects `archived`, `restoring` and `archived_readable` sessions in entry, feedback, attendance, publish, lifecycle and subject-assignment services. Report-card corrections/overrides intentionally bypass it | — |
+| Phase 6 absent marks | Phase 6+ | decided — marksheet records gain an optional `absent: boolean[]`; class averages now exclude null/unassessed totals. The existing `Marksheet` fields are unchanged | — |
 
 ## Notes
 

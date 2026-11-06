@@ -1,5 +1,6 @@
 import { AttributeRemark } from "../../../constants/assessment";
 import type { ServiceContext } from "../context";
+import { assertSessionWritable } from "../tenant/session-writable";
 import { requireScopedContext } from "../context";
 import { ValidationError } from "../errors";
 
@@ -25,6 +26,7 @@ export class AssessmentFeedbackService {
   constructor(private readonly ctx: ServiceContext) {}
 
   async upsertTeacherRemark(input: TeacherRemarkInput): Promise<void> {
+    await assertSessionWritable(this.ctx);
     if (input.studentId <= 0 || input.examTypeId <= 0) {
       throw new ValidationError("Student id and exam type id are required", "studentId");
     }
@@ -41,6 +43,7 @@ export class AssessmentFeedbackService {
   }
 
   async upsertStudentRatings(input: StudentRatingsInput): Promise<void> {
+    await assertSessionWritable(this.ctx);
     if (input.studentId <= 0 || input.examTypeId <= 0) {
       throw new ValidationError("Student id and exam type id are required", "studentId");
     }

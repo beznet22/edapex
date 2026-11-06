@@ -30,3 +30,51 @@ export const jobListQuery = z.object({
     .enum(["queued", "running", "completed", "failed", "cancelled", "awaiting_approval"])
     .optional()
 });
+
+export const studentIdParams = z.object({
+  id: z.coerce.number().int().positive()
+});
+
+export const marksheetParams = z.object({
+  id: z.coerce.number().int().positive(),
+  examTypeId: z.coerce.number().int().positive()
+});
+
+export const archivedMarksheetParams = z.object({
+  id: z.coerce.number().int().positive(),
+  sessionId: z.coerce.number().int().positive(),
+  examTypeId: z.coerce.number().int().positive()
+});
+
+export const transcriptParams = z.object({
+  id: z.coerce.number().int().positive(),
+  sessionId: z.coerce.number().int().positive()
+});
+
+export const marksheetQuery = z.object({
+  examTypeId: z.coerce.number().int().positive().optional(),
+  sessionId: z.coerce.number().int().positive().optional()
+});
+
+export const tokenParams = z.object({
+  token: z.string().min(1)
+});
+
+export const tokenIdParams = z.object({
+  tokenId: z.coerce.number().int().positive()
+});
+
+export const supersedeBody = z.object({
+  reason: z.string().min(1)
+});
+
+export const overrideBody = z.object({
+  reason: z.string().min(1),
+  totalMarks: z.number().min(0).max(100).optional(),
+  isAbsent: z.boolean().optional(),
+  teacherRemarks: z.string().nullable().optional()
+});
+
+export const resultParams = z.object({
+  id: z.coerce.number().int().positive()
+});

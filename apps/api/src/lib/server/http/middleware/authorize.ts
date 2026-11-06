@@ -21,6 +21,14 @@ export const currentUserId = (c: Context<AppContext>): number => {
   return user.id;
 };
 
+export const retrievalActor = (
+  c: Context<AppContext>
+): { readonly userId: number; readonly isStaff: boolean } => {
+  const user = c.get("user");
+  if (user === null) throw new AuthError();
+  return { userId: user.id, isStaff: user.staffId !== null };
+};
+
 export const staffIdOf = (c: Context<AppContext>): number => {
   const user = c.get("user");
   if (user === null) throw new AuthError();

@@ -1,5 +1,6 @@
 import type { ArchiveDocument } from "../../../schema/archive";
 import { archiveDocumentSchema } from "../../../schema/archive";
+import type { ArchiveStorePort } from "../ports";
 
 export const ARCHIVE_OBJECT_PREFIX = "schools";
 
@@ -51,4 +52,28 @@ export async function sha256BytesHex(bytes: Uint8Array): Promise<string> {
   return [...new Uint8Array(digest)]
     .map((byte) => byte.toString(16).padStart(2, "0"))
     .join("");
+}
+
+export interface ArchiveRowLike {
+  readonly objectKey: string;
+  readonly checksum: string;
+}
+
+export type ReadArchiveResult =
+  | { readonly kind: "ok"; readonly document: ArchiveDocument }
+  | { readonly kind: "missing" }
+  | { readonly kind: "checksum" }
+  | { readonly kind: "unsupported"; readonly schemaVersion: number }
+  | { readonly kind: "invalid" };
+
+/** Reads, verifies and decodes one object; callers map the failures. */
+export async function readArchiveDocument(
+  store: ArchiveStorePort,
+  row: ArchiveRowLike
+): Promise<ReadArchiveResult> {
+  const bytes = await store.get(row.objectKey);
+  if (bytes === null) return { kind: "missing" };
+  const checksum = await sha256BytesHex(bytes);
+  if (checksum !== row.checksum) return { kind: "checksum" };
+  return decodeArchiveDocument(bytes);
 }

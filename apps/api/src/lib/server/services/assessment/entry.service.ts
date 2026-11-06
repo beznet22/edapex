@@ -1,6 +1,7 @@
 import { AttributeRemark, type AssessmentCategory } from "../../../constants/assessment";
 import { marksheetSchema, type Marksheet } from "../../../schema/marksheet";
 import type { ServiceContext } from "../context";
+import { assertSessionWritable } from "../tenant/session-writable";
 import { requireScopedContext } from "../context";
 import { ValidationError } from "../errors";
 import type { MarkStoreEntry, MarksInputRow } from "../domain";
@@ -90,6 +91,7 @@ export class AssessmentEntryService {
     input: StudentResultInput,
     staffId: number
   ): Promise<MarkResponse> {
+    await assertSessionWritable(this.ctx);
     if (!Number.isInteger(staffId) || staffId <= 0) {
       throw new ValidationError("A positive staff id is required", "staffId");
     }
@@ -149,6 +151,7 @@ export class AssessmentEntryService {
   }
 
   async upsertMarksheet(marksheet: Marksheet, staffId: number): Promise<Marksheet> {
+    await assertSessionWritable(this.ctx);
     if (!Number.isInteger(staffId) || staffId <= 0) {
       throw new ValidationError("A positive staff id is required", "staffId");
     }

@@ -1,4 +1,5 @@
 import type { ServiceContext } from "../context";
+import { assertSessionWritable } from "../tenant/session-writable";
 import { requireScopedContext } from "../context";
 import { ValidationError } from "../errors";
 
@@ -46,6 +47,7 @@ export class StudentLifecycleService {
     input: PromoteStudentInput,
     staffId: number
   ): Promise<PromoteStudentResult> {
+    await assertSessionWritable(this.ctx);
     if (input.studentId <= 0 || input.classId <= 0 || input.sectionId <= 0) {
       throw new ValidationError("Student, class and section are required", "studentId");
     }
@@ -170,6 +172,7 @@ export class StudentLifecycleService {
   }
 
   async demoteStudent(input: DemoteStudentInput): Promise<DemoteStudentResult> {
+    await assertSessionWritable(this.ctx);
     if (input.studentId <= 0) {
       throw new ValidationError("A positive student id is required", "studentId");
     }
@@ -260,6 +263,7 @@ export class StudentLifecycleService {
   }
 
   async setActiveStatus(studentId: number, active: boolean): Promise<StudentStatusView> {
+    await assertSessionWritable(this.ctx);
     if (!Number.isInteger(studentId) || studentId <= 0) {
       throw new ValidationError("A positive student id is required", "studentId");
     }

@@ -19,6 +19,7 @@ export type ServiceErrorCode =
   | "NOT_FOUND"
   | "SESSION_READ_ONLY"
   | "ARCHIVE_INCOMPLETE"
+  | "ARCHIVE_VERSION_UNSUPPORTED"
   | "WIPE_APPROVAL_REQUIRED"
   | "JOB_STATE_INVALID";
 
@@ -168,6 +169,15 @@ export class ArchiveIncompleteError extends ServiceError {
   constructor(message: string, gaps: readonly string[] = []) {
     super("ARCHIVE_INCOMPLETE", message);
     this.gaps = gaps;
+  }
+}
+
+export class ArchiveVersionError extends ServiceError {
+  readonly schemaVersion: number;
+
+  constructor(schemaVersion: number) {
+    super("ARCHIVE_VERSION_UNSUPPORTED", `Archive schema version ${schemaVersion} is not supported`);
+    this.schemaVersion = schemaVersion;
   }
 }
 

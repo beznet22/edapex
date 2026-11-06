@@ -1,4 +1,5 @@
 import type { ServiceContext } from "../context";
+import { assertSessionWritable } from "../tenant/session-writable";
 import { requireScopedContext } from "../context";
 import { TenantScopeError, ValidationError } from "../errors";
 
@@ -20,6 +21,7 @@ export class SubjectAssignmentService {
   constructor(private readonly ctx: ServiceContext) {}
 
   async assign(input: SubjectAssignmentInput): Promise<SubjectAssignmentResult> {
+    await assertSessionWritable(this.ctx);
     const scoped = requireScopedContext(this.ctx.repos.ctx);
     const { classId, sectionId, academicId, schoolId } = scoped.tenant;
     if (classId === null || sectionId === null || academicId === null) {
