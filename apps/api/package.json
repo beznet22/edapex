@@ -19,7 +19,10 @@
     "db:migrate:local": "wrangler d1 migrations apply DB --local",
     "check:schema-drift": "drizzle-kit generate && git diff --exit-code -- src/lib/server/db/migrations",
     "check:boundaries": "node scripts/check-import-boundaries.mjs",
-    "check:boundaries:self": "node scripts/check-import-boundaries.mjs --self-test"
+    "check:boundaries:self": "node scripts/check-import-boundaries.mjs --self-test",
+    "check:repository": "node scripts/check-repository-rules.mjs",
+    "check:repository:self": "node scripts/check-repository-rules.mjs --self-test",
+    "check:repository-map": "node scripts/check-repository-map.mjs"
   },
   "dependencies": {
     "drizzle-orm": "^0.44.7",
