@@ -24,7 +24,7 @@ Port code lands in [`apps/api/`](../../apps/api/AGENTS.md).
 
 ## Current focus
 
-**Phase 5 — Auth cutover flow.** Implemented on `phase-5-auth` (PR into `phase-4-http`); awaiting the `port` check. Phase 6 (archive and retrieval) is next.
+**Phase 5 — Auth cutover flow.** Complete on `phase-5-auth` (PR #6, check `port` green); Phase 6 (archive and retrieval) is next.
 
 ## Phase status
 
@@ -35,7 +35,7 @@ Port code lands in [`apps/api/`](../../apps/api/AGENTS.md).
 | 2 | Repository layer | done | Kimchi | 2026-11-06 | 2026-11-06 | PR #3 check `port` green ([run 42233886498](https://github.com/beznet22/edapex/actions/runs/42233886498)): typecheck, boundaries, repository rules + self-test, map completeness, 139 Workers-pool tests, local D1 apply, drift, both verifiers. Gate: 108 `01b` rows (103 implemented + 4 retired + 2 non-async), zero `db.transaction(`, zero `any`, 66 guarded files ≤300 lines, tenant-isolation suite green. |
 | 3 | Service layer | done | Kimchi | 2026-11-06 | 2026-11-06 | PR #4 check `port` green ([run 42265759924](https://github.com/beznet22/edapex/actions/runs/42265759924)): typecheck, 292 tests (55 files), boundaries, repository + service guards (53 service files, 45-file tree), method map 53/53 (37 mapped + 2 merged + 7 deleted + 5 retired + 2 out of scope), 77 tables, drift clean, both verifiers, report-settings import 1 file → 1 row verified. |
 | 4 | HTTP layer | done | Kimchi | 2026-11-06 | 2026-11-06 | PR #5 check `port` green ([run 42280594997](https://github.com/beznet22/edapex/actions/runs/42280594997)): typecheck, 399 tests / 80 files, boundary/repository/service/HTTP guards + self-tests, repository map 108/108, service map 53/53, D1 apply, drift, deploy dry-run, both verifiers. Gate: 19 route modules / 42 handlers, 422 byte-compatible, `hc<AppType>` type test, CORS/tenant/dropped-route suites green. |
-| 5 | Auth cutover flow | in progress | Kimchi | 2026-11-06 | — | Local gate green: typecheck, 505 tests (100 files), all guards + self-tests, 0002 apply + drift, deploy dry-run, both verifiers. Gate: claim → Google → session on local D1, 409 `AMBIGUOUS_EMAIL`, reissue revokes sessions, claim CPU 0.055 ms/attempt. PR open into `phase-4-http`; CI evidence to follow. |
+| 5 | Auth cutover flow | done | Kimchi | 2026-11-06 | 2026-11-06 | PR #6 check `port` green ([run 42288628524](https://github.com/beznet22/edapex/actions/runs/42288628524)): typecheck, 505 tests / 100 files, all guards + self-tests, 0002 apply + drift, deploy dry-run, both verifiers. Gate: claim → Google → session on local D1, 409 `AMBIGUOUS_EMAIL`, reissue revokes sessions, claim CPU 0.055 ms/attempt (Workers pool); `wrangler dev` handler p50 ~17 ms wall clock. |
 | 6 | Archive and retrieval | not started | — | — | — | — |
 | 7 | Migration execution | not started | — | — | — | — |
 | 8 | Cutover | not started | — | — | — | — |
@@ -149,6 +149,7 @@ Port code lands in [`apps/api/`](../../apps/api/AGENTS.md).
 | 2026-11-06 | 5 | HTTP: `/claim`, `/auth/google/*`, `/auth/code`, `/auth/mobile/code`, `/admin/student-codes/*`, `/admin/duplicate-emails/*`, `/admin/auth/claim-reset`; `__Host-` cookies, content negotiation middleware, legacy login retirement flag | Kimchi |
 | 2026-11-06 | 5 | Local gate: typecheck, 505 tests / 100 files, all guards + self-tests, migration apply + drift, deploy dry-run, both verifiers (365 links, 219 anchors, 62 tables, 0 failures) | Kimchi |
 | 2026-11-06 | 5 | Benchmark: claim CPU 0.055 ms/attempt (Workers pool); `wrangler dev` valid p50 35.6 ms, unknown p50 28.5 ms wall clock after batching the four rate-limit windows into one D1 round trip | Kimchi |
+| 2026-11-06 | 5 | Phase 5 gate passed: PR #6 check `port` green ([run 42288628524](https://github.com/beznet22/edapex/actions/runs/42288628524)); 505 tests, all guards, 0002 apply + drift, dry-run and both verifiers | Kimchi |
 
 ## Blockers and decisions
 
@@ -191,5 +192,5 @@ Port code lands in [`apps/api/`](../../apps/api/AGENTS.md).
 - Phase gates are cumulative: a later phase passing does not excuse an earlier gate that was skipped.
 - Phase 3 landed on `phase-3-services` (PR #4) with `phase-2-repository` as the PR base; the `port` check is green on run 42265759924.
 - Phase 4 landed on `phase-4-http` (PR #5) with `phase-3-services` as the PR base; the `port` check is green on run 42280594997.
-- Phase 5 landed on `phase-5-auth` with `phase-4-http` as the PR base; the local gate is green and CI evidence is added when the `port` check completes.
+- Phase 5 landed on `phase-5-auth` with `phase-4-http` as the PR base; the `port` check is green on run 42288628524.
 - Phase 0 landed on `phase-0-scaffolding` (PR #1). `main` was not pushed because Dokploy deploys on commit; the branch carries the preflight spec-suite commit `b83de20`. Do not push `main` until the Dokploy trigger is confirmed blocked.
