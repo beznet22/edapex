@@ -51,6 +51,48 @@ describe("middleware order", () => {
     expect(await response.json()).toMatchObject({ error: "VALIDATION_FAILED" });
   });
 
+  it("keeps the claim and Google routes outside the auth middleware", async () => {
+    const response = await request(app, "/api/v1/auth/claim", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email: "someone@example.test", password: "x" })
+    });
+    expect(response.status).not.toBe(401);
+    expect(response.status).not.toBe(403);
+
+    const start = await request(app, "/api/v1/auth/google/start");
+    expect(start.status).not.toBe(401);
+    expect(start.status).not.toBe(403);
+  });
+
+  it("gates the admin surface after tenant resolution", async () => {
+    const anonymous = await request(app, "/api/v1/admin/duplicate-emails");
+    expect(anonymous.status).toBe(401);
+
+    const missingTenant = await request(app, "/api/v1/admin/duplicate-emails", {
+      headers: { cookie }
+    });
+    expect(missingTenant.status).toBe(400);
+
+    const partialScope = await request(app, "/api/v1/admin/duplicate-emails", {
+      headers: {
+        cookie,
+        "X-Academic-Id": String(school.academicId),
+        "X-Class-Id": String(school.classId)
+      }
+    });
+    expect(partialScope.status).toBe(422);
+    expect(await partialScope.json()).toMatchObject({ error: "TENANT_SCOPE_REQUIRED" });
+
+    const nonAdmin = await request(app, "/api/v1/admin/duplicate-emails", {
+      headers: {
+        cookie,
+        "X-Academic-Id": String(school.academicId)
+      }
+    });
+    expect(nonAdmin.status).toBe(403);
+  });
+
   it("rate-limits auth attempts before the handler", async () => {
     const ip = "203.0.113.77";
     let lastStatus = 0;

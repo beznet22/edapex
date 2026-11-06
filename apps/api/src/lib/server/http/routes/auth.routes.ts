@@ -1,32 +1,18 @@
 import { Hono } from "hono";
-import { deleteCookie, setCookie } from "hono/cookie";
 import type { Context } from "hono";
 
 import { createService, AuthService, SessionService } from "../../services";
-import { AuthError } from "../../services/errors";
+import { AuthError, PasswordLoginRetiredError } from "../../services/errors";
+import { clearSessionCookie, setSessionCookie } from "../cookies";
 import { toUserDto } from "../dto/auth";
 import type { AppContext } from "../env";
-import { SESSION_COOKIE } from "../middleware/auth";
 import { loginBody, mobileTokenBody } from "../schemas/auth";
 import { jsonBody } from "../validation";
 
-const setSessionCookie = (
-  c: Context<AppContext>,
-  token: string,
-  expiresAt: number
-): void => {
-  const now = Math.floor(Date.now() / 1000);
-  setCookie(c, SESSION_COOKIE, token, {
-    httpOnly: true,
-    secure: true,
-    sameSite: "Lax",
-    path: "/",
-    maxAge: Math.max(0, expiresAt - now)
-  });
-};
-
-const clearSessionCookie = (c: Context<AppContext>): void => {
-  deleteCookie(c, SESSION_COOKIE, { path: "/", secure: true });
+const assertLegacyLogin = (c: Context<AppContext>): void => {
+  if (!c.get("baseCtx").ports.authConfig.legacyPasswordLogin) {
+    throw new PasswordLoginRetiredError();
+  }
 };
 
 const sessionTokenOf = (c: Context<AppContext>): string => {
@@ -37,6 +23,7 @@ const sessionTokenOf = (c: Context<AppContext>): string => {
 
 export const publicAuth = new Hono<AppContext>()
   .post("/login", jsonBody(loginBody), async (c) => {
+    assertLegacyLogin(c);
     const body = c.req.valid("json");
     const result = await createService(AuthService, c.get("baseCtx")).login({
       identifier: body.identifier,
@@ -52,6 +39,7 @@ export const publicAuth = new Hono<AppContext>()
     );
   })
   .post("/mobile/login", jsonBody(loginBody), async (c) => {
+    assertLegacyLogin(c);
     const body = c.req.valid("json");
     const result = await createService(AuthService, c.get("baseCtx")).login({
       identifier: body.identifier,

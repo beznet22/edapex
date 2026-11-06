@@ -15,6 +15,12 @@ export const requireAdmin: MiddlewareHandler<AppContext> = async (c, next) => {
   await next();
 };
 
+export const currentUserId = (c: Context<AppContext>): number => {
+  const user = c.get("user");
+  if (user === null) throw new AuthError();
+  return user.id;
+};
+
 export const staffIdOf = (c: Context<AppContext>): number => {
   const user = c.get("user");
   if (user === null) throw new AuthError();

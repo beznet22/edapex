@@ -3,9 +3,10 @@ import type { MiddlewareHandler } from "hono";
 
 import { createService, SessionService } from "../../services";
 import { AuthError } from "../../services/errors";
+import { SESSION_COOKIE } from "../cookies";
 import type { AppContext } from "../env";
 
-export const SESSION_COOKIE = "__Host-edapex_session";
+export { SESSION_COOKIE };
 
 export const auth: MiddlewareHandler<AppContext> = async (c, next) => {
   const token = getCookie(c, SESSION_COOKIE) ?? null;

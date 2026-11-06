@@ -4,6 +4,7 @@ import { createServiceContext } from "../services/context";
 import type { AppContext } from "./env";
 import { auth, requireAuth } from "./middleware/auth";
 import { bodyLimit } from "./middleware/body-limit";
+import { contentNegotiation } from "./middleware/content-negotiation";
 import { cors } from "./middleware/cors";
 import { errorHandler } from "./middleware/error-handler";
 import { logger } from "./middleware/logger";
@@ -13,6 +14,9 @@ import { requestId } from "./middleware/request-id";
 import { createServiceContextMiddleware } from "./middleware/service-context";
 import { createTenantMiddleware } from "./middleware/tenant";
 import { createProtectedRoutes, publicAuthRoutes } from "./routes";
+import { authClaim } from "./routes/auth-claim.routes";
+import { authCode } from "./routes/auth-code.routes";
+import { authGoogle } from "./routes/auth-google.routes";
 import { health } from "./routes/health.routes";
 import { studentPhotos } from "./routes/student-photo.routes";
 
@@ -32,12 +36,16 @@ export function createApp(deps: AppDependencies = {}) {
     .use("*", requestId)
     .use("*", logger)
     .use("*", cors)
+    .use("*", contentNegotiation)
     .use("*", bodyLimit)
     .route("/", health)
     .use("*", createServiceContextMiddleware(createContext))
     .use("*", rateLimit)
     .route("/", studentPhotos)
     .route("/api/v1/auth", publicAuthRoutes)
+    .route("/api/v1/auth", authClaim)
+    .route("/api/v1/auth", authGoogle)
+    .route("/api/v1/auth", authCode)
     .route("/api/v1", protectedApp);
 
   app.onError(errorHandler);

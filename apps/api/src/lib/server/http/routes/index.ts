@@ -2,6 +2,11 @@ import { Hono } from "hono";
 import type { MiddlewareHandler } from "hono";
 
 import type { AppContext } from "../env";
+import { requireAdmin } from "../middleware/authorize";
+import { adminAuth } from "./admin-auth.routes";
+import { adminDuplicateActions } from "./admin-duplicate-actions.routes";
+import { adminDuplicateEmails } from "./admin-duplicate-emails.routes";
+import { adminStudentCodes } from "./admin-student-codes.routes";
 import { assessmentCaptures } from "./assessment-captures.routes";
 import { assessmentFeedback } from "./assessment-feedback.routes";
 import { assessmentOcr } from "./assessment-ocr.routes";
@@ -31,6 +36,9 @@ export const createProtectedRoutes = (
     .use("/attendance", tenant)
     .use("/assessments/*", tenant)
     .use("/settings/*", tenant)
+    .use("/admin", tenant)
+    .use("/admin/*", tenant)
+    .use("/admin/*", requireAdmin)
     .route("/auth", protectedAuth)
     .route("/me", me)
     .route("/students", students)
@@ -46,4 +54,8 @@ export const createProtectedRoutes = (
     .route("/assessments/publish", assessmentPublish)
     .route("/settings", settingsGeneral)
     .route("/settings", settingsAcademic)
-    .route("/settings", settingsReport);
+    .route("/settings", settingsReport)
+    .route("/admin", adminStudentCodes)
+    .route("/admin", adminDuplicateEmails)
+    .route("/admin", adminDuplicateActions)
+    .route("/admin", adminAuth);

@@ -110,6 +110,10 @@ describe("claim repository", () => {
   });
 
   it("resets only the caller's school and is idempotent", async () => {
+    await db
+      .update(users)
+      .set({ claimStatus: null, password: "reset-candidate" })
+      .where(eq(users.id, schools[0].userId));
     const scoped = createRepositoryContext(db, tenantOf(schools[0]));
     await expect(resetClaimDigests(scoped, "shared-digest")).resolves.toBe(1);
     await expect(resetClaimDigests(scoped, "shared-digest")).resolves.toBe(1);
