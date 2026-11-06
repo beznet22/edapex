@@ -24,7 +24,7 @@ Port code lands in [`apps/api/`](../../apps/api/AGENTS.md).
 
 ## Current focus
 
-**Phase 4 — HTTP layer.** Complete on `phase-4-http` pending the CI gate; Phase 5 (auth cutover) is next.
+**Phase 4 — HTTP layer.** Complete on `phase-4-http` (PR #5, check `port` green); Phase 5 (auth cutover) is next.
 
 ## Phase status
 
@@ -34,7 +34,7 @@ Port code lands in [`apps/api/`](../../apps/api/AGENTS.md).
 | 1 | D1 schema and migrations | done | Kimchi | 2026-11-06 | 2026-11-06 | PR #2 check `port` green ([run 42181282784](https://github.com/beznet22/edapex/actions/runs/42181282784)): typecheck, boundaries, 17 Workers-pool tests, local D1 apply, drift, both verifiers. Gate: 74 tables (62 legacy + 12 registered), 226 recovered + 5 spec indexes, every table ≤100 columns, `PRAGMA foreign_key_check` zero rows. |
 | 2 | Repository layer | done | Kimchi | 2026-11-06 | 2026-11-06 | PR #3 check `port` green ([run 42233886498](https://github.com/beznet22/edapex/actions/runs/42233886498)): typecheck, boundaries, repository rules + self-test, map completeness, 139 Workers-pool tests, local D1 apply, drift, both verifiers. Gate: 108 `01b` rows (103 implemented + 4 retired + 2 non-async), zero `db.transaction(`, zero `any`, 66 guarded files ≤300 lines, tenant-isolation suite green. |
 | 3 | Service layer | done | Kimchi | 2026-11-06 | 2026-11-06 | PR #4 check `port` green ([run 42265759924](https://github.com/beznet22/edapex/actions/runs/42265759924)): typecheck, 292 tests (55 files), boundaries, repository + service guards (53 service files, 45-file tree), method map 53/53 (37 mapped + 2 merged + 7 deleted + 5 retired + 2 out of scope), 77 tables, drift clean, both verifiers, report-settings import 1 file → 1 row verified. |
-| 4 | HTTP layer | in progress | Kimchi | 2026-11-06 | — | Local gate green: typecheck; 399 tests / 80 files; 19 route modules (HTTP guard); boundary, repository and service guards + self-tests; repository map 108/108; service map 53/53; D1 apply and drift clean; `wrangler deploy --dry-run`; both verifiers. CI pending. |
+| 4 | HTTP layer | done | Kimchi | 2026-11-06 | 2026-11-06 | PR #5 check `port` green ([run 42280594997](https://github.com/beznet22/edapex/actions/runs/42280594997)): typecheck, 399 tests / 80 files, boundary/repository/service/HTTP guards + self-tests, repository map 108/108, service map 53/53, D1 apply, drift, deploy dry-run, both verifiers. Gate: 19 route modules / 42 handlers, 422 byte-compatible, `hc<AppType>` type test, CORS/tenant/dropped-route suites green. |
 | 5 | Auth cutover flow | not started | — | — | — | — |
 | 6 | Archive and retrieval | not started | — | — | — | — |
 | 7 | Migration execution | not started | — | — | — | — |
@@ -140,7 +140,8 @@ Port code lands in [`apps/api/`](../../apps/api/AGENTS.md).
 | 2026-11-06 | 4 | HTTP foundation: request-id/logger/CORS/body-limit/rate-limit/auth/tenant chain, flat error envelope with the byte-identical 422 body, typed validators, `createApp` composition and the `baseCtx`/`ctx` split | Kimchi |
 | 2026-11-06 | 4 | Service-led routes: auth/session/profile, students (search/status/photos/lifecycle), subject assignments, attendance, assessments (entry/query/feedback/OCR/captures/publish) and settings; telegram and PDF dropped, claim/OAuth and `/r/:token` deferred | Kimchi |
 | 2026-11-06 | 4 | Typed `hc<AppType>` client, `check:http` guard + self-test, CORS/preflight/type/tenant/dropped-route tests; 80 test files / 399 tests | Kimchi |
-| 2026-11-06 | 4 | Local gate green: typecheck, 399 tests, all guards, D1 apply, schema drift, deploy dry-run and both verifiers; CI pending push | Kimchi |
+| 2026-11-06 | 4 | Local gate green: typecheck, 399 tests, all guards, D1 apply, schema drift, deploy dry-run and both verifiers | Kimchi |
+| 2026-11-06 | 4 | Phase 4 gate passed: PR #5 check `port` green ([run 42280594997](https://github.com/beznet22/edapex/actions/runs/42280594997)); 80 test files / 399 tests, 19 route modules, all guards, D1 drift clean, both verifiers | Kimchi |
 | 2026-11-06 | 4 | Deviations: the service-led surface supersedes the legacy 20-row HTTP map; thin Phase 4 service/repository additions (`StudentSearchService`, `SubjectAssignmentService`, `TenantScopeService`, photo claim/remove, `setActiveStatus`, `RateLimitService.consume`, `findSubjectById`); no schema change | Kimchi |
 
 ## Blockers and decisions
@@ -176,5 +177,5 @@ Port code lands in [`apps/api/`](../../apps/api/AGENTS.md).
 - The measured baseline in [README.md](./README.md) is a snapshot of the remote dump. Refresh `docs/cloudflare-port/audit/db-inventory.json` before Phase 7 and update the numbers if they moved.
 - Phase gates are cumulative: a later phase passing does not excuse an earlier gate that was skipped.
 - Phase 3 landed on `phase-3-services` (PR #4) with `phase-2-repository` as the PR base; the `port` check is green on run 42265759924.
-- Phase 4 landed on `phase-4-http` (PR #5) with `phase-3-services` as the PR base; the local gate is green and the CI `port` run is pending.
+- Phase 4 landed on `phase-4-http` (PR #5) with `phase-3-services` as the PR base; the `port` check is green on run 42280594997.
 - Phase 0 landed on `phase-0-scaffolding` (PR #1). `main` was not pushed because Dokploy deploys on commit; the branch carries the preflight spec-suite commit `b83de20`. Do not push `main` until the Dokploy trigger is confirmed blocked.
