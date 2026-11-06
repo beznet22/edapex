@@ -12,8 +12,8 @@ export interface TableIndexExpectation extends IndexExpectation {
 }
 
 export const RECOVERED_INDEX_TOTAL = 226;
-export const SPEC_EXTRA_TOTAL = 5;
-export const LEGACY_INDEX_TOTAL = 231;
+export const SPEC_EXTRA_TOTAL = 6;
+export const LEGACY_INDEX_TOTAL = 232;
 export const NEW_TABLE_INDEX_TOTAL = 26;
 
 export const LEGACY_TABLES: readonly string[] = [
@@ -1842,6 +1842,15 @@ export const REDESIGN_EXTRA_INDEXES: readonly TableIndexExpectation[] = [
       "class_id",
       "section_id",
       "subject_id"
+    ]
+  },
+  {
+    "table": "users",
+    "name": "users_claim_status_index",
+    "unique": false,
+    "columns": [
+      "school_id",
+      "claim_status"
     ]
   }
 ];

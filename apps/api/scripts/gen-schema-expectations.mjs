@@ -33,7 +33,7 @@ const ADDED_LEGACY_INDEXES = {
   ]
 };
 
-/** 05 §4.1, §4.2, §6 and 04 §9 mandate indexes the legacy database never declared. */
+/** 05 §4.1, §4.2, §6 and 04 §9 mandate indexes the legacy database never declared; `04a §3` adds the claim-state index. */
 const REDESIGN_EXTRA_INDEXES = [
   {
     table: "sm_academic_years",
@@ -64,6 +64,12 @@ const REDESIGN_EXTRA_INDEXES = [
     name: "sm_exams_school_academic_term_class_section_subject_unique",
     unique: true,
     columns: ["school_id", "academic_id", "exam_type_id", "class_id", "section_id", "subject_id"]
+  },
+  {
+    table: "users",
+    name: "users_claim_status_index",
+    unique: false,
+    columns: ["school_id", "claim_status"]
   }
 ];
 
@@ -213,5 +219,5 @@ console.log(`written: ${path.relative(ROOT, OUT)}`);
 
 if (legacyTables.length !== 62) throw new Error(`expected 62 legacy tables, found ${legacyTables.length}`);
 if (recovered !== 226) throw new Error(`expected 226 recovered indexes, found ${recovered}`);
-if (legacySecondary !== 231) throw new Error(`expected 231 legacy secondary indexes, found ${legacySecondary}`);
+if (legacySecondary !== 232) throw new Error(`expected 232 legacy secondary indexes, found ${legacySecondary}`);
 if (NEW_TABLES.length !== 15) throw new Error(`expected 15 new tables, found ${NEW_TABLES.length}`);
