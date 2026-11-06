@@ -99,11 +99,11 @@ const expectIndexes = (
 };
 
 describe("D1 schema gate", () => {
-  it("creates exactly the 62 legacy tables plus the 12 registered tables", async () => {
+  it("creates exactly the 62 legacy tables plus the 15 registered tables", async () => {
     const tables = await readTables();
     expect([...tables].sort()).toEqual([...ALL_TABLES].sort());
     expect(LEGACY_TABLES).toHaveLength(62);
-    expect(NEW_TABLES).toHaveLength(12);
+    expect(NEW_TABLES).toHaveLength(15);
   });
 
   it("keeps every table at or below the 100-column D1 cap", async () => {

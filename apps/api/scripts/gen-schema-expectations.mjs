@@ -79,7 +79,10 @@ const NEW_TABLES = [
   "migration_resolutions",
   "session_jobs",
   "archive_objects",
-  "session_result_summary"
+  "session_result_summary",
+  "report_settings",
+  "ocr_cache",
+  "marksheet_captures"
 ];
 
 const NEW_TABLE_INDEXES = {
@@ -124,6 +127,18 @@ const NEW_TABLE_INDEXES = {
   session_result_summary: [
     { name: "session_result_summary_term_unique", unique: true, columns: ["school_id", "academic_id", "student_id", "term_id"] },
     { name: "session_result_summary_student_index", unique: false, columns: ["school_id", "student_id"] }
+  ],
+  report_settings: [],
+  ocr_cache: [
+    { name: "ocr_cache_expires_at_index", unique: false, columns: ["expires_at"] }
+  ],
+  marksheet_captures: [
+    { name: "marksheet_captures_school_status_index", unique: false, columns: ["school_id", "status"] },
+    { name: "marksheet_captures_class_exam_index", unique: false, columns: ["school_id", "class_id", "section_id", "exam_type_id"] },
+    { name: "marksheet_captures_ocr_index", unique: false, columns: ["school_id", "ocr_content_sha256", "ocr_parser_version"] },
+    { name: "marksheet_captures_student_exam_index", unique: false, columns: ["school_id", "student_id", "exam_type_id"] },
+    { name: "marksheet_captures_student_exam_unique", unique: true, columns: ["school_id", "student_id", "exam_type_id"] },
+    { name: "marksheet_captures_file_unique", unique: true, columns: ["school_id", "class_id", "section_id", "exam_type_id", "ocr_content_sha256", "ocr_parser_version"] }
   ]
 };
 
@@ -199,4 +214,4 @@ console.log(`written: ${path.relative(ROOT, OUT)}`);
 if (legacyTables.length !== 62) throw new Error(`expected 62 legacy tables, found ${legacyTables.length}`);
 if (recovered !== 226) throw new Error(`expected 226 recovered indexes, found ${recovered}`);
 if (legacySecondary !== 231) throw new Error(`expected 231 legacy secondary indexes, found ${legacySecondary}`);
-if (NEW_TABLES.length !== 12) throw new Error(`expected 12 new tables, found ${NEW_TABLES.length}`);
+if (NEW_TABLES.length !== 15) throw new Error(`expected 15 new tables, found ${NEW_TABLES.length}`);

@@ -10,5 +10,6 @@ export * from "./academics";
 export * from "./assessments";
 export * from "./attendance";
 export * from "./communications";
+export * from "./fees";
 export * from "./school";
 export * from "./reference";

@@ -1,6 +1,8 @@
 import { eq } from "drizzle-orm";
+import type { BatchItem } from "drizzle-orm/batch";
 
 import { authSessions, users } from "../../db/schema";
+import { batchOrThrow } from "../base/d1-helpers";
 import { withErrorHandling } from "../base/error-handling";
 import type { UnscopedRepositoryContext } from "../base/repository-context";
 import type { NewSession, SessionWithUser } from "./types";
@@ -87,5 +89,39 @@ export async function deleteAllUserSessions(
       await ctx.db.delete(authSessions).where(eq(authSessions.userId, userId));
     },
     "deleteAllUserSessions"
+  );
+}
+
+export async function revokeSessionByTokenHash(
+  ctx: UnscopedRepositoryContext,
+  tokenHash: string,
+  revokedAt: number
+): Promise<void> {
+  await withErrorHandling(
+    async () => {
+      await ctx.db
+        .update(authSessions)
+        .set({ revokedAt })
+        .where(eq(authSessions.tokenHash, tokenHash));
+    },
+    "revokeSessionByTokenHash"
+  );
+}
+
+/** Refresh replaces the old token and inserts its successor atomically. */
+export async function rotateSession(
+  ctx: UnscopedRepositoryContext,
+  oldTokenHash: string,
+  session: NewSession
+): Promise<void> {
+  await withErrorHandling(
+    async () => {
+      const statements: BatchItem<"sqlite">[] = [
+        ctx.db.delete(authSessions).where(eq(authSessions.tokenHash, oldTokenHash)),
+        ctx.db.insert(authSessions).values(session)
+      ];
+      await batchOrThrow(ctx.db, statements);
+    },
+    "rotateSession"
   );
 }
