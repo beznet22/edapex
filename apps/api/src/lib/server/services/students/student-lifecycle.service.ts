@@ -33,6 +33,12 @@ export interface DemoteStudentResult {
   readonly previousAcademicId: number;
 }
 
+export interface StudentStatusView {
+  readonly studentId: number;
+  readonly fullName: string | null;
+  readonly active: boolean;
+}
+
 export class StudentLifecycleService {
   constructor(private readonly ctx: ServiceContext) {}
 
@@ -250,6 +256,23 @@ export class StudentLifecycleService {
       previousClassId,
       previousSectionId,
       previousAcademicId
+    };
+  }
+
+  async setActiveStatus(studentId: number, active: boolean): Promise<StudentStatusView> {
+    if (!Number.isInteger(studentId) || studentId <= 0) {
+      throw new ValidationError("A positive student id is required", "studentId");
+    }
+    const scoped = requireScopedContext(this.ctx.repos.ctx);
+    const result = await this.ctx.repos.profiles.updateStudentStatus(
+      scoped,
+      studentId,
+      active
+    );
+    return {
+      studentId: result.studentId,
+      fullName: result.fullName,
+      active: result.active
     };
   }
 }

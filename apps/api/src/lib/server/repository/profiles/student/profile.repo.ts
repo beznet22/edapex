@@ -2,7 +2,7 @@ import { and, eq } from "drizzle-orm";
 
 import { smStudents, studentRecords } from "../../../db/schema";
 import { batchOrThrow } from "../../base/d1-helpers";
-import { DbInternalError } from "../../base/errors";
+import { DbEntityNotFoundError, DbInternalError } from "../../base/errors";
 import { withErrorHandling } from "../../base/error-handling";
 import { requireAcademicId } from "../../base/repository-context";
 import type { ScopedRepositoryContext } from "../../base/repository-context";
@@ -148,7 +148,7 @@ export async function updateStudent(
 export async function updateStudentPhoto(
   ctx: ScopedRepositoryContext,
   studentId: number,
-  photoPath: string
+  photoPath: string | null
 ): Promise<boolean> {
   return withErrorHandling(async () => {
     const rows = await ctx.db
@@ -209,7 +209,7 @@ export async function updateStudentStatus(
       .where(and(eq(smStudents.id, studentId), eq(smStudents.schoolId, ctx.tenant.schoolId)))
       .limit(1);
     if (student === undefined) {
-      throw new DbInternalError(`Student with id '${studentId}' not found`);
+      throw new DbEntityNotFoundError("Student", studentId);
     }
 
     const activeStatus = active ? 1 : 0;

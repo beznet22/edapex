@@ -74,6 +74,12 @@ jobs:
       - name: Service method map
         run: pnpm run check:service-map
 
+      - name: HTTP rules
+        run: pnpm run check:http
+
+      - name: HTTP rule self-test
+        run: pnpm run check:http:self
+
       - name: Tests
         run: pnpm test
 

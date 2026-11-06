@@ -1,4 +1,5 @@
 export * from "./adapters";
+export * from "./academics";
 export * from "./assessment";
 export * from "./attendance";
 export * from "./auth";
@@ -11,4 +12,5 @@ export * from "./media";
 export * from "./ports";
 export * from "./settings";
 export * from "./students";
+export * from "./tenant";
 export * from "./validation";

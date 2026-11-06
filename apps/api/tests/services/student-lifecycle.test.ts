@@ -157,6 +157,24 @@ describe("student lifecycle service", () => {
     expect(latest).toBeNull();
   });
 
+  it("sets the student's active status", async () => {
+    const inactive = await service.setActiveStatus(school.studentId, false);
+    expect(inactive).toEqual({
+      studentId: school.studentId,
+      fullName: "Student 1",
+      active: false
+    });
+
+    const rows = await db
+      .select({ activeStatus: smStudents.activeStatus })
+      .from(smStudents)
+      .where(eq(smStudents.id, school.studentId));
+    expect(rows[0]?.activeStatus).toBe(0);
+
+    const active = await service.setActiveStatus(school.studentId, true);
+    expect(active.active).toBe(true);
+  });
+
   it("compensates when the post-promotion fee write fails", async () => {
     const failingRepos = {
       ...ctx.repos,

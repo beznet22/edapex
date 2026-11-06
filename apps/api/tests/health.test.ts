@@ -8,6 +8,7 @@ describe("GET /health", () => {
 
     expect(response.status).toBe(200);
     expect(response.headers.get("content-type")).toContain("application/json");
+    expect(response.headers.get("x-request-id")).not.toBeNull();
 
     const body: unknown = await response.json();
     expect(body).toEqual({ status: "ok" });

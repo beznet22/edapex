@@ -4,6 +4,10 @@
   "main": "src/worker.ts",
   "compatibility_date": "2026-11-05",
   "compatibility_flags": ["nodejs_compat"],
+  "vars": {
+    // Comma-separated allowlist; production overrides this in the dashboard.
+    "CORS_ORIGINS": "http://localhost:5173,http://localhost:4173"
+  },
   "d1_databases": [
     {
       "binding": "DB",
