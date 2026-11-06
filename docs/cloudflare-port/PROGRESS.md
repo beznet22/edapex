@@ -24,7 +24,7 @@ Port code lands in [`apps/api/`](../../apps/api/AGENTS.md).
 
 ## Current focus
 
-**Phase 2 — Repository layer.** In progress on `phase-2-repository` (PR targets `phase-1-schema`).
+**Phase 2 — Repository layer.** Local gate green on `phase-2-repository`; CI run pending before the phase is marked `done`.
 
 ## Phase status
 
@@ -56,10 +56,12 @@ Port code lands in [`apps/api/`](../../apps/api/AGENTS.md).
 - [x] `PRAGMA foreign_key_check` returns zero rows
 
 ### Phase 2 — Repositories
-- [ ] All `01b` destinations implemented
-- [ ] Seven passthroughs deleted; retired auth methods removed
-- [ ] Tenant-isolation test per public read
-- [ ] No `db.transaction(`, no `any`, files within caps
+- [x] All 108 `01b` method rows accounted for: 103 implemented (107 unique names, `getById` maps to two aggregates), 4 retired (`createRefreshToken`, `validateRefreshToken`, `revokeRefreshToken`, `updateUserPassword`), plus 2 non-async methods missed by the generator (`getClassSections`, `getStuendtsByParentId`)
+- [x] Four retired auth methods have no target table/flow
+- [ ] Seven assessment-service passthroughs: carried to Phase 3 (they are service methods, not repository methods) — see decision log
+- [x] Tenant-isolation test per public read (two-school fixture suite)
+- [x] No `db.transaction(`, no `any`, files within the 300-line cap
+- [x] Barrel completeness and cross-aggregate import rules enforced by `check:repository`
 
 ### Phase 3 — Services
 - [ ] 53 methods mapped per `02`
@@ -113,7 +115,8 @@ Port code lands in [`apps/api/`](../../apps/api/AGENTS.md).
 | 2026-11-05 | — | Renamed the port package `cloudflare/` → `api/`; updated specs, verifier paths, and CI filters for the workspace layout | Kimchi |
 | 2026-11-05 | — | Moved `api/` → `apps/api/`; documented `apps/` as the deployable bucket and the API as the UI-less service consumed by `apps/web`, `apps/desktop`, and `apps/mobile` | Kimchi |
 | 2026-11-06 | 1 | Drizzle/SQLite schema for 74 tables (62 legacy per `05 §4` transforms + 12 registered), 226 recovered indexes + 5 spec-mandated, drizzle-kit baseline `0000_edapex_schema.sql`, Workers-pool schema gate + shape tests, expectations fixture generator, CI drift step; `0000_scaffold.sql` deleted (comment-only placeholder) | Kimchi |
-| 2026-11-06 | 1 | Phase 1 gate passed: CI run 42181282784 green on PR #2; vitest config de-noded so typecheck needs no node types | Kimchi |
+| 2026-11-06 | 2 | Repository layer implemented: `base/` (frozen context, D1 chunk/batch helpers, keyset pagination), 11 aggregate folders, 6 query modules; 103 `01b` methods implemented + 4 retired; 66 source files under the rule guard; 18 repository test files covering parity, tenant isolation, chunk boundaries and batch atomicity | Kimchi |
+| 2026-11-06 | 2 | Schema unchanged (O2 tenant-leading composites deferred to Phase 7 after data load); `01b` placement overridden by aggregate ownership where they conflict (timeline, designation/department, sessions, objectives); seven assessment-service passthroughs recorded as Phase 3 work | Kimchi |
 
 ## Blockers and decisions
 
@@ -124,7 +127,10 @@ Port code lands in [`apps/api/`](../../apps/api/AGENTS.md).
 | Repository layout | Phase 9 completion | decided — `apps/api/` is the API service and becomes a pnpm workspace package; `apps/` is the deployable bucket; no standalone extraction | — |
 | Phase 1 index arithmetic | Phase 2+ index work | decided — the 226 gate is 224 verbatim recovered (the two `session_id` indexes go with the dropped columns, `05 §4`) plus 01a O11's two new `chat_group_users` indexes; 05/04 add 5 more spec-mandated indexes, so legacy tables carry 231 secondary indexes total | — |
 | `sm_general_settings.identity` | Phase 7 transform | decided — created as a new TEXT column per 01a §6 even though no legacy column exists; `extras` therefore holds 95 legacy fields, not 94. Phase 7 must read the schema, not the prose | — |
-| `01a O2` school-id-leading composites | Phase 2 | deferred — recovered indexes keep the inventory's verbatim names and column order so the gate matches the artifact; tenant-leading composites are added query-driven in Phase 2 | — |
+| `01a O2` school-id-leading composites | Phase 2 | deferred — Phase 2 made no schema changes; add measured tenant-leading composites in Phase 7 after data load | — |
+| Cross-aggregate repository reads | Phase 2+ | decided — `repository/queries/` modules; repositories may read the declared reference dictionaries but never write them | — |
+| Guardian email update | Phase 2+ | decided — `updateParentEmail` writes `sm_parents` + `users` in one batch per `01 §8` site 3; creating a missing parent user stays in Phase 3 | — |
+| Student promotion orchestration | Phase 3 | decided — repository keeps batched data primitives; fees assignment and chat-group migration move to `student-lifecycle.service` | — |
 
 ## Notes
 
