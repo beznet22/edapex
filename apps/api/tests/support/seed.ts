@@ -60,8 +60,8 @@ export const tenantOf = (school: SeededSchool): TenantContext => ({
   designationId: school.designationId,
   roleId: school.roleId,
   academicId: school.academicId,
-  classId: null,
-  sectionId: null
+  classId: school.classId,
+  sectionId: school.sectionId
 });
 
 export const database = (env: { readonly DB: D1Database }): RepositoryDb =>

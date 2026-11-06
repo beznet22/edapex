@@ -4,10 +4,14 @@ import {
   infixRoles,
   smBaseGroups,
   smBaseSetups,
+  smClasses,
   smDesignations,
-  smHumanDepartments
+  smHumanDepartments,
+  smSections,
+  smStudentCategories
 } from "../../db/schema";
 import { withErrorHandling } from "../base/error-handling";
+import { requireAcademicId } from "../base/repository-context";
 import type { ScopedRepositoryContext } from "../base/repository-context";
 
 export interface RegistrationOption {
@@ -20,6 +24,19 @@ export interface StaffRegistrationOptions {
   readonly departments: readonly RegistrationOption[];
   readonly roles: readonly RegistrationOption[];
   readonly genders: readonly RegistrationOption[];
+}
+
+export interface GuardianRelationOption {
+  readonly value: string;
+  readonly label: string;
+}
+
+export interface StudentRegistrationOptions {
+  readonly classes: readonly RegistrationOption[];
+  readonly sections: readonly RegistrationOption[];
+  readonly categories: readonly RegistrationOption[];
+  readonly genders: readonly RegistrationOption[];
+  readonly guardianRelations: readonly GuardianRelationOption[];
 }
 
 /**
@@ -68,4 +85,68 @@ export async function findStaffRegistrationOptions(
     ]);
     return { designations, departments, roles, genders };
   }, "findStaffRegistrationOptions");
+}
+
+/** Student form dictionaries; the student aggregate plus reference reads. */
+export async function findStudentRegistrationOptions(
+  ctx: ScopedRepositoryContext
+): Promise<StudentRegistrationOptions> {
+  return withErrorHandling(async () => {
+    const schoolId = ctx.tenant.schoolId;
+    const academicId = requireAcademicId(ctx);
+    const [classes, sections, categories, genders] = await ctx.db.batch([
+      ctx.db
+        .select({ id: smClasses.id, name: smClasses.className })
+        .from(smClasses)
+        .where(
+          and(
+            eq(smClasses.activeStatus, 1),
+            eq(smClasses.schoolId, schoolId),
+            eq(smClasses.academicId, academicId)
+          )
+        )
+        .orderBy(smClasses.id),
+      ctx.db
+        .select({ id: smSections.id, name: smSections.sectionName })
+        .from(smSections)
+        .where(
+          and(
+            eq(smSections.activeStatus, 1),
+            eq(smSections.schoolId, schoolId),
+            eq(smSections.academicId, academicId)
+          )
+        )
+        .orderBy(smSections.id),
+      ctx.db
+        .select({ id: smStudentCategories.id, name: smStudentCategories.categoryName })
+        .from(smStudentCategories)
+        .where(eq(smStudentCategories.schoolId, schoolId))
+        .orderBy(smStudentCategories.id),
+      ctx.db
+        .select({ id: smBaseSetups.id, name: smBaseSetups.baseSetupName })
+        .from(smBaseSetups)
+        .innerJoin(smBaseGroups, eq(smBaseSetups.baseGroupId, smBaseGroups.id))
+        .where(
+          and(
+            eq(smBaseGroups.name, "Gender"),
+            eq(smBaseGroups.schoolId, schoolId),
+            eq(smBaseSetups.schoolId, schoolId),
+            eq(smBaseSetups.activeStatus, 1)
+          )
+        )
+        .orderBy(smBaseSetups.id)
+    ]);
+
+    return {
+      classes,
+      sections,
+      categories,
+      genders,
+      guardianRelations: [
+        { value: "father", label: "Father" },
+        { value: "mother", label: "Mother" },
+        { value: "other", label: "Other" }
+      ]
+    };
+  }, "findStudentRegistrationOptions");
 }
