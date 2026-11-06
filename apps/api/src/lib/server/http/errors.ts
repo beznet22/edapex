@@ -24,6 +24,9 @@ export type ErrorCode =
   | "NOT_FOUND"
   | "CONFLICT"
   | "AMBIGUOUS_EMAIL"
+  | "LINK_EMAIL_MISMATCH"
+  | "LINK_EMAIL_UNVERIFIED"
+  | "PASSWORD_LOGIN_RETIRED"
   | "TENANT_SCOPE_REQUIRED"
   | "RATE_LIMITED"
   | "INTERNAL_ERROR"
@@ -94,6 +97,14 @@ const fromServiceError = (error: ServiceError, requestId: string): ErrorMapping 
       return tenantEnvelope(error.message);
     case "AMBIGUOUS_EMAIL":
       return envelope(409, "AMBIGUOUS_EMAIL", error.message, requestId);
+    case "CONFLICT":
+      return envelope(409, "CONFLICT", error.message, requestId);
+    case "LINK_EMAIL_MISMATCH":
+      return envelope(403, "LINK_EMAIL_MISMATCH", error.message, requestId);
+    case "LINK_EMAIL_UNVERIFIED":
+      return envelope(403, "LINK_EMAIL_UNVERIFIED", error.message, requestId);
+    case "PASSWORD_LOGIN_RETIRED":
+      return envelope(403, "PASSWORD_LOGIN_RETIRED", error.message, requestId);
     case "RATE_LIMITED": {
       const retryAfterSeconds = error instanceof RateLimitError ? error.retryAfterSeconds : 60;
       return {

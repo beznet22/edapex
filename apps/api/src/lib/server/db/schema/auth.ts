@@ -102,6 +102,7 @@ export const authEvents = sqliteTable(
     email: text("email"),
     ip: text("ip"),
     userAgent: text("user_agent"),
+    metadata: text("metadata"),
     createdAt: integer("created_at").notNull()
   },
   (table) => [

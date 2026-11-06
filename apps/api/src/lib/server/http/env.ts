@@ -15,6 +15,8 @@ export interface AppVariables {
   requestId: string;
   ip: string | null;
   userAgent: string | null;
+  wantsHtml: boolean;
+  wantsCsv: boolean;
   baseCtx: ServiceContext;
   ctx: ServiceContext;
   session: SessionView | null;

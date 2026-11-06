@@ -19,6 +19,20 @@ export function randomToken(byteLength = 32): string {
   return toHex(bytes);
 }
 
+export function base64UrlEncode(bytes: Uint8Array): string {
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+/** PKCE S256 challenge (`04 §8`). */
+export async function sha256Base64Url(
+  input: ArrayBuffer | Uint8Array | string
+): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", toBytes(input));
+  return base64UrlEncode(new Uint8Array(digest));
+}
+
 /** Length-independent comparison for hex digests. */
 export function constantTimeEqual(left: string, right: string): boolean {
   const length = Math.max(left.length, right.length);

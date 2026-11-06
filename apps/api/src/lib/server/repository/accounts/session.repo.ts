@@ -108,6 +108,24 @@ export async function revokeSessionByTokenHash(
   );
 }
 
+/** A claim/link retry keeps the identity and replaces only the session. */
+export async function replaceUserSessions(
+  ctx: UnscopedRepositoryContext,
+  userId: number,
+  session: NewSession
+): Promise<void> {
+  await withErrorHandling(
+    async () => {
+      const statements: BatchItem<"sqlite">[] = [
+        ctx.db.delete(authSessions).where(eq(authSessions.userId, userId)),
+        ctx.db.insert(authSessions).values(session)
+      ];
+      await batchOrThrow(ctx.db, statements);
+    },
+    "replaceUserSessions"
+  );
+}
+
 /** Refresh replaces the old token and inserts its successor atomically. */
 export async function rotateSession(
   ctx: UnscopedRepositoryContext,

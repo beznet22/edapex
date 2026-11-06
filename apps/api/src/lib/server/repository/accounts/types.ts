@@ -1,4 +1,6 @@
 import type {
+  authCodes,
+  authEvents,
   authIdentities,
   authSessions,
   infixRoles,
@@ -8,12 +10,16 @@ import type {
 
 export type UserRow = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
+export type ClaimStatus = NonNullable<UserRow["claimStatus"]>;
 export type UserLookupField = "id" | "email" | "username";
 export type RoleRow = typeof infixRoles.$inferSelect;
 export type AuthStaffRow = typeof smStaffs.$inferSelect;
 export type AuthIdentityRow = typeof authIdentities.$inferSelect;
 export type NewAuthIdentity = typeof authIdentities.$inferInsert;
 export type AuthSessionRow = typeof authSessions.$inferSelect;
+export type AuthCodeRow = typeof authCodes.$inferSelect;
+export type NewAuthCode = typeof authCodes.$inferInsert;
+export type NewAuthEvent = typeof authEvents.$inferInsert;
 
 /** Columns a user profile update may touch; `password` and `id` are excluded. */
 export type UserPatch = Partial<

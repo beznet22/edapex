@@ -10,6 +10,10 @@ export type ServiceErrorCode =
   | "TENANT_MISMATCH"
   | "TENANT_SCOPE_REQUIRED"
   | "AMBIGUOUS_EMAIL"
+  | "CONFLICT"
+  | "LINK_EMAIL_MISMATCH"
+  | "LINK_EMAIL_UNVERIFIED"
+  | "PASSWORD_LOGIN_RETIRED"
   | "RATE_LIMITED"
   | "UPSTREAM_FAILURE"
   | "NOT_FOUND";
@@ -104,6 +108,36 @@ export class RateLimitError extends ServiceError {
   constructor(retryAfterSeconds: number, message?: string) {
     super("RATE_LIMITED", message ?? `Too many attempts; retry in ${retryAfterSeconds} seconds`);
     this.retryAfterSeconds = retryAfterSeconds;
+  }
+}
+
+export class ConflictError extends ServiceError {
+  constructor(message: string) {
+    super("CONFLICT", message);
+  }
+}
+
+export class LinkEmailMismatchError extends ServiceError {
+  constructor() {
+    super(
+      "LINK_EMAIL_MISMATCH",
+      "The Google account's verified email does not match this account; contact an administrator"
+    );
+  }
+}
+
+export class LinkEmailUnverifiedError extends ServiceError {
+  constructor() {
+    super("LINK_EMAIL_UNVERIFIED", "The Google account's email address is not verified");
+  }
+}
+
+export class PasswordLoginRetiredError extends ServiceError {
+  constructor() {
+    super(
+      "PASSWORD_LOGIN_RETIRED",
+      "Password sign-in is retired; claim your account with the school-issued password"
+    );
   }
 }
 

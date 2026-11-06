@@ -20,8 +20,6 @@ beforeAll(async () => {
 const dropped = [
   "/api/v1/parents/connect-telegram",
   "/api/v1/results/generate-pdf",
-  "/api/v1/auth/claim",
-  "/api/v1/auth/google/callback",
   "/api/v1/demo/admit"
 ];
 
@@ -41,6 +39,18 @@ describe("public surface", () => {
 
     const students = await request(app, "/api/v1/students");
     expect(students.status).toBe(401);
+  });
+
+  it("mounts the cutover routes but keeps them disabled until configured", async () => {
+    const claim = await request(app, "/api/v1/auth/claim", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email: "someone@example.test", password: "x" })
+    });
+    expect(claim.status).toBe(404);
+
+    const start = await request(app, "/api/v1/auth/google/start");
+    expect(start.status).toBe(404);
   });
 
   it("does not expose the dropped service routes", async () => {

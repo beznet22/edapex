@@ -13,6 +13,19 @@ export const mobileTokenBody = z
   })
   .strict();
 
+export const claimBody = z
+  .object({
+    email: z.string().trim().min(3).max(191),
+    password: z.string().min(1).max(200)
+  })
+  .strict();
+
+export const codeBody = z
+  .object({
+    code: z.string().trim().min(4).max(32)
+  })
+  .strict();
+
 export const profilePatchBody = z
   .object({
     fullName: z.string().min(1).nullable().optional(),

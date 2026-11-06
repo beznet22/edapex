@@ -32,6 +32,12 @@ export interface SessionView {
   readonly user: AuthUser;
 }
 
+export interface AuthSessionResult {
+  readonly token: string;
+  readonly expiresAt: number;
+  readonly user: AuthUser;
+}
+
 export const SESSION_TTL_SECONDS = 7 * 24 * 60 * 60;
 
 export function toAuthUser(user: UserLike, staff: StaffLike | null): AuthUser {

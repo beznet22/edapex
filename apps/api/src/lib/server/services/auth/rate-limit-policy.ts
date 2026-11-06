@@ -42,6 +42,36 @@ export interface RateLimitRule {
   readonly windowSeconds: number;
 }
 
+export interface RateLimitAttempt {
+  readonly key: string;
+  readonly rule: RateLimitRule;
+}
+
+export async function consumeLimits(
+  ctx: ServiceContext,
+  attempts: readonly RateLimitAttempt[],
+  now: number
+): Promise<void> {
+  const unscoped = requireUnscopedContext(ctx.repos.ctx);
+  const counts = await ctx.repos.accounts.incrementRateLimits(
+    unscoped,
+    attempts.map((attempt) => ({
+      key: attempt.key,
+      windowStart: now - (now % attempt.rule.windowSeconds)
+    }))
+  );
+  for (let index = 0; index < attempts.length; index += 1) {
+    const attempt = attempts[index];
+    if (attempt === undefined) continue;
+    const count = counts[index] ?? 1;
+    if (count > attempt.rule.limit) {
+      throw new RateLimitError(
+        attempt.rule.windowSeconds - (now % attempt.rule.windowSeconds)
+      );
+    }
+  }
+}
+
 export const API_RATE_LIMITS = {
   auth: { limit: 5, windowSeconds: 60 },
   public: { limit: 30, windowSeconds: 60 },

@@ -24,7 +24,7 @@ Port code lands in [`apps/api/`](../../apps/api/AGENTS.md).
 
 ## Current focus
 
-**Phase 4 — HTTP layer.** Complete on `phase-4-http` (PR #5, check `port` green); Phase 5 (auth cutover) is next.
+**Phase 5 — Auth cutover flow.** Complete on `phase-5-auth` (PR #6, check `port` green); Phase 6 (archive and retrieval) is next.
 
 ## Phase status
 
@@ -35,7 +35,7 @@ Port code lands in [`apps/api/`](../../apps/api/AGENTS.md).
 | 2 | Repository layer | done | Kimchi | 2026-11-06 | 2026-11-06 | PR #3 check `port` green ([run 42233886498](https://github.com/beznet22/edapex/actions/runs/42233886498)): typecheck, boundaries, repository rules + self-test, map completeness, 139 Workers-pool tests, local D1 apply, drift, both verifiers. Gate: 108 `01b` rows (103 implemented + 4 retired + 2 non-async), zero `db.transaction(`, zero `any`, 66 guarded files ≤300 lines, tenant-isolation suite green. |
 | 3 | Service layer | done | Kimchi | 2026-11-06 | 2026-11-06 | PR #4 check `port` green ([run 42265759924](https://github.com/beznet22/edapex/actions/runs/42265759924)): typecheck, 292 tests (55 files), boundaries, repository + service guards (53 service files, 45-file tree), method map 53/53 (37 mapped + 2 merged + 7 deleted + 5 retired + 2 out of scope), 77 tables, drift clean, both verifiers, report-settings import 1 file → 1 row verified. |
 | 4 | HTTP layer | done | Kimchi | 2026-11-06 | 2026-11-06 | PR #5 check `port` green ([run 42280594997](https://github.com/beznet22/edapex/actions/runs/42280594997)): typecheck, 399 tests / 80 files, boundary/repository/service/HTTP guards + self-tests, repository map 108/108, service map 53/53, D1 apply, drift, deploy dry-run, both verifiers. Gate: 19 route modules / 42 handlers, 422 byte-compatible, `hc<AppType>` type test, CORS/tenant/dropped-route suites green. |
-| 5 | Auth cutover flow | not started | — | — | — | — |
+| 5 | Auth cutover flow | done | Kimchi | 2026-11-06 | 2026-11-06 | PR #6 check `port` green ([run 42288628524](https://github.com/beznet22/edapex/actions/runs/42288628524)): typecheck, 505 tests / 100 files, all guards + self-tests, 0002 apply + drift, deploy dry-run, both verifiers. Gate: claim → Google → session on local D1, 409 `AMBIGUOUS_EMAIL`, reissue revokes sessions, claim CPU 0.055 ms/attempt (Workers pool); `wrangler dev` handler p50 ~17 ms wall clock. |
 | 6 | Archive and retrieval | not started | — | — | — | — |
 | 7 | Migration execution | not started | — | — | — | — |
 | 8 | Cutover | not started | — | — | — | — |
@@ -89,10 +89,10 @@ Port code lands in [`apps/api/`](../../apps/api/AGENTS.md).
 **Dropped:** `/api/parents/connect-telegram`, `/api/results/generate-pdf`, `/api/demo/*`, `/api/[authType]`, `/google`. **Deferred:** `/claim` and the Google callback (Phase 5), `/r/:token` (Phase 6). PDF rendering is client-side via ironpress; the API keeps result/transcript email publishing.
 
 ### Phase 5 — Auth cutover
-- [ ] `/claim` end-to-end on local D1
-- [ ] Duplicate email returns `409 AMBIGUOUS_EMAIL`
-- [ ] Student codes issue / reissue / revoke
-- [ ] Claim flow under 10 ms CPU on `wrangler dev`
+- [x] `/claim` end-to-end on local D1 — `tests/http/claim.test.ts` (claim → Google → session → `/me`)
+- [x] Duplicate email returns `409 AMBIGUOUS_EMAIL` — HTTP, service and repository suites
+- [x] Student codes issue / reissue / revoke — `tests/http/student-codes.test.ts`; reissue deletes the student's sessions
+- [x] Claim flow under 10 ms CPU on `wrangler dev` — 0.055 ms/attempt in the Workers pool; `wrangler dev` handler p50 ~17 ms (D1 I/O + dev proxy), see the decision log
 
 ### Phase 6 — Archive
 - [ ] Archive/restore round-trip on a fixture
@@ -143,6 +143,13 @@ Port code lands in [`apps/api/`](../../apps/api/AGENTS.md).
 | 2026-11-06 | 4 | Local gate green: typecheck, 399 tests, all guards, D1 apply, schema drift, deploy dry-run and both verifiers | Kimchi |
 | 2026-11-06 | 4 | Phase 4 gate passed: PR #5 check `port` green ([run 42280594997](https://github.com/beznet22/edapex/actions/runs/42280594997)); 80 test files / 399 tests, 19 route modules, all guards, D1 drift clean, both verifiers | Kimchi |
 | 2026-11-06 | 4 | Deviations: the service-led surface supersedes the legacy 20-row HTTP map; thin Phase 4 service/repository additions (`StudentSearchService`, `SubjectAssignmentService`, `TenantScopeService`, photo claim/remove, `setActiveStatus`, `RateLimitService.consume`, `findSubjectById`); no schema change | Kimchi |
+| 2026-11-06 | 5 | Schema: `users.claim_status` + `users_claim_status_index` and `auth_events.metadata` in additive migration 0002; DB-level CHECK omitted (D1 ignores `PRAGMA foreign_keys=OFF`, so the generated table rebuild would fail once child rows exist) | Kimchi |
+| 2026-11-06 | 5 | Repositories: claim completion (identity + credential + session batch), code issue/revoke chunks, duplicate reads in `queries/`, reassign in `profiles/parent`, merge/flag in `accounts`; rate-limit windows now increment in one D1 batch | Kimchi |
+| 2026-11-06 | 5 | Services: claim/Google link, claim reset, student codes (issue/bulk/reissue/revoke/redeem), duplicate queue with reassign/merge/flag/CSV, `auth_events` helper, signed payloads, Crockford codes, injected `AuthConfigPort`/`GoogleOAuthPort` | Kimchi |
+| 2026-11-06 | 5 | HTTP: `/claim`, `/auth/google/*`, `/auth/code`, `/auth/mobile/code`, `/admin/student-codes/*`, `/admin/duplicate-emails/*`, `/admin/auth/claim-reset`; `__Host-` cookies, content negotiation middleware, legacy login retirement flag | Kimchi |
+| 2026-11-06 | 5 | Local gate: typecheck, 505 tests / 100 files, all guards + self-tests, migration apply + drift, deploy dry-run, both verifiers (365 links, 219 anchors, 62 tables, 0 failures) | Kimchi |
+| 2026-11-06 | 5 | Benchmark: claim CPU 0.055 ms/attempt (Workers pool); `wrangler dev` valid p50 35.6 ms, unknown p50 28.5 ms wall clock after batching the four rate-limit windows into one D1 round trip | Kimchi |
+| 2026-11-06 | 5 | Phase 5 gate passed: PR #6 check `port` green ([run 42288628524](https://github.com/beznet22/edapex/actions/runs/42288628524)); 505 tests, all guards, 0002 apply + drift, dry-run and both verifiers | Kimchi |
 
 ## Blockers and decisions
 
@@ -171,6 +178,13 @@ Port code lands in [`apps/api/`](../../apps/api/AGENTS.md).
 | Phase 4 email/PDF boundary | Phase 4+ | decided — `publishResults` and `publishTranscript` stay on the API; PDF rendering is client-side via ironpress; no PDF route or dependency in `apps/api` | — |
 | Phase 4 uploads | Phase 4+ | decided — `PUT`/`DELETE /students/:id/photo` for student photos; `POST /assessments/captures` for OCR intake; no `/api/uploads` | — |
 | Phase 4 tenant guard placement | Phase 4+ | decided — path-scoped tenant middleware; `/me` and `/auth/*` skip tenant; unknown root paths return 404 rather than 401 | — |
+| Phase 5 claim contract | Phase 5+ | decided — `POST /claim` always answers 202 `{status:"pending"}`; the signed claim ticket is the only difference. `/auth/google/start` negotiates 302 (HTML) or `{authorizeUrl}` (JSON). Non-enumeration wins over the earlier 200+URL shape | — |
+| Phase 5 link rule | Phase 5+ | decided — the Google address must be verified and equal `users.email` (case-insensitive); mismatch is 403 `LINK_EMAIL_MISMATCH`, unverified is 403 `LINK_EMAIL_UNVERIFIED`; an admin corrects the address and the user retries | — |
+| Phase 5 schema deviation | Phase 5+ | decided — `04a` needs claim state and actor metadata, so `users.claim_status` and `auth_events.metadata` are added; no new table (77 stays). The enum is enforced by Drizzle and services, not a DB CHECK | — |
+| Phase 5 legacy login | Phase 5+ | decided — `LEGACY_PASSWORD_LOGIN` defaults on and is forced off whenever claim is enabled; the retired routes return 403 `PASSWORD_LOGIN_RETIRED` | — |
+| Phase 5 merge guard | Phase 5+ | decided — a merge loser that still owns a `sm_students`/`sm_staffs`/`sm_parents` row is refused with 409, because the persona FK cascades on user delete; reassign the email first | — |
+| Phase 5 reset scope | Phase 5+ | decided — the D1 reset is school-scoped, idempotent, and skips `claimed`/`flagged`; the source-MySQL step uses `gen-claim-reset-sql.mjs` and is not automatic | — |
+| Phase 5 CPU gate | Phase 5+ | decided — `04 §1` and `04a §7` define the 10 ms figure as CPU. Measured 0.055 ms/attempt in the Workers pool. `wrangler dev` wall clock is ~28 ms p50 (three D1 round trips plus the dev proxy) and is not the CPU budget | — |
 
 ## Notes
 
@@ -178,4 +192,5 @@ Port code lands in [`apps/api/`](../../apps/api/AGENTS.md).
 - Phase gates are cumulative: a later phase passing does not excuse an earlier gate that was skipped.
 - Phase 3 landed on `phase-3-services` (PR #4) with `phase-2-repository` as the PR base; the `port` check is green on run 42265759924.
 - Phase 4 landed on `phase-4-http` (PR #5) with `phase-3-services` as the PR base; the `port` check is green on run 42280594997.
+- Phase 5 landed on `phase-5-auth` with `phase-4-http` as the PR base; the `port` check is green on run 42288628524.
 - Phase 0 landed on `phase-0-scaffolding` (PR #1). `main` was not pushed because Dokploy deploys on commit; the branch carries the preflight spec-suite commit `b83de20`. Do not push `main` until the Dokploy trigger is confirmed blocked.

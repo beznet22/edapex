@@ -14,6 +14,11 @@ const typeCoverage = (client: ApiClient): void => {
   void client.api.v1.auth.refresh.$post;
   void client.api.v1.auth.mobile.refresh.$post;
   void client.api.v1.auth.mobile.logout.$post;
+  void client.api.v1.auth.claim.$post;
+  void client.api.v1.auth.google.start.$get;
+  void client.api.v1.auth.google.callback.$get;
+  void client.api.v1.auth.code.$post;
+  void client.api.v1.auth.mobile.code.$post;
   void client.api.v1.me.$get;
   void client.api.v1.me.$patch;
 
@@ -52,6 +57,16 @@ const typeCoverage = (client: ApiClient): void => {
   void client.api.v1.settings["exam-types"][":examTypeId"].active.$patch;
   void client.api.v1.settings["report-templates"].$get;
   void client.api.v1.settings["report-templates"].$patch;
+
+  void client.api.v1.admin["student-codes"].issue.$post;
+  void client.api.v1.admin["student-codes"][":studentId"].reissue.$post;
+  void client.api.v1.admin["student-codes"][":studentId"].$delete;
+  void client.api.v1.admin["duplicate-emails"].$get;
+  void client.api.v1.admin["duplicate-emails"]["export"].$get;
+  void client.api.v1.admin["duplicate-emails"].reassign.$post;
+  void client.api.v1.admin["duplicate-emails"].merge.$post;
+  void client.api.v1.admin["duplicate-emails"].flag.$post;
+  void client.api.v1.admin.auth["claim-reset"].$post;
 };
 
 describe("typed client coverage", () => {

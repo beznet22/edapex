@@ -6,6 +6,7 @@ import { auditTimestamps, boolean01, calendarDate, statusCheck } from "./common"
 const ACADEMIC_YEAR_STATUS = ["planned", "active", "closing", "archived", "restoring", "archived_readable"] as const;
 const ADMINISTRATOR_FLAG = ["yes", "no"] as const;
 const CONTACT_TYPE = ["yearly", "monthly", "once"] as const;
+export const CLAIM_STATUS = ["pending", "claimed", "flagged"] as const;
 
 export const smSchools = sqliteTable("sm_schools", {
   id: integer("id").primaryKey({ autoIncrement: true }),
@@ -85,12 +86,14 @@ export const users = sqliteTable(
     verified: text("verified"),
     trialEndsAt: integer("trial_ends_at"),
     walletBalance: integer("wallet_balance").notNull().default(0),
-    emailVerifiedAt: integer("email_verified_at")
+    emailVerifiedAt: integer("email_verified_at"),
+    claimStatus: text("claim_status", { enum: CLAIM_STATUS })
   },
   (table) => [
     index("users_role_id_foreign").on(table.roleId),
     index("users_school_id_foreign").on(table.schoolId),
-    index("users_email_index").on(table.email)
+    index("users_email_index").on(table.email),
+    index("users_claim_status_index").on(table.schoolId, table.claimStatus)
   ]
 );
 
