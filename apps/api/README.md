@@ -4,7 +4,7 @@ The Hono API on Cloudflare Workers with D1. This directory is the **API service*
 
 | | |
 |---|---|
-| Phase | **0 — done** ([PROGRESS](../docs/cloudflare-port/PROGRESS.md)) |
+| Phase | **1 — local gate passed, CI pending** ([PROGRESS](../docs/cloudflare-port/PROGRESS.md)) |
 | Plan | [ROADMAP](../docs/cloudflare-port/ROADMAP.md) |
 | Agent rules | [AGENTS.md](./AGENTS.md) |
 | Specs | [docs/cloudflare-port](../docs/cloudflare-port/README.md) |
@@ -95,4 +95,4 @@ Then update [PROGRESS.md](../docs/cloudflare-port/PROGRESS.md): status row, gate
 
 ## Status
 
-Phase 0 (scaffolding and guards) is complete: the Worker serves `/health`, the D1 binding and local migration path work, the Workers-pool harness passes, and both verifiers are green locally and in CI. Phase 1 (D1 schema and migrations) is next.
+Phase 0 (scaffolding and guards) is complete. Phase 1 (D1 schema and migrations) has its local gate green: the Drizzle/SQLite schema declares 74 tables (62 legacy + 12 registered), 226 recovered secondary indexes plus the 5 spec-mandated ones, every table is within the 100-column cap, and `PRAGMA foreign_key_check` returns zero rows. The Workers-pool suite applies the drizzle-generated baseline `0000_edapex_schema.sql` and asserts the gate; CI adds a drift check that regenerates and diffs the migrations directory.

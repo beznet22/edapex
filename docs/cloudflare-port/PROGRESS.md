@@ -24,14 +24,14 @@ Port code lands in [`apps/api/`](../../apps/api/AGENTS.md).
 
 ## Current focus
 
-**Phase 0 — Scaffolding and guards.** Complete. PR #1 checks are green. Phase 1 (D1 schema and migrations) is next; the migration cannot start until Phase 7, so do not jump ahead.
+**Phase 1 — D1 schema and migrations.** Local gate passed on `phase-1-schema`; CI pending push. Phase 2 (repository layer) is next.
 
 ## Phase status
 
 | Phase | Name | Status | Owner | Started | Completed | Gate evidence |
 |---|---|---|---|---|---|---|
 | 0 | Scaffolding and guards | done | Kimchi | 2026-11-05 | 2026-11-05 | PR #1 check `port` green ([run 42083953037](https://github.com/beznet22/edapex/actions/runs/42083953037)): typecheck, boundary + self-test, Workers test, D1 apply, both verifiers. Local: `/health` 200. |
-| 1 | D1 schema and migrations | not started | — | — | — | — |
+| 1 | D1 schema and migrations | in progress | Kimchi | 2026-11-06 | — | Local gate green on `phase-1-schema`: 74 tables (62 legacy + 12 registered), 226 recovered + 5 spec indexes, `PRAGMA foreign_key_check` zero rows; typecheck, boundaries, tests, drift, dry-run deploy, both verifiers pass. CI run pending push. |
 | 2 | Repository layer | not started | — | — | — | — |
 | 3 | Service layer | not started | — | — | — | — |
 | 4 | HTTP layer | not started | — | — | — | — |
@@ -50,10 +50,10 @@ Port code lands in [`apps/api/`](../../apps/api/AGENTS.md).
 - [x] Import-boundary test scaffolded
 
 ### Phase 1 — Schema
-- [ ] 62 legacy tables + redesigned tables created
-- [ ] Every table ≤100 columns
-- [ ] 226 secondary indexes declared
-- [ ] `PRAGMA foreign_key_check` returns zero rows
+- [x] 62 legacy tables + redesigned tables created
+- [x] Every table ≤100 columns
+- [x] 226 secondary indexes declared
+- [x] `PRAGMA foreign_key_check` returns zero rows
 
 ### Phase 2 — Repositories
 - [ ] All `01b` destinations implemented
@@ -112,6 +112,7 @@ Port code lands in [`apps/api/`](../../apps/api/AGENTS.md).
 | 2026-11-05 | 0 | Phase 0 gate passed: CI run 42083953037 green; PR #1 updated with the evidence | Kimchi |
 | 2026-11-05 | — | Renamed the port package `cloudflare/` → `api/`; updated specs, verifier paths, and CI filters for the workspace layout | Kimchi |
 | 2026-11-05 | — | Moved `api/` → `apps/api/`; documented `apps/` as the deployable bucket and the API as the UI-less service consumed by `apps/web`, `apps/desktop`, and `apps/mobile` | Kimchi |
+| 2026-11-06 | 1 | Drizzle/SQLite schema for 74 tables (62 legacy per `05 §4` transforms + 12 registered), 226 recovered indexes + 5 spec-mandated, drizzle-kit baseline `0000_edapex_schema.sql`, Workers-pool schema gate + shape tests, expectations fixture generator, CI drift step; `0000_scaffold.sql` deleted (comment-only placeholder) | Kimchi |
 
 ## Blockers and decisions
 
@@ -120,6 +121,9 @@ Port code lands in [`apps/api/`](../../apps/api/AGENTS.md).
 | Terms 2 and 3 calendars | Phase 7 (terms endpoint only) | waiting on school | — |
 | Term-date confirmation for FIRST TERM | Phase 7 | fixed from `assets/calendar.jpeg` (2026-09-14 → 2026-12-11); confirm against official notice | — |
 | Repository layout | Phase 9 completion | decided — `apps/api/` is the API service and becomes a pnpm workspace package; `apps/` is the deployable bucket; no standalone extraction | — |
+| Phase 1 index arithmetic | Phase 2+ index work | decided — the 226 gate is 224 verbatim recovered (the two `session_id` indexes go with the dropped columns, `05 §4`) plus 01a O11's two new `chat_group_users` indexes; 05/04 add 5 more spec-mandated indexes, so legacy tables carry 231 secondary indexes total | — |
+| `sm_general_settings.identity` | Phase 7 transform | decided — created as a new TEXT column per 01a §6 even though no legacy column exists; `extras` therefore holds 95 legacy fields, not 94. Phase 7 must read the schema, not the prose | — |
+| `01a O2` school-id-leading composites | Phase 2 | deferred — recovered indexes keep the inventory's verbatim names and column order so the gate matches the artifact; tenant-leading composites are added query-driven in Phase 2 | — |
 
 ## Notes
 
