@@ -5,3 +5,6 @@ export * from "./session.repo";
 export * from "./auth.repo";
 export * from "./auth-event.repo";
 export * from "./rate-limit.repo";
+export * from "./claim.repo";
+export * from "./claim-admin.repo";
+export * from "./code.repo";
