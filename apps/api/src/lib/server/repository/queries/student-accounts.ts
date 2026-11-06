@@ -3,7 +3,7 @@ import { and, eq, or } from "drizzle-orm";
 import { smClasses, smSections, smStudents } from "../../db/schema";
 import { chunkedInArray } from "../base/d1-helpers";
 import { withErrorHandling } from "../base/error-handling";
-import type { ScopedRepositoryContext } from "../base/repository-context";
+import type { RepositoryContext, ScopedRepositoryContext } from "../base/repository-context";
 
 /** The student → account mapping the code flow needs before a tenant exists. */
 export interface StudentUserLink {
@@ -16,6 +16,26 @@ export interface StudentUserLink {
 export interface StudentCodeExportRow extends StudentUserLink {
   readonly className: string | null;
   readonly sectionName: string | null;
+}
+
+/** Pre-tenant code redemption: the code row is the authority, not a tenant. */
+export async function findStudentAccount(
+  ctx: RepositoryContext,
+  studentId: number
+): Promise<StudentUserLink | null> {
+  return withErrorHandling(async () => {
+    const [row] = await ctx.db
+      .select({
+        studentId: smStudents.id,
+        userId: smStudents.userId,
+        fullName: smStudents.fullName,
+        admissionNo: smStudents.admissionNo
+      })
+      .from(smStudents)
+      .where(eq(smStudents.id, studentId))
+      .limit(1);
+    return row ?? null;
+  }, "findStudentAccount");
 }
 
 /** `auth_codes` has no school column (`04 §2`); scope comes from these ids. */

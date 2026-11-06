@@ -10,4 +10,5 @@ export * from "./rate-limit.service";
 export * from "./session-issuance";
 export * from "./session.service";
 export * from "./signed-payload";
+export * from "./student-code.service";
 export * from "./types";

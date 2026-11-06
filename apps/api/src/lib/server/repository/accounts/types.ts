@@ -1,5 +1,6 @@
 import type {
   authCodes,
+  authEvents,
   authIdentities,
   authSessions,
   infixRoles,
@@ -18,6 +19,7 @@ export type NewAuthIdentity = typeof authIdentities.$inferInsert;
 export type AuthSessionRow = typeof authSessions.$inferSelect;
 export type AuthCodeRow = typeof authCodes.$inferSelect;
 export type NewAuthCode = typeof authCodes.$inferInsert;
+export type NewAuthEvent = typeof authEvents.$inferInsert;
 
 /** Columns a user profile update may touch; `password` and `id` are excluded. */
 export type UserPatch = Partial<

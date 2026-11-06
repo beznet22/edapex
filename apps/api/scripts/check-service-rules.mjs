@@ -65,6 +65,7 @@ const REQUIRED_TREE = [
   "auth/session-issuance.ts",
   "auth/signed-payload.ts",
   "auth/session.service.ts",
+  "auth/student-code.service.ts",
   "auth/rate-limit.service.ts",
   "auth/profile.service.ts",
   "auth/index.ts",

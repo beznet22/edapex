@@ -1,11 +1,11 @@
 import { and, eq, gt, isNull, or } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
 
-import { authCodes } from "../../db/schema";
+import { authCodes, authEvents, authSessions } from "../../db/schema";
 import { batchOrThrow, chunkedInArray, chunkedInsert } from "../base/d1-helpers";
 import { withErrorHandling } from "../base/error-handling";
 import type { RepositoryContext, ScopedRepositoryContext } from "../base/repository-context";
-import type { AuthCodeRow, NewAuthCode } from "./types";
+import type { AuthCodeRow, NewAuthCode, NewAuthEvent } from "./types";
 
 const AUTH_CODE_COLUMNS = 9;
 
@@ -115,5 +115,74 @@ export async function revokeCodeById(
         .where(and(eq(authCodes.id, codeId), isNull(authCodes.revokedAt)));
     },
     "revokeCodeById"
+  );
+}
+
+export interface StudentCodeReplacement {
+  readonly studentId: number;
+  readonly userId: number;
+  readonly code: NewAuthCode;
+  readonly event: NewAuthEvent;
+  readonly now: number;
+}
+
+/** Reissue is one batch: revoke the old row, issue the new one, kill sessions. */
+export async function replaceStudentCode(
+  ctx: ScopedRepositoryContext,
+  input: StudentCodeReplacement
+): Promise<void> {
+  await withErrorHandling(
+    async () => {
+      const statements: BatchItem<"sqlite">[] = [
+        ctx.db
+          .update(authCodes)
+          .set({ revokedAt: input.now })
+          .where(
+            and(
+              eq(authCodes.subjectType, "student"),
+              eq(authCodes.subjectId, input.studentId),
+              isNull(authCodes.revokedAt)
+            )
+          ),
+        ctx.db.insert(authCodes).values(input.code),
+        ctx.db.delete(authSessions).where(eq(authSessions.userId, input.userId)),
+        ctx.db.insert(authEvents).values(input.event)
+      ];
+      await batchOrThrow(ctx.db, statements);
+    },
+    "replaceStudentCode"
+  );
+}
+
+export interface StudentCodeRevocation {
+  readonly studentId: number;
+  readonly userId: number;
+  readonly event: NewAuthEvent;
+  readonly now: number;
+}
+
+export async function revokeStudentCode(
+  ctx: ScopedRepositoryContext,
+  input: StudentCodeRevocation
+): Promise<void> {
+  await withErrorHandling(
+    async () => {
+      const statements: BatchItem<"sqlite">[] = [
+        ctx.db
+          .update(authCodes)
+          .set({ revokedAt: input.now })
+          .where(
+            and(
+              eq(authCodes.subjectType, "student"),
+              eq(authCodes.subjectId, input.studentId),
+              isNull(authCodes.revokedAt)
+            )
+          ),
+        ctx.db.delete(authSessions).where(eq(authSessions.userId, input.userId)),
+        ctx.db.insert(authEvents).values(input.event)
+      ];
+      await batchOrThrow(ctx.db, statements);
+    },
+    "revokeStudentCode"
   );
 }
