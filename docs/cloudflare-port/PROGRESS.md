@@ -24,7 +24,7 @@ Port code lands in [`apps/api/`](../../apps/api/AGENTS.md).
 
 ## Current focus
 
-**Phase 6 — Archive and retrieval.** In progress on `phase-6-archive` (PR into `phase-5-auth`); Phase 7 (migration execution) is next.
+**Phase 6 — Archive and retrieval.** Complete on `phase-6-archive` (PR #7, check `port` green); Phase 7 (migration execution) is next.
 
 ## Phase status
 
@@ -36,7 +36,7 @@ Port code lands in [`apps/api/`](../../apps/api/AGENTS.md).
 | 3 | Service layer | done | Kimchi | 2026-11-06 | 2026-11-06 | PR #4 check `port` green ([run 42265759924](https://github.com/beznet22/edapex/actions/runs/42265759924)): typecheck, 292 tests (55 files), boundaries, repository + service guards (53 service files, 45-file tree), method map 53/53 (37 mapped + 2 merged + 7 deleted + 5 retired + 2 out of scope), 77 tables, drift clean, both verifiers, report-settings import 1 file → 1 row verified. |
 | 4 | HTTP layer | done | Kimchi | 2026-11-06 | 2026-11-06 | PR #5 check `port` green ([run 42280594997](https://github.com/beznet22/edapex/actions/runs/42280594997)): typecheck, 399 tests / 80 files, boundary/repository/service/HTTP guards + self-tests, repository map 108/108, service map 53/53, D1 apply, drift, deploy dry-run, both verifiers. Gate: 19 route modules / 42 handlers, 422 byte-compatible, `hc<AppType>` type test, CORS/tenant/dropped-route suites green. |
 | 5 | Auth cutover flow | done | Kimchi | 2026-11-06 | 2026-11-06 | PR #6 check `port` green ([run 42288628524](https://github.com/beznet22/edapex/actions/runs/42288628524)): typecheck, 505 tests / 100 files, all guards + self-tests, 0002 apply + drift, deploy dry-run, both verifiers. Gate: claim → Google → session on local D1, 409 `AMBIGUOUS_EMAIL`, reissue revokes sessions, claim CPU 0.055 ms/attempt (Workers pool); `wrangler dev` handler p50 ~17 ms wall clock. |
-| 6 | Archive and retrieval | in progress | Kimchi | 2026-11-06 | — | Local gate: typecheck, full Workers suite, all guards, 0003 apply + drift, deploy dry-run, both verifiers. CI pending on the PR. |
+| 6 | Archive and retrieval | done | Kimchi | 2026-11-06 | 2026-11-06 | PR #7 check `port` green ([run 42300456462](https://github.com/beznet22/edapex/actions/runs/42300456462)): typecheck, 115 files / 565 tests, all guards + self-tests, 0003 apply + drift, deploy dry-run, both verifiers. Gate: archive/restore round-trip, checksum quarantine, published immutability + supersede *n+1*, wipe blocked without the second admin token. |
 | 7 | Migration execution | not started | — | — | — | — |
 | 8 | Cutover | not started | — | — | — | — |
 | 9 | Post-cutover | not started | — | — | — | — |
@@ -156,6 +156,7 @@ Port code lands in [`apps/api/`](../../apps/api/AGENTS.md).
 | 2026-11-06 | 6 | HTTP: `/students/:id/marksheets*`, `/students/:id/transcripts*`, the four `…/pdf` payload routes, `/r/:token`, `/admin/sessions/*`, `/admin/jobs/*`, `/admin/archive`, `/admin/tokens/:tokenId/revoke`, `/admin/results/:id/override`; `24` route modules and `42+` handlers now inspected by `check:http` | Kimchi |
 | 2026-11-06 | 6 | Local gate: typecheck, full Workers suite, repository/service/HTTP/boundary guards + self-tests, migration 0003 apply on a populated `session_jobs` table, drift, deploy dry-run, both verifiers | Kimchi |
 | 2026-11-06 | 6 | Deviations: `…/pdf` returns a JSON render payload (ironpress stays client-side; its Node binding is filesystem-bound and not Workers-ready); retention sweep/policy deferred to Phase 9; `archive-objects` split into a maintenance repo to stay under the 300-line cap; `class_attendances` stays in the assessment archive raw rows; `session-writable` is a free guard (service-to-service imports are banned) | Kimchi |
+| 2026-11-06 | 6 | Phase 6 gate passed: PR #7 check `port` green ([run 42300456462](https://github.com/beznet22/edapex/actions/runs/42300456462)); 115 test files / 565 tests, 96 repository files, 103 service files, 35 route modules, 0003 apply + drift, deploy dry-run, both verifiers | Kimchi |
 
 ## Blockers and decisions
 
