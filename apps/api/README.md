@@ -4,7 +4,7 @@ The Hono API on Cloudflare Workers with D1. This directory is the **API service*
 
 | | |
 |---|---|
-| Phase | **6 — Archive and retrieval complete** ([PROGRESS](../docs/cloudflare-port/PROGRESS.md)) |
+| Phase | **7 — Migration execution complete** ([PROGRESS](../docs/cloudflare-port/PROGRESS.md)) |
 | Plan | [ROADMAP](../docs/cloudflare-port/ROADMAP.md) |
 | Agent rules | [AGENTS.md](./AGENTS.md) |
 | Specs | [docs/cloudflare-port](../docs/cloudflare-port/README.md) |
@@ -72,7 +72,7 @@ Student photos live in R2 Standard bucket `edapex-media` (binding `MEDIA`) under
 pnpm exec wrangler r2 bucket create edapex-media
 ```
 
-`static/uploads/students` remains the legacy fallback until the Phase 7 migration; only images are in scope. The directory also contains PDFs, which are not student photos and are excluded — see `05 §5.1`.
+`static/uploads/students` remains the legacy fallback until the Phase 7 data upload; only images are in scope. The Phase 7 rehearsal inventories the referenced photos, uploads them to local R2 under the unchanged `/uploads/students/...` keys and verifies the public route. The directory also contains PDFs, which are not student photos and are excluded — see `05 §5.1`.
 
 ### Archive objects
 
@@ -141,4 +141,4 @@ Then update [PROGRESS.md](../docs/cloudflare-port/PROGRESS.md): status row, gate
 
 ## Status
 
-Phases 0–6 are complete. Phase 3 added the request-scoped service context, ports/adapters, pure domain and semantic validation, the five catalog-facing service groups, OCR cache/capture binding, settings, auth/session/profile/rate limiting, authorization and student lifecycle. Phase 4 added the service-led `/api/v1` surface, the flat error envelope, the `baseCtx`/`ctx` split, the `hc<AppType>` client and the HTTP guard. Phase 5 added the claim/Google/code auth cutover and the duplicate-email utility. Phase 6 adds session archives, retrieval, immutable report-card versions, public document tokens, read-only restore and the dual-admin wipe; 79 tables (62 legacy + 17 registered), 35 route modules and the full Workers suite are guarded by typecheck, repository/service/HTTP/boundary checks, migration drift, deploy dry-run and both verifiers.
+Phases 0–6 are complete. Phase 3 added the request-scoped service context, ports/adapters, pure domain and semantic validation, the five catalog-facing service groups, OCR cache/capture binding, settings, auth/session/profile/rate limiting, authorization and student lifecycle. Phase 4 added the service-led `/api/v1` surface, the flat error envelope, the `baseCtx`/`ctx` split, the `hc<AppType>` client and the HTTP guard. Phase 5 added the claim/Google/code auth cutover and the duplicate-email utility. Phase 6 adds session archives, retrieval, immutable report-card versions, public document tokens, read-only restore and the dual-admin wipe. Phase 7 adds the offline transform and tiered load, the integrity gate, bootstrap, terms, the filtered staffing copy with per-class-section review, promotion, quota/reversal and quarantine reporting; the local rehearsals load 196,801 rows across 62 legacy tables with zero FK violations and reconcile the 2026/27 roster. See [`scripts/migration/README.md`](./scripts/migration/README.md) for the rehearsal and production runbook.

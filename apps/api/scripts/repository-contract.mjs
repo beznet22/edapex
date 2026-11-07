@@ -86,6 +86,7 @@ export const AGGREGATES = {
     "gradeChangeAudit",
     "publicDocumentTokens"
   ],
+  lifecycle: ["migrationResolutions", "promotionBatches", "promotionOutcomes"],
   fees: [
     "smFeesGroups",
     "smFeesTypes",

@@ -257,7 +257,14 @@ export const smMarkStores = sqliteTable(
     index("sm_mark_stores_section_id_foreign").on(table.sectionId),
     index("sm_mark_stores_student_id_foreign").on(table.studentId),
     index("sm_mark_stores_student_record_id_foreign").on(table.studentRecordId),
-    index("sm_mark_stores_subject_id_foreign").on(table.subjectId)
+    index("sm_mark_stores_subject_id_foreign").on(table.subjectId),
+    index("sm_mark_stores_school_academic_term_class_section_index").on(
+      table.schoolId,
+      table.academicId,
+      table.examTermId,
+      table.classId,
+      table.sectionId
+    )
   ]
 );
 
@@ -320,7 +327,14 @@ export const smResultStores = sqliteTable(
     index("sm_result_stores_section_id_foreign").on(table.sectionId),
     index("sm_result_stores_student_id_foreign").on(table.studentId),
     index("sm_result_stores_student_record_id_foreign").on(table.studentRecordId),
-    index("sm_result_stores_subject_id_foreign").on(table.subjectId)
+    index("sm_result_stores_subject_id_foreign").on(table.subjectId),
+    index("sm_result_stores_school_academic_exam_class_section_index").on(
+      table.schoolId,
+      table.academicId,
+      table.examTypeId,
+      table.classId,
+      table.sectionId
+    )
   ]
 );
 
@@ -440,7 +454,13 @@ export const smStudentAttendances = sqliteTable(
     index("sm_student_attendances_class_id_foreign").on(table.classId),
     index("sm_student_attendances_school_id_foreign").on(table.schoolId),
     index("sm_student_attendances_section_id_foreign").on(table.sectionId),
-    index("sm_student_attendances_student_id_foreign").on(table.studentId)
+    index("sm_student_attendances_student_id_foreign").on(table.studentId),
+    index("sm_student_attendances_school_academic_class_section_index").on(
+      table.schoolId,
+      table.academicId,
+      table.classId,
+      table.sectionId
+    )
   ]
 );
 
@@ -473,7 +493,12 @@ export const studentRatings = sqliteTable(
       table.attribute
     ),
     index("student_ratings_academic_id_foreign").on(table.academicId),
-    index("student_ratings_exam_type_id_foreign").on(table.examTypeId)
+    index("student_ratings_exam_type_id_foreign").on(table.examTypeId),
+    index("student_ratings_academic_student_term_index").on(
+      table.academicId,
+      table.studentId,
+      table.examTypeId
+    )
   ]
 );
 
@@ -508,7 +533,12 @@ export const teacherRemarks = sqliteTable(
     ),
     index("teacher_remarks_academic_id_foreign").on(table.academicId),
     index("teacher_remarks_exam_type_id_foreign").on(table.examTypeId),
-    index("teacher_remarks_teacher_id_foreign").on(table.teacherId)
+    index("teacher_remarks_teacher_id_foreign").on(table.teacherId),
+    index("teacher_remarks_academic_student_term_index").on(
+      table.academicId,
+      table.studentId,
+      table.examTypeId
+    )
   ]
 );
 

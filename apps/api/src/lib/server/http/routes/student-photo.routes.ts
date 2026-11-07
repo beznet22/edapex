@@ -3,7 +3,7 @@ import { Hono } from "hono";
 import { createPhotoStore } from "../../services/adapters/r2-photo-store.adapter";
 import type { AppEnv } from "../env";
 
-const PHOTO_FILE = /^[a-f0-9]{64}\.(?:jpe?g|png|webp)$/i;
+const PHOTO_FILE = /^(?:[a-f0-9]{32}|[a-f0-9]{64})\.(?:jpe?g|png|webp)$/i;
 
 const contentTypeFor = (file: string): string => {
   const extension = file.split(".").pop()?.toLowerCase();

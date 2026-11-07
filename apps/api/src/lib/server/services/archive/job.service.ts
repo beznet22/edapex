@@ -4,6 +4,7 @@ import { requireScopedContext } from "../context";
 import { JobStateError, NotFoundError, PortError, WipeApprovalError } from "../errors";
 import { sha256BytesHex } from "./archive-object";
 import { runJobSlice } from "./job-runner";
+import type { JobSliceView } from "./job-runner";
 import type { SessionJobView } from "./job-progress";
 import {
   parseProgress,
@@ -50,7 +51,7 @@ export class JobService {
     return rows.map(toSessionJobView);
   }
 
-  async resume(jobId: string): Promise<SessionJobView> {
+  async resume(jobId: string): Promise<JobSliceView> {
     return runJobSlice(this.ctx, jobId);
   }
 

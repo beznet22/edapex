@@ -43,9 +43,17 @@ export const smAssignSubjects = sqliteTable(
     index("sm_assign_subjects_school_id_foreign").on(table.schoolId),
     index("sm_assign_subjects_section_id_foreign").on(table.sectionId),
     index("sm_assign_subjects_subject_id_foreign").on(table.subjectId),
-    index("sm_assign_subjects_teacher_id_foreign").on(table.teacherId)
+    index("sm_assign_subjects_teacher_id_foreign").on(table.teacherId),
+    index("sm_assign_subjects_school_academic_class_section_index").on(
+      table.schoolId,
+      table.academicId,
+      table.classId,
+      table.sectionId
+    )
   ]
 );
+
+const STAFFING_STATUS = ["pending", "copied", "reviewed"] as const;
 
 export const smClassSections = sqliteTable(
   "sm_class_sections",
@@ -67,13 +75,34 @@ export const smClassSections = sqliteTable(
     academicId: integer("academic_id")
       .default(1)
       .references(() => smAcademicYears.id, { onDelete: "cascade", onUpdate: "restrict" }),
-    parentId: integer("parent_id")
+    parentId: integer("parent_id"),
+    /**
+     * Phase 7 staffing review state. No DB CHECK: the column is added with an
+     * additive ALTER on a populated table and the enum is enforced by Drizzle
+     * and the staffing service (`05 §7` review gate).
+     */
+    staffingStatus: text("staffing_status", { enum: STAFFING_STATUS })
+      .notNull()
+      .default("pending"),
+    staffingReviewedAt: integer("staffing_reviewed_at"),
+    staffingReviewedBy: integer("staffing_reviewed_by")
   },
   (table) => [
     index("sm_class_sections_academic_id_foreign").on(table.academicId),
     index("sm_class_sections_class_id_section_id_index").on(table.classId, table.sectionId),
+    index("sm_class_sections_school_academic_staffing_index").on(
+      table.schoolId,
+      table.academicId,
+      table.staffingStatus
+    ),
     index("sm_class_sections_school_id_foreign").on(table.schoolId),
-    index("sm_class_sections_section_id_foreign").on(table.sectionId)
+    index("sm_class_sections_section_id_foreign").on(table.sectionId),
+    index("sm_class_sections_school_academic_class_section_index").on(
+      table.schoolId,
+      table.academicId,
+      table.classId,
+      table.sectionId
+    )
   ]
 );
 

@@ -5,6 +5,7 @@ import * as assessments from "../../repository/assessments";
 import * as attendance from "../../repository/attendance";
 import * as communications from "../../repository/communications";
 import * as fees from "../../repository/fees";
+import * as lifecycle from "../../repository/lifecycle";
 import * as profiles from "../../repository/profiles";
 import * as queries from "../../repository/queries";
 import * as reference from "../../repository/reference";
@@ -63,6 +64,7 @@ export interface RepositoryAccess {
   readonly queries: typeof queries;
   readonly fees: typeof fees;
   readonly archive: typeof archive;
+  readonly lifecycle: typeof lifecycle;
 }
 
 export function createRepositoryAccess(ctx: RepositoryContext): RepositoryAccess {
@@ -78,7 +80,8 @@ export function createRepositoryAccess(ctx: RepositoryContext): RepositoryAccess
     reference,
     queries,
     fees,
-    archive
+    archive,
+    lifecycle
   });
 }
 
