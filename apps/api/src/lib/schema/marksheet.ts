@@ -32,9 +32,9 @@ export const studentSchema = z.object({
   term: z.string().describe("The term of the exam"),
   title: z.string().describe("The title of the exam"),
   category: categoryEnum.describe("The category of the student"),
-  className: z.string().min(1).describe("The class name of the student"),
-  sectionName: z.string().min(1).describe("The section name of the student"),
-  adminNo: z.number().positive().describe("The admission number of the student"),
+  className: z.string().describe("The class name of the student"),
+  sectionName: z.string().describe("The section name of the student"),
+  adminNo: z.number().int().nonnegative().describe("The admission number of the student"),
   sessionYear: z.string().describe("The session year of the exam"),
   daysOpened: z.number().describe("The number of days opened"),
   daysAbsent: z.number().describe("The number of days absent"),
@@ -60,6 +60,10 @@ export const recordSchema = z
     titles: z.array(z.string()).default([]).describe("The titles of the marks"),
     markIds: z.array(z.number()).default([]).describe("The IDs of the marks"),
     marks: z.array(z.number()).default([]).describe("The marks for the subject"),
+    absent: z
+      .array(z.boolean())
+      .optional()
+      .describe("Per-mark absence flags; true renders ABS and is excluded from averages"),
     fullMarks: z.array(z.number()).default([]).describe("The maximum marks per exam title"),
     totalScore: z.number().max(100.0).optional().describe("The total score for the subject"),
     grade: z.string().describe("The grade for the subject"),
@@ -84,6 +88,18 @@ export const recordSchema = z
           code: "custom",
           message: "Number of marks must match number of titles",
           path: ["marks"],
+          continue: true
+        });
+      }
+      if (
+        data.absent !== undefined &&
+        data.absent.length !== 0 &&
+        data.absent.length !== data.marks.length
+      ) {
+        ctx.addIssue({
+          code: "custom",
+          message: "Number of absence flags must match number of marks",
+          path: ["absent"],
           continue: true
         });
       }

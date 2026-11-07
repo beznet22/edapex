@@ -256,6 +256,12 @@ export const smStudents = sqliteTable(
     index("sm_students_student_group_id_foreign").on(table.studentGroupId),
     index("sm_students_user_id_foreign").on(table.userId),
     index("sm_students_vechile_id_foreign").on(table.vechileId),
+    index("sm_students_school_academic_class_section_index").on(
+      table.schoolId,
+      table.academicId,
+      table.classId,
+      table.sectionId
+    ),
     statusCheck("sm_students_status_check", table.status, STUDENT_STATUS)
   ]
 );
@@ -303,6 +309,12 @@ export const studentRecords = sqliteTable(
     index("student_records_school_id_foreign").on(table.schoolId),
     index("student_records_section_id_foreign").on(table.sectionId),
     index("student_records_student_id_foreign").on(table.studentId),
+    index("student_records_school_academic_student_default_index").on(
+      table.schoolId,
+      table.academicId,
+      table.studentId,
+      table.isDefault
+    ),
     statusCheck("student_records_status_check", table.status, RECORD_STATUS)
   ]
 );

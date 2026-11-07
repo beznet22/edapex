@@ -13,7 +13,7 @@ import { emitAuthEvent } from "./auth-events";
 import { completeClaim } from "./claim-link";
 import { OAUTH_STATE_TTL_SECONDS } from "./claim-policy";
 import { issueSession, loadAuthUser } from "./session-issuance";
-import { signPayload } from "./signed-payload";
+import { signPayload } from "../crypto/signed-payload";
 import { SESSION_TTL_SECONDS } from "./types";
 import type { AuthSessionResult } from "./types";
 

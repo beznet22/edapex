@@ -30,7 +30,12 @@ export type ErrorCode =
   | "TENANT_SCOPE_REQUIRED"
   | "RATE_LIMITED"
   | "INTERNAL_ERROR"
-  | "UPSTREAM_FAILURE";
+  | "UPSTREAM_FAILURE"
+  | "SESSION_READ_ONLY"
+  | "ARCHIVE_INCOMPLETE"
+  | "ARCHIVE_VERSION_UNSUPPORTED"
+  | "WIPE_APPROVAL_REQUIRED"
+  | "JOB_STATE_INVALID";
 
 export type ErrorStatus = 400 | 401 | 403 | 404 | 409 | 422 | 429 | 500 | 502;
 
@@ -116,6 +121,16 @@ const fromServiceError = (error: ServiceError, requestId: string): ErrorMapping 
       return envelope(502, "UPSTREAM_FAILURE", UPSTREAM_MESSAGE, requestId);
     case "NOT_FOUND":
       return envelope(404, "NOT_FOUND", error.message, requestId);
+    case "SESSION_READ_ONLY":
+      return envelope(409, "SESSION_READ_ONLY", error.message, requestId);
+    case "ARCHIVE_INCOMPLETE":
+      return envelope(409, "ARCHIVE_INCOMPLETE", error.message, requestId);
+    case "ARCHIVE_VERSION_UNSUPPORTED":
+      return envelope(409, "ARCHIVE_VERSION_UNSUPPORTED", error.message, requestId);
+    case "WIPE_APPROVAL_REQUIRED":
+      return envelope(403, "WIPE_APPROVAL_REQUIRED", error.message, requestId);
+    case "JOB_STATE_INVALID":
+      return envelope(409, "JOB_STATE_INVALID", error.message, requestId);
   }
 };
 

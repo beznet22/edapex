@@ -40,8 +40,7 @@ const BANNED_PATHS = [
   "/api/settings/academic-calendar",
   "/api/parents/connect-telegram",
   "/api/results/generate-pdf",
-  "/api/demo",
-  "/r/"
+  "/api/demo"
 ];
 
 function listTypeScriptFiles(dir) {

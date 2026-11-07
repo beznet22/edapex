@@ -15,36 +15,10 @@ export const transcriptSubjectRowSchema = z
     subject: z.string(),
     subjectCode: z.string(),
     marks: z.array(z.number().nullable()).min(1),
-    total: z.number().min(0),
-    percentage: z.number().min(0).max(100),
+    total: z.number(),
+    percentage: z.number().min(0).max(1000),
     grade: z.string(),
     color: z.string().optional()
-  })
-  .superRefine((data, ctx) => {
-    if (data.marks.length !== 1 && data.marks.length !== 2 && data.marks.length !== 3) {
-      ctx.addIssue({
-        code: "custom",
-        message: "marks must have 1, 2, or 3 entries",
-        path: ["marks"]
-      });
-    }
-    for (const mark of data.marks) {
-      if (mark !== null && mark > 100) {
-        ctx.addIssue({
-          code: "custom",
-          message: "Per-term mark exceeds 100%",
-          path: ["marks"]
-        });
-        break;
-      }
-    }
-    if (data.total > 300) {
-      ctx.addIssue({
-        code: "custom",
-        message: "Cumulative subject total exceeds 300",
-        path: ["total"]
-      });
-    }
   });
 export type TranscriptSubjectRow = z.infer<typeof transcriptSubjectRowSchema>;
 
@@ -62,10 +36,10 @@ export const transcriptSchema = z
     academicYear: transcriptAcademicYearSchema,
     terms: z.array(transcriptTermSchema).min(1),
     subjects: z.array(transcriptSubjectRowSchema).min(1),
-    classAverage: z.number().min(0).max(100),
-    studentAverage: z.number().min(0).max(100),
-    yearlyTotal: z.number().min(0),
-    yearlyAverage: z.number().min(0).max(100),
+    classAverage: z.number().min(0).max(1000),
+    studentAverage: z.number().min(0).max(1000),
+    yearlyTotal: z.number(),
+    yearlyAverage: z.number().min(0).max(1000),
     maxPossibleTotal: z.number().min(0)
   })
   .superRefine((data, ctx) => {
@@ -77,12 +51,6 @@ export const transcriptSchema = z
           path: ["yearlyTotal"]
         });
       }
-    } else if (data.yearlyTotal <= 0) {
-      ctx.addIssue({
-        code: "custom",
-        message: "yearlyTotal must be positive when subjects are present",
-        path: ["yearlyTotal"]
-      });
     }
     data.subjects.forEach((subject, index) => {
       if (subject.marks.length !== data.terms.length) {

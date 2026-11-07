@@ -4,9 +4,22 @@ import type { MiddlewareHandler } from "hono";
 import type { AppContext } from "../env";
 import { requireAdmin } from "../middleware/authorize";
 import { adminAuth } from "./admin-auth.routes";
+import { adminArchive } from "./admin-archive.routes";
+import { adminBootstrap } from "./admin-bootstrap.routes";
 import { adminDuplicateActions } from "./admin-duplicate-actions.routes";
 import { adminDuplicateEmails } from "./admin-duplicate-emails.routes";
+import { adminJobs } from "./admin-jobs.routes";
+import { adminMigration } from "./admin-migration.routes";
+import { adminPromotion } from "./admin-promotion.routes";
+import { adminSessions } from "./admin-sessions.routes";
+import { adminStaffing } from "./admin-staffing.routes";
+import { adminTerms } from "./admin-terms.routes";
+import { adminResults } from "./admin-results.routes";
 import { adminStudentCodes } from "./admin-student-codes.routes";
+import { adminTokens } from "./admin-tokens.routes";
+import { archiveRender } from "./archive-render.routes";
+import { archiveRetrieval } from "./archive-retrieval.routes";
+import { reportCard } from "./report-card.routes";
 import { assessmentCaptures } from "./assessment-captures.routes";
 import { assessmentFeedback } from "./assessment-feedback.routes";
 import { assessmentOcr } from "./assessment-ocr.routes";
@@ -44,6 +57,9 @@ export const createProtectedRoutes = (
     .route("/students", students)
     .route("/students", studentPhotos)
     .route("/students", studentLifecycle)
+    .route("/students", archiveRetrieval)
+    .route("/students", archiveRender)
+    .route("/students", reportCard)
     .route("/subjects", subjectAssignments)
     .route("/attendance", attendance)
     .route("/assessments", assessments)
@@ -58,4 +74,14 @@ export const createProtectedRoutes = (
     .route("/admin", adminStudentCodes)
     .route("/admin", adminDuplicateEmails)
     .route("/admin", adminDuplicateActions)
-    .route("/admin", adminAuth);
+    .route("/admin", adminAuth)
+    .route("/admin", adminBootstrap)
+    .route("/admin", adminStaffing)
+    .route("/admin", adminMigration)
+    .route("/admin", adminPromotion)
+    .route("/admin", adminTerms)
+    .route("/admin", adminSessions)
+    .route("/admin", adminJobs)
+    .route("/admin", adminArchive)
+    .route("/admin", adminTokens)
+    .route("/admin", adminResults);

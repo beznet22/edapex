@@ -70,6 +70,72 @@ const REDESIGN_EXTRA_INDEXES = [
     name: "users_claim_status_index",
     unique: false,
     columns: ["school_id", "claim_status"]
+  },
+  {
+    table: "sm_class_sections",
+    name: "sm_class_sections_school_academic_staffing_index",
+    unique: false,
+    columns: ["school_id", "academic_id", "staffing_status"]
+  },
+  {
+    table: "student_records",
+    name: "student_records_school_academic_student_default_index",
+    unique: false,
+    columns: ["school_id", "academic_id", "student_id", "is_default"]
+  },
+  {
+    table: "sm_mark_stores",
+    name: "sm_mark_stores_school_academic_term_class_section_index",
+    unique: false,
+    columns: ["school_id", "academic_id", "exam_term_id", "class_id", "section_id"]
+  },
+  {
+    table: "sm_result_stores",
+    name: "sm_result_stores_school_academic_exam_class_section_index",
+    unique: false,
+    columns: ["school_id", "academic_id", "exam_type_id", "class_id", "section_id"]
+  },
+  {
+    table: "sm_assign_subjects",
+    name: "sm_assign_subjects_school_academic_class_section_index",
+    unique: false,
+    columns: ["school_id", "academic_id", "class_id", "section_id"]
+  },
+  {
+    table: "sm_class_sections",
+    name: "sm_class_sections_school_academic_class_section_index",
+    unique: false,
+    columns: ["school_id", "academic_id", "class_id", "section_id"]
+  },
+  {
+    table: "sm_students",
+    name: "sm_students_school_academic_class_section_index",
+    unique: false,
+    columns: ["school_id", "academic_id", "class_id", "section_id"]
+  },
+  {
+    table: "sm_student_attendances",
+    name: "sm_student_attendances_school_academic_class_section_index",
+    unique: false,
+    columns: ["school_id", "academic_id", "class_id", "section_id"]
+  },
+  {
+    table: "sm_fees_assigns",
+    name: "sm_fees_assigns_school_academic_student_index",
+    unique: false,
+    columns: ["school_id", "academic_id", "student_id"]
+  },
+  {
+    table: "teacher_remarks",
+    name: "teacher_remarks_academic_student_term_index",
+    unique: false,
+    columns: ["academic_id", "student_id", "exam_type_id"]
+  },
+  {
+    table: "student_ratings",
+    name: "student_ratings_academic_student_term_index",
+    unique: false,
+    columns: ["academic_id", "student_id", "exam_type_id"]
   }
 ];
 
@@ -88,7 +154,9 @@ const NEW_TABLES = [
   "session_result_summary",
   "report_settings",
   "ocr_cache",
-  "marksheet_captures"
+  "marksheet_captures",
+  "grade_change_audit",
+  "public_document_tokens"
 ];
 
 const NEW_TABLE_INDEXES = {
@@ -128,7 +196,9 @@ const NEW_TABLE_INDEXES = {
   ],
   archive_objects: [
     { name: "archive_objects_object_key_unique", unique: true, columns: ["object_key"] },
-    { name: "archive_objects_school_academic_student_unique", unique: true, columns: ["school_id", "academic_id", "student_id"] }
+    { name: "archive_objects_school_academic_student_version_unique", unique: true, columns: ["school_id", "academic_id", "student_id", "version"] },
+    { name: "archive_objects_session_status_index", unique: false, columns: ["school_id", "academic_id", "status"] },
+    { name: "archive_objects_student_term_index", unique: false, columns: ["school_id", "academic_id", "student_id", "exam_type_id"] }
   ],
   session_result_summary: [
     { name: "session_result_summary_term_unique", unique: true, columns: ["school_id", "academic_id", "student_id", "term_id"] },
@@ -145,6 +215,15 @@ const NEW_TABLE_INDEXES = {
     { name: "marksheet_captures_student_exam_index", unique: false, columns: ["school_id", "student_id", "exam_type_id"] },
     { name: "marksheet_captures_student_exam_unique", unique: true, columns: ["school_id", "student_id", "exam_type_id"] },
     { name: "marksheet_captures_file_unique", unique: true, columns: ["school_id", "class_id", "section_id", "exam_type_id", "ocr_content_sha256", "ocr_parser_version"] }
+  ],
+  grade_change_audit: [
+    { name: "grade_change_audit_result_index", unique: false, columns: ["school_id", "result_id"] },
+    { name: "grade_change_audit_student_term_index", unique: false, columns: ["school_id", "student_id", "academic_id", "exam_type_id"] }
+  ],
+  public_document_tokens: [
+    { name: "public_document_tokens_jti_unique", unique: true, columns: ["jti"] },
+    { name: "public_document_tokens_hash_unique", unique: true, columns: ["token_hash"] },
+    { name: "public_document_tokens_student_index", unique: false, columns: ["school_id", "student_id", "academic_id"] }
   ]
 };
 
@@ -219,5 +298,5 @@ console.log(`written: ${path.relative(ROOT, OUT)}`);
 
 if (legacyTables.length !== 62) throw new Error(`expected 62 legacy tables, found ${legacyTables.length}`);
 if (recovered !== 226) throw new Error(`expected 226 recovered indexes, found ${recovered}`);
-if (legacySecondary !== 232) throw new Error(`expected 232 legacy secondary indexes, found ${legacySecondary}`);
-if (NEW_TABLES.length !== 15) throw new Error(`expected 15 new tables, found ${NEW_TABLES.length}`);
+if (legacySecondary !== 243) throw new Error(`expected 243 legacy secondary indexes, found ${legacySecondary}`);
+if (NEW_TABLES.length !== 17) throw new Error(`expected 17 new tables, found ${NEW_TABLES.length}`);

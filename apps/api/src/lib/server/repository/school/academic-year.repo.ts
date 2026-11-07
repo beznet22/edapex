@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 
 import { smAcademicYears } from "../../db/schema";
 import { withErrorHandling } from "../base/error-handling";
@@ -31,4 +31,30 @@ export async function selectAcademicYearById(
     if (row === undefined || row.schoolId !== ctx.tenant.schoolId) return null;
     return row;
   }, "selectAcademicYearById");
+}
+
+export interface AcademicYearArchiveState {
+  readonly status: AcademicYearRow["status"];
+  readonly archivedAt?: number | null;
+  readonly archiveManifestKey?: string | null;
+}
+
+/** The archive state machine lives on the session row (`06 §6.1`). */
+export async function setAcademicYearArchiveState(
+  ctx: ScopedRepositoryContext,
+  id: number,
+  state: AcademicYearArchiveState
+): Promise<void> {
+  await withErrorHandling(async () => {
+    await ctx.db
+      .update(smAcademicYears)
+      .set({
+        status: state.status,
+        ...(state.archivedAt === undefined ? {} : { archivedAt: state.archivedAt }),
+        ...(state.archiveManifestKey === undefined
+          ? {}
+          : { archiveManifestKey: state.archiveManifestKey })
+      })
+      .where(and(eq(smAcademicYears.id, id), eq(smAcademicYears.schoolId, ctx.tenant.schoolId)));
+  }, "setAcademicYearArchiveState");
 }

@@ -79,6 +79,14 @@ export const AGGREGATES = {
     "marksheetCaptures"
   ],
   attendance: ["smStudentAttendances", "classAttendances"],
+  archive: [
+    "sessionJobs",
+    "archiveObjects",
+    "sessionResultSummary",
+    "gradeChangeAudit",
+    "publicDocumentTokens"
+  ],
+  lifecycle: ["migrationResolutions", "promotionBatches", "promotionOutcomes"],
   fees: [
     "smFeesGroups",
     "smFeesTypes",
@@ -101,6 +109,7 @@ export const REFERENCE_READ = [
   "smSections",
   "smSubjects",
   "smExamTypes",
+  "smStudents",
   "smBaseSetups",
   "smBaseGroups",
   "smDesignations",

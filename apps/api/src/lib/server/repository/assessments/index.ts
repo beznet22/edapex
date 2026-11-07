@@ -1,6 +1,9 @@
 export * from "./exam.repo";
 export * from "./exam-setup.repo";
 export * from "./exam-type.repo";
+export * from "./term-write.repo";
+export * from "./grade-band.repo";
+export * from "./exam-config.repo";
 export * from "./assessment-write.repo";
 export * from "./marks.repo";
 export * from "./results.repo";
@@ -10,3 +13,4 @@ export * from "./ocr-cache.repo";
 export * from "./marksheet-captures.repo";
 export * from "./results-types";
 export * from "./terms";
+export * from "./archive-raw.repo";

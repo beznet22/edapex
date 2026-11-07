@@ -6,7 +6,8 @@ import {
   MAX_BATCH_STATEMENTS,
   batchOrThrow,
   chunkedInArray,
-  chunkedInsert
+  chunkedInsert,
+  chunkedInsertIgnore
 } from "../../src/lib/server/repository/base/d1-helpers";
 import { smBaseGroups, smStudents } from "../../src/lib/server/db/schema";
 import { database, minimalStudentRow, seedSchool } from "../support/seed";
@@ -87,5 +88,26 @@ describe("batchOrThrow", () => {
     const [firstConflict] = conflicting;
     if (firstConflict === undefined) throw new Error("fixture produced no statement");
     await expect(batchOrThrow(db, [firstConflict])).rejects.toBeDefined();
+  });
+});
+
+describe("chunkedInsertIgnore", () => {
+  it("returns no statement for an empty row set", () => {
+    expect(chunkedInsertIgnore(db, smBaseGroups, [], 3)).toEqual([]);
+  });
+
+  it("ignores a duplicate primary key instead of failing", async () => {
+    const school = await seedSchool(db, 77);
+    const rows = [{ id: 7_701, name: "Group 7701", schoolId: school.schoolId }];
+    await batchOrThrow(db, chunkedInsertIgnore(db, smBaseGroups, rows, 1));
+    await batchOrThrow(db, chunkedInsertIgnore(db, smBaseGroups, rows, 1));
+
+    const stored = await db.select({ id: smBaseGroups.id }).from(smBaseGroups);
+    expect(stored.filter((entry) => entry.id === 7_701)).toHaveLength(1);
+  });
+
+  it("keeps the same bind budget as chunkedInsert", () => {
+    expect(() => chunkedInsertIgnore(db, smStudents, [{ id: 1 }], 101)).toThrow(RangeError);
+    expect(() => chunkedInsertIgnore(db, smStudents, [{ id: 1 }], 100)).not.toThrow();
   });
 });

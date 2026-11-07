@@ -16,7 +16,12 @@ export type ServiceErrorCode =
   | "PASSWORD_LOGIN_RETIRED"
   | "RATE_LIMITED"
   | "UPSTREAM_FAILURE"
-  | "NOT_FOUND";
+  | "NOT_FOUND"
+  | "SESSION_READ_ONLY"
+  | "ARCHIVE_INCOMPLETE"
+  | "ARCHIVE_VERSION_UNSUPPORTED"
+  | "WIPE_APPROVAL_REQUIRED"
+  | "JOB_STATE_INVALID";
 
 export interface ValidationIssue {
   readonly path: string;
@@ -149,5 +154,41 @@ export class PortError extends ServiceError {
     super("UPSTREAM_FAILURE", `${port}: ${message}`, options);
     this.port = port;
     this.retryable = retryable;
+  }
+}
+
+export class SessionReadOnlyError extends ServiceError {
+  constructor(message = "This session is read-only") {
+    super("SESSION_READ_ONLY", message);
+  }
+}
+
+export class ArchiveIncompleteError extends ServiceError {
+  readonly gaps: readonly string[];
+
+  constructor(message: string, gaps: readonly string[] = []) {
+    super("ARCHIVE_INCOMPLETE", message);
+    this.gaps = gaps;
+  }
+}
+
+export class ArchiveVersionError extends ServiceError {
+  readonly schemaVersion: number;
+
+  constructor(schemaVersion: number) {
+    super("ARCHIVE_VERSION_UNSUPPORTED", `Archive schema version ${schemaVersion} is not supported`);
+    this.schemaVersion = schemaVersion;
+  }
+}
+
+export class WipeApprovalError extends ServiceError {
+  constructor(message = "A second administrator's approval is required") {
+    super("WIPE_APPROVAL_REQUIRED", message);
+  }
+}
+
+export class JobStateError extends ServiceError {
+  constructor(message: string) {
+    super("JOB_STATE_INVALID", message);
   }
 }

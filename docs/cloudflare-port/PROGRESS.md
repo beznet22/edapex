@@ -24,7 +24,7 @@ Port code lands in [`apps/api/`](../../apps/api/AGENTS.md).
 
 ## Current focus
 
-**Phase 5 — Auth cutover flow.** Complete on `phase-5-auth` (PR #6, check `port` green); Phase 6 (archive and retrieval) is next.
+**Phase 7 — Migration execution.** Complete on `phase-7-migration` (based on `phase-6-archive`); PR #8 check `port` green ([run 42345892456](https://github.com/beznet22/edapex/actions/runs/42345892456)). Report: [`audit/phase-7-rehearsal.md`](./audit/phase-7-rehearsal.md).
 
 ## Phase status
 
@@ -36,8 +36,8 @@ Port code lands in [`apps/api/`](../../apps/api/AGENTS.md).
 | 3 | Service layer | done | Kimchi | 2026-11-06 | 2026-11-06 | PR #4 check `port` green ([run 42265759924](https://github.com/beznet22/edapex/actions/runs/42265759924)): typecheck, 292 tests (55 files), boundaries, repository + service guards (53 service files, 45-file tree), method map 53/53 (37 mapped + 2 merged + 7 deleted + 5 retired + 2 out of scope), 77 tables, drift clean, both verifiers, report-settings import 1 file → 1 row verified. |
 | 4 | HTTP layer | done | Kimchi | 2026-11-06 | 2026-11-06 | PR #5 check `port` green ([run 42280594997](https://github.com/beznet22/edapex/actions/runs/42280594997)): typecheck, 399 tests / 80 files, boundary/repository/service/HTTP guards + self-tests, repository map 108/108, service map 53/53, D1 apply, drift, deploy dry-run, both verifiers. Gate: 19 route modules / 42 handlers, 422 byte-compatible, `hc<AppType>` type test, CORS/tenant/dropped-route suites green. |
 | 5 | Auth cutover flow | done | Kimchi | 2026-11-06 | 2026-11-06 | PR #6 check `port` green ([run 42288628524](https://github.com/beznet22/edapex/actions/runs/42288628524)): typecheck, 505 tests / 100 files, all guards + self-tests, 0002 apply + drift, deploy dry-run, both verifiers. Gate: claim → Google → session on local D1, 409 `AMBIGUOUS_EMAIL`, reissue revokes sessions, claim CPU 0.055 ms/attempt (Workers pool); `wrangler dev` handler p50 ~17 ms wall clock. |
-| 6 | Archive and retrieval | not started | — | — | — | — |
-| 7 | Migration execution | not started | — | — | — | — |
+| 6 | Archive and retrieval | done | Kimchi | 2026-11-06 | 2026-11-06 | PR #7 check `port` green ([run 42300456462](https://github.com/beznet22/edapex/actions/runs/42300456462)): typecheck, 115 files / 565 tests, all guards + self-tests, 0003 apply + drift, deploy dry-run, both verifiers. Gate: archive/restore round-trip, checksum quarantine, published immutability + supersede *n+1*, wipe blocked without the second admin token. |
+| 7 | Migration execution | done | Kimchi | 2026-11-06 | 2026-11-06 | Local rehearsals A/B (`phase-7-migration`): 62 legacy tables / 196,801 rows / 0 FK / 0 reconciliation mismatches; target integrity green (0 identity, 0 target, 42 sections reviewed, 663 current records); 681 year-4 records = 666 unique default + 15 non-default duplicates; 639 promoted + 24 DAYCARE + 3 unplaced; 663 destination records; quarantine 237; sessions 1/2/4 archived with 652+641 checksum-verified objects (74/16 historical gaps), live marks/results/ratings/remarks/attendance zero; 853 referenced photo URLs (625 present/uploadable, 228 missing locally), 25 sample uploads and public route 200; 2 timeline exports; O2 10/10 present. Full local gate: typecheck, 591 tests / 123 files, all guards, 0004/0005 apply + drift, deploy dry-run, both verifiers. PR #8 check `port` green ([run 42345892456](https://github.com/beznet22/edapex/actions/runs/42345892456)). Report: [`audit/phase-7-rehearsal.md`](./audit/phase-7-rehearsal.md). |
 | 8 | Cutover | not started | — | — | — | — |
 | 9 | Post-cutover | not started | — | — | — | — |
 
@@ -95,16 +95,16 @@ Port code lands in [`apps/api/`](../../apps/api/AGENTS.md).
 - [x] Claim flow under 10 ms CPU on `wrangler dev` — 0.055 ms/attempt in the Workers pool; `wrangler dev` handler p50 ~17 ms (D1 I/O + dev proxy), see the decision log
 
 ### Phase 6 — Archive
-- [ ] Archive/restore round-trip on a fixture
-- [ ] Checksum mismatch quarantines without aborting
-- [ ] Published versions immutable; supersede creates *n+1*
-- [ ] Wipe blocked without the second admin token
+- [x] Archive/restore round-trip on a fixture — `tests/services/restore.test.ts`
+- [x] Checksum mismatch quarantines without aborting — `tests/services/archive-job.test.ts`
+- [x] Published versions immutable; supersede creates *n+1* — `tests/services/report-card.test.ts`
+- [x] Wipe blocked without the second admin token — `tests/services/wipe.test.ts`
 
 ### Phase 7 — Migration
-- [ ] Integrity gate zero (or audited waiver)
-- [ ] Row counts and checksums reconciled
-- [ ] 681 current records: 654 promoted + 24 DAYCARE + 3 quarantined
-- [ ] 463 subject assignments; 7 grade bands; readiness test green
+- [x] Integrity gate zero (identity 0; target gate green after the staffing review)
+- [x] Row counts and checksums reconciled (A/B identical; 0 load mismatches; archive objects checksum-verified)
+- [x] 681 year-4 records = 666 unique default students + 15 non-default duplicates; 639 promoted + 24 DAYCARE + 3 unplaced; 663 destination current records; quarantine 237
+- [x] 463 source subject assignments accounted: 231 active copied + 232 inactive; 6 student categories; 7 grade bands; readiness green
 
 ### Phase 8 — Cutover
 - [ ] Final delta loaded; verification repeated
@@ -150,6 +150,19 @@ Port code lands in [`apps/api/`](../../apps/api/AGENTS.md).
 | 2026-11-06 | 5 | Local gate: typecheck, 505 tests / 100 files, all guards + self-tests, migration apply + drift, deploy dry-run, both verifiers (365 links, 219 anchors, 62 tables, 0 failures) | Kimchi |
 | 2026-11-06 | 5 | Benchmark: claim CPU 0.055 ms/attempt (Workers pool); `wrangler dev` valid p50 35.6 ms, unknown p50 28.5 ms wall clock after batching the four rate-limit windows into one D1 round trip | Kimchi |
 | 2026-11-06 | 5 | Phase 5 gate passed: PR #6 check `port` green ([run 42288628524](https://github.com/beznet22/edapex/actions/runs/42288628524)); 505 tests, all guards, 0002 apply + drift, dry-run and both verifiers | Kimchi |
+| 2026-11-06 | 6 | Schema: `archive_objects` gains `exam_type_id`, `status`, `published_at`, `published_by`, `reason`, `error` and a version-scoped unique index; `session_jobs` is rebuilt with `wipe`, `cancelled`, `awaiting_approval` and actor/approval columns; `grade_change_audit` and `public_document_tokens` added (77 → 79 tables) | Kimchi |
+| 2026-11-06 | 6 | Repositories: archive aggregate (objects, jobs, summaries, grade audit, tokens), raw assessment/attendance capture, idempotent restore helpers, R2 archive-store port; signed payloads move to `services/crypto/signed-payload.ts` | Kimchi |
+| 2026-11-06 | 6 | Services: student-session capture, resumable archive job, manifest, purge, read-only restore, job control, dual-admin wipe, retrieval (live/archive marksheet, per-session and cross-session transcript, versions), JSON render payloads, public token/route, review/publish/supersede/override and session write rejection | Kimchi |
+| 2026-11-06 | 6 | HTTP: `/students/:id/marksheets*`, `/students/:id/transcripts*`, the four `…/pdf` payload routes, `/r/:token`, `/admin/sessions/*`, `/admin/jobs/*`, `/admin/archive`, `/admin/tokens/:tokenId/revoke`, `/admin/results/:id/override`; `24` route modules and `42+` handlers now inspected by `check:http` | Kimchi |
+| 2026-11-06 | 6 | Local gate: typecheck, full Workers suite, repository/service/HTTP/boundary guards + self-tests, migration 0003 apply on a populated `session_jobs` table, drift, deploy dry-run, both verifiers | Kimchi |
+| 2026-11-06 | 6 | Deviations: `…/pdf` returns a JSON render payload (ironpress stays client-side; its Node binding is filesystem-bound and not Workers-ready); retention sweep/policy deferred to Phase 9; `archive-objects` split into a maintenance repo to stay under the 300-line cap; `class_attendances` stays in the assessment archive raw rows; `session-writable` is a free guard (service-to-service imports are banned) | Kimchi |
+| 2026-11-06 | 6 | Phase 6 gate passed: PR #7 check `port` green ([run 42300456462](https://github.com/beznet22/edapex/actions/runs/42300456462)); 115 test files / 565 tests, 96 repository files, 103 service files, 35 route modules, 0003 apply + drift, deploy dry-run, both verifiers | Kimchi |
+| 2026-11-06 | 7 | Schema: `sm_class_sections` staffing state (`pending`/`copied`/`reviewed`) in `0004_phase7_staffing.sql`; ten school/academic-leading O2 composites in `0005_phase7_o2_indexes.sql`; expectations regenerated (233 → 243 legacy secondary indexes) | Kimchi |
+| 2026-11-06 | 7 | Offline migration: Adminer dump parser, pure §4 transform (academic years, records/defaults, parents/users/orphans, settings split, terms, timelines, passwords, chat ids, zero-FK sanitation), target-FK preflight and 62-table tiered load. 196,801 rows, 0 FK violations, 1,711 resolutions, 0 reconciliation mismatches | Kimchi |
+| 2026-11-06 | 7 | APIs: integrity/resolutions, bootstrap (filtered staffing copy, terms/exam configs, activation gate), terms, per-class-section staffing replace + bulk accept, promotion (ladder batches, carry-forward, reversal), quarantine CSV/JSON payload; `session_jobs` bootstrap/promotion dispatch | Kimchi |
+| 2026-11-06 | 7 | Rehearsals A/B: 681 year-4 records = 666 unique default + 15 non-default duplicates; 639 promoted + 24 DAYCARE + 3 unplaced; 663 destination records; quarantine 237; sessions 1/2/4 archived (652/0/641 objects, 74/16 gaps), live historical rows zero; 853 photo URLs (625 present, 228 missing locally), sample upload + public 200; 2 timeline exports; O2 10/10; A/B verified identical | Kimchi |
+| 2026-11-06 | 7 | Deviations: the spec's 654/24/3/678/222 counts double-count 15 non-default year-4 records and omit the 4-term transcript/empty-class historical rows; promotion uses `is_default=1`, so the measured roster is 666 unique → 639 + 24 + 3, 663 records, quarantine 237 (approved). Categories/grade bands are copied year-independently because the source rows live in an earlier year. Transcript/marksheet validation was relaxed for 4-term historical transcripts and empty class/section labels; the archive captures a malformed student as a manifest gap instead of aborting. Photos are inventoried but only sampled (the local static tree lacks 228 referenced files); the production runbook uses `--photos full` after the source supplies them | Kimchi |
+| 2026-11-06 | 7 | Phase 7 gate passed locally: typecheck, 123 test files / 591 tests, all guards + self-tests, 0004/0005 apply + drift, deploy dry-run, both verifiers; both rehearsals reconciled. PR #8 check `port` green ([run 42345892456](https://github.com/beznet22/edapex/actions/runs/42345892456)) | Kimchi |
 
 ## Blockers and decisions
 
@@ -160,7 +173,7 @@ Port code lands in [`apps/api/`](../../apps/api/AGENTS.md).
 | Repository layout | Phase 9 completion | decided — `apps/api/` is the API service and becomes a pnpm workspace package; `apps/` is the deployable bucket; no standalone extraction | — |
 | Phase 1 index arithmetic | Phase 2+ index work | decided — the 226 gate is 224 verbatim recovered (the two `session_id` indexes go with the dropped columns, `05 §4`) plus 01a O11's two new `chat_group_users` indexes; 05/04 add 5 more spec-mandated indexes, so legacy tables carry 231 secondary indexes total | — |
 | `sm_general_settings.identity` | Phase 7 transform | decided — created as a new TEXT column per 01a §6 even though no legacy column exists; `extras` therefore holds 95 legacy fields, not 94. Phase 7 must read the schema, not the prose | — |
-| `01a O2` school-id-leading composites | Phase 2 | deferred — Phase 2 made no schema changes; add measured tenant-leading composites in Phase 7 after data load | — |
+| `01a O2` school-id-leading composites | Phase 2 | done — 10 composites added in `0005_phase7_o2_indexes.sql`; all present, 9 chosen by the hot plans, and `teacher_remarks` is served by its existing `(student_id, exam_type_id, academic_id)` unique index. `student_ratings`/`teacher_remarks` lead with `academic_id` because those two legacy tables have no `school_id` | — |
 | Cross-aggregate repository reads | Phase 2+ | decided — `repository/queries/` modules; repositories may read the declared reference dictionaries but never write them | — |
 | Guardian email update | Phase 2+ | decided — `updateParentEmail` writes `sm_parents` + `users` in one batch per `01 §8` site 3; creating a missing parent user stays in Phase 3 | — |
 | Student promotion orchestration | Phase 3 | decided — repository keeps batched data primitives; fees assignment and chat-group migration move to `student-lifecycle.service` | — |
@@ -185,6 +198,23 @@ Port code lands in [`apps/api/`](../../apps/api/AGENTS.md).
 | Phase 5 merge guard | Phase 5+ | decided — a merge loser that still owns a `sm_students`/`sm_staffs`/`sm_parents` row is refused with 409, because the persona FK cascades on user delete; reassign the email first | — |
 | Phase 5 reset scope | Phase 5+ | decided — the D1 reset is school-scoped, idempotent, and skips `claimed`/`flagged`; the source-MySQL step uses `gen-claim-reset-sql.mjs` and is not automatic | — |
 | Phase 5 CPU gate | Phase 5+ | decided — `04 §1` and `04a §7` define the 10 ms figure as CPU. Measured 0.055 ms/attempt in the Workers pool. `wrangler dev` wall clock is ~28 ms p50 (three D1 round trips plus the dev proxy) and is not the CPU budget | — |
+| Phase 6 PDF boundary | Phase 6+ | decided — spec `06 §5` lists `…/pdf` routes, but ironpress is a client-side Rust/WASM renderer and its Node binding loads the WASM through the filesystem. The API returns `{ templateVersion, version, publishedAt, filename, document }`; no binary and no new dependency. Deviation recorded in the PR | — |
+| Phase 6 version unit | Phase 6+ | decided — one `archive_objects` row per student-session snapshot, with `version` scoped by `(school, academic, student, version)`. `draft` is the absence of a row, `reviewed` is a snapshot, `publish` flips it, `supersede` writes *n+1* and marks *n* `superseded` | — |
+| Phase 6 public tokens | Phase 6+ | decided — HMAC-signed payload (`studentId`, `sessionId`, `examTypeId`, `version`, `jti`, `exp`) plus a `public_document_tokens` row for revocation and the `:tokenId` endpoint. Tokens are 30 days, single-purpose, revocable | — |
+| Phase 6 purge scope | Phase 6+ | decided — purge removes marks, results, ratings, remarks, student attendance and class attendance for the session; term/exam/setup definitions and the archive index/summaries stay, so restore is insert-only | — |
+| Phase 6 retention | Phase 6/9 | deferred — `06 §7.1` sweep and policy endpoints stay Phase 9 work; Phase 6 owns archive, retrieval, versioning and controlled deletion only | — |
+| Phase 6 R2 namespace | Phase 6+ | decided — archive objects reuse the `MEDIA` bucket under `schools/{schoolId}/sessions/{sessionId}/students/{studentId}/v{n}.json`; no new binding | — |
+| Phase 6 `session_jobs` rebuild | Phase 6+ | decided — the kind/status CHECKs cannot be altered in place; the table has no dependents, so migration 0003 rebuilds it with `PRAGMA defer_foreign_keys=on` and preserves rows (verified on a populated scratch DB) | — |
+| Phase 6 read-only restore | Phase 6+ | decided — `assertSessionWritable` (a free guard, because service-to-service imports are banned) rejects `archived`, `restoring` and `archived_readable` sessions in entry, feedback, attendance, publish, lifecycle and subject-assignment services. Report-card corrections/overrides intentionally bypass it | — |
+| Phase 6 absent marks | Phase 6+ | decided — marksheet records gain an optional `absent: boolean[]`; class averages now exclude null/unassessed totals. The existing `Marksheet` fields are unchanged | — |
+| Phase 7 681 records | Phase 7 | decided — use `student_records.is_default = 1` and the unique student roster: 681 year-4 records = 666 unique students + 15 non-default duplicate records; 639 promoted + 24 DAYCARE + 3 unplaced; 663 destination records. Promoting the duplicates would create multiple current records per student | — |
+| Phase 7 subject assignments | Phase 7 | decided — the source has 463 rows, of which 231 are active and copied; the other 232 are inactive and are not staffing. The gate accounts for all 463 | — |
+| Phase 7 categories/bands | Phase 7 | decided — copy all school category/grade-band rows into the target year; the five legacy categories and seven bands live in an earlier academic year, not year 4 | — |
+| Phase 7 staffing copy | Phase 7 | decided — copy only active staff with active users; every skipped row writes `STAFFING_SKIPPED`; every class-section must be reviewed before activation; `accept-copied` never accepts an empty section | — |
+| Phase 7 bootstrap job FK | Phase 7 | decided — `session_jobs.academic_id` is null for bootstrap until the first step creates the target year; the payload carries the target id | — |
+| Phase 7 transcript schema | Phase 7 | decided — allow historical 4-term transcripts and marks above the modern 100 scale; empty class/section labels and zero totals are valid historical records. A malformed student becomes a manifest gap, not a failed session archive | — |
+| Phase 7 archive gaps | Phase 7 | decided — sessions 1/2/4 archive 652/0/641 objects; 74/16 historical students have no complete transcript and are manifest gaps. Every existing object verifies by checksum; the live historical rows are zero | — |
+| Phase 7 photos | Phase 7 | partial — 853 referenced URLs, 625 present/uploadable, 228 missing from the local static tree; two sampled uploads verify and the public 32/64-hex route returns 200. The full upload is the production runbook step after the source owner supplies the missing files | — |
 
 ## Notes
 
@@ -193,4 +223,5 @@ Port code lands in [`apps/api/`](../../apps/api/AGENTS.md).
 - Phase 3 landed on `phase-3-services` (PR #4) with `phase-2-repository` as the PR base; the `port` check is green on run 42265759924.
 - Phase 4 landed on `phase-4-http` (PR #5) with `phase-3-services` as the PR base; the `port` check is green on run 42280594997.
 - Phase 5 landed on `phase-5-auth` with `phase-4-http` as the PR base; the `port` check is green on run 42288628524.
+- Phase 7 landed on `phase-7-migration` with `phase-6-archive` as the PR base; PR #8 check `port` is green ([run 42345892456](https://github.com/beznet22/edapex/actions/runs/42345892456)) and both rehearsals reconciled. The committed rehearsal report is [`audit/phase-7-rehearsal.md`](./audit/phase-7-rehearsal.md). The 681/666/15 and 463/231/232 reconciliations are deliberate, approved deviations from the spec's record-level totals.
 - Phase 0 landed on `phase-0-scaffolding` (PR #1). `main` was not pushed because Dokploy deploys on commit; the branch carries the preflight spec-suite commit `b83de20`. Do not push `main` until the Dokploy trigger is confirmed blocked.

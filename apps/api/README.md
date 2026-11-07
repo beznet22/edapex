@@ -4,7 +4,7 @@ The Hono API on Cloudflare Workers with D1. This directory is the **API service*
 
 | | |
 |---|---|
-| Phase | **4 — HTTP layer complete; PR #5** ([PROGRESS](../docs/cloudflare-port/PROGRESS.md)) |
+| Phase | **7 — Migration execution complete** ([PROGRESS](../docs/cloudflare-port/PROGRESS.md)) |
 | Plan | [ROADMAP](../docs/cloudflare-port/ROADMAP.md) |
 | Agent rules | [AGENTS.md](./AGENTS.md) |
 | Specs | [docs/cloudflare-port](../docs/cloudflare-port/README.md) |
@@ -46,7 +46,7 @@ pnpm run check:http
 pnpm run check:http:self
 ```
 
-Local secrets go in `.dev.vars` (gitignored): session signing key, email provider key, Google OAuth client. Production secrets are set with `wrangler secret put`. **Never** commit `.dev.vars` or any data dump.
+Local secrets go in `.dev.vars` (gitignored): session signing key, email provider key, Google OAuth client, and `ARCHIVE_TOKEN_SECRET` for public document links. Production secrets are set with `wrangler secret put`. **Never** commit `.dev.vars` or any data dump.
 
 ### Email delivery
 
@@ -72,7 +72,18 @@ Student photos live in R2 Standard bucket `edapex-media` (binding `MEDIA`) under
 pnpm exec wrangler r2 bucket create edapex-media
 ```
 
-`static/uploads/students` remains the legacy fallback until the Phase 7 migration; only images are in scope. The directory also contains PDFs, which are not student photos and are excluded — see `05 §5.1`.
+`static/uploads/students` remains the legacy fallback until the Phase 7 data upload; only images are in scope. The Phase 7 rehearsal inventories the referenced photos, uploads them to local R2 under the unchanged `/uploads/students/...` keys and verifies the public route. The directory also contains PDFs, which are not student photos and are excluded — see `05 §5.1`.
+
+### Archive objects
+
+Session archives reuse the `edapex-media` bucket under a separate namespace:
+
+```text
+schools/{schoolId}/sessions/{sessionId}/students/{studentId}/v{version}.json
+schools/{schoolId}/sessions/{sessionId}/manifest.json
+```
+
+Each object is canonical JSON carrying `schemaVersion`, `meta`, `placement`, `terms`, `marksheets`, `transcript`, `photoKey` and the raw assessment rows. The SHA-256 checksum is recorded in `archive_objects` and re-verified on every read; a mismatch quarantines the object instead of aborting the job. Public document links are signed with `ARCHIVE_TOKEN_SECRET` and are revocable through `POST /api/v1/admin/tokens/:tokenId/revoke`.
 
 ## Deploy
 
@@ -110,7 +121,7 @@ The full set is in [AGENTS.md](./AGENTS.md); these are the ones that break build
 
 ## HTTP surface
 
-The API is service-led: each route maps to one service method under `/api/v1`, and the browser client is `hc<AppType>` from `src/lib/http/client.ts`. Tenant scope travels in `X-Academic-Id`, `X-Class-Id`, and `X-Section-Id`; the public surface is `/health` and the content-addressed `/uploads/students/:file` route. PDF rendering is client-side; the API owns result and transcript email publishing only.
+The API is service-led: each route maps to one service method under `/api/v1`, and the browser client is `hc<AppType>` from `src/lib/http/client.ts`. Tenant scope travels in `X-Academic-Id`, `X-Class-Id`, and `X-Section-Id`; the public surface is `/health`, the content-addressed `/uploads/students/:file` route, and `/r/:token`. PDF rendering is client-side via ironpress; the API's `…/pdf` routes return `{ templateVersion, version, publishedAt, filename, document }`, and the API keeps result/transcript email publishing.
 
 ## Testing
 
@@ -130,4 +141,4 @@ Then update [PROGRESS.md](../docs/cloudflare-port/PROGRESS.md): status row, gate
 
 ## Status
 
-Phases 0–4 are complete. Phase 3 added the request-scoped service context, ports/adapters, pure domain and semantic validation, the five catalog-facing service groups, OCR cache/capture binding, settings, auth/session/profile/rate limiting, authorization and student lifecycle. Phase 4 adds the service-led `/api/v1` surface, the flat error envelope, the `baseCtx`/`ctx` split, the `hc<AppType>` client and the HTTP guard. The local gate reports 80 test files / 399 tests, 77 tables (62 legacy + 15 registered), 53/53 mapped service methods, 19 HTTP route modules, clean boundaries/repository/service/HTTP guards, schema drift clean and both verifiers green.
+Phases 0–6 are complete. Phase 3 added the request-scoped service context, ports/adapters, pure domain and semantic validation, the five catalog-facing service groups, OCR cache/capture binding, settings, auth/session/profile/rate limiting, authorization and student lifecycle. Phase 4 added the service-led `/api/v1` surface, the flat error envelope, the `baseCtx`/`ctx` split, the `hc<AppType>` client and the HTTP guard. Phase 5 added the claim/Google/code auth cutover and the duplicate-email utility. Phase 6 adds session archives, retrieval, immutable report-card versions, public document tokens, read-only restore and the dual-admin wipe. Phase 7 adds the offline transform and tiered load, the integrity gate, bootstrap, terms, the filtered staffing copy with per-class-section review, promotion, quota/reversal and quarantine reporting; the local rehearsals load 196,801 rows across 62 legacy tables with zero FK violations and reconcile the 2026/27 roster. See [`scripts/migration/README.md`](./scripts/migration/README.md) for the rehearsal and production runbook.

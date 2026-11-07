@@ -1,4 +1,5 @@
 import type { ServiceContext } from "../context";
+import { assertSessionWritable } from "../tenant/session-writable";
 import { requireScopedContext } from "../context";
 import { ValidationError } from "../errors";
 
@@ -18,6 +19,7 @@ export class AttendanceService {
   constructor(private readonly ctx: ServiceContext) {}
 
   async upsertAttendance(input: UpsertAttendanceInput): Promise<number | null> {
+    await assertSessionWritable(this.ctx);
     if (input.studentId <= 0 || input.examTypeId <= 0) {
       throw new ValidationError("Student id and exam type id are required", "studentId");
     }

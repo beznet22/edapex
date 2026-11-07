@@ -162,7 +162,12 @@ export const smFeesAssigns = sqliteTable(
     index("sm_fees_assigns_fees_discount_id_foreign").on(table.feesDiscountId),
     index("sm_fees_assigns_fees_master_id_foreign").on(table.feesMasterId),
     index("sm_fees_assigns_school_id_foreign").on(table.schoolId),
-    index("sm_fees_assigns_student_id_foreign").on(table.studentId)
+    index("sm_fees_assigns_student_id_foreign").on(table.studentId),
+    index("sm_fees_assigns_school_academic_student_index").on(
+      table.schoolId,
+      table.academicId,
+      table.studentId
+    )
   ]
 );
 

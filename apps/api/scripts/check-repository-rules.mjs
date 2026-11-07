@@ -217,12 +217,12 @@ function selfTest() {
     writeFileSync(
       path.join(accountsDir, "demo.repo.ts"),
       [
-        'import { smClasses, smStudents } from "../../db/schema";',
+        'import { smClasses, smRoutes } from "../../db/schema";',
         'import { other } from "./other.repo";',
         "export async function demo(db: Demo): Promise<void> {",
         "  const value = 1 as number;",
         "  await db.transaction(async () => other);",
-        "  const broken: any = smStudents;",
+        "  const broken: any = smRoutes;",
         "  await db.update(smClasses).set({});",
         "}",
         ""

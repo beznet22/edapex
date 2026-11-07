@@ -13,3 +13,5 @@ export * from "./communications";
 export * from "./fees";
 export * from "./school";
 export * from "./reference";
+export * from "./archive";
+export * from "./lifecycle";

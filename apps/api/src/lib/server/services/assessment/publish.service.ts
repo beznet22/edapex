@@ -1,4 +1,5 @@
 import type { ServiceContext } from "../context";
+import { assertSessionWritable } from "../tenant/session-writable";
 import { requireScopedContext } from "../context";
 import { PortError, ValidationError } from "../errors";
 import { buildMarksheet } from "./marksheet-query";
@@ -49,6 +50,7 @@ export class AssessmentPublishService {
   }
 
   async publishResults(input: PublishResultsInput): Promise<PublishResultsResult> {
+    await assertSessionWritable(this.ctx);
     if (input.examId <= 0 || input.studentIds.length === 0) {
       throw new ValidationError("An exam and at least one student are required", "studentIds");
     }
@@ -121,6 +123,7 @@ export class AssessmentPublishService {
   async publishTranscript(
     input: PublishTranscriptInput
   ): Promise<PublishTranscriptResult> {
+    await assertSessionWritable(this.ctx);
     if (!input.to.includes("@")) {
       throw new ValidationError("A valid recipient email is required", "to");
     }

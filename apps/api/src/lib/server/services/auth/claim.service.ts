@@ -8,7 +8,7 @@ import {
   CLAIM_TICKET_TTL_SECONDS,
   consumeClaimAttempt
 } from "./claim-policy";
-import { signPayload } from "./signed-payload";
+import { signPayload } from "../crypto/signed-payload";
 import type { AuthSessionResult } from "./types";
 import type { ClaimLinkInput } from "./claim-link";
 

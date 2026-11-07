@@ -1,5 +1,6 @@
 export * from "./adapters";
 export * from "./academics";
+export * from "./archive";
 export * from "./assessment";
 export * from "./attendance";
 export * from "./auth";
@@ -9,6 +10,7 @@ export * from "./crypto/digest";
 export * from "./domain";
 export * from "./errors";
 export * from "./media";
+export * from "./migration";
 export * from "./ports";
 export * from "./settings";
 export * from "./students";

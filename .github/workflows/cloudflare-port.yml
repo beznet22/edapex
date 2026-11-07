@@ -80,6 +80,12 @@ jobs:
       - name: HTTP rule self-test
         run: pnpm run check:http:self
 
+      - name: Migration rules
+        run: pnpm run check:migration
+
+      - name: Migration rule self-test
+        run: pnpm run check:migration:self
+
       - name: Tests
         run: pnpm test
 

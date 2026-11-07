@@ -1,4 +1,4 @@
-import { base64UrlEncode } from "../crypto/digest";
+import { base64UrlEncode } from "./digest";
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
@@ -34,7 +34,7 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 
 export type PayloadGuard<T> = (value: unknown) => value is T;
 
-/** Signed, expiring payloads for the claim ticket and the OAuth state cookie. */
+/** Signed, expiring payloads for the claim ticket, OAuth state and public documents. */
 export async function signPayload(
   secret: string,
   payload: Readonly<Record<string, unknown>>,

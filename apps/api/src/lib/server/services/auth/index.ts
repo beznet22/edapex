@@ -11,6 +11,6 @@ export * from "./profile.service";
 export * from "./rate-limit.service";
 export * from "./session-issuance";
 export * from "./session.service";
-export * from "./signed-payload";
+export * from "../crypto/signed-payload";
 export * from "./student-code.service";
 export * from "./types";

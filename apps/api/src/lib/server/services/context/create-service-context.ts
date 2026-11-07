@@ -15,6 +15,7 @@ import { GmailEmailAdapter } from "../adapters/gmail-email.adapter";
 import { createGoogleOAuth } from "../adapters/google-oauth.adapter";
 import { MistralOcrAdapter } from "../adapters/mistral-ocr.adapter";
 import { createPhotoStore } from "../adapters/r2-photo-store.adapter";
+import { createArchiveStore } from "../adapters/r2-archive-store.adapter";
 import { TenantScopeError } from "../errors";
 import { systemClock } from "../ports";
 import type { ReportSettingsStore, ServicePorts, StudentDirectory } from "../ports";
@@ -121,6 +122,7 @@ function createPorts(env: ServiceEnv, repos: RepositoryAccess): ServicePorts {
     clock: systemClock,
     students,
     photos: createPhotoStore(env.MEDIA),
+    archiveStore: createArchiveStore(env.MEDIA),
     authConfig: createAuthConfig(env),
     google: createGoogleOAuth(env)
   };
@@ -156,6 +158,7 @@ export function createServiceContext(
     config: repositoryCtx.config,
     cache: overrides.cache ?? new ServiceCache(),
     logger: overrides.logger ?? consoleLogger,
-    tenant: repositoryCtx.tenant
+    tenant: repositoryCtx.tenant,
+    tokenSecret: env.ARCHIVE_TOKEN_SECRET ?? null
   });
 }

@@ -5,3 +5,4 @@ export * from "./gmail-email.adapter";
 export * from "./google-oauth.adapter";
 export * from "./mistral-ocr.adapter";
 export * from "./r2-photo-store.adapter";
+export * from "./r2-archive-store.adapter";
