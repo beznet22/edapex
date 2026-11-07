@@ -205,33 +205,42 @@ after the reset needs the pre-reset password hashes.
    ```bash
    pnpm run cutover:archive-export -- \
      --persist .tmp/rehearsal-final \
-     --out .tmp/cutover-plan \
-     --archive-db .tmp/rehearsal-final
+     --out .tmp/cutover-plan/archive
    ```
 
    Require ~652/0/641 objects, `archive_objects` ~1,293 and
    `session_result_summary` ~3,802; every object checksum verifies; the output
    stays under `.tmp/cutover-plan` (PII-bearing).
 
-3. Run the live-only preflight against the same dump:
+3. Run the full local preflight against the same dump:
 
    ```bash
    pnpm run cutover:preflight -- \
      --source <FINAL_DUMP> \
      --out .tmp/cutover-plan \
      --digest '<CLAIM_DIGEST>' \
-     --fresh \
-     --profile live
+     --fresh
    ```
 
-   It must produce a live-profile SQL plan + archive metadata, a write estimate
-   and no remote execution. The 62 legacy tables still exist in the schema;
-   historical raw tables are intentionally empty.
+4. Build the live-only plan and archive metadata:
 
-4. Require: full local transform 0 FK / 0 reconciliation; live-profile row
+   ```bash
+   pnpm run cutover:live-plan -- \
+     --plan .tmp/cutover-plan/cutover-plan.json \
+     --archive-metadata .tmp/cutover-plan/archive/archive-metadata.sql \
+     --archive-summary .tmp/cutover-plan/archive/archive-export.json \
+     --out .tmp/cutover-plan/live
+   ```
+
+   It must produce ~34 live tables / 5,380 live rows / 31 files and exclude
+   historical raw, timelines, unused tables and historical exams/setups. The 62
+   legacy tables still exist in the schema; historical raw tables are
+   intentionally empty.
+
+5. Require: full local transform 0 FK / 0 reconciliation; live-plan row
    estimate; archive object counts/checksums; a production photo manifest from
-   the supplied ZIP (the current 853/625/228 rehearsal counts are not final).
-   Review `load-window` and the R2 upload script; do not run them yet.
+   the supplied ZIP (the current rehearsal counts are not final). Review
+   `load-window` and the R2 upload script; do not run them yet.
 
 ## Phase 4 — One-window remote load
 
@@ -250,8 +259,8 @@ after the reset needs the pre-reset password hashes.
 
    ```bash
    pnpm run cutover:load-window -- \
-     --plan .tmp/cutover-plan/load-plan.json \
-     --state .tmp/cutover-plan/load-state.json \
+     --plan .tmp/cutover-plan/live/load-plan.json \
+     --state .tmp/cutover-plan/live/load-state.json \
      --budget 95000 \
      --execute
    ```
@@ -264,8 +273,9 @@ after the reset needs the pre-reset password hashes.
 4. Verify the live profile, archive metadata and historical emptiness:
 
    ```bash
-   pnpm exec wrangler d1 execute DB --remote --command="PRAGMA foreign_key_check;"
-   bash .tmp/cutover-plan/d1-verify.sh
+   pnpm run cutover:live-verify -- \
+     --plan .tmp/cutover-plan/live/load-plan.json \
+     --execute
    ```
 
    `sm_mark_stores`, `sm_result_stores`, `student_ratings`,
@@ -277,7 +287,7 @@ after the reset needs the pre-reset password hashes.
    claim disabled to the **interim** host:
 
    ```bash
-   bash .tmp/cutover-plan/archive-upload.sh
+   bash .tmp/cutover-plan/archive/archive-upload.sh
    pnpm exec wrangler deploy
    curl -fsS "https://edapex-api.llacademy.ng/health"
    curl -s -o /dev/null -w '%{http_code}\n' \

@@ -66,6 +66,11 @@ pnpm run cutover:load-window -- \
   --plan .tmp/cutover-plan/live/load-plan.json \
   --state .tmp/cutover-plan/load-state.json \
   --budget 95000
+
+# after the live load; read-only remote checks
+pnpm run cutover:live-verify -- \
+  --plan .tmp/cutover-plan/live/load-plan.json \
+  --execute
 ```
 
 The loader stops at the last completed file and resumes after 00:00 UTC the next

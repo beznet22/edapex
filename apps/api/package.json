@@ -43,6 +43,7 @@
     "cutover:archive-export": "node scripts/cutover/archive-export.mjs",
     "cutover:live-plan": "node scripts/cutover/live-plan.mjs",
     "cutover:load-window": "node scripts/cutover/load-window.mjs",
+    "cutover:live-verify": "node scripts/cutover/live-verify.mjs",
     "cutover:photo-inventory": "node scripts/cutover/photo-inventory.mjs",
     "cutover:missing-photo-students": "node scripts/cutover/missing-photo-students.mjs",
     "cutover:photo-audit": "node scripts/cutover/photo-audit.mjs"
