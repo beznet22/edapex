@@ -19,6 +19,9 @@ frozen snapshot, not a delta against an earlier production database.
 | Gmail refresh token | verified locally: HTTP 200, `gmail.send` scope; local `apps/api/.dev.vars`; production secrets pending Worker |
 | Preflight on the current snapshot | passed: 62 tables, 196,801 rows, 0 FK, 0 reconciliation, 44 SQL files, `executed:false`. Rehearsal photos 625/228; production ZIP 633/220; old static tree adds 10 fallback files; combined 643 present / 210 accepted missing. R2 upload: **643/643**, full SHA-256/byte audit **0 failures** |
 | Local application drill | passed: claim 404/202/202/409/404, target green, roster, marks grade, report-card checksum, core counts unchanged |
+| Archive export | validated: 1,293 objects / 3,802 summaries, per-session 652/641, checksums verified |
+| Live-only plan / loader | 34 tables, 5,380 live rows, 31 files, 28 excluded; budget loader dry-run/checkpoint tests pass |
+| Full gate / PR #9 | 126 test files / 617 tests, guards, drift, deploy dry-run; PR #9 `port` green |
 | Production resources, load, switch, claim enablement, 24 h watch | **not started** |
 | Production rollback drill | **not started** |
 

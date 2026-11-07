@@ -87,9 +87,9 @@ changed. The one-time consent is independent of the POC’s stored token.
 
 | Decision | Detail |
 |---|---|
-| Archive generation | Run the final dump through a local rehearsal; the existing Phase 6 archive-capture code generates sessions 1/2/4 objects, manifests and checksums |
+| Archive generation | Run the final dump through a local rehearsal; the existing Phase 6 archive-capture code generates sessions 1/2/4 objects, manifests and checksums. Validated on the current rehearsal: **1,293 objects / 3,802 summaries**, 652/641 by session |
 | Archive export | Export ~1,293 archive JSON objects + `archive_objects` (~1,293) + `session_result_summary` (~3,802) metadata; upload objects to production R2, load metadata to D1 |
-| Live-only load | Load identity/roster/structure/config + archive metadata. Historical **marks, results, ratings, remarks, attendance and timelines stay out of production D1** |
+| Live-only load | Load identity/roster/structure/config + archive metadata. Historical **marks, results, ratings, remarks, attendance and timelines stay out of production D1**. Validated live plan: **34 tables, 5,380 live rows, 31 files, 28 excluded** |
 | Skipped tables | `sm_mark_stores`, `sm_result_stores`, `student_ratings`, `teacher_remarks`, `class_attendances`, `sm_student_attendances`, `sm_student_timelines`; plus unused chat/finance/homework/dormitory/transport/library tables and historical `sm_exams`/`sm_exam_setups` (target bootstrap generates its own 189 configs from target assignments) |
 | FKs | Historical `student_records`, classes, sections, academic years and `sm_exam_types` are loaded so archive metadata FKs resolve; the live profile includes all FK parents required by the loaded rows |
 | Serving historical results | Existing archive retrieval reads the archive object from R2, verifies the checksum and serves the marksheet/transcript; no D1 historical raw rows |
