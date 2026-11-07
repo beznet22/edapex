@@ -4,6 +4,11 @@ Operational tooling for the Phase 8 cutover. Both scripts are local-only; the
 commands they generate contain the only `--remote` calls and are never executed
 by the scripts themselves.
 
+Read the Phase 8 [decision record](../../../../docs/cloudflare-port/cutover/decisions.md)
+before using these scripts: the POC D1 is not disposable, the POC moves to
+`sms-api.llacademy.ng`, EdApex takes `api.llacademy.ng`, and the load needs a
+paid plan or an approved multi-day free window.
+
 ## Preflight
 
 ```bash

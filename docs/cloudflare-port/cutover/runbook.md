@@ -12,10 +12,13 @@ Fill these only in the private cutover record, never in git:
 |---|---|
 | Cutover lead / rollback authority | `<CUTOVER_INPUT>` |
 | Maintenance window | `<CUTOVER_INPUT>` |
-| Production API hostname | `<CUTOVER_INPUT>` |
-| Legacy hostname kept for rollback | `<CUTOVER_INPUT>` |
-| Cloudflare account and zone | `<CUTOVER_INPUT>` |
-| Production D1 database id | `<CUTOVER_INPUT>` |
+| Production API hostname | `api.llacademy.ng` (after the POC moves) |
+| Interim EdApex host | `edapex-api.llacademy.ng` |
+| POC API host after move | `sms-api.llacademy.ng` |
+| POC frontend | `https://portal.llacademy.ng` (unchanged) |
+| Cloudflare account and zone | existing SMS POC account `<CUTOVER_INPUT>` |
+| Workers plan | Workers Paid (recommended) or approved multi-day free window |
+| Production D1 database id | `<CUTOVER_INPUT>` (new `edapex`, never the POC `sms`) |
 | Production R2 bucket | `edapex-media` (or `<CUTOVER_INPUT>`) |
 | Final frozen dump path | `<CUTOVER_INPUT>` |
 | Final dump SHA-256 | `<CUTOVER_INPUT>` |
@@ -23,12 +26,51 @@ Fill these only in the private cutover record, never in git:
 | Pre-reset source backup | `<CUTOVER_INPUT>` |
 | On-call channel / contacts | `<CUTOVER_INPUT>` |
 
+## Deployment topology and coexistence
+
+The existing Cloudflare account is shared with a **live** SMS POC. The cutover
+must not break it.
+
+| Resource | POC | EdApex |
+|---|---|---|
+| Worker | `sms-api` (live) | new `edapex-api` |
+| D1 | `sms` (live, UUID schema, already contains migrated data) | new `edapex` |
+| R2 | `sms-study-materials` | new `edapex-media` |
+| Frontend | Pages `sms-portal` at `portal.llacademy.ng` | EdApex frontend (origin `<CUTOVER_INPUT>`) |
+| API host | moves to `sms-api.llacademy.ng` | takes `api.llacademy.ng` |
+
+Rules:
+
+- **Never clear, overwrite or reuse the POC D1.** It is not a disposable demo.
+- **Do not create a second Cloudflare account** for quota; free limits are
+  account-wide and a new Worker/D1 does not add free resources.
+- **Do not attempt the 196,801-row load in one free-plan window.** Confirm
+  Workers Paid or a multi-day staged load before starting.
+- Keep the POC’s `CLIENT_URL=https://portal.llacademy.ng`; its Gmail callback is
+  on the portal and must not move with the API.
+
+See [decisions.md](./decisions.md) for the full decision record.
+
 ## Phase 0 — Approvals and preconditions
 
 - [ ] PR #8 is merged into `phase-6-archive` and the Phase 8 branch is rebased;
       the deployed commit is recorded.
 - [ ] The Phase 7 report and A/B evidence are reviewed:
       [`audit/phase-7-rehearsal.md`](../audit/phase-7-rehearsal.md).
+- [ ] The Cloudflare account plan is confirmed. Free is acceptable only with an
+      approved multi-day load; otherwise use Workers Paid.
+- [ ] The POC is confirmed live and must remain so; its D1, Worker, R2 bucket
+      and current host are not touched until the staged move.
+- [ ] The POC Pages deploy method is confirmed (Git integration or
+      `wrangler pages deploy`) and the frontend can be rebuilt.
+- [ ] The Gmail reuse is confirmed: same Google client, sender in the private
+      record, `GMAIL_*` values available, OAuth app publishing status checked.
+      Local `apps/api/.dev.vars` is present and gitignored.
+- [ ] Google redirect URIs are registered: POC portal callbacks, EdApex
+      `https://api.llacademy.ng/api/v1/auth/google/callback`, and the one-off
+      consent redirect.
+- [ ] The EdApex Worker does not exist yet; the first deploy will use the
+      interim host, not `api.llacademy.ng`.
 - [ ] The maintenance window, communications and rollback authority are
       approved.
 - [ ] The 228 missing student-photo files are supplied, or the school has
@@ -41,7 +83,8 @@ Fill these only in the private cutover record, never in git:
 
 ## Phase 1 — Production resources and configuration
 
-1. Create the resources and record the ids:
+1. Create the EdApex-only resources and record the ids. Do **not** reuse the
+   POC database or bucket:
 
    ```bash
    pnpm exec wrangler d1 create edapex
@@ -49,10 +92,13 @@ Fill these only in the private cutover record, never in git:
    ```
 
 2. Put the real D1 id in `wrangler.jsonc` and set the production CORS origins.
-   Add the custom domain or Worker route for `<CUTOVER_HOST>`. Keep
-   `CLAIM_ENABLED` unset so `/claim` stays 404.
+   Add the **interim** custom domain or Worker route for
+   `edapex-api.llacademy.ng`. Do not attach `api.llacademy.ng` yet; the POC still
+   owns it. Keep `CLAIM_ENABLED` unset so `/claim` stays 404.
 
-3. Set production secrets (values are entered interactively or through the
+3. The Worker does not exist yet, so secrets cannot be set in this phase.
+   Record the secret names below; after the first deploy in Phase 4, set them all
+   with `wrangler secret put` (values are entered interactively or through the
    dashboard; never in git):
 
    ```bash
@@ -61,10 +107,17 @@ Fill these only in the private cutover record, never in git:
    pnpm exec wrangler secret put ARCHIVE_TOKEN_SECRET
    pnpm exec wrangler secret put GOOGLE_CLIENT_ID
    pnpm exec wrangler secret put GOOGLE_CLIENT_SECRET
-   # plus GMAIL_* or the email-routing binding, and MISTRAL_* if OCR is enabled
+   pnpm exec wrangler secret put GMAIL_CLIENT_ID
+   pnpm exec wrangler secret put GMAIL_CLIENT_SECRET
+   pnpm exec wrangler secret put GMAIL_REFRESH_TOKEN
+   pnpm exec wrangler secret put GMAIL_SENDER_EMAIL
+   pnpm exec wrangler secret put GMAIL_SENDER_NAME
+   # plus MISTRAL_* if OCR is enabled
    ```
 
-   `CLAIM_PASSWORD_DIGEST` must equal the digest passed to the final preflight.
+   The Gmail client can be the same Google client as the POC; the refresh token
+   is the one generated for EdApex. `GMAIL_SENDER_EMAIL` is in the private
+   cutover record, not git.
 
 4. Before any deploy, reject the placeholder database id:
 
@@ -174,17 +227,23 @@ They are generated command lists; they are not run by the preflight.
    count variance above 0.1%, sequence gap or current-record orphan is a stop
    condition.
 
-4. Deploy the Worker with claim disabled:
+4. Deploy the Worker with claim disabled to the **interim** host:
 
    ```bash
    pnpm exec wrangler deploy
-   curl -fsS "https://<CUTOVER_HOST>/health"
+   curl -fsS "https://edapex-api.llacademy.ng/health"
    curl -s -o /dev/null -w '%{http_code}\n' \
-     -X POST "https://<CUTOVER_HOST>/api/v1/auth/claim" \
+     -X POST "https://edapex-api.llacademy.ng/api/v1/auth/claim" \
      -H 'content-type: application/json' \
      -d '{"email":"probe@example.test","password":"probe"}'
    # expect 404
    ```
+
+5. Now that the Worker exists, set all production secrets from Phase 1 (auth,
+   claim, archive and Gmail), then send a test email through EdApex to a private
+   test address. A successful token exchange is not enough; verify the Gmail
+   adapter sends. If it returns `invalid_grant`, stop: the token is
+   expired/revoked or was issued to a different client.
 
 ## Phase 5 — API-driven migration and history
 
@@ -195,7 +254,7 @@ private cutover shell; do not paste it into logs.
 1. Read the source gate:
 
    ```bash
-   curl -fsS "https://<CUTOVER_HOST>/api/v1/admin/sessions/4/integrity" \
+   curl -fsS "https://edapex-api.llacademy.ng/api/v1/admin/sessions/4/integrity" \
      -H "Cookie: $ADMIN_COOKIE" -H 'X-Academic-Id: 4'
    ```
 
@@ -210,7 +269,7 @@ private cutover shell; do not paste it into logs.
 3. Review staffing:
 
    ```bash
-   curl -fsS "https://<CUTOVER_HOST>/api/v1/admin/sessions/5/staffing" \
+   curl -fsS "https://edapex-api.llacademy.ng/api/v1/admin/sessions/5/staffing" \
      -H "Cookie: $ADMIN_COOKIE" -H 'X-Academic-Id: 5'
    ```
 
@@ -281,21 +340,28 @@ private cutover shell; do not paste it into logs.
 - [ ] Readiness test passed.
 - [ ] Claim is still 404 before the switch.
 
-## Phase 7 — Switch traffic and enable `/claim`
+## Phase 7 — Move the POC, switch EdApex, enable `/claim`
 
-1. Lower DNS TTL ahead of the window. Keep the legacy host resolvable.
-2. Point `<CUTOVER_HOST>` at the Worker; keep the legacy host as the rollback
-   target. Confirm CORS origins include the production UI origins.
-3. Smoke the Worker through the production host: `/health`, an unauthenticated
+1. Add `sms-api.llacademy.ng` as a **second** custom domain to the POC Worker;
+   deploy the production env; verify TLS, `/health`, login and the Gmail flow.
+   Keep `api.llacademy.ng` attached to the POC for now.
+2. Change only the POC frontend API base:
+   `sms-frontend/.env.production` → `https://sms-api.llacademy.ng/api`.
+   Rebuild and redeploy `sms-portal`; verify the portal and a Gmail send. Keep
+   `CLIENT_URL=https://portal.llacademy.ng`; do not move the Gmail callback.
+3. Only after step 2 passes, remove `api.llacademy.ng` from the POC Worker.
+   Attach it to EdApex in `wrangler.jsonc`, deploy, and verify TLS and `/health`.
+   This handover is a short hostname window; do it in low traffic.
+4. Smoke EdApex through `api.llacademy.ng`: `/health`, an unauthenticated
    protected route (401), a public photo sample (200), an archive token sample
-   if one is approved.
-4. Watch 5xx/latency for 15 minutes. If clean, enable claim:
+   if approved, and a Gmail send through EdApex.
+5. Watch 5xx/latency for 15 minutes. If clean, enable claim:
 
    ```bash
    pnpm exec wrangler secret put CLAIM_ENABLED   # enter 1
    pnpm exec wrangler deploy
    curl -s -o /dev/null -w '%{http_code}\n' \
-     -X POST "https://<CUTOVER_HOST>/api/v1/auth/claim" \
+     -X POST "https://api.llacademy.ng/api/v1/auth/claim" \
      -H 'content-type: application/json' \
      -d '{"email":"probe@example.test","password":"probe"}'
    # expect 202
@@ -305,7 +371,7 @@ private cutover shell; do not paste it into logs.
    update, verify the live version instead. Do not enable claim before the
    readiness and spot checks pass.
 
-5. Announce the claim removal date. Start the 24 h watch using
+6. Announce the claim removal date. Start the 24 h watch using
    [monitoring.md](./monitoring.md).
 
 ## Phase 8 — Close the window
@@ -326,15 +392,21 @@ check.
 
 1. Disable claim first (`CLAIM_ENABLED` unset or `0`; deploy if required) and
    confirm `/claim` returns 404.
-2. Revert DNS/routes to `<LEGACY_HOST>`. Do not delete the Worker or its data.
-3. Keep MySQL read-only. If the shared reset has already run, restore the
+2. If the failure is after EdApex took `api.llacademy.ng`, keep the POC on
+   `sms-api.llacademy.ng` and move EdApex back to `edapex-api.llacademy.ng`.
+   Reattach `api.llacademy.ng` to the POC only if external clients still use
+   that host; the portal already points at `sms-api`.
+3. If the failure is during the POC move, revert the POC frontend
+   `VITE_API_URL` to the old `api.llacademy.ng` base and keep the POC route;
+   do not change `CLIENT_URL`.
+4. Keep MySQL read-only. If the shared reset has already run, restore the
    pre-reset `users` password backup **before** reopening legacy login; verify a
    known account.
-4. Do not write to D1 after the rollback decision. Record the D1 state, request
+5. Do not write to D1 after the rollback decision. Record the D1 state, request
    ids, timestamps and the reason in the incident log.
-5. Verify legacy health and a read-only smoke path; confirm no new writes are
+6. Verify legacy/POC health and a read-only smoke path; confirm no new writes are
    reaching the source while the decision is open.
-6. Keep the dump, D1, R2 objects and generated evidence for the post-mortem.
+7. Keep the dump, D1, R2 objects and generated evidence for the post-mortem.
 
 The production rollback drill is a tabletop before the window. The local drill
 proves the application-level claim disable/restart and data stability; it does
@@ -349,6 +421,11 @@ secrets.
 
 ## Do not
 
+- clear, reuse or overwrite the POC D1, Worker, R2 bucket or host;
+- remove `api.llacademy.ng` from the POC before the new host and portal are
+  verified;
+- change the POC `CLIENT_URL`; its Gmail callback is on the portal;
+- attempt the 196,801-row load in one free-plan window;
 - deploy from a feature branch without recording the commit;
 - use the rehearsal session-minting path against remote D1;
 - run a delta against an existing production D1 under this runbook;

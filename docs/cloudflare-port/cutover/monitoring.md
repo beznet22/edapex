@@ -16,6 +16,23 @@ first production request; thresholds are agreed with the rollback authority.
 | Auth sessions | D1 `auth_events` / `auth_sessions` | Google link, code login, session creation, revocations |
 | Readiness probe | External `/health` check | 200 status and latency every 1 minute |
 
+## POC regression during the staged move
+
+The POC is live and must stay usable while `api.llacademy.ng` is handed over.
+Before the EdApex switch, watch:
+
+| Check | Expected | Action |
+|---|---|---|
+| `https://sms-api.llacademy.ng/health` | 200 | Stop the handover if it fails |
+| POC portal login | success | Do not remove `api.llacademy.ng` until this passes |
+| POC Gmail send | success | The Gmail callback remains on `portal.llacademy.ng` |
+| POC `VITE_API_URL` | `https://sms-api.llacademy.ng/api` | Rebuild/redeploy `sms-portal` |
+| EdApex `https://edapex-api.llacademy.ng/health` | 200 | Verify before taking `api.llacademy.ng` |
+| EdApex `/claim` | 404 | Claim stays disabled until the switch checks pass |
+
+Keep both custom domains attached during preparation. The only unavoidable
+window is the `api.llacademy.ng` detach/attach step; do it in low traffic.
+
 ## Queries
 
 Run from the private cutover shell with

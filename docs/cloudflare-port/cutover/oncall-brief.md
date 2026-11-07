@@ -8,7 +8,7 @@ names and contacts in the private copy; do not commit real names or numbers.
 | Role | Responsibility | Contact |
 |---|---|---|
 | Cutover lead | Runs the runbook, calls go/no-go | `<CUTOVER_INPUT>` |
-| Rollback authority | Decides to revert routing; owns the incident | `<CUTOVER_INPUT>` |
+| Rollback authority | Decides the host move or rollback; owns the incident | `<CUTOVER_INPUT>` |
 | API on-call | Watches 5xx, latency, claim funnel, Worker logs | `<CUTOVER_INPUT>` |
 | Source owner / DBA | Owns MySQL freeze, reset backup, read-only state, restore | `<CUTOVER_INPUT>` |
 | School admin | Owns the maintenance notice and claim communication | `<CUTOVER_INPUT>` |
@@ -21,9 +21,11 @@ owner confirms every MySQL state change out loud before it happens.
 
 **T+0 to T+15 minutes**
 
-- `/health` returns 200 on the production host.
+- `/health` returns 200 on both `api.llacademy.ng` (EdApex) and
+  `sms-api.llacademy.ng` (POC).
 - 5xx rate is below 1%; p95 is below 500 ms.
-- DNS resolves to the Worker; the legacy host is still reachable.
+- `api.llacademy.ng` resolves to EdApex; the POC is healthy on `sms-api`;
+  `portal.llacademy.ng` login and Gmail send still work.
 - `/claim` returns 404 until the lead explicitly enables it.
 - Public photo sample returns 200 with immutable caching.
 - D1 shows no FK or query errors.
@@ -43,6 +45,7 @@ owner confirms every MySQL state change out loud before it happens.
 - Hourly claim funnel, 5xx and D1 budget review.
 - Photo 404s are checked against `missing-photos.csv`; anything else is an
   incident.
+- POC regression is still clean on `sms-api` (portal login and Gmail send).
 - No writes reach source MySQL; it stays read-only.
 - Any count variance or spot-check difference is escalated immediately.
 
@@ -50,8 +53,8 @@ owner confirms every MySQL state change out loud before it happens.
 
 | Symptom | First action | Escalate to |
 |---|---|---|
-| Two `/health` failures | Check Worker status, recent deploy, DNS | API on-call + rollback authority |
-| 5xx > 5% for 5 min | Capture request ids, roll back routing if not explained | Rollback authority |
+| Two `/health` failures | Check both `api.llacademy.ng` and `sms-api.llacademy.ng`; check Worker status and host attachment | API on-call + rollback authority |
+| 5xx > 5% for 5 min | Capture request ids, move EdApex back to its interim host if not explained | Rollback authority |
 | FK violation | Stop the migration path; do not retry blindly | Cutover lead + source owner |
 | Count variance > 0.1% | Freeze further mutations, compare the final dump | Cutover lead |
 | Claim failure with no code change | Disable claim, keep routing, inspect `auth_events` | API on-call |
@@ -71,6 +74,8 @@ owner confirms every MySQL state change out loud before it happens.
   transcript; existing objects still verify by checksum.
 - **Rollback after the auth reset** needs the pre-reset password backup; legacy
   login is not usable with the shared digest.
+- **POC coexistence:** the POC is live on `sms-api.llacademy.ng`; do not clear
+  its D1 or change its `CLIENT_URL`. Its Gmail callback is on the portal.
 
 ## Rules
 
@@ -79,8 +84,9 @@ owner confirms every MySQL state change out loud before it happens.
 - No secret, cookie, token, email, phone or student name in the incident
   channel.
 - Record time, request id, route, status and action for every incident.
-- The rollback authority can order a routing revert without a second vote. The
-  cutover lead cannot overrule it.
+- The rollback authority can order a host move without a second vote. The
+  cutover lead cannot overrule it. Keep the POC on `sms-api`; move EdApex back
+  to `edapex-api` if `api.llacademy.ng` fails.
 - Keep the source backup, D1 and R2 objects until the rollback window closes and
   the post-mortem is complete.
 

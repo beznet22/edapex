@@ -63,8 +63,10 @@ Walk the following with the cutover lead, rollback authority and source owner:
 
 1. **Disable claim first.** Set `CLAIM_ENABLED` to unset/`0`; deploy or update
    the secret; call `/claim` and confirm 404.
-2. **Revert routing.** Point the production host back to `<LEGACY_HOST>`; keep
-   the Worker deployed but receive no traffic. Lower TTL was set in advance.
+2. **Move the host, not the data.** Keep the POC on `sms-api.llacademy.ng`.
+   Return EdApex to `edapex-api.llacademy.ng`; reattach `api.llacademy.ng` to
+   the POC only if external clients still require that host. The portal already
+   points at `sms-api`; `CLIENT_URL` stays the portal.
 3. **Keep MySQL read-only.** Do not reopen writes just because traffic moved
    back. Record the read-only state and binlog position.
 4. **Restore the pre-reset password backup if the shared reset already ran.**
@@ -82,7 +84,7 @@ Walk the following with the cutover lead, rollback authority and source owner:
 The gate item is satisfied only by an executed drill that records:
 
 - claim disable → `/claim` 404;
-- route reversion → legacy host healthy;
+- route/POC check → `sms-api.llacademy.ng` healthy; portal login and Gmail send work;
 - MySQL read-only verified; password backup restore tested or explicitly
   deferred by the rollback authority with the consequence recorded;
 - no D1 writes after the decision;

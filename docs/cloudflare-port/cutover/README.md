@@ -15,6 +15,8 @@ frozen snapshot, not a delta against an earlier production database.
 | Check | Status |
 |---|---|
 | Cutover runbook/checklist/monitoring/on-call/rollback pack | written |
+| Decision record | written: account topology, paid-plan recommendation, Gmail reuse, staged domain move |
+| Gmail refresh token | verified locally: HTTP 200, `gmail.send` scope; local `apps/api/.dev.vars`; production secrets pending Worker |
 | Preflight on the current snapshot | passed: 62 tables, 196,801 rows, 0 FK, 0 reconciliation, 44 SQL files, 625 uploadable/228 missing photos, `executed:false` |
 | Local application drill | passed: claim 404/202/202/409/404, target green, roster, marks grade, report-card checksum, core counts unchanged |
 | Production resources, load, switch, claim enablement, 24 h watch | **not started** |
@@ -28,6 +30,7 @@ review artefacts for the separate production approval.
 
 | Document | Purpose |
 |---|---|
+| [decisions.md](./decisions.md) | **Read first:** account topology, billing, Gmail reuse, domain move, open inputs and guardrails |
 | [runbook.md](./runbook.md) | Ordered production sequence, commands and stop/go gates |
 | [checklist.md](./checklist.md) | Go/no-go checklist, evidence fields and sign-off |
 | [monitoring.md](./monitoring.md) | Dashboard panels, alert thresholds, queries and the 24 h watch |
@@ -42,16 +45,22 @@ review artefacts for the separate production approval.
    explicit approval for the maintenance window.
 2. **Fresh target only.** The runbook aborts if the production D1 is non-empty.
    A delta over an existing production database needs a separate design.
-3. **Placeholders are intentional.** Hostnames, account and database ids,
+3. **The POC is live and separate.** Do not clear or reuse the POC D1, Worker,
+   R2 bucket or `api.llacademy.ng` host before the staged move is verified. See
+   [decisions.md](./decisions.md).
+4. **Free is not enough for the one-window load.** The 196,801-row load plus
+   index and API writes exceeds the free 100,000 writes/day. Confirm a paid plan
+   or design a multi-day window before starting.
+5. **Placeholders are intentional.** Hostnames, account and database ids,
    secrets, on-call names and dates are `<CUTOVER_INPUT>` values. No production
    value is committed.
-4. **No PII in git.** Dumps, generated SQL, NDJSON, photo inventories, quarantine
+6. **No PII in git.** Dumps, generated SQL, NDJSON, photo inventories, quarantine
    CSVs and drill copies live under `apps/api/.tmp/` (gitignored). Committed
    evidence is counts, checksums and pass/fail status only.
-5. **MySQL stays authoritative and read-only** until every pre-cutover check
+7. **MySQL stays authoritative and read-only** until every pre-cutover check
    passes and the rollback window closes. The auth reset invalidates legacy
    logins, so the pre-reset password backup is a rollback prerequisite.
-6. **The Phase 8 gate stays open** until production load, traffic switch,
+8. **The Phase 8 gate stays open** until production load, traffic switch,
    `/claim` enablement, 24 h monitoring and the production rollback drill are
    complete. A local drill is not a production drill.
 
@@ -59,20 +68,21 @@ review artefacts for the separate production approval.
 
 ```text
 approve window
-  -> create production D1 + R2, set secrets, deploy claim-disabled
+  -> create EdApex D1 + R2; deploy interim EdApex host; set Gmail secrets/test
   -> maintenance page, back up source passwords
   -> run the shared claim reset, set MySQL read_only
   -> take the final dump, record SHA-256
   -> preflight locally (62 tables, 0 FK, 0 reconciliation)
-  -> apply migrations and load the remote D1
+  -> apply migrations and load the remote EdApex D1
   -> integrity -> bootstrap -> staffing review -> activation
   -> archive 1/2/4 -> promotion -> quarantine -> photos/timelines
-  -> readiness -> switch routes -> enable /claim -> 24 h watch
-  -> close the rollback window
+  -> readiness -> move POC to sms-api -> portal rebuild -> attach api to EdApex
+  -> enable /claim -> 24 h watch -> close the rollback window
 ```
 
-Rollback reverts routing and keeps MySQL read-only. If the reset has already
-run, restore the pre-reset password backup before pointing traffic back.
+Rollback keeps the POC on `sms-api`, moves EdApex back to its interim host, and
+keeps MySQL read-only. If the reset has already run, restore the pre-reset
+password backup before pointing traffic back.
 
 ## Source material
 
