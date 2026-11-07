@@ -1,9 +1,9 @@
 /**
- * Rehearsal-only admin session minting.
+ * Rehearsal-only session minting.
  *
  * The Workers suite never sees this path: it is a local CLI helper that inserts
- * an opaque session row directly into the scratch D1 so the rehearsal can call
- * `/admin/*`. It refuses to run unless `--local` is present at the call site.
+ * an opaque session row directly into the scratch D1 so a rehearsal can call
+ * authenticated routes. It refuses to run unless `local === true`.
  */
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 
@@ -15,16 +15,20 @@ export function sha256Hex(value) {
   return createHash("sha256").update(value).digest("hex");
 }
 
-export function mintAdminSession(persist, local) {
+export function mintSession(persist, userId, local) {
   if (local !== true) {
     throw new Error("Refusing to mint a session without --local");
   }
-  const admins = queryJson(
+  if (!Number.isInteger(userId) || userId <= 0) {
+    throw new Error("A positive user id is required");
+  }
+  const users = queryJson(
     persist,
-    "SELECT id FROM users WHERE is_administrator = 'yes' AND active_status = 1 ORDER BY id LIMIT 1;"
+    `SELECT id FROM users WHERE id = ${userId} AND active_status = 1;`
   );
-  const userId = Number(admins[0]?.id ?? 0);
-  if (userId <= 0) throw new Error("No active administrator exists in the scratch database");
+  if (users.length === 0) {
+    throw new Error(`No active user ${userId} exists in the scratch database`);
+  }
 
   const token = randomBytes(32).toString("base64url");
   const tokenHash = sha256Hex(token);
@@ -45,4 +49,17 @@ export function mintAdminSession(persist, local) {
     expiresAt,
     cookie: `${SESSION_COOKIE}=${token}`
   };
+}
+
+export function mintAdminSession(persist, local) {
+  if (local !== true) {
+    throw new Error("Refusing to mint a session without --local");
+  }
+  const admins = queryJson(
+    persist,
+    "SELECT id FROM users WHERE is_administrator = 'yes' AND active_status = 1 ORDER BY id LIMIT 1;"
+  );
+  const userId = Number(admins[0]?.id ?? 0);
+  if (userId <= 0) throw new Error("No active administrator exists in the scratch database");
+  return mintSession(persist, userId, local);
 }

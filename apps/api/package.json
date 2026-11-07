@@ -37,7 +37,15 @@
     "migration:load": "node scripts/migration/load-cli.mjs",
     "migration:rehearse": "node scripts/migration/rehearse.mjs",
     "migration:verify": "node scripts/migration/verify.mjs",
-    "migration:report": "node scripts/migration/report.mjs"
+    "migration:report": "node scripts/migration/report.mjs",
+    "cutover:preflight": "node scripts/cutover/preflight.mjs",
+    "cutover:drill": "node scripts/cutover/drill.mjs",
+    "cutover:archive-export": "node scripts/cutover/archive-export.mjs",
+    "cutover:live-plan": "node scripts/cutover/live-plan.mjs",
+    "cutover:load-window": "node scripts/cutover/load-window.mjs",
+    "cutover:photo-inventory": "node scripts/cutover/photo-inventory.mjs",
+    "cutover:missing-photo-students": "node scripts/cutover/missing-photo-students.mjs",
+    "cutover:photo-audit": "node scripts/cutover/photo-audit.mjs"
   },
   "dependencies": {
     "drizzle-orm": "^0.44.7",

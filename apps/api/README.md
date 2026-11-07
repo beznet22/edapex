@@ -92,7 +92,7 @@ pnpm exec wrangler d1 migrations apply DB --remote
 pnpm exec wrangler deploy
 ```
 
-Deployment is gated by the cutover phase; do not deploy to production from a feature branch.
+Deployment is gated by the cutover phase; do not deploy to production from a feature branch. The production sequence, placeholders and stop/go gates are in [`docs/cloudflare-port/cutover/runbook.md`](../../docs/cloudflare-port/cutover/runbook.md). The current target is a **fresh** D1/R2 load from the final frozen snapshot; no production database exists yet.
 
 ## Layout
 
@@ -141,4 +141,4 @@ Then update [PROGRESS.md](../docs/cloudflare-port/PROGRESS.md): status row, gate
 
 ## Status
 
-Phases 0–6 are complete. Phase 3 added the request-scoped service context, ports/adapters, pure domain and semantic validation, the five catalog-facing service groups, OCR cache/capture binding, settings, auth/session/profile/rate limiting, authorization and student lifecycle. Phase 4 added the service-led `/api/v1` surface, the flat error envelope, the `baseCtx`/`ctx` split, the `hc<AppType>` client and the HTTP guard. Phase 5 added the claim/Google/code auth cutover and the duplicate-email utility. Phase 6 adds session archives, retrieval, immutable report-card versions, public document tokens, read-only restore and the dual-admin wipe. Phase 7 adds the offline transform and tiered load, the integrity gate, bootstrap, terms, the filtered staffing copy with per-class-section review, promotion, quota/reversal and quarantine reporting; the local rehearsals load 196,801 rows across 62 legacy tables with zero FK violations and reconcile the 2026/27 roster. See [`scripts/migration/README.md`](./scripts/migration/README.md) for the rehearsal and production runbook.
+Phases 0–7 are complete. Phase 8 preparation adds the cutover runbook/checklist/monitoring/on-call/rollback pack, a decision record, a dump preflight and a local application drill; no remote D1/R2/DNS/MySQL action has been taken and PR #8 remains unmerged. The preflight loads the current snapshot into a disposable local D1 (62 tables, 196,801 rows, zero FK/reconciliation failures) and emits reviewed remote command lists. The drill exercises claim disabled/enabled/rollback, target integrity, staffing, teacher roster, marks entry and report-card review on a copy of the Phase 7 D1. Gmail reuse was verified locally (token exchange HTTP 200, `gmail.send`), and the POC/EdApex domain move is staged but not executed. Read [`docs/cloudflare-port/cutover/decisions.md`](../../docs/cloudflare-port/cutover/decisions.md) first, then the [cutover README](../../docs/cloudflare-port/cutover/README.md) and [`scripts/migration/README.md`](./scripts/migration/README.md).

@@ -24,7 +24,12 @@ Port code lands in [`apps/api/`](../../apps/api/AGENTS.md).
 
 ## Current focus
 
-**Phase 7 — Migration execution.** Complete on `phase-7-migration` (based on `phase-6-archive`); PR #8 check `port` green ([run 42345892456](https://github.com/beznet22/edapex/actions/runs/42345892456)). Report: [`audit/phase-7-rehearsal.md`](./audit/phase-7-rehearsal.md).
+**Phase 8 — Cutover preparation.** PR #8 is merged; `phase-8-cutover` is
+rebased onto `phase-6-archive` and published as PR #9. The cutover pack,
+offline-archive/live-only decision record, dump preflight and local drill are
+prepared. No production D1/R2/DNS/MySQL action has been taken. The next work is
+the archive-export/live-profile tooling and the resumable one-window loader. See
+[`cutover/decisions.md`](./cutover/decisions.md).
 
 ## Phase status
 
@@ -38,7 +43,7 @@ Port code lands in [`apps/api/`](../../apps/api/AGENTS.md).
 | 5 | Auth cutover flow | done | Kimchi | 2026-11-06 | 2026-11-06 | PR #6 check `port` green ([run 42288628524](https://github.com/beznet22/edapex/actions/runs/42288628524)): typecheck, 505 tests / 100 files, all guards + self-tests, 0002 apply + drift, deploy dry-run, both verifiers. Gate: claim → Google → session on local D1, 409 `AMBIGUOUS_EMAIL`, reissue revokes sessions, claim CPU 0.055 ms/attempt (Workers pool); `wrangler dev` handler p50 ~17 ms wall clock. |
 | 6 | Archive and retrieval | done | Kimchi | 2026-11-06 | 2026-11-06 | PR #7 check `port` green ([run 42300456462](https://github.com/beznet22/edapex/actions/runs/42300456462)): typecheck, 115 files / 565 tests, all guards + self-tests, 0003 apply + drift, deploy dry-run, both verifiers. Gate: archive/restore round-trip, checksum quarantine, published immutability + supersede *n+1*, wipe blocked without the second admin token. |
 | 7 | Migration execution | done | Kimchi | 2026-11-06 | 2026-11-06 | Local rehearsals A/B (`phase-7-migration`): 62 legacy tables / 196,801 rows / 0 FK / 0 reconciliation mismatches; target integrity green (0 identity, 0 target, 42 sections reviewed, 663 current records); 681 year-4 records = 666 unique default + 15 non-default duplicates; 639 promoted + 24 DAYCARE + 3 unplaced; 663 destination records; quarantine 237; sessions 1/2/4 archived with 652+641 checksum-verified objects (74/16 historical gaps), live marks/results/ratings/remarks/attendance zero; 853 referenced photo URLs (625 present/uploadable, 228 missing locally), 25 sample uploads and public route 200; 2 timeline exports; O2 10/10 present. Full local gate: typecheck, 591 tests / 123 files, all guards, 0004/0005 apply + drift, deploy dry-run, both verifiers. PR #8 check `port` green ([run 42345892456](https://github.com/beznet22/edapex/actions/runs/42345892456)). Report: [`audit/phase-7-rehearsal.md`](./audit/phase-7-rehearsal.md). |
-| 8 | Cutover | not started | — | — | — | — |
+| 8 | Cutover | in progress | Kimchi | 2026-11-07 | — | PR #8 merged; `phase-8-cutover` rebased and published as PR #9. Preparation evidence: preflight on the current dump (62 tables, 196,801 rows, 0 FK, 0 reconciliation, 44 SQL files, `executed:false`; rehearsal photos 625/228, production ZIP 633/220, old static fallback +10 → combined 643 present/210 accepted-missing; 10 fallbacks included; active/default report 206 students; R2 `edapex-media` created; **643/643 uploaded, audit 0 failures**); local drill passed (target green, 42 sections, FIRST TERM dates, teacher roster, NURSERY marks with grade, report-card review checksum, claim 404/202/202/409/404, core counts unchanged). Gmail reuse verified locally (HTTP 200, `gmail.send`); POC Gmail callback unchanged; domain move staged (`api.llacademy.ng` for EdApex, `sms-api.llacademy.ng` for POC). Design: offline session 1/2/4 archives + minimal live-only D1 load; Free 95k target/100k hard gate, checkpoint and next-UTC-day continuation; no Paid fallback; no historical raw rows in production D1. Archive export/live-profile and budget loader tooling remain, then the production window. |
 | 9 | Post-cutover | not started | — | — | — | — |
 
 ## Gate checklists
@@ -107,9 +112,20 @@ Port code lands in [`apps/api/`](../../apps/api/AGENTS.md).
 - [x] 463 source subject assignments accounted: 231 active copied + 232 inactive; 6 student categories; 7 grade bands; readiness green
 
 ### Phase 8 — Cutover
-- [ ] Final delta loaded; verification repeated
-- [ ] Rollback drilled
-- [ ] Monitoring dashboard and on-call briefed
+- [x] Cutover runbook, checklist, monitoring, on-call and rollback-pack written; no production values invented
+- [x] Dump preflight passes on the current snapshot: 62 tables, 196,801 rows, 0 FK, 0 reconciliation, 0 sequence/orphan failures, 44 SQL files, rehearsal photos 625/228. Production ZIP: **633 present / 220 missing**; old static tree adds **10 fallback** files → combined **643 present / 210 accepted-missing**; active/default report lists **206 students**; R2 upload **643/643**, audit **0 failures**
+- [x] Local application drill passes: health 200, claim 404/202/202/409/404, target integrity green, 42 sections, FIRST TERM 2026-09-14 → 2026-12-11, teacher roster, NURSERY marks grade, report-card review checksum, core counts unchanged, source evidence hash unchanged
+- [x] Monitoring/on-call/rollback pack prepared (production briefing and tabletop still pending)
+- [x] Decision record written: same account, separate EdApex resources, POC D1 not reused, offline archives + live-only load, Gmail reuse, staged domain move
+- [x] Gmail refresh token verified locally (HTTP 200, `gmail.send`); local `apps/api/.dev.vars` created and gitignored; production secrets pending Worker
+- [x] POC host/domain move staged: `sms-api.llacademy.ng` for the POC, `api.llacademy.ng` for EdApex; `CLIENT_URL` stays on the portal
+- [x] PR #8 merged; `phase-8-cutover` rebased and published as PR #9
+- [ ] Archive export/live-profile tooling and resumable 95k/100k budget loader built
+- [ ] Production photo ZIP supplied and re-inventoried (current 625/228 is stale rehearsal data)
+- [ ] POC second host + rebuilt portal verified; EdApex interim host verified
+- [ ] Production D1/R2 created and loaded from the final frozen snapshot (fresh target; abort if non-empty; no delta)
+- [ ] Production traffic switch, `/claim` enablement and 24 h monitoring
+- [ ] Production rollback drill (local drill is not a substitute) and signed checklist
 
 ### Phase 9 — Post-cutover
 - [ ] `/claim` removed on the announced date
@@ -163,6 +179,14 @@ Port code lands in [`apps/api/`](../../apps/api/AGENTS.md).
 | 2026-11-06 | 7 | Rehearsals A/B: 681 year-4 records = 666 unique default + 15 non-default duplicates; 639 promoted + 24 DAYCARE + 3 unplaced; 663 destination records; quarantine 237; sessions 1/2/4 archived (652/0/641 objects, 74/16 gaps), live historical rows zero; 853 photo URLs (625 present, 228 missing locally), sample upload + public 200; 2 timeline exports; O2 10/10; A/B verified identical | Kimchi |
 | 2026-11-06 | 7 | Deviations: the spec's 654/24/3/678/222 counts double-count 15 non-default year-4 records and omit the 4-term transcript/empty-class historical rows; promotion uses `is_default=1`, so the measured roster is 666 unique → 639 + 24 + 3, 663 records, quarantine 237 (approved). Categories/grade bands are copied year-independently because the source rows live in an earlier year. Transcript/marksheet validation was relaxed for 4-term historical transcripts and empty class/section labels; the archive captures a malformed student as a manifest gap instead of aborting. Photos are inventoried but only sampled (the local static tree lacks 228 referenced files); the production runbook uses `--photos full` after the source supplies them | Kimchi |
 | 2026-11-06 | 7 | Phase 7 gate passed locally: typecheck, 123 test files / 591 tests, all guards + self-tests, 0004/0005 apply + drift, deploy dry-run, both verifiers; both rehearsals reconciled. PR #8 check `port` green ([run 42345892456](https://github.com/beznet22/edapex/actions/runs/42345892456)) | Kimchi |
+| 2026-11-07 | 8 | Preparation branch `phase-8-cutover` created from `phase-7-migration` (PR #8 not merged, no push). Cutover runbook, checklist, monitoring, on-call brief and rollback-drill pack written; all production values are `<CUTOVER_INPUT>` placeholders | Kimchi |
+| 2026-11-07 | 8 | Preflight tooling added (`cutover:preflight`) and run on the current dump: 62 tables, 196,801 rows, 0 FK, 0 reconciliation, 0 sequence/orphan failures, 1,711 resolutions, 44 SQL files, 625 uploadable/228 missing photos, `executed:false`; no remote command executed | Kimchi |
+| 2026-11-07 | 8 | Local drill added (`cutover:drill`) and passed on a disposable D1 copy: health 200; claim 404/202/202/409/404; target green; 42 sections; FIRST TERM dates; teacher roster, NURSERY marks grade and report-card review checksum; core counts and source evidence hash unchanged. First attempt correctly failed the target gate because synthetic claim users were active and unprofiled (`P4`); drill accounts are now inactive. Production DNS/MySQL rollback remains a tabletop/window step | Kimchi |
+| 2026-11-07 | 8 | Decision record added: reuse the existing Cloudflare account but create separate `edapex-api`/`edapex` D1/`edapex-media`; never clear or reuse the live POC `sms` D1; POC moves to `sms-api.llacademy.ng`, EdApex takes `api.llacademy.ng` in a staged handover; POC `CLIENT_URL` stays on the portal | Kimchi |
+| 2026-11-07 | 8 | Gmail reuse verified: same Google client/sender as the POC; `gmail.send` token exchange HTTP 200; local `apps/api/.dev.vars` created (gitignored); production `GMAIL_*` secrets pending the first `edapex-api` deploy. POC Gmail callback remains `portal.llacademy.ng`; EdApex auth callback registered | Kimchi |
+| 2026-11-07 | 8 | Billing/design revised: the all-tables load+purge is ~2.0–2.5M writes, so it is rejected. Use offline session 1/2/4 archives + minimal live-only D1 load + archive metadata: expected ~70–95k writes, Free 95k target/100k hard gate. If capped, checkpoint and resume after 00:00 UTC the next day; no Paid fallback. Historical raw tables stay empty; history serves from R2 | Kimchi |
+| 2026-11-07 | 8 | PR #8 merged into `phase-6-archive`; `phase-8-cutover` rebased and published as PR #9. No production resources/domains/secrets touched | Kimchi |
+| 2026-11-07 | 8 | Photo decision: include 10 static fallbacks; production ZIP 633 + 10 = **643 uploadable**; **210-image gap accepted**; active/default report lists **206 students** (639 target default records with class+section). R2 `edapex-media` created; **643/643 uploaded; full SHA-256/byte audit 0 failures**. DB keeps legacy relative `/uploads/students/...` URLs; no `student_photo` backfill | Kimchi |
 
 ## Blockers and decisions
 
@@ -170,6 +194,13 @@ Port code lands in [`apps/api/`](../../apps/api/AGENTS.md).
 |---|---|---|---|
 | Terms 2 and 3 calendars | Phase 7 (terms endpoint only) | waiting on school | — |
 | Term-date confirmation for FIRST TERM | Phase 7 | fixed from `assets/calendar.jpeg` (2026-09-14 → 2026-12-11); confirm against official notice | — |
+| Production D1/R2 and maintenance window | Phase 8 | not started — requires approval, Cloudflare/MySQL access and the one-window schedule | — |
+| Archive export/live-profile tooling | Phase 8 | in progress — offline archive export, R2 manifest, minimal live profile, resumable budget loader | — |
+| One-window canary | Phase 8 | pending — measure `meta.rows_written`; if 100k cap is reached, checkpoint and resume after 00:00 UTC the next day (no Paid) | — |
+| Production student-photo ZIP | Phase 8 | done — 10 fallbacks included; combined 643/853; 210 gap accepted; active/default report 206 students; **643/643 uploaded, audit 0 failures** | — |
+| EdApex CORS origin(s) | Phase 8 | pending — supply the approved browser origin(s); no invented values | — |
+| Final frozen dump | Phase 8 | pending — archives and live load must use the same snapshot | — |
+| Production rollback drill and on-call briefing | Phase 8 | pending the approved window; local drill is not a substitute | — |
 | Repository layout | Phase 9 completion | decided — `apps/api/` is the API service and becomes a pnpm workspace package; `apps/` is the deployable bucket; no standalone extraction | — |
 | Phase 1 index arithmetic | Phase 2+ index work | decided — the 226 gate is 224 verbatim recovered (the two `session_id` indexes go with the dropped columns, `05 §4`) plus 01a O11's two new `chat_group_users` indexes; 05/04 add 5 more spec-mandated indexes, so legacy tables carry 231 secondary indexes total | — |
 | `sm_general_settings.identity` | Phase 7 transform | decided — created as a new TEXT column per 01a §6 even though no legacy column exists; `extras` therefore holds 95 legacy fields, not 94. Phase 7 must read the schema, not the prose | — |
@@ -215,6 +246,18 @@ Port code lands in [`apps/api/`](../../apps/api/AGENTS.md).
 | Phase 7 transcript schema | Phase 7 | decided — allow historical 4-term transcripts and marks above the modern 100 scale; empty class/section labels and zero totals are valid historical records. A malformed student becomes a manifest gap, not a failed session archive | — |
 | Phase 7 archive gaps | Phase 7 | decided — sessions 1/2/4 archive 652/0/641 objects; 74/16 historical students have no complete transcript and are manifest gaps. Every existing object verifies by checksum; the live historical rows are zero | — |
 | Phase 7 photos | Phase 7 | partial — 853 referenced URLs, 625 present/uploadable, 228 missing from the local static tree; two sampled uploads verify and the public 32/64-hex route returns 200. The full upload is the production runbook step after the source owner supplies the missing files | — |
+| Phase 8 target | Phase 8 | decided — no production D1 exists, so the cutover is a **fresh initial load** from the final frozen snapshot, not a delta. Abort if a non-empty production D1 is found; a delta needs a separate design. This is a deliberate reading of `05 §8` for the current deployment state | — |
+| Phase 8 preparation scope | Phase 8 | decided — PR #8 is merged; `phase-8-cutover` was rebased onto `phase-6-archive` and published as PR #9. Production D1/R2/DNS/MySQL writes still need the approved window | — |
+| Phase 8 rollback evidence | Phase 8 | decided — the local drill proves application-level claim disable/restart, readiness and data stability only. DNS/route reversion, MySQL read-only state and pre-reset password restore remain production tabletop/drill items; the Phase 8 gate stays open | — |
+| Phase 8 auth reset backup | Phase 8 | decided — back up source `users` passwords/full DB before the shared reset. Rollback after the reset restores the backup before reopening legacy login; the shared digest is not a rollback credential | — |
+| Phase 8 photos | Phase 8 | decided — production ZIP 633 + 10 approved static fallbacks = **643 uploadable**; **210 accepted gap**; active/default report 206 students. R2 upload **643/643**, audit **0 failures**. Upload only the 643 union; no wholesale stale-tree upload. Keep legacy relative `student_photo` URLs and use a media-base helper for absolute client URLs; no backfill | — |
+| Phase 8 photo URL contract | Phase 8 | decided — DB keeps `/uploads/students/<hash>.<ext>`; R2 key is `uploads/students/<file>`; the public route serves it; absolute client URLs are derived from `PUBLIC_MEDIA_BASE`/API base in the DTO. No `student_photo` backfill on storage moves; use the manifest + photo audit for consistency | — |
+| Phase 8 account topology | Phase 8 | decided — reuse the existing Cloudflare account, but create separate `edapex-api`, `edapex` D1 and `edapex-media` R2. The live POC `sms` D1 has a different UUID schema and already contains migrated data; never clear or reuse it. Free quota is account-wide | — |
+| Phase 8 billing | Phase 8 | decided — Workers Free; offline session 1/2/4 archives + minimal live-only D1 load. Expected ~70–95k writes; 95k target/100k hard gate. If the cap is reached, stop at the last completed file and resume after 00:00 UTC the next day; no Paid fallback. The all-tables load+purge (~2.0–2.5M writes) is rejected | — |
+| Phase 8 Gmail | Phase 8 | decided — reuse the POC’s Google OAuth client and Gmail sender; one fresh consent with `gmail.send` produced a new refresh token (HTTP 200). Local `apps/api/.dev.vars` is gitignored; production `GMAIL_*` secrets wait for the first Worker deploy. POC Gmail callback remains on the portal; EdApex auth callback is `https://api.llacademy.ng/api/v1/auth/google/callback` | — |
+| Phase 8 domain move | Phase 8 | decided — staged: POC gets `sms-api.llacademy.ng`, frontend `VITE_API_URL` updated and `sms-portal` rebuilt; only after verification is `api.llacademy.ng` removed from the POC and attached to EdApex. POC `CLIENT_URL` stays `https://portal.llacademy.ng`; keep old host until the new path is verified | — |
+| Phase 8 local env | Phase 8 | decided — repository-root `.env` is legacy-app configuration and is not read by `apps/api`; local API values live in gitignored `apps/api/.dev.vars`; production values use `wrangler secret put` after the Worker exists | — |
+| Phase 8 offline archives | Phase 8 | decided — generate session 1/2/4 archives locally from the final dump, export/upload the objects to R2, and load only `archive_objects` + `session_result_summary`. Historical raw marks/results/ratings/remarks/attendance/timelines stay out of production D1; retrieval reads R2. Do not import history back for normal serving | — |
 
 ## Notes
 
@@ -224,4 +267,5 @@ Port code lands in [`apps/api/`](../../apps/api/AGENTS.md).
 - Phase 4 landed on `phase-4-http` (PR #5) with `phase-3-services` as the PR base; the `port` check is green on run 42280594997.
 - Phase 5 landed on `phase-5-auth` with `phase-4-http` as the PR base; the `port` check is green on run 42288628524.
 - Phase 7 landed on `phase-7-migration` with `phase-6-archive` as the PR base; PR #8 check `port` is green ([run 42345892456](https://github.com/beznet22/edapex/actions/runs/42345892456)) and both rehearsals reconciled. The committed rehearsal report is [`audit/phase-7-rehearsal.md`](./audit/phase-7-rehearsal.md). The 681/666/15 and 463/231/232 reconciliations are deliberate, approved deviations from the spec's record-level totals.
+- Phase 8 preparation is on `phase-8-cutover`, rebased onto `phase-6-archive` after PR #8 merged and published as PR #9. No production resources/domains/secrets were touched. The decision record at [`cutover/decisions.md`](./cutover/decisions.md) is the first file the next agent should read; it records the POC/EdApex topology, offline archives + live-only load, one-window 95k/100k checkpoint, Gmail reuse and staged domain move.
 - Phase 0 landed on `phase-0-scaffolding` (PR #1). `main` was not pushed because Dokploy deploys on commit; the branch carries the preflight spec-suite commit `b83de20`. Do not push `main` until the Dokploy trigger is confirmed blocked.

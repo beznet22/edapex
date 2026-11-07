@@ -7,7 +7,7 @@
  * legacy hash format instead of failing a valid file.
  */
 import { createHash } from "node:crypto";
-import { existsSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import path from "node:path";
 
@@ -24,19 +24,42 @@ const CONTENT_TYPES = {
   ".gif": "image/gif"
 };
 
-function findFile(file) {
-  for (const root of ROOTS) {
-    const full = path.join(root, file);
-    if (existsSync(full)) return full;
-  }
-  return null;
-}
-
 function sha256(buffer) {
   return createHash("sha256").update(buffer).digest("hex");
 }
 
-export function inventoryPhotos(photos) {
+export function inventoryPhotos(photos, roots = ROOTS) {
+  const indexes = roots.map((root) => {
+    const index = new Map();
+    const stems = new Map();
+    if (!existsSync(root)) return { index, stems };
+    for (const entry of readdirSync(root)) {
+      const full = path.join(root, entry);
+      index.set(entry.toLowerCase(), full);
+      const dot = entry.lastIndexOf(".");
+      const stem = (dot < 0 ? entry : entry.slice(0, dot)).toLowerCase();
+      if (!stems.has(stem)) stems.set(stem, full);
+    }
+    return { index, stems };
+  });
+  const findFile = (file) => {
+    for (const root of roots) {
+      const full = path.join(root, file);
+      if (existsSync(full)) return full;
+    }
+    const lower = file.toLowerCase();
+    for (const entry of indexes) {
+      const found = entry.index.get(lower);
+      if (found !== undefined) return found;
+    }
+    const dot = lower.lastIndexOf(".");
+    const stem = dot < 0 ? lower : lower.slice(0, dot);
+    for (const entry of indexes) {
+      const found = entry.stems.get(stem);
+      if (found !== undefined) return found;
+    }
+    return null;
+  };
   const inventory = photos.map((photo) => {
     if (photo.kind !== "IMAGE") {
       return { ...photo, status: photo.kind, path: null, sha256: null, bytes: 0 };
@@ -115,7 +138,7 @@ export function uploadPhotos(persist, inventory, mode) {
   for (const photo of candidates) {
     const key = `uploads/students/${photo.file}`;
     const contentType =
-      CONTENT_TYPES[photo.extension] ?? "application/octet-stream";
+      CONTENT_TYPES[photo.extension.toLowerCase()] ?? "application/octet-stream";
     wrangler(
       [
         "r2",
