@@ -130,6 +130,17 @@ changed. The one-time consent is independent of the POC’s stored token.
 | Storage move | Keep the key contract, copy objects to the new store, run the photo audit, switch the binding/adapter; no DB migration |
 | Consistency | Use the inventory manifest (SHA-256/bytes) and a post-upload `photo-audit` comparing D1 references ↔ storage objects; rerun after any storage move |
 
+## D10 — Production recovery and Free-plan stop (2026-11-07)
+
+| Decision | Detail |
+|---|---|
+| Partial D1 | `edapex` (`9fe491dc-…`) received the 61,358-write live load and is retained for rollback; it is not the active binding |
+| Recovery D1 | `edapex-recovery` (`a6ae7003-…`) was loaded from the validated local rehearsal target (14,039 rows, **87,503 writes**) and is now bound as `DB`; it has 663 target records, 237 students without a target current record, 42 reviewed sections and FK 0 |
+| Reason | Promotion batches above ~65 students exceed the Free Worker CPU limit (503) at batch 5; retrying does not advance. Recovery uses the already-validated Phase 7 target instead of rewriting promotion |
+| Quota | Account writes are at least **148,861** today, above the Free 100k limit. **Stop all D1 writes** until 00:00 UTC; do not upgrade to Paid |
+| Assignment variance | The recovery target has 366 active subject assignments because the rehearsal fixture filled 15 otherwise-empty sections; the bootstrap produced 231. Clean/review after the reset before calling the gate final |
+| POC | Untouched; `api.llacademy.ng` still points at the POC. The staged move and EdApex switch remain pending |
+
 ## Linked records
 
 - [Runbook](./runbook.md)

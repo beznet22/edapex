@@ -4,16 +4,22 @@
   "main": "src/worker.ts",
   "compatibility_date": "2026-11-05",
   "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "routes": [
+    {
+      "pattern": "edapex-api.llacademy.ng",
+      "custom_domain": true
+    }
+  ],
   "vars": {
-    // Comma-separated allowlist; production overrides this in the dashboard.
-    "CORS_ORIGINS": "http://localhost:5173,http://localhost:4173"
+    // Comma-separated allowlist; EdApex production frontend.
+    "CORS_ORIGINS": "https://app.llacademy.ng"
   },
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "edapex",
-      // Placeholder until the production D1 database exists (Phase 7/8).
-      "database_id": "00000000-0000-0000-0000-000000000000",
+      "database_name": "edapex-recovery",
+      "database_id": "a6ae7003-54b6-45da-9790-3818e293a33e",
       "migrations_dir": "src/lib/server/db/migrations"
     }
   ],
