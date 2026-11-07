@@ -47,5 +47,51 @@ The drill copies the rehearsal D1 and verifies the source evidence hash before
 and after. It writes `.tmp/cutover-drill/evidence.json` and per-phase Worker
 logs. It never mutates `.tmp/rehearsal-a` and never calls `--remote`.
 
-The procedure, assertions and production limitation are documented in
-[`docs/cloudflare-port/cutover/rollback-drill.md`](../../../../docs/cloudflare-port/cutover/rollback-drill.md).
+## Offline archives and one-window load
+
+```bash
+# final local rehearsal -> archive objects/metadata
+pnpm run cutover:archive-export -- \
+  --persist .tmp/rehearsal-final \
+  --out .tmp/cutover-plan/archive
+
+# live-only plan from the full preflight SQL
+pnpm run cutover:live-plan -- \
+  --plan .tmp/cutover-plan/cutover-plan.json \
+  --archive-metadata .tmp/cutover-plan/archive/archive-metadata.sql \
+  --out .tmp/cutover-plan/live
+
+# dry-run first; --execute is required for remote work
+pnpm run cutover:load-window -- \
+  --plan .tmp/cutover-plan/live/load-plan.json \
+  --state .tmp/cutover-plan/load-state.json \
+  --budget 95000
+```
+
+The loader stops at the last completed file and resumes after 00:00 UTC the next
+day if the 100k cap is reached. It never switches to Paid.
+
+## Production photos and reports
+
+```bash
+pnpm run cutover:photo-inventory -- \
+  --photos-dir .tmp/photos-production/student \
+  --photos-dir ../../static/uploads/students \
+  --references .tmp/cutover-plan/transform/photos.json \
+  --out .tmp/cutover-plan/photos-union
+
+pnpm run cutover:missing-photo-students -- \
+  --persist .tmp/rehearsal-a \
+  --missing .tmp/cutover-plan/photos-union/missing-photos.csv \
+  --out .tmp/cutover-plan/photos-union/missing-photo-students.csv
+
+# after the R2 upload; full download/hash audit (read-only remote)
+pnpm run cutover:photo-audit -- \
+  --manifest .tmp/cutover-plan/photos-union/inventory.json \
+  --out .tmp/cutover-plan/photos-union/audit.json \
+  --execute
+```
+
+The photo and student reports are PII-bearing `.tmp` artifacts; never commit
+them. The DB keeps the legacy relative `/uploads/students/...` key; R2 and the
+public route use the same key contract.

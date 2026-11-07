@@ -285,7 +285,7 @@ export function renderPhotoUploadScript(rows, appRoot) {
     ""
   ];
   for (const row of uploadable) {
-    const type = contentTypes[row.extension] ?? "application/octet-stream";
+    const type = contentTypes[row.extension.toLowerCase()] ?? "application/octet-stream";
     lines.push(
       `pnpm exec wrangler r2 object put ${shellQuote(
         `edapex-media/uploads/students/${row.file}`

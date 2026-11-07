@@ -22,18 +22,21 @@ single summary the next agent should read before touching Cloudflare.
 Creating a second Worker/D1 does **not** add free quota. Cloudflare free limits
 are account-wide and are shared with the live POC.
 
-## D2 — Billing and the initial load
+## D2 — Billing and the one-window load
 
 | Decision | Detail |
 |---|---|
-| Recommendation | Use **Workers Paid ($5/month)** for the cutover and first month |
-| Why | Free D1 allows **100,000 rows written/day**. EdApex loads 196,801 table rows plus index writes, then bootstrap/staffing/archive/promotion writes |
-| Free alternative | Split the load and API migration across at least two days, with the legacy system read-only and the API unavailable. Not recommended for a single maintenance window |
-| POC precedent | The POC’s own PROGRESS says the free-tier row-write limit will bind its API replay and recommends a paid plan or multi-window replay |
-| Open input | Confirm the account’s current Workers plan in the dashboard; Wrangler does not show plan/usage |
+| Plan | **Workers Free**; POC traffic is not budgeted because the POC is being removed soon |
+| Window | **One preferred maintenance window**; target **95,000 writes**, hard cap **100,000** |
+| Strategy | **Offline historical archives + minimal live-only D1 load**. Historical marks/results never enter production D1, so the 196,801-row load and the ~171k-row purge disappear |
+| Expected writes | ~**70–95k** for live/structural data + archive metadata + bootstrap/promotion, versus ~**2.0–2.5M** for the all-tables-load-and-purge approach |
+| Canary | Measure a small production chunk’s `meta.rows_written` first; extrapolate and stop if the total would exceed 100k |
+| If the cap is reached | **Stop after the last completed file, write the checkpoint, and resume after 00:00 UTC the next day.** Do not switch to Paid and do not silently exceed 100k |
+| Rejected | Loading all 62 tables then archiving/purging on Free; that is a multi-week window, not one careful window |
 
 Storage is not the blocker: the local D1 is about 36 MB (free limit 500 MB per
 database / 5 GB per account), and the photo set is about 123 MB (R2 free 10 GB).
+The archive JSON adds R2 objects, not D1 rows.
 
 ## D3 — Gmail reuse
 
@@ -43,13 +46,13 @@ database / 5 GB per account), and the photo set is about 123 MB (R2 free 10 GB).
 | POC storage | Refresh token is AES-GCM ciphertext in production D1 `gmail_accounts`, encrypted with `MASTER_ENCRYPTION_KEY` |
 | POC secrets | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `MASTER_ENCRYPTION_KEY` exist on the production `sms-api` environment; secret values are write-only |
 | EdApex variables | `GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET`, `GMAIL_REFRESH_TOKEN`, `GMAIL_SENDER_EMAIL`, `GMAIL_SENDER_NAME` |
-| Reuse path chosen | Reuse the same Google OAuth client and Gmail account; one fresh consent with `gmail.send` produced a new refresh token |
+| Reuse path chosen | Reuse the same Google OAuth client and Gmail account; one fresh consent with `gmail.send` produced a new refresh token; the OAuth screen is published |
 | Verification | Token exchange returned HTTP 200, `gmail.send` scope, access token received; sender matches the POC account |
 | Local configuration | Root `.env` is **not** read by `apps/api`; the five Gmail values were copied to gitignored `apps/api/.dev.vars` |
 | Production configuration | Not set yet: the `edapex-api` Worker does not exist. Set with `wrangler secret put` after the first deploy |
 | POC Gmail callback | `https://portal.llacademy.ng/integrations/gmail/callback` — remains on the portal and is unaffected by the API host move |
 | EdApex auth callback | `https://api.llacademy.ng/api/v1/auth/google/callback` — registered on the Google client |
-| OAuth testing risk | If the consent screen is in Testing, refresh tokens expire after 7 days; publish or use an internal/Workspace setup |
+| OAuth status | Published (confirmed). If it is returned to Testing, refresh tokens expire after 7 days |
 | Sending limit | Consumer Gmail is roughly 400–500 recipients/day; keep a cap for report-card mail |
 
 The POC’s encrypted token was not decrypted and no POC secret was read or
@@ -80,27 +83,52 @@ changed. The one-time consent is independent of the POC’s stored token.
 - No secret value, token, ciphertext or PII belongs in this repository or in the
   cutover evidence.
 
-## D6 — Open inputs before production
+## D6 — Offline historical archives and minimal live profile
+
+| Decision | Detail |
+|---|---|
+| Archive generation | Run the final dump through a local rehearsal; the existing Phase 6 archive-capture code generates sessions 1/2/4 objects, manifests and checksums |
+| Archive export | Export ~1,293 archive JSON objects + `archive_objects` (~1,293) + `session_result_summary` (~3,802) metadata; upload objects to production R2, load metadata to D1 |
+| Live-only load | Load identity/roster/structure/config + archive metadata. Historical **marks, results, ratings, remarks, attendance and timelines stay out of production D1** |
+| Skipped tables | `sm_mark_stores`, `sm_result_stores`, `student_ratings`, `teacher_remarks`, `class_attendances`, `sm_student_attendances`, `sm_student_timelines`; plus unused chat/finance/homework/dormitory/transport/library tables and historical `sm_exams`/`sm_exam_setups` (target bootstrap generates its own 189 configs from target assignments) |
+| FKs | Historical `student_records`, classes, sections, academic years and `sm_exam_types` are loaded so archive metadata FKs resolve; the live profile includes all FK parents required by the loaded rows |
+| Serving historical results | Existing archive retrieval reads the archive object from R2, verifies the checksum and serves the marksheet/transcript; no D1 historical raw rows |
+| Photo source | The current `static/uploads/students` tree is **stale/rehearsal-only**. The production ZIP has 2,945 files and covers **633** of the 853 referenced images; the old static tree adds **10 fallback** files, so the combined set is **643 present / 210 missing**. The 210-image gap is **accepted**. The 10 fallbacks are included. The active/default report lists **206 students** still needing a photo (639 target default records with class+section; 24 DAYCARE/no-section excluded by the condition). Production R2 upload completed **643/643**; full SHA-256/byte audit **0 failures**. Extract under `.tmp/photos-production`; the report stays under `.tmp` |
+| Gradual import | **Rejected as a normal path.** Do not import previous sessions back into D1; that reintroduces writes and live historical rows. Restore only a specific session for a rare correction |
+| Historical corrections | Use the existing restore flow for the affected session, correct, re-archive and re-purge; budget those writes separately |
+
+## D7 — Open inputs before production
 
 | Input | Why it blocks |
 |---|---|
-| Current Workers plan (Free/Paid) | Determines whether the 196,801-row load can be one window |
-| POC Pages deploy method | `sms-portal` must be rebuilt with the new `VITE_API_URL`; the frontend package has no deploy script, so Git integration vs `wrangler pages deploy` must be confirmed |
 | EdApex production frontend origin(s) | Required for `CORS_ORIGINS` and the Google post-login redirect |
-| PR #8 merge + Phase 8 branch publication | The next agent needs the Phase 7 code and this pack in the base branch |
-| Google OAuth publishing status | Testing-mode refresh tokens expire after 7 days |
+| Final frozen dump | Archives and live load must use the same final snapshot |
+| 228 missing photos | The production ZIP covers 633/853; the old static tree adds 10 fallback files; combined 643/853. **The 210-image gap is accepted.** The report lists 206 active/default students needing photos; upload only the 643 union files. No stale wholesale upload |
+| One-window canary result | Confirms the index/write amplification fits under 100k; if it reaches the cap, resume the remaining files after 00:00 UTC the next day |
+| POC removal timing | The POC must remain healthy on `sms-api` through the staged move |
 
-## D7 — Guardrails
+## D8 — Guardrails
 
 1. Do not clear, overwrite or repurpose the POC D1.
-2. Do not attempt the EdApex load on the Free plan without a multi-day window.
-3. Do not remove `api.llacademy.ng` from the POC before the new host and portal
-   are verified.
-4. Do not change the POC `CLIENT_URL`; the Gmail callback is the portal.
-5. Do not copy `.dev.vars`, `.env`, tokens or PII into git.
-6. Do not treat the local drill as the production rollback drill.
-7. Do not start Phase 9 until Phase 8’s production load, switch, 24 h watch and
-   rollback gate are complete.
+2. Do not load historical raw assessment rows into production D1; they belong in R2.
+3. Do not import previous sessions back into D1 for normal serving.
+4. Do not exceed the 100k write cap. Stop after the last completed file and resume after 00:00 UTC the next day; do not switch to Paid and do not spill silently.
+5. Do not remove `api.llacademy.ng` from the POC before the new host and portal are verified.
+6. Do not change the POC `CLIENT_URL`; the Gmail callback is the portal.
+7. Do not upload the current stale `static/uploads/students` tree wholesale; upload the 643-file union manifest (633 production ZIP + 10 explicitly approved fallbacks). The 210-image gap is accepted; record it.
+8. Do not write absolute storage URLs into `student_photo`; keep the legacy relative key and use a media-base helper for clients if needed.
+9. Do not treat the local drill as the production rollback drill.
+10. Do not start Phase 9 until Phase 8’s production load, switch, 24 h watch and rollback gate are complete.
+
+## D9 — Photo URL contract and storage portability
+
+| Decision | Detail |
+|---|---|
+| DB value | Keep the legacy relative `/uploads/students/<hash>.<ext>`; do **not** backfill `student_photo` with R2/CDN URLs |
+| Storage key | `uploads/students/<hash>.<ext>`; the public route maps the relative URL to the storage adapter |
+| Client URLs | If an absolute URL is needed, derive it in the DTO from `PUBLIC_MEDIA_BASE`/API base; do not store it |
+| Storage move | Keep the key contract, copy objects to the new store, run the photo audit, switch the binding/adapter; no DB migration |
+| Consistency | Use the inventory manifest (SHA-256/bytes) and a post-upload `photo-audit` comparing D1 references ↔ storage objects; rerun after any storage move |
 
 ## Linked records
 

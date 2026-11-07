@@ -19,9 +19,9 @@ timestamp, operator role, command/endpoint and result. No PII or secrets.
 ## Preparation status (local only)
 
 - [x] Runbook, checklist, monitoring, on-call and rollback pack written with no production values.
-- [x] Preflight passes on the current snapshot: 62 tables, 196,801 rows, 0 FK, 0 reconciliation, 44 SQL files, 625 uploadable/228 missing photos, `executed:false`.
+- [x] Preflight passes on the current snapshot: 62 tables, 196,801 rows, 0 FK, 0 reconciliation, 44 SQL files, 625 uploadable/228 missing photos (rehearsal baseline only; production photo ZIP pending), `executed:false`.
 - [x] Local drill passes: health 200; claim 404/202/202/409/404; target green; 42 sections; FIRST TERM dates; teacher roster; NURSERY marks grade; report-card review checksum; core counts and source evidence hash unchanged.
-- [x] Decision record written: same account, separate EdApex resources, POC D1 not reused, paid-plan recommendation, Gmail reuse, staged domain move.
+- [x] Decision record written: same account, separate EdApex resources, POC D1 not reused, offline archives + live-only load, Gmail reuse, staged domain move.
 - [x] Gmail refresh token verified: HTTP 200, `gmail.send`; local `apps/api/.dev.vars` created and gitignored.
 - [ ] Final frozen-dump preflight, production resources, load, switch, claim enablement, 24 h watch and production rollback drill.
 
@@ -32,11 +32,13 @@ fresh-target and approval rules in the runbook still apply.
 
 - [ ] PR #8 merged; Phase 8 branch rebased; deployed commit recorded.
 - [ ] Phase 7 report and A/B evidence reviewed.
-- [ ] Cloudflare account plan confirmed; free load only with an approved multi-day window, otherwise Workers Paid.
+- [ ] Cloudflare account plan confirmed as Free; offline archive/live-only profile chosen; 95k target/100k hard gate and next-UTC-day continuation agreed.
 - [ ] POC confirmed live and preserved; its D1, Worker, R2 bucket and current host are not touched before the staged move.
 - [ ] POC Pages deploy method confirmed; `sms-portal` can be rebuilt and redeployed.
 - [ ] Gmail reuse confirmed: same Google client, sender in the private record, `GMAIL_*` values available, OAuth publishing status checked.
 - [ ] Google redirects registered: portal callbacks, EdApex `https://api.llacademy.ng/api/v1/auth/google/callback`, one-off consent redirect.
+- [ ] Final-dump archive factory/export complete: 652/0/641 objects, `archive_objects` ~1,293, `session_result_summary` ~3,802, all checksums verified.
+- [ ] Live-only profile generated; historical raw tables and timelines excluded; archive metadata included.
 - [ ] Production D1 does not exist or is empty; **abort** if non-empty (fresh
       load only).
 - [ ] Production D1 created; id recorded; placeholder id rejected.
@@ -46,34 +48,34 @@ fresh-target and approval rules in the runbook still apply.
       `ARCHIVE_TOKEN_SECRET`, `GOOGLE_*` for auth, `GMAIL_*` for email.
       `CLAIM_ENABLED` remains unset.
 - [ ] EdApex Gmail test send succeeds from the POC sender account.
+- [ ] Archive objects uploaded to R2; `archive_objects`/`session_result_summary` ready to load.
 - [ ] Legacy app in maintenance mode; writes stopped.
 - [ ] Pre-reset source password backup verified restorable.
 - [ ] Shared claim reset run; reported row count recorded.
 - [ ] `read_only=ON` verified; binlog position recorded.
 - [ ] Final Adminer dump exported; SHA-256 recorded; 62 catalog tables present.
-- [ ] 228 missing photos supplied or gap accepted in writing.
+- [ ] Production student-photo ZIP supplied; production ZIP **633 present / 220 missing**, old static tree adds **10 fallback** files; combined **643 present / 210 missing** referenced images (only images counted). Current tree is stale and must not be wholesale uploaded; decide on the 10 fallback files.
 - [ ] Preflight passes: 62 tables, 0 FK, 0 reconciliation mismatches, 0 sequence
       failures, 0 current-record orphans, matching resolutions.
-- [ ] Generated `d1-load.sh`, `d1-verify.sh`, `photo-upload.sh` reviewed; no
-      remote command was executed during preflight.
+- [ ] Generated `load-plan.json`, `d1-verify.sh`, `archive-upload.sh` and the production photo manifest reviewed; no remote command was executed during preflight.
 - [ ] On-call briefed; rollback authority named; monitoring dashboard open.
 
 **Stop:** any missing table, dump checksum mismatch, FK violation, unexplained
 count variance, or unresolved photo decision.
 
-## B — Load and migrate
+## B — Live-only load
 
 - [ ] `wrangler d1 migrations apply DB --remote` completed.
-- [ ] Tier files executed in order; no manual reordering.
+- [ ] Canary chunk `meta.rows_written` measured; projected total ≤100k.
+- [ ] Live profile + archive metadata loaded in order; no historical raw tables.
+- [ ] If the 100k cap was reached: stopped after the last completed file, checkpoint written, remaining files resumed after 00:00 UTC the next day.
 - [ ] `PRAGMA foreign_key_check` zero rows.
-- [ ] `d1-verify.sh` per-table counts equal `cutover-plan.json`.
-- [ ] `sqlite_sequence` at or above every max id.
-- [ ] `sm_students.current_record_id` has no orphans.
-- [ ] `migration_resolutions` count equals the transform expectation.
-- [ ] Worker deployed with claim disabled; `/health` 200; probe `/claim` 404.
+- [ ] `d1-verify.sh` live-profile counts match `load-plan.json`.
+- [ ] `archive_objects`/`session_result_summary` counts match the export.
+- [ ] `sm_mark_stores`, `sm_result_stores`, `student_ratings`, `teacher_remarks`, `class_attendances`, `sm_student_attendances`, `sm_student_timelines` are zero for historical sessions.
+- [ ] Worker deployed with claim disabled on the interim host; `/health` 200; probe `/claim` 404.
 
-**Stop:** any FK row, table mismatch >0.1% unexplained, sequence gap or current
-record orphan.
+**Stop:** any FK row, table mismatch >0.1% unexplained, over-100k write, or historical raw row.
 
 ## C — Create 2026/27 and carry the roster
 
@@ -94,13 +96,12 @@ record orphan.
 - [ ] 3 unplaced students reported; 234 no-current-record students reported;
       15 non-default source duplicates documented.
 
-## D — Archive and promote
+## D — Archive metadata/retrieval and promotion
 
-- [ ] Session 1 archived with `purge:true`; manifest count matches; checksums
-      verify; 74 gaps recorded; live rows zero.
-- [ ] Session 2 archived; 0 objects; live rows zero.
-- [ ] Session 4 archived with `purge:true`; manifest count matches; checksums
-      verify; 16 gaps recorded; live rows zero.
+- [ ] Session 1 archive objects (652) uploaded and checksum-verified; session 2 (0); session 4 (641).
+- [ ] `archive_objects` ~1,293 and `session_result_summary` ~3,802 metadata loaded; counts match the export.
+- [ ] Historical marksheet and transcript sample read from R2 with the expected checksum; no archive job or purge ran in production.
+- [ ] Historical raw tables remain zero; no background import of previous sessions.
 - [ ] Promotion dry-run reviewed.
 - [ ] Promotion real run completed; batches and outcomes recorded.
 - [ ] Quarantine report generated; 237 rows reviewed (or final-snapshot
@@ -109,10 +110,10 @@ record orphan.
 
 ## E — Photos, timelines and readiness
 
-- [ ] `photo-upload.sh` run with `--remote`; object count and total bytes
-      recorded.
-- [ ] Sample object hashes verify; sample public URLs return 200 with immutable
-      caching.
+- [x] Production photo ZIP + 10 approved static fallbacks extracted; union manifest **643 present / 210 accepted missing**; active/default report **206 students** recorded locally.
+- [x] `photos-union/photo-upload.sh` run with `--remote`; **643/643** objects and total bytes recorded; no stale wholesale upload.
+- [x] Post-upload photo audit passes **643/643, 0 failures**; 210 accepted gap recorded.
+- [ ] Sample public photo URLs return 200 with immutable caching (requires the deployed Worker).
 - [ ] Missing photos match the accepted list; no placeholders uploaded.
 - [ ] Timeline NDJSON uploaded; SHA-256 values match `manifest.json`; live
       timeline table stays empty.
@@ -152,9 +153,10 @@ record orphan.
 
 | Phase 8 gate | Checklist evidence |
 |---|---|
-| Final production load; verification repeated | Fresh initial load: sections A–E; final dump SHA, preflight, counts, FK, spot check |
+| Final production load; verification repeated | Live-only + archive metadata: sections A–E; final dump SHA, preflight, canary, counts, FK, spot check |
 | Rollback drilled | Local drill record + production tabletop + production drill |
 | POC preserved through the move | `sms-api` health/login/Gmail checks; `api.llacademy.ng` handover only after verification |
+| Historical retrieval from R2 | Archive objects/metadata + historical marksheet/transcript sample |
 | Monitoring dashboard and on-call briefed | Section A pack, monitoring schedule, on-call sign-off |
 
 ## Sign-off

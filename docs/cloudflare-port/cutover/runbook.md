@@ -17,11 +17,12 @@ Fill these only in the private cutover record, never in git:
 | POC API host after move | `sms-api.llacademy.ng` |
 | POC frontend | `https://portal.llacademy.ng` (unchanged) |
 | Cloudflare account and zone | existing SMS POC account `<CUTOVER_INPUT>` |
-| Workers plan | Workers Paid (recommended) or approved multi-day free window |
+| Workers plan | Workers Free; 95k target / 100k hard; resume next UTC day if capped |
 | Production D1 database id | `<CUTOVER_INPUT>` (new `edapex`, never the POC `sms`) |
 | Production R2 bucket | `edapex-media` (or `<CUTOVER_INPUT>`) |
 | Final frozen dump path | `<CUTOVER_INPUT>` |
 | Final dump SHA-256 | `<CUTOVER_INPUT>` |
+| Production student-photo ZIP | `<CUTOVER_INPUT>` (stale local tree is not the source) |
 | Shared claim digest | `<CUTOVER_INPUT>` (the SHA-256 stored in `CLAIM_PASSWORD_DIGEST`) |
 | Pre-reset source backup | `<CUTOVER_INPUT>` |
 | On-call channel / contacts | `<CUTOVER_INPUT>` |
@@ -44,8 +45,11 @@ Rules:
 - **Never clear, overwrite or reuse the POC D1.** It is not a disposable demo.
 - **Do not create a second Cloudflare account** for quota; free limits are
   account-wide and a new Worker/D1 does not add free resources.
-- **Do not attempt the 196,801-row load in one free-plan window.** Confirm
-  Workers Paid or a multi-day staged load before starting.
+- **Do not load historical raw assessment rows into production D1.** Generate
+  session 1/2/4 archives locally, upload the objects to R2, and load only the
+  archive metadata. If the 100k write cap is reached, stop after the last
+  completed file and resume after 00:00 UTC the next day; do not switch to
+  Paid and do not silently exceed the cap.
 - Keep the POC’s `CLIENT_URL=https://portal.llacademy.ng`; its Gmail callback is
   on the portal and must not move with the API.
 
@@ -57,8 +61,9 @@ See [decisions.md](./decisions.md) for the full decision record.
       the deployed commit is recorded.
 - [ ] The Phase 7 report and A/B evidence are reviewed:
       [`audit/phase-7-rehearsal.md`](../audit/phase-7-rehearsal.md).
-- [ ] The Cloudflare account plan is confirmed. Free is acceptable only with an
-      approved multi-day load; otherwise use Workers Paid.
+- [ ] The Cloudflare account plan is confirmed as Free; the offline-archive +
+      live-only profile is the chosen design; the 95k/100k write gate and
+      next-UTC-day continuation are agreed.
 - [ ] The POC is confirmed live and must remain so; its D1, Worker, R2 bucket
       and current host are not touched until the staged move.
 - [ ] The POC Pages deploy method is confirmed (Git integration or
@@ -73,8 +78,14 @@ See [decisions.md](./decisions.md) for the full decision record.
       interim host, not `api.llacademy.ng`.
 - [ ] The maintenance window, communications and rollback authority are
       approved.
-- [ ] The 228 missing student-photo files are supplied, or the school has
-      accepted the gap in writing. Do not upload placeholders.
+- [ ] The production student-photo ZIP is supplied. The current
+      `static/uploads/students` tree is stale; do not upload it wholesale. The
+      approved set is **643 present / 210 accepted-missing** referenced images
+      (633 production ZIP + 10 explicit static fallbacks; 2,945 ZIP files; only
+      images counted). The 210-image gap is accepted. The active/default report
+      lists **206 students** needing photos. Extract under
+      `.tmp/photos-production`, re-inventory against the final DB URLs, and upload
+      only the 643 union files.
 - [ ] The source owner confirms the final dump method (Adminer export), the
       source backup location and the pre-reset password backup.
 - [ ] Cloudflare account access, D1/R2 permissions and DNS access are confirmed.
@@ -174,33 +185,55 @@ after the reset needs the pre-reset password hashes.
    Verify it contains the 62 catalog tables. A missing or extra catalog table is
    a stop condition.
 
-## Phase 3 — Local preflight (no remote writes)
+## Phase 3 — Archive factory and local preflight (no remote writes)
 
-Run the preflight against the final frozen dump:
+1. Run the local rehearsal against the **final frozen dump**. This is the only
+   place all 62 tables are loaded; production D1 will receive only the live
+   profile.
 
-```bash
-pnpm run cutover:preflight -- \
-  --source <FINAL_DUMP> \
-  --out .tmp/cutover-plan \
-  --digest '<CLAIM_DIGEST>' \
-  --fresh
-```
+   ```bash
+   pnpm run migration:rehearse -- \
+     --source <FINAL_DUMP> \
+     --persist .tmp/rehearsal-final \
+     --run-id final \
+     --photos skip
+   ```
 
-Require all of the following before continuing:
+2. Export the session 1/2/4 archive objects and metadata from the local
+   rehearsal:
 
-- 62 legacy tables present; 0 foreign-key violations; 0 reconciliation
-  mismatches; 0 sequence failures; 0 current-record orphans; expected equals
-  actual resolution count.
-- The generated SQL files are in tier order and each has a SHA-256.
-- `cutover-plan.json` has `executed:false`; the preflight has not called
-  `wrangler ... --remote`.
-- The photo manifest lists every referenced image. The 228 historically missing
-  files are either present or covered by the written acceptance from Phase 0.
+   ```bash
+   pnpm run cutover:archive-export -- \
+     --persist .tmp/rehearsal-final \
+     --out .tmp/cutover-plan \
+     --archive-db .tmp/rehearsal-final
+   ```
 
-Review `d1-load.sh`, `d1-verify.sh` and `photo-upload.sh` before the window.
-They are generated command lists; they are not run by the preflight.
+   Require ~652/0/641 objects, `archive_objects` ~1,293 and
+   `session_result_summary` ~3,802; every object checksum verifies; the output
+   stays under `.tmp/cutover-plan` (PII-bearing).
 
-## Phase 4 — Remote schema and initial load
+3. Run the live-only preflight against the same dump:
+
+   ```bash
+   pnpm run cutover:preflight -- \
+     --source <FINAL_DUMP> \
+     --out .tmp/cutover-plan \
+     --digest '<CLAIM_DIGEST>' \
+     --fresh \
+     --profile live
+   ```
+
+   It must produce a live-profile SQL plan + archive metadata, a write estimate
+   and no remote execution. The 62 legacy tables still exist in the schema;
+   historical raw tables are intentionally empty.
+
+4. Require: full local transform 0 FK / 0 reconciliation; live-profile row
+   estimate; archive object counts/checksums; a production photo manifest from
+   the supplied ZIP (the current 853/625/228 rehearsal counts are not final).
+   Review `load-window` and the R2 upload script; do not run them yet.
+
+## Phase 4 — One-window remote load
 
 1. Apply migrations to the fresh production D1:
 
@@ -208,28 +241,43 @@ They are generated command lists; they are not run by the preflight.
    pnpm exec wrangler d1 migrations apply DB --remote
    ```
 
-2. Review `d1-load.sh` once more. It must contain only `--remote` commands and
-   must not contain `mintAdminSession`, a local persist directory or a secret.
-   Execute it:
+2. Run a small canary chunk through `cutover:load-window` and read its
+   `meta.rows_written`. Extrapolate the live profile + archive metadata. If the
+   projected total exceeds 100k, stop before the main load and schedule the
+   continuation after 00:00 UTC; do not switch to Paid.
+
+3. Run the ordered live profile + archive metadata with a 95k target:
 
    ```bash
-   bash .tmp/cutover-plan/d1-load.sh
+   pnpm run cutover:load-window -- \
+     --plan .tmp/cutover-plan/load-plan.json \
+     --state .tmp/cutover-plan/load-state.json \
+     --budget 95000 \
+     --execute
    ```
 
-3. Verify:
+   The loader stops before a file that would cross 100k. If it reaches the cap,
+   finish only the current file, write the checkpoint and resume the remaining
+   files after 00:00 UTC the next day. Do not run the superseded all-tables
+   `d1-load.sh`.
+
+4. Verify the live profile, archive metadata and historical emptiness:
 
    ```bash
    pnpm exec wrangler d1 execute DB --remote --command="PRAGMA foreign_key_check;"
    bash .tmp/cutover-plan/d1-verify.sh
    ```
 
-   Every table count must equal `cutover-plan.json`. Any FK row, unexplained
-   count variance above 0.1%, sequence gap or current-record orphan is a stop
-   condition.
+   `sm_mark_stores`, `sm_result_stores`, `student_ratings`,
+   `teacher_remarks`, `class_attendances`, `sm_student_attendances` and
+   `sm_student_timelines` must be zero for sessions 1/2/4. Any FK row or
+   unexplained count variance is a stop condition.
 
-4. Deploy the Worker with claim disabled to the **interim** host:
+5. Upload archive objects and timelines to R2, then deploy the Worker with
+   claim disabled to the **interim** host:
 
    ```bash
+   bash .tmp/cutover-plan/archive-upload.sh
    pnpm exec wrangler deploy
    curl -fsS "https://edapex-api.llacademy.ng/health"
    curl -s -o /dev/null -w '%{http_code}\n' \
@@ -239,7 +287,7 @@ They are generated command lists; they are not run by the preflight.
    # expect 404
    ```
 
-5. Now that the Worker exists, set all production secrets from Phase 1 (auth,
+6. Now that the Worker exists, set all production secrets from Phase 1 (auth,
    claim, archive and Gmail), then send a test email through EdApex to a private
    test address. A successful token exchange is not enough; verify the Gmail
    adapter sends. If it returns `invalid_grant`, stop: the token is
@@ -282,12 +330,11 @@ private cutover shell; do not paste it into logs.
      bands and one dated FIRST TERM;
    - no unreviewed sections and no unstaffed classes.
 
-5. Archive sessions 1, 2 and 4 with `purge:true`, one at a time. For each:
-   - confirm the manifest object count equals the exported count;
-   - verify every object checksum;
-   - record gaps (74 for session 1, 16 for session 4, 0 for session 2);
-   - confirm live marks/results/ratings/remarks/attendance for that session are
-     zero after purge.
+5. Verify historical archive retrieval from R2. Pick a student from sessions
+   1 and 4, request an archived marksheet and transcript through the normal
+   retrieval endpoints, and confirm the checksum/status. **Do not run an
+   archive job or purge in production**; the archive objects and metadata were
+   generated offline and loaded in Phase 4. Historical raw tables stay empty.
 
 6. Run promotion class by class through the API:
 
@@ -303,17 +350,21 @@ private cutover shell; do not paste it into logs.
    the preflight explains the variance. Generate the quarantine CSV and PDF
    payload; review the 237-row report.
 
-7. Upload photos:
+7. Prepare production photos **before the D1 window** (R2 writes do not consume
+   the D1 budget). The approved set is 643 files: 633 from the production ZIP +
+   10 explicit static fallbacks. The 210 missing images are accepted; the
+   active/default report lists 206 students who still need a photo.
 
    ```bash
-   bash .tmp/cutover-plan/photo-upload.sh
+   bash .tmp/cutover-plan/photos-union/photo-upload.sh
    ```
 
-   This uses `wrangler r2 object put ... --remote` (Wrangler v4 defaults to local
-   mode, so `--remote` is mandatory). Verify object count, total bytes and a
-   sample of full-object hashes; fetch the same sample through
-   `/uploads/students/...` and expect 200 with immutable caching. The 228
-   missing files stay listed in `missing-photos.csv`; do not upload placeholders.
+   Use the union manifest; do not wholesale-upload the stale tree. Verify 643
+   objects, total bytes and a sample of full-object hashes; fetch the same sample
+   through `/uploads/students/...` and expect 200 with immutable caching. The
+   report stays local under `.tmp`; no PII in git. The approved production upload
+   completed 643/643 and the full SHA-256/byte audit returned 0 failures; the
+   210-image gap is accepted.
 
 8. Upload the timeline NDJSON exports from the preflight’s
    `.tmp/cutover-transform/timelines/` to the archive namespace in R2, then
@@ -328,8 +379,12 @@ private cutover shell; do not paste it into logs.
 
 - [ ] Per-table counts: final dump vs D1; every variance explained.
 - [ ] `PRAGMA foreign_key_check` returns zero rows.
-- [ ] Every archived object checksum verifies; manifest counts match.
-- [ ] Live historical marks/results/ratings/remarks/attendance are zero.
+- [ ] Every archived object checksum verifies; archive manifest counts match.
+- [ ] `archive_objects` and `session_result_summary` metadata are loaded; a
+      historical marksheet and transcript read from R2 with the expected
+      checksum.
+- [ ] Live historical marks/results/ratings/remarks/attendance are zero; no
+      production archive/purge job was run.
 - [ ] Every student has at most one current record; the 3 unplaced and 234
       no-current students are quarantined, not silently placed.
 - [ ] Every class-section is reviewed; zero classes without assignments.
@@ -421,11 +476,14 @@ secrets.
 
 ## Do not
 
+- load historical raw assessment rows into production D1; they belong in R2;
+- run an archive/purge job in production; the archives are generated locally;
+- import previous sessions back into D1 for normal serving;
+- exceed the 100k write cap; stop and resume after 00:00 UTC the next day;
 - clear, reuse or overwrite the POC D1, Worker, R2 bucket or host;
 - remove `api.llacademy.ng` from the POC before the new host and portal are
   verified;
 - change the POC `CLIENT_URL`; its Gmail callback is on the portal;
-- attempt the 196,801-row load in one free-plan window;
 - deploy from a feature branch without recording the commit;
 - use the rehearsal session-minting path against remote D1;
 - run a delta against an existing production D1 under this runbook;

@@ -15,9 +15,9 @@ frozen snapshot, not a delta against an earlier production database.
 | Check | Status |
 |---|---|
 | Cutover runbook/checklist/monitoring/on-call/rollback pack | written |
-| Decision record | written: account topology, paid-plan recommendation, Gmail reuse, staged domain move |
+| Decision record | written: account topology, offline archives + live-only load, one-window 95k/100k gate, Gmail reuse, staged domain move |
 | Gmail refresh token | verified locally: HTTP 200, `gmail.send` scope; local `apps/api/.dev.vars`; production secrets pending Worker |
-| Preflight on the current snapshot | passed: 62 tables, 196,801 rows, 0 FK, 0 reconciliation, 44 SQL files, 625 uploadable/228 missing photos, `executed:false` |
+| Preflight on the current snapshot | passed: 62 tables, 196,801 rows, 0 FK, 0 reconciliation, 44 SQL files, `executed:false`. Rehearsal photos 625/228; production ZIP 633/220; old static tree adds 10 fallback files; combined 643 present / 210 accepted missing. R2 upload: **643/643**, full SHA-256/byte audit **0 failures** |
 | Local application drill | passed: claim 404/202/202/409/404, target green, roster, marks grade, report-card checksum, core counts unchanged |
 | Production resources, load, switch, claim enablement, 24 h watch | **not started** |
 | Production rollback drill | **not started** |
@@ -48,9 +48,7 @@ review artefacts for the separate production approval.
 3. **The POC is live and separate.** Do not clear or reuse the POC D1, Worker,
    R2 bucket or `api.llacademy.ng` host before the staged move is verified. See
    [decisions.md](./decisions.md).
-4. **Free is not enough for the one-window load.** The 196,801-row load plus
-   index and API writes exceeds the free 100,000 writes/day. Confirm a paid plan
-   or design a multi-day window before starting.
+4. **Free one-window target, with next-day continuation.** The offline-archive/live-only profile should fit ~70–95k writes. If the 100k cap is reached, stop at the last completed file and resume after 00:00 UTC the next day; do not switch to Paid and do not silently exceed the cap.
 5. **Placeholders are intentional.** Hostnames, account and database ids,
    secrets, on-call names and dates are `<CUTOVER_INPUT>` values. No production
    value is committed.
@@ -72,13 +70,18 @@ approve window
   -> maintenance page, back up source passwords
   -> run the shared claim reset, set MySQL read_only
   -> take the final dump, record SHA-256
-  -> preflight locally (62 tables, 0 FK, 0 reconciliation)
-  -> apply migrations and load the remote EdApex D1
+  -> locally generate/export session 1/2/4 archives; upload objects to R2
+  -> preflight live-only profile + archive metadata; verify FKs/checksums
+  -> apply migrations; load live profile + archive metadata in one budgeted pass
   -> integrity -> bootstrap -> staffing review -> activation
-  -> archive 1/2/4 -> promotion -> quarantine -> photos/timelines
+  -> promotion -> quarantine -> photos/timelines -> archive retrieval sample
   -> readiness -> move POC to sms-api -> portal rebuild -> attach api to EdApex
   -> enable /claim -> 24 h watch -> close the rollback window
 ```
+
+If the 100k D1 write cap is reached, stop after the last completed file and
+resume the remaining load after 00:00 UTC the next day. No Paid plan is used.
+Historical raw marks/results stay out of D1 and are served from R2.
 
 Rollback keeps the POC on `sms-api`, moves EdApex back to its interim host, and
 keeps MySQL read-only. If the reset has already run, restore the pre-reset
