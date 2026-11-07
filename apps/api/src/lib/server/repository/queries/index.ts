@@ -11,3 +11,5 @@ export * from "./transcript";
 export * from "./objectives";
 export * from "./registration-options";
 export * from "./archive-students";
+export * from "./staffing.repo";
+export * from "./promotion.repo";

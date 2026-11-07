@@ -12,8 +12,8 @@ export interface TableIndexExpectation extends IndexExpectation {
 }
 
 export const RECOVERED_INDEX_TOTAL = 226;
-export const SPEC_EXTRA_TOTAL = 6;
-export const LEGACY_INDEX_TOTAL = 232;
+export const SPEC_EXTRA_TOTAL = 17;
+export const LEGACY_INDEX_TOTAL = 243;
 export const NEW_TABLE_INDEX_TOTAL = 33;
 
 export const LEGACY_TABLES: readonly string[] = [
@@ -1851,6 +1851,125 @@ export const REDESIGN_EXTRA_INDEXES: readonly TableIndexExpectation[] = [
     "columns": [
       "school_id",
       "claim_status"
+    ]
+  },
+  {
+    "table": "sm_class_sections",
+    "name": "sm_class_sections_school_academic_staffing_index",
+    "unique": false,
+    "columns": [
+      "school_id",
+      "academic_id",
+      "staffing_status"
+    ]
+  },
+  {
+    "table": "student_records",
+    "name": "student_records_school_academic_student_default_index",
+    "unique": false,
+    "columns": [
+      "school_id",
+      "academic_id",
+      "student_id",
+      "is_default"
+    ]
+  },
+  {
+    "table": "sm_mark_stores",
+    "name": "sm_mark_stores_school_academic_term_class_section_index",
+    "unique": false,
+    "columns": [
+      "school_id",
+      "academic_id",
+      "exam_term_id",
+      "class_id",
+      "section_id"
+    ]
+  },
+  {
+    "table": "sm_result_stores",
+    "name": "sm_result_stores_school_academic_exam_class_section_index",
+    "unique": false,
+    "columns": [
+      "school_id",
+      "academic_id",
+      "exam_type_id",
+      "class_id",
+      "section_id"
+    ]
+  },
+  {
+    "table": "sm_assign_subjects",
+    "name": "sm_assign_subjects_school_academic_class_section_index",
+    "unique": false,
+    "columns": [
+      "school_id",
+      "academic_id",
+      "class_id",
+      "section_id"
+    ]
+  },
+  {
+    "table": "sm_class_sections",
+    "name": "sm_class_sections_school_academic_class_section_index",
+    "unique": false,
+    "columns": [
+      "school_id",
+      "academic_id",
+      "class_id",
+      "section_id"
+    ]
+  },
+  {
+    "table": "sm_students",
+    "name": "sm_students_school_academic_class_section_index",
+    "unique": false,
+    "columns": [
+      "school_id",
+      "academic_id",
+      "class_id",
+      "section_id"
+    ]
+  },
+  {
+    "table": "sm_student_attendances",
+    "name": "sm_student_attendances_school_academic_class_section_index",
+    "unique": false,
+    "columns": [
+      "school_id",
+      "academic_id",
+      "class_id",
+      "section_id"
+    ]
+  },
+  {
+    "table": "sm_fees_assigns",
+    "name": "sm_fees_assigns_school_academic_student_index",
+    "unique": false,
+    "columns": [
+      "school_id",
+      "academic_id",
+      "student_id"
+    ]
+  },
+  {
+    "table": "teacher_remarks",
+    "name": "teacher_remarks_academic_student_term_index",
+    "unique": false,
+    "columns": [
+      "academic_id",
+      "student_id",
+      "exam_type_id"
+    ]
+  },
+  {
+    "table": "student_ratings",
+    "name": "student_ratings_academic_student_term_index",
+    "unique": false,
+    "columns": [
+      "academic_id",
+      "student_id",
+      "exam_type_id"
     ]
   }
 ];

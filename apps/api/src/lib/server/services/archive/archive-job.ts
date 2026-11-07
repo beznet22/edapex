@@ -99,11 +99,18 @@ export async function runArchiveSlice(
       continue;
     }
 
-    const document = await captureStudentSession(sessionCtx, {
-      studentId: student.studentId,
-      academicId: sessionId,
-      archivedAt: now
-    });
+    let document: Awaited<ReturnType<typeof captureStudentSession>> = null;
+    try {
+      document = await captureStudentSession(sessionCtx, {
+        studentId: student.studentId,
+        academicId: sessionId,
+        archivedAt: now
+      });
+    } catch {
+      // A historical student with an incomplete profile becomes a manifest gap,
+      // never an abort that loses the whole session archive.
+      document = null;
+    }
     if (document === null) {
       current = {
         ...current,

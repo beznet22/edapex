@@ -155,20 +155,10 @@ export async function purgeAssessmentRawRows(
         ),
       ctx.db
         .delete(studentRatings)
-        .where(
-          and(
-            eq(studentRatings.academicId, academicId),
-            studentInSchool(studentRatings.studentId, schoolId)
-          )
-        ),
+        .where(eq(studentRatings.academicId, academicId)),
       ctx.db
         .delete(teacherRemarks)
-        .where(
-          and(
-            eq(teacherRemarks.academicId, academicId),
-            studentInSchool(teacherRemarks.studentId, schoolId)
-          )
-        )
+        .where(eq(teacherRemarks.academicId, academicId))
     ]);
   }, "purgeAssessmentRawRows");
   return counts;

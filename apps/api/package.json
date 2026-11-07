@@ -30,7 +30,14 @@
     "check:services:self": "node scripts/check-service-rules.mjs --self-test",
     "check:service-map": "node scripts/check-service-map.mjs",
     "check:http": "node scripts/check-http-rules.mjs",
-    "check:http:self": "node scripts/check-http-rules.mjs --self-test"
+    "check:http:self": "node scripts/check-http-rules.mjs --self-test",
+    "check:migration": "node scripts/check-migration-rules.mjs",
+    "check:migration:self": "node scripts/check-migration-rules.mjs --self-test",
+    "migration:transform": "node scripts/migration/transform-cli.mjs",
+    "migration:load": "node scripts/migration/load-cli.mjs",
+    "migration:rehearse": "node scripts/migration/rehearse.mjs",
+    "migration:verify": "node scripts/migration/verify.mjs",
+    "migration:report": "node scripts/migration/report.mjs"
   },
   "dependencies": {
     "drizzle-orm": "^0.44.7",

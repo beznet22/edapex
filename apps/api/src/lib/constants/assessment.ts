@@ -3,7 +3,8 @@ export const CATEGORY_VALUES = [
   "NURSERY",
   "GRADEK",
   "LOWERBASIC",
-  "MIDDLEBASIC"
+  "MIDDLEBASIC",
+  "UPPERBASIC"
 ] as const;
 
 export type AssessmentCategory = (typeof CATEGORY_VALUES)[number];
@@ -14,7 +15,8 @@ export const EXAM_MARK_MAXIMUMS: Record<AssessmentCategory, Record<string, numbe
   NURSERY: { CA: 30, ORAL: 5, PSYCHO: 5, HW: 10, EXAM: 50 },
   GRADEK: { CA1: 20, CA2: 20, HW: 2, REPORT: 4, PSYCHO: 4, EXAM: 50 },
   LOWERBASIC: { MTA: 30, CA: 10, REPORT: 10, EXAM: 50 },
-  MIDDLEBASIC: { MTA: 30, CA: 10, REPORT: 10, EXAM: 50 }
+  MIDDLEBASIC: { MTA: 30, CA: 10, REPORT: 10, EXAM: 50 },
+  UPPERBASIC: { MTA: 30, CA: 10, REPORT: 10, EXAM: 50 }
 };
 
 export const TITLES_BY_CATEGORY: Record<AssessmentCategory, readonly string[]> = {
@@ -22,7 +24,8 @@ export const TITLES_BY_CATEGORY: Record<AssessmentCategory, readonly string[]> =
   NURSERY: ["CA", "ORAL", "PSYCHO", "HW", "EXAM"],
   GRADEK: ["CA1", "CA2", "HW", "REPORT", "PSYCHO", "EXAM"],
   LOWERBASIC: ["MTA", "CA", "REPORT", "EXAM"],
-  MIDDLEBASIC: ["MTA", "CA", "REPORT", "EXAM"]
+  MIDDLEBASIC: ["MTA", "CA", "REPORT", "EXAM"],
+  UPPERBASIC: ["MTA", "CA", "REPORT", "EXAM"]
 };
 
 export enum AttributeEnum {

@@ -253,3 +253,42 @@ export async function findAssignedTeacher(
     return row ?? null;
   }, "findAssignedTeacher");
 }
+
+export interface AssignmentConfigRow {
+  readonly classId: number;
+  readonly sectionId: number;
+  readonly subjectId: number;
+}
+
+/** Distinct class/section/subject triples for the `sm_exams` configuration. */
+export async function listAssignmentsForConfigs(
+  ctx: ScopedRepositoryContext,
+  academicId: number
+): Promise<readonly AssignmentConfigRow[]> {
+  return withErrorHandling(async () => {
+    const rows = await ctx.db
+      .select({
+        classId: smAssignSubjects.classId,
+        sectionId: smAssignSubjects.sectionId,
+        subjectId: smAssignSubjects.subjectId
+      })
+      .from(smAssignSubjects)
+      .where(
+        and(
+          eq(smAssignSubjects.schoolId, ctx.tenant.schoolId),
+          eq(smAssignSubjects.academicId, academicId),
+          eq(smAssignSubjects.activeStatus, 1)
+        )
+      );
+    const seen = new Set<string>();
+    const out: AssignmentConfigRow[] = [];
+    for (const row of rows) {
+      if (row.classId === null || row.sectionId === null || row.subjectId === null) continue;
+      const key = `${row.classId}:${row.sectionId}:${row.subjectId}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push({ classId: row.classId, sectionId: row.sectionId, subjectId: row.subjectId });
+    }
+    return out;
+  }, "listAssignmentsForConfigs");
+}
