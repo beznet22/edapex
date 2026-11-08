@@ -9,6 +9,10 @@
     {
       "pattern": "edapex-api.llacademy.ng",
       "custom_domain": true
+    },
+    {
+      "pattern": "api.llacademy.ng",
+      "custom_domain": true
     }
   ],
   "vars": {

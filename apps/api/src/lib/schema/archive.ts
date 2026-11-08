@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { marksheetSchema } from "./marksheet";
+import { archivedMarksheetSchema } from "./marksheet";
 import { transcriptSchema } from "./transcript";
 
 /** The archive contract is versioned independently of the table schema. */
@@ -203,7 +203,7 @@ export const archiveDocumentSchema = z.object({
   meta: archiveMetaSchema,
   placement: archivePlacementSchema,
   terms: z.record(z.string(), archiveTermSnapshotSchema),
-  marksheets: z.record(z.string(), marksheetSchema),
+  marksheets: z.record(z.string(), archivedMarksheetSchema),
   transcript: transcriptSchema,
   photoKey: z.string().nullable(),
   raw: archiveRawSchema

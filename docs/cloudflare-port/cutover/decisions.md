@@ -137,9 +137,17 @@ changed. The one-time consent is independent of the POC’s stored token.
 | Partial D1 | `edapex` (`9fe491dc-…`) received the 61,358-write live load and is retained for rollback; it is not the active binding |
 | Recovery D1 | `edapex-recovery` (`a6ae7003-…`) was loaded from the validated local rehearsal target (14,039 rows, **87,503 writes**) and is now bound as `DB`; it has 663 target records, 237 students without a target current record, 42 reviewed sections and FK 0 |
 | Reason | Promotion batches above ~65 students exceed the Free Worker CPU limit (503) at batch 5; retrying does not advance. Recovery uses the already-validated Phase 7 target instead of rewriting promotion |
-| Quota | Account writes are at least **148,861** today, above the Free 100k limit. **Stop all D1 writes** until 00:00 UTC; do not upgrade to Paid |
-| Assignment variance | The recovery target has 366 active subject assignments because the rehearsal fixture filled 15 otherwise-empty sections; the bootstrap produced 231. Clean/review after the reset before calling the gate final |
-| POC | Untouched; `api.llacademy.ng` still points at the POC. The staged move and EdApex switch remain pending |
+| Quota | Incident closed at 00:00 UTC. Post-reset writes were limited to fixture cleanup, admin reset and claim events; do not replay the recovery load. No Paid upgrade |
+| Assignment variance | Cleaned: **231** active target assignments, 42/42 reviewed; 15 sections intentionally have no subject teacher |
+| POC | Moved to `sms-api.llacademy.ng`; portal rebuilt against it and `api.llacademy.ng` handed to EdApex. POC D1/R2 untouched |
+
+## D11 — Archived marksheet validation
+
+| Decision | Detail |
+|---|---|
+| Problem | Historical archived marksheets can contain 13 raw records for 12 subjects; the live `marksheetSchema` equality refinement rejected them, producing `ARCHIVE_INCOMPLETE` |
+| Decision | Added `archivedMarksheetSchema` (base shape, no live record/subject equality rule) and used it only in `archiveDocumentSchema`; live marksheet writes retain the strict schema |
+| Verification | Archived transcript and marksheet for student 1/session 1 return 200; typecheck and the archive/marksheet test files pass |
 
 ## Linked records
 
