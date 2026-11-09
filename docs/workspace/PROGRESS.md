@@ -1,6 +1,6 @@
 # Workspace Programme Progress
 
-**Status:** Phase 9B approved; 10A in progress. Phase 8 and the Phase 9A platform are done. `app.llacademy.ng` is live via a proxied Pages CNAME; migration 0006 and Worker `372cb73f` are deployed. `/claim` and shared digests move to 10G.2; student codes/duplicate resolution move to 10G.1.
+**Status:** Phase 9B approved; 10A in progress. Phase 8 and the Phase 9A platform are done. `app.llacademy.ng` is live via a proxied Pages CNAME; migration 0006 and Worker `7bab26b5` are deployed. `/claim` and shared digests move to 10G.2; student codes/duplicate resolution move to 10G.1.
 
 ## Status table
 
@@ -10,7 +10,7 @@
 | Phase 9A — auth/retention | **done (platform)** | Migration 0006, Worker `bfa72530`, Pages `edapex-web.pages.dev`, proxied CNAME `app.llacademy.ng` → `edapex-web.pages.dev`; app root/claim/admin 200; `/claim` 202; magic 202; admin 401. Transitional `/claim` and digests are 10G.2 |
 | Phase 9B — handoff docs | **approved 2026-11-09** | 28 markdown files; documentation only |
 | Phase 10A — capability contract | **deployed** | Worker `372cb73f`; shared `@edapex/contracts`, role manifest, budget checks, admin issue read/plan/apply, public applicant contract |
-| Phase 10B — workspace shell | **next** | Starts against the 10A manifest and contracts |
+| Phase 10B — workspace shell | **in progress** | `/workspace` deployed; 430px shell, typed chat parts, capability gate, tool activity, local approval cards, fixed surface fallback; post-login redirect now targets the workspace. Editor/OpenUI/Tauri/runtime slices remain |
 | Phase 10G.1 — identity provisioning | **deferred to 10B** | Student codes, duplicate resolution, staff/parent claiming and Gmail assistance |
 | Phase 10G.2 — transitional retirement | **deferred after 10F** | Remove `/claim`, null/drop password digests, retention execution |
 

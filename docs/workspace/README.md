@@ -1,6 +1,6 @@
 # EdApex Workspace Programme
 
-**Status:** Phase 9B approved; 10A capability contract deployed. Phase 8 and the Phase 9A platform are complete. `app.llacademy.ng` is live via a proxied Pages CNAME; migration 0006 and Worker `372cb73f` are deployed. `/claim` and shared password digests are carried to Phase 10G.2 after workspace completion; student codes and duplicate resolution are carried to 10G.1. Phase 10 has started: 9B is approved and 10A is in progress.
+**Status:** Phase 9B approved; 10A deployed; 10B workspace shell in progress. Phase 8 and the Phase 9A platform are complete. `app.llacademy.ng` is live via a proxied Pages CNAME; migration 0006 and Worker `7bab26b5` are deployed. `/claim` and shared password digests are carried to Phase 10G.2 after workspace completion; student codes and duplicate resolution are carried to 10G.1. Phase 10 has started: 9B is approved and 10A is in progress.
 
 This folder is the home for the local-first cowork workspace that follows the EdApex production cutover. It covers the React/Tauri web and desktop clients, the local agent, the shared Rust core, capabilities, GenUI, the document engine, workflows, synchronization and evaluation.
 

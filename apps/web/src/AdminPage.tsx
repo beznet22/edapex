@@ -218,6 +218,12 @@ export function AdminPage() {
             </p>
           </div>
           <div className="flex items-center gap-2">
+            <a
+              className="mr-2 inline-flex min-h-11 items-center rounded-lg border border-border px-3 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+              href="/workspace"
+            >
+              Workspace
+            </a>
             <label className="text-xs font-semibold text-muted-foreground" htmlFor="academicId">
               Academic ID
             </label>

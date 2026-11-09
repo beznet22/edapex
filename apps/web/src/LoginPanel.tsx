@@ -4,6 +4,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
 interface LoginPanelProps {
+  readonly eyebrow?: string;
+  readonly title?: string;
+  readonly description?: string;
   readonly authMode: "google" | "email";
   readonly email: string;
   readonly authMessage: string;
@@ -16,6 +19,9 @@ interface LoginPanelProps {
 }
 
 export function LoginPanel({
+  eyebrow = "EdApex administration",
+  title = "Sign in to continue",
+  description = "This page is for school administrators. Use the Google account linked to your staff account or a magic link sent to your school email.",
   authMode,
   email,
   authMessage,
@@ -30,13 +36,10 @@ export function LoginPanel({
     <main className="flex min-h-screen items-center justify-center bg-background px-4 py-16 text-foreground">
       <section className="w-full max-w-xl rounded-xl border border-border bg-card p-8 shadow-2xl">
         <div className="text-xs font-bold uppercase tracking-[0.16em] text-primary">
-          EdApex administration
+          {eyebrow}
         </div>
-        <h1 className="mt-2 text-2xl font-semibold tracking-tight">Sign in to continue</h1>
-        <p className="mb-5 mt-2 text-sm leading-6 text-muted-foreground">
-          This page is for school administrators. Use the Google account linked to your staff
-          account or a magic link sent to your school email.
-        </p>
+        <h1 className="mt-2 text-2xl font-semibold tracking-tight">{title}</h1>
+        <p className="mb-5 mt-2 text-sm leading-6 text-muted-foreground">{description}</p>
 
         <div className="mb-4 flex gap-2">
           {(["google", "email"] as const).map((mode) => (
