@@ -122,12 +122,11 @@ export class ClaimLinkService {
     const scoped = requireScopedContext(this.ctx.repos.ctx);
     const now = this.ctx.ports.clock.now();
     const people = await this.ctx.repos.queries.listClaimDirectory(scoped);
-    const userIds = [...new Set(people.map((row) => row.userId).filter((id): id is number => id !== null))];
     const links = await this.ctx.repos.accounts.listClaimLinksBySchool(
       scoped,
       scoped.tenant.schoolId
     );
-    const providers = await this.ctx.repos.queries.listIdentityProviders(scoped, userIds);
+    const providers = await this.ctx.repos.queries.listSchoolIdentityProviders(scoped);
     const duplicates = await this.ctx.repos.queries.listDuplicateEmailGroups(scoped);
     const duplicateEmails = new Set(
       duplicates

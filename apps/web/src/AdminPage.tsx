@@ -48,6 +48,7 @@ export function AdminPage() {
   const [authMode, setAuthMode] = useState<AuthMode>("google");
   const [email, setEmail] = useState("");
   const [authMessage, setAuthMessage] = useState("");
+  const [authSending, setAuthSending] = useState(false);
   const [academicId, setAcademicId] = useState(
     Number(window.localStorage.getItem("edapex.academicId") ?? "5")
   );
@@ -141,16 +142,20 @@ export function AdminPage() {
 
   const sendMagicLink = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
     event.preventDefault();
+    if (authSending) return;
     setAuthMessage("");
     if (email.trim().length === 0) {
       setAuthMessage("Enter your school email address.");
       return;
     }
+    setAuthSending(true);
     try {
       await requestMagicLink(email.trim());
       setAuthMessage("Check your email for a sign-in link. You can close this message after signing in.");
     } catch (cause) {
       setAuthMessage(cause instanceof Error ? cause.message : "Could not send the sign-in link");
+    } finally {
+      setAuthSending(false);
     }
   };
 
@@ -176,6 +181,7 @@ export function AdminPage() {
         onGoogle={() => window.location.assign(`${apiBase()}/api/v1/auth/google/start`)}
         onMagicLink={(event) => void sendMagicLink(event)}
         onModeChange={setAuthMode}
+        sending={authSending}
       />
     );
   }

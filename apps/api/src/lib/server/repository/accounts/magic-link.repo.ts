@@ -60,6 +60,31 @@ export async function consumeMagicLink(
   }, "consumeMagicLink");
 }
 
+export async function findRecentMagicLink(
+  ctx: RepositoryContext,
+  email: string,
+  since: number,
+  now: number
+): Promise<MagicLinkRow | null> {
+  return withErrorHandling(async () => {
+    const [row] = await ctx.db
+      .select()
+      .from(authMagicLinks)
+      .where(
+        and(
+          eq(authMagicLinks.email, email),
+          eq(authMagicLinks.purpose, "signin"),
+          isNull(authMagicLinks.consumedAt),
+          gt(authMagicLinks.expiresAt, now),
+          gt(authMagicLinks.createdAt, since)
+        )
+      )
+      .orderBy(authMagicLinks.createdAt)
+      .limit(1);
+    return row ?? null;
+  }, "findRecentMagicLink");
+}
+
 export async function findMagicLinkById(
   ctx: RepositoryContext,
   id: string

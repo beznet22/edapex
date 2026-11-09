@@ -12,6 +12,7 @@ interface LoginPanelProps {
   readonly onEmailChange: (email: string) => void;
   readonly onMagicLink: (event: FormEvent<HTMLFormElement>) => void;
   readonly onGoogle: () => void;
+  readonly sending: boolean;
 }
 
 export function LoginPanel({
@@ -22,7 +23,8 @@ export function LoginPanel({
   onModeChange,
   onEmailChange,
   onMagicLink,
-  onGoogle
+  onGoogle,
+  sending
 }: LoginPanelProps) {
   return (
     <main className="flex min-h-screen items-center justify-center bg-background px-4 py-16 text-foreground">
@@ -60,13 +62,16 @@ export function LoginPanel({
               School email
             </label>
             <Input
+              disabled={sending}
               id="email"
               onChange={(event) => onEmailChange(event.target.value)}
               placeholder="you@school.example"
               type="email"
               value={email}
             />
-            <Button type="submit">Send magic link</Button>
+            <Button disabled={sending} type="submit">
+              {sending ? "Sending…" : "Send magic link"}
+            </Button>
           </form>
         )}
         {authMessage.length > 0 ? (

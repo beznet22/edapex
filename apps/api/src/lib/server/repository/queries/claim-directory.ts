@@ -80,13 +80,13 @@ export async function listClaimDirectory(
       ...staff.map((row) => ({
         persona: "staff" as const,
         recordId: row.recordId,
-        userId: row.userId !== null && row.userId > 1 ? row.userId : null,
+        userId: row.userId,
         fullName: row.fullName,
         email: row.email ?? row.fallbackEmail,
         phone: row.phone,
         claimStatus: row.claimStatus,
         password: row.password,
-        userActive: row.userId !== null && row.userId > 1 ? row.userActive : null,
+        userActive: row.userActive,
         emailVerifiedAt: row.emailVerifiedAt
       })),
       ...parents.map((row) => ({
@@ -152,7 +152,7 @@ export async function findStaffClaimSubject(
     return {
       subjectType: "staff",
       subjectId: row.id,
-      userId: row.userId !== null && row.userId > 1 ? row.userId : null,
+      userId: row.userId,
       fullName: row.fullName,
       email: row.email
     };

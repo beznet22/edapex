@@ -53,6 +53,10 @@ describe("magic link", () => {
     expect(message.to).toBe("user1@example.test");
 
     const token = tokenFrom(message);
+    const duplicate = await requestLink("user1@example.test");
+    expect(duplicate.status).toBe(202);
+    expect(sent).toHaveLength(before + 1);
+
     const verify = await request(app, `/api/v1/auth/magic-link/verify?token=${token}`);
     expect(verify.status).toBe(302);
     expect(verify.headers.get("set-cookie")).toContain("__Host-edapex_session=");

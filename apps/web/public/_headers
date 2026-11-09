@@ -1,5 +1,5 @@
 /*
-  Content-Security-Policy: default-src 'self'; connect-src 'self' https://api.llacademy.ng; img-src 'self' data: blob:; script-src 'self'; style-src 'self'; font-src 'self' data:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self' https://api.llacademy.ng
+  Content-Security-Policy: default-src 'self'; connect-src 'self' https://api.llacademy.ng https://cloudflareinsights.com; img-src 'self' data: blob:; script-src 'self' https://static.cloudflareinsights.com; style-src 'self'; font-src 'self' data:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self' https://api.llacademy.ng
   Referrer-Policy: no-referrer
   X-Content-Type-Options: nosniff
   X-Frame-Options: DENY

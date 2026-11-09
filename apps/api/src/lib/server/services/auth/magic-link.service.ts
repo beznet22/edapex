@@ -80,6 +80,28 @@ export class MagicLinkService {
       return;
     }
 
+    const recent = await this.ctx.repos.accounts.findRecentMagicLink(
+      unscoped,
+      email,
+      now - 60,
+      now
+    );
+    if (recent !== null) {
+      await emitAuthEvent(
+        this.ctx,
+        {
+          type: "magic_link_requested",
+          userId: user.id,
+          email,
+          ip: input.ip,
+          userAgent: input.userAgent,
+          metadata: { outcome: "deduped" }
+        },
+        now
+      );
+      return;
+    }
+
     const token = randomToken();
     const expiresAt = now + MAGIC_LINK_TTL_SECONDS;
     await this.ctx.repos.accounts.createMagicLink(unscoped, {

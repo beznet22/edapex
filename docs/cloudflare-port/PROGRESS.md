@@ -212,6 +212,7 @@ student codes, duplicate resolution and staff/parent coverage to **10G.1**. See
 | 2026-11-09 | 9 | Phase 9A re-scoped: platform closeout is migration/Worker/Pages deployment. `/claim` and digest nulling move to workspace 10G.2 after 10F; student codes, duplicate resolution and staff/parent coverage move to 10G.1. This avoids reopening 9A | Kimchi |
 | 2026-11-09 | 9 | Production deployment: migration 0006 applied; Worker `bfa72530-b53b-4f6a-b771-7b9f450d3795`; Pages `edapex-web.pages.dev` deployed; `/claim` 202, magic 202, admin 401, invalid exchange 401; CORS includes Pages preview + app origin. `app.llacademy.ng` attached, pending DNS/certificate | Kimchi |
 | 2026-11-09 | 9 | `app.llacademy.ng` proxied CNAME added (`app` → `edapex-web.pages.dev`); root, `/claim`, `/admin/claim-links` all 200; CORS app preflight 204; Phase 9A platform closed. `/claim` and digests remain 10G.2; student codes/duplicates 10G.1 | Kimchi |
+| 2026-11-09 | 9 | Admin directory 500 fixed: replaced the over-limit 580-id identity query with a school-scoped join. Directory now 200 with 87 staff rows. Added 60s magic-link dedupe + send-button lock; two rapid requests produce one token row. Pages CSP now explicitly allows the Cloudflare Insights beacon | Kimchi |
 
 ## Blockers and decisions
 
