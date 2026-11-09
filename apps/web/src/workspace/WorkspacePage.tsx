@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 
+import { applyTurnEvent, initialTurn } from "@edapex/chat";
 import type {
   CapabilityManifest,
   ChatMessage,
@@ -50,18 +51,6 @@ const initialMessages = (role: CapabilityManifest["role"]): readonly ChatMessage
   ];
 };
 
-const previewRuntime: WorkspaceRuntimeView = {
-  connected: false,
-  state: "idle",
-  turn: {
-    state: "idle",
-    stoppable: false,
-    queueCount: 0,
-    serverQueueCount: 0,
-    lastSeenAt: null
-  }
-};
-
 const nextMessage = (
   role: ChatMessage["role"],
   parts: readonly ChatMessagePart[]
@@ -77,6 +66,14 @@ export function WorkspacePage() {
   const [session, setSession] = useState<SessionView | null>(null);
   const [manifest, setManifest] = useState<CapabilityManifest | null>(null);
   const [messages, setMessages] = useState<readonly ChatMessage[]>([]);
+  const [turn] = useState(() =>
+    applyTurnEvent(initialTurn(), { type: "restore_complete" })
+  );
+  const runtime: WorkspaceRuntimeView = {
+    connected: false,
+    state: turn.state,
+    turn
+  };
   const [authMode, setAuthMode] = useState<AuthMode>("google");
   const [email, setEmail] = useState("");
   const [authMessage, setAuthMessage] = useState("");
@@ -153,7 +150,7 @@ export function WorkspacePage() {
   };
 
   const onSend = (text: string, attachmentNames: readonly string[]): void => {
-    if (!previewRuntime.connected) return;
+    if (!runtime.connected) return;
     const attachmentText =
       attachmentNames.length > 0 ? `\n\nAttached: ${attachmentNames.join(", ")}` : "";
     setMessages((current) => [
@@ -245,7 +242,7 @@ export function WorkspacePage() {
       onApproval={onApproval}
       onOpenAdmin={() => window.location.assign("/admin/claim-links")}
       onSend={onSend}
-      runtime={previewRuntime}
+      runtime={runtime}
       userName={session?.user.fullName ?? session?.user.email ?? "Signed in"}
     />
   );
