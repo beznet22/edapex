@@ -1,5 +1,5 @@
-import { useEffect, useRef } from "react";
-import { FolderClosed, ListChecks, MessageCircle, Settings2, WandSparkles } from "lucide-react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import { FilePlus2, FolderClosed, ListChecks, MessageCircle, Settings2, WandSparkles, X } from "lucide-react";
 
 import type {
   CapabilityManifest,
@@ -11,6 +11,11 @@ import type {
 import { MessageBubble } from "./WorkspaceMessages";
 import { WorkspaceComposer } from "./WorkspaceComposer";
 import { WorkspaceStatus } from "./WorkspaceChrome";
+
+const DocumentEditor = lazy(async () => {
+  const module = await import("@edapex/documents");
+  return { default: module.DocumentEditor };
+});
 
 interface WorkspaceViewProps {
   readonly runtime: WorkspaceRuntimeView;
@@ -71,10 +76,20 @@ export function WorkspaceView({
   onOpenAdmin
 }: WorkspaceViewProps) {
   const endRef = useRef<HTMLDivElement>(null);
+  const [documentOpen, setDocumentOpen] = useState(false);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ block: "end" });
   }, [messages.length]);
+
+  useEffect(() => {
+    if (!documentOpen) return;
+    const onKeyDown = (event: KeyboardEvent): void => {
+      if (event.key === "Escape") setDocumentOpen(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [documentOpen]);
 
   return (
     <div className="flex h-dvh w-full justify-center overflow-hidden bg-background text-foreground">
@@ -97,6 +112,14 @@ export function WorkspaceView({
                 connected={runtime.connected}
                 label={stateLabel(runtime.state, runtime.connected)}
               />
+              <button
+                aria-label="New document"
+                className="flex size-11 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground"
+                onClick={() => setDocumentOpen(true)}
+                type="button"
+              >
+                <FilePlus2 aria-hidden="true" className="size-4" />
+              </button>
               {manifest.role === "admin" ? (
                 <button
                   aria-label="Open admin claim links"
@@ -163,6 +186,48 @@ export function WorkspaceView({
           </div>
         </nav>
       </div>
+      {documentOpen ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3"
+          role="presentation"
+        >
+          <section
+            aria-label="Document editor"
+            aria-modal="true"
+            className="flex h-[min(88dvh,720px)] w-full max-w-[430px] flex-col overflow-hidden rounded-xl border border-border bg-background shadow-2xl"
+            role="dialog"
+          >
+            <header className="flex shrink-0 items-center justify-between border-b border-border px-3 py-2.5">
+              <div>
+                <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-primary">
+                  Local draft
+                </div>
+                <h2 className="text-sm font-semibold">Untitled document</h2>
+              </div>
+              <button
+                aria-label="Close document editor"
+                className="flex size-11 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground"
+                onClick={() => setDocumentOpen(false)}
+                type="button"
+              >
+                <X aria-hidden="true" className="size-4" />
+              </button>
+            </header>
+            <Suspense
+              fallback={
+                <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
+                  Loading editor…
+                </div>
+              }
+            >
+              <DocumentEditor />
+            </Suspense>
+            <footer className="shrink-0 border-t border-border px-3 py-2 text-[10px] text-muted-foreground">
+              Not saved. Local artifact storage lands in 10C.
+            </footer>
+          </section>
+        </div>
+      ) : null}
     </div>
   );
 }
