@@ -1,6 +1,6 @@
 # Workspace Programme Progress
 
-**Status:** Phase 9B approved; 10A in progress. Phase 8 and the Phase 9A platform are done. `app.llacademy.ng` is live via a proxied Pages CNAME; migration 0006 and Worker `bfa72530` are deployed. `/claim` and shared digests move to 10G.2; student codes/duplicate resolution move to 10G.1.
+**Status:** Phase 9B approved; 10A in progress. Phase 8 and the Phase 9A platform are done. `app.llacademy.ng` is live via a proxied Pages CNAME; migration 0006 and Worker `372cb73f` are deployed. `/claim` and shared digests move to 10G.2; student codes/duplicate resolution move to 10G.1.
 
 ## Status table
 
@@ -9,7 +9,7 @@
 | Phase 8 — cutover | **done** | 24-hour watch closed 2026-11-09; owner POC login confirmed; checklist signed; 2,298 EdApex requests/0 errors |
 | Phase 9A — auth/retention | **done (platform)** | Migration 0006, Worker `bfa72530`, Pages `edapex-web.pages.dev`, proxied CNAME `app.llacademy.ng` → `edapex-web.pages.dev`; app root/claim/admin 200; `/claim` 202; magic 202; admin 401. Transitional `/claim` and digests are 10G.2 |
 | Phase 9B — handoff docs | **approved 2026-11-09** | 28 markdown files; documentation only |
-| Phase 10A — capability contract | **in progress** | Shared `@edapex/contracts`, role manifest, budget checks, admin issue read/plan/apply, public applicant contract |
+| Phase 10A — capability contract | **deployed** | Worker `372cb73f`; shared `@edapex/contracts`, role manifest, budget checks, admin issue read/plan/apply, public applicant contract |
 | Phase 10B — workspace shell | **next** | Starts against the 10A manifest and contracts |
 | Phase 10G.1 — identity provisioning | **deferred to 10B** | Student codes, duplicate resolution, staff/parent claiming and Gmail assistance |
 | Phase 10G.2 — transitional retirement | **deferred after 10F** | Remove `/claim`, null/drop password digests, retention execution |
@@ -30,6 +30,7 @@ Counts only; no names, emails or marks.
 | Placement mismatches | 1 | Non-blocking C1 finding |
 | Active staff without class assignment | 39 | Split teaching/non-teaching before treating as a gap |
 | Archive objects / summaries | 1,293 / 3,802 | R2; metadata loaded |
+| Admin issue queue (10A smoke) | 582 | 558 unclaimed accounts, 2 unlinked parents, 20 duplicate-email records, 2 missing emails; counts only |
 
 ## Decisions recorded
 
