@@ -1,14 +1,19 @@
 import { useEffect, useRef } from "react";
 import { FolderClosed, ListChecks, MessageCircle, Settings2, WandSparkles } from "lucide-react";
 
-import type { CapabilityManifest, ChatMessage } from "@edapex/contracts";
+import type {
+  CapabilityManifest,
+  ChatMessage,
+  WorkspaceRunState,
+  WorkspaceRuntimeView
+} from "@edapex/contracts";
 
 import { MessageBubble } from "./WorkspaceMessages";
 import { WorkspaceComposer } from "./WorkspaceComposer";
 import { WorkspaceStatus } from "./WorkspaceChrome";
 
 interface WorkspaceViewProps {
-  readonly connected: boolean;
+  readonly runtime: WorkspaceRuntimeView;
   readonly manifest: CapabilityManifest;
   readonly messages: readonly ChatMessage[];
   readonly userName: string;
@@ -28,8 +33,34 @@ const NAV_ITEMS = [
   { id: "files", label: "Files", icon: FolderClosed, active: false }
 ] as const;
 
+const stateLabel = (state: WorkspaceRunState, connected: boolean): string => {
+  if (!connected) return "Preview";
+  switch (state) {
+    case "restoring":
+      return "Restoring";
+    case "history_unavailable":
+      return "History unavailable";
+    case "thinking":
+      return "Thinking";
+    case "following":
+      return "Following";
+    case "tool_running":
+      return "Working";
+    case "waiting_for_person":
+      return "Waiting for you";
+    case "completed":
+      return "Complete";
+    case "stopped":
+      return "Stopped";
+    case "error":
+      return "Error";
+    case "idle":
+      return "Live";
+  }
+};
+
 export function WorkspaceView({
-  connected,
+  runtime,
   manifest,
   messages,
   userName,
@@ -60,7 +91,10 @@ export function WorkspaceView({
               </div>
             </div>
             <div className="flex items-center gap-1">
-              <WorkspaceStatus connected={connected} label={connected ? "Live" : "Preview"} />
+              <WorkspaceStatus
+                connected={runtime.connected}
+                label={stateLabel(runtime.state, runtime.connected)}
+              />
               {manifest.role === "admin" ? (
                 <button
                   aria-label="Open admin claim links"
@@ -89,7 +123,11 @@ export function WorkspaceView({
           </div>
         </main>
 
-        <WorkspaceComposer connected={connected} onSend={onSend} />
+        <WorkspaceComposer
+          connected={runtime.connected}
+          disabled={!runtime.connected}
+          onSend={onSend}
+        />
 
         <nav
           aria-label="Workspace sections"

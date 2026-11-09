@@ -1,7 +1,12 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 
-import type { CapabilityManifest, ChatMessage, ChatMessagePart } from "@edapex/contracts";
+import type {
+  CapabilityManifest,
+  ChatMessage,
+  ChatMessagePart,
+  WorkspaceRuntimeView
+} from "@edapex/contracts";
 
 import { LoginPanel } from "../LoginPanel";
 import {
@@ -11,8 +16,7 @@ import {
   requestMagicLink
 } from "../api";
 import type { SessionView } from "../api";
-import { WorkspaceStatus } from "./WorkspaceChrome";
-import { WorkspaceError, WorkspaceSkeleton } from "./WorkspaceChrome";
+import { WorkspaceError, WorkspaceSkeleton, WorkspaceStatus } from "./WorkspaceChrome";
 import { WorkspaceView } from "./WorkspaceView";
 
 type SessionState = "loading" | "anonymous" | "authenticated";
@@ -22,57 +26,40 @@ const initialMessages = (role: CapabilityManifest["role"]): readonly ChatMessage
   const now = Date.now();
   return [
     {
-      id: "welcome",
-      role: "assistant",
+      id: "runtime-notice",
+      role: "system",
       createdAt: now,
       parts: [
         {
           kind: "text",
-          text: "Welcome to EdApex Work. I can help with school records, reports and planning. Changes that affect school data stop for your approval."
-        },
-        {
-          kind: "tool",
-          toolCallId: "context-check",
-          name: "Checked workspace context",
-          status: "completed",
-          summary: `${role} manifest loaded`
+          text: "Local preview. The xcodex runtime is not connected, so no message is sent."
         }
       ]
     },
     {
-      id: "user-demo",
-      role: "user",
-      createdAt: now + 1,
-      parts: [{ kind: "text", text: "What needs attention today?" }]
-    },
-    {
-      id: "assistant-demo",
+      id: "welcome",
       role: "assistant",
-      createdAt: now + 2,
+      createdAt: now + 1,
       parts: [
         {
           kind: "text",
-          text: "The admin issue queue is ready for review. I would open the fixed issue surface rather than change records from chat."
-        },
-        {
-          kind: "surface",
-          language: "openui",
-          catalogVersion: "edapex-v1",
-          source: "workspace.ready()",
-          dataClass: "workspace"
-        },
-        {
-          kind: "approval",
-          approvalRequestId: "approval-demo",
-          status: "pending",
-          title: "Review the admin queue",
-          description:
-            "This preview uses a local approval decision. Production approvals are issued and validated by the Worker.",
-          risk: "read"
+          text: `Welcome to EdApex Work. Your ${role} capability manifest is loaded. I can help with school records, reports and planning; changes that affect school data stop for your approval.`
         }
       ]
     }
   ];
+};
+
+const previewRuntime: WorkspaceRuntimeView = {
+  connected: false,
+  state: "idle",
+  turn: {
+    state: "idle",
+    stoppable: false,
+    queueCount: 0,
+    serverQueueCount: 0,
+    lastSeenAt: null
+  }
 };
 
 const nextMessage = (
@@ -166,6 +153,7 @@ export function WorkspacePage() {
   };
 
   const onSend = (text: string, attachmentNames: readonly string[]): void => {
+    if (!previewRuntime.connected) return;
     const attachmentText =
       attachmentNames.length > 0 ? `\n\nAttached: ${attachmentNames.join(", ")}` : "";
     setMessages((current) => [
@@ -252,12 +240,12 @@ export function WorkspacePage() {
 
   return (
     <WorkspaceView
-      connected={false}
       manifest={manifest}
       messages={messages}
       onApproval={onApproval}
       onOpenAdmin={() => window.location.assign("/admin/claim-links")}
       onSend={onSend}
+      runtime={previewRuntime}
       userName={session?.user.fullName ?? session?.user.email ?? "Signed in"}
     />
   );

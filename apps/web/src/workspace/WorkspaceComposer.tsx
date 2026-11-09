@@ -7,10 +7,15 @@ import { cn } from "@/lib/utils";
 
 interface WorkspaceComposerProps {
   readonly connected: boolean;
+  readonly disabled?: boolean;
   readonly onSend: (text: string, attachmentNames: readonly string[]) => void;
 }
 
-export function WorkspaceComposer({ connected, onSend }: WorkspaceComposerProps) {
+export function WorkspaceComposer({
+  connected,
+  disabled = false,
+  onSend
+}: WorkspaceComposerProps) {
   const [draft, setDraft] = useState("");
   const [attachments, setAttachments] = useState<readonly string[]>([]);
   const fileInput = useRef<HTMLInputElement>(null);
@@ -69,6 +74,7 @@ export function WorkspaceComposer({ connected, onSend }: WorkspaceComposerProps)
         <input
           accept=".pdf,.doc,.docx,.csv,.png,.jpg,.jpeg"
           className="hidden"
+          disabled={disabled}
           multiple
           onChange={onFiles}
           ref={fileInput}
@@ -77,6 +83,7 @@ export function WorkspaceComposer({ connected, onSend }: WorkspaceComposerProps)
         <Button
           aria-label="Add attachment"
           className="size-11 shrink-0"
+          disabled={disabled}
           onClick={() => fileInput.current?.click()}
           size="icon"
           type="button"
@@ -86,7 +93,8 @@ export function WorkspaceComposer({ connected, onSend }: WorkspaceComposerProps)
         </Button>
         <textarea
           aria-label="Message"
-          className="max-h-32 min-h-11 flex-1 resize-none bg-transparent px-1 py-2.5 text-[15px] leading-6 outline-none placeholder:text-muted-foreground"
+          className="max-h-32 min-h-11 flex-1 resize-none bg-transparent px-1 py-2.5 text-[15px] leading-6 outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed"
+          disabled={disabled}
           onChange={(event) => setDraft(event.target.value)}
           onKeyDown={onKeyDown}
           placeholder={connected ? "Message EdApex" : "Draft a message — runtime offline"}
@@ -96,7 +104,7 @@ export function WorkspaceComposer({ connected, onSend }: WorkspaceComposerProps)
         <Button
           aria-label="Send message"
           className={cn("size-11 shrink-0", !connected && "opacity-90")}
-          disabled={draft.trim().length === 0}
+          disabled={disabled || draft.trim().length === 0}
           size="icon"
           type="submit"
         >

@@ -6,6 +6,7 @@ export type ToolCallStatus =
   | "failed"
   | "blocked"
   | "declined"
+  | "refused"
   | "waiting_for_person";
 
 export interface TextPart {
@@ -27,6 +28,13 @@ export interface ToolCallPart {
   readonly detail?: string;
 }
 
+export interface AttachmentPart {
+  readonly kind: "attachment";
+  readonly attachmentId: string;
+  readonly fileName: string;
+  readonly contentType: string;
+}
+
 export interface ApprovalPart {
   readonly kind: "approval";
   readonly approvalRequestId: string;
@@ -34,6 +42,7 @@ export interface ApprovalPart {
   readonly title: string;
   readonly description: string;
   readonly risk: "read" | "write" | "destructive";
+  readonly decisionSource?: "inline" | "inbox";
 }
 
 export interface SurfacePart {
@@ -49,25 +58,48 @@ export type ChatMessagePart =
   | ThinkingPart
   | ToolCallPart
   | ApprovalPart
-  | SurfacePart;
+  | SurfacePart
+  | AttachmentPart;
 
 export interface ChatMessage {
   readonly id: string;
   readonly role: ChatMessageRole;
   readonly createdAt: number;
   readonly parts: readonly ChatMessagePart[];
+  readonly queueState?: "queued" | "sending";
+  readonly seenAt?: number | null;
 }
 
 export type WorkspaceRunState =
   | "restoring"
+  | "history_unavailable"
   | "idle"
   | "thinking"
+  | "following"
   | "tool_running"
   | "waiting_for_person"
   | "completed"
-  | "stopped";
+  | "stopped"
+  | "error";
+
+export interface QueuedMessage {
+  readonly id: string;
+  readonly text: string;
+  readonly attachmentIds: readonly string[];
+  readonly attachmentNames: readonly string[];
+  readonly createdAt: number;
+}
+
+export interface WorkspaceTurnView {
+  readonly state: WorkspaceRunState;
+  readonly stoppable: boolean;
+  readonly queueCount: number;
+  readonly serverQueueCount: number;
+  readonly lastSeenAt: number | null;
+}
 
 export interface WorkspaceRuntimeView {
   readonly state: WorkspaceRunState;
   readonly connected: boolean;
+  readonly turn: WorkspaceTurnView;
 }

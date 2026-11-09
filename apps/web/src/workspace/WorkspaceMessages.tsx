@@ -16,6 +16,7 @@ const statusLabel: Record<ToolCallPart["status"], string> = {
   failed: "Didn't work",
   blocked: "Blocked",
   declined: "Declined",
+  refused: "Refused",
   waiting_for_person: "Waiting for you"
 };
 
@@ -182,6 +183,13 @@ function PartView({
       );
     case "surface":
       return <SurfaceCard surface={part} />;
+    case "attachment":
+      return (
+        <span className="inline-flex max-w-full items-center gap-2 rounded-lg border border-border bg-card px-2.5 py-2 text-xs text-muted-foreground">
+          <span className="truncate">{part.fileName}</span>
+          <span className="shrink-0 text-muted-foreground/70">{part.contentType}</span>
+        </span>
+      );
   }
 }
 
