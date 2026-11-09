@@ -4,6 +4,8 @@ Low-level specs for porting the EdApex backend to a Hono API on Cloudflare Worke
 
 **Implementing the port?** Start with [ROADMAP.md](./ROADMAP.md) — it contains the working agreement for coding agents and one executable brief per phase, with gates. **Progress** is tracked in [PROGRESS.md](./PROGRESS.md); **port code** lands in [`apps/api/`](../../apps/api/README.md) (service README, agent rules in [apps/api/AGENTS.md](../../apps/api/AGENTS.md)).
 
+**Current status:** Phase 8 is complete and the Phase 9 platform is deployed: migration `0006`, Worker `bfa72530`, Pages `edapex-web.pages.dev`, and `app.llacademy.ng` (proxied CNAME) all live. `/claim` and shared password digests are intentionally retained until workspace **10G.2**; student-code issuance, duplicate-email resolution and staff/parent coverage are **10G.1**.
+
 ## Porting scope is defined by the catalog
 
 [`schema-catalog.md`](./schema-catalog.md) is the **authoritative list of legacy SMS tables**. The 49 tables it catalogs plus the 13 FK-closure tables it recommends are the only ones migrated from MySQL — **62 legacy tables**.
@@ -28,7 +30,7 @@ Rules, to prevent scope drift between code, schema, and migration:
 | Persistence | **D1 (SQLite)** — not MySQL/Hyperdrive |
 | Port surface | **62 legacy tables** = 49 cataloged + 13 FK-closure; redesigned tables are specified separately |
 | Out of scope | `newsletters` (declared, absent from DB) and the five legacy `ai_*` tables (present, decommissioned) |
-| Deployment | **Workers Paid** — arbitrary-recipient email is Paid-only |
+| Deployment | **Workers Free** — Gmail OAuth2 delivers mail; no Paid fallback. D1 writes are account-wide and capped at 100k/day. |
 | CPU target | Claim flow designed to **10 ms** per invocation |
 | Auth | Two-phase: transitional claim flow, then social sign-in + magic link + student codes |
 | Hashing | No bcrypt anywhere; SHA-256 for high-entropy tokens; **no KDF on the claim path** |

@@ -1,4 +1,4 @@
-export type EmailTemplate = "result" | "transcript";
+export type EmailTemplate = "result" | "transcript" | "magic_link";
 
 export type EmailTemplateData = Readonly<
   Record<string, string | number | boolean | null>

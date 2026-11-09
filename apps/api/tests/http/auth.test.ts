@@ -6,10 +6,10 @@ import { users } from "../../src/lib/server/db/schema";
 import { database, seedTwoSchools } from "../support/seed";
 import type { SeededSchool } from "../support/seed";
 import {
+  createSessionToken,
   isRecord,
   login,
   request,
-  setPassword,
   stringField,
   testApp
 } from "./support/http";
@@ -21,44 +21,19 @@ let school: SeededSchool;
 beforeAll(async () => {
   const [first] = await seedTwoSchools(db);
   school = first;
-  await setPassword(school, "secret");
 });
 
 describe("auth routes", () => {
-  it("sets the exact session cookie and keeps the token out of the body", async () => {
-    const response = await request(app, "/api/v1/auth/login", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ identifier: "user1@example.test", password: "secret" })
-    });
-
-    expect(response.status).toBe(200);
-    const setCookie = response.headers.get("set-cookie") ?? "";
-    expect(setCookie).toContain("__Host-edapex_session=");
-    expect(setCookie).toContain("HttpOnly");
-    expect(setCookie).toContain("Secure");
-    expect(setCookie).toContain("SameSite=Lax");
-    expect(setCookie).toContain("Path=/");
-    expect(setCookie).not.toContain("Domain=");
-    expect(response.headers.get("cache-control")).toBe("no-store");
-
-    const body: unknown = await response.json();
-    expect(body).toMatchObject({ user: { id: school.userId } });
-    expect(body).not.toHaveProperty("token");
-  });
-
-  it("returns a token and no cookie for mobile login", async () => {
-    const response = await request(app, "/api/v1/auth/mobile/login", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ identifier: "user1@example.test", password: "secret" })
-    });
-
-    expect(response.status).toBe(200);
-    expect(response.headers.get("set-cookie")).toBeNull();
-    const body: unknown = await response.json();
-    expect(typeof stringField(body, "token")).toBe("string");
-    expect(body).toMatchObject({ user: { id: school.userId } });
+  it("retires password login routes", async () => {
+    for (const path of ["/api/v1/auth/login", "/api/v1/auth/mobile/login"]) {
+      const response = await request(app, path, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ identifier: "user1@example.test", password: "secret" })
+      });
+      expect(response.status).toBe(401);
+      expect(await response.json()).toMatchObject({ error: "UNAUTHENTICATED" });
+    }
   });
 
   it("reads the session without a tenant scope and rejects anonymous access", async () => {
@@ -120,14 +95,7 @@ describe("auth routes", () => {
   });
 
   it("refreshes and revokes a mobile token", async () => {
-    const loginResponse = await request(app, "/api/v1/auth/mobile/login", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ identifier: "user1@example.test", password: "secret" })
-    });
-    const loginBody: unknown = await loginResponse.json();
-    const token = stringField(loginBody, "token");
-    if (token === null) throw new Error("mobile login did not return a token");
+    const { token } = await createSessionToken("user1@example.test");
 
     const refresh = await request(app, "/api/v1/auth/mobile/refresh", {
       method: "POST",

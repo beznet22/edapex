@@ -1,9 +1,8 @@
 import { z } from "zod";
 
-export const loginBody = z
+export const magicLinkBody = z
   .object({
-    identifier: z.string().trim().min(1).max(191),
-    password: z.string().min(1).max(200)
+    email: z.string().trim().toLowerCase().email().max(191)
   })
   .strict();
 
@@ -17,6 +16,12 @@ export const claimBody = z
   .object({
     email: z.string().trim().min(3).max(191),
     password: z.string().min(1).max(200)
+  })
+  .strict();
+
+export const claimLinkExchangeBody = z
+  .object({
+    token: z.string().trim().min(32).max(256)
   })
   .strict();
 

@@ -22,6 +22,8 @@ export type GooglePurpose = "signin" | "claim";
 export interface GoogleStartInput {
   readonly purpose: GooglePurpose;
   readonly claimUserId: number | null;
+  readonly allowEmailChange?: boolean;
+  readonly claimLinkId?: string | null;
 }
 
 export interface GoogleStartResult {
@@ -35,6 +37,8 @@ export interface GoogleCallbackInput {
   readonly codeVerifier: string;
   readonly purpose: GooglePurpose;
   readonly claimUserId: number | null;
+  readonly allowEmailChange?: boolean;
+  readonly claimLinkId?: string | null;
   readonly ip: string | null;
   readonly userAgent: string | null;
   readonly fingerprint: string | null;
@@ -43,6 +47,8 @@ export interface GoogleCallbackInput {
 export interface GoogleStatePayload extends Record<string, unknown> {
   readonly purpose: GooglePurpose;
   readonly userId: number | null;
+  readonly allowEmailChange: boolean;
+  readonly claimLinkId: string | null;
   readonly state: string;
   readonly verifier: string;
   readonly exp: number;
@@ -55,6 +61,8 @@ export const isGoogleStatePayload = (value: unknown): value is GoogleStatePayloa
   isRecord(value) &&
   (value["purpose"] === "signin" || value["purpose"] === "claim") &&
   (value["userId"] === null || typeof value["userId"] === "number") &&
+  typeof value["allowEmailChange"] === "boolean" &&
+  (value["claimLinkId"] === null || typeof value["claimLinkId"] === "string") &&
   typeof value["state"] === "string" &&
   typeof value["verifier"] === "string" &&
   typeof value["exp"] === "number";
@@ -78,6 +86,8 @@ export class GoogleService {
       {
         purpose: input.purpose,
         userId: input.claimUserId,
+        allowEmailChange: input.allowEmailChange === true,
+        claimLinkId: input.claimLinkId ?? null,
         state,
         verifier
       },
@@ -119,6 +129,8 @@ export class GoogleService {
       return completeClaim(this.ctx, {
         userId: input.claimUserId,
         profile,
+        allowEmailChange: input.allowEmailChange === true,
+        claimLinkId: input.claimLinkId ?? null,
         ip: input.ip,
         userAgent: input.userAgent,
         fingerprint: input.fingerprint
@@ -249,6 +261,7 @@ export class GoogleService {
         deviceFingerprint: input.fingerprint,
         createdAt: now
       },
+      email: profile.email,
       now
     });
     await emitAuthEvent(

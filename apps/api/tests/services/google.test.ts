@@ -40,10 +40,11 @@ const google: GoogleOAuthPort = {
 const config = (googleConfigured: boolean) => ({
   claimEnabled: true,
   claimDigest: "a".repeat(64),
-  legacyPasswordLogin: false,
+  claimLinkEnabled: true,
   cookieSecret: SECRET,
   googleConfigured,
-  postLoginRedirect: "/"
+  postLoginRedirect: "/",
+  appOrigin: "https://app.example.test"
 });
 
 const callbackInput = (purpose: "signin" | "claim", claimUserId: number | null) => ({

@@ -1,19 +1,11 @@
 import { Hono } from "hono";
 import type { Context } from "hono";
 
-import { createService, AuthService, SessionService } from "../../services";
-import { AuthError, PasswordLoginRetiredError } from "../../services/errors";
+import { AuthError, SessionService, createService } from "../../services";
 import { clearSessionCookie, setSessionCookie } from "../cookies";
-import { toUserDto } from "../dto/auth";
 import type { AppContext } from "../env";
-import { loginBody, mobileTokenBody } from "../schemas/auth";
+import { mobileTokenBody } from "../schemas/auth";
 import { jsonBody } from "../validation";
-
-const assertLegacyLogin = (c: Context<AppContext>): void => {
-  if (!c.get("baseCtx").ports.authConfig.legacyPasswordLogin) {
-    throw new PasswordLoginRetiredError();
-  }
-};
 
 const sessionTokenOf = (c: Context<AppContext>): string => {
   const token = c.get("sessionToken");
@@ -22,41 +14,6 @@ const sessionTokenOf = (c: Context<AppContext>): string => {
 };
 
 export const publicAuth = new Hono<AppContext>()
-  .post("/login", jsonBody(loginBody), async (c) => {
-    assertLegacyLogin(c);
-    const body = c.req.valid("json");
-    const result = await createService(AuthService, c.get("baseCtx")).login({
-      identifier: body.identifier,
-      password: body.password,
-      ip: c.get("ip"),
-      userAgent: c.get("userAgent")
-    });
-    setSessionCookie(c, result.token, result.expiresAt);
-    c.header("Cache-Control", "no-store");
-    return c.json(
-      { user: toUserDto(result.user), expiresAt: result.expiresAt },
-      200
-    );
-  })
-  .post("/mobile/login", jsonBody(loginBody), async (c) => {
-    assertLegacyLogin(c);
-    const body = c.req.valid("json");
-    const result = await createService(AuthService, c.get("baseCtx")).login({
-      identifier: body.identifier,
-      password: body.password,
-      ip: c.get("ip"),
-      userAgent: c.get("userAgent")
-    });
-    c.header("Cache-Control", "no-store");
-    return c.json(
-      {
-        token: result.token,
-        expiresAt: result.expiresAt,
-        user: toUserDto(result.user)
-      },
-      200
-    );
-  })
   .post("/mobile/refresh", jsonBody(mobileTokenBody), async (c) => {
     const body = c.req.valid("json");
     const result = await createService(

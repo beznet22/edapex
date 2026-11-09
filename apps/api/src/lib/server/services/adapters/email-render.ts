@@ -22,6 +22,16 @@ const textValue = (data: EmailTemplateData, key: string, fallback: string): stri
 };
 
 export function renderEmail(message: EmailMessage): RenderedEmail {
+  if (message.template === "magic_link") {
+    const url = textValue(message.data, "url", "");
+    const minutes = textValue(message.data, "expiresMinutes", "15");
+    return {
+      subject: "Sign in to EdApex",
+      text: `Use this link to sign in to EdApex:\n\n${url}\n\nThis link expires in ${minutes} minutes. If you did not request it, ignore this email.`,
+      html: `<p>Use this link to sign in to EdApex:</p><p><a href="${escapeHtml(url)}">Sign in</a></p><p>This link expires in ${escapeHtml(minutes)} minutes. If you did not request it, ignore this email.</p>`
+    };
+  }
+
   if (message.template === "transcript") {
     const studentName = textValue(message.data, "studentName", "the student");
     const schoolName = textValue(message.data, "schoolName", "EdApex");

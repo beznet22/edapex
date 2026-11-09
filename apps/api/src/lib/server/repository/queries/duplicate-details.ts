@@ -6,7 +6,8 @@ import {
   authSessions,
   smParents,
   smStaffs,
-  smStudents
+  smStudents,
+  users
 } from "../../db/schema";
 import { chunkedInArray } from "../base/d1-helpers";
 import { withErrorHandling } from "../base/error-handling";
@@ -122,6 +123,21 @@ export async function listIdentityProviders(
         .where(or(...predicates))
         .orderBy(authIdentities.userId, authIdentities.provider),
     "listIdentityProviders"
+  );
+}
+
+export async function listSchoolIdentityProviders(
+  ctx: ScopedRepositoryContext
+): Promise<readonly IdentityProviderRow[]> {
+  return withErrorHandling(
+    async () =>
+      ctx.db
+        .select({ userId: authIdentities.userId, provider: authIdentities.provider })
+        .from(authIdentities)
+        .innerJoin(users, eq(authIdentities.userId, users.id))
+        .where(eq(users.schoolId, ctx.tenant.schoolId))
+        .orderBy(authIdentities.userId, authIdentities.provider),
+    "listSchoolIdentityProviders"
   );
 }
 

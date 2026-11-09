@@ -1,12 +1,11 @@
 import { env } from "cloudflare:workers";
 import { eq } from "drizzle-orm";
 import type { Hono } from "hono";
-import { expect } from "vitest";
 
-import { users } from "../../../src/lib/server/db/schema";
+import { authSessions, users } from "../../../src/lib/server/db/schema";
 import { createApp } from "../../../src/lib/server/http/app";
 import type { AppContext } from "../../../src/lib/server/http/env";
-import { sha256Hex } from "../../../src/lib/server/services";
+import { randomToken, sha256Hex, SESSION_TTL_SECONDS } from "../../../src/lib/server/services";
 import { createServiceContext } from "../../../src/lib/server/services/context";
 import type { ServicePorts } from "../../../src/lib/server/services/ports";
 import { database } from "../../support/seed";
@@ -57,24 +56,32 @@ export const makeAdmin = async (school: SeededSchool): Promise<void> => {
     .where(eq(users.id, school.userId));
 };
 
-export const login = async (
-  app: Hono<AppContext>,
-  identifier: string,
-  password: string
-): Promise<string> => {
-  const response = await request(app, "/api/v1/auth/login", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ identifier, password })
+export const createSessionToken = async (
+  identifier: string
+): Promise<{ readonly token: string; readonly cookie: string }> => {
+  const db = database(workerEnv);
+  const [user] = await db.select().from(users).where(eq(users.email, identifier)).limit(1);
+  if (user === undefined) throw new Error(`test session user not found: ${identifier}`);
+
+  const token = randomToken();
+  const now = Math.floor(Date.now() / 1000);
+  await db.insert(authSessions).values({
+    id: crypto.randomUUID(),
+    userId: user.id,
+    tokenHash: await sha256Hex(token),
+    expiresAt: now + SESSION_TTL_SECONDS,
+    deviceFingerprint: null,
+    createdAt: now
   });
-  expect(response.status).toBe(200);
-  const setCookie = response.headers.get("set-cookie") ?? "";
-  const cookie = setCookie.split(";")[0];
-  if (cookie === undefined || cookie.length === 0) {
-    throw new Error("login did not set a session cookie");
-  }
-  return cookie;
+  return { token, cookie: `__Host-edapex_session=${token}` };
 };
+
+/** Test-only session factory; password authentication is retired. */
+export const login = async (
+  _app: Hono<AppContext>,
+  identifier: string,
+  _password: string
+): Promise<string> => (await createSessionToken(identifier)).cookie;
 
 export const tenantHeaders = (
   school: SeededSchool,

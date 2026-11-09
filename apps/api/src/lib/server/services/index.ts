@@ -1,4 +1,5 @@
 export * from "./adapters";
+export * from "./admin-issues";
 export * from "./academics";
 export * from "./archive";
 export * from "./assessment";
@@ -16,3 +17,4 @@ export * from "./settings";
 export * from "./students";
 export * from "./tenant";
 export * from "./validation";
+export * from "./workspace";

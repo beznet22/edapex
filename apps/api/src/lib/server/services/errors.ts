@@ -13,7 +13,6 @@ export type ServiceErrorCode =
   | "CONFLICT"
   | "LINK_EMAIL_MISMATCH"
   | "LINK_EMAIL_UNVERIFIED"
-  | "PASSWORD_LOGIN_RETIRED"
   | "RATE_LIMITED"
   | "UPSTREAM_FAILURE"
   | "NOT_FOUND"
@@ -134,15 +133,6 @@ export class LinkEmailMismatchError extends ServiceError {
 export class LinkEmailUnverifiedError extends ServiceError {
   constructor() {
     super("LINK_EMAIL_UNVERIFIED", "The Google account's email address is not verified");
-  }
-}
-
-export class PasswordLoginRetiredError extends ServiceError {
-  constructor() {
-    super(
-      "PASSWORD_LOGIN_RETIRED",
-      "Password sign-in is retired; claim your account with the school-issued password"
-    );
   }
 }
 

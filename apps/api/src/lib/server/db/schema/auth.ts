@@ -1,7 +1,7 @@
 import { index, integer, primaryKey, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 import { statusCheck } from "./common";
-import { users } from "./tenancy";
+import { smSchools, users } from "./tenancy";
 
 const SUBJECT_TYPE = ["student", "staff", "parent"] as const;
 
@@ -39,6 +39,14 @@ export const authMagicLinks = sqliteTable(
     email: text("email").notNull(),
     tokenHash: text("token_hash").notNull(),
     purpose: text("purpose").notNull(),
+    subjectType: text("subject_type", { enum: ["user", "parent", "staff"] }),
+    subjectId: integer("subject_id"),
+    schoolId: integer("school_id").references(() => smSchools.id, {
+      onDelete: "cascade",
+      onUpdate: "restrict"
+    }),
+    createdBy: integer("created_by"),
+    revokedAt: integer("revoked_at"),
     expiresAt: integer("expires_at").notNull(),
     consumedAt: integer("consumed_at"),
     requestedIp: text("requested_ip"),

@@ -5,11 +5,10 @@ import { createAuthConfig } from "../../src/lib/server/services";
 const DIGEST = "a".repeat(64);
 
 describe("auth config", () => {
-  it("keeps the cutover off by default and leaves legacy login on", () => {
+  it("keeps the cutover off by default", () => {
     const config = createAuthConfig({});
     expect(config.claimEnabled).toBe(false);
     expect(config.claimDigest).toBeNull();
-    expect(config.legacyPasswordLogin).toBe(true);
     expect(config.googleConfigured).toBe(false);
     expect(config.postLoginRedirect).toBe("/");
   });
@@ -22,7 +21,6 @@ describe("auth config", () => {
     });
     expect(config.claimEnabled).toBe(true);
     expect(config.claimDigest).toBe(DIGEST);
-    expect(config.legacyPasswordLogin).toBe(false);
   });
 
   it("fails closed when the digest is invalid or the secret is missing", () => {
@@ -40,11 +38,6 @@ describe("auth config", () => {
         CLAIM_PASSWORD_DIGEST: DIGEST
       }).claimEnabled
     ).toBe(false);
-  });
-
-  it("honours an explicit legacy-login off switch", () => {
-    expect(createAuthConfig({ LEGACY_PASSWORD_LOGIN: "0" }).legacyPasswordLogin).toBe(false);
-    expect(createAuthConfig({ LEGACY_PASSWORD_LOGIN: "1" }).legacyPasswordLogin).toBe(true);
   });
 
   it("requires all three Google settings", () => {

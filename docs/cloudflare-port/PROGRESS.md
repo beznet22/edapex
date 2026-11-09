@@ -24,12 +24,14 @@ Port code lands in [`apps/api/`](../../apps/api/AGENTS.md).
 
 ## Current focus
 
-**Phase 9A — auth/retention closeout.** Phase 8 closed on **2026-11-09** after
-the 24 h watch, owner POC login and signed checklist. Phase 9A code is in
-progress: magic link, password-login retirement, retention dry-run, archive
-manifests and workspace wiring. `/claim` removal and password-digest nulling are
-scheduled for the announced date, **2026-12-03**. See
-[`cutover/checklist.md`](./cutover/checklist.md) and
+**Phase 9A — platform complete.** Phase 8 and the Phase 9A platform deployment
+are complete. Migration 0006 is applied; Worker `bfa72530-b53b-4f6a-b771-7b9f450d3795`
+is live; Pages `edapex-web.pages.dev` and **`app.llacademy.ng`** return 200 for
+root, `/claim` and `/admin/claim-links`; app CNAME is proxied and CORS passes.
+The Pages domain certificate is still finalizing, but the origin is serving.
+`/claim` and shared password digests are carried to workspace **10G.2**;
+student codes, duplicate resolution and staff/parent coverage to **10G.1**. See
+[`phase9a-closeout.md`](./phase9a-closeout.md) and
 [`04a-auth-cutover.spec.md`](./04a-auth-cutover.spec.md).
 
 ## Phase status
@@ -45,7 +47,7 @@ scheduled for the announced date, **2026-12-03**. See
 | 6 | Archive and retrieval | done | Kimchi | 2026-11-06 | 2026-11-06 | PR #7 check `port` green ([run 42300456462](https://github.com/beznet22/edapex/actions/runs/42300456462)): typecheck, 115 files / 565 tests, all guards + self-tests, 0003 apply + drift, deploy dry-run, both verifiers. Gate: archive/restore round-trip, checksum quarantine, published immutability + supersede *n+1*, wipe blocked without the second admin token. |
 | 7 | Migration execution | done | Kimchi | 2026-11-06 | 2026-11-06 | Local rehearsals A/B (`phase-7-migration`): 62 legacy tables / 196,801 rows / 0 FK / 0 reconciliation mismatches; target integrity green (0 identity, 0 target, 42 sections reviewed, 663 current records); 681 year-4 records = 666 unique default + 15 non-default duplicates; 639 promoted + 24 DAYCARE + 3 unplaced; 663 destination records; quarantine 237; sessions 1/2/4 archived with 652+641 checksum-verified objects (74/16 historical gaps), live marks/results/ratings/remarks/attendance zero; 853 referenced photo URLs (625 present/uploadable, 228 missing locally), 25 sample uploads and public route 200; 2 timeline exports; O2 10/10 present. Full local gate: typecheck, 591 tests / 123 files, all guards, 0004/0005 apply + drift, deploy dry-run, both verifiers. PR #8 check `port` green ([run 42345892456](https://github.com/beznet22/edapex/actions/runs/42345892456)). Report: [`audit/phase-7-rehearsal.md`](./audit/phase-7-rehearsal.md). |
 | 8 | Cutover | done | Kimchi | 2026-11-07 | 2026-11-09 | PR #8 merged; `phase-8-cutover` rebased and published as PR #9. Preparation evidence: preflight on the current dump (62 tables, 196,801 rows, 0 FK, 0 reconciliation, 44 SQL files, `executed:false`; rehearsal photos 625/228, production ZIP 633/220, old static fallback +10 → combined 643 present/210 accepted-missing; 10 fallbacks included; active/default report 206 students; R2 `edapex-media` created; **643/643 uploaded, audit 0 failures**); local drill passed (target green, 42 sections, FIRST TERM dates, teacher roster, NURSERY marks with grade, report-card review checksum, claim 404/202/202/409/404, core counts unchanged). Gmail reuse verified locally (HTTP 200, `gmail.send`); POC Gmail callback unchanged; domain move staged (`api.llacademy.ng` for EdApex, `sms-api.llacademy.ng` for POC). Design: offline session 1/2/4 archives + minimal live-only D1 load; Free 95k target/100k hard gate, checkpoint and next-UTC-day continuation; no Paid fallback; no historical raw rows in production D1. Archive export validated **1,293 objects / 3,802 summaries**; live plan **34 tables / 5,380 rows / 31 files (28 excluded)**; loader dry-run passes; full gate **126 files / 617 tests**; PR #9 `port` green ([run 42385118234](https://github.com/beznet22/edapex/actions/runs/42385118234)). Production execution on 2026-11-07: `edapex` D1 + Worker + auth/Gmail secrets + CORS `https://app.llacademy.ng`; live load **61,358 writes**, verification 0 failures; bootstrap/staffing/activation 42 sections, 231 initial assignments; promotion hit the Free Worker CPU limit (503) at batch 5. Recovered the validated local target into `edapex-recovery` (14,039 rows / **87,503 writes**): 663 target records, 237 students without a target current record, 42 reviewed sections, 6 categories, 7 bands, 663 outcomes, FK 0; archive upload **1,293/1,293** with last-object checksum verified; Worker health 200, claim 404. **Write-cap incident:** at least **148,861 account writes** today (>100k); no further D1 writes until 00:00 UTC; no Paid upgrade. Post-reset 2026-11-08: fixture cleanup **366 → 231**; admin login restored and target gate **green**; archive retrieval schema fixed (transcript and marksheet **200**); POC moved to `sms-api.llacademy.ng` and portal rebuilt; `api.llacademy.ng` switched to EdApex; health 200, protected route 401, claim 202, CORS `https://app.llacademy.ng`. Gmail adapter send returned **200** (`messageId 1a1b8f8110948b17`); 24 h watch started **2026-11-08T02:26Z**. 24 h watch closed 2026-11-09: EdApex 2,298 requests/0 errors, POC 1,352/0 errors, D1 96 write queries/180 rows, 2 claim probes, 0 new sessions; FK 0, archives 1,293/3,802, 663 active-year records; owner POC login confirmed; checklist signed. POC has no `/health`; its root returns 200 JSON. |
-| 9 | Post-cutover | in progress | Kimchi | 2026-11-09 | — | Phase 9A code: magic link, password-login retirement, retention dry-run, archive manifests, workspace wiring. `/claim` removal and password-digest nulling scheduled **2026-12-03**. |
+| 9 | Post-cutover | done (platform) | Kimchi | 2026-11-09 | 2026-11-09 | Code: magic link, admin claim links/directory, non-Gmail directory, password-login retirement, retention dry-run (0 rows), archive manifests (652/0/641), workspace wiring, `apps/web`, full gate 126 files / 611 tests, web build. Deployed: migration 0006, Worker `bfa72530`, Pages `edapex-web.pages.dev`, proxied `app.llacademy.ng` CNAME. Smoke: app root/claim/admin 200, API health 200, `/claim` 202, magic 202, admin 401, CORS 204. **Transitional:** `/claim` and digests are 10G.2; student codes/duplicates/linking are 10G.1. |
 
 ## Gate checklists
 
@@ -132,11 +134,15 @@ scheduled for the announced date, **2026-12-03**. See
 - [x] Signed Phase 8 checklist: Owner, 2026-11-09T02:55Z
 
 ### Phase 9 — Post-cutover
-- [ ] `/claim` removed on the announced date — **2026-12-03**
-- [ ] Password digests nulled, column dropped later — **2026-12-03**
-- [ ] Retention sweep dry-run matches expectations — code now, gate pending
-- [ ] Session archives 1–4 manifest verified — code now, gate pending
-- [ ] Workspace package wiring verified (roadmap Part 5); `apps/api/` remains the in-repo **EdApex API service** — code now, gate pending
+- [ ] `/claim` removed on the announced date — **moved to workspace 10G.2; the former 2026-12-03 date is withdrawn**
+- [ ] Password digests nulled, column dropped later — **moved to workspace 10G.2; 1,611 non-null**
+- [x] Retention sweep dry-run matches expectations — 0 old academic years / 0 operational rows
+- [x] Session archives 1–4 manifest verified — session 1 652/652, session 2 0/0, session 4 641/641; missing manifests repaired in R2
+- [x] Workspace package wiring verified (roadmap Part 5); `apps/api/` remains the in-repo **EdApex API service** — root install, typecheck, tests, guards and deploy dry-run pass
+- [x] Migration 0006 applied to production D1
+- [x] Worker deployed (`bfa72530-b53b-4f6a-b771-7b9f450d3795`)
+- [x] Pages deployed at `edapex-web.pages.dev`; root, `/claim`, `/admin/claim-links` 200
+- [x] `app.llacademy.ng` custom domain — proxied CNAME `app` → `edapex-web.pages.dev`; root/claim/admin 200; Pages certificate finalizing
 
 ## Change log
 
@@ -200,7 +206,14 @@ scheduled for the announced date, **2026-12-03**. See
 | 2026-11-08 | 8 | Gmail adapter send returned 200 (`messageId 1a1b8f8110948b17`). Archived transcript and marksheet both 200 after the schema separation. Full gate green: **126 files / 617 tests**, both root verifiers, deploy dry-run. 24 h watch starts **2026-11-08T02:26Z**; POC login owner verification and production rollback drill remain | Kimchi |
 | 2026-11-08 | 8 | Production rollback drill passed: detached `api.llacademy.ng` from EdApex (523), attached it back to POC (root 200), then restored EdApex (`/health` 200). Final smoke: protected 401, claim 202, archived transcript 200, integrity green (663 current records, 42 reviewed), `sms-api` 200, portal 200. Rollback drill complete; 24 h watch and owner POC login remain | Kimchi |
 | 2026-11-09 | 8 | **Phase 8 gate closed.** 24 h watch: EdApex 2,298 requests / 0 errors, p95 31.6 ms; POC 1,352 / 0 errors; D1 96 write queries / 180 rows; 2 claim probes, 0 tickets, 0 new sessions. FK 0; archives 1,293/3,802; 663 active-year records; public photo 200; CORS 204. Owner POC login confirmed and checklist signed. POC `/health` is 404 by design; root returns 200 JSON, monitoring corrected | Kimchi |
-| 2026-11-09 | 9 | Phase 9A started: magic link, password-login retirement, retention dry-run, archive manifests and workspace wiring. `/claim` removal and digest nulling scheduled **2026-12-03** | Kimchi |
+| 2026-11-09 | 9 | Phase 9A code complete: magic-link endpoint/service/tests, password-login retirement, 7-year retention dry-run (0 rows), archive manifests repaired/verified (1,293 objects; 652/0/641), root pnpm workspace + CI job + deploy dry-run. Full gate 125 files / 609 tests | Kimchi |
+| 2026-11-09 | 9 | **Phase 9A blocked:** production has 0 student codes, 0 linked identities, 24 duplicate-email groups and 1,611 non-null password digests. The former 2026-12-03 `/claim` removal date is withdrawn; 10G.2 now owns removal | Kimchi |
+| 2026-11-09 | 9 | Admin claim-link slice: migration 0006 adds subject/school/creator/revocation columns to `auth_magic_links`; per-user 72h links for staff/parent records; pending-user provisioning for records with no user; non-Gmail badge/filter; `apps/web` at `app.llacademy.ng/admin/claim-links` and `/claim`; full API gate 126 files / 611 tests, web build, deploy dry-run | Kimchi |
+| 2026-11-09 | 9 | Phase 9A re-scoped: platform closeout is migration/Worker/Pages deployment. `/claim` and digest nulling move to workspace 10G.2 after 10F; student codes, duplicate resolution and staff/parent coverage move to 10G.1. This avoids reopening 9A | Kimchi |
+| 2026-11-09 | 9 | Production deployment: migration 0006 applied; Worker `bfa72530-b53b-4f6a-b771-7b9f450d3795`; Pages `edapex-web.pages.dev` deployed; `/claim` 202, magic 202, admin 401, invalid exchange 401; CORS includes Pages preview + app origin. `app.llacademy.ng` attached, pending DNS/certificate | Kimchi |
+| 2026-11-09 | 9 | `app.llacademy.ng` proxied CNAME added (`app` → `edapex-web.pages.dev`); root, `/claim`, `/admin/claim-links` all 200; CORS app preflight 204; Phase 9A platform closed. `/claim` and digests remain 10G.2; student codes/duplicates 10G.1 | Kimchi |
+| 2026-11-09 | 9 | Admin directory 500 fixed: replaced the over-limit 580-id identity query with a school-scoped join. Directory now 200 with 87 staff rows. Added 60s magic-link dedupe + send-button lock; two rapid requests produce one token row. Pages CSP now explicitly allows the Cloudflare Insights beacon | Kimchi |
+| 2026-11-09 | 9 | Pages CSP updated for shadcn/Radix runtime styles (`style-src`, `style-src-elem`, `style-src-attr` allow `'unsafe-inline'`); favicon added and 200 | Kimchi |
 
 ## Blockers and decisions
 
@@ -265,7 +278,8 @@ scheduled for the announced date, **2026-12-03**. See
 | Phase 7 photos | Phase 7 | partial — 853 referenced URLs, 625 present/uploadable, 228 missing from the local static tree; two sampled uploads verify and the public 32/64-hex route returns 200. The full upload is the production runbook step after the source owner supplies the missing files | — |
 | Phase 8 target | Phase 8 | decided — no production D1 exists, so the cutover is a **fresh initial load** from the final frozen snapshot, not a delta. Abort if a non-empty production D1 is found; a delta needs a separate design. This is a deliberate reading of `05 §8` for the current deployment state | — |
 | Phase 8 preparation scope | Phase 8 | decided — PR #8 is merged; `phase-8-cutover` was rebased onto `phase-6-archive` and published as PR #9. Production D1/R2/DNS/MySQL writes still need the approved window | — |
-| Phase 8 rollback evidence | Phase 8 | decided — the local drill proves application-level claim disable/restart, readiness and data stability only. DNS/route reversion, MySQL read-only state and pre-reset password restore remain production tabletop/drill items; the Phase 8 gate stays open | — |
+| Phase 9A auth population | Phase 9 / 10G | moved — 0 student codes, 24 duplicate-email groups and staff/parent coverage are 10G.1; `/claim` and 1,611 shared digests are 10G.2 after workspace completion. Keep `/claim` enabled | Owner |
+| Phase 8 rollback evidence | Phase 8 | done — local drill, production tabletop and production host drill completed; gate closed 2026-11-09 | — |
 | Phase 8 auth reset backup | Phase 8 | decided — back up source `users` passwords/full DB before the shared reset. Rollback after the reset restores the backup before reopening legacy login; the shared digest is not a rollback credential | — |
 | Phase 8 photos | Phase 8 | decided — production ZIP 633 + 10 approved static fallbacks = **643 uploadable**; **210 accepted gap**; active/default report 206 students. R2 upload **643/643**, audit **0 failures**. Upload only the 643 union; no wholesale stale-tree upload. Keep legacy relative `student_photo` URLs and use a media-base helper for absolute client URLs; no backfill | — |
 | Phase 8 photo URL contract | Phase 8 | decided — DB keeps `/uploads/students/<hash>.<ext>`; R2 key is `uploads/students/<file>`; the public route serves it; absolute client URLs are derived from `PUBLIC_MEDIA_BASE`/API base in the DTO. No `student_photo` backfill on storage moves; use the manifest + photo audit for consistency | — |

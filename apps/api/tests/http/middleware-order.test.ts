@@ -98,16 +98,13 @@ describe("middleware order", () => {
     let lastStatus = 0;
     let last: Response | null = null;
     for (let attempt = 0; attempt < 6; attempt += 1) {
-      last = await request(app, "/api/v1/auth/login", {
+      last = await request(app, "/api/v1/auth/magic-link", {
         method: "POST",
         headers: {
           "content-type": "application/json",
           "cf-connecting-ip": ip
         },
-        body: JSON.stringify({
-          identifier: "nobody@example.test",
-          password: "wrong"
-        })
+        body: JSON.stringify({ email: "nobody@example.test" })
       });
       lastStatus = last.status;
     }
