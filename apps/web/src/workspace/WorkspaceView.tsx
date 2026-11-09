@@ -199,7 +199,7 @@ export function WorkspaceView({
           <aside
             aria-label="Document editor drawer"
             aria-modal="true"
-            className="absolute inset-y-0 right-0 flex w-full max-w-[min(900px,calc(100vw-12px))] flex-col overflow-hidden border-l border-border bg-background shadow-[-24px_0_80px_-32px_rgba(0,0,0,0.9)]"
+            className="fixed inset-y-0 right-0 flex w-full max-w-[900px] flex-col overflow-hidden border-l border-border bg-background shadow-[-24px_0_80px_-32px_rgba(0,0,0,0.9)]"
             role="dialog"
           >
             <Suspense

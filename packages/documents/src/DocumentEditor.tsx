@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { KeyboardEvent, ReactNode } from "react";
 import {
   Bold,
@@ -51,8 +51,8 @@ function ToolbarButton({
       aria-pressed={active}
       className={
         active
-          ? "flex min-h-9 min-w-9 items-center justify-center rounded-md bg-primary/15 text-primary"
-          : "flex min-h-9 min-w-9 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-35"
+          ? "flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-md bg-primary/15 text-primary sm:min-h-9 sm:min-w-9"
+          : "flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-35 sm:min-h-9 sm:min-w-9"
       }
       disabled={disabled}
       onClick={onClick}
@@ -156,7 +156,7 @@ function TopBar({
         {onClose !== undefined ? (
           <button
             aria-label="Close document drawer"
-            className="mr-1 flex size-9 items-center justify-center rounded-md hover:bg-muted hover:text-foreground"
+            className="mr-1 flex size-11 items-center justify-center rounded-md hover:bg-muted hover:text-foreground sm:size-9"
             onClick={onClose}
             type="button"
           >
@@ -185,7 +185,7 @@ function FormattingBar({ editor }: { readonly editor: Editor }) {
   return (
     <div
       aria-label="Document formatting"
-      className="flex shrink-0 flex-wrap items-center gap-0.5 border-b border-border bg-card/40 px-2 py-1.5"
+      className="flex shrink-0 flex-nowrap items-center gap-0.5 overflow-x-auto border-b border-border bg-card/40 px-2 py-1.5 [-ms-overflow-style:none] [scrollbar-width:none] sm:flex-wrap sm:overflow-visible [&::-webkit-scrollbar]:hidden"
       role="toolbar"
     >
       <ToolbarButton
@@ -279,8 +279,16 @@ export function DocumentEditor({
   onClose
 }: DocumentEditorProps) {
   const [title, setTitle] = useState(initialTitle);
+  const titleRef = useRef<HTMLTextAreaElement>(null);
   const [words, setWords] = useState(0);
   const [slash, setSlash] = useState<SlashState | null>(null);
+  useEffect(() => {
+    const field = titleRef.current;
+    if (field === null) return;
+    field.style.height = "auto";
+    field.style.height = `${field.scrollHeight}px`;
+  }, [title]);
+
   const filteredCommands = useMemo(() => {
     if (slash === null) return [];
     const query = slash.query.toLowerCase();
@@ -367,17 +375,19 @@ export function DocumentEditor({
       {editor !== null ? <FormattingBar editor={editor} /> : null}
 
       <div className="relative min-h-0 flex-1 overflow-y-auto bg-[radial-gradient(circle_at_top,rgba(217,180,91,0.06),transparent_44%)]">
-        <div className="mx-auto w-full max-w-[760px] px-3 py-6 sm:px-8 sm:py-10">
+        <div className="mx-auto w-full max-w-[760px] px-3 py-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:px-8 sm:py-10">
           <article className="rounded-2xl border border-border/80 bg-card/70 px-5 py-7 shadow-[0_24px_80px_-40px_rgba(0,0,0,0.85)] sm:px-10 sm:py-10">
             <div className="mb-7 flex items-center justify-between gap-3 text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
               <span>Private workspace draft</span>
               <span>EdApex</span>
             </div>
-            <input
+            <textarea
               aria-label="Document title"
-              className="w-full bg-transparent text-3xl font-semibold tracking-tight outline-none placeholder:text-muted-foreground/40 sm:text-4xl"
+              className="block w-full resize-none overflow-hidden bg-transparent text-2xl font-semibold leading-tight tracking-tight outline-none placeholder:text-muted-foreground/40 sm:text-3xl lg:text-4xl"
               onChange={(event) => setTitle(event.target.value)}
               placeholder="Untitled"
+              ref={titleRef}
+              rows={1}
               value={title}
             />
             <div className="my-6 h-px bg-border/80" />
