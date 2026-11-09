@@ -57,7 +57,12 @@ export interface DirectoryFilters {
 }
 
 const envBase = import.meta.env.VITE_API_BASE_URL;
-const API_BASE = typeof envBase === "string" ? envBase : "";
+const API_BASE =
+  typeof envBase === "string" && envBase.length > 0
+    ? envBase
+    : import.meta.env.PROD
+      ? "https://api.llacademy.ng"
+      : "";
 
 export const apiBase = (): string => API_BASE;
 
