@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
-import { FilePlus2, FolderClosed, ListChecks, MessageCircle, Settings2, WandSparkles, X } from "lucide-react";
+import { FilePlus2, FolderClosed, ListChecks, MessageCircle, Settings2, WandSparkles } from "lucide-react";
 
 import type {
   CapabilityManifest,
@@ -76,7 +76,9 @@ export function WorkspaceView({
   onOpenAdmin
 }: WorkspaceViewProps) {
   const endRef = useRef<HTMLDivElement>(null);
-  const [documentOpen, setDocumentOpen] = useState(false);
+  const [documentOpen, setDocumentOpen] = useState(
+    () => import.meta.env.DEV && new URLSearchParams(window.location.search).has("document")
+  );
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ block: "end" });
@@ -187,32 +189,19 @@ export function WorkspaceView({
         </nav>
       </div>
       {documentOpen ? (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3"
-          role="presentation"
-        >
-          <section
-            aria-label="Document editor"
+        <div className="fixed inset-0 z-50" role="presentation">
+          <button
+            aria-label="Close document drawer"
+            className="absolute inset-0 bg-black/30 backdrop-blur-[1px]"
+            onClick={() => setDocumentOpen(false)}
+            type="button"
+          />
+          <aside
+            aria-label="Document editor drawer"
             aria-modal="true"
-            className="flex h-[min(88dvh,720px)] w-full max-w-[430px] flex-col overflow-hidden rounded-xl border border-border bg-background shadow-2xl"
+            className="absolute inset-y-0 right-0 flex w-full max-w-[min(900px,calc(100vw-12px))] flex-col overflow-hidden border-l border-border bg-background shadow-[-24px_0_80px_-32px_rgba(0,0,0,0.9)]"
             role="dialog"
           >
-            <header className="flex shrink-0 items-center justify-between border-b border-border px-3 py-2.5">
-              <div>
-                <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-primary">
-                  Local draft
-                </div>
-                <h2 className="text-sm font-semibold">Untitled document</h2>
-              </div>
-              <button
-                aria-label="Close document editor"
-                className="flex size-11 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground"
-                onClick={() => setDocumentOpen(false)}
-                type="button"
-              >
-                <X aria-hidden="true" className="size-4" />
-              </button>
-            </header>
             <Suspense
               fallback={
                 <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
@@ -220,12 +209,9 @@ export function WorkspaceView({
                 </div>
               }
             >
-              <DocumentEditor />
+              <DocumentEditor onClose={() => setDocumentOpen(false)} />
             </Suspense>
-            <footer className="shrink-0 border-t border-border px-3 py-2 text-[10px] text-muted-foreground">
-              Not saved. Local artifact storage lands in 10C.
-            </footer>
-          </section>
+          </aside>
         </div>
       ) : null}
     </div>

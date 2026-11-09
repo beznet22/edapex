@@ -477,9 +477,15 @@ importers:
 
   packages/documents:
     dependencies:
+      '@floating-ui/dom':
+        specifier: ^1.6.0
+        version: 1.8.0
       '@tiptap/core':
         specifier: 3.33.0
         version: 3.33.0(@tiptap/pm@3.33.0)
+      '@tiptap/extension-bubble-menu':
+        specifier: 3.33.0
+        version: 3.33.0(@tiptap/core@3.33.0(@tiptap/pm@3.33.0))(@tiptap/pm@3.33.0)
       '@tiptap/extension-placeholder':
         specifier: 3.33.0
         version: 3.33.0(@tiptap/extensions@3.33.0(@tiptap/core@3.33.0(@tiptap/pm@3.33.0))(@tiptap/pm@3.33.0))
@@ -492,6 +498,9 @@ importers:
       '@tiptap/starter-kit':
         specifier: 3.33.0
         version: 3.33.0
+      lucide-react:
+        specifier: ^0.468.0
+        version: 0.468.0(react@19.2.6)
     devDependencies:
       '@types/react':
         specifier: ^19.2.0
@@ -1999,9 +2008,6 @@ packages:
 
   '@floating-ui/core@1.8.0':
     resolution: {integrity: sha512-0CIZ5itps/8x7BG8dEIhs53BvCUH2PCoogtakwRTut+Arm58sJooJ0AuZhLw2HJYIR5cMLNPBSS728sPho2khQ==}
-
-  '@floating-ui/dom@1.7.6':
-    resolution: {integrity: sha512-9gZSAI5XM36880PPMm//9dfiEngYoC6Am2izES1FF406YFsjvyBMmeJ2g4SAju3xWwtuynNRFL2s9hgxpLI5SQ==}
 
   '@floating-ui/dom@1.8.0':
     resolution: {integrity: sha512-yXSrzeHZBTZadLOlfyhCkJHNeLJnHRnRInwdZ40L7ZiaAtrBwoYlsDrX3v5zB1Utk7CLfzcOVnVVWoXEky7Ceg==}
@@ -9772,11 +9778,6 @@ snapshots:
     dependencies:
       '@floating-ui/utils': 0.2.12
 
-  '@floating-ui/dom@1.7.6':
-    dependencies:
-      '@floating-ui/core': 1.7.5
-      '@floating-ui/utils': 0.2.11
-
   '@floating-ui/dom@1.8.0':
     dependencies:
       '@floating-ui/core': 1.8.0
@@ -10188,8 +10189,8 @@ snapshots:
 
   '@melt-ui/svelte@0.76.2(svelte@5.55.5)':
     dependencies:
-      '@floating-ui/core': 1.7.5
-      '@floating-ui/dom': 1.7.6
+      '@floating-ui/core': 1.8.0
+      '@floating-ui/dom': 1.8.0
       '@internationalized/date': 3.12.1
       dequal: 2.0.3
       focus-trap: 7.8.0
@@ -11338,7 +11339,6 @@ snapshots:
       '@floating-ui/dom': 1.8.0
       '@tiptap/core': 3.33.0(@tiptap/pm@3.33.0)
       '@tiptap/pm': 3.33.0
-    optional: true
 
   '@tiptap/extension-bullet-list@3.23.6(@tiptap/extension-list@3.23.6(@tiptap/core@3.23.6(@tiptap/pm@3.23.6))(@tiptap/pm@3.23.6))':
     dependencies:
@@ -12349,7 +12349,7 @@ snapshots:
   bits-ui@2.18.1(@internationalized/date@3.12.1)(@sveltejs/kit@2.59.1(@opentelemetry/api@1.9.0)(@sveltejs/vite-plugin-svelte@6.2.4(svelte@5.55.5)(vite@7.3.3(@types/node@22.19.19)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.22.4)))(svelte@5.55.5)(typescript@5.9.3)(vite@7.3.3(@types/node@22.19.19)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.22.4)))(svelte@5.55.5):
     dependencies:
       '@floating-ui/core': 1.7.5
-      '@floating-ui/dom': 1.7.6
+      '@floating-ui/dom': 1.8.0
       '@internationalized/date': 3.12.1
       esm-env: 1.2.2
       runed: 0.35.1(@sveltejs/kit@2.59.1(@opentelemetry/api@1.9.0)(@sveltejs/vite-plugin-svelte@6.2.4(svelte@5.55.5)(vite@7.3.3(@types/node@22.19.19)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.22.4)))(svelte@5.55.5)(typescript@5.9.3)(vite@7.3.3(@types/node@22.19.19)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.22.4)))(svelte@5.55.5)
@@ -16043,7 +16043,7 @@ snapshots:
 
   streamdown-svelte@3.0.6(@types/mdast@4.0.4)(micromark-util-types@2.0.2)(micromark@4.0.2)(svelte@5.55.5):
     dependencies:
-      '@floating-ui/dom': 1.7.6
+      '@floating-ui/dom': 1.8.0
       '@shikijs/langs': 3.23.0
       '@shikijs/themes': 3.23.0
       '@streamdown-svelte/plugin-core': 1.0.0(@types/mdast@4.0.4)(micromark-util-types@2.0.2)(micromark@4.0.2)
@@ -16161,7 +16161,7 @@ snapshots:
 
   svelte-streamdown@3.0.1(svelte@5.55.5):
     dependencies:
-      '@floating-ui/dom': 1.7.6
+      '@floating-ui/dom': 1.8.0
       '@shikijs/langs': 3.23.0
       '@shikijs/themes': 3.23.0
       clsx: 2.1.1
