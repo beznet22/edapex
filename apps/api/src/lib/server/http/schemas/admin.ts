@@ -57,7 +57,7 @@ export const claimLinkDirectoryQuery = z
       .default("all"),
     search: z.string().trim().max(200).default(""),
     page: z.coerce.number().int().positive().default(1),
-    pageSize: z.coerce.number().int().positive().max(100).default(50)
+    pageSize: z.coerce.number().int().positive().max(1_000).default(50)
   })
   .strict();
 

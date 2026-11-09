@@ -53,7 +53,9 @@ export function AdminPage() {
     Number(window.localStorage.getItem("edapex.academicId") ?? "5")
   );
   const [filters, setFilters] = useState(defaultFilters);
-  const [page, setPage] = useState<ClaimDirectoryPage | null>(null);
+  const [snapshot, setSnapshot] = useState<ClaimDirectoryPage | null>(null);
+  const [localPage, setLocalPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [created, setCreated] = useState<{ item: ClaimDirectoryItem; link: CreatedClaimLink } | null>(null);
@@ -83,9 +85,12 @@ export function AdminPage() {
     let cancelled = false;
     setLoading(true);
     setError("");
-    loadDirectory(academicId, filters)
+    loadDirectory(academicId, { ...filters, page: 1, pageSize: 1_000 })
       .then((result) => {
-        if (!cancelled) setPage(result);
+        if (!cancelled) {
+          setSnapshot(result);
+          setLocalPage(1);
+        }
       })
       .catch((cause: unknown) => {
         if (!cancelled) setError(cause instanceof Error ? cause.message : "Could not load directory");
@@ -103,10 +108,12 @@ export function AdminPage() {
     setAcademicId(next);
     window.localStorage.setItem("edapex.academicId", String(next));
     setFilters((current) => ({ ...current, page: 1 }));
+    setLocalPage(1);
   };
 
   const updateSearch = (event: ChangeEvent<HTMLInputElement>): void => {
     setFilters((current) => ({ ...current, search: event.target.value, page: 1 }));
+    setLocalPage(1);
   };
 
   const requestLink = async (item: ClaimDirectoryItem): Promise<void> => {
@@ -123,7 +130,7 @@ export function AdminPage() {
     if (item.linkId === null) return;
     try {
       await revokeClaimLink(academicId, item.linkId);
-      setPage((current) =>
+      setSnapshot((current) =>
         current === null
           ? current
           : {
@@ -252,6 +259,7 @@ export function AdminPage() {
               onValueChange={(value) => {
                 if (value === "all" || value === "staff" || value === "parent") {
                   setFilters((current) => ({ ...current, persona: value, page: 1 }));
+                  setLocalPage(1);
                 }
               }}
               value={filters.persona}
@@ -269,7 +277,10 @@ export function AdminPage() {
           <label className="grid gap-1 text-xs font-semibold text-muted-foreground">
             Status
             <Select
-              onValueChange={(value) => setFilters((current) => ({ ...current, status: value, page: 1 }))}
+              onValueChange={(value) => {
+                setFilters((current) => ({ ...current, status: value, page: 1 }));
+                setLocalPage(1);
+              }}
               value={filters.status}
             >
               <SelectTrigger className="w-full">
@@ -299,16 +310,29 @@ export function AdminPage() {
 
         <DirectoryTable
           loading={loading}
-          onNext={() => setFilters((current) => ({ ...current, page: current.page + 1 }))}
-          onPageSizeChange={(pageSize) =>
-            setFilters((current) => ({ ...current, pageSize, page: 1 }))
-          }
-          onPrevious={() => setFilters((current) => ({ ...current, page: current.page - 1 }))}
+          onNext={() => setLocalPage((current) => current + 1)}
+          onPageSizeChange={(nextPageSize) => {
+            setPageSize(nextPageSize);
+            setLocalPage(1);
+          }}
+          onPrevious={() => setLocalPage((current) => Math.max(1, current - 1))}
           onRequest={(item) => void requestLink(item)}
           onRevoke={(item) => void revoke(item)}
-          page={page}
-          pageNumber={filters.page}
-          pageSize={filters.pageSize}
+          page={
+            snapshot === null
+              ? null
+              : {
+                  ...snapshot,
+                  items: snapshot.items.slice(
+                    (localPage - 1) * pageSize,
+                    localPage * pageSize
+                  ),
+                  page: localPage,
+                  pageSize
+                }
+          }
+          pageNumber={localPage}
+          pageSize={pageSize}
         />
       </div>
     </main>

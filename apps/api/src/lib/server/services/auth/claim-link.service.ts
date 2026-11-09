@@ -185,7 +185,7 @@ export class ClaimLinkService {
         .some((value) => value.includes(search));
     });
 
-    const pageSize = Math.min(Math.max(input.pageSize, 1), 100);
+    const pageSize = Math.min(Math.max(input.pageSize, 1), 1_000);
     const page = Math.max(input.page, 1);
     const start = (page - 1) * pageSize;
     return {
