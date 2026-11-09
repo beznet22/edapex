@@ -59,18 +59,35 @@ values and drops a row only when a non-null FK cannot be satisfied.
 
 ## Production runbook (requires explicit approval)
 
-The rehearsal is local-only. The production sequence is:
+The rehearsal is local-only. The production sequence is owned by
+[`docs/cloudflare-port/cutover/runbook.md`](../../../../docs/cloudflare-port/cutover/runbook.md)
+and the checklist/monitoring/rollback pack beside it. The current target is a
+**fresh** D1/R2 load from the final frozen snapshot; no production database
+exists yet. Abort if a non-empty production D1 is found; a delta needs a
+separate design.
+
+Run the preflight against the final dump before any remote command:
+
+```bash
+pnpm run cutover:preflight -- \
+  --source <FINAL_DUMP> \
+  --out .tmp/cutover-plan \
+  --digest '<04a shared digest>' \
+  --fresh
+```
+
+It writes `cutover-plan.json`, `d1-load.sh`, `d1-verify.sh` and
+`photo-upload.sh`; review them, then follow the runbook. The remote sequence is:
 
 ```bash
 wrangler d1 migrations apply DB --remote
-node scripts/migration/transform-cli.mjs --source edapexdb.sql \
-  --out .tmp/migration/prod --digest <the 04a shared digest>
-# execute the generated tier files with wrangler d1 execute DB --remote --file=...
+bash .tmp/cutover-plan/d1-load.sh
+bash .tmp/cutover-plan/d1-verify.sh
 # then, through the normal admin login (never the rehearsal minting path):
 #   integrity -> bootstrap (activate:false) -> staffing review -> activation
-#   -> archive 1..4 -> promotion -> quarantine -> readiness
+#   -> archive 1/2/4 -> promotion -> quarantine -> readiness -> switch
 ```
 
-Do not run the remote steps until the rehearsal evidence is reviewed and the
-cutover owner approves the maintenance window. `main` is never pushed by this
-phase.
+Do not run the remote steps until the rehearsal/preflight evidence is reviewed
+and the cutover owner approves the maintenance window. `main` is never pushed by
+this phase.

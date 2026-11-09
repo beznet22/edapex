@@ -22,13 +22,13 @@ describe("middleware order", () => {
     const response = await request(app, "/api/v1/me", {
       method: "OPTIONS",
       headers: {
-        origin: "http://localhost:5173",
+        origin: "https://app.llacademy.ng",
         "access-control-request-method": "GET"
       }
     });
     expect(response.status).toBe(204);
     expect(response.headers.get("access-control-allow-origin")).toBe(
-      "http://localhost:5173"
+      "https://app.llacademy.ng"
     );
   });
 

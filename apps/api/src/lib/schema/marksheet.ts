@@ -199,7 +199,7 @@ export const subjectAssignedSchema = z.object({
 });
 export type SubjectAssigned = z.infer<typeof subjectAssignedSchema>;
 
-export const marksheetSchema = z
+const marksheetObjectSchema = z
   .object({
     school: schoolSchema,
     student: studentSchema,
@@ -210,7 +210,9 @@ export const marksheetSchema = z
     remark: remarkSchema,
     examType: examType.optional(),
     recordId: z.int().nullable().optional()
-  })
+  });
+
+export const marksheetSchema = marksheetObjectSchema
   .superRefine(async (data, ctx) => {
     if (data.student.category === "DAYCARE") return;
     if (data.records.length !== data.subjects.length) {
@@ -229,5 +231,8 @@ export const marksheetSchema = z
       });
     }
   });
+
+/** Historical archives may contain extra legacy records for a subject. */
+export const archivedMarksheetSchema = marksheetObjectSchema;
 
 export type Marksheet = z.infer<typeof marksheetSchema>;

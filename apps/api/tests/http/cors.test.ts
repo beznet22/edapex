@@ -9,7 +9,7 @@ describe("CORS", () => {
     const response = await request(app, "/api/v1/me", {
       method: "OPTIONS",
       headers: {
-        origin: "http://localhost:5173",
+        origin: "https://app.llacademy.ng",
         "access-control-request-method": "PATCH",
         "access-control-request-headers": "content-type"
       }
@@ -17,7 +17,7 @@ describe("CORS", () => {
 
     expect(response.status).toBe(204);
     expect(response.headers.get("access-control-allow-origin")).toBe(
-      "http://localhost:5173"
+      "https://app.llacademy.ng"
     );
     expect(response.headers.get("access-control-allow-credentials")).toBe("true");
     expect(response.headers.get("access-control-allow-methods")).toContain("PATCH");
@@ -42,11 +42,11 @@ describe("CORS", () => {
 
   it("adds the allowlisted origin to actual responses", async () => {
     const response = await request(app, "/health", {
-      headers: { origin: "http://localhost:5173" }
+      headers: { origin: "https://app.llacademy.ng" }
     });
     expect(response.status).toBe(200);
     expect(response.headers.get("access-control-allow-origin")).toBe(
-      "http://localhost:5173"
+      "https://app.llacademy.ng"
     );
   });
 });
