@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 
-import { applyTurnEvent, initialTurn } from "@edapex/chat";
+import { createRuntimeState, reduceRuntime } from "@edapex/chat";
 import type {
   CapabilityManifest,
   ChatMessage,
@@ -66,13 +66,17 @@ export function WorkspacePage() {
   const [session, setSession] = useState<SessionView | null>(null);
   const [manifest, setManifest] = useState<CapabilityManifest | null>(null);
   const [messages, setMessages] = useState<readonly ChatMessage[]>([]);
-  const [turn] = useState(() =>
-    applyTurnEvent(initialTurn(), { type: "restore_complete" })
-  );
+  const [runtimeState] = useState(() => {
+    const initial = createRuntimeState();
+    return reduceRuntime(initial, {
+      type: "turn",
+      event: { type: "restore_complete" }
+    }).state;
+  });
   const runtime: WorkspaceRuntimeView = {
     connected: false,
-    state: turn.state,
-    turn
+    state: runtimeState.turn.state,
+    turn: runtimeState.turn
   };
   const [authMode, setAuthMode] = useState<AuthMode>("google");
   const [email, setEmail] = useState("");
