@@ -11,10 +11,10 @@
 
 export const EXPECTED_COUNTS = Object.freeze({
   total: 53,
-  mapped: 37,
+  mapped: 36,
   merged: 2,
   deleted: 7,
-  retired: 5,
+  retired: 6,
   out_of_scope: 2
 });
 
@@ -42,8 +42,8 @@ export const SERVICE_METHOD_MAP = [
   { source: "assessment", method: "getStudentsByClassSection", disposition: "deleted", destination: null, reason: "single repository call" },
   { source: "assessment", method: "getAssignedSubjects", disposition: "deleted", destination: null, reason: "single repository call" },
 
-  // auth.service.ts — 9 mapped, 5 retired, 2 out of scope
-  { source: "auth", method: "login", disposition: "mapped", destination: "auth/auth.service.ts" },
+  // auth.service.ts — 8 mapped, 6 retired, 2 out of scope
+  { source: "auth", method: "login", disposition: "retired", destination: null, reason: "passwordless target; magic link and Google replace password sign-in" },
   { source: "auth", method: "getSession", disposition: "mapped", destination: "auth/session.service.ts" },
   { source: "auth", method: "refresh", disposition: "mapped", destination: "auth/session.service.ts" },
   { source: "auth", method: "logout", disposition: "mapped", destination: "auth/session.service.ts" },

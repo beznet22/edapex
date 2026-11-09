@@ -2,49 +2,42 @@ import { eq } from "drizzle-orm";
 import { env } from "cloudflare:workers";
 import { beforeAll, describe, expect, it } from "vitest";
 
-import { authSessions, users } from "../../src/lib/server/db/schema";
+import { authSessions } from "../../src/lib/server/db/schema";
 import {
   createService,
   createServiceContext
 } from "../../src/lib/server/services/context";
-import { AuthService, SessionService } from "../../src/lib/server/services/auth";
+import { SessionService, issueSession } from "../../src/lib/server/services/auth";
 import { AuthError } from "../../src/lib/server/services/errors";
-import { sha256Hex } from "../../src/lib/server/services";
 import { database, seedTwoSchools } from "../support/seed";
 import type { SeededSchool } from "../support/seed";
 
 const db = database(env);
 let school: SeededSchool;
-let auth: AuthService;
+let ctx: ReturnType<typeof createServiceContext>;
 let session: SessionService;
 
 beforeAll(async () => {
   const schools = await seedTwoSchools(db);
   school = schools[0];
-  await db
-    .update(users)
-    .set({ password: await sha256Hex("secret") })
-    .where(eq(users.id, school.userId));
-
-  const ctx = createServiceContext({ DB: env.DB }, null);
-  auth = createService(AuthService, ctx);
+  ctx = createServiceContext({ DB: env.DB }, null);
   session = createService(SessionService, ctx);
 });
 
 describe("session service", () => {
   it("reads, rotates and revokes a session", async () => {
-    const login = await auth.login({
-      identifier: "user1@example.test",
-      password: "secret",
-      ip: "10.2.0.1"
+    const issued = await issueSession(ctx, school.userId, {
+      ip: "10.2.0.1",
+      userAgent: null,
+      fingerprint: null
     });
 
-    const view = await session.getSession(login.token);
+    const view = await session.getSession(issued.token);
     expect(view?.user.id).toBe(school.userId);
     expect(view?.sessionId).toBeDefined();
 
-    const refreshed = await session.refresh(login.token);
-    await expect(session.getSession(login.token)).resolves.toBeNull();
+    const refreshed = await session.refresh(issued.token);
+    await expect(session.getSession(issued.token)).resolves.toBeNull();
     await expect(session.getSession(refreshed.token)).resolves.not.toBeNull();
 
     await session.logout(refreshed.token);
@@ -58,15 +51,15 @@ describe("session service", () => {
   });
 
   it("logs out every session for a user", async () => {
-    await auth.login({
-      identifier: "user1@example.test",
-      password: "secret",
-      ip: "10.2.0.2"
+    await issueSession(ctx, school.userId, {
+      ip: "10.2.0.2",
+      userAgent: null,
+      fingerprint: null
     });
-    await auth.login({
-      identifier: "user1@example.test",
-      password: "secret",
-      ip: "10.2.0.3"
+    await issueSession(ctx, school.userId, {
+      ip: "10.2.0.3",
+      userAgent: null,
+      fingerprint: null
     });
 
     await session.logoutAll(school.userId);
@@ -78,12 +71,12 @@ describe("session service", () => {
   });
 
   it("keeps the mobile aliases wired to the same lifecycle", async () => {
-    const login = await auth.login({
-      identifier: "user1@example.test",
-      password: "secret",
-      ip: "10.2.0.4"
+    const issued = await issueSession(ctx, school.userId, {
+      ip: "10.2.0.4",
+      userAgent: null,
+      fingerprint: null
     });
-    const refreshed = await session.refreshMobile(login.token);
+    const refreshed = await session.refreshMobile(issued.token);
     await session.logoutMobile(refreshed.token);
     await expect(session.getSession(refreshed.token)).resolves.toBeNull();
   });

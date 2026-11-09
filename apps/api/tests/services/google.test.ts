@@ -40,7 +40,6 @@ const google: GoogleOAuthPort = {
 const config = (googleConfigured: boolean) => ({
   claimEnabled: true,
   claimDigest: "a".repeat(64),
-  legacyPasswordLogin: false,
   cookieSecret: SECRET,
   googleConfigured,
   postLoginRedirect: "/"

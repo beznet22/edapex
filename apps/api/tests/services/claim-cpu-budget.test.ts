@@ -37,7 +37,6 @@ beforeAll(async () => {
       authConfig: {
         claimEnabled: true,
         claimDigest: digest,
-        legacyPasswordLogin: false,
         cookieSecret: SECRET,
         googleConfigured: true,
         postLoginRedirect: "/"

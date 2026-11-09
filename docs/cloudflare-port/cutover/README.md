@@ -3,7 +3,7 @@
 Status: **executed and closed.** Production D1/R2, the Worker, the live-only
 load, the domain switch, `/claim` enablement, the 24 h watch, the production
 rollback drill and the owner POC login are complete. The Phase 8 checklist is
-signed; Phase 9A is in progress.
+signed; Phase 9A code is complete but the production auth-population gate is blocked.
 
 This pack turns Phase 8 of the [roadmap](../ROADMAP.md) into an ordered,
 rehearsable production procedure. It implements the cutover section of

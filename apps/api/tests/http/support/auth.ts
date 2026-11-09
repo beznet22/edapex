@@ -9,7 +9,6 @@ export const claimConfig = async (
 ): Promise<AuthConfigPort> => ({
   claimEnabled: true,
   claimDigest: await sha256Hex(SHARED_CLAIM_PASSWORD),
-  legacyPasswordLogin: false,
   cookieSecret: COOKIE_SECRET,
   googleConfigured: true,
   postLoginRedirect: "/app",

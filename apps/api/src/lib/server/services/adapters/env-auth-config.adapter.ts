@@ -3,7 +3,6 @@ import type { AuthConfigPort } from "../ports/auth-config.port";
 export interface AuthConfigEnv {
   readonly CLAIM_ENABLED?: string;
   readonly CLAIM_PASSWORD_DIGEST?: string;
-  readonly LEGACY_PASSWORD_LOGIN?: string;
   readonly AUTH_COOKIE_SECRET?: string;
   readonly GOOGLE_CLIENT_ID?: string;
   readonly GOOGLE_CLIENT_SECRET?: string;
@@ -38,7 +37,6 @@ export function createAuthConfig(env: AuthConfigEnv): AuthConfigPort {
   return Object.freeze({
     claimEnabled,
     claimDigest: claimEnabled && digest !== null ? digest.toLowerCase() : null,
-    legacyPasswordLogin: claimEnabled ? false : env.LEGACY_PASSWORD_LOGIN !== "0",
     cookieSecret,
     googleConfigured,
     postLoginRedirect: present(env.POST_LOGIN_REDIRECT) ?? "/"

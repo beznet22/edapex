@@ -1,4 +1,3 @@
-export * from "./auth.service";
 export * from "./auth-events";
 export * from "./claim-link";
 export * from "./claim-policy";
@@ -7,6 +6,7 @@ export * from "./code-normalisation";
 export * from "./claim-reset.service";
 export * from "./duplicate-email.service";
 export * from "./google.service";
+export * from "./magic-link.service";
 export * from "./profile.service";
 export * from "./rate-limit.service";
 export * from "./session-issuance";

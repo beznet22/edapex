@@ -7,8 +7,8 @@ const typeCoverage = (client: ApiClient): void => {
   void client.health.$get;
   void client.uploads.students[":file"].$get;
 
-  void client.api.v1.auth.login.$post;
-  void client.api.v1.auth.mobile.login.$post;
+  void client.api.v1.auth["magic-link"].$post;
+  void client.api.v1.auth["magic-link"].verify.$get;
   void client.api.v1.auth.logout.$post;
   void client.api.v1.auth["logout-all"].$post;
   void client.api.v1.auth.refresh.$post;

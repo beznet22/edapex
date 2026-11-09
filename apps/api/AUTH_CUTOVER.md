@@ -1,6 +1,6 @@
-# Auth cutover (Phase 5)
+# Auth cutover (Phase 5) and target auth (Phase 9A)
 
-The transitional claim flow from [`04a`](../../docs/cloudflare-port/04a-auth-cutover.spec.md). It is time-boxed: the routes are removed on the announced date and replaced by the target sign-in in [`04`](../../docs/cloudflare-port/04-auth-identity.spec.md).
+The transitional claim flow from [`04a`](../../docs/cloudflare-port/04a-auth-cutover.spec.md) is time-boxed. Phase 9A removes password sign-in and adds magic link; the claim route is removed on **2026-12-03**. The target is [`04`](../../docs/cloudflare-port/04-auth-identity.spec.md).
 
 ## Flags and secrets
 
@@ -9,7 +9,6 @@ The transitional claim flow from [`04a`](../../docs/cloudflare-port/04a-auth-cut
 | `CLAIM_ENABLED` | var/secret | unset | `"1"` enables `/claim` and the claim-purpose Google link. Requires a valid digest and cookie secret, otherwise the routes stay 404. |
 | `CLAIM_PASSWORD_DIGEST` | secret | unset | SHA-256 hex of the shared claim password. Invalid values disable claim. |
 | `AUTH_COOKIE_SECRET` | secret | unset | HMAC key for the claim ticket and the OAuth state cookie. Missing disables claim. |
-| `LEGACY_PASSWORD_LOGIN` | var | on | `"0"` retires `/auth/login` and `/auth/mobile/login`. Forced off whenever claim is enabled. |
 | `GOOGLE_CLIENT_ID` | secret | unset | Google OAuth client id. |
 | `GOOGLE_CLIENT_SECRET` | secret | unset | Google OAuth client secret. |
 | `GOOGLE_REDIRECT_URI` | var/secret | unset | Registered callback, e.g. `https://api.example.com/api/v1/auth/google/callback`. |
@@ -21,7 +20,9 @@ Google routes are 404 until all three `GOOGLE_*` values are present. Set secrets
 
 | Method | Path | Notes |
 |---|---|---|
-| POST | `/api/v1/auth/claim` | Always 202 for unknown and valid addresses; sets the claim ticket only on success. |
+| POST | `/api/v1/auth/claim` | Transitional; always 202 for unknown and valid addresses; removed 2026-12-03. |
+| POST | `/api/v1/auth/magic-link` | Always 202 for known and unknown addresses; sends a 15-minute single-use link. |
+| GET | `/api/v1/auth/magic-link/verify` | Consumes the link, sets `email_verified_at`, sets the session cookie and redirects. |
 | GET | `/api/v1/auth/google/start` | 302 for `Accept: text/html`, JSON otherwise. Binds state + PKCE in an HttpOnly cookie. |
 | GET | `/api/v1/auth/google/callback` | Verifies state, exchanges the code, links the identity, sets the session cookie. |
 | POST | `/api/v1/auth/code` | Student code sign-in; sets the session cookie. |
@@ -49,7 +50,7 @@ Admin routes require a session, `X-Academic-Id`, the tenant pair or neither, and
 6. Enable `/claim` and announce the removal date.
 7. Work the duplicate queue: reassign, merge unlinked duplicates, flag the rest.
 8. Monitor `auth_events` for `claim_*`, `google_signin`, `code_*`, `account_*`.
-9. On the removal date delete the claim/Google routes, NULL remaining passwords, and publish the target sign-in.
+9. On 2026-12-03 delete the claim route and claim admin reset, NULL remaining password digests, and keep Google, magic link and student-code sign-in as the target. Password login routes are already removed.
 
 ## Local benchmark
 

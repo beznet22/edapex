@@ -38,7 +38,6 @@ beforeAll(async () => {
   const authConfig = {
     claimEnabled: true,
     claimDigest: digest,
-    legacyPasswordLogin: false,
     cookieSecret: "reset-cookie-secret",
     googleConfigured: true,
     postLoginRedirect: "/"

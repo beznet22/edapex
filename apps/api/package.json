@@ -46,7 +46,9 @@
     "cutover:live-verify": "node scripts/cutover/live-verify.mjs",
     "cutover:photo-inventory": "node scripts/cutover/photo-inventory.mjs",
     "cutover:missing-photo-students": "node scripts/cutover/missing-photo-students.mjs",
-    "cutover:photo-audit": "node scripts/cutover/photo-audit.mjs"
+    "cutover:photo-audit": "node scripts/cutover/photo-audit.mjs",
+    "phase9:retention-dry-run": "node scripts/phase9/retention-dry-run.mjs",
+    "phase9:archive-manifests": "node scripts/phase9/archive-manifests.mjs"
   },
   "dependencies": {
     "drizzle-orm": "^0.44.7",

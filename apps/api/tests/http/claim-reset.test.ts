@@ -26,7 +26,7 @@ beforeAll(async () => {
   school = first;
   await setPassword(school, "secret");
   await makeAdmin(school);
-  app = testApp({ authConfig: await claimConfig({ legacyPasswordLogin: true }) });
+  app = testApp({ authConfig: await claimConfig() });
   cookie = await login(app, "user1@example.test", "secret");
 });
 

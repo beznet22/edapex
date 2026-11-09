@@ -32,10 +32,12 @@ console.log(
 
 if (process.argv.includes("--self-test")) {
   const duplicate = [...SERVICE_METHOD_MAP, { ...SERVICE_METHOD_MAP[0] }];
+  const mapped = SERVICE_METHOD_MAP.find((row) => row.disposition === "mapped");
+  if (mapped === undefined) throw new Error("service map has no mapped row for self-test");
   const missingDestination = SERVICE_METHOD_MAP.map((row) =>
-    row.method === "login" ? { ...row, destination: null } : row
+    row === mapped ? { ...row, destination: null } : row
   );
-  const badCount = SERVICE_METHOD_MAP.filter((row) => row.method !== "login");
+  const badCount = SERVICE_METHOD_MAP.filter((row) => row !== SERVICE_METHOD_MAP[0]);
 
   const checks = [
     report("self-test duplicate detection", validateMethodMap(duplicate)),
