@@ -4,7 +4,7 @@
 
 ## Summary
 
-- Current HTTP: **94 method/path operations across 87 unique paths** (automated extraction).
+- Current HTTP: **99 method/path operations across 92 unique paths** (automated extraction plus 10A).
 - Agent-facing tools: **role packs**, not one tool per endpoint.
 - Local workspace tools: Tauri/Rust commands, not HTTP endpoints.
 - Phase 9B: documentation only.
@@ -38,6 +38,7 @@
 | Method | Path |
 |---|---|
 | GET, PATCH | `/api/v1/me` |
+| GET | `/api/v1/agent/capabilities` |
 | GET, POST | `/api/v1/settings/academic-years` |
 | GET, PUT | `/api/v1/settings/academic-years/active` |
 | GET, POST | `/api/v1/settings/exam-types` |
@@ -119,6 +120,10 @@
 | DELETE | `/api/v1/admin/student-codes/:studentId` |
 | POST | `/api/v1/admin/tokens/:tokenId/revoke` |
 | POST | `/api/v1/admin/results/:id/override` |
+| GET | `/api/v1/admin/issues` |
+| GET | `/api/v1/admin/issues/:id` |
+| POST | `/api/v1/admin/issues/:id/plan` |
+| POST | `/api/v1/admin/issues/:id/apply` |
 
 The current tree contains other internal Hono context reads (`c.get("ctx")`) that are not route operations; the inventory excludes them.
 
@@ -189,7 +194,7 @@ The exact tool schema is generated from the capability registry; the 87 HTTP pat
 | **8** | Existing cutover only; no new endpoints |
 | **9A** | Magic-link auth, claim retirement, digest cleanup, retention; existing auth endpoints |
 | **9B** | Documentation only — this inventory and UI/capability specs |
-| **10A** | Capability manifest, admin issues plan/apply, capability registry |
+| **10A** | Capability manifest, admin issues plan/apply, capability registry **(implemented)** |
 | **10B** | UI only; consumes 10A and existing endpoints |
 | **10C** | Local agent/Needle/iroh; device registration/revocation endpoint |
 | **10D** | Local workflow/shell/sandbox and artifact UI commands; no HTTP |

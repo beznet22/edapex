@@ -1,6 +1,6 @@
 # Workspace Programme Roadmap
 
-**Status:** Phase 9B draft. Phase 8 and the Phase 9A platform are **done**. `app.llacademy.ng` is live via a proxied Pages CNAME; migration 0006 and Worker `bfa72530` are deployed. The transitional `/claim` route and shared password digests are explicitly carried into **10G.2** after cowork workspace completion. Student codes, duplicate-email resolution and staff/parent provisioning are carried into **10G.1**. Do not remove `/claim` on 2026-12-03. Phase 10 remains blocked until 9B approval and 10A.
+**Status:** Phase 9B **approved**; 10A in progress. Phase 8 and the Phase 9A platform are **done**. `app.llacademy.ng` is live via a proxied Pages CNAME; migration 0006 and Worker `bfa72530` are deployed. The transitional `/claim` route and shared password digests are explicitly carried into **10G.2** after cowork workspace completion. Student codes, duplicate-email resolution and staff/parent provisioning are carried into **10G.1**. The former 2026-12-03 `/claim` removal date is withdrawn. Phase 10 is approved and 10A is in progress.
 
 ## 0. Agent operating instructions — read first
 
@@ -59,8 +59,8 @@ The workspace is a general office-agent harness. EdApex is a capability/tool pac
 |---|---|---|
 | Phase 8 — cutover | **done** | 24 h watch closed 2026-11-09; owner POC login confirmed; checklist signed; 2,298 EdApex requests/0 errors, D1 96 write queries/180 rows, FK 0. See `docs/cloudflare-port/PROGRESS.md`. |
 | Phase 9A — auth/retention + workspace wiring | **done (platform)** | Migration 0006; Worker `bfa72530`; Pages `edapex-web.pages.dev`; proxied CNAME `app.llacademy.ng` → `edapex-web.pages.dev`; app root/claim/admin 200; API smoke green. `/claim` and shared digests stay transitional in 10G.2. |
-| Phase 9B — workspace handoff docs | **draft** | 28 markdown files under `docs/workspace/`; awaiting approval. |
-| Phase 10 — workspace implementation | **blocked** | Requires Phase 9A platform deployment, Phase 9B approval and 10A. |
+| Phase 9B — workspace handoff docs | **approved 2026-11-09** | 28 markdown files under `docs/workspace/`. |
+| Phase 10 — workspace implementation | **in progress** | 10A capability contract implemented; 10B shell is next. |
 | Phase 10G.1 — identity provisioning | **deferred, starts with 10B** | Admin claim links, student codes, duplicate resolution and staff/parent linking. |
 | Phase 10G.2 — transitional retirement | **deferred after 10F** | Remove `/claim`, null/drop password digests, retention execution. |
 
@@ -335,7 +335,7 @@ Do not restate cutover details here; use `docs/cloudflare-port/PROGRESS.md` and 
 - Phase 8 signed
 - Phase 9A platform deployed
 - Phase 9B approved
-- 10A capability contract approved
+- 10A capability contract implemented and reviewed
 - explicit owner approval to start
 - 10G.2 excluded from this gate and closes after 10F
 

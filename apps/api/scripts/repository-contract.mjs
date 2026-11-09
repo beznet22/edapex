@@ -12,6 +12,8 @@ export const AGGREGATES = {
     "infixRoles",
     // §6.3 pre-tenant path: login resolves the staff persona before a tenant exists.
     "smStaffs",
+    // Admin provisioning creates the pending user and links the guardian identity.
+    "smParents",
     "authSessions",
     "authIdentities",
     "authEvents",

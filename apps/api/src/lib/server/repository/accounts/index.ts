@@ -10,3 +10,4 @@ export * from "./claim-admin.repo";
 export * from "./code.repo";
 export * from "./magic-link.repo";
 export * from "./merge.repo";
+export * from "./provisioning.repo";

@@ -1,6 +1,6 @@
 # EdApex Workspace Programme
 
-**Status:** Phase 9B handoff — draft audited, awaiting approval. Phase 8 and the Phase 9A platform are complete. `app.llacademy.ng` is live via a proxied Pages CNAME; migration 0006 and Worker `bfa72530` are deployed. `/claim` and shared password digests are carried to Phase 10G.2 after workspace completion; student codes and duplicate resolution are carried to 10G.1. Phase 10 remains blocked until 9B approval and 10A.
+**Status:** Phase 9B approved; 10A capability contract in progress. Phase 8 and the Phase 9A platform are complete. `app.llacademy.ng` is live via a proxied Pages CNAME; migration 0006 and Worker `bfa72530` are deployed. `/claim` and shared password digests are carried to Phase 10G.2 after workspace completion; student codes and duplicate resolution are carried to 10G.1. Phase 10 has started: 9B is approved and 10A is in progress.
 
 This folder is the home for the local-first cowork workspace that follows the EdApex production cutover. It covers the React/Tauri web and desktop clients, the local agent, the shared Rust core, capabilities, GenUI, the document engine, workflows, synchronization and evaluation.
 
@@ -172,7 +172,7 @@ Workspace performance numbers (Tauri, Pages, Needle 3, iroh, GenUI, document eng
 | [`specs/80-v2-native-mobile.md`](./specs/80-v2-native-mobile.md) | RN/Lynx/Flutter v2 options, OpenUI RN correction and GenUI gate |
 | [`extracted-ui-spec.md`](./extracted-ui-spec.md) | OpenDuet interaction/UI reference |
 
-All workspace specs are **Phase 9B drafts** until the roadmap gate is approved. The port README’s “done” statuses refer to the port spec suite, not these workspace drafts.
+Phase 9B is approved; the workspace specs are authoritative for implementation. The port README’s “done” statuses refer to the port spec suite, not these workspace drafts.
 
 ## Reading order
 
@@ -186,8 +186,8 @@ All workspace specs are **Phase 9B drafts** until the roadmap gate is approved. 
 
 - **Phase 8 — done:** 24 h watch, owner POC login verification and signed checklist.
 - **Phase 9A — done (platform):** migration 0006, Worker, Pages and `app.llacademy.ng` are live; app root/claim/admin 200. `/claim` and digest nulling are deferred to **10G.2**; student codes and duplicate resolution to **10G.1**.
-- **Phase 9B — draft:** this documentation set, awaiting approval.
-- **Phase 10 — blocked:** requires the Phase 9A platform deployment, Phase 9B approval and 10A capability contract. 10G.2 closes after 10F.
+- **Phase 9B — approved:** this documentation set is the implementation baseline.
+- **Phase 10 — in progress:** 10A capability contract; 10B shell follows. 10G.2 closes after 10F.
 
 ## Non-goals for Phase 9B
 

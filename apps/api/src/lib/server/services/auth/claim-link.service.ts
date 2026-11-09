@@ -1,19 +1,21 @@
 import type { ServiceContext } from "../context";
 import { requireScopedContext, requireUnscopedContext } from "../context";
-import { randomToken, sha256Hex } from "../crypto/digest";
-import {
-  AuthError,
-  ConflictError,
-  NotFoundError,
-  ValidationError
-} from "../errors";
+import { sha256Hex } from "../crypto/digest";
+import { AuthError, ConflictError, NotFoundError } from "../errors";
 import { CLAIM_TICKET_TTL_SECONDS } from "./claim-policy";
 import type { ClaimTicketPayload } from "./claim-policy";
 import { signPayload } from "../crypto/signed-payload";
 import { emitAuthEvent } from "./auth-events";
+import { createClaimLink } from "./claim-link-create";
+import type {
+  ClaimLinkPersona,
+  CreateClaimLinkInput,
+  CreatedClaimLink
+} from "./claim-link-create";
+
+export type { ClaimLinkPersona, CreateClaimLinkInput, CreatedClaimLink };
 
 export type ClaimLinkStatus = "none" | "active" | "expired" | "used" | "revoked";
-export type ClaimLinkPersona = "staff" | "parent";
 
 export interface ClaimDirectoryItem {
   readonly persona: ClaimLinkPersona;
@@ -95,19 +97,6 @@ const statusMatches = (item: ClaimDirectoryItem, status: ClaimDirectoryQuery["st
       return item.linkStatus === "revoked";
   }
 };
-
-export interface CreateClaimLinkInput {
-  readonly subjectType: ClaimLinkPersona;
-  readonly subjectId: number;
-  readonly ttlHours: number;
-  readonly adminUserId: number;
-}
-
-export interface CreatedClaimLink {
-  readonly id: string;
-  readonly url: string;
-  readonly expiresAt: number;
-}
 
 export interface ExchangedClaimLink {
   readonly ticket: string;
@@ -196,80 +185,7 @@ export class ClaimLinkService {
   }
 
   async create(input: CreateClaimLinkInput): Promise<CreatedClaimLink> {
-    const config = this.ctx.ports.authConfig;
-    if (!config.claimLinkEnabled) throw new ConflictError("Claim links are not enabled");
-    if (input.ttlHours < 1 || input.ttlHours > 168) {
-      throw new ValidationError("ttlHours must be between 1 and 168", "ttlHours");
-    }
-
-    const scoped = requireScopedContext(this.ctx.repos.ctx);
-    const subject =
-      input.subjectType === "parent"
-        ? await this.ctx.repos.queries.findParentClaimSubject(scoped, input.subjectId)
-        : await this.ctx.repos.queries.findStaffClaimSubject(scoped, input.subjectId);
-    if (subject === null) {
-      throw new NotFoundError(input.subjectType, input.subjectId);
-    }
-    if (subject.userId !== null) {
-      const account = await this.ctx.repos.queries.findAccountInTenant(
-        scoped,
-        subject.userId
-      );
-      if (account === null) throw new NotFoundError("user", subject.userId);
-      if (account.claimStatus === "flagged") {
-        throw new ConflictError("This account is flagged for administrative review");
-      }
-      if (account.claimStatus === "claimed") {
-        throw new ConflictError("This account is already claimed");
-      }
-    }
-    const email = subject.email?.trim().toLowerCase() ?? "";
-    if (email.length === 0) {
-      throw new ValidationError("The record has no email address", "subjectId");
-    }
-
-    const now = this.ctx.ports.clock.now();
-    const userId =
-      subject.userId ?? (await this.ctx.repos.queries.provisionSubjectUser(scoped, subject));
-    const token = randomToken();
-    const id = crypto.randomUUID();
-    const expiresAt = now + input.ttlHours * 3600;
-    await this.ctx.repos.accounts.createMagicLink(scoped, {
-      id,
-      userId,
-      email,
-      subjectType: input.subjectType,
-      subjectId: input.subjectId,
-      schoolId: scoped.tenant.schoolId,
-      createdBy: input.adminUserId,
-      tokenHash: await sha256Hex(token),
-      purpose: "claim_link",
-      expiresAt,
-      requestedIp: null,
-      createdAt: now
-    });
-    await emitAuthEvent(
-      this.ctx,
-      {
-        type: "claim_link_issued",
-        userId,
-        email,
-        metadata: {
-          claimLinkId: id,
-          adminUserId: input.adminUserId,
-          ttlHours: input.ttlHours,
-          subjectType: input.subjectType,
-          subjectId: input.subjectId
-        }
-      },
-      now
-    );
-
-    return {
-      id,
-      url: `${config.appOrigin}/claim#token=${token}`,
-      expiresAt
-    };
+    return createClaimLink(this.ctx, input);
   }
 
   async revoke(linkId: string): Promise<void> {

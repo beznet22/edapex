@@ -3,12 +3,14 @@ import type { MiddlewareHandler } from "hono";
 
 import type { AppContext } from "../env";
 import { requireAdmin } from "../middleware/authorize";
+import { agent } from "./agent.routes";
 import { adminAuth } from "./admin-auth.routes";
 import { adminArchive } from "./admin-archive.routes";
 import { adminClaimLinks } from "./admin-claim-links.routes";
 import { adminBootstrap } from "./admin-bootstrap.routes";
 import { adminDuplicateActions } from "./admin-duplicate-actions.routes";
 import { adminDuplicateEmails } from "./admin-duplicate-emails.routes";
+import { adminIssues } from "./admin-issues.routes";
 import { adminJobs } from "./admin-jobs.routes";
 import { adminMigration } from "./admin-migration.routes";
 import { adminPromotion } from "./admin-promotion.routes";
@@ -49,11 +51,13 @@ export const createProtectedRoutes = (
     .use("/subjects/*", tenant)
     .use("/attendance", tenant)
     .use("/assessments/*", tenant)
+    .use("/agent/*", tenant)
     .use("/settings/*", tenant)
     .use("/admin", tenant)
     .use("/admin/*", tenant)
     .use("/admin/*", requireAdmin)
     .route("/auth", protectedAuth)
+    .route("/agent", agent)
     .route("/me", me)
     .route("/students", students)
     .route("/students", studentPhotos)
@@ -85,5 +89,6 @@ export const createProtectedRoutes = (
     .route("/admin", adminJobs)
     .route("/admin", adminArchive)
     .route("/admin", adminClaimLinks)
+    .route("/admin", adminIssues)
     .route("/admin", adminTokens)
     .route("/admin", adminResults);

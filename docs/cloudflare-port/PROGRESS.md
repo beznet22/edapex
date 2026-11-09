@@ -134,7 +134,7 @@ student codes, duplicate resolution and staff/parent coverage to **10G.1**. See
 - [x] Signed Phase 8 checklist: Owner, 2026-11-09T02:55Z
 
 ### Phase 9 — Post-cutover
-- [ ] `/claim` removed on the announced date — **moved to workspace 10G.2; do not execute 2026-12-03**
+- [ ] `/claim` removed on the announced date — **moved to workspace 10G.2; the former 2026-12-03 date is withdrawn**
 - [ ] Password digests nulled, column dropped later — **moved to workspace 10G.2; 1,611 non-null**
 - [x] Retention sweep dry-run matches expectations — 0 old academic years / 0 operational rows
 - [x] Session archives 1–4 manifest verified — session 1 652/652, session 2 0/0, session 4 641/641; missing manifests repaired in R2
@@ -207,7 +207,7 @@ student codes, duplicate resolution and staff/parent coverage to **10G.1**. See
 | 2026-11-08 | 8 | Production rollback drill passed: detached `api.llacademy.ng` from EdApex (523), attached it back to POC (root 200), then restored EdApex (`/health` 200). Final smoke: protected 401, claim 202, archived transcript 200, integrity green (663 current records, 42 reviewed), `sms-api` 200, portal 200. Rollback drill complete; 24 h watch and owner POC login remain | Kimchi |
 | 2026-11-09 | 8 | **Phase 8 gate closed.** 24 h watch: EdApex 2,298 requests / 0 errors, p95 31.6 ms; POC 1,352 / 0 errors; D1 96 write queries / 180 rows; 2 claim probes, 0 tickets, 0 new sessions. FK 0; archives 1,293/3,802; 663 active-year records; public photo 200; CORS 204. Owner POC login confirmed and checklist signed. POC `/health` is 404 by design; root returns 200 JSON, monitoring corrected | Kimchi |
 | 2026-11-09 | 9 | Phase 9A code complete: magic-link endpoint/service/tests, password-login retirement, 7-year retention dry-run (0 rows), archive manifests repaired/verified (1,293 objects; 652/0/641), root pnpm workspace + CI job + deploy dry-run. Full gate 125 files / 609 tests | Kimchi |
-| 2026-11-09 | 9 | **Phase 9A blocked:** production has 0 student codes, 0 linked identities, 24 duplicate-email groups and 1,611 non-null password digests. Do not remove `/claim` on 2026-12-03 without owner risk acceptance; students have no fallback | Kimchi |
+| 2026-11-09 | 9 | **Phase 9A blocked:** production has 0 student codes, 0 linked identities, 24 duplicate-email groups and 1,611 non-null password digests. The former 2026-12-03 `/claim` removal date is withdrawn; 10G.2 now owns removal | Kimchi |
 | 2026-11-09 | 9 | Admin claim-link slice: migration 0006 adds subject/school/creator/revocation columns to `auth_magic_links`; per-user 72h links for staff/parent records; pending-user provisioning for records with no user; non-Gmail badge/filter; `apps/web` at `app.llacademy.ng/admin/claim-links` and `/claim`; full API gate 126 files / 611 tests, web build, deploy dry-run | Kimchi |
 | 2026-11-09 | 9 | Phase 9A re-scoped: platform closeout is migration/Worker/Pages deployment. `/claim` and digest nulling move to workspace 10G.2 after 10F; student codes, duplicate resolution and staff/parent coverage move to 10G.1. This avoids reopening 9A | Kimchi |
 | 2026-11-09 | 9 | Production deployment: migration 0006 applied; Worker `bfa72530-b53b-4f6a-b771-7b9f450d3795`; Pages `edapex-web.pages.dev` deployed; `/claim` 202, magic 202, admin 401, invalid exchange 401; CORS includes Pages preview + app origin. `app.llacademy.ng` attached, pending DNS/certificate | Kimchi |

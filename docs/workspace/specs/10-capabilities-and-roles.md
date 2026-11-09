@@ -1,6 +1,6 @@
 # 10 — Capabilities and Roles
 
-**Draft.** No endpoint implementation in Phase 9B.
+**Implemented in 10A:** `GET /api/v1/agent/capabilities`, shared `@edapex/contracts`, and the admin issue plan/apply contract. Public applicant forms remain contract-only until 10E.
 
 ## Roles
 

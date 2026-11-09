@@ -1,3 +1,5 @@
+import type { CapabilityManifest } from "@edapex/contracts";
+
 export type Persona = "staff" | "parent";
 export type LinkStatus = "none" | "active" | "expired" | "used" | "revoked";
 
@@ -88,6 +90,13 @@ export const getSession = async (): Promise<SessionView | null> => {
   if (!response.ok) throw new Error(`Session check failed (${response.status})`);
   return (await response.json()) as SessionView;
 };
+
+export const loadCapabilities = async (
+  academicId: number
+): Promise<CapabilityManifest> =>
+  request<CapabilityManifest>("/api/v1/agent/capabilities", {
+    headers: { "X-Academic-Id": String(academicId) }
+  });
 
 export const loadDirectory = async (
   academicId: number,

@@ -154,7 +154,7 @@ count variance, or unresolved photo decision.
 - [x] Smoke: `/health` 200, protected route 401, public photo 200, archive retrieval sample 200, Gmail send through EdApex 200.
 - [x] 15-minute 5xx/latency watch clean.
 - [x] `CLAIM_ENABLED=1` set; deploy verified; probe `/claim` 202.
-- [x] Claim removal date announced: **2026-12-03**.
+- [x] Claim removal date announced: **2026-12-03** (former date; withdrawn — removal moved to 10G.2).
 - [x] 24 h aggregate checks recorded; no per-window incident was raised.
 - [x] Claim, 5xx and D1 budget metrics reviewed; no rollback trigger.
 - [x] Rollback window closed; MySQL retirement plan scheduled separately.

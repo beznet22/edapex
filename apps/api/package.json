@@ -51,6 +51,7 @@
     "phase9:archive-manifests": "node scripts/phase9/archive-manifests.mjs"
   },
   "dependencies": {
+    "@edapex/contracts": "workspace:^",
     "drizzle-orm": "^0.44.7",
     "hono": "^4.13.16",
     "zod": "^4.1.13"

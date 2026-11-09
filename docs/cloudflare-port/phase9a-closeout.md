@@ -5,7 +5,7 @@ Status: **code complete; production gate blocked.**
 Phase 9A code is on `phase-9a-auth`. It adds magic-link sign-in, removes password
 verification routes, adds retention/archive verification tools, and wires
 `apps/api` into the root pnpm workspace. The cutover actions are **not** safe to
-execute on 2026-12-03 without the population prerequisites below. See
+execute on the former 2026-12-03 date without the population prerequisites below. See
 [`phase9a-cutover.md`](./phase9a-cutover.md) for the exact sequence and rollback.
 
 ## Code evidence
@@ -56,7 +56,7 @@ Students have no password fallback because their codes have not been issued.
 - Do **not** deploy the password-login removal to production yet.
 - Phase 9A platform is deployed on `app.llacademy.ng`; root, `/claim` and
   `/admin/claim-links` return 200.
-- Do **not** remove `/claim` on 2026-12-03. Removal and digest nulling are
+- The former 2026-12-03 date is **withdrawn**. Do **not** remove `/claim` on that date. Removal and digest nulling are
   workspace **10G.2**, after 10F.
 - Student codes, duplicate-email resolution and staff/parent coverage are
   workspace **10G.1**.

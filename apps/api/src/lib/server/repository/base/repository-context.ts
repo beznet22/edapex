@@ -14,6 +14,14 @@ export type GeneralSettingRow = typeof smGeneralSettings.$inferSelect;
  * The 12-column active settings surface (`01a §6`). `extras` is deliberately
  * absent so the hot read never touches the 95-column tail.
  */
+export interface ClaimSubjectRow {
+  readonly subjectType: "parent" | "staff";
+  readonly subjectId: number;
+  readonly userId: number | null;
+  readonly fullName: string | null;
+  readonly email: string | null;
+}
+
 export interface CachedGeneralSetting {
   readonly id: number;
   readonly schoolId: number | null;
