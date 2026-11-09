@@ -47,7 +47,7 @@ tests/.tmp/
 basic-ai-editor/
 .kiro
 novel/
-reference/
+reference-app/
 .kimchi/
 
 # Per-school runtime data (report-settings cache, audit log)
@@ -70,3 +70,7 @@ storage/edapex-mastra.db-shm
 # Local database dumps — contain student/parent/user PII, never commit
 /edapexdb.sql
 /*.sql
+/*.zip
+
+# Rust build output
+/target/
