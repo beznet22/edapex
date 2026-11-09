@@ -37,12 +37,14 @@ export interface ServiceEnv {
   readonly MISTRAL_OCR_MODEL?: string;
   readonly MISTRAL_API_BASE_URL?: string;
   readonly CLAIM_ENABLED?: string;
+  readonly CLAIM_LINK_ENABLED?: string;
   readonly CLAIM_PASSWORD_DIGEST?: string;
   readonly AUTH_COOKIE_SECRET?: string;
   readonly GOOGLE_CLIENT_ID?: string;
   readonly GOOGLE_CLIENT_SECRET?: string;
   readonly GOOGLE_REDIRECT_URI?: string;
   readonly POST_LOGIN_REDIRECT?: string;
+  readonly APP_ORIGIN?: string;
   readonly ARCHIVE_TOKEN_SECRET?: string;
 }
 

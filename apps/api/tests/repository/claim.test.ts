@@ -49,6 +49,7 @@ describe("claim repository", () => {
         createdAt: now
       },
       session: session(schools[0].userId, "fresh", now),
+      email: "user1@example.test",
       now
     });
 
@@ -92,6 +93,7 @@ describe("claim repository", () => {
           createdAt: now
         },
         session: session(schools[1].userId, "should-not-exist", now),
+        email: "user2@example.test",
         now
       })
     ).rejects.toThrow();

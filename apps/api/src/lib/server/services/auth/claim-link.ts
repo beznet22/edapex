@@ -1,7 +1,13 @@
 import { requireUnscopedContext } from "../context";
 import type { ServiceContext } from "../context";
 import { randomToken, sha256Hex } from "../crypto/digest";
-import { AuthError, ConflictError, LinkEmailMismatchError, LinkEmailUnverifiedError } from "../errors";
+import {
+  AmbiguousEmailError,
+  AuthError,
+  ConflictError,
+  LinkEmailMismatchError,
+  LinkEmailUnverifiedError
+} from "../errors";
 import type { GoogleProfile } from "../ports/google-oauth.port";
 import { emitAuthEvent } from "./auth-events";
 import { loadAuthUser } from "./session-issuance";
@@ -11,6 +17,8 @@ import type { AuthSessionResult } from "./types";
 export interface ClaimLinkInput {
   readonly userId: number;
   readonly profile: GoogleProfile;
+  readonly allowEmailChange?: boolean;
+  readonly claimLinkId?: string | null;
   readonly ip: string | null;
   readonly userAgent: string | null;
   readonly fingerprint: string | null;
@@ -29,7 +37,9 @@ export async function completeClaim(
   input: ClaimLinkInput
 ): Promise<AuthSessionResult> {
   const config = ctx.ports.authConfig;
-  if (!config.claimEnabled) {
+  const allowEmailChange = input.allowEmailChange === true;
+  const claimLinkId = input.claimLinkId ?? null;
+  if (allowEmailChange ? !config.claimLinkEnabled : !config.claimEnabled) {
     throw new ConflictError("The claim flow is not available");
   }
   const now = ctx.ports.clock.now();
@@ -65,8 +75,10 @@ export async function completeClaim(
     );
   }
 
+  const profileEmail = normalized(input.profile.email);
   const accountEmail = user.email === null ? null : normalized(user.email);
-  if (accountEmail === null || accountEmail !== normalized(input.profile.email)) {
+  const emailChanged = accountEmail !== profileEmail;
+  if (emailChanged && !allowEmailChange) {
     await emitAuthEvent(
       ctx,
       {
@@ -80,6 +92,12 @@ export async function completeClaim(
       now
     );
     throw new LinkEmailMismatchError();
+  }
+  if (emailChanged) {
+    const matches = await ctx.repos.accounts.listUsersByEmail(unscoped, profileEmail);
+    if (matches.some((match) => match.id !== user.id)) {
+      throw new AmbiguousEmailError(profileEmail);
+    }
   }
 
   const identity = await ctx.repos.accounts.findIdentity(
@@ -138,6 +156,7 @@ export async function completeClaim(
         lastUsedAt: now
       },
       session,
+      email: profileEmail,
       now
     });
     await emitAuthEvent(
@@ -145,10 +164,10 @@ export async function completeClaim(
       {
         type: "identity_linked",
         userId: user.id,
-        email: accountEmail,
+        email: profileEmail,
         ip: input.ip,
         userAgent: input.userAgent,
-        metadata: { provider: "google" }
+        metadata: { provider: "google", emailChanged }
       },
       now
     );
@@ -156,18 +175,47 @@ export async function completeClaim(
     await ctx.repos.accounts.replaceUserSessions(unscoped, user.id, session);
   }
 
+  if (emailChanged) {
+    await emitAuthEvent(
+      ctx,
+      {
+        type: "email_changed_by_claim_link",
+        userId: user.id,
+        email: profileEmail,
+        ip: input.ip,
+        userAgent: input.userAgent,
+        metadata: { oldEmail: accountEmail, newEmail: profileEmail }
+      },
+      now
+    );
+  }
+  if (claimLinkId !== null) {
+    await emitAuthEvent(
+      ctx,
+      {
+        type: "claim_link_completed",
+        userId: user.id,
+        email: profileEmail,
+        ip: input.ip,
+        userAgent: input.userAgent,
+        metadata: { claimLinkId }
+      },
+      now
+    );
+  }
   await emitAuthEvent(
     ctx,
     {
       type: "claim_success",
       userId: user.id,
-      email: accountEmail,
+      email: profileEmail,
       ip: input.ip,
       userAgent: input.userAgent,
-      metadata: { sessionId, alreadyLinked: identity !== null }
+      metadata: { sessionId, alreadyLinked: identity !== null, emailChanged }
     },
     now
   );
 
-  return { token, expiresAt, user: await loadAuthUser(ctx, user) };
+  const updated = await ctx.repos.accounts.findUserById(unscoped, user.id);
+  return { token, expiresAt, user: await loadAuthUser(ctx, updated ?? user) };
 }

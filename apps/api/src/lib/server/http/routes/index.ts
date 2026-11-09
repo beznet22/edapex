@@ -5,6 +5,7 @@ import type { AppContext } from "../env";
 import { requireAdmin } from "../middleware/authorize";
 import { adminAuth } from "./admin-auth.routes";
 import { adminArchive } from "./admin-archive.routes";
+import { adminClaimLinks } from "./admin-claim-links.routes";
 import { adminBootstrap } from "./admin-bootstrap.routes";
 import { adminDuplicateActions } from "./admin-duplicate-actions.routes";
 import { adminDuplicateEmails } from "./admin-duplicate-emails.routes";
@@ -83,5 +84,6 @@ export const createProtectedRoutes = (
     .route("/admin", adminSessions)
     .route("/admin", adminJobs)
     .route("/admin", adminArchive)
+    .route("/admin", adminClaimLinks)
     .route("/admin", adminTokens)
     .route("/admin", adminResults);

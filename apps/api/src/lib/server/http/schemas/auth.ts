@@ -19,6 +19,12 @@ export const claimBody = z
   })
   .strict();
 
+export const claimLinkExchangeBody = z
+  .object({
+    token: z.string().trim().min(32).max(256)
+  })
+  .strict();
+
 export const codeBody = z
   .object({
     code: z.string().trim().min(4).max(32)

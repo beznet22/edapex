@@ -4,6 +4,7 @@ export * from "./student-search";
 export * from "./student-details";
 export * from "./student-accounts";
 export * from "./duplicate-emails";
+export * from "./claim-directory";
 export * from "./duplicate-details";
 export * from "./exam-setups";
 export * from "./result-read";

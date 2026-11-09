@@ -1,5 +1,6 @@
 export * from "./auth-events";
 export * from "./claim-link";
+export * from "./claim-link.service";
 export * from "./claim-policy";
 export * from "./claim.service";
 export * from "./code-normalisation";

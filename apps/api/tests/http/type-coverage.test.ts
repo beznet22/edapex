@@ -9,6 +9,7 @@ const typeCoverage = (client: ApiClient): void => {
 
   void client.api.v1.auth["magic-link"].$post;
   void client.api.v1.auth["magic-link"].verify.$get;
+  void client.api.v1.auth["claim-link"].exchange.$post;
   void client.api.v1.auth.logout.$post;
   void client.api.v1.auth["logout-all"].$post;
   void client.api.v1.auth.refresh.$post;
@@ -67,6 +68,9 @@ const typeCoverage = (client: ApiClient): void => {
   void client.api.v1.admin["duplicate-emails"].merge.$post;
   void client.api.v1.admin["duplicate-emails"].flag.$post;
   void client.api.v1.admin.auth["claim-reset"].$post;
+  void client.api.v1.admin["claim-links"].$get;
+  void client.api.v1.admin["claim-links"].$post;
+  void client.api.v1.admin["claim-links"][":id"].revoke.$post;
 };
 
 describe("typed client coverage", () => {

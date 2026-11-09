@@ -37,9 +37,11 @@ beforeAll(async () => {
       authConfig: {
         claimEnabled: true,
         claimDigest: digest,
+        claimLinkEnabled: true,
         cookieSecret: SECRET,
         googleConfigured: true,
-        postLoginRedirect: "/"
+        postLoginRedirect: "/",
+        appOrigin: "https://app.example.test"
       }
     }
   });

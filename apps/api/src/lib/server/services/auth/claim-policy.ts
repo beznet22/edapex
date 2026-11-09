@@ -70,6 +70,8 @@ export interface ClaimTicketPayload extends Record<string, unknown> {
   readonly purpose: "claim";
   readonly userId: number;
   readonly exp: number;
+  readonly allowEmailChange?: boolean;
+  readonly claimLinkId?: string;
 }
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -79,4 +81,6 @@ export const isClaimTicketPayload = (value: unknown): value is ClaimTicketPayloa
   isRecord(value) &&
   value["purpose"] === "claim" &&
   typeof value["userId"] === "number" &&
-  typeof value["exp"] === "number";
+  typeof value["exp"] === "number" &&
+  (value["allowEmailChange"] === undefined || typeof value["allowEmailChange"] === "boolean") &&
+  (value["claimLinkId"] === undefined || typeof value["claimLinkId"] === "string");

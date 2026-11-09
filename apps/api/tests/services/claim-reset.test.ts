@@ -38,9 +38,11 @@ beforeAll(async () => {
   const authConfig = {
     claimEnabled: true,
     claimDigest: digest,
+    claimLinkEnabled: true,
     cookieSecret: "reset-cookie-secret",
     googleConfigured: true,
-    postLoginRedirect: "/"
+    postLoginRedirect: "/",
+    appOrigin: "https://app.example.test"
   };
   scoped = createServiceContext(env, tenantOf(schools[0]), {
     ports: { clock, authConfig }

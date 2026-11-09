@@ -26,6 +26,8 @@ export const authGoogle = new Hono<AppContext>()
     if (!config.googleConfigured || config.cookieSecret === null) return c.notFound();
 
     let claimUserId: number | null = null;
+    let allowEmailChange = false;
+    let claimLinkId: string | null = null;
     const ticket = readClaimCookie(c);
     if (ticket !== null) {
       const payload = await verifyPayload(
@@ -35,12 +37,18 @@ export const authGoogle = new Hono<AppContext>()
         nowSeconds()
       );
       if (payload === null) clearClaimCookie(c);
-      else claimUserId = payload.userId;
+      else {
+        claimUserId = payload.userId;
+        allowEmailChange = payload.allowEmailChange === true;
+        claimLinkId = payload.claimLinkId ?? null;
+      }
     }
 
     const result = await createService(GoogleService, c.get("baseCtx")).start({
       purpose: claimUserId === null ? "signin" : "claim",
-      claimUserId
+      claimUserId,
+      allowEmailChange,
+      claimLinkId
     });
     setOAuthCookie(c, result.oauthCookie, result.expiresAt);
     c.header("Cache-Control", "no-store");
@@ -80,6 +88,8 @@ export const authGoogle = new Hono<AppContext>()
       codeVerifier: payload.verifier,
       purpose: payload.purpose,
       claimUserId: payload.userId,
+      allowEmailChange: payload.allowEmailChange,
+      claimLinkId: payload.claimLinkId,
       ip: c.get("ip"),
       userAgent: c.get("userAgent"),
       fingerprint: null

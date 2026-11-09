@@ -37,3 +37,38 @@ export const claimResetBody = z
     confirm: z.literal("RESET_ALL_PASSWORDS")
   })
   .strict();
+
+export const claimLinkDirectoryQuery = z
+  .object({
+    persona: z.enum(["all", "staff", "parent"]).default("all"),
+    status: z
+      .enum([
+        "all",
+        "unclaimed",
+        "claimed",
+        "flagged",
+        "no_user",
+        "no_email",
+        "non_gmail",
+        "duplicate",
+        "link_active",
+        "link_revoked"
+      ])
+      .default("all"),
+    search: z.string().trim().max(200).default(""),
+    page: z.coerce.number().int().positive().default(1),
+    pageSize: z.coerce.number().int().positive().max(100).default(50)
+  })
+  .strict();
+
+export const createClaimLinkBody = z
+  .object({
+    subjectType: z.enum(["staff", "parent"]),
+    subjectId: z.number().int().positive(),
+    ttlHours: z.number().int().min(1).max(168).default(72)
+  })
+  .strict();
+
+export const claimLinkIdParams = z.object({
+  id: z.string().uuid()
+});

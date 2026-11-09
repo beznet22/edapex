@@ -2,12 +2,14 @@ import type { AuthConfigPort } from "../ports/auth-config.port";
 
 export interface AuthConfigEnv {
   readonly CLAIM_ENABLED?: string;
+  readonly CLAIM_LINK_ENABLED?: string;
   readonly CLAIM_PASSWORD_DIGEST?: string;
   readonly AUTH_COOKIE_SECRET?: string;
   readonly GOOGLE_CLIENT_ID?: string;
   readonly GOOGLE_CLIENT_SECRET?: string;
   readonly GOOGLE_REDIRECT_URI?: string;
   readonly POST_LOGIN_REDIRECT?: string;
+  readonly APP_ORIGIN?: string;
 }
 
 const SHA256_HEX = /^[0-9a-f]{64}$/;
@@ -28,6 +30,7 @@ export function createAuthConfig(env: AuthConfigEnv): AuthConfigPort {
   const configured =
     digest !== null && SHA256_HEX.test(digest.toLowerCase()) && cookieSecret !== null;
   const claimEnabled = env.CLAIM_ENABLED === "1" && configured;
+  const claimLinkEnabled = env.CLAIM_LINK_ENABLED !== "0";
 
   const googleConfigured =
     present(env.GOOGLE_CLIENT_ID) !== null &&
@@ -37,8 +40,10 @@ export function createAuthConfig(env: AuthConfigEnv): AuthConfigPort {
   return Object.freeze({
     claimEnabled,
     claimDigest: claimEnabled && digest !== null ? digest.toLowerCase() : null,
+    claimLinkEnabled,
     cookieSecret,
     googleConfigured,
-    postLoginRedirect: present(env.POST_LOGIN_REDIRECT) ?? "/"
+    postLoginRedirect: present(env.POST_LOGIN_REDIRECT) ?? "/",
+    appOrigin: present(env.APP_ORIGIN) ?? "https://app.llacademy.ng"
   });
 }

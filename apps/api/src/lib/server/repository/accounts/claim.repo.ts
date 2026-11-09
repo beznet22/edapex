@@ -11,6 +11,7 @@ export interface ClaimCompletionInput {
   readonly userId: number;
   readonly identity: NewAuthIdentity;
   readonly session: NewSession;
+  readonly email: string;
   readonly now: number;
 }
 
@@ -30,6 +31,7 @@ export async function completeClaimLink(
         ctx.db
           .update(users)
           .set({
+            email: input.email,
             password: null,
             claimStatus: "claimed",
             emailVerifiedAt: input.now

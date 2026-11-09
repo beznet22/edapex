@@ -6,7 +6,9 @@
 export interface AuthConfigPort {
   readonly claimEnabled: boolean;
   readonly claimDigest: string | null;
+  readonly claimLinkEnabled: boolean;
   readonly cookieSecret: string | null;
   readonly googleConfigured: boolean;
   readonly postLoginRedirect: string;
+  readonly appOrigin: string;
 }

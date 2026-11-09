@@ -13,6 +13,7 @@ execute on 2026-12-03 without the population prerequisites below. See
 | Item | Evidence |
 |---|---|
 | Magic link | `POST /api/v1/auth/magic-link` always 202; 15-minute single-use token; `GET /verify` consumes it, sets `email_verified_at`, issues a session, redirects |
+| Admin claim links | `app.llacademy.ng/admin/claim-links`; subject-based staff/parent 72h tokens; pending-user provisioning for records without a user; non-Gmail badge/filter; public `/claim` page |
 | Password login | `/api/v1/auth/login` and `/api/v1/auth/mobile/login` removed; no password verification path remains |
 | Auth tests | `tests/http/magic-link.test.ts`, `tests/http/auth.test.ts`, `tests/services/auth-session.test.ts` |
 | Retention dry-run | `pnpm --dir apps/api run phase9:retention-dry-run`; 7-year window; read-only |
@@ -30,17 +31,20 @@ execute on 2026-12-03 without the population prerequisites below. See
 | Staff records | 87 | Every staff account needs a tested sign-in |
 | Parent records | 494 | Every parent account needs a tested sign-in |
 
-The shared `/claim` password is the only currently working population path for
-most staff/parents. The target magic-link UI is not deployed. Students have no
-password fallback because their codes have not been issued.
+The shared `/claim` password is still the only production population path for
+most staff/parents. The admin claim-link page and API are built but not deployed.
+The admin directory marks non-Gmail addresses; a provisioned account can use
+magic-link sign-in with its current email while the admin assists with Gmail.
+Students have no password fallback because their codes have not been issued.
 
 ## Blockers before `/claim` removal
 
 1. Issue and distribute all student codes; verify `auth_codes` coverage.
 2. Resolve or explicitly flag all 24 duplicate-email groups.
-3. Pilot magic link with at least one staff and one parent account, then verify
+3. Deploy the admin claim-link page and pilot staff/parent provisioning.
+4. Pilot magic link with at least one staff and one parent account, then verify
    `email_verified_at` and a successful session.
-4. Deploy the target sign-in UI; `GET /magic-link/verify` redirects to
+5. Deploy the target sign-in UI; `GET /magic-link/verify` redirects to
    `POST_LOGIN_REDIRECT`.
 5. Keep `/claim` enabled until the above are complete. Null password digests
    only after the removal and a verified rollback path.

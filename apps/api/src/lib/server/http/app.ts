@@ -15,6 +15,7 @@ import { createServiceContextMiddleware } from "./middleware/service-context";
 import { createTenantMiddleware } from "./middleware/tenant";
 import { createProtectedRoutes, publicAuthRoutes } from "./routes";
 import { authClaim } from "./routes/auth-claim.routes";
+import { authClaimLink } from "./routes/auth-claim-link.routes";
 import { authCode } from "./routes/auth-code.routes";
 import { authGoogle } from "./routes/auth-google.routes";
 import { authMagicLink } from "./routes/auth-magic-link.routes";
@@ -47,6 +48,7 @@ export function createApp(deps: AppDependencies = {}) {
     .route("/", publicDocument)
     .route("/api/v1/auth", publicAuthRoutes)
     .route("/api/v1/auth", authClaim)
+    .route("/api/v1/auth", authClaimLink)
     .route("/api/v1/auth", authGoogle)
     .route("/api/v1/auth", authMagicLink)
     .route("/api/v1/auth", authCode)

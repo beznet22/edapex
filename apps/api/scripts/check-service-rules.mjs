@@ -63,6 +63,7 @@ const REQUIRED_TREE = [
   "auth/claim-policy.ts",
   "auth/claim-reset.service.ts",
   "auth/claim.service.ts",
+  "auth/claim-link.service.ts",
   "auth/code-normalisation.ts",
   "auth/duplicate-email.service.ts",
   "auth/google.service.ts",
