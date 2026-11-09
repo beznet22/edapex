@@ -1,6 +1,13 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from "@/components/ui/select";
+import {
   Table,
   TableBody,
   TableCell,
@@ -36,6 +43,7 @@ interface DirectoryTableProps {
   readonly pageSize: number;
   readonly onPrevious: () => void;
   readonly onNext: () => void;
+  readonly onPageSizeChange: (pageSize: number) => void;
   readonly onRequest: (item: ClaimDirectoryItem) => void;
   readonly onRevoke: (item: ClaimDirectoryItem) => void;
 }
@@ -47,9 +55,13 @@ export function DirectoryTable({
   pageSize,
   onPrevious,
   onNext,
+  onPageSizeChange,
   onRequest,
   onRevoke
 }: DirectoryTableProps) {
+  const total = page?.total ?? 0;
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+
   return (
     <section className="overflow-hidden rounded-xl border border-border bg-card">
       <div className="flex justify-between px-4 py-3 text-xs text-muted-foreground">
@@ -112,20 +124,44 @@ export function DirectoryTable({
           No staff or parent records match these filters.
         </p>
       ) : null}
-      <div className="flex items-center justify-end gap-3 border-t border-border px-4 py-3 text-xs text-muted-foreground">
-        <Button disabled={pageNumber <= 1} onClick={onPrevious} size="sm" type="button" variant="outline">
-          Previous
-        </Button>
-        <span>Page {pageNumber}</span>
-        <Button
-          disabled={(page?.items.length ?? 0) < pageSize}
-          onClick={onNext}
-          size="sm"
-          type="button"
-          variant="outline"
-        >
-          Next
-        </Button>
+      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-4 py-3 text-xs text-muted-foreground">
+        <div className="flex items-center gap-3">
+          <span>{total} total records</span>
+          <span aria-hidden="true">·</span>
+          <span>
+            Page {pageNumber} of {totalPages}
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span>Rows per page</span>
+          <Select
+            onValueChange={(value) => onPageSizeChange(Number(value))}
+            value={String(pageSize)}
+          >
+            <SelectTrigger className="h-8 w-20">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {[25, 50, 100].map((size) => (
+                <SelectItem key={size} value={String(size)}>
+                  {size}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button disabled={pageNumber <= 1} onClick={onPrevious} size="sm" type="button" variant="outline">
+            Previous
+          </Button>
+          <Button
+            disabled={pageNumber >= totalPages}
+            onClick={onNext}
+            size="sm"
+            type="button"
+            variant="outline"
+          >
+            Next
+          </Button>
+        </div>
       </div>
     </section>
   );

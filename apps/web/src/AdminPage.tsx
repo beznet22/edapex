@@ -300,6 +300,9 @@ export function AdminPage() {
         <DirectoryTable
           loading={loading}
           onNext={() => setFilters((current) => ({ ...current, page: current.page + 1 }))}
+          onPageSizeChange={(pageSize) =>
+            setFilters((current) => ({ ...current, pageSize, page: 1 }))
+          }
           onPrevious={() => setFilters((current) => ({ ...current, page: current.page - 1 }))}
           onRequest={(item) => void requestLink(item)}
           onRevoke={(item) => void revoke(item)}
