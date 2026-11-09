@@ -121,13 +121,12 @@ export class ClaimLinkService {
   async list(input: ClaimDirectoryQuery): Promise<ClaimDirectoryPage> {
     const scoped = requireScopedContext(this.ctx.repos.ctx);
     const now = this.ctx.ports.clock.now();
-    const people = await this.ctx.repos.queries.listClaimDirectory(scoped);
-    const links = await this.ctx.repos.accounts.listClaimLinksBySchool(
-      scoped,
-      scoped.tenant.schoolId
-    );
-    const providers = await this.ctx.repos.queries.listSchoolIdentityProviders(scoped);
-    const duplicates = await this.ctx.repos.queries.listDuplicateEmailGroups(scoped);
+    const [people, links, providers, duplicates] = await Promise.all([
+      this.ctx.repos.queries.listClaimDirectory(scoped),
+      this.ctx.repos.accounts.listClaimLinksBySchool(scoped, scoped.tenant.schoolId),
+      this.ctx.repos.queries.listSchoolIdentityProviders(scoped),
+      this.ctx.repos.queries.listDuplicateEmailGroups(scoped)
+    ]);
     const duplicateEmails = new Set(
       duplicates
         .map((row) => normalized(row.email))

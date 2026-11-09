@@ -33,8 +33,9 @@ export async function listClaimDirectory(
   ctx: ScopedRepositoryContext
 ): Promise<readonly DirectoryPersonRow[]> {
   return withErrorHandling(async () => {
-    const staff = await ctx.db
-      .select({
+    const [staff, parents] = await Promise.all([
+      ctx.db
+        .select({
         recordId: smStaffs.id,
         userId: smStaffs.userId,
         fullName: smStaffs.fullName,
@@ -48,15 +49,14 @@ export async function listClaimDirectory(
       })
       .from(smStaffs)
       .leftJoin(users, eq(smStaffs.userId, users.id))
-      .where(
-        and(
-          eq(smStaffs.schoolId, ctx.tenant.schoolId),
-          isNotNull(smStaffs.fullName)
-        )
-      );
-
-    const parents = await ctx.db
-      .select({
+        .where(
+          and(
+            eq(smStaffs.schoolId, ctx.tenant.schoolId),
+            isNotNull(smStaffs.fullName)
+          )
+        ),
+      ctx.db
+        .select({
         recordId: smParents.id,
         userId: smParents.userId,
         fullName: smParents.guardiansName,
@@ -72,9 +72,10 @@ export async function listClaimDirectory(
         userActive: users.activeStatus,
         emailVerifiedAt: users.emailVerifiedAt
       })
-      .from(smParents)
-      .leftJoin(users, eq(smParents.userId, users.id))
-      .where(eq(smParents.schoolId, ctx.tenant.schoolId));
+        .from(smParents)
+        .leftJoin(users, eq(smParents.userId, users.id))
+        .where(eq(smParents.schoolId, ctx.tenant.schoolId))
+    ]);
 
     return [
       ...staff.map((row) => ({
