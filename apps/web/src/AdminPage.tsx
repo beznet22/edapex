@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import type { ChangeEvent, FormEvent } from "react";
 
+import { Skeleton } from "boneyard-js/react";
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -10,6 +12,7 @@ import {
   SelectTrigger,
   SelectValue
 } from "@/components/ui/select";
+import { DirectorySkeleton } from "./DirectorySkeleton";
 import { DirectoryTable } from "./DirectoryTable";
 import { LoginPanel } from "./LoginPanel";
 
@@ -58,6 +61,7 @@ export function AdminPage() {
   const [pageSize, setPageSize] = useState(50);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showSkeleton, setShowSkeleton] = useState(false);
   const [created, setCreated] = useState<{ item: ClaimDirectoryItem; link: CreatedClaimLink } | null>(null);
 
   useEffect(() => {
@@ -102,6 +106,15 @@ export function AdminPage() {
       cancelled = true;
     };
   }, [academicId, filters, sessionState]);
+
+  useEffect(() => {
+    if (!loading || snapshot !== null) {
+      setShowSkeleton(false);
+      return;
+    }
+    const timer = window.setTimeout(() => setShowSkeleton(true), 150);
+    return () => window.clearTimeout(timer);
+  }, [loading, snapshot]);
 
   const updateAcademic = (event: ChangeEvent<HTMLInputElement>): void => {
     const next = Number(event.target.value);
@@ -308,8 +321,13 @@ export function AdminPage() {
           </label>
         </section>
 
-        <DirectoryTable
-          loading={loading}
+        <Skeleton
+          fallback={<DirectorySkeleton />}
+          loading={showSkeleton}
+          name="admin-directory"
+        >
+          <DirectoryTable
+            loading={loading}
           onNext={() => setLocalPage((current) => current + 1)}
           onPageSizeChange={(nextPageSize) => {
             setPageSize(nextPageSize);
@@ -333,7 +351,8 @@ export function AdminPage() {
           }
           pageNumber={localPage}
           pageSize={pageSize}
-        />
+          />
+        </Skeleton>
       </div>
     </main>
   );
