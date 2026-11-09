@@ -1,14 +1,15 @@
 # Phase 8 cutover pack
 
-Status: **prepared, not executed.** No production D1/R2 resource, DNS record,
-source-MySQL write or traffic switch has been performed from this branch.
+Status: **executed and closed.** Production D1/R2, the Worker, the live-only
+load, the domain switch, `/claim` enablement, the 24 h watch, the production
+rollback drill and the owner POC login are complete. The Phase 8 checklist is
+signed; Phase 9A is in progress.
 
 This pack turns Phase 8 of the [roadmap](../ROADMAP.md) into an ordered,
 rehearsable production procedure. It implements the cutover section of
 [`05`](../05-d1-migration.spec.md) and the auth sequence of
-[`04a`](../04a-auth-cutover.spec.md) for the current deployment state: **there is
-no production D1 yet**, so the cutover performs an initial load from the final
-frozen snapshot, not a delta against an earlier production database.
+[`04a`](../04a-auth-cutover.spec.md). Production used an initial load from the
+final frozen snapshot, not a delta against an earlier production database.
 
 ## Preparation evidence
 
@@ -22,8 +23,10 @@ frozen snapshot, not a delta against an earlier production database.
 | Archive export | validated: 1,293 objects / 3,802 summaries, per-session 652/641, checksums verified |
 | Live-only plan / loader | 34 tables, 5,380 live rows, 31 files, 28 excluded; budget loader dry-run/checkpoint tests pass |
 | Full gate / PR #9 | 126 test files / 617 tests, guards, drift, deploy dry-run; PR #9 `port` green |
-| Production resources, load, switch, claim enablement, 24 h watch | **not started** |
-| Production rollback drill | **not started** |
+| Production resources, load, switch, claim enablement | **done** — `edapex-recovery` D1, Worker, R2 archive/photo upload, `api.llacademy.ng`, `/claim` 202 |
+| 24 h watch | **done** — 2026-11-08T02:26Z → 2026-11-09T02:26Z; EdApex 2,298 requests/0 errors; D1 96 write queries/180 rows; 2 claim probes; no rollback trigger |
+| Production rollback drill | **done** — host bounce to POC and back; final EdApex health 200 |
+| Owner POC login + signed checklist | **done** — owner confirmed 2026-11-09; all sign-off roles recorded as Owner |
 
 The local preflight and drill are tooling evidence only; they do not close the
 Phase 8 gate. The committed runbook, checklist and drill summary are the

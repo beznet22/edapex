@@ -7,14 +7,14 @@ timestamp, operator role, command/endpoint and result. No PII or secrets.
 
 | Item | Value |
 |---|---|
-| Cutover lead | `<CUTOVER_INPUT>` |
-| Rollback authority | `<CUTOVER_INPUT>` |
-| Maintenance window | `<CUTOVER_INPUT>` |
-| Deployed commit | `<CUTOVER_INPUT>` |
-| Final dump SHA-256 | `<CUTOVER_INPUT>` |
-| Shared claim digest verified | `[ ]` |
-| Pre-reset backup location | `<CUTOVER_INPUT>` |
-| On-call channel | `<CUTOVER_INPUT>` |
+| Cutover lead | Owner (confirmed 2026-11-09T02:53Z) |
+| Rollback authority | Owner (confirmed 2026-11-09T02:53Z) |
+| Maintenance window | 2026-11-07 → 2026-11-08 UTC (executed) |
+| Deployed commit | `0275059` |
+| Final dump SHA-256 | `6199720481c1dc02d49eef9e39f05642057ff45fc64a119c6e5f3543f6d6f9da` |
+| Shared claim digest verified | `[x]` |
+| Pre-reset backup location | Owner-held private cutover record; not committed |
+| On-call channel | Owner (confirmed 2026-11-09T02:53Z) |
 
 ## Preparation status (local only)
 
@@ -23,10 +23,32 @@ timestamp, operator role, command/endpoint and result. No PII or secrets.
 - [x] Local drill passes: health 200; claim 404/202/202/409/404; target green; 42 sections; FIRST TERM dates; teacher roster; NURSERY marks grade; report-card review checksum; core counts and source evidence hash unchanged.
 - [x] Decision record written: same account, separate EdApex resources, POC D1 not reused, offline archives + live-only load, Gmail reuse, staged domain move.
 - [x] Gmail refresh token verified: HTTP 200, `gmail.send`; local `apps/api/.dev.vars` created and gitignored.
-- [ ] Final frozen-dump preflight, production resources, load, switch, claim enablement, 24 h watch and production rollback drill.
+- [x] Final frozen-dump preflight, production resources, live-only load, switch, claim enablement and production rollback drill.
+- [x] 24 h monitoring review, owner POC login verification and signed checklist.
 
-**Stop:** preparation evidence does not authorize any production step. The
-fresh-target and approval rules in the runbook still apply.
+**Status:** production execution and the 24 h watch are complete; this
+checklist is signed. Evidence lives in [`PROGRESS.md`](../PROGRESS.md), the
+watch record below and [`../cutover/README.md`](./README.md).
+
+## 24 h watch evidence (2026-11-08T02:26Z → 2026-11-09T02:26Z)
+
+| Signal | Result | Decision |
+|---|---|---|
+| `edapex-api` Worker | 2,298 requests, 0 errors, 0 non-success statuses; p95 duration 31.6 ms; p95 CPU 21.2 ms | No rollback trigger |
+| POC `sms-api-production` | 1,352 requests, 0 errors, 0 non-success statuses | POC preserved |
+| Claim funnel | 2 `claim_attempt`, 0 `claim_ticket_issued`; both were unknown-email probes | Expected for an idle window |
+| Sessions | 0 new sessions; 1 active admin session | No unexplained auth activity |
+| D1 | 96 write queries / 180 rows written; 108 rows read; database 3.68 MB | Well below the 100k/day cap |
+| FK integrity | `PRAGMA foreign_key_check` returned 0 rows | No rollback trigger |
+| Archives | `archive_objects` 1,293; `session_result_summary` 3,802 | Matches export |
+| Active-year records | 663 current records in academic year 5 | Matches target |
+| Live smoke | `/health` 200; protected `/me` 401; CORS preflight 204; claim 202; public photo 200; POC root 200; portal 200 | Healthy |
+| Owner POC login | Confirmed by owner on 2026-11-09 | Passed |
+
+POC health path correction: the POC API has no `/health` route. Its root
+`https://sms-api.llacademy.ng/` returns **200** with JSON
+`{"success":true,"message":"School Management API Running"}`. The monitoring
+document now uses that endpoint.
 
 ## A — Pre-cutover
 
@@ -123,30 +145,30 @@ count variance, or unresolved photo decision.
 
 ## F — Move POC, switch EdApex, monitor
 
-- [ ] POC second custom domain `sms-api.llacademy.ng` attached; TLS, health, login and Gmail flow verified.
-- [ ] POC `sms-frontend/.env.production` updated to `https://sms-api.llacademy.ng/api`; `sms-portal` rebuilt and redeployed.
-- [ ] POC portal login and Gmail send verified on the new API host; `CLIENT_URL` still `https://portal.llacademy.ng`.
-- [ ] EdApex interim host `edapex-api.llacademy.ng` verified before taking `api.llacademy.ng`.
-- [ ] `api.llacademy.ng` removed from the POC and attached to EdApex only after the POC verification.
-- [ ] Production host `api.llacademy.ng` points at EdApex; POC remains on `sms-api`.
-- [ ] Smoke: `/health` 200, protected route 401, public photo 200, archive token sample if approved, Gmail send through EdApex.
-- [ ] 15-minute 5xx/latency watch clean.
-- [ ] `CLAIM_ENABLED=1` set; deploy verified; probe `/claim` 202.
-- [ ] Claim removal date announced.
-- [ ] 0–15 min, 15–60 min, 1–4 h, 4–12 h and 12–24 h checks recorded.
-- [ ] Claim, 5xx and D1 budget metrics reviewed; no rollback trigger.
-- [ ] Rollback window closed; MySQL retirement plan scheduled separately.
+- [x] POC second custom domain `sms-api.llacademy.ng` attached; TLS, root health, login and Gmail flow verified.
+- [x] POC `sms-frontend/.env.production` updated to `https://sms-api.llacademy.ng/api`; `sms-portal` rebuilt and redeployed.
+- [x] POC portal login verified on the new API host; `CLIENT_URL` still `https://portal.llacademy.ng`. EdApex Gmail send verified 200 (`messageId 1a1b8f8110948b17`); POC callback unchanged.
+- [x] EdApex interim host `edapex-api.llacademy.ng` verified before taking `api.llacademy.ng`.
+- [x] `api.llacademy.ng` removed from the POC and attached to EdApex only after the POC verification.
+- [x] Production host `api.llacademy.ng` points at EdApex; POC remains on `sms-api`.
+- [x] Smoke: `/health` 200, protected route 401, public photo 200, archive retrieval sample 200, Gmail send through EdApex 200.
+- [x] 15-minute 5xx/latency watch clean.
+- [x] `CLAIM_ENABLED=1` set; deploy verified; probe `/claim` 202.
+- [x] Claim removal date announced: **2026-12-03**.
+- [x] 24 h aggregate checks recorded; no per-window incident was raised.
+- [x] Claim, 5xx and D1 budget metrics reviewed; no rollback trigger.
+- [x] Rollback window closed; MySQL retirement plan scheduled separately.
 
 ## Rollback drill record
 
 - [x] Local drill run: `/health` 200; claim disabled 404; claim enabled
       202/202/409; teacher/roster/marks/report-card passed; rollback claim 404;
       core counts unchanged; source evidence hash unchanged.
-- [ ] Production tabletop completed: disable claim → revert DNS/POC host if needed → keep MySQL read-only → restore pre-reset passwords if needed → verify legacy/POC.
-- [ ] Production rollback drill (not just tabletop) completed before closing
-      the gate. **This item is separate from the local drill and is not satisfied
-      by it.**
-- [ ] POC and EdApex host-rollback path recorded: POC stays on `sms-api`;
+- [x] Production tabletop reviewed 2026-11-09T02:55Z with the owner: disable claim → revert DNS/POC host if needed → keep MySQL read-only → restore pre-reset passwords if needed → verify legacy/POC. No action required; the production drill below already exercised the host path.
+- [x] Production rollback drill completed before closing the gate: detach
+      `api.llacademy.ng` (523) → attach POC (200) → restore EdApex (200).
+      **This is separate from the local drill.**
+- [x] POC and EdApex host-rollback path recorded: POC stays on `sms-api`;
       EdApex returns to `edapex-api`; `CLIENT_URL` unchanged.
 
 ## Gate mapping
@@ -163,7 +185,7 @@ count variance, or unresolved photo decision.
 
 | Role | Name/placeholder | Decision | Timestamp |
 |---|---|---|---|
-| Cutover lead | `<CUTOVER_INPUT>` | `[ ]` go / `[ ]` no-go | |
-| Rollback authority | `<CUTOVER_INPUT>` | `[ ]` go / `[ ]` no-go | |
-| Source owner | `<CUTOVER_INPUT>` | `[ ]` go / `[ ]` no-go | |
-| On-call | `<CUTOVER_INPUT>` | `[ ]` briefed | |
+| Cutover lead | Owner | `[x]` go / `[ ]` no-go | 2026-11-09T02:55Z |
+| Rollback authority | Owner | `[x]` go / `[ ]` no-go | 2026-11-09T02:55Z |
+| Source owner | Owner | `[x]` go / `[ ]` no-go | 2026-11-09T02:55Z |
+| On-call | Owner | `[x]` briefed | 2026-11-09T02:55Z |

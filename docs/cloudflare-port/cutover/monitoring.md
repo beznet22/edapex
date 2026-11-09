@@ -23,7 +23,7 @@ Before the EdApex switch, watch:
 
 | Check | Expected | Action |
 |---|---|---|
-| `https://sms-api.llacademy.ng/health` | 200 | Stop the handover if it fails |
+| `https://sms-api.llacademy.ng/` | 200 JSON (`School Management API Running`) | Stop the handover if it fails; the POC has no `/health` route |
 | POC portal login | success | Do not remove `api.llacademy.ng` until this passes |
 | POC Gmail send | success | The Gmail callback remains on `portal.llacademy.ng` |
 | POC `VITE_API_URL` | `https://sms-api.llacademy.ng/api` | Rebuild/redeploy `sms-portal` |
