@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import type { ChangeEvent, FormEvent, KeyboardEvent } from "react";
-import { Paperclip, Send, X } from "lucide-react";
+import { Paperclip, Send, Square, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -9,12 +9,18 @@ interface WorkspaceComposerProps {
   readonly connected: boolean;
   readonly disabled?: boolean;
   readonly onSend: (text: string, attachmentNames: readonly string[]) => void;
+  readonly onStop: () => void;
+  readonly queueCount: number;
+  readonly stoppable: boolean;
 }
 
 export function WorkspaceComposer({
   connected,
   disabled = false,
-  onSend
+  onSend,
+  onStop,
+  queueCount,
+  stoppable
 }: WorkspaceComposerProps) {
   const [draft, setDraft] = useState("");
   const [attachments, setAttachments] = useState<readonly string[]>([]);
@@ -101,21 +107,40 @@ export function WorkspaceComposer({
           rows={1}
           value={draft}
         />
-        <Button
-          aria-label="Send message"
-          className={cn("size-11 shrink-0", !connected && "opacity-90")}
-          disabled={disabled || draft.trim().length === 0}
-          size="icon"
-          type="submit"
-        >
-          <Send aria-hidden="true" className="size-4" />
-        </Button>
+        {stoppable ? (
+          <Button
+            aria-label="Stop run"
+            className="size-11 shrink-0"
+            onClick={onStop}
+            size="icon"
+            type="button"
+          >
+            <Square aria-hidden="true" className="size-4 fill-current" />
+          </Button>
+        ) : (
+          <Button
+            aria-label="Send message"
+            className={cn("size-11 shrink-0", !connected && "opacity-90")}
+            disabled={disabled || draft.trim().length === 0}
+            size="icon"
+            type="submit"
+          >
+            <Send aria-hidden="true" className="size-4" />
+          </Button>
+        )}
       </div>
-      <p className="mt-2 px-1 text-[10px] leading-4 text-muted-foreground">
-        {connected
-          ? "Approval-gated actions are sent through the workspace runtime."
-          : "Local preview only. Messages stay in this tab; the xcodex runtime arrives in 10C."}
-      </p>
+      <div className="mt-2 flex items-center justify-between gap-2 px-1 text-[10px] leading-4 text-muted-foreground">
+        <p>
+          {connected
+            ? "Approval-gated actions are sent through the workspace runtime."
+            : "Local preview only. Messages stay in this tab; the xcodex runtime arrives in 10C."}
+        </p>
+        {queueCount > 0 ? (
+          <span className="shrink-0 rounded-full border border-border px-2 py-0.5">
+            {queueCount} queued
+          </span>
+        ) : null}
+      </div>
     </form>
   );
 }

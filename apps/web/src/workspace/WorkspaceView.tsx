@@ -23,6 +23,7 @@ interface WorkspaceViewProps {
     decision: "allowed" | "declined"
   ) => void;
   readonly onSend: (text: string, attachmentNames: readonly string[]) => void;
+  readonly onStop: () => void;
   readonly onOpenAdmin: () => void;
 }
 
@@ -66,6 +67,7 @@ export function WorkspaceView({
   userName,
   onApproval,
   onSend,
+  onStop,
   onOpenAdmin
 }: WorkspaceViewProps) {
   const endRef = useRef<HTMLDivElement>(null);
@@ -127,6 +129,9 @@ export function WorkspaceView({
           connected={runtime.connected}
           disabled={!runtime.connected}
           onSend={onSend}
+          onStop={onStop}
+          queueCount={runtime.turn.queueCount}
+          stoppable={runtime.turn.stoppable}
         />
 
         <nav

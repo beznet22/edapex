@@ -242,6 +242,7 @@ export function WorkspacePage() {
       onApproval={onApproval}
       onOpenAdmin={() => window.location.assign("/admin/claim-links")}
       onSend={onSend}
+      onStop={() => undefined}
       runtime={runtime}
       userName={session?.user.fullName ?? session?.user.email ?? "Signed in"}
     />
