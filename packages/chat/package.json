@@ -11,9 +11,16 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@edapex/contracts": "workspace:*"
+    "@edapex/contracts": "workspace:*",
+    "clsx": "^2.1.1",
+    "tailwind-merge": "^3.3.1"
+  },
+  "peerDependencies": {
+    "react": "^19.2.0"
   },
   "devDependencies": {
+    "@types/react": "^19.2.0",
+    "react": "^19.2.0",
     "typescript": "^5.9.3",
     "vitest": "^4.1.10"
   }

@@ -1,3 +1,5 @@
+import { Skeleton } from "@edapex/chat";
+
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -9,9 +11,9 @@ export function WorkspaceSkeleton({ compact = false }: WorkspaceSkeletonProps) {
   return (
     <div aria-label="Loading workspace" className="flex h-full flex-col" role="status">
       <div className="flex-1 space-y-5 px-4 py-6">
-        <div className="h-7 w-48 animate-pulse rounded-md bg-slate-700/50 motion-reduce:animate-none" />
-        <div className="h-20 w-[86%] animate-pulse rounded-[20px] bg-slate-700/35 motion-reduce:animate-none" />
-        <div className="ml-auto h-14 w-[62%] animate-pulse rounded-[20px] bg-primary/15 motion-reduce:animate-none" />
+        <Skeleton className="h-7 w-48 bg-slate-700/50" />
+        <Skeleton className="h-20 w-[86%] rounded-[20px] bg-slate-700/35" />
+        <Skeleton className="ml-auto h-14 w-[62%] rounded-[20px] bg-primary/15" />
         {!compact ? (
           <>
             <div className="h-16 w-[82%] animate-pulse rounded-[20px] bg-slate-700/35 motion-reduce:animate-none" />

@@ -1,5 +1,7 @@
 import { Check, ChevronDown, CircleAlert, Clock3, ShieldAlert, X } from "lucide-react";
 
+import { Message, MessageContent } from "@edapex/chat";
+
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type {
@@ -217,13 +219,8 @@ export function MessageBubble({
   let renderedTools = false;
 
   return (
-    <article
-      className={cn(
-        "flex",
-        message.role === "user" ? "justify-end" : "justify-start"
-      )}
-    >
-      <div
+    <Message align={message.role === "user" ? "end" : "start"}>
+      <MessageContent
         className={cn(
           "space-y-2",
           message.role === "user" ? "max-w-[85%]" : "max-w-[92%]"
@@ -252,7 +249,7 @@ export function MessageBubble({
             </div>
           );
         })}
-      </div>
-    </article>
+      </MessageContent>
+    </Message>
   );
 }
