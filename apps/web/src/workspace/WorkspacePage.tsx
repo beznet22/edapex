@@ -45,6 +45,13 @@ const initialMessages = (role: CapabilityManifest["role"]): readonly ChatMessage
         {
           kind: "text",
           text: `Welcome to EdApex Work. Your ${role} capability manifest is loaded. I can help with school records, reports and planning; changes that affect school data stop for your approval.`
+        },
+        {
+          kind: "surface",
+          language: "openui",
+          catalogVersion: "edapex-v1",
+          source: `root = Stack([title, role, note])\ntitle = TextContent("Workspace ready")\nrole = Metric("Role", "${role}")\nnote = Callout("Runtime offline", "The xcodex adapter is not connected in this preview.", "warning")`,
+          dataClass: "workspace"
         }
       ]
     }

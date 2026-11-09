@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { Check, ChevronDown, CircleAlert, Clock3, ShieldAlert, X } from "lucide-react";
 
 import { Message, MessageContent } from "@edapex/chat";
@@ -11,6 +12,11 @@ import type {
   SurfacePart,
   ToolCallPart
 } from "@edapex/contracts";
+
+const GenUISurface = lazy(async () => {
+  const module = await import("@edapex/genui");
+  return { default: module.SurfaceRenderer };
+});
 
 const statusLabel: Record<ToolCallPart["status"], string> = {
   running: "In progress",
@@ -124,33 +130,36 @@ function ApprovalCard({
   );
 }
 
+function SurfaceFallback({ surface }: { readonly surface: SurfacePart }) {
+  return (
+    <div className="rounded-lg border border-border bg-background p-3">
+      <h3 className="text-sm font-semibold">Surface unavailable</h3>
+      <p className="mt-1 text-xs leading-5 text-muted-foreground">
+        The generated surface could not be validated. The turn remains readable and no action ran.
+      </p>
+      <div className="mt-3 flex items-center justify-between gap-2 text-[10px] uppercase tracking-wide text-muted-foreground">
+        <span>{surface.catalogVersion}</span>
+        <span>{surface.dataClass}</span>
+      </div>
+    </div>
+  );
+}
+
 function SurfaceCard({ surface }: { readonly surface: SurfacePart }) {
   return (
     <section className="overflow-hidden rounded-xl border border-border bg-card">
       <div className="flex items-center justify-between gap-2 border-b border-border px-3 py-2.5">
         <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-primary">
-          Surface fallback
+          Generated surface
         </div>
         <span className="rounded-full border border-border px-2 py-0.5 text-[10px] text-muted-foreground">
           {surface.catalogVersion}
         </span>
       </div>
       <div className="p-3">
-        <h3 className="text-sm font-semibold">Workspace readiness</h3>
-        <p className="mt-1 text-xs leading-5 text-muted-foreground">
-          The OpenUI renderer is not connected in this browser build. This fixed fallback keeps the
-          turn readable and preserves the capability boundary.
-        </p>
-        <div className="mt-3 grid grid-cols-2 gap-2">
-          <div className="rounded-lg border border-border bg-background p-2.5">
-            <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Data</div>
-            <div className="mt-1 text-sm font-medium">{surface.dataClass}</div>
-          </div>
-          <div className="rounded-lg border border-border bg-background p-2.5">
-            <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Mode</div>
-            <div className="mt-1 text-sm font-medium">Read-only</div>
-          </div>
-        </div>
+        <Suspense fallback={<p className="text-xs text-muted-foreground">Rendering surface…</p>}>
+          <GenUISurface fallback={<SurfaceFallback surface={surface} />} surface={surface} />
+        </Suspense>
       </div>
     </section>
   );
