@@ -13,7 +13,14 @@ export default defineConfig({
       "/api": {
         target: "https://api.llacademy.ng",
         changeOrigin: true,
-        secure: true
+        secure: true,
+        configure: (proxy) => {
+          const cookie = process.env.DEV_API_COOKIE;
+          if (cookie === undefined || cookie.length === 0) return;
+          proxy.on("proxyReq", (proxyReq) => {
+            proxyReq.setHeader("cookie", cookie);
+          });
+        }
       }
     }
   }
