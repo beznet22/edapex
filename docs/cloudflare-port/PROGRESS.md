@@ -24,13 +24,13 @@ Port code lands in [`apps/api/`](../../apps/api/AGENTS.md).
 
 ## Current focus
 
-**Phase 9A — staged platform deployment.** Phase 8 closed on **2026-11-09**.
-Migration 0006 is applied to production D1; Worker version `bfa72530-b53b-4f6a-b771-7b9f450d3795`
-is live; Pages is deployed at **https://edapex-web.pages.dev/** (root, `/claim`
-and `/admin/claim-links` all 200). `app.llacademy.ng` is attached but still
-pending DNS/certificate validation, so it currently returns 404. `/claim` and
-shared password digests are carried to workspace **10G.2**; student codes,
-duplicate resolution and staff/parent coverage to **10G.1**. See
+**Phase 9A — platform complete.** Phase 8 and the Phase 9A platform deployment
+are complete. Migration 0006 is applied; Worker `bfa72530-b53b-4f6a-b771-7b9f450d3795`
+is live; Pages `edapex-web.pages.dev` and **`app.llacademy.ng`** return 200 for
+root, `/claim` and `/admin/claim-links`; app CNAME is proxied and CORS passes.
+The Pages domain certificate is still finalizing, but the origin is serving.
+`/claim` and shared password digests are carried to workspace **10G.2**;
+student codes, duplicate resolution and staff/parent coverage to **10G.1**. See
 [`phase9a-closeout.md`](./phase9a-closeout.md) and
 [`04a-auth-cutover.spec.md`](./04a-auth-cutover.spec.md).
 
@@ -47,7 +47,7 @@ duplicate resolution and staff/parent coverage to **10G.1**. See
 | 6 | Archive and retrieval | done | Kimchi | 2026-11-06 | 2026-11-06 | PR #7 check `port` green ([run 42300456462](https://github.com/beznet22/edapex/actions/runs/42300456462)): typecheck, 115 files / 565 tests, all guards + self-tests, 0003 apply + drift, deploy dry-run, both verifiers. Gate: archive/restore round-trip, checksum quarantine, published immutability + supersede *n+1*, wipe blocked without the second admin token. |
 | 7 | Migration execution | done | Kimchi | 2026-11-06 | 2026-11-06 | Local rehearsals A/B (`phase-7-migration`): 62 legacy tables / 196,801 rows / 0 FK / 0 reconciliation mismatches; target integrity green (0 identity, 0 target, 42 sections reviewed, 663 current records); 681 year-4 records = 666 unique default + 15 non-default duplicates; 639 promoted + 24 DAYCARE + 3 unplaced; 663 destination records; quarantine 237; sessions 1/2/4 archived with 652+641 checksum-verified objects (74/16 historical gaps), live marks/results/ratings/remarks/attendance zero; 853 referenced photo URLs (625 present/uploadable, 228 missing locally), 25 sample uploads and public route 200; 2 timeline exports; O2 10/10 present. Full local gate: typecheck, 591 tests / 123 files, all guards, 0004/0005 apply + drift, deploy dry-run, both verifiers. PR #8 check `port` green ([run 42345892456](https://github.com/beznet22/edapex/actions/runs/42345892456)). Report: [`audit/phase-7-rehearsal.md`](./audit/phase-7-rehearsal.md). |
 | 8 | Cutover | done | Kimchi | 2026-11-07 | 2026-11-09 | PR #8 merged; `phase-8-cutover` rebased and published as PR #9. Preparation evidence: preflight on the current dump (62 tables, 196,801 rows, 0 FK, 0 reconciliation, 44 SQL files, `executed:false`; rehearsal photos 625/228, production ZIP 633/220, old static fallback +10 → combined 643 present/210 accepted-missing; 10 fallbacks included; active/default report 206 students; R2 `edapex-media` created; **643/643 uploaded, audit 0 failures**); local drill passed (target green, 42 sections, FIRST TERM dates, teacher roster, NURSERY marks with grade, report-card review checksum, claim 404/202/202/409/404, core counts unchanged). Gmail reuse verified locally (HTTP 200, `gmail.send`); POC Gmail callback unchanged; domain move staged (`api.llacademy.ng` for EdApex, `sms-api.llacademy.ng` for POC). Design: offline session 1/2/4 archives + minimal live-only D1 load; Free 95k target/100k hard gate, checkpoint and next-UTC-day continuation; no Paid fallback; no historical raw rows in production D1. Archive export validated **1,293 objects / 3,802 summaries**; live plan **34 tables / 5,380 rows / 31 files (28 excluded)**; loader dry-run passes; full gate **126 files / 617 tests**; PR #9 `port` green ([run 42385118234](https://github.com/beznet22/edapex/actions/runs/42385118234)). Production execution on 2026-11-07: `edapex` D1 + Worker + auth/Gmail secrets + CORS `https://app.llacademy.ng`; live load **61,358 writes**, verification 0 failures; bootstrap/staffing/activation 42 sections, 231 initial assignments; promotion hit the Free Worker CPU limit (503) at batch 5. Recovered the validated local target into `edapex-recovery` (14,039 rows / **87,503 writes**): 663 target records, 237 students without a target current record, 42 reviewed sections, 6 categories, 7 bands, 663 outcomes, FK 0; archive upload **1,293/1,293** with last-object checksum verified; Worker health 200, claim 404. **Write-cap incident:** at least **148,861 account writes** today (>100k); no further D1 writes until 00:00 UTC; no Paid upgrade. Post-reset 2026-11-08: fixture cleanup **366 → 231**; admin login restored and target gate **green**; archive retrieval schema fixed (transcript and marksheet **200**); POC moved to `sms-api.llacademy.ng` and portal rebuilt; `api.llacademy.ng` switched to EdApex; health 200, protected route 401, claim 202, CORS `https://app.llacademy.ng`. Gmail adapter send returned **200** (`messageId 1a1b8f8110948b17`); 24 h watch started **2026-11-08T02:26Z**. 24 h watch closed 2026-11-09: EdApex 2,298 requests/0 errors, POC 1,352/0 errors, D1 96 write queries/180 rows, 2 claim probes, 0 new sessions; FK 0, archives 1,293/3,802, 663 active-year records; owner POC login confirmed; checklist signed. POC has no `/health`; its root returns 200 JSON. |
-| 9 | Post-cutover | partial | Kimchi | 2026-11-09 | — | Code complete: magic link, admin claim links/directory, non-Gmail directory, password-login retirement, retention dry-run (0 rows), archive manifests repaired/verified, workspace wiring, `apps/web`, full gate 126 files / 611 tests, web build and deploy dry-run. Deployed: migration 0006, Worker `bfa72530`, Pages `edapex-web.pages.dev`; `/claim` 202, magic 202, admin 401, exchange-invalid 401. **Pending:** `app.llacademy.ng` DNS/certificate validation (currently 404). `/claim` and digests are 10G.2; student codes/duplicates/linking are 10G.1. |
+| 9 | Post-cutover | done (platform) | Kimchi | 2026-11-09 | 2026-11-09 | Code: magic link, admin claim links/directory, non-Gmail directory, password-login retirement, retention dry-run (0 rows), archive manifests (652/0/641), workspace wiring, `apps/web`, full gate 126 files / 611 tests, web build. Deployed: migration 0006, Worker `bfa72530`, Pages `edapex-web.pages.dev`, proxied `app.llacademy.ng` CNAME. Smoke: app root/claim/admin 200, API health 200, `/claim` 202, magic 202, admin 401, CORS 204. **Transitional:** `/claim` and digests are 10G.2; student codes/duplicates/linking are 10G.1. |
 
 ## Gate checklists
 
@@ -142,7 +142,7 @@ duplicate resolution and staff/parent coverage to **10G.1**. See
 - [x] Migration 0006 applied to production D1
 - [x] Worker deployed (`bfa72530-b53b-4f6a-b771-7b9f450d3795`)
 - [x] Pages deployed at `edapex-web.pages.dev`; root, `/claim`, `/admin/claim-links` 200
-- [ ] `app.llacademy.ng` custom domain — attached, pending DNS/certificate validation
+- [x] `app.llacademy.ng` custom domain — proxied CNAME `app` → `edapex-web.pages.dev`; root/claim/admin 200; Pages certificate finalizing
 
 ## Change log
 
@@ -211,6 +211,7 @@ duplicate resolution and staff/parent coverage to **10G.1**. See
 | 2026-11-09 | 9 | Admin claim-link slice: migration 0006 adds subject/school/creator/revocation columns to `auth_magic_links`; per-user 72h links for staff/parent records; pending-user provisioning for records with no user; non-Gmail badge/filter; `apps/web` at `app.llacademy.ng/admin/claim-links` and `/claim`; full API gate 126 files / 611 tests, web build, deploy dry-run | Kimchi |
 | 2026-11-09 | 9 | Phase 9A re-scoped: platform closeout is migration/Worker/Pages deployment. `/claim` and digest nulling move to workspace 10G.2 after 10F; student codes, duplicate resolution and staff/parent coverage move to 10G.1. This avoids reopening 9A | Kimchi |
 | 2026-11-09 | 9 | Production deployment: migration 0006 applied; Worker `bfa72530-b53b-4f6a-b771-7b9f450d3795`; Pages `edapex-web.pages.dev` deployed; `/claim` 202, magic 202, admin 401, invalid exchange 401; CORS includes Pages preview + app origin. `app.llacademy.ng` attached, pending DNS/certificate | Kimchi |
+| 2026-11-09 | 9 | `app.llacademy.ng` proxied CNAME added (`app` → `edapex-web.pages.dev`); root, `/claim`, `/admin/claim-links` all 200; CORS app preflight 204; Phase 9A platform closed. `/claim` and digests remain 10G.2; student codes/duplicates 10G.1 | Kimchi |
 
 ## Blockers and decisions
 

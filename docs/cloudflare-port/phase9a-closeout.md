@@ -20,7 +20,7 @@ execute on 2026-12-03 without the population prerequisites below. See
 | Archive manifests | `pnpm --dir apps/api run phase9:archive-manifests`; `--repair` wrote the missing session 1/2/4 manifests to R2 |
 | Workspace wiring | `pnpm-workspace.yaml`; root lockfile; `pnpm --filter edapex-api run typecheck`; deploy dry-run |
 | Deployment | Migration 0006 applied; Worker `bfa72530-b53b-4f6a-b771-7b9f450d3795`; Pages `edapex-web.pages.dev`; root/claim/admin 200; `/claim` 202; magic 202; admin 401; invalid exchange 401 |
-| Custom domain | `app.llacademy.ng` attached to Pages, status pending DNS/certificate; current response 404 |
+| Custom domain | Proxied CNAME `app` → `edapex-web.pages.dev`; `app.llacademy.ng` root/claim/admin 200; Pages certificate finalizing |
 
 ## Production population (2026-11-09)
 
@@ -54,8 +54,8 @@ Students have no password fallback because their codes have not been issued.
 ## Gate decision
 
 - Do **not** deploy the password-login removal to production yet.
-- Phase 9A platform is deployed on the Pages preview; final close requires
-  `app.llacademy.ng` DNS/certificate validation.
+- Phase 9A platform is deployed on `app.llacademy.ng`; root, `/claim` and
+  `/admin/claim-links` return 200.
 - Do **not** remove `/claim` on 2026-12-03. Removal and digest nulling are
   workspace **10G.2**, after 10F.
 - Student codes, duplicate-email resolution and staff/parent coverage are

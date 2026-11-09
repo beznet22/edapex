@@ -4,7 +4,7 @@ Low-level specs for porting the EdApex backend to a Hono API on Cloudflare Worke
 
 **Implementing the port?** Start with [ROADMAP.md](./ROADMAP.md) — it contains the working agreement for coding agents and one executable brief per phase, with gates. **Progress** is tracked in [PROGRESS.md](./PROGRESS.md); **port code** lands in [`apps/api/`](../../apps/api/README.md) (service README, agent rules in [apps/api/AGENTS.md](../../apps/api/AGENTS.md)).
 
-**Current status:** Phase 8 is complete. Phase 9 platform is preview-deployed: migration `0006` applied, Worker `bfa72530` live, Pages at `edapex-web.pages.dev`. `app.llacademy.ng` is attached but pending DNS/certificate. `/claim` and shared password digests are intentionally retained until workspace **10G.2**; student-code issuance, duplicate-email resolution and staff/parent coverage are **10G.1**.
+**Current status:** Phase 8 is complete and the Phase 9 platform is deployed: migration `0006`, Worker `bfa72530`, Pages `edapex-web.pages.dev`, and `app.llacademy.ng` (proxied CNAME) all live. `/claim` and shared password digests are intentionally retained until workspace **10G.2**; student-code issuance, duplicate-email resolution and staff/parent coverage are **10G.1**.
 
 ## Porting scope is defined by the catalog
 
