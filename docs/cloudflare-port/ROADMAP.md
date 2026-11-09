@@ -225,18 +225,18 @@ If two specs conflict, **stop and report**. Do not pick one silently.
 
 ### Phase 9 — Post-cutover
 
-**Goal:** retire the transitional surface and finish the target auth.
+**Goal:** deploy the passwordless platform and finish the safe retention/archive checks. The transitional-account retirement is carried into the workspace programme.
 
-**Read first:** [04a §8](./04a-auth-cutover.spec.md), [04](./04-auth-identity.spec.md), [06 §7](./06-archive-and-retrieval.spec.md).
+**Read first:** [04a §8](./04a-auth-cutover.spec.md), [04](./04-auth-identity.spec.md), [06 §7](./06-archive-and-retrieval.spec.md), [`../workspace/specs/45-admin-claim-links.md`](../workspace/specs/45-admin-claim-links.md).
 
 **Do:**
 
-- Activate magic link and Google for parents/staff; retire `/claim` on the announced date.
-- Null remaining password digests; drop the column in a later migration.
-- Schedule the retention sweep; run it in `dryRun` first.
-- Confirm archive manifests for sessions 1–4; purge only by decision.
+- Activate magic link, admin claim links and Google for parents/staff.
+- Apply migration `0006`; deploy the Worker and `apps/web` to Pages.
+- Run the retention sweep in `dryRun` first; confirm archive manifests for sessions 1–4.
+- **Keep `/claim` enabled.** Do not null password digests. `/claim` removal and digest nulling are workspace **10G.2** after 10F; student codes, duplicate resolution and staff/parent coverage are **10G.1**.
 
-**Gate:** all `04a` exit criteria met; claim route removed; retention sweep dry-run reports expected counts.
+**Gate:** migration/Worker/Pages deployed; magic-link and claim-link smoke pass; retention dry-run reports expected counts; archives verified; `/claim` remains intentionally transitional.
 
 ---
 

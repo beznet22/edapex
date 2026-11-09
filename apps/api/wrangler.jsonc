@@ -17,7 +17,7 @@
   ],
   "vars": {
     // Comma-separated allowlist; EdApex production frontend.
-    "CORS_ORIGINS": "https://app.llacademy.ng",
+    "CORS_ORIGINS": "https://app.llacademy.ng,https://edapex-web.pages.dev,https://phase-9a-auth.edapex-web.pages.dev,https://48c785b5.edapex-web.pages.dev",
     "APP_ORIGIN": "https://app.llacademy.ng",
     "POST_LOGIN_REDIRECT": "https://app.llacademy.ng/"
   },

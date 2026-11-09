@@ -1,8 +1,8 @@
-# Phase 9A cutover runbook — do not execute yet
+# Phase 10G.2 — transitional retirement runbook
 
-Status: **prepared, blocked.** Do not run steps 4–7 until the population gate
-passes. The announced date is 2026-12-03; if the counts are not met, extend the
-date rather than accepting a lockout.
+Status: **deferred until after 10F.** This was formerly the Phase 9A claim
+removal runbook. Do not run steps 4–7 until 10G.1 population coverage passes.
+The 2026-12-03 date is withdrawn.
 
 ## 0. Population gate
 

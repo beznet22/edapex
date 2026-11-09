@@ -19,6 +19,8 @@ execute on 2026-12-03 without the population prerequisites below. See
 | Retention dry-run | `pnpm --dir apps/api run phase9:retention-dry-run`; 7-year window; read-only |
 | Archive manifests | `pnpm --dir apps/api run phase9:archive-manifests`; `--repair` wrote the missing session 1/2/4 manifests to R2 |
 | Workspace wiring | `pnpm-workspace.yaml`; root lockfile; `pnpm --filter edapex-api run typecheck`; deploy dry-run |
+| Deployment | Migration 0006 applied; Worker `bfa72530-b53b-4f6a-b771-7b9f450d3795`; Pages `edapex-web.pages.dev`; root/claim/admin 200; `/claim` 202; magic 202; admin 401; invalid exchange 401 |
+| Custom domain | `app.llacademy.ng` attached to Pages, status pending DNS/certificate; current response 404 |
 
 ## Production population (2026-11-09)
 
@@ -37,7 +39,7 @@ The admin directory marks non-Gmail addresses; a provisioned account can use
 magic-link sign-in with its current email while the admin assists with Gmail.
 Students have no password fallback because their codes have not been issued.
 
-## Blockers before `/claim` removal
+## Carried into workspace 10G.1
 
 1. Issue and distribute all student codes; verify `auth_codes` coverage.
 2. Resolve or explicitly flag all 24 duplicate-email groups.
@@ -46,15 +48,19 @@ Students have no password fallback because their codes have not been issued.
    `email_verified_at` and a successful session.
 5. Deploy the target sign-in UI; `GET /magic-link/verify` redirects to
    `POST_LOGIN_REDIRECT`.
-5. Keep `/claim` enabled until the above are complete. Null password digests
-   only after the removal and a verified rollback path.
+5. Keep `/claim` enabled until 10G.2 after workspace completion. Null password
+   digests only after the removal and a verified rollback path.
 
 ## Gate decision
 
 - Do **not** deploy the password-login removal to production yet.
-- Do **not** remove `/claim` on 2026-12-03 unless the owner explicitly accepts
-  the lockout risk after reviewing the counts.
-- Phase 9A remains blocked; Phase 10 remains blocked.
+- Phase 9A platform is deployed on the Pages preview; final close requires
+  `app.llacademy.ng` DNS/certificate validation.
+- Do **not** remove `/claim` on 2026-12-03. Removal and digest nulling are
+  workspace **10G.2**, after 10F.
+- Student codes, duplicate-email resolution and staff/parent coverage are
+  workspace **10G.1**.
+- Phase 10 remains blocked until the 9A platform deployment, 9B approval and 10A.
 
 ## Verification commands
 
