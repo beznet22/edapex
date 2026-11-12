@@ -52,7 +52,8 @@ const extract = (): Promise<Response> => {
     method: "POST",
     headers: {
       cookie,
-      "X-Academic-Id": String(school.academicId)
+      "X-Academic-Id": String(school.academicId),
+      "x-ocr-consent": "cloud"
     },
     body: form
   });

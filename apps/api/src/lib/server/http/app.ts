@@ -17,6 +17,7 @@ import { createProtectedRoutes, publicAuthRoutes } from "./routes";
 import { authClaim } from "./routes/auth-claim.routes";
 import { authClaimLink } from "./routes/auth-claim-link.routes";
 import { authCode } from "./routes/auth-code.routes";
+import { authDesktop } from "./routes/auth-desktop.routes";
 import { authGoogle } from "./routes/auth-google.routes";
 import { authMagicLink } from "./routes/auth-magic-link.routes";
 import { health } from "./routes/health.routes";
@@ -52,6 +53,7 @@ export function createApp(deps: AppDependencies = {}) {
     .route("/api/v1/auth", authGoogle)
     .route("/api/v1/auth", authMagicLink)
     .route("/api/v1/auth", authCode)
+    .route("/api/v1/auth", authDesktop)
     .route("/api/v1", protectedApp);
 
   app.onError(errorHandler);

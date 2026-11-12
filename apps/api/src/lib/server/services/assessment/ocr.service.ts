@@ -1,6 +1,6 @@
 import type { ServiceContext } from "../context";
 import * as extraction from "./ocr-extraction";
-import type { OcrExtractionResult } from "./ocr-extraction";
+import type { LocalOcrInput, OcrExtractionResult } from "./ocr-extraction";
 
 export class AssessmentOcrService {
   constructor(private readonly ctx: ServiceContext) {}
@@ -10,6 +10,10 @@ export class AssessmentOcrService {
     readonly fileName: string;
   }): Promise<OcrExtractionResult> {
     return extraction.extractOrGetCached(this.ctx, input);
+  }
+
+  async runLocalExtraction(input: LocalOcrInput): Promise<OcrExtractionResult> {
+    return extraction.extractLocal(this.ctx, input);
   }
 
   async getCachedExtraction(

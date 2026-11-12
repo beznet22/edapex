@@ -1,18 +1,44 @@
 # 47 — Performance and Memory Budgets
 
-**Status:** v1 implementation standard. These are release gates, not aspirations.
+**Status:** v1 implementation standard. These are release gates.
+
+## Specification context
+
+This spec owns **measured budgets and release gates**. It does not choose product behavior. `15` owns UI behavior, `17` owns chat state, `19` owns visual primitives and `21` owns generated-UI bounds. When a budget conflicts with a behavior spec, record an exception or change the implementation; do not silently relax the budget.
 
 ## Hosting decision
 
-Cloudflare Pages supports SSR through Pages Functions, but v1 uses **static Pages + Worker API**.
+`apps/web` is a **vinext Worker with static assets** at `app.llacademy.ng`. The previous static Pages deployment remains the rollback until the cutover gate.
 
-- No Pages Functions or SSR in v1.
-- If SSR is adopted later, use **Workers with static assets**, not Pages Functions.
-- SSR is allowed only for public/SEO routes.
-- Authenticated layouts, chat, editor, documents and agent surfaces remain client-rendered.
-- No school data or session token is rendered into HTML or cached at the edge.
+- No Pages Functions.
+- The Worker may render the application shell, but authenticated school data is fetched client-side from `api.llacademy.ng`.
+- No school data, session token or private API response is embedded in server-rendered HTML, cached at the edge or stored by the service worker.
+- Public/SEO pages may be server-rendered; authenticated surfaces must not depend on SSR for authorization.
+- The service worker caches static assets, icons and the offline shell only.
 
-Reason: the current bottleneck is backend response time, not client rendering. SSR would move work to TTFB, lose edge caching, and add cookie/PII risk for no measured gain.
+Reason: the web client now shares one React app across PWA and Tauri; a Worker keeps routing and asset deployment together. The prior Pages static-only decision is retained as rollback, not as the target architecture.
+
+## OCR and camera rules
+
+- Local OCR models are assets, not network fetches; missing models fail closed before the first capture.
+- Do not hold decoded camera frames after the preview closes. Write one JPEG to app cache, import it, then release the native session.
+- Local OCR returns structured lines/confidence; do not send the image to the API for cache hits.
+- Cloud OCR is a separate user action and is measured separately; it is not part of the local OCR budget.
+- No camera preview on desktop or PWA; no school image in PWA cache, IndexedDB, iroh or git.
+- Measure mobile camera cold start, capture-to-OCR latency and peak RSS on the device matrix in `70`; record device/date/build SHA.
+
+## OCR and camera rules
+
+- Local OCR models are assets, not network fetches; missing models fail closed before the first capture.
+- Do not hold decoded camera frames after the preview closes. Write one JPEG to app cache, import it, then release the native session.
+- Local OCR returns structured lines/confidence; do not send the image to the API for cache hits.
+- Cloud OCR is a separate user action and is measured separately; it is not part of the local OCR budget.
+- No camera preview on desktop or PWA; no school image in PWA cache, IndexedDB, iroh or git.
+- Measure mobile camera cold start, capture-to-OCR latency and peak RSS on the device matrix in `70`; record device/date/build SHA.
+
+## Measurement profile
+
+Release gates are measured with Lighthouse CI mobile emulation (Moto G Power-class device, 4× CPU throttle) on the production Worker build; Pages remains the rollback comparison. Field data via Cloudflare Web Analytics (RUM). Every measurement records device, date and build SHA.
 
 ## Budgets
 
@@ -23,23 +49,23 @@ Reason: the current bottleneck is backend response time, not client rendering. S
 | LCP | ≤2.5 s mid-tier mobile | Lighthouse/RUM |
 | INP | ≤200 ms | RUM |
 | CLS | ≤0.1 | Lighthouse/RUM |
-| Directory snapshot p95 | ≤800 ms | benchmark |
-| Directory page change | 0 API requests | code review |
+| Directory snapshot p95 | ≤800 ms | benchmark: 581-row production directory, web Worker/PWA build, date-stamped in PROGRESS |
+| Directory page change | ≤1 API request (next-page fetch) | code review |
 | Identity/query round trips | ≤10 per endpoint | API test |
 | D1 bound parameters | ≤100 per statement | repository guard |
-| Directory snapshot copies | 1 in memory | code review |
-| Page working set | ≤20 MB | memory profile |
+| Route working set | ≤20 MB | memory profile |
 | School data in PWA/cache | 0 | security review |
 | Initial document-engine bundle | 0 bytes | bundle scan |
 | IronPress/PDF.js/Mammoth/docx/PapaParse | lazy chunk | bundle scan |
 
-Current measured baseline (2026-11-09): initial JS **106 KB gzip**, CSS **6.2 KB gzip**, directory snapshot **581 rows / 200 KB**. Parallelizing the four D1 reads improved the first snapshot from **~3.7 s to ~1.9–2.5 s**, which still misses the 800 ms budget. The miss is recorded as a performance exception; the next optimization target is a single cached/read-optimized snapshot path.
+Current measured baseline (2026-11-09, Pages rollback build): initial JS **106 KB gzip**, CSS **6.2 KB gzip**, directory **581 rows / 200 KB**. RustO baseline (2026-11-11, i7-8850H Linux x86_64, 16 AY4 images, 1 warmup + 3 runs): p50 **1,219 ms**, p95 **1,289 ms**, peak RSS **256.5 MiB**, models **6.1 MiB**, mean CER **0.1479**, numeric recall **0.9251**. ocrs was rejected at CER **0.3654** and numeric recall **0.2543**. These are desktop measurements, not mobile guarantees. RustO baseline (2026-11-11, i7-8850H Linux x86_64, 16 AY4 images, 1 warmup + 3 runs): p50 **1,219 ms**, p95 **1,289 ms**, peak RSS **256.5 MiB**, models **6.1 MiB**, mean CER **0.1479**, numeric recall **0.9251**. ocrs was rejected at CER **0.3654** and numeric recall **0.2543**. These are desktop measurements, not mobile guarantees. RustO baseline (2026-11-11, i7-8850H Linux x86_64, 16 AY4 images, 1 warmup + 3 runs): p50 **1,219 ms**, p95 **1,289 ms**, peak RSS **256.5 MiB**, models **6.1 MiB**, mean CER **0.1479**, numeric recall **0.9251**. ocrs was rejected at CER **0.3654** and numeric recall **0.2543**. These are desktop measurements, not mobile guarantees. The 10B vinext build is measured separately; do not treat the Pages number as the Worker build's evidence. Parallelizing four reads (five D1 statements; the directory read fans into staff + parents) improved the first page from **~3.7 s to ~1.9–2.5 s**, which still misses the 800 ms budget. Recorded exception — owner: backend lead (beznet); follow-up: evaluate a cached, read-optimized directory endpoint at 10B close-out.
 
 ## Loading rules
 
 - Any data-bound or lazy route with a blank-layout risk must define a skeleton.
-- Use **Boneyard** for table, list and panel skeletons; shadcn `Skeleton`/a static fallback is the fallback.
-- Do not show a skeleton for work expected to finish in under 150–200 ms.
+- The workspace boot skeleton must mirror the compact or desktop shell at the current breakpoint (430px column below 1024px; rail + 760px canvas above). Do not render the mobile column on a desktop viewport; that produces a visible layout shift when the shell resolves.
+- Use **Boneyard** for table, list and panel skeletons (`apps/web/boneyard.config.json`, breakpoints 375/768/1280; `app/bones` is not yet generated — generation is a 10B build task). If Boneyard bones don't fit the layout, use shadcn `Skeleton` or a static fallback. Existing hand-written skeletons (`DirectorySkeleton.tsx`, `WorkspaceBoot`) are Modify targets for token variables and reduced-motion guards.
+- Do not show a skeleton for work expected to finish in under 150 ms (team decision; validate against RUM in `70-evaluation-and-rollout.md`).
 - If stale data exists, show stale data, not a skeleton.
 - Bones must match the final layout at 375/768/1280 and must not cause layout shift.
 - Respect `prefers-reduced-motion`; disable pulse/shimmer when reduced.
@@ -49,17 +75,15 @@ Current measured baseline (2026-11-09): initial JS **106 KB gzip**, CSS **6.2 KB
 - IronPress WASM, PDF.js worker/cmaps, Mammoth, `docx`, PapaParse and Tiptap extensions load only when used.
 - No import of whole icon or component barrels.
 - Hashed immutable assets; Brotli/HTTP3; no external font dependency.
-- PWA caches the app shell only; never API responses or school data.
+- PWA caches static assets, icons and the offline shell only; never API responses, transcripts, session data or school records.
 - HTML is `no-store` while data is dynamic.
 
 ## Directory and list rules
 
-- One snapshot per filter set; paginate locally in memory.
-- One copy of the snapshot; derive page slices.
-- Default page size 50; maximum snapshot 1,000.
-- Filters/search trigger one snapshot, not one request per keystroke; debounce search at 250–300 ms.
+- Directory listing uses server-side pagination per `45-admin-claim-links.md` (default 50, max 100 per page; the 581-row directory is ~6 pages). Filter changes fetch page 1.
+- Filters/search trigger one request, not one request per keystroke; debounce search at 250 ms (team decision; validate against RUM in `70`).
 - Abort in-flight requests when filters change.
-- Optimistic link revoke; refresh on explicit action or TTL.
+- Optimistic link revoke; refresh on explicit action or after the link TTL recorded in `45-admin-claim-links.md`.
 - Do not put staff/parent PII in `localStorage`, `sessionStorage`, IndexedDB, service workers or iroh.
 
 ## Worker and D1 rules
@@ -80,6 +104,15 @@ Current measured baseline (2026-11-09): initial JS **106 KB gzip**, CSS **6.2 KB
 - OpenUI output is bounded by `21-generative-ui-openui.md`; reject oversized surfaces.
 - Tiptap remains the editor; no full formatting toolbar and no Novel package.
 
+## OCR and camera rules
+
+- Local OCR models are assets, not network fetches; missing models fail closed before the first capture.
+- Do not hold decoded camera frames after the preview closes. Write one JPEG to app cache, import it, then release the native session.
+- Local OCR returns structured lines/confidence; do not send the image to the API for cache hits.
+- Cloud OCR is a separate user action and is measured separately; it is not part of the local OCR budget.
+- No camera preview on desktop or PWA; no school image in PWA cache, IndexedDB, iroh or git.
+- Measure mobile camera cold start, capture-to-OCR latency and peak RSS on the device matrix in `70`; record device/date/build SHA.
+
 ## Measurement
 
 Every release records:
@@ -95,10 +128,9 @@ Measurements are device/date-stamped. No invented benchmark numbers.
 
 ## Acceptance
 
-- Budgets are enforced in CI or review.
+- Budgets are enforced in CI: `apps/web/budget.json` (size limits per route chunk) wired into the build check; Lighthouse CI on the production Worker build with the measurement profile above.
 - No initial document-engine bundle.
-- No duplicate directory snapshot in memory.
-- Snapshot p95 ≤800 ms after parallelization, or a recorded exception with an owner and follow-up.
-- No Pages Functions/SSR in v1.
-- No PII in client caches.
-- Performance regressions are release blockers.
+- Snapshot p95 ≤800 ms after parallelization, or a recorded exception with an owner and follow-up (current exception recorded above).
+- No Pages Functions; the Worker does not embed school data or session tokens in HTML or edge caches.
+- No PII in client caches, service-worker caches or SSR HTML.
+- Any budget miss blocks release unless a recorded exception with an owner and follow-up exists.

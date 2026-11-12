@@ -5,6 +5,7 @@ export * from "./claim-policy";
 export * from "./claim.service";
 export * from "./code-normalisation";
 export * from "./claim-reset.service";
+export * from "./desktop.service";
 export * from "./duplicate-email.service";
 export * from "./google.service";
 export * from "./magic-link.service";

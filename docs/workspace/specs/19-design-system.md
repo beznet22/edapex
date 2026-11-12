@@ -1,6 +1,18 @@
 # 19 — Design System: shadcn/ui + Tailwind v4
 
-**Draft.** Phase 9B design decision; no dependency is installed by this document.
+**Draft.** Phase 9B design decision; dependencies are installed only where a later phase owns them.
+
+## Specification context
+
+This spec owns the **visual language and primitive layer**: Gold on Slate tokens, typography, accessible component choices, and the rule that generated or reference-derived UI must map back to those primitives.
+
+- `15-ui-surfaces.md` owns routes, shell geometry, responsive/PWA/Tauri placement and interaction behavior.
+- `17-chat-framework.md` owns chat state, message parts, queue/run semantics and the xcodex adapter.
+- `21-generative-ui-openui.md` owns the OpenUI catalog, validation and action bridge.
+- `43`/`44` own source reuse and audit rules; they do not define the visual system.
+- `47` owns measured load/memory budgets.
+
+If a component is in the right place but uses the wrong token, primitive or accessibility behavior, this spec wins. If this spec is silent about layout or state, 15/17/21 win.
 
 ## Decision
 
@@ -10,9 +22,9 @@ Use **shadcn/ui + Tailwind CSS v4** for the React workspace UI (web PWA, Tauri d
 - Gold on Slate in `src/routes/layout.css` is the visual authority.
 - Do not use shadcn's default theme colors or typography.
 - Do not reuse the existing Svelte shadcn components; the React workspace gets its own `packages/ui`.
-- The chat shell is the vendored OpenDuet presentation layer, not a third-party chat primitive library.
-- OpenUI Lang is the generated-surface renderer; it maps to Gold-on-Slate components in `packages/genui`.
-- Streamdown is the chat Markdown renderer; Tiptap is the artifact editor.
+- The chat shell is the ported OpenDuet interaction layer in `apps/web/components/openduet`, built on the shared primitives in `packages/chat`; it is not a third-party chat primitive library.
+- OpenUI Lang is the generated-surface renderer; it maps to Gold on Slate components in `packages/genui`.
+- Streamdown is the target chat Markdown renderer; Tiptap is the artifact editor. The current 10B shell renders plain text until Streamdown is integrated; do not claim Markdown support before that adapter exists.
 
 ## Tailwind v4 facts
 
@@ -65,7 +77,7 @@ Do not copy OpenDuet's purple/Inter theme. Do not change `src/routes/layout.css`
 ## Component use
 
 - **shadcn primitives:** Button, Dialog, Sheet, Drawer, Tabs, ScrollArea, Command, Field, Input, Select, Popover, Tooltip, Skeleton, Progress, Toast/Sonner.
-- **OpenDuet chat presentation:** transcript, composer, tool activity, approval cards, queue/following states, shell geometry. Vendor only the required files; strip CopilotKit/A2UI/auth/query imports. See `43-openduet-ui-vendoring.md`.
+- **OpenDuet chat presentation:** transcript, composer, tool activity, approval cards, queue/following states, shell geometry. Port only the required files into `apps/web/components/openduet`; shared message/skeleton primitives live in `packages/chat`. Strip CopilotKit/A2UI/auth/query imports. See `43-openduet-ui-vendoring.md`.
 - **OpenUI generated surfaces:** only the `packages/genui` catalog. Map each OpenUI component to a Gold-on-Slate React component. Do not use OpenUI's prebuilt chat layouts (`@openuidev/react-ui`) or chat state (`@openuidev/react-headless`).
 - **Streamdown:** chat Markdown and artifact preview. Pin the version, sanitize/allowlist links/images, and add the Tailwind v4 `@source` entries for `streamdown` and enabled plugins.
 - **Tiptap:** artifact editor; build the minimal Novel-style slash/bubble UI from Gold tokens. Use open-source extensions only. Novel is visual reference only; do not add the package or copy source (`44-reference-app-audits.md`).
@@ -74,10 +86,10 @@ Do not copy OpenDuet's purple/Inter theme. Do not change `src/routes/layout.css`
 
 ## Monorepo
 
-- shadcn components live in `packages/ui`.
-- OpenDuet-derived chat components live in `packages/chat`.
+- shadcn components live in `apps/web/components/ui` for the single web app; extract to `packages/ui` only when a second React surface needs them. The Tauri host loads the same app, so it does not need a duplicate component tree.
+- OpenDuet-derived primitives live in `packages/chat`; app composition and route-specific chrome live in `apps/web/components/openduet`.
 - OpenUI catalog/parser/action bridge live in `packages/genui`.
-- `components.json` lives with the UI package/application that consumes it; use the shadcn monorepo CLI support.
+- `components.json` lives with the web app that consumes it; use the shadcn monorepo CLI support when a package is extracted.
 - No duplicate component copies between web and Tauri.
 - Pin CLI/component versions and review generated diffs; shadcn copies code, so upgrades are deliberate.
 
@@ -103,5 +115,5 @@ Do not copy OpenDuet's purple/Inter theme. Do not change `src/routes/layout.css`
 - No shadcn AI Elements are installed in v1.
 - No assistant-ui, assistant-cloud, CopilotKit runtime, A2UI or paid MAU/seat is installed.
 - No `novel` package or copied Novel source; only the visual/interaction pattern is referenced.
-- Data-bound tables/panels use the Boneyard skeleton pattern with a 150 ms delay; reduced-motion disables animation; fallback is a static Tailwind skeleton.
+- Data-bound tables/panels use the Boneyard skeleton pattern with a 150 ms delay (`47-performance-budgets.md`); reduced-motion disables animation; fallback is a static Tailwind skeleton.
 - No generated surface can use arbitrary HTML, CSS or JavaScript.

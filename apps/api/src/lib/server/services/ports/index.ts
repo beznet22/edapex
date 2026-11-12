@@ -7,6 +7,7 @@ export * from "./photo-store.port";
 export * from "./report-settings-store.port";
 export * from "./student-directory.port";
 export * from "./archive-store.port";
+export * from "./web-provider.port";
 
 import type { Clock } from "./clock.port";
 import type { AuthConfigPort } from "./auth-config.port";
@@ -17,6 +18,7 @@ import type { PhotoStore } from "./photo-store.port";
 import type { ReportSettingsStore } from "./report-settings-store.port";
 import type { StudentDirectory } from "./student-directory.port";
 import type { ArchiveStorePort } from "./archive-store.port";
+import type { WebFetchClient, WebSearchClient } from "./web-provider.port";
 
 export interface ServicePorts {
   readonly email: EmailSender;
@@ -28,4 +30,6 @@ export interface ServicePorts {
   readonly authConfig: AuthConfigPort;
   readonly google: GoogleOAuthPort;
   readonly archiveStore: ArchiveStorePort;
+  readonly webSearch: WebSearchClient;
+  readonly webFetch: WebFetchClient;
 }

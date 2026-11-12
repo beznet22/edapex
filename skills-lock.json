@@ -1,17 +1,23 @@
 {
-  "version": 1,
+  "version": 2,
   "skills": {
     "ai-sdk": {
       "source": "vercel/ai",
       "sourceType": "github",
       "skillPath": "skills/use-ai-sdk/SKILL.md",
-      "computedHash": "2249889eb47ef0f61c4dba4cf2afe01c1c8dd793bb4c24230347c1ab909bb7dd"
+      "computedHash": ""
     },
     "grill-me": {
-      "source": "beznet/grill-me",
+      "source": "./beznet/grill-me",
       "sourceType": "local",
       "skillPath": "skills/grill-me/SKILL.md",
-      "computedHash": "2249889eb47ef0f61c4dba4cf2afe01c1c8dd793bb4c24230347c1ab909bb7dd"
+      "computedHash": ""
+    },
+    "migrate-to-vinext": {
+      "source": "cloudflare/vinext",
+      "sourceType": "github",
+      "skillPath": ".agents/skills/migrate-to-vinext/SKILL.md",
+      "computedHash": "a989206e5d67f43fc45d4b0c845c802a331d70417bacb3b8c1eed0c14e61a09f"
     }
   }
 }

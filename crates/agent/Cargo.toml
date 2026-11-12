@@ -1,0 +1,27 @@
+[package]
+name = "edapex-agent"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+publish = false
+
+[dependencies]
+codex-app-server-client = { git = "https://github.com/openai/codex", rev = "6bfdc75f0d9e6fae313234f694839866d7c63c39" }
+codex-app-server-protocol = { git = "https://github.com/openai/codex", rev = "6bfdc75f0d9e6fae313234f694839866d7c63c39" }
+codex-arg0 = { git = "https://github.com/openai/codex", rev = "6bfdc75f0d9e6fae313234f694839866d7c63c39" }
+codex-config = { git = "https://github.com/openai/codex", rev = "6bfdc75f0d9e6fae313234f694839866d7c63c39" }
+codex-core = { git = "https://github.com/openai/codex", rev = "6bfdc75f0d9e6fae313234f694839866d7c63c39" }
+codex-exec-server = { git = "https://github.com/openai/codex", rev = "6bfdc75f0d9e6fae313234f694839866d7c63c39" }
+codex-feedback = { git = "https://github.com/openai/codex", rev = "6bfdc75f0d9e6fae313234f694839866d7c63c39" }
+codex-http-client = { git = "https://github.com/openai/codex", rev = "6bfdc75f0d9e6fae313234f694839866d7c63c39" }
+codex-protocol = { git = "https://github.com/openai/codex", rev = "6bfdc75f0d9e6fae313234f694839866d7c63c39" }
+rama-error = "=0.3.0-alpha.4"
+rama-macros = "=0.3.0-alpha.4"
+rama-utils = "=0.3.0-alpha.4"
+thiserror = "2"
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "sync", "time"] }
+toml = "0.9.5"
+
+[dev-dependencies]
+tempfile = "3"
+tokio = { version = "1", features = ["full"] }

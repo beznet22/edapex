@@ -51,6 +51,7 @@ export interface SurfacePart {
   readonly catalogVersion: string;
   readonly source: string;
   readonly dataClass: "workspace" | "edapex-ephemeral";
+  readonly expiresAt?: number;
 }
 
 export type ChatMessagePart =

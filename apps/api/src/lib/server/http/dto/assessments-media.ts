@@ -7,9 +7,12 @@ import type {
 export interface ExtractionDto {
   readonly contentHash: string;
   readonly parserVersion: string;
+  readonly provider: OcrExtractionResult["provider"];
+  readonly isLocal: boolean;
   readonly rawText: string;
   readonly annotation: OcrExtractionResult["annotation"];
   readonly pageCount: number;
+  readonly warnings: readonly string[];
   readonly cached: boolean;
 }
 
@@ -44,9 +47,12 @@ export interface CaptureResultDto {
 export const toExtractionDto = (result: OcrExtractionResult): ExtractionDto => ({
   contentHash: result.contentHash,
   parserVersion: result.parserVersion,
+  provider: result.provider,
+  isLocal: result.isLocal,
   rawText: result.rawText,
   annotation: result.annotation,
   pageCount: result.pageCount,
+  warnings: result.warnings,
   cached: result.cached
 });
 

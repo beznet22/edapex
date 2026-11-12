@@ -17,4 +17,5 @@ export * from "./settings";
 export * from "./students";
 export * from "./tenant";
 export * from "./validation";
+export * from "./web";
 export * from "./workspace";

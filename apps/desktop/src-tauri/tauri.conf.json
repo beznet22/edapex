@@ -4,15 +4,28 @@
   "version": "0.1.0",
   "identifier": "ng.llacademy.edapex",
   "build": {
-    "beforeDevCommand": "pnpm --dir ../web dev --port 5180",
-    "devUrl": "http://localhost:5180",
-    "beforeBuildCommand": "pnpm --dir ../web build",
-    "frontendDist": "../../web/dist"
+    "beforeDevCommand": "pnpm --dir ../web dev",
+    "devUrl": "http://localhost:5181/workspace",
+    "beforeBuildCommand": "pnpm --dir ../web build:mobile",
+    "frontendDist": "../../web/.cloudflare/output/v0/workers/default/assets"
+  },
+  "plugins": {
+    "deep-link": {
+      "desktop": {
+        "schemes": ["edapex"]
+      },
+      "mobile": [
+        {
+          "scheme": ["edapex"]
+        }
+      ]
+    }
   },
   "app": {
     "windows": [
       {
         "title": "EdApex Work",
+        "url": "/workspace/",
         "width": 430,
         "height": 860,
         "minWidth": 360,
@@ -25,6 +38,12 @@
     }
   },
   "bundle": {
-    "active": false
+    "active": false,
+    "resources": [
+      "resources/ocr/manifest.json",
+      "resources/ocr/det.onnx",
+      "resources/ocr/rec.onnx",
+      "resources/ocr/dict.txt"
+    ]
   }
 }

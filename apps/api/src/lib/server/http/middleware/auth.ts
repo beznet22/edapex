@@ -8,8 +8,14 @@ import type { AppContext } from "../env";
 
 export { SESSION_COOKIE };
 
+const bearerToken = (header: string | undefined): string | null => {
+  if (header === undefined) return null;
+  const match = /^Bearer\s+(.+)$/i.exec(header.trim());
+  return match?.[1]?.trim() ?? null;
+};
+
 export const auth: MiddlewareHandler<AppContext> = async (c, next) => {
-  const token = getCookie(c, SESSION_COOKIE) ?? null;
+  const token = getCookie(c, SESSION_COOKIE) ?? bearerToken(c.req.header("authorization"));
   c.set("sessionToken", token);
   if (token === null) {
     c.set("session", null);

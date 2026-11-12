@@ -30,10 +30,10 @@ describe("chat queue", () => {
       busy: false
     });
     expect(result.state.queued).toEqual([]);
-    expect(result.drain?.messages.map((entry) => entry.id)).toEqual(["a"]);
+    expect(result.drain?.message.id).toBe("a");
   });
 
-  it("drains every queued message into one follow-up turn", () => {
+  it("drains one queued message as a distinct turn in creation order", () => {
     const first = reduceQueue(emptyQueue(), {
       type: "park",
       message: message("a", "first")
@@ -42,10 +42,13 @@ describe("chat queue", () => {
       type: "park",
       message: message("b", "second")
     });
-    const result = reduceQueue(second.state, { type: "settle" });
-    expect(result.state.queued).toEqual([]);
-    expect(result.drain?.messages.map((entry) => entry.id)).toEqual(["a", "b"]);
-    expect(result.drain?.text).toBe("first\n\nsecond");
+    const drained = reduceQueue(second.state, { type: "settle" });
+    expect(drained.drain?.message.id).toBe("a");
+    expect(drained.state.queued.map((entry) => entry.id)).toEqual(["b"]);
+
+    const next = reduceQueue(drained.state, { type: "settle" });
+    expect(next.drain?.message.id).toBe("b");
+    expect(next.state.queued).toEqual([]);
   });
 
   it("does not drain twice after settling", () => {
@@ -92,7 +95,7 @@ describe("chat queue", () => {
     expect(state.queued).toHaveLength(MAX_QUEUED_MESSAGES);
   });
 
-  it("drains attachment IDs with the joined turn", () => {
+  it("drains a queued message with its own attachments", () => {
     const parked = reduceQueue(emptyQueue(), {
       type: "park",
       message: {
@@ -101,6 +104,6 @@ describe("chat queue", () => {
       }
     });
     const result = reduceQueue(parked.state, { type: "settle" });
-    expect(result.drain?.attachmentIds).toEqual(["file-1"]);
+    expect(result.drain?.message.attachmentIds).toEqual(["file-1"]);
   });
 });

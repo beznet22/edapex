@@ -25,6 +25,9 @@ v2 is about native UI/performance, platform integrations, offline behavior and a
 - iroh state/workspace sync
 - typed workflow IR + sandbox + allowlisted shell
 - CF Worker API for EdApex data
+- native tab/navigation primitives; equivalent composer, transcript, tool-activity and approval behavior (the v1 interaction model from `15-ui-surfaces.md`)
+- Gold on Slate tokens adapted to native styling; accessibility, safe areas and reduced motion
+- the same capability/approval semantics
 - no local school-record database
 - no server-side xcodex
 
@@ -65,6 +68,21 @@ Flutter and Lynx have no OpenUI renderer today. Before those candidates can clai
 - keep GenUI web-only inside a WebView for that candidate and accept the reduced experience.
 
 This is a v2 gate, not v1 work. Do not promise full GenUI parity in v2 until the chosen path passes the `70` evaluation on the devices in scope.
+
+## A2UI re-evaluation triggers (moved from `21`)
+
+Re-evaluate A2UI vs OpenUI when at least one is true:
+
+1. EdApex renders GenUI in Flutter, SwiftUI, Lynx or another host where the OpenUI React Native entry is not usable.
+2. Third-party or remote agents return UI into EdApex.
+3. A cross-host UI payload is required by an integration.
+4. A native OpenUI Lang renderer is not feasible for the selected v2 runtime.
+
+At that point, compare A2UI and OpenUI on the EdApex catalog, not on vendor benchmarks alone. A2UI is Apache-2.0 with formal AG-UI/A2A/MCP bindings — real advantages outside a React-only client. The `@openuidev/a2ui` profile is experimental, unpublished and not compatible with standard A2UI agents; do not use it as a shortcut.
+
+## Native bindings (moved from `30`)
+
+`edapex-bindings` (UniFFI/C ABI for native Swift/Kotlin modules) is a v2-only crate; v1 uses Tauri commands on native and WASM on web. React Native/Craby/JSI paths are v2 candidates only.
 
 ## Common blockers
 

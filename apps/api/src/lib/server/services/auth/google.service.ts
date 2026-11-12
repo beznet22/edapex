@@ -17,13 +17,19 @@ import { signPayload } from "../crypto/signed-payload";
 import { SESSION_TTL_SECONDS } from "./types";
 import type { AuthSessionResult } from "./types";
 
-export type GooglePurpose = "signin" | "claim";
+export type GooglePurpose = "signin" | "claim" | "desktop";
+
+export interface DesktopOAuthStart {
+  readonly codeChallenge: string;
+  readonly redirectUri: string;
+}
 
 export interface GoogleStartInput {
   readonly purpose: GooglePurpose;
   readonly claimUserId: number | null;
   readonly allowEmailChange?: boolean;
   readonly claimLinkId?: string | null;
+  readonly desktop?: DesktopOAuthStart | null;
 }
 
 export interface GoogleStartResult {
@@ -49,6 +55,8 @@ export interface GoogleStatePayload extends Record<string, unknown> {
   readonly userId: number | null;
   readonly allowEmailChange: boolean;
   readonly claimLinkId: string | null;
+  readonly desktopCodeChallenge: string | null;
+  readonly desktopRedirectUri: string | null;
   readonly state: string;
   readonly verifier: string;
   readonly exp: number;
@@ -59,10 +67,16 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 
 export const isGoogleStatePayload = (value: unknown): value is GoogleStatePayload =>
   isRecord(value) &&
-  (value["purpose"] === "signin" || value["purpose"] === "claim") &&
+  (value["purpose"] === "signin" ||
+    value["purpose"] === "claim" ||
+    value["purpose"] === "desktop") &&
   (value["userId"] === null || typeof value["userId"] === "number") &&
   typeof value["allowEmailChange"] === "boolean" &&
   (value["claimLinkId"] === null || typeof value["claimLinkId"] === "string") &&
+  (value["desktopCodeChallenge"] === null ||
+    typeof value["desktopCodeChallenge"] === "string") &&
+  (value["desktopRedirectUri"] === null ||
+    typeof value["desktopRedirectUri"] === "string") &&
   typeof value["state"] === "string" &&
   typeof value["verifier"] === "string" &&
   typeof value["exp"] === "number";
@@ -88,6 +102,8 @@ export class GoogleService {
         userId: input.claimUserId,
         allowEmailChange: input.allowEmailChange === true,
         claimLinkId: input.claimLinkId ?? null,
+        desktopCodeChallenge: input.desktop?.codeChallenge ?? null,
+        desktopRedirectUri: input.desktop?.redirectUri ?? null,
         state,
         verifier
       },

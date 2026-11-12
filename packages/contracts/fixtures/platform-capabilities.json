@@ -1,0 +1,67 @@
+{
+  "host": {
+    "nativeAgent": true,
+    "localOcr": true,
+    "screenshotCapture": true,
+    "cameraPreview": false,
+    "browserAssistance": false,
+    "mobileSafeToolsOnly": false
+  },
+  "server": {
+    "webSearch": true,
+    "webFetch": true,
+    "cloudOcr": true
+  },
+  "camera": {
+    "facing": "back",
+    "flash": "auto",
+    "maxDimension": 2048
+  },
+  "cameraResult": {
+    "status": "captured",
+    "path": "/app-cache/capture-1.jpg",
+    "width": 2048,
+    "height": 1536,
+    "mimeType": "image/jpeg",
+    "sizeBytes": 412000
+  },
+  "capture": {
+    "captureId": "capture-1",
+    "source": "camera",
+    "fileName": "capture-1.jpg",
+    "mimeType": "image/jpeg",
+    "width": 2048,
+    "height": 1536,
+    "sizeBytes": 412000
+  },
+  "ocr": {
+    "engine": "rusto",
+    "engineVersion": "0.3.2",
+    "modelVersion": "pp-ocrv6-tiny",
+    "pages": [
+      {
+        "pageNumber": 1,
+        "width": 2048,
+        "height": 1536,
+        "text": "CA 10",
+        "meanConfidence": 0.94,
+        "lines": [
+          {
+            "text": "CA 10",
+            "confidence": 0.94,
+            "box": {
+              "x": 0.1,
+              "y": 0.2,
+              "width": 0.3,
+              "height": 0.05
+            }
+          }
+        ]
+      }
+    ],
+    "meanConfidence": 0.94,
+    "fallbackRecommended": false,
+    "warnings": [],
+    "durationMs": 1219
+  }
+}

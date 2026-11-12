@@ -3,8 +3,11 @@ import { Hono } from "hono";
 import {
   adminIssueApplySchema,
   adminIssueIdParamsSchema,
-  adminIssueQuerySchema
-} from "@edapex/contracts";
+  adminIssueQuerySchema,
+  type AdminIssueApplyBody,
+  type AdminIssueIdParams,
+  type AdminIssueQuery
+} from "@edapex/contracts/issues";
 
 import { AdminIssueService, createService } from "../../services";
 import type { AppContext } from "../env";
@@ -12,7 +15,7 @@ import { currentUserId } from "../middleware/authorize";
 import { jsonBody, queryParams, routeParams } from "../validation";
 
 export const adminIssues = new Hono<AppContext>()
-  .get("/issues", queryParams(adminIssueQuerySchema), async (c) => {
+  .get("/issues", queryParams<AdminIssueQuery>(adminIssueQuerySchema), async (c) => {
     const page = await createService(
       AdminIssueService,
       c.get("ctx")
@@ -20,7 +23,7 @@ export const adminIssues = new Hono<AppContext>()
     c.header("Cache-Control", "no-store");
     return c.json(page, 200);
   })
-  .get("/issues/:id", routeParams(adminIssueIdParamsSchema), async (c) => {
+  .get("/issues/:id", routeParams<AdminIssueIdParams>(adminIssueIdParamsSchema), async (c) => {
     const issue = await createService(
       AdminIssueService,
       c.get("ctx")
@@ -28,7 +31,7 @@ export const adminIssues = new Hono<AppContext>()
     c.header("Cache-Control", "no-store");
     return c.json(issue, 200);
   })
-  .post("/issues/:id/plan", routeParams(adminIssueIdParamsSchema), async (c) => {
+  .post("/issues/:id/plan", routeParams<AdminIssueIdParams>(adminIssueIdParamsSchema), async (c) => {
     const plan = await createService(
       AdminIssueService,
       c.get("ctx")
@@ -38,8 +41,8 @@ export const adminIssues = new Hono<AppContext>()
   })
   .post(
     "/issues/:id/apply",
-    routeParams(adminIssueIdParamsSchema),
-    jsonBody(adminIssueApplySchema),
+    routeParams<AdminIssueIdParams>(adminIssueIdParamsSchema),
+    jsonBody<AdminIssueApplyBody>(adminIssueApplySchema),
     async (c) => {
       const body = c.req.valid("json");
       const result = await createService(AdminIssueService, c.get("ctx")).apply(

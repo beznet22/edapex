@@ -74,3 +74,8 @@ storage/edapex-mastra.db-shm
 
 # Rust build output
 /target/
+
+# RustO OCR model binaries (manifest is tracked; binaries are fetched and verified)
+/apps/desktop/src-tauri/resources/ocr/*.onnx
+/apps/desktop/src-tauri/resources/ocr/dict.txt
+/apps/desktop/src-tauri/resources/ocr/*.part

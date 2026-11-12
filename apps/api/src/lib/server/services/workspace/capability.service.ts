@@ -3,6 +3,7 @@ import {
   type CapabilityManifest,
   type CapabilityRole
 } from "@edapex/contracts";
+import type { ServerCapabilities } from "@edapex/contracts/platform";
 
 import type { ServiceContext } from "../context";
 import { requireScopedContext } from "../context";
@@ -17,6 +18,15 @@ export class CapabilityService {
 
   async manifestFor(user: AuthUser): Promise<CapabilityManifest> {
     return buildCapabilityManifest(await this.resolveRole(user));
+  }
+
+  serverCapabilities(user: AuthUser): ServerCapabilities {
+    const staff = user.isAdmin || user.staffId !== null;
+    return {
+      webSearch: staff && this.ctx.ports.webSearch.configured,
+      webFetch: staff && this.ctx.ports.webFetch.configured,
+      cloudOcr: true
+    };
   }
 
   private async resolveRole(user: AuthUser): Promise<CapabilityRole> {

@@ -1,6 +1,6 @@
 # Workspace Programme Roadmap
 
-**Status:** Phase 9B **approved**; 10A in progress. Phase 8 and the Phase 9A platform are **done**. `app.llacademy.ng` is live via a proxied Pages CNAME; migration 0006 and Worker `7bab26b5` are deployed. The transitional `/claim` route and shared password digests are explicitly carried into **10G.2** after cowork workspace completion. Student codes, duplicate-email resolution and staff/parent provisioning are carried into **10G.1**. The former 2026-12-03 `/claim` removal date is withdrawn. Phase 10 is approved and 10A is in progress.
+**Status:** Phase 9B **approved**; 10B web rewrite in progress. Phase 8 and the Phase 9A platform are **done**. `app.llacademy.ng` is live via a proxied Pages CNAME and remains the rollback. The single `apps/web` app is being replaced with a Next App Router PWA built by vinext and deployed as a Cloudflare Worker with static assets. Migration 0006 and Worker `7bab26b5` are deployed. The transitional `/claim` route and shared password digests are explicitly carried into **10G.2** after cowork workspace completion. Student codes, duplicate-email resolution and staff/parent provisioning are carried into **10G.1**. The former 2026-12-03 `/claim` removal date is withdrawn.
 
 ## 0. Agent operating instructions — read first
 
@@ -10,7 +10,7 @@ You are implementing the EdApex local-first workspace. Read this roadmap, `PROGR
 
 1. `docs/cloudflare-port/schema-catalog.md` and `05-d1-migration.spec.md` — the migrated backend and data movement.
 2. `docs/cloudflare-port/01/02/03/04/04a/06` — backend structure, auth, HTTP and archive behaviour.
-3. `docs/workspace/specs/*` — workspace UI, Tiptap editor, GenUI, document engine, local agent, workflows and v2.
+3. `docs/workspace/specs/*` — workspace UI, Tiptap editor, GenUI, document engine, local agent, workflows and v2. Within that set, use the authority map in `docs/workspace/README.md#specification-authority`: 15 owns surface behavior/placement, 17 owns chat state, 19 owns visual primitives, 21 owns GenUI, 43/44 own source reuse, 47 owns budgets and 05 owns repository/deployment boundaries.
 4. This roadmap is sequencing only; it never overrides a spec.
 5. `PROGRESS.md` is live status, not a design document.
 
@@ -44,7 +44,7 @@ The Cloudflare port and the workspace are two programmes, not two backends.
 - `docs/workspace/specs/*` are authoritative for the workspace UI, editor, GenUI, local agent, workflows and v2.
 - The port phases run **0 → 9**. Workspace **Phase 9A is the port's Phase 9** (auth/retention closeout). Workspace **Phase 10** starts only after that gate.
 - `apps/api/` remains the in-repo EdApex API service. It becomes a pnpm workspace package after Phase 9; it is not extracted into a separate repository.
-- `apps/web/` is the React PWA deployed to **Cloudflare Pages**. `apps/api/` is the Hono API on **Cloudflare Workers**. `apps/desktop/` is Tauri; its installers are not hosted on Pages.
+- `apps/web/` is the single browser PWA: a Next App Router app built by **vinext** and deployed as a **Cloudflare Worker with static assets** at `app.llacademy.ng`. `apps/api/` is the Hono API on **Cloudflare Workers**. `apps/desktop/` is Tauri; its installers are not hosted by the web deployment. The previous Pages deployment is rollback only.
 - If a workspace spec and a port spec disagree about backend behaviour, the port spec wins and the workspace spec is corrected. If they disagree about workspace behaviour, the workspace spec wins. Stop and report a genuine conflict; do not pick silently.
 
 ## 2. Goal
@@ -58,17 +58,15 @@ The workspace is a general office-agent harness. EdApex is a capability/tool pac
 | Gate | State | Evidence |
 |---|---|---|
 | Phase 8 — cutover | **done** | 24 h watch closed 2026-11-09; owner POC login confirmed; checklist signed; 2,298 EdApex requests/0 errors, D1 96 write queries/180 rows, FK 0. See `docs/cloudflare-port/PROGRESS.md`. |
-| Phase 9A — auth/retention + workspace wiring | **done (platform)** | Migration 0006; Worker `bfa72530`; Pages `edapex-web.pages.dev`; proxied CNAME `app.llacademy.ng` → `edapex-web.pages.dev`; app root/claim/admin 200; API smoke green. `/claim` and shared digests stay transitional in 10G.2. |
-| Phase 9B — workspace handoff docs | **approved 2026-11-09** | 28 markdown files under `docs/workspace/`. |
-| Phase 10 — workspace implementation | **in progress** | 10A deployed; 10B `/workspace` shell in progress. |
-| Phase 10G.1 — identity provisioning | **deferred, starts with 10B** | Admin claim links, student codes, duplicate resolution and staff/parent linking. |
-| Phase 10G.2 — transitional retirement | **deferred after 10F** | Remove `/claim`, null/drop password digests, retention execution. |
+| Phase 9A — auth/retention + workspace wiring | **in progress** | Admin claim-link backend and first `apps/web` page are being added. Shared `/claim` remains until staff/parent coverage and student codes pass. |
+| Phase 9B — workspace handoff docs | **draft** | 26 markdown files under `docs/workspace/`; awaiting approval. |
+| Phase 10 — workspace implementation | **blocked** | Requires Phase 8 gate, Phase 9A gate, Phase 9B approval and workspace wiring. |
 
 ## 4. v1 architecture
 
 ```text
 React UI
-  ├── Web PWA on Cloudflare Pages (app.llacademy.ng)
+  ├── Web PWA: Next App Router via vinext, Cloudflare Worker + static assets (app.llacademy.ng)
   └── Tauri 2 desktop + mobile (system WebView)
         │
         ├── OpenDuet-derived chat shell + xcodex adapter
@@ -105,19 +103,18 @@ Cloudflare Workers (api.llacademy.ng)
 - **Workers Free only.** No Paid fallback. D1 writes are account-wide and capped at 100k/day.
 - `apps/api/` remains deployable on its own; workspace wiring must not break its package, lockfile, tests or deploy dry-run.
 
-### Cloudflare Pages boundary
+### Cloudflare web boundary
 
-- `apps/web` is static React/PWA output; no Pages Functions, no SSR and no second API.
-- `app.llacademy.ng` → Pages; `api.llacademy.ng` → Worker.
-- Build: `pnpm install --frozen-lockfile && pnpm --filter @edapex/web build`; output `apps/web/dist`.
-- `_redirects`: `/* /index.html 200`.
-- `_headers`: CSP, HSTS, `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`, `application/wasm`, cache policy.
-- CSP: `connect-src https://api.llacademy.ng`; `worker-src 'self' blob:`; `script-src 'self' 'wasm-unsafe-eval'`; `img-src 'self' data: blob:`; no arbitrary frames.
+- `apps/web` builds through vinext and deploys as a Worker with static assets; no Pages Functions and no second API.
+- `app.llacademy.ng` → web Worker; `api.llacademy.ng` → API Worker. The previous Pages deployment is the rollback until cutover.
+- Build: `pnpm install --frozen-lockfile && pnpm --dir apps/web build`; output `apps/web/dist`. Deploy with `vinext-cloudflare` using `apps/web/cloudflare.config.ts` and `apps/web/worker/index.ts`.
+- Headers: CSP, HSTS, `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`, cache policy in `next.config.ts`.
+- CSP: `connect-src https://api.llacademy.ng`; `worker-src 'self' blob:`; `img-src 'self' data: blob:`; no arbitrary frames. Do not add `wasm-unsafe-eval` unless a reviewed WASM feature requires it.
 - `Cross-Origin-Opener-Policy` / `Cross-Origin-Embedder-Policy` only if OPFS SQLite or WASM threads require them; test first.
 - IronPress WASM (6.4 MB gzip) and PDF.js worker/cmaps are lazy-loaded, never in the initial bundle.
-- PWA service worker caches app shell/static assets only; never school data or API responses.
-- Preview deployments per PR; production deploy from the approved release branch, never `main`.
-- Tauri installers/updaters use GitHub Releases or R2, not Pages.
+- PWA service worker caches static assets, icons and the offline shell only; never API responses, transcripts, session data or school records.
+- Preview Worker per PR; production promotion from the approved release branch, never `main`.
+- Tauri installers/updaters use GitHub Releases or R2, not the web Worker.
 
 ## 5. Workstreams
 
@@ -149,6 +146,7 @@ Every spec maps to at least one workstream; `06` and the cross-cutting specs are
 | `44-reference-app-audits.md` | 10B |
 | `45-admin-claim-links.md` | 10B, 10E |
 | `47-performance-budgets.md` | 10B, 10F |
+| `45-admin-claim-links.md` | 10B, 10E |
 | `50-workflows-shell-sandbox.md` | 10D |
 | `60-security-privacy.md` | 10A–10F |
 | `70-evaluation-and-rollout.md` | 10D, 10F |
@@ -165,7 +163,7 @@ Every spec maps to at least one workstream; `06` and the cross-cutting specs are
 - typed API/capability contracts consumed by the workspace
 - no speculative endpoints
 
-**Read first:** `specs/00-overview.md`, `specs/05-project-structure.md`, `specs/10-capabilities-and-roles.md`, `specs/18-operation-inventory.md`, `specs/20-public-applicant-flow.md`, `specs/60-security-privacy.md`.
+**Read first:** `specs/00-overview.md`, `specs/05-project-structure.md`, `specs/10-capabilities-and-roles.md`, `specs/18-operation-inventory.md`, `specs/20-public-applicant-flow.md`, `specs/45-admin-claim-links.md`, `specs/60-security-privacy.md`.
 
 **Depends on:** Phase 9A + Phase 9B approval.
 
@@ -174,7 +172,7 @@ Every spec maps to at least one workstream; `06` and the cross-cutting specs are
 ### 10B — Tauri shell, GenUI, editor and document engine
 
 - React shell based on OpenDuet interaction/state; Gold on Slate
-- Tauri desktop **and** mobile WebView; web PWA on Cloudflare Pages
+- Tauri desktop **and** mobile WebView; web PWA on a vinext Worker
 - full v1 surface matrix from `specs/15-ui-surfaces.md`
 - OpenUI Lang generated surfaces; read-only/assisted only
 - minimal Tiptap inline/side-panel editor (same editor, not a full toolbar)
@@ -183,7 +181,7 @@ Every spec maps to at least one workstream; `06` and the cross-cutting specs are
 - legacy EdApex UI reuse: report/transcript templates, filestore/artifact viewer patterns, school settings
 - legacy SvelteKit freeze/tag/retirement sequence
 - workspace package wiring: `apps/api/` joins the pnpm workspace, stays deployable, no extraction
-- Pages project, custom domain, `_headers`/`_redirects`, preview/production deploy
+- Worker route/custom domain, `next.config.ts` headers, preview/production deploy
 
 **Read first:** `specs/00-overview.md`, `specs/05-project-structure.md`, `specs/06-legacy-archive.md`, `specs/15-ui-surfaces.md`, `16-artifacts.md`, `17-chat-framework.md`, `19-design-system.md`, `21-generative-ui-openui.md`, `22-documents-and-artifacts.md`, `30-tauri-rust-core.md`, `43-openduet-ui-vendoring.md`, `44-reference-app-audits.md`, `45-admin-claim-links.md`, `47-performance-budgets.md`, `60-security-privacy.md`, and `extracted-ui-spec.md`.
 
@@ -236,7 +234,7 @@ Every spec maps to at least one workstream; `06` and the cross-cutting specs are
 
 - Needle 3 tool accuracy/memory benchmarks
 - Tauri desktop/mobile/WebView performance
-- Cloudflare Pages performance, cache and PWA offline shell
+- vinext Worker performance, cache and PWA offline shell
 - iroh pairing/conflict/revocation
 - GenUI/OpenUI evaluation
 - document engine evaluation (IronPress/PDF.js/DOCX/CSV)
@@ -248,7 +246,7 @@ Every spec maps to at least one workstream; `06` and the cross-cutting specs are
 
 **Depends on:** 10B–10E.
 
-**Accept:** benchmark evidence, no unresolved high-severity security finding, rollback exercised, Pages deploy verified.
+**Accept:** benchmark evidence, no unresolved high-severity security finding, rollback exercised, web Worker deploy verified.
 
 ### 10G — Identity operations and transitional auth retirement
 
@@ -325,7 +323,7 @@ Do not restate cutover details here; use `docs/cloudflare-port/PROGRESS.md` and 
 ### Phase 9B — this documentation gate (draft)
 
 - `docs/workspace/README.md`, `ROADMAP.md`, `PROGRESS.md` and all specs present
-- v1/v2 decisions recorded, including OpenUI, Tiptap, document engine, legacy UI reuse, Cloudflare Pages and OpenUI React Native
+- v1/v2 decisions recorded, including OpenUI, Tiptap, document engine, legacy UI reuse, vinext Worker/PWA and OpenUI React Native
 - no unresolved TBD/TODO
 - relative links, code fences and stale-term checks pass
 - no code/endpoints/production changes in Phase 9B
@@ -360,7 +358,7 @@ Do not restate cutover details here; use `docs/cloudflare-port/PROGRESS.md` and 
 - `PROGRESS.md` updated.
 - PR description contains gate output and the report format above.
 - No school data or session tokens in local/P2P storage.
-- Cloudflare Pages deploy verified with `_headers`/`_redirects` and the Worker API origin.
+- Web Worker deploy verified with `next.config.ts` headers and the Worker API origin.
 
 ## 10. v2 native mobile
 
@@ -388,4 +386,4 @@ OpenUI Lang has a React Native native entry; Flutter/Lynx have no OpenUI rendere
 - Make Novel a dependency, copy Novel source, or turn the minimal Tiptap editor into a full toolbar-rich editor
 - Treat PDF/DOCX/CSV parsing as authoritative school-record creation
 - Promise OCR, PDF/A or tagged PDF in v1
-- Host `apps/api` or Tauri installers on Cloudflare Pages
+- Host `apps/api` or Tauri installers on the web Worker/Pages

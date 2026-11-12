@@ -17,6 +17,10 @@ import { MistralOcrAdapter } from "../adapters/mistral-ocr.adapter";
 import { createPhotoStore } from "../adapters/r2-photo-store.adapter";
 import { createArchiveStore } from "../adapters/r2-archive-store.adapter";
 import { TenantScopeError } from "../errors";
+import { FallbackWebFetchClient, FallbackWebSearchClient } from "../web/fallback";
+import { TavilyProvider } from "../web/providers/tavily.provider";
+import { TinyFishFetchProvider } from "../web/providers/tinyfish-fetch.provider";
+import { TinyFishSearchProvider } from "../web/providers/tinyfish-search.provider";
 import { systemClock } from "../ports";
 import type { ReportSettingsStore, ServicePorts, StudentDirectory } from "../ports";
 import { consoleLogger } from "./logger";
@@ -111,6 +115,10 @@ function createPorts(env: ServiceEnv, repos: RepositoryAccess): ServicePorts {
           }
         };
 
+  const tinyfishSearch = new TinyFishSearchProvider({ apiKey: env.TINYFISH_API_KEY });
+  const tinyfishFetch = new TinyFishFetchProvider({ apiKey: env.TINYFISH_API_KEY });
+  const tavily = new TavilyProvider({ apiKey: env.TAVILY_API_KEY });
+
   return {
     email: createEmail(env),
     ocr: new MistralOcrAdapter({
@@ -124,7 +132,9 @@ function createPorts(env: ServiceEnv, repos: RepositoryAccess): ServicePorts {
     photos: createPhotoStore(env.MEDIA),
     archiveStore: createArchiveStore(env.MEDIA),
     authConfig: createAuthConfig(env),
-    google: createGoogleOAuth(env)
+    google: createGoogleOAuth(env),
+    webSearch: new FallbackWebSearchClient([tinyfishSearch, tavily]),
+    webFetch: new FallbackWebFetchClient([tinyfishFetch, tavily])
   };
 }
 

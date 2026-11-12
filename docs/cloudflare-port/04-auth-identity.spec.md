@@ -144,7 +144,7 @@ The session read is folded into the tenant-resolution middleware so it costs one
 | Fact | Consequence |
 |---|---|
 | Cloudflare Email Service supports Workers binding, REST, and SMTP on port 465 | Bindings are the lowest-latency path inside Workers |
-| **Arbitrary-recipient sending requires Workers Paid** | Free can only reach pre-verified destination addresses — unusable for magic links |
+| **Cloudflare Email Routing arbitrary-recipient sending requires Workers Paid** | EdApex does not use that path. Gmail OAuth2 is the delivery adapter; Workers stay on Free and there is no Paid fallback. |
 | Port 25 is inbound-only; plaintext SMTP and STARTTLS on 587 are not supported | The existing `SMTP_*` variables in `.env` cannot be used from Workers |
 | Cloudflare requires the sending domain on Cloudflare DNS | Domain setup is a prerequisite, not a runtime concern |
 

@@ -72,3 +72,46 @@ Any work on the Hono + Cloudflare + D1 port must start at [`docs/cloudflare-port
 Port code lands in [`apps/api/`](apps/api/AGENTS.md) — read that file before adding anything there. Phase status is tracked in [`docs/cloudflare-port/PROGRESS.md`](docs/cloudflare-port/PROGRESS.md) and must be updated in the same PR.
 
 Before opening a port PR, run `node scripts/verify-port-specs.mjs` and `node scripts/verify-schema-catalog.mjs`, and paste the output in the description.
+
+## Local Capability Layer (10C)
+
+Spec [`docs/workspace/specs/48-local-capability-layer.md`](docs/workspace/specs/48-local-capability-layer.md) is normative. The layer is Rust domain crate → Tauri adapter/state → typed WebView client → UI hook. Do not bypass it.
+
+- Role tools remain server-owned and capped at 5 tools / 8 operations. Host and server capabilities are separate booleans and never grant role authority.
+- `packages/contracts/src/agent.ts`, `platform.ts`, `web.ts` and `json.ts` are the shared wire contracts. Add a fixture and both a TS and Rust test for every change.
+- Native xcodex uses `codex-app-server::in_process` on a Tokio thread, Tauri commands and `tauri::ipc::Channel<AgentEvent>`. No sidecar, no SSE production path, no server-side xcodex.
+- EdApex tools are app-server dynamic tools (`web_search`, `web_fetch`, `ocr_extract`), executed in process. Do not add an EdApex MCP child process for them.
+- The WebView never holds the EdApex bearer token or OpenRouter key. Use the native `api_request` proxy and OS keychain/Keystore only.
+- RustO is the local OCR engine; Mistral is explicit fallback. Local OCR sends text/annotation only; student images never upload without `X-OCR-Consent: cloud`.
+- Mobile camera is a first-party Tauri plugin: full-screen native preview, stills only, AVFoundation on iOS and CameraX on Android. Desktop uses file import and `xcap` screenshots.
+- Browser assistance is desktop-only, user-installed official Chrome DevTools MCP. No custom extension, BrowserBridge, PWA or mobile browser control.
+- Do not add an `AGENT_DB` table to the EdApex school `DB`; persistence/sync is a separate follow-on using `41`/`42`.
+
+Verification:
+
+```bash
+pnpm --dir apps/web check
+pnpm --dir apps/web test
+pnpm --dir apps/api run typecheck
+pnpm --dir apps/api test
+cargo test -p edapex-agent -p edapex-ocr
+```
+
+## Workspace Web Architecture (`apps/web`)
+
+The workspace follows these invariants. They are enforced by `apps/web/tests/workspace-architecture.test.ts`.
+
+- **Persistent layout owns auth, session, runtime and shell.** `app/workspace/layout.tsx` wraps `WorkspaceLayoutClient`; Chat/Tasks/Make pages render only their surface component (`WorkspaceChat`, `TasksSurface`, `MakeSurface`). Never put `getSession`, `loadCapabilities`, `useWorkspaceRuntime` or the shell in a page.
+- **Internal navigation uses `next/link`.** No `<a href>` for `/workspace`, `/workspace/tasks`, `/workspace/make` or `/admin` inside the workspace shell. Full-page anchors remount the layout and reset local state.
+- **One boot per surface.** `WorkspaceBoot` selects Chat, Tasks or Make from `usePathname`; do not use one generic chat skeleton for every route.
+- **Skeletons mirror the resolved page.** Use `.skeleton-shimmer` and the Boneyard configuration; never mix pulse and shimmer.
+- **Artifact editing is a split/sheet host, not a nested editor.** Desktop uses the 38/62 split; below 1024px it uses the sheet. The editor stays on Gold on Slate tokens.
+- **Dev-only CSP exceptions stay dev-only.** `unsafe-eval` and local HMR WebSocket origins must never appear in the production CSP.
+
+Verification for this area:
+
+```bash
+pnpm --dir apps/web check
+pnpm --dir apps/web test
+pnpm --dir apps/web build
+```

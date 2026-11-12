@@ -47,6 +47,18 @@ node scripts/verify-port-specs.mjs
 node scripts/verify-schema-catalog.mjs
 ```
 
+## Local capability API routes
+
+The capability layer is defined by [`../../docs/workspace/specs/48-local-capability-layer.md`](../../docs/workspace/specs/48-local-capability-layer.md).
+
+- `GET /api/v1/agent/capabilities` stays role-owned; do not add host features to the role manifest.
+- `GET /api/v1/agent/platform-capabilities` reports only server-side flags (`webSearch`, `webFetch`, `cloudOcr`), never local host state.
+- `POST /api/v1/agent/web/search` and `/web/fetch` are staff-only, tenant-scoped and rate-limited below provider free-tier caps.
+- Provider keys are Worker secrets. Never return or log them, and never write search queries or fetched URLs to logs.
+- `POST /api/v1/assessments/ocr/local-extractions` accepts text/annotation only. `POST /api/v1/assessments/ocr/extractions` requires `X-OCR-Consent: cloud`.
+- Desktop auth uses signed PKCE and bearer sessions; do not depend on `__Host-` cookies for Tauri.
+- Reuse `auth_rate_limits` for capability quotas; do not add a table to the school `DB` for this layer.
+
 ## Non-negotiables
 
 - **62 legacy tables only** are migrated from MySQL; new tables must be declared in a spec (`04`, `05`, `06`).

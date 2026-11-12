@@ -7,6 +7,7 @@ import {
   buildCapabilityManifest,
   validateAllRolePacks
 } from "@edapex/contracts";
+import { isHostCapabilities, isServerCapabilities } from "@edapex/contracts/platform";
 
 describe("capability contract", () => {
   it("keeps every role pack within the 5-tool and 8-operation budgets", () => {
@@ -37,6 +38,23 @@ describe("capability contract", () => {
     expect(parentToolIds).not.toContain("admin_issues");
     expect(parentToolIds).not.toContain("admissions");
     expect(adminToolIds).toContain("admin_issues");
+  });
+
+  it("keeps host and server capabilities as separate contracts", () => {
+    expect(
+      isHostCapabilities({
+        nativeAgent: true,
+        localOcr: true,
+        screenshotCapture: true,
+        cameraPreview: false,
+        browserAssistance: false,
+        mobileSafeToolsOnly: false
+      })
+    ).toBe(true);
+    expect(
+      isServerCapabilities({ webSearch: true, webFetch: true, cloudOcr: true })
+    ).toBe(true);
+    expect(isHostCapabilities({ nativeAgent: true })).toBe(false);
   });
 
   it("validates the public applicant draft contract", () => {

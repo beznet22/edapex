@@ -1,12 +1,23 @@
 # 21 — Generative UI: OpenUI Lang for v1
 
-**Draft.** Phase 9B decision. No dependency is installed by this document.
+**Draft.** Phase 9B decision. Dependencies installed: `@openuidev/lang-core@1.1.0`, `@openuidev/react-lang@1.1.0` (pinned). Transitive `@openuidev/devtools@0.3.1` and `@openuidev/observability@0.0.4` are inside the security-review scope.
+
+## Specification context
+
+This spec is **authoritative for v1 generated UI** and owns the OpenUI encoder, catalog, validation, action bridge, storage shape and security rules. It is not a chat-shell or platform-layout spec.
+
+- `15-ui-surfaces.md` owns where a surface appears and how it fits the transcript/artifact layout.
+- `17-chat-framework.md` owns the `surface` message part and runtime event mapping.
+- `19-design-system.md` owns the tokens and React primitives each catalog component maps to.
+- `43`/`44` own source reuse and audit rules.
+
+Where spec 15 says “if both are enabled,” this spec resolves v1: **OpenUI only; A2UI is deferred**. Do not add an A2UI adapter, dependency or fallback path.
 
 ## Decision
 
 Use **OpenUI Lang** as the v1 generative-UI encoder and renderer.
 
-- The chat shell, transcript, composer, approvals and runtime state come from the vendored OpenDuet presentation layer.
+- The chat shell, transcript, composer, approvals and runtime state come from the ported OpenDuet interaction layer.
 - xcodex remains the only local agent runtime.
 - OpenUI renders generated surfaces from a fixed, host-owned component catalog.
 - Authoritative EdApex workflows stay in fixed React forms. GenUI is read-only or assisted, never the final authority.
@@ -20,7 +31,7 @@ xcodex
   → typed tool result (already authorized and tenant-scoped)
   → OpenUI Lang surface
   → parser + catalog validation
-  → Gold-on-Slate React components
+  → Gold on Slate React components
   → closed action ID
   → xcodex typed operation
   → CF Worker authorization / approval
@@ -29,7 +40,7 @@ xcodex
 
 ## Why OpenUI for v1
 
-v1 is a React application inside Tauri and the browser. OpenDuet is React. The shortest, lowest-risk GenUI path is a compact language that renders registered React components.
+v1 is a React application inside Tauri and the browser, and OpenDuet is React. A compact language that renders registered React components adds no new runtime beyond the existing React layer, which is why it was chosen for v1.
 
 OpenUI's first-party benchmark reports, across 46 screens and six models:
 
@@ -41,13 +52,9 @@ OpenUI's first-party benchmark reports, across 46 screens and six models:
 | Stream time at 50 tok/s | ~27s | ~56s |
 | Render success | 99.9% | 96.6% |
 
-The benchmark is maintained by OpenUI, not an independent standards body. Treat it as a strong signal, not a guarantee. `70-evaluation-and-rollout.md` requires an EdApex bake-off on real school surfaces before the catalog is frozen.
+The benchmark is maintained by OpenUI, not an independent standards body. Treat it as directional evidence pending the EdApex bake-off in `70-evaluation-and-rollout.md`. `70-evaluation-and-rollout.md` requires an EdApex bake-off on real school surfaces before the catalog is frozen.
 
-The decision is not permanent:
-
-- A2UI's cross-platform and remote-agent advantages may become decisive at v2 or when third-party agents return UI.
-- `@openuidev/react-lang` has a React Native native entry (optional `react-native` peer); Flutter/Lynx renderers do not exist today.
-- The `@openuidev/a2ui` profile is experimental, unpublished, and not compatible with standard A2UI agents out of the box. Do not use it as a shortcut.
+The decision is not permanent: re-evaluation triggers, the React Native/Flutter/Lynx renderer status and the v2 GenUI gate live in `80-v2-native-mobile.md` (§A2UI triggers, §v2 GenUI).
 
 ## GenUI scope
 
@@ -120,7 +127,7 @@ The workspace package is `packages/genui`. It owns the catalog, parser wrapper, 
 
 ## Catalog
 
-Keep the v1 catalog small: 25–35 components, role-scoped.
+Keep the v1 catalog small: 25–35 components, role-scoped. The shipped baseline is `packages/genui/src/catalog.tsx` — six components (`Stack`, `TextContent`, `Badge`, `Metric`, `Callout`, `Table`; library id `edapex-v1`) with Zod-enforced caps (≤20 rows, ≤8 columns, ≤200 cells, ≤40 `Stack` children, ≤2,000 chars text). The role-scoped catalog is a Modify of that file: `createLibrary(role)` returning the per-role component set.
 
 ### Layout and structure
 
@@ -128,7 +135,7 @@ Keep the v1 catalog small: 25–35 components, role-scoped.
 
 ### Data presentation
 
-`Metric`, `Table`, `Chart`, `Timeline`, `Diff`, `Badge`, `Callout`, `KeyValue`, `Progress`.
+`Metric`, `Table`, `Chart`, `Timeline`, `Diff`, `Badge`, `Callout`, `TextContent`, `KeyValue`, `Progress`.
 
 ### EdApex domain summaries
 
@@ -195,18 +202,7 @@ Rules:
 
 ## Surface storage
 
-Store generated surfaces in `message_parts` (see `42-agent-db-schema.md`) with:
-
-```ts
-type SurfacePart = {
-  partType: "surface";
-  language: "openui";
-  catalogVersion: string;
-  source: string;
-  dataClass: "workspace" | "edapex-ephemeral";
-  expiresAt?: number;
-};
-```
+Store generated surfaces in `message_parts` (see `42-agent-db-schema.md`). The normative type is `SurfacePart` in `packages/contracts/src/chat.ts` — discriminator `kind: "surface"`, fields `language: "openui"`, `catalogVersion`, `source`, `dataClass`, and optional `expiresAt` (epoch ms) for `edapex-ephemeral` surfaces.
 
 - `workspace` surfaces may be stored locally and synced under the workspace policy.
 - `edapex-ephemeral` surfaces store source and metadata only; no student/mark/fee snapshot.
@@ -222,7 +218,6 @@ Starting budgets, to be validated in `70`:
 - max 20 table rows;
 - charts use aggregated data, not raw exports;
 - one surface per turn by default; no speculative surfaces;
-- prompt caching for the catalog/system prompt;
 - fallback to a fixed tool card or plain text when the budget, parser or renderer fails.
 
 Do not optimize by removing the catalog's safety constraints. A smaller role-scoped catalog is the preferred lever.
@@ -241,29 +236,6 @@ OpenUI Lang is untrusted model output.
 - A generated surface is not an approval, a capability grant or a mutation token.
 - OpenUI's parser/runtime must be pinned and security-reviewed before release.
 
-## A2UI future trigger
-
-Re-evaluate A2UI when at least one is true:
-
-1. EdApex renders GenUI in Flutter, SwiftUI, Lynx or another host where the OpenUI React Native entry is not usable.
-2. Third-party or remote agents return UI into EdApex.
-3. A cross-host UI payload is required by an integration.
-4. A native OpenUI Lang renderer is not feasible for the selected v2 runtime.
-
-At that point, compare A2UI and OpenUI on the EdApex catalog, not on vendor benchmarks alone. A2UI is Apache-2.0 and has formal AG-UI/A2A/MCP bindings; those are real advantages outside a React-only client.
-
-## v2 caveat
-
-`@openuidev/react-lang` supports web React and React Native through a native entry (optional `react-native` peer). Flutter and Lynx renderers do not exist today.
-
-v2 must choose one of:
-
-- reuse OpenUI Lang on React Native with the native entry and a native component catalog;
-- build a Flutter/Lynx renderer over `lang-core`, or adopt A2UI for those hosts;
-- keep GenUI web-only inside a WebView for the non-React-Native candidate.
-
-Do not claim full GenUI parity in v2 until that gate is passed. See `80-v2-native-mobile.md`.
-
 ## Non-goals
 
 - No GenUI marksheet editor.
@@ -278,8 +250,8 @@ Do not claim full GenUI parity in v2 until that gate is passed. See `80-v2-nativ
 ## Acceptance
 
 - The catalog renders on web, Tauri desktop and Tauri mobile WebView.
-- 50 golden prompts across admin/teacher/parent/student meet the `70` thresholds.
-- Every generated action is a closed ID; zero unauthorized mutations in red-team tests.
+- 50 golden prompts across admin/teacher/parent/student meet the `70` thresholds (golden set: `packages/genui/test/golden/`, thresholds imported from `70-evaluation-and-rollout.md`).
+- Every generated action is a closed ID; zero unauthorized mutations in the red-team suite (`packages/genui/test/redteam/`: closed-ID rejection, unknown-action error path, no direct-write components).
 - No school-data snapshot is persisted for `edapex-ephemeral` surfaces.
 - Parser failure, unknown component, over-budget surface and missing data all fall back safely.
 - A2UI/assistant-ui/CopilotKit are absent from the v1 dependency graph.

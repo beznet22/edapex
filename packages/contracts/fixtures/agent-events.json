@@ -1,0 +1,81 @@
+[
+  {
+    "type": "connected",
+    "threadId": "thread-1"
+  },
+  {
+    "type": "turn_started",
+    "threadId": "thread-1",
+    "turnId": "turn-1"
+  },
+  {
+    "type": "message_delta",
+    "threadId": "thread-1",
+    "turnId": "turn-1",
+    "itemId": "item-1",
+    "delta": "Checking the marksheet."
+  },
+  {
+    "type": "reasoning_delta",
+    "threadId": "thread-1",
+    "turnId": "turn-1",
+    "itemId": "item-2",
+    "delta": "The numeric column needs verification."
+  },
+  {
+    "type": "tool_started",
+    "threadId": "thread-1",
+    "turnId": "turn-1",
+    "toolCallId": "tool-1",
+    "name": "ocr_extract",
+    "summary": "Reading the captured marksheet"
+  },
+  {
+    "type": "tool_completed",
+    "threadId": "thread-1",
+    "turnId": "turn-1",
+    "toolCallId": "tool-1",
+    "name": "ocr_extract",
+    "status": "completed",
+    "detail": "16 lines, 3 low-confidence fields"
+  },
+  {
+    "type": "approval_requested",
+    "threadId": "thread-1",
+    "turnId": "turn-1",
+    "approvalRequestId": "approval-1",
+    "title": "Save marksheet",
+    "description": "Write the validated marksheet for the selected exam.",
+    "risk": "write",
+    "decisions": ["allow_once", "allow_for_session", "deny", "abort"]
+  },
+  {
+    "type": "approval_resolved",
+    "threadId": "thread-1",
+    "turnId": "turn-1",
+    "approvalRequestId": "approval-1",
+    "decision": "allow_once"
+  },
+  {
+    "type": "turn_completed",
+    "threadId": "thread-1",
+    "turnId": "turn-1",
+    "status": "completed"
+  },
+  {
+    "type": "interrupted",
+    "threadId": "thread-1",
+    "turnId": "turn-1",
+    "reason": "App moved to the background"
+  },
+  {
+    "type": "error",
+    "threadId": "thread-1",
+    "turnId": "turn-1",
+    "error": {
+      "code": "model_missing",
+      "message": "The local OCR model is missing.",
+      "retryable": false
+    }
+  }
+]

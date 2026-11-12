@@ -1,10 +1,14 @@
 {
   "breakpoints": [375, 768, 1280],
-  "out": "./src/bones",
+  "out": "./app/bones",
   "wait": 800,
-  "animate": "pulse",
+  "animate": "shimmer",
+  "speed": "1.8s",
+  "shimmerAngle": 100,
   "transition": 150,
   "select": "viewport",
   "color": "rgba(148, 163, 184, 0.16)",
-  "darkColor": "rgba(148, 163, 184, 0.16)"
+  "darkColor": "rgba(148, 163, 184, 0.16)",
+  "shimmerColor": "rgba(148, 163, 184, 0.22)",
+  "darkShimmerColor": "rgba(148, 163, 184, 0.22)"
 }

@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "tauri dev",
-    "build": "tauri build"
+    "build": "tauri build",
+    "android:dev": "tauri android dev",
+    "android:build": "tauri android build --debug"
   },
   "devDependencies": {
     "@tauri-apps/cli": "2.12.4"

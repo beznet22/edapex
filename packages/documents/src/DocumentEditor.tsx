@@ -4,6 +4,7 @@ import {
   Bold,
   ChevronRight,
   Code2,
+  FileText,
   Heading1,
   Heading2,
   Italic,
@@ -51,8 +52,8 @@ function ToolbarButton({
       aria-pressed={active}
       className={
         active
-          ? "flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-md bg-primary/15 text-primary sm:min-h-9 sm:min-w-9"
-          : "flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-35 sm:min-h-9 sm:min-w-9"
+          ? "flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-md bg-[#e9e3d5] text-[#5c4717] sm:min-h-9 sm:min-w-9"
+          : "flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-md text-[#6f6a61] hover:bg-black/5 hover:text-[#1f1f1f] disabled:opacity-35 sm:min-h-9 sm:min-w-9"
       }
       disabled={disabled}
       onClick={onClick}

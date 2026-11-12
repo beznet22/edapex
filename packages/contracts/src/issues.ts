@@ -83,9 +83,13 @@ export const adminIssueQuerySchema = z
   })
   .strict();
 
+export type AdminIssueQuery = z.infer<typeof adminIssueQuerySchema>;
+
 export const adminIssueIdParamsSchema = z.object({
   id: z.string().trim().min(3).max(80).regex(/^[a-z_]+:(staff|parent):\d+$/)
 });
+
+export type AdminIssueIdParams = z.infer<typeof adminIssueIdParamsSchema>;
 
 export const adminIssueApplySchema = z
   .object({
@@ -94,3 +98,5 @@ export const adminIssueApplySchema = z
     confirm: z.literal("apply")
   })
   .strict();
+
+export type AdminIssueApplyBody = z.infer<typeof adminIssueApplySchema>;

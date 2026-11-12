@@ -1,7 +1,10 @@
 import { Hono } from "hono";
 
 import {
+  DESKTOP_REDIRECT_URI,
+  DesktopAuthService,
   GoogleService,
+  SessionService,
   createService,
   isClaimTicketPayload,
   isGoogleStatePayload,
@@ -94,6 +97,25 @@ export const authGoogle = new Hono<AppContext>()
       userAgent: c.get("userAgent"),
       fingerprint: null
     });
+
+    if (payload.purpose === "desktop") {
+      const challenge = payload.desktopCodeChallenge;
+      const redirectUri = payload.desktopRedirectUri;
+      if (challenge === null || redirectUri !== DESKTOP_REDIRECT_URI) {
+        throw new AuthError("The desktop OAuth state is invalid");
+      }
+      await createService(SessionService, c.get("baseCtx")).logout(result.token);
+      const desktopCode = await createService(
+        DesktopAuthService,
+        c.get("baseCtx")
+      ).createCode(result.user.id, challenge, redirectUri);
+      c.header("Cache-Control", "no-store");
+      return c.redirect(
+        `${redirectUri}?code=${encodeURIComponent(desktopCode)}`,
+        302
+      );
+    }
+
     setSessionCookie(c, result.token, result.expiresAt);
     c.header("Cache-Control", "no-store");
     return c.redirect(config.postLoginRedirect, 302);

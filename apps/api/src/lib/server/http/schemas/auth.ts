@@ -31,6 +31,22 @@ export const codeBody = z
   })
   .strict();
 
+const pkceValue = z.string().trim().regex(/^[A-Za-z0-9_-]{43,128}$/);
+
+export const desktopStartBody = z
+  .object({
+    codeChallenge: pkceValue,
+    redirectUri: z.literal("edapex://auth")
+  })
+  .strict();
+
+export const desktopExchangeBody = z
+  .object({
+    code: z.string().trim().min(32).max(4096),
+    codeVerifier: pkceValue
+  })
+  .strict();
+
 export const profilePatchBody = z
   .object({
     fullName: z.string().min(1).nullable().optional(),

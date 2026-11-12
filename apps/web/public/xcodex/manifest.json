@@ -1,0 +1,6 @@
+{
+  "buildId": "a8f84b2f1ff25d6fb3356186fa6361552945ee52",
+  "entry": "/xcodex/current/xcodex.js",
+  "wasm": "/xcodex/current/xcodex_bg.wasm",
+  "runtime": "/xcodex/current/xcodex-runtime.js"
+}

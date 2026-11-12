@@ -2,5 +2,17 @@
 resolver = "2"
 members = [
   "crates/core",
+  "crates/agent",
+  "crates/ocr",
+  "crates/ocr-bench",
   "apps/desktop/src-tauri"
 ]
+
+[patch."https://github.com/microsoft/mxc"]
+mxc-sdk = { path = "/home/beznet/mxc-mobile/src/mxc-sdk" }
+
+[patch.crates-io]
+sqlx-core = { git = "https://github.com/transact-rs/sqlx", rev = "10462fa4414c6c7f1ed1d39bb31678e3b726878c" }
+sqlx-sqlite = { git = "https://github.com/transact-rs/sqlx", rev = "10462fa4414c6c7f1ed1d39bb31678e3b726878c" }
+tokio-tungstenite = { git = "https://github.com/openai-oss-forks/tokio-tungstenite", rev = "7447c427513cfe685f236e1ac0513c4ea3dd9c0b" }
+tungstenite = { git = "https://github.com/openai-oss-forks/tungstenite-rs", rev = "bc589d684755a8c02da0fc7e58d0861cbfc306f1" }

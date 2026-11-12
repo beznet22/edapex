@@ -32,7 +32,18 @@
 - native vs local WASM WebView fallback
 - model provider latency
 - tool-call loop and cancellation
+- dynamic-tool round trip (`web_search`, `web_fetch`, `ocr_extract`)
+- approval mapping (`allow_once`, `allow_for_session`, `deny`, `abort`)
 - memory and long-session stability
+
+### Capability layer
+
+- RustO OCR on the synthetic fixture and the tenant-safe AY4 benchmark; record CER/WER, numeric recall, p50/p95, peak RSS and model size.
+- Mistral fallback only with explicit consent; verify no image reaches the API on the local path.
+- Mobile camera on physical iOS and Android: permission allow/deny, front/back, flash, rotation, background/resume, cancel/retake and EXIF GPS strip.
+- Desktop PKCE: system-browser login, one-time code, keychain storage, refresh/logout, no token in WebView storage.
+- WebSearch/WebFetch: TinyFish primary, Tavily fallback, quota `429`, SSRF rejection and no query/URL logging.
+- Contract fixtures parse in TypeScript and Rust; no drift.
 
 ### Workflows
 
@@ -42,7 +53,23 @@
 - approval/idempotency tests
 - deterministic replay
 
-### Cloudflare Pages
+### xcodex local
+
+- native vs local WASM WebView fallback
+- model provider latency
+- tool-call loop and cancellation
+- dynamic-tool round trip (`web_search`, `web_fetch`, `ocr_extract`)
+- approval mapping (`allow_once`, `allow_for_session`, `deny`, `abort`)
+- memory and long-session stability
+
+### Capability layer
+
+- RustO OCR on the synthetic fixture and the tenant-safe AY4 benchmark; record CER/WER, numeric recall, p50/p95, peak RSS and model size.
+- Mistral fallback only with explicit consent; verify no image reaches the API on the local path.
+- Mobile camera on physical iOS and Android: permission allow/deny, front/back, flash, rotation, background/resume, cancel/retake and EXIF GPS strip.
+- Desktop PKCE: system-browser login, one-time code, keychain storage, refresh/logout, no token in WebView storage.
+- WebSearch/WebFetch: TinyFish primary, Tavily fallback, quota `429`, SSRF rejection and no query/URL logging.
+- Contract fixtures parse in TypeScript and Rust; no drift.
 
 - Build from the approved release branch, never `main`; verify `_headers`/`_redirects`.
 - CSP allows `api.llacademy.ng`, WASM and PDF.js workers; no arbitrary frames.
@@ -68,6 +95,10 @@ See `22-documents-and-artifacts.md`.
 - pairing, conflict, offline, revocation
 - no school data/token leakage
 - relay failure and recovery
+- iroh-first transport with CF `AGENT_DB` authority: direct path, relay path, CF store-and-forward fallback, cursor convergence
+- no school image, token or provider key in sync state
+- iroh-first transport with CF `AGENT_DB` authority: direct path, relay path, CF store-and-forward fallback, cursor convergence
+- no school image, token or provider key in sync state
 
 ### GenUI (OpenUI)
 
@@ -92,7 +123,8 @@ Also run malformed/adversarial OpenUI Lang: unknown components, oversized trees,
 
 - desktop pilot first
 - web PWA second
-- Tauri mobile third
+- Tauri mobile third, including the native camera/OCR smoke
+- persistence/sync is a separate follow-on gate (`41`/`42`); do not block the capability layer on iroh
 - v2 native mobile only after a separate gate
 - GenUI starts read-only, then assisted actions; no authoritative GenUI writes
 - no big-bang migration of school data or sessions

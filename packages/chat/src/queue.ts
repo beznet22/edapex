@@ -7,9 +7,7 @@ export interface ChatQueueState {
 }
 
 export interface QueueDrain {
-  readonly messages: readonly QueuedMessage[];
-  readonly text: string;
-  readonly attachmentIds: readonly string[];
+  readonly message: QueuedMessage;
 }
 
 export type QueueAction =
@@ -29,16 +27,8 @@ export const emptyQueue = (): ChatQueueState => ({ queued: [] });
 const bounded = (messages: readonly QueuedMessage[]): readonly QueuedMessage[] =>
   messages.slice(0, MAX_QUEUED_MESSAGES);
 
-export function drainOf(messages: readonly QueuedMessage[]): QueueDrain {
-  const text = messages
-    .map((message) => message.text.trim())
-    .filter((value) => value.length > 0)
-    .join("\n\n");
-  return {
-    messages,
-    text,
-    attachmentIds: messages.flatMap((message) => message.attachmentIds)
-  };
+export function drainOf(message: QueuedMessage): QueueDrain {
+  return { message };
 }
 
 export function reduceQueue(state: ChatQueueState, action: QueueAction): QueueResult {
@@ -56,16 +46,16 @@ export function reduceQueue(state: ChatQueueState, action: QueueAction): QueueRe
           }
         : {
             state: { queued: state.queued },
-            drain: drainOf([action.message])
+            drain: drainOf(action.message)
           };
     case "settle": {
-      if (state.queued.length === 0) {
+      const first = state.queued[0];
+      if (first === undefined) {
         return { state, drain: null };
       }
-      const messages = state.queued;
       return {
-        state: { queued: [] },
-        drain: drainOf(messages)
+        state: { queued: state.queued.slice(1) },
+        drain: drainOf(first)
       };
     }
     case "restore":

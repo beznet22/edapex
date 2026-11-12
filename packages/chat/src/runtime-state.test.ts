@@ -66,8 +66,15 @@ describe("workspace runtime projection", () => {
       action: { type: "settle" }
     });
     expect(second.state.turn.queueCount).toBe(2);
-    expect(drained.state.turn.queueCount).toBe(0);
-    expect(drained.drain?.messages.map((entry) => entry.id)).toEqual(["a", "b"]);
+    expect(drained.state.turn.queueCount).toBe(1);
+    expect(drained.drain?.message.id).toBe("a");
+
+    const next = reduceRuntime(drained.state, {
+      type: "queue",
+      action: { type: "settle" }
+    });
+    expect(next.state.turn.queueCount).toBe(0);
+    expect(next.drain?.message.id).toBe("b");
   });
 
   it("restores the queue after a failed drain", () => {
@@ -82,7 +89,7 @@ describe("workspace runtime projection", () => {
     });
     const restored = reduceRuntime(drained.state, {
       type: "queue",
-      action: { type: "restore", messages: drained.drain?.messages ?? [] }
+      action: { type: "restore", messages: drained.drain ? [drained.drain.message] : [] }
     });
     expect(restored.state.turn.queueCount).toBe(1);
     expect(restored.drain).toBeNull();

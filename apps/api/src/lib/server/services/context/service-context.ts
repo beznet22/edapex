@@ -46,6 +46,8 @@ export interface ServiceEnv {
   readonly POST_LOGIN_REDIRECT?: string;
   readonly APP_ORIGIN?: string;
   readonly ARCHIVE_TOKEN_SECRET?: string;
+  readonly TINYFISH_API_KEY?: string;
+  readonly TAVILY_API_KEY?: string;
 }
 
 /**

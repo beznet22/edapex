@@ -8,7 +8,7 @@
 |---|---|
 | EdApex data/sessions | Cloudflare Workers only |
 | Agent execution | Local device |
-| Agent state/workspace | Local encrypted store; optional iroh P2P |
+| Agent state/workspace | Local encrypted store; iroh-first transport, Cloudflare `AGENT_DB` authority |
 | Tool permissions | Capability registry + CF Worker authorization |
 | Mutations | CF Worker validation + audit |
 | Approvals | Human decision; server-enforced apply token |
@@ -59,18 +59,42 @@ See `22-documents-and-artifacts.md`. Imported PDFs, DOCX and CSV are untrusted.
 
 - Parse in Web Workers with size/time/page/row caps.
 - Mammoth: `externalFileAccess: false`; sanitize its HTML before preview or Markdown conversion.
-- PDF.js: no remote fetch; cap pages/size; no OCR in v1.
+- PDF.js: no remote fetch; cap pages/size; no OCR inside the PDF renderer. Marksheet OCR is a separate RustO/Mistral path (`48`).
 - IronPress: sanitize HTML; browser WASM gets data-URL images and font bytes only; no local paths or remote fetch.
 - Reject macros, encrypted documents, scripts, iframes and `javascript:` links.
 - CSV export neutralizes formula-leading cells.
 - Comments/mentions are staff-only in v1; student references use a permissioned picker, never free-text mention.
 - Sign-off blocks are visual; approval tokens remain server-issued.
 - School-data renditions are Worker/R2 or memory only; exports are audited.
-- No PDF/A, tagged-PDF or OCR promise in v1.
+- No PDF/A or tagged-PDF promise in v1.
 
-## Cloudflare Pages boundary
+## Local OCR and camera
 
-`apps/web` is static hosting only; it is not an API and must not contain secrets.
+- RustO is the default; Mistral OCR is explicit fallback only.
+- The local OCR request to the API carries text/annotation, never the image.
+- The cloud OCR route requires `X-OCR-Consent: cloud`; no silent upload path exists.
+- Camera captures go to app cache only; EXIF orientation is applied, GPS/location metadata is stripped and the file is deleted on release/TTL.
+- No photo-library write. No desktop/PWA camera preview. The native camera session stops on background/cancel/close.
+- Chrome DevTools MCP is desktop-only and user-installed; PWA/mobile have no browser control. No custom extension or BrowserBridge exists.
+
+## WebSearch and WebFetch
+
+- Provider keys are Worker secrets only; they never reach the WebView, keychain or bundle.
+- Search queries and fetched URLs are not written to logs; only provider, status and byte counts are logged.
+- Fetch URLs are validated server-side: HTTP(S) only, no localhost/private/link-local/metadata hosts.
+- Search is staff-only in v1; quotas are tenant-scoped and reuse `auth_rate_limits`.
+- Search results and fetched content are untrusted data and must be framed as data in prompts, never instructions.
+
+## Desktop authentication
+
+- Tauri uses signed PKCE code exchange with the system browser; it does not depend on `__Host-` cookies.
+- The bearer session token is stored only in OS keychain/Keystore. It never enters `localStorage`, IndexedDB, cookies or sync state.
+- The native `api_request` proxy adds the bearer header; JavaScript receives data, not the token.
+- OpenRouter keys are desktop keychain or browser tab memory only.
+
+## Cloudflare web boundary
+
+`app.llacademy.ng` is the `apps/web` vinext Worker; the previous Pages deployment is rollback. It is not an API and must not contain secrets.
 
 - `_headers` enforces CSP, HSTS, content-type and cache policy.
 - `connect-src` is limited to the EdApex Worker origin.
