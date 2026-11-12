@@ -6,22 +6,11 @@ license = "MIT"
 publish = false
 
 [dependencies]
-codex-app-server-client = { path = "/home/beznet/codex-mobile/codex-rs/app-server-client" }
-codex-app-server-protocol = { path = "/home/beznet/codex-mobile/codex-rs/app-server-protocol" }
-codex-arg0 = { path = "/home/beznet/codex-mobile/codex-rs/arg0" }
-codex-config = { path = "/home/beznet/codex-mobile/codex-rs/config" }
-codex-core = { path = "/home/beznet/codex-mobile/codex-rs/core" }
-codex-exec-server = { path = "/home/beznet/codex-mobile/codex-rs/exec-server" }
-codex-feedback = { path = "/home/beznet/codex-mobile/codex-rs/feedback" }
-codex-http-client = { path = "/home/beznet/codex-mobile/codex-rs/http-client" }
-codex-protocol = { path = "/home/beznet/codex-mobile/codex-rs/protocol" }
-rama-error = "=0.3.0-alpha.4"
-rama-macros = "=0.3.0-alpha.4"
-rama-utils = "=0.3.0-alpha.4"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
 thiserror = "2"
-tokio = { version = "1", features = ["macros", "rt-multi-thread", "sync", "time"] }
-toml = "0.9.5"
+tokio = { version = "1", features = ["macros", "rt", "sync", "time"] }
+uuid = { version = "1", features = ["v4"] }
 
 [dev-dependencies]
-tempfile = "3"
 tokio = { version = "1", features = ["full"] }

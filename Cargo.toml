@@ -16,3 +16,11 @@ sqlx-core = { git = "https://github.com/transact-rs/sqlx", rev = "10462fa4414c6c
 sqlx-sqlite = { git = "https://github.com/transact-rs/sqlx", rev = "10462fa4414c6c7f1ed1d39bb31678e3b726878c" }
 tokio-tungstenite = { git = "https://github.com/openai-oss-forks/tokio-tungstenite", rev = "7447c427513cfe685f236e1ac0513c4ea3dd9c0b" }
 tungstenite = { git = "https://github.com/openai-oss-forks/tungstenite-rs", rev = "bc589d684755a8c02da0fc7e58d0861cbfc306f1" }
+
+[profile.agent-release]
+inherits = "release"
+lto = "thin"
+opt-level = "z"
+codegen-units = 1
+panic = "abort"
+strip = "symbols"
