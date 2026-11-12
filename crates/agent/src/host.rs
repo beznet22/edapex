@@ -33,7 +33,10 @@ fn mobile_overrides() -> Vec<(String, TomlValue)> {
         ("features.code_mode".to_string(), disabled.clone()),
         ("features.multi_agent".to_string(), disabled.clone()),
         ("features.multi_agent_v2".to_string(), disabled),
-        ("web_search".to_string(), TomlValue::String("disabled".to_string())),
+        (
+            "web_search".to_string(),
+            TomlValue::String("disabled".to_string()),
+        ),
     ]
 }
 
