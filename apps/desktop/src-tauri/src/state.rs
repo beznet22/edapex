@@ -55,6 +55,20 @@ impl HostState {
         Ok(())
     }
 
+    pub fn agent(&self) -> Result<Option<AgentSession>, HostError> {
+        self.agent
+            .lock()
+            .map(|slot| slot.clone())
+            .map_err(|_| HostError::new("internal_error", "Agent state is unavailable", true))
+    }
+
+    pub fn take_agent(&self) -> Result<Option<AgentSession>, HostError> {
+        self.agent
+            .lock()
+            .map(|mut slot| slot.take())
+            .map_err(|_| HostError::new("internal_error", "Agent state is unavailable", true))
+    }
+
     pub fn has_agent(&self) -> bool {
         self.agent
             .lock()

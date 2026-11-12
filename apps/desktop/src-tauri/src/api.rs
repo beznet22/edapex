@@ -49,7 +49,7 @@ fn error_for_status(status: reqwest::StatusCode, body: &serde_json::Value) -> Ho
     }
 }
 
-async fn send(
+pub(crate) async fn send(
     method: Method,
     path: String,
     body: Option<serde_json::Value>,

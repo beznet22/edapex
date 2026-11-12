@@ -46,20 +46,16 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_deep_link::init())
         .manage(HostState::default())
-        .setup(|app| {
-            match agent::start(app.handle()) {
-                Ok(session) => {
-                    if let Err(error) = app.state::<HostState>().set_agent(session) {
-                        eprintln!("EdApex agent state: {}", error.message);
-                    }
-                }
-                Err(error) => eprintln!("EdApex agent start: {}", error.message),
-            }
-            Ok(())
-        })
         .invoke_handler(tauri::generate_handler![
             runtime_health,
             host_capabilities,
+            agent::agent_set_openrouter_key,
+            agent::agent_connect,
+            agent::agent_thread_start,
+            agent::agent_turn_start,
+            agent::agent_turn_interrupt,
+            agent::agent_approval_response,
+            agent::agent_close,
             auth::auth_start,
             auth::auth_exchange,
             auth::auth_status,

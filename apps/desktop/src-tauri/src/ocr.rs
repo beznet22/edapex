@@ -45,6 +45,16 @@ fn map_ocr_error(error: OcrError) -> HostError {
     }
 }
 
+pub(crate) async fn extract_path(app: &AppHandle, path: PathBuf) -> Result<OcrResult, HostError> {
+    let models = models_dir(app)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        let mut engine = RustOEngine::load(&models).map_err(map_ocr_error)?;
+        engine.extract_path(&path).map_err(map_ocr_error)
+    })
+    .await
+    .map_err(|error| HostError::new("internal_error", format!("OCR task: {error}"), true))?
+}
+
 #[tauri::command]
 pub async fn ocr_extract(
     app: AppHandle,
@@ -52,11 +62,5 @@ pub async fn ocr_extract(
     capture_id: String,
 ) -> Result<OcrResult, HostError> {
     let path = state.capture_path(&capture_id)?;
-    let models = models_dir(&app)?;
-    tauri::async_runtime::spawn_blocking(move || {
-        let mut engine = RustOEngine::load(&models).map_err(map_ocr_error)?;
-        engine.extract_path(&path).map_err(map_ocr_error)
-    })
-    .await
-    .map_err(|error| HostError::new("internal_error", format!("OCR task: {error}"), true))?
+    extract_path(&app, path).await
 }
