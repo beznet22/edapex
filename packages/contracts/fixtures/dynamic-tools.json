@@ -1,0 +1,54 @@
+[
+  {
+    "name": "web_search",
+    "description": "Search the public web through the EdApex API.",
+    "inputSchema": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "query": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "maxResults": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10
+        }
+      },
+      "required": ["query"]
+    }
+  },
+  {
+    "name": "web_fetch",
+    "description": "Fetch one public page through the EdApex API.",
+    "inputSchema": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "url": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2048
+        }
+      },
+      "required": ["url"]
+    }
+  },
+  {
+    "name": "ocr_extract",
+    "description": "Read text from a user-created local capture.",
+    "inputSchema": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "captureId": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": ["captureId"]
+    }
+  }
+]

@@ -1,0 +1,24 @@
+{
+  "version": "pp-ocrv6-tiny",
+  "source": "https://www.modelscope.cn/models/RapidAI/RapidOCR",
+  "files": [
+    {
+      "name": "det.onnx",
+      "sha256": "f42c0fbd294d95eac1a550e131b277dac97462c8025fa4b6c3cec1b7894bd3d5",
+      "bytes": 1829618,
+      "url": "https://www.modelscope.cn/api/v1/models/RapidAI/RapidOCR/repo?Revision=master&FilePath=onnx%2FPP-OCRv6%2Fdet%2FPP-OCRv6_det_tiny.onnx"
+    },
+    {
+      "name": "rec.onnx",
+      "sha256": "e16e242de5937ad92609223f19bc2aff3727ee40b095f996907c24749bad251b",
+      "bytes": 4489813,
+      "url": "https://www.modelscope.cn/api/v1/models/RapidAI/RapidOCR/repo?Revision=master&FilePath=onnx%2FPP-OCRv6%2Frec%2FPP-OCRv6_rec_tiny.onnx"
+    },
+    {
+      "name": "dict.txt",
+      "sha256": "c5cbe34ef40c29c4df07ed012bf96569cb69a2d2a01a07027e9f13cb832bd9cd",
+      "bytes": 27156,
+      "url": "https://www.modelscope.cn/api/v1/models/RapidAI/RapidOCR/repo?Revision=master&FilePath=paddle%2FPP-OCRv6%2Frec%2FPP-OCRv6_rec_tiny%2Fppocrv6_tiny_dict.txt"
+    }
+  ]
+}

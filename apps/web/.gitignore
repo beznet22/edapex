@@ -1,0 +1,8 @@
+node_modules
+.next
+.cloudflare
+dist
+out
+.env*
+!.env.example
+*.tsbuildinfo

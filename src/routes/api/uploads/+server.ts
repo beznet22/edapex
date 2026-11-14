@@ -108,6 +108,12 @@ export const POST: RequestHandler = async ({ request, locals, cookies }) => {
 
   if (kind === "studentPhoto") {
     if (!studentId) error(400, "studentId required for studentPhoto kind");
+    if (!file.type.startsWith("image/")) {
+      error(400, "studentPhoto must be an image");
+    }
+    if (buffer.byteLength > 5 * 1024 * 1024) {
+      error(400, "studentPhoto must be 5 MB or smaller");
+    }
     const relativePath = `uploads/students/${contentHash}.${ext}`;
     const fullPath = join(STATIC_DIR, relativePath);
     mkdirSync(join(STATIC_DIR, "uploads/students"), { recursive: true });

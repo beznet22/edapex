@@ -1,0 +1,39 @@
+[workspace]
+resolver = "2"
+members = [
+  "crates/core",
+  "crates/agent",
+  "crates/agent-wasm",
+  "crates/ocr",
+  "crates/ocr-bench",
+  "apps/desktop/src-tauri"
+]
+
+[patch."https://github.com/microsoft/mxc"]
+mxc-sdk = { path = "/home/beznet/mxc-mobile/src/mxc-sdk" }
+
+[patch.crates-io]
+sqlx-core = { git = "https://github.com/transact-rs/sqlx", rev = "10462fa4414c6c7f1ed1d39bb31678e3b726878c" }
+sqlx-sqlite = { git = "https://github.com/transact-rs/sqlx", rev = "10462fa4414c6c7f1ed1d39bb31678e3b726878c" }
+tokio-tungstenite = { git = "https://github.com/openai-oss-forks/tokio-tungstenite", rev = "7447c427513cfe685f236e1ac0513c4ea3dd9c0b" }
+tungstenite = { git = "https://github.com/openai-oss-forks/tungstenite-rs", rev = "bc589d684755a8c02da0fc7e58d0861cbfc306f1" }
+
+[profile.agent-release]
+inherits = "release"
+lto = "thin"
+opt-level = "z"
+codegen-units = 1
+panic = "abort"
+strip = "symbols"
+
+# The application build. `agent-release` above is the size-gate profile for the
+# core alone; without this table a plain `cargo build --release` for the desktop
+# app got no LTO, no stripping and no codegen-unit tuning.
+[profile.release]
+lto = "thin"
+codegen-units = 1
+# Not stripped: `strip = true` removes the `target_features` custom section, and
+# wasm-bindgen then cannot detect which Wasm features the artifact uses. Size for
+# the web bundle is reduced with `wasm-opt`, not by stripping the metadata.
+strip = "none"
+

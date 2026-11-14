@@ -1,0 +1,19 @@
+{
+  "name": "@edapex/contracts",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./agent": "./src/agent.ts",
+    "./capabilities": "./src/capabilities.ts",
+    "./issues": "./src/issues.ts",
+    "./json": "./src/json.ts",
+    "./platform": "./src/platform.ts",
+    "./public-applications": "./src/public-applications.ts",
+    "./web": "./src/web.ts"
+  },
+  "dependencies": {
+    "zod": "4.4.3"
+  }
+}

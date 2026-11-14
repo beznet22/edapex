@@ -1,0 +1,130 @@
+name: API (Cloudflare)
+
+on:
+  pull_request:
+    paths:
+      - "services/sms-api/**"
+      - "docs/cloudflare-port/**"
+      - "scripts/verify-port-specs.mjs"
+      - "scripts/verify-schema-catalog.mjs"
+      - ".github/workflows/cloudflare-port.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "services/sms-api/**"
+      - "docs/cloudflare-port/**"
+      - "scripts/verify-port-specs.mjs"
+      - "scripts/verify-schema-catalog.mjs"
+      - ".github/workflows/cloudflare-port.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  workspace:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 26.13.1
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install workspace package
+        run: pnpm install --frozen-lockfile --ignore-scripts --filter edapex-api...
+
+      - name: Workspace package typecheck
+        run: pnpm --filter edapex-api run typecheck
+
+  port:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/sms-api
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 26.13.1
+          cache: pnpm
+          cache-dependency-path: services/sms-api/pnpm-lock.yaml
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm run typecheck
+
+      - name: Import boundaries
+        run: pnpm run check:boundaries
+
+      - name: Import boundary self-test
+        run: pnpm run check:boundaries:self
+
+      - name: Repository rules
+        run: pnpm run check:repository
+
+      - name: Repository rule self-test
+        run: pnpm run check:repository:self
+
+      - name: Repository map completeness
+        run: pnpm run check:repository-map
+
+      - name: Service rules
+        run: pnpm run check:services
+
+      - name: Service rule self-test
+        run: pnpm run check:services:self
+
+      - name: Service method map
+        run: pnpm run check:service-map
+
+      - name: HTTP rules
+        run: pnpm run check:http
+
+      - name: HTTP rule self-test
+        run: pnpm run check:http:self
+
+      - name: Migration rules
+        run: pnpm run check:migration
+
+      - name: Migration rule self-test
+        run: pnpm run check:migration:self
+
+      - name: Tests
+        run: pnpm test
+
+      - name: Apply local D1 migrations
+        run: pnpm run db:migrate:local
+
+      - name: Schema drift
+        run: |
+          pnpm exec drizzle-kit generate
+          git diff --exit-code -- src/lib/server/db/migrations
+
+      - name: Verify port specs
+        working-directory: .
+        run: node scripts/verify-port-specs.mjs
+
+      - name: Verify schema catalog
+        working-directory: .
+        run: node scripts/verify-schema-catalog.mjs

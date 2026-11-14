@@ -1,0 +1,52 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "edapex-api",
+  "main": "src/worker.ts",
+  "compatibility_date": "2026-11-05",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "routes": [
+    {
+      "pattern": "edapex-api.llacademy.ng",
+      "custom_domain": true
+    },
+    {
+      "pattern": "api.llacademy.ng",
+      "custom_domain": true
+    }
+  ],
+  // Set provider keys outside git:
+  //   pnpm exec wrangler secret put TINYFISH_API_KEY
+  //   pnpm exec wrangler secret put TAVILY_API_KEY
+  "vars": {
+    // Comma-separated allowlist; EdApex production frontend.
+    "CORS_ORIGINS": "https://app.llacademy.ng,https://preview.llacademy.ng,https://edapex-web.pages.dev,https://phase-9a-auth.edapex-web.pages.dev,https://48c785b5.edapex-web.pages.dev",
+    "APP_ORIGIN": "https://app.llacademy.ng",
+    "POST_LOGIN_REDIRECT": "https://app.llacademy.ng/workspace"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "edapex-recovery",
+      "database_id": "a6ae7003-54b6-45da-9790-3818e293a33e",
+      "migrations_dir": "src/lib/server/db/migrations"
+    }
+  ],
+  // Private service binding: `model-router` has no public hostname.
+  // Deploy `services/model-router` first, then this Worker.
+  "services": [
+    {
+      "binding": "MODEL_ROUTER",
+      "service": "edapex-model-router"
+    }
+  ],
+  // Set the shared secret outside git:
+  //   pnpm exec wrangler secret put MODEL_ROUTER_SECRET
+  "r2_buckets": [
+    {
+      "binding": "MEDIA",
+      // Create with: pnpm exec wrangler r2 bucket create edapex-media
+      "bucket_name": "edapex-media"
+    }
+  ]
+}

@@ -1,0 +1,55 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1793945128454,
+      "tag": "0000_edapex_schema",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1793984857909,
+      "tag": "0001_service_layer_tables",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1793995054533,
+      "tag": "0002_auth_cutover",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1793999832970,
+      "tag": "0003_archive_and_retrieval",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1794008022081,
+      "tag": "0004_phase7_staffing",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1794009683588,
+      "tag": "0005_phase7_o2_indexes",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1794197700844,
+      "tag": "0006_colorful_dexter_bennett",
+      "breakpoints": true
+    }
+  ]
+}

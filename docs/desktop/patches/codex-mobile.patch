@@ -1,0 +1,54 @@
+diff --git a/codex-rs/Cargo.toml b/codex-rs/Cargo.toml
+index baaefe8d3b..b2768c303b 100644
+--- a/codex-rs/Cargo.toml
++++ b/codex-rs/Cargo.toml
+@@ -472,7 +472,7 @@ regex = "1.12.3"
+ regex-automata = { version = "0.4.13", default-features = false, features = ["std", "syntax", "unicode", "nfa-pikevm"] }
+ regex-lite = "0.1.8"
+ regex-syntax = "0.8.8"
+-reqwest = { version = "0.12", features = ["cookies"] }
++reqwest = { version = "0.12", default-features = false, features = ["charset", "cookies", "http2", "json", "rustls-tls", "rustls-tls-native-roots", "stream"] }
+ rmcp = { git = "https://github.com/modelcontextprotocol/rust-sdk", rev = "98a54789b80110ad210495c4ad845c89e1980471", version = "=3.5.1", default-features = false }
+ runfiles = { git = "https://github.com/dzbarsky/rules_rust", rev = "b56cbaa8465e74127f1ea216f813cd377295ad81" }
+ rustix = { version = "1.1.4", features = ["net"] }
+diff --git a/codex-rs/http-client/Cargo.toml b/codex-rs/http-client/Cargo.toml
+index fa144cbb70..10b2920dd0 100644
+--- a/codex-rs/http-client/Cargo.toml
++++ b/codex-rs/http-client/Cargo.toml
+@@ -11,7 +11,6 @@ futures = { workspace = true }
+ http = { workspace = true }
+ http-body = "1.0.1"
+ httpdate = { workspace = true }
+-native-tls = "0.2"
+ opentelemetry = { workspace = true }
+ reqwest = { workspace = true, features = ["json", "rustls-tls", "rustls-tls-native-roots", "stream"] }
+ rustls = { workspace = true }
+@@ -28,6 +27,9 @@ tracing-opentelemetry = { workspace = true }
+ url = { workspace = true }
+ zstd = { workspace = true }
+ 
++[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
++native-tls = "0.2"
++
+ [target.'cfg(target_os = "macos")'.dependencies]
+ system-configuration = { workspace = true }
+ 
+diff --git a/codex-rs/http-client/src/route_aware_client_pool.rs b/codex-rs/http-client/src/route_aware_client_pool.rs
+index 796a4a2659..84467c1ae3 100644
+--- a/codex-rs/http-client/src/route_aware_client_pool.rs
++++ b/codex-rs/http-client/src/route_aware_client_pool.rs
+@@ -114,9 +114,11 @@ impl RouteAwareRequestError {
+         }
+         let mut source: Option<&(dyn std::error::Error + 'static)> = Some(self);
+         while let Some(error) = source {
+-            if error.downcast_ref::<rustls::Error>().is_some()
+-                || error.downcast_ref::<native_tls::Error>().is_some()
+-            {
++            #[cfg(not(any(target_os = "android", target_os = "ios")))]
++            let native_tls_error = error.downcast_ref::<native_tls::Error>().is_some();
++            #[cfg(any(target_os = "android", target_os = "ios"))]
++            let native_tls_error = false;
++            if error.downcast_ref::<rustls::Error>().is_some() || native_tls_error {
+                 return Some(RouteFailureClass::TlsError);
+             }
+             if error.to_string() == "tunnel error: proxy authorization required" {
