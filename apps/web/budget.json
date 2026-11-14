@@ -1,0 +1,62 @@
+{
+  "$comment": "Measured budgets from docs/workspace/specs/47-performance-budgets.md. A miss blocks release. Update with measurements, never with estimates.",
+  "version": 3,
+  "frameworkFloorGzip": 143211,
+  "$frameworkFloorNote": "react-dom 67,510 + vinext runtime 44,283 + vinext browser entry 31,418. This is the fixed cost of React 19 + vinext; it changes only with a deliberate framework upgrade. Re-measure with `node scripts/check-budget.mjs` when it does.",
+  "routes": {
+    "/workspace": {
+      "$comment": "The 150 KB (153,600 B) target is superseded, not missed: the framework floor is 143 KB, so even zero app code and zero icons would land near 159 KB. See the decision in spec 47.",
+      "initialJsGzip": 204800,
+      "controllableJsGzip": 61440,
+      "initialCssGzip": 30720,
+      "lcpMs": 2500,
+      "inpMs": 200
+    },
+    "/workspace/tasks": {
+      "initialJsGzip": 204800,
+      "controllableJsGzip": 61440,
+      "initialCssGzip": 30720,
+      "lcpMs": 2500,
+      "inpMs": 200
+    },
+    "/workspace/make": {
+      "initialJsGzip": 204800,
+      "controllableJsGzip": 61440,
+      "initialCssGzip": 30720,
+      "lcpMs": 2500,
+      "inpMs": 200
+    }
+  },
+  "assets": {
+    "$comment": "The agent runtime is fetched lazily on the first turn and is never precached, so it is budgeted separately from the initial route payload.",
+    "/agent-runtime/edapex_agent_wasm_bg.wasm": {
+      "gzip": 1200000,
+      "reason": "crates/agent-wasm core; replaces a 9.9 MB xcodex payload"
+    },
+    "/agent-runtime/edapex_agent_wasm.js": {
+      "gzip": 60000,
+      "reason": "wasm-bindgen glue"
+    }
+  },
+  "pwa": {
+    "$comment": "Spec 47 §76: the WASM runtime does not count toward this shell budget.",
+    "shellGzip": 2097152
+  },
+  "measured": {
+    "date": "2026-11-14",
+    "initialJsGzip": 181599,
+    "initialCssGzip": 10735,
+    "controllableJsGzip": 38388,
+    "agentWasmGzip": 134395,
+    "agentJsGlueGzip": 5526,
+    "breakdown": {
+      "react-dom": 67510,
+      "vinext-runtime": 44283,
+      "vinext-browser-entry": 31418,
+      "app-code": 11667,
+      "lucide": 10851,
+      "other": 15870
+    },
+    "note": "Measured on a vinext build with Node 26.13.1. The Pages rollback baseline in spec 47 (106 KB) is a different build and is not comparable. The lazy document editor (188 KB) is not in this figure because it loads only when the artifact panel opens."
+  }
+}

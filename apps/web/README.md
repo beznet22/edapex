@@ -19,6 +19,30 @@ claim flow, login surface and the cowork workspace.
 No AI SDK, Auth.js, Drizzle/Postgres, Redis, Vercel Blob, BotID, CopilotKit or A2UI
 runtime is part of this app.
 
+## Prerequisites
+
+The workspace runs the agent core as WebAssembly, which is a generated artifact
+and therefore not committed:
+
+```bash
+pnpm --dir apps/web run build:agent-runtime
+```
+
+This compiles `crates/agent-wasm` for `wasm32-unknown-unknown`, runs `wasm-bindgen`
+and enforces the compressed size budget. Without it the workspace still renders,
+but the model setup dialog reports that the runtime failed to load and no turn can
+start.
+
+## Tests
+
+```bash
+pnpm --dir apps/web exec vitest run      # unit tests in tests/
+pnpm --dir apps/web exec playwright test # browser tests in e2e/
+```
+
+The two runners are deliberately scoped to separate directories: each otherwise
+collects the other's specs and fails.
+
 ## Routes
 
 | Route | Surface |

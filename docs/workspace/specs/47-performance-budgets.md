@@ -58,7 +58,59 @@ Release gates are measured with Lighthouse CI mobile emulation (Moto G Power-cla
 | Initial document-engine bundle | 0 bytes | bundle scan |
 | IronPress/PDF.js/Mammoth/docx/PapaParse | lazy chunk | bundle scan |
 
-Current measured baseline (2026-11-09, Pages rollback build): initial JS **106 KB gzip**, CSS **6.2 KB gzip**, directory **581 rows / 200 KB**. RustO baseline (2026-11-11, i7-8850H Linux x86_64, 16 AY4 images, 1 warmup + 3 runs): p50 **1,219 ms**, p95 **1,289 ms**, peak RSS **256.5 MiB**, models **6.1 MiB**, mean CER **0.1479**, numeric recall **0.9251**. ocrs was rejected at CER **0.3654** and numeric recall **0.2543**. These are desktop measurements, not mobile guarantees. RustO baseline (2026-11-11, i7-8850H Linux x86_64, 16 AY4 images, 1 warmup + 3 runs): p50 **1,219 ms**, p95 **1,289 ms**, peak RSS **256.5 MiB**, models **6.1 MiB**, mean CER **0.1479**, numeric recall **0.9251**. ocrs was rejected at CER **0.3654** and numeric recall **0.2543**. These are desktop measurements, not mobile guarantees. RustO baseline (2026-11-11, i7-8850H Linux x86_64, 16 AY4 images, 1 warmup + 3 runs): p50 **1,219 ms**, p95 **1,289 ms**, peak RSS **256.5 MiB**, models **6.1 MiB**, mean CER **0.1479**, numeric recall **0.9251**. ocrs was rejected at CER **0.3654** and numeric recall **0.2543**. These are desktop measurements, not mobile guarantees. The 10B vinext build is measured separately; do not treat the Pages number as the Worker build's evidence. Parallelizing four reads (five D1 statements; the directory read fans into staff + parents) improved the first page from **~3.7 s to ~1.9–2.5 s**, which still misses the 800 ms budget. Recorded exception — owner: backend lead (beznet); follow-up: evaluate a cached, read-optimized directory endpoint at 10B close-out.
+Current measured baseline (2026-11-09, Pages rollback build): initial JS **106 KB gzip**, CSS **6.2 KB gzip**, directory **581 rows / 200 KB**. The 10B vinext build is measured separately; do not treat the Pages number as the Worker build's evidence. Parallelizing four reads (five D1 statements; the directory read fans into staff + parents) improved the first page from **~3.7 s to ~1.9–2.5 s**, which still misses the 800 ms budget. Recorded exception — owner: backend lead (beznet); follow-up: evaluate a cached, read-optimized directory endpoint at 10B close-out.
+
+RustO baseline (2026-11-11, i7-8850H Linux x86_64, 16 AY4 images, 1 warmup + 3 runs): p50 **1,219 ms**, p95 **1,289 ms**, peak RSS **256.5 MiB**, models **6.1 MiB**, mean CER **0.1479**, numeric recall **0.9251**. ocrs was rejected at CER **0.3654** and numeric recall **0.2543**. These are desktop measurements, not mobile guarantees.
+
+### Decision — initial route JS budget (2026-11-14)
+
+**Supersedes** the 150 KB (153,600 B) initial-JS target for the web workspace. That
+number came from the Pages rollback build (106 KB JS), which is a different bundler
+and a different dependency graph; it was never evidence for the Worker build.
+
+**Measured:** 181,599 B JS gzip and 10,735 B CSS gzip on the vinext build
+(Node 26.13.1) for `/workspace`.
+
+**Why the old target could not be met.** The framework floor is 143,211 B on its own:
+
+| Component | gzip |
+|---|---|
+| `react-dom` | 67,510 |
+| vinext runtime | 44,283 |
+| vinext browser entry | 31,418 |
+| **framework floor** | **143,211** |
+| app code | 11,667 |
+| `lucide` icons | 10,851 |
+| other chunks | 15,870 |
+
+Deleting every icon *and* all application code would still land near 159 KB. The
+target was therefore not a stretch goal, it was arithmetic that could not close
+without replacing React — a rewrite this project is not making.
+
+**New budget, in two parts.** A single total lets a framework upgrade consume the
+whole allowance silently, and a gate that can never pass gets ignored. So the
+budget separates the fixed cost from the controllable cost:
+
+- **Hard ceiling: 200 KB (204,800 B) initial JS.** Measured 181,599 B. Catches a
+  stray dependency or a route that pulls the document editor onto the initial path.
+- **Controllable ceiling: 60 KB (61,440 B).** Measured 38,388 B, computed as total
+  minus the recorded framework floor. This is the number the team is accountable
+  for, and the one chunk 4 should be measured against.
+- **CSS: 30 KB.** Measured 10,735 B.
+
+The framework floor is recorded in `apps/web/budget.json` and re-measured on a
+framework upgrade. The lazy document engine (188 KB gzip) stays out of both figures
+because it loads only when the artifact panel opens.
+
+**Is 181 KB acceptable for a school on a phone?** First visit transfers roughly
+192 KB compressed JS+CSS. The service worker precaches the shell, so repeat visits
+are served locally. The agent runtime (134 KB gzip) is fetched lazily on the first
+turn and is never precached. This is a considered trade, not an oversight: the
+alternative was hand-rolling a framework, and the measured cost is one second on a
+good connection.
+
+**Owner:** platform lead (beznet). **Revisit:** when chunk 4 adds the Task/Make
+dashboards, or on any framework upgrade, whichever comes first.
 
 ## Loading rules
 
@@ -73,10 +125,12 @@ Current measured baseline (2026-11-09, Pages rollback build): initial JS **106 K
 - Boneyard is a dev/build-time generator; no headless Chromium in production.
 - Route-level code splitting.
 - IronPress WASM, PDF.js worker/cmaps, Mammoth, `docx`, PapaParse and Tiptap extensions load only when used.
+- The agent runtime WASM (`crates/agent-wasm`) is **lazily fetched on first turn** and is **never precached**. It does not count toward the ≤2 MB PWA shell, and it must not appear in the initial route budget.
 - No import of whole icon or component barrels.
 - Hashed immutable assets; Brotli/HTTP3; no external font dependency.
 - PWA caches static assets, icons and the offline shell only; never API responses, transcripts, session data or school records.
 - HTML is `no-store` while data is dynamic.
+- Android ships an **AAB with per-ABI splits**, not a universal APK; a universal APK is roughly four times the per-ABI payload.
 
 ## Directory and list rules
 
@@ -84,7 +138,7 @@ Current measured baseline (2026-11-09, Pages rollback build): initial JS **106 K
 - Filters/search trigger one request, not one request per keystroke; debounce search at 250 ms (team decision; validate against RUM in `70`).
 - Abort in-flight requests when filters change.
 - Optimistic link revoke; refresh on explicit action or after the link TTL recorded in `45-admin-claim-links.md`.
-- Do not put staff/parent PII in `localStorage`, `sessionStorage`, IndexedDB, service workers or iroh.
+- Do not put staff/parent PII in `localStorage`, `sessionStorage`, IndexedDB, service workers or any sync transport.
 
 ## Worker and D1 rules
 

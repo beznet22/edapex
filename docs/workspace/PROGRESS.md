@@ -1,6 +1,122 @@
 # Workspace Programme Progress
 
-**Status:** Phase 9B approved; 10A deployed; 10B preview live; 10C local capability layer in progress. Phase 8 and the Phase 9A platform are done. `app.llacademy.ng` is live via a proxied Pages CNAME and remains the rollback; the single `apps/web` app is being replaced with a Next App Router PWA built by vinext for a Cloudflare Worker. Migration 0006 and Worker `7bab26b5` are deployed. `/claim` and shared digests move to 10G.2; student codes/duplicate resolution move to 10G.1.
+**Status:** Phase 9B approved; 10A deployed; 10B preview live; 10C local capability layer in progress. **Phase A (spec amendments for the thin core) is complete.** Phase 8 and the Phase 9A platform are done. `app.llacademy.ng` is live via a proxied Pages CNAME and remains the rollback; the single `apps/web` app is being replaced with a Next App Router PWA built by vinext for a Cloudflare Worker. Migration 0006 and Worker `7bab26b5` are deployed. `/claim` and shared digests move to 10G.2; student codes/duplicate resolution move to 10G.1.
+
+## Phase A — spec amendments (complete)
+
+The agent runtime decision and the backend split are now recorded in the specs, before any implementation code.
+
+| Change | Where |
+|---|---|
+| xcodex retired; `crates/agent` is the only runtime | `17-chat-framework.md`, `30-tauri-rust-core.md`, `48-local-capability-layer.md` |
+| AG-UI becomes the **external-agent boundary**, required and lossless | `17-chat-framework.md` §AG-UI boundary |
+| iroh deferred; `AGENT_DB` is the only v1 transport, CI-guarded | `41-storage-sync.md`, `15-ui-surfaces.md` §15.15 |
+| Local store: plain SQLite + per-record XChaCha20-Poly1305 (no SQLCipher) | `41-storage-sync.md` §Encryption |
+| Routines are local-first; no Worker cron fan-out | `41-storage-sync.md` §Routines are local-first |
+| Agent creation policy + narrowing invariant + per-agent manifest | `10-capabilities-and-roles.md` §Agents and grants, `42-agent-db-schema.md` §Agent creation policy |
+| Tenant-defined role set; non-school tiers 1–3 | `10-capabilities-and-roles.md` §Roles |
+| Server-side governed MCP client permitted | `60-security-privacy.md` §Connectors and governed MCP, `42` |
+| PWA definition + "adaptation vs. measure" resolution | `15-ui-surfaces.md` §15.4, `extracted-ui-spec.md` §1/§7.1 |
+| `apps/` vs `services/` vs `packages/`; two-Worker split | `05-project-structure.md` |
+| Agent WASM lazy, never precached; per-ABI AAB | `47-performance-budgets.md` |
+
+### Repository move
+
+`apps/api` → **`services/sms-api`**. Deployment is unaffected: `wrangler.jsonc` keeps `name: edapex-api` and both custom domains. 109 references updated across 40 files, including `scripts/verify-port-specs.mjs`, the CI workflow path filter and `pnpm-lock.yaml`.
+
+Gate output:
+
+```text
+node scripts/verify-port-specs.mjs      failures: 0, spec suite verified
+node scripts/verify-schema-catalog.mjs  catalog verified
+services/sms-api typecheck             clean
+services/sms-api test                  133 files / 635 tests passed
+```
+
+## Chunk 0 — core review for OpenDuet completeness (complete)
+
+The thin core is now the only runtime, and the WASM question is answered by a real build rather than an estimate.
+
+| Item | Result |
+|---|---|
+| **tokio-on-WASM** | **Works.** `cargo build --target wasm32-unknown-unknown -p edapex-agent-wasm` succeeds. The only blocker was a missing `uuid` feature (`js`); no executor swap was needed. |
+| `InterruptSignal` | Ported from `jcode-agent-runtime`. Flag + monotonic epoch + `Notify`, with `reset_if_epoch` so a deferred reset cannot erase a newer cancel. 6 tests. |
+| One SSE framer | `crates/agent/src/stream.rs`: `Utf8StreamDecoder` (carries split multi-byte characters, `U+FFFD` for genuinely invalid bytes) + `take_sse_event` draining in place over `memchr::memmem`. Differential test against a naive whole-buffer decode at **every** byte boundary. Replaced both host copies. |
+| Per-tool risk | `DynamicToolName::risk()` and `approval_decisions()`. Removed the hardcoded `CapabilityRisk::Read` and the unconditional four-decision list. `Write` no longer offers session approval. |
+| AG-UI round-trip | `risk`, `decisions` and `summary` now survive both directions. Unparseable risk defaults to `Destructive`; unparseable decision defaults to `Deny` — both fail closed. 4 round-trip tests. |
+| `Arc<str>` history | `ProviderRequest.messages` is `Arc<[ChatMessage]>` and message content is `Arc<str>`, so a per-round transcript snapshot is pointer bumps instead of a deep copy. |
+| Contract parity | `crates/agent/tests/contract_parity.rs`: every fixture event round-trips through the Rust enum, every variant is covered, nested enum strings match. **7 tests. This test did not exist.** |
+| `crates/agent-wasm` | New `cdylib`/`rlib` with `JsProvider`, `SseFramer`, `parseSseData`, `encodeEvent`. Host injects transport; the core still carries no HTTP. |
+| Chat history dedupe | `agent.rs` truncation repaired: `process_sse_event` restored, `struct HostTools` redefined, `requires_approval` overridden to `true`. **The desktop crate compiles for the first time.** |
+| `[profile.release]` | Added `lto`, `codegen-units`, `strip`. Previously only the non-default `agent-release` profile had them, so an app build got none. |
+| Contracts | `TenantFeature`, `AgentGrant`, `disabledFeatureIds`, `allowedOperationIds`, `validateAgentGrant`; `buildCapabilityManifest(role, features?)`. |
+
+Semantics decision: **unlisted features are enabled.** A tenant masks off what it does not use; a partial mask must not silently disable everything else. Caught by the new filter test before it shipped.
+
+Gate output:
+
+```text
+cargo check --workspace                                        0 errors
+cargo build --target wasm32-unknown-unknown -p agent-wasm      0 errors
+cargo check --target aarch64-linux-android -p edapex-agent      0 errors
+cargo test -p edapex-agent -p edapex-ocr                       47 passed, 0 failed
+node scripts/check-agent-size.mjs                              0.59 MiB / 10 MiB
+node scripts/verify-port-specs.mjs                             failures: 0
+capabilities.test.ts                                           8 passed (incl. narrowing invariant)
+```
+
+## Chunk 1 — three surfaces + visual language (in progress)
+
+### Landed and verified
+
+| Item | Result |
+|---|---|
+| `model-router` service | New private Worker (no public route, no D1). Holds the gateway token only; provider keys live in AI Gateway BYOK, selected per tenant by `cf-aig-byok-alias`. 25 tests. |
+| OpenAI-compatible surface | `GET /v1/models`, `POST /v1/chat/completions`, OpenAI error envelope, `Authorization: Bearer`. Deleted the bespoke camelCase schema and its translation layer. |
+| Logging suppression | `cf-aig-collect-log: false` on every request, forced — AI Gateway logs prompt **and** response bodies by default and prompts contain school records. |
+| Passthrough choice | Direct provider URL, never Unified Billing, where a missing BYOK key silently falls through to Cloudflare billing. |
+| **xcodex deleted** | `lib/xcodex-browser.ts`, `public/xcodex/`, `public/xrouter-browser/` removed. `apps/web/public` went **10.5 MB → 404 KB**. |
+| Browser runtime | `lib/native-agent.ts` + `lib/agent-runtime.ts`. `agent-wasm` rewritten with a real turn driver; `ChunkQueue` is now a rendezvous (the previous eager drain would have deadlocked the first turn). |
+| WASM budgets | 416 KB raw / **134 KB gzip**, glue 5.4 KB gzip — enforced by `scripts/build-agent-runtime.mjs`. Grew from 121 KB when tool and approval callbacks became promise-aware. |
+| tokio on wasm32 | **Builds.** Only blocker was `uuid`'s `js` feature. |
+| PWA | Real icons generated (they were missing entirely, so install rejected); manifest loses `portrait-primary` and gains shortcuts; `sw.js` never caches `/api/`, agent runtime or transcripts. |
+| Theme | Genuine light `:root` + `.dark` pair (previously dark values in `:root` with no `.dark` at all), accent presets, cookie-backed SSR class so there is no flash. |
+| Borders → elevation | `border-r`/`border-b`/`border-x` replaced with `--elevation-*` and inset shadows in the shell, composer and artifact host. |
+| Desktop credential | The keychain-held OpenRouter key and `agent_set_openrouter_key` are gone; the provider now targets `model-router` with the session bearer. |
+| `EventHub` + `agent_attach` | Bounded 1,024-event ring with monotonic sequence numbers. A WebView reload swaps the channel **before** replaying, so nothing emitted during replay is lost. 8 tests. |
+| `turn_start` returns early | The turn now runs on a detached task via `crates/agent/src/spawn.rs` (`tokio::spawn` native, `spawn_local` on wasm). Five turn tests had to wait for completion, which is the honest contract. |
+| Tauri bundle | `bundle.active: true` with icons and categories; the window was locked to 430×860 and is now 1100×800 with a 360 minimum. **CSP is no longer `null`** — it was disabled entirely. |
+| Web CI | `.github/workflows/web.yml`: typecheck, test, build, budget, plus a `wasm` job that builds the runtime and a `contracts` job for parity. Nothing built or tested `apps/web` before. |
+| Budget enforcement | `apps/web/budget.json` from spec 47 plus `scripts/check-budget.mjs`. It **fails** when no build exists instead of skipping. |
+| Tool pills | Settled steps collapse to one line that still names what ran and counts failures; actions needing a person stay expanded, because they are what blocks the turn. Borders replaced with elevation. |
+| Adaptive widths | The shell no longer caps the canvas at 880px. Chat keeps its own 760px measure; Tasks and Make now own the full width as dashboards should. |
+| READMEs | Every workspace member now has one (7 were missing). |
+| **Browser route settled** | Model traffic terminates at `POST /api/v1/agent/model/chat/completions` on `sms-api` and forwards to `model-router` over a service binding. The `__Host-` cookie cannot cross hosts, so no other shape works without duplicating session validation. |
+| Path convention | The passthrough is `/api/v1/agent/model/chat/completions`, not `/api/v1/agent/model/v1/...`. EdApex's `v1` and OpenAI's `v1` are different version axes; only `model-router` carries the OpenAI path, because only it impersonates a provider. |
+| **Budget measured** | The web build now runs (Node 26.13.1) and the budget is measured, not assumed: **181,824 B JS / 10,684 B CSS gzip**. Target **resolved, not missed**: the framework floor alone is 143,211 B (react-dom 67,510 + vinext 75,701), so 150 KB was unreachable without replacing React. Budget is now a 200 KB hard ceiling plus a 60 KB controllable ceiling (total minus floor, measured 38,388 B). Decision recorded in spec 47. |
+| Zod off the initial path | `lib/dev-preview.ts` imported the `@edapex/contracts` barrel, dragging `./agent`'s module-scope schemas onto first paint. Now imports the `/capabilities` subpath. `native-agent.ts` validates events with a hand-written guard instead of `agentEventSchema`. **−19 KB**. |
+| Budget script corrected | It summed every chunk, counting Tiptap (188 KB) which only loads when the artifact panel opens. Now walks the Vite manifest from the entry through static imports, and accounts for emitted CSS the manifest does not reference. |
+| Tenant middleware narrowed | `use("/agent/*")` also captured `/agent/model`, which would have blocked a school-less tenant. Now scoped per route. Caught by a test, not by review. |
+| Test stub for the binding | `vitest.config.ts` declares a `edapex-model-router` stub Worker; without it miniflare fails to boot the entire `sms-api` suite. |
+| **`/workspace` returned 500** | Every request failed while `tsc` and `vite build` were green. `lib/theme.ts` carried `"use client"`, which turns every export into a client reference, and the root layout called `readThemeCookies` during render. Split into `theme.ts` (pure, server-safe) and `theme-dom.ts` (browser-only). |
+| **Browser runtime never loaded** | `native-agent.ts` imported `/agent-runtime/…` through the module graph. Vite rejects that for `public/` assets: "should not be imported from source code". `@vite-ignore` did not help because the specifier was a const with a literal value. Now built with `new URL(...)` at runtime. |
+| **Provider body was not OpenAI-shaped** | `ProviderRequestWire` sent camelCase `toolCalls` / `toolCallId` and flat tool-call entries. `model-router` drops unknown keys instead of rejecting, so tool correlation would have vanished silently upstream. Now `snake_case` with `{id, type, function:{name, arguments}}`, plus explicit `stream: true`. |
+| **System theme flashed** | The server cannot know the OS preference, so `data-theme-mode="system"` rendered light and flipped after hydration. Added a `prefers-color-scheme` rule mirroring `.dark`, plus an e2e test comparing computed tokens so the two blocks cannot drift. |
+| **`NODE_ENV=production` breaks dev** | With it set, react-dom resolves its production server build while Vite still emits the dev JSX runtime; every render throws `dispatcher.getOwner is not a function`. The Playwright config pins `NODE_ENV=development`. |
+| **E2E suite exists** | `pnpm --dir apps/web exec playwright test` — 22 tests: render, server-rendered theme, system-mode parity, responsive overflow at 7 widths, manifest, reduced motion, and streaming against an intercepted SSE response. `playwright.config.ts` scopes `testDir` to `e2e/`; without it Playwright collected the Vitest files and died with "No tests found". |
+| **Wire shape covered** | The streaming test asserts the posted body is OpenAI-shaped and carries no `toolCalls`/`toolCallId`. This is the only automatic guard, because `agent-wasm` is gated to `wasm32` and cannot be unit-tested natively. |
+
+### Still open in chunk 1
+
+- `gen/ios/` — blocked on this machine: the installed `tauri-cli` has no `ios`
+  subcommand (a Linux build without the mobile targets). iOS icons are present
+  under `src-tauri/icons/ios/`. Run `pnpm exec tauri ios init` on macOS.
+- Native desktop/mobile builds are unverified end to end: the web build needs
+  Node ≥22.18 and `engines` wants 26.13.1, while this environment has 22.13.
+- `budget.json`, Lighthouse config and a `web.yml` CI job — `apps/web` is still not built or tested in CI.
+- Authored primitives beyond the five that exist; `components.json` still on the `new-york` preset name (shadcn has since renamed it, so the value is cosmetic until a CLI run).
+- Tool-call pills and the responsive 320→1920 audit.
+- `POST /api/v1/agent/turn` and `/stop` were removed from the web client: the turn loop runs in the WASM core, so no server endpoint is involved. Tool and approval round-trips still need a transport (they are wired as promises but the core-side call sites are placeholders).
 
 ## Status table
 
