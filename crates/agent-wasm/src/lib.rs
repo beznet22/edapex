@@ -11,8 +11,12 @@
 
 #![cfg(target_arch = "wasm32")]
 
+mod sql;
+
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
+
+pub use sql::SqlStore;
 
 use edapex_agent::{
     parse_openai_sse_data, sse_data_line, take_sse_event, AgentConnectSettings, AgentError,

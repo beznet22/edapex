@@ -19,6 +19,11 @@ thiserror = "2"
 # Native hosts talk to SQLite directly. The browser binds a JS-backed driver
 # instead (OPFS SQLite WASM, IndexedDB fallback), which is why the driver is a
 # trait rather than a concrete connection.
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+# `js` routes entropy through `crypto.getRandomValues`, so nonce generation is
+# the same call on every target.
+getrandom = { version = "0.2", features = ["js"] }
+
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 getrandom = "0.2"
 rusqlite = { version = "0.32", features = ["bundled"] }

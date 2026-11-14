@@ -26,7 +26,12 @@ and therefore not committed:
 
 ```bash
 pnpm --dir apps/web run build:agent-runtime
+pnpm --dir apps/web run build:sqlite-runtime
 ```
+
+The second venders the SQLite WASM engine used by the browser store into
+`public/sqlite/`. It is generated, not committed, and lazy-loaded: it is never
+precached and sits outside the initial-JS budget.
 
 This compiles `crates/agent-wasm` for `wasm32-unknown-unknown`, runs `wasm-bindgen`
 and enforces the compressed size budget. Without it the workspace still renders,

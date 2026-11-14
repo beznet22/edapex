@@ -17,7 +17,7 @@ pub mod migrations;
 pub use error::{Result, StoreError};
 pub use journal::{Journal, JournalRecord, PersistVectorMode};
 
-use crypto::MasterKey;
+pub use crypto::MasterKey;
 use migrations::{MIGRATIONS, LATEST_VERSION};
 
 /// A bindable SQL value. Deliberately not `rusqlite::types::Value`, so the crate
@@ -106,7 +106,11 @@ pub struct OutboxEntry {
 }
 
 /// One event as it goes over the wire.
-#[derive(Debug, Clone, PartialEq)]
+///
+/// Serialised camelCase because this is exactly the JSON body the sync service
+/// accepts; there is no second translation layer to drift out of step.
+#[derive(Debug, Clone, PartialEq, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct PushItem {
     pub id: String,
     pub entity_type: String,
@@ -562,6 +566,23 @@ fn parse_operation(value: &str) -> Operation {
     }
 }
 
+/// Seconds since the epoch.
+///
+/// `wasm32-unknown-unknown` has no clock, and `SystemTime::now()` panics there
+/// rather than returning an error. None of the timestamps this produces are
+/// load-bearing: records carry a `created_at` supplied by the host, and the only
+/// two internal uses are the informational `schema_migrations.applied_at` and
+/// `sync_cursors.updated_at`. Cursor correctness depends on `last_seq` alone, so
+/// a zero here loses provenance, not data.
+///
+/// Bringing `js-sys` into this crate to read `Date.now()` would hand the storage
+/// layer a browser dependency that desktop does not have.
+#[cfg(target_arch = "wasm32")]
+fn now() -> i64 {
+    0
+}
+
+#[cfg(not(target_arch = "wasm32"))]
 fn now() -> i64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)

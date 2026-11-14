@@ -67,11 +67,18 @@ rebuild.
 | Host | Driver |
 |---|---|
 | Desktop / mobile | `RusqliteDriver` (`rusqlite`, WAL) |
-| Browser | JS-backed driver over OPFS SQLite WASM, IndexedDB fallback |
+| Browser | `JsSqlDriver` in `crates/agent-wasm`, over OPFS SQLite WASM |
 
-The browser driver is not in this crate: it is bound from `crates/agent-wasm`
-because it necessarily crosses into JavaScript. The logical model and all crypto
-stay here.
+The browser driver is not in this crate because it necessarily crosses into
+JavaScript; the logical model, the per-record keys and the outbox stay here, so a
+rule enforced natively is enforced on the web without a second implementation.
+
+The calls are synchronous in both directions. `sqlite3.oo1` is a blocking API, so
+no executor or promise queue is needed between Rust and the engine.
+
+Without OPFS the engine falls back to an in-memory database and reports
+`persistent: false`. That is "offline storage unavailable", not silent data loss —
+the caller can say so rather than discovering it after a reload.
 
 ## Verification
 

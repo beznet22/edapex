@@ -171,6 +171,10 @@ jobs:
           name: agent-runtime
           path: apps/web/public/agent-runtime/
 
+      # Generated, not committed. The browser store test fails without it.
+      - name: Build SQLite runtime
+        run: pnpm --dir apps/web run build:sqlite-runtime
+
       - name: Install Chromium
         run: pnpm --dir apps/web exec playwright install --with-deps chromium
 
