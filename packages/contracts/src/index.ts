@@ -6,3 +6,6 @@ export * from "./connectors";
 export * from "./chat";
 export * from "./issues";
 export * from "./public-applications";
+export * from "./notifications";
+export * from "./routines";
+export * from "./tasks";

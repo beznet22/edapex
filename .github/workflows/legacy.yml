@@ -1,12 +1,13 @@
 name: Legacy app
 
-# The root SvelteKit app is the one that actually serves production today. It had
-# no CI at all, which is how its Docker build broke on 2026-11-14 (a module-scope
-# libSQL connection at postbuild analysis) and went unnoticed for months: the last
-# successful `docker.yml` run was 2026-08-03.
+# The root SvelteKit app is what serves production today, and it had no CI at all.
+# `docker.yml` last succeeded on 2026-08-03 — not because it was broken, but
+# because nothing had been pushed to main since. That gap is the point: without a
+# workflow, "is the legacy app still buildable?" had no answer in either direction,
+# and I answered it wrongly from the gap alone.
 #
-# This job builds it the same way the image does, so a break is caught on the PR
-# rather than on the next deploy to main.
+# This job builds it the same way the image does, so the answer is a check result
+# rather than an inference.
 
 on:
   pull_request:
@@ -74,9 +75,10 @@ jobs:
       - name: Generate SvelteKit types
         run: pnpm exec svelte-kit sync
 
-      # The same two placeholders the Dockerfile's builder stage sets. Both are
-      # read at module scope during postbuild analysis: the Telegram adapter wants
-      # a bot token, and Mastra storage opens libSQL.
+      # The Telegram adapter validates `botToken` at module scope, and postbuild
+      # analysis imports it. MASTRA_DB_URL is set because the bundled `db-url`
+      # module resolves its project root from its own chunk location, which lands
+      # outside the repo; pinning it here makes the database path deterministic.
       - name: Build
         env:
           TELEGRAM_BOT_TOKEN: placeholder
