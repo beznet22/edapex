@@ -11,12 +11,37 @@
   // Workers Route that has to be added when this Worker is first deployed.
   "vars": {
     "API_ORIGIN": "https://api.llacademy.ng"
-  }
+  },
 
-  // Bindings are added with each chunk:
-  //   chunk 2 — AGENT_DB (D1), SYNC_MEDIA (R2), service binding to sms-api
-  //   chunk 3 — service binding to model-router, APPROVALS_QUEUE
-  //
-  // `AGENT_DB` is bound only here. The school `DB` is never bound to this
-  // Worker, so no query in this codebase can reach school records.
+  // `AGENT_DB` is bound only here. The school `DB` is never bound to this Worker,
+  // so no statement in this codebase can reach a student record. Create the
+  // database and replace the id below with the one it prints:
+  //   pnpm exec wrangler d1 create edapex-agent
+  "d1_databases": [
+    {
+      "binding": "AGENT_DB",
+      "database_name": "edapex-agent",
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "migrations/agent"
+    }
+  ],
+
+  // Encrypted update blobs and snapshots. Ciphertext only: this Worker holds no
+  // key material for anything stored here.
+  "r2_buckets": [
+    {
+      "binding": "SYNC_MEDIA",
+      "bucket_name": "edapex-agent-sync"
+    }
+  ],
+
+  // Session validation is delegated to sms-api over a private binding. The
+  // session table and the school database never leave that Worker.
+  // Chunk 3 adds a binding to model-router and the approvals queue.
+  "services": [
+    {
+      "binding": "SMS_API",
+      "service": "edapex-api"
+    }
+  ]
 }

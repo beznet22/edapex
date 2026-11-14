@@ -65,6 +65,32 @@ node scripts/verify-port-specs.mjs                             failures: 0
 capabilities.test.ts                                           8 passed (incl. narrowing invariant)
 ```
 
+
+## Chunk 2 — local store + `AGENT_DB`
+
+| Item | Outcome |
+|---|---|
+| `crates/store` | Plain SQLite, per-record XChaCha20-Poly1305, append-only JSONL journal with 512 KB rotation, FTS derived-only. **24 tests.** |
+| Outbox atomicity | The entity write and its `sync_outbox` row share one transaction; a forced failure leaves no orphan. Enforced by test, not convention. |
+| Data-class exclusion | `CHECK (data_class = 'workspace')` on every table. `edapex` and `edapex-ephemeral` have no representation, so a bug cannot persist school records in the local store. |
+| `services/cowork-api` | Device register/list/revoke, batched push, cursor pull. **16 tests.** Bindings `AGENT_DB`, `SYNC_MEDIA`, service binding to `sms-api`. |
+| Push idempotency | `UNIQUE (device_id, device_seq)` + `INSERT OR IGNORE`, so a retry after a timeout accepts nothing. Verified by replaying a batch. |
+| Entity allowlist | `entityType` is a closed set; `students` and friends are rejected before a statement is prepared. |
+| Server-side fallback | `pull` excludes the caller's own device and never advances the cursor past the page it returned. |
+| `received_at` added | Ordering uses the **server's** receive time, not the client's `created_at`: a wrong clock would otherwise write events behind a reader's cursor that are never pulled. Recorded in spec 42. |
+
+### Decisions
+
+- **One cursor format, `<receivedAt>:<id>`.** D1 cannot index `rowid`, and there is no dense per-workspace sequence without an `AUTOINCREMENT` primary key the spec does not have. A compound key ordered by `(received_at, id)` is total and stable.
+- **The server never holds a key.** It stores and routes ciphertext only, so a compromised Worker cannot read a transcript. Checksum verification is the one thing it can still do.
+- **Revocation is a tombstone**, not a delete: the device row is the audit trail, and a revoked device gets `device_revoked` rather than a silent failure so the client can prompt a re-pair.
+
+### Open
+
+- **The browser driver is not written yet.** `SqlDriver` is defined and `RusqliteDriver` implements it (WAL, transactions). The OPFS SQLite WASM / IndexedDB driver is bound from `crates/agent-wasm`, because it crosses into JavaScript, and lands with the web persistence work. Until then the PWA cannot persist locally.
+- **The client half of sync is unbuilt.** The store emits outbox rows and the service accepts them; nothing yet runs the flush loop on a device. That is integration, not protocol, and belongs with the runtime wiring.
+- `wrangler.jsonc` carries a placeholder `database_id`; `wrangler d1 create edapex-agent` must replace it before deploy.
+
 ## Chunk 1 — three surfaces + visual language (in progress)
 
 ### Landed and verified

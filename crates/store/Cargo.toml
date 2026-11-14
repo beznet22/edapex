@@ -1,0 +1,25 @@
+[package]
+name = "edapex-store"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+publish = false
+
+[dependencies]
+# `derive_key` gives each record its own key from the workspace master without a
+# second hash dependency, and blake3 compiles for wasm unchanged.
+blake3 = "1.8"
+chacha20poly1305 = { version = "0.10", default-features = false, features = ["alloc"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+
+# Native hosts talk to SQLite directly. The browser binds a JS-backed driver
+# instead (OPFS SQLite WASM, IndexedDB fallback), which is why the driver is a
+# trait rather than a concrete connection.
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+getrandom = "0.2"
+rusqlite = { version = "0.32", features = ["bundled"] }
+
+[dev-dependencies]
+rusqlite = { version = "0.32", features = ["bundled"] }
