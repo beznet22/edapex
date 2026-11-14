@@ -66,8 +66,11 @@ function scan(rootDir) {
   const routesDir = path.join(rootDir, ROUTES_SUFFIX);
   const files = listTypeScriptFiles(routesDir);
   const violations = [];
+  // Every route module, not just `index.ts`: a route can be mounted by another
+  // route module (`agent-web` is mounted by `agent.routes.ts`), and scanning one
+  // file reported that as "not mounted".
   const mountText = [
-    readIfExists(path.join(rootDir, HTTP_SUFFIX, "routes", "index.ts")),
+    ...files.map((file) => readFileSync(file, "utf8")),
     readIfExists(path.join(rootDir, HTTP_SUFFIX, "app.ts"))
   ].join("\n");
 

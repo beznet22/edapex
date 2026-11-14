@@ -42,13 +42,13 @@ export const agentModel = new Hono<AppContext>().post("/chat/completions", async
 
   const body = await c.req.text();
   // Forward only the provider selector; nothing else from the caller is relayed.
-  const provider = c.req.header("x-edapex-provider");
+  const provider = c.get("providerSelector") ?? undefined;
 
   const upstream = await router.fetch("https://model-router/v1/chat/completions", {
     method: "POST",
     headers: {
       "content-type": "application/json",
-      accept: c.req.header("accept") ?? "text/event-stream",
+      accept: c.get("acceptHeader"),
       authorization: `Bearer ${secret}`,
       "x-edapex-user-id": String(user.id),
       // A tenant-less identity is valid: a non-school workspace still uses models.
