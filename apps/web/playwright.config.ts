@@ -36,9 +36,16 @@ export default defineConfig({
   ],
 
   webServer: {
+    // `--host 127.0.0.1` is explicit: Vite otherwise binds `localhost`, which
+    // resolves to `::1` first on some runners, and the poll below targets IPv4 —
+    // the server is up but unreachable, so Playwright reports a 180s timeout with
+    // no useful cause.
     command: isProductionTarget
       ? `pnpm build && pnpm exec vinext start --port ${PORT}`
-      : `pnpm exec vite dev --port ${PORT}`,
+      : `pnpm exec vite dev --host 127.0.0.1 --port ${PORT}`,
+    // Without this a failed start is silent; the only symptom is a timeout.
+    stdout: "pipe",
+    stderr: "pipe",
     url: `http://127.0.0.1:${PORT}/workspace`,
     reuseExistingServer: !process.env.CI,
     timeout: 180_000,
