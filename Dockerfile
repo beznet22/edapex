@@ -5,21 +5,37 @@ FROM node:22-slim AS builder
 # Enable pnpm via corepack (version from package.json packageManager field)
 RUN corepack enable
 
-# Build-time placeholder — Telegram adapter validates botToken at module import
-# during postbuild analysis. Real value injected at runtime via compose.
-# ARG (not ENV) ensures it doesn't persist into production image layers.
+# Build-time placeholders. Both are needed because the postbuild analysis step
+# *imports* server modules, and two of them validate at module scope:
+#   - the Telegram adapter validates `botToken`
+#   - Mastra storage opens libSQL through `@libsql/client`
+# Without the database URL the build fails with
+# `new LibSQLStore(...) -> _createClient(...)` rather than a useful message.
+# They are declared as ARG and exported to ENV only inside the builder stage, so
+# neither reaches the production image; the real values come from compose at
+# runtime.
 ARG TELEGRAM_BOT_TOKEN=placeholder
+ARG MASTRA_DB_URL=file:/tmp/build-mastra.db
 
 WORKDIR /app
 
-# Copy package files first to leverage Docker layer caching
-COPY package.json pnpm-lock.yaml ./
+# `pnpm-workspace.yaml` must be present or the install resolves this repo as a
+# single package while CI resolves it as a workspace, and the two disagree about
+# the lockfile. The workspace members live under apps/, packages/, services/ and
+# crates/; they are copied by the `COPY . .` below.
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 
 # Install dependencies with frozen lockfile for reproducible builds
 RUN pnpm install --frozen-lockfile
 
 # Copy source code excluding unnecessary files (using .dockerignore)
 COPY . .
+
+# Export the build-time placeholders into the *builder* environment. An ARG alone
+# is only a build variable; the import that needs it reads `process.env`. This ENV
+# is scoped to the builder stage, so neither value reaches the production image.
+ENV MASTRA_DB_URL=${MASTRA_DB_URL}
+ENV TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
 
 # Build the SvelteKit application
 RUN pnpm run build
