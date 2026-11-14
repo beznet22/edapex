@@ -1213,12 +1213,14 @@ dependencies = [
 name = "edapex-store"
 version = "0.1.0"
 dependencies = [
+ "base64 0.22.1",
  "blake3",
  "chacha20poly1305",
  "getrandom 0.2.17",
  "rusqlite",
  "serde",
  "serde_json",
+ "sha2",
  "thiserror 2.0.21",
 ]
 

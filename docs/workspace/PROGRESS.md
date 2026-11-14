@@ -87,8 +87,8 @@ capabilities.test.ts                                           8 passed (incl. n
 
 ### Open
 
-- **The browser driver is not written yet.** `SqlDriver` is defined and `RusqliteDriver` implements it (WAL, transactions). The OPFS SQLite WASM / IndexedDB driver is bound from `crates/agent-wasm`, because it crosses into JavaScript, and lands with the web persistence work. Until then the PWA cannot persist locally.
-- **The client half of sync is unbuilt.** The store emits outbox rows and the service accepts them; nothing yet runs the flush loop on a device. That is integration, not protocol, and belongs with the runtime wiring.
+- **The client sync chain is built and tested.** `Store::push_batch` emits the exact wire shape the service validates (base64 ciphertext, SHA-256 checksum, monotonic `device_seq`). `apps/web/lib/sync-client.ts` runs the flush loop with bounded batching, high-water-mark acknowledgement and exponential backoff, plus a `fetch` transport that keeps 401/403 non-retryable and 5xx retryable. **16 web tests.**
+- **The browser SQL driver is still unwritten, and it is now a decision rather than a task.** `SqlDriver` is defined and `RusqliteDriver` implements it (WAL, transactions); the browser needs a real SQL engine, and the only credible options (`@sqlite.org/sqlite-wasm`, `wa-sqlite`) add roughly a megabyte of WASM to the PWA. That either becomes a lazy asset with its own budget entry or it changes the 60 KB controllable ceiling agreed for spec 47, so it should be settled explicitly rather than slipped in. Until then the PWA cannot persist locally.
 - `wrangler.jsonc` carries a placeholder `database_id`; `wrangler d1 create edapex-agent` must replace it before deploy.
 
 ## Chunk 1 — three surfaces + visual language (in progress)

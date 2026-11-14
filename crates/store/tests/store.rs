@@ -250,3 +250,72 @@ fn outbox_ciphertext_matches_the_stored_envelope() {
     assert!(ciphertext.len() > 25);
     assert_ne!(&ciphertext[25..], b"body");
 }
+
+#[test]
+fn push_batch_produces_the_wire_shape_the_service_expects() {
+    let mut store = store();
+    thread(&mut store, "t-1");
+    message(&mut store, "m-1", "marks for AY4");
+
+    let batch = store.push_batch("device-a", 10).unwrap();
+    assert_eq!(batch.len(), 2);
+
+    for item in &batch {
+        // The service rejects anything that is not lowercase hex sha256.
+        assert_eq!(item.checksum.len(), 64);
+        assert!(
+            item.checksum.chars().all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase()),
+            "checksum is not lowercase hex: {}",
+            item.checksum
+        );
+        assert!(["create", "update", "delete", "tombstone"].contains(&item.operation.as_str()));
+
+        // Base64 decodes back to a sealed envelope, not to plaintext.
+        let raw = {
+            use base64::Engine as _;
+            base64::engine::general_purpose::STANDARD
+                .decode(&item.ciphertext)
+                .expect("ciphertext must be base64")
+        };
+        assert_eq!(raw[0], 1, "envelope version byte missing");
+
+        // version (1) + nonce (24) + ciphertext + tag (16)
+        let expected = match item.entity_type.as_str() {
+            "messages" => 41 + "marks for AY4".len(),
+            "threads" => 41 + "{\"title\":\"Marks\"}".len(),
+            other => panic!("unexpected entity type {other}"),
+        };
+        assert_eq!(raw.len(), expected, "{} envelope length", item.entity_type);
+        assert!(!String::from_utf8_lossy(&raw).contains("marks for AY4"));
+    }
+}
+
+#[test]
+fn a_pushed_batch_is_removed_only_after_acknowledgement() {
+    let mut store = store();
+    thread(&mut store, "t-1");
+
+    let batch = store.push_batch("device-a", 10).unwrap();
+    assert_eq!(batch.len(), 1);
+
+    // A failed push leaves the outbox untouched, so nothing is lost.
+    assert_eq!(store.pending_outbox("device-a", 10).unwrap().len(), 1);
+
+    store.acknowledge("device-a", "ws-1", "default", batch[0].device_seq).unwrap();
+    assert!(store.pending_outbox("device-a", 10).unwrap().is_empty());
+    assert_eq!(store.push_batch("device-a", 10).unwrap().len(), 0);
+}
+
+#[test]
+fn push_batch_respects_the_limit() {
+    let mut store = store();
+    thread(&mut store, "t-1");
+    for index in 0..5 {
+        message(&mut store, &format!("m-{index}"), "x");
+    }
+
+    let batch = store.push_batch("device-a", 3).unwrap();
+    assert_eq!(batch.len(), 3);
+    assert_eq!(batch[0].device_seq, 1);
+    assert_eq!(batch[2].device_seq, 3);
+}

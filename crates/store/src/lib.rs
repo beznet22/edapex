@@ -105,6 +105,21 @@ pub struct OutboxEntry {
     pub created_at: i64,
 }
 
+/// One event as it goes over the wire.
+#[derive(Debug, Clone, PartialEq)]
+pub struct PushItem {
+    pub id: String,
+    pub entity_type: String,
+    pub entity_id: String,
+    pub operation: String,
+    /// Base64 of the sealed envelope.
+    pub ciphertext: String,
+    /// Lowercase hex SHA-256 of the raw envelope bytes.
+    pub checksum: String,
+    pub device_seq: u64,
+    pub created_at: i64,
+}
+
 /// Tables whose sealed body can be read for a push. A whitelist rather than a
 /// caller-supplied name, because the table name reaches SQL directly.
 const BODY_TABLES: &[&str] = &[
@@ -377,6 +392,37 @@ impl<D: SqlDriver> Store<D> {
             .and_then(SqlValue::as_blob)
             .map(|blob| blob.to_vec())
             .ok_or(StoreError::Decrypt)
+    }
+
+    /// Builds the exact payload the sync service accepts.
+    ///
+    /// The ciphertext is base64 and the checksum is SHA-256 over the raw bytes,
+    /// because that is what `services/cowork-api` verifies before writing. Doing
+    /// the encoding here means every host produces byte-identical requests and
+    /// the checksum cannot be computed from the wrong representation.
+    pub fn push_batch(&mut self, device_id: &str, limit: usize) -> Result<Vec<PushItem>> {
+        use base64::Engine as _;
+        use sha2::{Digest as _, Sha256};
+
+        let entries = self.pending_outbox(device_id, limit)?;
+        let mut items = Vec::with_capacity(entries.len());
+
+        for entry in entries {
+            let ciphertext = self.outbox_ciphertext(&entry)?;
+            let checksum = Sha256::digest(&ciphertext);
+            items.push(PushItem {
+                id: entry.id.clone(),
+                entity_type: entry.entity_type.clone(),
+                entity_id: entry.entity_id.clone(),
+                operation: entry.operation.as_str().to_string(),
+                ciphertext: base64::engine::general_purpose::STANDARD.encode(&ciphertext),
+                checksum: checksum.iter().map(|byte| format!("{byte:02x}")).collect(),
+                device_seq: entry.device_seq,
+                created_at: entry.created_at,
+            });
+        }
+
+        Ok(items)
     }
 
     /// Removes acknowledged entries and advances the cursor, in one transaction.
