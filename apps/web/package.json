@@ -16,7 +16,8 @@
     "build:mobile": "cross-env EDAPEX_DESKTOP_BUILD=1 vite build",
     "check:budget": "node scripts/check-budget.mjs",
     "check:agent-size": "node ../../scripts/check-agent-size.mjs",
-    "build:agent-runtime": "node scripts/build-agent-runtime.mjs"
+    "build:agent-runtime": "node scripts/build-agent-runtime.mjs",
+    "build:sqlite-runtime": "node scripts/build-sqlite-runtime.mjs"
   },
   "dependencies": {
     "@edapex/chat": "workspace:^",
@@ -29,6 +30,7 @@
     "@radix-ui/react-separator": "^1.1.7",
     "@radix-ui/react-slot": "^1.2.4",
     "@radix-ui/react-tooltip": "^1.2.8",
+    "@sqlite.org/sqlite-wasm": "3.54.1-build1",
     "@tauri-apps/api": "^2.9.0",
     "boneyard-js": "1.10.0",
     "class-variance-authority": "^0.7.1",

@@ -65,6 +65,35 @@ node scripts/verify-port-specs.mjs                             failures: 0
 capabilities.test.ts                                           8 passed (incl. narrowing invariant)
 ```
 
+
+## Chunk 2 — local store + `AGENT_DB`
+
+| Item | Outcome |
+|---|---|
+| `crates/store` | Plain SQLite, per-record XChaCha20-Poly1305, append-only JSONL journal with 512 KB rotation, FTS derived-only. **24 tests.** |
+| Outbox atomicity | The entity write and its `sync_outbox` row share one transaction; a forced failure leaves no orphan. Enforced by test, not convention. |
+| Data-class exclusion | `CHECK (data_class = 'workspace')` on every table. `edapex` and `edapex-ephemeral` have no representation, so a bug cannot persist school records in the local store. |
+| `services/cowork-api` | Device register/list/revoke, batched push, cursor pull. **16 tests.** Bindings `AGENT_DB`, `SYNC_MEDIA`, service binding to `sms-api`. |
+| Push idempotency | `UNIQUE (device_id, device_seq)` + `INSERT OR IGNORE`, so a retry after a timeout accepts nothing. Verified by replaying a batch. |
+| Entity allowlist | `entityType` is a closed set; `students` and friends are rejected before a statement is prepared. |
+| Server-side fallback | `pull` excludes the caller's own device and never advances the cursor past the page it returned. |
+| `received_at` added | Ordering uses the **server's** receive time, not the client's `created_at`: a wrong clock would otherwise write events behind a reader's cursor that are never pulled. Recorded in spec 42. |
+
+### Decisions
+
+- **One cursor format, `<receivedAt>:<id>`.** D1 cannot index `rowid`, and there is no dense per-workspace sequence without an `AUTOINCREMENT` primary key the spec does not have. A compound key ordered by `(received_at, id)` is total and stable.
+- **The server never holds a key.** It stores and routes ciphertext only, so a compromised Worker cannot read a transcript. Checksum verification is the one thing it can still do.
+- **Revocation is a tombstone**, not a delete: the device row is the audit trail, and a revoked device gets `device_revoked` rather than a silent failure so the client can prompt a re-pair.
+
+### Open
+
+- **The client sync chain is built and tested.** `Store::push_batch` emits the exact wire shape the service validates (base64 ciphertext, SHA-256 checksum, monotonic `device_seq`). `apps/web/lib/sync-client.ts` runs the flush loop with bounded batching, high-water-mark acknowledgement and exponential backoff, plus a `fetch` transport that keeps 401/403 non-retryable and 5xx retryable. **16 web tests.**
+- **The browser store works.** `JsSqlDriver` in `crates/agent-wasm` forwards statement execution to OPFS SQLite WASM across wasm-bindgen; the calls are synchronous in both directions, so no executor sits between Rust and the engine. Crypto, schema and outbox stay in `crates/store`, which is what keeps one scheme across native and web.
+- **The engine is a lazy asset.** Vendored into `public/sqlite/` by `build:sqlite-runtime` and measured at **773,425 B gzip** against the approved 1.2 MB ceiling. It is never precached and is enforced by both `build-sqlite-runtime` and `check-budget`.
+- **Proven in a real browser.** `e2e/browser-store.spec.ts` opens the store in Chromium, writes a sealed record, reads it back, produces a valid push batch, searches the derived index, acknowledges, and confirms that a failed transaction leaves no outbox row. Three tests, and the only coverage that says anything about the wasm-bindgen boundary.
+- **No clock on wasm.** `SystemTime::now()` panics on `wasm32-unknown-unknown`; the store now returns 0 there. Nothing load-bearing used it: records carry a host-supplied `created_at`, cursor correctness rests on `last_seq`, and the only internal uses are informational timestamps.
+- `wrangler.jsonc` carries a placeholder `database_id`; `wrangler d1 create edapex-agent` must replace it before deploy.
+
 ## Chunk 1 — three surfaces + visual language (in progress)
 
 ### Landed and verified

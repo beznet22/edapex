@@ -33,7 +33,36 @@ interface AgentBridge {
   readonly close: () => void;
 }
 
-interface AgentWasmModule {
+/**
+ * The store bindings exported by `crates/agent-wasm`.
+ *
+ * Named exactly as wasm-bindgen emits them (snake_case retained where no
+ * `js_name` is set), so this stays a description of the generated `.d.ts` rather
+ * than a second opinion about it.
+ */
+export interface StoreBridge {
+  migrate: () => void;
+  version: () => number;
+  writeRecord: (
+    entityType: string,
+    entityId: string,
+    workspaceId: string,
+    operation: string,
+    extraJson: string,
+    plaintext: Uint8Array,
+    searchText: string | null,
+    deviceId: string,
+    createdAt: number
+  ) => string;
+  read_record: (entityType: string, entityId: string) => Uint8Array;
+  pushBatch: (deviceId: string, limit: number) => string;
+  acknowledge: (deviceId: string, workspaceId: string, scope: string, throughSeq: number) => void;
+  cursor: (deviceId: string, workspaceId: string, scope: string) => number;
+  search: (query: string, limit: number) => string;
+  rebuildSearchIndex: () => number;
+}
+
+export interface AgentWasmModule {
   readonly default: (input: { module_or_path: string }) => Promise<unknown>;
   readonly WasmAgent: new (
     settings: string,
@@ -48,6 +77,7 @@ interface AgentWasmModule {
     readonly finish: () => string;
   };
   readonly parseSseData: (data: string) => string;
+  readonly SqlStore: new (driver: unknown, masterKey: Uint8Array) => StoreBridge;
 }
 
 export interface AgentCallbacks {
@@ -83,7 +113,7 @@ let modulePromise: Promise<AgentWasmModule> | null = null;
  * does not help, because the const's literal value is inlined before the comment
  * is consulted.
  */
-async function loadAgentModule(): Promise<AgentWasmModule> {
+export async function loadAgentModule(): Promise<AgentWasmModule> {
   if (modulePromise !== null) return modulePromise;
   modulePromise = (async () => {
     const specifier = new URL(RUNTIME_PATH, window.location.origin).href;

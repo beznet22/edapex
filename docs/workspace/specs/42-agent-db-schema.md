@@ -874,7 +874,8 @@ sync_events (
   device_id TEXT NOT NULL,
   device_seq INTEGER NOT NULL,
   checksum TEXT NOT NULL,
-  created_at INTEGER NOT NULL,
+  created_at INTEGER NOT NULL,       -- the client's clock
+  received_at INTEGER NOT NULL,      -- server receive time; the pull order
   UNIQUE (device_id, device_seq)
 );
 

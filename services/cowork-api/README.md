@@ -6,13 +6,13 @@ Cloudflare Worker that **never** touches school records.
 | | |
 |---|---|
 | Worker | `edapex-cowork-api` |
-| Owns | `AGENT_DB` (D1), `SYNC_MEDIA` (R2) — *added in chunk 2* |
+| Owns | `AGENT_DB` (D1), `SYNC_MEDIA` (R2) |
 | Must never bind | the school `DB` |
 | Verifies identity via | service binding to `services/sms-api` |
 | Calls | `services/model-router` over a service binding |
 
-**Status: skeleton.** The Worker config and package exist so the boundary is
-real; routes and bindings land with each chunk.
+**Status: chunk 2 lands the sync channel** — device registry, encrypted event
+push, cursor-based pull. Approvals, connectors and quota arrive in chunks 3-5.
 
 ## The separation, and why it is physical
 
@@ -60,13 +60,63 @@ carries a credential.
 This Worker therefore still has **no public route** of its own; browser traffic
 reaches it through `sms-api` once chunk 2 adds the agent state it serves.
 
-## Bindings, by chunk
+## Sync channel
 
-| Chunk | Binding |
+The device owns the plaintext. This Worker stores and routes ciphertext and never
+holds a key, so a compromised Worker cannot read a transcript.
+
+| Method | Path | Purpose |
+|---|---|---|
+| `GET` | `/api/v1/agent/devices` | This account's devices, newest first |
+| `POST` | `/api/v1/agent/devices` | Register a device and its public key |
+| `DELETE` | `/api/v1/agent/devices/:id` | Revoke (tombstone, not delete) |
+| `POST` | `/api/v1/agent/sync/push` | Accept a batch of sealed events |
+| `GET` | `/api/v1/agent/sync/pull` | Events for the workspace since a cursor |
+
+Every route requires the `__Host-edapex_session` cookie and is scoped to its
+`user.id`. Another account's device id resolves to `device_unknown`, never to that
+device.
+
+### Push
+
+- **Idempotent by the database**, not by application bookkeeping:
+  `UNIQUE (device_id, device_seq)` plus `INSERT OR IGNORE` means a retry after a
+  timeout accepts nothing new.
+- **One batch per push.** The events, the device heartbeat and the cursor commit
+  together, so a cursor can never advance past events that were not stored.
+- **Checksum verified before writing.** SHA-256 over the raw ciphertext catches
+  truncation and transport corruption, which would otherwise only surface as a
+  decryption failure on the far device.
+- `entityType` is an allowlist. `students`, `marks` and similar are rejected at
+  validation, before a statement is prepared.
+
+### Pull
+
+The cursor is an opaque `"<receivedAt>:<id>"`. Ordering uses **the server's**
+`received_at`, not the client's `created_at`: a device with a wrong clock would
+otherwise write events that sort behind another device's cursor and are never
+pulled.
+
+A short page does not advance the cursor past what it returned, so a limited read
+cannot silently skip the remainder.
+
+| Column | Note |
 |---|---|
-| 2 | `AGENT_DB` (D1), `SYNC_MEDIA` (R2), service binding → `sms-api` |
-| 3 | service binding → `model-router`, approvals queue |
-| 5 | connectors and the tenant package |
+| `created_at` | The client's clock, per `42-agent-db-schema.md`; never used for ordering |
+| `received_at` | Server receive time; the pull order. Server-assigned so ordering cannot be influenced by the client |
+
+## Bindings
+
+| Binding | Type | Purpose |
+|---|---|---|
+| `AGENT_DB` | D1 | Devices, events, cursors |
+| `SYNC_MEDIA` | R2 | Encrypted snapshots and update blobs |
+| `SMS_API` | Service | Session validation only |
+
+Chunk 3 adds a service binding to `model-router` and the approvals queue.
+
+`AGENT_DB` is bound only here. The school `DB` is not bound to this Worker, so the
+separation is a deployment fact rather than a lint rule.
 
 ## Budget constraints that shape the design
 
@@ -92,8 +142,16 @@ reaches it through `sms-api` once chunk 2 adds the agent state it serves.
 
 ```bash
 pnpm exec tsc --noEmit
+pnpm exec tsc --noEmit -p tests/tsconfig.json
 pnpm exec vitest run
 pnpm exec wrangler dev
+```
+
+Before the first deploy, create the database and replace the placeholder id in
+`wrangler.jsonc`:
+
+```bash
+pnpm exec wrangler d1 create edapex-agent
 ```
 
 `pnpm-workspace.yaml` lists this directory, so `pnpm install` must run at the root

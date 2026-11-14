@@ -36,10 +36,18 @@
     "/agent-runtime/edapex_agent_wasm.js": {
       "gzip": 60000,
       "reason": "wasm-bindgen glue"
+    },
+    "/sqlite/sqlite3.wasm": {
+      "gzip": 500000,
+      "reason": "SQLite engine for the browser store; lazy, never precached"
+    },
+    "/sqlite/index.mjs": {
+      "gzip": 400000,
+      "reason": "engine glue plus OPFS worker"
     }
   },
   "pwa": {
-    "$comment": "Spec 47 §76: the WASM runtime does not count toward this shell budget.",
+    "$comment": "Spec 47 \u00a776: the WASM runtime does not count toward this shell budget.",
     "shellGzip": 2097152
   },
   "measured": {
@@ -57,6 +65,7 @@
       "lucide": 10851,
       "other": 15870
     },
-    "note": "Measured on a vinext build with Node 26.13.1. The Pages rollback baseline in spec 47 (106 KB) is a different build and is not comparable. The lazy document editor (188 KB) is not in this figure because it loads only when the artifact panel opens."
+    "note": "Measured on a vinext build with Node 26.13.1. The Pages rollback baseline in spec 47 (106 KB) is a different build and is not comparable. The lazy document editor (188 KB) is not in this figure because it loads only when the artifact panel opens. The SQLite engine (773 KB gzip, approved ceiling 1.2 MB) is lazy: it loads only when the store is opened.",
+    "sqliteRuntimeGzip": 773425
   }
 }

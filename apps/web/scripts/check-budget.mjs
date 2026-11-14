@@ -157,12 +157,28 @@ report("controllable JS", controllable, initial.controllableJsGzip);
 
 // Lazily loaded assets get their own ceiling: off the initial path, but still
 // bounded, because an unbounded lazy chunk is how 9.9 MB shipped unnoticed.
+//
+// `public/` assets never appear in the Vite manifest, so they are read from disk
+// instead of silently skipped — otherwise these entries would be decorative.
+const publicDir = join(appRoot, "public");
 for (const [assetPath, limit] of Object.entries(budget.assets)) {
   if (assetPath.startsWith("$")) continue;
   const relative = assetPath.replace(/^\//, "");
+
   const chunk = Object.keys(manifest).find((key) => manifest[key].file.endsWith(relative));
-  if (chunk === undefined) continue;
-  report(relative, gzipSize(manifest[chunk].file), limit.gzip);
+  if (chunk !== undefined) {
+    report(relative, gzipSize(manifest[chunk].file), limit.gzip);
+    continue;
+  }
+
+  const onDisk = join(publicDir, relative);
+  try {
+    statSync(onDisk);
+    report(relative, gzipSync(readFileSync(onDisk), { level: 9 }).byteLength, limit.gzip);
+  } catch {
+    // Not built in this tree. `build:sqlite-runtime` is what produces it, and CI
+    // runs that before the browser tests.
+  }
 }
 
 if (failures.length > 0) {
