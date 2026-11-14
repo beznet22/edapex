@@ -66,6 +66,31 @@ capabilities.test.ts                                           8 passed (incl. n
 ```
 
 
+## Chunk 3 — gateway, connectors, approvals, tenant-neutral capabilities
+
+| Item | Outcome |
+|---|---|
+| **Policy → audit → act** | One path in `services/agent/gateway/actions.ts`. A pending approval is created before anything runs, and `execute` refuses without an allowed decision. **26 tests.** |
+| Audit | A record before the action and another after, so a crash mid-action leaves evidence of intent. Credential-shaped keys are redacted at any depth, because a token that reached a log has already leaked. |
+| **Secret box** | Write-only by construction: no method returns a stored secret; `withSecret` hands plaintext to a callback and it never enters a response body. AES-GCM with an HKDF key **per workspace**, so one leaked derived key exposes one tenant. **13 tests.** |
+| **Tier 1 unblocked** | `GET /api/v1/agent/capabilities` moved to `cowork-api`. It previously sat behind `sms-api`'s tenant middleware, which rejects a user with no `schoolId` — so a tenant with zero packs could not resolve a role at all. **7 tests.** |
+| **Connectors** | `packages/connectors` — governed MCP client and per-person Google. **31 tests.** HTTPS-only URL validation, allowlisted tools, per-agent grant checks at call time. |
+| **Zero connector bytes** | Enforced twice in `apps/web/tests/dependency-boundary.test.ts`: against the package manifest and against every source file, so a deep or dynamic import cannot slip past. |
+| Decision vocabulary | Aligned to the existing `ApprovalDecision` union (`allow_once`/`allow_for_session`/`deny`/`abort`) rather than a second two-value version. `deny` answers one call; `abort` stops the turn; they are tracked separately. |
+
+### Decisions
+
+- **A write that policy classifies as a read is denied, not run.** Acting without a decision is precisely the failure the gateway exists to prevent, so a misclassification fails closed and is audited as `classification_error`.
+- **An ungranted connector tool is denied before anyone is asked.** A prompt for something that could not run trains people to click through, which is worse than no prompt.
+- **Google scopes are per connection.** A read connection asks only for `readonly` scopes, and `scopeCovers` is checked at *use* time: a connection granted months ago must not send today.
+- **The Google endpoint is a path, not a URL.** `callGoogle` prefixes the origin, so a caller cannot redirect the bearer token to another host. Error bodies are not read at all, because Google echoes the rejected token in them.
+
+### Open
+
+- **The connector routes are read-only over state that nothing yet writes.** `connector_accounts` and `connector_grants` have schema and readers; the OAuth callback and the grant-writing endpoints land with the connectors UI in chunk 5. The policies, the secret box and the MCP/Google clients are complete and tested; what is missing is the write path from a real OAuth round trip.
+- **`desktop/src-tauri/src/mcp.rs` remains config-detection only**, as the brief requires: browser assistance stays a user-installed Chrome DevTools server and is desktop-only.
+- Capability resolution treats an unknown parent as a `student`, because confirming parent status would need a school lookup this Worker must not perform. That is the direction that grants the fewest tools.
+
 ## Chunk 2 — local store + `AGENT_DB`
 
 | Item | Outcome |

@@ -105,6 +105,42 @@ cannot silently skip the remainder.
 | `created_at` | The client's clock, per `42-agent-db-schema.md`; never used for ordering |
 | `received_at` | Server receive time; the pull order. Server-assigned so ordering cannot be influenced by the client |
 
+## Gateway
+
+Every write goes **policy → audit → act**, in that order and with no shortcut.
+`actions.ts` exposes one path; a caller that skips it is visibly skipping the
+gateway rather than quietly taking a different route.
+
+| Piece | Rule |
+|---|---|
+| `policy.ts` | Anything not positively a read is a write. The default is "ask", because a forgotten classification must fail toward asking. |
+| `audit.ts` | A record before the action and another after, so a crash mid-action leaves evidence of intent. Credential-shaped keys are redacted at any depth. |
+| `actions.ts` | The pending approval is created *before* anything runs, and `execute` refuses to run without an allowed decision. |
+| `secrets.ts` | Write-only. There is no method that returns a stored secret; the only way out is `withSecret`, which hands plaintext to a callback. |
+
+Decisions are appended once and never overwritten, so a replayed or racing
+approval cannot flip a denial into an allow. `deny` answers one call and `abort`
+stops the turn; they are tracked separately rather than flattened.
+
+Two refusals worth knowing:
+
+- A write that policy classifies as a read is **denied**, not run. Acting without
+  a decision is the exact failure the gateway exists to prevent.
+- A connector tool with no grant is denied **before** anyone is asked. A prompt
+  for something that could not run trains people to click through.
+
+## Capabilities without a school
+
+`GET /api/v1/agent/capabilities` lives here, not in `sms-api`, because spec 10
+tier 1 requires a tenant with no first-party pack to boot. The `sms-api` tenant
+middleware rejects a user with no `schoolId`, which made that tier unable to
+resolve a role at all.
+
+The endpoint reads no school data: the role is derived from the identity
+`sms-api` returns and the manifest is a pure function of that role plus the feature
+mask. An unlisted feature means **enabled**; a malformed mask is ignored rather
+than silently disabling everything.
+
 ## Bindings
 
 | Binding | Type | Purpose |
