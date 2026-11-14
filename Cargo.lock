@@ -6855,10 +6855,6 @@ dependencies = [
 ]
 
 [[patch.unused]]
-name = "mxc-sdk"
-version = "1.0.0"
-
-[[patch.unused]]
 name = "sqlx-core"
 version = "0.9.0"
 source = "git+https://github.com/transact-rs/sqlx?rev=10462fa4414c6c7f1ed1d39bb31678e3b726878c#10462fa4414c6c7f1ed1d39bb31678e3b726878c"

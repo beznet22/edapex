@@ -10,8 +10,12 @@ members = [
   "apps/desktop/src-tauri"
 ]
 
-[patch."https://github.com/microsoft/mxc"]
-mxc-sdk = { path = "/home/beznet/mxc-mobile/src/mxc-sdk" }
+# `mxc-sdk` was patched to a sibling checkout so an abandoned mobile experiment
+# could build here. Nothing in the workspace depends on it — it is `patch.unused`
+# in Cargo.lock — and an absolute path to one developer's home directory made every
+# fresh clone fail with "patch location does not contain packages matching
+# mxc-sdk". Removed rather than parameterised: a patch nobody consumes is just a
+# machine-specific build breaker.
 
 [patch.crates-io]
 sqlx-core = { git = "https://github.com/transact-rs/sqlx", rev = "10462fa4414c6c7f1ed1d39bb31678e3b726878c" }

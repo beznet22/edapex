@@ -97,8 +97,17 @@ describe("capability contract", () => {
   });
 
   it("bounds an agent grant by its creator's ceiling", () => {
+    // Neither role contains the other, which is why the escalation check below
+    // is worth having: `admin` holds the mutating operations and `parent` holds
+    // `get_student`, so a subset assumption in either direction would be wrong.
+    // Asserted rather than assumed — if the packs ever converge, this test would
+    // start passing for the wrong reason.
     const adminOperations = allowedOperationIds("admin");
     const parentOperations = allowedOperationIds("parent");
+    expect(parentOperations.has("get_student"), "parent holds get_student").toBe(true);
+    expect(adminOperations.has("get_student"), "admin does not").toBe(false);
+    expect(adminOperations.has("update"), "admin holds update").toBe(true);
+    expect(parentOperations.has("update"), "parent does not").toBe(false);
 
     const narrowed = validateAgentGrant(
       { agentId: "agent-1", operationIds: ["search"] },
