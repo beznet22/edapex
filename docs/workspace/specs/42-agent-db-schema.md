@@ -11,6 +11,19 @@ The agent database is **not** a generic document/Yjs store. It is an OpenDuet-do
 - EdApex school D1 `DB` is never joined, copied or mixed with `AGENT_DB`.
 - No user session tables, cookies or password credentials here.
 
+## Agent creation policy
+
+`agents` and `agent_profiles` are user-creatable, so creation is a permission change and needs an explicit policy. The normative rules live in `10-capabilities-and-roles.md` §Agents and grants; this spec owns the persisted shape.
+
+- An agent's grant set is stored as `AgentGrant` records. It is always a **subset** of its creator's capability ceiling — see the narrowing invariant in `10`.
+- Persist the **ceiling snapshot** the grants were validated against (`validated_against`), so a later role change or feature disable can be detected and re-resolved rather than silently trusted.
+- A grant that no longer resolves against the current ceiling is **dropped**. It is never widened and never silently retained.
+- Remote agents (`agents.kind = 'remote'`, AG-UI endpoints) require explicit admin approval; their grants are never derived from the creator.
+- `agents.yaml` package rows are seeded with `origin = 'package'` and are non-deletable. User rows use `origin = 'user'`.
+- Creation is plan-then-apply. The server resolves candidate grants and reports exceedances; it does not trim silently, and nothing is auto-applied.
+
+`TenantFeature` gates which capability areas are on for the tenant. Feature filtering happens **before** the 5-tool cap, so a disabled area never consumes a tool slot.
+
 ## Verified OpenDuet core
 
 The OpenDuet source schema contains, among others:
@@ -64,10 +77,13 @@ agents (
   slug TEXT NOT NULL,
   name TEXT NOT NULL,
   kind TEXT NOT NULL,                -- built_in/remote
+  origin TEXT NOT NULL,              -- package/user
   role_description TEXT,
   system_prompt_ref TEXT,
   model_config_json TEXT,            -- no provider keys
   status TEXT NOT NULL,
+  created_by TEXT,                   -- user id; null for package rows
+  validated_against TEXT,            -- ceiling snapshot the grants were resolved against
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL
 );
@@ -738,6 +754,27 @@ plugin_grants (
   updated_at INTEGER NOT NULL,
   PRIMARY KEY (kind, ref, agent_id)
 );
+
+-- Capability operations granted to an agent. Each row must resolve against the
+-- creator's ceiling (10-capabilities-and-roles.md §Narrowing invariant).
+agent_capability_grants (
+  agent_id TEXT NOT NULL,
+  tool_id TEXT NOT NULL,
+  operation_id TEXT NOT NULL,
+  granted_by TEXT NOT NULL,
+  granted_at INTEGER NOT NULL,
+  validated_against TEXT NOT NULL,   -- ceiling snapshot; recheck when it changes
+  PRIMARY KEY (agent_id, tool_id, operation_id)
+);
+
+-- Tenant feature mask. Filters the tool set before the 5-tool cap.
+tenant_features (
+  workspace_id TEXT NOT NULL,
+  feature_id TEXT NOT NULL,
+  enabled INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+  PRIMARY KEY (workspace_id, feature_id)
+);
 ```
 
 ### Responsibilities
@@ -912,7 +949,7 @@ Some OpenDuet tables are represented by an existing EdApex table, not copied one
 | `routine_sweeps` | Operational queue detail; `work_items` carries the durable queue |
 | `push_devices` | Deferred until mobile push notifications are implemented |
 | `components`, `sandboxed_components` | Not copied; OpenUI uses a static, host-owned catalog |
-| `composio_connections`, `brokered_connections` | Out of v1 (paid broker) unless separately approved |
+| `composio_connections`, `brokered_connections` | Paid brokers remain out of v1. A **governed MCP client we run ourselves** in `services/cowork-api` is in scope (`60-security-privacy.md`); its server records are `mcp_servers`, `mcp_tools` and `plugin_grants`. |
 
 ## What is not in `AGENT_DB`
 
@@ -924,7 +961,7 @@ Some OpenDuet tables are represented by an existing EdApex table, not copied one
 - computers, voice, learning, shared-use approvals/requests or demonstrations
 - saved passwords/sign-in requests
 - deployment packages, intelligence channel mappings or Component Playground
-- Composio/Arcade/brokered connections
+- Composio/Arcade/brokered connections (a self-run governed MCP client is in scope; its brokered credentials are not stored here)
 - opaque vector indexes by default
 
 ## Sync mapping
@@ -933,6 +970,7 @@ Some OpenDuet tables are represented by an existing EdApex table, not copied one
 |---|---|
 | `messages`, `message_parts`, `runs`, `tool_calls`, `approval_requests`, `tasks`, `task_questions` | `sync_events` append-only |
 | `agents`, `agent_profiles`, `agent_preferences`, `channels`, `channel_memberships`, `channel_looks`, `skills`, grants, routines, connections, memory, `approval_preferences`, `approval_team_settings`, `approval_team_rules`, `proactive_settings` | `sync_events` |
+| `agent_capability_grants`, `tenant_features` | `sync_events`; re-resolved against the local ceiling before use |
 | `team_bot_*`, `group_bot_threads`, `group_messages` | `sync_events` |
 | `delivery_bindings`, `delivery_challenges`, `delivery_inbox`, `delivery_outbox` | `sync_events`; provider payloads remain opaque |
 | `mcp_servers`, `mcp_tools`, `skill_tools`, `plugin_grants` | `sync_events`; credential refs only |

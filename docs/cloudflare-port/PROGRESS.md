@@ -2,7 +2,7 @@
 
 Live status for the implementation phases defined in [ROADMAP.md](./ROADMAP.md). The roadmap says **what** each phase is; this file says **where we are**.
 
-Port code lands in [`apps/api/`](../../apps/api/AGENTS.md).
+Port code lands in [`services/sms-api/`](../../services/sms-api/AGENTS.md).
 
 ## How to update this file
 
@@ -120,7 +120,7 @@ student codes, duplicate resolution and staff/parent coverage to **10G.1**. See
 - [x] Local application drill passes: health 200, claim 404/202/202/409/404, target integrity green, 42 sections, FIRST TERM 2026-09-14 → 2026-12-11, teacher roster, NURSERY marks grade, report-card review checksum, core counts unchanged, source evidence hash unchanged
 - [x] Monitoring/on-call/rollback pack prepared (production briefing and tabletop still pending)
 - [x] Decision record written: same account, separate EdApex resources, POC D1 not reused, offline archives + live-only load, Gmail reuse, staged domain move
-- [x] Gmail refresh token verified locally (HTTP 200, `gmail.send`); local `apps/api/.dev.vars` created and gitignored; production secrets pending Worker
+- [x] Gmail refresh token verified locally (HTTP 200, `gmail.send`); local `services/sms-api/.dev.vars` created and gitignored; production secrets pending Worker
 - [x] POC host/domain move staged: `sms-api.llacademy.ng` for the POC, `api.llacademy.ng` for EdApex; `CLIENT_URL` stays on the portal
 - [x] PR #8 merged; `phase-8-cutover` rebased and published as PR #9
 - [x] Archive export validated: 1,293 objects, 3,802 summaries, checksums; live plan 34 tables/5,380 rows/31 files, 28 excluded; loader dry-run
@@ -138,7 +138,7 @@ student codes, duplicate resolution and staff/parent coverage to **10G.1**. See
 - [ ] Password digests nulled, column dropped later — **moved to workspace 10G.2; 1,611 non-null**
 - [x] Retention sweep dry-run matches expectations — 0 old academic years / 0 operational rows
 - [x] Session archives 1–4 manifest verified — session 1 652/652, session 2 0/0, session 4 641/641; missing manifests repaired in R2
-- [x] Workspace package wiring verified (roadmap Part 5); `apps/api/` remains the in-repo **EdApex API service** — root install, typecheck, tests, guards and deploy dry-run pass
+- [x] Workspace package wiring verified (roadmap Part 5); `services/sms-api/` remains the in-repo **EdApex API service** — root install, typecheck, tests, guards and deploy dry-run pass
 - [x] Migration 0006 applied to production D1
 - [x] Worker deployed (`bfa72530-b53b-4f6a-b771-7b9f450d3795`)
 - [x] Pages deployed at `edapex-web.pages.dev`; root, `/claim`, `/admin/claim-links` 200
@@ -152,7 +152,7 @@ student codes, duplicate resolution and staff/parent coverage to **10G.1**. See
 | 2026-11-05 | 0 | Worker scaffold, `/health`, D1 binding + `0000_scaffold`, vitest Workers harness, import-boundary guard, CI workflow; local gates green, CI pending push | Kimchi |
 | 2026-11-05 | 0 | Phase 0 gate passed: CI run 42083953037 green; PR #1 updated with the evidence | Kimchi |
 | 2026-11-05 | — | Renamed the port package `cloudflare/` → `api/`; updated specs, verifier paths, and CI filters for the workspace layout | Kimchi |
-| 2026-11-05 | — | Moved `api/` → `apps/api/`; documented `apps/` as the deployable bucket and the API as the UI-less service consumed by `apps/web`, `apps/desktop`, and `apps/mobile` | Kimchi |
+| 2026-11-05 | — | Moved `api/` → `services/sms-api/`; documented `apps/` as the deployable bucket and the API as the UI-less service consumed by `apps/web`, `apps/desktop`, and `apps/mobile` | Kimchi |
 | 2026-11-06 | 1 | Drizzle/SQLite schema for 74 tables (62 legacy per `05 §4` transforms + 12 registered), 226 recovered indexes + 5 spec-mandated, drizzle-kit baseline `0000_edapex_schema.sql`, Workers-pool schema gate + shape tests, expectations fixture generator, CI drift step; `0000_scaffold.sql` deleted (comment-only placeholder) | Kimchi |
 | 2026-11-06 | 2 | Repository layer implemented: `base/` (frozen context, D1 chunk/batch helpers, keyset pagination), 11 aggregate folders, 6 query modules; 103 `01b` methods implemented + 4 retired; 66 source files under the rule guard; 18 repository test files covering parity, tenant isolation, chunk boundaries and batch atomicity | Kimchi |
 | 2026-11-06 | 2 | Phase 2 gate passed: CI run 42233886498 green on PR #3; 139 tests, 66 repository files guarded, map 108/108, schema drift clean, both verifiers pass | Kimchi |
@@ -193,7 +193,7 @@ student codes, duplicate resolution and staff/parent coverage to **10G.1**. See
 | 2026-11-07 | 8 | Preflight tooling added (`cutover:preflight`) and run on the current dump: 62 tables, 196,801 rows, 0 FK, 0 reconciliation, 0 sequence/orphan failures, 1,711 resolutions, 44 SQL files, 625 uploadable/228 missing photos, `executed:false`; no remote command executed | Kimchi |
 | 2026-11-07 | 8 | Local drill added (`cutover:drill`) and passed on a disposable D1 copy: health 200; claim 404/202/202/409/404; target green; 42 sections; FIRST TERM dates; teacher roster, NURSERY marks grade and report-card review checksum; core counts and source evidence hash unchanged. First attempt correctly failed the target gate because synthetic claim users were active and unprofiled (`P4`); drill accounts are now inactive. Production DNS/MySQL rollback remains a tabletop/window step | Kimchi |
 | 2026-11-07 | 8 | Decision record added: reuse the existing Cloudflare account but create separate `edapex-api`/`edapex` D1/`edapex-media`; never clear or reuse the live POC `sms` D1; POC moves to `sms-api.llacademy.ng`, EdApex takes `api.llacademy.ng` in a staged handover; POC `CLIENT_URL` stays on the portal | Kimchi |
-| 2026-11-07 | 8 | Gmail reuse verified: same Google client/sender as the POC; `gmail.send` token exchange HTTP 200; local `apps/api/.dev.vars` created (gitignored); production `GMAIL_*` secrets pending the first `edapex-api` deploy. POC Gmail callback remains `portal.llacademy.ng`; EdApex auth callback registered | Kimchi |
+| 2026-11-07 | 8 | Gmail reuse verified: same Google client/sender as the POC; `gmail.send` token exchange HTTP 200; local `services/sms-api/.dev.vars` created (gitignored); production `GMAIL_*` secrets pending the first `edapex-api` deploy. POC Gmail callback remains `portal.llacademy.ng`; EdApex auth callback registered | Kimchi |
 | 2026-11-07 | 8 | Billing/design revised: the all-tables load+purge is ~2.0–2.5M writes, so it is rejected. Use offline session 1/2/4 archives + minimal live-only D1 load + archive metadata: expected ~70–95k writes, Free 95k target/100k hard gate. If capped, checkpoint and resume after 00:00 UTC the next day; no Paid fallback. Historical raw tables stay empty; history serves from R2 | Kimchi |
 | 2026-11-07 | 8 | PR #8 merged into `phase-6-archive`; `phase-8-cutover` rebased and published as PR #9. No production resources/domains/secrets touched | Kimchi |
 | 2026-11-07 | 8 | Tooling validated: archive export **1,293 objects / 3,802 summaries** with checksum verification; live-only plan **34 tables / 5,380 rows / 31 files (28 excluded)**; resumable loader dry-run; full gate **126 test files / 617 tests**; PR #9 `port` green ([run 42385118234](https://github.com/beznet22/edapex/actions/runs/42385118234)). No production D1 load or domain switch | Kimchi |
@@ -235,7 +235,7 @@ student codes, duplicate resolution and staff/parent coverage to **10G.1**. See
 | POC owner verification | Phase 8 | done — owner confirmed POC portal login on 2026-11-09; POC root 200, portal 200, EdApex Gmail send 200 | — |
 | 24 h watch | Phase 8 | done — 2026-11-08T02:26Z → 2026-11-09T02:26Z; 0 Worker errors, 0 new sessions, 96 write queries, no rollback trigger | — |
 | Production rollback drill | Phase 8 | done — host bounce to POC and back; final EdApex health 200 | — |
-| Repository layout | Phase 9 completion | decided — `apps/api/` is the API service and becomes a pnpm workspace package; `apps/` is the deployable bucket; no standalone extraction | — |
+| Repository layout | Phase 9 completion | decided — `services/sms-api/` is the API service and becomes a pnpm workspace package; `apps/` is the deployable bucket; no standalone extraction | — |
 | Phase 1 index arithmetic | Phase 2+ index work | decided — the 226 gate is 224 verbatim recovered (the two `session_id` indexes go with the dropped columns, `05 §4`) plus 01a O11's two new `chat_group_users` indexes; 05/04 add 5 more spec-mandated indexes, so legacy tables carry 231 secondary indexes total | — |
 | `sm_general_settings.identity` | Phase 7 transform | decided — created as a new TEXT column per 01a §6 even though no legacy column exists; `extras` therefore holds 95 legacy fields, not 94. Phase 7 must read the schema, not the prose | — |
 | `01a O2` school-id-leading composites | Phase 2 | done — 10 composites added in `0005_phase7_o2_indexes.sql`; all present, 9 chosen by the hot plans, and `teacher_remarks` is served by its existing `(student_id, exam_type_id, academic_id)` unique index. `student_ratings`/`teacher_remarks` lead with `academic_id` because those two legacy tables have no `school_id` | — |
@@ -289,9 +289,9 @@ student codes, duplicate resolution and staff/parent coverage to **10G.1**. See
 | Phase 8 photo URL contract | Phase 8 | decided — DB keeps `/uploads/students/<hash>.<ext>`; R2 key is `uploads/students/<file>`; the public route serves it; absolute client URLs are derived from `PUBLIC_MEDIA_BASE`/API base in the DTO. No `student_photo` backfill on storage moves; use the manifest + photo audit for consistency | — |
 | Phase 8 account topology | Phase 8 | decided — reuse the existing Cloudflare account, but create separate `edapex-api`, `edapex` D1 and `edapex-media` R2. The live POC `sms` D1 has a different UUID schema and already contains migrated data; never clear or reuse it. Free quota is account-wide | — |
 | Phase 8 billing | Phase 8 | decided — Workers Free; offline session 1/2/4 archives + minimal live-only D1 load. Expected ~70–95k writes; 95k target/100k hard gate. If the cap is reached, stop at the last completed file and resume after 00:00 UTC the next day; no Paid fallback. The all-tables load+purge (~2.0–2.5M writes) is rejected | — |
-| Phase 8 Gmail | Phase 8 | decided — reuse the POC’s Google OAuth client and Gmail sender; one fresh consent with `gmail.send` produced a new refresh token (HTTP 200). Local `apps/api/.dev.vars` is gitignored; production `GMAIL_*` secrets wait for the first Worker deploy. POC Gmail callback remains on the portal; EdApex auth callback is `https://api.llacademy.ng/api/v1/auth/google/callback` | — |
+| Phase 8 Gmail | Phase 8 | decided — reuse the POC’s Google OAuth client and Gmail sender; one fresh consent with `gmail.send` produced a new refresh token (HTTP 200). Local `services/sms-api/.dev.vars` is gitignored; production `GMAIL_*` secrets wait for the first Worker deploy. POC Gmail callback remains on the portal; EdApex auth callback is `https://api.llacademy.ng/api/v1/auth/google/callback` | — |
 | Phase 8 domain move | Phase 8 | decided — staged: POC gets `sms-api.llacademy.ng`, frontend `VITE_API_URL` updated and `sms-portal` rebuilt; only after verification is `api.llacademy.ng` removed from the POC and attached to EdApex. POC `CLIENT_URL` stays `https://portal.llacademy.ng`; keep old host until the new path is verified | — |
-| Phase 8 local env | Phase 8 | decided — repository-root `.env` is legacy-app configuration and is not read by `apps/api`; local API values live in gitignored `apps/api/.dev.vars`; production values use `wrangler secret put` after the Worker exists | — |
+| Phase 8 local env | Phase 8 | decided — repository-root `.env` is legacy-app configuration and is not read by `apps/api`; local API values live in gitignored `services/sms-api/.dev.vars`; production values use `wrangler secret put` after the Worker exists | — |
 | Phase 8 offline archives | Phase 8 | decided — generate session 1/2/4 archives locally from the final dump, export/upload the objects to R2, and load only `archive_objects` + `session_result_summary`. Historical raw marks/results/ratings/remarks/attendance/timelines stay out of production D1; retrieval reads R2. Do not import history back for normal serving | — |
 
 ## Notes

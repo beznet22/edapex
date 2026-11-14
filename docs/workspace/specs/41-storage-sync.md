@@ -17,12 +17,21 @@ If “everything local-first” includes school records, it contradicts “EdApe
 
 ## Local store
 
+### Encryption
+
+- Native and web use **one scheme**: plain SQLite plus **per-record XChaCha20-Poly1305**.
+- SQLCipher is **not** used. It costs an extra per-ABI native binary, adds a second crypto stack that would diverge from web, and its value over per-record encryption is small when every record already carries a distinct key and nonce.
+- Per-user key material is derived on-device; per-device wrapping keys are registered with the sync service. The server stores ciphertext and metadata only.
+- The **FTS index is derived data and is not encrypted**. Treat it as a local-only cache: it is rebuildable from the encrypted records and must never be synced.
+- Secrets (provider keys, connector credentials) never enter this store; they live in OS Keychain/Keystore or the server secret box.
+
 ### Tauri native (desktop/mobile)
 
-- SQLite (encrypted at rest).
+- SQLite with the per-record encryption above, WAL and migrations.
 - The canonical table set is `42-agent-db-schema.md`; local tables mirror it. Core tables: `threads`, `messages`, `message_parts`, `runs`, `tool_calls`, `approval_requests`, `approval_rules`, `tasks`, `artifacts`, `artifact_versions`, `memory_facts`, `sync_events`, `sync_outbox`, `sync_cursors`. The same local schema also carries the v1 channel, Team Bot, group, delivery, connection/skill, work-item, routine-run, responsibility, artifact rendition/import/comment/sign-off and local-audit tables defined there.
-- FTS for search; optional local vector index for memory.
+- FTS for search (derived, unencrypted, rebuildable); optional local vector index for memory.
 - WAL, migrations, backup/restore.
+- Every local write appends to `sync_outbox` in the **same** transaction.
 
 ### Web PWA
 
@@ -39,7 +48,7 @@ If “everything local-first” includes school records, it contradicts “EdApe
 - Artifact renditions follow `data_class`: `workspace` may be local/synced; `edapex` is Worker/R2 only; `edapex-ephemeral` is memory/download only.
 - `artifact_imports` store parser/warning metadata; the source file keeps its own data class.
 - Comments/mentions/sign-offs are metadata; staff-only mentions in v1, no student PII in free text.
-- Do **not** use AI SDK `UIMessage` rows; the xcodex adapter defines the message-part contract.
+- Do **not** use AI SDK `UIMessage` rows; the thin-core adapter defines the message-part contract (`17-chat-framework.md`).
 - The local SQLite and IndexedDB/OPFS stores implement the same logical schema from `42-agent-db-schema.md`.
 
 ## Sync architecture
@@ -76,13 +85,21 @@ Use CF Workers for cloud sync, but not D1 as a high-frequency CRDT room:
 
 A high-frequency Yjs update stream written row-by-row to D1 would consume the free write budget and add latency. Batch/compact updates and store blobs in R2 or DO storage. `AGENT_DB` is separate from the EdApex school `DB`; the two never share rows, keys or bindings.
 
-### iroh
+### iroh — deferred
 
-- iroh is transport: direct device-to-device sync, relay fallback.
-- It does not provide cloud backup or asynchronous offline mailbox by itself.
-- Cross-device sync when devices are not online together needs an always-on peer or a CF sync service.
-- `iroh-ffi` does not expose iroh-blobs/docs; implement the protocol or wrap it.
-- Use iroh only for encrypted agent state/workspace; never school records or session tokens.
+`AGENT_DB` is the **only** v1 transport. iroh is not used.
+
+Verified against the iroh documentation: iroh is a QUIC + TLS 1.3 networking stack — key-based endpoints, NAT traversal, relay fallback, DNS/DHT lookup, with blob/doc/gossip protocols on top. It is a transport, not a store, and it has **no offline mailbox**: a powered-off peer is simply unreachable, so it cannot provide offline sync.
+
+Three disqualifiers for v1:
+
+1. **The PWA cannot use it.** Browser transport is WebTransport/WebRTC, not UDP. Adopting iroh would create a desktop/mobile-P2P tier that the web surface can never join, contradicting one capability set across three surfaces.
+2. **It costs megabytes** of QUIC/TLS/trust-root code and contradicts the thin core's no-TLS rule. It could only ever live in a native-only `crates/sync`.
+3. **Nothing in v1 needs it.** Live co-editing is the only real use, and that is deferred.
+
+Device pairing uses a **server-issued short code / QR** and a server-issued device registration — required under any design, because device authorization is server-authoritative.
+
+A `Transport` trait ships **unimplemented** so a future transport has a seam. CI **fails if `iroh` appears in any `Cargo.toml`**. Revisit only when live co-editing is greenlit.
 
 ## Separate D1 databases
 
@@ -96,8 +113,18 @@ EdApex school data and agent sync data must not share a D1 database or binding.
 
 - No foreign keys or joins across `DB` and `AGENT_DB`.
 - No school data or session token in `AGENT_DB`.
-- The sync Worker uses `AGENT_DB`, not the EdApex `DB`.
+- The sync Worker is `services/cowork-api`, which binds `AGENT_DB` and `SYNC_MEDIA` and does **not** bind the school `DB`. It verifies identity through a Cloudflare service binding to `services/sms-api`.
 - Separate D1 databases do **not** create separate Free-plan quota; writes still count against the account-wide 100k/day cap. Batch and compact.
+
+## Routines are local-first
+
+Routines run on the **device**, not on a Worker cron.
+
+- The local store holds `routines` and `routine_runs`; the device executes a due routine while it is open.
+- The server holds **state, dedupe keys and cursors only**. No `scheduled` handler is added to the Worker for routine fan-out.
+- With a hundred tenants, a per-routine cron fan-out would exceed the account-wide 100k D1 writes/day cap. One documented incident already reached 148,861 writes in a day.
+- **Accepted trade:** a routine only fires while a device is open. The UI states this; it is not presented as a server guarantee.
+- Morning-brief dedupe is a **server-held key**, so two tabs or two devices still produce exactly one brief per day.
 
 ## How Yjs works with D1
 

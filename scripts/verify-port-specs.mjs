@@ -117,17 +117,17 @@ for (let i = 0; i <= 9; i += 1) {
 if (!roadmap.includes("PROGRESS.md")) failures.push("ROADMAP: progress tracker not referenced");
 if (!readme.includes("PROGRESS.md")) failures.push("README: progress tracker not referenced");
 
-const workspaceAgents = path.resolve(DIR, "..", "..", "apps", "api", "AGENTS.md");
+const workspaceAgents = path.resolve(DIR, "..", "..", "services", "sms-api", "AGENTS.md");
 if (!fs.existsSync(workspaceAgents)) {
-  failures.push("apps/api/AGENTS.md: port workspace instructions missing");
+  failures.push("services/sms-api/AGENTS.md: port workspace instructions missing");
 } else {
   const text = fs.readFileSync(workspaceAgents, "utf8");
-  if (!text.includes("All port code goes here")) failures.push("apps/api/AGENTS.md: workspace scope statement missing");
-  if (!text.includes("PROGRESS.md")) failures.push("apps/api/AGENTS.md: does not require progress updates");
-  if (!text.includes("## Repository layout")) failures.push("apps/api/AGENTS.md: repository layout section missing");
-  if (!text.includes("EdApex API service")) failures.push("apps/api/AGENTS.md: service identity missing");
-  if (!text.includes("workspace package")) failures.push("apps/api/AGENTS.md: workspace placement missing");
-  if (!/no extraction/i.test(text)) failures.push("apps/api/AGENTS.md: no-extraction decision missing");
+  if (!text.includes("All port code goes here")) failures.push("services/sms-api/AGENTS.md: workspace scope statement missing");
+  if (!text.includes("PROGRESS.md")) failures.push("services/sms-api/AGENTS.md: does not require progress updates");
+  if (!text.includes("## Repository layout")) failures.push("services/sms-api/AGENTS.md: repository layout section missing");
+  if (!text.includes("EdApex API service")) failures.push("services/sms-api/AGENTS.md: service identity missing");
+  if (!text.includes("workspace package")) failures.push("services/sms-api/AGENTS.md: workspace placement missing");
+  if (!/no extraction/i.test(text)) failures.push("services/sms-api/AGENTS.md: no-extraction decision missing");
 }
 
 const layoutText = [
@@ -141,15 +141,15 @@ for (const forbidden of ["Future extraction", "Repo extraction", "standalone dep
   }
 }
 
-const workspaceReadme = path.resolve(DIR, "..", "..", "apps", "api", "README.md");
+const workspaceReadme = path.resolve(DIR, "..", "..", "services", "sms-api", "README.md");
 if (!fs.existsSync(workspaceReadme)) {
-  failures.push("apps/api/README.md: workspace readme missing");
+  failures.push("services/sms-api/README.md: workspace readme missing");
 } else {
   const text = fs.readFileSync(workspaceReadme, "utf8");
   for (const section of ["## Quickstart", "## Layout", "## Before opening a PR"]) {
-    if (!text.includes(section)) failures.push(`apps/api/README.md: missing \`${section}\``);
+    if (!text.includes(section)) failures.push(`services/sms-api/README.md: missing \`${section}\``);
   }
-  if (!text.includes("PROGRESS.md")) failures.push("apps/api/README.md: does not reference the progress tracker");
+  if (!text.includes("PROGRESS.md")) failures.push("services/sms-api/README.md: does not reference the progress tracker");
 }
 
 const expect = [

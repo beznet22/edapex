@@ -141,6 +141,36 @@ impl DynamicToolName {
             _ => None,
         }
     }
+
+    /// Every dynamic tool is a network or device read in v1. This is the single
+    /// place the risk is declared, so adding a write-capable tool cannot inherit
+    /// a read risk by omission.
+    pub fn risk(self) -> CapabilityRisk {
+        match self {
+            Self::WebSearch | Self::WebFetch | Self::OcrExtract => CapabilityRisk::Read,
+        }
+    }
+
+    /// The decisions the server offers for this tool.
+    ///
+    /// Destructive and write tools do not offer session approval until policy
+    /// allows it, so `AllowForSession` must not be handed out unconditionally.
+    pub fn approval_decisions(self) -> Vec<ApprovalDecision> {
+        match self.risk() {
+            CapabilityRisk::Read => vec![
+                ApprovalDecision::AllowOnce,
+                ApprovalDecision::AllowForSession,
+                ApprovalDecision::Deny,
+                ApprovalDecision::Abort,
+            ],
+            CapabilityRisk::Write => vec![
+                ApprovalDecision::AllowOnce,
+                ApprovalDecision::Deny,
+                ApprovalDecision::Abort,
+            ],
+            CapabilityRisk::Destructive => vec![ApprovalDecision::Deny, ApprovalDecision::Abort],
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

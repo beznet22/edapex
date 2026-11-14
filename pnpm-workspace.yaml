@@ -1,5 +1,7 @@
 packages:
-  - apps/api
   - apps/web
   - apps/desktop
+  - services/sms-api
+  - services/cowork-api
+  - services/model-router
   - packages/*

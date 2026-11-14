@@ -78,6 +78,12 @@ pub enum AgUiEvent {
 pub struct AgUiBridge {
     open_text: HashSet<String>,
     open_tools: HashSet<String>,
+    /// Tool summaries carried separately in the AG-UI stream.
+    ///
+    /// AG-UI's `ToolCallStart` has no summary field, so `from_agent_event`
+    /// emits a `edapex.tool_summary` custom event next to it. Remembering the
+    /// summary here lets `from_agui_event` restore it instead of dropping it.
+    pending_summaries: std::collections::HashMap<String, String>,
 }
 
 impl AgUiBridge {
@@ -113,16 +119,22 @@ impl AgUiBridge {
                 ..
             } => {
                 self.open_tools.insert(tool_call_id.clone());
-                let mut events = vec![AgUiEvent::ToolCallStart {
-                    tool_call_id: tool_call_id.clone(),
-                    tool_call_name: name.clone(),
-                }];
+                // The summary must precede the start event: AG-UI has no summary
+                // field on `ToolCallStart`, so a consumer reconstructing the
+                // internal union needs the custom event first.
+                let mut events = Vec::new();
                 if !summary.is_empty() {
+                    self.pending_summaries
+                        .insert(tool_call_id.clone(), summary.clone());
                     events.push(AgUiEvent::Custom {
                         name: "edapex.tool_summary".to_string(),
                         value: json!({ "toolCallId": tool_call_id, "summary": summary }),
                     });
                 }
+                events.push(AgUiEvent::ToolCallStart {
+                    tool_call_id: tool_call_id.clone(),
+                    tool_call_name: name.clone(),
+                });
                 events
             }
             AgentEvent::ToolCompleted {
@@ -241,13 +253,19 @@ impl AgUiBridge {
             AgUiEvent::ToolCallStart {
                 tool_call_id,
                 tool_call_name,
-            } => vec![AgentEvent::ToolStarted {
-                thread_id: thread_id.to_string(),
-                turn_id: turn_id.to_string(),
-                tool_call_id: tool_call_id.clone(),
-                name: tool_call_name.clone(),
-                summary: String::new(),
-            }],
+            } => {
+                let summary = self
+                    .pending_summaries
+                    .remove(tool_call_id)
+                    .unwrap_or_default();
+                vec![AgentEvent::ToolStarted {
+                    thread_id: thread_id.to_string(),
+                    turn_id: turn_id.to_string(),
+                    tool_call_id: tool_call_id.clone(),
+                    name: tool_call_name.clone(),
+                    summary,
+                }]
+            }
             AgUiEvent::RunFinished { .. } => vec![AgentEvent::TurnCompleted {
                 thread_id: thread_id.to_string(),
                 turn_id: turn_id.to_string(),
@@ -290,6 +308,15 @@ impl AgUiBridge {
         turn_id: &str,
     ) -> Vec<AgentEvent> {
         match name {
+            // Carried alongside `ToolCallStart`; consumed by the arm above.
+            "edapex.tool_summary" => {
+                let tool_call_id = string_field(value, "toolCallId");
+                let summary = string_field(value, "summary");
+                if !tool_call_id.is_empty() {
+                    self.pending_summaries.insert(tool_call_id, summary);
+                }
+                Vec::new()
+            }
             "edapex.tool_result" => {
                 let tool_call_id = value
                     .get("toolCallId")
@@ -327,19 +354,14 @@ impl AgUiBridge {
                 approval_request_id: string_field(value, "approvalRequestId"),
                 title: string_field(value, "title"),
                 description: string_field(value, "description"),
-                risk: CapabilityRisk::Read,
-                decisions: vec![
-                    ApprovalDecision::AllowOnce,
-                    ApprovalDecision::AllowForSession,
-                    ApprovalDecision::Deny,
-                    ApprovalDecision::Abort,
-                ],
+                risk: risk_from_value(value.get("risk")),
+                decisions: decisions_from_value(value.get("decisions")),
             }],
             "edapex.approval_resolved" => vec![AgentEvent::ApprovalResolved {
                 thread_id: thread_id.to_string(),
                 turn_id: turn_id.to_string(),
                 approval_request_id: string_field(value, "approvalRequestId"),
-                decision: ApprovalDecision::AllowOnce,
+                decision: decision_from_value(value.get("decision")),
             }],
             "edapex.interrupted" => vec![AgentEvent::Interrupted {
                 thread_id: thread_id.to_string(),
@@ -372,6 +394,63 @@ fn string_field(value: &Value, key: &str) -> String {
         .and_then(Value::as_str)
         .unwrap_or_default()
         .to_string()
+}
+
+/// Read a risk from a JSON field, defaulting to the strictest interpretation.
+///
+/// An unrecognised risk must never fall back to `Read`: that would silently
+/// downgrade a write or destructive action.
+fn risk_from_value(value: Option<&Value>) -> CapabilityRisk {
+    match value.and_then(Value::as_str) {
+        Some("read") => CapabilityRisk::Read,
+        Some("write") => CapabilityRisk::Write,
+        Some("destructive") => CapabilityRisk::Destructive,
+        _ => CapabilityRisk::Destructive,
+    }
+}
+
+/// Read the offered decisions. An absent or empty list falls back to the
+/// read-risk set, never to an auto-approval.
+fn decisions_from_value(value: Option<&Value>) -> Vec<ApprovalDecision> {
+    let Some(items) = value.and_then(Value::as_array) else {
+        return read_decisions();
+    };
+    let decisions: Vec<ApprovalDecision> = items
+        .iter()
+        .filter_map(|item| match item.as_str() {
+            Some("allow_once") => Some(ApprovalDecision::AllowOnce),
+            Some("allow_for_session") => Some(ApprovalDecision::AllowForSession),
+            Some("deny") => Some(ApprovalDecision::Deny),
+            Some("abort") => Some(ApprovalDecision::Abort),
+            _ => None,
+        })
+        .collect();
+    if decisions.is_empty() {
+        read_decisions()
+    } else {
+        decisions
+    }
+}
+
+fn read_decisions() -> Vec<ApprovalDecision> {
+    vec![
+        ApprovalDecision::AllowOnce,
+        ApprovalDecision::AllowForSession,
+        ApprovalDecision::Deny,
+        ApprovalDecision::Abort,
+    ]
+}
+
+/// Read a resolved decision, defaulting to `Deny`.
+///
+/// Never default to an allow: an unparseable decision must fail closed.
+fn decision_from_value(value: Option<&Value>) -> ApprovalDecision {
+    match value.and_then(Value::as_str) {
+        Some("allow_once") => ApprovalDecision::AllowOnce,
+        Some("allow_for_session") => ApprovalDecision::AllowForSession,
+        Some("abort") => ApprovalDecision::Abort,
+        _ => ApprovalDecision::Deny,
+    }
 }
 
 fn code_from_str(value: Option<&str>) -> AgentErrorCode {
@@ -472,5 +551,83 @@ mod tests {
                 delta: "hello".to_string()
             }]
         );
+    }
+
+    #[test]
+    fn round_trips_approval_risk_and_decisions() {
+        let mut outbound = AgUiBridge::default();
+        let original = AgentEvent::ApprovalRequested {
+            thread_id: "t".to_string(),
+            turn_id: "r".to_string(),
+            approval_request_id: "a1".to_string(),
+            title: "Run web_fetch".to_string(),
+            description: "Allow web_fetch?".to_string(),
+            risk: CapabilityRisk::Write,
+            decisions: vec![ApprovalDecision::AllowOnce, ApprovalDecision::Deny],
+        };
+
+        let agui = outbound.from_agent_event(&original);
+        let request = agui
+            .iter()
+            .find(|event| matches!(event, AgUiEvent::Custom { name, .. } if name == "edapex.approval_requested"))
+            .expect("approval request must be emitted");
+
+        let mut inbound = AgUiBridge::default();
+        let restored = inbound.from_agui_event(request, "t", "r");
+        assert_eq!(restored, vec![original], "risk and decisions must survive the round trip");
+    }
+
+    #[test]
+    fn round_trips_approval_decision() {
+        for decision in [
+            ApprovalDecision::AllowOnce,
+            ApprovalDecision::AllowForSession,
+            ApprovalDecision::Deny,
+            ApprovalDecision::Abort,
+        ] {
+            let mut outbound = AgUiBridge::default();
+            let original = AgentEvent::ApprovalResolved {
+                thread_id: "t".to_string(),
+                turn_id: "r".to_string(),
+                approval_request_id: "a1".to_string(),
+                decision,
+            };
+            let agui = outbound.from_agent_event(&original);
+            let mut inbound = AgUiBridge::default();
+            let restored = inbound.from_agui_event(&agui[0], "t", "r");
+            assert_eq!(restored, vec![original], "decision {decision:?} must survive");
+        }
+    }
+
+    #[test]
+    fn round_trips_tool_summary() {
+        let mut outbound = AgUiBridge::default();
+        let original = AgentEvent::ToolStarted {
+            thread_id: "t".to_string(),
+            turn_id: "r".to_string(),
+            tool_call_id: "c1".to_string(),
+            name: "web_search".to_string(),
+            summary: "{\"query\":\"rust\"}".to_string(),
+        };
+
+        let agui = outbound.from_agent_event(&original);
+        let mut inbound = AgUiBridge::default();
+        for event in &agui {
+            let restored = inbound.from_agui_event(event, "t", "r");
+            if restored.is_empty() {
+                continue;
+            }
+            assert_eq!(restored, vec![original], "summary must survive the round trip");
+            return;
+        }
+        panic!("no tool start event produced");
+    }
+
+    #[test]
+    fn unparseable_risk_and_decision_fail_closed() {
+        assert_eq!(risk_from_value(None), CapabilityRisk::Destructive);
+        assert_eq!(risk_from_value(Some(&json!("nonsense"))), CapabilityRisk::Destructive);
+        assert_eq!(decision_from_value(None), ApprovalDecision::Deny);
+        assert_eq!(decision_from_value(Some(&json!("nonsense"))), ApprovalDecision::Deny);
     }
 }

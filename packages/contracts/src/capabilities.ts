@@ -33,6 +33,44 @@ export interface CapabilityLimits {
   readonly maxOperationsPerTool: 8;
 }
 
+/**
+ * A tenant-level on/off switch for a capability area.
+ *
+ * Filtering happens before the 5-tool cap, so a disabled area can never consume
+ * a tool slot.
+ */
+export interface TenantFeature {
+  readonly id: string;
+  readonly enabled: boolean;
+}
+
+/**
+ * The operations one agent may call, always a subset of its creator's ceiling.
+ *
+ * An agent narrows; it never extends the catalogue. Enforced server-side at
+ * creation and again at every turn.
+ */
+export interface AgentGrant {
+  readonly agentId: string;
+  readonly operationIds: readonly string[];
+}
+
+/**
+ * The subset of features that are explicitly disabled.
+ *
+ * Unlisted features are **enabled**: a tenant masks off what it does not use, and
+ * a partial mask must not silently disable everything else.
+ */
+export function disabledFeatureIds(
+  features: readonly TenantFeature[]
+): ReadonlySet<string> {
+  const disabled = new Set<string>();
+  for (const feature of features) {
+    if (!feature.enabled) disabled.add(feature.id);
+  }
+  return disabled;
+}
+
 export interface CapabilityManifest {
   readonly version: "1";
   readonly role: CapabilityRole;
@@ -399,10 +437,22 @@ function visibleTool(tool: CapabilityTool, role: CapabilityRole): CapabilityTool
   });
 }
 
-export function buildCapabilityManifest(role: CapabilityRole): CapabilityManifest {
+/**
+ * Build the effective manifest for a role in a tenant.
+ *
+ * `features` is the tenant feature mask. Filtering by feature happens **before**
+ * the 5-tool cap, so disabling an area frees its slot rather than consuming it.
+ * Omitting `features` means "no tenant filtering" — the shipped default.
+ */
+export function buildCapabilityManifest(
+  role: CapabilityRole,
+  features: readonly TenantFeature[] = []
+): CapabilityManifest {
+  const disabled = disabledFeatureIds(features);
   const toolIds = ROLE_TOOL_IDS[role];
   const tools: CapabilityTool[] = [];
   for (const id of toolIds) {
+    if (disabled.has(id)) continue;
     const visible = visibleTool(toolById(id), role);
     if (visible !== null) tools.push(visible);
   }
@@ -416,6 +466,42 @@ export function buildCapabilityManifest(role: CapabilityRole): CapabilityManifes
     packs: Object.freeze([{ id: `${role}_pack`, role, tools: Object.freeze(tools) }]),
     limits: CAPABILITY_LIMITS
   });
+}
+
+/** Every operation id a role may call in this tenant. Used to bound agent grants. */
+export function allowedOperationIds(
+  role: CapabilityRole,
+  features: readonly TenantFeature[] = []
+): ReadonlySet<string> {
+  const manifest = buildCapabilityManifest(role, features);
+  const ids = new Set<string>();
+  for (const pack of manifest.packs) {
+    for (const tool of pack.tools) {
+      for (const operation of tool.operations) ids.add(operation.id);
+    }
+  }
+  return ids;
+}
+
+/**
+ * Validate an agent's grants against its creator's ceiling.
+ *
+ * Returns the offending operation ids, or an empty list when the grant set is a
+ * legitimate subset. An agent with an empty grant list is valid.
+ */
+export function validateAgentGrant(
+  grant: AgentGrant,
+  role: CapabilityRole,
+  features: readonly TenantFeature[] = []
+): readonly string[] {
+  const allowed = allowedOperationIds(role, features);
+  const violations: string[] = [];
+  for (const operationId of grant.operationIds) {
+    if (!allowed.has(operationId)) {
+      violations.push(`${grant.agentId} may not call ${operationId} as ${role}`);
+    }
+  }
+  return Object.freeze(violations);
 }
 
 export function validateCapabilityPacks(

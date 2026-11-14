@@ -92,12 +92,30 @@ Do not perform a broad mechanical rewrite before the UI/data/runtime boundaries 
 
 | Surface | Shell | Cowork content | Platform-specific behavior |
 |---|---|---|---|
-| Web PWA | Browser | Centered app column, max 430px | Installable where supported; browser-safe file access; CSS safe areas |
-| Tauri desktop | Tauri 2 window | Centered app column, max 430px | Resizable; keyboard/mouse; desktop file dialogs; wider admin PageShells |
-| Tauri mobile | Tauri 2 mobile | Full viewport | System WebView; safe-area and keyboard handling; touch and native pickers |
+| Web PWA | Browser | Adaptive: tab bar below 1024px, inset rail + canvas at or above | Installable where supported; browser-safe file access; CSS safe areas |
+| Tauri desktop | Tauri 2 window | Adaptive: rail + canvas; transcript measured, not device-detected | Resizable; keyboard/mouse; desktop file dialogs; wider admin PageShells |
+| Tauri mobile | Tauri 2 mobile | Full viewport; measured transcript | System WebView; safe-area and keyboard handling; touch and native pickers |
 | v2 native | RN/Lynx/Flutter, TBD | Native navigation and components | Native equivalents with shared state, policy, and accessibility contracts |
 
-The compact cowork layout is 430px. The desktop shell uses a left rail and a centered canvas with a 760px transcript/composer maximum, so the chat does not stretch across a wide window. Admin/settings data grids may use wider shells, with defined maximums such as 768px or 960px.
+### Adaptation vs. measure
+
+Three separate concerns; do not conflate them.
+
+1. **The shell adapts to the device.** Below 1024px the primary navigation is a tab bar. At or above 1024px it is an inset sidebar that collapses to icons, plus a canvas. Admin and settings PageShells may widen to 768px or 960px.
+2. **The chat column is capped for readability.** 430px on a phone; up to 760px on a desktop canvas. This is a **typographic measure, not a media query** — long lines are harder to read, and a 1920px-wide transcript is worse, not more modern.
+3. **Dashboard surfaces are wide.** Tasks, Make, Settings and Admin render as bento grids inside their PageShell and are not constrained by the chat measure.
+
+The cap in item 2 never constrains item 3, and it never disables adaptation in item 1. A wide viewport does **not** keep the phone-width app composition; it keeps a readable chat column inside a desktop shell.
+
+### PWA definition
+
+> A PWA here is **one highly responsive, mobile-first web application that runs in-browser and adapts to the user's device — phone, tablet or desktop — and is installable with an offline app shell.**
+
+- Mobile-first describes authoring order, not a mobile-only product.
+- Test band: **320, 375, 430, 768, 1024, 1280, 1920**.
+- Installability is a property (manifest, maskable icons, standalone display, start URL, screenshots), not the definition.
+- The service worker caches **static assets, icons and the offline shell only** — never API responses, transcripts, school data or session tokens.
+- Safe-area insets, keyboard/viewport resize handling, 44px touch targets, focus restoration and reduced-motion support are required at every size.
 
 ### Artifact editing exception
 
@@ -105,6 +123,7 @@ The compact cowork layout is 430px. The desktop shell uses a left rail and a cen
 - Web PWA and Tauri mobile editing use a full-screen sheet within the app column.
 - Fixed reports/pages use a viewer or panel, not the document editor.
 - If the desktop window is narrower than the split-view minimums, use a full-screen artifact panel rather than forcing unusable columns.
+- Panes are separated by **elevation, not border lines**. A hard divider between chat and artifact is not the target treatment.
 
 ## 15.5 Shell, navigation, and screen scope
 
@@ -411,9 +430,9 @@ Downloads by type: document MD/DOCX/PDF; report PDF/DOCX; data CSV/PDF; page PDF
 
 ## 15.14 Responsive behavior and accessibility
 
-- Test viewport widths from 320px to 430px and representative wide-desktop sizes.
-- Main cowork content remains within the narrow column; admin tables use explicit wider shells.
-- Touch targets are at least 44px.
+- Test the bands **320, 375, 430, 768, 1024, 1280 and 1920px**.
+- The **shell adapts** across those bands; the **chat column stays measured**; dashboards are wide (see §15.4 "Adaptation vs. measure").
+- Touch targets are at least 44px at every size.
 - Support keyboard navigation, visible focus, logical focus order, and focus restoration after dialogs/sheets close.
 - Use screen-reader live regions for meaningful step/status changes. Avoid per-token announcements.
 - Respect reduced-motion preferences. Do not auto-scroll on every token.
@@ -422,7 +441,8 @@ Downloads by type: document MD/DOCX/PDF; report PDF/DOCX; data CSV/PDF; page PDF
 - Handle mobile keyboard resize/viewport changes without covering the composer or approval controls.
 - Ensure dialogs, sheets, disclosures, and split-view controls work with keyboard, touch, and assistive technology.
 - Provide accessible names and status text for icon-only buttons and activity indicators.
-- Do not communicate success, error, blocked, or approval-required states by color alone.
+- Never communicate success, error, blocked or approval-required states by colour alone.
+- Theme selection is user-controlled (`system`, light, dark, accent presets) and persists across reload without a flash of the wrong theme.
 
 ## 15.15 State, storage, and privacy
 
@@ -430,7 +450,7 @@ Downloads by type: document MD/DOCX/PDF; report PDF/DOCX; data CSV/PDF; page PDF
 - Do not persist authoritative school records, durable API-response caches, or session tokens in browser/P2P storage.
 - Session-derived content (transcripts, tool results, artifacts) persists only under `60-security-privacy.md` retention rules.
 - Local agent workspace/session state is allowed only where policy permits and must follow data-class rules.
-- Sync through iroh or another P2P mechanism only if the relevant policy explicitly allows the data class and retention behavior.
+- Sync through a server-mediated sync service only if the relevant policy explicitly allows the data class and retention behavior. Device sync v1 uses `AGENT_DB`; iroh is deferred (`41-storage-sync.md`).
 - Web authentication uses secure cookie/session mechanisms. Mobile native authentication uses Keychain/Keystore where applicable.
 - No provider secret or privileged tool credential ships in the browser bundle or local WASM package.
 - Every native bridge capability is allowlisted, platform-scoped, and validated; web cannot invoke Tauri APIs.
@@ -489,9 +509,12 @@ Do not scrape rendered GitHub pages as audit evidence. Do not claim visual parit
 - The starter-derived web UI builds and deploys to Cloudflare Workers using a pinned, tested vinext release or a documented alternative.
 - CI runs compatibility checks, production builds, deployment smoke tests, and critical-route tests.
 - The app works without Vercel AI SDK hooks or message/stream protocols as its UI interaction contract.
-- The UI uses EdApex Gold on Slate tokens and keeps cowork chat narrow on desktop.
-- Chat, Tasks, composer, approvals, and activity are usable at 320–430px.
+- The UI uses EdApex Gold on Slate tokens; the shell adapts at 320–1920px while the chat column stays measured.
+- Chat, Tasks, composer, approvals, and activity are usable at 320–430px **and** at desktop widths without retaining a phone-width composition.
+- Dashboard surfaces (Tasks, Make, Settings, Admin) use wide bento grids inside their PageShell.
 - Desktop tables use wider PageShells without stretching the cowork transcript.
+- Theme selection survives reload with no flash of the wrong theme; `system`, light, dark and accent presets all render.
+- Borders are not used as the primary surface separator; elevation and concentric radii carry the hierarchy.
 - History restoration does not duplicate or replay messages; following and queued turns are visibly distinct.
 - Queue limits, removal, draining order, and failure restoration match this contract.
 - Approvals remain consistent across inline, inbox, and task surfaces; no approval is hidden or auto-applied.

@@ -1,6 +1,6 @@
 # 48 — Local Capability Layer
 
-**Status:** Approved 2026-11-11. This spec is normative for the capability layer. Contracts, fixtures, RustO OCR, desktop PKCE/API transport, local OCR ingestion, Tauri capture/OCR and WebSearch/WebFetch are implemented. Native xcodex is blocked on the pinned xcodex dependency graph (Rust 1.96 dependency skew); the first-party mobile camera plugin is not yet landed. Neither gap is replaced with a fake implementation.
+**Status:** Approved 2026-11-11, amended for the thin core. This spec is normative for the capability layer. Contracts, fixtures, RustO OCR, desktop PKCE/API transport, local OCR ingestion, Tauri capture/OCR and WebSearch/WebFetch are implemented. The agent runtime is `crates/agent` (xcodex is retired; see `17-chat-framework.md`); `crates/agent-wasm` provides the browser surface. The first-party mobile camera plugin is not yet landed. That gap is not replaced with a fake implementation.
 
 ## Purpose
 
@@ -44,8 +44,8 @@ The role manifest remains capped at **5 tools and 8 operations per tool**. Platf
 
 | Capability | Web PWA | Tauri desktop | Tauri mobile |
 |---|---|---|---|
-| Browser xcodex WASM | yes | no | fallback only |
-| Native xcodex host | no | yes | yes, if the mobile build passes |
+| Browser thin core (WASM) | yes | no | no |
+| Native thin core | no | yes | yes, if the mobile build passes |
 | RustO local OCR | no | yes | yes |
 | Mistral OCR fallback | yes, explicit consent | yes, explicit consent | yes, explicit consent |
 | Desktop screenshot capture | no | yes | no |
@@ -107,16 +107,18 @@ The native host streams a discriminated union over `tauri::ipc::Channel<AgentEve
 
 Approval decisions are explicit and never automatic:
 
-| Contract | xcodex app-server | UI |
+| Contract | Decision | UI |
 |---|---|---|
-| `allow_once` | `accept` | Allow once |
-| `allow_for_session` | `acceptForSession` | Allow for session |
-| `deny` | `decline` | Deny |
-| `abort` | `cancel` | Stop turn |
+| `allow_once` | accepted once | Allow once |
+| `allow_for_session` | accepted for this session | Allow for session |
+| `deny` | declined; the turn continues if other actions remain | Deny |
+| `abort` | declined and the turn stops | Stop turn |
+
+Decisions are policy-driven per tool: a tool's `CapabilityRisk` determines which decisions the server offers. The UI never adds a decision the server did not offer, and never auto-approves.
 
 ### Dynamic tools
 
-Native xcodex registers EdApex tools through `thread/start.dynamicTools`; the host answers app-server `DynamicToolCall` requests in process. No EdApex MCP child process is needed.
+The thin core registers EdApex tools as closed dynamic tools; the host answers each call in process. No EdApex MCP child process is needed.
 
 | Tool | Input | Execution |
 |---|---|---|
@@ -134,16 +136,18 @@ Rules:
 - no provider key or EdApex bearer token enters the WebView;
 - a tool call that would require an unavailable host returns `unsupported_capability`.
 
-## Native xcodex host
+## Native thin-core host
 
 - `crates/agent` owns the `AgentHost` and the typed protocol mapping.
-- `codex-app-server::in_process` runs on a Tokio thread inside Tauri.
-- Tauri commands: `agent_connect`, `agent_thread_start`, `agent_turn_start`, `agent_turn_interrupt`, `agent_approval_response`, `agent_set_openrouter_key`, `agent_close`.
+- The core runs natively inside Tauri. There is no sidecar, no `codex-app-server`, and no server-side agent runtime.
+- Tauri commands: `agent_connect`, `agent_thread_start`, `agent_turn_start`, `agent_turn_interrupt`, `agent_approval_response`, `agent_close`.
 - Streaming uses `tauri::ipc::Channel<AgentEvent>`; SSE is a debug/portability option only.
-- The OpenRouter key is written to the OS keychain/Keystore and is never returned to JavaScript.
+- A turn that starts must survive a WebView reload: events are also published through a replayable `EventHub` with a bounded ring, and `agent_attach(since_seq, channel)` re-attaches a client mid-turn.
+- `agent_turn_start` returns as soon as the turn is accepted. It does not await turn completion.
+- **No client stores a model provider key.** Provider credentials live in Cloudflare AI Gateway (BYOK) and are used only by `services/model-router`; the OS keychain/Keystore holds the EdApex session token and nothing else. The native provider transport injects the session bearer and targets `model-router`, never a provider directly.
 - The WebView calls `api_request`; Rust adds the bearer token. The token is not stored in `localStorage`, cookies or IndexedDB.
 - Desktop uses the full tool profile. Mobile uses the mobile-safe profile: no shell, PTY, child process, process-based git or unrestricted filesystem.
-- If the mobile app-server build cannot be made safe, mobile uses the existing WASM xcodex and reports `nativeAgent: false`; it does not remove tools from a native host and pretend they exist.
+- A host that cannot run a tool reports `nativeAgent: false` for that profile; it does not remove tools from a native host and pretend they exist.
 
 ## OCR and capture
 
@@ -260,7 +264,7 @@ Before adding a capability:
 ## Contract tests
 
 - `apps/web/tests/capability-contracts.test.ts`
-- `apps/api/tests/services/capabilities.test.ts`
+- `services/sms-api/tests/services/capabilities.test.ts`
 - `crates/agent/tests/protocol.rs`
 - `crates/agent/tests/events.rs`
 - `crates/ocr/tests/models.rs`
@@ -271,8 +275,8 @@ Commands:
 ```bash
 pnpm --dir apps/web check
 pnpm --dir apps/web test
-pnpm --dir apps/api run typecheck
-pnpm --dir apps/api test
+pnpm --dir services/sms-api run typecheck
+pnpm --dir services/sms-api test
 cargo test -p edapex-agent -p edapex-ocr
 ```
 
@@ -281,10 +285,12 @@ cargo test -p edapex-agent -p edapex-ocr
 - **Official Tauri camera plugin:** unmerged draft since 2023; no release.
 - **crates.io `tauri-plugin-camera`:** Android-only community plugin.
 - **`nanderstabel/tauri-plugin-camera`:** 9-star, 2-commit mirror of the draft.
-- **EdApex MCP server for web/OCR tools:** extra child process, mobile-hostile; app-server dynamic tools are in-process.
+- **EdApex MCP server for web/OCR tools:** extra child process, mobile-hostile; core dynamic tools are in-process.
 - **SSE as the production native transport:** Tauri Channel is typed and local.
-- **Desktop sidecar:** unnecessary if `in_process` builds.
-- **Cloud xcodex:** Workers Free cannot host app-server; no paid fallback.
+- **Desktop sidecar:** unnecessary; the core runs in process.
+- **Server-side agent runtime:** Workers Free cannot host it; no paid fallback.
+- **xcodex** (previous runtime): retired — pinned dependency graph did not resolve, 7.4 MB browser WASM, and it duplicated approval/allowlisting the core now owns.
+- **iroh:** deferred — QUIC+TLS stack, no offline mailbox, unusable from a browser (`41-storage-sync.md`).
 - **Browser control on PWA/mobile:** no tab-control API and no extension model.
 - **RustXNG/Websurfx as v1 search:** AGPL frontends, not independent indexes, and require infrastructure.
 - **ocrs/Indra:** measured or platform mismatch; RustO selected.
@@ -293,7 +299,7 @@ cargo test -p edapex-agent -p edapex-ocr
 
 - The four contracts parse their shared fixtures.
 - Host and server capabilities are separate and cannot mint role authority.
-- Native xcodex streams typed events and executes the three dynamic tools in process.
+- The native host streams typed events, survives a WebView reload mid-turn, and executes the three dynamic tools in process.
 - Local OCR is default; cloud upload is explicit and text-only for local OCR.
 - Mobile camera is a real native preview, not a file-input stub.
 - PWA/mobile have no browser control.

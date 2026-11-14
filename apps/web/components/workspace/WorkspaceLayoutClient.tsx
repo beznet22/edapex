@@ -233,11 +233,12 @@ export function WorkspaceLayoutClient({ children }: { readonly children: ReactNo
         <RuntimeSetup
           connecting={runtime.connecting}
           error={runtime.connectError}
-          onConnect={runtime.connectOpenRouter}
+          onConnect={runtime.connectAgent}
           onDismiss={() => {
             setSetupDismissed(true);
             runtime.restoreComplete();
           }}
+          workspaceId={String(session?.user.id ?? "workspace")}
         />
       ) : null}
     </WorkspaceProvider>

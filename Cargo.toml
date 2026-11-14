@@ -3,6 +3,7 @@ resolver = "2"
 members = [
   "crates/core",
   "crates/agent",
+  "crates/agent-wasm",
   "crates/ocr",
   "crates/ocr-bench",
   "apps/desktop/src-tauri"
@@ -24,3 +25,15 @@ opt-level = "z"
 codegen-units = 1
 panic = "abort"
 strip = "symbols"
+
+# The application build. `agent-release` above is the size-gate profile for the
+# core alone; without this table a plain `cargo build --release` for the desktop
+# app got no LTO, no stripping and no codegen-unit tuning.
+[profile.release]
+lto = "thin"
+codegen-units = 1
+# Not stripped: `strip = true` removes the `target_features` custom section, and
+# wasm-bindgen then cannot detect which Wasm features the artifact uses. Size for
+# the web bundle is reduced with `wasm-opt`, not by stripping the metadata.
+strip = "none"
+

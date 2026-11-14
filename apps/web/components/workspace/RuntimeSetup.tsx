@@ -2,47 +2,59 @@
 
 import { useState } from "react";
 import type { FormEvent } from "react";
-import { KeyRound, LoaderCircle, X } from "lucide-react";
+import { LoaderCircle, Sparkles, X } from "lucide-react";
 
-import type { OpenRouterSettings } from "@/lib/xcodex-browser";
+import type { NativeAgentSettings } from "@/lib/native-agent";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
 interface RuntimeSetupProps {
+  readonly workspaceId: string;
   readonly connecting: boolean;
   readonly error: string;
-  readonly onConnect: (settings: OpenRouterSettings) => Promise<void>;
+  readonly onConnect: (settings: NativeAgentSettings) => Promise<void>;
   readonly onDismiss: () => void;
 }
 
+/**
+ * Model selection for the workspace.
+ *
+ * This deliberately collects no credential. The provider key lives on the server
+ * and is attached by the `/api/v1/agent/chat` proxy, so a compromised browser
+ * bundle or a shared device never exposes it.
+ */
 export function RuntimeSetup({
+  workspaceId,
   connecting,
   error,
   onConnect,
   onDismiss
 }: RuntimeSetupProps) {
-  const [apiKey, setApiKey] = useState("");
-  const [model, setModel] = useState("");
+  const [model, setModel] = useState("openrouter/auto");
 
   const submit = (event: FormEvent<HTMLFormElement>): void => {
     event.preventDefault();
-    if (connecting || apiKey.trim().length === 0 || model.trim().length === 0) return;
-    void onConnect({ apiKey: apiKey.trim(), model: model.trim() }).catch(() => undefined);
+    if (connecting || model.trim().length === 0) return;
+    void onConnect({
+      workspaceId,
+      model: model.trim(),
+      mobileSafeTools: true
+    }).catch(() => undefined);
   };
 
   return (
     <div
-      aria-label="Connect xcodex"
+      aria-label="Choose a model"
       aria-modal="true"
-      className="fixed inset-0 z-[70] flex items-center justify-center bg-background/80 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-[70] flex items-center justify-center bg-background/70 p-4 backdrop-blur-md"
       role="dialog"
     >
       <form
-        className="relative w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-2xl"
+        className="animate-spring-in relative w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-3xl"
         onSubmit={submit}
       >
         <button
-          aria-label="Close runtime setup"
+          aria-label="Close model setup"
           className="absolute right-2 top-2 flex size-11 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground"
           onClick={onDismiss}
           type="button"
@@ -50,31 +62,20 @@ export function RuntimeSetup({
           <X aria-hidden="true" className="size-4" />
         </button>
         <span className="flex size-11 items-center justify-center rounded-xl bg-primary/15 text-primary">
-          <KeyRound aria-hidden="true" className="size-5" />
+          <Sparkles aria-hidden="true" className="size-5" />
         </span>
-        <h2 className="mt-4 text-xl font-semibold tracking-tight">Connect xcodex</h2>
+        <h2 className="mt-4 text-xl font-semibold tracking-tight">Start your workspace</h2>
         <p className="mt-2 text-sm leading-6 text-muted-foreground">
-          Use your own OpenRouter key. It stays in this tab&apos;s memory only and is not
-          written to storage, cookies or the service worker.
+          EdApex runs the agent locally in this browser and streams from the school
+          gateway. No API key is stored on this device.
         </p>
         <label className="mt-5 grid gap-1.5 text-xs font-semibold text-muted-foreground">
-          OpenRouter API key
-          <Input
-            autoComplete="off"
-            disabled={connecting}
-            onChange={(event) => setApiKey(event.target.value)}
-            placeholder="sk-or-v1-…"
-            type="password"
-            value={apiKey}
-          />
-        </label>
-        <label className="mt-3 grid gap-1.5 text-xs font-semibold text-muted-foreground">
-          OpenRouter model
+          Model
           <Input
             autoComplete="off"
             disabled={connecting}
             onChange={(event) => setModel(event.target.value)}
-            placeholder="e.g. openrouter/auto"
+            placeholder="openrouter/auto"
             type="text"
             value={model}
           />
@@ -84,28 +85,18 @@ export function RuntimeSetup({
             {error}
           </p>
         ) : null}
-        <div className="mt-5 flex items-center justify-between gap-3">
-          <a
-            className="text-xs font-medium text-primary underline-offset-4 hover:underline"
-            href="https://openrouter.ai/keys"
-            rel="noreferrer"
-            target="_blank"
-          >
-            Get a key
-          </a>
-          <Button disabled={connecting || apiKey.trim().length === 0 || model.trim().length === 0} type="submit">
+        <div className="mt-5 flex items-center justify-end gap-3">
+          <Button disabled={connecting || model.trim().length === 0} type="submit">
             {connecting ? (
               <LoaderCircle aria-hidden="true" className="size-4 animate-spin" />
             ) : null}
-            {connecting ? "Connecting…" : "Connect"}
+            {connecting ? "Loading runtime…" : "Open workspace"}
           </Button>
         </div>
         <p className="mt-4 text-[10px] leading-4 text-muted-foreground">
-          The key is sent directly to OpenRouter. EdApex never receives it.
+          Approvals are required for every action that reaches the network or your
+          school records.
         </p>
-        <button className="sr-only" type="button" onClick={onDismiss}>
-          Dismiss
-        </button>
       </form>
     </div>
   );

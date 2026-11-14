@@ -1,5 +1,11 @@
 import { NextResponse } from "next/server";
 
+/**
+ * The workspace is installable but not phone-shaped: it adapts from 320px to
+ * 1920px, so the manifest deliberately omits `orientation` and declares no
+ * narrow-only display mode. Locking orientation to portrait would contradict the
+ * responsive contract in spec 15.
+ */
 const manifest = {
   name: "EdApex Work",
   short_name: "EdApex",
@@ -8,7 +14,7 @@ const manifest = {
   start_url: "/workspace",
   scope: "/workspace",
   display: "standalone",
-  orientation: "portrait-primary",
+  display_override: ["window-controls-overlay", "standalone"],
   background_color: "#161a24",
   theme_color: "#161a24",
   categories: ["education", "productivity"],
@@ -30,6 +36,26 @@ const manifest = {
       sizes: "512x512",
       type: "image/png",
       purpose: "maskable"
+    }
+  ],
+  shortcuts: [
+    {
+      name: "Chat",
+      short_name: "Chat",
+      url: "/workspace",
+      icons: [{ src: "/workspace/icons/icon-192.png", sizes: "192x192" }]
+    },
+    {
+      name: "Tasks",
+      short_name: "Tasks",
+      url: "/workspace/tasks",
+      icons: [{ src: "/workspace/icons/icon-192.png", sizes: "192x192" }]
+    },
+    {
+      name: "Make",
+      short_name: "Make",
+      url: "/workspace/make",
+      icons: [{ src: "/workspace/icons/icon-192.png", sizes: "192x192" }]
     }
   ]
 } as const;

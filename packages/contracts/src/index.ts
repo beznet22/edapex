@@ -1,3 +1,4 @@
+export * from "./agent";
 export * from "./agui";
 export * from "./capabilities";
 export * from "./chat";

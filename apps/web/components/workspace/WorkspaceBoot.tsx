@@ -86,7 +86,7 @@ function ChatBoot() {
 
 function TasksBoot() {
   return (
-    <div className="mx-auto flex min-h-0 w-full max-w-[430px] flex-1 flex-col px-4 py-6 lg:max-w-[880px] lg:px-6 lg:py-8">
+    <div className="mx-auto flex min-h-0 w-full max-w-[430px] flex-1 flex-col px-4 py-6 lg:max-w-none lg:px-8 lg:py-8">
       <div className="flex items-center justify-between gap-3">
         <div className="space-y-2">
           <Skeleton className="h-7 w-28" />
@@ -120,7 +120,7 @@ function TasksBoot() {
 
 function MakeBoot() {
   return (
-    <div className="mx-auto flex min-h-0 w-full max-w-[430px] flex-1 flex-col px-4 py-6 lg:max-w-[880px] lg:px-6 lg:py-8">
+    <div className="mx-auto flex min-h-0 w-full max-w-[430px] flex-1 flex-col px-4 py-6 lg:max-w-none lg:px-8 lg:py-8">
       <div className="flex items-center justify-between gap-3">
         <div className="space-y-2">
           <Skeleton className="h-7 w-24" />

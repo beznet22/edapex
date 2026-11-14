@@ -1,0 +1,25 @@
+[package]
+name = "edapex-agent-wasm"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+publish = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+edapex-agent = { path = "../agent" }
+js-sys = "0.3"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["macros", "rt", "sync", "time"] }
+uuid = { version = "1", features = ["v4", "js"] }
+wasm-bindgen = "0.2"
+wasm-bindgen-futures = "0.4"
+
+# This crate is the browser surface. On native the `HostFuture` alias requires
+# `Send`, and a `JsValue`-based future can never satisfy that, so the crate has no
+# native meaning. Building it for a native target is a mistake, not a feature.
+[package.metadata]
+targets = ["wasm32-unknown-unknown"]

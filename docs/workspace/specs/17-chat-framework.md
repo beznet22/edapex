@@ -1,10 +1,10 @@
 # 17 — Chat Runtime and Generative UI Framework
 
-**Draft.** Phase 10 recommendation. `packages/chat` now owns the normalized runtime/queue state; the xcodex adapter, streaming Markdown and artifact events are still pending 10B/10C work.
+**Draft.** Phase 10 recommendation. `packages/chat` now owns the normalized runtime/queue state; the thin-core adapter, streaming Markdown and artifact events are still pending 10B/10C work.
 
 ## Specification context
 
-This spec owns the **chat runtime and normalized state**: message parts, run/turn states, queue drain, restore/follow/stop, approval mapping and the xcodex adapter boundary.
+This spec owns the **chat runtime and normalized state**: message parts, run/turn states, queue drain, restore/follow/stop, approval mapping and the thin-core adapter boundary.
 
 - `15-ui-surfaces.md` owns how those states are presented, routed and made responsive.
 - `19-design-system.md` owns the visual primitives and tokens used to render them.
@@ -15,12 +15,12 @@ Do not solve a visual placement problem in this spec, and do not define a second
 
 ## Recommendation
 
-Use the **ported OpenDuet interaction layer** as the presentation layer, a **custom xcodex runtime adapter** as the only chat state/runtime, **OpenUI Lang** for generated surfaces, **Streamdown** for streaming Markdown, and **Tiptap** for editable document artifacts.
+Use the **ported OpenDuet interaction layer** as the presentation layer, the **thin Rust core (`crates/agent`) adapter** as the only chat state/runtime, **AG-UI** as the external-agent boundary, **OpenUI Lang** for generated surfaces, **Streamdown** for streaming Markdown, and **Tiptap** for editable document artifacts.
 
 ```text
-xcodex Rust local agent
-  → XcodexChatAdapter
-  → message parts / runs / tool calls / approvals
+thin Rust core (crates/agent)
+  → AgentEvent channel (Tauri) / WASM bridge (web)
+  → normalized message parts / runs / tool calls / approvals
   → OpenDuet-derived transcript + composer + ActionBar
   → OpenUI SurfaceRenderer for generated cards
   → Streamdown for Markdown
@@ -28,10 +28,30 @@ xcodex Rust local agent
   → PDF.js/IronPress/docx/PapaParse for document import/export
 ```
 
-- **xcodex is the agent runtime.** There is no AI SDK agent runtime and no server-side xcodex.
+- **The thin Rust core is the agent runtime.** There is no AI SDK agent runtime, no server-side agent runtime, and no xcodex. See `30-tauri-rust-core.md`.
+- **AG-UI is the external-agent boundary.** An external agent that speaks AG-UI can be plugged in behind the same `AgentEvent` projection; AG-UI is not the internal transport and it is not the UI contract. See "AG-UI boundary" below.
 - **OpenDuet owns the interaction model**, not the data model. Strip CopilotKit, A2UI, query clients and auth before vendoring.
 - **OpenUI owns generated presentation**, not chat state and not data access. See `21-generative-ui-openui.md`.
 - **The server remains authoritative** for EdApex mutations, approvals and capability grants.
+
+### Runtime history
+
+xcodex was the previous runtime authority (`codex-app-server::in_process` natively, WASM in the browser). It is retired: its pinned dependency graph did not resolve on the pinned toolchain, the browser WASM bundle cost 7.4 MB, and it duplicated the approval and tool-allowlisting logic the thin core now owns. Do not reintroduce xcodex, a desktop sidecar, or a server-side agent runtime.
+
+## AG-UI boundary
+
+AG-UI is **required**, not optional, because it is what lets an external agent participate:
+
+```text
+external AG-UI agent  ──AG-UI──▶  adapter  ──AgentEvent──▶  chat projection
+internal thin core     ────────▶ AgentEvent ───────────▶  chat projection
+```
+
+- The normative internal transport is `AgentEvent` (`packages/contracts/src/agent.ts`, mirrored in Rust by `crates/agent/src/protocol.rs`).
+- `crates/agent/src/agui.rs` maps `AgentEvent` ⇄ AG-UI events. The mapping must be lossless in both directions for `risk`, `decisions` and `summary`; a lossy mapping is a defect, not a limitation.
+- AG-UI is not a second chat state model. An external agent's AG-UI stream is normalised into `AgentEvent` before it reaches the UI.
+- Do not expose AG-UI to the browser as a transport in v1. The browser adapter consumes `AgentEvent`.
+
 
 ## Why assistant-ui was rejected
 
@@ -49,22 +69,22 @@ Do not add `@assistant-ui/*`, `@assistant-ui/react-markdown`, assistant-cloud or
 
 | Option | Strengths | Limits | Role |
 |---|---|---|---|
-| **OpenDuet ported interaction + custom xcodex runtime** | Exact interaction/state parity; no CopilotKit runtime; Gold on Slate; one chat layer | Must strip upstream imports and build the adapter; upstream drift is manual | **Chosen** |
+| **OpenDuet ported interaction + thin-core runtime** | Exact interaction/state parity; no CopilotKit runtime; Gold on Slate; one chat layer | Must strip upstream imports and build the adapter; upstream drift is manual | **Chosen** |
 | **OpenUI Lang** | Compact, streaming-first, React renderer, token-efficient; registered components | Web-only; no native renderer; vendor-led; needs catalog/action controls | **GenUI surfaces only** |
 | **Streamdown** | Streaming Markdown, incomplete blocks, GFM/code/math/Mermaid; already used by OpenDuet | Markdown only; sanitize and pin | **Chat Markdown + artifact preview** |
 | **Tiptap** | Headless ProseMirror editor, MIT, active, already used by legacy EdApex | Must build the minimal Novel-style UI; use open-source extensions only | **Artifact editor** |
-| **Novel** | Notion-style Tiptap UI, Apache-2.0 | Adds Vercel AI SDK completion and an opinionated UI; conflicts with xcodex | **Visual reference only; no package/source copy** |
-| **CopilotKit** | AG-UI, shared state, human-in-the-loop; OpenDuet reference | Server/runtime layer; duplicates xcodex and CF authority | **Reference only** |
+| **Novel** | Notion-style Tiptap UI, Apache-2.0 | Adds Vercel AI SDK completion and an opinionated UI; conflicts with the thin core | **Visual reference only; no package/source copy** |
+| **AG-UI** | Framework-neutral agent protocol; lets LangGraph/Mastra/CrewAI/ADK or hand-written agents participate | Not a chat state model; not a browser transport in v1 | **External-agent boundary** |
 | **assistant-ui** | React chat primitives, runtime adapters, tool UI | Duplicate shell/runtime; paid Cloud risk; removed | **Rejected** |
-| **AI SDK UI/RSC** | Stable React chat hooks; RSC `streamUI` | `streamUI` is experimental and Next.js/RSC-specific; AI SDK agent runtime is not local xcodex | **Rejected for v1** |
+| **AI SDK UI/RSC** | Stable React chat hooks; RSC `streamUI` | `streamUI` is experimental and Next.js/RSC-specific; the AI SDK agent runtime is not the thin core | **Rejected for v1** |
 | **shadcn AI Elements** | shadcn-native chat patterns | Duplicates the OpenDuet chat layer | **Not used** |
 
 ## Runtime contract
 
-The adapter is local: Tauri invoke/WASM on native, WASM on web. It maps xcodex app-server/thread/tool events into EdApex message parts.
+The adapter is local: a typed Tauri channel on desktop/mobile, a WASM bridge on web. It maps thin-core `AgentEvent` values into EdApex message parts.
 
 ```text
-xcodex event
+AgentEvent (thin core) or AG-UI (external agent)
   → normalized chat event
   → local transaction (message/run/tool/approval/activity)
   → syncable event (unless edapex-ephemeral)
@@ -73,23 +93,24 @@ xcodex event
 
 Required mappings:
 
-| xcodex event | EdApex projection |
+| `AgentEvent` | EdApex projection |
 |---|---|
-| thread/message text delta | `text` message part; Streamdown |
-| reasoning/thinking | `thinking` part; never mistaken for final text |
-| tool call start/args | `tool_call` part, `running` |
-| tool result | `tool_call` part, `completed` / `failed` / `blocked` |
-| approval request | `approval_request` + `ActionBar`/inline approval |
-| approval decision | decided card; restore tool renderer/result |
+| `message_delta` | `text` message part; Streamdown |
+| `reasoning_delta` | `thinking` part; never mistaken for final text |
+| `tool_started` | `tool_call` part, `running` |
+| `tool_completed` | `tool_call` part, `completed` / `failed` / `declined` |
+| `approval_requested` | `approval_request` + `ActionBar`/inline approval |
+| `approval_resolved` | decided card; restore tool renderer/result |
 | generated surface | `surface` part; OpenUI `SurfaceRenderer`; renderer validates `catalogVersion` |
 | attachment upload | `attachment` part via local transaction |
 | artifact tool-call deltas | `artifact_start/delta/finish/error` events → `ArtifactPart` + artifact store; turn stays `tool_running` (contract: `16-artifacts.md`) |
-| run start/finish | `runs` row; turn-level busy/follow state |
-| cancellation | `stopped/error`; restore draft where the source does |
+| `turn_started` / `turn_completed` | `runs` row; turn-level busy/follow state |
+| `interrupted` | `stopped/error`; restore draft where the source does |
+| `error` | turn `error`; never presented as a successful completion |
 
-Do not map xcodex events through AI SDK `UIMessage` or assistant-ui runtime types. Define one EdApex message-part contract in `packages/contracts`.
+Do not map events through AI SDK `UIMessage` or assistant-ui runtime types. Define one EdApex message-part contract in `packages/contracts`.
 
-Native xcodex uses the same projection through a typed `AgentEvent` channel (`48-local-capability-layer.md`). Its app-server dynamic tools (`web_search`, `web_fetch`, `ocr_extract`) are executed in process by the Tauri host and do not appear as MCP child processes. Browser WASM uses the same tool names and schemas. A tool that the host cannot execute is not advertised.
+The same `AgentEvent` projection serves native and web. The core's dynamic tools (`web_search`, `web_fetch`, `ocr_extract`) are executed in process by the host — a Tauri command handler or the WASM host — and do not appear as MCP child processes. A tool that the host cannot execute is not advertised.
 
 ## Message parts
 
@@ -187,7 +208,8 @@ Use **Streamdown (React package)** for streaming agent Markdown and artifact pre
 
 - Streamdown's Markdown extensions increase the HTML/Markdown attack surface; sanitize, allowlist links/images, and pin the version.
 - Upstream OpenDuet drift is manual once vendored; re-audit against the pinned SHA before each vendoring change (`44-reference-app-audits.md`).
-- The xcodex event map is adapter-owned; no app-wide event catalogue exists upstream — do not invent one.
+- The `AgentEvent` map is adapter-owned; there is no app-wide event catalogue beyond `packages/contracts/src/agent.ts` and `crates/agent/src/protocol.rs` — do not invent a second one.
+- AG-UI drift: pin the AG-UI event names and fixture both directions (`crates/agent/tests/agui.rs` plus the contract fixtures).
 - Artifact event emission couples `packages/chat` to the artifact store; the mapping table above is the single source.
 
 ## Acceptance
@@ -195,7 +217,8 @@ Use **Streamdown (React package)** for streaming agent Markdown and artifact pre
 - Streamdown is the target chat Markdown renderer; the current 10B shell renders plain text until the integration lands.
 - No `@assistant-ui/*`, assistant-cloud, AI SDK `UIMessage` or CopilotKit runtime dependency.
 - No `novel` package, Novel source copy or `ai`/`@ai-sdk/*` completion path; Tiptap is the only editor runtime.
-- The custom adapter maps every xcodex event in the table above.
+- The thin-core adapter maps every `AgentEvent` in the table above, and `agui.rs` round-trips `risk`, `decisions` and `summary` losslessly.
+- An external AG-UI agent reaches the same projection without a second chat state model.
 - Queue/following, stop, history restore and approval states match `15`.
 - Streamdown renders incomplete Markdown safely; Tiptap remains the artifact editor.
 - OpenUI surfaces render from a typed catalog and closed actions.
@@ -210,6 +233,6 @@ Use **Streamdown (React package)** for streaming agent Markdown and artifact pre
 - Streamdown: <https://github.com/vercel/streamdown>
 - Tiptap: <https://github.com/ueberdosis/tiptap>
 - Novel (visual reference only; enforced by `44-reference-app-audits.md`): <https://github.com/steven-tey/novel>
-- xcodex: <https://github.com/olegische/xcodex>
+- AG-UI protocol: <https://github.com/ag-ui-protocol/ag-ui>
 
 Agents must pin versions and verify current APIs before implementation. No dependency is approved by this draft.

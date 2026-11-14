@@ -2,7 +2,7 @@
 
 Low-level specs for porting the EdApex backend to a Hono API on Cloudflare Workers with D1. Each document is written to be implementable without reference to the conversation that produced it.
 
-**Implementing the port?** Start with [ROADMAP.md](./ROADMAP.md) — it contains the working agreement for coding agents and one executable brief per phase, with gates. **Progress** is tracked in [PROGRESS.md](./PROGRESS.md); **port code** lands in [`apps/api/`](../../apps/api/README.md) (service README, agent rules in [apps/api/AGENTS.md](../../apps/api/AGENTS.md)).
+**Implementing the port?** Start with [ROADMAP.md](./ROADMAP.md) — it contains the working agreement for coding agents and one executable brief per phase, with gates. **Progress** is tracked in [PROGRESS.md](./PROGRESS.md); **port code** lands in [`services/sms-api/`](../../services/sms-api/README.md) (service README, agent rules in [services/sms-api/AGENTS.md](../../services/sms-api/AGENTS.md)).
 
 **Current status:** Phase 8 is complete and the Phase 9 platform is deployed: migration `0006`, Worker `bfa72530`, Pages `edapex-web.pages.dev`, and `app.llacademy.ng` (proxied CNAME) all live. `/claim` and shared password digests are intentionally retained until workspace **10G.2**; student-code issuance, duplicate-email resolution and staff/parent coverage are **10G.1**.
 
@@ -40,7 +40,7 @@ Rules, to prevent scope drift between code, schema, and migration:
 | Grade changes | Locked after term closure; admin override requires a reason and writes an audit row |
 | Retention | Transcripts permanent; attendance/homework/chat ~7 years; parents read-only |
 | Archive deletion | Two admins + typed confirmation + audit; blocked during restores |
-| Repository layout | `apps/api/` is the **EdApex API service** — a deployable, UI-less backend consumed by the frontend apps — and becomes a pnpm workspace package. `apps/` is the deployable bucket; no separate repository or extraction step |
+| Repository layout | `services/sms-api/` is the **EdApex API service** — a deployable, UI-less backend consumed by the frontend apps — and becomes a pnpm workspace package. `apps/` is the deployable bucket; no separate repository or extraction step |
 
 ## Spec index
 

@@ -49,8 +49,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             runtime_health,
             host_capabilities,
-            agent::agent_set_openrouter_key,
             agent::agent_connect,
+            agent::agent_attach,
             agent::agent_thread_start,
             agent::agent_turn_start,
             agent::agent_turn_interrupt,

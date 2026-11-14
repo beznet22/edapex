@@ -20,9 +20,9 @@ Do not assume any package or script is installed globally.
 - **Marksheet Schema**: Use `marksheetSchema` and `Marksheet` from `src/lib/schema/marksheet.ts`. Persist validated marksheets via `AssessmentService.upsertMarksheet(marksheet: Marksheet, staffId: number): Promise<Marksheet>`.
 - **ActionBar Architecture**: `src/lib/components/ai-elements/ActionBar.svelte` is the unified action-required surface rendered above `ChatComposer`. It handles tool approvals, option selection, ambiguity Q&A, and workflow resume — one component for every "user must decide" moment.
 - **Skills**: Domain skills live in `src/lib/server/mastra/skills/<name>.skill.md` — `default`, `assistant`, `read`, `write`, `destructive`, `academic`, `reporting`, `parent` (one per operation group plus `default` and `assistant`).
-- **UI/UX Guidelines**: Adhere to the design system defined in `src/routes/layout.css`. Utilize "Gold on Slate" `oklch` tokens and shadcn-svelte components in `src/lib/components/ui/*`, `src/lib/components/ai-elements/*` and `src/lib/components/prompt-kit/*`. All UI updates, style and design must conform to `src/routes/layout.css`. Do not change `src/routes/layout.css`.
+- **UI/UX Guidelines**: Adhere to the design system defined in `src/routes/layout.css` for the **legacy SvelteKit tree only**. The active workspace app has its own token file: `apps/web/app/globals.css`. Do not treat `src/routes/layout.css` as the design authority for `apps/web`, and do not change either file's tokens without a spec amendment. Utilize "Gold on Slate" `oklch` tokens and shadcn-svelte components in `src/lib/components/ui/*`, `src/lib/components/ai-elements/*` and `src/lib/components/prompt-kit/*`. For `apps/web`, use shadcn/ui (`apps/web/components/ui/*`) per `docs/workspace/specs/19-design-system.md` and `15-ui-surfaces.md`.
 - **Device Responsiveness Guidelines**: Adhere to the responsive design guidelines defined in `docs/responsive_design.md`.
-- **Safety**: Apply `.omit()` on Zod schema mutations to prevent mass-assignment. Supervised LLM intents must reach a 90% confidence threshold to execute state mutations. See `docs/agent_migration_prompt.md`.
+- **Safety**: Apply `.omit()` on Zod schema mutations to prevent mass-assignment. Supervised LLM intents must reach a 90% confidence threshold to execute state mutations. See `docs/workspace/specs/60-security-privacy.md`.
 
 # Code Quality Constraints (NON-NEGOTIABLE)
 - **Absolute Production Readiness**: You must write complete, production-ready code. 
@@ -69,7 +69,7 @@ Run `pnpm run svelte-check --workspace path/to/file.svelte` and `pnpm run lint p
 
 Any work on the Hono + Cloudflare + D1 port must start at [`docs/cloudflare-port/ROADMAP.md`](docs/cloudflare-port/ROADMAP.md). It contains the coding-agent working agreement and one brief per phase; the suite's own rules (62 legacy tables, D1 batching, tenant scoping, line caps) apply to port code even where this file is silent.
 
-Port code lands in [`apps/api/`](apps/api/AGENTS.md) — read that file before adding anything there. Phase status is tracked in [`docs/cloudflare-port/PROGRESS.md`](docs/cloudflare-port/PROGRESS.md) and must be updated in the same PR.
+Port code lands in [`services/sms-api/`](services/sms-api/AGENTS.md) — read that file before adding anything there. Phase status is tracked in [`docs/cloudflare-port/PROGRESS.md`](docs/cloudflare-port/PROGRESS.md) and must be updated in the same PR.
 
 Before opening a port PR, run `node scripts/verify-port-specs.mjs` and `node scripts/verify-schema-catalog.mjs`, and paste the output in the description.
 
@@ -85,17 +85,25 @@ Spec [`docs/workspace/specs/48-local-capability-layer.md`](docs/workspace/specs/
 - RustO is the local OCR engine; Mistral is explicit fallback. Local OCR sends text/annotation only; student images never upload without `X-OCR-Consent: cloud`.
 - Mobile camera is a first-party Tauri plugin: full-screen native preview, stills only, AVFoundation on iOS and CameraX on Android. Desktop uses file import and `xcap` screenshots.
 - Browser assistance is desktop-only, user-installed official Chrome DevTools MCP. No custom extension, BrowserBridge, PWA or mobile browser control.
-- Do not add an `AGENT_DB` table to the EdApex school `DB`; persistence/sync is a separate follow-on using `41`/`42`.
+- Do not add an `AGENT_DB` table to the EdApex school `DB`. Agent persistence and sync live in a separate `AGENT_DB` database bound only to `services/cowork-api` (`41`/`42`).
 
 Verification:
 
 ```bash
 pnpm --dir apps/web check
 pnpm --dir apps/web test
-pnpm --dir apps/api run typecheck
-pnpm --dir apps/api test
+pnpm --dir services/sms-api run typecheck
+pnpm --dir services/sms-api test
+pnpm --dir services/cowork-api run typecheck
+pnpm --dir services/cowork-api test
+pnpm --dir packages/connectors run typecheck
 cargo test -p edapex-agent -p edapex-ocr
+cargo test -p edapex-store
+cargo build --target wasm32-unknown-unknown -p edapex-agent-wasm
+node scripts/check-agent-size.mjs
 ```
+
+`services/sms-api` is the current `services/sms-api` directory; the rename lands with the `05-project-structure.md` amendment and moves `scripts/verify-port-specs.mjs` in the same change.
 
 ## Workspace Web Architecture (`apps/web`)
 

@@ -4,7 +4,8 @@ import { useCallback, useMemo, useState, useSyncExternalStore } from "react";
 
 import type { ChatMessage, QueuedMessage, WorkspaceRuntimeView } from "@edapex/contracts";
 
-import { OpenRouterXcodexAdapter, type OpenRouterSettings } from "@/lib/xcodex-browser";
+import { NativeAgentAdapter } from "@/lib/agent-runtime";
+import type { NativeAgentSettings } from "@/lib/native-agent";
 
 export interface WorkspaceRuntimeController {
   readonly connected: boolean;
@@ -21,29 +22,26 @@ export interface WorkspaceRuntimeController {
   ) => void;
   readonly restoreComplete: () => void;
   readonly restoreUnavailable: () => void;
-  readonly connectOpenRouter: (settings: OpenRouterSettings) => Promise<void>;
+  readonly connectAgent: (settings: NativeAgentSettings) => Promise<void>;
   readonly connecting: boolean;
   readonly connectError: string;
 }
 
 export function useWorkspaceRuntime(): WorkspaceRuntimeController {
-  const adapter = useMemo(() => new OpenRouterXcodexAdapter(), []);
+  const adapter = useMemo(() => new NativeAgentAdapter(), []);
   const [connecting, setConnecting] = useState(false);
   const [connectError, setConnectError] = useState("");
   const state = useSyncExternalStore(adapter.subscribe, adapter.getSnapshot, adapter.getSnapshot);
   const view = adapter.view;
 
-  const connectOpenRouter = useCallback(
-    async (settings: OpenRouterSettings): Promise<void> => {
-      if (!(adapter instanceof OpenRouterXcodexAdapter)) {
-        throw new Error("Native xcodex transport is not available in this build.");
-      }
+  const connectAgent = useCallback(
+    async (settings: NativeAgentSettings): Promise<void> => {
       setConnecting(true);
       setConnectError("");
       try {
         await adapter.connect(settings);
       } catch (cause) {
-        const message = cause instanceof Error ? cause.message : "Could not connect xcodex";
+        const message = cause instanceof Error ? cause.message : "Could not load the agent runtime";
         setConnectError(message);
         throw cause;
       } finally {
@@ -65,7 +63,7 @@ export function useWorkspaceRuntime(): WorkspaceRuntimeController {
       adapter.decideApproval(messageId, approvalRequestId, decision),
     restoreComplete: () => adapter.restoreComplete(),
     restoreUnavailable: () => adapter.restoreUnavailable(),
-    connectOpenRouter,
+    connectAgent,
     connecting,
     connectError
   };

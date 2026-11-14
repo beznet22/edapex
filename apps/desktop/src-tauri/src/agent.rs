@@ -5,11 +5,10 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use edapex_agent::{
-    parse_openai_sse_data, tool_spec_json, AgentConnectSettings, AgentError, AgentErrorCode,
-    AgentEvent, AgentHost, AgentHostOptions, AgentStatus, AgentTurnInput, ApprovalDecision,
-    ApprovalHandler, ApprovalRequest, ChatMessage, DynamicToolCall, DynamicToolName,
-    DynamicToolResult, EventSink, ProviderChunk, ProviderClient, ProviderRequest, ThreadStartResult,
-    TurnStarted,
+    tool_spec_json, AgentConnectSettings, AgentError, AgentErrorCode, AgentEvent, AgentHost,
+    AgentHostOptions, AgentStatus, AgentTurnInput, ApprovalDecision, ApprovalHandler,
+    ApprovalRequest, ChatMessage, DynamicToolCall, DynamicToolName, DynamicToolResult, EventSink,
+    ProviderChunk, ProviderClient, ProviderRequest, ThreadStartResult, ToolExecutor, TurnStarted,
 };
 use serde_json::{json, Value};
 use tauri::ipc::Channel;
@@ -18,14 +17,15 @@ use tokio::sync::{mpsc, oneshot};
 
 use crate::state::{HostError, HostState};
 
-const KEYRING_SERVICE: &str = "ng.llacademy.edapex";
-const OPENROUTER_ACCOUNT: &str = "openrouter";
-const DEFAULT_OPENROUTER_BASE: &str = "https://openrouter.ai/api/v1";
+/// Where model traffic goes. Never a provider: `model-router` holds the provider
+/// credential and is the only process allowed to reach AI Gateway.
+const MODEL_ROUTER_PATH: &str = "/api/v1/agent/model/v1/chat/completions";
 
 #[derive(Clone)]
 pub struct AgentSession {
     pub host: AgentHost,
     pub approvals: Arc<ApprovalRegistry>,
+    pub sink: Arc<ChannelSink>,
 }
 
 #[derive(Default)]
@@ -74,50 +74,67 @@ impl ApprovalRegistry {
     }
 }
 
+/// Publishes every event to the ring and, when one is attached, to the channel.
+///
+/// The channel is replaceable because a WebView reload destroys it while the
+/// turn keeps running. `agent_attach` installs a new one and replays from the
+/// last sequence the client saw.
 struct ChannelSink {
-    channel: Channel<AgentEvent>,
+    hub: Arc<edapex_agent::EventHub>,
+    channel: Mutex<Option<Channel<AgentEvent>>>,
 }
 
 impl EventSink for ChannelSink {
     fn emit(&self, event: AgentEvent) {
-        let _ = self.channel.send(event);
+        // Record first: the ring is the durable record, the channel is best-effort.
+        let _ = self.hub.push(event.clone());
+        if let Ok(guard) = self.channel.lock() {
+            if let Some(channel) = guard.as_ref() {
+                let _ = channel.send(event);
+            }
+        }
     }
 }
 
-struct OpenRouterProvider {
-    api_key: String,
+/// The model transport.
+///
+/// This holds an **EdApex session token**, never a provider key. Provider
+/// credentials live in AI Gateway (BYOK) and are used only by
+/// `services/model-router`, so a compromised desktop holds nothing worth
+/// stealing beyond a revocable session.
+struct ModelRouterProvider {
+    session_token: String,
     client: reqwest::Client,
     base_url: String,
 }
 
-impl OpenRouterProvider {
-    fn new(api_key: String) -> Self {
-        let base_url = std::env::var("EDAPEX_OPENROUTER_BASE")
-            .unwrap_or_else(|_| DEFAULT_OPENROUTER_BASE.to_string());
+impl ModelRouterProvider {
+    fn new(session_token: String) -> Self {
+        let base_url = crate::auth::api_base();
         let client = reqwest::Client::builder()
             .timeout(Duration::from_secs(120))
             .build()
             .unwrap_or_default();
         Self {
-            api_key,
+            session_token,
             client,
             base_url,
         }
     }
 }
 
-impl ProviderClient for OpenRouterProvider {
+impl ProviderClient for ModelRouterProvider {
     fn stream_chat(
         &self,
         request: ProviderRequest,
     ) -> Result<mpsc::Receiver<ProviderChunk>, AgentError> {
         let (sender, receiver) = mpsc::channel(64);
         let client = self.client.clone();
-        let api_key = self.api_key.clone();
+        let session_token = self.session_token.clone();
         let base_url = self.base_url.clone();
         tauri::async_runtime::spawn(async move {
             if let Err(error) =
-                stream_openrouter(&client, &base_url, &api_key, request, &sender).await
+                stream_model(&client, &base_url, &session_token, request, &sender).await
             {
                 let _ = sender.send(ProviderChunk::Failed(error)).await;
             }
@@ -160,10 +177,10 @@ fn message_json(message: &ChatMessage) -> Value {
     Value::Object(object)
 }
 
-async fn stream_openrouter(
+async fn stream_model(
     client: &reqwest::Client,
     base_url: &str,
-    api_key: &str,
+    session_token: &str,
     request: ProviderRequest,
     sender: &mpsc::Sender<ProviderChunk>,
 ) -> Result<(), AgentError> {
@@ -184,43 +201,41 @@ async fn stream_openrouter(
     }
 
     let response = client
-        .post(format!("{base_url}/chat/completions"))
-        .bearer_auth(api_key)
-        .header("HTTP-Referer", "https://app.llacademy.ng")
-        .header("X-Title", "EdApex Work")
+        .post(format!("{base_url}{MODEL_ROUTER_PATH}"))
+        .bearer_auth(session_token)
         .json(&body)
         .send()
         .await
-        .map_err(|error| AgentError::provider(format!("OpenRouter request: {error}")))?;
+        .map_err(|error| AgentError::provider(format!("Model request: {error}")))?;
 
     let status = response.status();
     if !status.is_success() {
         let text = response.text().await.unwrap_or_default();
         let message: String = text.chars().take(300).collect();
         return Err(AgentError::provider(format!(
-            "OpenRouter returned {status}: {message}"
+            "The model router returned {status}: {message}"
         )));
     }
 
     let mut response = response;
     let mut buffer = String::new();
+    let mut decoder = edapex_agent::Utf8StreamDecoder::new();
     loop {
         let chunk = response
             .chunk()
             .await
-            .map_err(|error| AgentError::provider(format!("OpenRouter stream: {error}")))?;
+            .map_err(|error| AgentError::provider(format!("Model stream: {error}")))?;
         let Some(chunk) = chunk else {
             break;
         };
-        let text = String::from_utf8_lossy(&chunk).replace("\r\n", "\n");
-        buffer.push_str(&text);
-        while let Some(index) = buffer.find("\n\n") {
-            let event: String = buffer.drain(..index + 2).collect();
+        buffer.push_str(&decoder.push(&chunk));
+        while let Some(event) = edapex_agent::take_sse_event(&mut buffer) {
             if process_sse_event(&event, sender).await? {
                 return Ok(());
             }
         }
     }
+    buffer.push_str(&decoder.finish());
     if !buffer.trim().is_empty() {
         process_sse_event(&buffer, sender).await?;
     }
@@ -236,18 +251,12 @@ async fn process_sse_event(
     event: &str,
     sender: &mpsc::Sender<ProviderChunk>,
 ) -> Result<bool, AgentError> {
-    for line in event.lines() {
-        let Some(data) = line.strip_prefix("data:") else {
-            continue;
-        };
-        let data = data.trim();
-        if data.is_empty() {
-            continue;
-        }
-        if data == " 
-            if sender.send(chunk).await.is_err() {
-                return Ok(true);
-            }
+    let Some(data) = edapex_agent::sse_data_line(event) else {
+        return Ok(false);
+    };
+    for chunk in edapex_agent::parse_openai_sse_data(data)? {
+        if sender.send(chunk).await.is_err() {
+            return Ok(true);
         }
     }
     Ok(false)
@@ -258,6 +267,13 @@ struct HostTools {
 }
 
 impl ToolExecutor for HostTools {
+    /// Every v1 dynamic tool reaches the network or a device capture, so each
+    /// one asks first. Omitting this would silently inherit the trait default
+    /// (`false`) and no approval would ever be requested.
+    fn requires_approval(&self, _tool: DynamicToolName) -> bool {
+        true
+    }
+
     fn execute(
         &self,
         call: DynamicToolCall,
@@ -330,60 +346,6 @@ fn to_host_error(error: AgentError) -> HostError {
     HostError::new(error.code.as_str(), error.message, error.retryable)
 }
 
-fn keyring_entry() -> Result<keyring::Entry, HostError> {
-    keyring::Entry::new(KEYRING_SERVICE, OPENROUTER_ACCOUNT).map_err(|error| {
-        HostError::new(
-            "internal_error",
-            format!("Open the system keychain: {error}"),
-            false,
-        )
-    })
-}
-
-fn load_openrouter_key() -> Result<Option<String>, HostError> {
-    match keyring_entry()?.get_password() {
-        Ok(key) if !key.trim().is_empty() => Ok(Some(key)),
-        Ok(_) => Ok(None),
-        Err(keyring::Error::NoEntry) => Ok(None),
-        Err(error) => Err(HostError::new(
-            "internal_error",
-            format!("Read the OpenRouter key: {error}"),
-            false,
-        )),
-    }
-}
-
-fn store_openrouter_key(key: &str) -> Result<(), HostError> {
-    keyring_entry()?.set_password(key).map_err(|error| {
-        HostError::new(
-            "internal_error",
-            format!("Store the OpenRouter key: {error}"),
-            false,
-        )
-    })
-}
-
-fn clear_openrouter_key() -> Result<(), HostError> {
-    match keyring_entry()?.delete_credential() {
-        Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
-        Err(error) => Err(HostError::new(
-            "internal_error",
-            format!("Clear the OpenRouter key: {error}"),
-            false,
-        )),
-    }
-}
-
-#[tauri::command]
-pub async fn agent_set_openrouter_key(api_key: String) -> Result<(), HostError> {
-    let trimmed = api_key.trim();
-    if trimmed.is_empty() {
-        clear_openrouter_key()
-    } else {
-        store_openrouter_key(trimmed)
-    }
-}
-
 #[tauri::command]
 pub async fn agent_connect(
     app: AppHandle,
@@ -391,10 +353,10 @@ pub async fn agent_connect(
     settings: AgentConnectSettings,
     channel: Channel<AgentEvent>,
 ) -> Result<AgentStatus, HostError> {
-    let key = load_openrouter_key()?.ok_or_else(|| {
+    let session_token = crate::auth::session_token()?.ok_or_else(|| {
         HostError::new(
             "auth_required",
-            "Add an OpenRouter API key in Settings",
+            "Sign in to EdApex first",
             false,
         )
     })?;
@@ -402,17 +364,54 @@ pub async fn agent_connect(
         previous.host.close();
     }
     let approvals = Arc::new(ApprovalRegistry::default());
+    let sink = Arc::new(ChannelSink {
+        hub: Arc::new(edapex_agent::EventHub::default()),
+        channel: Mutex::new(Some(channel)),
+    });
     let host = AgentHost::connect(AgentHostOptions {
         settings,
-        provider: Arc::new(OpenRouterProvider::new(key)),
+        provider: Arc::new(ModelRouterProvider::new(session_token)),
         tools: Arc::new(HostTools { app }),
         approvals: approvals.clone(),
-        events: Arc::new(ChannelSink { channel }),
+        events: sink.clone(),
     })
     .map_err(to_host_error)?;
     let status = host.status();
-    state.set_agent(AgentSession { host, approvals })?;
+    state.set_agent(AgentSession {
+        host,
+        approvals,
+        sink,
+    })?;
     Ok(status)
+}
+
+/// Re-attach a client after a WebView reload.
+///
+/// `since_seq` is the last sequence the client processed, so replay is exact.
+/// Returns the cursor to resume from.
+#[tauri::command]
+pub async fn agent_attach(
+    state: State<'_, HostState>,
+    since_seq: u64,
+    channel: Channel<AgentEvent>,
+) -> Result<u64, HostError> {
+    let session = state
+        .agent()?
+        .ok_or_else(|| HostError::new("invalid_input", "The agent is not connected", false))?;
+
+    let replay = session.sink.hub.since(since_seq);
+    let cursor = session.sink.hub.cursor();
+
+    // Swap the channel first, then replay, so no event emitted during replay is
+    // delivered to the dead channel and lost.
+    if let Ok(mut guard) = session.sink.channel.lock() {
+        *guard = Some(channel.clone());
+    }
+    for (_, event) in replay {
+        let _ = channel.send(event);
+    }
+
+    Ok(cursor)
 }
 
 #[tauri::command]

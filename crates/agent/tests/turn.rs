@@ -65,6 +65,24 @@ impl CollectedEvents {
     fn snapshot(&self) -> Vec<AgentEvent> {
         self.0.lock().expect("events").clone()
     }
+
+    /// Wait until the detached turn reports completion.
+    ///
+    /// `turn_start` returns as soon as the turn is accepted, so a test that reads
+    /// events immediately would race the turn loop.
+    async fn wait_for_completion(&self) {
+        for _ in 0..500 {
+            let done = self
+                .snapshot()
+                .iter()
+                .any(|event| matches!(event, AgentEvent::TurnCompleted { .. }));
+            if done {
+                return;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(2)).await;
+        }
+        panic!("the turn did not complete");
+    }
 }
 
 struct FakeTools {
@@ -168,6 +186,7 @@ async fn streams_text_and_completes() {
         .expect("turn");
 
     assert!(!turn.turn_id.is_empty());
+    events.wait_for_completion().await;
     let events = events.snapshot();
     assert!(matches!(events[0], AgentEvent::Connected { .. }));
     assert!(events.iter().any(|event| matches!(
@@ -225,6 +244,7 @@ async fn executes_tool_calls_and_round_trips_results() {
     .await
     .expect("turn");
 
+    events.wait_for_completion().await;
     assert_eq!(tools.calls.load(Ordering::SeqCst), 1);
     let events = events.snapshot();
     assert!(events.iter().any(|event| matches!(
@@ -286,6 +306,7 @@ async fn declines_approval_without_executing() {
     .await
     .expect("turn");
 
+    events.wait_for_completion().await;
     assert_eq!(tools.calls.load(Ordering::SeqCst), 0);
     let events = events.snapshot();
     assert!(events.iter().any(|event| matches!(
@@ -355,6 +376,7 @@ async fn interrupts_a_running_turn() {
     host.interrupt(&thread.thread_id, &turn_id)
         .expect("interrupt");
     handle.await.expect("task").expect("turn");
+    events.wait_for_completion().await;
 
     let events = events.snapshot();
     assert!(events

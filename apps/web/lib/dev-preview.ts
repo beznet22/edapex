@@ -1,4 +1,4 @@
-import { buildCapabilityManifest } from "@edapex/contracts";
+import { buildCapabilityManifest } from "@edapex/contracts/capabilities";
 
 import type { SessionView } from "@/lib/api";
 

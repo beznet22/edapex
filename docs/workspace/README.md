@@ -13,7 +13,7 @@ The Cloudflare port and the workspace are two programmes, not two backends.
 - **Port authority:** `docs/cloudflare-port/schema-catalog.md`, `05-d1-migration.spec.md`, the port specs and `PROGRESS.md` own the migrated backend, D1/R2, auth and cutover.
 - **Workspace authority:** `docs/workspace/specs/*` owns the UI, Tiptap editor, GenUI, document engine, local agent, workflows and v2.
 - The port runs **Phases 0–9**. Workspace **Phase 9A is the port's Phase 9 platform closeout**; Phase 10 starts after its deployment, Phase 9B approval and 10A.
-- `apps/api/` remains the in-repo EdApex API service. It becomes a pnpm workspace package after Phase 9 and is never extracted into a separate repository.
+- `services/sms-api/` remains the in-repo EdApex API service. It becomes a pnpm workspace package after Phase 9 and is never extracted into a separate repository.
 - `apps/web/` is the single browser application: a React PWA built as a Next App Router app through **vinext** and deployed to a **Cloudflare Worker** with static assets at `app.llacademy.ng`. The previous static Pages deployment is the rollback until the cutover gate.
 - `apps/desktop/` is Tauri; its installers are not hosted by the web deployment.
 - If a workspace spec and a port spec disagree about backend behaviour, the port spec wins. If they disagree about workspace behaviour, the workspace spec wins. Stop and report a genuine conflict.
@@ -22,7 +22,7 @@ The Cloudflare port and the workspace are two programmes, not two backends.
 
 - Only the **62 cataloged legacy tables** may be migrated from MySQL. New tables are allowed only when a port spec owns them; they never import legacy data.
 - Workspace tables (`AGENT_DB` and local agent state) are separate from the EdApex school `DB`; no joins, no school data, no session tokens.
-- `apps/api/` is UI-less and deployable on its own. Workspace wiring must not break its package, lockfile, tests or deploy dry-run.
+- `services/sms-api/` is UI-less and deployable on its own. Workspace wiring must not break its package, lockfile, tests or deploy dry-run.
 
 ## Boundaries
 
@@ -81,13 +81,13 @@ apps/web (vinext Worker + PWA)
 apps/desktop (Tauri)
   └── same React packages + Rust crates
 
-apps/api (Workers)
+services/sms-api (Workers)
   └── routes → services → repositories → D1/R2
 ```
 
 - UI packages do not import server runtime code, D1 or Node-only modules.
 - Rust crates are platform libraries; web uses their WASM builds.
-- `apps/api/` stays a deployable API service; workspace wiring adds it to the root pnpm workspace after Phase 9, with no extraction.
+- `services/sms-api/` stays a deployable API service; workspace wiring adds it to the root pnpm workspace after Phase 9, with no extraction.
 - One construction path for API services; no module-scope singletons or mutable module state.
 
 ## Platform rules
@@ -224,7 +224,7 @@ Phase 9B is approved; the workspace specs are authoritative for implementation. 
 - No server-side xcodex.
 - No school data or session tokens in local/P2P storage.
 - No assistant-ui, Novel, A2UI or MCP Apps dependency in v1. Novel source is not vendored or copied; see `specs/44-reference-app-audits.md`.
-- No standalone extraction of `apps/api/` or a second backend.
+- No standalone extraction of `services/sms-api/` or a second backend.
 
 ## Verification
 

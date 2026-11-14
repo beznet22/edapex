@@ -1065,11 +1065,27 @@ checksum = "d0881ea181b1df73ff77ffaaf9c7544ecc11e82fba9b5f27b262a3c73a332555"
 name = "edapex-agent"
 version = "0.1.0"
 dependencies = [
+ "memchr",
  "serde",
  "serde_json",
  "thiserror 2.0.21",
  "tokio",
  "uuid",
+ "wasm-bindgen-futures",
+]
+
+[[package]]
+name = "edapex-agent-wasm"
+version = "0.1.0"
+dependencies = [
+ "edapex-agent",
+ "js-sys",
+ "serde",
+ "serde_json",
+ "tokio",
+ "uuid",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
 ]
 
 [[package]]

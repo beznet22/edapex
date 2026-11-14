@@ -340,40 +340,6 @@ importers:
         specifier: ^4.1.13
         version: 4.4.3
 
-  apps/api:
-    dependencies:
-      '@edapex/contracts':
-        specifier: workspace:^
-        version: link:../../packages/contracts
-      drizzle-orm:
-        specifier: ^0.44.7
-        version: 0.44.7(@libsql/client@0.17.4)(@opentelemetry/api@1.9.1)(mysql2@3.22.3(@types/node@22.19.19))
-      hono:
-        specifier: ^4.13.16
-        version: 4.13.17
-      zod:
-        specifier: ^4.1.13
-        version: 4.4.3
-    devDependencies:
-      '@cloudflare/vitest-plugin':
-        specifier: ^1.6.0
-        version: 1.6.0(@types/node@22.19.19)(vitest@4.1.10(@opentelemetry/api@1.9.1)(@types/node@22.19.19)(@vitest/coverage-v8@4.1.5)(jsdom@28.1.0)(vite@7.3.3(@types/node@22.19.19)(jiti@2.7.0)(lightningcss@1.33.0)(terser@5.51.2)(tsx@4.22.4)))
-      drizzle-kit:
-        specifier: ^0.31.7
-        version: 0.31.10
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
-      vite:
-        specifier: 7.3.3
-        version: 7.3.3(@types/node@22.19.19)(jiti@2.7.0)(lightningcss@1.33.0)(terser@5.51.2)(tsx@4.22.4)
-      vitest:
-        specifier: 4.1.10
-        version: 4.1.10(@opentelemetry/api@1.9.1)(@types/node@22.19.19)(@vitest/coverage-v8@4.1.5)(jsdom@28.1.0)(vite@7.3.3(@types/node@22.19.19)(jiti@2.7.0)(lightningcss@1.33.0)(terser@5.51.2)(tsx@4.22.4))
-      wrangler:
-        specifier: ^4.158.0
-        version: 4.158.0(@types/node@22.19.19)
-
   apps/desktop:
     devDependencies:
       '@tauri-apps/cli':
@@ -590,6 +556,93 @@ importers:
       vitest:
         specifier: ^4.1.10
         version: 4.1.10(@opentelemetry/api@1.9.1)(@types/node@22.19.19)(@vitest/coverage-v8@4.1.5)(jsdom@28.1.0)(vite@8.3.8(@types/node@22.19.19)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.22.4))
+
+  services/cowork-api:
+    dependencies:
+      '@edapex/contracts':
+        specifier: workspace:^
+        version: link:../../packages/contracts
+      hono:
+        specifier: ^4.13.16
+        version: 4.13.17
+      zod:
+        specifier: ^4.1.13
+        version: 4.4.3
+    devDependencies:
+      '@cloudflare/vitest-plugin':
+        specifier: ^1.6.0
+        version: 1.6.0(@types/node@22.19.19)(vitest@4.1.10(@opentelemetry/api@1.9.1)(@types/node@22.19.19)(@vitest/coverage-v8@4.1.5)(jsdom@28.1.0)(vite@7.3.3(@types/node@22.19.19)(jiti@2.7.0)(lightningcss@1.33.0)(terser@5.51.2)(tsx@4.22.4)))
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vite:
+        specifier: 7.3.3
+        version: 7.3.3(@types/node@22.19.19)(jiti@2.7.0)(lightningcss@1.33.0)(terser@5.51.2)(tsx@4.22.4)
+      vitest:
+        specifier: 4.1.10
+        version: 4.1.10(@opentelemetry/api@1.9.1)(@types/node@22.19.19)(@vitest/coverage-v8@4.1.5)(jsdom@28.1.0)(vite@7.3.3(@types/node@22.19.19)(jiti@2.7.0)(lightningcss@1.33.0)(terser@5.51.2)(tsx@4.22.4))
+      wrangler:
+        specifier: ^4.158.0
+        version: 4.160.1(@types/node@22.19.19)
+
+  services/model-router:
+    dependencies:
+      hono:
+        specifier: ^4.13.16
+        version: 4.13.17
+      zod:
+        specifier: ^4.1.13
+        version: 4.4.3
+    devDependencies:
+      '@cloudflare/vitest-plugin':
+        specifier: ^1.6.0
+        version: 1.6.0(@types/node@22.19.19)(vitest@4.1.10(@opentelemetry/api@1.9.1)(@types/node@22.19.19)(@vitest/coverage-v8@4.1.5)(jsdom@28.1.0)(vite@7.3.3(@types/node@22.19.19)(jiti@2.7.0)(lightningcss@1.33.0)(terser@5.51.2)(tsx@4.22.4)))
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vite:
+        specifier: 7.3.3
+        version: 7.3.3(@types/node@22.19.19)(jiti@2.7.0)(lightningcss@1.33.0)(terser@5.51.2)(tsx@4.22.4)
+      vitest:
+        specifier: 4.1.10
+        version: 4.1.10(@opentelemetry/api@1.9.1)(@types/node@22.19.19)(@vitest/coverage-v8@4.1.5)(jsdom@28.1.0)(vite@7.3.3(@types/node@22.19.19)(jiti@2.7.0)(lightningcss@1.33.0)(terser@5.51.2)(tsx@4.22.4))
+      wrangler:
+        specifier: ^4.158.0
+        version: 4.160.1(@types/node@22.19.19)
+
+  services/sms-api:
+    dependencies:
+      '@edapex/contracts':
+        specifier: workspace:^
+        version: link:../../packages/contracts
+      drizzle-orm:
+        specifier: ^0.44.7
+        version: 0.44.7(@libsql/client@0.17.4)(@opentelemetry/api@1.9.1)(mysql2@3.22.3(@types/node@22.19.19))
+      hono:
+        specifier: ^4.13.16
+        version: 4.13.17
+      zod:
+        specifier: ^4.1.13
+        version: 4.4.3
+    devDependencies:
+      '@cloudflare/vitest-plugin':
+        specifier: ^1.6.0
+        version: 1.6.0(@types/node@22.19.19)(vitest@4.1.10(@opentelemetry/api@1.9.1)(@types/node@22.19.19)(@vitest/coverage-v8@4.1.5)(jsdom@28.1.0)(vite@7.3.3(@types/node@22.19.19)(jiti@2.7.0)(lightningcss@1.33.0)(terser@5.51.2)(tsx@4.22.4)))
+      drizzle-kit:
+        specifier: ^0.31.7
+        version: 0.31.10
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vite:
+        specifier: 7.3.3
+        version: 7.3.3(@types/node@22.19.19)(jiti@2.7.0)(lightningcss@1.33.0)(terser@5.51.2)(tsx@4.22.4)
+      vitest:
+        specifier: 4.1.10
+        version: 4.1.10(@opentelemetry/api@1.9.1)(@types/node@22.19.19)(@vitest/coverage-v8@4.1.5)(jsdom@28.1.0)(vite@7.3.3(@types/node@22.19.19)(jiti@2.7.0)(lightningcss@1.33.0)(terser@5.51.2)(tsx@4.22.4))
+      wrangler:
+        specifier: ^4.158.0
+        version: 4.158.0(@types/node@22.19.19)
 
 packages:
 
@@ -2775,12 +2828,14 @@ packages:
   '@opentelemetry/sdk-trace-base@2.7.1':
     resolution: {integrity: sha512-NAYIlsF8MPUsKqJMiDQJTMPOmlbawC1Iz/omMLygZ1C9am8fTKYjTaI+OZM+WTY3t3Glo0wnOg/6/pac6RGPPw==}
     engines: {node: ^18.19.0 || >=20.6.0}
+    deprecated: Use @opentelemetry/sdk-trace package
     peerDependencies:
       '@opentelemetry/api': '>=1.3.0 <1.10.0'
 
   '@opentelemetry/sdk-trace-node@2.7.1':
     resolution: {integrity: sha512-pCpQxU68lV+I9s9svqMyVu5iHdDDUnqUpSxqwyCU8A9ejEsSnMPCbearwsUO4yk08ZJzAIUCFuReMdVQvHrdvg==}
     engines: {node: ^18.19.0 || >=20.6.0}
+    deprecated: Use @opentelemetry/sdk-trace package
     peerDependencies:
       '@opentelemetry/api': '>=1.0.0 <1.10.0'
 
@@ -7108,6 +7163,7 @@ packages:
 
   libsql@0.5.29:
     resolution: {integrity: sha512-8lMP8iMgiBzzoNbAPQ59qdVcj6UaE/Vnm+fiwX4doX4Narook0a4GPKWBEv+CR8a1OwbfkgL18uBfBjWdF0Fzg==}
+    cpu: [x64, arm64, wasm32, arm]
     os: [darwin, linux, win32]
 
   lie@3.3.0:
@@ -8057,10 +8113,6 @@ packages:
 
   postcss@8.4.31:
     resolution: {integrity: sha512-PS08Iboia9mts/2ygV3eLpY5ghnUcfLV/EXTOW1E2qYxJKGGBUtNjN76FYHnMs36RmARn41bC0AZmn+rR0OVpQ==}
-    engines: {node: ^10 || ^12 || >=14}
-
-  postcss@8.5.14:
-    resolution: {integrity: sha512-SoSL4+OSEtR99LHFZQiJLkT59C5B1amGO1NzTwj7TT1qCUgUO6hxOvzkOYxD+vMrXBM3XJIKzokoERdqQq/Zmg==}
     engines: {node: ^10 || ^12 || >=14}
 
   postcss@8.5.32:
@@ -9637,7 +9689,7 @@ snapshots:
   '@ai-sdk/provider-utils@2.2.8(zod@4.4.3)':
     dependencies:
       '@ai-sdk/provider': 1.1.3
-      nanoid: 3.3.12
+      nanoid: 3.3.20
       secure-json-parse: 2.7.0
       zod: 4.4.3
 
@@ -12412,7 +12464,7 @@ snapshots:
     dependencies:
       '@types/estree': 1.0.9
       estree-walker: 2.0.2
-      picomatch: 4.0.4
+      picomatch: 4.0.7
     optionalDependencies:
       rollup: 4.60.3
 
@@ -13928,7 +13980,7 @@ snapshots:
       '@vue/shared': 3.5.34
       entities: 7.0.1
       estree-walker: 2.0.2
-      source-map-js: 1.2.1
+      source-map-js: 1.2.2
 
   '@vue/compiler-dom@3.5.34':
     dependencies:
@@ -13944,8 +13996,8 @@ snapshots:
       '@vue/shared': 3.5.34
       estree-walker: 2.0.2
       magic-string: 0.30.21
-      postcss: 8.5.14
-      source-map-js: 1.2.1
+      postcss: 8.5.32
+      source-map-js: 1.2.2
 
   '@vue/compiler-ssr@3.5.34':
     dependencies:
@@ -17428,12 +17480,6 @@ snapshots:
       picocolors: 1.1.1
       source-map-js: 1.2.1
 
-  postcss@8.5.14:
-    dependencies:
-      nanoid: 3.3.12
-      picocolors: 1.1.1
-      source-map-js: 1.2.1
-
   postcss@8.5.32:
     dependencies:
       nanoid: 3.3.20
@@ -18856,11 +18902,11 @@ snapshots:
   vite@7.3.3(@types/node@22.19.19)(jiti@2.7.0)(lightningcss@1.33.0)(terser@5.51.2)(tsx@4.22.4):
     dependencies:
       esbuild: 0.27.7
-      fdir: 6.5.0(picomatch@4.0.4)
-      picomatch: 4.0.4
-      postcss: 8.5.14
+      fdir: 6.5.0(picomatch@4.0.7)
+      picomatch: 4.0.7
+      postcss: 8.5.32
       rollup: 4.60.3
-      tinyglobby: 0.2.16
+      tinyglobby: 0.2.17
     optionalDependencies:
       '@types/node': 22.19.19
       fsevents: 2.3.3

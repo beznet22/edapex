@@ -1,14 +1,14 @@
 # 30 — Tauri, React and the Rust Core
 
-**Status:** In progress (10C). `crates/core` is scaffolded; the capability layer adds `crates/ocr`, `crates/agent`, the Tauri auth/API/capture adapters and the mobile camera plugin. `runtime_health` remains the baseline command.
+**Status:** In progress (10C). `crates/core` is scaffolded; the capability layer adds `crates/ocr`, `crates/agent`, `crates/agent-wasm`, `crates/store`, the Tauri auth/API/capture adapters and the mobile camera plugin. `runtime_health` remains the baseline command.
 
 ## v1 platform matrix
 
 | Surface | UI | Native execution |
 |---|---|---|
-| Web | React PWA | Rust core compiled to WASM; xcodex/Needle 3 WASM; iroh WASM |
-| Desktop | React in Tauri 2 WebView | Rust core native; xcodex native; Needle 3 native; iroh native |
-| Mobile | React in Tauri 2 WebView | Rust core native; xcodex native; Needle 3 native; iroh native |
+| Web | React PWA | Rust core compiled to WASM (`crates/agent-wasm`); host `fetch` transport |
+| Desktop | React in Tauri 2 WebView | Rust core native; host `reqwest` transport |
+| Mobile | React in Tauri 2 WebView | Rust core native; host `reqwest` transport |
 
 Tauri 2 supports desktop and mobile. The WebView is the UI host, not the agent runtime.
 
@@ -17,11 +17,11 @@ Tauri 2 supports desktop and mobile. The WebView is the UI host, not the agent r
 ```text
 crates/
   core               sessions, capability registry, approvals, workflow IR
-  agent              xcodex host/protocol adapter and dynamic tools
-  ocr                RustO local OCR and model validation and dynamic tools
+  agent              thin provider-neutral runtime: provider stream → tools → approvals
+  agent-wasm         cdylib + wasm-bindgen wrapper for the browser surface
+  store              local SQLite, per-record encryption, sync outbox
   ocr                RustO local OCR and model validation
   needle             Cactus Needle 3 C API wrapper
-  sync               iroh device identity, state/workspace sync, AGENT_DB
   workspace          files and allowlisted shell
   sandbox            QuickJS/wasmi/DSL code execution
   documents          IronPress PDF engine (crate + WASM)
@@ -29,30 +29,35 @@ crates/
 
 Directories are the short names above (matching `05-project-structure.md`); each Cargo package is `edapex-<dir>` (`crates/core` → `edapex-core`). UniFFI/`edapex-bindings` native extensions are deferred to v2 (`80-v2-native-mobile.md`).
 
+There is **no `crates/sync`**. Device sync is server-mediated through `AGENT_DB`; iroh is deferred (`41-storage-sync.md`). A `Transport` trait ships unimplemented so a future transport has a seam.
+
 Scaffold order (owning workstream in parentheses):
 
 1. `core` — done (10B baseline): `runtime_health`, `CoreHealth`, `LOCAL_STATE_SCHEMA_VERSION = 1`.
-2. `agent`, `ocr` — 10C: native xcodex host, dynamic tools, RustO OCR and the mobile camera bridge.
-3. `sync` — follow-on: AGENT_DB storage and iroh/CF sync (`41`, `42`).
-4. `documents` — IronPress native crate (`22`).
-5. `needle`, `sandbox` — 10C+ (routing, execution).
+2. `agent` — 10C: provider → tools → approvals. **The only agent runtime.**
+3. `agent-wasm`, `ocr` — 10C: browser surface and RustO OCR with the mobile camera bridge.
+4. `store` — chunk 2: local SQLite, per-record XChaCha20-Poly1305, `sync_outbox`.
+5. `documents` — IronPress native crate (`22`).
+6. `needle`, `sandbox` — 10C+ (routing, execution).
 
 Tauri mobile bring-up (10C): `tauri mobile init`, Android/iOS targets, native camera plugin and CI smoke build. The shell renders the web UI in the system WebView; `agent_connected` is true only when the native host starts.
 
 ## Bindings
 
 - Tauri: direct Rust commands/events; no JSI.
-- Web: Rust core WASM; same TypeScript contracts.
+- Web: Rust core WASM (`crates/agent-wasm`); same TypeScript contracts.
 - React Native/Craby/JSI/UniFFI: deferred to v2; see `80-v2-native-mobile.md`.
 
-## xcodex
+## The thin core
 
-- Tauri desktop/mobile: `codex-app-server::in_process` on a Tokio thread; Tauri commands plus a typed `tauri::ipc::Channel<AgentEvent>`.
-- EdApex tools are app-server **dynamic tools** (`web_search`, `web_fetch`, `ocr_extract`), not an EdApex MCP child process. Chrome DevTools MCP remains the desktop-only user-installed browser path.
+- Desktop/mobile: `crates/agent` runs natively; the Tauri host injects `reqwest`, the tool executor, the approval handler and a typed `tauri::ipc::Channel<AgentEvent>`.
+- Web: the same crate compiles to WASM; the browser host injects `fetch`.
+- The core carries **no TLS stack and no HTTP client**. Transport is a host concern.
+- EdApex tools are core **dynamic tools** (`web_search`, `web_fetch`, `ocr_extract`), executed in process by the host. They are not an MCP child process.
 - Desktop uses the full tool profile. Mobile uses a mobile-safe profile with no shell, PTY, child process, process-based git or unrestricted filesystem.
-- Fallback: local xcodex WASM in the Tauri WebView for mobile only if the native app-server build cannot be made safe. The host reports `nativeAgent: false`; tools are not faked.
-- Web: xcodex WASM.
-- Official xcodex UI is Svelte; the React UI uses the runtime/protocol, not the Svelte shell.
+- AG-UI is the **external-agent** boundary (`17-chat-framework.md`); it is not the internal transport.
+- Official OpenDuet UI is React; the EdApex UI uses the runtime/protocol, not the Svelte shell.
+- The WebView never holds an EdApex bearer token or a provider key.
 
 ### OCR and capture
 

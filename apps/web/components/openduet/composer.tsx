@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 import type { ChangeEvent, FormEvent, KeyboardEvent } from "react";
 import type { QueuedMessage } from "@edapex/contracts";
-import { Paperclip, Send, Square, X } from "lucide-react";
+import { ArrowUp, Paperclip, Square, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -21,6 +21,13 @@ interface ComposerProps {
 const MAX_ATTACHMENTS = 3;
 const MAX_QUEUE = 20;
 
+/**
+ * The message composer.
+ *
+ * Frosted glass is applied from `md` up only. On a phone the blur costs more than
+ * it gives: the compositor has to re-blur while the software keyboard resizes
+ * the viewport.
+ */
 export function Composer({
   connected,
   disabled = false,
@@ -32,14 +39,12 @@ export function Composer({
 }: ComposerProps) {
   const [draft, setDraft] = useState("");
   const [attachments, setAttachments] = useState<readonly string[]>([]);
+  const [focused, setFocused] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
   const textarea = useRef<HTMLTextAreaElement>(null);
 
   const canSend =
-    connected &&
-    !disabled &&
-    draft.trim().length > 0 &&
-    queue.length < MAX_QUEUE;
+    connected && !disabled && draft.trim().length > 0 && queue.length < MAX_QUEUE;
 
   const submit = (): void => {
     if (!canSend) return;
@@ -67,7 +72,7 @@ export function Composer({
     setDraft(event.target.value);
     const element = event.target;
     element.style.height = "auto";
-    element.style.height = `${Math.min(element.scrollHeight, 160)}px`;
+    element.style.height = `${Math.min(element.scrollHeight, 176)}px`;
   };
 
   const onFiles = (event: ChangeEvent<HTMLInputElement>): void => {
@@ -80,21 +85,24 @@ export function Composer({
 
   return (
     <form
-      className="shrink-0 border-t border-border bg-background/95 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2.5 lg:border-t-0 lg:bg-transparent lg:px-4 lg:pb-5"
+      className="shrink-0 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 lg:px-4 lg:pb-5"
       onSubmit={onSubmit}
     >
       {queue.length > 0 ? (
-        <div className="mb-2 space-y-1.5" aria-label="Queued messages">
+        <div
+          aria-label="Queued messages"
+          className="mb-2 space-y-1.5"
+        >
           {queue.map((message) => (
             <div
-              className="flex items-center gap-2 rounded-lg border border-border bg-card/60 px-2.5 py-1.5 text-xs text-muted-foreground"
+              className="flex items-center gap-2 rounded-xl bg-muted/70 px-2.5 py-1.5 text-xs text-muted-foreground"
               key={message.id}
             >
               <span className="min-w-0 flex-1 truncate">{message.text}</span>
               <span className="shrink-0 text-[10px] uppercase tracking-wide">Queued</span>
               <button
                 aria-label={`Remove queued message ${message.text}`}
-                className="flex size-11 shrink-0 items-center justify-center rounded-full hover:bg-muted hover:text-foreground"
+                className="flex size-8 shrink-0 items-center justify-center rounded-full hover:bg-background hover:text-foreground"
                 onClick={() => onRemoveQueued(message.id)}
                 type="button"
               >
@@ -109,13 +117,13 @@ export function Composer({
         <div className="mb-2 flex flex-wrap gap-1.5">
           {attachments.map((name) => (
             <span
-              className="inline-flex max-w-full items-center gap-1 rounded-full border border-border bg-card px-2.5 py-1 text-xs text-muted-foreground"
+              className="inline-flex max-w-full items-center gap-1 rounded-full bg-secondary px-2.5 py-1 text-xs text-secondary-foreground"
               key={name}
             >
               <span className="truncate">{name}</span>
               <button
                 aria-label={`Remove ${name}`}
-                className="flex size-8 items-center justify-center rounded-full hover:text-foreground"
+                className="flex size-6 items-center justify-center rounded-full hover:text-foreground"
                 onClick={() =>
                   setAttachments((current) => current.filter((item) => item !== name))
                 }
@@ -128,23 +136,31 @@ export function Composer({
         </div>
       ) : null}
 
-      <div className="rounded-2xl border border-border bg-card p-2.5 shadow-sm transition-shadow focus-within:border-ring/60 focus-within:ring-2 focus-within:ring-ring/30">
+      {/*
+        One surface, no per-edge rules. The ring carries the focused state, so the
+        composer does not draw a border at all.
+      */}
+      <div
+        className={cn(
+          "nested rounded-2xl bg-card p-2 transition-all duration-200 md:glass",
+          focused ? "ring-2 ring-ring/40" : "ring-1 ring-border/60",
+          "shadow-[var(--elevation-2)]"
+        )}
+      >
         <textarea
           aria-label="Message"
-          className="max-h-40 min-h-12 w-full resize-none bg-transparent px-1.5 py-2 text-[15px] leading-6 outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed"
+          className="max-h-44 min-h-11 w-full resize-none bg-transparent px-2 py-2 text-[15px] leading-6 outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed"
           disabled={disabled}
+          onBlur={() => setFocused(false)}
           onChange={onInput}
+          onFocus={() => setFocused(true)}
           onKeyDown={onKeyDown}
-          placeholder={
-            connected
-              ? "Message EdApex"
-              : "Draft — the runtime is not connected"
-          }
+          placeholder={connected ? "Ask EdApex anything" : "Loading the workspace…"}
           ref={textarea}
           rows={1}
           value={draft}
         />
-        <div className="mt-1 flex items-center gap-1.5">
+        <div className="mt-1 flex items-center gap-1">
           <input
             accept=".pdf,.doc,.docx,.csv,.png,.jpg,.jpeg"
             className="hidden"
@@ -154,63 +170,48 @@ export function Composer({
             ref={fileInput}
             type="file"
           />
-          <Button
+          <button
             aria-label="Add attachment"
-            className="size-11 shrink-0"
+            className="flex size-9 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
             disabled={disabled}
             onClick={() => fileInput.current?.click()}
-            size="icon"
             type="button"
-            variant="ghost"
           >
             <Paperclip aria-hidden="true" className="size-4" />
-          </Button>
-          <span
-            className="inline-flex min-h-7 items-center gap-1.5 rounded-full border border-border px-2.5 text-[10px] font-semibold text-muted-foreground"
-            title="Local agent runtime"
-          >
-            <span
-              aria-hidden="true"
-              className={connected ? "size-1.5 rounded-full bg-emerald-400" : "size-1.5 rounded-full bg-muted-foreground"}
-            />
-            xcodex · {connected ? "local" : "offline"}
-          </span>
+          </button>
           <span className="flex-1" />
           {stoppable ? (
             <Button
               aria-label="Stop run"
-              className="size-11 shrink-0"
+              className="size-9 shrink-0 rounded-full"
               onClick={onStop}
               size="icon"
               type="button"
+              variant="secondary"
             >
-              <Square aria-hidden="true" className="size-4 fill-current" />
+              <Square aria-hidden="true" className="size-3.5 fill-current" />
             </Button>
           ) : (
             <Button
               aria-label="Send message"
-              className={cn("size-11 shrink-0", !canSend && "opacity-60")}
+              className={cn(
+                "size-9 shrink-0 rounded-full transition-transform",
+                canSend ? "scale-100" : "scale-95 opacity-40"
+              )}
               disabled={!canSend}
               size="icon"
               type="submit"
             >
-              <Send aria-hidden="true" className="size-4" />
+              <ArrowUp aria-hidden="true" className="size-4" />
             </Button>
           )}
         </div>
       </div>
-      <div className="mt-2 flex items-center justify-between gap-2 px-1 text-[10px] leading-4 text-muted-foreground">
-        <p>
-          {connected
-            ? "Approval-gated actions are sent through the workspace runtime."
-            : "Local shell only. The xcodex runtime arrives in 10C."}
-        </p>
-        {queue.length > 0 ? (
-          <span className="shrink-0 rounded-full border border-border px-2 py-0.5">
-            {queue.length} queued
-          </span>
-        ) : null}
-      </div>
+      <p className="mt-2 px-1 text-[10px] leading-4 text-muted-foreground">
+        {connected
+          ? "Every action that reaches the network or your records asks first."
+          : "The local agent runtime is still loading."}
+      </p>
     </form>
   );
 }

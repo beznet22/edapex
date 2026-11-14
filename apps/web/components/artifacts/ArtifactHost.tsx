@@ -50,7 +50,7 @@ export function ArtifactHost({ open, split, chat, onClose }: ArtifactHostProps) 
         className="fixed inset-0 z-50 grid grid-cols-[minmax(360px,38%)_minmax(480px,62%)] overflow-hidden bg-background"
         role="dialog"
       >
-        <div className="flex min-w-0 flex-col border-r border-border">{chat}</div>
+        <div className="flex min-w-0 flex-col shadow-[1px_0_0_var(--border)]">{chat}</div>
         <div className="min-w-0 overflow-hidden bg-background">
           <DocumentEditor onClose={onClose} />
         </div>
@@ -65,7 +65,7 @@ export function ArtifactHost({ open, split, chat, onClose }: ArtifactHostProps) 
       className="fixed inset-0 z-50 flex justify-center bg-background"
       role="dialog"
     >
-      <div className="h-dvh w-full max-w-[430px] overflow-hidden border-x border-border bg-background">
+      <div className="h-dvh w-full max-w-[430px] overflow-hidden bg-background">
         <DocumentEditor onClose={onClose} />
       </div>
     </div>

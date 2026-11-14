@@ -1,6 +1,6 @@
 # 45 — Admin Claim Links and Directory
 
-**Status:** v1 implementation in `apps/web` and `apps/api`. It is the first
+**Status:** v1 implementation in `apps/web` and `services/sms-api`. It is the first
 workspace surface and must ship before the general cowork workspace.
 
 ## Purpose

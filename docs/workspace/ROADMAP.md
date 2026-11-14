@@ -43,8 +43,8 @@ The Cloudflare port and the workspace are two programmes, not two backends.
 - `docs/cloudflare-port/schema-catalog.md`, `05-d1-migration.spec.md`, the port specs and `PROGRESS.md` are authoritative for the migrated backend, D1/R2, auth and cutover.
 - `docs/workspace/specs/*` are authoritative for the workspace UI, editor, GenUI, local agent, workflows and v2.
 - The port phases run **0 → 9**. Workspace **Phase 9A is the port's Phase 9** (auth/retention closeout). Workspace **Phase 10** starts only after that gate.
-- `apps/api/` remains the in-repo EdApex API service. It becomes a pnpm workspace package after Phase 9; it is not extracted into a separate repository.
-- `apps/web/` is the single browser PWA: a Next App Router app built by **vinext** and deployed as a **Cloudflare Worker with static assets** at `app.llacademy.ng`. `apps/api/` is the Hono API on **Cloudflare Workers**. `apps/desktop/` is Tauri; its installers are not hosted by the web deployment. The previous Pages deployment is rollback only.
+- `services/sms-api/` remains the in-repo EdApex API service. It becomes a pnpm workspace package after Phase 9; it is not extracted into a separate repository.
+- `apps/web/` is the single browser PWA: a Next App Router app built by **vinext** and deployed as a **Cloudflare Worker with static assets** at `app.llacademy.ng`. `services/sms-api/` is the Hono API on **Cloudflare Workers**. `apps/desktop/` is Tauri; its installers are not hosted by the web deployment. The previous Pages deployment is rollback only.
 - If a workspace spec and a port spec disagree about backend behaviour, the port spec wins and the workspace spec is corrected. If they disagree about workspace behaviour, the workspace spec wins. Stop and report a genuine conflict; do not pick silently.
 
 ## 2. Goal
@@ -101,7 +101,7 @@ Cloudflare Workers (api.llacademy.ng)
 - School-data PDF/DOCX/CSV renditions are Worker/R2 or memory only; never P2P/local durable.
 - Agent API writes pass through CF Worker authorization and audit.
 - **Workers Free only.** No Paid fallback. D1 writes are account-wide and capped at 100k/day.
-- `apps/api/` remains deployable on its own; workspace wiring must not break its package, lockfile, tests or deploy dry-run.
+- `services/sms-api/` remains deployable on its own; workspace wiring must not break its package, lockfile, tests or deploy dry-run.
 
 ### Cloudflare web boundary
 
@@ -180,7 +180,7 @@ Every spec maps to at least one workstream; `06` and the cross-cutting specs are
 - artifact renditions/imports/comments/sign-offs/checklists
 - legacy EdApex UI reuse: report/transcript templates, filestore/artifact viewer patterns, school settings
 - legacy SvelteKit freeze/tag/retirement sequence
-- workspace package wiring: `apps/api/` joins the pnpm workspace, stays deployable, no extraction
+- workspace package wiring: `services/sms-api/` joins the pnpm workspace, stays deployable, no extraction
 - Worker route/custom domain, `next.config.ts` headers, preview/production deploy
 
 **Read first:** `specs/00-overview.md`, `specs/05-project-structure.md`, `specs/06-legacy-archive.md`, `specs/15-ui-surfaces.md`, `16-artifacts.md`, `17-chat-framework.md`, `19-design-system.md`, `21-generative-ui-openui.md`, `22-documents-and-artifacts.md`, `30-tauri-rust-core.md`, `43-openduet-ui-vendoring.md`, `44-reference-app-audits.md`, `45-admin-claim-links.md`, `47-performance-budgets.md`, `60-security-privacy.md`, and `extracted-ui-spec.md`.
@@ -316,8 +316,8 @@ Do not restate cutover details here; use `docs/cloudflare-port/PROGRESS.md` and 
 - magic link and admin claim-link smoke pass; `app.llacademy.ng` proxied CNAME and 200
 - retention sweep dry-run matches expectations
 - session archives 1–4 manifests verified
-- workspace package wiring verified: `apps/api/` joins the pnpm workspace, remains deployable, and the port verifiers + deploy dry-run still pass
-- `apps/api/` remains the in-repo API service; no standalone extraction
+- workspace package wiring verified: `services/sms-api/` joins the pnpm workspace, remains deployable, and the port verifiers + deploy dry-run still pass
+- `services/sms-api/` remains the in-repo API service; no standalone extraction
 - **transitional exception:** `/claim` and shared password digests remain until 10G.2; student codes, duplicate resolution and staff/parent coverage belong to 10G.1
 
 ### Phase 9B — this documentation gate (draft)
@@ -382,8 +382,8 @@ OpenUI Lang has a React Native native entry; Flutter/Lynx have no OpenUI rendere
 - One tool per API route in Needle
 - Treat shell as a workflow engine
 - Start React Native/Lynx/Flutter before the v2 gate
-- Fork the backend or extract `apps/api/` into a separate repository
+- Fork the backend or extract `services/sms-api/` into a separate repository
 - Make Novel a dependency, copy Novel source, or turn the minimal Tiptap editor into a full toolbar-rich editor
 - Treat PDF/DOCX/CSV parsing as authoritative school-record creation
 - Promise OCR, PDF/A or tagged PDF in v1
-- Host `apps/api` or Tauri installers on the web Worker/Pages
+- Host `services/sms-api` or Tauri installers on the web Worker/Pages

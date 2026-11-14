@@ -1,4 +1,4 @@
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tokio::sync::mpsc;
 
@@ -33,13 +33,15 @@ pub struct ToolCall {
 #[derive(Debug, Clone)]
 pub struct ChatMessage {
     pub role: Role,
-    pub content: Option<String>,
+    /// Shared so a transcript snapshot is pointer bumps rather than a copy of
+    /// every message body.
+    pub content: Option<std::sync::Arc<str>>,
     pub tool_calls: Vec<ToolCall>,
     pub tool_call_id: Option<String>,
 }
 
 impl ChatMessage {
-    pub fn system(text: impl Into<String>) -> Self {
+    pub fn system(text: impl Into<std::sync::Arc<str>>) -> Self {
         Self {
             role: Role::System,
             content: Some(text.into()),
@@ -48,7 +50,7 @@ impl ChatMessage {
         }
     }
 
-    pub fn user(text: impl Into<String>) -> Self {
+    pub fn user(text: impl Into<std::sync::Arc<str>>) -> Self {
         Self {
             role: Role::User,
             content: Some(text.into()),
@@ -57,7 +59,7 @@ impl ChatMessage {
         }
     }
 
-    pub fn assistant(text: Option<String>, tool_calls: Vec<ToolCall>) -> Self {
+    pub fn assistant(text: Option<std::sync::Arc<str>>, tool_calls: Vec<ToolCall>) -> Self {
         Self {
             role: Role::Assistant,
             content: text,
@@ -66,7 +68,7 @@ impl ChatMessage {
         }
     }
 
-    pub fn tool(tool_call_id: impl Into<String>, content: impl Into<String>) -> Self {
+    pub fn tool(tool_call_id: impl Into<String>, content: impl Into<std::sync::Arc<str>>) -> Self {
         Self {
             role: Role::Tool,
             content: Some(content.into()),
@@ -79,12 +81,21 @@ impl ChatMessage {
 #[derive(Debug, Clone)]
 pub struct ProviderRequest {
     pub model: String,
-    pub messages: Vec<ChatMessage>,
+    /// A shared snapshot of the transcript.
+    ///
+    /// The turn loop appends to its history every round. Handing out an owned
+    /// `Vec` forced a deep copy of the whole conversation per tool round; this
+    /// is O(1) to clone and immutable for the duration of the request.
+    pub messages: std::sync::Arc<[ChatMessage]>,
     pub tools: Vec<DynamicToolSpec>,
     pub temperature: Option<f32>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+/// One normalized provider stream event.
+///
+/// Serialized for the WASM boundary, where JavaScript receives and returns these
+/// values. Externally tagged: `{"Text":"hello"}`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum ProviderChunk {
     Text(String),
     Reasoning(String),
@@ -101,7 +112,10 @@ pub enum ProviderChunk {
 }
 
 /// The host injects the HTTP transport. The core never carries a TLS stack.
-pub trait ProviderClient: Send + Sync {
+///
+/// The `Send + Sync` requirement comes from `HostObject`, which relaxes it on
+/// wasm32 where a `JsValue`-based transport cannot satisfy it.
+pub trait ProviderClient: crate::runtime::HostObject {
     fn stream_chat(
         &self,
         request: ProviderRequest,

@@ -18,7 +18,7 @@
 - No local school-record database.
 - No session cookies/tokens in P2P sync.
 - No provider API keys in web/localStorage or P2P state.
-- No server-side xcodex.
+- No server-side agent runtime. The agent executes on the user's device; the server owns policy, connectors and persistence.
 - No arbitrary shell as a workflow engine.
 - No model-generated code in the main UI runtime.
 - No auto-apply of placements, enrollment, email merges or staffing.
@@ -77,20 +77,45 @@ See `22-documents-and-artifacts.md`. Imported PDFs, DOCX and CSV are untrusted.
 - No photo-library write. No desktop/PWA camera preview. The native camera session stops on background/cancel/close.
 - Chrome DevTools MCP is desktop-only and user-installed; PWA/mobile have no browser control. No custom extension or BrowserBridge exists.
 
+## Connectors and governed MCP
+
+Connectors run **server-side** in `services/cowork-api`. They are the only way an agent reaches a third-party system, and they are not part of the agent runtime.
+
+- **Governed MCP client.** The Worker is an MCP *client*; it dials out to a configured server. It never spawns a process and never accepts a server supplied by model output at runtime.
+- **Per-agent grants.** A connector tool is usable only when granted through `plugin_grants` and the agent's `AgentGrant`. Grants are validated at call time, not at connect time.
+- **Per-person OAuth.** Google Workspace connects per user; tokens are encrypted at rest, write-only, never returned by an API and redacted from audit events. There is no deployment-wide shared mailbox token.
+- **Read vs write.** A tool that cannot be positively classified as a read is a write and goes through policy → audit → act. Outgoing messages always require an explicit decision showing recipient and content.
+- **No brokered/paid connectors.** Composio/Arcade-style brokers stay out of v1. A self-run MCP client is in scope; a paid broker is not.
+- **Zero app bytes.** Connector code, credentials and catalogue never enter the web bundle, the Tauri binary or the APK.
+- **Tool results are data.** Connector output is never treated as instructions; the same prompt-injection framing as web content applies.
+
+This does not relax the browser boundary: a connector is server-side reach, not browser control. PWA/mobile still cannot drive a browser.
+
 ## WebSearch and WebFetch
 
-- Provider keys are Worker secrets only; they never reach the WebView, keychain or bundle.
+- Web tool provider keys (TinyFish, Tavily) are `services/sms-api` Worker secrets; they never reach the WebView, keychain or bundle.
 - Search queries and fetched URLs are not written to logs; only provider, status and byte counts are logged.
 - Fetch URLs are validated server-side: HTTP(S) only, no localhost/private/link-local/metadata hosts.
 - Search is staff-only in v1; quotas are tenant-scoped and reuse `auth_rate_limits`.
 - Search results and fetched content are untrusted data and must be framed as data in prompts, never instructions.
+
+## Model provider credentials
+
+Language-model credentials are held **only** by `services/model-router`. They never reach a client bundle, a WebView, a keychain, `sms-api` or `cowork-api`.
+
+- Keys are stored in **Cloudflare AI Gateway via BYOK** (Secrets Store), not as Worker secrets, and are selected per tenant with `cf-aig-byok-alias`. Rotating a key is a dashboard action with no redeploy.
+- `services/model-router` holds only `CF_AIG_TOKEN` (authorises the gateway call) and `CALLER_SECRET` (proves the caller is an EdApex Worker). Neither is a provider credential.
+- **Prompt and response logging is disabled on every request** with `cf-aig-collect-log: false`. AI Gateway logs both bodies by default, and prompts contain marksheet OCR text and parent conversations.
+- Because that header is the guarantee, **no client may call AI Gateway directly.** The browser, desktop and mobile reach models only through `model-router`. A browser could omit the header; a server cannot be made to.
+- Requests use direct provider passthrough, never the Unified Billing surface, where a missing BYOK key silently falls through to Cloudflare billing and charges the wrong party.
+- `model-router` has no public hostname (`workers_dev: false`, no `routes`). It does not parse cookies and does not bind D1, so it cannot be induced to authenticate a caller.
 
 ## Desktop authentication
 
 - Tauri uses signed PKCE code exchange with the system browser; it does not depend on `__Host-` cookies.
 - The bearer session token is stored only in OS keychain/Keystore. It never enters `localStorage`, IndexedDB, cookies or sync state.
 - The native `api_request` proxy adds the bearer header; JavaScript receives data, not the token.
-- OpenRouter keys are desktop keychain or browser tab memory only.
+- No desktop or mobile client holds a model provider key. Model calls go through `services/model-router`, which owns the gateway token; the desktop keychain holds only the EdApex session token.
 
 ## Cloudflare web boundary
 

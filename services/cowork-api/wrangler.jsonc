@@ -1,0 +1,22 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "edapex-cowork-api",
+  "main": "src/worker.ts",
+  "compatibility_date": "2026-11-05",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+
+  // Public entry point for agent traffic. It shares the api host with sms-api so
+  // the `__Host-` session cookie is sent to both; see the README for the
+  // Workers Route that has to be added when this Worker is first deployed.
+  "vars": {
+    "API_ORIGIN": "https://api.llacademy.ng"
+  }
+
+  // Bindings are added with each chunk:
+  //   chunk 2 — AGENT_DB (D1), SYNC_MEDIA (R2), service binding to sms-api
+  //   chunk 3 — service binding to model-router, APPROVALS_QUEUE
+  //
+  // `AGENT_DB` is bound only here. The school `DB` is never bound to this
+  // Worker, so no query in this codebase can reach school records.
+}

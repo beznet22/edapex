@@ -26,19 +26,43 @@
       {
         "title": "EdApex Work",
         "url": "/workspace/",
-        "width": 430,
-        "height": 860,
+        "width": 1100,
+        "height": 800,
         "minWidth": 360,
         "minHeight": 640,
-        "resizable": true
+        "resizable": true,
+        "center": true
       }
     ],
     "security": {
-      "csp": null
+      "csp": {
+        "default-src": "'self'",
+        "script-src": "'self' 'wasm-unsafe-eval'",
+        "style-src": "'self' 'unsafe-inline'",
+        "img-src": "'self' data: blob:",
+        "font-src": "'self' data:",
+        "connect-src": "'self' https://api.llacademy.ng",
+        "worker-src": "'self' blob:",
+        "object-src": "'none'",
+        "base-uri": "'self'",
+        "form-action": "'self'",
+        "frame-ancestors": "'none'"
+      }
     }
   },
   "bundle": {
-    "active": false,
+    "active": true,
+    "targets": "all",
+    "category": "Productivity",
+    "shortDescription": "EdApex school operations and cowork workspace",
+    "longDescription": "EdApex Work runs the school workspace and the local agent runtime on desktop and mobile.",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
     "resources": [
       "resources/ocr/manifest.json",
       "resources/ocr/det.onnx",

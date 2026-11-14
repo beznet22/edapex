@@ -2,7 +2,7 @@
 
 Implementation order for the EdApex port. Every phase has an executable brief a coding agent can follow without reading the whole conversation that produced these specs.
 
-Read [README.md](./README.md) first, then the specs named in the phase you are working on. Progress lives in [PROGRESS.md](./PROGRESS.md); port code lands in [`apps/api/`](../../apps/api/AGENTS.md).
+Read [README.md](./README.md) first, then the specs named in the phase you are working on. Progress lives in [PROGRESS.md](./PROGRESS.md); port code lands in [`services/sms-api/`](../../services/sms-api/AGENTS.md).
 
 ---
 
@@ -260,14 +260,14 @@ P7 cannot start until P6 exists, because archiving history is part of the migrat
 
 ## Part 5 — Repository layout
 
-`apps/api/` is the **EdApex API service** — a deployable, UI-less backend consumed by the frontend apps. It stays in this repository and is planned to become a package in a pnpm workspace; there is no separate repository and no extraction step. `apps/` is the deployable bucket, not a frontend-only bucket. The rules below keep the package deployable on its own and the spec suite single-sourced.
+`services/sms-api/` is the **EdApex API service** — a deployable, UI-less backend consumed by the frontend apps. It stays in this repository and is planned to become a package in a pnpm workspace; there is no separate repository and no extraction step. `apps/` is the deployable bucket, not a frontend-only bucket. The rules below keep the package deployable on its own and the spec suite single-sourced.
 
 | Rule | Why | Enforced by |
 |---|---|---|
-| Deployment config lives in `apps/api/` (`package.json`, lockfile, `wrangler.jsonc`) | the package must build and deploy without depending on the parent app | clean-clone `pnpm install && pnpm exec vitest && pnpm exec wrangler deploy --dry-run` |
+| Deployment config lives in `services/sms-api/` (`package.json`, lockfile, `wrangler.jsonc`) | the package must build and deploy without depending on the parent app | clean-clone `pnpm install && pnpm exec vitest && pnpm exec wrangler deploy --dry-run` |
 | Runtime code does not import the legacy `src/` tree | the port is a rewrite, not a shared-code refactor; imports into `../src` would couple the Worker to SvelteKit | dependency scan in CI |
 | The spec suite stays in `docs/cloudflare-port/`, one copy | two copies drift immediately | both verifier scripts |
 | Workspace wiring happens after Phase 9 | migrating and reorganising the build simultaneously is unrecoverable | this roadmap's phase order |
 | Source anchors remain relative to `docs/cloudflare-port/` | the repository is not split, so `../../src/...` links keep resolving | link check in `verify-port-specs.mjs` |
 
-When the repository adopts a pnpm workspace, add `apps/api/` as a workspace package, keep its deployment scripts, and run the verifiers from the repository root. Do not fork the spec suite or move it under `apps/api/`.
+When the repository adopts a pnpm workspace, add `services/sms-api/` as a workspace package, keep its deployment scripts, and run the verifiers from the repository root. Do not fork the spec suite or move it under `services/sms-api/`.

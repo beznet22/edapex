@@ -3,7 +3,7 @@ name: API (Cloudflare)
 on:
   pull_request:
     paths:
-      - "apps/api/**"
+      - "services/sms-api/**"
       - "docs/cloudflare-port/**"
       - "scripts/verify-port-specs.mjs"
       - "scripts/verify-schema-catalog.mjs"
@@ -12,7 +12,7 @@ on:
     branches:
       - main
     paths:
-      - "apps/api/**"
+      - "services/sms-api/**"
       - "docs/cloudflare-port/**"
       - "scripts/verify-port-specs.mjs"
       - "scripts/verify-schema-catalog.mjs"
@@ -51,7 +51,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: apps/api
+        working-directory: services/sms-api
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -66,7 +66,7 @@ jobs:
         with:
           node-version: 26.13.1
           cache: pnpm
-          cache-dependency-path: apps/api/pnpm-lock.yaml
+          cache-dependency-path: services/sms-api/pnpm-lock.yaml
 
       - name: Install
         run: pnpm install --frozen-lockfile

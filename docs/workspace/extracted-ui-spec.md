@@ -4,9 +4,11 @@
 
 **The porting target is the authenticated OpenDuet operating application—not the Tauri setup wizard.** The product workspace is implemented in `openbot/app`, with runtime and policy behavior in `openbot/server`, `openbot/shared`, `openbot/toolkit`, and the agent packages.
 
-A key visual constraint: OpenDuet’s main runtime experience is **mobile-first and phone-width even in a desktop window**. The authenticated shell centers a column capped at **430 px** on a wide viewport; its Chat, Tasks, and Make navigation floats at the foot of that column. Don’t reinterpret it as a full-width desktop dashboard or stretch the chat layout across the window. This narrow, centered composition is part of the existing design. [AppShell](https://github.com/CopilotKit/OpenDuet/blob/f52288fff5ccdbd3de428d573d9f026fce5ff480/openbot/app/src/components/shell/app-shell.tsx#L26-L128)
+A key visual constraint in the **source**: OpenDuet's main runtime experience is mobile-first and phone-width even in a desktop window. The authenticated shell centers a column capped at **430 px** on a wide viewport; its Chat, Tasks, and Make navigation floats at the foot of that column. [AppShell](https://github.com/CopilotKit/OpenDuet/blob/f52288fff5ccdbd3de428d573d9f026fce5ff480/openbot/app/src/components/shell/app-shell.tsx#L26-L128)
 
-**Parity goal:** reproduce the same route hierarchy, responsive geometry, content order, interaction states, motion, and agent-runtime feedback. Treat the source as the authority; the specification below does not propose a redesign.
+> **EdApex diverges here deliberately.** This document is a **reference port**, not the product mandate. EdApex keeps the measured chat column (430px on a phone, up to 760px on a desktop canvas) but the **shell adapts**: a tab bar below 1024px and an inset sidebar plus canvas at or above it, with dashboards as wide bento grids. Do **not** reproduce the phone-width-in-a-desktop-window composition. The binding rule is `15-ui-surfaces.md` §15.4 "Adaptation vs. measure".
+
+**Parity goal:** reproduce the same route hierarchy, content order, interaction states, motion, and agent-runtime feedback. Responsive **geometry** follows the EdApex divergence above, not the source's fixed phone column. Treat the source as the authority for interaction; this document does not redefine EdApex's identity.
 
 **Evidence note:** the inspected source establishes the overall shell, Chat, transcript, composer, and representative agent/approval behavior. I did not run the app or inspect screenshots; some secondary page details are identified as not yet verified. Code-search results may be incomplete; [browse more repository code results](https://github.com/CopilotKit/OpenDuet/search?q=tool_activity&type=code).
 
@@ -258,7 +260,7 @@ Use the app tokens rather than the desktop setup wizard’s styles. [Theme token
 - Bubble/card radius 20 px; field radius 22 px; tile radius 10 px; pills/buttons fully rounded.
 - Main side gutter: 16 px.
 - Touch controls: at least 44 px (shell uses a `duet-touch` floor).
-- Main shell max width: 430 px.
+- Main shell max width: 430 px (EdApex: the chat measure, not the shell — see §1).
 - Chat transcript: 672 px max width outside shell, but shell Chat expands the transcript to its 430 px column.
 - Page-shell configuration column: 768 px default, 960 px for wide tables.
 
@@ -291,7 +293,7 @@ Use this as the port’s acceptance checklist:
 
 ### Frame and navigation
 - [ ] App occupies one viewport with internal scrolling, not document scrolling.
-- [ ] Main runtime column is centered and capped at 430 px on wide desktop.
+- [ ] Shell adapts: tab bar below 1024 px, inset sidebar + canvas at or above; the chat column stays measured (see §1 divergence).
 - [ ] Chat, Tasks, Make tab bar floats at bottom; correct active capsule and Tasks waiting badge.
 - [ ] Tab routes preserve selection for task/page detail overlays.
 - [ ] Pushed pages use back/title/action chrome and omit the tab bar.
@@ -334,7 +336,7 @@ Use this as the port’s acceptance checklist:
 - [ ] Match tab/header/composer positioning and safe-area behavior.
 - [ ] Honor reduced motion.
 - [ ] Keep touch targets at least 44 px and preserve keyboard/focus access.
-- [ ] Test at 320–430 px and in a wide desktop viewport; wide viewport should still retain the phone-width app composition.
+- [ ] Test at 320–430 px and in a wide desktop viewport; the wide viewport adapts the shell (rail + canvas) while the chat column stays measured — see the EdApex divergence in §1.
 
 ---
 

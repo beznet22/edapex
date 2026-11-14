@@ -10,32 +10,50 @@ use uuid::Uuid;
 
 use crate::protocol::{
     AgentConnectSettings, AgentError, AgentEvent, AgentStatus, AgentTurnInput, ApprovalDecision,
-    ApprovalRequest, CapabilityRisk, DynamicToolCall, DynamicToolName, DynamicToolResult,
+    ApprovalRequest, DynamicToolCall, DynamicToolName, DynamicToolResult,
     DynamicToolSpec, ThreadStartResult, ToolCompletionStatus, TurnCompletionStatus, TurnStarted,
 };
 use crate::provider::{ChatMessage, ProviderChunk, ProviderClient, ProviderRequest, ToolCall};
 
 const MAX_TOOL_ROUNDS: usize = 8;
 
-pub trait ToolExecutor: Send + Sync {
+/// The bound every host-injected collaborator must satisfy.
+///
+/// Native hosts run turns across threads, so their collaborators must be
+/// `Send + Sync`. `wasm32-unknown-unknown` is single-threaded and its `JsValue`
+/// is neither, so requiring those bounds would make the browser surface
+/// impossible to implement. The bound is therefore target-dependent rather than
+/// weakened everywhere.
+#[cfg(not(target_arch = "wasm32"))]
+pub trait HostObject: Send + Sync {}
+#[cfg(not(target_arch = "wasm32"))]
+impl<T: Send + Sync + ?Sized> HostObject for T {}
+
+#[cfg(target_arch = "wasm32")]
+pub trait HostObject {}
+#[cfg(target_arch = "wasm32")]
+impl<T: ?Sized> HostObject for T {}
+
+/// A boxed future returned by a host-injected collaborator.
+#[cfg(not(target_arch = "wasm32"))]
+pub type HostFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
+
+#[cfg(target_arch = "wasm32")]
+pub type HostFuture<'a, T> = Pin<Box<dyn Future<Output = T> + 'a>>;
+
+pub trait ToolExecutor: HostObject {
     fn requires_approval(&self, _tool: DynamicToolName) -> bool {
         false
     }
 
-    fn execute(
-        &self,
-        call: DynamicToolCall,
-    ) -> Pin<Box<dyn Future<Output = DynamicToolResult> + Send>>;
+    fn execute(&self, call: DynamicToolCall) -> HostFuture<'_, DynamicToolResult>;
 }
 
-pub trait ApprovalHandler: Send + Sync {
-    fn request(
-        &self,
-        request: ApprovalRequest,
-    ) -> Pin<Box<dyn Future<Output = ApprovalDecision> + Send>>;
+pub trait ApprovalHandler: HostObject {
+    fn request(&self, request: ApprovalRequest) -> HostFuture<'_, ApprovalDecision>;
 }
 
-pub trait EventSink: Send + Sync {
+pub trait EventSink: HostObject {
     fn emit(&self, event: AgentEvent);
 }
 
@@ -174,26 +192,31 @@ impl AgentHost {
         });
 
         history.push(ChatMessage::user(input.text));
-        let status = self
-            .run_turn(&input.thread_id, &turn_id, &control, &mut history)
-            .await;
 
-        self.inner
-            .turns
-            .lock()
-            .ok()
-            .map(|mut turns| turns.remove(&turn_id));
-        self.inner
-            .active_threads
-            .lock()
-            .ok()
-            .map(|mut active| active.remove(&input.thread_id));
-        self.save_history(&input.thread_id, history);
+        // The turn runs detached so this returns as soon as it is accepted. A UI
+        // that awaited the whole turn could not render progress, and Stop would
+        // have nothing to cancel into.
+        let host = self.clone();
+        let thread_id = input.thread_id.clone();
+        let spawned_turn_id = turn_id.clone();
+        crate::spawn::spawn(async move {
+            let status = host
+                .run_turn(&thread_id, &spawned_turn_id, &control, &mut history)
+                .await;
 
-        self.emit(AgentEvent::TurnCompleted {
-            thread_id: input.thread_id,
-            turn_id: turn_id.clone(),
-            status,
+            host.inner.turns.lock().ok().map(|mut turns| turns.remove(&spawned_turn_id));
+            host.inner
+                .active_threads
+                .lock()
+                .ok()
+                .map(|mut active| active.remove(&thread_id));
+            host.save_history(&thread_id, history);
+
+            host.emit(AgentEvent::TurnCompleted {
+                thread_id,
+                turn_id: spawned_turn_id,
+                status,
+            });
         });
 
         Ok(TurnStarted { turn_id })
@@ -256,7 +279,9 @@ impl AgentHost {
 
             let request = ProviderRequest {
                 model: self.inner.settings.model.clone(),
-                messages: history.clone(),
+                // Cheap snapshot: the transcript is only cloned when it actually
+                // changes, not once per tool round.
+                messages: std::sync::Arc::from(history.as_slice()),
                 tools: tool_specs(),
                 temperature: None,
             };
@@ -351,7 +376,7 @@ impl AgentHost {
 
             if calls.is_empty() {
                 history.push(ChatMessage::assistant(
-                    if text.is_empty() { None } else { Some(text) },
+                    if text.is_empty() { None } else { Some(std::sync::Arc::from(text.as_str())) },
                     Vec::new(),
                 ));
                 return TurnCompletionStatus::Completed;
@@ -366,7 +391,7 @@ impl AgentHost {
                 })
                 .collect();
             history.push(ChatMessage::assistant(
-                if text.is_empty() { None } else { Some(text) },
+                if text.is_empty() { None } else { Some(std::sync::Arc::from(text.as_str())) },
                 tool_calls.clone(),
             ));
 
@@ -410,13 +435,8 @@ impl AgentHost {
                         approval_request_id: Uuid::new_v4().to_string(),
                         title: format!("Run {}", tool.as_str()),
                         description: format!("Allow {} for this turn?", tool.as_str()),
-                        risk: CapabilityRisk::Read,
-                        decisions: vec![
-                            ApprovalDecision::AllowOnce,
-                            ApprovalDecision::AllowForSession,
-                            ApprovalDecision::Deny,
-                            ApprovalDecision::Abort,
-                        ],
+                        risk: tool.risk(),
+                        decisions: tool.approval_decisions(),
                     };
                     self.emit(AgentEvent::ApprovalRequested {
                         thread_id: thread_id.to_string(),

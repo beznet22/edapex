@@ -6,7 +6,7 @@ import type {
 
 /**
  * The only boundary the web and Tauri shells consume. The preview adapter is
- * disconnected; the future xcodex adapter maps local Rust events into this.
+ * disconnected; a host adapter maps local Rust core events into this.
  */
 export interface WorkspaceRuntimeAdapter {
   readonly view: WorkspaceRuntimeView;

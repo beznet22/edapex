@@ -1,18 +1,53 @@
-const CACHE_NAME = "edapex-workspace-v1";
+const CACHE_NAME = "edapex-workspace-v2";
 const OFFLINE_URL = "/workspace/offline";
-const STATIC_ASSETS = [
+
+/**
+ * The install set is deliberately tiny: the offline shell and the icons the
+ * manifest promises. Everything else is cached on first use, so a cache version
+ * bump does not force a re-download of the app bundle.
+ */
+const PRECACHE = [
   OFFLINE_URL,
   "/workspace/icons/icon-192.png",
   "/workspace/icons/icon-512.png",
   "/workspace/icons/maskable-512.png",
+  "/workspace/icons/apple-touch-icon.png",
   "/favicon.svg"
 ];
+
+/**
+ * Paths that must never enter the cache.
+ *
+ * The agent runtime and the API carry transcripts, school records and tokens.
+ * Storing any of them would leave school data on a shared device and survive a
+ * sign-out. The shell is the only thing this worker is allowed to keep.
+ */
+const NEVER_CACHE = [
+  "/api/",
+  "/agent-runtime/",
+  // Retained deliberately: these paths no longer exist, but a client that cached
+  // the old runtime must never serve it from a stale entry.
+  "/xcodex/",
+  "/xrouter-browser/"
+];
+
+const isCacheable = (url, request) => {
+  if (request.method !== "GET") return false;
+  if (url.origin !== self.location.origin) return false;
+  if (NEVER_CACHE.some((prefix) => url.pathname.startsWith(prefix))) return false;
+  if (url.pathname.startsWith("/_next/static/")) return true;
+  return false;
+};
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
     caches
       .open(CACHE_NAME)
-      .then((cache) => cache.addAll(STATIC_ASSETS))
+      // A single missing file must not fail the install: the shell is useful
+      // even if one optional icon is absent.
+      .then((cache) =>
+        Promise.all(PRECACHE.map((path) => cache.add(path).catch(() => undefined)))
+      )
       .then(() => self.skipWaiting())
   );
 });
@@ -35,7 +70,6 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
 
-  // API and auth responses are never cached. Workspace data stays network-only.
   if (url.pathname.startsWith("/api/")) return;
 
   if (url.pathname.startsWith("/_next/static/")) {
@@ -70,3 +104,6 @@ self.addEventListener("fetch", (event) => {
     );
   }
 });
+
+// Exported logic is unreachable at runtime but keeps the policy testable.
+self.__edapexServiceWorkerPolicy = { isCacheable, NEVER_CACHE, PRECACHE };

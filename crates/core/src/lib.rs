@@ -15,7 +15,8 @@ pub struct CoreHealth {
     pub agent_connected: bool,
 }
 
-/// The initial local core surface. xcodex, Needle and iroh attach here in 10C.
+/// The initial local core surface. Needle and local documents attach here in a
+/// later chunk.
 pub fn health() -> CoreHealth {
     CoreHealth {
         core_version: CORE_VERSION,

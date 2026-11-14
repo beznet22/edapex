@@ -16,6 +16,7 @@ import type { CapabilityManifest, WorkspaceRuntimeView } from "@edapex/contracts
 import type { CoreHealth } from "@/lib/tauri";
 
 import { RuntimeStatus } from "@/components/openduet/runtime-status";
+import { ThemeToggle } from "@/components/workspace/ThemeToggle";
 import { TabBar, type WorkspaceTab } from "@/components/openduet/tab-bar";
 
 interface WorkspaceShellProps {
@@ -58,7 +59,7 @@ function DesktopRail({
   readonly waitingCount: number;
 }) {
   return (
-    <aside className="hidden w-[72px] shrink-0 flex-col items-center border-r border-border bg-card/25 py-4 lg:flex">
+    <aside className="hidden w-[76px] shrink-0 flex-col items-center bg-card/40 py-4 shadow-[1px_0_0_var(--border)] lg:flex">
       <Link
         aria-label="EdApex workspace home"
         className="flex size-11 items-center justify-center rounded-xl bg-primary text-sm font-black text-primary-foreground"
@@ -66,7 +67,7 @@ function DesktopRail({
       >
         E
       </Link>
-      <div className="my-4 h-px w-8 bg-border" />
+      <div className="my-4 h-px w-7 bg-border/70" />
       <nav aria-label="Primary" className="flex flex-1 flex-col items-center gap-2">
         {RAIL_ITEMS.map((item) => {
           const active = item.id === surface;
@@ -132,7 +133,7 @@ export function WorkspaceShell({
     >
       <DesktopRail manifest={manifest} surface={surface} waitingCount={waitingCount} />
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <header className="safe-top shrink-0 border-b border-border px-3 pb-2.5 lg:px-6 lg:pb-3 lg:pt-4">
+        <header className="safe-top shrink-0 px-3 pb-2.5 shadow-[0_1px_0_var(--border)] lg:px-6 lg:pb-3 lg:pt-4">
           <div className="mx-auto flex w-full max-w-[430px] items-center justify-between gap-2 lg:max-w-none">
             <div className="flex min-w-0 items-center gap-2 lg:hidden">
               <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary text-sm font-black text-primary-foreground">
@@ -170,16 +171,17 @@ export function WorkspaceShell({
                   Core {coreHealth.core_version}
                 </span>
               ) : null}
+              <ThemeToggle className="hidden sm:flex" />
               <RuntimeStatus connected={runtime.connected} state={runtime.state} />
               {!runtime.connected && onConnectRuntime !== undefined ? (
                 <button
-                  aria-label="Connect xcodex runtime"
+                  aria-label="Open model setup"
                   className="flex min-h-11 items-center gap-1.5 rounded-xl border border-primary/35 bg-primary/10 px-2.5 text-[11px] font-semibold text-primary hover:bg-primary/15"
                   onClick={onConnectRuntime}
                   type="button"
                 >
                   <KeyRound aria-hidden="true" className="size-3.5" />
-                  Connect
+                  Set up
                 </button>
               ) : null}
               {onOpenArtifact !== undefined ? (
@@ -206,7 +208,7 @@ export function WorkspaceShell({
         </header>
 
         <main className="relative flex min-h-0 flex-1 flex-col overflow-hidden pb-[92px] lg:pb-0">
-          <div className="mx-auto flex min-h-0 w-full max-w-[430px] flex-1 flex-col lg:max-w-[880px]">
+          <div className="mx-auto flex min-h-0 w-full max-w-[430px] flex-1 flex-col lg:max-w-none">
             {children}
           </div>
           <div className="lg:hidden">
