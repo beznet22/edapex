@@ -16,10 +16,16 @@ export interface AppEnv {
    */
   readonly SMS_API: Fetcher;
   readonly API_ORIGIN: string;
+  /**
+   * Master key for the connector secret box. 32 bytes, base64, supplied as a
+   * Worker secret. The derived per-workspace keys never leave this Worker.
+   */
+  readonly AGENT_SECRET_KEY: string;
 }
 
 export interface AppVariables {
   userId: string;
+  identity: import("./auth").ResolvedIdentity;
 }
 
 export type AppContext = {
