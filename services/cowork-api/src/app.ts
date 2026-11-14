@@ -5,6 +5,7 @@ import type { AppContext } from "./env";
 import { agentCapabilities } from "./routes/agent-capabilities.routes";
 import { agentSync } from "./routes/agent-sync.routes";
 import { connectors } from "./routes/connectors.routes";
+import { proactiveRoutes } from "./routes/proactive.routes";
 import { apiError } from "./schema";
 
 export function createApp() {
@@ -20,6 +21,7 @@ export function createApp() {
   app.route("/api/v1/agent", agentCapabilities);
   app.route("/api/v1/agent", agentSync);
   app.route("/api/v1/agent/connectors", connectors);
+  app.route("/api/v1/agent", proactiveRoutes);
 
   app.notFound((context) => context.json(apiError("Not found.", "invalid_request"), 404));
 

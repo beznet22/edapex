@@ -66,6 +66,30 @@ capabilities.test.ts                                           8 passed (incl. n
 ```
 
 
+## Chunk 4 — proactive work
+
+| Item | Outcome |
+|---|---|
+| **Contracts** | `tasks.ts`, `routines.ts`, `notifications.ts`. `deriveTaskState` is pure and shared, so the list, the badge and the tests cannot disagree. **42 tests.** |
+| **Brief dedupe** | Claim lease and completion are separate columns. A single flag cannot distinguish "another device is working" from "the device that claimed it crashed" — and with only a flag, a crash claims the day permanently. Verified by takeover after an expired lease. |
+| **Routine claims** | Same lease shape. A `running` row whose lease expired is re-claimable; a live one blocks. **12 server tests.** |
+| **No cron** | `scripts/check-no-cron.mjs` inspects every Worker entry and `wrangler.jsonc`. Self-tested by injecting a `scheduled` export and confirming exit 1. In CI. |
+| **Tasks surface** | Now renders the derived queue instead of a placeholder: triage order, needs-input count, and retry shown as *"Attempt 2 of 3 — reason"*. |
+| Retry is shown | Never hidden. A silent retry cannot be distinguished from no attempt at all, so people learn to distrust the result. |
+
+### Decisions
+
+- **`already_complete` and `held_by_other` are different answers.** One is permanent, the other resolves in minutes. A UI showing one message for both teaches people to retry something that will never succeed.
+- **The greeting loses every race to the person.** Conditions are explicit rather than implied by render order: no content in the composer, no prior send, no existing thread.
+- **Reply chips fill the composer, never send.** A chip is a shortcut for typing; a person must not lose the chance to edit a suggestion they did not write.
+- **Silence is not success.** An unfinished task with no signals is `not_completed`, not `done`.
+
+### Open
+
+- **Task rows are not yet fetched.** The surface renders from a `tasks` prop; wiring it to the sync store is the remaining half, and it depends on the routine scheduler running on a device.
+- **The device-side scheduler is not written.** Contracts and server claims exist; the client loop that checks `isDue` and calls claim → run → finish does not.
+- **One vacuous-test lesson worth keeping:** the "no cron" assertions originally ran inside the workerd sandbox, which cannot read the real filesystem, and a `catch { continue; }` made them pass while checking nothing. They now live in a Node script that fails loudly when it cannot find its inputs.
+
 ## Design system and window chrome
 
 | Item | Outcome |

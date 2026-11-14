@@ -73,6 +73,12 @@ jobs:
       - name: Lint DESIGN.md
         run: pnpm dlx @google/design.md lint DESIGN.md --max-warnings 0
 
+      # Spec 41: routines run on the device, never on a Worker cron. The failure
+      # mode is someone adding a `scheduled` export months from now, so it is
+      # checked rather than remembered.
+      - name: No cron fan-out
+        run: pnpm --dir services/cowork-api run check:no-cron
+
   # The web surface depends on a Rust core compiled to WebAssembly. Without this
   # job a break in `crates/agent` would be discovered only when someone happened
   # to open the workspace in a browser.

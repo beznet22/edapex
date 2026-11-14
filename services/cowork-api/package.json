@@ -13,7 +13,8 @@
     "typecheck": "tsc --noEmit && tsc --noEmit -p tests/tsconfig.json",
     "test": "vitest run",
     "test:watch": "vitest",
-    "cf-typegen": "wrangler types"
+    "cf-typegen": "wrangler types",
+    "check:no-cron": "node scripts/check-no-cron.mjs"
   },
   "dependencies": {
     "@edapex/contracts": "workspace:^",
