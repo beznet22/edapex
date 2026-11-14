@@ -5,11 +5,13 @@ import type { ReactNode } from "react";
 
 import type { CapabilityManifest } from "@edapex/contracts";
 
+import type { ProactiveController } from "@/hooks/use-proactive";
 import type { WorkspaceRuntimeController } from "@/hooks/use-workspace-runtime";
 
 export interface WorkspaceContextValue {
   readonly manifest: CapabilityManifest;
   readonly runtime: WorkspaceRuntimeController;
+  readonly proactive: ProactiveController;
   readonly openArtifact: () => void;
 }
 

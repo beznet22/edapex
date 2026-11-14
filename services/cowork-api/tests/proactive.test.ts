@@ -201,3 +201,55 @@ describe("routine claims", () => {
     expect(response.status).toBe(400);
   });
 });
+
+describe("read routes", () => {
+  it("lists routines for a workspace", async () => {
+    await seedRoutine("routine-list", 1, 500);
+
+    const response = await app.request(
+      "/api/v1/agent/routines?workspaceId=ws-1",
+      { headers: cookie },
+      env
+    );
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as { routines: { id: string }[] };
+    expect(body.routines.map((row) => row.id)).toContain("routine-list");
+  });
+
+  it("returns task signals as facts, not a status", async () => {
+    const now = Math.floor(Date.now() / 1000);
+    await env.AGENT_DB.prepare(
+      "INSERT OR REPLACE INTO tasks \
+       (id, workspace_id, owner_user_id, agent_id, title, why, open_question, blocked_on_approval, \
+        failed_after_retries, running, finished_unresolved, resolved_at, attempts, max_attempts, last_error, created_at, updated_at) \
+       VALUES ('task-1', 'ws-1', '1', 'agent-1', 'Approve the report', 'AY4 needs sign-off', 1, 0, 0, 0, 0, NULL, 2, 3, 'connector timed out', ?, ?)"
+    )
+      .bind(now, now)
+      .run();
+
+    const response = await app.request("/api/v1/agent/tasks?workspaceId=ws-1", { headers: cookie }, env);
+    expect(response.status).toBe(200);
+
+    const body = (await response.json()) as {
+      tasks: {
+        id: string;
+        signals: Record<string, boolean>;
+        attempts: number;
+        lastError: string | null;
+      }[];
+    };
+
+    const task = body.tasks.find((row) => row.id === "task-1");
+    expect(task).toBeDefined();
+    // No `status` field: the client derives it with the shared pure function.
+    expect(task).not.toHaveProperty("status");
+    expect(task!.signals.openQuestion).toBe(true);
+    expect(task!.attempts).toBe(2);
+    expect(task!.lastError).toBe("connector timed out");
+  });
+
+  it("requires a workspace id", async () => {
+    const response = await app.request("/api/v1/agent/tasks", { headers: cookie }, env);
+    expect(response.status).toBe(400);
+  });
+});

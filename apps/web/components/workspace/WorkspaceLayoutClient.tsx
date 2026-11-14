@@ -15,6 +15,7 @@ import {
   DEV_PREVIEW_MANIFEST,
   DEV_PREVIEW_SESSION
 } from "@/lib/dev-preview";
+import { useProactive } from "@/hooks/use-proactive";
 import { useWorkspaceRuntime } from "@/hooks/use-workspace-runtime";
 import { useRuntimeHealth } from "@/hooks/use-runtime-health";
 import { isDesktopViewport } from "@/lib/platform";
@@ -53,6 +54,11 @@ export function WorkspaceLayoutClient({ children }: { readonly children: ReactNo
   const [setupDismissed, setSetupDismissed] = useState(false);
   const [artifactSplit, setArtifactSplit] = useState(false);
   const runtime = useWorkspaceRuntime();
+  // Mounted here rather than in the Tasks page so the tick loop keeps running
+  // while the person is on Chat — a routine due at 08:00 should fire even if the
+  // Tasks tab is not open. The trade (only while a device is open) is stated in
+  // the surface copy.
+  const proactive = useProactive(session === null ? null : String(session.user.id));
   const runtimeHealth = useRuntimeHealth();
 
   const closeArtifact = useCallback((): void => setArtifactOpen(false), []);
@@ -193,7 +199,7 @@ export function WorkspaceLayoutClient({ children }: { readonly children: ReactNo
   }
 
   const userName = session?.user.fullName ?? session?.user.email ?? "Signed in";
-  const contextValue = { manifest, runtime, openArtifact };
+  const contextValue = { manifest, runtime, proactive, openArtifact };
 
   return (
     <WorkspaceProvider value={contextValue}>

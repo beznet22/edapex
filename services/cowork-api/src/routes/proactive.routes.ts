@@ -15,7 +15,90 @@ import { claimBrief, claimRoutine, completeBrief, finishRoutine } from "../servi
  * That means a routine only fires while a device is open. The trade is stated in
  * the UI (`ROUTINE_UNAVAILABLE_NOTICE`), not hidden here.
  */
+interface TaskRow {
+  id: string;
+  title: string;
+  why: string | null;
+  created_at: number;
+  open_question: number;
+  blocked_on_approval: number;
+  failed_after_retries: number;
+  running: number;
+  finished_unresolved: number;
+  resolved_at: number | null;
+  attempts: number;
+  max_attempts: number;
+  last_error: string | null;
+}
+
+interface RoutineRow {
+  id: string;
+  workspace_id: string;
+  agent_id: string;
+  title: string;
+  instructions: string;
+  schedule: string;
+  enabled: number;
+  next_run_at: number | null;
+  last_run_at: number | null;
+}
+
 export const proactiveRoutes = new Hono<AppContext>()
+  .get("/routines", async (context) => {
+    const workspaceId = context.req.query("workspaceId") ?? "";
+    if (workspaceId.length === 0) {
+      return context.json(apiError("workspaceId is required.", "invalid_request"), 400);
+    }
+
+    const { results } = await context.env.AGENT_DB.prepare(
+      "SELECT id, workspace_id, agent_id, title, instructions, schedule, enabled, next_run_at, last_run_at \
+       FROM routines WHERE workspace_id = ? ORDER BY next_run_at ASC"
+    )
+      .bind(workspaceId)
+      .all<RoutineRow>();
+
+    context.header("Cache-Control", "no-store");
+    return context.json({ routines: results }, 200);
+  })
+
+  .get("/tasks", async (context) => {
+    const workspaceId = context.req.query("workspaceId") ?? "";
+    if (workspaceId.length === 0) {
+      return context.json(apiError("workspaceId is required.", "invalid_request"), 400);
+    }
+
+    // Signals are returned as facts; the client derives the state with the shared
+    // `deriveTaskState`, so the list and the badge cannot disagree.
+    const { results } = await context.env.AGENT_DB.prepare(
+      "SELECT id, title, why, created_at, open_question, blocked_on_approval, \
+              failed_after_retries, running, finished_unresolved, resolved_at, \
+              attempts, max_attempts, last_error \
+       FROM tasks WHERE workspace_id = ? AND owner_user_id = ? ORDER BY created_at DESC LIMIT 200"
+    )
+      .bind(workspaceId, context.get("userId"))
+      .all<TaskRow>();
+
+    context.header("Cache-Control", "no-store");
+    return context.json({
+      tasks: results.map((row) => ({
+        id: row.id,
+        title: row.title,
+        why: row.why,
+        createdAt: row.created_at,
+        signals: {
+          openQuestion: row.open_question === 1,
+          blockedOnApproval: row.blocked_on_approval === 1,
+          failedAfterRetries: row.failed_after_retries === 1,
+          running: row.running === 1,
+          finishedUnresolved: row.finished_unresolved === 1,
+          resolved: row.resolved_at !== null
+        },
+        attempts: row.attempts,
+        maxAttempts: row.max_attempts,
+        lastError: row.last_error
+      }))
+    }, 200);
+  })
   .post("/briefs/claim", async (context) => {
     const body = (await context.req.json().catch(() => null)) as {
       workspaceId?: unknown;

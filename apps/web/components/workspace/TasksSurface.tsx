@@ -36,7 +36,14 @@ export interface TaskRow {
   readonly lastError: string | null;
 }
 
-export function TasksSurface({ tasks = [] }: { readonly tasks?: readonly TaskRow[] }) {
+export function TasksSurface({
+  tasks = [],
+  notice
+}: {
+  readonly tasks?: readonly TaskRow[];
+  /** The availability trade, shown rather than implied. */
+  readonly notice?: string;
+}) {
   const rows = useMemo(
     () =>
       tasks
@@ -75,6 +82,10 @@ export function TasksSurface({ tasks = [] }: { readonly tasks?: readonly TaskRow
           </span>
         ) : null}
       </header>
+
+      {notice === undefined ? null : (
+        <p className="px-4 pb-1 text-[13px] leading-5 text-muted-foreground lg:px-8">{notice}</p>
+      )}
 
       <ul className="min-h-0 flex-1 space-y-2 overflow-y-auto px-4 pb-6 pt-2 lg:px-8">
         {rows.map((row) => {

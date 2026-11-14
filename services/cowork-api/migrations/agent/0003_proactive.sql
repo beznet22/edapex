@@ -78,3 +78,30 @@ CREATE TABLE IF NOT EXISTS proactive_settings (
   greeting_at INTEGER,
   updated_at  INTEGER NOT NULL
 );
+
+-- Task signals, not task status. `42` forbids a cached status because a stored
+-- status and the underlying work drift apart, and the person is then shown "done"
+-- over a failed run. These are the raw facts `deriveTaskState` projects from.
+CREATE TABLE IF NOT EXISTS tasks (
+  id                   TEXT PRIMARY KEY,
+  workspace_id         TEXT NOT NULL,
+  owner_user_id        TEXT NOT NULL,
+  agent_id             TEXT NOT NULL,
+  title                TEXT NOT NULL,
+  why                  TEXT,
+  -- Derived-state inputs. Each is a fact, not an interpretation.
+  open_question        INTEGER NOT NULL DEFAULT 0,
+  blocked_on_approval  INTEGER NOT NULL DEFAULT 0,
+  failed_after_retries INTEGER NOT NULL DEFAULT 0,
+  running              INTEGER NOT NULL DEFAULT 0,
+  finished_unresolved  INTEGER NOT NULL DEFAULT 0,
+  resolved_at          INTEGER,
+  attempts             INTEGER NOT NULL DEFAULT 0,
+  max_attempts         INTEGER NOT NULL DEFAULT 3,
+  last_error           TEXT,
+  created_at           INTEGER NOT NULL,
+  updated_at           INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS tasks_by_triage
+  ON tasks (workspace_id, resolved_at, created_at);

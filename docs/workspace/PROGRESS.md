@@ -84,10 +84,23 @@ capabilities.test.ts                                           8 passed (incl. n
 - **Reply chips fill the composer, never send.** A chip is a shortcut for typing; a person must not lose the chance to edit a suggestion they did not write.
 - **Silence is not success.** An unfinished task with no signals is `not_completed`, not `done`.
 
+### Scheduler wiring
+
+| Piece | Outcome |
+|---|---|
+| `lib/device-identity.ts` | Device id and master key in IndexedDB, generated once. Not `localStorage`: a key is the last thing that belongs in a synchronous, script-readable store. |
+| `lib/scheduler.ts` | `tick()` evaluates due-ness **locally** (no server round trip to decide), claims, runs, records. Advances the local cursor before running so a hang cannot double-fire. **14 tests.** |
+| `useProactive` | Mounted in the workspace layout rather than the Tasks page, so a routine due at 08:00 fires while the person is on Chat. |
+| Read routes | `GET /api/v1/agent/routines` and `/tasks`. The task route returns **signals, not a status**, so the client derives with the shared function and the two cannot disagree. |
+| Browser proof | 3 e2e tests: claim on mount, no claim for a future routine, and the surface showing derived state plus retry. |
+
+**A bug this exposed:** `refresh()` was gated on the local store being open. Since the store opens asynchronously, the first read bailed and never re-ran — and because the empty state says "Nothing needs you", a storage failure would have looked like a genuine all-clear. The task list is a server read and no longer depends on OPFS at all.
+
 ### Open
 
-- **Task rows are not yet fetched.** The surface renders from a `tasks` prop; wiring it to the sync store is the remaining half, and it depends on the routine scheduler running on a device.
-- **The device-side scheduler is not written.** Contracts and server claims exist; the client loop that checks `isDue` and calls claim → run → finish does not.
+- **The device-side scheduler is wired and running.** `lib/scheduler.ts` ticks while the workspace is open, claims due routines and records the outcome. Proven in a browser: `e2e/proactive.spec.ts` asserts a due routine is claimed and finished, and that a future one costs no claim at all.
+- **Task rows are fetched** from `GET /api/v1/agent/tasks`, which returns signals rather than a status so the client derives state with the shared function.
+- **The routine turn is not connected to the agent runtime.** The scheduler claims and records honestly, reporting `failed` with "the routine turn is not wired to the runtime yet" rather than pretending success. That connection is the remaining half.
 - **One vacuous-test lesson worth keeping:** the "no cron" assertions originally ran inside the workerd sandbox, which cannot read the real filesystem, and a `catch { continue; }` made them pass while checking nothing. They now live in a Node script that fails loudly when it cannot find its inputs.
 
 ## Design system and window chrome
