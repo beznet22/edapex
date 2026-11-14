@@ -179,6 +179,7 @@ Spec 15 controls **where and how a surface appears**. Spec 19 controls **what it
 | [`specs/17-chat-framework.md`](./specs/17-chat-framework.md) | OpenDuet chat shell, custom xcodex runtime, OpenUI surfaces, Streamdown and Tiptap |
 | [`specs/18-operation-inventory.md`](./specs/18-operation-inventory.md) | every current endpoint, missing endpoint, agent tool and phase assignment |
 | [`specs/19-design-system.md`](./specs/19-design-system.md) | shadcn/ui + Tailwind v4, Gold tokens and WebView floor |
+| [`specs/46-proactive-work.md`](./specs/46-proactive-work.md) | routines on an open device, brief dedupe leases, derived task state, greeting and chips | chat state, routines execution |
 | [`specs/20-public-applicant-flow.md`](./specs/20-public-applicant-flow.md) | progressive applicant identity, drafts, notifications, enrollment |
 | [`specs/21-generative-ui-openui.md`](./specs/21-generative-ui-openui.md) | OpenUI Lang v1 decision, catalog, action bridge, storage and security |
 | [`specs/22-documents-and-artifacts.md`](./specs/22-documents-and-artifacts.md) | PDF/DOCX/CSV/Markdown engine, Tiptap editor and artifact renditions |

@@ -15,6 +15,7 @@ import type { LucideIcon } from "lucide-react";
 import type { CapabilityManifest, WorkspaceRuntimeView } from "@edapex/contracts";
 import type { CoreHealth } from "@/lib/tauri";
 
+import { Titlebar } from "@/components/desktop/Titlebar";
 import { RuntimeStatus } from "@/components/openduet/runtime-status";
 import { ThemeToggle } from "@/components/workspace/ThemeToggle";
 import { TabBar, type WorkspaceTab } from "@/components/openduet/tab-bar";
@@ -127,10 +128,13 @@ export function WorkspaceShell({
 }: WorkspaceShellProps) {
   return (
     <div
-      className="flex h-dvh w-full overflow-hidden bg-background text-foreground"
+      className="flex h-dvh w-full flex-col overflow-hidden bg-background text-foreground"
       data-surface={surface}
       data-workspace-shell="true"
     >
+      {/* Renders null in a browser tab: the browser draws its own chrome. */}
+      <Titlebar title="EdApex Work" />
+      <div className="flex min-h-0 flex-1 overflow-hidden">
       <DesktopRail manifest={manifest} surface={surface} waitingCount={waitingCount} />
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <header className="safe-top shrink-0 px-3 pb-2.5 shadow-[0_1px_0_var(--border)] lg:px-6 lg:pb-3 lg:pt-4">
@@ -215,6 +219,7 @@ export function WorkspaceShell({
             <TabBar current={surface} waitingCount={waitingCount} />
           </div>
         </main>
+      </div>
       </div>
     </div>
   );
