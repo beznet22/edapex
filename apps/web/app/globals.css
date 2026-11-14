@@ -44,6 +44,18 @@
   --glass-tint: oklch(1 0 0 / 0.72);
   --glass-edge: oklch(0.9 0.008 255 / 0.9);
 
+  /*
+   * Window chrome. Used only inside the desktop window; a browser tab has no
+   * titlebar, so these resolve but nothing consumes them there.
+   * See specs/49-desktop-window.md and DESIGN.md.
+   */
+  --window-hairline: oklch(0.24 0.02 255 / 0.06);
+  --window-surface: oklch(0.985 0.003 255);
+  --titlebar-height: 2rem;
+  --motion-fast: 120ms;
+  --motion-normal: 200ms;
+  --motion-panel: 280ms;
+
   --radius: 0.75rem;
   --workspace-width: 430px;
   --workspace-canvas: 760px;
@@ -84,6 +96,10 @@
   --elevation-3: 0 8px 28px oklch(0 0 0 / 0.55);
   --glass-tint: oklch(0.19 0.014 255 / 0.72);
   --glass-edge: oklch(0.42 0.02 255 / 0.6);
+
+  /* A hairline on a dark surface needs more opacity to be visible at all. */
+  --window-hairline: oklch(1 0 0 / 0.10);
+  --window-surface: oklch(0.15 0.012 255);
 }
 
 /*

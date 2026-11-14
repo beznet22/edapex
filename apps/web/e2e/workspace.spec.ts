@@ -211,6 +211,26 @@ test.describe("manifest", () => {
   });
 });
 
+test.describe("host chrome", () => {
+  test("the desktop titlebar does not render in a browser tab", async ({ page }) => {
+    await page.goto(WORKSPACE);
+    await page.waitForTimeout(300);
+
+    // A fake titlebar inside a tab duplicates chrome the browser already draws,
+    // and a reserved band of empty space would shift every surface down. Asserting
+    // absence is the point: the same bundle serves both hosts.
+    await expect(page.locator("[data-tauri-drag-region]")).toHaveCount(0);
+
+    // And nothing reserves its height.
+    const top = await page.evaluate(() => {
+      const main = document.querySelector("main");
+      return main === null ? null : main.getBoundingClientRect().top;
+    });
+    expect(top).not.toBeNull();
+    expect(top as number).toBeLessThan(120);
+  });
+});
+
 test.describe("accessibility", () => {
   test("respects reduced motion", async ({ browser }) => {
     const context = await browser.newContext({ reducedMotion: "reduce" });

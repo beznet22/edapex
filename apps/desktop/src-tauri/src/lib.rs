@@ -1,3 +1,4 @@
+mod window;
 mod agent;
 mod api;
 mod auth;
@@ -62,6 +63,11 @@ pub fn run() {
             auth::auth_logout,
             api::api_request,
             api::ocr_mistral,
+            window::window_start_dragging,
+            window::window_minimize,
+            window::window_toggle_maximize,
+            window::window_close,
+            window::window_is_focused,
             capture::capture_screen,
             capture::capture_import,
             capture::capture_import_path,

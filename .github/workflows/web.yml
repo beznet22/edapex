@@ -67,6 +67,12 @@ jobs:
       - name: Budget
         run: pnpm --dir apps/web run check:budget
 
+      # The design system is machine-readable, so it is machine-checked. The
+      # linter catches broken token references, orphaned tokens and WCAG AA
+      # contrast failures — it found two real ones while this file was written.
+      - name: Lint DESIGN.md
+        run: pnpm dlx @google/design.md lint DESIGN.md --max-warnings 0
+
   # The web surface depends on a Rust core compiled to WebAssembly. Without this
   # job a break in `crates/agent` would be discovered only when someone happened
   # to open the workspace in a browser.

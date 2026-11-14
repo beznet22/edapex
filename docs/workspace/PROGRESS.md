@@ -66,6 +66,30 @@ capabilities.test.ts                                           8 passed (incl. n
 ```
 
 
+## Design system and window chrome
+
+| Item | Outcome |
+|---|---|
+| **`DESIGN.md`** | The system in Google's open DESIGN.md format: tokens plus rationale. Grounded in the tokens the app actually uses, not aspirational ones. |
+| **Machine-checked** | `@google/design.md lint` runs in CI with `--max-warnings 0`. It found two real defects while the file was being written: titlebar text at **3.50:1** and white-on-gold at **1.97:1**, both below WCAG AA. |
+| **Both hosts, one design** | The document explicitly covers a browser tab and a frameless window: what changes is the frame, never a token. There is no desktop-only skin. |
+| Frameless window | `decorations: false`, transparent, 32px titlebar. macOS keeps native traffic lights via `titleBarStyle: Overlay`; Linux and Windows get custom controls. |
+| Drag region | A dedicated element, because `data-tauri-drag-region` does not inherit — a wrapper makes every child button a drag handle. Double-click to maximise is wired by hand, since it is not automatic. |
+| Titlebar in a tab | Renders **nothing**. Not hidden, not a spacer: a reserved band would shift every surface down for chrome the browser already draws. Asserted by e2e. |
+| No `<html>` flash | The component returns null before its effect runs, so a tab never renders a titlebar for one frame. |
+
+### Decisions
+
+- **Depth replaces borders** — now a written rule rather than a habit. Panels separate with tint and shadow; the window edge is the only hairline on the frame.
+- **The scroll hairline is information, not decoration.** A line under the titlebar appears only once content has moved beneath it.
+- **Losing focus dims the chrome to 60%.** An undecorated window has no other way to say it is not the active one; without it the app reads as a page.
+- **Three type sizes, not four.** Hierarchy comes from spacing and weight. A fourth size is a symptom that the spacing is wrong.
+
+### Open
+
+- **macOS and Windows are unverified.** The window compiles and the Linux behaviour is manual-tested here; neither of the other two platforms has a runner, and Playwright cannot assert a native window.
+- `tauri.conf.json` is strict JSON — comments are not permitted, unlike `wrangler.jsonc`.
+
 ## Chunk 3 — gateway, connectors, approvals, tenant-neutral capabilities
 
 | Item | Outcome |
