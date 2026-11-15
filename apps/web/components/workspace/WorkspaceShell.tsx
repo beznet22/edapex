@@ -37,6 +37,7 @@ import {
 } from "@/components/ui/sidebar";
 import { Titlebar } from "@/components/desktop/Titlebar";
 import { RuntimeStatus } from "@/components/openduet/runtime-status";
+import { CommandPaletteTrigger } from "@/components/workspace/CommandPalette";
 import { SidebarNav } from "@/components/workspace/SidebarNav";
 import { SidebarUser } from "@/components/workspace/SidebarUser";
 import { ThemeToggle } from "@/components/workspace/ThemeToggle";
@@ -162,10 +163,26 @@ function DesktopRail({
           <div className="flex shrink-0 items-center gap-0.5">
             {open ? (
               <>
-                <SidebarMenuButton asChild className="size-8 p-0" tooltip="Search">
-                  <Link aria-label="Search" href="/workspace/search">
-                    <Search aria-hidden="true" />
-                  </Link>
+                {/*
+                  Opens the palette, not a route. `/workspace/search` exists but says the
+                  index is unbuilt; the palette is the search that actually works.
+                */}
+                <SidebarMenuButton
+                  aria-label="Search"
+                  className="size-8 p-0"
+                  onClick={() => {
+                    document.dispatchEvent(
+                      new KeyboardEvent("keydown", {
+                        key: "k",
+                        metaKey: true,
+                        bubbles: true
+                      })
+                    );
+                  }}
+                  tooltip="Search"
+                  type="button"
+                >
+                  <Search aria-hidden="true" />
                 </SidebarMenuButton>
                 <button
                   aria-label="Collapse sidebar"

@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import { ListChecks } from "lucide-react";
 
+import { EmptyState } from "@/components/workspace/EmptyState";
 import {
   compareTasks,
   deriveTaskState,
@@ -56,17 +57,12 @@ export function TasksSurface({
 
   if (rows.length === 0) {
     return (
-      <section className="flex flex-1 items-center justify-center px-6 py-10 text-center lg:px-10">
-        <div className="max-w-sm lg:max-w-md">
-          <span className="mx-auto flex size-12 items-center justify-center rounded-2xl bg-primary/15 text-primary">
-            <ListChecks aria-hidden="true" className="size-5" />
-          </span>
-          <h1 className="mt-4 text-lg font-semibold tracking-tight">Nothing needs you</h1>
-          <p className="mt-2 text-sm leading-6 text-muted-foreground">
-            Work the agent asks you to decide appears here. Routines run while EdApex is open, so
-            this list fills as they report back.
-          </p>
-        </div>
+      <section className="flex flex-1 items-center justify-center">
+        <EmptyState
+          description="Work the agent asks you to decide appears here. Routines run while EdApex is open, so this list fills as they report back."
+          kind="blank"
+          title="Nothing needs you"
+        />
       </section>
     );
   }

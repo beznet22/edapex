@@ -5,6 +5,7 @@ import { Check, ChevronRight, Mail, Plus, Search, Server } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/workspace/EmptyState";
 import { Input } from "@/components/ui/input";
 import {
   PLUGIN_GROUPS,
@@ -115,9 +116,16 @@ export function PluginsSurface({
         </label>
 
         {groups.length === 0 ? (
-          <p className="mt-10 text-center text-[13px] text-muted-foreground">
-            No plugin matches “{query.trim()}”.
-          </p>
+          <EmptyState
+            action={
+              <Button onClick={() => setQuery("")} size="sm" variant="outline">
+                Clear search
+              </Button>
+            }
+            description={`Nothing matched “${query.trim()}”. Try a shorter word, or clear the search to see everything.`}
+            kind="no-results"
+            title="No plugins match"
+          />
         ) : (
           groups.map((group) => (
             <section className="mt-8" key={group.id}>

@@ -26,6 +26,7 @@ import { useSidebarState } from "@/lib/sidebar-state-hooks";
 import type { WorkspaceTab } from "@/components/openduet/tab-bar";
 import { Button } from "@/components/ui/button";
 import { ChatSurface } from "@/components/workspace/ChatSurface";
+import { CommandPalette } from "@/components/workspace/CommandPalette";
 import { WorkspaceBoot } from "@/components/workspace/WorkspaceBoot";
 import { WorkspaceProvider } from "@/components/workspace/WorkspaceContext";
 import { RuntimeSetup } from "@/components/workspace/RuntimeSetup";
@@ -252,6 +253,7 @@ export function WorkspaceLayoutClient({
       >
         {children}
       </WorkspaceShell>
+      <CommandPalette />
       <ArtifactHost
         chat={
           surface === "chat" ? (

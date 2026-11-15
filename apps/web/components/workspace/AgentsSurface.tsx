@@ -6,6 +6,7 @@ import { AlertCircle, Bot, Loader2, Pencil, Plus, ShieldAlert, Sparkles, Trash2 
 import { useWorkspaceContext } from "@/components/workspace/WorkspaceContext";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/workspace/EmptyState";
 import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { GrantPicker, RISK_TONE } from "@/components/workspace/GrantPicker";
@@ -78,27 +79,30 @@ export function AgentsSurface() {
    */
   if (!loading && error.length === 0 && agents.length === 0) {
     return (
-      <section className="flex min-h-0 flex-1 items-center justify-center overflow-y-auto px-6 py-10">
-        <div className="flex max-w-sm flex-col items-center text-center">
-          <span className="flex size-14 items-center justify-center rounded-[var(--radius-lg)] bg-primary/15 text-primary">
-            <Bot aria-hidden="true" className="size-6" />
-          </span>
-          <h1 className="mt-5 text-base font-semibold tracking-tight">No agents yet</h1>
-          <p className="mt-2 text-[13px] leading-6 text-muted-foreground">
-            An agent takes a narrow task you already do and does it without you. Start with one
-            job, not five.
-          </p>
-          <Button className="mt-5" onClick={() => setCreating(true)} size="sm" variant="outline">
-            <Plus aria-hidden="true" />
-            Create the first one
-          </Button>
-          {DEV_AUTH_BYPASS ? (
-            <p className="mt-4 max-w-xs text-[11px] leading-5 text-muted-foreground">
-              Dev bypass: there is no local agent database, so this list is always empty
-              here. Point NEXT_PUBLIC_API_BASE_URL at a running cowork-api to create agents.
-            </p>
-          ) : null}
+      <section className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+        {/*
+          A modal cannot live inside a `flex items-center justify-center` block without
+          inheriting its centring; keeping the section a plain column and centring the
+          empty state itself.
+        */}
+        <div className="flex flex-1 items-center justify-center">
+          <EmptyState
+            action={
+              <Button onClick={() => setCreating(true)} size="sm" variant="outline">
+                <Plus aria-hidden="true" />
+                Create the first one
+              </Button>
+            }
+            description="An agent takes a narrow task you already do and does it without you. Start with one job, not five."
+            kind="blank"
+            title="No agents yet"
+          />
         </div>
+        {DEV_AUTH_BYPASS ? (
+          <p className="mx-auto mb-8 max-w-xs px-4 text-center text-[11px] leading-5 text-muted-foreground">
+            Dev bypass: there is no local agent database, so this list is always empty here.
+          </p>
+        ) : null}
 
         <AgentComposerModal
           catalog={catalog}
