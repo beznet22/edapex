@@ -10,6 +10,13 @@ import type { WorkspaceRuntimeController } from "@/hooks/use-workspace-runtime";
 
 export interface WorkspaceContextValue {
   readonly manifest: CapabilityManifest;
+  /**
+   * The workspace the signed-in user acts in.
+   *
+   * Carried here rather than derived in each surface: a surface that hardcodes one
+   * (or falls back to the literal "workspace") writes rows nobody will ever read back.
+   */
+  readonly workspaceId: string;
   readonly runtime: WorkspaceRuntimeController;
   readonly proactive: ProactiveController;
   readonly openArtifact: () => void;

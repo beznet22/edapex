@@ -102,7 +102,7 @@ export function Composer({
               <span className="shrink-0 text-[10px] uppercase tracking-wide">Queued</span>
               <button
                 aria-label={`Remove queued message ${message.text}`}
-                className="flex size-8 shrink-0 items-center justify-center rounded-full hover:bg-background hover:text-foreground"
+                className="relative flex size-8 shrink-0 items-center justify-center rounded-full hover:bg-background hover:text-foreground after:absolute after:-inset-1.5 after:content-['']"
                 onClick={() => onRemoveQueued(message.id)}
                 type="button"
               >
@@ -123,7 +123,7 @@ export function Composer({
               <span className="truncate">{name}</span>
               <button
                 aria-label={`Remove ${name}`}
-                className="flex size-6 items-center justify-center rounded-full hover:text-foreground"
+                className="relative flex size-6 items-center justify-center rounded-full hover:text-foreground after:absolute after:-inset-2.5 after:content-['']"
                 onClick={() =>
                   setAttachments((current) => current.filter((item) => item !== name))
                 }

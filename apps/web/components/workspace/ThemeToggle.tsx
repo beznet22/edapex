@@ -45,7 +45,10 @@ export function ThemeToggle({ className }: { readonly className?: string }) {
             aria-label={`${LABELS[mode]} theme`}
             aria-pressed={active}
             className={cn(
-              "flex size-8 items-center justify-center rounded-lg transition-colors",
+              // `after:-inset-1.5` grows the touch target to ~44px without making the
+              // segmented control visually larger: three 44px boxes would not fit beside
+              // the runtime pill.
+              "relative flex size-8 items-center justify-center rounded-lg transition-colors after:absolute after:-inset-1.5 after:content-['']",
               active
                 ? "bg-card text-foreground shadow-sm"
                 : "text-muted-foreground hover:text-foreground"

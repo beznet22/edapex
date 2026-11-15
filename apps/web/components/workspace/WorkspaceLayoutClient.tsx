@@ -202,7 +202,8 @@ export function WorkspaceLayoutClient({ children }: { readonly children: ReactNo
   }
 
   const userName = session?.user.fullName ?? session?.user.email ?? "Signed in";
-  const contextValue = { manifest, runtime, proactive, openArtifact };
+  const workspaceId = String(session?.user.id ?? "workspace");
+  const contextValue = { manifest, workspaceId, runtime, proactive, openArtifact };
 
   return (
     <WorkspaceProvider value={contextValue}>
@@ -247,7 +248,7 @@ export function WorkspaceLayoutClient({ children }: { readonly children: ReactNo
             setSetupDismissed(true);
             runtime.restoreComplete();
           }}
-          workspaceId={String(session?.user.id ?? "workspace")}
+          workspaceId={workspaceId}
         />
       ) : null}
     </WorkspaceProvider>

@@ -128,7 +128,7 @@ test.describe("theme", () => {
     // The model-setup dialog is a full-screen modal (`fixed inset-0 z-[70]`) and it
     // opens on first load, so the shell header is unclickable until it is dismissed.
     // Dismissing it is part of the flow a real person goes through, not a test hack.
-    await page.getByRole("button", { name: "Close model setup" }).click();
+    await page.getByRole("dialog", { name: "Start your workspace" }).getByRole("button", { name: "Close" }).click();
 
     const before = await page.evaluate(() =>
       document.documentElement.classList.contains("dark")

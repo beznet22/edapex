@@ -444,14 +444,128 @@
   }
 }
 
-@layer utilities {
-  .no-scrollbar {
-    -ms-overflow-style: none;
-    scrollbar-width: none;
+/*
+ * Scrollbars.
+ *
+ * One system for every scroll container. Before this there was a `.no-scrollbar` that
+ * hid the bar on chat and the raw OS default everywhere else.
+ *
+ * The default is not merely ugly, it is *inconsistent*: Windows reserves a permanent
+ * 17px gutter, so a 430px chat column renders 413px of text and reflows when a list
+ * crosses the fold. macOS overlays, so the same layout measures differently. Neither
+ * is a theme problem, which is why this is a behaviour fix first.
+ *
+ * Decisions:
+ *   - **Thumb only, no track.** Every modern platform draws a transparent track.
+ *     Painting one produces the inset-groove look of 2008.
+ *   - **8px fine pointer, 6px coarse.** 8px is the practical floor for mouse
+ *     acquisition; on touch the thumb is found by feel, not by aim.
+ *   - **Opacity fade, never `display: none`.** Removing it reflows mid-scroll.
+ *   - **Tokens, not `rgba(0,0,0,0.2)`.** The thumb has to hold up on both the cream
+ *     canvas and the warm dark one.
+ *   - **No reveal-on-hover JS.** A `pointerenter` listener per container would run
+ *     across the whole tree, and touch devices have no hover to fire it, so the thumb
+ *     would latch visible. CSS gets this right without a listener.
+ */
+@layer base {
+  :root {
+    /*
+     * Measured against the cream canvas: 0.34 composites to 2.18:1, quiet but
+     * present; 0.50 composites to 3.44:1, which meets WCAG 2.2's 3:1 for non-text UI.
+     * The first draft used 0.18 — 1.47:1, effectively invisible.
+     */
+    --scrollbar-thumb: oklch(0.191 0.0020 106.6 / 0.34);
+    --scrollbar-thumb-hover: oklch(0.191 0.0020 106.6 / 0.50);
+    --scrollbar-width: 8px;
+    --scrollbar-size: 8px;
   }
 
-  .no-scrollbar::-webkit-scrollbar {
-    display: none;
+  .dark {
+    /* Lighter alpha in dark reaches the same perceived weight: 0.30 is 2.7:1 and
+       0.42 is 3.94:1, because a light thumb on a dark ground gains contrast faster. */
+    --scrollbar-thumb: oklch(0.982 0.0054 95.1 / 0.30);
+    --scrollbar-thumb-hover: oklch(0.982 0.0054 95.1 / 0.42);
+  }
+
+  /* A touch pointer cannot hover to reveal a thumb, so it gets a slimmer bar that is
+     always visible. 6px is enough to grab without eating the gutter. */
+  @media (pointer: coarse) {
+    :root {
+      --scrollbar-width: 6px;
+      --scrollbar-size: 6px;
+    }
+  }
+
+  /* Firefox. `thin` is the provider-level equivalent of the slim width above. */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--scrollbar-thumb) transparent;
+  }
+
+  /* Chromium and WebKit. `scrollbar-color` is supported in newer Chromium, but the
+     pseudo-elements are still needed for the width and radius. */
+  ::-webkit-scrollbar {
+    width: var(--scrollbar-width);
+    height: var(--scrollbar-width);
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    border-radius: 999px;
+    background-color: var(--scrollbar-thumb);
+    /* A border in the same colour as the backdrop is the only cross-browser way to
+       inset the thumb without a padding-box trick that Safari ignores. */
+    background-clip: content-box;
+    transition: background-color var(--motion-fast) var(--duet-ease);
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: var(--scrollbar-thumb-hover);
+  }
+
+  ::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+
+  /*
+   * The premium reveal: the bar is invisible at rest and fades in when the container
+   * is hovered or focused. Applied to the transcript once it is long enough to scroll,
+   * so the reading surface stays clean.
+   *
+   * This is a class rather than the default because a scrollbar is a *discoverability*
+   * affordance: hiding it everywhere makes a clipped list look complete.
+   */
+  .scrollbar-reveal {
+    scrollbar-color: transparent transparent;
+  }
+
+  .scrollbar-reveal::-webkit-scrollbar-thumb {
+    background-color: transparent;
+  }
+
+  .scrollbar-reveal:hover,
+  .scrollbar-reveal:focus-within {
+    scrollbar-color: var(--scrollbar-thumb) transparent;
+  }
+
+  .scrollbar-reveal:hover::-webkit-scrollbar-thumb,
+  .scrollbar-reveal:focus-within::-webkit-scrollbar-thumb {
+    background-color: var(--scrollbar-thumb);
+  }
+
+  .scrollbar-reveal:hover::-webkit-scrollbar-thumb:hover {
+    background-color: var(--scrollbar-thumb-hover);
+  }
+
+  /* Reduced motion: the fade is decorative, so it is removed rather than shortened.
+     The bar still appears, just without the transition. */
+  @media (prefers-reduced-motion: reduce) {
+    ::-webkit-scrollbar-thumb {
+      transition: none;
+    }
   }
 
   .safe-top {
