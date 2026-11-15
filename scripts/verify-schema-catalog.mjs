@@ -63,8 +63,19 @@ if (badRows.length > 0) failures.push(`rows with wrong column count: ${badRows.m
 const linkRe = /\]\((\.\.\/[^)#]+)#L(\d+)\)/g;
 const fileCache = new Map();
 
+/**
+ * Resolves a catalog link, translating the pre-move path.
+ *
+ * The catalog points at `../../src/...`, which is where the legacy SvelteKit app used
+ * to live. It is now under `legacy/`. The catalog describes the *legacy* schema it is
+ * porting from, so the paths are translated here rather than rewritten in the doc —
+ * rewriting would churn 100+ rows and lose the record of what each row was audited
+ * against.
+ */
 function readTarget(relPath) {
-  const abs = join(ROOT, CATALOG_DIR, relPath);
+  const direct = join(ROOT, CATALOG_DIR, relPath);
+  const legacy = direct.replace(/([/\\])src([/\\])/, "$1legacy$1src$2");
+  const abs = existsSync(direct) ? direct : legacy;
   if (!fileCache.has(abs)) {
     fileCache.set(abs, existsSync(abs) ? readFileSync(abs, "utf8").split("\n") : null);
   }

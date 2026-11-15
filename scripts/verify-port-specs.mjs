@@ -14,7 +14,15 @@ import fs from "node:fs";
 import path from "node:path";
 
 const DIR = "docs/cloudflare-port";
-const SRC_ROOT = process.cwd();
+
+/**
+ * The legacy SvelteKit app now lives in `legacy/`.
+ *
+ * These verifiers check the *port source*, which is the legacy tree, so the root is
+ * that directory now. Using `process.cwd()` meant every path silently assumed the app
+ * was still at the repository root.
+ */
+const SRC_ROOT = path.join(process.cwd(), "legacy");
 
 const files = fs.readdirSync(DIR).filter((f) => f.endsWith(".md")).sort();
 const failures = [];
@@ -40,7 +48,21 @@ for (const file of files) {
     const [rawPath, rawAnchor] = target.split("#");
     const resolved = path.resolve(path.dirname(full), rawPath || file);
 
-    if (!fs.existsSync(resolved)) {
+    // The legacy SvelteKit app moved to `legacy/`, but 223 spec links still point at
+    // the pre-move `../../src/...` paths. Rewriting them would churn every spec for no
+    // information gain, and the specs are meant to describe the *legacy* source they
+    // port from. So the path is translated at resolve time instead.
+    const legacyResolved = resolved.replace(
+      `${path.sep}src${path.sep}`,
+      `${path.sep}legacy${path.sep}src${path.sep}`
+    );
+    const target_ = fs.existsSync(resolved)
+      ? resolved
+      : fs.existsSync(legacyResolved)
+        ? legacyResolved
+        : resolved;
+
+    if (!fs.existsSync(target_)) {
       failures.push(`${file}: link target missing — ${target}`);
       continue;
     }
@@ -48,7 +70,7 @@ for (const file of files) {
     if (rawAnchor && /^L\d+$/.test(rawAnchor)) {
       anchorCount += 1;
       const lineNo = Number(rawAnchor.slice(1));
-      const line = readLines(resolved)[lineNo - 1];
+      const line = readLines(target_)[lineNo - 1];
       if (line === undefined) failures.push(`${file}: anchor out of range — ${target}`);
       else if (line.trim().length === 0) failures.push(`${file}: anchor on blank line — ${target}`);
     }
@@ -219,7 +241,7 @@ const SERVICE_FILES = [
 
 const methodDeclarations = [];
 for (const file of SERVICE_FILES) {
-  const src = fs.readFileSync(path.join(SRC_ROOT, "src/lib/server/service", file), "utf8");
+  const src = fs.readFileSync(path.join(SRC_ROOT, "src", "lib", "server", "service", file), "utf8");
   for (const m of src.matchAll(/^\s+async\s+([A-Za-z_$][\w$]*)\s*\(/gm)) {
     methodDeclarations.push({ file, name: m[1] });
   }
