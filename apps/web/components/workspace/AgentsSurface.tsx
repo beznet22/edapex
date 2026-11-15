@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AlertCircle, Bot, Loader2, Pencil, Plus, ShieldAlert, Sparkles, Trash2 } from "lucide-react";
 
+import { Skeleton } from "@edapex/chat";
+
 import { useWorkspaceContext } from "@/components/workspace/WorkspaceContext";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -77,7 +79,15 @@ export function AgentsSurface() {
    * the one action available — create — competes with a New agent button that does the
    * same thing. So the empty state *is* the page, and the header arrives with the list.
    */
-  if (!loading && error.length === 0 && agents.length === 0) {
+  /*
+   * Loading and empty share one container.
+   *
+   * Previously loading rendered the *list* layout and then resolved to the empty layout —
+   * header disappearing, content jumping from top-left to centre. That is precisely the
+   * shift a skeleton exists to prevent, and it also meant the header said "Agents" while
+   * the body said "Loading agents…".
+   */
+  if (loading || (error.length === 0 && agents.length === 0)) {
     return (
       <section className="flex min-h-0 flex-1 flex-col overflow-y-auto">
         {/*
@@ -86,17 +96,31 @@ export function AgentsSurface() {
           empty state itself.
         */}
         <div className="flex flex-1 items-center justify-center">
-          <EmptyState
-            action={
-              <Button onClick={() => setCreating(true)} size="sm" variant="outline">
-                <Plus aria-hidden="true" />
-                Create the first one
-              </Button>
-            }
-            description="An agent takes a narrow task you already do and does it without you. Start with one job, not five."
-            kind="blank"
-            title="No agents yet"
-          />
+          {loading ? (
+            /*
+             * The empty state's shape while loading, so nothing moves when it resolves.
+             * The illustration slot is a circle of the same 72px the art occupies.
+             */
+            <div aria-busy="true" aria-label="Loading agents" className="flex flex-col items-center px-6 py-14">
+              <Skeleton className="size-[72px] rounded-full" />
+              <Skeleton className="mt-5 h-4 w-36" />
+              <Skeleton className="mt-3 h-3 w-64" />
+              <Skeleton className="mt-2 h-3 w-52" />
+              <Skeleton className="mt-5 h-9 w-40 rounded-[var(--radius-md)]" />
+            </div>
+          ) : (
+            <EmptyState
+              action={
+                <Button onClick={() => setCreating(true)} size="sm" variant="outline">
+                  <Plus aria-hidden="true" />
+                  Create the first one
+                </Button>
+              }
+              description="An agent takes a narrow task you already do and does it without you. Start with one job, not five."
+              kind="blank"
+              title="No agents yet"
+            />
+          )}
         </div>
         {DEV_AUTH_BYPASS ? (
           <p className="mx-auto mb-8 max-w-xs px-4 text-center text-[11px] leading-5 text-muted-foreground">
@@ -149,13 +173,7 @@ export function AgentsSurface() {
       ) : null}
 
       <div className="scrollbar-auto min-h-0 flex-1 overflow-y-auto px-4 pb-10 pt-4 lg:px-10">
-        {loading ? (
-          <p className="flex items-center gap-2 py-8 text-[13px] text-muted-foreground">
-            <Loader2 aria-hidden="true" className="size-4 animate-spin" />
-            Loading agents…
-          </p>
-        ) : (
-          <ul className="mx-auto max-w-3xl space-y-2.5">
+        <ul className="mx-auto max-w-3xl space-y-2.5">
             {agents.map((agent) => (
               <li
                 className="rounded-[var(--radius-lg)] bg-card p-5 shadow-[var(--elevation-1)]"
@@ -224,7 +242,6 @@ export function AgentsSurface() {
               </li>
             ))}
           </ul>
-        )}
       </div>
 
       <AgentComposerModal

@@ -628,6 +628,49 @@
   }
 
   /*
+   * Skeleton shimmer.
+   *
+   * The one loading affordance, per the design spec: `skeleton-shimmer` only, never
+   * `animate-pulse`. Pulse fades the whole block; shimmer moves a highlight across it,
+   * which reads as "arriving" rather than "broken". Mixing the two in one page makes a
+   * skeleton look like it is glitching.
+   *
+   * A single keyframe on a background gradient, not an animated mask: the mask approach
+   * needs `mask-image` support and a compositor layer per skeleton, and a task list can
+   * hold twenty.
+   */
+  .skeleton-shimmer {
+    position: relative;
+    overflow: hidden;
+    background-color: var(--muted);
+  }
+
+  .skeleton-shimmer::after {
+    position: absolute;
+    inset: 0;
+    content: "";
+    background-image: linear-gradient(
+      90deg,
+      transparent,
+      color-mix(in oklch, var(--foreground) 7%, transparent),
+      transparent
+    );
+    transform: translateX(-100%);
+    animation: edapex-shimmer 1.6s var(--ease-enter) infinite;
+  }
+
+  /*
+   * Reduced motion keeps the block's shape and drops the movement. The skeleton still
+   * communicates "not loaded"; the sweep is decoration.
+   */
+  @media (prefers-reduced-motion: reduce) {
+    .skeleton-shimmer::after {
+      animation: none;
+      background-image: none;
+    }
+  }
+
+  /*
    * Pointer cursor on everything interactive.
    *
    * Tailwind v4's preflight resets `button` to `cursor: default`, on the reasoning that a
@@ -782,6 +825,12 @@
   40% {
     opacity: 1;
     transform: translateY(-2px);
+  }
+}
+
+@keyframes edapex-shimmer {
+  to {
+    transform: translateX(100%);
   }
 }
 
