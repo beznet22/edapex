@@ -66,6 +66,38 @@ capabilities.test.ts                                           8 passed (incl. n
 ```
 
 
+## Legacy move
+
+| Item | Outcome |
+|---|---|
+| **`legacy/`** | SvelteKit + Mastra app, `Dockerfile`, `compose*.yml`, `.env.example`, own `README.md`, own `AGENTS.md`. **Builds and emits `build/index.js`** — verified, not assumed. |
+| **Standalone project** | Own `pnpm-workspace.yaml` with no members, own lockfile, `.npmrc`, `.nvmrc`, `.env`, `.gitignore`. pnpm stops walking up, so the legacy app cannot acquire an `@edapex/*` dependency. |
+| **Split by ownership** | Scripts and docs classified by *what they reference*, not by name. `scripts/` stayed shared where it serves both trees (`check-agent-size.mjs` is used by the new crates); legacy-only tooling moved to `legacy/scripts/`; 19 documents to `legacy/docs/`. |
+| **Root is now the new system** | `package.json` is workspace-only with no dependencies, `README.md` describes both trees, `AGENTS.md` is the new system's rules. |
+| **CI workaround removed** | `web.yml` needed `svelte-kit sync` only because the root tsconfig extended the legacy app's generated file. That file is no longer at the root, so the step is gone. |
+| Deleted | `package-lock.json` (second lockfile = second answer), tracked `coverage/` (43 generated files), `build` + `.svelte-kit` (129 MB of output). |
+| Dotfiles split | `.npmrc` copied to both; `.nvmrc` root pins 26.13.1 (CI's version), legacy pins 22; `.env` split so `legacy/.env` holds only the 25 legacy keys; `.gitignore` rules moved into `legacy/.gitignore`. |
+
+**One thing the gitignore split taught us:** `/coverage/` with a trailing slash only
+matches a directory, so the rule silently does nothing when the path is a file or a
+symlink — and `git check-ignore` cannot match it against a path that does not exist,
+which reads exactly like "the ignore file is not working". The rules no longer use
+trailing slashes.
+
+## WASM audit (desktop and mobile)
+
+**The rule is violated.** `apps/desktop` compiles no WASM dependency and implements
+all seven native agent commands — `agent_connect`, `agent_thread_start`,
+`agent_turn_start`, `agent_approval_response`, `agent_attach`, `agent_close` — but
+`apps/web` has **zero wrappers** for them, and `agent-runtime.ts` unconditionally
+constructs the WASM client. The desktop shell ships the web bundle as its frontend,
+so it carries the WASM runtime *and* the native core it never calls.
+
+**No blocker.** The native path compiles and is registered; this is missing wiring.
+Recorded in [`specs/50-native-agent-path.md`](specs/50-native-agent-path.md) with the
+fix order and the test that proves it (delete `public/agent-runtime/`, then run a
+turn).
+
 ## Chunk 4 — proactive work
 
 | Item | Outcome |

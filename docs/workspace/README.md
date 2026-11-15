@@ -243,3 +243,4 @@ Phase 9B is approved; the workspace specs are authoritative for implementation. 
 - Keep diffs inside the workstream; no drive-by refactors.
 - One workstream per branch/PR; never push `main`.
 - If a gate is not signed, do not start the next workstream.
+| [`specs/50-native-agent-path.md`](./specs/50-native-agent-path.md) | native agent path for desktop and mobile; WASM is web-only | `46`, `48` |

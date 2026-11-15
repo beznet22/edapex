@@ -99,7 +99,9 @@ client → UI hook. Do not bypass it.
   never upload without `X-OCR-Consent: cloud`.
 - **Desktop and mobile are native.** WebAssembly is the web delivery mechanism only.
   A host that can run native code uses `crates/*` directly; adding a WASM runtime to
-  a native host needs a written justification and a recorded blocker.
+  a native host needs a written justification and a recorded blocker. **Currently
+  violated** — see [`docs/workspace/specs/50-native-agent-path.md`](docs/workspace/specs/50-native-agent-path.md):
+  the Tauri commands exist and the web app never calls them.
 - Do not add an `AGENT_DB` table to the school `DB`. Agent persistence lives in the
   separate `AGENT_DB` bound only to `services/cowork-api` (`41`/`42`).
 
