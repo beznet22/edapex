@@ -1,0 +1,48 @@
+{
+  "id": "edapex-school",
+  "version": "1.0.0",
+  "template": "school",
+  "brand": {
+    "name": "EdApex",
+    "accent": "gold",
+    "wordmark": "EdApex Work",
+    "tagline": "School operations, with your agent alongside"
+  },
+  "bots": [
+    {
+      "key": "registrar",
+      "name": "Registrar",
+      "purpose": "Keeps student records current: enrollment, promotion, transfers, guardian links.",
+      "operations": ["search", "get", "plan_enrollment", "apply_enrollment", "plan_promotion"],
+      "channel": "tasks"
+    },
+    {
+      "key": "assessment",
+      "name": "Assessment",
+      "purpose": "Prepares marksheets and report cards, and checks them before they are published.",
+      "operations": ["get_marksheet", "save_marksheet", "get_report_card", "save_feedback", "review"],
+      "channel": "chat"
+    },
+    {
+      "key": "attendance",
+      "name": "Attendance",
+      "purpose": "Records and reconciles class attendance against the timetable.",
+      "operations": ["list_classes", "list_sections", "get", "status"],
+      "channel": "tasks"
+    }
+  ],
+  "channels": [
+    { "key": "chat", "name": "Chat", "surfaces": ["chat"] },
+    { "key": "tasks", "name": "Tasks", "surfaces": ["tasks"] },
+    { "key": "make", "name": "Make", "surfaces": ["make"] }
+  ],
+  "model": {
+    "allowed": ["openrouter/auto", "openrouter/anthropic/claude-sonnet-4.5", "openrouter/openai/gpt-5"],
+    "default": "openrouter/auto",
+    "maxOutputTokens": 4096
+  },
+  "skills": [
+    { "key": "extract", "name": "Extract marksheet", "description": "Read a photographed marksheet into structured marks.", "operations": ["get_marksheet", "save_marksheet"] },
+    { "key": "report", "name": "Draft report", "description": "Draft a report card comment from recorded results.", "operations": ["get_report_card", "save_feedback"] }
+  ]
+}

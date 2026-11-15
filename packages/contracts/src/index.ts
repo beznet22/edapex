@@ -9,3 +9,5 @@ export * from "./public-applications";
 export * from "./notifications";
 export * from "./routines";
 export * from "./tasks";
+export * from "./agents";
+export * from "./tenant";

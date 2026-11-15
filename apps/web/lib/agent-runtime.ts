@@ -15,6 +15,7 @@ import type {
   WorkspaceRuntimeView
 } from "@edapex/contracts";
 
+import { agentHost, nativeIsDefault } from "@/lib/agent-host";
 import { NativeAgentClient, type NativeAgentSettings } from "@/lib/native-agent";
 
 type Listener = () => void;
@@ -84,6 +85,27 @@ export class NativeAgentAdapter implements WorkspaceRuntimeAdapter {
   };
 
   async connect(settings: NativeAgentSettings): Promise<void> {
+    // Desktop and mobile run the agent natively. The WASM path remains the default
+    // until the native transport can be verified on a real host (see
+    // `specs/50-native-agent-path.md`), but the branch exists so the rule is true in
+    // code rather than aspirational.
+    if (agentHost() === "native" && nativeIsDefault()) {
+      const { connectNative } = await import("@/lib/native-runtime");
+      await connectNative(settings, {
+        onEvent: (event) => this.onAgentEvent(event),
+        onTool: (call) => this.runTool(call),
+        onApproval: (request) =>
+          new Promise<boolean>((resolve) => {
+            this.pendingApprovals.set(request.approvalRequestId, resolve);
+            this.showApproval(request);
+          })
+      });
+      this.connected = true;
+      this.state = { ...this.state, turn: { ...this.state.turn, state: "idle" } };
+      this.emit();
+      return;
+    }
+
     const client = new NativeAgentClient(settings, {
       onEvent: (event) => this.onAgentEvent(event),
       onTool: (call) => this.runTool(call),

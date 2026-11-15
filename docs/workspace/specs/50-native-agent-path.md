@@ -36,19 +36,36 @@ registered. This is missing wiring, not a platform limitation.
 - **The wrong one is tested.** `crates/agent-wasm` is gated to `wasm32`, so the
   desktop build never exercises the code it actually ships.
 
-## The fix, in order
+## The fix
 
-1. **`apps/web/lib/tauri.ts`** gains typed wrappers for the seven agent commands,
-   matching the existing style there (`invokeCommand<T>`).
-2. **A host-aware client.** `agent-runtime.ts` selects a `NativeAgentAdapter` when
-   `isTauriHost()` is true and the WASM adapter otherwise. The interface is already
-   `WorkspaceRuntimeAdapter`, so this is a second implementation, not a rewrite.
-3. **`agent_attach` on reconnect.** The native side already swaps the channel before
-   replay, so a mid-turn reload re-attaches; the WASM side cannot do this as well
-   because its state is per-page.
-4. **Stop shipping the WASM runtime to native hosts.** Once the web bundle no longer
-   needs it under Tauri, `build:agent-runtime` becomes a web-only concern. The budget
-   entry already treats it as a lazy asset, so nothing else moves.
+**Done:**
+
+1. **`apps/web/lib/native-agent-tauri.ts`** — typed wrappers for all seven commands,
+   plus a structural guard on the event union. The guard is duplicated from the WASM
+   client *deliberately*: the producers are different transports (`tauri::ipc` versus
+   a wasm-bindgen callback), so a drift between them is exactly what it catches.
+2. **`apps/web/lib/native-runtime.ts`** — connection, `agent_attach` on reload,
+   interrupt and approval response, wired to the callback shape the workspace adapter
+   already speaks.
+3. **`apps/web/lib/agent-host.ts`** — host selection, chosen at **runtime** rather
+   than build time, because one bundle serves the browser and the shell and a build
+   flag would be two artifacts and two chances to ship the wrong one.
+4. **A branch in `agent-runtime.ts`**, with 7 unit tests covering it.
+
+**Not done, and why:** the native path is *not* the default yet.
+`nativeIsDefault()` returns false unless `NEXT_PUBLIC_NATIVE_AGENT=1`, because the
+native transport **cannot be verified in CI** — there is no Tauri window in the
+runner. Making an unverified transport the default on the platform teachers use most
+would be a guess dressed as a fix. The env override lets a desktop build exercise it
+without changing the committed default.
+
+**Still to do:**
+
+5. **Flip the default** once Android builds and runs — gated on a real device, not on
+   a passing typecheck.
+6. **Stop shipping the WASM runtime to native hosts.** Once the flip happens,
+   `build:agent-runtime` becomes web-only. The budget entry already treats it as a
+   lazy asset, so nothing else moves.
 
 ## Verification
 

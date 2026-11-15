@@ -29,7 +29,7 @@ export interface AuthStatus {
   readonly authenticated: boolean;
 }
 
-async function invokeCommand<T>(
+export async function invokeCommand<T>(
   command: string,
   args?: Readonly<Record<string, unknown>>
 ): Promise<T> {
