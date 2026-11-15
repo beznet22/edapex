@@ -312,7 +312,7 @@ Rules:
 ## 8. Reproduction
 
 ```bash
-node scripts/introspect-mysql.mjs     # refreshes docs/cloudflare-port/audit/db-inventory.json
+node legacy/scripts/introspect-mysql.mjs     # refreshes docs/cloudflare-port/audit/db-inventory.json
 ```
 
 The script is read-only: `SELECT` and `SHOW` only, credentials from `.env`, never printed.

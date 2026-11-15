@@ -141,7 +141,7 @@ Bundle caps:
 
 ## Measured baseline
 
-The backend baseline (tables, rows, indexes, auth counts, hashing cost) is measured and maintained in [`docs/cloudflare-port/README.md`](../cloudflare-port/README.md). Do not duplicate it here; refresh it with `node scripts/introspect-mysql.mjs` when the dump changes.
+The backend baseline (tables, rows, indexes, auth counts, hashing cost) is measured and maintained in [`docs/cloudflare-port/README.md`](../cloudflare-port/README.md). Do not duplicate it here; refresh it with `node legacy/scripts/introspect-mysql.mjs` when the dump changes.
 
 Workspace performance numbers (Tauri, Worker/PWA, Needle 3, iroh, GenUI, document engine and editor) belong in `specs/70-evaluation-and-rollout.md` and must be device/date-stamped. No invented benchmark numbers.
 

@@ -12,35 +12,13 @@ name: Legacy app
 on:
   pull_request:
     paths:
-      - "src/**"
-      - "static/**"
-      - "bin/**"
-      - "scripts/**"
-      - "package.json"
-      - "pnpm-lock.yaml"
-      - "pnpm-workspace.yaml"
-      - "svelte.config.js"
-      - "vite.config.ts"
-      - "tsconfig.json"
-      - "Dockerfile"
-      - ".dockerignore"
+      - "legacy/**"
       - ".github/workflows/legacy.yml"
   push:
     branches:
       - main
     paths:
-      - "src/**"
-      - "static/**"
-      - "bin/**"
-      - "scripts/**"
-      - "package.json"
-      - "pnpm-lock.yaml"
-      - "pnpm-workspace.yaml"
-      - "svelte.config.js"
-      - "vite.config.ts"
-      - "tsconfig.json"
-      - "Dockerfile"
-      - ".dockerignore"
+      - "legacy/**"
       - ".github/workflows/legacy.yml"
   workflow_dispatch:
 
@@ -70,9 +48,11 @@ jobs:
       # `prepare`; without scripts it has to run explicitly, which is what the
       # Docker build gets for free.
       - name: Install
+        working-directory: legacy
         run: pnpm install --frozen-lockfile --ignore-scripts
 
       - name: Generate SvelteKit types
+        working-directory: legacy
         run: pnpm exec svelte-kit sync
 
       # The Telegram adapter validates `botToken` at module scope, and postbuild
@@ -80,12 +60,14 @@ jobs:
       # module resolves its project root from its own chunk location, which lands
       # outside the repo; pinning it here makes the database path deterministic.
       - name: Build
+        working-directory: legacy
         env:
           TELEGRAM_BOT_TOKEN: placeholder
           MASTRA_DB_URL: file:/tmp/build-mastra.db
         run: pnpm run build
 
       - name: Build artifact exists
+        working-directory: legacy
         run: test -f build/index.js
 
   # The image is what actually deploys, so the Dockerfile is built too — but only
@@ -103,7 +85,8 @@ jobs:
       - name: Build image
         uses: docker/build-push-action@v6
         with:
-          context: .
+          context: ./legacy
+          file: ./legacy/Dockerfile
           platforms: linux/amd64
           push: false
           tags: edapex-legacy:ci
