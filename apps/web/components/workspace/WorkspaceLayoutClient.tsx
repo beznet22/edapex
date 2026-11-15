@@ -19,6 +19,7 @@ import { useProactive } from "@/hooks/use-proactive";
 import { useWorkspaceRuntime } from "@/hooks/use-workspace-runtime";
 import { useAutoHideScrollbars } from "@/hooks/use-auto-hide-scrollbars";
 import { useRuntimeHealth } from "@/hooks/use-runtime-health";
+import { activeItemId, treeForPath } from "@/lib/nav-tree";
 import { isDesktopViewport } from "@/lib/platform";
 import type { SidebarState } from "@/lib/sidebar-state";
 import { useSidebarState } from "@/lib/sidebar-state-hooks";
@@ -37,6 +38,8 @@ function surfaceForPath(pathname: string): WorkspaceTab {
   const path = pathname.replace(/\/+$/, "") || "/";
   if (path === "/workspace/tasks") return "tasks";
   if (path === "/workspace/make") return "make";
+  if (path === "/workspace/plugins" || path.startsWith("/workspace/plugins/")) return "plugins";
+  if (path === "/workspace/settings" || path.startsWith("/workspace/settings/")) return "settings";
   return "chat";
 }
 
@@ -56,6 +59,11 @@ export function WorkspaceLayoutClient({
 
   const pathname = usePathname();
   const surface = surfaceForPath(pathname);
+  // Derived from the route, not from state: the tree must be correct on the first paint,
+  // and a `useEffect` that set it would render the workspace tree for one frame on a
+  // settings route.
+  const navTree = treeForPath(pathname);
+  const activeNavId = activeItemId(navTree, pathname);
   const [sessionState, setSessionState] = useState<SessionState>("loading");
   const [session, setSession] = useState<SessionView | null>(null);
   const [manifest, setManifest] = useState<CapabilityManifest | null>(null);
@@ -228,8 +236,10 @@ export function WorkspaceLayoutClient({
     <WorkspaceProvider value={contextValue}>
       <WorkspaceShell
         manifest={manifest}
+        activeNavId={activeNavId}
         connecting={runtime.connecting}
         coreHealth={runtimeHealth.health}
+        navTree={navTree}
         devBypass={DEV_AUTH_BYPASS}
         onConnectRuntime={() => setSetupDismissed(false)}
         onOpenArtifact={surface === "chat" ? openArtifact : undefined}

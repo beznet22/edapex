@@ -117,6 +117,8 @@
   --motion-fast: 120ms;
   --motion-normal: 200ms;
   --motion-panel: 280ms;
+  --motion-exit: 160ms;
+  --motion-enter: 220ms;
 
   /*
    * Radius ladder, derived from the `0.625rem` base in the pasted shadcn preset.
@@ -151,6 +153,12 @@
   --artifact-hover: rgba(0, 0, 0, 0.05);
   --duet-ease: cubic-bezier(0.22, 1, 0.36, 1);
   --duet-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  /*
+   * Exit is faster than enter on purpose: leaving should feel responsive, arriving
+   * considered. Reversing the pair makes navigation feel sluggish.
+   */
+  --ease-exit: cubic-bezier(0.3, 0, 0.8, 0.15);
+  --ease-enter: cubic-bezier(0.05, 0.7, 0.1, 1);
 }
 
 .dark {
@@ -427,6 +435,8 @@
   --shadow-paper: var(--paper-shadow);
   --ease-duet: var(--duet-ease);
   --ease-duet-spring: var(--duet-spring);
+  --ease-out-soft: var(--ease-exit);
+  --ease-in-soft: var(--ease-enter);
   --color-destructive-foreground: var(--destructive-foreground);
   --color-border: var(--border);
   --color-input: var(--input);

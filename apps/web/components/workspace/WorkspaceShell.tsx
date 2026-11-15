@@ -45,9 +45,11 @@ import {
 } from "@/components/ui/sidebar";
 import { Titlebar } from "@/components/desktop/Titlebar";
 import { RuntimeStatus } from "@/components/openduet/runtime-status";
+import { SidebarNav } from "@/components/workspace/SidebarNav";
 import { SidebarUser } from "@/components/workspace/SidebarUser";
 import { ThemeToggle } from "@/components/workspace/ThemeToggle";
 import { TabBar, type WorkspaceTab } from "@/components/openduet/tab-bar";
+import type { NavTree } from "@/lib/nav-tree";
 
 interface WorkspaceShellProps {
   readonly manifest: CapabilityManifest;
@@ -66,13 +68,18 @@ interface WorkspaceShellProps {
   /** Server-resolved so the rail is the right width on first paint. */
   readonly sidebarOpen: boolean;
   readonly setSidebarOpen: (open: boolean) => void;
+  /** The navigation tree for the current route. Derived server-side, so first paint is right. */
+  readonly navTree: NavTree;
+  readonly activeNavId: string | null;
   readonly children: ReactNode;
 }
 
 const SURFACE_LABEL: Record<WorkspaceTab, string> = {
   chat: "Chat",
   tasks: "Tasks",
-  make: "Make"
+  make: "Make",
+  plugins: "Plugins",
+  settings: "Settings"
 };
 
 const RAIL_ITEMS: readonly {
@@ -97,18 +104,20 @@ const RAIL_ITEMS: readonly {
  */
 function DesktopRail({
   manifest,
-  surface,
   waitingCount,
   userName,
   userEmail,
-  onSignOut
+  onSignOut,
+  navTree,
+  activeNavId
 }: {
   readonly manifest: CapabilityManifest;
-  readonly surface: WorkspaceTab;
   readonly waitingCount: number;
   readonly userName: string;
   readonly userEmail: string | null;
   readonly onSignOut: (() => void) | undefined;
+  readonly navTree: NavTree;
+  readonly activeNavId: string | null;
 }) {
   return (
     <Sidebar collapsible="icon" variant="inset">
@@ -133,38 +142,7 @@ function DesktopRail({
       </SidebarHeader>
 
       <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupLabel>Workspace</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {RAIL_ITEMS.map((item) => {
-                const active = item.id === surface;
-                const Icon = item.icon;
-                const badge = item.id === "tasks" ? waitingCount : 0;
-                return (
-                  <SidebarMenuItem key={item.id}>
-                    <SidebarMenuButton
-                      asChild
-                      isActive={active}
-                      tooltip={item.label}
-                    >
-                      <Link
-                        aria-current={active ? "page" : undefined}
-                        href={item.href}
-                      >
-                        <Icon aria-hidden="true" />
-                        <span>{item.label}</span>
-                      </Link>
-                    </SidebarMenuButton>
-                    {badge > 0 ? (
-                      <SidebarMenuBadge>{badge}</SidebarMenuBadge>
-                    ) : null}
-                  </SidebarMenuItem>
-                );
-              })}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        <SidebarNav activeId={activeNavId} tree={navTree} waitingCount={waitingCount} />
       </SidebarContent>
 
       <SidebarFooter>
@@ -212,6 +190,8 @@ export function WorkspaceShell({
   onConnectRuntime,
   sidebarOpen,
   setSidebarOpen,
+  navTree,
+  activeNavId,
   children
 }: WorkspaceShellProps) {
   return (
@@ -224,9 +204,10 @@ export function WorkspaceShell({
       <Titlebar title="EdApex Work" />
       <SidebarProvider onOpenChange={setSidebarOpen} open={sidebarOpen}>
         <DesktopRail
+          activeNavId={activeNavId}
           manifest={manifest}
+          navTree={navTree}
           onSignOut={onSignOut}
-          surface={surface}
           userEmail={userEmail}
           userName={userName}
           waitingCount={waitingCount}

@@ -12,7 +12,14 @@ import type { LucideIcon } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
-export type WorkspaceTab = "chat" | "tasks" | "make";
+/**
+ * `plugins` and `settings` are destinations, not tabs.
+ *
+ * The bottom tab bar is a phone control with room for four items. Adding Plugins would
+ * make it five and Settings six, so those live in the sheet behind the trigger — the bar
+ * keeps the three things done daily.
+ */
+export type WorkspaceTab = "chat" | "tasks" | "make" | "plugins" | "settings";
 
 interface TabItem {
   readonly id: WorkspaceTab;

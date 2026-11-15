@@ -6,7 +6,9 @@ import type { WorkspaceTab } from "@/components/openduet/tab-bar";
 const BOOT_LABEL: Record<WorkspaceTab, string> = {
   chat: "Chat",
   tasks: "Tasks",
-  make: "Make"
+  make: "Make",
+  plugins: "Plugins",
+  settings: "Settings"
 };
 
 const BOOT_TABS: readonly WorkspaceTab[] = ["chat", "tasks", "make"];
