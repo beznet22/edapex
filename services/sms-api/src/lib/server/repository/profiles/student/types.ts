@@ -5,7 +5,17 @@ export type NewStudent = typeof smStudents.$inferInsert;
 export type StudentRecordRow = typeof studentRecords.$inferSelect;
 export type NewStudentRecord = typeof studentRecords.$inferInsert;
 
-/** Columns a student profile update may touch. */
+/**
+ * Columns a student profile update may touch.
+ *
+ * `classId`/`sectionId` are present because a *promotion* writes them, but
+ * `StudentProfileService.update` strips them: moving a student must go through
+ * `promoteStudent`, which also creates the placement record, assigns fees and moves chat
+ * groups. A bare column update would leave all three pointing at the old section.
+ *
+ * `parentId` is here because the guardian endpoints need it — before them, nothing in the
+ * system could change a student's guardian.
+ */
 export type StudentPatch = Partial<
   Pick<
     NewStudent,
@@ -20,6 +30,7 @@ export type StudentPatch = Partial<
     | "rollNo"
     | "email"
     | "mobile"
+    | "parentId"
   >
 >;
 

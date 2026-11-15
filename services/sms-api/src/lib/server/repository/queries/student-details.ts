@@ -40,6 +40,7 @@ export interface StudentDetails {
   readonly studentCategoryId: number | null;
   readonly rollNo: number | null;
   readonly userId: number | null;
+  readonly activeStatus: number | null;
 }
 
 /**
@@ -61,8 +62,15 @@ export async function findStudentDetails(
         fullName: smStudents.fullName,
         firstName: smStudents.firstName,
         lastName: smStudents.lastName,
-        email: smParents.guardiansEmail,
-        mobile: smParents.guardiansMobile,
+        /*
+         * These were reading `smParents` — the student's email and mobile silently showed
+         * the *guardian's* contact details. Anyone editing a student saw their own write
+         * fail to appear, because the read came from a different table.
+         *
+         * The guardian fields are carried separately below, which is what they are for.
+         */
+        email: smStudents.email,
+        mobile: smStudents.mobile,
         studentPhoto: smStudents.studentPhoto,
         dateOfBirth: smStudents.dateOfBirth,
         genderName: smBaseSetups.baseSetupName,
@@ -81,7 +89,8 @@ export async function findStudentDetails(
         genderId: smStudents.genderId,
         studentCategoryId: smStudents.studentCategoryId,
         rollNo: smStudents.rollNo,
-        userId: smStudents.userId
+        userId: smStudents.userId,
+        activeStatus: smStudents.activeStatus
       })
       .from(smStudents)
       .leftJoin(smBaseSetups, eq(smStudents.genderId, smBaseSetups.id))
@@ -104,7 +113,12 @@ export async function findStudentDetails(
             byAdmissionNumber ? smStudents.admissionNo : smStudents.id,
             id
           ),
-          eq(smStudents.activeStatus, 1),
+          /*
+           * No `activeStatus` filter: this is a *lookup by id*, and a retired student must
+           * stay readable. Filtering here made `PATCH /active` deactivate the row and then
+           * 404 on its own read-back — which reads as a broken endpoint rather than as a
+           * deliberate soft delete. Lists filter on active; a direct read does not.
+           */
           eq(smStudents.schoolId, ctx.tenant.schoolId)
         )
       )

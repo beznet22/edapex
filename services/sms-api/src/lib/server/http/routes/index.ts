@@ -39,6 +39,7 @@ import { settingsGeneral } from "./settings-general.routes";
 import { settingsReport } from "./settings-report.routes";
 import { studentLifecycle } from "./student-lifecycle.routes";
 import { studentPhotos } from "./student-photos.routes";
+import { studentProfiles } from "./student-profiles.routes";
 import { students } from "./students.routes";
 import { subjectAssignments } from "./subject-assignments.routes";
 
@@ -73,6 +74,7 @@ export const createProtectedRoutes = (
     .route("/students", students)
     .route("/students", studentPhotos)
     .route("/students", studentLifecycle)
+    .route("/students", studentProfiles)
     .route("/students", archiveRetrieval)
     .route("/students", archiveRender)
     .route("/students", reportCard)

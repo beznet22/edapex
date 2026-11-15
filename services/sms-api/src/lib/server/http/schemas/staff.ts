@@ -81,3 +81,18 @@ export const staffStatusBody = z
     active: z.boolean()
   })
   .strict();
+
+/**
+ * Multipart photo body.
+ *
+ * `filename` and `kind` are accepted and ignored — the same shape the student endpoint
+ * takes, so one client helper can drive both. Validation reads magic bytes; the filename is
+ * caller-controlled and the declared MIME type is a hint at best.
+ */
+export const staffPhotoForm = z
+  .object({
+    file: z.instanceof(File),
+    filename: z.string().max(255).optional(),
+    kind: z.string().max(32).optional()
+  })
+  .strict();

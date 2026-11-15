@@ -1,12 +1,13 @@
 import { Hono } from "hono";
 
-import { StaffService, createService } from "../../services";
+import { StaffPhotoService, StaffService, createService } from "../../services";
 import type { AppContext } from "../env";
-import { jsonBody, queryParams, routeParams } from "../validation";
+import { formBody, jsonBody, queryParams, routeParams } from "../validation";
 import {
   createStaffBody,
   staffIdParams,
   staffListQuery,
+  staffPhotoForm,
   staffStatusBody,
   updateStaffBody
 } from "../schemas/staff";
@@ -67,4 +68,16 @@ export const adminStaff = new Hono<AppContext>()
       c.header("Cache-Control", "no-store");
       return c.json(staff, 200);
     }
-  );
+  )
+  .put("/staff/:staffId/photo", routeParams(staffIdParams), formBody(staffPhotoForm), async (c) => {
+    const { staffId } = c.req.valid("param");
+    const { file } = c.req.valid("form");
+    const photo = await createService(StaffPhotoService, c.get("ctx")).save({ staffId, file });
+    c.header("Cache-Control", "no-store");
+    return c.json(photo, 200);
+  })
+  .delete("/staff/:staffId/photo", routeParams(staffIdParams), async (c) => {
+    const { staffId } = c.req.valid("param");
+    await createService(StaffPhotoService, c.get("ctx")).remove(staffId);
+    return c.body(null, 204);
+  });

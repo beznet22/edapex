@@ -159,7 +159,13 @@ export async function buildMarksheet(
       examTypeId: data.examType?.id ?? params.examId,
       fullName: details.fullName ?? "",
       gender: details.genderName ?? "",
-      parentEmail: details.email ?? "",
+      /*
+       * `guardiansEmail`, not `email`. `email` used to carry the guardian's address because
+       * `findStudentDetails` selected the wrong table — a bug that made the student's own
+       * contact fields read as the parent's. With that fixed, the report's recipient has to
+       * come from the field that actually means "parent".
+       */
+      parentEmail: details.guardiansEmail ?? "",
       parentName: details.guardiansName ?? "Unknown Parent",
       term: data.examType?.name ?? "",
       title: reportSettings.termlyReportTitle,

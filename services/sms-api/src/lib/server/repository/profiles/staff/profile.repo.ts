@@ -151,7 +151,7 @@ export async function updateStaff(
 export async function updateStaffPhoto(
   ctx: ScopedRepositoryContext,
   staffId: number,
-  photoPath: string
+  photoPath: string | null
 ): Promise<boolean> {
   return withErrorHandling(async () => {
     const rows = await ctx.db
