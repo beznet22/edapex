@@ -61,6 +61,9 @@ export const createProtectedRoutes = (
     .use("/agent/platform-capabilities", tenant)
     .use("/agent/web/*", tenant)
     .use("/settings/*", tenant)
+    // Only the photo routes need a tenant: `GET /me` must work for an account with no
+    // school, which is why `/me` itself is not scoped.
+    .use("/me/photo", tenant)
     .use("/admin", tenant)
     .use("/admin/*", tenant)
     .use("/admin/*", requireAdmin)

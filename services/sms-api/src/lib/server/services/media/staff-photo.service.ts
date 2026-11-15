@@ -30,6 +30,23 @@ export interface StaffPhotoResult {
 export class StaffPhotoService {
   constructor(private readonly ctx: ServiceContext) {}
 
+  /**
+   * A staff member setting their own photo.
+   *
+   * Same storage and validation as the admin path; the only difference is that the id comes
+   * from the session rather than the URL, so this can never be pointed at a colleague. That
+   * is the whole reason it is a separate method rather than an optional parameter on `save`:
+   * an "any staff id" argument on a self-service endpoint is a privilege bug waiting for the
+   * next refactor.
+   */
+  async saveOwn(staffId: number, file: Blob): Promise<StaffPhotoResult> {
+    return await this.save({ staffId, file });
+  }
+
+  async removeOwn(staffId: number): Promise<void> {
+    await this.remove(staffId);
+  }
+
   async save(input: StaffPhotoInput): Promise<StaffPhotoResult> {
     if (!Number.isInteger(input.staffId) || input.staffId <= 0) {
       throw new ValidationError("A positive staff id is required", "staffId");
