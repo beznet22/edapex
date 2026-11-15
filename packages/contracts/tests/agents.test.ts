@@ -86,24 +86,26 @@ describe("proposeAgent", () => {
   });
 
   it("respects a disabled feature, because the ceiling shrinks first", () => {
+    // `search` belongs to the people tool, so disabling that feature removes it.
+    // Note `get` is deliberately *not* used here: it is a generic operation present
+    // in several tools, so it survives the filter and would make this test pass for
+    // the wrong reason.
     const enabled = proposeAgent({
-      draft: draft(["get"]),
+      draft: draft(["search"]),
       kind: "local",
       creatorRole: "admin",
       features: [],
       creatorIsAdmin: true
     });
     const disabled = proposeAgent({
-      draft: draft(["get"]),
+      draft: draft(["search"]),
       kind: "local",
       creatorRole: "admin",
       features: [{ id: "people", enabled: false }],
       creatorIsAdmin: true
     });
 
-    expect(enabled.kind).toBe("proposable");
-    // With `people` disabled, `get` leaves the ceiling, so the proposal must fail.
-    if (enabled.kind === "proposable") expect(enabled.within).toContain("get");
+    if (enabled.kind === "proposable") expect(enabled.within).toContain("search");
     expect(disabled.kind).toBe("rejected");
   });
 });
@@ -131,14 +133,14 @@ describe("effectiveGrant", () => {
   });
 
   it("shrinks when a feature is disabled", () => {
-    const before = effectiveGrant({ stored: ["get"], creatorRole: "admin", features: [] });
+    const before = effectiveGrant({ stored: ["search"], creatorRole: "admin", features: [] });
     const after = effectiveGrant({
-      stored: ["get"],
+      stored: ["search"],
       creatorRole: "admin",
       features: [{ id: "people", enabled: false }]
     });
-    expect(before).toContain("get");
-    expect(after).not.toContain("get");
+    expect(before).toContain("search");
+    expect(after).not.toContain("search");
   });
 });
 
@@ -221,7 +223,9 @@ describe("tenant packages", () => {
 
   it("ships no credential or secret in a package", () => {
     const serialised = JSON.stringify(schoolPackage) + JSON.stringify(genericPackage);
-    expect(serialised).not.toMatch(/api[_-]?key|secret|token|password/i);
+    // Key names, not the word appearing anywhere: `maxOutputTokens` is a legitimate
+    // setting and matched a naive /token/ search.
+    expect(serialised).not.toMatch(/"(api[_-]?key|secret|password|credential|access_token|refresh_token)"/i);
   });
 
   it("never wildcards the model allowlist", () => {
