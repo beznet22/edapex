@@ -45,10 +45,13 @@
   --sidebar-accent: oklch(0.936 0.0161 82.8);
   --sidebar-accent-foreground: oklch(0.264 0.0037 106.6);
   --sidebar-ring: oklch(0.56 0.13 36);
-  /* Icon-only and expanded rail widths. 72px is a three-item rail; 15rem fits a
-     two-word label at 13px without truncation. */
-  --sidebar-width: 15rem;
-  --sidebar-width-icon: 4.5rem;
+  /*
+   * shadcn's widths, unchanged. `--sidebar-width-icon` is 3rem because the menu button
+   * collapses to `size-8` — a wider rail simply adds dead space around a 32px icon,
+   * which is exactly what made the collapsed rail look oversized.
+   */
+  --sidebar-width: 16rem;
+  --sidebar-width-icon: 3rem;
 
   /*
    * Warm neutrals, from the Claude palette in `designs/claude.design.md`.

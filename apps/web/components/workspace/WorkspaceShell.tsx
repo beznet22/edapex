@@ -17,6 +17,15 @@ import type { CoreHealth } from "@/lib/tauri";
 
 import { Button } from "@/components/ui/button";
 import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb";
+import { Separator } from "@/components/ui/separator";
+import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
@@ -91,7 +100,7 @@ function DesktopRail({
   readonly waitingCount: number;
 }) {
   return (
-    <Sidebar collapsible="icon">
+    <Sidebar collapsible="icon" variant="inset">
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
@@ -149,6 +158,19 @@ function DesktopRail({
 
       <SidebarFooter>
         <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton size="lg" tooltip={manifest.role}>
+              <span className="flex size-8 shrink-0 items-center justify-center rounded-[var(--radius-sm)] bg-sidebar-accent text-xs font-semibold text-sidebar-accent-foreground">
+                {manifest.role.slice(0, 1).toUpperCase()}
+              </span>
+              <span className="grid min-w-0 flex-1 text-left leading-tight">
+                <span className="truncate text-sm font-medium">Workspace</span>
+                <span className="truncate text-[11px] text-muted-foreground">
+                  {manifest.role}
+                </span>
+              </span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
           {manifest.role === "admin" ? (
             <SidebarMenuItem>
               <SidebarMenuButton asChild tooltip="Admin">
@@ -188,50 +210,43 @@ export function WorkspaceShell({
     >
       {/* Renders null in a browser tab: the browser draws its own chrome. */}
       <Titlebar title="EdApex Work" />
-      <SidebarProvider
-        // `open`, not `defaultOpen`. The provider treats `open` as controlled and
-        // `defaultOpen` as a one-time initial value, so passing only the latter made the
-        // rail ignore every toggle: the cookie changed while the UI did not.
-        onOpenChange={setSidebarOpen}
-        open={sidebarOpen}
-        // The provider hardcodes its width constants, so ours are re-stated here rather
-        // than winning through the theme layer.
-        style={
-          {
-            "--sidebar-width": "15rem",
-            "--sidebar-width-icon": "4.5rem",
-            minHeight: 0
-          } as React.CSSProperties
-        }
-      >
+      <SidebarProvider onOpenChange={setSidebarOpen} open={sidebarOpen}>
         <DesktopRail manifest={manifest} surface={surface} waitingCount={waitingCount} />
         <SidebarInset className="min-h-0 overflow-hidden">
-          <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <header className="safe-top shrink-0 px-3 pb-2.5 shadow-[0_1px_0_var(--border)] lg:px-6 lg:pb-3 lg:pt-4">
-          <div className="mx-auto flex w-full max-w-[430px] items-center justify-between gap-2 lg:max-w-none">
-            <div className="flex min-w-0 items-center gap-2 lg:hidden">
-              <SidebarTrigger aria-label="Open navigation" className="-ml-1 shrink-0" />
-              <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary text-sm font-black text-primary-foreground">
-                E
-              </span>
-              <div className="min-w-0">
-                <div className="truncate text-sm font-semibold tracking-tight">EdApex Work</div>
-                <div className="truncate text-[11px] text-muted-foreground">
-                  {userName} · {manifest.role}
-                </div>
-              </div>
+          {/*
+            Official shadcn header geometry: a fixed 64px bar with the trigger, a vertical
+            separator and a breadcrumb, then the content in its own padded column. The
+            previous version had a custom 430px-max row that reflowed at every breakpoint
+            and pushed the surface name into the same line as the status pills.
+          */}
+          {/*
+            Official geometry: 64px, shrinking to 48px when the rail collapses, so the
+            header tracks the rail's own height change instead of staying fixed and
+            leaving a gap.
+          */}
+          <header className="safe-top flex h-16 shrink-0 items-center justify-between gap-2 border-b border-border transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
+            <div className="flex min-w-0 items-center gap-2 px-4">
+              <SidebarTrigger aria-label="Toggle navigation" className="-ml-1" />
+              <Separator
+                className="mr-2 data-[orientation=vertical]:h-4"
+                orientation="vertical"
+              />
+              <Breadcrumb>
+                <BreadcrumbList>
+                  <BreadcrumbItem className="hidden md:block">
+                    <BreadcrumbLink asChild>
+                      <Link href="/workspace">EdApex</Link>
+                    </BreadcrumbLink>
+                  </BreadcrumbItem>
+                  <BreadcrumbSeparator className="hidden md:block" />
+                  <BreadcrumbItem>
+                    <BreadcrumbPage>{SURFACE_LABEL[surface]}</BreadcrumbPage>
+                  </BreadcrumbItem>
+                </BreadcrumbList>
+              </Breadcrumb>
             </div>
-            {/*
-              No brand repeat on desktop: the rail already shows it, and the two
-              together read as the title twice. Only the surface name and the person
-              belong here.
-            */}
-            <div className="hidden min-w-0 items-center gap-2 text-sm lg:flex">
-              <SidebarTrigger aria-label="Toggle navigation" className="-ml-1 shrink-0" />
-              <span className="font-semibold tracking-tight">{SURFACE_LABEL[surface]}</span>
-              <span className="ml-1 truncate text-[11px] text-muted-foreground">{userName}</span>
-            </div>
-            <div className="flex items-center gap-1">
+
+            <div className="flex shrink-0 items-center gap-1 pr-4">
               {devBypass ? (
                 <span
                   className="rounded-full border border-primary/30 bg-primary/10 px-2 py-1 text-[10px] font-semibold text-primary"
@@ -278,24 +293,26 @@ export function WorkspaceShell({
               {manifest.role === "admin" ? (
                 <Link
                   aria-label="Open admin claim links"
-                  className="flex size-11 items-center justify-center rounded-xl text-muted-foreground hover:bg-muted hover:text-foreground lg:hidden"
+                  className="flex size-9 items-center justify-center rounded-[var(--radius-md)] text-muted-foreground hover:bg-muted hover:text-foreground"
                   href="/admin/claim-links"
                 >
                   <Settings2 aria-hidden="true" className="size-4" />
                 </Link>
               ) : null}
             </div>
-          </div>
-        </header>
+          </header>
 
-        <main className="relative flex min-h-0 flex-1 flex-col overflow-hidden pb-[92px] lg:pb-0">
-          <div className="mx-auto flex min-h-0 w-full max-w-[430px] flex-1 flex-col lg:max-w-none">
-            {children}
-          </div>
-          <div className="lg:hidden">
-            <TabBar current={surface} waitingCount={waitingCount} />
-          </div>
-        </main>
+          {/*
+            Content column. `max-w-[430px]` centres the chat on a phone and the composer
+            with it; on desktop the surface owns the full inset width.
+          */}
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden pb-[92px] lg:pb-0">
+            <div className="mx-auto flex min-h-0 w-full max-w-[430px] flex-1 flex-col lg:max-w-none">
+              {children}
+            </div>
+            <div className="lg:hidden">
+              <TabBar current={surface} waitingCount={waitingCount} />
+            </div>
           </div>
         </SidebarInset>
       </SidebarProvider>
