@@ -1,0 +1,19 @@
+# Local development variables for `wrangler dev`.
+#
+# Copy to `.dev.vars` (gitignored) — `wrangler dev` reads that file, **not the shell
+# environment**, so `LOCAL_EMAIL_LOG=true pnpm dev` has no effect and the magic-link
+# adapter still throws "Email binding is not configured". That cost a debugging round.
+#
+#   cp .dev.vars.example .dev.vars
+#
+# None of these are secrets. Anything that is a secret belongs in `wrangler secret put`
+# for a deployed Worker, never here.
+
+# Writes email to the console instead of sending it, and prints the magic-link URL so
+# sign-in works locally. Without it there is no email binding and no way to sign in.
+LOCAL_EMAIL_LOG=true
+
+# Where the API sends a browser after a successful sign-in.
+APP_ORIGIN=http://localhost:5181
+POST_LOGIN_REDIRECT=http://localhost:5181/workspace
+CORS_ORIGINS=http://localhost:5181,http://127.0.0.1:5181

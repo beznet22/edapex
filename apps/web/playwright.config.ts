@@ -53,7 +53,12 @@ export default defineConfig({
       NODE_ENV: isProductionTarget ? "production" : "development",
       // The bypass exposes a fixed admin session with no school data. It is
       // development-only by construction, so nothing here weakens production.
-      NEXT_PUBLIC_DEV_AUTH_BYPASS: "1"
+      /*
+       * A fixture for the runner, not a dev bypass. It also requires a loopback API base
+       * (see `lib/test-session.ts`), so a production bundle carrying the flag still
+       * refuses to activate against a real origin.
+       */
+      NEXT_PUBLIC_TEST_SESSION: "1"
     }
   }
 });

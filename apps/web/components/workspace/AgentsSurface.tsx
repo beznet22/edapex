@@ -21,7 +21,6 @@ import {
   type AgentView,
   type GrantCatalog
 } from "@/lib/agents-api";
-import { DEV_AUTH_BYPASS } from "@/lib/dev-preview";
 
 /**
  * Agents — list, with creation in a modal.
@@ -59,9 +58,7 @@ export function AgentsSurface() {
        * Everywhere else the error stands: a 401 in production means the session expired,
        * and pretending there are no agents would be a lie.
        */
-      if (!DEV_AUTH_BYPASS) {
-        setError(cause instanceof Error ? cause.message : "Could not load agents");
-      }
+      setError(cause instanceof Error ? cause.message : "Could not load agents");
     } finally {
       setLoading(false);
     }
@@ -122,11 +119,6 @@ export function AgentsSurface() {
             />
           )}
         </div>
-        {DEV_AUTH_BYPASS ? (
-          <p className="mx-auto mb-8 max-w-xs px-4 text-center text-[11px] leading-5 text-muted-foreground">
-            Dev bypass: there is no local agent database, so this list is always empty here.
-          </p>
-        ) : null}
 
         <AgentComposerModal
           catalog={catalog}
@@ -163,12 +155,6 @@ export function AgentsSurface() {
             <AlertCircle aria-hidden="true" className="size-4 shrink-0" />
             {error}
           </p>
-          {DEV_AUTH_BYPASS ? (
-            <p className="mt-1.5 pl-6 text-[12px] leading-5 text-muted-foreground">
-              Dev bypass is on and there is no local agent database. Point
-              NEXT_PUBLIC_API_BASE_URL at a running cowork-api to create agents here.
-            </p>
-          ) : null}
         </div>
       ) : null}
 

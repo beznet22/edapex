@@ -57,7 +57,6 @@ interface WorkspaceShellProps {
   readonly connecting?: boolean;
   readonly waitingCount?: number;
   readonly coreHealth?: CoreHealth | null;
-  readonly devBypass?: boolean;
   readonly onOpenArtifact?: (() => void) | undefined;
   readonly onConnectRuntime?: (() => void) | undefined;
   /** Server-resolved so the rail is the right width on first paint. */
@@ -257,7 +256,6 @@ export function WorkspaceShell({
   connecting = false,
   waitingCount = 0,
   coreHealth = null,
-  devBypass = false,
   onOpenArtifact,
   onConnectRuntime,
   sidebarOpen,

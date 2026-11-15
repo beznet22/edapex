@@ -10,16 +10,13 @@ import { ArtifactHost } from "@/components/artifacts/ArtifactHost";
 import { LoginPanel } from "@/components/auth/LoginPanel";
 import { apiBase, getSession, loadCapabilities, requestMagicLink } from "@/lib/api";
 import type { SessionView } from "@/lib/api";
-import {
-  DEV_AUTH_BYPASS,
-  DEV_PREVIEW_MANIFEST,
-  DEV_PREVIEW_SESSION
-} from "@/lib/dev-preview";
+
 import { useProactive } from "@/hooks/use-proactive";
 import { useWorkspaceRuntime } from "@/hooks/use-workspace-runtime";
 import { useAutoHideScrollbars } from "@/hooks/use-auto-hide-scrollbars";
 import { useRuntimeHealth } from "@/hooks/use-runtime-health";
 import { activeItemId, treeForPath } from "@/lib/nav-tree";
+import { TEST_MANIFEST, TEST_SESSION, testSessionEnabled } from "@/lib/test-session";
 import { isDesktopViewport } from "@/lib/platform";
 import type { SidebarState } from "@/lib/sidebar-state";
 import { useSidebarState } from "@/lib/sidebar-state-hooks";
@@ -117,15 +114,19 @@ export function WorkspaceLayoutClient({
   }, []);
 
   useEffect(() => {
-    if (!DEV_AUTH_BYPASS) return;
-    setSession(DEV_PREVIEW_SESSION);
-    setManifest(DEV_PREVIEW_MANIFEST);
-    setSessionState("authenticated");
-    runtime.restoreComplete();
-  }, []);
+    /*
+     * The browser suite needs a deterministic starting state without driving an email
+     * flow on every spec. `testSessionEnabled()` requires both the flag *and* a loopback
+     * API base, so it cannot activate a deployed bundle.
+     */
+    if (testSessionEnabled()) {
+      setSession(TEST_SESSION);
+      setManifest(TEST_MANIFEST);
+      setSessionState("authenticated");
+      runtime.restoreComplete();
+      return;
+    }
 
-  useEffect(() => {
-    if (DEV_AUTH_BYPASS) return;
     let cancelled = false;
     getSession()
       .then((current) => {
@@ -144,7 +145,9 @@ export function WorkspaceLayoutClient({
   }, []);
 
   useEffect(() => {
-    if (DEV_AUTH_BYPASS || sessionState !== "authenticated") return;
+    // The fixture already resolved the manifest; fetching would hit an API the suite
+    // does not run.
+    if (testSessionEnabled() || sessionState !== "authenticated") return;
     let cancelled = false;
     setLoadingManifest(true);
     setError("");
@@ -242,7 +245,7 @@ export function WorkspaceLayoutClient({
         connecting={runtime.connecting}
         coreHealth={runtimeHealth.health}
         navTree={navTree}
-        devBypass={DEV_AUTH_BYPASS}
+
         onConnectRuntime={() => setSetupDismissed(false)}
         onOpenArtifact={surface === "chat" ? openArtifact : undefined}
         setSidebarOpen={sidebar.setOpen}

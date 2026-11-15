@@ -28,6 +28,15 @@ export interface ServiceEnv {
   readonly MEDIA?: R2Bucket;
   readonly EMAIL?: unknown;
   readonly EMAIL_FROM?: string;
+  /**
+   * Local development only. `wrangler dev` has no `send_email` binding, so without this
+   * the adapter throws and magic-link sign-in cannot work locally — which is the reason
+   * the web app carried a dev auth bypass.
+   *
+   * A string, not a boolean: Workers vars are strings, and comparing to `"true"` means a
+   * typo or an unset value fails closed rather than enabling log-only email in production.
+   */
+  readonly LOCAL_EMAIL_LOG?: string;
   readonly GMAIL_CLIENT_ID?: string;
   readonly GMAIL_CLIENT_SECRET?: string;
   readonly GMAIL_REFRESH_TOKEN?: string;
