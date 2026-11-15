@@ -2,15 +2,7 @@
 
 import type { ReactNode } from "react";
 import Link from "next/link";
-import {
-  FilePlus2,
-  KeyRound,
-  ListChecks,
-  MessageCircle,
-  Settings2,
-  WandSparkles
-} from "lucide-react";
-import type { LucideIcon } from "lucide-react";
+import { FilePlus2, PanelLeft, Search } from "lucide-react";
 
 import type { CapabilityManifest, WorkspaceRuntimeView } from "@edapex/contracts";
 import type { CoreHealth } from "@/lib/tauri";
@@ -79,19 +71,9 @@ const SURFACE_LABEL: Record<WorkspaceTab, string> = {
   tasks: "Tasks",
   make: "Make",
   plugins: "Plugins",
-  settings: "Settings"
+  settings: "Settings",
+  search: "Search"
 };
-
-const RAIL_ITEMS: readonly {
-  readonly id: WorkspaceTab;
-  readonly href: string;
-  readonly label: string;
-  readonly icon: LucideIcon;
-}[] = [
-  { id: "chat", href: "/workspace", label: "Chat", icon: MessageCircle },
-  { id: "tasks", href: "/workspace/tasks", label: "Tasks", icon: ListChecks },
-  { id: "make", href: "/workspace/make", label: "Make", icon: WandSparkles }
-];
 
 /**
  * The rail.
@@ -109,9 +91,13 @@ function DesktopRail({
   userEmail,
   onSignOut,
   navTree,
-  activeNavId
+  activeNavId,
+  sidebarOpen,
+  setSidebarOpen
 }: {
   readonly manifest: CapabilityManifest;
+  readonly sidebarOpen: boolean;
+  readonly setSidebarOpen: (open: boolean) => void;
   readonly waitingCount: number;
   readonly userName: string;
   readonly userEmail: string | null;
@@ -122,23 +108,48 @@ function DesktopRail({
   return (
     <Sidebar collapsible="icon" variant="inset">
       <SidebarHeader>
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton asChild size="lg" tooltip="EdApex workspace">
-              <Link href="/workspace">
-                <span className="flex size-8 shrink-0 items-center justify-center rounded-[var(--radius-sm)] bg-primary text-sm font-black text-primary-foreground">
-                  E
-                </span>
-                <span className="grid min-w-0 text-left leading-tight">
-                  <span className="truncate text-sm font-semibold tracking-tight">EdApex</span>
-                  <span className="truncate text-[11px] text-muted-foreground">
-                    {manifest.role}
-                  </span>
-                </span>
+        {/*
+          Wordmark row, matching the reference: the product name leads, and the two
+          icon actions sit to its right. The previous header was a link tile, which read
+          as a nav item rather than as the app's identity — and it duplicated the role
+          that already shows in the footer account block.
+
+          Collapse lives here because this is where the rail's own state belongs; the
+          header trigger in the content bar stays for the case where the rail is hidden.
+        */}
+        <div className="flex items-center justify-between gap-2 px-1">
+          <Link
+            className="truncate rounded-[var(--radius-sm)] px-2 py-1.5 text-[15px] font-semibold tracking-tight outline-none hover:bg-sidebar-accent focus-visible:ring-2 focus-visible:ring-sidebar-ring"
+            href="/workspace"
+          >
+            EdApex
+          </Link>
+          <div className="flex items-center gap-0.5">
+            <SidebarMenuButton
+              asChild
+              className="size-8 p-0"
+              tooltip="Search"
+            >
+              <Link aria-label="Search" href="/workspace/search">
+                <Search aria-hidden="true" />
               </Link>
             </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
+            {/*
+              Hidden below `md`: at that width the rail is a sheet, and the content
+              header's `SidebarTrigger` is what opens it. Two controls for one state was
+              the reason this row looked busier than the reference.
+            */}
+            <SidebarMenuButton
+              aria-label="Toggle sidebar"
+              className="hidden size-8 p-0 md:flex"
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+              tooltip="Toggle sidebar"
+              type="button"
+            >
+              <PanelLeft aria-hidden="true" />
+            </SidebarMenuButton>
+          </div>
+        </div>
       </SidebarHeader>
 
       <SidebarContent>
@@ -205,6 +216,8 @@ export function WorkspaceShell({
       <SidebarProvider onOpenChange={setSidebarOpen} open={sidebarOpen}>
         <DesktopRail
           activeNavId={activeNavId}
+          setSidebarOpen={setSidebarOpen}
+          sidebarOpen={sidebarOpen}
           manifest={manifest}
           navTree={navTree}
           onSignOut={onSignOut}

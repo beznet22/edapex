@@ -148,10 +148,12 @@ export function SidebarNav({ tree, activeId, waitingCount }: SidebarNavProps) {
         </SidebarGroup>
       ) : null}
 
-      {rendered.groups.map((group) => (
+      {rendered.groups.map((group, index) => (
         <SidebarGroup key={group.id}>
           {group.label === undefined ? null : (
-            <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
+            <SidebarGroupLabel className={index === 0 ? undefined : "mt-4"}>
+              {group.label}
+            </SidebarGroupLabel>
           )}
           <SidebarGroupContent>
             <SidebarMenu>

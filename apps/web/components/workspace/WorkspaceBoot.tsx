@@ -8,7 +8,8 @@ const BOOT_LABEL: Record<WorkspaceTab, string> = {
   tasks: "Tasks",
   make: "Make",
   plugins: "Plugins",
-  settings: "Settings"
+  settings: "Settings",
+  search: "Search"
 };
 
 const BOOT_TABS: readonly WorkspaceTab[] = ["chat", "tasks", "make"];

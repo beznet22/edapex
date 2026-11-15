@@ -39,6 +39,7 @@ function surfaceForPath(pathname: string): WorkspaceTab {
   if (path === "/workspace/tasks") return "tasks";
   if (path === "/workspace/make") return "make";
   if (path === "/workspace/plugins" || path.startsWith("/workspace/plugins/")) return "plugins";
+  if (path === "/workspace/search" || path.startsWith("/workspace/search/")) return "search";
   if (path === "/workspace/settings" || path.startsWith("/workspace/settings/")) return "settings";
   return "chat";
 }
