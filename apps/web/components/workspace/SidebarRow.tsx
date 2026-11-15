@@ -3,8 +3,12 @@
 import Link from "next/link";
 import {
   Archive,
+  ArrowUpDown,
+  Check,
   ChevronDown,
+  Folder,
   FolderInput,
+  List,
   Lock,
   MoreHorizontal,
   Pencil,
@@ -210,14 +214,20 @@ export function SidebarSectionHeader({
   collapsed = false,
   onToggle,
   onFilter,
-  onAdd
+  onAdd,
+  sortByProject = false,
+  onSortChange
 }: {
   readonly label: string;
   readonly collapsible?: boolean;
   readonly collapsed?: boolean;
   readonly onToggle?: (() => void) | undefined;
+  /** Renders the filter menu. `undefined` omits the control entirely. */
   readonly onFilter?: (() => void) | undefined;
   readonly onAdd?: (() => void) | undefined;
+  /** Current sort mode, for the filter menu's check mark. */
+  readonly sortByProject?: boolean;
+  readonly onSortChange?: ((byProject: boolean) => void) | undefined;
 }) {
   return (
     <SidebarGroupLabel asChild>
@@ -243,10 +253,56 @@ export function SidebarSectionHeader({
         )}
 
         <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover/section:opacity-100 group-focus-within/section:opacity-100">
-          {onFilter === undefined ? null : (
+          {onFilter === undefined ? null : onSortChange === undefined ? (
             <SectionButton label={`Filter ${label.toLowerCase()}`} onClick={onFilter}>
               <SlidersHorizontal aria-hidden="true" className="size-3.5" />
             </SectionButton>
+          ) : (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  aria-label={`Filter ${label.toLowerCase()}`}
+                  className="flex size-5 items-center justify-center rounded-[var(--radius-xs)] text-muted-foreground outline-none transition-colors hover:bg-sidebar-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring"
+                  type="button"
+                >
+                  <SlidersHorizontal aria-hidden="true" className="size-3.5" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-52">
+                <DropdownMenuItem disabled>
+                  <SlidersHorizontal aria-hidden="true" />
+                  Organize sidebar
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuSub>
+                  <DropdownMenuSubTrigger>
+                    <ArrowUpDown aria-hidden="true" />
+                    Sort chats by
+                  </DropdownMenuSubTrigger>
+                  <DropdownMenuSubContent>
+                    {/*
+                      A visible check rather than a toggle: the current mode must be
+                      readable at a glance, and two radio items that both look unpressed
+                      is the common failure of this menu.
+                    */}
+                    <DropdownMenuItem onSelect={() => onSortChange(false)}>
+                      <List aria-hidden="true" />
+                      In one list
+                      {!sortByProject ? (
+                        <Check aria-hidden="true" className="ml-auto" />
+                      ) : null}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => onSortChange(true)}>
+                      <Folder aria-hidden="true" />
+                      By project
+                      {sortByProject ? (
+                        <Check aria-hidden="true" className="ml-auto" />
+                      ) : null}
+                    </DropdownMenuItem>
+                  </DropdownMenuSubContent>
+                </DropdownMenuSub>
+              </DropdownMenuContent>
+            </DropdownMenu>
           )}
           {onAdd === undefined ? null : (
             <SectionButton label={`New ${label.toLowerCase()}`} onClick={onAdd}>

@@ -132,6 +132,14 @@ function DesktopRail({
           the same affordance a resizable pane uses, which is what this is.
         */}
         <div className="flex items-center justify-between gap-1 px-1">
+          {/*
+            The icon is always visible beside the label.
+
+            The first version hid it at rest and revealed it on hover, which made the
+            toggle look absent — a control that only exists under the pointer is a control
+            most people never find. The label states identity, the icon states what the row
+            does, and both are present.
+          */}
           <button
             aria-label={open ? "Collapse sidebar" : "Expand sidebar"}
             className={cn(
@@ -146,12 +154,10 @@ function DesktopRail({
           >
             {open ? (
               <>
-                <span className="truncate text-[15px] font-semibold tracking-tight group-hover/logo:hidden">
-                  EdApex
-                </span>
+                <span className="truncate text-[15px] font-semibold tracking-tight">EdApex</span>
                 <PanelLeft
                   aria-hidden="true"
-                  className="hidden size-4 text-muted-foreground group-hover/logo:block"
+                  className="size-4 shrink-0 text-muted-foreground transition-colors group-hover/logo:text-foreground"
                 />
               </>
             ) : (

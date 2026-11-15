@@ -217,6 +217,9 @@ function HistorySections({ data }: { readonly data: WorkspaceSidebarData }) {
   // Recents does not want that choice remembered across reloads.
   const [folded, setFolded] = useState<Record<string, boolean>>({});
   const [projectModal, setProjectModal] = useState(false);
+  // Sort mode is a view preference, so it lives with the section and is not persisted —
+  // a stored ordering would surprise someone who changed it once on another device.
+  const [sortByProject, setSortByProject] = useState(false);
 
   const toggle = (id: string): void =>
     setFolded((current) => ({ ...current, [id]: current[id] !== true }));
@@ -262,6 +265,8 @@ function HistorySections({ data }: { readonly data: WorkspaceSidebarData }) {
           label="Projects"
           onAdd={() => setProjectModal(true)}
           onFilter={() => undefined}
+          onSortChange={setSortByProject}
+          sortByProject={sortByProject}
         />
         <SidebarGroupContent>
           <p className="px-2 py-1 text-[13px] text-muted-foreground/70 group-data-[collapsible=icon]:hidden">
