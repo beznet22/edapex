@@ -88,11 +88,13 @@ capabilities.test.ts                                           8 passed (incl. n
 
 | Piece | Outcome |
 |---|---|
-| `lib/device-identity.ts` | Device id and master key in IndexedDB, generated once. Not `localStorage`: a key is the last thing that belongs in a synchronous, script-readable store. |
+| `lib/device-identity.ts` | Device id and master key as an **OPFS file**, generated once. One storage mechanism, not two — see the note below. |
 | `lib/scheduler.ts` | `tick()` evaluates due-ness **locally** (no server round trip to decide), claims, runs, records. Advances the local cursor before running so a hang cannot double-fire. **14 tests.** |
 | `useProactive` | Mounted in the workspace layout rather than the Tasks page, so a routine due at 08:00 fires while the person is on Chat. |
 | Read routes | `GET /api/v1/agent/routines` and `/tasks`. The task route returns **signals, not a status**, so the client derives with the shared function and the two cannot disagree. |
 | Browser proof | 3 e2e tests: claim on mount, no claim for a future routine, and the surface showing derived state plus retry. |
+
+**One storage layer, not two.** The key originally lived in IndexedDB while records lived in OPFS SQLite. That gave the app two persistence APIs, two failure modes and two versioned schemas for one job, and the supposed security benefit was narrow: an XSS reads both, so it only protected against a partial copy. The key is now a sibling *file* in OPFS — same mechanism, still not the same artifact as the database it unlocks. One availability check now covers both: if OPFS is missing, neither persists and the workspace is honestly offline-only rather than half-persistent. Verified by a reload test.
 
 **A bug this exposed:** `refresh()` was gated on the local store being open. Since the store opens asynchronously, the first read bailed and never re-ran — and because the empty state says "Nothing needs you", a storage failure would have looked like a genuine all-clear. The task list is a server read and no longer depends on OPFS at all.
 
@@ -100,7 +102,9 @@ capabilities.test.ts                                           8 passed (incl. n
 
 - **The device-side scheduler is wired and running.** `lib/scheduler.ts` ticks while the workspace is open, claims due routines and records the outcome. Proven in a browser: `e2e/proactive.spec.ts` asserts a due routine is claimed and finished, and that a future one costs no claim at all.
 - **Task rows are fetched** from `GET /api/v1/agent/tasks`, which returns signals rather than a status so the client derives state with the shared function.
-- **The routine turn is not connected to the agent runtime.** The scheduler claims and records honestly, reporting `failed` with "the routine turn is not wired to the runtime yet" rather than pretending success. That connection is the remaining half.
+- **The routine turn is connected.** `NativeAgentAdapter.sendAndWait` sends and resolves when the turn settles, so a routine is a normal turn: same runtime, same approvals, same transcript. It reports `succeeded`, `waiting` or `failed`.
+- **`waiting` is not `failed`.** A routine that stopped for an approval has done what it should; recording it as failed would mark a task broken because it asked a question. The scheduler records `waiting` and the server already accepts it.
+- **`sendAndWait` requires seeing a busy state before it will settle.** A turn can be queued behind a busy runtime, so resolving on the first idle emit would report success before anything ran.
 - **One vacuous-test lesson worth keeping:** the "no cron" assertions originally ran inside the workerd sandbox, which cannot read the real filesystem, and a `catch { continue; }` made them pass while checking nothing. They now live in a Node script that fails loudly when it cannot find its inputs.
 
 ## Design system and window chrome

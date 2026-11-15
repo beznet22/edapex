@@ -20,6 +20,7 @@ const HARNESS = "/workspace/offline";
  * this directory and fail to resolve.
  */
 const MODULE = "/lib/browser-store.ts";
+const IDENTITY = "/lib/device-identity.ts";
 
 test.describe("browser store", () => {
   test("writes, encrypts, reads back and produces a push batch", async ({ page }) => {
@@ -148,6 +149,28 @@ test.describe("browser store", () => {
 
     expect(result.threw).toBe(true);
     expect(result.after).toBe(result.before);
+  });
+
+  test("device identity persists across a reload on OPFS", async ({ page }) => {
+    await page.goto(HARNESS);
+
+    const read = async (): Promise<{ deviceId: string; keyLength: number }> =>
+      page.evaluate(async (modulePath) => {
+        const { deviceIdentity } = (await import(
+          /* @vite-ignore */ modulePath
+        )) as typeof import("../lib/device-identity");
+        const identity = await deviceIdentity();
+        return { deviceId: identity.deviceId, keyLength: identity.masterKey.length };
+      }, IDENTITY);
+
+    const first = await read();
+    expect(first.keyLength).toBe(32);
+
+    // A reload must find the same identity, or every previously sealed record
+    // becomes unreadable.
+    await page.reload();
+    const second = await read();
+    expect(second.deviceId).toBe(first.deviceId);
   });
 
   test("rejects a master key of the wrong length", async ({ page }) => {

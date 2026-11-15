@@ -25,6 +25,7 @@ import { isDue, LEASE_SECONDS, type RoutineView } from "@edapex/contracts";
 export type RoutineOutcome =
   | { readonly kind: "idle" }
   | { readonly kind: "ran"; readonly routineId: string; readonly runId: string }
+  | { readonly kind: "waiting"; readonly routineId: string; readonly runId: string }
   | { readonly kind: "skipped"; readonly routineId: string; readonly reason: string }
   | { readonly kind: "failed"; readonly routineId: string; readonly error: string };
 
@@ -35,11 +36,20 @@ export interface SchedulerDeps {
     | { readonly kind: "claimed"; readonly runId: string; readonly takeover: boolean }
     | { readonly kind: "refused"; readonly reason: string }
   >;
-  /** Runs the turn. Resolves when it settles; never throws for a normal failure. */
-  readonly run: (routine: RoutineView) => Promise<{ readonly ok: boolean; readonly error?: string }>;
+  /**
+   * Runs the turn and reports how it settled.
+   *
+   * `waiting` is deliberately distinct from `failed`: a routine that stopped for
+   * an approval has done what it should, and recording it as broken would mark a
+   * task failed because it asked a question.
+   */
+  readonly run: (routine: RoutineView) => Promise<{
+    readonly status: "succeeded" | "waiting" | "failed";
+    readonly error?: string;
+  }>;
   readonly finish: (
     runId: string,
-    status: "succeeded" | "failed" | "skipped",
+    status: "succeeded" | "failed" | "skipped" | "waiting",
     error: string | null
   ) => Promise<void>;
   /** Locally advanced so a single tick cannot fire the same routine twice. */
@@ -80,14 +90,23 @@ export async function tick(
 
     const result = await deps.run(routine);
 
-    if (result.ok) {
+    if (result.status === "succeeded") {
       await deps.finish(claim.runId, "succeeded", null);
       outcomes.push({ kind: "ran", routineId: routine.id, runId: claim.runId });
-    } else {
-      const error = result.error ?? "the routine did not complete";
-      await deps.finish(claim.runId, "failed", error);
-      outcomes.push({ kind: "failed", routineId: routine.id, error });
+      continue;
     }
+
+    if (result.status === "waiting") {
+      // Paused on a person. The server accepts `waiting`, so it is recorded as
+      // that rather than as a failure with a misleading error.
+      await deps.finish(claim.runId, "waiting", result.error ?? null);
+      outcomes.push({ kind: "waiting", routineId: routine.id, runId: claim.runId });
+      continue;
+    }
+
+    const error = result.error ?? "the routine did not complete";
+    await deps.finish(claim.runId, "failed", error);
+    outcomes.push({ kind: "failed", routineId: routine.id, error });
   }
 
   if (outcomes.length === 0) outcomes.push({ kind: "idle" });

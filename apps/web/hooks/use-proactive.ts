@@ -63,7 +63,14 @@ async function jsonRequest(path: string, body: unknown): Promise<Response> {
   });
 }
 
-export function useProactive(workspaceId: string | null): ProactiveController {
+export function useProactive(
+  workspaceId: string | null,
+  /** Provided by the shell. Absent means the runtime is not connected yet. */
+  sendAndWait?: (text: string) => Promise<{
+    readonly status: "succeeded" | "waiting" | "failed";
+    readonly error?: string;
+  }>
+): ProactiveController {
   const [tasks, setTasks] = useState<readonly TaskItem[]>([]);
   const [ready, setReady] = useState(false);
   const store = useRef<BrowserStore | null>(null);
@@ -176,11 +183,14 @@ export function useProactive(workspaceId: string | null): ProactiveController {
               | { kind: "claimed"; runId: string; takeover: boolean }
               | { kind: "refused"; reason: string };
           },
-          run: async () => {
-            // The turn itself is started by the agent runtime; the scheduler's job
-            // is the claim and the record. Returning `ok` here would be a lie, so
-            // it reports that no turn was started rather than pretending.
-            return { ok: false, error: "the routine turn is not wired to the runtime yet" };
+          run: async (routine) => {
+            // The routine is a normal turn: same runtime, same approvals, same
+            // transcript. `sendAndWait` reports how it settled — `waiting` when it
+            // stopped for a person, which is recorded as waiting, not as failure.
+            if (sendAndWait === undefined) {
+              return { status: "failed", error: "the agent runtime is not connected" };
+            }
+            return sendAndWait(routine.instructions);
           },
           finish: async (runId, status, error) => {
             await jsonRequest(
@@ -209,7 +219,7 @@ export function useProactive(workspaceId: string | null): ProactiveController {
       stopped = true;
       if (timer !== null) clearInterval(timer);
     };
-  }, [workspaceId, ready, refresh]);
+  }, [workspaceId, ready, refresh, sendAndWait]);
 
   useEffect(() => {
     void refresh();

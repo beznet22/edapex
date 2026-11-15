@@ -39,6 +39,12 @@ If “everything local-first” includes school records, it contradicts “EdApe
 - OPFS is a filesystem, not a SQL database; use SQLite WASM/wa-sqlite or an IndexedDB store.
 - Keep the same logical schema as native.
 - Do not use localStorage for chat history/memory.
+- **One storage mechanism.** The SQLite database and the device key both live in
+  OPFS; the key is a sibling file rather than a row, so a copy of the database does
+  not carry the key that unlocks it. IndexedDB is not used for either, because two
+  persistence APIs meant two failure modes and two schemas for one job. An
+  implementation that genuinely needs IndexedDB (for example a browser without
+  OPFS) should move *all* of it, not half.
 
 ### Chat store
 

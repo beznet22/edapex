@@ -135,6 +135,70 @@ export class NativeAgentAdapter implements WorkspaceRuntimeAdapter {
     this.emit();
   }
 
+  /**
+   * Sends a message and resolves when the turn settles.
+   *
+   * `send` is fire-and-forget, which is right for a composer but useless to a
+   * scheduler: it needs to know whether the work finished, is waiting on a person,
+   * or failed, so it can record the right thing.
+   *
+   * `waiting_for_person` is **not** a failure. A routine that needs an approval has
+   * done exactly what it should; recording it as failed would mark a task broken
+   * because it asked a question.
+   *
+   * The timeout exists so a hung turn cannot hold the scheduler's lease forever.
+   * On expiry it reports failure, because "we do not know" must not read as success.
+   */
+  async sendAndWait(
+    text: string,
+    timeoutMs = 5 * 60_000
+  ): Promise<{ readonly status: "succeeded" | "waiting" | "failed"; readonly error?: string }> {
+    if (!this.connected) return { status: "failed", error: "the agent runtime is not connected" };
+
+    return new Promise((resolve) => {
+      let settled = false;
+      // A turn can be queued behind a busy runtime, so the first state change may
+      // still be idle. Resolving then would report success before anything ran.
+      let sawBusy = false;
+
+      const finish = (result: { status: "succeeded" | "waiting" | "failed"; error?: string }): void => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        unsubscribe();
+        resolve(result);
+      };
+
+      const unsubscribe = this.subscribe(() => {
+        const state = this.state.turn.state;
+        if (busy(this.state)) sawBusy = true;
+
+        if (!sawBusy) return;
+
+        if (state === "waiting_for_person") {
+          // Paused on a decision. Resolve now rather than waiting for the person:
+          // the scheduler records `waiting`, and the Tasks surface shows it.
+          finish({ status: "waiting" });
+          return;
+        }
+
+        if (state === "error" || state === "stopped") {
+          finish({ status: "failed", error: `the turn ended as ${state}` });
+          return;
+        }
+
+        if (!busy(this.state)) finish({ status: "succeeded" });
+      });
+
+      const timer = setTimeout(
+        () => finish({ status: "failed", error: "the turn timed out" }),
+        timeoutMs
+      );
+
+      this.send(text, []);
+    });
+  }
+
   removeQueued(id: string): void {
     this.state = reduceRuntime(this.state, {
       type: "queue",

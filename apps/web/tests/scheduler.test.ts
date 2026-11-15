@@ -51,7 +51,7 @@ function deps(overrides: Partial<SchedulerDeps> = {}): SchedulerDeps & {
     claim: async () => ({ kind: "claimed", runId: "run-1", takeover: false }),
     run: async (candidate) => {
       ran.push(candidate.id);
-      return { ok: true };
+      return { status: "succeeded" };
     },
     finish: async (runId, status, error) => {
       finished.push({ runId, status, error });
@@ -100,7 +100,7 @@ describe("tick", () => {
 
   it("records a failure instead of retrying silently", async () => {
     const d = deps({
-      run: async () => ({ ok: false, error: "the connector timed out" })
+      run: async () => ({ status: "failed", error: "the connector timed out" })
     });
     const outcomes = await tick(d, "device-a");
 
@@ -132,7 +132,7 @@ describe("tick", () => {
       claim: async (id) => ({ kind: "claimed", runId: `run-${id}`, takeover: false }),
       run: async (candidate) => {
         order.push(candidate.id);
-        return { ok: true };
+        return { status: "succeeded" };
       }
     });
 
@@ -197,5 +197,34 @@ describe("a skipped run is not a failure", () => {
 
     await tick(d, "device-a");
     expect(finish).not.toHaveBeenCalled();
+  });
+});
+
+describe("waiting is not failure", () => {
+  it("records a routine paused on a person as `waiting`", async () => {
+    const d = deps({ run: async () => ({ status: "waiting" }) });
+    const outcomes = await tick(d, "device-a");
+
+    expect(outcomes).toEqual([
+      { kind: "waiting", routineId: "routine-1", runId: "run-1" }
+    ]);
+    // Recorded as waiting, not failed. A routine that asked a question has done
+    // what it should, and marking it broken would be a lie the Tasks surface shows.
+    expect(d.finished).toEqual([{ runId: "run-1", status: "waiting", error: null }]);
+  });
+
+  it("still records a genuine failure as failed", async () => {
+    const d = deps({ run: async () => ({ status: "failed", error: "no connection" }) });
+    const outcomes = await tick(d, "device-a");
+
+    expect(outcomes[0]).toMatchObject({ kind: "failed", error: "no connection" });
+    expect(d.finished[0]).toMatchObject({ status: "failed" });
+  });
+
+  it("does not swallow a missing error message", async () => {
+    const d = deps({ run: async () => ({ status: "failed" }) });
+    await tick(d, "device-a");
+    // A failure with no reason must still say something rather than record null.
+    expect(d.finished[0]?.error).toBe("the routine did not complete");
   });
 });

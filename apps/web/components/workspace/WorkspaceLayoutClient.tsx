@@ -58,7 +58,10 @@ export function WorkspaceLayoutClient({ children }: { readonly children: ReactNo
   // while the person is on Chat — a routine due at 08:00 should fire even if the
   // Tasks tab is not open. The trade (only while a device is open) is stated in
   // the surface copy.
-  const proactive = useProactive(session === null ? null : String(session.user.id));
+  const proactive = useProactive(
+    session === null ? null : String(session.user.id),
+    runtime.sendAndWait
+  );
   const runtimeHealth = useRuntimeHealth();
 
   const closeArtifact = useCallback((): void => setArtifactOpen(false), []);
