@@ -104,7 +104,7 @@ soft caps: a file over the limit is a review question, not a build failure.
 | Route module | **40** | a page composes a surface; it does not implement one. Anything longer belongs in `components/` |
 | Surface component | **300** | one surface, one file. Composer and editor living inside a list component is how `AgentsSurface` reached 586 before it was split |
 | UI component | **150** | presentational, no data fetching. If it needs a fetch it is a surface |
-| Client library (`lib/`) | **300** | one concern. `agent-runtime.ts` at 458 is the current offender |
+| Client library (`lib/`) | **300** | one concern. `agent-runtime.ts` reached 458 before it was split into five |
 | Hook | **120** | one behaviour. A hook that returns ten things is a state machine and belongs in `lib/` |
 | Test file | **400** | beyond that it is testing two features and the name is lying |
 
@@ -145,22 +145,22 @@ later chunk, not a silent exception.
 | Domain | `services/domain/student-matcher.ts` 183 | 200 | at the limit |
 | Contract | `contracts/capabilities.ts` 545 | 400 | **over** |
 | Surface component | `workspace/AgentsSurface.tsx` 236 | 300 | ok — split into surface + two modals |
-| Client library | `lib/agent-runtime.ts` 458 | 300 | **over** |
-| Hook | `hooks/use-proactive.ts` 229 | 120 | **over** |
+| Client library | `lib/agent-runtime.ts` 300 | 300 | at the limit — split into 5 modules |
+| Hook | `hooks/use-proactive.ts` 113 | 120 | ok — store and loop extracted |
 | Rust crate root | `crates/store/src/lib.rs` 694 | 300 | **over** |
 | Rust module | `crates/agent/src/agui.rs` 633 | 400 | **over** |
 | Tauri command | `desktop/src-tauri/src/agent.rs` 474 | 250 | **over** |
 | Test file | `cowork-api/tests/gateway.test.ts` 364 | 400 | ok |
 
-**Eight files are over, and they are a queue, not a policy.** The rule above means nothing
+**Six files are over, and they are a queue, not a policy.** The rule above means nothing
 if the list keeps growing, so the splits are ordered by how much they cost to leave:
 
 1. ~~`AgentsSurface.tsx` 586~~ → **done**: 236 + `AgentComposerModal` 162 +
    `AgentEditorModal` 180.
-2. `use-proactive.ts` 229 → the hook returns tick loop, claim, run and finish. The state
-   machine belongs in `lib/`, the hook becomes a binding.
-3. `agent-runtime.ts` 458 → transport, reducer and persistence. Persistence already exists
-   separately; the reducer is the piece still mixed in.
+2. ~~`use-proactive.ts` 229~~ → **done**: 113 + `use-agent-store` 57 +
+   `lib/proactive-loop` 127.
+3. ~~`agent-runtime.ts` 458~~ → **done**: 300 + `streaming-buffer` 62 +
+   `turn-events` 128 + `runtime-connect` 111 + `turn-settlement` 74.
 4. `crates/store/src/lib.rs` 694 → schema, journal and outbox are three modules.
 5. `agui.rs` 633 / `runtime.rs` 611 → event mapping and turn lifecycle.
 6. `desktop/src-tauri/src/agent.rs` 474 → seven commands split by lifecycle (connect,
