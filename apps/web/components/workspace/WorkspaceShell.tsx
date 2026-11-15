@@ -145,7 +145,9 @@ function DesktopRail({
               href="/workspace"
             >
               <BrandMark size={24} />
-              <span className="truncate text-[15px] font-semibold tracking-tight">EdApex</span>
+              <span className="truncate text-[15px] font-semibold uppercase tracking-[0.08em]">
+                EDAPEX
+              </span>
             </Link>
           ) : (
             <button
