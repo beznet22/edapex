@@ -52,7 +52,7 @@ export function MessageScroller({ children, className, label, scrollKey }: Messa
         // `tabIndex={0}`, so a keyboard user needs to see that the region scrolls.
         // Hiding the bar entirely made a clipped transcript look complete. The bar
         // now fades in on hover or focus and stays out of the reading surface otherwise.
-        className="scrollbar-reveal min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-4 pt-5"
+        className="scrollbar-auto min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-4 pt-5"
         onScroll={updateAtEnd}
         ref={viewportRef}
         role="log"

@@ -44,12 +44,38 @@ export interface AgentDraftInput {
   readonly operationIds: readonly string[];
 }
 
+/**
+ * Request timeout.
+ *
+ * `fetch` has no default timeout, so a request that never settles leaves the surface
+ * pinned in a loading state forever with no retry affordance. Twelve seconds is longer
+ * than any honest response and short enough that the person is still looking at the
+ * screen when it fails.
+ */
+const REQUEST_TIMEOUT_MS = 12_000;
+
 const request = async <T>(path: string, init?: RequestInit): Promise<T> => {
-  const response = await fetch(`${apiBase()}${path}`, {
-    ...init,
-    credentials: "include",
-    headers: { "content-type": "application/json", ...(init?.headers ?? {}) }
-  });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  let response: Response;
+  try {
+    response = await fetch(`${apiBase()}${path}`, {
+      ...init,
+      credentials: "include",
+      signal: controller.signal,
+      headers: { "content-type": "application/json", ...(init?.headers ?? {}) }
+    });
+  } catch (cause) {
+    throw new Error(
+      cause instanceof DOMException && cause.name === "AbortError"
+        ? "The request timed out. Check your connection and try again."
+        : cause instanceof Error
+          ? cause.message
+          : "Could not reach the server."
+    );
+  } finally {
+    clearTimeout(timer);
+  }
 
   if (!response.ok) {
     const body: unknown = await response.json().catch(() => null);

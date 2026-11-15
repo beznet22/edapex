@@ -87,7 +87,7 @@ export function TasksSurface({
         <p className="px-4 pb-1 text-[13px] leading-5 text-muted-foreground lg:px-8">{notice}</p>
       )}
 
-      <ul className="min-h-0 flex-1 space-y-2 overflow-y-auto px-4 pb-6 pt-2 lg:px-8">
+      <ul className="scrollbar-auto min-h-0 flex-1 space-y-2 overflow-y-auto px-4 pb-6 pt-2 lg:px-8">
         {rows.map((row) => {
           const retry = retryView({
             attempts: row.attempts,

@@ -114,8 +114,16 @@ export function Modal({
         aria-describedby={description === undefined ? undefined : descriptionId}
         aria-labelledby={titleId}
         aria-modal="true"
+        /**
+         * Flat, not raised.
+         *
+         * The first version carried `--elevation-3`, which on a warm canvas reads as a
+         * grey halo rather than depth. Separation comes from the scrim behind the panel
+         * and a single hairline border, which is how every flat-surface app does it —
+         * a shadow on top of a scrim is depth described twice.
+         */
         className={cn(
-          "animate-spring-in relative flex max-h-[85dvh] w-full flex-col overflow-hidden rounded-[var(--radius-xl)] border border-border bg-card shadow-[var(--elevation-3)]",
+          "animate-spring-in relative flex max-h-[85dvh] w-full flex-col overflow-hidden rounded-[var(--radius-xl)] border border-border bg-card",
           widthClassName
         )}
         ref={panelRef}
@@ -143,10 +151,10 @@ export function Modal({
           </button>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-6 pb-2">{children}</div>
+        <div className="scrollbar-auto min-h-0 flex-1 overflow-y-auto px-6 pb-2">{children}</div>
 
         {footer === undefined ? null : (
-          <div className="flex items-center justify-end gap-2 border-t border-border px-6 py-4">
+          <div className="flex items-center justify-end gap-2 border-t border-border bg-muted/40 px-6 py-4">
             {footer}
           </div>
         )}

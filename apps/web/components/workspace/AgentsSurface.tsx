@@ -51,7 +51,17 @@ export function AgentsSurface() {
     try {
       setAgents(await listAgents(workspaceId));
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Could not load agents");
+      /*
+       * In the dev bypass there is no cowork-api, so a 401 is the *expected* response,
+       * not a failure. Showing it as a red error made a working screen look broken and
+       * hid the empty state that is the actual dev experience.
+       *
+       * Everywhere else the error stands: a 401 in production means the session expired,
+       * and pretending there are no agents would be a lie.
+       */
+      if (!DEV_AUTH_BYPASS) {
+        setError(cause instanceof Error ? cause.message : "Could not load agents");
+      }
     } finally {
       setLoading(false);
     }
@@ -60,6 +70,52 @@ export function AgentsSurface() {
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  /*
+   * Empty until the first agent exists.
+   *
+   * The list and its header are for a surface that has content. Rendering "Agents" with
+   * a subtitle above an empty illustration makes the screen look like a failed load, and
+   * the one action available — create — competes with a New agent button that does the
+   * same thing. So the empty state *is* the page, and the header arrives with the list.
+   */
+  if (!loading && error.length === 0 && agents.length === 0) {
+    return (
+      <section className="flex min-h-0 flex-1 items-center justify-center overflow-y-auto px-6 py-10">
+        <div className="flex max-w-sm flex-col items-center text-center">
+          <span className="flex size-14 items-center justify-center rounded-[var(--radius-lg)] bg-primary/15 text-primary">
+            <Bot aria-hidden="true" className="size-6" />
+          </span>
+          <h1 className="mt-5 text-base font-semibold tracking-tight">No agents yet</h1>
+          <p className="mt-2 text-[13px] leading-6 text-muted-foreground">
+            An agent takes a narrow task you already do and does it without you. Start with one
+            job, not five.
+          </p>
+          <Button className="mt-5" onClick={() => setCreating(true)} size="sm" variant="outline">
+            <Plus aria-hidden="true" />
+            Create the first one
+          </Button>
+          {DEV_AUTH_BYPASS ? (
+            <p className="mt-4 max-w-xs text-[11px] leading-5 text-muted-foreground">
+              Dev bypass: there is no local agent database, so this list is always empty
+              here. Point NEXT_PUBLIC_API_BASE_URL at a running cowork-api to create agents.
+            </p>
+          ) : null}
+        </div>
+
+        <AgentComposerModal
+          catalog={catalog}
+          onClose={() => setCreating(false)}
+          onCreated={() => {
+            setCreating(false);
+            void refresh();
+          }}
+          open={creating}
+          workspaceId={workspaceId}
+        />
+      </section>
+    );
+  }
 
   return (
     <section className="flex min-h-0 flex-1 flex-col overflow-hidden">
@@ -82,7 +138,6 @@ export function AgentsSurface() {
             <AlertCircle aria-hidden="true" className="size-4 shrink-0" />
             {error}
           </p>
-          {/* A bare "Request failed (401)" tells a developer nothing. */}
           {DEV_AUTH_BYPASS ? (
             <p className="mt-1.5 pl-6 text-[12px] leading-5 text-muted-foreground">
               Dev bypass is on and there is no local agent database. Point
@@ -92,27 +147,12 @@ export function AgentsSurface() {
         </div>
       ) : null}
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-10 pt-4 lg:px-10">
+      <div className="scrollbar-auto min-h-0 flex-1 overflow-y-auto px-4 pb-10 pt-4 lg:px-10">
         {loading ? (
           <p className="flex items-center gap-2 py-8 text-[13px] text-muted-foreground">
             <Loader2 aria-hidden="true" className="size-4 animate-spin" />
             Loading agents…
           </p>
-        ) : agents.length === 0 ? (
-          <div className="flex flex-col items-center px-6 py-16 text-center">
-            <span className="flex size-14 items-center justify-center rounded-[var(--radius-lg)] bg-primary/15 text-primary">
-              <Bot aria-hidden="true" className="size-6" />
-            </span>
-            <h2 className="mt-5 text-base font-semibold tracking-tight">No agents yet</h2>
-            <p className="mt-2 max-w-sm text-[13px] leading-6 text-muted-foreground">
-              An agent takes a narrow task you already do and does it without you. Start with one
-              job, not five.
-            </p>
-            <Button className="mt-5" onClick={() => setCreating(true)} size="sm" variant="outline">
-              <Plus aria-hidden="true" />
-              Create the first one
-            </Button>
-          </div>
         ) : (
           <ul className="mx-auto max-w-3xl space-y-2.5">
             {agents.map((agent) => (

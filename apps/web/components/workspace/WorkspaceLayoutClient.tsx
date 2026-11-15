@@ -17,6 +17,7 @@ import {
 } from "@/lib/dev-preview";
 import { useProactive } from "@/hooks/use-proactive";
 import { useWorkspaceRuntime } from "@/hooks/use-workspace-runtime";
+import { useAutoHideScrollbars } from "@/hooks/use-auto-hide-scrollbars";
 import { useRuntimeHealth } from "@/hooks/use-runtime-health";
 import { isDesktopViewport } from "@/lib/platform";
 import type { WorkspaceTab } from "@/components/openduet/tab-bar";
@@ -63,6 +64,8 @@ export function WorkspaceLayoutClient({ children }: { readonly children: ReactNo
     runtime.sendAndWait
   );
   const runtimeHealth = useRuntimeHealth();
+  // One capture-phase listener for every scroll container in the tree.
+  useAutoHideScrollbars();
 
   const closeArtifact = useCallback((): void => setArtifactOpen(false), []);
   const openArtifact = useCallback((): void => setArtifactOpen(true), []);
