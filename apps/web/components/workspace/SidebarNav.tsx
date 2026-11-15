@@ -25,7 +25,13 @@ import {
   SidebarMenuButton,
   SidebarMenuItem
 } from "@/components/ui/sidebar";
-import type { NavItem, NavTree } from "@/lib/nav-tree";
+import type {
+  NavItem,
+  NavTree,
+  SidebarEntry,
+  WorkspaceSidebarData
+} from "@/lib/nav-tree";
+import { EMPTY_SIDEBAR_DATA } from "@/lib/nav-tree";
 
 /**
  * The sidebar's navigation region, which swaps content by context.
@@ -69,9 +75,16 @@ export interface SidebarNavProps {
   readonly tree: NavTree;
   readonly activeId: string | null;
   readonly waitingCount: number;
+  /** Pinned, Projects and Recents. Empty today; the shape is what ships. */
+  readonly data?: WorkspaceSidebarData;
 }
 
-export function SidebarNav({ tree, activeId, waitingCount }: SidebarNavProps) {
+export function SidebarNav({
+  tree,
+  activeId,
+  waitingCount,
+  data = EMPTY_SIDEBAR_DATA
+}: SidebarNavProps) {
   // The tree actually rendered. It lags `tree` by one animation frame on a change so the
   // outgoing content can finish leaving before the new content arrives.
   const [rendered, setRendered] = useState(tree);
@@ -169,7 +182,96 @@ export function SidebarNav({ tree, activeId, waitingCount }: SidebarNavProps) {
           </SidebarGroupContent>
         </SidebarGroup>
       ))}
+
+      {/*
+        Hidden entirely when collapsed: the section labels already hide, and three groups
+        of prose placeholders in a 50px rail would be unreadable stubs. The primary
+        destinations are what the icon rail is for.
+      */}
+      {rendered.context === "workspace" ? (
+        <div className="group-data-[collapsible=icon]:hidden">
+          <HistorySections data={data} />
+        </div>
+      ) : null}
     </div>
+  );
+}
+
+/**
+ * Pinned, Projects and Recents.
+ *
+ * Text-only rows with no icon and no active fill, matching the reference: these are a
+ * reading list, and an icon per conversation would be noise at this density.
+ *
+ * The data is empty today because history is not stored yet. The sections still render,
+ * with their labels and their empty states — a layout change later is a failure mode this
+ * avoids, and an invented row would be worse than an empty list because someone would
+ * click it.
+ */
+function HistorySections({ data }: { readonly data: WorkspaceSidebarData }) {
+  return (
+    <>
+      <SidebarGroup>
+        <SidebarGroupLabel className="mt-6">Pinned</SidebarGroupLabel>
+        <SidebarGroupContent>
+          {data.pinned.length === 0 ? (
+            <p className="px-2 py-1 text-[13px] text-muted-foreground/70 group-data-[collapsible=icon]:hidden">
+              Nothing pinned
+            </p>
+          ) : (
+            <SidebarMenu>
+              {data.pinned.map((entry) => (
+                <TextRow entry={entry} key={entry.id} />
+              ))}
+            </SidebarMenu>
+          )}
+        </SidebarGroupContent>
+      </SidebarGroup>
+
+      <SidebarGroup>
+        <SidebarGroupLabel className="mt-6">Projects</SidebarGroupLabel>
+        <SidebarGroupContent>
+          {/*
+            Placeholder only. There is no project model yet, and mapping some other list
+            here — which my first pass did — would have shown pinned conversations under a
+            "Projects" heading.
+          */}
+          <p className="px-2 py-1 text-[13px] text-muted-foreground/70 group-data-[collapsible=icon]:hidden">
+            No projects
+          </p>
+        </SidebarGroupContent>
+      </SidebarGroup>
+
+      <SidebarGroup>
+        <SidebarGroupLabel className="mt-6">Recents</SidebarGroupLabel>
+        <SidebarGroupContent>
+          {data.recent.length === 0 ? (
+            <p className="px-2 py-1 text-[13px] text-muted-foreground/70 group-data-[collapsible=icon]:hidden">
+              Conversations appear here
+            </p>
+          ) : (
+            <SidebarMenu>
+              {data.recent.map((entry) => (
+                <TextRow entry={entry} key={entry.id} />
+              ))}
+            </SidebarMenu>
+          )}
+        </SidebarGroupContent>
+      </SidebarGroup>
+    </>
+  );
+}
+
+/** A history row: label only, truncated, no icon. */
+function TextRow({ entry }: { readonly entry: SidebarEntry }) {
+  return (
+    <SidebarMenuItem>
+      <SidebarMenuButton asChild className="h-8" tooltip={entry.label}>
+        <Link href={entry.href}>
+          <span className="truncate text-[13px]">{entry.label}</span>
+        </Link>
+      </SidebarMenuButton>
+    </SidebarMenuItem>
   );
 }
 

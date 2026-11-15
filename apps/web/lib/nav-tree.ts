@@ -25,6 +25,13 @@ export interface NavGroup {
   /** Rendered as the group label. Omitted for the first, unlabelled group. */
   readonly label?: string;
   readonly items: readonly NavItem[];
+  /**
+   * Placeholder shown when `items` is empty.
+   *
+   * The reference uses one for Projects ("No projects"). A labelled section that renders
+   * nothing looks broken; a labelled section that states why is complete.
+   */
+  readonly emptyText?: string;
 }
 
 export interface NavTree {
@@ -97,6 +104,40 @@ export function treeForPath(pathname: string): NavTree {
 
 /** The item a path selects, for `aria-current`. Longest match wins so a nested route
  *  does not light up its own parent as well. */
+/**
+ * Text-only rows, matching the reference's Pinned and Recents sections.
+ *
+ * The reference gives these **no icon and no active fill**: they are a reading list, not
+ * navigation chrome, and an icon per conversation would be noise at this density. Only
+ * the primary destinations get icons.
+ */
+export interface SidebarEntry {
+  readonly id: string;
+  readonly label: string;
+  readonly href: string;
+}
+
+export interface WorkspaceSidebarData {
+  readonly pinned: readonly SidebarEntry[];
+  readonly recent: readonly SidebarEntry[];
+  /** Null while the workspace has no projects, which renders the reference's placeholder. */
+  readonly projectCount: number | null;
+}
+
+/**
+ * No history yet.
+ *
+ * Pinned, Projects and Recents render their labels and empty states rather than being
+ * omitted, so filling them later is a data change rather than a layout change. They must
+ * never render invented rows: a fake conversation is worse than an empty list, because
+ * someone will click it.
+ */
+export const EMPTY_SIDEBAR_DATA: WorkspaceSidebarData = {
+  pinned: [],
+  recent: [],
+  projectCount: null
+};
+
 /**
  * Whether the tree declares `path` as an item of its own.
  *

@@ -91,13 +91,9 @@ function DesktopRail({
   userEmail,
   onSignOut,
   navTree,
-  activeNavId,
-  sidebarOpen,
-  setSidebarOpen
+  activeNavId
 }: {
   readonly manifest: CapabilityManifest;
-  readonly sidebarOpen: boolean;
-  readonly setSidebarOpen: (open: boolean) => void;
   readonly waitingCount: number;
   readonly userName: string;
   readonly userEmail: string | null;
@@ -105,6 +101,10 @@ function DesktopRail({
   readonly navTree: NavTree;
   readonly activeNavId: string | null;
 }) {
+  // `useSidebar` rather than a prop: the provider owns the state, and a prop would go
+  // stale the moment the rail toggled itself.
+  const { open, setOpen } = useSidebar();
+
   return (
     <Sidebar collapsible="icon" variant="inset">
       <SidebarHeader>
@@ -117,39 +117,49 @@ function DesktopRail({
           Collapse lives here because this is where the rail's own state belongs; the
           header trigger in the content bar stays for the case where the rail is hidden.
         */}
-        <div className="flex items-center justify-between gap-2 px-1">
-          <Link
-            className="truncate rounded-[var(--radius-sm)] px-2 py-1.5 text-[15px] font-semibold tracking-tight outline-none hover:bg-sidebar-accent focus-visible:ring-2 focus-visible:ring-sidebar-ring"
-            href="/workspace"
-          >
-            EdApex
-          </Link>
-          <div className="flex items-center gap-0.5">
-            <SidebarMenuButton
-              asChild
-              className="size-8 p-0"
-              tooltip="Search"
+        {/*
+          Collapsed, the header is the toggle alone. The reference does exactly this: the
+          wordmark and search disappear and the rail becomes a column of icons, with the
+          toggle sitting above them as the one control that changes the shape back.
+        */}
+        {open ? (
+          <div className="flex items-center justify-between gap-2 px-1">
+            <Link
+              className="truncate rounded-[var(--radius-sm)] px-2 py-1.5 text-[15px] font-semibold tracking-tight outline-none hover:bg-sidebar-accent focus-visible:ring-2 focus-visible:ring-sidebar-ring"
+              href="/workspace"
             >
-              <Link aria-label="Search" href="/workspace/search">
-                <Search aria-hidden="true" />
-              </Link>
-            </SidebarMenuButton>
-            {/*
-              Hidden below `md`: at that width the rail is a sheet, and the content
-              header's `SidebarTrigger` is what opens it. Two controls for one state was
-              the reason this row looked busier than the reference.
-            */}
+              EdApex
+            </Link>
+            <div className="flex items-center gap-0.5">
+              <SidebarMenuButton asChild className="size-8 p-0" tooltip="Search">
+                <Link aria-label="Search" href="/workspace/search">
+                  <Search aria-hidden="true" />
+                </Link>
+              </SidebarMenuButton>
+              <SidebarMenuButton
+                aria-label="Toggle sidebar"
+                className="size-8 p-0"
+                onClick={() => setOpen(false)}
+                tooltip="Toggle sidebar"
+                type="button"
+              >
+                <PanelLeft aria-hidden="true" />
+              </SidebarMenuButton>
+            </div>
+          </div>
+        ) : (
+          <div className="flex justify-center">
             <SidebarMenuButton
               aria-label="Toggle sidebar"
-              className="hidden size-8 p-0 md:flex"
-              onClick={() => setSidebarOpen(!sidebarOpen)}
+              className="size-8 p-0"
+              onClick={() => setOpen(true)}
               tooltip="Toggle sidebar"
               type="button"
             >
               <PanelLeft aria-hidden="true" />
             </SidebarMenuButton>
           </div>
-        </div>
+        )}
       </SidebarHeader>
 
       <SidebarContent>
@@ -216,8 +226,6 @@ export function WorkspaceShell({
       <SidebarProvider onOpenChange={setSidebarOpen} open={sidebarOpen}>
         <DesktopRail
           activeNavId={activeNavId}
-          setSidebarOpen={setSidebarOpen}
-          sidebarOpen={sidebarOpen}
           manifest={manifest}
           navTree={navTree}
           onSignOut={onSignOut}
@@ -239,12 +247,21 @@ export function WorkspaceShell({
           */}
           <header className="safe-top flex h-16 shrink-0 items-center justify-between gap-2 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
             <div className="flex min-w-0 items-center gap-2 px-4">
-              <SidebarTrigger aria-label="Toggle navigation" className="-ml-1" />
+              {/*
+                Below `md` only: the rail is a sheet there, so this is the control that
+                opens it. From `md` up the rail is visible and owns its own toggle — two
+                controls for one state was most of why this row looked busier than the
+                reference.
+              */}
+              <SidebarTrigger
+                aria-label="Toggle navigation"
+                className="-ml-1 md:hidden"
+              />
               <Separator
-                className="mr-2 data-[orientation=vertical]:h-4"
+                className="mr-2 hidden data-[orientation=vertical]:h-4 md:block"
                 orientation="vertical"
               />
-              <Breadcrumb>
+              <Breadcrumb className="md:pl-2">
                 <BreadcrumbList>
                   <BreadcrumbItem className="hidden md:block">
                     <BreadcrumbLink asChild>
