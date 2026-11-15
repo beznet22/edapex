@@ -32,6 +32,10 @@ import type {
   WorkspaceSidebarData
 } from "@/lib/nav-tree";
 import { EMPTY_SIDEBAR_DATA } from "@/lib/nav-tree";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Modal } from "@/components/ui/modal";
+import { SidebarRow, SidebarSectionHeader } from "@/components/workspace/SidebarRow";
 
 /**
  * The sidebar's navigation region, which swaps content by context.
@@ -209,33 +213,57 @@ export function SidebarNav({
  * click it.
  */
 function HistorySections({ data }: { readonly data: WorkspaceSidebarData }) {
+  // Section collapse is local UI state, not persisted: a person who folds Pinned to see
+  // Recents does not want that choice remembered across reloads.
+  const [folded, setFolded] = useState<Record<string, boolean>>({});
+  const [projectModal, setProjectModal] = useState(false);
+
+  const toggle = (id: string): void =>
+    setFolded((current) => ({ ...current, [id]: current[id] !== true }));
+
   return (
     <>
       <SidebarGroup>
-        <SidebarGroupLabel className="mt-6">Pinned</SidebarGroupLabel>
-        <SidebarGroupContent>
-          {data.pinned.length === 0 ? (
-            <p className="px-2 py-1 text-[13px] text-muted-foreground/70 group-data-[collapsible=icon]:hidden">
-              Nothing pinned
-            </p>
-          ) : (
-            <SidebarMenu>
-              {data.pinned.map((entry) => (
-                <TextRow entry={entry} key={entry.id} />
-              ))}
-            </SidebarMenu>
-          )}
-        </SidebarGroupContent>
+        <SidebarSectionHeader
+          collapsed={folded.pinned === true}
+          collapsible
+          label="Pinned"
+          onToggle={() => toggle("pinned")}
+        />
+        {folded.pinned === true ? null : (
+          <SidebarGroupContent>
+            {data.pinned.length === 0 ? (
+              <p className="px-2 py-1 text-[13px] text-muted-foreground/70 group-data-[collapsible=icon]:hidden">
+                Nothing pinned
+              </p>
+            ) : (
+              <div className="space-y-0.5">
+                {data.pinned.map((entry) => (
+                  <SidebarRow
+                    actions={{ onTogglePin: () => undefined, pinned: true }}
+                    href={entry.href}
+                    id={entry.id}
+                    key={entry.id}
+                    label={entry.label}
+                  />
+                ))}
+              </div>
+            )}
+          </SidebarGroupContent>
+        )}
       </SidebarGroup>
 
       <SidebarGroup>
-        <SidebarGroupLabel className="mt-6">Projects</SidebarGroupLabel>
+        {/*
+          Projects has no chevron: it is not a list to fold, it is a place to create one.
+          The plus opens a modal, matching the reference.
+        */}
+        <SidebarSectionHeader
+          label="Projects"
+          onAdd={() => setProjectModal(true)}
+          onFilter={() => undefined}
+        />
         <SidebarGroupContent>
-          {/*
-            Placeholder only. There is no project model yet, and mapping some other list
-            here — which my first pass did — would have shown pinned conversations under a
-            "Projects" heading.
-          */}
           <p className="px-2 py-1 text-[13px] text-muted-foreground/70 group-data-[collapsible=icon]:hidden">
             No projects
           </p>
@@ -243,21 +271,62 @@ function HistorySections({ data }: { readonly data: WorkspaceSidebarData }) {
       </SidebarGroup>
 
       <SidebarGroup>
-        <SidebarGroupLabel className="mt-6">Recents</SidebarGroupLabel>
-        <SidebarGroupContent>
-          {data.recent.length === 0 ? (
-            <p className="px-2 py-1 text-[13px] text-muted-foreground/70 group-data-[collapsible=icon]:hidden">
-              Conversations appear here
-            </p>
-          ) : (
-            <SidebarMenu>
-              {data.recent.map((entry) => (
-                <TextRow entry={entry} key={entry.id} />
-              ))}
-            </SidebarMenu>
-          )}
-        </SidebarGroupContent>
+        <SidebarSectionHeader
+          collapsed={folded.recents === true}
+          collapsible
+          label="Recents"
+          onToggle={() => toggle("recents")}
+        />
+        {folded.recents === true ? null : (
+          <SidebarGroupContent>
+            {data.recent.length === 0 ? (
+              <p className="px-2 py-1 text-[13px] text-muted-foreground/70 group-data-[collapsible=icon]:hidden">
+                Conversations appear here
+              </p>
+            ) : (
+              <div className="space-y-0.5">
+                {data.recent.map((entry) => (
+                  <SidebarRow
+                    actions={{ onTogglePin: () => undefined, pinned: false }}
+                    href={entry.href}
+                    id={entry.id}
+                    key={entry.id}
+                    label={entry.label}
+                  />
+                ))}
+              </div>
+            )}
+          </SidebarGroupContent>
+        )}
       </SidebarGroup>
+
+      <Modal
+        description="Projects group related conversations so a term's work does not scatter across Recents."
+        footer={
+          <Button disabled type="button">
+            Create project
+          </Button>
+        }
+        onClose={() => setProjectModal(false)}
+        open={projectModal}
+        title="New project"
+      >
+        {/*
+          The form is present but disabled: there is no project table, so a working submit
+          would write to nothing. Showing the shape is honest; a button that silently did
+          nothing would not be.
+        */}
+        <div className="space-y-4 py-2">
+          <label className="block">
+            <span className="text-[13px] font-medium">Name</span>
+            <Input className="mt-2" disabled placeholder="First term reports" />
+          </label>
+          <p className="text-[12px] leading-5 text-muted-foreground">
+            Projects are not stored yet. This dialog will create one once the project model
+            lands.
+          </p>
+        </div>
+      </Modal>
     </>
   );
 }

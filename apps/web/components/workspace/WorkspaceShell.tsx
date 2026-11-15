@@ -41,6 +41,7 @@ import { SidebarNav } from "@/components/workspace/SidebarNav";
 import { SidebarUser } from "@/components/workspace/SidebarUser";
 import { ThemeToggle } from "@/components/workspace/ThemeToggle";
 import { TabBar, type WorkspaceTab } from "@/components/openduet/tab-bar";
+import { cn } from "@/lib/utils";
 import type { NavTree } from "@/lib/nav-tree";
 
 interface WorkspaceShellProps {
@@ -122,44 +123,58 @@ function DesktopRail({
           wordmark and search disappear and the rail becomes a column of icons, with the
           toggle sitting above them as the one control that changes the shape back.
         */}
-        {open ? (
-          <div className="flex items-center justify-between gap-2 px-1">
-            <Link
-              className="truncate rounded-[var(--radius-sm)] px-2 py-1.5 text-[15px] font-semibold tracking-tight outline-none hover:bg-sidebar-accent focus-visible:ring-2 focus-visible:ring-sidebar-ring"
-              href="/workspace"
-            >
-              EdApex
-            </Link>
-            <div className="flex items-center gap-0.5">
-              <SidebarMenuButton asChild className="size-8 p-0" tooltip="Search">
-                <Link aria-label="Search" href="/workspace/search">
-                  <Search aria-hidden="true" />
-                </Link>
-              </SidebarMenuButton>
-              <SidebarMenuButton
-                aria-label="Toggle sidebar"
-                className="size-8 p-0"
-                onClick={() => setOpen(false)}
-                tooltip="Toggle sidebar"
-                type="button"
-              >
-                <PanelLeft aria-hidden="true" />
-              </SidebarMenuButton>
-            </div>
-          </div>
-        ) : (
-          <div className="flex justify-center">
-            <SidebarMenuButton
-              aria-label="Toggle sidebar"
-              className="size-8 p-0"
-              onClick={() => setOpen(true)}
-              tooltip="Toggle sidebar"
-              type="button"
-            >
-              <PanelLeft aria-hidden="true" />
+        {/*
+          The wordmark *is* the toggle.
+
+          Two controls in the top row (a brand link and a collapse button) competed for the
+          same 240px and neither read clearly. Merging them: the label states identity at
+          rest, and hovering reveals the rail icon with a horizontal double-arrow cursor —
+          the same affordance a resizable pane uses, which is what this is.
+        */}
+        <div className="flex items-center justify-between gap-1 px-1">
+          <button
+            aria-label={open ? "Collapse sidebar" : "Expand sidebar"}
+            className={cn(
+              "group/logo flex min-w-0 flex-1 items-center gap-2 rounded-[var(--radius-sm)] px-2 py-1.5 text-left outline-none",
+              "cursor-ew-resize transition-colors hover:bg-sidebar-accent",
+              "focus-visible:ring-2 focus-visible:ring-sidebar-ring",
+              !open && "justify-center"
+            )}
+            onClick={() => setOpen(!open)}
+            title={open ? "Collapse sidebar" : "Expand sidebar"}
+            type="button"
+          >
+            {open ? (
+              <>
+                <span className="truncate text-[15px] font-semibold tracking-tight group-hover/logo:hidden">
+                  EdApex
+                </span>
+                <PanelLeft
+                  aria-hidden="true"
+                  className="hidden size-4 text-muted-foreground group-hover/logo:block"
+                />
+              </>
+            ) : (
+              <>
+                <span className="flex size-7 shrink-0 items-center justify-center rounded-[var(--radius-xs)] bg-primary text-[11px] font-black text-primary-foreground group-hover/logo:hidden">
+                  E
+                </span>
+                <PanelLeft
+                  aria-hidden="true"
+                  className="hidden size-4 text-muted-foreground group-hover/logo:block"
+                />
+              </>
+            )}
+          </button>
+
+          {open ? (
+            <SidebarMenuButton asChild className="size-8 shrink-0 p-0" tooltip="Search">
+              <Link aria-label="Search" href="/workspace/search">
+                <Search aria-hidden="true" />
+              </Link>
             </SidebarMenuButton>
-          </div>
-        )}
+          ) : null}
+        </div>
       </SidebarHeader>
 
       <SidebarContent>
