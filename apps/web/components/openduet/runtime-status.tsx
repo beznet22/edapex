@@ -4,17 +4,39 @@ import type { WorkspaceRunState } from "@edapex/contracts";
 
 import { cn } from "@/lib/utils";
 
+/**
+ * Visible labels. Deliberately short: this sits in the header beside the theme control and
+ * a Set up button, and "Runtime offline" plus "History unavailable" pushed the row wider
+ * than the surface it describes.
+ *
+ * Nothing is lost — the full sentence lives in the accessible name below, so a screen
+ * reader still hears "Runtime offline" while the pill reads "Offline".
+ */
 const LABELS: Record<WorkspaceRunState, string> = {
   restoring: "Restoring",
-  history_unavailable: "History unavailable",
+  history_unavailable: "No history",
   idle: "Live",
   thinking: "Thinking",
   following: "Following",
   tool_running: "Working",
-  waiting_for_person: "Waiting for you",
+  waiting_for_person: "Waiting",
   completed: "Complete",
   stopped: "Stopped",
   error: "Error"
+};
+
+/** The spoken form, where there is room to be specific. */
+const ACCESSIBLE: Record<WorkspaceRunState, string> = {
+  restoring: "Runtime restoring",
+  history_unavailable: "Conversation history unavailable",
+  idle: "Runtime live",
+  thinking: "Runtime thinking",
+  following: "Runtime following",
+  tool_running: "Runtime working",
+  waiting_for_person: "Runtime waiting for you",
+  completed: "Runtime complete",
+  stopped: "Runtime stopped",
+  error: "Runtime error"
 };
 
 interface RuntimeStatusProps {
@@ -27,7 +49,7 @@ export function RuntimeStatus({ connected, state }: RuntimeStatusProps) {
   const error = state === "history_unavailable" || state === "error";
   return (
     <span
-      aria-label={connected ? `Runtime ${LABELS[state].toLowerCase()}` : "Runtime offline"}
+      aria-label={connected ? ACCESSIBLE[state] : "Runtime offline"}
       className={cn(
         "inline-flex min-h-6 items-center gap-1.5 rounded-full border px-2.5 text-[10px] font-semibold tracking-wide",
         !connected && "border-border bg-muted/50 text-muted-foreground",
@@ -50,7 +72,7 @@ export function RuntimeStatus({ connected, state }: RuntimeStatusProps) {
           connected && !waiting && !error && "bg-success"
         )}
       />
-      {connected ? LABELS[state] : "Runtime offline"}
+      {connected ? LABELS[state] : "Offline"}
     </span>
   );
 }

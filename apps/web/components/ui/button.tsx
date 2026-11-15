@@ -55,9 +55,22 @@ export interface ButtonProps
   readonly asChild?: boolean;
 }
 
-function Button({ className, variant, size, asChild = false, ...props }: ButtonProps) {
+/**
+ * `forwardRef` rather than a plain function.
+ *
+ * A native `<button>` accepts a ref, so a wrapper that drops it is a *silent* downgrade:
+ * composition still works until something composes focus or measurement — shadcn's
+ * sidebar does exactly that, and the failure is a type error far from the cause.
+ */
+const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(function Button(
+  { className, variant, size, asChild = false, ...props },
+  ref
+) {
   const Comp = asChild ? Slot : "button";
-  return <Comp className={cn(buttonVariants({ variant, size, className }))} {...props} />;
-}
+  return (
+    <Comp className={cn(buttonVariants({ variant, size, className }))} ref={ref} {...props} />
+  );
+});
+Button.displayName = "Button";
 
 export { Button, buttonVariants };

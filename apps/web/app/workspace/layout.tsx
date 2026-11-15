@@ -5,6 +5,7 @@ import { cookies } from "next/headers";
 import { ServiceWorkerRegistration } from "@/components/pwa/ServiceWorkerRegistration";
 import { ThemeProvider } from "@/components/workspace/ThemeProvider";
 import { WorkspaceLayoutClient } from "@/components/workspace/WorkspaceLayoutClient";
+import { readSidebarCookie, type SidebarState } from "@/lib/sidebar-state";
 import { readThemeCookies } from "@/lib/theme";
 
 export const metadata: Metadata = {
@@ -25,11 +26,12 @@ export const metadata: Metadata = {
 export default async function WorkspaceLayout({ children }: Readonly<{ children: ReactNode }>) {
   const cookieStore = await cookies();
   const preference = readThemeCookies(cookieStore.toString());
+  const sidebar = readSidebarCookie(cookieStore.toString());
 
   return (
     <ThemeProvider initial={preference}>
       <ServiceWorkerRegistration />
-      <WorkspaceLayoutClient>{children}</WorkspaceLayoutClient>
+      <WorkspaceLayoutClient initialSidebar={sidebar}>{children}</WorkspaceLayoutClient>
     </ThemeProvider>
   );
 }

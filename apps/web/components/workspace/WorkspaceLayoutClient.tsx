@@ -20,6 +20,8 @@ import { useWorkspaceRuntime } from "@/hooks/use-workspace-runtime";
 import { useAutoHideScrollbars } from "@/hooks/use-auto-hide-scrollbars";
 import { useRuntimeHealth } from "@/hooks/use-runtime-health";
 import { isDesktopViewport } from "@/lib/platform";
+import type { SidebarState } from "@/lib/sidebar-state";
+import { useSidebarState } from "@/lib/sidebar-state-hooks";
 import type { WorkspaceTab } from "@/components/openduet/tab-bar";
 import { Button } from "@/components/ui/button";
 import { ChatSurface } from "@/components/workspace/ChatSurface";
@@ -38,7 +40,20 @@ function surfaceForPath(pathname: string): WorkspaceTab {
   return "chat";
 }
 
-export function WorkspaceLayoutClient({ children }: { readonly children: ReactNode }) {
+export function WorkspaceLayoutClient({
+  children,
+  initialSidebar
+}: {
+  readonly children: ReactNode;
+  readonly initialSidebar: SidebarState;
+}) {
+  // The collapsed state is a width decision, so it comes from the server: reading a
+  // cookie in an effect renders the rail expanded and then snaps it, which is a visible
+  // layout shift on every load.
+  // No custom Cmd+B handler: shadcn's SidebarProvider binds it already. Two handlers
+  // toggle twice, so the rail appears not to respond.
+  const sidebar = useSidebarState(initialSidebar);
+
   const pathname = usePathname();
   const surface = surfaceForPath(pathname);
   const [sessionState, setSessionState] = useState<SessionState>("loading");
@@ -217,6 +232,8 @@ export function WorkspaceLayoutClient({ children }: { readonly children: ReactNo
         devBypass={DEV_AUTH_BYPASS}
         onConnectRuntime={() => setSetupDismissed(false)}
         onOpenArtifact={surface === "chat" ? openArtifact : undefined}
+        setSidebarOpen={sidebar.setOpen}
+        sidebarOpen={sidebar.open}
         runtime={runtime.view}
         surface={surface}
         userName={userName}

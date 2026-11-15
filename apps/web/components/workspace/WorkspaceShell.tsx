@@ -16,6 +16,24 @@ import type { CapabilityManifest, WorkspaceRuntimeView } from "@edapex/contracts
 import type { CoreHealth } from "@/lib/tauri";
 
 import { Button } from "@/components/ui/button";
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarHeader,
+  SidebarInset,
+  SidebarMenu,
+  SidebarMenuBadge,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarProvider,
+  SidebarRail,
+  SidebarTrigger,
+  useSidebar
+} from "@/components/ui/sidebar";
 import { Titlebar } from "@/components/desktop/Titlebar";
 import { RuntimeStatus } from "@/components/openduet/runtime-status";
 import { ThemeToggle } from "@/components/workspace/ThemeToggle";
@@ -31,6 +49,9 @@ interface WorkspaceShellProps {
   readonly devBypass?: boolean;
   readonly onOpenArtifact?: (() => void) | undefined;
   readonly onConnectRuntime?: (() => void) | undefined;
+  /** Server-resolved so the rail is the right width on first paint. */
+  readonly sidebarOpen: boolean;
+  readonly setSidebarOpen: (open: boolean) => void;
   readonly children: ReactNode;
 }
 
@@ -51,6 +72,15 @@ const RAIL_ITEMS: readonly {
   { id: "make", href: "/workspace/make", label: "Make", icon: WandSparkles }
 ];
 
+/**
+ * The rail.
+ *
+ * shadcn's `collapsible="icon"` rather than a hand-rolled 76px column: the primitives
+ * give a tooltip on collapse, a keyboard-reachable trigger, and a sheet drawer below the
+ * breakpoint — three things the previous rail did not have. Icons + labels when expanded,
+ * icons + tooltips when collapsed, and the state persists in a cookie so it is right on
+ * first paint.
+ */
 function DesktopRail({
   manifest,
   surface,
@@ -61,57 +91,78 @@ function DesktopRail({
   readonly waitingCount: number;
 }) {
   return (
-    <aside className="hidden w-[76px] shrink-0 flex-col items-center bg-card/40 py-4 shadow-[1px_0_0_var(--border)] lg:flex">
-      <Link
-        aria-label="EdApex workspace home"
-        className="flex size-11 items-center justify-center rounded-xl bg-primary text-sm font-black text-primary-foreground"
-        href="/workspace"
-      >
-        E
-      </Link>
-      <div className="my-4 h-px w-7 bg-border/70" />
-      <nav aria-label="Primary" className="flex flex-1 flex-col items-center gap-2">
-        {RAIL_ITEMS.map((item) => {
-          const active = item.id === surface;
-          const Icon = item.icon;
-          const badge = item.id === "tasks" ? waitingCount : 0;
-          return (
-            <Link
-              aria-current={active ? "page" : undefined}
-              aria-label={badge > 0 ? `${item.label}, ${badge} waiting` : item.label}
-              className={
-                active
-                  ? "relative flex size-11 items-center justify-center rounded-xl bg-primary/15 text-primary"
-                  : "relative flex size-11 items-center justify-center rounded-xl text-muted-foreground hover:bg-muted hover:text-foreground"
-              }
-              href={item.href}
-              key={item.id}
-              title={item.label}
-            >
-              <Icon aria-hidden="true" className="size-5" strokeWidth={active ? 2.2 : 1.9} />
-              {badge > 0 ? (
-                <span
-                  aria-hidden="true"
-                  className="absolute right-1 top-1 grid h-4 min-w-4 place-items-center rounded-full bg-primary px-1 text-[9px] font-bold text-primary-foreground"
-                >
-                  {badge}
+    <Sidebar collapsible="icon">
+      <SidebarHeader>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton asChild size="lg" tooltip="EdApex workspace">
+              <Link href="/workspace">
+                <span className="flex size-8 shrink-0 items-center justify-center rounded-[var(--radius-sm)] bg-primary text-sm font-black text-primary-foreground">
+                  E
                 </span>
-              ) : null}
-            </Link>
-          );
-        })}
-      </nav>
-      {manifest.role === "admin" ? (
-        <Link
-          aria-label="Open admin claim links"
-          className="flex size-11 items-center justify-center rounded-xl text-muted-foreground hover:bg-muted hover:text-foreground"
-          href="/admin/claim-links"
-          title="Admin"
-        >
-          <Settings2 aria-hidden="true" className="size-5" />
-        </Link>
-      ) : null}
-    </aside>
+                <span className="grid min-w-0 text-left leading-tight">
+                  <span className="truncate text-sm font-semibold tracking-tight">EdApex</span>
+                  <span className="truncate text-[11px] text-muted-foreground">
+                    {manifest.role}
+                  </span>
+                </span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarHeader>
+
+      <SidebarContent>
+        <SidebarGroup>
+          <SidebarGroupLabel>Workspace</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {RAIL_ITEMS.map((item) => {
+                const active = item.id === surface;
+                const Icon = item.icon;
+                const badge = item.id === "tasks" ? waitingCount : 0;
+                return (
+                  <SidebarMenuItem key={item.id}>
+                    <SidebarMenuButton
+                      asChild
+                      isActive={active}
+                      tooltip={item.label}
+                    >
+                      <Link
+                        aria-current={active ? "page" : undefined}
+                        href={item.href}
+                      >
+                        <Icon aria-hidden="true" />
+                        <span>{item.label}</span>
+                      </Link>
+                    </SidebarMenuButton>
+                    {badge > 0 ? (
+                      <SidebarMenuBadge>{badge}</SidebarMenuBadge>
+                    ) : null}
+                  </SidebarMenuItem>
+                );
+              })}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+      </SidebarContent>
+
+      <SidebarFooter>
+        <SidebarMenu>
+          {manifest.role === "admin" ? (
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild tooltip="Admin">
+                <Link href="/admin/claim-links">
+                  <Settings2 aria-hidden="true" />
+                  <span>Admin</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          ) : null}
+        </SidebarMenu>
+      </SidebarFooter>
+      <SidebarRail />
+    </Sidebar>
   );
 }
 
@@ -125,6 +176,8 @@ export function WorkspaceShell({
   devBypass = false,
   onOpenArtifact,
   onConnectRuntime,
+  sidebarOpen,
+  setSidebarOpen,
   children
 }: WorkspaceShellProps) {
   return (
@@ -135,12 +188,29 @@ export function WorkspaceShell({
     >
       {/* Renders null in a browser tab: the browser draws its own chrome. */}
       <Titlebar title="EdApex Work" />
-      <div className="flex min-h-0 flex-1 overflow-hidden">
-      <DesktopRail manifest={manifest} surface={surface} waitingCount={waitingCount} />
-      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+      <SidebarProvider
+        // `open`, not `defaultOpen`. The provider treats `open` as controlled and
+        // `defaultOpen` as a one-time initial value, so passing only the latter made the
+        // rail ignore every toggle: the cookie changed while the UI did not.
+        onOpenChange={setSidebarOpen}
+        open={sidebarOpen}
+        // The provider hardcodes its width constants, so ours are re-stated here rather
+        // than winning through the theme layer.
+        style={
+          {
+            "--sidebar-width": "15rem",
+            "--sidebar-width-icon": "4.5rem",
+            minHeight: 0
+          } as React.CSSProperties
+        }
+      >
+        <DesktopRail manifest={manifest} surface={surface} waitingCount={waitingCount} />
+        <SidebarInset className="min-h-0 overflow-hidden">
+          <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <header className="safe-top shrink-0 px-3 pb-2.5 shadow-[0_1px_0_var(--border)] lg:px-6 lg:pb-3 lg:pt-4">
           <div className="mx-auto flex w-full max-w-[430px] items-center justify-between gap-2 lg:max-w-none">
             <div className="flex min-w-0 items-center gap-2 lg:hidden">
+              <SidebarTrigger aria-label="Open navigation" className="-ml-1 shrink-0" />
               <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary text-sm font-black text-primary-foreground">
                 E
               </span>
@@ -151,13 +221,15 @@ export function WorkspaceShell({
                 </div>
               </div>
             </div>
+            {/*
+              No brand repeat on desktop: the rail already shows it, and the two
+              together read as the title twice. Only the surface name and the person
+              belong here.
+            */}
             <div className="hidden min-w-0 items-center gap-2 text-sm lg:flex">
-              <span className="font-semibold tracking-tight">EdApex Work</span>
-              <span className="text-muted-foreground">/</span>
-              <span className="text-muted-foreground">{SURFACE_LABEL[surface]}</span>
-              <span className="ml-2 truncate text-[11px] text-muted-foreground">
-                {userName}
-              </span>
+              <SidebarTrigger aria-label="Toggle navigation" className="-ml-1 shrink-0" />
+              <span className="font-semibold tracking-tight">{SURFACE_LABEL[surface]}</span>
+              <span className="ml-1 truncate text-[11px] text-muted-foreground">{userName}</span>
             </div>
             <div className="flex items-center gap-1">
               {devBypass ? (
@@ -224,8 +296,9 @@ export function WorkspaceShell({
             <TabBar current={surface} waitingCount={waitingCount} />
           </div>
         </main>
-      </div>
-      </div>
+          </div>
+        </SidebarInset>
+      </SidebarProvider>
     </div>
   );
 }
