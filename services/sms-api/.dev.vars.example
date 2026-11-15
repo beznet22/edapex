@@ -6,14 +6,13 @@
 #
 #   cp .dev.vars.example .dev.vars
 #
-# None of these are secrets. Anything that is a secret belongs in `wrangler secret put`
-# for a deployed Worker, never here.
+# Keep this file to vars that are **not** already in `wrangler.jsonc`. `.dev.vars`
+# overrides the wrangler vars wholesale, and the vitest plugin loads it too — putting
+# CORS_ORIGINS here silently broke the CORS suite, which expects the production origin.
+#
+# None of these are secrets. Anything secret belongs in `wrangler secret put` for a
+# deployed Worker, never here.
 
 # Writes email to the console instead of sending it, and prints the magic-link URL so
 # sign-in works locally. Without it there is no email binding and no way to sign in.
 LOCAL_EMAIL_LOG=true
-
-# Where the API sends a browser after a successful sign-in.
-APP_ORIGIN=http://localhost:5181
-POST_LOGIN_REDIRECT=http://localhost:5181/workspace
-CORS_ORIGINS=http://localhost:5181,http://127.0.0.1:5181

@@ -23,6 +23,7 @@
 /storage/*.db
 /storage/*.db-wal
 /storage/*.db-shm
+edapexdb.sql
 
 # Secrets
 .env

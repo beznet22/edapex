@@ -28,7 +28,7 @@ let first: ScopedRepositoryContext;
 let second: ScopedRepositoryContext;
 
 beforeAll(async () => {
-  schools = await seedTwoSchools(db);
+  schools = await seedTwoSchools(db, { staffed: false });
   first = createRepositoryContext(db, tenantOf(schools[0]));
   second = createRepositoryContext(db, tenantOf(schools[1]));
 });

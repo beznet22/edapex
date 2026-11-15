@@ -5,6 +5,7 @@ import type {
 } from "../../src/lib/server/repository/base/repository-context";import {
   infixRoles,
   smAcademicYears,
+  smAssignSubjects,
   smBaseGroups,
   smBaseSetups,
   smClassSections,
@@ -50,6 +51,17 @@ export interface SeedOptions {
   readonly className?: string;
   readonly studentAdmissionNo?: number;
   readonly studentRecordStatus?: "current" | "promoted" | "repeated" | "graduated" | "withdrawn";
+  /**
+   * Whether the seeded staff member is staffed into the seeded section.
+   *
+   * Defaults to `true`, because a school where the teacher teaches nothing is not a school:
+   * `TenantScopeService` now rejects a `X-Class-Id` the caller is not assigned to, so every
+   * scoped request in an unstaffed fixture would 403 — that is the check working.
+   *
+   * Tests that assert *unstaffed* state opt out explicitly rather than the majority
+   * hand-building an assignment per test.
+   */
+  readonly staffed?: boolean;
 }
 
 /** A scoped tenant for the seeded school; `createRepositoryContext` needs one. */
@@ -174,6 +186,23 @@ export async function seedSchool(
     departmentId,
     genderId
   });
+  if (options.staffed !== false) {
+    /*
+     * The seeded teacher teaches Mathematics in the seeded section, which is what makes
+     * `tenantOf` a usable scope. The explicit id keeps it clear of the low autoincrement
+     * range tests assert on when they insert their own assignment.
+     */
+    await db.insert(smAssignSubjects).values({
+      id: 9_000_000 + schoolId,
+      teacherId: staffId,
+      classId,
+      sectionId,
+      subjectId,
+      schoolId,
+      academicId,
+      activeStatus: 1
+    });
+  }
   await db.insert(smParents).values({
     id: parentId,
     guardiansName: `Guardian ${schoolId}`,
@@ -274,10 +303,11 @@ export async function seedSchool(
 
 /** The standard two-tenant fixture used by every isolation test. */
 export async function seedTwoSchools(
-  db: RepositoryDb
+  db: RepositoryDb,
+  options: SeedOptions = {}
 ): Promise<readonly [SeededSchool, SeededSchool]> {
-  const first = await seedSchool(db, 1);
-  const second = await seedSchool(db, 2);
+  const first = await seedSchool(db, 1, options);
+  const second = await seedSchool(db, 2, options);
   return [first, second];
 }
 

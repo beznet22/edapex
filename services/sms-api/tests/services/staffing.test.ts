@@ -10,7 +10,7 @@ const db = database(env);
 let school: SeededSchool;
 
 beforeAll(async () => {
-  const schools = await seedTwoSchools(db);
+  const schools = await seedTwoSchools(db, { staffed: false });
   school = schools[0];
 });
 

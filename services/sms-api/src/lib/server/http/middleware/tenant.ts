@@ -61,7 +61,7 @@ export const createTenantMiddleware = (
   });
   c.set("tenant", tenant);
   c.set("ctx", scoped);
-  await createService(TenantScopeService, scoped).assertScope();
+  await createService(TenantScopeService, scoped).assertScope(user.isAdmin);
   await next();
 };
 

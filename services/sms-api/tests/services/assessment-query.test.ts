@@ -21,7 +21,7 @@ let query: AssessmentQueryService;
 let roster: AssessmentRosterQueryService;
 
 beforeAll(async () => {
-  schools = await seedTwoSchools(db);
+  schools = await seedTwoSchools(db, { staffed: false });
   school = schools[0];
   await db.insert(smAssignSubjects).values({
     classId: school.classId,

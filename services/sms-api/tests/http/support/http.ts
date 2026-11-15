@@ -2,7 +2,7 @@ import { env } from "cloudflare:workers";
 import { eq } from "drizzle-orm";
 import type { Hono } from "hono";
 
-import { authSessions, users } from "../../../src/lib/server/db/schema";
+import { authSessions, smAssignSubjects, users } from "../../../src/lib/server/db/schema";
 import { createApp } from "../../../src/lib/server/http/app";
 import type { AppContext } from "../../../src/lib/server/http/env";
 import { randomToken, sha256Hex, SESSION_TTL_SECONDS } from "../../../src/lib/server/services";
@@ -82,6 +82,29 @@ export const login = async (
   identifier: string,
   _password: string
 ): Promise<string> => (await createSessionToken(identifier)).cookie;
+
+/**
+ * Gives the seeded staff member a real subject assignment.
+ *
+ * `TenantScopeService` proves a caller is assigned to the section they send, not merely
+ * that the section belongs to their school. `seedTwoSchools` deliberately seeds no
+ * assignment — repository tests hand-build their own fixtures and several assert on exact
+ * assignment rows — so an HTTP test that sends `X-Class-Id` must say, once, that its
+ * teacher actually teaches there.
+ */
+export const seedTeacherAssignment = async (
+  school: SeededSchool
+): Promise<void> => {
+  await database(env).insert(smAssignSubjects).values({
+    teacherId: school.staffId,
+    classId: school.classId,
+    sectionId: school.sectionId,
+    subjectId: school.subjectId,
+    schoolId: school.schoolId,
+    academicId: school.academicId,
+    activeStatus: 1
+  });
+};
 
 export const tenantHeaders = (
   school: SeededSchool,
