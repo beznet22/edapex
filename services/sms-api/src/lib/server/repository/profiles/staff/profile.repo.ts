@@ -1,4 +1,5 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, gt, like, or } from "drizzle-orm";
+import type { SQL } from "drizzle-orm";
 
 import { smDesignations, smHumanDepartments, smStaffs } from "../../../db/schema";
 import { DbEntityNotFoundError } from "../../base/errors";
@@ -33,6 +34,22 @@ export type StaffPatch = Partial<
 export interface StaffSearchFilters {
   readonly departmentId?: number;
   readonly designationId?: number;
+}
+
+/** One row in the admin staff list. Carries enough to render without a second query. */
+export interface StaffListRow {
+  readonly id: number;
+  readonly fullName: string | null;
+  readonly email: string | null;
+  readonly mobile: string | null;
+  readonly designationId: number | null;
+  readonly designation: string | null;
+  readonly department: string | null;
+  readonly roleId: number | null;
+  readonly activeStatus: number | null;
+  readonly staffPhoto: string | null;
+  /** Null when the staff record has no linked account. */
+  readonly userId: number | null;
 }
 
 export interface StaffSearchRow {
@@ -179,6 +196,76 @@ export async function searchStaff(
       .leftJoin(smHumanDepartments, eq(smStaffs.departmentId, smHumanDepartments.id))
       .where(and(...conditions));
   }, "searchStaff");
+}
+
+/**
+ * The admin staff list.
+ *
+ * Distinct from `searchStaff`, which returns `[]` unless a department or designation is
+ * supplied — it exists for the "who teaches in this department" picker, not for a roster of
+ * everybody. An admin list has to work with no filters at all.
+ *
+ * Keyset pagination on `id`, per the repository contract: no `OFFSET`. `includeInactive`
+ * is explicit because the default view is people who still work here, and a soft-deleted
+ * row must not reappear just because a filter was cleared.
+ */
+export async function listStaff(
+  ctx: ScopedRepositoryContext,
+  options: {
+    readonly query?: string;
+    readonly departmentId?: number;
+    readonly designationId?: number;
+    readonly includeInactive?: boolean;
+    readonly afterId?: number | null;
+    readonly limit: number;
+  }
+): Promise<readonly StaffListRow[]> {
+  return withErrorHandling(async () => {
+    const conditions = [eq(smStaffs.schoolId, ctx.tenant.schoolId)];
+    if (options.includeInactive !== true) {
+      conditions.push(eq(smStaffs.activeStatus, 1));
+    }
+    if (options.departmentId !== undefined) {
+      conditions.push(eq(smStaffs.departmentId, options.departmentId));
+    }
+    if (options.designationId !== undefined) {
+      conditions.push(eq(smStaffs.designationId, options.designationId));
+    }
+    if (options.afterId !== undefined && options.afterId !== null) {
+      conditions.push(gt(smStaffs.id, options.afterId));
+    }
+    if (options.query !== undefined && options.query.trim().length > 0) {
+      const pattern = `%${options.query.trim()}%`;
+      conditions.push(
+        or(
+          like(smStaffs.fullName, pattern),
+          like(smStaffs.email, pattern),
+          like(smStaffs.mobile, pattern)
+        ) as SQL<unknown>
+      );
+    }
+
+    return ctx.db
+      .select({
+        id: smStaffs.id,
+        fullName: smStaffs.fullName,
+        email: smStaffs.email,
+        mobile: smStaffs.mobile,
+        designationId: smStaffs.designationId,
+        designation: smDesignations.title,
+        department: smHumanDepartments.name,
+        roleId: smStaffs.roleId,
+        activeStatus: smStaffs.activeStatus,
+        staffPhoto: smStaffs.staffPhoto,
+        userId: smStaffs.userId
+      })
+      .from(smStaffs)
+      .leftJoin(smDesignations, eq(smStaffs.designationId, smDesignations.id))
+      .leftJoin(smHumanDepartments, eq(smStaffs.departmentId, smHumanDepartments.id))
+      .where(and(...conditions))
+      .orderBy(smStaffs.id)
+      .limit(options.limit + 1);
+  }, "listStaff");
 }
 
 /** Staff record only; the user's active status is an accounts concern. */

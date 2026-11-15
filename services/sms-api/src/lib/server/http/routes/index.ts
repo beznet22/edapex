@@ -16,6 +16,7 @@ import { adminJobs } from "./admin-jobs.routes";
 import { adminMigration } from "./admin-migration.routes";
 import { adminPromotion } from "./admin-promotion.routes";
 import { adminSessions } from "./admin-sessions.routes";
+import { adminStaff } from "./admin-staff.routes";
 import { adminStaffing } from "./admin-staffing.routes";
 import { adminTerms } from "./admin-terms.routes";
 import { adminResults } from "./admin-results.routes";
@@ -92,6 +93,7 @@ export const createProtectedRoutes = (
     .route("/admin", adminAuth)
     .route("/admin", adminBootstrap)
     .route("/admin", adminStaffing)
+    .route("/admin", adminStaff)
     .route("/admin", adminMigration)
     .route("/admin", adminPromotion)
     .route("/admin", adminTerms)

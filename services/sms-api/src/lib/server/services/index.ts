@@ -14,6 +14,7 @@ export * from "./media";
 export * from "./migration";
 export * from "./ports";
 export * from "./settings";
+export * from "./staff";
 export * from "./students";
 export * from "./tenant";
 export * from "./validation";
