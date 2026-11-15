@@ -15,7 +15,7 @@ import type { LucideIcon } from "lucide-react";
 
 const STATUS: Record<ToolCallStatus, { label: string; icon: LucideIcon; className: string }> = {
   running: { label: "Working", icon: LoaderCircle, className: "text-primary animate-spin" },
-  completed: { label: "Done", icon: Check, className: "text-emerald-500" },
+  completed: { label: "Done", icon: Check, className: "text-success" },
   failed: { label: "Didn’t work", icon: AlertTriangle, className: "text-destructive" },
   blocked: { label: "Blocked", icon: Ban, className: "text-destructive" },
   declined: { label: "You declined", icon: X, className: "text-muted-foreground" },

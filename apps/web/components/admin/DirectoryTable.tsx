@@ -29,11 +29,11 @@ const dateLabel = (value: number | null): string =>
 
 const statusBadge = (item: ClaimDirectoryItem) => {
   if (item.claimStatus === "claimed") {
-    return <Badge className="bg-emerald-400/10 text-emerald-300">Claimed</Badge>;
+    return <Badge className="bg-success/10 text-success">Claimed</Badge>;
   }
   if (item.claimStatus === "flagged") return <Badge variant="destructive">Flagged</Badge>;
   if (item.userId === null) return <Badge variant="secondary">No user</Badge>;
-  return <Badge className="bg-amber-300/10 text-amber-200">Unclaimed</Badge>;
+  return <Badge className="bg-warning/10 text-warning">Unclaimed</Badge>;
 };
 
 interface DirectoryTableProps {

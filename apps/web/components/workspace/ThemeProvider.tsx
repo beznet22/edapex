@@ -76,8 +76,15 @@ export function ThemeProvider({
 export function useTheme(): ThemeContextValue {
   const value = useContext(ThemeContext);
   if (value === null) {
-    // A component outside the provider still gets a working control rather than
-    // a crash, because the toggle lives in the shell header.
+    // In development this throws. The previous version returned a no-op, which made a
+    // missing provider invisible: the control rendered, accepted clicks and changed
+    // nothing. That is exactly how this bug shipped — a crash would have been caught
+    // the first time the page was opened.
+    if (process.env.NODE_ENV !== "production") {
+      throw new Error(
+        "useTheme was called outside ThemeProvider. Mount it in app/workspace/layout.tsx."
+      );
+    }
     return {
       preference: DEFAULT_THEME,
       setMode: () => undefined,

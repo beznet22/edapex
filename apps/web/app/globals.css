@@ -20,54 +20,95 @@
 :root {
   color-scheme: light;
 
-  --background: oklch(0.985 0.003 255);
-  --foreground: oklch(0.24 0.018 255);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.24 0.018 255);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.24 0.018 255);
   /*
-   * Dark ink on gold, not near-white.
+   * Warm neutrals, from the Claude palette in `designs/claude.design.md`.
    *
-   * Near-white on `oklch(0.62 0.12 74)` measures 3.59:1 — below the 4.5:1 that body
-   * text needs, and this is the app's most-used action. Ink at 0.18 measures 5.09:1.
-   * Gold is a light accent; treating it as a dark one was the whole mistake.
+   * The hue is ~85 rather than slate's 255: a cream canvas instead of a cool one.
+   * Cool grays read as clinical, and this is a surface people read for a term at a
+   * time. The chroma stays under 0.02 so the warmth is felt, not seen.
    */
-  --primary: oklch(0.62 0.12 74);
-  --primary-foreground: oklch(0.18 0.02 74);
-  --secondary: oklch(0.955 0.006 255);
-  --secondary-foreground: oklch(0.28 0.02 255);
-  --muted: oklch(0.955 0.006 255);
-  --muted-foreground: oklch(0.5 0.018 255);
-  --accent: oklch(0.94 0.012 255);
-  --accent-foreground: oklch(0.26 0.02 255);
-  --destructive: oklch(0.55 0.19 27);
-  --destructive-foreground: oklch(0.99 0.005 27);
-  --border: oklch(0.9 0.008 255);
-  --input: oklch(0.9 0.008 255);
-  --ring: oklch(0.62 0.12 74);
+  --background: oklch(0.982 0.0054 95.1);
+  --foreground: oklch(0.191 0.0020 106.6);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.191 0.0020 106.6);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.191 0.0020 106.6);
+  /*
+   * Coral. The source token `#cc785c` is `oklch(0.658 0.1131 39.1)` and measures
+   * 3.28:1 against white — below the 4.5:1 body text needs, and this is the app's
+   * most-used action. Darkened to L=0.56, which keeps the hue and the warmth and
+   * measures 4.94:1. The near-white foreground is therefore correct here; the
+   * previous mustard needed ink, which is why "gold with dark ink" looked wrong —
+   * `oklch(0.62 0.12 74)` renders as `#b17a21`, which is mustard, not gold.
+   */
+  --primary: oklch(0.56 0.13 36);
+  --primary-foreground: oklch(1 0 0);
+  --secondary: oklch(0.957 0.0119 79.8);
+  --secondary-foreground: oklch(0.264 0.0037 106.6);
+  --muted: oklch(0.957 0.0119 79.8);
+  --muted-foreground: oklch(0.524 0.0096 91.6);
+  --accent: oklch(0.936 0.0161 82.8);
+  --accent-foreground: oklch(0.264 0.0037 106.6);
+  --destructive: oklch(0.57 0.165 24);
+  --destructive-foreground: oklch(1 0 0);
+  --border: oklch(0.907 0.0122 67.7);
+  --input: oklch(0.907 0.0122 67.7);
+  --ring: oklch(0.56 0.13 36);
+  /*
+   * Semantic state colours. These exist because six components used raw Tailwind
+   * palette classes (`text-emerald-300`, `bg-amber-300/10`) and the "Live" pill was
+   * nearly invisible on a light surface. A raw palette value has no idea which theme
+   * it is on; a token does, and each is measured against its own canvas.
+   */
+  --success: oklch(0.50 0.11 150);
+  --success-foreground: oklch(1 0 0);
+  --warning: oklch(0.55 0.12 75);
+  --warning-foreground: oklch(1 0 0);
 
   /* Surface elevations. Replacing per-edge borders with these is what makes the
      shell read as layers instead of a grid of lines. */
-  --elevation-1: 0 1px 2px oklch(0.24 0.02 255 / 0.06);
-  --elevation-2: 0 2px 8px oklch(0.24 0.02 255 / 0.08);
-  --elevation-3: 0 8px 28px oklch(0.24 0.02 255 / 0.12);
+  --elevation-1: 0 1px 2px oklch(0.191 0.002 106.6 / 0.06);
+  --elevation-2: 0 2px 8px oklch(0.191 0.002 106.6 / 0.08);
+  --elevation-3: 0 8px 28px oklch(0.191 0.002 106.6 / 0.12);
   --glass-tint: oklch(1 0 0 / 0.72);
-  --glass-edge: oklch(0.9 0.008 255 / 0.9);
+  --glass-edge: oklch(0.907 0.0122 67.7 / 0.9);
 
   /*
    * Window chrome. Used only inside the desktop window; a browser tab has no
    * titlebar, so these resolve but nothing consumes them there.
    * See specs/49-desktop-window.md and DESIGN.md.
    */
-  --window-hairline: oklch(0.24 0.02 255 / 0.06);
-  --window-surface: oklch(0.985 0.003 255);
+  --window-hairline: oklch(0.191 0.002 106.6 / 0.06);
+  --window-surface: oklch(0.982 0.0054 95.1);
   --titlebar-height: 2rem;
   --motion-fast: 120ms;
   --motion-normal: 200ms;
   --motion-panel: 280ms;
 
-  --radius: 0.75rem;
+  /*
+   * Radius ladder, derived from the `0.625rem` base in the pasted shadcn preset.
+   * A single `--radius` forced every surface to one corner, which is why the shell read
+   * as one flat slab: a 11px rail button and a 400px canvas had identical corners.
+   * Four steps let nesting communicate itself — the outer surface is roundest, children
+   * step down.
+   */
+  --radius: 0.625rem;
+  --radius-xs: calc(var(--radius) - 4px);
+  --radius-sm: calc(var(--radius) - 2px);
+  --radius-md: var(--radius);
+  --radius-lg: calc(var(--radius) + 4px);
+  --radius-xl: calc(var(--radius) + 8px);
+
+  /*
+   * Paper. Report cards, transcripts and artifacts render on this rather than on
+   * `--card`: paper is warm-white and slightly warmer than a UI card, so a document
+   * reads as a document instead of a panel.
+   */
+  --paper: oklch(0.992 0.0032 95.1);
+  --paper-ink: oklch(0.191 0.0020 106.6);
+  --paper-line: oklch(0.925 0.0104 78);
+  --paper-shadow: 0 1px 2px oklch(0.191 0.002 106.6 / 0.04), 0 8px 24px oklch(0.191 0.002 106.6 / 0.06);
+
   --workspace-width: 430px;
   --workspace-canvas: 760px;
   --artifact-paper: #fbfaf7;
@@ -82,78 +123,98 @@
 .dark {
   color-scheme: dark;
 
-  --background: oklch(0.15 0.012 255);
-  --foreground: oklch(0.92 0.01 255);
-  --card: oklch(0.19 0.014 255);
-  --card-foreground: oklch(0.92 0.01 255);
-  --popover: oklch(0.19 0.014 255);
-  --popover-foreground: oklch(0.92 0.01 255);
-  --primary: oklch(0.78 0.13 78);
-  --primary-foreground: oklch(0.18 0.02 78);
-  --secondary: oklch(0.25 0.018 255);
-  --secondary-foreground: oklch(0.9 0.01 255);
-  --muted: oklch(0.24 0.015 255);
-  --muted-foreground: oklch(0.67 0.02 255);
-  --accent: oklch(0.28 0.025 255);
-  --accent-foreground: oklch(0.94 0.01 255);
-  --destructive: oklch(0.62 0.18 25);
-  --destructive-foreground: oklch(0.98 0.01 25);
-  --border: oklch(0.31 0.02 255);
-  --input: oklch(0.31 0.02 255);
-  --ring: oklch(0.78 0.13 78);
+  /*
+   * The warm dark from the Claude reference (`#181715` = `oklch(0.205 0.0042 84.6)`),
+   * not a blue-black. A cool dark beside a cream light surface reads as two different
+   * products rather than one at night.
+   */
+  --background: oklch(0.205 0.0042 84.6);
+  --foreground: oklch(0.982 0.0054 95.1);
+  --card: oklch(0.257 0.0063 78.2);
+  --card-foreground: oklch(0.982 0.0054 95.1);
+  --popover: oklch(0.257 0.0063 78.2);
+  --popover-foreground: oklch(0.982 0.0054 95.1);
+  /*
+   * Lightened rather than darkened. The source dark primary sits at L=0.45, which
+   * measured 2.10:1 against `--muted` — a primary button and a muted surface were
+   * nearly the same colour, so the action did not read as the action. At L=0.74 the
+   * separation is comfortable and ink text on it measures 7.67:1.
+   */
+  --primary: oklch(0.74 0.11 40);
+  --primary-foreground: oklch(0.205 0.0042 84.6);
+  --secondary: oklch(0.275 0.006 78);
+  --secondary-foreground: oklch(0.982 0.0054 95.1);
+  --muted: oklch(0.275 0.006 78);
+  --muted-foreground: oklch(0.696 0.0106 87.5);
+  --accent: oklch(0.275 0.006 78);
+  --accent-foreground: oklch(0.982 0.0054 95.1);
+  --destructive: oklch(0.70 0.15 24);
+  --destructive-foreground: oklch(0.205 0.0042 84.6);
+  /* A hairline on dark needs opacity rather than a lighter solid: a fixed light
+     border is visible on the canvas but glares on elevated cards. */
+  --border: oklch(1 0 0 / 12%);
+  --input: oklch(1 0 0 / 16%);
+  --ring: oklch(0.74 0.11 40);
+  --success: oklch(0.72 0.13 150);
+  --success-foreground: oklch(0.205 0.0042 84.6);
+  --warning: oklch(0.78 0.13 80);
+  --warning-foreground: oklch(0.205 0.0042 84.6);
+
+  --paper: oklch(0.245 0.0058 84.6);
+  --paper-ink: oklch(0.982 0.0054 95.1);
+  --paper-line: oklch(1 0 0 / 10%);
+  --paper-shadow: 0 1px 2px oklch(0 0 0 / 0.3), 0 8px 24px oklch(0 0 0 / 0.35);
 
   --elevation-1: 0 1px 2px oklch(0 0 0 / 0.4);
   --elevation-2: 0 2px 8px oklch(0 0 0 / 0.45);
   --elevation-3: 0 8px 28px oklch(0 0 0 / 0.55);
-  --glass-tint: oklch(0.19 0.014 255 / 0.72);
-  --glass-edge: oklch(0.42 0.02 255 / 0.6);
+  --glass-tint: oklch(0.257 0.0063 78.2 / 0.72);
+  --glass-edge: oklch(1 0 0 / 0.14);
 
   /* A hairline on a dark surface needs more opacity to be visible at all. */
   --window-hairline: oklch(1 0 0 / 0.10);
-  --window-surface: oklch(0.15 0.012 255);
+  --window-surface: oklch(0.205 0.0042 84.6);
 }
 
 /*
  * Accent presets. `[data-accent]` is independent of light/dark, so a tenant can
  * change the accent without redefining the whole palette.
+ *
+ * Every preset sets its own foreground. Leaving `--primary-foreground` to inherit is
+ * what produced white-on-mustard at 3.59:1 — the light value works with a dark
+ * foreground and the dark value works with a light one, and they are not
+ * interchangeable.
  */
-[data-accent="gold"] {
-  --primary: oklch(0.62 0.12 74);
-  --ring: oklch(0.62 0.12 74);
+[data-accent="coral"] {
+  --primary: oklch(0.56 0.13 36);
+  --primary-foreground: oklch(1 0 0);
+  --ring: oklch(0.56 0.13 36);
 }
-[data-accent="gold"].dark,
-.dark [data-accent="gold"] {
-  --primary: oklch(0.78 0.13 78);
-  --ring: oklch(0.78 0.13 78);
-}
-
-[data-accent="jade"] {
-  --primary: oklch(0.55 0.11 165);
-  --ring: oklch(0.55 0.11 165);
-}
-[data-accent="jade"].dark,
-.dark [data-accent="jade"] {
-  --primary: oklch(0.72 0.13 165);
-  --ring: oklch(0.72 0.13 165);
-}
-
-[data-accent="indigo"] {
-  --primary: oklch(0.52 0.16 268);
-  --ring: oklch(0.52 0.16 268);
-}
-[data-accent="indigo"].dark,
-.dark [data-accent="indigo"] {
-  --primary: oklch(0.68 0.15 268);
-  --ring: oklch(0.68 0.15 268);
+[data-accent="coral"].dark,
+.dark [data-accent="coral"] {
+  --primary: oklch(0.74 0.11 40);
+  --primary-foreground: oklch(0.205 0.0042 84.6);
+  --ring: oklch(0.74 0.11 40);
 }
 
 /*
- * Teal. The shadcn preset as selected measured 2.10:1 between `--primary` and
- * `--muted` in dark mode — a primary button and a muted surface were nearly the same
- * colour, so the action did not read as the action. Raising the dark primary to
- * L=0.62 fixes the separation (4.17:1) and lets the foreground stay dark ink (5.08:1).
- * Light values pass as selected (5.07:1 text, 4.74:1 against muted).
+ * Gold, corrected. The previous value `oklch(0.62 0.12 74)` renders as `#b17a21`,
+ * which is mustard — that is why it read as "yellow" rather than gold. Raise the
+ * chroma and drop the lightness slightly to land on a metal, and keep the near-white
+ * foreground only where it actually passes.
  */
+[data-accent="gold"] {
+  --primary: oklch(0.53 0.108 74);
+  --primary-foreground: oklch(1 0 0);
+  --ring: oklch(0.53 0.108 74);
+}
+[data-accent="gold"].dark,
+.dark [data-accent="gold"] {
+  --primary: oklch(0.80 0.115 82);
+  --primary-foreground: oklch(0.205 0.0042 84.6);
+  --ring: oklch(0.80 0.115 82);
+}
+
 [data-accent="teal"] {
   --primary: oklch(0.52 0.105 223.128);
   --primary-foreground: oklch(0.984 0.019 200.873);
@@ -164,6 +225,30 @@
   --primary: oklch(0.62 0.105 223.128);
   --primary-foreground: oklch(0.2 0.02 223);
   --ring: oklch(0.62 0.105 223.128);
+}
+
+[data-accent="jade"] {
+  --primary: oklch(0.55 0.11 165);
+  --primary-foreground: oklch(1 0 0);
+  --ring: oklch(0.55 0.11 165);
+}
+[data-accent="jade"].dark,
+.dark [data-accent="jade"] {
+  --primary: oklch(0.72 0.13 165);
+  --primary-foreground: oklch(0.205 0.0042 84.6);
+  --ring: oklch(0.72 0.13 165);
+}
+
+[data-accent="indigo"] {
+  --primary: oklch(0.52 0.16 268);
+  --primary-foreground: oklch(1 0 0);
+  --ring: oklch(0.52 0.16 268);
+}
+[data-accent="indigo"].dark,
+.dark [data-accent="indigo"] {
+  --primary: oklch(0.68 0.15 268);
+  --primary-foreground: oklch(0.205 0.0042 84.6);
+  --ring: oklch(0.68 0.15 268);
 }
 
 /*
@@ -178,48 +263,82 @@
  * computed tokens between the two so the pair cannot silently drift.
  */
 @media (prefers-color-scheme: dark) {
-  [data-theme-mode="system"] {
+  /*
+   * `:not(.dark)` rather than `:where()`.
+   *
+   * `:where()` zeroes specificity, which let the `:root` block win and pinned every
+   * dark-OS user to the light palette — the exact flash this rule exists to prevent.
+   * `[data-theme-mode="system"]` (0,1,0) beats `:root` (0,1,0) only by source order,
+   * so the selector has to carry real weight; `.dark` is excluded instead because an
+   * explicit dark choice already applied that palette.
+   */
+  [data-theme-mode="system"]:not(.dark) {
     color-scheme: dark;
 
-    --background: oklch(0.15 0.012 255);
-    --foreground: oklch(0.92 0.01 255);
-    --card: oklch(0.19 0.014 255);
-    --card-foreground: oklch(0.92 0.01 255);
-    --popover: oklch(0.19 0.014 255);
-    --popover-foreground: oklch(0.92 0.01 255);
-    --primary: oklch(0.78 0.13 78);
-    --primary-foreground: oklch(0.18 0.02 78);
-    --secondary: oklch(0.25 0.018 255);
-    --secondary-foreground: oklch(0.9 0.01 255);
-    --muted: oklch(0.24 0.015 255);
-    --muted-foreground: oklch(0.67 0.02 255);
-    --accent: oklch(0.28 0.025 255);
-    --accent-foreground: oklch(0.94 0.01 255);
-    --destructive: oklch(0.62 0.18 25);
-    --destructive-foreground: oklch(0.98 0.01 25);
-    --border: oklch(0.31 0.02 255);
-    --input: oklch(0.31 0.02 255);
-    --ring: oklch(0.78 0.13 78);
+    --background: oklch(0.205 0.0042 84.6);
+    --foreground: oklch(0.982 0.0054 95.1);
+    --card: oklch(0.257 0.0063 78.2);
+    --card-foreground: oklch(0.982 0.0054 95.1);
+    --popover: oklch(0.257 0.0063 78.2);
+    --popover-foreground: oklch(0.982 0.0054 95.1);
+    --primary: oklch(0.74 0.11 40);
+    --primary-foreground: oklch(0.205 0.0042 84.6);
+    --secondary: oklch(0.275 0.006 78);
+    --secondary-foreground: oklch(0.982 0.0054 95.1);
+    --muted: oklch(0.275 0.006 78);
+    --muted-foreground: oklch(0.696 0.0106 87.5);
+    --accent: oklch(0.275 0.006 78);
+    --accent-foreground: oklch(0.982 0.0054 95.1);
+    --destructive: oklch(0.70 0.15 24);
+    --destructive-foreground: oklch(0.205 0.0042 84.6);
+    --border: oklch(1 0 0 / 12%);
+    --input: oklch(1 0 0 / 16%);
+    --ring: oklch(0.74 0.11 40);
+    --success: oklch(0.72 0.13 150);
+    --success-foreground: oklch(0.205 0.0042 84.6);
+    --warning: oklch(0.78 0.13 80);
+    --warning-foreground: oklch(0.205 0.0042 84.6);
 
     --elevation-1: 0 1px 2px oklch(0 0 0 / 0.4);
     --elevation-2: 0 2px 8px oklch(0 0 0 / 0.45);
     --elevation-3: 0 8px 28px oklch(0 0 0 / 0.55);
-    --glass-tint: oklch(0.19 0.014 255 / 0.72);
-    --glass-edge: oklch(0.42 0.02 255 / 0.6);
+    --glass-tint: oklch(0.257 0.0063 78.2 / 0.72);
+    --glass-edge: oklch(1 0 0 / 0.14);
+    --window-hairline: oklch(1 0 0 / 0.10);
+    --window-surface: oklch(0.205 0.0042 84.6);
   }
 
+  /*
+   * Accent presets in system mode.
+   *
+   * `[data-accent].dark` exists but system mode never sets the `.dark` class, so
+   * without this every accent kept its light value on a dark canvas. Scoped inside
+   * the media query rather than added to the selector list: unscoped, a light-OS
+   * system user would get the dark accent on a cream surface.
+   */
+  [data-theme-mode="system"][data-accent="coral"] {
+    --primary: oklch(0.74 0.11 40);
+    --primary-foreground: oklch(0.205 0.0042 84.6);
+    --ring: oklch(0.74 0.11 40);
+  }
   [data-theme-mode="system"][data-accent="gold"] {
-    --primary: oklch(0.78 0.13 78);
-    --ring: oklch(0.78 0.13 78);
+    --primary: oklch(0.80 0.115 82);
+    --primary-foreground: oklch(0.205 0.0042 84.6);
+    --ring: oklch(0.80 0.115 82);
   }
-
+  [data-theme-mode="system"][data-accent="teal"] {
+    --primary: oklch(0.62 0.105 223.128);
+    --primary-foreground: oklch(0.2 0.02 223);
+    --ring: oklch(0.62 0.105 223.128);
+  }
   [data-theme-mode="system"][data-accent="jade"] {
     --primary: oklch(0.72 0.13 165);
+    --primary-foreground: oklch(0.205 0.0042 84.6);
     --ring: oklch(0.72 0.13 165);
   }
-
   [data-theme-mode="system"][data-accent="indigo"] {
     --primary: oklch(0.68 0.15 268);
+    --primary-foreground: oklch(0.205 0.0042 84.6);
     --ring: oklch(0.68 0.15 268);
   }
 }
@@ -240,6 +359,22 @@
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-paper: var(--paper);
+  --color-paper-ink: var(--paper-ink);
+  --color-paper-line: var(--paper-line);
+  --radius-xs: var(--radius-xs);
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+  --radius-xl: var(--radius-xl);
+  --shadow-paper: var(--paper-shadow);
+  --ease-duet: var(--duet-ease);
+  --ease-duet-spring: var(--duet-spring);
   --color-destructive-foreground: var(--destructive-foreground);
   --color-border: var(--border);
   --color-input: var(--input);

@@ -118,6 +118,43 @@ test.describe("theme", () => {
     expect(system).toEqual(explicit);
   });
 
+  test("the theme control changes the document and persists the choice", async ({ page }) => {
+    // The control used to render, accept clicks and change nothing: ThemeProvider was
+    // never mounted, and `useTheme` returned a no-op fallback that hid the bug. Every
+    // existing theme test set a cookie and reloaded, so none of them touched the
+    // control. This one does.
+    await page.goto(WORKSPACE);
+
+    // The model-setup dialog is a full-screen modal (`fixed inset-0 z-[70]`) and it
+    // opens on first load, so the shell header is unclickable until it is dismissed.
+    // Dismissing it is part of the flow a real person goes through, not a test hack.
+    await page.getByRole("button", { name: "Close model setup" }).click();
+
+    const before = await page.evaluate(() =>
+      document.documentElement.classList.contains("dark")
+    );
+
+    await page.getByRole("button", { name: "Dark theme" }).click();
+    await expect
+      .poll(() =>
+        page.evaluate(() => document.documentElement.classList.contains("dark"))
+      )
+      .toBe(true);
+
+    const cookie = (await page.context().cookies()).find((c) => c.name === "edapex.theme");
+    expect(cookie?.value).toBe("dark");
+
+    await page.getByRole("button", { name: "Light theme" }).click();
+    await expect
+      .poll(() =>
+        page.evaluate(() => document.documentElement.classList.contains("dark"))
+      )
+      .toBe(false);
+
+    // Proves the click did something rather than the page starting dark.
+    expect(before).toBe(false);
+  });
+
   test("an explicit light preference wins over a dark OS", async ({ browser }) => {
     const context = await browser.newContext({
       javaScriptEnabled: false,

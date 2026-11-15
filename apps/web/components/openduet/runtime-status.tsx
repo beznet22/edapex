@@ -36,7 +36,7 @@ export function RuntimeStatus({ connected, state }: RuntimeStatusProps) {
         connected &&
           !waiting &&
           !error &&
-          "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
+          "border-success/40 bg-success/10 text-success"
       )}
       role="status"
     >
@@ -47,7 +47,7 @@ export function RuntimeStatus({ connected, state }: RuntimeStatusProps) {
           !connected && "bg-muted-foreground",
           connected && waiting && "bg-primary",
           connected && error && "bg-destructive",
-          connected && !waiting && !error && "bg-emerald-400"
+          connected && !waiting && !error && "bg-success"
         )}
       />
       {connected ? LABELS[state] : "Runtime offline"}
