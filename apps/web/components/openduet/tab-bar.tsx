@@ -19,7 +19,14 @@ import { cn } from "@/lib/utils";
  * make it five and Settings six, so those live in the sheet behind the trigger — the bar
  * keeps the three things done daily.
  */
-export type WorkspaceTab = "chat" | "tasks" | "make" | "plugins" | "settings" | "search";
+export type WorkspaceTab =
+  | "chat"
+  | "tasks"
+  | "make"
+  | "plugins"
+  | "settings"
+  | "search"
+  | "admin";
 
 interface TabItem {
   readonly id: WorkspaceTab;

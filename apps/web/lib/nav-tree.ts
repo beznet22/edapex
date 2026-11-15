@@ -1,3 +1,5 @@
+import type { CapabilityRole } from "@edapex/contracts";
+
 /**
  * Sidebar navigation trees.
  *
@@ -18,6 +20,14 @@ export interface NavItem {
   readonly label: string;
   readonly icon: string;
   readonly badge?: "waiting";
+  /**
+   * Roles that see this item. Omitted means every role.
+   *
+   * The tree is filtered by role rather than the items hiding themselves: a teacher must not
+   * reach a destination that will only 403, and an item that renders and then fails is worse
+   * than one that was never offered.
+   */
+  readonly roles?: readonly CapabilityRole[];
 }
 
 export interface NavGroup {
@@ -49,6 +59,20 @@ export const WORKSPACE_TREE: NavTree = {
         { id: "tasks", href: "/workspace/tasks", label: "Tasks", icon: "list-checks", badge: "waiting" },
         { id: "make", href: "/workspace/make", label: "Make", icon: "wand-sparkles" },
         { id: "plugins", href: "/workspace/plugins", label: "Plugins", icon: "plug" }
+      ]
+    },
+    {
+      id: "manage",
+      items: [
+        {
+          id: "admin",
+          href: "/workspace/admin",
+          label: "People",
+          icon: "users",
+          // Both roles manage people; what differs is the dataset and the actions. A parent
+          // or student has no business here at all.
+          roles: ["admin", "teacher"]
+        }
       ]
     }
   ]
@@ -96,6 +120,22 @@ export function contextForPath(pathname: string): SidebarContextKind {
   return path === "/workspace/settings" || path.startsWith("/workspace/settings/")
     ? "settings"
     : "workspace";
+}
+
+/** Drops items the given role may not see. `null` means "no role yet", which shows none. */
+export function filterTreeForRole(
+  tree: NavTree,
+  role: CapabilityRole | null
+): NavTree {
+  const visibleGroups = tree.groups
+    .map((group) => ({
+      ...group,
+      items: group.items.filter(
+        (item) => item.roles === undefined || (role !== null && item.roles.includes(role))
+      )
+    }))
+    .filter((group) => group.items.length > 0);
+  return { context: tree.context, groups: visibleGroups };
 }
 
 export function treeForPath(pathname: string): NavTree {

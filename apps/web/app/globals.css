@@ -98,6 +98,21 @@
   --warning: oklch(0.55 0.12 75);
   --warning-foreground: oklch(1 0 0);
 
+  /*
+   * Text inks for tinted chips and deltas.
+   *
+   * `--warning` and `--destructive` are sized to work as *fills*, and used as 12px text on
+   * their own 10% tint they measure 4.35:1 and 4.22:1 — below the 4.5:1 AA floor. These are
+   * one step darker in lightness with the hue held, which lands at 4.91:1 and 5.13:1 against
+   * the same tint and is indistinguishable in hue at chip size.
+   *
+   * Dark mode needs no ink tokens: every one of its chips already measures 4.59:1 or better
+   * on its own 10% self-tint, which is why they are declared only in `:root`.
+   */
+  --success-ink: var(--success);
+  --warning-ink: oklch(0.52 0.115 72);
+  --destructive-ink: oklch(0.52 0.15 25);
+
   /* Surface elevations. Replacing per-edge borders with these is what makes the
      shell read as layers instead of a grid of lines. */
   --elevation-1: 0 1px 2px oklch(0.191 0.002 106.6 / 0.06);
@@ -557,9 +572,31 @@
     }
   }
 
-  * {
-    scrollbar-width: thin;
-    scrollbar-color: var(--scrollbar-thumb) transparent;
+  /*
+   * `scrollbar-width` and `::-webkit-scrollbar` cannot both be live.
+   *
+   * Setting the standard property makes Chromium 121+ / Safari 18.2+ ignore every
+   * `::-webkit-scrollbar` rule — including the 6px width, the radius and the hover fade.
+   * `scrollbar-color` is inherited too, so one ancestor rule disables the pseudo-elements for
+   * everything beneath it. That is what this file used to do: `* { scrollbar-width: thin }`
+   * silently made the whole custom scrollbar inert on the engines that support it best.
+   *
+   * So: pseudo-elements where they exist, the standard property only where they do not.
+   * `@supports selector()` is the discriminator; no feature-sniffing script.
+   */
+  @supports selector(::-webkit-scrollbar) {
+    .scrollbar-auto,
+    * {
+      scrollbar-width: auto;
+      scrollbar-color: auto;
+    }
+  }
+
+  @supports not selector(::-webkit-scrollbar) {
+    * {
+      scrollbar-width: thin;
+      scrollbar-color: var(--scrollbar-thumb) transparent;
+    }
   }
 
   ::-webkit-scrollbar {
@@ -828,6 +865,21 @@
   }
 }
 
+/*
+ * Tab content and list cross-fades. Opacity and a 2px lift, nothing horizontal: a slide on a
+ * full-width panel reads as a page transition, which is the wrong scale for a tab switch.
+ */
+@keyframes edapex-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
 @keyframes edapex-shimmer {
   to {
     transform: translateX(100%);
@@ -880,16 +932,22 @@
 }
 
 /*
- * Reduced motion removes the movement but keeps the state change visible: opacity
- * still animates, transforms do not.
+ * Reduced motion removes the *movement*, not the feedback.
+ *
+ * The previous rule contradicted this comment: `transition-duration: 0.01ms` on `*` kills
+ * opacity fades too, so a reduced-motion user got instant, unanimated state changes and lost
+ * the cue that something had changed at all. Suppressing everything is not an accessibility
+ * win — it is a different bug.
+ *
+ * Scoping the kill to transforms and scroll means a fade, a colour change and a focus ring
+ * still resolve over their normal duration, while nothing slides, scales or scrolls smoothly.
  */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
   *::after {
     scroll-behavior: auto !important;
-    animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
+    transition-property: opacity, color, background-color, border-color, box-shadow, outline-color !important;
   }
 }

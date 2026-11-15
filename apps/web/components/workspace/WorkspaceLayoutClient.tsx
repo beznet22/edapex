@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
 import { usePathname } from "next/navigation";
 
@@ -15,7 +15,7 @@ import { useProactive } from "@/hooks/use-proactive";
 import { useWorkspaceRuntime } from "@/hooks/use-workspace-runtime";
 import { useAutoHideScrollbars } from "@/hooks/use-auto-hide-scrollbars";
 import { useRuntimeHealth } from "@/hooks/use-runtime-health";
-import { activeItemId, treeForPath } from "@/lib/nav-tree";
+import { activeItemId, filterTreeForRole, treeForPath } from "@/lib/nav-tree";
 import { TEST_MANIFEST, TEST_SESSION, testSessionEnabled } from "@/lib/test-session";
 import { isDesktopViewport } from "@/lib/platform";
 import type { SidebarState } from "@/lib/sidebar-state";
@@ -39,6 +39,7 @@ function surfaceForPath(pathname: string): WorkspaceTab {
   if (path === "/workspace/plugins" || path.startsWith("/workspace/plugins/")) return "plugins";
   if (path === "/workspace/search" || path.startsWith("/workspace/search/")) return "search";
   if (path === "/workspace/settings" || path.startsWith("/workspace/settings/")) return "settings";
+  if (path === "/workspace/admin" || path.startsWith("/workspace/admin/")) return "admin";
   return "chat";
 }
 
@@ -61,11 +62,21 @@ export function WorkspaceLayoutClient({
   // Derived from the route, not from state: the tree must be correct on the first paint,
   // and a `useEffect` that set it would render the workspace tree for one frame on a
   // settings route.
-  const navTree = treeForPath(pathname);
-  const activeNavId = activeItemId(navTree, pathname);
   const [sessionState, setSessionState] = useState<SessionState>("loading");
   const [session, setSession] = useState<SessionView | null>(null);
   const [manifest, setManifest] = useState<CapabilityManifest | null>(null);
+
+  /*
+   * The tree is filtered by role before anything renders, so a teacher never sees a
+   * destination that would 403. `manifest` is null while capabilities load — until then the
+   * role is unknown and role-gated items stay hidden, which is the safe direction.
+   */
+  const navTree = useMemo(
+    () => filterTreeForRole(treeForPath(pathname), manifest?.role ?? null),
+    [pathname, manifest]
+  );
+  const activeNavId = activeItemId(navTree, pathname);
+
   const [academicId, setAcademicId] = useState(5);
   const [authMode, setAuthMode] = useState<AuthMode>("google");
   const [email, setEmail] = useState("");

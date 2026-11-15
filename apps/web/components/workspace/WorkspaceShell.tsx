@@ -70,6 +70,7 @@ interface WorkspaceShellProps {
 
 const SURFACE_LABEL: Record<WorkspaceTab, string> = {
   chat: "Chat",
+  admin: "People",
   tasks: "Tasks",
   make: "Make",
   plugins: "Plugins",
