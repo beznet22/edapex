@@ -133,53 +133,49 @@ function DesktopRail({
         */}
         <div className="flex items-center justify-between gap-1 px-1">
           {/*
-            The icon is always visible beside the label.
+            Wordmark left, then search and toggle together on the right — matching the
+            reference, where the two icon actions sit as a pair and neither is attached to
+            the brand.
 
-            The first version hid it at rest and revealed it on hover, which made the
-            toggle look absent — a control that only exists under the pointer is a control
-            most people never find. The label states identity, the icon states what the row
-            does, and both are present.
+            The brand is a plain label, not a control: it identifies the app, and the
+            double-headed arrow belongs on the control that actually resizes the rail.
           */}
-          <button
-            aria-label={open ? "Collapse sidebar" : "Expand sidebar"}
+          <span
             className={cn(
-              "group/logo flex min-w-0 flex-1 items-center gap-2 rounded-[var(--radius-sm)] px-2 py-1.5 text-left outline-none",
-              "cursor-ew-resize transition-colors hover:bg-sidebar-accent",
-              "focus-visible:ring-2 focus-visible:ring-sidebar-ring",
-              !open && "justify-center"
+              "min-w-0 flex-1 truncate px-2 text-[15px] font-semibold tracking-tight",
+              !open && "sr-only"
             )}
-            onClick={() => setOpen(!open)}
-            title={open ? "Collapse sidebar" : "Expand sidebar"}
-            type="button"
           >
-            {open ? (
-              <>
-                <span className="truncate text-[15px] font-semibold tracking-tight">EdApex</span>
-                <PanelLeft
-                  aria-hidden="true"
-                  className="size-4 shrink-0 text-muted-foreground transition-colors group-hover/logo:text-foreground"
-                />
-              </>
-            ) : (
-              <>
-                <span className="flex size-7 shrink-0 items-center justify-center rounded-[var(--radius-xs)] bg-primary text-[11px] font-black text-primary-foreground group-hover/logo:hidden">
-                  E
-                </span>
-                <PanelLeft
-                  aria-hidden="true"
-                  className="hidden size-4 text-muted-foreground group-hover/logo:block"
-                />
-              </>
-            )}
-          </button>
-
-          {open ? (
-            <SidebarMenuButton asChild className="size-8 shrink-0 p-0" tooltip="Search">
-              <Link aria-label="Search" href="/workspace/search">
-                <Search aria-hidden="true" />
-              </Link>
-            </SidebarMenuButton>
+            EdApex
+          </span>
+          {!open ? (
+            <span className="flex size-7 shrink-0 items-center justify-center rounded-[var(--radius-xs)] bg-primary text-[11px] font-black text-primary-foreground">
+              E
+            </span>
           ) : null}
+
+          <div className="flex shrink-0 items-center gap-0.5">
+            {open ? (
+              <SidebarMenuButton asChild className="size-8 p-0" tooltip="Search">
+                <Link aria-label="Search" href="/workspace/search">
+                  <Search aria-hidden="true" />
+                </Link>
+              </SidebarMenuButton>
+            ) : null}
+            <button
+              aria-label={open ? "Collapse sidebar" : "Expand sidebar"}
+              className={cn(
+                "flex size-8 items-center justify-center rounded-[var(--radius-sm)] text-muted-foreground outline-none transition-colors",
+                "cursor-ew-resize hover:bg-sidebar-accent hover:text-foreground",
+                "focus-visible:ring-2 focus-visible:ring-sidebar-ring"
+              )}
+              onClick={() => setOpen(!open)}
+              title={open ? "Collapse sidebar" : "Expand sidebar"}
+              type="button"
+            >
+              <PanelLeft aria-hidden="true" className="size-4" />
+            </button>
+          </div>
         </div>
       </SidebarHeader>
 
