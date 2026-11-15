@@ -37,6 +37,7 @@ import {
 } from "@/components/ui/sidebar";
 import { Titlebar } from "@/components/desktop/Titlebar";
 import { RuntimeStatus } from "@/components/openduet/runtime-status";
+import { BrandMark } from "@/components/workspace/BrandMark";
 import { CommandPaletteTrigger } from "@/components/workspace/CommandPalette";
 import { SidebarNav } from "@/components/workspace/SidebarNav";
 import { SidebarUser } from "@/components/workspace/SidebarUser";
@@ -139,9 +140,13 @@ function DesktopRail({
             the "E" tile swaps to the rail icon on hover.
           */}
           {open ? (
-            <span className="min-w-0 flex-1 truncate px-2 text-[15px] font-semibold tracking-tight">
-              EdApex
-            </span>
+            <Link
+              className="flex min-w-0 flex-1 items-center gap-2 rounded-[var(--radius-sm)] px-2 py-1 outline-none hover:bg-sidebar-accent focus-visible:ring-2 focus-visible:ring-sidebar-ring"
+              href="/workspace"
+            >
+              <BrandMark size={24} />
+              <span className="truncate text-[15px] font-semibold tracking-tight">EdApex</span>
+            </Link>
           ) : (
             <button
               aria-label="Expand sidebar"
@@ -150,9 +155,16 @@ function DesktopRail({
               title="Expand sidebar"
               type="button"
             >
-              <span className="flex size-7 items-center justify-center rounded-[var(--radius-xs)] bg-primary text-[11px] font-black text-primary-foreground group-hover/logo:hidden">
-                E
-              </span>
+              {/*
+                The real mark, not a letter tile. It sits on the rail's own background —
+                the two files exist precisely so the right one shows on each ground, and
+                putting it inside a coloured tile would defeat that.
+              */}
+              {/*
+                Larger than the row icons: the mark is the app's identity, and at the
+                same optical weight as a nav glyph it read as one more destination.
+              */}
+              <BrandMark className="group-hover/logo:hidden" size={28} />
               <PanelLeft
                 aria-hidden="true"
                 className="hidden size-4 text-muted-foreground group-hover/logo:block"

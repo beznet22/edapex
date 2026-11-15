@@ -1,5 +1,6 @@
 "use client";
 
+import { BrandMark } from "@/components/workspace/BrandMark";
 import type { ReactNode } from "react";
 import {
   MarkdownMessage,
@@ -178,9 +179,7 @@ function EmptyState({ manifest }: { readonly manifest: CapabilityManifest }) {
   const toolCount = manifest.packs.reduce((total, pack) => total + pack.tools.length, 0);
   return (
     <div className="flex min-h-0 flex-1 flex-col items-center justify-center px-6 py-12 text-center">
-      <div className="flex size-12 items-center justify-center rounded-2xl bg-primary text-lg font-black text-primary-foreground">
-        E
-      </div>
+      <BrandMark size={40} />
       <h2 className="mt-5 text-xl font-semibold tracking-tight">What are we working on?</h2>
       <p className="mt-2 max-w-[28ch] text-sm leading-6 text-muted-foreground">
         Your {manifest.role} workspace is ready. Ask about people, classes, attendance or reports.

@@ -3,6 +3,8 @@ import type { FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
+import { BrandMark } from "@/components/workspace/BrandMark";
+
 interface LoginPanelProps {
   readonly eyebrow?: string;
   readonly title?: string;
@@ -35,6 +37,7 @@ export function LoginPanel({
   return (
     <main className="flex min-h-screen items-center justify-center bg-background px-4 py-16 text-foreground">
       <section className="w-full max-w-xl rounded-xl border border-border bg-card p-8 shadow-2xl">
+        <BrandMark className="mb-5" size={40} />
         <div className="text-xs font-bold uppercase tracking-[0.16em] text-primary">
           {eyebrow}
         </div>
