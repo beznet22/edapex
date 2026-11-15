@@ -45,14 +45,19 @@ import {
 } from "@/components/ui/sidebar";
 import { Titlebar } from "@/components/desktop/Titlebar";
 import { RuntimeStatus } from "@/components/openduet/runtime-status";
+import { SidebarUser } from "@/components/workspace/SidebarUser";
 import { ThemeToggle } from "@/components/workspace/ThemeToggle";
 import { TabBar, type WorkspaceTab } from "@/components/openduet/tab-bar";
 
 interface WorkspaceShellProps {
   readonly manifest: CapabilityManifest;
   readonly userName: string;
+  readonly userEmail?: string | null;
+  readonly onSignOut?: (() => void) | undefined;
   readonly surface: WorkspaceTab;
   readonly runtime: WorkspaceRuntimeView;
+  /** True while a connection attempt is in flight. Not on the view: it is controller state. */
+  readonly connecting?: boolean;
   readonly waitingCount?: number;
   readonly coreHealth?: CoreHealth | null;
   readonly devBypass?: boolean;
@@ -93,11 +98,17 @@ const RAIL_ITEMS: readonly {
 function DesktopRail({
   manifest,
   surface,
-  waitingCount
+  waitingCount,
+  userName,
+  userEmail,
+  onSignOut
 }: {
   readonly manifest: CapabilityManifest;
   readonly surface: WorkspaceTab;
   readonly waitingCount: number;
+  readonly userName: string;
+  readonly userEmail: string | null;
+  readonly onSignOut: (() => void) | undefined;
 }) {
   return (
     <Sidebar collapsible="icon" variant="inset">
@@ -158,30 +169,28 @@ function DesktopRail({
 
       <SidebarFooter>
         <SidebarMenu>
+          {/*
+            Theme lives here, not in the header: it is a preference, not state, and it is
+            set roughly once. Labeled rather than icon-only because a cycling control has
+            no fixed meaning — the icon shows the *current* mode, so without a word beside
+            it a person has to click to learn what it does.
+          */}
           <SidebarMenuItem>
-            <SidebarMenuButton size="lg" tooltip={manifest.role}>
-              <span className="flex size-8 shrink-0 items-center justify-center rounded-[var(--radius-sm)] bg-sidebar-accent text-xs font-semibold text-sidebar-accent-foreground">
-                {manifest.role.slice(0, 1).toUpperCase()}
-              </span>
-              <span className="grid min-w-0 flex-1 text-left leading-tight">
-                <span className="truncate text-sm font-medium">Workspace</span>
-                <span className="truncate text-[11px] text-muted-foreground">
-                  {manifest.role}
-                </span>
-              </span>
-            </SidebarMenuButton>
+            <ThemeToggle />
           </SidebarMenuItem>
-          {manifest.role === "admin" ? (
-            <SidebarMenuItem>
-              <SidebarMenuButton asChild tooltip="Admin">
-                <Link href="/admin/claim-links">
-                  <Settings2 aria-hidden="true" />
-                  <span>Admin</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          ) : null}
         </SidebarMenu>
+        {/*
+          No Admin or Settings entries: both are already reachable from the composer, and
+          a menu that repeats them adds a click to something already on screen.
+        */}
+        <SidebarUser
+          email={userEmail}
+          name={userName}
+          onAdmin={undefined}
+          onSettings={undefined}
+          onSignOut={onSignOut}
+          role={manifest.role}
+        />
       </SidebarFooter>
       <SidebarRail />
     </Sidebar>
@@ -191,8 +200,11 @@ function DesktopRail({
 export function WorkspaceShell({
   manifest,
   userName,
+  userEmail = null,
+  onSignOut,
   surface,
   runtime,
+  connecting = false,
   waitingCount = 0,
   coreHealth = null,
   devBypass = false,
@@ -211,7 +223,14 @@ export function WorkspaceShell({
       {/* Renders null in a browser tab: the browser draws its own chrome. */}
       <Titlebar title="EdApex Work" />
       <SidebarProvider onOpenChange={setSidebarOpen} open={sidebarOpen}>
-        <DesktopRail manifest={manifest} surface={surface} waitingCount={waitingCount} />
+        <DesktopRail
+          manifest={manifest}
+          onSignOut={onSignOut}
+          surface={surface}
+          userEmail={userEmail}
+          userName={userName}
+          waitingCount={waitingCount}
+        />
         <SidebarInset className="min-h-0 overflow-hidden">
           {/*
             Official shadcn header geometry: a fixed 64px bar with the trigger, a vertical
@@ -224,7 +243,7 @@ export function WorkspaceShell({
             header tracks the rail's own height change instead of staying fixed and
             leaving a gap.
           */}
-          <header className="safe-top flex h-16 shrink-0 items-center justify-between gap-2 border-b border-border transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
+          <header className="safe-top flex h-16 shrink-0 items-center justify-between gap-2 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
             <div className="flex min-w-0 items-center gap-2 px-4">
               <SidebarTrigger aria-label="Toggle navigation" className="-ml-1" />
               <Separator
@@ -247,58 +266,25 @@ export function WorkspaceShell({
             </div>
 
             <div className="flex shrink-0 items-center gap-1 pr-4">
-              {devBypass ? (
-                <span
-                  className="rounded-full border border-primary/30 bg-primary/10 px-2 py-1 text-[10px] font-semibold text-primary"
-                  title="Development auth bypass"
-                >
-                  Dev
-                </span>
-              ) : null}
-              {coreHealth !== null ? (
-                <span
-                  className="hidden rounded-full border border-border px-2 py-1 text-[10px] text-muted-foreground sm:inline"
-                  title="Local Rust core"
-                >
-                  Core {coreHealth.core_version}
-                </span>
-              ) : null}
-              <ThemeToggle className="hidden sm:flex" />
-              <RuntimeStatus connected={runtime.connected} state={runtime.state} />
-              {!runtime.connected && onConnectRuntime !== undefined ? (
-                <Button
-                  aria-label="Open model setup"
-                  className="h-9 border-primary/35 bg-primary/10 px-2.5 text-[11px] font-semibold text-primary hover:bg-primary/15"
-                  onClick={onConnectRuntime}
-                  size="sm"
-                  type="button"
-                  variant="outline"
-                >
-                  <KeyRound aria-hidden="true" className="size-3.5" />
-                  Set up
-                </Button>
-              ) : null}
-              {onOpenArtifact !== undefined ? (
-                <Button
-                  aria-label="New document"
-                  className="text-muted-foreground hover:bg-muted hover:text-foreground"
-                  onClick={onOpenArtifact}
-                  size="icon-sm"
-                  type="button"
-                  variant="ghost"
-                >
-                  <FilePlus2 aria-hidden="true" className="size-4" />
-                </Button>
-              ) : null}
-              {manifest.role === "admin" ? (
-                <Link
-                  aria-label="Open admin claim links"
-                  className="flex size-9 items-center justify-center rounded-[var(--radius-md)] text-muted-foreground hover:bg-muted hover:text-foreground"
-                  href="/admin/claim-links"
-                >
-                  <Settings2 aria-hidden="true" className="size-4" />
-                </Link>
-              ) : null}
+              {/*
+                Three elements, ranked by how often they change.
+
+                `Dev` and `Core 0.1.0` are build metadata: they never change, and they
+                were sitting at the same visual weight as the one thing here that is live
+                state. A badge that never changes state is decoration pretending to be a
+                signal. The bypass is already stated where it matters — the empty states
+                say there is no local database.
+
+                The admin link was duplicated: it is in the sidebar footer. The header
+                copy was `lg:hidden`, so it was a fallback for a nav item the mobile sheet
+                already provides.
+              */}
+              <RuntimeStatus
+                connected={runtime.connected}
+                connecting={connecting}
+                onConnect={onConnectRuntime}
+                state={runtime.state}
+              />
             </div>
           </header>
 

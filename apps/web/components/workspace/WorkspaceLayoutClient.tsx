@@ -228,6 +228,7 @@ export function WorkspaceLayoutClient({
     <WorkspaceProvider value={contextValue}>
       <WorkspaceShell
         manifest={manifest}
+        connecting={runtime.connecting}
         coreHealth={runtimeHealth.health}
         devBypass={DEV_AUTH_BYPASS}
         onConnectRuntime={() => setSetupDismissed(false)}

@@ -618,6 +618,29 @@
   }
 
   /*
+   * Pointer cursor on everything interactive.
+   *
+   * Tailwind v4's preflight resets `button` to `cursor: default`, on the reasoning that a
+   * native button on iOS does not show a pointer. The consequence is that every button,
+   * tab and menu item in a desktop browser has an arrow cursor — which reads as
+   * "disabled" to anyone who has used an application before.
+   *
+   * Scoped to interactive selectors rather than `*`, and `:disabled` is excluded so a
+   * disabled control still signals that it does nothing.
+   */
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  [role="tab"]:not([aria-disabled="true"]),
+  [role="menuitem"]:not([aria-disabled="true"]),
+  [role="option"]:not([aria-disabled="true"]),
+  summary,
+  label[for],
+  select:not(:disabled),
+  a[href] {
+    cursor: pointer;
+  }
+
+  /*
    * No hover on touch.
    *
    * On Android and iOS a tapped element keeps its `:hover` styling until something else

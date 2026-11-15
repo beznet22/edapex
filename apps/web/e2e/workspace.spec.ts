@@ -123,36 +123,41 @@ test.describe("theme", () => {
     // never mounted, and `useTheme` returned a no-op fallback that hid the bug. Every
     // existing theme test set a cookie and reloaded, so none of them touched the
     // control. This one does.
+    //
+    // It cycles light → dark → system from a *default* of system, so the test follows
+    // the cycle rather than assuming a starting mode: system → light → dark → system.
     await page.goto(WORKSPACE);
 
-    // The model-setup dialog is a full-screen modal (`fixed inset-0 z-[70]`) and it
-    // opens on first load, so the shell header is unclickable until it is dismissed.
-    // Dismissing it is part of the flow a real person goes through, not a test hack.
-    await page.getByRole("dialog", { name: "Start your workspace" }).getByRole("button", { name: "Close" }).click();
+    // The model-setup dialog is a full-screen modal, so the shell is unclickable until
+    // it is dismissed. Dismissing it is what a real person does, not a test hack.
+    await page.getByRole("dialog", { name: "Start your workspace" })
+      .getByRole("button", { name: "Close" })
+      .click();
 
-    const before = await page.evaluate(() =>
-      document.documentElement.classList.contains("dark")
-    );
+    const isDark = (): Promise<boolean> =>
+      page.evaluate(() => document.documentElement.classList.contains("dark"));
+    const themeMode = (): Promise<string | null> =>
+      page.evaluate(() => document.documentElement.dataset.themeMode ?? null);
 
-    await page.getByRole("button", { name: "Dark theme" }).click();
-    await expect
-      .poll(() =>
-        page.evaluate(() => document.documentElement.classList.contains("dark"))
-      )
-      .toBe(true);
+    const startingMode = await themeMode();
+    expect(startingMode).toBe("system");
+
+    // system → light. Explicitly light means not dark even on a dark OS.
+    await page.getByRole("button", { name: /^Theme: System\./ }).click();
+    await expect.poll(themeMode).toBe("light");
+    await expect.poll(isDark).toBe(false);
+
+    // light → dark.
+    await page.getByRole("button", { name: /^Theme: Light\./ }).click();
+    await expect.poll(themeMode).toBe("dark");
+    await expect.poll(isDark).toBe(true);
 
     const cookie = (await page.context().cookies()).find((c) => c.name === "edapex.theme");
     expect(cookie?.value).toBe("dark");
 
-    await page.getByRole("button", { name: "Light theme" }).click();
-    await expect
-      .poll(() =>
-        page.evaluate(() => document.documentElement.classList.contains("dark"))
-      )
-      .toBe(false);
-
-    // Proves the click did something rather than the page starting dark.
-    expect(before).toBe(false);
+    // dark → system, which closes the cycle.
+    await page.getByRole("button", { name: /^Theme: Dark\./ }).click();
+    await expect.poll(themeMode).toBe("system");
   });
 
   test("an explicit light preference wins over a dark OS", async ({ browser }) => {

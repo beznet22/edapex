@@ -3,10 +3,9 @@
 import { Monitor, Moon, Sun } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
+import { SidebarMenuButton } from "@/components/ui/sidebar";
 import { useTheme } from "@/components/workspace/ThemeProvider";
 import { THEME_MODES, type ThemeMode } from "@/lib/theme";
-import { cn } from "@/lib/utils";
 
 const ICONS: Record<ThemeMode, LucideIcon> = {
   light: Sun,
@@ -21,51 +20,40 @@ const LABELS: Record<ThemeMode, string> = {
 };
 
 /**
- * A three-way theme control.
+ * Theme, as a labelled row in the sidebar footer.
  *
- * A single cycling button instead of a menu: there are only three states, and a
- * menu would cost a focus trap and a click for something a tap already resolves.
+ * **Labelled, not icon-only.** A cycling control shows the *current* mode, so the icon
+ * alone is ambiguous: a moon could mean "dark is on" or "switch to dark". The label
+ * removes the guess, and the secondary line states what a click does next.
+ *
+ * It lives in the footer rather than the header because it is a preference, not state —
+ * set roughly once, and it was one of six items crowding a 64px bar.
  */
-export function ThemeToggle({ className }: { readonly className?: string }) {
+export function ThemeToggle() {
   const { preference, setMode } = useTheme();
 
+  const index = THEME_MODES.indexOf(preference.mode);
+  const following = THEME_MODES[(index + 1) % THEME_MODES.length] ?? "system";
+  const Icon = ICONS[preference.mode];
+
   return (
-    <div
-      aria-label="Colour theme"
-      className={cn(
-        "flex items-center gap-0.5 rounded-xl bg-muted/60 p-0.5",
-        className
-      )}
-      role="group"
+    <SidebarMenuButton
+      // The accessible name carries both facts, because the visible second line is the
+      // only place the *next* mode is stated.
+      aria-label={`Theme: ${LABELS[preference.mode]}. Change to ${LABELS[following]}.`}
+      data-theme-mode={preference.mode}
+      onClick={() => setMode(following)}
+      tooltip={`Theme: ${LABELS[preference.mode]}`}
+      type="button"
     >
-      {THEME_MODES.map((mode) => {
-        const Icon = ICONS[mode];
-        const active = preference.mode === mode;
-        return (
-          <Button
-            aria-label={`${LABELS[mode]} theme`}
-            aria-pressed={active}
-            className={cn(
-              // A segmented control: the surface belongs to the group, so a segment is
-              // transparent at rest and only the active one lifts. `after:-inset-1.5`
-              // grows the target to ~44px — three real 44px boxes would not fit beside
-              // the runtime pill.
-              "size-8 after:-inset-1.5",
-              active
-                ? "bg-card text-foreground shadow-sm hover:bg-card"
-                : "text-muted-foreground hover:bg-transparent hover:text-foreground"
-            )}
-            key={mode}
-            onClick={() => setMode(mode)}
-            size="sm"
-            title={`${LABELS[mode]} theme`}
-            type="button"
-            variant="ghost"
-          >
-            <Icon aria-hidden="true" className="size-3.5" />
-          </Button>
-        );
-      })}
-    </div>
+      <Icon aria-hidden="true" />
+      <span className="min-w-0 flex-1 truncate text-left text-sm">
+        <span className="font-medium">Theme</span>
+        <span aria-hidden="true" className="mx-1.5 text-muted-foreground">
+          |
+        </span>
+        <span className="text-muted-foreground">{LABELS[preference.mode]}</span>
+      </span>
+    </SidebarMenuButton>
   );
 }
