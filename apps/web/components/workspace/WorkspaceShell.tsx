@@ -15,6 +15,7 @@ import type { LucideIcon } from "lucide-react";
 import type { CapabilityManifest, WorkspaceRuntimeView } from "@edapex/contracts";
 import type { CoreHealth } from "@/lib/tauri";
 
+import { Button } from "@/components/ui/button";
 import { Titlebar } from "@/components/desktop/Titlebar";
 import { RuntimeStatus } from "@/components/openduet/runtime-status";
 import { ThemeToggle } from "@/components/workspace/ThemeToggle";
@@ -178,25 +179,29 @@ export function WorkspaceShell({
               <ThemeToggle className="hidden sm:flex" />
               <RuntimeStatus connected={runtime.connected} state={runtime.state} />
               {!runtime.connected && onConnectRuntime !== undefined ? (
-                <button
+                <Button
                   aria-label="Open model setup"
-                  className="flex min-h-11 items-center gap-1.5 rounded-xl border border-primary/35 bg-primary/10 px-2.5 text-[11px] font-semibold text-primary hover:bg-primary/15"
+                  className="h-9 border-primary/35 bg-primary/10 px-2.5 text-[11px] font-semibold text-primary hover:bg-primary/15"
                   onClick={onConnectRuntime}
+                  size="sm"
                   type="button"
+                  variant="outline"
                 >
                   <KeyRound aria-hidden="true" className="size-3.5" />
                   Set up
-                </button>
+                </Button>
               ) : null}
               {onOpenArtifact !== undefined ? (
-                <button
+                <Button
                   aria-label="New document"
-                  className="flex size-11 items-center justify-center rounded-xl text-muted-foreground hover:bg-muted hover:text-foreground"
+                  className="text-muted-foreground hover:bg-muted hover:text-foreground"
                   onClick={onOpenArtifact}
+                  size="icon-sm"
                   type="button"
+                  variant="ghost"
                 >
                   <FilePlus2 aria-hidden="true" className="size-4" />
-                </button>
+                </Button>
               ) : null}
               {manifest.role === "admin" ? (
                 <Link

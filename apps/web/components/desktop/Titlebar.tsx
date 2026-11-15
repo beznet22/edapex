@@ -88,8 +88,15 @@ export function Titlebar({ title }: { readonly title?: string }) {
 }
 
 function Controls() {
+  /**
+   * Window controls, not app buttons.
+   *
+   * Deliberately not `Button`: these are chrome, so they should match the OS's own
+   * window buttons rather than the app's radius scale and sizing. What they do share is
+   * the focus ring — a keyboard user reaching them with F6 needs to see where they are.
+   */
   const base =
-    "flex h-full w-11 items-center justify-center text-muted-foreground transition-colors duration-[120ms] hover:bg-accent hover:text-foreground";
+    "flex h-full w-11 items-center justify-center text-muted-foreground transition-colors duration-[120ms] outline-none hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset";
   return (
     <div className="flex h-full">
       <button

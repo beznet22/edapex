@@ -4,6 +4,7 @@ import { useEffect, useId, useRef } from "react";
 import type { ReactNode } from "react";
 import { X } from "lucide-react";
 
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 /**
@@ -141,14 +142,16 @@ export function Modal({
               </p>
             )}
           </div>
-          <button
+          <Button
             aria-label="Close"
-            className="-mr-2 -mt-2 flex size-11 shrink-0 items-center justify-center rounded-[var(--radius-md)] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            className="-mr-2 -mt-2 text-muted-foreground hover:bg-muted hover:text-foreground"
             onClick={onClose}
+            size="icon"
             type="button"
+            variant="ghost"
           >
             <X aria-hidden="true" className="size-4" />
-          </button>
+          </Button>
         </div>
 
         <div className="scrollbar-auto min-h-0 flex-1 overflow-y-auto px-6 pb-2">{children}</div>

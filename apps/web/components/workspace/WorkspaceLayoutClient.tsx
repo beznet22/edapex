@@ -21,6 +21,7 @@ import { useAutoHideScrollbars } from "@/hooks/use-auto-hide-scrollbars";
 import { useRuntimeHealth } from "@/hooks/use-runtime-health";
 import { isDesktopViewport } from "@/lib/platform";
 import type { WorkspaceTab } from "@/components/openduet/tab-bar";
+import { Button } from "@/components/ui/button";
 import { ChatSurface } from "@/components/workspace/ChatSurface";
 import { WorkspaceBoot } from "@/components/workspace/WorkspaceBoot";
 import { WorkspaceProvider } from "@/components/workspace/WorkspaceContext";
@@ -192,13 +193,13 @@ export function WorkspaceLayoutClient({ children }: { readonly children: ReactNo
         <section className="w-full max-w-md rounded-xl border border-border bg-card p-6">
           <h1 className="text-lg font-semibold">Workspace unavailable</h1>
           <p className="mt-2 text-sm text-muted-foreground">{error || "Could not load the workspace."}</p>
-          <button
-            className="mt-4 inline-flex min-h-11 items-center rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground"
+          <Button
+            className="mt-4"
             onClick={() => setReloadToken((value) => value + 1)}
             type="button"
           >
             Try again
-          </button>
+          </Button>
         </section>
       </main>
     );

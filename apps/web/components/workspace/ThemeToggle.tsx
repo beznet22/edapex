@@ -3,6 +3,7 @@
 import { Monitor, Moon, Sun } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
+import { Button } from "@/components/ui/button";
 import { useTheme } from "@/components/workspace/ThemeProvider";
 import { THEME_MODES, type ThemeMode } from "@/lib/theme";
 import { cn } from "@/lib/utils";
@@ -41,25 +42,28 @@ export function ThemeToggle({ className }: { readonly className?: string }) {
         const Icon = ICONS[mode];
         const active = preference.mode === mode;
         return (
-          <button
+          <Button
             aria-label={`${LABELS[mode]} theme`}
             aria-pressed={active}
             className={cn(
-              // `after:-inset-1.5` grows the touch target to ~44px without making the
-              // segmented control visually larger: three 44px boxes would not fit beside
+              // A segmented control: the surface belongs to the group, so a segment is
+              // transparent at rest and only the active one lifts. `after:-inset-1.5`
+              // grows the target to ~44px — three real 44px boxes would not fit beside
               // the runtime pill.
-              "relative flex size-8 items-center justify-center rounded-lg transition-colors after:absolute after:-inset-1.5 after:content-['']",
+              "size-8 after:-inset-1.5",
               active
-                ? "bg-card text-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground"
+                ? "bg-card text-foreground shadow-sm hover:bg-card"
+                : "text-muted-foreground hover:bg-transparent hover:text-foreground"
             )}
             key={mode}
             onClick={() => setMode(mode)}
+            size="sm"
             title={`${LABELS[mode]} theme`}
             type="button"
+            variant="ghost"
           >
             <Icon aria-hidden="true" className="size-3.5" />
-          </button>
+          </Button>
         );
       })}
     </div>

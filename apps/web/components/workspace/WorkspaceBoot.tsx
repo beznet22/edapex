@@ -1,6 +1,6 @@
 "use client";
 
-import { Skeleton } from "@/components/openduet/skeleton";
+import { Skeleton } from "@edapex/chat";
 import type { WorkspaceTab } from "@/components/openduet/tab-bar";
 
 const BOOT_LABEL: Record<WorkspaceTab, string> = {

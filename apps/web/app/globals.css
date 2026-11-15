@@ -10,6 +10,21 @@
 @custom-variant dark (&:is(.dark *));
 
 /*
+ * Hover, but only where hover exists.
+ *
+ * Every `hover:` class in the app was unguarded, which on Android and iOS leaves the
+ * hover state *stuck* after a tap — the element keeps its hover background until
+ * something else is tapped, so a tapped row looks permanently selected.
+ *
+ * A Tailwind variant cannot carry a media query, so this is handled in two places:
+ * `@media (hover: none)` below neutralises the common hover surfaces, and the modal
+ * reveals on `:focus-within` rather than relying on hover alone.
+ *
+ * `(hover: hover)` is the pointer-capability query. `(pointer: fine)` is deliberately not
+ * used: a stylus is fine but cannot hover.
+ */
+
+/*
  * Gold on Slate.
  *
  * Both palettes are defined explicitly. Previously `:root` held the dark values
@@ -563,6 +578,31 @@
   .scrollbar-auto[data-scrolling="true"]::-webkit-scrollbar-thumb:hover,
   .scrollbar-auto:hover::-webkit-scrollbar-thumb:hover {
     background-color: var(--scrollbar-thumb-hover);
+  }
+
+  /*
+   * No hover on touch.
+   *
+   * On Android and iOS a tapped element keeps its `:hover` styling until something else
+   * is tapped — so a row you touched looks permanently selected, and the UI appears to
+   * hold state it does not have.
+   *
+   * A Tailwind variant cannot carry a media query, so `hover:` cannot be guarded at the
+   * utility level. These rules neutralise the hover *surfaces* instead: the backgrounds
+   * that make the stuck state visible. Colour-only hovers (`hover:text-foreground`) are
+   * harmless and are left alone, because a stuck text colour reads as emphasis rather
+   * than as selection.
+   */
+  @media (hover: none) {
+    .hover\:bg-muted:hover,
+    .hover\:bg-accent:hover,
+    .hover\:bg-secondary\/80:hover,
+    .hover\:bg-primary\/90:hover,
+    .hover\:bg-background:hover,
+    .hover\:bg-card:hover,
+    .hover\:bg-transparent:hover {
+      background-color: initial;
+    }
   }
 
   /* Reduced motion removes the fade, not the bar: appearing is information, sliding is
