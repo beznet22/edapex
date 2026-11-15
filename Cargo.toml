@@ -6,6 +6,7 @@ members = [
   "crates/agent",
   "crates/agent-wasm",
   "crates/ocr",
+  "crates/documents",
   "crates/ocr-bench",
   "apps/desktop/src-tauri"
 ]

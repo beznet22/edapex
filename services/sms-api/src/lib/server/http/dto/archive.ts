@@ -1,5 +1,9 @@
-import type { Marksheet } from "../../../schema/marksheet";
-import type { Transcript } from "../../../schema/transcript";
+import type {
+  MarksheetPayload,
+  TranscriptHistoryPayload,
+  TranscriptPayload
+} from "@edapex/contracts";
+
 import type {
   ArchiveVersionView,
   CrossSessionHistory,
@@ -7,18 +11,15 @@ import type {
   TranscriptView
 } from "../../services/archive";
 
-export interface RenderPayloadDto<TDocument> {
-  readonly templateVersion: "marksheet@1" | "transcript@1" | "transcript-history@1";
-  readonly version: number;
-  readonly publishedAt: number | null;
-  readonly filename: string;
-  readonly document: TDocument;
-}
-
+/**
+ * The payload types live in `@edapex/contracts` so the client renderer is checked
+ * against the same declaration. Declaring them here too would let the client and server
+ * drift while both compiled.
+ */
 export const toMarksheetRenderPayload = (
   view: MarksheetView,
   filename: string
-): RenderPayloadDto<Marksheet> => ({
+): MarksheetPayload => ({
   templateVersion: "marksheet@1",
   version: view.version,
   publishedAt: view.publishedAt,
@@ -29,7 +30,7 @@ export const toMarksheetRenderPayload = (
 export const toTranscriptRenderPayload = (
   view: TranscriptView,
   filename: string
-): RenderPayloadDto<Transcript> => ({
+): TranscriptPayload => ({
   templateVersion: "transcript@1",
   version: view.version,
   publishedAt: view.publishedAt,
@@ -40,7 +41,7 @@ export const toTranscriptRenderPayload = (
 export const toHistoryRenderPayload = (
   history: CrossSessionHistory,
   filename: string
-): RenderPayloadDto<CrossSessionHistory> => ({
+): TranscriptHistoryPayload => ({
   templateVersion: "transcript-history@1",
   version: 0,
   publishedAt: null,

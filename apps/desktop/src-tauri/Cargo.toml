@@ -13,6 +13,7 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
+edapex-documents = { path = "../../../crates/documents" }
 edapex-agent = { path = "../../../crates/agent" }
 edapex-core = { path = "../../../crates/core" }
 edapex-ocr = { path = "../../../crates/ocr" }

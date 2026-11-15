@@ -44,6 +44,11 @@
     "/sqlite/index.mjs": {
       "gzip": 400000,
       "reason": "engine glue plus OPFS worker"
+    },
+    "ironpress_bg.wasm": {
+      "$comment": "IronPress PDF engine for web. Lazy: loaded only on the first export. Native hosts use crates/documents instead and never download this.",
+      "gzip": 6500000,
+      "reason": "6,376,926 B measured; 6.5 MB ceiling. Spec 22 accepts this cost because it replaces a headless-browser subprocess."
     }
   },
   "pwa": {
@@ -52,9 +57,9 @@
   },
   "measured": {
     "date": "2026-11-14",
-    "initialJsGzip": 181599,
-    "initialCssGzip": 10735,
-    "controllableJsGzip": 38388,
+    "initialJsGzip": 205044,
+    "initialCssGzip": 11062,
+    "controllableJsGzip": 61833,
     "agentWasmGzip": 134395,
     "agentJsGlueGzip": 5526,
     "breakdown": {
@@ -65,7 +70,9 @@
       "lucide": 10851,
       "other": 15870
     },
-    "note": "Measured on a vinext build with Node 26.13.1. The Pages rollback baseline in spec 47 (106 KB) is a different build and is not comparable. The lazy document editor (188 KB) is not in this figure because it loads only when the artifact panel opens. The SQLite engine (773 KB gzip, approved ceiling 1.2 MB) is lazy: it loads only when the store is opened.",
-    "sqliteRuntimeGzip": 773425
+    "note": "Measured on a vinext build with Node 26.13.1. The Pages rollback baseline in spec 47 (106 KB) is a different build and is not comparable. The lazy document editor (188 KB) is not in this figure because it loads only when the artifact panel opens. The SQLite engine (773 KB gzip, approved ceiling 1.2 MB) is lazy: it loads only when the store is opened. The IronPress engine (6,376,926 B gzip) is lazy and measured from the installed package: no UI imports the exporter yet, so it is not in the client graph.",
+    "sqliteRuntimeGzip": 773425,
+    "ironpressWasmGzip": 6376926,
+    "$overBudgetException": "Over ceiling by 244 B initial / 393 B controllable. Recorded exception in spec 47: the proactive scheduler mounts in the workspace layout. Ceilings are NOT raised. Clean worktree at f523373 measures identically, so this predates the IronPress work."
   }
 }

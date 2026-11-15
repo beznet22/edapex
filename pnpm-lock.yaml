@@ -61,6 +61,9 @@ importers:
       clsx:
         specifier: ^2.1.1
         version: 2.1.1
+      ironpress:
+        specifier: 1.7.0
+        version: 1.7.0
       lucide-react:
         specifier: ^0.468.0
         version: 0.468.0(react@19.3.1)
@@ -3727,6 +3730,9 @@ packages:
   ipaddr.js@2.5.0:
     resolution: {integrity: sha512-aq+t5NAc+cS6rZQQVWC2x98CPqGtKKTMDd4Gaodv0wShnItdKg/51djkGJ1hqH+Oy0ivDftCbSLCQob8zso01w==}
     engines: {node: '>= 10'}
+
+  ironpress@1.7.0:
+    resolution: {integrity: sha512-NJ6JKnKArpmgYkGdegzXg8X+60O4Vbu47Ubcbyn3erNwMhCQG6/GStqQpH8kwoSKkoJjMkvncmBxOmGY3zN6uA==}
 
   is-extglob@2.1.1:
     resolution: {integrity: sha512-SbKbANkN603Vi4jEZv49LeVJMn4yGwsbzZworEoyEiutsN3nJYdbO36zfhGJ6QEDpOZIFkDtnq5JRxmvl3jsoQ==}
@@ -7786,6 +7792,8 @@ snapshots:
     optional: true
 
   ipaddr.js@2.5.0: {}
+
+  ironpress@1.7.0: {}
 
   is-extglob@2.1.1: {}
 

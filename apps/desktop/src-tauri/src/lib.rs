@@ -5,6 +5,7 @@ mod auth;
 mod capture;
 mod mcp;
 mod ocr;
+mod pdf;
 mod state;
 
 use edapex_core::CoreHealth;
@@ -73,7 +74,8 @@ pub fn run() {
             capture::capture_import_path,
             capture::capture_release,
             capture::capture_preview,
-            ocr::ocr_extract
+            ocr::ocr_extract,
+            pdf::render_pdf
         ])
         .run(tauri::generate_context!())
         .expect("error while running EdApex Work");
