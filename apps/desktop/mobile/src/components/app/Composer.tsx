@@ -11,6 +11,10 @@ import {
 /**
  * The composer from Frame 1: one pill, a plus, the field, and a primary circle.
  *
+ * Both trailing actions are always present. An earlier build swapped dictation for send
+ * when the field had text; it gave the text more width but made the send button appear and
+ * disappear, which reads as a bug rather than as a mode.
+ *
  * The field grows with the text — one line at rest, five before it scrolls — because a
  * fixed-height field that scrolls horizontally hides what you just wrote. The growth is
  * `field-sizing: content`, not an animated height: transitioning a box height reflows the
@@ -73,35 +77,27 @@ export function Composer({
           />
 
           <InputGroupAddon align="inline-end" className="gap-1">
-            {/*
-             * One trailing action, not two. An empty field offers dictation; a field with
-             * text offers send. Two 40dp buttons cost 88dp of a 328dp composer, which left
-             * the text a 176dp column — and at five lines that is twenty characters a line.
-             */}
-            {busy || value.trim() !== "" ? (
-              <InputGroupButton
-                aria-label={busy ? "Stop" : "Send"}
-                className="size-10 rounded-full text-primary-foreground"
-                onClick={busy ? onStop : undefined}
-                size="icon-sm"
-                type="submit"
-                variant="default"
-              >
-                {busy ? (
-                  <Square aria-hidden="true" className="size-3.5 fill-current" strokeWidth={0} />
-                ) : (
-                  <ArrowUp aria-hidden="true" className="size-5" strokeWidth={2.75} />
-                )}
-              </InputGroupButton>
-            ) : (
-              <InputGroupButton
-                aria-label="Dictate"
-                className="size-10 rounded-full text-muted-foreground"
-                size="icon-sm"
-              >
-                <Mic aria-hidden="true" className="size-5" />
-              </InputGroupButton>
-            )}
+            <InputGroupButton
+              aria-label="Dictate"
+              className="size-10 rounded-full text-muted-foreground"
+              size="icon-sm"
+            >
+              <Mic aria-hidden="true" className="size-5" />
+            </InputGroupButton>
+            <InputGroupButton
+              aria-label={busy ? "Stop" : "Send"}
+              className="size-10 rounded-full text-primary-foreground"
+              onClick={busy ? onStop : undefined}
+              size="icon-sm"
+              type="submit"
+              variant="default"
+            >
+              {busy ? (
+                <Square aria-hidden="true" className="size-3.5 fill-current" strokeWidth={0} />
+              ) : (
+                <ArrowUp aria-hidden="true" className="size-5" strokeWidth={2.75} />
+              )}
+            </InputGroupButton>
           </InputGroupAddon>
         </InputGroup>
       </form>

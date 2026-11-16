@@ -68,23 +68,33 @@ export function TopBar({
         value={mode}
       >
         <ToggleGroupItem
-          className="gap-2 rounded-dock px-4 text-label data-[state=on]:bg-card data-[state=on]:text-foreground"
+          className="gap-1.5 rounded-dock px-3 text-label data-[state=on]:bg-card data-[state=on]:text-foreground"
           value="chat"
         >
           <MessageCircle aria-hidden="true" className="size-4" />
           Chat
         </ToggleGroupItem>
         <ToggleGroupItem
-          className="gap-2 rounded-dock px-4 text-label data-[state=on]:bg-card data-[state=on]:text-foreground"
+          className="gap-2 rounded-dock px-3 text-label data-[state=on]:bg-card data-[state=on]:text-foreground"
           value="tasks"
         >
-          <Sparkles aria-hidden="true" className="size-4 text-primary" />
+          {/*
+           * The count sits on the icon, not after the label. After the label it is a pill that
+           * widens the segment by its own width; on the icon it costs nothing, and it still
+           * reads as a property of Tasks rather than of the control.
+           */}
+          <span className="relative flex items-center justify-center">
+            <Sparkles aria-hidden="true" className="size-4 text-primary" />
+            {approvals > 0 ? (
+              <span
+                aria-hidden="true"
+                className="absolute -right-1.5 -top-1.5 min-w-3 rounded-full bg-primary px-0.5 text-center text-chrome font-medium leading-3 text-primary-foreground"
+              >
+                {approvals > 9 ? "9+" : approvals}
+              </span>
+            ) : null}
+          </span>
           Tasks
-          {approvals > 0 ? (
-            <span className="rounded-full bg-primary px-1.5 text-chrome font-medium text-primary-foreground">
-              {approvals}
-            </span>
-          ) : null}
         </ToggleGroupItem>
       </ToggleGroup>
 

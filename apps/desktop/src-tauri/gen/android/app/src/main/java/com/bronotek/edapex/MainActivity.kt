@@ -12,6 +12,7 @@ import androidx.core.content.ContextCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
+import kotlin.math.roundToInt
 
 /**
  * The Android host.
@@ -178,6 +179,9 @@ class MainActivity : TauriActivity() {
         }
     }
 
+    /** Physical pixels to the page's unit. A WebView CSS pixel is one dp, not one device pixel. */
+    private fun Int.toCssPx(): Int = (this / resources.displayMetrics.density).roundToInt()
+
     /** Fallback only: `onWebViewCreate` is the hook that always fires. */
     private fun findWebView(view: View): WebView? = when (view) {
         is WebView -> view
@@ -224,13 +228,19 @@ class MainActivity : TauriActivity() {
             val bottom = (bars.bottom - gapBelow).coerceAtLeast(0)
             val keyboardInset = (keyboard.bottom - gapBelow).coerceAtLeast(0)
 
+            /*
+             * Insets arrive in **physical pixels**; the page's unit is the CSS pixel, which in
+             * a WebView is a dp. Writing the raw values tripled every inset on a 3× screen —
+             * 88px of status bar became 88dp against a 29dp bar, and 48dp of navigation bar
+             * became 144dp. That is the empty band at the top and bottom of every screen.
+             */
             target?.evaluateJavascript(
                 """
-                document.documentElement.style.setProperty('--platform-inset-top', '${top}px');
-                document.documentElement.style.setProperty('--platform-inset-bottom', '${bottom}px');
-                document.documentElement.style.setProperty('--platform-inset-left', '${bars.left}px');
-                document.documentElement.style.setProperty('--platform-inset-right', '${bars.right}px');
-                document.documentElement.style.setProperty('--platform-keyboard-inset', '${keyboardInset}px');
+                document.documentElement.style.setProperty('--platform-inset-top', '${top.toCssPx()}px');
+                document.documentElement.style.setProperty('--platform-inset-bottom', '${bottom.toCssPx()}px');
+                document.documentElement.style.setProperty('--platform-inset-left', '${bars.left.toCssPx()}px');
+                document.documentElement.style.setProperty('--platform-inset-right', '${bars.right.toCssPx()}px');
+                document.documentElement.style.setProperty('--platform-keyboard-inset', '${keyboardInset.toCssPx()}px');
                 """.trimIndent(),
                 null
             )
