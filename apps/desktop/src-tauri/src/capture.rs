@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 
 use base64::Engine;
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Manager};
+use tauri::AppHandle;
 use uuid::Uuid;
 
 use crate::state::{HostError, HostState};
@@ -46,13 +46,11 @@ pub struct CaptureRecord {
 }
 
 fn cache_root(app: &AppHandle) -> Result<PathBuf, HostError> {
-    app.path()
-        .app_cache_dir()
-        .map_err(|error| HostError::new("internal_error", format!("Cache directory: {error}"), false))
+    Ok(crate::agent::HostEnv::from_app(app)?.cache_dir)
 }
 
 fn captures_dir(app: &AppHandle) -> Result<PathBuf, HostError> {
-    let dir = cache_root(app)?.join("captures");
+    let dir = crate::agent::HostEnv::from_app(app)?.captures_dir();
     fs::create_dir_all(&dir)
         .map_err(|error| HostError::new("internal_error", format!("Create capture directory: {error}"), false))?;
     Ok(dir)

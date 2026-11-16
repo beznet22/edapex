@@ -1,30 +1,10 @@
 use std::path::PathBuf;
 
 use edapex_ocr::{OcrError, OcrResult, RustOEngine};
-use tauri::{AppHandle, Manager, State};
+use tauri::{AppHandle, State};
 
+use crate::agent::HostEnv;
 use crate::state::{HostError, HostState};
-
-fn models_dir(app: &AppHandle) -> Result<PathBuf, HostError> {
-    if let Ok(path) = std::env::var("EDAPEX_OCR_MODELS_DIR") {
-        return Ok(PathBuf::from(path));
-    }
-    if let Ok(resource) = app.path().resource_dir() {
-        let bundled = resource.join("ocr");
-        if bundled.join("manifest.json").is_file() {
-            return Ok(bundled);
-        }
-    }
-    let development = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("resources/ocr");
-    if development.join("manifest.json").is_file() {
-        return Ok(development);
-    }
-    Err(HostError::new(
-        "model_missing",
-        "RustO OCR models are not installed; run scripts/fetch-rusto-models.mjs",
-        false,
-    ))
-}
 
 fn map_ocr_error(error: OcrError) -> HostError {
     match error {
@@ -45,8 +25,8 @@ fn map_ocr_error(error: OcrError) -> HostError {
     }
 }
 
-pub(crate) async fn extract_path(app: &AppHandle, path: PathBuf) -> Result<OcrResult, HostError> {
-    let models = models_dir(app)?;
+pub(crate) async fn extract_path(env: &HostEnv, path: PathBuf) -> Result<OcrResult, HostError> {
+    let models = env.models_dir()?;
     tauri::async_runtime::spawn_blocking(move || {
         let mut engine = RustOEngine::load(&models).map_err(map_ocr_error)?;
         engine.extract_path(&path).map_err(map_ocr_error)
@@ -62,5 +42,5 @@ pub async fn ocr_extract(
     capture_id: String,
 ) -> Result<OcrResult, HostError> {
     let path = state.capture_path(&capture_id)?;
-    extract_path(&app, path).await
+    extract_path(&HostEnv::from_app(&app)?, path).await
 }
