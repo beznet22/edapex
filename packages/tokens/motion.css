@@ -125,10 +125,11 @@
 }
 
 /*
- * Reduced motion: spatial snaps, effects keep the fast curve.
+ * Reduced motion: everything is immediate.
  *
- * 1ms rather than 0 because a 0ms transition never fires `transitionend`, and a sheet
- * unmount that waits for it would never resolve.
+ * Not "spatial snaps, effects stay fast" — that was a 149ms floor on a preference whose
+ * whole point is not waiting. 1ms rather than 0 because a zero-duration transition never
+ * fires `transitionend`, and the boot veil unmounts on that event.
  */
 @media (prefers-reduced-motion: reduce) {
   :root {
@@ -136,7 +137,8 @@
     --motion-duration-spatial-default: 1ms;
     --motion-duration-spatial-slow: 1ms;
     --motion-duration-spatial-play: 1ms;
-    --motion-duration-effects-default: var(--motion-duration-effects-fast);
-    --motion-duration-effects-slow: var(--motion-duration-effects-fast);
+    --motion-duration-effects-fast: 1ms;
+    --motion-duration-effects-default: 1ms;
+    --motion-duration-effects-slow: 1ms;
   }
 }

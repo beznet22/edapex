@@ -10,6 +10,7 @@ import { Rail } from "@/components/shell/Rail";
 import { Screen } from "@/components/shell/Screen";
 import { ScreenHeader } from "@/components/shell/ScreenHeader";
 import { Sheet } from "@/components/shell/Sheet";
+import { BrandMarkReveal } from "@/components/brand/BrandMarkReveal";
 import { BootVeil } from "@/components/shell/BootVeil";
 import { TouchTarget } from "@/components/shell/TouchTarget";
 import { useKeyboardOpen } from "@/hooks/use-keyboard-open";
@@ -55,6 +56,7 @@ export function App() {
   const [previewOpen, setPreviewOpen] = useState(false);
   const [light, setLight] = useState(true);
   const [ready, setReady] = useState(false);
+  const [revealed, setRevealed] = useState(false);
   const sheetOpen = menuOpen || previewOpen;
 
   useEffect(() => {
@@ -67,6 +69,12 @@ export function App() {
     // starts fading, which is what makes two surfaces read as one.
     const frame = requestAnimationFrame(() => setReady(true));
     return () => cancelAnimationFrame(frame);
+  }, []);
+
+  useEffect(() => {
+    // The onboarding beat, demonstrated here until D1 mounts it for real.
+    const timer = window.setTimeout(() => setRevealed(true), 200);
+    return () => window.clearTimeout(timer);
   }, []);
 
   useEffect(() => {
@@ -137,6 +145,26 @@ export function App() {
               <span className="text-label text-muted-foreground">
                 44dp targets, 20dp icons
               </span>
+            </section>
+
+            <section aria-label="Brand mark" className="flex flex-col items-start gap-3">
+              <p className="text-label text-muted-foreground">
+                The onboarding reveal: the book opens from its spine
+              </p>
+              <BrandMarkReveal className="w-40" revealed={revealed} />
+              <Button
+                onClick={() => {
+                  setRevealed(false);
+                  // Two frames: one to paint the clipped state, one to start the transition.
+                  requestAnimationFrame(() =>
+                    requestAnimationFrame(() => setRevealed(true))
+                  );
+                }}
+                size="sm"
+                variant="outline"
+              >
+                Replay reveal
+              </Button>
             </section>
 
             <section aria-label="Motion presets" className="flex flex-col gap-2">

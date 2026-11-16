@@ -124,3 +124,44 @@
     -webkit-mask-size: contain;
   }
 }
+
+@layer components {
+  /*
+   * The onboarding reveal: two copies of the mark, each clipped to one side of the spine.
+   * `clip-path` uncovers the silhouette outward from the centre — geometry, not a scale, so
+   * the logo is revealed rather than zoomed. The spine is the seam, which makes the antenna
+   * resolve last as the halves meet.
+   */
+  .brand-reveal-start,
+  .brand-reveal-end {
+    clip-path: inset(0 50% 0 50%);
+    transition-property: clip-path;
+    transition-duration: var(--motion-duration-spatial-slow);
+    transition-timing-function: var(--motion-ease-spatial-slow);
+  }
+
+  .brand-reveal[data-revealed="true"] .brand-reveal-start {
+    clip-path: inset(0 50% 0 0);
+  }
+
+  .brand-reveal[data-revealed="true"] .brand-reveal-end {
+    clip-path: inset(0 0 0 50%);
+  }
+}
+
+/*
+ * Reduced motion is *immediate*, not fast.
+ *
+ * The shared sheet floors transitions at 150ms so a fade still signals that something
+ * changed. On a surface someone opted out of motion on, that floor is a wait with nothing in
+ * it — the state has already changed. 1ms rather than 0 because a zero-duration transition
+ * never fires `transitionend`, and the boot veil unmounts on that event.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 1ms !important;
+    animation-duration: 1ms !important;
+  }
+}

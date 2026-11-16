@@ -14,6 +14,8 @@
     "check:tokens:update": "node scripts/check-tokens.mjs --update",
     "check:agent-size": "node scripts/check-agent-size.mjs",
     "verify:ports": "node scripts/verify-port-specs.mjs",
-    "verify:schema": "node scripts/verify-schema-catalog.mjs"
+    "verify:schema": "node scripts/verify-schema-catalog.mjs",
+    "brand:build": "node scripts/build-brand-mark.mjs",
+    "brand:verify": "node scripts/verify-brand-mark.mjs"
   }
 }

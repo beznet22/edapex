@@ -90,6 +90,48 @@ A real device is the only place this is verified. USB and wireless debugging bot
 forgotten. The commands for cold start, deep links, process kill, frame pacing and service
 inspection are listed in `AGENTS.md` → *Mobile (Android)*.
 
+## 8a. The splash screen, precisely
+
+Two durations are commonly conflated, and only one of them is ours.
+
+**Splash visibility is not a fixed window.** The system shows the splash from process start
+until the activity's first frame is ready to draw. There is no documented minimum and no
+fixed maximum: on a warm start it is a few frames, on a cold start on a slow device it can be
+most of a second. An app cannot extend it except through
+`SplashScreen.setKeepOnScreenCondition`, and this app does **not** use that — holding the
+splash would delay access to a workspace that is already interactive.
+
+**Icon animation duration is a different thing.** On API 31+ an
+`AnimatedVectorDrawable` may be supplied as the splash icon, and the platform plays it once,
+on a schedule the app does not control. Because the splash can end before the animation does,
+a cut-off frame is a normal outcome, not an edge case. Below API 31 the compat library does
+not replicate AVD support at all. That is why the icon here is **static**.
+
+**What the app owns** is the handover:
+
+| Stage | Owner | Duration |
+|---|---|---|
+| Splash icon, stationary | platform | until the first frame |
+| Splash view fade-out | app, `setOnExitAnimationListener` | 150ms, opacity only |
+| Boot veil fade-out | app, CSS | effects spring (230ms), opacity only |
+
+The splash background and the veil background are the same token colour, so the three stages
+read as one surface settling rather than three that swap. Nothing animates the mark itself:
+a mark that moves while its own ghost fades draws the eye to the seam.
+
+The brand animation lives on onboarding page 1, where the mark is neither masked by the
+system nor racing the process start: a centre-out reveal from the book's spine, two clipped
+halves uncovering outward, `spatial-slow` (496ms), no overshoot, and immediate under
+`prefers-reduced-motion`.
+
+### Icon geometry
+
+The splash canvas is 288dp and the system masks the icon to a **192dp circle**. A bounding
+box that fits a square does not fit a circle: this mark's widest points are 98.4dp from its
+centre and would be clipped by 2.4dp. The generated VectorDrawable therefore uses a square
+629×629 viewport with the silhouette centred and scaled to a **92dp radius**, leaving 4dp
+inside the mask. `docs/design/brand/splash-preview.png` is the measured preview.
+
 ## 9. Acceptance
 
 - Cold start shows no white flash; the native splash hands off to the boot veil.

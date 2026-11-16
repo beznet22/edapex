@@ -1,107 +1,188 @@
 #!/usr/bin/env node
 /**
- * Brand mark → a web SVG and an Android VectorDrawable, reproducibly.
+ * Brand mark pipeline.
  *
- * The source of truth is the PNG in `apps/web/public/brand`. Android cannot use a PNG well:
- * the splash icon is scaled by the system to whatever the density and mask require, so a
- * raster gets resampled at exactly the size where it is most visible. A VectorDrawable is
- * resolution-free, and generating it means the mark cannot drift from the web's copy.
+ * **The SVG is the source of truth.** `apps/web/public/brand/edapex_brand_mark.svg` is the
+ * editable asset; the optimised copy and the Android VectorDrawable are generated
+ * derivatives. Change the SVG and re-run this.
  *
- * Pipeline: ImageMagick thresholds the alpha, Potrace fits Béziers to the silhouette, SVGO
- * rounds the coordinates, and this script turns the result into `pathData`.
+ * `--from-raster` re-traces the PNG once, for the case where the SVG is lost. That is a
+ * bootstrap, not the normal path: a trace of a trace loses fidelity every time.
  *
- * Requires ImageMagick, Potrace, SVGO and Inkscape on PATH. It fails loudly rather than
- * emitting a half-built mark.
+ * Why the Android icon is padded: the splash masks the icon to a **192dp circle** inside a
+ * 288dp canvas, and a bounding box that fits a square does not fit a circle — this mark's
+ * widest points are 98.4dp from its centre, which the circle cuts by 2.4dp. Fitting by
+ * aspect cannot fix that, because Android scales the drawable to the box, so the padding has
+ * to live inside the vector's own viewport.
  */
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = fileURLToPath(new URL("..", import.meta.url));
-const SOURCE = join(ROOT, "apps/web/public/brand/edapex_brand_mark_black_transparent.png");
-const SVG_OUT = join(ROOT, "apps/web/public/brand/edapex_brand_mark.svg");
+const CANONICAL = join(ROOT, "apps/web/public/brand/edapex_brand_mark.svg");
+const RASTER = join(ROOT, "apps/web/public/brand/edapex_brand_mark_black_transparent.png");
 const MOBILE_SVG = join(ROOT, "apps/desktop/mobile/src/assets/brand-mark.svg");
-const VECTOR_OUT = join(
+const MOBILE_PATHS = join(ROOT, "apps/desktop/mobile/src/assets/brand-mark-paths.ts");
+const VECTOR = join(
   ROOT,
   "apps/desktop/src-tauri/gen/android/app/src/main/res/drawable/ic_splash_mark.xml"
 );
+const PREVIEW = join(ROOT, "docs/design/brand/splash-preview.png");
 
-/** The splash icon renders at 2/3 of the 288dp canvas; the mark is a little wider than tall. */
+/** 288dp canvas, 192dp safe circle, and the radius we actually aim for inside it. */
+const CANVAS_DP = 288;
+const SAFE_RADIUS_DP = 96;
+const TARGET_RADIUS_DP = 92;
 const ICON_DP = 192;
+const PREVIEW_SCALE = 4;
 
 const work = mkdtempSync(join(tmpdir(), "edapex-mark-"));
-
 const run = (command, args) => {
   try {
-    execFileSync(command, args, { stdio: "pipe" });
+    return execFileSync(command, args, { stdio: "pipe" });
   } catch (cause) {
     console.error(`${command} failed. Is it installed and on PATH?`);
     throw cause;
   }
 };
 
-// 1. Alpha → a 1-bit bitmap where the mark is black, which is what Potrace traces.
-const pbm = join(work, "mark.pbm");
-run("convert", [
-  SOURCE,
-  "-alpha", "extract",
-  "-threshold", "50%",
-  "-negate",
-  "-trim", "+repage",
-  "-bordercolor", "white",
-  "-border", "8",
-  pbm
-]);
+if (process.argv.includes("--from-raster")) {
+  const pbm = join(work, "mark.pbm");
+  run("convert", [RASTER, "-alpha", "extract", "-threshold", "50%", "-negate", "-trim", "+repage", "-bordercolor", "white", "-border", "8", pbm]);
+  run("potrace", ["-s", "-o", CANONICAL, "--turdsize", "8", "--alphamax", "1", "--opttolerance", "0.2", pbm]);
+  console.log("re-traced the canonical SVG from the PNG");
+}
 
-// 2. Trace. `--opttolerance 0.2` is the curve-fit tolerance: smaller is more faithful and
-//    larger; 0.2 measured 0.16% pixel difference against the source, which is the
-//    antialiasing edge and nothing else.
-const traced = join(work, "traced.svg");
-run("potrace", ["-s", "-o", traced, "--turdsize", "8", "--alphamax", "1", "--opttolerance", "0.2", pbm]);
-
-// 3. Round coordinates to two decimals. At a 588-unit viewport that is sub-pixel at every
-//    density, and it roughly halves the pathData Android has to parse at startup.
+// 1. Optimise. Two decimals is sub-pixel at every Android density.
 const optimised = join(work, "mark.svg");
-run("svgo", ["--multipass", "--precision=2", "-i", traced, "-o", optimised]);
-
+run("svgo", ["--multipass", "--precision=2", "-i", CANONICAL, "-o", optimised]);
 const svg = readFileSync(optimised, "utf8");
+
 const viewBox = /viewBox="([^"]+)"/.exec(svg)?.[1];
-if (viewBox === undefined) throw new Error("the traced SVG has no viewBox");
-const [, , viewportWidth, viewportHeight] = viewBox.split(/[\s,]+/).map(Number);
-
+if (viewBox === undefined) throw new Error("the canonical SVG has no viewBox");
+const [minX, minY, vbW, vbH] = viewBox.split(/[\s,]+/).map(Number);
 const paths = [...svg.matchAll(/<path[^>]*\bd="([^"]+)"/g)].map((match) => match[1]);
-if (paths.length === 0) throw new Error("the traced SVG has no paths");
+if (paths.length === 0) throw new Error("the canonical SVG has no paths");
 
-writeFileSync(SVG_OUT, `${svg.trim()}\n`);
-// The shell masks this to paint the mark in the theme's ink rather than in the PNG's black,
-// so dark mode needs no second asset.
-writeFileSync(MOBILE_SVG, `${svg.trim()}\n`);
+// 2. Measure the silhouette. A bounding box is not enough: the mask is a circle.
+const MEASURE = 768;
+const measured = join(work, "measure.png");
+run("inkscape", [optimised, "--export-type=png", `--export-width=${MEASURE}`, `--export-filename=${measured}`]);
+
+const raw = join(work, "alpha.raw");
+run("convert", [measured, "-alpha", "extract", "-depth", "8", `gray:${raw}`]);
+const alpha = readFileSync(raw);
+const scale = vbW / MEASURE;
+const rows = Math.round(alpha.length / MEASURE);
+
+let boxMinX = MEASURE;
+let boxMaxX = 0;
+let boxMinY = rows;
+let boxMaxY = 0;
+for (let y = 0; y < rows; y += 1) {
+  for (let x = 0; x < MEASURE; x += 1) {
+    if (alpha[y * MEASURE + x] <= 128) continue;
+    if (x < boxMinX) boxMinX = x;
+    if (x > boxMaxX) boxMaxX = x;
+    if (y < boxMinY) boxMinY = y;
+    if (y > boxMaxY) boxMaxY = y;
+  }
+}
+
+const centreX = (boxMinX + boxMaxX) / 2;
+const centreY = (boxMinY + boxMaxY) / 2;
+let maxRadius = 0;
+for (let y = 0; y < rows; y += 1) {
+  for (let x = 0; x < MEASURE; x += 1) {
+    if (alpha[y * MEASURE + x] <= 128) continue;
+    const radius = Math.hypot(x - centreX, y - centreY);
+    if (radius > maxRadius) maxRadius = radius;
+  }
+}
+maxRadius *= scale;
+const centre = { x: minX + centreX * scale, y: minY + centreY * scale };
 
 /*
- * Android's PathParser accepts the command set Potrace emits (MmCcLlVvHhZz). `fillType` is
- * left at its default `nonZero`: Potrace expresses holes as reversed sub-paths inside one
- * `d`, so `evenOdd` would invert them.
+ * 3. A square viewport whose inscribed circle clears the mask with a margin. Android fits the
+ *    drawable to the 192dp box and preserves aspect, so a square is scaled to 192dp and the
+ *    silhouette's radius maps to `maxRadius / (side / 2) * 96dp`.
  */
+const side = Math.ceil((2 * maxRadius * SAFE_RADIUS_DP) / TARGET_RADIUS_DP);
+const translate = { x: side / 2 - centre.x, y: side / 2 - centre.y };
+const radiusDp = (maxRadius / (side / 2)) * SAFE_RADIUS_DP;
+
 const vector = `<?xml version="1.0" encoding="utf-8"?>
 <!--
   Generated by scripts/build-brand-mark.mjs from
-  apps/web/public/brand/edapex_brand_mark_black_transparent.png.
-  Do not edit by hand: change the source PNG and re-run the script.
+  apps/web/public/brand/edapex_brand_mark.svg. Do not edit by hand.
+  Square ${side}×${side} viewport, centred on the silhouette: the splash masks this to a
+  192dp circle, and the mark's widest point is ${maxRadius.toFixed(1)} units from its centre.
 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="${ICON_DP}dp"
-    android:height="${Math.round((ICON_DP * viewportHeight) / viewportWidth)}dp"
-    android:viewportWidth="${viewportWidth}"
-    android:viewportHeight="${viewportHeight}">
-${paths.map((path) => `    <path\n        android:fillColor="#FF000000"\n        android:pathData="${path}" />`).join("\n")}
+    android:height="${ICON_DP}dp"
+    android:viewportWidth="${side}"
+    android:viewportHeight="${side}">
+    <group android:translateX="${translate.x.toFixed(2)}" android:translateY="${translate.y.toFixed(2)}">
+${paths.map((path) => `        <path\n            android:fillColor="#FF000000"\n            android:pathData="${path}" />`).join("\n")}
+    </group>
 </vector>
 `;
 
-writeFileSync(VECTOR_OUT, vector);
+writeFileSync(VECTOR, vector);
+writeFileSync(MOBILE_SVG, `${svg.trim()}\n`);
 
-console.log(`viewBox ${viewportWidth}×${viewportHeight}, ${paths.length} path(s)`);
-console.log(`  ${SVG_OUT.replace(ROOT, "")}`);
+/*
+ * The onboarding reveal needs the geometry, not a URL: it clips two copies of the mark so the
+ * book can open from the spine. Generated from the same source, so the animation cannot draw
+ * a stale logo.
+ */
+writeFileSync(
+  MOBILE_PATHS,
+  `// Generated by scripts/build-brand-mark.mjs. Do not edit by hand.
+export const BRAND_VIEW_BOX = { width: ${vbW}, height: ${vbH} } as const;
+export const BRAND_PATHS: readonly string[] = [
+${paths.map((path) => `  "${path}"`).join(",\n")}
+];
+`
+);
+
+// 4. A preview at the real sizes: canvas, safe circle, and where the mark actually lands.
+const px = (dp) => Math.round(dp * PREVIEW_SCALE);
+const canvas = px(CANVAS_DP);
+/*
+ * The canonical SVG has a tight viewBox; the vector has a padded one. Rendering the canonical
+ * file at its own width would draw the mark ~7% larger than the icon Android actually shows,
+ * so the preview has to map the same viewport the vector declares.
+ */
+const renderWidthDp = (vbW * ICON_DP) / side;
+const renderedMark = join(work, "mark.png");
+run("inkscape", [optimised, "--export-type=png", `--export-width=${px(renderWidthDp)}`, `--export-filename=${renderedMark}`]);
+
+mkdirSync(join(ROOT, "docs/design/brand"), { recursive: true });
+const markPx = px(renderWidthDp);
+run("convert", [
+  "-size", `${canvas}x${canvas}`, "xc:#fbfbfd",
+  "-fill", "none", "-stroke", "#cc785c", "-strokewidth", "2",
+  "-draw", `circle ${canvas / 2},${canvas / 2} ${canvas / 2 + px(SAFE_RADIUS_DP)},${canvas / 2}`,
+  "-stroke", "#b9b5ad", "-strokewidth", "1", "-fill", "none",
+  "-draw", `rectangle 0.5,0.5 ${canvas - 1.5},${canvas - 1.5}`,
+  // The mark is black on transparent, so it composites directly. Extracting and negating
+  // the alpha would draw a white plate the size of the viewport.
+  "(", renderedMark, ")",
+  "-geometry", `+${Math.round((canvas - markPx) / 2)}+${Math.round((canvas - markPx) / 2)}`,
+  "-compose", "over", "-composite",
+  "-fill", "#6f6a61", "-stroke", "none", "-pointsize", "18",
+  "-annotate", `+14+${canvas - 14}`, `288dp canvas · 192dp safe circle · radius ${radiusDp.toFixed(1)}dp`,
+  PREVIEW
+]);
+
+console.log(`silhouette radius ${maxRadius.toFixed(1)} units → ${radiusDp.toFixed(1)}dp inside a ${SAFE_RADIUS_DP}dp circle`);
+console.log(`vector viewport ${side}×${side}, ${paths.length} path(s)`);
+console.log(`  ${VECTOR.replace(ROOT, "")}`);
 console.log(`  ${MOBILE_SVG.replace(ROOT, "")}`);
-console.log(`  ${VECTOR_OUT.replace(ROOT, "")}`);
+console.log(`  ${MOBILE_PATHS.replace(ROOT, "")}`);
+console.log(`  ${PREVIEW.replace(ROOT, "")}`);

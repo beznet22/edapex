@@ -57,14 +57,21 @@ describe("motion tokens", () => {
     }
   });
 
-  it("snaps spatial motion under reduced motion and keeps effects at the fast curve", () => {
+  it("is immediate under reduced motion, with no floor to sit through", () => {
     const reduced = /@media \(prefers-reduced-motion: reduce\) \{[\s\S]*?\n\}/.exec(css)?.[0] ?? "";
-    expect(reduced).toContain("--motion-duration-spatial-fast: 1ms");
-    expect(reduced).toContain("--motion-duration-spatial-slow: 1ms");
-    expect(reduced).toContain(
-      "--motion-duration-effects-slow: var(--motion-duration-effects-fast)"
-    );
-    // 1ms rather than 0: a 0ms transition never fires `transitionend`.
+    for (const name of [
+      "spatial-fast",
+      "spatial-default",
+      "spatial-slow",
+      "spatial-play",
+      "effects-fast",
+      "effects-default",
+      "effects-slow"
+    ]) {
+      expect(reduced).toContain(`--motion-duration-${name}: 1ms`);
+    }
+    // 1ms rather than 0: a zero-duration transition never fires `transitionend`, and the
+    // boot veil unmounts on that event.
     expect(reduced).not.toContain(": 0ms");
   });
 
