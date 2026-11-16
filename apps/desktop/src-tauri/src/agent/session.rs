@@ -52,6 +52,24 @@ impl ChannelSink {
     }
 }
 
+/// Delivers to the WebView and, when a journal exists, records the same event.
+///
+/// Both are fed from one call so the UI and the resume log cannot drift: an
+/// event the person saw is an event a resumed run can replay.
+pub struct FanoutSink {
+    pub primary: Arc<ChannelSink>,
+    pub journal: Option<Arc<super::journal::RunJournal>>,
+}
+
+impl EventSink for FanoutSink {
+    fn emit(&self, event: AgentEvent) {
+        self.primary.emit(event.clone());
+        if let Some(journal) = &self.journal {
+            journal.emit(event);
+        }
+    }
+}
+
 impl EventSink for ChannelSink {
     fn emit(&self, event: AgentEvent) {
         // Record first: the ring is the durable record, the channel is best-effort.

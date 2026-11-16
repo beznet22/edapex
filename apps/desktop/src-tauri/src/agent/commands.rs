@@ -11,7 +11,7 @@ use super::approvals::ApprovalRegistry;
 use super::env::HostEnv;
 use super::journal::RunJournal;
 use super::provider::ModelRouterProvider;
-use super::session::{AgentSession, ChannelSink};
+use super::session::{AgentSession, ChannelSink, FanoutSink};
 use super::tools::{to_host_error, HostTools};
 use crate::state::{HostError, HostState};
 
@@ -33,15 +33,22 @@ pub async fn agent_connect(
     let session_token = crate::auth::session_token()?.ok_or_else(HostError::auth_required)?;
     let env = Arc::new(HostEnv::from_app(&app)?);
     // A keychain or disk failure degrades durability, it does not block work.
-    let recorder = match RunJournal::open(&env, &settings.workspace_id) {
-        Ok(journal) => Some(Arc::new(journal) as Arc<dyn edapex_agent::TurnRecorder>),
+    let journal = match RunJournal::open(&env, &settings.workspace_id) {
+        Ok(journal) => Some(Arc::new(journal)),
         Err(error) => {
             eprintln!("run journal unavailable: {}", error.message);
             None
         }
     };
+    let recorder = journal
+        .as_ref()
+        .map(|journal| Arc::clone(journal) as Arc<dyn edapex_agent::TurnRecorder>);
     let approvals = Arc::new(ApprovalRegistry::default());
     let sink = Arc::new(ChannelSink::new(Some(channel)));
+    let events: Arc<dyn edapex_agent::EventSink> = Arc::new(FanoutSink {
+        primary: sink.clone(),
+        journal: journal.clone(),
+    });
     let tools = Arc::new(HostTools {
         env,
         captures: state.captures(),
@@ -51,8 +58,8 @@ pub async fn agent_connect(
         provider: Arc::new(ModelRouterProvider::new(session_token)),
         tools,
         approvals: approvals.clone(),
-        events: sink.clone(),
-                recorder,
+        events,
+        recorder,
     })
     .map_err(to_host_error)?;
     let status = host.status();

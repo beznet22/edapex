@@ -5,9 +5,11 @@
 //! entry — losing the entry loses resumability, not the app, and nothing here
 //! ever reaches the WebView.
 
+use std::collections::BTreeMap;
 use std::sync::Mutex;
+use std::time::{Duration, Instant};
 
-use edapex_agent::{ChatMessage, RunStart, TurnCompletionStatus, TurnRecorder};
+use edapex_agent::{AgentEvent, ChatMessage, EventSink, RunStart, TurnCompletionStatus, TurnRecorder};
 use edapex_store::{MasterKey, RusqliteDriver, Store};
 use rand::RngCore;
 use serde_json::{json, Value};
@@ -18,9 +20,29 @@ use crate::state::HostError;
 const KEYRING_SERVICE: &str = "com.bronotek.edapex";
 const KEYRING_USER: &str = "agent-db";
 
+/// Events are written on the same window as the IPC channel: one transaction
+/// per flush, never one insert per token.
+const FLUSH_WINDOW: Duration = Duration::from_millis(16);
+const FLUSH_COUNT: usize = 64;
+
+struct Pending {
+    rows: Vec<(String, String, Vec<u8>)>,
+    last_flush: Instant,
+}
+
+impl Default for Pending {
+    fn default() -> Self {
+        Pending {
+            rows: Vec::new(),
+            last_flush: Instant::now(),
+        }
+    }
+}
+
 pub struct RunJournal {
     store: Mutex<Store<RusqliteDriver>>,
     workspace_id: String,
+    pending: Mutex<Pending>,
 }
 
 impl RunJournal {
@@ -38,6 +60,7 @@ impl RunJournal {
         Ok(RunJournal {
             store: Mutex::new(store),
             workspace_id: workspace_id.to_string(),
+            pending: Mutex::new(Pending::default()),
         })
     }
 }
@@ -72,6 +95,9 @@ impl TurnRecorder for RunJournal {
     }
 
     fn finished(&self, run_id: &str, status: TurnCompletionStatus, error: Option<&str>) {
+        // The terminal events belong before the status: a resume must see why a
+        // run stopped, and a settled row is what stops it being offered again.
+        self.flush();
         let status = match status {
             TurnCompletionStatus::Completed => "done",
             TurnCompletionStatus::Stopped => "interrupted",
@@ -173,5 +199,127 @@ fn master_key() -> Result<[u8; 32], HostError> {
             format!("Read journal key: {error}"),
             true,
         )),
+    }
+}
+
+impl EventSink for RunJournal {
+    fn emit(&self, event: AgentEvent) {
+        let Ok(value) = serde_json::to_value(&event) else {
+            return;
+        };
+        let run_id = value.get("turnId").and_then(Value::as_str).unwrap_or_default();
+        let kind = value.get("type").and_then(Value::as_str).unwrap_or_default();
+        if run_id.is_empty() || kind.is_empty() {
+            return;
+        }
+        let Ok(payload) = serde_json::to_vec(&value) else {
+            return;
+        };
+        let Ok(mut pending) = self.pending.lock() else {
+            return;
+        };
+        pending
+            .rows
+            .push((run_id.to_string(), kind.to_string(), payload));
+        if pending.rows.len() >= FLUSH_COUNT || pending.last_flush.elapsed() >= FLUSH_WINDOW {
+            self.write_batch(&mut pending);
+        }
+    }
+}
+
+impl RunJournal {
+    /// Writes everything buffered, grouped so each run is one transaction.
+    pub fn flush(&self) {
+        if let Ok(mut pending) = self.pending.lock() {
+            self.write_batch(&mut pending);
+        }
+    }
+
+    fn write_batch(&self, pending: &mut Pending) {
+        pending.last_flush = Instant::now();
+        if pending.rows.is_empty() {
+            return;
+        }
+        let rows = std::mem::take(&mut pending.rows);
+        let mut by_run: BTreeMap<String, Vec<(String, Vec<u8>)>> = BTreeMap::new();
+        for (run_id, kind, payload) in rows {
+            by_run.entry(run_id).or_default().push((kind, payload));
+        }
+        for (run_id, events) in by_run {
+            let borrowed: Vec<(&str, &[u8])> = events
+                .iter()
+                .map(|(kind, payload)| (kind.as_str(), payload.as_slice()))
+                .collect();
+            if let Err(error) = self.lock(|store| store.append_run_events(&run_id, &borrowed, now())) {
+                eprintln!("run journal: could not append events: {}", error.message);
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn journal() -> RunJournal {
+        let mut store = Store::new(
+            RusqliteDriver::in_memory().expect("memory store"),
+            MasterKey::from_bytes([3u8; 32]),
+        );
+        store.migrate().expect("migrate");
+        RunJournal {
+            store: Mutex::new(store),
+            workspace_id: "ws".to_string(),
+            pending: Mutex::new(Pending::default()),
+        }
+    }
+
+    fn delta(text: &str) -> AgentEvent {
+        AgentEvent::MessageDelta {
+            thread_id: "thread-1".to_string(),
+            turn_id: "turn-1".to_string(),
+            item_id: "message-1".to_string(),
+            delta: text.to_string(),
+        }
+    }
+
+    #[test]
+    fn events_are_written_in_order_under_their_run() {
+        let journal = journal();
+        journal
+            .lock(|store| store.begin_run("turn-1", "thread-1", "ws", b"{}", 1))
+            .expect("run");
+
+        journal.emit(delta("Chidi"));
+        journal.emit(AgentEvent::TurnStarted {
+            thread_id: "thread-1".to_string(),
+            turn_id: "turn-1".to_string(),
+        });
+        journal.flush();
+
+        let events = journal
+            .lock(|store| store.run_events("turn-1"))
+            .expect("events");
+        let kinds: Vec<&str> = events.iter().map(|(_, kind, _)| kind.as_str()).collect();
+        assert_eq!(kinds, vec!["message_delta", "turn_started"]);
+        // The payload is the event as the UI receives it, so a resume can replay it.
+        assert!(events[0].2.windows(5).any(|window| window == b"Chidi"));
+    }
+
+    #[test]
+    fn an_event_without_a_turn_is_not_recorded() {
+        let journal = journal();
+        // `Error` carries no turn: it is a provider failure before a turn exists.
+        journal.emit(AgentEvent::Error {
+            thread_id: None,
+            turn_id: None,
+            error: edapex_agent::AgentError::internal("no route"),
+        });
+        journal.flush();
+
+        let rows = journal
+            .lock(|store| store.run_events("turn-1"))
+            .expect("events");
+        assert!(rows.is_empty(), "a turn-less event found a run");
     }
 }
