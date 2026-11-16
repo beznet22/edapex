@@ -55,7 +55,14 @@ export function ChatSurface({
 
       <div className="relative flex min-h-0 flex-1 flex-col">
         <div className="scrollbar-auto mx-auto flex min-h-0 w-full max-w-2xl flex-1 flex-col overflow-y-auto px-gutter pb-2">
-          <div className="flex flex-1 flex-col items-center justify-center gap-3 py-6 text-center">
+          {/*
+           * `mt-auto`, not `flex-1`. A growing composer shrinks the scroll area from the
+           * bottom, and a block that absorbs the leftover space re-centres itself every time
+           * a line is added — the whole screen drifts upward as you type. Pushed down
+           * instead, the mark and the suggestions stay pinned above the composer and move
+           * with it.
+           */}
+          <div className="mt-auto flex flex-col items-center gap-3 py-6 text-center">
             <BrandMark className="h-14 w-auto text-foreground" />
             <p className="text-title font-semibold tracking-tight">What are we working on?</p>
             <p className="max-w-64 text-label text-muted-foreground">
