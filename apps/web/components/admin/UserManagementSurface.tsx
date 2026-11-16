@@ -18,7 +18,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Modal } from "@/components/ui/modal";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { DashboardShell, StatTile, type StatTone } from "@/components/admin/DashboardShell";
+import { DashboardShell } from "@/components/admin/DashboardShell";
+import { StatFigure, StatGroup } from "@/components/admin/StatGroup";
 import { ContactCell, PersonCell, StatusPill } from "@/components/admin/PersonCell";
 import {
   FilterBar,
@@ -46,14 +47,6 @@ import {
 } from "@/lib/admin-api";
 
 type Tab = "staff" | "parents" | "duplicates";
-
-interface Tile {
-  readonly label: string;
-  readonly value: number;
-  readonly qualifier: string;
-  readonly tone: StatTone;
-  readonly alertWhenNonZero?: boolean;
-}
 
 /**
  * The dashboard: one page, everything else a tab, modal or dropdown.
@@ -220,54 +213,23 @@ export function UserManagementSurface() {
     });
   }, [directory, statusFilter, sortKey, sortDirection]);
 
-  const tiles = useMemo<readonly Tile[]>(() => {
-    if (tab === "staff") {
-      return [
-        { label: "People", value: visible.length, qualifier: "in this view", tone: "neutral" },
-        {
-          label: "Active",
-          value: visible.filter((r) => r.active).length,
-          qualifier: "can sign in",
-          tone: "success"
-        },
-        {
-          label: "With account",
-          value: visible.filter((r) => r.hasAccount).length,
-          qualifier: "linked identity",
-          tone: "neutral"
-        },
-        {
-          label: "No email",
-          value: visible.filter((r) => r.email === null || r.email.length === 0).length,
-          qualifier: "cannot be invited",
-          tone: "danger",
-          alertWhenNonZero: true
-        }
-      ];
-    }
-    return [
-      { label: "Guardians", value: directoryVisible.length, qualifier: "in this view", tone: "neutral" },
-      {
-        label: "Claimed",
-        value: directoryVisible.filter((r) => r.claimStatus === "claimed").length,
-        qualifier: "account confirmed",
-        tone: "success"
-      },
-      {
-        label: "Unclaimed",
-        value: directoryVisible.filter((r) => r.claimStatus !== "claimed").length,
-        qualifier: "waiting on them",
-        tone: "warning"
-      },
-      {
-        label: "Flagged",
-        value: directoryVisible.filter((r) => r.claimStatus === "flagged").length,
-        qualifier: "needs review",
-        tone: "danger",
-        alertWhenNonZero: true
-      }
-    ];
-  }, [tab, visible, directoryVisible]);
+  /**
+   * The share of people with a usable account, as a percentage.
+   *
+   * A real ratio rather than a fabricated trend: we have no time series, so an arrow and a
+   * delta would be a claim about history the database does not hold.
+   */
+  const linkedPercent = (
+    list: readonly StaffRow[] | readonly DirectoryItem[],
+    kind: Tab
+  ): string | undefined => {
+    if (list.length === 0) return undefined;
+    const linked =
+      kind === "staff"
+        ? (list as readonly StaffRow[]).filter((row) => row.hasAccount).length
+        : (list as readonly DirectoryItem[]).filter((row) => row.claimStatus === "claimed").length;
+    return `${Math.round((linked / list.length) * 100)}%`;
+  };
 
   const shownIds = useMemo(
     () => (tab === "staff" ? visible.map((r) => r.id) : directoryVisible.map((r) => r.subjectId)),
@@ -373,18 +335,70 @@ export function UserManagementSurface() {
       }
       title={isAdmin ? "People" : "My class"}
     >
-      {/* KPIs first: they answer "what is the state" before the table answers "who". */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {tiles.map((tile) => (
-          <StatTile
-            alertWhenNonZero={tile.alertWhenNonZero ?? false}
-            key={tile.label}
-            label={tile.label}
-            qualifier={tile.qualifier}
-            tone={tile.tone}
-            value={tile.value}
-          />
-        ))}
+      {/*
+        KPIs first: they answer "what is the state" before the table answers "who".
+
+        Grouped rather than four equal tiles, following the reference. The three state counts
+        belong to one question and share a card; the total stands on its own because it is a
+        different kind of number. Four identical cards gave every metric the same weight as the
+        total, which is the wrong hierarchy.
+      */}
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <StatGroup
+          aside={tab === "staff" ? "current view" : "guardians"}
+          className="sm:col-span-2"
+          metrics={
+            tab === "staff"
+              ? [
+                  { label: "Active", value: visible.filter((r) => r.active).length, tone: "success" },
+                  {
+                    label: "Account",
+                    value: visible.filter((r) => r.hasAccount).length,
+                    tone: "neutral"
+                  },
+                  {
+                    label: "No email",
+                    value: visible.filter((r) => r.email === null || r.email.length === 0).length,
+                    tone: "danger"
+                  }
+                ]
+              : [
+                  {
+                    label: "Claimed",
+                    value: directoryVisible.filter((r) => r.claimStatus === "claimed").length,
+                    tone: "success"
+                  },
+                  {
+                    label: "Unclaimed",
+                    value: directoryVisible.filter((r) => r.claimStatus !== "claimed").length,
+                    tone: "warning"
+                  },
+                  {
+                    label: "Flagged",
+                    value: directoryVisible.filter((r) => r.claimStatus === "flagged").length,
+                    tone: "danger"
+                  }
+                ]
+          }
+          title={tab === "staff" ? "People" : "Guardians"}
+        />
+        <StatFigure
+          badge={linkedPercent(tab === "staff" ? visible : directoryVisible, tab)}
+          caption={tab === "staff" ? "have a linked identity" : "have claimed their account"}
+          title={tab === "staff" ? "Linked" : "Claimed"}
+          tone="neutral"
+          value={tab === "staff" ? visible.filter((r) => r.hasAccount).length : directoryVisible.filter((r) => r.claimStatus === "claimed").length}
+        />
+        <StatFigure
+          caption="need an administrator"
+          title="Needs attention"
+          tone="danger"
+          value={
+            tab === "staff"
+              ? visible.filter((r) => r.email === null || r.email.length === 0).length
+              : directoryVisible.filter((r) => r.claimStatus === "flagged").length
+          }
+        />
       </div>
 
       <Tabs className="mt-6" onValueChange={(value) => setTab(value as Tab)} value={tab}>

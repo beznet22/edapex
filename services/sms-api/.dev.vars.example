@@ -29,3 +29,11 @@ POST_LOGIN_REDIRECT=http://127.0.0.1:5181/workspace
 # `CORS_ORIGINS` is deliberately absent. The dev server proxies `/api`, so the browser never
 # makes a cross-origin request — and overriding it makes the vitest plugin (which loads this
 # file) fail the CORS suite, which asserts the production allowlist.
+
+# Sign-in links last 30 days locally.
+#
+# Production ships 15 minutes, because a token sitting in an inbox is a bearer credential and
+# a long window makes a forwarded email a standing invitation. Locally the only place the link
+# appears is this terminal, and a 15-minute link expires while you are still reading the error
+# you were about to fix — so the window is the whole debug session.
+MAGIC_LINK_TTL_SECONDS=2592000

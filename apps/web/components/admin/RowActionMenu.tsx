@@ -54,7 +54,7 @@ export function RowActionMenu(actions: RowActions) {
         </DropdownMenuLabel>
         <DropdownMenuItem onSelect={actions.onEdit}>
           <Pencil aria-hidden="true" />
-          {actions.editLabel ?? "Update"}
+          {actions.editLabel ?? "Edit"}
         </DropdownMenuItem>
 
         {actions.onLink === undefined ? null : (
@@ -64,7 +64,7 @@ export function RowActionMenu(actions: RowActions) {
             title={actions.linkDisabledReason}
           >
             <Link2 aria-hidden="true" />
-            {actions.linkDisabledReason === undefined ? "Send claim link" : "Link unavailable"}
+            {actions.linkDisabledReason === undefined ? "Link" : "Link unavailable"}
           </DropdownMenuItem>
         )}
 
@@ -81,7 +81,7 @@ export function RowActionMenu(actions: RowActions) {
           onSelect={actions.onRemove}
         >
           <UserMinus aria-hidden="true" />
-          {actions.removeLabel ?? "Remove"}
+          {actions.removeLabel ?? "Delete"}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

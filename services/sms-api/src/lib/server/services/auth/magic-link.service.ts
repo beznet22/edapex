@@ -8,6 +8,12 @@ import type { RateLimitAttempt, RateLimitRule } from "./rate-limit-policy";
 import { issueSession, loadAuthUser } from "./session-issuance";
 import type { AuthSessionResult } from "./types";
 
+/**
+ * The production default, kept for tests and for the DTO's `expiresMinutes`.
+ *
+ * The live value comes from `authConfig.magicLinkTtlSeconds` — a Worker has no `process.env`,
+ * and `.dev.vars` raises this to 30 days so a local link does not expire mid-debug.
+ */
 export const MAGIC_LINK_TTL_SECONDS = 15 * 60;
 
 export const MAGIC_LINK_LIMITS = {
@@ -109,7 +115,8 @@ export class MagicLinkService {
     }
 
     const token = randomToken();
-    const expiresAt = now + MAGIC_LINK_TTL_SECONDS;
+    const ttl = this.ctx.ports.authConfig.magicLinkTtlSeconds;
+    const expiresAt = now + ttl;
     await this.ctx.repos.accounts.createMagicLink(unscoped, {
       id: crypto.randomUUID(),
       userId: user.id,
@@ -129,7 +136,7 @@ export class MagicLinkService {
       await this.ctx.ports.email.send({
         template: "magic_link",
         to: email,
-        data: { url: url.toString(), expiresMinutes: MAGIC_LINK_TTL_SECONDS / 60 }
+        data: { url: url.toString(), expiresMinutes: Math.round(ttl / 60) }
       });
     } catch (error) {
       delivered = false;

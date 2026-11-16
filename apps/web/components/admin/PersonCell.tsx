@@ -22,6 +22,25 @@ export function initialsOf(name: string | null): string {
   return `${first}${last}`.toUpperCase();
 }
 
+/**
+ * A stable hue per person, so two people whose initials collide are still distinct.
+ *
+ * Derived from the name rather than stored: it must survive a re-render, and a colour column
+ * on `users` for a cosmetic hint would be a schema change for nothing.
+ *
+ * The lightness is fixed and the chroma is low — this is a tint behind an initial, not a
+ * signal, and a directory of saturated avatars competes with the status pills that do carry
+ * meaning.
+ */
+function hueOf(name: string | null): number {
+  const text = name ?? "?";
+  let hash = 0;
+  for (let index = 0; index < text.length; index += 1) {
+    hash = (hash * 31 + text.charCodeAt(index)) % 360;
+  }
+  return hash;
+}
+
 export function PersonCell({
   name,
   secondary,
@@ -39,7 +58,12 @@ export function PersonCell({
         {photo === null || photo === undefined ? null : (
           <AvatarImage alt="" src={photo} />
         )}
-        <AvatarFallback className="text-[11px] font-semibold">
+        <AvatarFallback
+          className="text-[11px] font-semibold text-foreground/80"
+          style={{
+            backgroundColor: `oklch(0.93 0.045 ${hueOf(name)})`
+          }}
+        >
           {initialsOf(name)}
         </AvatarFallback>
       </Avatar>

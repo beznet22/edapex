@@ -11,4 +11,11 @@ export interface AuthConfigPort {
   readonly googleConfigured: boolean;
   readonly postLoginRedirect: string;
   readonly appOrigin: string;
+  /**
+   * How long a sign-in link stays valid, in seconds.
+   *
+   * 15 minutes in production; `.dev.vars` raises it, because a link that expires while you
+   * are still reading the error you were about to fix is a link you request again.
+   */
+  readonly magicLinkTtlSeconds: number;
 }
