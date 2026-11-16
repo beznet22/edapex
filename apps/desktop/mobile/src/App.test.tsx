@@ -18,11 +18,17 @@ import { windowClassFor } from "./hooks/use-window-class";
 describe("the shell", () => {
   const html = renderToString(<App />);
 
-  it("starts on a conversation, with Chat and Make as the only ways in", () => {
+  it("starts on a conversation, with Chat and Tasks in the segmented control", () => {
     expect(html).toContain("Chat");
-    expect(html).toContain("Make");
+    expect(html).toContain("Tasks");
+    expect(html).not.toContain(">Make<");
     expect(html).toContain('aria-label="Open menu"');
     expect(html).toContain('aria-label="More options"');
+  });
+
+  it("puts the mark above the question rather than an icon", () => {
+    expect(html).toContain("What are we working on?");
+    expect(html).toContain("<svg");
   });
 
   it("has no bottom dock and no app bar", () => {
@@ -31,7 +37,7 @@ describe("the shell", () => {
   });
 
   it("mounts the composer and its disclaimer", () => {
-    expect(html).toContain('aria-label="Message EDAPEX"');
+    expect(html).toContain('aria-label="Message Edapex"');
     expect(html).toContain("EDAPEX can make mistakes");
   });
 

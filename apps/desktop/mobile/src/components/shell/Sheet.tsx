@@ -45,7 +45,7 @@ export function Sheet({
         <DrawerHeader className="px-gutter pb-2 pt-0">
           <DrawerTitle className="text-title">{title}</DrawerTitle>
         </DrawerHeader>
-        <div className="screen-bottom scrollbar-auto min-h-0 flex-1 overflow-y-auto px-gutter pb-4">
+        <div className="screen-bottom scrollbar-auto min-h-0 flex-1 overflow-y-auto px-gutter">
           {children}
         </div>
       </DrawerContent>

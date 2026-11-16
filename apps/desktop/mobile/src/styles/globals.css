@@ -70,59 +70,47 @@
   --inset-bottom: max(env(safe-area-inset-bottom), var(--platform-inset-bottom, 0px));
   --inset-left: max(env(safe-area-inset-left), var(--platform-inset-left, 0px));
   --inset-right: max(env(safe-area-inset-right), var(--platform-inset-right, 0px));
-  --dock-height: calc(var(--spacing-dock) + var(--inset-bottom));
 }
 
-@layer components {
-  .screen-top {
-    padding-top: var(--inset-top);
-  }
+/*
+ * Unlayered on purpose. Tailwind checks cascade layers *before* specificity, so a
+ * `@layer components` rule loses to a utilities-layer class even when it is more
+ * specific — that is why the sheet ignored its own height and the composer override
+ * needed a rule instead of a `pb-*`. These rules exist to win, so they sit outside
+ * every layer.
+ */
+.screen-top {
+  padding-top: var(--inset-top);
+}
 
-  .screen-bottom {
-    padding-bottom: var(--inset-bottom);
-  }
+.screen-bottom {
+  padding-bottom: var(--inset-bottom);
+}
 
-  /* The dock floats above the gesture bar, so it needs the inset plus its own gap. */
-  .dock-offset {
-    bottom: calc(var(--inset-bottom) + 0.75rem);
-  }
+/*
+ * The composer is anchored to the bottom edge, so the gesture bar is part of its height.
+ * Declared here rather than as `pb-*` on the element: a utility would win over this class
+ * and the composer would sit under the bar on exactly the devices that have one.
+ */
+.composer-dock {
+  padding-bottom: calc(var(--inset-bottom) + 1rem);
+}
 
-  /*
-   * The composer is anchored to the bottom edge, so the gesture bar is part of its height.
-   * Declared here rather than as `pb-*` on the element: a utility would win over this class
-   * and the composer would sit under the bar on exactly the devices that have one.
-   */
-  .composer-dock {
-    padding-bottom: calc(var(--inset-bottom) + 0.5rem);
-  }
+/* The attach panel floats clear of the composer and the gesture bar together. */
+.attach-offset {
+  bottom: calc(var(--inset-bottom) + 5.5rem);
+}
 
-  /* The attach panel floats clear of the composer and the gesture bar together. */
-  .attach-offset {
-    bottom: calc(var(--inset-bottom) + 5.5rem);
-  }
+/* A control pinned to the bottom of a surface. */
+.float-bottom {
+  bottom: calc(var(--inset-bottom) + 0.75rem);
+}
 
-  /* A control pinned to the bottom of a surface. */
-  .float-bottom {
-    bottom: calc(var(--inset-bottom) + 0.75rem);
-  }
-
-  /* The drawer runs edge to edge, so it owns both insets — the wordmark was under the status bar. */
-  .app-drawer {
-    padding: 0;
-    padding-top: var(--inset-top);
-    padding-bottom: var(--inset-bottom);
-  }
-
-  /*
-   * Leaving the viewport has to be a transform, not a `translate-y-[calc(...)]` — an
-   * arbitrary value is a value no token can change, and this one has to clear the gesture
-   * bar's inset.
-   */
-  .dock-shift[data-hidden="true"] {
-    transform: translateY(calc(100% + var(--inset-bottom) + 1rem));
-    opacity: 0;
-    pointer-events: none;
-  }
+/* The drawer runs edge to edge, so it owns both insets — the wordmark was under the status bar. */
+.app-drawer {
+  padding: 0;
+  padding-top: var(--inset-top);
+  padding-bottom: var(--inset-bottom);
 }
 
 @layer components {
@@ -189,29 +177,34 @@
   }
 }
 
-@layer components {
-  /*
-   * The sheet's two heights.
-   *
-   * Declared here rather than as utilities because the registry panel carries `h-auto`, and a
-   * utilities-layer class beats a components-layer one whatever the class order — that is how
-   * the sheet ended up clamped to 80vh and positioned off-screen. The `[data-slot]` prefix
-   * gives these rules enough specificity that the layer no longer decides.
-   */
-  [data-slot="drawer-content"].sheet-peek {
-    height: 40dvh;
-  }
+/*
+ * Unlayered on purpose. Tailwind checks cascade layers *before* specificity, so a
+ * `@layer components` rule loses to a utilities-layer class even when it is more
+ * specific — that is why the sheet ignored its own height and the composer override
+ * needed a rule instead of a `pb-*`. These rules exist to win, so they sit outside
+ * every layer.
+ */
+/*
+ * The sheet's two heights.
+ *
+ * Declared here rather than as utilities because the registry panel carries `h-auto`, and a
+ * utilities-layer class beats a components-layer one whatever the class order — that is how
+ * the sheet ended up clamped to 80vh and positioned off-screen. The `[data-slot]` prefix
+ * gives these rules enough specificity that the layer no longer decides.
+ */
+[data-slot="drawer-content"].sheet-peek {
+  height: 40dvh;
+}
 
-  [data-slot="drawer-content"].sheet-full {
-    height: 100dvh;
-  }
+[data-slot="drawer-content"].sheet-full {
+  height: 100dvh;
+}
 
-  /*
-   * A sheet is anchored to the bottom edge, so its content sits behind the gesture bar unless
-   * it reserves the inset itself. This is the one place outside `Screen` that writes it, and
-   * it does so for the same reason `Screen` does: a sheet has no parent to inherit from.
-   */
-  [data-slot="drawer-content"] {
-    padding-bottom: max(env(safe-area-inset-bottom), var(--platform-inset-bottom, 0px));
-  }
+/*
+ * A sheet is anchored to the bottom edge, so its content sits behind the gesture bar unless
+ * it reserves the inset itself. This is the one place outside `Screen` that writes it, and
+ * it does so for the same reason `Screen` does: a sheet has no parent to inherit from.
+ */
+[data-slot="drawer-content"] {
+  padding-bottom: max(env(safe-area-inset-bottom), var(--platform-inset-bottom, 0px));
 }

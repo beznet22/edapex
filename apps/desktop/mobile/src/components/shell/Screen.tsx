@@ -19,7 +19,7 @@ export function Screen({
   return (
     <div
       className={cn(
-        "screen-top flex min-h-dvh flex-col bg-background text-foreground",
+        "screen-top flex min-h-dvh w-full flex-col bg-background text-foreground",
         className
       )}
     >

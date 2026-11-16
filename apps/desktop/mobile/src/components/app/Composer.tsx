@@ -57,33 +57,33 @@ export function Composer({
           </InputGroupAddon>
 
           <InputGroupInput
-            aria-label="Message EDAPEX"
+            aria-label="Message Edapex"
             className="h-auto py-0 text-body"
             onChange={(event) => setValue(event.target.value)}
-            placeholder="Ask EDAPEX"
+            placeholder="Ask Edapex"
             value={value}
           />
 
           <InputGroupAddon align="inline-end" className="gap-1">
             <InputGroupButton
               aria-label="Dictate"
-              className="size-touch rounded-full text-muted-foreground"
+              className="size-10 rounded-full text-muted-foreground"
               size="icon-sm"
             >
               <Mic aria-hidden="true" className="size-5" />
             </InputGroupButton>
             <InputGroupButton
               aria-label={busy ? "Stop" : "Send"}
-              className="size-touch rounded-full"
+              className="size-10 rounded-full text-primary-foreground"
               onClick={busy ? onStop : undefined}
               size="icon-sm"
               type={busy ? "button" : "submit"}
               variant="default"
             >
               {busy ? (
-                <Square aria-hidden="true" className="size-4 fill-current" />
+                <Square aria-hidden="true" className="size-3.5 fill-current" strokeWidth={0} />
               ) : (
-                <ArrowUp aria-hidden="true" className="size-5" />
+                <ArrowUp aria-hidden="true" className="size-5" strokeWidth={2.75} />
               )}
             </InputGroupButton>
           </InputGroupAddon>

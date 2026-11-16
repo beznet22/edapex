@@ -1,4 +1,4 @@
-import { Search, UserPlus } from "lucide-react";
+import { Search, Sparkles, UserPlus } from "lucide-react";
 
 import { Avatar, AvatarFallback } from "@edapex/ui/components/avatar";
 import { Button } from "@edapex/ui/components/button";
@@ -15,6 +15,7 @@ import {
   RECENT_THREADS,
   type SurfaceId
 } from "@/lib/nav";
+import { BrandMark } from "@/components/brand/BrandMark";
 import { ICONS } from "@/lib/icons";
 
 /**
@@ -47,7 +48,10 @@ export function AppDrawer({
         side="left"
       >
         <SheetHeader className="flex-row items-center justify-between px-gutter pt-4">
-          <SheetTitle className="text-title font-semibold tracking-tight">EDAPEX</SheetTitle>
+          <div className="flex items-center gap-2">
+            <BrandMark className="h-6 w-auto text-foreground" />
+            <SheetTitle className="text-title font-semibold tracking-tight">EDAPEX</SheetTitle>
+          </div>
           <Button
             aria-label="Search"
             className="rounded-full bg-muted text-foreground"
@@ -83,10 +87,19 @@ export function AppDrawer({
 
             <button
               className="mt-2 flex min-h-comfortable w-full items-center gap-3 rounded-lg px-3 text-left text-primary outline-none motion-effects-fast hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
+              onClick={() => onSelect("make")}
+              type="button"
+            >
+              <Sparkles aria-hidden="true" className="size-5 shrink-0" />
+              <span className="min-w-0 flex-1 truncate text-body">New agent</span>
+            </button>
+
+            <button
+              className="flex min-h-comfortable w-full items-center gap-3 rounded-lg px-3 text-left outline-none motion-effects-fast hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
               onClick={() => onSelect("people")}
               type="button"
             >
-              <UserPlus aria-hidden="true" className="size-5 shrink-0" />
+              <UserPlus aria-hidden="true" className="size-5 shrink-0 text-muted-foreground" />
               <span className="min-w-0 flex-1 truncate text-body">Invite staff</span>
             </button>
           </nav>

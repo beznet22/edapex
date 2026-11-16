@@ -1,4 +1,4 @@
-import { Menu, MessageCircle, MoreVertical, Sparkles } from "lucide-react";
+import { MessageCircle, MoreVertical, Sparkles } from "lucide-react";
 
 import { Button } from "@edapex/ui/components/button";
 import {
@@ -10,20 +10,21 @@ import {
 } from "@edapex/ui/components/dropdown-menu";
 import { ToggleGroup, ToggleGroupItem } from "@edapex/ui/components/toggle-group";
 
+import { MenuGlyph } from "@/components/brand/MenuGlyph";
 import type { SurfaceId } from "@/lib/nav";
 
-export type ComposeMode = "chat" | "make";
+export type ComposeMode = "chat" | "tasks";
 
 /**
- * Frame 1's top strip, with two EDAPEX changes.
+ * Frame 1's top strip: the mark to open navigation, Chat · Tasks to switch what the screen
+ * is showing, and a menu for everything that is an action rather than a destination.
  *
- * The segmented control keeps only the two things you begin from — a conversation, or an
- * agent. Everything else is navigation, and navigation lives in the drawer. The right-hand
- * circle is a **vertical three-dot menu** rather than ChatGPT's recorder, because the
- * recorder is a surface we do not have and a menu is one we need.
+ * The two controls are bare icons, not filled circles. On a screen with no app bar, two
+ * discs at the top edge compete with the segmented control between them; the 44dp target is
+ * still there, and the press state gives the same feedback a permanent disc would.
  *
- * No app bar: three floating clusters on the page background, so the content keeps the
- * height an app bar would cost.
+ * Make is not a tab. It is a thing you start, so it lives in the menu and in the drawer —
+ * a tab that opens a form and then closes again is a mode pretending to be a place.
  */
 export function TopBar({
   approvals,
@@ -43,17 +44,17 @@ export function TopBar({
       <div className="relative">
         <Button
           aria-label="Open menu"
-          className="rounded-full border border-border bg-card text-foreground"
+          className="size-touch rounded-full text-foreground"
           onClick={onOpenDrawer}
           size="icon"
           variant="ghost"
         >
-          <Menu aria-hidden="true" className="size-5" />
+          <MenuGlyph className="size-6" />
         </Button>
         {approvals > 0 ? (
           <span
             aria-hidden="true"
-            className="pointer-events-none absolute right-1 top-1 size-2 rounded-full bg-primary"
+            className="pointer-events-none absolute right-1.5 top-1.5 size-2 rounded-full bg-primary"
           />
         ) : null}
       </div>
@@ -75,10 +76,10 @@ export function TopBar({
         </ToggleGroupItem>
         <ToggleGroupItem
           className="gap-2 rounded-dock px-4 text-label data-[state=on]:bg-card data-[state=on]:text-foreground"
-          value="make"
+          value="tasks"
         >
           <Sparkles aria-hidden="true" className="size-4 text-primary" />
-          Make
+          Tasks
         </ToggleGroupItem>
       </ToggleGroup>
 
@@ -86,7 +87,7 @@ export function TopBar({
         <DropdownMenuTrigger asChild>
           <Button
             aria-label="More options"
-            className="rounded-full border border-border bg-card text-foreground"
+            className="size-touch rounded-full text-foreground"
             size="icon"
             variant="ghost"
           >
@@ -95,6 +96,7 @@ export function TopBar({
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-56 rounded-xl">
           <DropdownMenuItem onSelect={() => onSelect("new")}>New chat</DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => onSelect("make")}>Create agent</DropdownMenuItem>
           <DropdownMenuItem onSelect={() => onSelect("approvals")}>
             Approvals
             {approvals > 0 ? (
@@ -103,7 +105,6 @@ export function TopBar({
               </span>
             ) : null}
           </DropdownMenuItem>
-          <DropdownMenuItem onSelect={() => onSelect("agents")}>Agents</DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem onSelect={() => onSelect("settings")}>Settings</DropdownMenuItem>
         </DropdownMenuContent>

@@ -1,5 +1,4 @@
-import { MessageCircle } from "lucide-react";
-
+import { BrandMark } from "@/components/brand/BrandMark";
 import { QUICK_ACTIONS, type SurfaceId } from "@/lib/nav";
 import { ICONS } from "@/lib/icons";
 import { cn } from "@edapex/ui/lib/utils";
@@ -55,11 +54,9 @@ export function ChatSurface({
       />
 
       <div className="relative flex min-h-0 flex-1 flex-col">
-        <div className="scrollbar-auto flex min-h-0 flex-1 flex-col overflow-y-auto px-gutter pb-2">
+        <div className="scrollbar-auto mx-auto flex min-h-0 w-full max-w-2xl flex-1 flex-col overflow-y-auto px-gutter pb-2">
           <div className="flex flex-1 flex-col items-center justify-center gap-3 py-6 text-center">
-            <span className="flex size-14 items-center justify-center rounded-full bg-muted text-muted-foreground">
-              <MessageCircle aria-hidden="true" className="size-6" />
-            </span>
+            <BrandMark className="h-14 w-auto text-foreground" />
             <p className="text-title font-semibold tracking-tight">What are we working on?</p>
             <p className="max-w-64 text-label text-muted-foreground">
               Ask about a class, a record or a document. EDAPEX reads what you give it and
@@ -89,7 +86,9 @@ export function ChatSurface({
         </div>
 
         <AttachPanel onSelect={onAttachSelect} open={attachOpen} />
-        <Composer busy={busy} onAttach={onAttach} onSend={onSend} />
+        <div className="mx-auto w-full max-w-2xl">
+          <Composer busy={busy} onAttach={onAttach} onSend={onSend} />
+        </div>
       </div>
     </Screen>
   );

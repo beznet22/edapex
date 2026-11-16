@@ -87,10 +87,25 @@ class MainActivity : TauriActivity() {
 
     override fun onResume() {
         super.onResume()
+        restoreEdgeToEdge()
         // A cold start can finish `onCreate` before the WebView is attached; a resume is the
         // last chance to catch one that appeared late.
         attachHostBridge()
         applyInsets()
+    }
+
+    /**
+     * Edge-to-edge is not sticky across a screen lock.
+     *
+     * `enableEdgeToEdge()` runs once in `onCreate`, but some OEMs — this Samsung among them —
+     * restore decor fitting when the app comes back from the keyguard. The WebView is then
+     * laid out *inside* the status and navigation bars while the page still reserves those
+     * insets in CSS, so the space is counted twice and the content loses height at both ends
+     * until the activity is recreated. Re-asserting it on every resume and focus makes the
+     * two agree again.
+     */
+    private fun restoreEdgeToEdge() {
+        WindowCompat.setDecorFitsSystemWindows(window, false)
     }
 
     /**
@@ -130,6 +145,7 @@ class MainActivity : TauriActivity() {
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
         if (hasFocus) {
+            restoreEdgeToEdge()
             attachHostBridge()
             applyInsets()
         }
