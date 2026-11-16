@@ -1,0 +1,13 @@
+{
+  "name": "@edapex/tokens",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Gold on Slate — the single source of every design value in the workspace",
+  "exports": {
+    "./tokens.css": "./tokens.css"
+  },
+  "files": [
+    "tokens.css"
+  ]
+}

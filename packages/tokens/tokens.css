@@ -1,0 +1,876 @@
+/*
+ * Gold on Slate — the only file in the repository that defines a design value.
+ *
+ * Every colour, type size, radius, shadow and motion duration in every host comes from
+ * here. A second definition anywhere else is a bug, not a variant. See DESIGN.md for the
+ * rationale and `docs/workspace/specs/82-package-boundaries.md` for why this is a package
+ * rather than a stylesheet inside one app.
+ *
+ * Host-neutral by construction: no selectors that depend on a route, a shell or a window.
+ * Anything web-specific stays in `apps/web/app/globals.css`; anything mobile-specific is an
+ * additive `@theme` block in `apps/desktop/mobile`.
+ */
+
+/*
+ * Gold on Slate.
+ *
+ * Both palettes are defined explicitly. Previously `:root` held the dark values
+ * and there was no `.dark` block at all, so "light mode" was dark mode with a
+ * different class name. Light values live in `:root`, dark values in `.dark`, and
+ * `<html class="dark">` selects the dark set.
+ */
+:root {
+  color-scheme: light;
+
+  /*
+   * Sidebar. A slightly recessed cream so the rail separates from the canvas without
+   * looking like a panel. Consumed by `components/ui/sidebar.tsx`.
+   */
+  --sidebar: oklch(0.966 0.0089 82.8);
+  --sidebar-foreground: oklch(0.191 0.0020 106.6);
+  --sidebar-border: oklch(0.907 0.0122 67.7);
+  --sidebar-accent: oklch(0.936 0.0161 82.8);
+  --sidebar-accent-foreground: oklch(0.264 0.0037 106.6);
+  --sidebar-ring: oklch(0.56 0.13 36);
+  /*
+   * shadcn's widths, unchanged. `--sidebar-width-icon` is 3rem because the menu button
+   * collapses to `size-8` — a wider rail simply adds dead space around a 32px icon,
+   * which is exactly what made the collapsed rail look oversized.
+   */
+  --sidebar-width: 16rem;
+  --sidebar-width-icon: 3rem;
+
+  /*
+   * Warm neutrals, from the Claude palette in `designs/claude.design.md`.
+   *
+   * The hue is ~85 rather than slate's 255: a cream canvas instead of a cool one.
+   * Cool grays read as clinical, and this is a surface people read for a term at a
+   * time. The chroma stays under 0.02 so the warmth is felt, not seen.
+   */
+  --background: oklch(0.982 0.0054 95.1);
+  --foreground: oklch(0.191 0.0020 106.6);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.191 0.0020 106.6);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.191 0.0020 106.6);
+  /*
+   * Coral. The source token `#cc785c` is `oklch(0.658 0.1131 39.1)` and measures
+   * 3.28:1 against white — below the 4.5:1 body text needs, and this is the app's
+   * most-used action. Darkened to L=0.56, which keeps the hue and the warmth and
+   * measures 4.94:1. The near-white foreground is therefore correct here; the
+   * previous mustard needed ink, which is why "gold with dark ink" looked wrong —
+   * `oklch(0.62 0.12 74)` renders as `#b17a21`, which is mustard, not gold.
+   */
+  --primary: oklch(0.56 0.13 36);
+  --primary-foreground: oklch(1 0 0);
+  --secondary: oklch(0.957 0.0119 79.8);
+  --secondary-foreground: oklch(0.264 0.0037 106.6);
+  --muted: oklch(0.957 0.0119 79.8);
+  --muted-foreground: oklch(0.524 0.0096 91.6);
+  --accent: oklch(0.936 0.0161 82.8);
+  --accent-foreground: oklch(0.264 0.0037 106.6);
+  --destructive: oklch(0.57 0.165 24);
+  --destructive-foreground: oklch(1 0 0);
+  --border: oklch(0.907 0.0122 67.7);
+  --input: oklch(0.907 0.0122 67.7);
+  --ring: oklch(0.56 0.13 36);
+  /*
+   * Semantic state colours. These exist because six components used raw Tailwind
+   * palette classes (`text-emerald-300`, `bg-amber-300/10`) and the "Live" pill was
+   * nearly invisible on a light surface. A raw palette value has no idea which theme
+   * it is on; a token does, and each is measured against its own canvas.
+   */
+  --success: oklch(0.50 0.11 150);
+  --success-foreground: oklch(1 0 0);
+  --warning: oklch(0.55 0.12 75);
+  --warning-foreground: oklch(1 0 0);
+
+  /*
+   * Text inks for tinted chips and deltas.
+   *
+   * `--warning` and `--destructive` are sized to work as *fills*, and used as 12px text on
+   * their own 10% tint they measure 4.35:1 and 4.22:1 — below the 4.5:1 AA floor. These are
+   * one step darker in lightness with the hue held, which lands at 4.91:1 and 5.13:1 against
+   * the same tint and is indistinguishable in hue at chip size.
+   *
+   * Dark mode needs no ink tokens: every one of its chips already measures 4.59:1 or better
+   * on its own 10% self-tint, which is why they are declared only in `:root`.
+   */
+  --success-ink: var(--success);
+  --warning-ink: oklch(0.52 0.115 72);
+  --destructive-ink: oklch(0.52 0.15 25);
+
+  /* Surface elevations. Replacing per-edge borders with these is what makes the
+     shell read as layers instead of a grid of lines. */
+  --elevation-1: 0 1px 2px oklch(0.191 0.002 106.6 / 0.06);
+  --elevation-2: 0 2px 8px oklch(0.191 0.002 106.6 / 0.08);
+  --elevation-3: 0 8px 28px oklch(0.191 0.002 106.6 / 0.12);
+  --glass-tint: oklch(1 0 0 / 0.72);
+  --glass-edge: oklch(0.907 0.0122 67.7 / 0.9);
+
+  /*
+   * Window chrome. Used only inside the desktop window; a browser tab has no
+   * titlebar, so these resolve but nothing consumes them there.
+   * See specs/49-desktop-window.md and DESIGN.md.
+   */
+  --window-hairline: oklch(0.191 0.002 106.6 / 0.06);
+  --window-surface: oklch(0.982 0.0054 95.1);
+  --titlebar-height: 2rem;
+  --motion-fast: 120ms;
+  --motion-normal: 200ms;
+  --motion-panel: 280ms;
+  --motion-exit: 160ms;
+  --motion-enter: 220ms;
+
+  /*
+   * Radius ladder, derived from the `0.625rem` base in the pasted shadcn preset.
+   * A single `--radius` forced every surface to one corner, which is why the shell read
+   * as one flat slab: a 11px rail button and a 400px canvas had identical corners.
+   * Four steps let nesting communicate itself — the outer surface is roundest, children
+   * step down.
+   */
+  --radius: 0.625rem;
+  --radius-xs: calc(var(--radius) - 4px);
+  --radius-sm: calc(var(--radius) - 2px);
+  --radius-md: var(--radius);
+  --radius-lg: calc(var(--radius) + 4px);
+  --radius-xl: calc(var(--radius) + 8px);
+
+  /*
+   * Paper. Report cards, transcripts and artifacts render on this rather than on
+   * `--card`: paper is warm-white and slightly warmer than a UI card, so a document
+   * reads as a document instead of a panel.
+   */
+  --paper: oklch(0.992 0.0032 95.1);
+  --paper-ink: oklch(0.191 0.0020 106.6);
+  --paper-line: oklch(0.925 0.0104 78);
+  --paper-shadow: 0 1px 2px oklch(0.191 0.002 106.6 / 0.04), 0 8px 24px oklch(0.191 0.002 106.6 / 0.06);
+
+  --workspace-width: 430px;
+  --workspace-canvas: 760px;
+  --artifact-paper: #fbfaf7;
+  --artifact-ink: #1f1f1f;
+  --artifact-muted: #6f6a61;
+  --artifact-line: #e4e0d7;
+  --artifact-hover: rgba(0, 0, 0, 0.05);
+  --duet-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --duet-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  /*
+   * Exit is faster than enter on purpose: leaving should feel responsive, arriving
+   * considered. Reversing the pair makes navigation feel sluggish.
+   */
+  --ease-exit: cubic-bezier(0.3, 0, 0.8, 0.15);
+  --ease-enter: cubic-bezier(0.05, 0.7, 0.1, 1);
+}
+
+.dark {
+  color-scheme: dark;
+
+  --sidebar: oklch(0.235 0.0058 91.6);
+  --sidebar-foreground: oklch(0.982 0.0054 95.1);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-accent: oklch(0.275 0.006 78);
+  --sidebar-accent-foreground: oklch(0.982 0.0054 95.1);
+  --sidebar-ring: oklch(0.74 0.11 40);
+
+  /*
+   * The warm dark from the Claude reference (`#181715` = `oklch(0.205 0.0042 84.6)`),
+   * not a blue-black. A cool dark beside a cream light surface reads as two different
+   * products rather than one at night.
+   */
+  --background: oklch(0.205 0.0042 84.6);
+  --foreground: oklch(0.982 0.0054 95.1);
+  --card: oklch(0.257 0.0063 78.2);
+  --card-foreground: oklch(0.982 0.0054 95.1);
+  --popover: oklch(0.257 0.0063 78.2);
+  --popover-foreground: oklch(0.982 0.0054 95.1);
+  /*
+   * Lightened rather than darkened. The source dark primary sits at L=0.45, which
+   * measured 2.10:1 against `--muted` — a primary button and a muted surface were
+   * nearly the same colour, so the action did not read as the action. At L=0.74 the
+   * separation is comfortable and ink text on it measures 7.67:1.
+   */
+  --primary: oklch(0.74 0.11 40);
+  --primary-foreground: oklch(0.205 0.0042 84.6);
+  --secondary: oklch(0.275 0.006 78);
+  --secondary-foreground: oklch(0.982 0.0054 95.1);
+  --muted: oklch(0.275 0.006 78);
+  --muted-foreground: oklch(0.696 0.0106 87.5);
+  --accent: oklch(0.275 0.006 78);
+  --accent-foreground: oklch(0.982 0.0054 95.1);
+  --destructive: oklch(0.70 0.15 24);
+  --destructive-foreground: oklch(0.205 0.0042 84.6);
+  /* A hairline on dark needs opacity rather than a lighter solid: a fixed light
+     border is visible on the canvas but glares on elevated cards. */
+  --border: oklch(1 0 0 / 12%);
+  --input: oklch(1 0 0 / 16%);
+  --ring: oklch(0.74 0.11 40);
+  --success: oklch(0.72 0.13 150);
+  --success-foreground: oklch(0.205 0.0042 84.6);
+  --warning: oklch(0.78 0.13 80);
+  --warning-foreground: oklch(0.205 0.0042 84.6);
+
+  --paper: oklch(0.245 0.0058 84.6);
+  --paper-ink: oklch(0.982 0.0054 95.1);
+  --paper-line: oklch(1 0 0 / 10%);
+  --paper-shadow: 0 1px 2px oklch(0 0 0 / 0.3), 0 8px 24px oklch(0 0 0 / 0.35);
+
+  --elevation-1: 0 1px 2px oklch(0 0 0 / 0.4);
+  --elevation-2: 0 2px 8px oklch(0 0 0 / 0.45);
+  --elevation-3: 0 8px 28px oklch(0 0 0 / 0.55);
+  --glass-tint: oklch(0.257 0.0063 78.2 / 0.72);
+  --glass-edge: oklch(1 0 0 / 0.14);
+
+  /* A hairline on a dark surface needs more opacity to be visible at all. */
+  --window-hairline: oklch(1 0 0 / 0.10);
+  --window-surface: oklch(0.205 0.0042 84.6);
+}
+
+/*
+ * Accent presets. `[data-accent]` is independent of light/dark, so a tenant can
+ * change the accent without redefining the whole palette.
+ *
+ * Every preset sets its own foreground. Leaving `--primary-foreground` to inherit is
+ * what produced white-on-mustard at 3.59:1 — the light value works with a dark
+ * foreground and the dark value works with a light one, and they are not
+ * interchangeable.
+ */
+[data-accent="coral"] {
+  --primary: oklch(0.56 0.13 36);
+  --primary-foreground: oklch(1 0 0);
+  --ring: oklch(0.56 0.13 36);
+}
+[data-accent="coral"].dark,
+.dark [data-accent="coral"] {
+  --primary: oklch(0.74 0.11 40);
+  --primary-foreground: oklch(0.205 0.0042 84.6);
+  --ring: oklch(0.74 0.11 40);
+}
+
+/*
+ * Gold, corrected. The previous value `oklch(0.62 0.12 74)` renders as `#b17a21`,
+ * which is mustard — that is why it read as "yellow" rather than gold. Raise the
+ * chroma and drop the lightness slightly to land on a metal, and keep the near-white
+ * foreground only where it actually passes.
+ */
+[data-accent="gold"] {
+  --primary: oklch(0.53 0.108 74);
+  --primary-foreground: oklch(1 0 0);
+  --ring: oklch(0.53 0.108 74);
+}
+[data-accent="gold"].dark,
+.dark [data-accent="gold"] {
+  --primary: oklch(0.80 0.115 82);
+  --primary-foreground: oklch(0.205 0.0042 84.6);
+  --ring: oklch(0.80 0.115 82);
+}
+
+[data-accent="teal"] {
+  --primary: oklch(0.52 0.105 223.128);
+  --primary-foreground: oklch(0.984 0.019 200.873);
+  --ring: oklch(0.52 0.105 223.128);
+}
+[data-accent="teal"].dark,
+.dark [data-accent="teal"] {
+  --primary: oklch(0.62 0.105 223.128);
+  --primary-foreground: oklch(0.2 0.02 223);
+  --ring: oklch(0.62 0.105 223.128);
+}
+
+[data-accent="jade"] {
+  --primary: oklch(0.55 0.11 165);
+  --primary-foreground: oklch(1 0 0);
+  --ring: oklch(0.55 0.11 165);
+}
+[data-accent="jade"].dark,
+.dark [data-accent="jade"] {
+  --primary: oklch(0.72 0.13 165);
+  --primary-foreground: oklch(0.205 0.0042 84.6);
+  --ring: oklch(0.72 0.13 165);
+}
+
+[data-accent="indigo"] {
+  --primary: oklch(0.52 0.16 268);
+  --primary-foreground: oklch(1 0 0);
+  --ring: oklch(0.52 0.16 268);
+}
+[data-accent="indigo"].dark,
+.dark [data-accent="indigo"] {
+  --primary: oklch(0.68 0.15 268);
+  --primary-foreground: oklch(0.205 0.0042 84.6);
+  --ring: oklch(0.68 0.15 268);
+}
+
+/*
+ * System mode, resolved in CSS instead of JavaScript.
+ *
+ * The server cannot know the OS preference, so it renders
+ * `data-theme-mode="system"` with no `.dark` class. Without the rule below a
+ * dark-OS user paints light and only flips once `applyTheme` runs after
+ * hydration — a flash on every reload, which the design spec forbids.
+ *
+ * These declarations mirror `.dark` exactly. `e2e/workspace.spec.ts` compares
+ * computed tokens between the two so the pair cannot silently drift.
+ */
+@media (prefers-color-scheme: dark) {
+  /*
+   * `:not(.dark)` rather than `:where()`.
+   *
+   * `:where()` zeroes specificity, which let the `:root` block win and pinned every
+   * dark-OS user to the light palette — the exact flash this rule exists to prevent.
+   * `[data-theme-mode="system"]` (0,1,0) beats `:root` (0,1,0) only by source order,
+   * so the selector has to carry real weight; `.dark` is excluded instead because an
+   * explicit dark choice already applied that palette.
+   */
+  [data-theme-mode="system"]:not(.dark) {
+    color-scheme: dark;
+
+    --background: oklch(0.205 0.0042 84.6);
+    --foreground: oklch(0.982 0.0054 95.1);
+    --card: oklch(0.257 0.0063 78.2);
+    --card-foreground: oklch(0.982 0.0054 95.1);
+    --popover: oklch(0.257 0.0063 78.2);
+    --popover-foreground: oklch(0.982 0.0054 95.1);
+    --primary: oklch(0.74 0.11 40);
+    --primary-foreground: oklch(0.205 0.0042 84.6);
+    --secondary: oklch(0.275 0.006 78);
+    --secondary-foreground: oklch(0.982 0.0054 95.1);
+    --muted: oklch(0.275 0.006 78);
+    --muted-foreground: oklch(0.696 0.0106 87.5);
+    --accent: oklch(0.275 0.006 78);
+    --accent-foreground: oklch(0.982 0.0054 95.1);
+    --destructive: oklch(0.70 0.15 24);
+    --destructive-foreground: oklch(0.205 0.0042 84.6);
+    --sidebar: oklch(0.235 0.0058 91.6);
+    --sidebar-foreground: oklch(0.982 0.0054 95.1);
+    --sidebar-border: oklch(1 0 0 / 10%);
+    --sidebar-accent: oklch(0.275 0.006 78);
+    --sidebar-accent-foreground: oklch(0.982 0.0054 95.1);
+    --sidebar-ring: oklch(0.74 0.11 40);
+    --border: oklch(1 0 0 / 12%);
+    --input: oklch(1 0 0 / 16%);
+    --ring: oklch(0.74 0.11 40);
+    --success: oklch(0.72 0.13 150);
+    --success-foreground: oklch(0.205 0.0042 84.6);
+    --warning: oklch(0.78 0.13 80);
+    --warning-foreground: oklch(0.205 0.0042 84.6);
+
+    --elevation-1: 0 1px 2px oklch(0 0 0 / 0.4);
+    --elevation-2: 0 2px 8px oklch(0 0 0 / 0.45);
+    --elevation-3: 0 8px 28px oklch(0 0 0 / 0.55);
+    --glass-tint: oklch(0.257 0.0063 78.2 / 0.72);
+    --glass-edge: oklch(1 0 0 / 0.14);
+    --window-hairline: oklch(1 0 0 / 0.10);
+    --window-surface: oklch(0.205 0.0042 84.6);
+  }
+
+  /*
+   * Accent presets in system mode.
+   *
+   * `[data-accent].dark` exists but system mode never sets the `.dark` class, so
+   * without this every accent kept its light value on a dark canvas. Scoped inside
+   * the media query rather than added to the selector list: unscoped, a light-OS
+   * system user would get the dark accent on a cream surface.
+   */
+  [data-theme-mode="system"][data-accent="coral"] {
+    --primary: oklch(0.74 0.11 40);
+    --primary-foreground: oklch(0.205 0.0042 84.6);
+    --ring: oklch(0.74 0.11 40);
+  }
+  [data-theme-mode="system"][data-accent="gold"] {
+    --primary: oklch(0.80 0.115 82);
+    --primary-foreground: oklch(0.205 0.0042 84.6);
+    --ring: oklch(0.80 0.115 82);
+  }
+  [data-theme-mode="system"][data-accent="teal"] {
+    --primary: oklch(0.62 0.105 223.128);
+    --primary-foreground: oklch(0.2 0.02 223);
+    --ring: oklch(0.62 0.105 223.128);
+  }
+  [data-theme-mode="system"][data-accent="jade"] {
+    --primary: oklch(0.72 0.13 165);
+    --primary-foreground: oklch(0.205 0.0042 84.6);
+    --ring: oklch(0.72 0.13 165);
+  }
+  [data-theme-mode="system"][data-accent="indigo"] {
+    --primary: oklch(0.68 0.15 268);
+    --primary-foreground: oklch(0.205 0.0042 84.6);
+    --ring: oklch(0.68 0.15 268);
+  }
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-paper: var(--paper);
+  --color-paper-ink: var(--paper-ink);
+  --color-paper-line: var(--paper-line);
+  --radius-xs: var(--radius-xs);
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+  --radius-xl: var(--radius-xl);
+  --shadow-paper: var(--paper-shadow);
+  --ease-duet: var(--duet-ease);
+  --ease-duet-spring: var(--duet-spring);
+  --ease-out-soft: var(--ease-exit);
+  --ease-in-soft: var(--ease-enter);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-sm: calc(var(--radius) - 6px);
+  --radius-md: calc(var(--radius) - 3px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 6px);
+  --radius-2xl: calc(var(--radius) + 14px);
+}
+
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--border);
+  }
+
+  html {
+    height: 100%;
+    overflow-x: hidden;
+    -webkit-text-size-adjust: 100%;
+    background: var(--background);
+  }
+
+  body {
+    min-height: 100%;
+    margin: 0;
+    overflow-x: hidden;
+    background: var(--background);
+    color: var(--foreground);
+    font-family:
+      ui-sans-serif,
+      system-ui,
+      -apple-system,
+      BlinkMacSystemFont,
+      "Segoe UI",
+      sans-serif;
+    font-feature-settings: "ss01", "ss02", "cv01";
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  button,
+  input,
+  textarea,
+  select {
+    font: inherit;
+  }
+
+  button:focus-visible,
+  select:focus-visible,
+  [role="button"]:focus-visible,
+  input:focus-visible,
+  textarea:focus-visible,
+  a:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+
+  ::selection {
+    background: color-mix(in oklch, var(--primary) 30%, transparent);
+    color: var(--foreground);
+  }
+}
+
+/*
+ * Scrollbars.
+ *
+ * One system for every scroll container. Before this there was a `.no-scrollbar` that
+ * hid the bar on chat and the raw OS default everywhere else.
+ *
+ * The default is not merely inconsistent, it is *wrong*: Windows reserves a permanent
+ * 17px gutter, so a 430px chat column renders 413px of text and reflows when a list
+ * crosses the fold. macOS overlays. Neither changes with a theme, which is why this is
+ * a behaviour fix first.
+ *
+ * # The four decisions
+ *
+ * 1. **Slim.** 6px fine pointer, 4px coarse. A 6px thumb is grabbable with a mouse; on
+ *    touch you swipe anywhere in the region rather than aiming at the bar.
+ * 2. **Auto-hide.** Nothing draws until you scroll, then it fades out after 900ms of
+ *    stillness. Native scrollbars cannot detect this, so `useAutoHideScrollbars` sets
+ *    `data-scrolling`. The drawing stays in CSS.
+ * 3. **No track, no arrows.** Every modern platform draws a transparent track. The
+ *    arrow buttons are a 1995 affordance — wheel, trackpad, touch and keyboard all
+ *    exist now — and they consume 12-15px of height each. Hiding them is why
+ *    `::-webkit-scrollbar-button` is set to `display: none` below; on Firefox there is
+ *    no equivalent, but Firefox does not draw them either.
+ * 4. **Hover reveals it too.** A person reaching for the bar should not have to scroll
+ *    to find it.
+ *
+ * # Contrast
+ *
+ * Measured by compositing the thumb over each canvas. Rest is 2.18:1 — quiet but
+ * present; hover is 3.44:1, meeting WCAG 2.2's 3:1 for non-text UI. The first draft used
+ * 0.18 alpha, which composited to 1.47:1 and was effectively invisible.
+ */
+@layer base {
+  :root {
+    --scrollbar-thumb: oklch(0.191 0.0020 106.6 / 0.34);
+    --scrollbar-thumb-hover: oklch(0.191 0.0020 106.6 / 0.50);
+    --scrollbar-size: 6px;
+  }
+
+  .dark {
+    --scrollbar-thumb: oklch(0.982 0.0054 95.1 / 0.30);
+    --scrollbar-thumb-hover: oklch(0.982 0.0054 95.1 / 0.42);
+  }
+
+  /* Touch: found by feel rather than aimed at, so it can be thinner. */
+  @media (pointer: coarse) {
+    :root {
+      --scrollbar-size: 4px;
+    }
+  }
+
+  /*
+   * `scrollbar-width` and `::-webkit-scrollbar` cannot both be live.
+   *
+   * Setting the standard property makes Chromium 121+ / Safari 18.2+ ignore every
+   * `::-webkit-scrollbar` rule — including the 6px width, the radius and the hover fade.
+   * `scrollbar-color` is inherited too, so one ancestor rule disables the pseudo-elements for
+   * everything beneath it. That is what this file used to do: `* { scrollbar-width: thin }`
+   * silently made the whole custom scrollbar inert on the engines that support it best.
+   *
+   * So: pseudo-elements where they exist, the standard property only where they do not.
+   * `@supports selector()` is the discriminator; no feature-sniffing script.
+   */
+  @supports selector(::-webkit-scrollbar) {
+    .scrollbar-auto,
+    * {
+      scrollbar-width: auto;
+      scrollbar-color: auto;
+    }
+  }
+
+  @supports not selector(::-webkit-scrollbar) {
+    * {
+      scrollbar-width: thin;
+      scrollbar-color: var(--scrollbar-thumb) transparent;
+    }
+  }
+
+  ::-webkit-scrollbar {
+    width: var(--scrollbar-size);
+    height: var(--scrollbar-size);
+  }
+
+  /* The arrow buttons. Present on Windows and older Chromium, absent everywhere else.
+     Hiding them is what makes the bar read as a modern overlay rather than a frame. */
+  ::-webkit-scrollbar-button {
+    display: none;
+    width: 0;
+    height: 0;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    border-radius: 999px;
+    background-color: var(--scrollbar-thumb);
+    background-clip: content-box;
+    transition: background-color var(--motion-fast) var(--duet-ease);
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: var(--scrollbar-thumb-hover);
+  }
+
+  ::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+
+  /*
+   * Auto-hide. `data-scrolling` is set by the scroll listener and removed on idle; the
+   * transition is what makes it a fade rather than a flash.
+   *
+   * These selectors are scoped to containers marked `.scrollbar-auto`, so a bar cannot
+   * vanish from something that was never opted in — an element inside a modal, say,
+   * where the user has no other cue that it scrolls.
+   */
+  .scrollbar-auto {
+    scrollbar-color: transparent transparent;
+  }
+
+  .scrollbar-auto::-webkit-scrollbar-thumb {
+    background-color: transparent;
+  }
+
+  .scrollbar-auto[data-scrolling="true"],
+  .scrollbar-auto:hover,
+  .scrollbar-auto:focus-within {
+    scrollbar-color: var(--scrollbar-thumb) transparent;
+  }
+
+  .scrollbar-auto[data-scrolling="true"]::-webkit-scrollbar-thumb,
+  .scrollbar-auto:hover::-webkit-scrollbar-thumb,
+  .scrollbar-auto:focus-within::-webkit-scrollbar-thumb {
+    background-color: var(--scrollbar-thumb);
+  }
+
+  .scrollbar-auto[data-scrolling="true"]::-webkit-scrollbar-thumb:hover,
+  .scrollbar-auto:hover::-webkit-scrollbar-thumb:hover {
+    background-color: var(--scrollbar-thumb-hover);
+  }
+
+  /* Reduced motion removes the fade, not the bar: appearing is information, sliding is
+     decoration. */
+  @media (prefers-reduced-motion: reduce) {
+    ::-webkit-scrollbar-thumb {
+      transition: none;
+    }
+    .scrollbar-auto::-webkit-scrollbar-thumb {
+      transition: none;
+    }
+  }
+
+  /*
+   * Tinted badge variants.
+   *
+   * Written as classes rather than Tailwind arbitrary values: the mix arguments contain
+   * commas, which the class scanner splits, so the generated rule silently never applies —
+   * a failure that looks like "the colour is wrong" rather than "the class does not exist".
+   *
+   * The ink tokens are one lightness step below the fill tokens because these are 11px text
+   * on their own 10% tint. `--warning` as text measures 4.35:1 there and `--destructive`
+   * 4.22:1; both are below the 4.5:1 AA floor, which is the "yellow on yellow" report. The
+   * inks measure 4.91:1 and 5.13:1 against the same tint.
+   */
+  /*
+   * The tint is 18%, not 10%.
+   *
+   * At 10% over a cream card — and against a cream page behind it — the amber pill was
+   * within a few points of the surface it sat on, so it read as coloured text rather than as
+   * a chip. The reference's Pending pill is unmistakably a shape. 18% keeps the ink above
+   * 4.5:1 while giving the fill an edge; the border is one step stronger still, because a
+   * 1px line at the same tint as the fill is not a line.
+   */
+  .badge-success {
+    border-color: color-mix(in oklch, var(--success) 38%, transparent);
+    background-color: color-mix(in oklch, var(--success) 18%, var(--card));
+    color: var(--success-ink);
+  }
+
+  .badge-warning {
+    border-color: color-mix(in oklch, var(--warning) 40%, transparent);
+    background-color: color-mix(in oklch, var(--warning) 18%, var(--card));
+    color: var(--warning-ink);
+  }
+
+  .badge-destructive {
+    border-color: color-mix(in oklch, var(--destructive) 38%, transparent);
+    background-color: color-mix(in oklch, var(--destructive) 18%, var(--card));
+    color: var(--destructive-ink);
+  }
+
+  /*
+   * Skeleton shimmer.
+   *
+   * The one loading affordance, per the design spec: `skeleton-shimmer` only, never
+   * `animate-pulse`. Pulse fades the whole block; shimmer moves a highlight across it,
+   * which reads as "arriving" rather than "broken". Mixing the two in one page makes a
+   * skeleton look like it is glitching.
+   *
+   * A single keyframe on a background gradient, not an animated mask: the mask approach
+   * needs `mask-image` support and a compositor layer per skeleton, and a task list can
+   * hold twenty.
+   */
+  .skeleton-shimmer {
+    position: relative;
+    overflow: hidden;
+    background-color: var(--muted);
+  }
+
+  .skeleton-shimmer::after {
+    position: absolute;
+    inset: 0;
+    content: "";
+    background-image: linear-gradient(
+      90deg,
+      transparent,
+      color-mix(in oklch, var(--foreground) 7%, transparent),
+      transparent
+    );
+    transform: translateX(-100%);
+    animation: edapex-shimmer 1.6s var(--ease-enter) infinite;
+  }
+
+  /*
+   * Reduced motion keeps the block's shape and drops the movement. The skeleton still
+   * communicates "not loaded"; the sweep is decoration.
+   */
+  @media (prefers-reduced-motion: reduce) {
+    .skeleton-shimmer::after {
+      animation: none;
+      background-image: none;
+    }
+  }
+
+  /*
+   * Pointer cursor on everything interactive.
+   *
+   * Tailwind v4's preflight resets `button` to `cursor: default`, on the reasoning that a
+   * native button on iOS does not show a pointer. The consequence is that every button,
+   * tab and menu item in a desktop browser has an arrow cursor — which reads as
+   * "disabled" to anyone who has used an application before.
+   *
+   * Scoped to interactive selectors rather than `*`, and `:disabled` is excluded so a
+   * disabled control still signals that it does nothing.
+   */
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  [role="tab"]:not([aria-disabled="true"]),
+  [role="menuitem"]:not([aria-disabled="true"]),
+  [role="option"]:not([aria-disabled="true"]),
+  summary,
+  label[for],
+  select:not(:disabled),
+  a[href] {
+    cursor: pointer;
+  }
+
+  .safe-top {
+    padding-top: max(0.75rem, env(safe-area-inset-top));
+  }
+
+  .safe-bottom {
+    padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+  }
+
+  /* Elevation instead of per-edge rules. */
+  .surface-1 {
+    box-shadow: var(--elevation-1);
+  }
+
+  .surface-2 {
+    box-shadow: var(--elevation-2);
+  }
+
+  .surface-3 {
+    box-shadow: var(--elevation-3);
+  }
+
+  /*
+   * The streaming tail. Plain text while tokens arrive, upgraded to Markdown
+   * once the turn completes, so no Markdown parse runs per token.
+   */
+  .stream-tail {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+}
+
+@keyframes edapex-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes edapex-pulse {
+  0%,
+  80%,
+  100% {
+    opacity: 0.25;
+    transform: translateY(0);
+  }
+  40% {
+    opacity: 1;
+    transform: translateY(-2px);
+  }
+}
+
+/*
+ * Tab content and list cross-fades. Opacity and a 2px lift, nothing horizontal: a slide on a
+ * full-width panel reads as a page transition, which is the wrong scale for a tab switch.
+ */
+@keyframes edapex-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes edapex-shimmer {
+  to {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes edapex-spring-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@layer utilities {
+  .animate-message-in {
+    animation: edapex-fade-up 220ms var(--duet-ease) both;
+  }
+
+  .animate-spring-in {
+    animation: edapex-spring-in 260ms var(--duet-spring) both;
+  }
+
+  .thinking-dot {
+    animation: edapex-pulse 1.3s ease-in-out infinite;
+  }
+
+  .thinking-dot:nth-child(2) {
+    animation-delay: 120ms;
+  }
+
+  .thinking-dot:nth-child(3) {
+    animation-delay: 240ms;
+  }
+}
