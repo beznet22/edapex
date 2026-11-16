@@ -29,7 +29,7 @@ pub use provider::{
 };
 pub use recorder::{RunStart, TurnRecorder};
 pub use runtime::{
-    AgentHost, AgentHostOptions, ApprovalHandler, EventSink, HostFuture, HostObject,
-    ToolExecutor,
+    AgentHost, AgentHostOptions, ApprovalFailure, ApprovalHandler, EventSink, HostFuture,
+    HostObject, ToolExecutor,
 };
 pub use stream::{sse_data_line, take_sse_event, Utf8StreamDecoder};

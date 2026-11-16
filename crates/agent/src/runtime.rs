@@ -51,6 +51,22 @@ pub trait ToolExecutor: HostObject {
 
 pub trait ApprovalHandler: HostObject {
     fn request(&self, request: ApprovalRequest) -> HostFuture<'_, ApprovalDecision>;
+
+    /// Why a request ended without a person choosing to allow it.
+    ///
+    /// The decision stays `Deny` — that is what happened — but the transcript
+    /// must not tell someone they declined an action they never saw. Defaults to
+    /// a person's decision, which is every host that has no deadline of its own.
+    fn failure(&self, _approval_request_id: &str) -> Option<ApprovalFailure> {
+        None
+    }
+}
+
+/// The reason an approval ended without an answer, when that is the reason.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ApprovalFailure {
+    /// The host stopped waiting. The action was not run.
+    Timeout,
 }
 
 pub trait EventSink: HostObject {
@@ -465,6 +481,9 @@ impl AgentHost {
                         decisions: request.decisions.clone(),
                     });
                     let decision = self.inner.approvals.request(request.clone()).await;
+                    // Read before the event consumes the id below.
+                    let approval_failure =
+                        self.inner.approvals.failure(&request.approval_request_id);
                     self.emit(AgentEvent::ApprovalResolved {
                         thread_id: thread_id.to_string(),
                         turn_id: turn_id.to_string(),
@@ -490,9 +509,14 @@ impl AgentHost {
                         return TurnCompletionStatus::Stopped;
                     }
                     if decision == ApprovalDecision::Deny {
+                        let timed_out = approval_failure == Some(ApprovalFailure::Timeout);
                         let result = DynamicToolResult::failure(AgentError::new(
                             crate::protocol::AgentErrorCode::PermissionDenied,
-                            "The person declined this action",
+                            if timed_out {
+                                "Nobody answered within 10 minutes, so this action was not run"
+                            } else {
+                                "The person declined this action"
+                            },
                             false,
                         ));
                         self.emit(AgentEvent::ToolCompleted {

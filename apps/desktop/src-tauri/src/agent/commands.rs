@@ -22,10 +22,15 @@ pub async fn agent_connect(
     settings: AgentConnectSettings,
     channel: Channel<AgentEvent>,
 ) -> Result<AgentStatus, HostError> {
-    let session_token = crate::auth::session_token()?.ok_or_else(HostError::auth_required)?;
-    if let Some(previous) = state.take_agent()? {
-        previous.host.close();
+    // Reopening the app must not kill the run it was meant to show: closing a
+    // session clears its threads and cancels its turns, and a swipe-away plus a
+    // relaunch is the ordinary way a person comes back to work in progress.
+    if let Some(session) = state.agent()? {
+        session.attach(0, channel);
+        return Ok(session.host.status());
     }
+
+    let session_token = crate::auth::session_token()?.ok_or_else(HostError::auth_required)?;
     let env = Arc::new(HostEnv::from_app(&app)?);
     // A keychain or disk failure degrades durability, it does not block work.
     let recorder = match RunJournal::open(&env, &settings.workspace_id) {
