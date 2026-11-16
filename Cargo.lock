@@ -1287,6 +1287,7 @@ dependencies = [
  "edapex-ocr",
  "edapex-store",
  "image 0.25.10",
+ "jni",
  "keyring",
  "open",
  "rand 0.8.8",

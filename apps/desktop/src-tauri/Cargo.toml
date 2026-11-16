@@ -20,6 +20,8 @@ edapex-store = { path = "../../../crates/store" }
 edapex-ocr = { path = "../../../crates/ocr" }
 base64 = "0.22"
 image = "0.25"
+# The JNI entry point a WorkManager worker calls; no Activity, no Tauri app.
+jni = "0.21"
 keyring = "3"
 open = "5"
 rand = "0.8"

@@ -145,6 +145,9 @@ class MainActivity : TauriActivity() {
          */
         webView.setBackgroundColor(ContextCompat.getColor(this, R.color.splash_background))
         attachHostBridge(webView)
+        // Armed here rather than at turn start: without a foreground service this job is the only
+        // thing that picks up a turn whose process died, and it must exist before that happens.
+        com.bronotek.edapex.run.RunScheduler.ensureScheduled(this)
     }
 
     private fun attachHostBridge(created: WebView? = null) {

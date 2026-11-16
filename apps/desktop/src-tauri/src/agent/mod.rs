@@ -6,12 +6,9 @@
 
 mod approvals;
 pub(crate) mod commands;
+mod bridge;
 mod env;
-// The JNI entry point is what calls these; nothing in the process does until it
-// lands, which is the next step. Remove both allows with that commit.
-#[allow(dead_code)]
 mod headless;
-#[allow(dead_code)]
 mod history;
 mod journal;
 mod provider;
