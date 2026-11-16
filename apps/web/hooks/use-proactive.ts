@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { ROUTINE_UNAVAILABLE_NOTICE, type TaskSignals } from "@edapex/contracts";
 
@@ -50,6 +50,15 @@ export function useProactive(
   }>
 ): ProactiveController {
   const [tasks, setTasks] = useState<readonly TaskItem[]>([]);
+  /**
+   * Set when the endpoint answers 404.
+   *
+   * A 404 is not a transient failure: the route does not exist in this deployment, and
+   * retrying it every minute forever fills the console with the same error and keeps a timer
+   * alive for a feature that cannot work. `cowork-api` owns these routes; if only `sms-api`
+   * is running locally, they are legitimately absent.
+   */
+  const unavailable = useRef(false);
   const { deviceId, ready } = useAgentStore(workspaceId);
 
   const refresh = useCallback(async () => {
@@ -63,6 +72,10 @@ export function useProactive(
         `${apiBase()}/api/v1/agent/tasks?workspaceId=${encodeURIComponent(workspaceId)}`,
         { credentials: "include", headers: { accept: "application/json" } }
       );
+      if (response.status === 404) {
+        unavailable.current = true;
+        return;
+      }
       if (!response.ok) return;
 
       const body = (await response.json()) as { tasks?: readonly TaskItem[] };
@@ -83,6 +96,12 @@ export function useProactive(
 
     const runTick = async (): Promise<void> => {
       if (stopped) return;
+      // The route answered 404 once; it will answer 404 again.
+      if (unavailable.current) {
+        stopped = true;
+        if (timer !== null) clearInterval(timer);
+        return;
+      }
       // The store is not a prerequisite for the loop any more than it is for `refresh`:
       // a tick that cannot persist is still a tick that should fire.
       try {

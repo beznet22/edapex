@@ -43,3 +43,20 @@ MAGIC_LINK_TTL_SECONDS=2592000
 # Production ships 7 days. A dev session that expires mid-debug means signing in again through
 # a link, which is the same annoyance the magic-link TTL above exists to remove.
 SESSION_TTL_SECONDS=2592000
+
+# ---------------------------------------------------------------------------
+# Two Workers, one /api prefix
+#
+# `sms-api` owns sessions and the school database. `cowork-api` owns the agent
+# workspace routes — routines, tasks, agents, sync, connectors — and does not
+# exist in `sms-api` at all, so those paths answer 404 unless it is running.
+#
+#   pnpm --dir services/cowork-api exec wrangler d1 migrations apply AGENT_DB --local
+#   pnpm --dir services/cowork-api dev                       # :8788
+#   DEV_API_TARGET=http://127.0.0.1:8787 \
+#   DEV_COWORK_TARGET=http://127.0.0.1:8788 pnpm --dir apps/web dev
+#
+# The web proxy splits by path; `DEV_COWORK_TARGET` is what enables the split.
+# Without it the Tasks surface degrades quietly: the 404 is treated as permanent
+# and polling stops, rather than retrying an endpoint that will never exist.
+# ---------------------------------------------------------------------------
