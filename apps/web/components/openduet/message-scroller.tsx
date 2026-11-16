@@ -10,7 +10,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { ArrowDown } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
+import { Button } from "@edapex/ui/components/button";
 import { cn } from "@/lib/utils";
 
 interface MessageScrollerProps {

@@ -3,7 +3,7 @@
 import type { ApprovalPart } from "@edapex/contracts";
 import { Check, ShieldAlert, X } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
+import { Button } from "@edapex/ui/components/button";
 
 interface ApprovalCardProps {
   readonly messageId: string;

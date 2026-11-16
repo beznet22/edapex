@@ -2,7 +2,7 @@
 
 import { ChevronsUpDown, LogOut, Settings, ShieldCheck } from "lucide-react";
 
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@edapex/ui/components/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -10,7 +10,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger
-} from "@/components/ui/dropdown-menu";
+} from "@edapex/ui/components/dropdown-menu";
 import {
   SidebarMenu,
   SidebarMenuButton,

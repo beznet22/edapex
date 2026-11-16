@@ -17,6 +17,16 @@ const badgeVariants = cva(
           "border-border text-foreground [a&]:hover:bg-accent [a&]:hover:text-accent-foreground",
         ghost: "[a&]:hover:bg-accent [a&]:hover:text-accent-foreground",
         link: "text-primary underline-offset-4 [a&]:hover:underline",
+        /*
+         * The three state variants the registry lacks. They exist because a task or
+         * capability state needs a colour that carries meaning, and a raw palette class
+         * cannot know which theme it is on. `badge-success` and `badge-warning` are the
+         * measured tinted pairs from the token sheet: 18% fill over the card, 38-40%
+         * border, and an ink one lightness step below the fill so 11px text clears 4.5:1.
+         */
+        success: "badge-success",
+        warning: "badge-warning",
+        neutral: "border-border bg-muted text-muted-foreground",
       },
     },
     defaultVariants: {

@@ -4,7 +4,7 @@ import { useEffect, useId, useRef } from "react";
 import type { ReactNode } from "react";
 import { X } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
+import { Button } from "@edapex/ui/components/button";
 import { cn } from "@/lib/utils";
 
 /**

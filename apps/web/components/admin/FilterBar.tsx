@@ -2,8 +2,8 @@
 
 import { Search, SlidersHorizontal, ArrowUpDown } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Button } from "@edapex/ui/components/button";
+import { Input } from "@edapex/ui/components/input";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -11,7 +11,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger
-} from "@/components/ui/dropdown-menu";
+} from "@edapex/ui/components/dropdown-menu";
 import { cn } from "@/lib/utils";
 
 /**

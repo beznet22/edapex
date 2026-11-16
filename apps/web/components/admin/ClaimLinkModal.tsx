@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { AlertCircle, Check, Copy, Link2, Loader2 } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
+import { Button } from "@edapex/ui/components/button";
 import { Modal } from "@/components/ui/modal";
 import { createClaimLink, type CreatedClaimLink } from "@/lib/admin-api";
 

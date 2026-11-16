@@ -23,7 +23,7 @@ import { isDesktopViewport } from "@/lib/platform";
 import type { SidebarState } from "@/lib/sidebar-state";
 import { useSidebarState } from "@/lib/sidebar-state-hooks";
 import type { WorkspaceTab } from "@/components/openduet/tab-bar";
-import { Button } from "@/components/ui/button";
+import { Button } from "@edapex/ui/components/button";
 import { ChatSurface } from "@/components/workspace/ChatSurface";
 import { CommandPalette } from "@/components/workspace/CommandPalette";
 import { WorkspaceBoot } from "@/components/workspace/WorkspaceBoot";

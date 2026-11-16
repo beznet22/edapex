@@ -5,8 +5,8 @@ import type { FormEvent } from "react";
 import { LoaderCircle, Sparkles } from "lucide-react";
 
 import type { NativeAgentSettings } from "@/lib/native-agent";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Button } from "@edapex/ui/components/button";
+import { Input } from "@edapex/ui/components/input";
 import { Modal } from "@/components/ui/modal";
 
 interface RuntimeSetupProps {

@@ -4,9 +4,9 @@ import { useState } from "react";
 import { Check, ChevronRight, Mail, Plus, Search, Server } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
+import { Button } from "@edapex/ui/components/button";
 import { EmptyState } from "@/components/workspace/EmptyState";
-import { Input } from "@/components/ui/input";
+import { Input } from "@edapex/ui/components/input";
 import {
   PLUGIN_GROUPS,
   pluginById,

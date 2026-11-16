@@ -5,7 +5,7 @@ import type { ChangeEvent, FormEvent, KeyboardEvent } from "react";
 import type { QueuedMessage } from "@edapex/contracts";
 import { ArrowUp, Paperclip, Square, X } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
+import { Button } from "@edapex/ui/components/button";
 import { cn } from "@/lib/utils";
 
 interface ComposerProps {

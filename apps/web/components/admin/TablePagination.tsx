@@ -8,7 +8,7 @@ import {
   PaginationLink,
   PaginationNext,
   PaginationPrevious
-} from "@/components/ui/pagination";
+} from "@edapex/ui/components/pagination";
 
 /**
  * Table footer.
