@@ -86,21 +86,28 @@ if (entry === undefined) {
   process.exit(1);
 }
 
-// Client references for the workspace surface, matched by component name because
-// their file names are content-hashed.
-const ROUTE_COMPONENTS = ["WorkspaceChat", "WorkspaceLayoutClient", "ServiceWorkerRegistration"];
-const routeRoots = Object.keys(manifest).filter((key) =>
-  ROUTE_COMPONENTS.some((name) => key.includes(`/${name}`))
-);
+/*
+ * Client references per route, matched by component name because their file names are
+ * content-hashed.
+ *
+ * Every route in `budget.json` must appear here. A configured route with no mapping used
+ * to be silently unmeasured — two of the three entries were decorative — so a missing
+ * mapping is now a failure rather than a skip.
+ */
+const ROUTE_COMPONENTS = {
+  "/workspace": ["WorkspaceChat", "WorkspaceLayoutClient", "ServiceWorkerRegistration"],
+  "/workspace/tasks": ["TasksSurface", "WorkspaceLayoutClient", "ServiceWorkerRegistration"],
+  "/workspace/make": ["AgentsSurface", "WorkspaceLayoutClient", "ServiceWorkerRegistration"]
+};
 
-const files = closure([entry, ...routeRoots]);
-const perFile = [...files]
-  .map((key) => ({ file: manifest[key].file, size: gzipSize(manifest[key].file) }))
-  .sort((a, b) => b.size - a.size);
-
-const jsTotal = perFile
-  .filter((chunk) => chunk.file.endsWith(".js") && !chunk.file.includes("agent-runtime"))
-  .reduce((sum, chunk) => sum + chunk.size, 0);
+const missingMapping = Object.keys(budget.routes).filter((route) => ROUTE_COMPONENTS[route] === undefined);
+if (missingMapping.length > 0) {
+  console.error(
+    `budget.json declares routes with no component mapping, so they would never be ` +
+      `measured:\n  ${missingMapping.join("\n  ")}`
+  );
+  process.exit(1);
+}
 
 // The bundler emits stylesheets as standalone files and does not reference them
 // from the manifest, so they are collected directly. There is one per app today;
@@ -120,7 +127,6 @@ const cssTotal = collectCss(assets).reduce(
   0
 );
 
-const initial = budget.routes["/workspace"];
 const failures = [];
 
 const report = (label, actual, limit) => {
@@ -130,30 +136,44 @@ const report = (label, actual, limit) => {
 };
 
 console.log("Initial payload (entry + route references, static imports only):");
-for (const chunk of perFile.slice(0, 6)) {
-  console.log(`       ${String(chunk.size).padStart(7)}  ${chunk.file}`);
-}
-console.log("");
-
-report("initial JS", jsTotal, initial.initialJsGzip);
-report("initial CSS", cssTotal, initial.initialCssGzip);
-
-/**
- * The part of the payload this team controls.
- *
- * The total is dominated by React 19 + vinext, which nobody here can shrink by
- * writing code differently. Budgeting only the total lets a framework upgrade
- * silently consume the entire allowance, and a team that can never pass a budget
- * stops reading it. This isolates app code, icons and route chunks.
- */
-const controllable = jsTotal - budget.frameworkFloorGzip;
-if (controllable < 0) {
-  console.log(
-    `       WARNING: total is below the recorded framework floor ` +
-      `(${budget.frameworkFloorGzip}) — re-measure it in budget.json`
+for (const route of Object.keys(budget.routes)) {
+  const roots = Object.keys(manifest).filter((key) =>
+    ROUTE_COMPONENTS[route].some((name) => key.includes(`/${name}`))
   );
+  const files = closure([entry, ...roots]);
+  const perFile = [...files]
+    .map((key) => ({ file: manifest[key].file, size: gzipSize(manifest[key].file) }))
+    .sort((a, b) => b.size - a.size);
+  const jsTotal = perFile
+    .filter((chunk) => chunk.file.endsWith(".js") && !chunk.file.includes("agent-runtime"))
+    .reduce((sum, chunk) => sum + chunk.size, 0);
+
+  const limits = budget.routes[route];
+  console.log(`\n  ${route}`);
+  for (const chunk of perFile.slice(0, 3)) {
+    console.log(`       ${String(chunk.size).padStart(7)}  ${chunk.file}`);
+  }
+  report(`${route} · initial JS`, jsTotal, limits.initialJsGzip);
+
+  /**
+   * The part of the payload this team controls.
+   *
+   * The total is dominated by React 19 + vinext, which nobody here can shrink by writing
+   * code differently. Budgeting only the total lets a framework upgrade silently consume
+   * the whole allowance, and a team that can never pass a budget stops reading it. This
+   * isolates app code, icons and route chunks.
+   */
+  const controllable = jsTotal - budget.frameworkFloorGzip;
+  if (controllable < 0) {
+    console.log(
+      `       WARNING: total is below the recorded framework floor ` +
+        `(${budget.frameworkFloorGzip}) — re-measure it in budget.json`
+    );
+  }
+  report(`${route} · controllable JS`, controllable, limits.controllableJsGzip);
 }
-report("controllable JS", controllable, initial.controllableJsGzip);
+
+report("initial CSS", cssTotal, budget.routes["/workspace"].initialCssGzip);
 
 // Lazily loaded assets get their own ceiling: off the initial path, but still
 // bounded, because an unbounded lazy chunk is how 9.9 MB shipped unnoticed.

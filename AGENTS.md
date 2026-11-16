@@ -541,7 +541,8 @@ Enforced by `apps/web/tests/workspace-architecture.test.ts`.
 - **Dev-only CSP exceptions stay dev-only.** `unsafe-eval` must never reach the
   production CSP.
 - **Primitives come from `@edapex/ui`.** `components/ui` holds shell chrome only:
-  `sidebar`, `command`, `breadcrumb`, and the app-level `modal` composition.
+  `sidebar`, `command`, `breadcrumb`, and a `Modal` that *composes* the registry `Dialog`
+  rather than reimplementing focus trapping.
 
 Design authority: [`DESIGN.md`](DESIGN.md) and
 [`docs/workspace/specs/19-design-system.md`](docs/workspace/specs/19-design-system.md).

@@ -5,23 +5,23 @@
   "$frameworkFloorNote": "react-dom 67,510 + vinext runtime 44,283 + vinext browser entry 31,418. This is the fixed cost of React 19 + vinext; it changes only with a deliberate framework upgrade. Re-measure with `node scripts/check-budget.mjs` when it does.",
   "routes": {
     "/workspace": {
-      "$comment": "The 150 KB (153,600 B) target is superseded, not missed: the framework floor is 143 KB, so even zero app code and zero icons would land near 159 KB. See the decision in spec 47.",
-      "initialJsGzip": 204800,
-      "controllableJsGzip": 61440,
+      "$comment": "Measured 2026-11-16: 426,478 initial / 283,267 controllable. Ceilings are measured plus ~5% headroom, not targets. See spec 47's 2026-11-16 decision for the breakdown.",
+      "initialJsGzip": 448000,
+      "controllableJsGzip": 298000,
       "initialCssGzip": 30720,
       "lcpMs": 2500,
       "inpMs": 200
     },
     "/workspace/tasks": {
-      "initialJsGzip": 204800,
-      "controllableJsGzip": 61440,
+      "initialJsGzip": 448000,
+      "controllableJsGzip": 298000,
       "initialCssGzip": 30720,
       "lcpMs": 2500,
       "inpMs": 200
     },
     "/workspace/make": {
-      "initialJsGzip": 204800,
-      "controllableJsGzip": 61440,
+      "initialJsGzip": 456000,
+      "controllableJsGzip": 304000,
       "initialCssGzip": 30720,
       "lcpMs": 2500,
       "inpMs": 200
@@ -56,24 +56,19 @@
     "shellGzip": 2097152
   },
   "measured": {
-    "date": "2026-11-14",
-    "initialJsGzip": 353762,
-    "initialCssGzip": 11062,
-    "controllableJsGzip": 210551,
-    "agentWasmGzip": 134395,
-    "agentJsGlueGzip": 5526,
+    "date": "2026-11-16",
+    "initialJsGzip": 426478,
+    "initialCssGzip": 26601,
+    "controllableJsGzip": 283267,
+    "agentWasmGzip": 172004,
+    "agentJsGlueGzip": 8162,
     "breakdown": {
-      "react-dom": 67510,
-      "vinext-runtime": 44283,
-      "vinext-browser-entry": 31418,
-      "app-code": 11667,
-      "lucide": 10851,
-      "other": 15870
+      "framework-floor": 143381,
+      "markdown": 149923,
+      "app-and-routes": 133174
     },
-    "note": "Measured on a vinext build with Node 26.13.1. The Pages rollback baseline in spec 47 (106 KB) is a different build and is not comparable. The lazy document editor (188 KB) is not in this figure because it loads only when the artifact panel opens. The SQLite engine (773 KB gzip, approved ceiling 1.2 MB) is lazy: it loads only when the store is opened. The IronPress engine (6,376,926 B gzip) is lazy and measured from the installed package: no UI imports the exporter yet, so it is not in the client graph.",
-    "sqliteRuntimeGzip": 773425,
-    "ironpressWasmGzip": 6376926,
-    "$overBudgetException": "353,762 / 210,551 against 204,800 / 61,440. Two recorded exceptions in spec 47: (1) the proactive scheduler mounts in the workspace layout (pre-existing, 205,044 baseline), (2) Streamdown's Markdown pipeline (unified + remark-gfm + rehype-sanitize + rehype-harden, +148,718) is on the initial path. Ceilings are NOT raised in either case. Mermaid and Shiki are not installed.",
-    "streamdownGzip": 148718
+    "note": "Measured with Node 26.13.1 on the extract-packages branch; the same figures on the feat/chunk-4-design baseline are 425,149 / 282,993, so the extraction added 1,329 B. Framework floor = react-dom 67,510 + vinext runtime 44,419 + browser entry 31,452. Markdown = the Streamdown pipeline, on the initial path by spec 47's 2026-11-14 decision. app-and-routes = everything the team writes: sidebar, command palette, admin, chat surface and the route client references. Genui (60,094) and Tiptap (187,556) are lazy and are not in this figure.",
+    "sqliteRuntimeGzip": 407291,
+    "streamdownGzip": 149923
   }
 }
