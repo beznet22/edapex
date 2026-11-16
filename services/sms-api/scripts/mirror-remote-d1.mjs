@@ -408,10 +408,37 @@ if (dbFile === null) {
 
 const { DatabaseSync } = await import("node:sqlite");
 const database = new DatabaseSync(dbFile);
+
+/*
+ * Sessions survive the mirror.
+ *
+ * `DELETE FROM users` cascades to `auth_sessions` (`ON DELETE CASCADE`), so every mirror run
+ * silently signed everyone out — which reads as "the session expired" rather than "a script
+ * deleted it". The rows are copied aside and restored at the end.
+ *
+ * They are *not* mirrored from production: a live session token is a credential, and the
+ * local database has no business holding production's. Only the local ones are preserved.
+ */
+const localSessions = (() => {
+  try {
+    return database.prepare('SELECT * FROM auth_sessions' + String.fromCharCode(59)).all();
+  } catch {
+    return [];
+  }
+})();
 database.exec("PRAGMA foreign_keys = OFF;");
 database.exec("BEGIN;");
 for (const statement of pendingSql) database.exec(statement);
 database.exec("COMMIT;");
+
+if (localSessions.length > 0 && localSessions[0] !== undefined) {
+  const columns = Object.keys(localSessions[0]);
+  const insert = database.prepare(
+    `INSERT OR REPLACE INTO auth_sessions (${columns.map((c) => `"${c}"`).join(", ")}) VALUES (${columns.map(() => "?").join(", ")})`
+  );
+  for (const row of localSessions) insert.run(...columns.map((column) => row[column]));
+  console.log(`  auth_sessions: ${localSessions.length} local session(s) preserved`);
+}
 
 const violations = database.prepare("PRAGMA foreign_key_check").all();
 database.close();

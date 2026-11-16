@@ -18,4 +18,11 @@ export interface AuthConfigPort {
    * are still reading the error you were about to fix is a link you request again.
    */
   readonly magicLinkTtlSeconds: number;
+  /**
+   * How long a signed-in session stays valid, in seconds.
+   *
+   * Seven days in production. A dev session that expires mid-debug is the same annoyance as
+   * a short sign-in link, so `.dev.vars` raises it.
+   */
+  readonly sessionTtlSeconds: number;
 }

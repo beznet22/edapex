@@ -11,7 +11,6 @@ import {
 import type { GoogleProfile } from "../ports/google-oauth.port";
 import { emitAuthEvent } from "./auth-events";
 import { loadAuthUser } from "./session-issuance";
-import { SESSION_TTL_SECONDS } from "./types";
 import type { AuthSessionResult } from "./types";
 
 export interface ClaimLinkInput {
@@ -132,7 +131,7 @@ export async function completeClaim(
 
   const token = randomToken();
   const sessionId = crypto.randomUUID();
-  const expiresAt = now + SESSION_TTL_SECONDS;
+  const expiresAt = now + ctx.ports.authConfig.sessionTtlSeconds;
   const session = {
     id: sessionId,
     userId: user.id,

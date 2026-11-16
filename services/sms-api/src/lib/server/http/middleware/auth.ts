@@ -1,12 +1,17 @@
-import { getCookie } from "hono/cookie";
 import type { MiddlewareHandler } from "hono";
 
 import { createService, SessionService } from "../../services";
 import { AuthError } from "../../services/errors";
-import { SESSION_COOKIE } from "../cookies";
+import { readSessionCookie, sessionCookieName } from "../cookies";
 import type { AppContext } from "../env";
 
-export { SESSION_COOKIE };
+/**
+ * Re-exported for callers that only need the canonical name.
+ *
+ * Resolution is request-dependent now (the `__Host-` prefix is dropped over plain-HTTP
+ * loopback), so anything *reading* a cookie must use `readSessionCookie` instead.
+ */
+export { readSessionCookie, sessionCookieName };
 
 const bearerToken = (header: string | undefined): string | null => {
   if (header === undefined) return null;
@@ -15,7 +20,7 @@ const bearerToken = (header: string | undefined): string | null => {
 };
 
 export const auth: MiddlewareHandler<AppContext> = async (c, next) => {
-  const token = getCookie(c, SESSION_COOKIE) ?? bearerToken(c.req.header("authorization"));
+  const token = readSessionCookie(c) ?? bearerToken(c.req.header("authorization"));
   c.set("sessionToken", token);
   if (token === null) {
     c.set("session", null);

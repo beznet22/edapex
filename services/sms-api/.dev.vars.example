@@ -37,3 +37,9 @@ POST_LOGIN_REDIRECT=http://127.0.0.1:5181/workspace
 # appears is this terminal, and a 15-minute link expires while you are still reading the error
 # you were about to fix — so the window is the whole debug session.
 MAGIC_LINK_TTL_SECONDS=2592000
+
+# Signed-in sessions last 30 days locally.
+#
+# Production ships 7 days. A dev session that expires mid-debug means signing in again through
+# a link, which is the same annoyance the magic-link TTL above exists to remove.
+SESSION_TTL_SECONDS=2592000

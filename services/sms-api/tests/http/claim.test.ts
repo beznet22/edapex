@@ -120,7 +120,7 @@ describe("POST /claim", () => {
     expect(callback.status).toBe(302);
     expect(callback.headers.get("location")).toBe("/app");
 
-    const sessionCookie = cookiePair(callback, "__Host-edapex_session");
+    const sessionCookie = cookiePair(callback, "edapex_session");
     if (sessionCookie === null) throw new Error("callback did not set a session");
 
     const me = await request(app, "/api/v1/me", {

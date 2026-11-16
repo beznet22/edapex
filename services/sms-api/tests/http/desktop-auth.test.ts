@@ -79,7 +79,7 @@ describe("desktop PKCE auth", () => {
     );
     expect(callback.status).toBe(302);
     expect(callback.headers.get("set-cookie") ?? "").not.toContain(
-      "__Host-edapex_session="
+      "edapex_session="
     );
     const location = callback.headers.get("location");
     if (location === null) throw new Error("desktop callback did not redirect");

@@ -73,7 +73,12 @@ export const createSessionToken = async (
     deviceFingerprint: null,
     createdAt: now
   });
-  return { token, cookie: `__Host-edapex_session=${token}` };
+  /*
+   * The dev cookie name, because the test app is called over `http://localhost` and the
+   * `__Host-` prefix requires `Secure` — which a browser refuses to store over plain HTTP.
+   * `cookies.test.ts` covers the production branch explicitly.
+   */
+  return { token, cookie: `edapex_session=${token}` };
 };
 
 /** Test-only session factory; password authentication is retired. */

@@ -59,7 +59,7 @@ describe("magic link", () => {
 
     const verify = await request(app, `/api/v1/auth/magic-link/verify?token=${token}`);
     expect(verify.status).toBe(302);
-    expect(verify.headers.get("set-cookie")).toContain("__Host-edapex_session=");
+    expect(verify.headers.get("set-cookie")).toContain("edapex_session=");
 
     const sessions = await db
       .select()
