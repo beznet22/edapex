@@ -25,6 +25,7 @@
     "@edapex/documents": "workspace:^",
     "@edapex/genui": "workspace:^",
     "@edapex/tokens": "workspace:^",
+    "@edapex/ui": "workspace:^",
     "@radix-ui/react-avatar": "^1.1.10",
     "@radix-ui/react-dialog": "^1.1.15",
     "@radix-ui/react-dropdown-menu": "^2.1.16",

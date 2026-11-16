@@ -1,0 +1,9 @@
+/*
+ * Enter/exit animation utilities for Radix `data-state` transitions.
+ *
+ * Imported once, from the package, so the dependency is owned in one place. Without this
+ * file every `data-[state=open]:animate-in` / `slide-in-from-bottom` class in the registry
+ * components resolves to nothing — which is exactly the state `apps/web` was in before the
+ * extraction: the sheet did not animate, it appeared.
+ */
+@import "tw-animate-css";

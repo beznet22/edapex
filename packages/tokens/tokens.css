@@ -107,6 +107,14 @@
   --elevation-3: 0 8px 28px oklch(0.191 0.002 106.6 / 0.12);
   --glass-tint: oklch(1 0 0 / 0.72);
   --glass-edge: oklch(0.907 0.0122 67.7 / 0.9);
+  /*
+   * The scrim behind a modal sheet or dialog.
+   *
+   * A token rather than the registry's `bg-black/50`: a raw black scrim is invisible
+   * against the warm dark canvas and too heavy against the cream one. This darkens in both
+   * themes, which is what makes the layer behind read as *behind*.
+   */
+  --overlay: oklch(0.191 0.002 106.6 / 0.55);
 
   /*
    * Window chrome. Used only inside the desktop window; a browser tab has no
@@ -220,6 +228,7 @@
   --elevation-3: 0 8px 28px oklch(0 0 0 / 0.55);
   --glass-tint: oklch(0.257 0.0063 78.2 / 0.72);
   --glass-edge: oklch(1 0 0 / 0.14);
+  --overlay: oklch(0 0 0 / 0.65);
 
   /* A hairline on a dark surface needs more opacity to be visible at all. */
   --window-hairline: oklch(1 0 0 / 0.10);
@@ -360,6 +369,7 @@
     --elevation-3: 0 8px 28px oklch(0 0 0 / 0.55);
     --glass-tint: oklch(0.257 0.0063 78.2 / 0.72);
     --glass-edge: oklch(1 0 0 / 0.14);
+    --overlay: oklch(0 0 0 / 0.65);
     --window-hairline: oklch(1 0 0 / 0.10);
     --window-surface: oklch(0.205 0.0042 84.6);
   }
@@ -429,6 +439,7 @@
   --color-paper: var(--paper);
   --color-paper-ink: var(--paper-ink);
   --color-paper-line: var(--paper-line);
+  --color-overlay: var(--overlay);
   --radius-xs: var(--radius-xs);
   --radius-sm: var(--radius-sm);
   --radius-md: var(--radius-md);
@@ -447,6 +458,32 @@
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 6px);
   --radius-2xl: calc(var(--radius) + 14px);
+}
+
+@theme {
+  /*
+   * The type scale from DESIGN.md: three sizes, two weights. They were prose until now,
+   * which is why components reached for `text-[15px]` and `text-[13px]` — an arbitrary
+   * value is what a missing token looks like.
+   *
+   * A fourth size is a design decision, not a local one.
+   */
+  --text-title: 1.375rem; /* 22px */
+  --text-title--line-height: 1.25;
+  --text-title--font-weight: 600;
+  --text-title--letter-spacing: -0.02em;
+
+  --text-body: 0.9375rem; /* 15px */
+  --text-body--line-height: 1.6;
+
+  --text-label: 0.8125rem; /* 13px */
+  --text-label--line-height: 1.4;
+  --text-label--font-weight: 500;
+
+  /* Metadata and chrome: the label size at a tight line height, for titlebars and pills. */
+  --text-chrome: 0.8125rem;
+  --text-chrome--line-height: 1;
+  --text-chrome--font-weight: 500;
 }
 
 @layer base {

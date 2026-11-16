@@ -5,15 +5,15 @@
   "tsx": true,
   "tailwind": {
     "config": "",
-    "css": "app/globals.css",
+    "css": "../../packages/tokens/tokens.css",
     "baseColor": "slate",
     "cssVariables": true,
     "prefix": ""
   },
   "aliases": {
     "components": "@/components",
-    "utils": "@/lib/utils",
-    "ui": "@/components/ui",
+    "utils": "@edapex/ui/lib/utils",
+    "ui": "@edapex/ui/components",
     "lib": "@/lib",
     "hooks": "@/hooks"
   },

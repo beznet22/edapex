@@ -9,7 +9,9 @@
  * `docs/workspace/specs/82-package-boundaries.md`.
  */
 @import "@edapex/tokens/tokens.css";
+@import "@edapex/ui/styles/animate.css";
 
+@source "../../../packages/ui/src";
 @source "../../../packages/chat/src";
 @source "../../../packages/genui/src";
 @source "../../../packages/documents/src";
