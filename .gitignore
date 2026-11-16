@@ -91,6 +91,8 @@ reference-app/
 
 # Generated coverage report
 /coverage/
+uiland_chatgpt_mobile_images
+uiland_chatgpt_web_images_figma
 
 # Secrets never live in the repository, in either tree.
 .env
