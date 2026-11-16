@@ -97,3 +97,8 @@ reference-app/
 .env.local
 .env.production
 .env.development
+
+# Local scratch media. `boy_writing.mp4` (92 MB) was swept in by a `git add -A` and pushed,
+# which is what triggered GitHub's large-file warning. Keep it on disk, out of history.
+boy_writing.mp4
+*.mp4
