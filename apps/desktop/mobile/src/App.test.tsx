@@ -8,23 +8,35 @@ import { windowClassFor } from "./hooks/use-window-class";
  * The shell's contract.
  *
  * Nothing here asserts a pixel. These are the things a typecheck cannot see and a broken
- * build would not report: the destinations exist, the compact window gets a dock rather than
- * a rail, the height unit is `dvh`, and the insets are written once.
+ * build would not report: which controls exist at launch, that navigation moved into the
+ * drawer, that the height unit is `dvh`, and that insets are written once.
+ *
+ * The drawer's own contents are not asserted here: the registry `Sheet` mounts its content
+ * only while open, so a server render of a closed drawer is empty by design. Those rows are
+ * the drawer's test, not the shell's.
  */
 describe("the shell", () => {
   const html = renderToString(<App />);
 
-  it("renders all four destinations and no fifth", () => {
-    for (const label of ["Chat", "Scan", "Tasks", "Account"]) {
-      expect(html).toContain(label);
-    }
-    expect(html).not.toContain("More");
-    expect((html.match(/aria-label="Primary"/g) ?? []).length).toBe(1);
+  it("starts on a conversation, with Chat and Make as the only ways in", () => {
+    expect(html).toContain("Chat");
+    expect(html).toContain("Make");
+    expect(html).toContain('aria-label="Open menu"');
+    expect(html).toContain('aria-label="More options"');
   });
 
-  it("uses the dock at a compact width and not the rail", () => {
-    expect(html).toContain('aria-label="Primary"');
-    expect(html).toContain("rounded-dock");
+  it("has no bottom dock and no app bar", () => {
+    expect(html).not.toContain('aria-label="Primary"');
+    expect(html).not.toContain("rounded-dock border border-border bg-card p-1 shadow-dock");
+  });
+
+  it("mounts the composer and its disclaimer", () => {
+    expect(html).toContain('aria-label="Message EDAPEX"');
+    expect(html).toContain("EDAPEX can make mistakes");
+  });
+
+  it("keeps the attach panel closed until it is asked for", () => {
+    expect(html).not.toContain('aria-label="Add to chat"');
   });
 
   it("writes the safe-area insets exactly once, in Screen", () => {

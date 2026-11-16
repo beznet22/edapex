@@ -26,12 +26,17 @@ navigation bars.
 
 | Breakpoint | Width | Navigation | Content |
 |---|---|---|---|
-| compact | < 600dp | floating bottom dock, 4 destinations | single column |
-| medium | 600–839dp | 72dp rail | single column, max measure |
-| expanded | 840–1199dp | rail | supporting pane from 1024dp |
-| large | 1200–1599dp | rail | two-pane, transcript capped |
-| extra-large | ≥ 1600dp | rail | two-pane |
-| short | < 480dp high | dock hides on keyboard | — |
+| compact | < 600dp | drawer; top strip is Chat · Make | single column |
+| medium | 600–839dp | drawer | single column, max measure |
+| expanded | 840–1199dp | drawer | supporting pane from 1024dp |
+| large | 1200–1599dp | drawer, persistent at ≥ 1024dp | two-pane, transcript capped |
+| extra-large | ≥ 1600dp | drawer | two-pane |
+| short | < 480dp high | quick actions hide on keyboard | — |
+
+Navigation is one component at every size. The dock and the rail were removed: a bottom
+dock competes with the composer for the bottom edge, and a rail plus a drawer is two
+navigation models to keep in sync. What the top strip carries is what you *begin* from —
+Chat, or Make — and everything else is a row in the drawer.
 
 API 37 removes the orientation and resizability opt-out on large screens, so a layout that
 assumes portrait is a defect, not a preference. Free-form windowing and split-screen are
@@ -178,7 +183,7 @@ fallback path rather than the primary one.
 | Back, nothing open | Exits the task |
 | Back, drawer open | Drawer closes, activity keeps focus |
 | Deep link | `edapex://auth?code=test` arrives at `MainActivity` via `onNewIntent` |
-| Rotation | Dock → rail at the medium window class; no reload |
+| Rotation | Layout reflows at the medium window class; no reload |
 | Density 560 | Rows grow, text wraps, nothing clipped |
 
 Three defects were found only here, and none was reachable from a desktop build:

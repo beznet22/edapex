@@ -88,6 +88,32 @@
   }
 
   /*
+   * The composer is anchored to the bottom edge, so the gesture bar is part of its height.
+   * Declared here rather than as `pb-*` on the element: a utility would win over this class
+   * and the composer would sit under the bar on exactly the devices that have one.
+   */
+  .composer-dock {
+    padding-bottom: calc(var(--inset-bottom) + 0.5rem);
+  }
+
+  /* The attach panel floats clear of the composer and the gesture bar together. */
+  .attach-offset {
+    bottom: calc(var(--inset-bottom) + 5.5rem);
+  }
+
+  /* A control pinned to the bottom of a surface. */
+  .float-bottom {
+    bottom: calc(var(--inset-bottom) + 0.75rem);
+  }
+
+  /* The drawer runs edge to edge, so it owns both insets — the wordmark was under the status bar. */
+  .app-drawer {
+    padding: 0;
+    padding-top: var(--inset-top);
+    padding-bottom: var(--inset-bottom);
+  }
+
+  /*
    * Leaving the viewport has to be a transform, not a `translate-y-[calc(...)]` — an
    * arbitrary value is a value no token can change, and this one has to clear the gesture
    * bar's inset.

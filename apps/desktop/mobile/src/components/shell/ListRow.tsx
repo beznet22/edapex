@@ -13,17 +13,20 @@ export function ListRow({
   label,
   description,
   control,
+  leading,
   onPress,
   className
 }: {
   readonly label: string;
   readonly description?: string;
   readonly control?: ReactNode;
+  readonly leading?: ReactNode;
   readonly onPress?: () => void;
   readonly className?: string;
 }) {
   const content = (
     <>
+      {leading === undefined ? null : <span className="shrink-0 text-muted-foreground">{leading}</span>}
       <span className="min-w-0 flex-1">
         <span className="block truncate text-body">{label}</span>
         {description === undefined ? null : (
