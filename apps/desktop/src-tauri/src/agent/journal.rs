@@ -91,7 +91,7 @@ impl TurnRecorder for RunJournal {
     }
 
     fn checkpoint(&self, run_id: &str, messages: &[ChatMessage]) {
-        let Ok(payload) = serde_json::to_vec(&messages_json(messages)) else {
+        let Ok(payload) = serde_json::to_vec(&super::history::encode(messages)) else {
             eprintln!("run journal: could not serialise a checkpoint");
             return;
         };
@@ -118,7 +118,12 @@ impl TurnRecorder for RunJournal {
 }
 
 impl RunJournal {
-    fn lock<T>(
+    #[allow(dead_code)]
+    pub(crate) fn now(&self) -> i64 {
+        now()
+    }
+
+    pub(crate) fn lock<T>(
         &self,
         use_store: impl FnOnce(&mut Store<RusqliteDriver>) -> edapex_store::Result<T>,
     ) -> Result<T, HostError> {
@@ -139,34 +144,6 @@ fn now() -> i64 {
         .duration_since(std::time::UNIX_EPOCH)
         .map(|duration| duration.as_secs() as i64)
         .unwrap_or(0)
-}
-
-/// The transcript as stored, in the same field names the runtime uses on the wire.
-fn messages_json(messages: &[ChatMessage]) -> Value {
-    Value::Array(
-        messages
-            .iter()
-            .map(|message| {
-                let calls: Vec<Value> = message
-                    .tool_calls
-                    .iter()
-                    .map(|call| {
-                        json!({
-                            "id": call.id,
-                            "name": call.name,
-                            "arguments": call.arguments,
-                        })
-                    })
-                    .collect();
-                json!({
-                    "role": message.role.as_str(),
-                    "content": message.content.as_deref(),
-                    "tool_calls": calls,
-                    "tool_call_id": message.tool_call_id,
-                })
-            })
-            .collect(),
-    )
 }
 
 /// Reads the journal key from the OS keychain, creating it once.
@@ -265,10 +242,10 @@ impl RunJournal {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn journal() -> RunJournal {
+impl RunJournal {
+    /// A journal over memory, for the tests that plan resumes as well as the
+    /// tests that write them.
+    pub(crate) fn in_memory(workspace_id: &str) -> Self {
         let mut store = Store::new(
             RusqliteDriver::in_memory().expect("memory store"),
             MasterKey::from_bytes([3u8; 32]),
@@ -276,9 +253,18 @@ mod tests {
         store.migrate().expect("migrate");
         RunJournal {
             store: Mutex::new(store),
-            workspace_id: "ws".to_string(),
+            workspace_id: workspace_id.to_string(),
             pending: Mutex::new(Pending::default()),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn journal() -> RunJournal {
+        RunJournal::in_memory("ws")
     }
 
     fn delta(text: &str) -> AgentEvent {

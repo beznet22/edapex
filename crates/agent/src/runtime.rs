@@ -171,7 +171,7 @@ impl AgentHost {
             .insert(
                 thread_id.clone(),
                 ThreadState {
-                    messages: vec![ChatMessage::system(system_prompt())],
+                    messages: initial_history(""),
                 },
             );
         Ok(ThreadStartResult { thread_id })
@@ -256,6 +256,78 @@ impl AgentHost {
         });
 
         Ok(TurnStarted { turn_id })
+    }
+
+    /// Continues a checkpointed run with no new user message.
+    ///
+    /// Only the native headless worker calls this: the WebView always starts a
+    /// turn with `turn_start`. It runs inline rather than detached, because the
+    /// caller is a WorkManager job whose only job is to finish or fail, and it
+    /// installs the replayed history as the thread's transcript so a later
+    /// `agent_attach` sees exactly what the worker saw.
+    pub async fn resume_turn(
+        &self,
+        thread_id: &str,
+        turn_id: &str,
+        history: Vec<ChatMessage>,
+    ) -> Result<TurnCompletionStatus, AgentError> {
+        {
+            let mut threads = self
+                .inner
+                .threads
+                .lock()
+                .map_err(|_| AgentError::internal("Thread store is unavailable"))?;
+            threads.insert(
+                thread_id.to_string(),
+                ThreadState {
+                    messages: history.clone(),
+                },
+            );
+        }
+        {
+            let mut active = self
+                .inner
+                .active_threads
+                .lock()
+                .map_err(|_| AgentError::internal("Turn store is unavailable"))?;
+            if !active.insert(thread_id.to_string()) {
+                return Err(AgentError::invalid_input("A turn is already active"));
+            }
+        }
+
+        let control = Arc::new(TurnControl::new());
+        self.inner
+            .turns
+            .lock()
+            .map_err(|_| AgentError::internal("Turn store is unavailable"))?
+            .insert(turn_id.to_string(), Arc::clone(&control));
+
+        self.emit(AgentEvent::TurnStarted {
+            thread_id: thread_id.to_string(),
+            turn_id: turn_id.to_string(),
+        });
+
+        let mut history = history;
+        let status = self.run_turn(thread_id, turn_id, &control, &mut history).await;
+
+        self.inner.turns.lock().ok().map(|mut turns| turns.remove(turn_id));
+        self.inner
+            .active_threads
+            .lock()
+            .ok()
+            .map(|mut active| active.remove(thread_id));
+        if let Some(recorder) = &self.inner.recorder {
+            recorder.checkpoint(turn_id, history.as_slice());
+            recorder.finished(turn_id, status, None);
+        }
+        self.save_history(thread_id, history);
+
+        self.emit(AgentEvent::TurnCompleted {
+            thread_id: thread_id.to_string(),
+            turn_id: turn_id.to_string(),
+            status,
+        });
+        Ok(status)
     }
 
     pub fn interrupt(&self, _thread_id: &str, turn_id: &str) -> Result<(), AgentError> {
@@ -611,6 +683,18 @@ fn summarize_arguments(arguments: &str) -> String {
     } else {
         format!("{}…", compact.chars().take(79).collect::<String>())
     }
+}
+
+/// What a conversation looks like before anything has happened.
+///
+/// One definition, because a resumed run that rebuilt this differently from a
+/// new thread would answer differently for the same question.
+pub fn initial_history(input: &str) -> Vec<ChatMessage> {
+    let mut messages = vec![ChatMessage::system(system_prompt())];
+    if !input.is_empty() {
+        messages.push(ChatMessage::user(input));
+    }
+    messages
 }
 
 fn system_prompt() -> String {

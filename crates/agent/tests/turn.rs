@@ -483,3 +483,61 @@ async fn a_recorder_hears_the_start_each_tool_round_and_the_end() {
     let finished = recorder.finished.lock().expect("finished");
     assert_eq!(finished.as_slice(), &[TurnCompletionStatus::Completed]);
 }
+
+#[tokio::test]
+async fn a_resumed_run_continues_from_its_checkpoint_without_a_new_message() {
+    let provider = ScriptedProvider::new(vec![vec![
+        ProviderChunk::Text("six rows are missing".to_string()),
+        ProviderChunk::Done {
+            finish_reason: Some("stop".to_string()),
+        },
+    ]]);
+    let tools = FakeTools::new(false);
+    let (host, events) = host(
+        provider.clone(),
+        tools,
+        Arc::new(FixedApproval(ApprovalDecision::AllowOnce)),
+    );
+
+    // The checkpoint a tool round leaves behind: system, user, assistant with a
+    // call, and its result. A resume must continue this, not start over.
+    let checkpoint = vec![
+        ChatMessage::system("you are EdApex"),
+        ChatMessage::user("which marks are missing?"),
+        ChatMessage::assistant(
+            Some(std::sync::Arc::from("checking")),
+            vec![edapex_agent::ToolCall {
+                id: "call_1".to_string(),
+                name: "web_search".to_string(),
+                arguments: "{\"query\":\"JSS 2B\"}".to_string(),
+            }],
+        ),
+        ChatMessage {
+            role: edapex_agent::Role::Tool,
+            content: Some(std::sync::Arc::from("3 rows")),
+            tool_calls: Vec::new(),
+            tool_call_id: Some("call_1".to_string()),
+        },
+    ];
+
+    let status = host
+        .resume_turn("thread-1", "turn-1", checkpoint.clone())
+        .await
+        .expect("resumes");
+
+    assert_eq!(status, TurnCompletionStatus::Completed);
+    let requests = provider.requests.lock().expect("requests");
+    assert_eq!(requests.len(), 1, "a resume sends exactly one request");
+    assert_eq!(
+        requests[0].messages.len(),
+        checkpoint.len(),
+        "the transcript was re-seeded instead of continued"
+    );
+    assert!(
+        events.snapshot().iter().any(|event| matches!(
+            event,
+            AgentEvent::TurnCompleted { status: TurnCompletionStatus::Completed, .. }
+        )),
+        "the client never learned the turn finished"
+    );
+}
