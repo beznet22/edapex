@@ -7,6 +7,11 @@
     "node": ">=22.18"
   },
   "scripts": {
+    "check": "pnpm run check:boundaries && pnpm run check:docs && pnpm run check:tokens",
+    "check:boundaries": "node scripts/check-boundaries.mjs",
+    "check:docs": "node scripts/check-docs.mjs",
+    "check:tokens": "node scripts/check-tokens.mjs",
+    "check:tokens:update": "node scripts/check-tokens.mjs --update",
     "check:agent-size": "node scripts/check-agent-size.mjs",
     "verify:ports": "node scripts/verify-port-specs.mjs",
     "verify:schema": "node scripts/verify-schema-catalog.mjs"

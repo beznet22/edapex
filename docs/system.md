@@ -90,3 +90,23 @@
     ║  per-record XChaCha20 · outbox · journal · FTS (derived)                     ║
     ║  key = sibling OPFS file / OS keychain                                       ║
     ╚══════════════════════════════════════════════════════════════════════════════╝
+    ── What this diagram does not show ───────────────────────────────────────────
+
+    Two frontends            apps/web (browser + desktop window)
+                             apps/desktop/mobile (Android, Vite + React)
+                             sharing tokens / ui / host, never each other
+
+    The package layer        @edapex/tokens   design values, CSS only
+                             @edapex/ui       shadcn primitives
+                             @edapex/host     transport · api · agent adapter
+                             @edapex/chat     runtime state machine + Markdown
+
+    The native run host      RunWorker (WorkManager) → RunService (foreground service,
+                             type specialUse) → AgentHost, with `runs` / `run_events`
+                             in crates/store as the journal a reboot resumes from
+
+    Notifications            four channels: run · approval · done · routine
+
+    Why the web branch says "state dies with page": a page reload loses the in-memory
+    EventHub. The native branch survives it, and survives process death, which is why the
+    durability work lives there and not in the browser.

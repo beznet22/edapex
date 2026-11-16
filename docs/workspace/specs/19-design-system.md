@@ -86,7 +86,7 @@ Do not copy OpenDuet's purple/Inter theme. Do not change `src/routes/layout.css`
 
 ## Monorepo
 
-- shadcn components live in `apps/web/components/ui` for the single web app; extract to `packages/ui` only when a second React surface needs them. The Tauri host loads the same app, so it does not need a duplicate component tree.
+- **Amended by the package extraction.** The trigger in this section has fired: a second React surface (the Android app) needed the primitives, so they now live in `packages/ui`, installed with `pnpm dlx shadcn@latest add` from the app directory and routed by `aliases.ui`. `apps/web/components/ui` holds shell chrome only. Originally this read: shadcn components live in `apps/web/components/ui` for the single web app; extract to `packages/ui` only when a second React surface needs them. The Tauri host loads the same app, so it does not need a duplicate component tree.
 - OpenDuet-derived primitives live in `packages/chat`; app composition and route-specific chrome live in `apps/web/components/openduet`.
 - OpenUI catalog/parser/action bridge live in `packages/genui`.
 - `components.json` lives with the web app that consumes it; use the shadcn monorepo CLI support when a package is extracted.
