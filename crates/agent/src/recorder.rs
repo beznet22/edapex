@@ -19,6 +19,11 @@ pub struct RunStart<'a> {
     pub thread_id: &'a str,
     /// The person's message, verbatim. The recorder seals it with the rest.
     pub input: &'a str,
+    /// Everything a worker needs to rebuild the same request with no session
+    /// in memory. Without these a resumed run has a transcript and no model.
+    pub model: &'a str,
+    pub workspace_id: &'a str,
+    pub mobile_safe_tools: bool,
 }
 
 pub trait TurnRecorder: Send + Sync {

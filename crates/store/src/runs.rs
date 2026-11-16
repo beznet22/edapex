@@ -26,43 +26,62 @@ pub struct RunRecord {
     pub lease_until: i64,
 }
 
-/// A run that can be resumed, with its checkpoint already opened.
+/// A run that can be resumed, with everything it needs opened.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ResumePoint {
     pub run: RunRecord,
     /// The messages array as the runtime last wrote it. Empty when a run died
     /// before its first tool round — which is a legitimate state, not an error.
     pub checkpoint: Vec<u8>,
+    /// The person's message, verbatim: what a run with no checkpoint replays.
+    pub input: Vec<u8>,
+    /// `{ model, workspaceId, mobileSafeTools }`. Without it a worker has a
+    /// transcript and no model to send it to.
+    pub settings: Vec<u8>,
 }
 
 impl<D: SqlDriver> Store<D> {
     /// Records a run as started. Idempotent: a retried start keeps the first
     /// row rather than failing, because the caller may have died between the
     /// write and its own acknowledgement.
+    #[allow(clippy::too_many_arguments)]
     pub fn begin_run(
         &mut self,
         run_id: &str,
         thread_id: &str,
         workspace_id: &str,
         input: &[u8],
+        settings: &[u8],
         created_at: i64,
     ) -> Result<()> {
-        let body = crypto::seal(
+        // Each column is sealed under its own entity id, so a row edited by hand
+        // cannot move settings into the checkpoint or the input into either.
+        let checkpoint = crypto::seal(&self.master, "runs", run_id, crypto::random_nonce(), b"[]")?;
+        let input = crypto::seal(
             &self.master,
             "runs",
-            run_id,
+            &format!("{run_id}:input"),
             crypto::random_nonce(),
             input,
         )?;
+        let settings = crypto::seal(
+            &self.master,
+            "runs",
+            &format!("{run_id}:settings"),
+            crypto::random_nonce(),
+            settings,
+        )?;
         self.driver.execute(
             "INSERT OR IGNORE INTO runs \
-             (id, thread_id, workspace_id, status, body, data_class, created_at, updated_at, attempt, lease_until) \
-             VALUES (?, ?, ?, 'running', ?, 'workspace', ?, ?, 0, 0)",
+             (id, thread_id, workspace_id, status, body, input, settings, data_class, created_at, updated_at, attempt, lease_until) \
+             VALUES (?, ?, ?, 'running', ?, ?, ?, 'workspace', ?, ?, 0, 0)",
             &[
                 SqlValue::text(run_id),
                 SqlValue::text(thread_id),
                 SqlValue::text(workspace_id),
-                SqlValue::Blob(body),
+                SqlValue::Blob(checkpoint),
+                SqlValue::Blob(input),
+                SqlValue::Blob(settings),
                 SqlValue::integer(created_at),
                 SqlValue::integer(created_at),
             ],
@@ -278,17 +297,24 @@ impl<D: SqlDriver> Store<D> {
     /// The checkpoint for a run, opened, or `None` when it has no row.
     pub fn resume_point(&mut self, run_id: &str) -> Result<Option<ResumePoint>> {
         let rows = self.driver.query(
-            "SELECT id, thread_id, status, attempt, lease_until, body FROM runs WHERE id = ?",
+            "SELECT id, thread_id, status, attempt, lease_until, body, input, settings \
+             FROM runs WHERE id = ?",
             &[SqlValue::text(run_id)],
         )?;
         let Some(row) = rows.first() else {
             return Ok(None);
         };
-        let envelope = match row.get(5).and_then(SqlValue::as_blob) {
-            Some(envelope) => envelope,
-            None => return Ok(None),
+        // A row written by the sync path has no local state; it is not resumable.
+        let (Some(checkpoint), Some(input), Some(settings)) = (
+            row.get(5).and_then(SqlValue::as_blob),
+            row.get(6).and_then(SqlValue::as_blob),
+            row.get(7).and_then(SqlValue::as_blob),
+        ) else {
+            return Ok(None);
         };
-        let checkpoint = crypto::open(&self.master, "runs", run_id, envelope)?;
+        let checkpoint = crypto::open(&self.master, "runs", run_id, checkpoint)?;
+        let input = crypto::open(&self.master, "runs", &format!("{run_id}:input"), input)?;
+        let settings = crypto::open(&self.master, "runs", &format!("{run_id}:settings"), settings)?;
         Ok(Some(ResumePoint {
             run: RunRecord {
                 id: text_at(row, 0),
@@ -298,6 +324,8 @@ impl<D: SqlDriver> Store<D> {
                 lease_until: row.get(4).and_then(SqlValue::as_integer).unwrap_or(0),
             },
             checkpoint,
+            input,
+            settings,
         }))
     }
 

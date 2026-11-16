@@ -69,12 +69,19 @@ impl TurnRecorder for RunJournal {
     fn started(&self, run: RunStart<'_>) {
         // A journal write must never take a turn down with it: losing a
         // checkpoint costs durability after the fact, aborting costs the work.
+        let settings = serde_json::to_vec(&json!({
+            "model": run.model,
+            "workspaceId": run.workspace_id,
+            "mobileSafeTools": run.mobile_safe_tools,
+        }))
+        .unwrap_or_default();
         let result = self.lock(|store| {
             store.begin_run(
                 run.run_id,
                 run.thread_id,
                 &self.workspace_id,
                 run.input.as_bytes(),
+                &settings,
                 now(),
             )
         });
@@ -287,7 +294,7 @@ mod tests {
     fn events_are_written_in_order_under_their_run() {
         let journal = journal();
         journal
-            .lock(|store| store.begin_run("turn-1", "thread-1", "ws", b"{}", 1))
+            .lock(|store| store.begin_run("turn-1", "thread-1", "ws", b"{}", b"{}", 1))
             .expect("run");
 
         journal.emit(delta("Chidi"));

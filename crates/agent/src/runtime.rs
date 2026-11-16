@@ -217,6 +217,9 @@ impl AgentHost {
                 run_id: &turn_id,
                 thread_id: &input.thread_id,
                 input: &input.text,
+                model: &self.inner.settings.model,
+                workspace_id: &self.inner.settings.workspace_id,
+                mobile_safe_tools: self.inner.settings.mobile_safe_tools,
             });
         }
 

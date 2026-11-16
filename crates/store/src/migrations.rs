@@ -46,6 +46,13 @@ CREATE TABLE IF NOT EXISTS threads (
   -- Sealed payload. The title lives in here rather than in its own column: a
   -- plaintext title would leak the subject of a confidential conversation.
   body          BLOB NOT NULL,
+  -- Sealed with the run, but separately: the checkpoint is rewritten after every
+  -- tool round, while these two never change. Folding them into `body` would make
+  -- each checkpoint a read-modify-write.
+  -- Nullable because `write_record` also writes `runs` rows for sync, and those
+  -- carry no local resume state. A row without them is simply not resumable.
+  input         BLOB,
+  settings      BLOB,
   data_class    TEXT NOT NULL CHECK (data_class = 'workspace'),
   created_at    INTEGER NOT NULL,
   updated_at    INTEGER NOT NULL,
@@ -61,6 +68,13 @@ CREATE TABLE IF NOT EXISTS messages (
   workspace_id  TEXT NOT NULL,
   role          TEXT NOT NULL,
   body          BLOB NOT NULL,
+  -- Sealed with the run, but separately: the checkpoint is rewritten after every
+  -- tool round, while these two never change. Folding them into `body` would make
+  -- each checkpoint a read-modify-write.
+  -- Nullable because `write_record` also writes `runs` rows for sync, and those
+  -- carry no local resume state. A row without them is simply not resumable.
+  input         BLOB,
+  settings      BLOB,
   data_class    TEXT NOT NULL CHECK (data_class = 'workspace'),
   created_at    INTEGER NOT NULL,
   device_seq    INTEGER NOT NULL,
@@ -75,6 +89,13 @@ CREATE TABLE IF NOT EXISTS message_parts (
   part_type     TEXT NOT NULL,
   ordinal       INTEGER NOT NULL,
   body          BLOB NOT NULL,
+  -- Sealed with the run, but separately: the checkpoint is rewritten after every
+  -- tool round, while these two never change. Folding them into `body` would make
+  -- each checkpoint a read-modify-write.
+  -- Nullable because `write_record` also writes `runs` rows for sync, and those
+  -- carry no local resume state. A row without them is simply not resumable.
+  input         BLOB,
+  settings      BLOB,
   data_class    TEXT NOT NULL CHECK (data_class = 'workspace'),
   created_at    INTEGER NOT NULL
 );
@@ -86,6 +107,13 @@ CREATE TABLE IF NOT EXISTS runs (
   workspace_id  TEXT NOT NULL,
   status        TEXT NOT NULL,
   body          BLOB NOT NULL,
+  -- Sealed with the run, but separately: the checkpoint is rewritten after every
+  -- tool round, while these two never change. Folding them into `body` would make
+  -- each checkpoint a read-modify-write.
+  -- Nullable because `write_record` also writes `runs` rows for sync, and those
+  -- carry no local resume state. A row without them is simply not resumable.
+  input         BLOB,
+  settings      BLOB,
   data_class    TEXT NOT NULL CHECK (data_class = 'workspace'),
   created_at    INTEGER NOT NULL,
   updated_at    INTEGER NOT NULL
@@ -98,6 +126,13 @@ CREATE TABLE IF NOT EXISTS tool_calls (
   name          TEXT NOT NULL,
   status        TEXT NOT NULL,
   body          BLOB NOT NULL,
+  -- Sealed with the run, but separately: the checkpoint is rewritten after every
+  -- tool round, while these two never change. Folding them into `body` would make
+  -- each checkpoint a read-modify-write.
+  -- Nullable because `write_record` also writes `runs` rows for sync, and those
+  -- carry no local resume state. A row without them is simply not resumable.
+  input         BLOB,
+  settings      BLOB,
   data_class    TEXT NOT NULL CHECK (data_class = 'workspace'),
   created_at    INTEGER NOT NULL
 );
@@ -109,6 +144,13 @@ CREATE TABLE IF NOT EXISTS approval_requests (
   risk          TEXT NOT NULL,
   decision      TEXT,
   body          BLOB NOT NULL,
+  -- Sealed with the run, but separately: the checkpoint is rewritten after every
+  -- tool round, while these two never change. Folding them into `body` would make
+  -- each checkpoint a read-modify-write.
+  -- Nullable because `write_record` also writes `runs` rows for sync, and those
+  -- carry no local resume state. A row without them is simply not resumable.
+  input         BLOB,
+  settings      BLOB,
   data_class    TEXT NOT NULL CHECK (data_class = 'workspace'),
   created_at    INTEGER NOT NULL,
   resolved_at   INTEGER
@@ -118,6 +160,13 @@ CREATE TABLE IF NOT EXISTS approval_rules (
   id            TEXT PRIMARY KEY,
   workspace_id  TEXT NOT NULL,
   body          BLOB NOT NULL,
+  -- Sealed with the run, but separately: the checkpoint is rewritten after every
+  -- tool round, while these two never change. Folding them into `body` would make
+  -- each checkpoint a read-modify-write.
+  -- Nullable because `write_record` also writes `runs` rows for sync, and those
+  -- carry no local resume state. A row without them is simply not resumable.
+  input         BLOB,
+  settings      BLOB,
   data_class    TEXT NOT NULL CHECK (data_class = 'workspace'),
   created_at    INTEGER NOT NULL
 );
@@ -127,6 +176,13 @@ CREATE TABLE IF NOT EXISTS tasks (
   workspace_id  TEXT NOT NULL,
   status        TEXT NOT NULL,
   body          BLOB NOT NULL,
+  -- Sealed with the run, but separately: the checkpoint is rewritten after every
+  -- tool round, while these two never change. Folding them into `body` would make
+  -- each checkpoint a read-modify-write.
+  -- Nullable because `write_record` also writes `runs` rows for sync, and those
+  -- carry no local resume state. A row without them is simply not resumable.
+  input         BLOB,
+  settings      BLOB,
   data_class    TEXT NOT NULL CHECK (data_class = 'workspace'),
   created_at    INTEGER NOT NULL,
   updated_at    INTEGER NOT NULL
@@ -137,6 +193,13 @@ CREATE TABLE IF NOT EXISTS artifacts (
   workspace_id  TEXT NOT NULL,
   kind          TEXT NOT NULL,
   body          BLOB NOT NULL,
+  -- Sealed with the run, but separately: the checkpoint is rewritten after every
+  -- tool round, while these two never change. Folding them into `body` would make
+  -- each checkpoint a read-modify-write.
+  -- Nullable because `write_record` also writes `runs` rows for sync, and those
+  -- carry no local resume state. A row without them is simply not resumable.
+  input         BLOB,
+  settings      BLOB,
   data_class    TEXT NOT NULL CHECK (data_class = 'workspace'),
   created_at    INTEGER NOT NULL
 );
@@ -147,6 +210,13 @@ CREATE TABLE IF NOT EXISTS artifact_versions (
   workspace_id  TEXT NOT NULL,
   version       INTEGER NOT NULL,
   body          BLOB NOT NULL,
+  -- Sealed with the run, but separately: the checkpoint is rewritten after every
+  -- tool round, while these two never change. Folding them into `body` would make
+  -- each checkpoint a read-modify-write.
+  -- Nullable because `write_record` also writes `runs` rows for sync, and those
+  -- carry no local resume state. A row without them is simply not resumable.
+  input         BLOB,
+  settings      BLOB,
   data_class    TEXT NOT NULL CHECK (data_class = 'workspace'),
   created_at    INTEGER NOT NULL,
   UNIQUE (artifact_id, version)
@@ -156,6 +226,13 @@ CREATE TABLE IF NOT EXISTS memory_facts (
   id            TEXT PRIMARY KEY,
   workspace_id  TEXT NOT NULL,
   body          BLOB NOT NULL,
+  -- Sealed with the run, but separately: the checkpoint is rewritten after every
+  -- tool round, while these two never change. Folding them into `body` would make
+  -- each checkpoint a read-modify-write.
+  -- Nullable because `write_record` also writes `runs` rows for sync, and those
+  -- carry no local resume state. A row without them is simply not resumable.
+  input         BLOB,
+  settings      BLOB,
   data_class    TEXT NOT NULL CHECK (data_class = 'workspace'),
   created_at    INTEGER NOT NULL,
   updated_at    INTEGER NOT NULL
@@ -228,6 +305,13 @@ CREATE TABLE runs_v2 (
   workspace_id  TEXT NOT NULL,
   status        TEXT NOT NULL,
   body          BLOB NOT NULL,
+  -- Sealed with the run, but separately: the checkpoint is rewritten after every
+  -- tool round, while these two never change. Folding them into `body` would make
+  -- each checkpoint a read-modify-write.
+  -- Nullable because `write_record` also writes `runs` rows for sync, and those
+  -- carry no local resume state. A row without them is simply not resumable.
+  input         BLOB,
+  settings      BLOB,
   data_class    TEXT NOT NULL CHECK (data_class = 'workspace'),
   created_at    INTEGER NOT NULL,
   updated_at    INTEGER NOT NULL,

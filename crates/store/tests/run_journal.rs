@@ -16,13 +16,15 @@ fn contains(haystack: &[u8], needle: &[u8]) -> bool {
 #[test]
 fn a_checkpoint_survives_as_the_exact_messages() {
     let mut store = store();
-    store.begin_run("run-1", "thread-1", "ws", b"{}", 100).unwrap();
+    store.begin_run("run-1", "thread-1", "ws", b"{}", b"{\"model\":\"m\"}", 100).unwrap();
 
     let messages = br#"[{"role":"assistant","content":"two marks are missing"}]"#;
     store.checkpoint_run("run-1", messages, 120).unwrap();
 
     let point = store.resume_point("run-1").unwrap().expect("no resume point");
     assert_eq!(point.checkpoint, messages);
+    assert_eq!(point.input, b"{}");
+    assert_eq!(point.settings, br#"{"model":"m"}"#);
     assert_eq!(point.run.thread_id, "thread-1");
     assert_eq!(point.run.status, "running");
     assert_eq!(point.run.attempt, 0);
@@ -31,7 +33,7 @@ fn a_checkpoint_survives_as_the_exact_messages() {
 #[test]
 fn the_checkpoint_on_disk_is_not_readable() {
     let mut store = store();
-    store.begin_run("run-1", "thread-1", "ws", b"{}", 100).unwrap();
+    store.begin_run("run-1", "thread-1", "ws", b"{}", b"{\"model\":\"m\"}", 100).unwrap();
     store
         .checkpoint_run("run-1", b"Confidential Term 2 marksheet", 120)
         .unwrap();
@@ -50,7 +52,7 @@ fn the_checkpoint_on_disk_is_not_readable() {
 #[test]
 fn events_keep_their_order_and_open_with_their_bodies() {
     let mut store = store();
-    store.begin_run("run-1", "thread-1", "ws", b"{}", 100).unwrap();
+    store.begin_run("run-1", "thread-1", "ws", b"{}", b"{\"model\":\"m\"}", 100).unwrap();
 
     store
         .append_run_events(
@@ -77,7 +79,7 @@ fn events_keep_their_order_and_open_with_their_bodies() {
 #[test]
 fn an_event_body_is_not_readable_on_disk() {
     let mut store = store();
-    store.begin_run("run-1", "thread-1", "ws", b"{}", 100).unwrap();
+    store.begin_run("run-1", "thread-1", "ws", b"{}", b"{\"model\":\"m\"}", 100).unwrap();
     store
         .append_run_events("run-1", &[("message_delta", b"Chidi scored 82")], 110)
         .unwrap();
@@ -93,8 +95,8 @@ fn an_event_body_is_not_readable_on_disk() {
 #[test]
 fn a_settled_run_is_not_offered_to_a_worker() {
     let mut store = store();
-    store.begin_run("run-1", "thread-1", "ws", b"{}", 100).unwrap();
-    store.begin_run("run-2", "thread-2", "ws", b"{}", 101).unwrap();
+    store.begin_run("run-1", "thread-1", "ws", b"{}", b"{\"model\":\"m\"}", 100).unwrap();
+    store.begin_run("run-2", "thread-2", "ws", b"{}", b"{\"model\":\"m\"}", 101).unwrap();
 
     store.settle_run("run-1", "done", None, 130).unwrap();
 
@@ -106,7 +108,7 @@ fn a_settled_run_is_not_offered_to_a_worker() {
 #[test]
 fn a_second_worker_cannot_take_a_live_lease() {
     let mut store = store();
-    store.begin_run("run-1", "thread-1", "ws", b"{}", 100).unwrap();
+    store.begin_run("run-1", "thread-1", "ws", b"{}", b"{\"model\":\"m\"}", 100).unwrap();
 
     assert!(store.claim_run("run-1", 100, 130).unwrap());
     assert!(
@@ -122,7 +124,7 @@ fn a_second_worker_cannot_take_a_live_lease() {
 #[test]
 fn attempts_count_up_so_a_worker_can_stop_retrying() {
     let mut store = store();
-    store.begin_run("run-1", "thread-1", "ws", b"{}", 100).unwrap();
+    store.begin_run("run-1", "thread-1", "ws", b"{}", b"{\"model\":\"m\"}", 100).unwrap();
 
     assert_eq!(store.bump_run_attempt("run-1").unwrap(), 1);
     assert_eq!(store.bump_run_attempt("run-1").unwrap(), 2);
@@ -132,10 +134,13 @@ fn attempts_count_up_so_a_worker_can_stop_retrying() {
 #[test]
 fn beginning_the_same_run_twice_keeps_the_first_row() {
     let mut store = store();
-    store.begin_run("run-1", "thread-1", "ws", b"first", 100).unwrap();
-    store.begin_run("run-1", "thread-1", "ws", b"second", 101).unwrap();
+    store.begin_run("run-1", "thread-1", "ws", b"first", b"settings", 100).unwrap();
+    store.begin_run("run-1", "thread-1", "ws", b"second", b"settings", 101).unwrap();
 
     let point = store.resume_point("run-1").unwrap().unwrap();
-    assert_eq!(point.checkpoint, b"first");
+    assert_eq!(point.input, b"first");
+    // The checkpoint starts empty: a run that died before its first tool round
+    // replays from the input, not from a half-written transcript.
+    assert_eq!(point.checkpoint, b"[]");
     assert_eq!(store.open_runs(10).unwrap().len(), 1);
 }
