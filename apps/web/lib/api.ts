@@ -48,6 +48,14 @@ export interface SessionView {
   readonly user: SessionUser;
   readonly sessionId: string;
   readonly expiresAt: number;
+  /**
+   * The workspace this session acts in.
+   *
+   * Use this rather than `String(user.id)`: the two are equal today, but only one of them is
+   * a workspace. Every caller that reached for the user id is a place a real workspace would
+   * have to be found and fixed later.
+   */
+  readonly workspaceId: string;
 }
 
 export interface DirectoryFilters {

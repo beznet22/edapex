@@ -17,6 +17,15 @@ export interface WorkspaceContextValue {
    * (or falls back to the literal "workspace") writes rows nobody will ever read back.
    */
   readonly workspaceId: string;
+  /**
+   * The academic year the person is looking at.
+   *
+   * Distinct from `workspaceId` and not interchangeable with it: this is the school's session
+   * (academic year) id, carried on every tenant request as `X-Academic-Id`. A surface that
+   * derives it from `workspaceId` sends a *user* id, which happens to resolve when a row with
+   * that id exists and silently scopes everything else to the wrong year.
+   */
+  readonly academicId: number;
   readonly runtime: WorkspaceRuntimeController;
   readonly proactive: ProactiveController;
   readonly openArtifact: () => void;

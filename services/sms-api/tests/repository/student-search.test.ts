@@ -42,7 +42,23 @@ describe("student placement search", () => {
       classId: schools[0].classId,
       sectionId: schools[0].sectionId
     });
-    expect(roster).toEqual([{ id: schools[0].studentId, name: "Student 1", admissionNo: 114 }]);
+    /*
+     * The three joined columns are asserted, not just the identity ones.
+     *
+     * They used to be hardcoded to `null` in the service, so the DTO advertised six fields and
+     * delivered three — every roster row rendered "Inactive" with no class. A test that only
+     * checks id/name/admissionNo cannot see that.
+     */
+    expect(roster).toEqual([
+      {
+        id: schools[0].studentId,
+        name: "Student 1",
+        admissionNo: 114,
+        className: "CLASS 1",
+        sectionName: "A",
+        activeStatus: 1
+      }
+    ]);
 
     const filtered = await listStudentsByClassSection(
       first,

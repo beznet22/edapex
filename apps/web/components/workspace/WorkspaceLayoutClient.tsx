@@ -101,10 +101,7 @@ export function WorkspaceLayoutClient({
   // while the person is on Chat — a routine due at 08:00 should fire even if the
   // Tasks tab is not open. The trade (only while a device is open) is stated in
   // the surface copy.
-  const proactive = useProactive(
-    session === null ? null : String(session.user.id),
-    runtime.sendAndWait
-  );
+  const proactive = useProactive(session?.workspaceId ?? null, runtime.sendAndWait);
   const runtimeHealth = useRuntimeHealth();
   // One capture-phase listener for every scroll container in the tree.
   useAutoHideScrollbars();
@@ -230,8 +227,10 @@ export function WorkspaceLayoutClient({
   }
 
   const userName = session?.user.fullName ?? session?.user.email ?? "Signed in";
-  const workspaceId = String(session?.user.id ?? "workspace");
-  const contextValue = { manifest, workspaceId, runtime, proactive, openArtifact };
+  // The session names its workspace; the fallback exists only for the pre-auth render, where
+  // no surface is mounted yet.
+  const workspaceId = session?.workspaceId ?? "workspace";
+  const contextValue = { manifest, workspaceId, academicId, runtime, proactive, openArtifact };
 
   return (
     <WorkspaceProvider value={contextValue}>

@@ -1,0 +1,9 @@
+# Local development for `cowork-api`.
+#
+#   cp .dev.vars.example .dev.vars
+#
+# This Worker validates sessions by asking `sms-api`, over a private service binding in
+# production. `wrangler dev` does not wire bindings between separate processes, so locally the
+# binding is absent and `callSmsApi` falls back to a plain HTTP call — but only to a loopback
+# origin. Point this at the running `sms-api`.
+API_ORIGIN=http://127.0.0.1:8787

@@ -33,6 +33,7 @@ import { RowActionMenu } from "@/components/admin/RowActionMenu";
 import { TablePagination } from "@/components/admin/TablePagination";
 import { ClaimLinkModal, type ClaimSubject } from "@/components/admin/ClaimLinkModal";
 import { DuplicatesTab } from "@/components/admin/DuplicatesTab";
+import { StudentsTab } from "@/components/admin/StudentsTab";
 import { StaffFormModal } from "@/components/admin/StaffFormModal";
 import { StaffDetailModal } from "@/components/admin/StaffDetailModal";
 import { useWorkspaceContext } from "@/components/workspace/WorkspaceContext";
@@ -46,7 +47,7 @@ import {
   type StaffRow
 } from "@/lib/admin-api";
 
-type Tab = "staff" | "parents" | "duplicates";
+type Tab = "staff" | "parents" | "students" | "duplicates";
 
 /**
  * The dashboard: one page, everything else a tab, modal or dropdown.
@@ -60,7 +61,7 @@ type Tab = "staff" | "parents" | "duplicates";
  * absent rather than misleading.
  */
 export function UserManagementSurface() {
-  const { manifest, workspaceId } = useWorkspaceContext();
+  const { manifest, workspaceId, academicId } = useWorkspaceContext();
   const isAdmin = manifest.role === "admin";
 
   const [tab, setTab] = useState<Tab>(isAdmin ? "staff" : "parents");
@@ -98,10 +99,13 @@ export function UserManagementSurface() {
    * routes validate it as a positive integer. Parsing here rather than at the call site keeps
    * a bad value from reaching the transport as "NaN" in a header.
    */
-  const academicId = useMemo(() => {
-    const value = Number(workspaceId);
-    return Number.isInteger(value) && value > 0 ? value : 0;
-  }, [workspaceId]);
+  /*
+   * From the workspace context, not derived from `workspaceId`.
+   *
+   * The previous version parsed the *workspace* id as an academic year. It appeared to work
+   * because a row with that id existed, so `assertScope` passed — but every request was scoped
+   * to the wrong session, which is why the class picker came back empty.
+   */
 
   const refresh = useCallback(async (): Promise<void> => {
     if (!isAdmin || academicId === 0) {
@@ -404,11 +408,12 @@ export function UserManagementSurface() {
       <Tabs className="mt-6" onValueChange={(value) => setTab(value as Tab)} value={tab}>
         <TabsList>
           {isAdmin ? <TabsTrigger value="staff">Staff</TabsTrigger> : null}
-          <TabsTrigger value="parents">Parents</TabsTrigger>
+          {isAdmin ? <TabsTrigger value="parents">Parents</TabsTrigger> : null}
+          <TabsTrigger value="students">Students</TabsTrigger>
           {isAdmin ? <TabsTrigger value="duplicates">Duplicates</TabsTrigger> : null}
         </TabsList>
 
-        {tab === "duplicates" ? null : (
+        {tab === "duplicates" || tab === "students" ? null : (
           <div className="mt-4">
             <FilterBar
               includeInactive={includeInactive}
@@ -558,6 +563,10 @@ export function UserManagementSurface() {
               total={total}
             />
           )}
+        </TabsContent>
+
+        <TabsContent className="mt-3" value="students">
+          <StudentsTab academicId={academicId} />
         </TabsContent>
 
         <TabsContent className="mt-3" value="duplicates">

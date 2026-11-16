@@ -399,3 +399,65 @@ export const loadIssues = async (
   params.set("page", String(filters.page ?? 1));
   return await call<IssuePage>(academicId, `/api/v1/admin/issues?${params.toString()}`);
 };
+
+/* ── Classes and roster ─────────────────────────────────────────────────── */
+
+export interface ClassSection {
+  readonly classId: number;
+  readonly className: string | null;
+  readonly sectionId: number;
+  readonly sectionName: string | null;
+  readonly label: string;
+}
+
+/** The classes this caller may open a roster for — every one for an admin, their own for a teacher. */
+export const loadMyClasses = async (academicId: number): Promise<readonly ClassSection[]> => {
+  const response = await call<{ classes: readonly ClassSection[] }>(academicId, "/api/v1/me/classes");
+  return response.classes;
+};
+
+/**
+ * One row of `GET /students`, matching `StudentSummaryDto` exactly.
+ *
+ * The DTO is the contract; a client interface that renames its fields (`id` → `studentId`)
+ * compiles and then renders `undefined` everywhere, which is how the roster table came back
+ * empty with a 200 on the wire.
+ */
+export interface RosterStudent {
+  readonly id: number;
+  readonly fullName: string;
+  readonly admissionNo: number | null;
+  readonly className: string | null;
+  readonly sectionName: string | null;
+  readonly activeStatus: number | null;
+}
+
+/**
+ * One section's roster.
+ *
+ * The class and section travel as headers because the route is class-scoped on the server:
+ * `requireClassScope` reads them, and `TenantScopeService` then proves the caller may open
+ * that section. They are not query parameters, so a roster cannot be requested for a class the
+ * caller does not hold.
+ */
+export const loadRoster = async (
+  academicId: number,
+  target: { readonly classId: number; readonly sectionId: number },
+  query?: string
+): Promise<readonly RosterStudent[]> => {
+  const params = new URLSearchParams({ limit: "200" });
+  if (query !== undefined && query.length > 0) params.set("q", query);
+
+  const response = await apiFetch(`/api/v1/students?${params.toString()}`, apiBase(), {
+    headers: {
+      "X-Academic-Id": String(academicId),
+      "X-Class-Id": String(target.classId),
+      "X-Section-Id": String(target.sectionId)
+    }
+  });
+  if (!response.ok) {
+    throw new Error(readMessage(response.data, `Request failed (${response.status})`));
+  }
+  const body = response.data as { rows?: readonly RosterStudent[] };
+  return body.rows ?? [];
+};

@@ -55,6 +55,44 @@ function toIdentity(payload: SessionPayload): ResolvedIdentity | null {
   };
 }
 
+/**
+ * Calls `sms-api`, over the service binding where there is one.
+ *
+ * In production `SMS_API` is a private binding: traffic never leaves Cloudflare and the API
+ * has no public hostname to reach. Locally, `wrangler dev` runs each Worker as its own
+ * process and does not wire bindings between them unless they start in the same session —
+ * so `context.env.SMS_API` is undefined and every authenticated request fails with a 401 that
+ * looks like a session problem.
+ *
+ * The fallback is a plain `fetch` to `API_ORIGIN`, which `.dev.vars` points at
+ * `http://127.0.0.1:8787`. Gated on the binding being absent rather than on an environment
+ * name: if production ever lost its binding, falling back to a public URL would be a security
+ * regression, so the fallback requires a loopback origin.
+ */
+async function callSmsApi(
+  context: Context<AppContext>,
+  path: string,
+  init: RequestInit
+): Promise<Response> {
+  const url = new URL(path, context.env.API_ORIGIN);
+  const binding = context.env.SMS_API;
+
+  if (binding !== undefined && typeof binding.fetch === "function") {
+    return await binding.fetch(new Request(url, init));
+  }
+
+  /*
+   * No binding. Only allowed against a loopback origin: a missing binding in production must
+   * fail loudly rather than silently route a session check over the public internet.
+   */
+  if (url.hostname !== "127.0.0.1" && url.hostname !== "localhost") {
+    throw new Error(
+      "SMS_API binding is missing and API_ORIGIN is not loopback; refusing to call it directly."
+    );
+  }
+  return await fetch(url, init);
+}
+
 export async function authenticate(
   context: Context<AppContext>,
   next: Next
@@ -64,13 +102,10 @@ export async function authenticate(
     return context.json(apiError("Sign in to continue.", "unauthorized"), 401);
   }
 
-  const response = await context.env.SMS_API.fetch(
-    new URL("/api/v1/me", context.env.API_ORIGIN),
-    {
-      method: "GET",
-      headers: { cookie, accept: "application/json" }
-    }
-  );
+  const response = await callSmsApi(context, "/api/v1/me", {
+    method: "GET",
+    headers: { cookie, accept: "application/json" }
+  });
 
   if (!response.ok) {
     return context.json(apiError("Sign in to continue.", "unauthorized"), 401);

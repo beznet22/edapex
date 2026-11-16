@@ -54,5 +54,6 @@ export const TEST_SESSION: SessionView = {
     email: "admin@localhost"
   },
   sessionId: "test-fixture",
-  expiresAt: Math.floor(Date.now() / 1000) + 3600
+  expiresAt: Math.floor(Date.now() / 1000) + 3600,
+  workspaceId: "1"
 };

@@ -73,6 +73,14 @@ export interface StudentSearchRow {
   readonly id: number;
   readonly name: string | null;
   readonly admissionNo: number | null;
+  /**
+   * Carried from the placement row and the two joins, not from the denormalized mirror on
+   * `sm_students`. The service used to hardcode these to `null`, so every roster row rendered
+   * "Inactive" with no class — a DTO that advertised six fields and delivered three.
+   */
+  readonly className: string | null;
+  readonly sectionName: string | null;
+  readonly activeStatus: number | null;
 }
 
 export type PromotionRow = typeof smStudentPromotions.$inferSelect;

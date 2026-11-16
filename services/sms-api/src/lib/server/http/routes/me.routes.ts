@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 
-import { createService, ProfileService, StaffPhotoService } from "../../services";
+import { createService, MyClassesService, ProfileService, StaffPhotoService } from "../../services";
 import { AuthError, NotFoundError, PermissionError } from "../../services/errors";
 import { toSessionDto, toUserDto } from "../dto/auth";
 import type { AppContext } from "../env";
@@ -69,4 +69,21 @@ export const me = new Hono<AppContext>()
     }
     await createService(StaffPhotoService, c.get("ctx")).removeOwn(user.staffId);
     return c.body(null, 204);
+  })
+  /**
+   * The classes this caller may open a roster for.
+   *
+   * Needs the tenant middleware (for the academic year) but deliberately not
+   * `requireClassScope`: the whole point is to discover a class, so requiring one up front
+   * would be circular.
+   */
+  .get("/classes", async (c) => {
+    const user = c.get("user");
+    if (user === null) throw new AuthError();
+    const classes = await createService(MyClassesService, c.get("ctx")).list({
+      isAdmin: user.isAdmin,
+      staffId: user.staffId
+    });
+    c.header("Cache-Control", "no-store");
+    return c.json({ classes }, 200);
   });
