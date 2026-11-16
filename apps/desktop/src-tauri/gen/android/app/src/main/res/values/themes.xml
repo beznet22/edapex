@@ -1,6 +1,37 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
-    <!-- Base application theme. -->
+    <!--
+      The base theme.
+
+      `windowBackground` is set so a relaunch or a configuration change paints the token
+      background instead of the platform's grey — the WebView is recreated but the window is
+      not, and a grey frame between the two is visible on every rotation.
+
+      No `windowActionMode`, no `windowNoTitle` fiddling: the shell draws no app bar at all,
+      and the activity is edge-to-edge, so the theme has nothing to hide.
+    -->
     <style name="Theme.edapex_desktop" parent="Theme.Material3.DayNight.NoActionBar">
-        <!-- Customize your theme here. -->
+        <item name="android:windowBackground">@color/splash_background</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar">true</item>
+    </style>
+
+    <!--
+      The launch theme.
+
+      The icon is deliberately **static**. Android masks the splash icon to a circle and
+      scales it itself, and the only thing it will animate is an AnimatedVectorDrawable on
+      API 31+ — played once, timed by the platform, and cut off mid-frame when the app is
+      ready. A cut-off animation reads as a stutter, and a circle crops a mark that is wider
+      than it is tall. The motion budget goes to the exit fade in `MainActivity` and to
+      onboarding, where the mark is neither masked nor rushed.
+
+      `postSplashScreenTheme` is what keeps the splash off the back stack.
+    -->
+    <style name="Theme.EdApex.Starting" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/splash_background</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_splash_mark</item>
+        <item name="postSplashScreenTheme">@style/Theme.edapex_desktop</item>
     </style>
 </resources>

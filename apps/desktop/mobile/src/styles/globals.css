@@ -101,3 +101,26 @@
     pointer-events: none;
   }
 }
+
+@layer components {
+  /*
+   * The brand mark, painted in the theme's ink.
+   *
+   * A CSS mask over `--foreground` rather than an `<img>`: the generated SVG is a black
+   * silhouette, so masking it follows light and dark from the token sheet instead of
+   * needing a second file. The `-webkit-` pair is for WebViews before `mask-image` shipped
+   * unprefixed.
+   */
+  .brand-mask {
+    display: block;
+    background-color: var(--foreground);
+    mask-image: var(--brand-mark);
+    mask-repeat: no-repeat;
+    mask-position: center;
+    mask-size: contain;
+    -webkit-mask-image: var(--brand-mark);
+    -webkit-mask-repeat: no-repeat;
+    -webkit-mask-position: center;
+    -webkit-mask-size: contain;
+  }
+}

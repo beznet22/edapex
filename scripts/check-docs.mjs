@@ -58,20 +58,45 @@ for (const name of dirs(join(ROOT, "docs/workspace/specs")).filter((entry) => en
 }
 
 // 5. The Android package identity agrees in all three places.
+//
+// Reading the java directory as a file threw EISDIR, and the surrounding catch swallowed
+// the whole assertion — so this check passed while asserting nothing. Walk for the source
+// and read its `package` line instead.
+function kotlinPackages(dir) {
+  const found = [];
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const full = join(dir, entry.name);
+    if (entry.isDirectory()) found.push(...kotlinPackages(full));
+    else if (entry.name.endsWith(".kt")) {
+      const match = /^package\s+([\w.]+)/m.exec(readFileSync(full, "utf8"));
+      if (match) found.push({ file: full, name: match[1] });
+    }
+  }
+  return found;
+}
+
 try {
   const conf = JSON.parse(readFileSync(join(ROOT, "apps/desktop/src-tauri/tauri.conf.json"), "utf8"));
   const gradle = readFileSync(join(ROOT, "apps/desktop/src-tauri/gen/android/app/build.gradle.kts"), "utf8");
-  const activity = readFileSync(
-    join(ROOT, "apps/desktop/src-tauri/gen/android/app/src/main/java"),
-    "utf8"
-  );
-  void activity;
   const appId = /applicationId\s*=\s*"([^"]+)"/.exec(gradle)?.[1];
+  const namespace = /namespace\s*=\s*"([^"]+)"/.exec(gradle)?.[1];
+
   if (appId !== undefined && conf.identifier !== appId) {
     fail(`tauri identifier (${conf.identifier}) !== gradle applicationId (${appId})`);
   }
-} catch {
-  // The Android project may not exist yet; the check is meaningful only for a mobile build.
+  if (namespace !== undefined && namespace !== appId) {
+    fail(`gradle namespace (${namespace}) !== applicationId (${appId})`);
+  }
+
+  const sources = kotlinPackages(join(ROOT, "apps/desktop/src-tauri/gen/android/app/src/main/java"));
+  if (sources.length === 0) fail("no Kotlin sources under gen/android/app/src/main/java");
+  for (const source of sources) {
+    if (source.name !== appId) {
+      fail(`${relative(ROOT, source.file)} is package ${source.name}, expected ${appId}`);
+    }
+  }
+} catch (cause) {
+  fail(`the Android package identity could not be checked: ${cause.message}`);
 }
 
 // 6. The workspace globs cover every app and package directory.

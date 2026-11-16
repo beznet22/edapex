@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Menu, ScanLine, Sparkles } from "lucide-react";
 
 import { Button } from "@edapex/ui/components/button";
@@ -10,11 +10,14 @@ import { Rail } from "@/components/shell/Rail";
 import { Screen } from "@/components/shell/Screen";
 import { ScreenHeader } from "@/components/shell/ScreenHeader";
 import { Sheet } from "@/components/shell/Sheet";
+import { BootVeil } from "@/components/shell/BootVeil";
 import { TouchTarget } from "@/components/shell/TouchTarget";
 import { useKeyboardOpen } from "@/hooks/use-keyboard-open";
 import { useScrollCollapse } from "@/hooks/use-scroll-collapse";
 import { useWindowClass, usesRail } from "@/hooks/use-window-class";
+import { onSystemBack, setBackEnabled } from "@/lib/host-bridge";
 import { DESTINATIONS, type DestinationId } from "@/lib/nav";
+import { applyThemeMode, readThemeMode, watchSystemTheme } from "@/lib/theme";
 
 const TITLES: Readonly<Record<DestinationId, string>> = {
   chat: "Chat",
@@ -51,6 +54,30 @@ export function App() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [light, setLight] = useState(true);
+  const [ready, setReady] = useState(false);
+  const sheetOpen = menuOpen || previewOpen;
+
+  useEffect(() => {
+    applyThemeMode(readThemeMode());
+    return watchSystemTheme(readThemeMode);
+  }, []);
+
+  useEffect(() => {
+    // The veil hands over from the native splash. One frame means it is painted before it
+    // starts fading, which is what makes two surfaces read as one.
+    const frame = requestAnimationFrame(() => setReady(true));
+    return () => cancelAnimationFrame(frame);
+  }, []);
+
+  useEffect(() => {
+    // Back closes a sheet before it exits the app. The host is told when the page can
+    // consume the gesture; when it cannot, the host lets the system close the task.
+    setBackEnabled(sheetOpen);
+    return onSystemBack(() => {
+      setMenuOpen(false);
+      setPreviewOpen(false);
+    });
+  }, [sheetOpen]);
 
   return (
     <div className="flex min-h-dvh bg-background text-foreground">
@@ -154,6 +181,8 @@ export function App() {
           press back to dismiss.
         </p>
       </Sheet>
+
+      <BootVeil ready={ready} />
     </div>
   );
 }

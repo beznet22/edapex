@@ -6,7 +6,7 @@ use tauri::State;
 
 use crate::state::{HostError, HostState, PendingAuth};
 
-const KEYRING_SERVICE: &str = "ng.llacademy.edapex";
+const KEYRING_SERVICE: &str = "com.bronotek.edapex";
 const KEYRING_USER: &str = "session";
 const DEFAULT_API_BASE: &str = "https://api.llacademy.ng";
 
