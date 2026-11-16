@@ -26,7 +26,7 @@ export function SettingsSurface({ onBack }: { readonly onBack: () => void }) {
       <header className="flex items-center justify-between px-gutter py-2">
         <Button
           aria-label="Back"
-          className="rounded-full border border-border bg-card text-foreground"
+          className="size-touch rounded-full text-foreground"
           onClick={onBack}
           size="icon"
           variant="ghost"
@@ -36,7 +36,7 @@ export function SettingsSurface({ onBack }: { readonly onBack: () => void }) {
         <h1 className="text-title font-semibold tracking-tight">Settings</h1>
         <Button
           aria-label="About EDAPEX"
-          className="rounded-full border border-border bg-card text-foreground"
+          className="size-touch rounded-full text-foreground"
           size="icon"
           variant="ghost"
         >

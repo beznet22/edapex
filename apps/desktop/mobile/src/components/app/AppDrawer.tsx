@@ -54,7 +54,7 @@ export function AppDrawer({
           </div>
           <Button
             aria-label="Search"
-            className="rounded-full bg-muted text-foreground"
+            className="size-touch rounded-full text-foreground"
             size="icon"
             variant="ghost"
           >

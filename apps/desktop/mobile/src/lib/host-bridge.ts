@@ -11,6 +11,7 @@
 interface EdApexHostBridge {
   setBackEnabled(enabled: boolean): void;
   setDarkTheme(dark: boolean): void;
+  bootReady(): void;
 }
 
 declare global {
@@ -33,6 +34,17 @@ export function setBackEnabled(enabled: boolean): void {
  */
 export function setDarkTheme(dark: boolean): void {
   window.EdApexHost?.setDarkTheme(dark);
+}
+
+/**
+ * Tell the host the first frame has been painted.
+ *
+ * The native splash holds until this arrives, so the hand-off happens between two surfaces
+ * that are both already drawn rather than at a guess. The host also has a timeout: a bundle
+ * that never loads must not leave the splash holding the screen forever.
+ */
+export function bootReady(): void {
+  window.EdApexHost?.bootReady();
 }
 
 /**

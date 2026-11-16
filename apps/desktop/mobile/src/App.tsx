@@ -10,7 +10,7 @@ import type { ComposeMode } from "@/components/app/TopBar";
 import { BootVeil } from "@/components/shell/BootVeil";
 import { Sheet } from "@/components/shell/Sheet";
 import { useKeyboardOpen } from "@/hooks/use-keyboard-open";
-import { onSystemBack, setBackEnabled } from "@/lib/host-bridge";
+import { bootReady, onSystemBack, setBackEnabled } from "@/lib/host-bridge";
 import { SECTIONS, type SurfaceId } from "@/lib/nav";
 import { applyThemeMode, readThemeMode, watchSystemTheme } from "@/lib/theme";
 
@@ -42,9 +42,20 @@ export function App() {
   }, []);
 
   useEffect(() => {
-    // The veil hands over from the native splash; one frame means it is painted before it fades.
-    const frame = requestAnimationFrame(() => setReady(true));
-    return () => cancelAnimationFrame(frame);
+    /*
+     * Two frames, in this order: the first paints the veil, the second commits it. Only then
+     * is the native splash allowed to leave, so the hand-off never exposes an unpainted
+     * WebView — which is what the white flash was.
+     */
+    let second = 0;
+    const first = requestAnimationFrame(() => {
+      bootReady();
+      second = requestAnimationFrame(() => setReady(true));
+    });
+    return () => {
+      cancelAnimationFrame(first);
+      cancelAnimationFrame(second);
+    };
   }, []);
 
   useEffect(() => {

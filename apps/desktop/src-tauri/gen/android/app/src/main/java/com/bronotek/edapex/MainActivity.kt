@@ -1,12 +1,14 @@
 package com.bronotek.edapex
 
 import android.os.Bundle
+import android.os.SystemClock
 import android.view.View
 import android.view.ViewGroup
 import android.webkit.JavascriptInterface
 import android.webkit.WebView
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.enableEdgeToEdge
+import androidx.core.content.ContextCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -37,6 +39,8 @@ class MainActivity : TauriActivity() {
     private var bridgeAttached = false
     private var reloadedForBridge = false
     private var insetsInstalled = false
+    @Volatile private var pagePainted = false
+    private var bootDeadline = 0L
 
     override fun onCreate(savedInstanceState: Bundle?) {
         val splash = installSplashScreen()
@@ -49,6 +53,23 @@ class MainActivity : TauriActivity() {
          * Opacity only. A scale or a slide here would move the mark relative to the veil
          * behind it, drawing the eye to the seam this exists to hide.
          */
+        /*
+         * Hold the splash until the page has painted its own first frame.
+         *
+         * The system would otherwise hand over as soon as the activity was ready — before the
+         * bundle had run — and the WebView's default white background showed through the 150ms
+         * fade. The page calls `bootReady()` after two `requestAnimationFrame`s, which is the
+         * first moment the veil is on screen rather than merely parsed.
+         *
+         * The deadline is not decoration: a bundle that fails to load must not leave the splash
+         * holding the screen. After `BOOT_TIMEOUT_MS` the condition stops being true whatever
+         * the page did.
+         */
+        bootDeadline = SystemClock.uptimeMillis() + BOOT_TIMEOUT_MS
+        splash.setKeepOnScreenCondition {
+            !pagePainted && SystemClock.uptimeMillis() < bootDeadline
+        }
+
         splash.setOnExitAnimationListener { provider ->
             val view = provider.view
             view.animate()
@@ -116,6 +137,12 @@ class MainActivity : TauriActivity() {
      */
     override fun onWebViewCreate(webView: WebView) {
         super.onWebViewCreate(webView)
+        /*
+         * The WebView's own default is white, and it is what showed between the splash leaving
+         * and the bundle's first frame. Painting it with the same night-aware resource the
+         * splash uses means the seam has nothing to reveal, even if the hand-off is late.
+         */
+        webView.setBackgroundColor(ContextCompat.getColor(this, R.color.splash_background))
         attachHostBridge(webView)
     }
 
@@ -175,13 +202,35 @@ class MainActivity : TauriActivity() {
             val caption = windowInsets.getInsets(WindowInsetsCompat.Type.captionBar())
             val keyboard = windowInsets.getInsets(WindowInsetsCompat.Type.ime())
 
-            webView?.evaluateJavascript(
+            /*
+             * The bars are where the system *is*, not where the page starts.
+             *
+             * If the WebView already sits below the status bar — which is what some OEMs do
+             * after the keyguard is dismissed, whatever edge-to-edge was asked for — then the
+             * page must not reserve that strip again. Measured against the WebView's real
+             * frame, the page pads only the part the WebView does not cover, so the layout is
+             * correct whether or not the window is edge-to-edge.
+             */
+            val target = webView
+            val location = IntArray(2)
+            target?.getLocationOnScreen(location)
+            val displayHeight = view.height
+            val top = target?.let {
+                ((bars.top + caption.top) - location[1]).coerceAtLeast(0)
+            } ?: (bars.top + caption.top)
+            val gapBelow = target?.let {
+                displayHeight - (location[1] + it.height)
+            } ?: 0
+            val bottom = (bars.bottom - gapBelow).coerceAtLeast(0)
+            val keyboardInset = (keyboard.bottom - gapBelow).coerceAtLeast(0)
+
+            target?.evaluateJavascript(
                 """
-                document.documentElement.style.setProperty('--platform-inset-top', '${bars.top + caption.top}px');
-                document.documentElement.style.setProperty('--platform-inset-bottom', '${bars.bottom}px');
+                document.documentElement.style.setProperty('--platform-inset-top', '${top}px');
+                document.documentElement.style.setProperty('--platform-inset-bottom', '${bottom}px');
                 document.documentElement.style.setProperty('--platform-inset-left', '${bars.left}px');
                 document.documentElement.style.setProperty('--platform-inset-right', '${bars.right}px');
-                document.documentElement.style.setProperty('--platform-keyboard-inset', '${keyboard.bottom}px');
+                document.documentElement.style.setProperty('--platform-keyboard-inset', '${keyboardInset}px');
                 """.trimIndent(),
                 null
             )
@@ -227,6 +276,11 @@ class MainActivity : TauriActivity() {
         }
 
         @JavascriptInterface
+        fun bootReady() {
+            pagePainted = true
+        }
+
+        @JavascriptInterface
         fun setDarkTheme(dark: Boolean) {
             runOnUiThread {
                 WindowCompat.getInsetsController(window, window.decorView).apply {
@@ -239,5 +293,8 @@ class MainActivity : TauriActivity() {
 
     private companion object {
         const val SPLASH_EXIT_MS = 150L
+
+        /** A bundle that never loads must not leave the splash holding the screen. */
+        const val BOOT_TIMEOUT_MS = 4_000L
     }
 }

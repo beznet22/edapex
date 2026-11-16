@@ -27,7 +27,7 @@ export function ListSurface({
       <header className="flex items-center gap-2 px-gutter py-2">
         <Button
           aria-label="Back"
-          className="rounded-full border border-border bg-card text-foreground"
+          className="size-touch rounded-full text-foreground"
           onClick={onBack}
           size="icon"
           variant="ghost"

@@ -80,6 +80,11 @@ export function TopBar({
         >
           <Sparkles aria-hidden="true" className="size-4 text-primary" />
           Tasks
+          {approvals > 0 ? (
+            <span className="rounded-full bg-primary px-1.5 text-chrome font-medium text-primary-foreground">
+              {approvals}
+            </span>
+          ) : null}
         </ToggleGroupItem>
       </ToggleGroup>
 
