@@ -17,17 +17,24 @@ export default {
   async fetch(request) {
     const cookie = request.headers.get("cookie") ?? "";
     // A cookie that does not match deliberately returns 401.
-    const match = /edapex_session=user-(\\d+)/.exec(cookie);
+    //
+    // The identity fields are encoded in the cookie so a test can express an admin, a
+    // teacher or a student. Returning only the id silently made every test user a
+    // student with an empty ceiling, which made authority assertions pass for the
+    // wrong reason.
+    const match = /edapex_session=user-(\\d+)(?:\\.admin)?(?:\\.staff-(\\d+))?/.exec(cookie);
     if (!match) {
       return new Response(JSON.stringify({ error: { message: "unauthorized" } }), {
         status: 401,
         headers: { "content-type": "application/json" }
       });
     }
-    return new Response(JSON.stringify({ user: { id: Number(match[1]) } }), {
-      status: 200,
-      headers: { "content-type": "application/json" }
-    });
+    const isAdmin = cookie.includes(".admin");
+    const staffId = match[2] === undefined ? null : Number(match[2]);
+    return new Response(
+      JSON.stringify({ user: { id: Number(match[1]), isAdmin, staffId } }),
+      { status: 200, headers: { "content-type": "application/json" } }
+    );
   }
 };
 `;

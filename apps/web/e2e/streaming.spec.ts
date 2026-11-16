@@ -36,7 +36,7 @@ function sseFrom(deltas: readonly string[]): string {
 
 /** Opens the model dialog and boots the WASM runtime. */
 async function connectRuntime(page: Page): Promise<void> {
-  const dialog = page.getByRole("dialog", { name: "Choose a model" });
+  const dialog = page.getByRole("dialog", { name: "Start your workspace" });
   await expect(dialog).toBeVisible({ timeout: 20_000 });
   await dialog.getByRole("button", { name: "Open workspace" }).click();
 

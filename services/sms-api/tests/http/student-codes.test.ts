@@ -136,7 +136,7 @@ describe("student code routes", () => {
       body: JSON.stringify({ code })
     });
     expect(loginResponse.status).toBe(200);
-    const session = cookiePair(loginResponse, "__Host-edapex_session");
+    const session = cookiePair(loginResponse, "edapex_session");
     if (session === null) throw new Error("code login did not set a session");
     expect((await request(app, "/api/v1/me", { headers: { cookie: session } })).status).toBe(
       200

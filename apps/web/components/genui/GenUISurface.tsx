@@ -8,7 +8,7 @@ const SurfaceRenderer = dynamic(
   () => import("@edapex/genui").then((module) => ({ default: module.SurfaceRenderer })),
   {
     ssr: false,
-    loading: () => <div className="h-20 animate-pulse rounded-xl border border-border bg-muted/40" />
+    loading: () => <div className="skeleton-shimmer h-20 rounded-xl border border-border" />
   }
 );
 

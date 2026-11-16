@@ -5,7 +5,17 @@ export type NewStudent = typeof smStudents.$inferInsert;
 export type StudentRecordRow = typeof studentRecords.$inferSelect;
 export type NewStudentRecord = typeof studentRecords.$inferInsert;
 
-/** Columns a student profile update may touch. */
+/**
+ * Columns a student profile update may touch.
+ *
+ * `classId`/`sectionId` are present because a *promotion* writes them, but
+ * `StudentProfileService.update` strips them: moving a student must go through
+ * `promoteStudent`, which also creates the placement record, assigns fees and moves chat
+ * groups. A bare column update would leave all three pointing at the old section.
+ *
+ * `parentId` is here because the guardian endpoints need it — before them, nothing in the
+ * system could change a student's guardian.
+ */
 export type StudentPatch = Partial<
   Pick<
     NewStudent,
@@ -20,6 +30,7 @@ export type StudentPatch = Partial<
     | "rollNo"
     | "email"
     | "mobile"
+    | "parentId"
   >
 >;
 
@@ -62,6 +73,14 @@ export interface StudentSearchRow {
   readonly id: number;
   readonly name: string | null;
   readonly admissionNo: number | null;
+  /**
+   * Carried from the placement row and the two joins, not from the denormalized mirror on
+   * `sm_students`. The service used to hardcode these to `null`, so every roster row rendered
+   * "Inactive" with no class — a DTO that advertised six fields and delivered three.
+   */
+  readonly className: string | null;
+  readonly sectionName: string | null;
+  readonly activeStatus: number | null;
 }
 
 export type PromotionRow = typeof smStudentPromotions.$inferSelect;

@@ -1,9 +1,11 @@
+mod window;
 mod agent;
 mod api;
 mod auth;
 mod capture;
 mod mcp;
 mod ocr;
+mod pdf;
 mod state;
 
 use edapex_core::CoreHealth;
@@ -62,12 +64,18 @@ pub fn run() {
             auth::auth_logout,
             api::api_request,
             api::ocr_mistral,
+            window::window_start_dragging,
+            window::window_minimize,
+            window::window_toggle_maximize,
+            window::window_close,
+            window::window_is_focused,
             capture::capture_screen,
             capture::capture_import,
             capture::capture_import_path,
             capture::capture_release,
             capture::capture_preview,
-            ocr::ocr_extract
+            ocr::ocr_extract,
+            pdf::render_pdf
         ])
         .run(tauri::generate_context!())
         .expect("error while running EdApex Work");

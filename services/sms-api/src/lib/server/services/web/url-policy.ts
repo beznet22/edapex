@@ -1,13 +1,19 @@
 import { ValidationError } from "../errors";
 
-const BLOCKED_HOSTNAMES = new Set([
+/**
+ * `as const` rather than a module-scope `Set`: the service rule engine forbids a
+ * module-scope Map/Set, because a mutable collection shared across a request is a
+ * place state can leak between tenants. A frozen tuple has no such surface and
+ * the list is small enough that `includes` is not a cost worth optimizing.
+ */
+const BLOCKED_HOSTNAMES: readonly string[] = [
   "localhost",
   "localhost.localdomain",
   "metadata",
   "metadata.google.internal",
   "instance-data",
   "169.254.169.254"
-]);
+];
 
 const isPrivateIpv4 = (hostname: string): boolean => {
   const parts = hostname.split(".");
@@ -64,7 +70,7 @@ export function assertPublicHttpUrl(value: string): string {
   }
   const hostname = url.hostname.toLowerCase();
   if (
-    BLOCKED_HOSTNAMES.has(hostname) ||
+    BLOCKED_HOSTNAMES.includes(hostname) ||
     hostname.endsWith(".localhost") ||
     hostname.endsWith(".local") ||
     hostname.endsWith(".internal") ||

@@ -165,7 +165,11 @@ for (const [assetPath, limit] of Object.entries(budget.assets)) {
   if (assetPath.startsWith("$")) continue;
   const relative = assetPath.replace(/^\//, "");
 
-  const chunk = Object.keys(manifest).find((key) => manifest[key].file.endsWith(relative));
+  // Vite emits hashed names, so an entry like `ironpress_bg.wasm` would never match
+  // with `endsWith` alone and the ceiling would pass vacuously.
+  const chunk =
+    Object.keys(manifest).find((key) => manifest[key].file.endsWith(relative)) ??
+    Object.keys(manifest).find((key) => manifest[key].file.includes(relative));
   if (chunk !== undefined) {
     report(relative, gzipSize(manifest[chunk].file), limit.gzip);
     continue;

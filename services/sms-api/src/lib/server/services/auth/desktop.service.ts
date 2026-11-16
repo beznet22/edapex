@@ -2,8 +2,8 @@ import type { ServiceContext } from "../context";
 import { requireUnscopedContext } from "../context";
 import { sha256Base64Url, randomToken } from "../crypto/digest";
 import { signPayload, verifyPayload } from "../crypto/signed-payload";
+import { issueSession, loadAuthUser } from "./session-issuance";
 import { AuthError, ConflictError, ValidationError } from "../errors";
-import { SessionService } from "./session.service";
 import type { AuthSessionResult } from "./types";
 
 export const DESKTOP_REDIRECT_URI = "edapex://auth";
@@ -105,11 +105,25 @@ export class DesktopAuthService {
       throw new AuthError("This desktop sign-in code has already been used");
     }
 
-    const result = await new SessionService(this.ctx).issueForUser(payload.userId, {
+    // Session issuance lives behind the shared helpers, not a sibling service
+    // class: a service importing another service makes construction order
+    // implicit and is exactly what the rule engine forbids. The same validation
+    // runs here — an inactive or flagged account must not receive a session from
+    // the desktop flow any more than from the web one.
+    const user = await this.ctx.repos.accounts.findUserById(unscoped, payload.userId);
+    if (user === null) throw new AuthError("This account does not exist");
+    if (user.activeStatus !== 1) throw new AuthError("This account is not active");
+    if (user.claimStatus === "flagged") {
+      throw new ConflictError(
+        "This account is under administrative review; contact the school administrator"
+      );
+    }
+
+    const session = await issueSession(this.ctx, user.id, {
       ip: input.ip,
       userAgent: input.userAgent,
       fingerprint: null
     });
-    return result;
+    return { ...session, user: await loadAuthUser(this.ctx, user) };
   }
 }

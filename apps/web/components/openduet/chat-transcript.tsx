@@ -1,7 +1,9 @@
 "use client";
 
+import { BrandMark } from "@/components/workspace/BrandMark";
 import type { ReactNode } from "react";
 import {
+  MarkdownMessage,
   Message,
   MessageContent,
   MessageGroup,
@@ -15,6 +17,7 @@ import type {
   QueuedMessage,
   SurfacePart,
   ToolCallPart,
+  WorkspaceRunState,
   WorkspaceRuntimeView
 } from "@edapex/contracts";
 import { Paperclip } from "lucide-react";
@@ -56,13 +59,23 @@ function Thinking() {
   );
 }
 
-function renderPart(
-  part: ChatMessagePart,
-  index: number,
-  message: ChatMessage,
-  manifest: CapabilityManifest,
-  onApproval: ChatTranscriptProps["onApproval"]
-): ReactNode {
+interface RenderPartOptions {
+  readonly part: ChatMessagePart;
+  readonly index: number;
+  readonly message: ChatMessage;
+  readonly manifest: CapabilityManifest;
+  readonly onApproval: ChatTranscriptProps["onApproval"];
+  readonly streaming: boolean;
+}
+
+function renderPart({
+  part,
+  index,
+  message,
+  manifest,
+  onApproval,
+  streaming
+}: RenderPartOptions): ReactNode {
   switch (part.kind) {
     case "text":
       return (
@@ -72,7 +85,13 @@ function renderPart(
           variant={message.role === "user" ? "default" : "secondary"}
         >
           <BubbleContent>
-            <p className="whitespace-pre-wrap">{part.text}</p>
+            {message.role === "user" ? (
+              // A person's own words stay literal. Rendering their text as Markdown
+              // would silently reinterpret asterisks and underscores they typed.
+              <p className="whitespace-pre-wrap">{part.text}</p>
+            ) : (
+              <MarkdownMessage streaming={streaming}>{part.text}</MarkdownMessage>
+            )}
           </BubbleContent>
         </Bubble>
       );
@@ -98,14 +117,41 @@ function renderPart(
   }
 }
 
+/**
+ * States in which a turn is actively producing assistant text.
+ *
+ * `waiting_for_person` is excluded on purpose: the turn is paused at an approval or a
+ * question, so its text is final for now and should render exactly as written.
+ * `completed`, `stopped` and `error` are likewise done.
+ */
+function isTurnProducing(state: WorkspaceRunState): boolean {
+  return state === "thinking" || state === "following" || state === "tool_running";
+}
+
+/** The trailing assistant message, if the transcript ends with one. */
+function lastAssistantMessageId(messages: readonly ChatMessage[]): string | null {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index];
+    if (message === undefined) continue;
+    if (message.role === "assistant") return message.id;
+    // A queued user message can sit after the live one. Anything else ends the search:
+    // if the last assistant message is not trailing, nothing is being written.
+    if (message.role === "user" && message.queueState === "queued") continue;
+    return null;
+  }
+  return null;
+}
+
 function AssistantParts({
   message,
   manifest,
-  onApproval
+  onApproval,
+  streaming
 }: {
   readonly message: ChatMessage;
   readonly manifest: CapabilityManifest;
   readonly onApproval: ChatTranscriptProps["onApproval"];
+  readonly streaming: boolean;
 }) {
   const nodes: ReactNode[] = [];
   let tools: ToolCallPart[] = [];
@@ -122,7 +168,7 @@ function AssistantParts({
       return;
     }
     flushTools();
-    nodes.push(renderPart(part, index, message, manifest, onApproval));
+    nodes.push(renderPart({ part, index, message, manifest, onApproval, streaming }));
   });
   flushTools();
 
@@ -133,9 +179,7 @@ function EmptyState({ manifest }: { readonly manifest: CapabilityManifest }) {
   const toolCount = manifest.packs.reduce((total, pack) => total + pack.tools.length, 0);
   return (
     <div className="flex min-h-0 flex-1 flex-col items-center justify-center px-6 py-12 text-center">
-      <div className="flex size-12 items-center justify-center rounded-2xl bg-primary text-lg font-black text-primary-foreground">
-        E
-      </div>
+      <BrandMark size={40} />
       <h2 className="mt-5 text-xl font-semibold tracking-tight">What are we working on?</h2>
       <p className="mt-2 max-w-[28ch] text-sm leading-6 text-muted-foreground">
         Your {manifest.role} workspace is ready. Ask about people, classes, attendance or reports.
@@ -167,6 +211,17 @@ export function ChatTranscript({
   onApproval
 }: ChatTranscriptProps) {
   const scrollKey = `${messages.length}:${queue.length}:${runtime.state}`;
+
+  // Which assistant message is still being written.
+  //
+  // Derived rather than read from the runtime view: a turn produces exactly one
+  // assistant message and it is always the last one, so the invariant already holds.
+  // Adding a `streamingMessageId` field would give the adapter a second thing to keep
+  // correct for no extra information — and a stale id would silently stop repairing
+  // Markdown mid-answer.
+  const streamingMessageId = isTurnProducing(runtime.state)
+    ? lastAssistantMessageId(messages)
+    : null;
 
   if (runtime.state === "restoring") {
     return (
@@ -229,11 +284,25 @@ export function ChatTranscript({
                 {message.role === "user" ? (
                   <MessageGroup>
                     {message.parts.map((part, index) =>
-                      renderPart(part, index, message, manifest, onApproval)
+                      renderPart({
+                        part,
+                        index,
+                        message,
+                        manifest,
+                        onApproval,
+                        // A person's own message is never "streaming": it is sent
+                        // whole, so repairing its Markdown would alter their text.
+                        streaming: false
+                      })
                     )}
                   </MessageGroup>
                 ) : (
-                  <AssistantParts manifest={manifest} message={message} onApproval={onApproval} />
+                  <AssistantParts
+                    manifest={manifest}
+                    message={message}
+                    onApproval={onApproval}
+                    streaming={streamingMessageId === message.id}
+                  />
                 )}
                 {message.seenAt !== null && message.seenAt !== undefined ? (
                   <span className="self-end text-[10px] text-muted-foreground">Seen</span>

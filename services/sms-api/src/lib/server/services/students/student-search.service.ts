@@ -52,9 +52,9 @@ export class StudentSearchService {
         id: row.id,
         fullName: row.name ?? "",
         admissionNo: row.admissionNo,
-        className: null,
-        sectionName: null,
-        activeStatus: null
+        className: row.className,
+        sectionName: row.sectionName,
+        activeStatus: row.activeStatus
       })),
       nextCursor: null
     };

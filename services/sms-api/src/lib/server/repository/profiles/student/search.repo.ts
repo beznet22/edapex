@@ -1,6 +1,6 @@
 import { and, eq, like, or, sql } from "drizzle-orm";
 
-import { smStudents, studentRecords } from "../../../db/schema";
+import { smClasses, smSections, smStudents, studentRecords } from "../../../db/schema";
 import { withErrorHandling } from "../../base/error-handling";
 import { requireAcademicId } from "../../base/repository-context";
 import type { ScopedRepositoryContext } from "../../base/repository-context";
@@ -48,10 +48,15 @@ export async function listStudentsByClassSection(
       .select({
         id: smStudents.id,
         name: smStudents.fullName,
-        admissionNo: smStudents.admissionNo
+        admissionNo: smStudents.admissionNo,
+        className: smClasses.className,
+        sectionName: smSections.sectionName,
+        activeStatus: smStudents.activeStatus
       })
       .from(smStudents)
       .innerJoin(studentRecords, eq(smStudents.id, studentRecords.studentId))
+      .leftJoin(smClasses, eq(studentRecords.classId, smClasses.id))
+      .leftJoin(smSections, eq(studentRecords.sectionId, smSections.id))
       .where(where)
       .orderBy(smStudents.id);
   }, "listStudentsByClassSection");

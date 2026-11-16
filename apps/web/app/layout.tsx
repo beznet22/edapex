@@ -7,18 +7,18 @@ import { resolveDarkClass, readThemeCookies } from "@/lib/theme";
 
 export const metadata: Metadata = {
   title: {
-    default: "EdApex",
-    template: "%s · EdApex"
+    default: "EDAPEX",
+    template: "%s · EDAPEX"
   },
-  description: "EdApex school operations and cowork workspace.",
-  applicationName: "EdApex",
+  description: "EDAPEX school operations and cowork workspace.",
+  applicationName: "EDAPEX",
   icons: {
     icon: "/favicon.svg",
     apple: "/workspace/icons/apple-touch-icon.png"
   },
   appleWebApp: {
     capable: true,
-    title: "EdApex",
+    title: "EDAPEX",
     statusBarStyle: "black-translucent"
   }
 };

@@ -1,0 +1,62 @@
+# Local development variables for `wrangler dev`.
+#
+# Copy to `.dev.vars` (gitignored) — `wrangler dev` reads that file, **not the shell**, so
+# `LOCAL_EMAIL_LOG=true pnpm dev` has no effect and magic-link sign-in fails. That cost a
+# debugging round.
+#
+#   cp .dev.vars.example .dev.vars
+#
+# Everything here overrides `wrangler.jsonc` wholesale for the keys it names. That is why
+# `CORS_ORIGINS` is *not* repeated: putting a local value here once silently broke the CORS
+# suite, which expects the production origin.
+#
+# No secrets. Anything secret belongs in `wrangler secret put`, never here.
+
+# Writes email to the console instead of sending it, and prints the magic-link URL so
+# sign-in works locally. Without it the Cloudflare adapter throws "Email binding is not
+# configured" — `wrangler dev` has no `send_email` binding.
+LOCAL_EMAIL_LOG=true
+
+# Where a browser lands after a successful sign-in.
+#
+# These must point at the dev server, not production. `wrangler.jsonc` sets
+# `APP_ORIGIN=https://app.llacademy.ng`, and a local sign-in that redirects there looks
+# like a broken session: the cookie is set on the API host, the browser then leaves for
+# production, and the workspace there has no session for this machine.
+APP_ORIGIN=http://127.0.0.1:5181
+POST_LOGIN_REDIRECT=http://127.0.0.1:5181/workspace
+
+# `CORS_ORIGINS` is deliberately absent. The dev server proxies `/api`, so the browser never
+# makes a cross-origin request — and overriding it makes the vitest plugin (which loads this
+# file) fail the CORS suite, which asserts the production allowlist.
+
+# Sign-in links last 30 days locally.
+#
+# Production ships 15 minutes, because a token sitting in an inbox is a bearer credential and
+# a long window makes a forwarded email a standing invitation. Locally the only place the link
+# appears is this terminal, and a 15-minute link expires while you are still reading the error
+# you were about to fix — so the window is the whole debug session.
+MAGIC_LINK_TTL_SECONDS=2592000
+
+# Signed-in sessions last 30 days locally.
+#
+# Production ships 7 days. A dev session that expires mid-debug means signing in again through
+# a link, which is the same annoyance the magic-link TTL above exists to remove.
+SESSION_TTL_SECONDS=2592000
+
+# ---------------------------------------------------------------------------
+# Two Workers, one /api prefix
+#
+# `sms-api` owns sessions and the school database. `cowork-api` owns the agent
+# workspace routes — routines, tasks, agents, sync, connectors — and does not
+# exist in `sms-api` at all, so those paths answer 404 unless it is running.
+#
+#   pnpm --dir services/cowork-api exec wrangler d1 migrations apply AGENT_DB --local
+#   pnpm --dir services/cowork-api dev                       # :8788
+#   DEV_API_TARGET=http://127.0.0.1:8787 \
+#   DEV_COWORK_TARGET=http://127.0.0.1:8788 pnpm --dir apps/web dev
+#
+# The web proxy splits by path; `DEV_COWORK_TARGET` is what enables the split.
+# Without it the Tasks surface degrades quietly: the 404 is treated as permanent
+# and polling stops, rather than retrying an endpoint that will never exist.
+# ---------------------------------------------------------------------------

@@ -1,12 +1,16 @@
 "use client";
 
-import { Skeleton } from "@/components/openduet/skeleton";
+import { Skeleton } from "@edapex/chat";
 import type { WorkspaceTab } from "@/components/openduet/tab-bar";
 
 const BOOT_LABEL: Record<WorkspaceTab, string> = {
   chat: "Chat",
   tasks: "Tasks",
-  make: "Make"
+  make: "Make",
+  plugins: "Plugins",
+  settings: "Settings",
+  search: "Search",
+  admin: "People"
 };
 
 const BOOT_TABS: readonly WorkspaceTab[] = ["chat", "tasks", "make"];
@@ -160,7 +164,7 @@ export function WorkspaceBoot({ surface }: { readonly surface: WorkspaceTab }) {
               </div>
             </div>
             <div className="hidden items-center gap-2 text-sm lg:flex">
-              <span className="font-semibold tracking-tight">EdApex Work</span>
+              <span className="font-semibold tracking-tight">EDAPEX Work</span>
               <span className="text-muted-foreground">/</span>
               <span className="text-muted-foreground">{BOOT_LABEL[surface]}</span>
             </div>

@@ -19,7 +19,7 @@ export const ACCENT_COOKIE = "edapex.accent";
 export const THEME_MODES = ["light", "dark", "system"] as const;
 export type ThemeMode = (typeof THEME_MODES)[number];
 
-export const ACCENTS = ["gold", "jade", "indigo"] as const;
+export const ACCENTS = ["coral", "gold", "teal", "jade", "indigo"] as const;
 export type Accent = (typeof ACCENTS)[number];
 
 export interface ThemePreference {
@@ -27,7 +27,13 @@ export interface ThemePreference {
   readonly accent: Accent;
 }
 
-export const DEFAULT_THEME: ThemePreference = { mode: "system", accent: "gold" };
+/**
+ * Coral, from the warm palette in `designs/claude.design.md`.
+ *
+ * Gold was the default and rendered as mustard (`#b17a21`) — it is kept as a preset
+ * rather than removed, because a tenant may still choose it.
+ */
+export const DEFAULT_THEME: ThemePreference = { mode: "system", accent: "coral" };
 
 export function isThemeMode(value: unknown): value is ThemeMode {
   return typeof value === "string" && (THEME_MODES as readonly string[]).includes(value);

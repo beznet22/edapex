@@ -10,7 +10,7 @@ import { formBody, jsonBody } from "../validation";
 
 export const assessmentOcr = new Hono<AppContext>()
   .post("/ocr/extractions", formBody(ocrForm), async (c) => {
-    if (c.req.header("x-ocr-consent") !== "cloud") {
+    if (!c.get("cloudOcrConsented")) {
       return c.json(
         {
           error: "VALIDATION_FAILED",

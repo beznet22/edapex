@@ -118,7 +118,7 @@ Numbers below come from read-only introspection of the development database, not
 
 | Metric | Value | Source |
 |---|---|---|
-| Tables in database / declared in schema | 316 / 311 | `scripts/introspect-mysql.mjs` |
+| Tables in database / declared in schema | 316 / 311 | `legacy/scripts/introspect-mysql.mjs` |
 | Ported subset | 74.0 MB of 161.7 MB | same |
 | Indexes in DB / declared in schema | 1,041 / 4 (**222 missing from schema** on ported tables) | same |
 | Widest table | `sm_general_settings`, **106 columns** (D1 cap: 100) | same |
@@ -141,7 +141,7 @@ Raw inventory: `docs/cloudflare-port/audit/db-inventory.json`.
 
 ```bash
 node scripts/verify-schema-catalog.mjs        # catalog rows, anchors, links
-node scripts/introspect-mysql.mjs             # refresh the measured baseline
+node legacy/scripts/introspect-mysql.mjs             # refresh the measured baseline
 grep -rn 'TBD\|TODO' docs/cloudflare-port/    # must return nothing
 ```
 

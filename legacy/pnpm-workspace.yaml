@@ -1,0 +1,7 @@
+# Standalone project root.
+#
+# Without this file pnpm walks up to the repository root, treats `legacy/` as part
+# of the new monorepo, and pulls its workspace packages into this app's lockfile.
+# The legacy app has no `@edapex/*` dependency and must not depend on the new tree;
+# an empty member list makes this directory its own workspace root.
+packages: []

@@ -2,7 +2,7 @@ import { requireUnscopedContext } from "../context";
 import type { ServiceContext } from "../context";
 import { randomToken, sha256Hex } from "../crypto/digest";
 import { emitAuthEvent } from "./auth-events";
-import { SESSION_TTL_SECONDS, toAuthUser } from "./types";
+import { toAuthUser } from "./types";
 import type { AuthUser, UserLike } from "./types";
 
 export interface SessionRequest {
@@ -26,7 +26,17 @@ export async function issueSession(
   const now = ctx.ports.clock.now();
   const sessionId = crypto.randomUUID();
   const token = randomToken();
-  const expiresAt = now + SESSION_TTL_SECONDS;
+  /*
+   * Guarded, not trusted.
+   *
+   * A missing or malformed TTL produced `now + undefined` → `NaN`, which D1 reported as
+   * "NOT NULL constraint failed: auth_sessions.expires_at" — a schema error describing a
+   * configuration mistake three layers away. Falling back to the production default makes the
+   * failure mode a shorter session rather than a 500.
+   */
+  const ttl = ctx.ports.authConfig.sessionTtlSeconds;
+  const lifetime = Number.isFinite(ttl) && ttl > 0 ? ttl : 7 * 24 * 60 * 60;
+  const expiresAt = now + lifetime;
 
   await ctx.repos.accounts.createSession(unscoped, {
     id: sessionId,

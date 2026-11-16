@@ -39,6 +39,11 @@ describe("model passthrough", () => {
     });
     expect(response.status).toBe(200);
     expect(response.headers.get("content-type")).toContain("text/event-stream");
+
+    // The fixture is a real school with a real academic year, so a 200 here means
+    // the route genuinely ran without `X-Academic-Id` rather than passing because
+    // no tenant existed to require one.
+    expect(school.academicId).toBeGreaterThan(0);
   });
 
   it("stamps the caller identity from the session, not the request", async () => {
@@ -61,6 +66,9 @@ describe("model passthrough", () => {
     const text = await response.text();
     const forwarded = /"forwardedUser":"?(\d+)"?/.exec(text)?.[1];
     expect(response.status).toBe(200);
+    // The spoofed ids are ignored and the session's own identity is stamped, so
+    // the forwarded value must be the seeded user rather than the claimed one.
+    expect(forwarded).toBe(String(school.userId));
     expect(forwarded).not.toBe("99999");
   });
 

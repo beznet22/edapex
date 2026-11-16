@@ -1,101 +1,261 @@
-# Agent Instructions
+# Agent Instructions — EdApex workspace
+
+This repository holds **two systems** during the migration. Know which one you are
+in before changing anything.
+
+| Path | What | Status |
+|---|---|---|
+| `legacy/` | SvelteKit + Mastra monolith | **Serves production today.** Own instructions: [`legacy/AGENTS.md`](legacy/AGENTS.md) |
+| `apps/web` | Workspace web app (vinext + React) | The replacement surface |
+| `apps/desktop` | Tauri desktop and mobile shell | New |
+| `services/` | `sms-api`, `cowork-api`, `model-router` | New, Cloudflare Workers |
+| `packages/` | `contracts`, `chat`, `genui`, `documents`, `connectors` | New, shared TypeScript |
+| `crates/` | `agent`, `agent-wasm`, `store`, `ocr`, `core` | New, Rust |
+| `docs/` | `cloudflare-port`, `workspace`, `desktop`, research | New |
+| `scripts/` | New-system tooling only | New |
+
+New code goes in `apps/`, `services/`, `packages/` or `crates/`. Never add to
+`legacy/` except to keep production working. A change that has to touch both trees is
+a migration step, not a refactor — say so in the PR.
 
 ## Package Manager & Scripts
-Use **pnpm**: `pnpm install`, `pnpm run dev`, `pnpm run build`.
-Use `pnx` or Aliases: `pnpm dlx`, `pnpx` to run any package or script that is not installed globally. 
-Do not assume any package or script is installed globally.
 
+Use **pnpm** from the repository root: `pnpm install`, `pnpm --dir apps/web dev`.
+Run anything not installed globally with `pnpm dlx` (or `pnpx`). Do not assume a
+global binary exists.
 
-## File-Scoped Commands
-| Task | Command |
-|------|---------|
-| Typecheck | `pnpm run svelte-check --workspace path/to/file.svelte` |
-| Lint | `pnpm run lint path/to/file.ts` |
-
-## Key Conventions (EdApex Mastra Migration)
-- **Architecture**: Modular monolith using Svelte 5 and Mastra AI Framework. Never create global singletons.
-- **Isolation Boundaries**: Always bind queries and AI agents to the active `TenantContext` (`classId`, `schoolId`). Use Drizzle ORM.
-- **Sovereign Storage**: Legacy MySQL `ai_` tables are deprecated. Mastra memory, configurations, and states run natively on `libSQL` (`mastra.db`).
-- **Tool Organization**: Tools live in `src/lib/server/mastra/tools/operations/<group>/` where group is one of `context`, `read`, `write`, `destructive`, `reporting`, `parent`. Each group has an `index.ts` re-export. Shared utilities (e.g. `context-tool`, `choose-document`, `tinyfish-client`, `selection-tools`) live in `src/lib/server/mastra/tools/internal/`.
-- **Marksheet Schema**: Use `marksheetSchema` and `Marksheet` from `src/lib/schema/marksheet.ts`. Persist validated marksheets via `AssessmentService.upsertMarksheet(marksheet: Marksheet, staffId: number): Promise<Marksheet>`.
-- **ActionBar Architecture**: `src/lib/components/ai-elements/ActionBar.svelte` is the unified action-required surface rendered above `ChatComposer`. It handles tool approvals, option selection, ambiguity Q&A, and workflow resume — one component for every "user must decide" moment.
-- **Skills**: Domain skills live in `src/lib/server/mastra/skills/<name>.skill.md` — `default`, `assistant`, `read`, `write`, `destructive`, `academic`, `reporting`, `parent` (one per operation group plus `default` and `assistant`).
-- **UI/UX Guidelines**: Adhere to the design system defined in `src/routes/layout.css` for the **legacy SvelteKit tree only**. The active workspace app has its own token file: `apps/web/app/globals.css`. Do not treat `src/routes/layout.css` as the design authority for `apps/web`, and do not change either file's tokens without a spec amendment. Utilize "Gold on Slate" `oklch` tokens and shadcn-svelte components in `src/lib/components/ui/*`, `src/lib/components/ai-elements/*` and `src/lib/components/prompt-kit/*`. For `apps/web`, use shadcn/ui (`apps/web/components/ui/*`) per `docs/workspace/specs/19-design-system.md` and `15-ui-surfaces.md`.
-- **Device Responsiveness Guidelines**: Adhere to the responsive design guidelines defined in `docs/responsive_design.md`.
-- **Safety**: Apply `.omit()` on Zod schema mutations to prevent mass-assignment. Supervised LLM intents must reach a 90% confidence threshold to execute state mutations. See `docs/workspace/specs/60-security-privacy.md`.
+`legacy/` is a **standalone pnpm project** with its own `pnpm-workspace.yaml` and
+lockfile, and no `@edapex/*` dependency. A root install must not reach into it.
 
 # Code Quality Constraints (NON-NEGOTIABLE)
-- **Absolute Production Readiness**: You must write complete, production-ready code. 
-- **No Placeholders**: Never write logic like `// implementation goes here` or `// TODO: add validation`. You must execute the full implementation.
-- **No Instructional Comments**: Do not riddle the codebase with comments explaining what the code is doing (e.g., `// This function fetches users`). Only comment on complex business logic tradeoffs (e.g., `// Debounced by 500ms to allow bulk Svelte reactivity batches to flush`).
-- **Complete End-to-End**: If a task requires modifying an interface, writing a repository method, and exposing it via a Server Action, you must fully complete all three. Leaving tasks half-finished is a failure of your mission.
+
+- **Absolute Production Readiness**: Write complete, production-ready code.
+- **No Placeholders**: Never write `// implementation goes here` or
+  `// TODO: add validation`. Execute the full implementation.
+- **No Instructional Comments**: Do not explain what the code obviously does. Comment
+  only trade-offs and constraints a reader could not infer.
+- **Complete End-to-End**: If a task needs a schema change, a repository method and a
+  route, do all three. Half-finished work is a failure.
 
 ## TypeScript Type Safety (NON-NEGOTIABLE)
 
-Every line of TypeScript must be **fully type-safe**. Loose types erode correctness silently and are forbidden.
+Every line must be **fully type-safe**. Loose types erode correctness silently.
 
 ### Banned Types
+
 | Type | Why | Use Instead |
-|------|-----|-------------|
-| `any` | Disables all type checking | A concrete type, generic `<T>`, or `unknown` with a type guard |
-| `never` (as annotation) | Masks unreachable logic bugs | Exhaustive `switch` returns; let TS infer `never` |
-| `unknown` (raw) | Defers safety to runtime without a guard | `unknown` + an immediate type guard / assertion function |
-| `object` | Too broad; allows any non-primitive | A specific interface or `Record<string, V>` |
-| `Function` | Untyped callable | `(...args: A) => R` with explicit params and return |
-| `{}` | Matches any non-nullish value | A named interface or `Record<string, unknown>` |
+|---|---|---|
+| `any` | Disables all checking | A concrete type, a bounded generic, or `unknown` + a guard |
+| `never` (as annotation) | Masks unreachable logic bugs | Exhaustive `switch`; let TS infer `never` |
+| `object` | Too broad | A specific interface or `Record<K, V>` |
+| `Function` | Untyped callable | `(...args: A) => R` |
+| `{}` | Matches any non-nullish | A named interface |
 
 ### Required Practices
-- **Utility types over manual rewriting**: Use `Omit<T, K>`, `Pick<T, K>`, `Partial<T>`, `Required<T>`, and `Readonly<T>` to derive types from a single source of truth.
-- **Infer from Zod schemas**: Derive runtime types with `z.infer<typeof schema>` instead of duplicating interfaces.
-- **Explicit return types on exported functions**: Every exported function, server action, and API handler must declare its return type.
-- **Const assertions for literals**: Use `as const` for fixed string unions, config objects, and enum-like values.
-- **Strict generics**: Generic functions must constrain type params (`<T extends Base>`) — never use bare `<T>` when a bound exists.
-- **No type assertions (`as`)**: Avoid `as Type` casts. Use type guards (`is`), assertion functions (`asserts x is T`), or `satisfies` instead. The only exception is `as const`.
-- **Discriminated unions for variants**: Model mutually exclusive states with tagged unions (`{ kind: 'a'; ... } | { kind: 'b'; ... }`) — never optional fields that are "sometimes present."
-- **Index signatures must be narrow**: Prefer `Record<SpecificKey, V>` over `Record<string, V>`. If a dynamic key is unavoidable, the value type must not be `any`.
-- **Event handlers**: Type event callbacks with the framework's event type (e.g., `FormEventHandler<HTMLInputElement>`, SvelteKit `RequestEvent`) — never `(e: any) => void`.
-- **Error handling**: Catch blocks must narrow `unknown` immediately: `if (err instanceof AppError)` or a type guard. Never cast `catch (e: any)`.
-- **No `@ts-ignore` / `@ts-expect-error`**: Fix the underlying type issue. If a third-party type is genuinely wrong, wrap it in a thin typed adapter and document why.
 
-### Verification
-Run `pnpm run svelte-check --workspace path/to/file.svelte` and `pnpm run lint path/to/file.ts` after every change. Zero type errors is the only acceptable state.
+- **Utility types over rewriting**: `Omit`/`Pick`/`Partial`/`Required`/`Readonly` from
+  a single source of truth.
+- **Infer from Zod**: `z.infer<typeof schema>`; never duplicate the interface.
+- **Explicit return types** on every exported function, server action and handler.
+- **Const assertions** for fixed string unions and config objects.
+- **Strict generics**: constrain every parameter (`<T extends Base>`).
+- **No `as` casts.** Use type guards (`is`), assertion functions (`asserts x is T`) or
+  `satisfies`. The only exception is `as const`.
+- **Discriminated unions** for variants — never optional "sometimes present" fields.
+- **Narrow index signatures**: `Record<SpecificKey, V>` over `Record<string, V>`.
+- **Typed event handlers**: framework event types, never `(e: any) => void`.
+- **`catch` narrows `unknown` immediately.** Never `catch (e: any)`.
+- **No `@ts-ignore` / `@ts-expect-error`.** Wrap a genuinely wrong third-party type in
+  a thin typed adapter and say why.
 
-## MCP Usage (Svelte 5 / SvelteKit)
-- Run `list-sections` FIRST for new frontend topics.
-- Run `get-documentation` based on `use_cases`.
-- Run `svelte-autofixer` repeatedly until all Svelte specific issues resolve cleanly before submitting code.
+Verify with `pnpm --dir <package> run typecheck` after every change. Zero errors is
+the only acceptable state.
+
+## File-size caps (NON-NEGOTIABLE)
+
+A file that outgrows its cap is split by responsibility, not by line count. These are
+soft caps: a file over the limit is a review question, not a build failure.
+
+### Server (`services/`)
+
+| Category | Soft cap | Rationale |
+|---|---|---|
+| Repository file | **300** | one aggregate. `student.repo.ts` at 1,275 lines in the legacy tree is the cautionary example this rule exists for |
+| Service file | **400** | orchestration, error translation and port calls, so it gets modest headroom |
+| Route module | **300** | one aggregate per module; handlers stay ≤15 lines each |
+| Domain module | **200** | pure functions; split by concept (marks, grades, mapping) |
+| Schema module | **250** | one table family. Drizzle definitions are declarative, so length is data, not logic. `people.ts` at 577 is over because one "person" family spans students, guardians, staff and their links |
+| Middleware | **120** | one cross-cutting concern. A middleware that needs more is usually two |
+| DTO / mapper | **150** | shape translation only. Anything else belongs in the service |
+
+### Shared packages (`packages/`)
+
+| Category | Soft cap | Rationale |
+|---|---|---|
+| Contract module | **400** | one domain's wire types plus their guards. `capabilities.ts` sits at 545 and is the pressure point |
+| Pure-logic module | **250** | a reducer, scheduler or queue. Split by state machine, not by function count |
+| React component (package) | **250** | one surface. A component that maps and renders is two |
+| Package entry (`index.ts`) | **40** | re-exports only. Logic in a barrel file is invisible to the boundary tests |
+
+### Web (`apps/web`)
+
+| Category | Soft cap | Rationale |
+|---|---|---|
+| Route module | **40** | a page composes a surface; it does not implement one. Anything longer belongs in `components/` |
+| Surface component | **300** | one surface, one file. Composer and editor living inside a list component is how `AgentsSurface` reached 586 before it was split |
+| UI component | **150** | presentational, no data fetching. If it needs a fetch it is a surface |
+| Client library (`lib/`) | **300** | one concern. `agent-runtime.ts` reached 458 before it was split into five |
+| Hook | **120** | one behaviour. A hook that returns ten things is a state machine and belongs in `lib/` |
+| Test file | **400** | beyond that it is testing two features and the name is lying |
+
+### Rust (`crates/`, `apps/desktop`)
+
+| Category | Soft cap | Rationale |
+|---|---|---|
+| Crate module (`lib.rs` / `mod.rs`) | **300** | module root wires; behaviour lives in siblings. `store/src/lib.rs` at 694 is the offender |
+| Implementation module | **400** | one concern. `agui.rs` at 633 and `runtime.rs` at 611 both exceed it |
+| Tauri command module | **250** | one command family. `agent.rs` at 474 holds seven commands and needs splitting by lifecycle |
+| Type/protocol module | **350** | wire types plus serde attributes. Protocol files are long by nature |
+| Rust test module | **400** | same rule as TypeScript tests |
+
+### Vendored and generated (exempt)
+
+| Category | Cap | Why exempt |
+|---|---|---|
+| `components/ui/*` | none | generated by `shadcn add`. A local split is undone by the next add and obscures the upstream diff |
+| `packages/documents/src/DocumentEditor.tsx` | none | vendored Tiptap boilerplate; the split belongs upstream |
+| `crates/ocr` model glue | none | generated from the pinned model release |
+
+### Spec documents
+
+No cap. Length is allowed, but inventories belong in the generated companions (`01b`,
+`03b`) so a prose spec stays about decisions rather than lists.
+
+**Current state, measured — not assumed.** Anything marked *over* is a split queued for a
+later chunk, not a silent exception.
+
+| Category | Largest file | Cap | Status |
+|---|---|---|---|
+| Repository | `academics/assignment.repo.ts` 294 | 300 | at the limit |
+| Service | `agent/agents.ts` 405 | 400 | over by 5 — accepted, see below |
+| Route (server) | `routes/agents.routes.ts` 245 | 300 | ok |
+| Schema | `db/schema/people.ts` 577 | 250 | **over** — table family is one aggregate |
+| Middleware | `http/middleware/tenant.ts` 74 | 120 | ok |
+| DTO / mapper | `http/dto/settings.ts` 107 | 150 | ok |
+| Domain | `services/domain/student-matcher.ts` 183 | 200 | at the limit |
+| Contract | `contracts/capabilities.ts` 545 | 400 | **over** |
+| Surface component | `workspace/AgentsSurface.tsx` 236 | 300 | ok — split into surface + two modals |
+| Client library | `lib/agent-runtime.ts` 300 | 300 | at the limit — split into 5 modules |
+| Hook | `hooks/use-proactive.ts` 113 | 120 | ok — store and loop extracted |
+| Rust crate root | `crates/store/src/lib.rs` 694 | 300 | **over** |
+| Rust module | `crates/agent/src/agui.rs` 633 | 400 | **over** |
+| Tauri command | `desktop/src-tauri/src/agent.rs` 474 | 250 | **over** |
+| Test file | `cowork-api/tests/gateway.test.ts` 364 | 400 | ok |
+
+**Six files are over, and they are a queue, not a policy.** The rule above means nothing
+if the list keeps growing, so the splits are ordered by how much they cost to leave:
+
+1. ~~`AgentsSurface.tsx` 586~~ → **done**: 236 + `AgentComposerModal` 162 +
+   `AgentEditorModal` 180.
+2. ~~`use-proactive.ts` 229~~ → **done**: 113 + `use-agent-store` 57 +
+   `lib/proactive-loop` 127.
+3. ~~`agent-runtime.ts` 458~~ → **done**: 300 + `streaming-buffer` 62 +
+   `turn-events` 128 + `runtime-connect` 111 + `turn-settlement` 74.
+4. `crates/store/src/lib.rs` 694 → schema, journal and outbox are three modules.
+5. `agui.rs` 633 / `runtime.rs` 611 → event mapping and turn lifecycle.
+6. `desktop/src-tauri/src/agent.rs` 474 → seven commands split by lifecycle (connect,
+   turn, approval).
+7. `capabilities.ts` 545 → the tool catalogue is data; the resolver is logic.
+8. `db/schema/people.ts` 577 → students, guardians and staff are three families.
+
+**`agent/agents.ts` is 5 lines over and stays split-unsplit deliberately.** It is one
+aggregate — read, list, create, re-grant, delete — and every function shares the same two
+helpers (`ceilingOf`, `parseSnapshot`). Splitting it would move types into a second file
+to buy nothing but a number. The cap is a review question, and the answer here is that the
+next thing added to this file is the split trigger, not this one.
+
+`components/ui/*` is exempt: those are generated by shadcn and vendored verbatim, so a
+local split would be undone by the next `shadcn add` and would obscure the diff against
+upstream.
 
 ## Cloudflare / Hono port
 
-Any work on the Hono + Cloudflare + D1 port must start at [`docs/cloudflare-port/ROADMAP.md`](docs/cloudflare-port/ROADMAP.md). It contains the coding-agent working agreement and one brief per phase; the suite's own rules (62 legacy tables, D1 batching, tenant scoping, line caps) apply to port code even where this file is silent.
+Start at [`docs/cloudflare-port/ROADMAP.md`](docs/cloudflare-port/ROADMAP.md). Phase
+status lives in [`docs/cloudflare-port/PROGRESS.md`](docs/cloudflare-port/PROGRESS.md)
+and must be updated in the same PR.
 
-Port code lands in [`services/sms-api/`](services/sms-api/AGENTS.md) — read that file before adding anything there. Phase status is tracked in [`docs/cloudflare-port/PROGRESS.md`](docs/cloudflare-port/PROGRESS.md) and must be updated in the same PR.
-
-Before opening a port PR, run `node scripts/verify-port-specs.mjs` and `node scripts/verify-schema-catalog.mjs`, and paste the output in the description.
+Port code lands in [`services/sms-api/`](services/sms-api/AGENTS.md) — read that file
+first. Before a port PR, run `node scripts/verify-port-specs.mjs` and
+`node scripts/verify-schema-catalog.mjs`, and paste the output in the description.
 
 ## Local Capability Layer (10C)
 
-Spec [`docs/workspace/specs/48-local-capability-layer.md`](docs/workspace/specs/48-local-capability-layer.md) is normative. The layer is Rust domain crate → Tauri adapter/state → typed WebView client → UI hook. Do not bypass it.
+[`docs/workspace/specs/48-local-capability-layer.md`](docs/workspace/specs/48-local-capability-layer.md)
+is normative. The layer is Rust domain crate → Tauri adapter/state → typed WebView
+client → UI hook. Do not bypass it.
 
-- Role tools remain server-owned and capped at 5 tools / 8 operations. Host and server capabilities are separate booleans and never grant role authority.
-- `packages/contracts/src/agent.ts`, `platform.ts`, `web.ts` and `json.ts` are the shared wire contracts. Add a fixture and both a TS and Rust test for every change.
-- Native xcodex uses `codex-app-server::in_process` on a Tokio thread, Tauri commands and `tauri::ipc::Channel<AgentEvent>`. No sidecar, no SSE production path, no server-side xcodex.
-- EdApex tools are app-server dynamic tools (`web_search`, `web_fetch`, `ocr_extract`), executed in process. Do not add an EdApex MCP child process for them.
-- The WebView never holds the EdApex bearer token or OpenRouter key. Use the native `api_request` proxy and OS keychain/Keystore only.
-- RustO is the local OCR engine; Mistral is explicit fallback. Local OCR sends text/annotation only; student images never upload without `X-OCR-Consent: cloud`.
-- Mobile camera is a first-party Tauri plugin: full-screen native preview, stills only, AVFoundation on iOS and CameraX on Android. Desktop uses file import and `xcap` screenshots.
-- Browser assistance is desktop-only, user-installed official Chrome DevTools MCP. No custom extension, BrowserBridge, PWA or mobile browser control.
-- Do not add an `AGENT_DB` table to the EdApex school `DB`. Agent persistence and sync live in a separate `AGENT_DB` database bound only to `services/cowork-api` (`41`/`42`).
+- Role tools are server-owned and capped at 5 tools / 8 operations. Host and server
+  capabilities are separate booleans and never grant role authority.
+- `packages/contracts/src/agent.ts`, `platform.ts`, `web.ts` and `json.ts` are the
+  shared wire contracts. Every change needs a fixture plus a TS and a Rust test.
+- EdApex tools are app-server dynamic tools (`web_search`, `web_fetch`,
+  `ocr_extract`), executed in process. Do not add an EdApex MCP child process.
+- The WebView never holds the EdApex bearer token or a provider key. Use the native
+  `api_request` proxy and the OS keychain/Keystore only.
+- RustO is the local OCR engine; Mistral is the explicit fallback. Student images
+  never upload without `X-OCR-Consent: cloud`.
+- **Desktop and mobile are native.** WebAssembly is the web delivery mechanism only.
+  A host that can run native code uses `crates/*` directly; adding a WASM runtime to
+  a native host needs a written justification and a recorded blocker. **Currently
+  violated** — see [`docs/workspace/specs/50-native-agent-path.md`](docs/workspace/specs/50-native-agent-path.md):
+  the Tauri commands exist and the web app never calls them.
+- Do not add an `AGENT_DB` table to the school `DB`. Agent persistence lives in the
+  separate `AGENT_DB` bound only to `services/cowork-api` (`41`/`42`).
 
-Verification:
+## Workspace Web Architecture (`apps/web`)
+
+Enforced by `apps/web/tests/workspace-architecture.test.ts`.
+
+- **Persistent layout owns auth, session, runtime and shell.**
+  `app/workspace/layout.tsx` wraps `WorkspaceLayoutClient`; Chat/Tasks/Make pages
+  render only their surface. Never put `getSession`, `loadCapabilities`,
+  `useWorkspaceRuntime` or the shell in a page.
+- **Internal navigation uses `next/link`.** No `<a href>` inside the workspace shell;
+  a full-page anchor remounts the layout and resets local state.
+- **One boot per surface.** `WorkspaceBoot` selects Chat, Tasks, Make, Plugins, Search
+  or Settings from `usePathname`.
+- **The sidebar renders from a tree, not a list.** `lib/nav-tree.ts` holds one tree per
+  context; the route selects it. Entering settings swaps the tree and adds "Back to app".
+  Adding a destination means adding a tree entry, never a `<Link>` in the shell.
+- **The tree animates; the rail width does not.** Animating width moves the content
+  column, which on a 760px canvas reflows everything being read.
+- **A settings row is a row.** Hairline-separated, label and description left, control
+  right. Do not card individual settings — ten bordered cards is a stack of boxes.
+  See [`docs/workspace/specs/51-settings-surface.md`](docs/workspace/specs/51-settings-surface.md).
+- **Plugins is the UI word for connectors.** The server type stays `ConnectorKind`. The
+  client catalogue in `lib/plugins-catalogue.ts` is a guarded copy — `tests/plugins-nav.test.ts`
+  asserts it matches `packages/connectors/src/catalogue.ts`, because
+  `packages/connectors` is server-only and must never reach a bundle.
+- **Skeletons mirror the resolved page.** `.skeleton-shimmer` only; never mix pulse
+  and shimmer.
+- **Artifact editing is a split/sheet host**, not a nested editor: 38/62 above
+  1024px, sheet below.
+- **Dev-only CSP exceptions stay dev-only.** `unsafe-eval` must never reach the
+  production CSP.
+
+Design authority: [`DESIGN.md`](DESIGN.md) and
+[`docs/workspace/specs/19-design-system.md`](docs/workspace/specs/19-design-system.md).
+`DESIGN.md` is machine-checked — run
+`pnpm dlx @google/design.md lint DESIGN.md --max-warnings 0` after editing it.
+
+## Verification
 
 ```bash
-pnpm --dir apps/web check
+pnpm --dir apps/web run check
 pnpm --dir apps/web test
-pnpm --dir services/sms-api run typecheck
-pnpm --dir services/sms-api test
-pnpm --dir services/cowork-api run typecheck
-pnpm --dir services/cowork-api test
+pnpm --dir apps/web exec playwright test
+pnpm --dir services/sms-api run typecheck && pnpm --dir services/sms-api test
+pnpm --dir services/cowork-api run typecheck && pnpm --dir services/cowork-api test
 pnpm --dir packages/connectors run typecheck
 cargo test -p edapex-agent -p edapex-ocr
 cargo test -p edapex-store
@@ -103,23 +263,9 @@ cargo build --target wasm32-unknown-unknown -p edapex-agent-wasm
 node scripts/check-agent-size.mjs
 ```
 
-`services/sms-api` is the current `services/sms-api` directory; the rename lands with the `05-project-structure.md` amendment and moves `scripts/verify-port-specs.mjs` in the same change.
-
-## Workspace Web Architecture (`apps/web`)
-
-The workspace follows these invariants. They are enforced by `apps/web/tests/workspace-architecture.test.ts`.
-
-- **Persistent layout owns auth, session, runtime and shell.** `app/workspace/layout.tsx` wraps `WorkspaceLayoutClient`; Chat/Tasks/Make pages render only their surface component (`WorkspaceChat`, `TasksSurface`, `MakeSurface`). Never put `getSession`, `loadCapabilities`, `useWorkspaceRuntime` or the shell in a page.
-- **Internal navigation uses `next/link`.** No `<a href>` for `/workspace`, `/workspace/tasks`, `/workspace/make` or `/admin` inside the workspace shell. Full-page anchors remount the layout and reset local state.
-- **One boot per surface.** `WorkspaceBoot` selects Chat, Tasks or Make from `usePathname`; do not use one generic chat skeleton for every route.
-- **Skeletons mirror the resolved page.** Use `.skeleton-shimmer` and the Boneyard configuration; never mix pulse and shimmer.
-- **Artifact editing is a split/sheet host, not a nested editor.** Desktop uses the 38/62 split; below 1024px it uses the sheet. The editor stays on Gold on Slate tokens.
-- **Dev-only CSP exceptions stay dev-only.** `unsafe-eval` and local HMR WebSocket origins must never appear in the production CSP.
-
-Verification for this area:
+Legacy production build — only when you have touched `legacy/`:
 
 ```bash
-pnpm --dir apps/web check
-pnpm --dir apps/web test
-pnpm --dir apps/web build
+pnpm --dir legacy install --frozen-lockfile
+pnpm --dir legacy run build
 ```

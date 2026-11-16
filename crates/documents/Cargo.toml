@@ -1,0 +1,12 @@
+[package]
+name = "edapex-documents"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+publish = false
+
+[dependencies]
+ironpress = { version = "1.7.0", default-features = false }
+thiserror = "2"
+
+[dev-dependencies]

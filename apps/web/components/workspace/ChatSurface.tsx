@@ -81,7 +81,13 @@ export function ChatSurface({
   }
 
   return (
-    <div className="mx-auto flex min-h-0 w-full max-w-[760px] flex-1 flex-col">
+    /*
+     * Centred at the chat measure, and the composer inherits it. `mx-auto` here was not
+     * enough on desktop: the outer column is `max-w-none`, so this element filled the
+     * inset and the composer stretched with it. The padding gives the composer breathing
+     * room from the inset edge on wide screens.
+     */
+    <div className="mx-auto flex min-h-0 w-full max-w-[760px] flex-1 flex-col px-4 lg:px-6">
       <ChatTranscript
         manifest={manifest}
         messages={messages}

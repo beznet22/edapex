@@ -44,6 +44,11 @@
     "/sqlite/index.mjs": {
       "gzip": 400000,
       "reason": "engine glue plus OPFS worker"
+    },
+    "ironpress_bg.wasm": {
+      "$comment": "IronPress PDF engine for web. Lazy: loaded only on the first export. Native hosts use crates/documents instead and never download this.",
+      "gzip": 6500000,
+      "reason": "6,376,926 B measured; 6.5 MB ceiling. Spec 22 accepts this cost because it replaces a headless-browser subprocess."
     }
   },
   "pwa": {
@@ -52,9 +57,9 @@
   },
   "measured": {
     "date": "2026-11-14",
-    "initialJsGzip": 181599,
-    "initialCssGzip": 10735,
-    "controllableJsGzip": 38388,
+    "initialJsGzip": 353762,
+    "initialCssGzip": 11062,
+    "controllableJsGzip": 210551,
     "agentWasmGzip": 134395,
     "agentJsGlueGzip": 5526,
     "breakdown": {
@@ -65,7 +70,10 @@
       "lucide": 10851,
       "other": 15870
     },
-    "note": "Measured on a vinext build with Node 26.13.1. The Pages rollback baseline in spec 47 (106 KB) is a different build and is not comparable. The lazy document editor (188 KB) is not in this figure because it loads only when the artifact panel opens. The SQLite engine (773 KB gzip, approved ceiling 1.2 MB) is lazy: it loads only when the store is opened.",
-    "sqliteRuntimeGzip": 773425
+    "note": "Measured on a vinext build with Node 26.13.1. The Pages rollback baseline in spec 47 (106 KB) is a different build and is not comparable. The lazy document editor (188 KB) is not in this figure because it loads only when the artifact panel opens. The SQLite engine (773 KB gzip, approved ceiling 1.2 MB) is lazy: it loads only when the store is opened. The IronPress engine (6,376,926 B gzip) is lazy and measured from the installed package: no UI imports the exporter yet, so it is not in the client graph.",
+    "sqliteRuntimeGzip": 773425,
+    "ironpressWasmGzip": 6376926,
+    "$overBudgetException": "353,762 / 210,551 against 204,800 / 61,440. Two recorded exceptions in spec 47: (1) the proactive scheduler mounts in the workspace layout (pre-existing, 205,044 baseline), (2) Streamdown's Markdown pipeline (unified + remark-gfm + rehype-sanitize + rehype-harden, +148,718) is on the initial path. Ceilings are NOT raised in either case. Mermaid and Shiki are not installed.",
+    "streamdownGzip": 148718
   }
 }

@@ -24,6 +24,63 @@ export interface ParentSearchRow {
 const searchPattern = (query: string): string =>
   `%${query.trim().replace(/\s+/g, "%")}%`;
 
+/**
+ * A guardian record, before it has an account.
+ *
+ * `userId` is deliberately absent from this input. The column defaults to `1` and
+ * foreign-keys to `users`, which is a legacy shape meaning "some user" — writing it would
+ * attach every new guardian to whichever account happens to be id 1. `createParent` sets it
+ * to null and account linking stays a separate, explicit act.
+ */
+export interface NewParentInput {
+  readonly guardiansName: string;
+  readonly guardiansEmail: string | null;
+  readonly guardiansMobile: string | null;
+  readonly guardiansRelation: string | null;
+  readonly guardiansAddress?: string | null;
+  readonly fathersName?: string | null;
+  readonly mothersName?: string | null;
+  readonly academicId?: number | null;
+}
+
+/**
+ * Creates a guardian row.
+ *
+ * Callers must resolve an existing guardian by email first — `findParentByEmail` exists for
+ * that. Two siblings sharing a guardian is one row and two links, never two rows: the
+ * legacy system produced duplicates this way, and the migration still carries repair steps
+ * for it (`transform/people.mjs` D1/F1).
+ */
+export async function createParent(
+  ctx: ScopedRepositoryContext,
+  input: NewParentInput
+): Promise<number> {
+  return withErrorHandling(async () => {
+    const rows = await ctx.db
+      .insert(smParents)
+      .values({
+        guardiansName: input.guardiansName.trim(),
+        guardiansEmail: input.guardiansEmail,
+        guardiansMobile: input.guardiansMobile,
+        guardiansRelation: input.guardiansRelation,
+        guardiansAddress: input.guardiansAddress ?? null,
+        fathersName: input.fathersName ?? null,
+        mothersName: input.mothersName ?? null,
+        isGuardian: 1,
+        activeStatus: 1,
+        userId: null,
+        schoolId: ctx.tenant.schoolId,
+        ...(input.academicId === undefined || input.academicId === null
+          ? {}
+          : { academicId: input.academicId })
+      })
+      .returning({ id: smParents.id });
+    const [row] = rows;
+    if (row === undefined) throw new DbEntityNotFoundError("Parent", "new");
+    return row.id;
+  }, "createParent");
+}
+
 export async function findParentByEmail(
   ctx: ScopedRepositoryContext,
   email: string

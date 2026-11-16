@@ -14,6 +14,10 @@ export const claimConfig = async (
   googleConfigured: true,
   postLoginRedirect: "/app",
   appOrigin: "https://app.example.test",
+  // The TTLs live on the port now; a fixture missing them makes `now + undefined` a NaN and
+  // the insert fails on a NOT NULL column rather than telling anyone why.
+  magicLinkTtlSeconds: 15 * 60,
+  sessionTtlSeconds: 7 * 24 * 60 * 60,
   ...overrides
 });
 

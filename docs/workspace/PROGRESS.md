@@ -66,6 +66,103 @@ capabilities.test.ts                                           8 passed (incl. n
 ```
 
 
+## Legacy move
+
+| Item | Outcome |
+|---|---|
+| **`legacy/`** | SvelteKit + Mastra app, `Dockerfile`, `compose*.yml`, `.env.example`, own `README.md`, own `AGENTS.md`. **Builds and emits `build/index.js`** — verified, not assumed. |
+| **Standalone project** | Own `pnpm-workspace.yaml` with no members, own lockfile, `.npmrc`, `.nvmrc`, `.env`, `.gitignore`. pnpm stops walking up, so the legacy app cannot acquire an `@edapex/*` dependency. |
+| **Split by ownership** | Scripts and docs classified by *what they reference*, not by name. `scripts/` stayed shared where it serves both trees (`check-agent-size.mjs` is used by the new crates); legacy-only tooling moved to `legacy/scripts/`; 19 documents to `legacy/docs/`. |
+| **Root is now the new system** | `package.json` is workspace-only with no dependencies, `README.md` describes both trees, `AGENTS.md` is the new system's rules. |
+| **CI workaround removed** | `web.yml` needed `svelte-kit sync` only because the root tsconfig extended the legacy app's generated file. That file is no longer at the root, so the step is gone. |
+| Deleted | `package-lock.json` (second lockfile = second answer), tracked `coverage/` (43 generated files), `build` + `.svelte-kit` (129 MB of output). |
+| Dotfiles split | `.npmrc` copied to both; `.nvmrc` root pins 26.13.1 (CI's version), legacy pins 22; `.env` split so `legacy/.env` holds only the 25 legacy keys; `.gitignore` rules moved into `legacy/.gitignore`. |
+
+**One thing the gitignore split taught us:** `/coverage/` with a trailing slash only
+matches a directory, so the rule silently does nothing when the path is a file or a
+symlink — and `git check-ignore` cannot match it against a path that does not exist,
+which reads exactly like "the ignore file is not working". The rules no longer use
+trailing slashes.
+
+## WASM audit (desktop and mobile)
+
+**The rule is violated.** `apps/desktop` compiles no WASM dependency and implements
+all seven native agent commands — `agent_connect`, `agent_thread_start`,
+`agent_turn_start`, `agent_approval_response`, `agent_attach`, `agent_close` — but
+`apps/web` has **zero wrappers** for them, and `agent-runtime.ts` unconditionally
+constructs the WASM client. The desktop shell ships the web bundle as its frontend,
+so it carries the WASM runtime *and* the native core it never calls.
+
+**No blocker.** The native path compiles and is registered; this is missing wiring.
+Recorded in [`specs/50-native-agent-path.md`](specs/50-native-agent-path.md) with the
+fix order and the test that proves it (delete `public/agent-runtime/`, then run a
+turn).
+
+## Chunk 4 — proactive work
+
+| Item | Outcome |
+|---|---|
+| **Contracts** | `tasks.ts`, `routines.ts`, `notifications.ts`. `deriveTaskState` is pure and shared, so the list, the badge and the tests cannot disagree. **42 tests.** |
+| **Brief dedupe** | Claim lease and completion are separate columns. A single flag cannot distinguish "another device is working" from "the device that claimed it crashed" — and with only a flag, a crash claims the day permanently. Verified by takeover after an expired lease. |
+| **Routine claims** | Same lease shape. A `running` row whose lease expired is re-claimable; a live one blocks. **12 server tests.** |
+| **No cron** | `scripts/check-no-cron.mjs` inspects every Worker entry and `wrangler.jsonc`. Self-tested by injecting a `scheduled` export and confirming exit 1. In CI. |
+| **Tasks surface** | Now renders the derived queue instead of a placeholder: triage order, needs-input count, and retry shown as *"Attempt 2 of 3 — reason"*. |
+| Retry is shown | Never hidden. A silent retry cannot be distinguished from no attempt at all, so people learn to distrust the result. |
+
+### Decisions
+
+- **`already_complete` and `held_by_other` are different answers.** One is permanent, the other resolves in minutes. A UI showing one message for both teaches people to retry something that will never succeed.
+- **The greeting loses every race to the person.** Conditions are explicit rather than implied by render order: no content in the composer, no prior send, no existing thread.
+- **Reply chips fill the composer, never send.** A chip is a shortcut for typing; a person must not lose the chance to edit a suggestion they did not write.
+- **Silence is not success.** An unfinished task with no signals is `not_completed`, not `done`.
+
+### Scheduler wiring
+
+| Piece | Outcome |
+|---|---|
+| `lib/device-identity.ts` | Device id and master key as an **OPFS file**, generated once. One storage mechanism, not two — see the note below. |
+| `lib/scheduler.ts` | `tick()` evaluates due-ness **locally** (no server round trip to decide), claims, runs, records. Advances the local cursor before running so a hang cannot double-fire. **14 tests.** |
+| `useProactive` | Mounted in the workspace layout rather than the Tasks page, so a routine due at 08:00 fires while the person is on Chat. |
+| Read routes | `GET /api/v1/agent/routines` and `/tasks`. The task route returns **signals, not a status**, so the client derives with the shared function and the two cannot disagree. |
+| Browser proof | 3 e2e tests: claim on mount, no claim for a future routine, and the surface showing derived state plus retry. |
+
+**One storage layer, not two.** The key originally lived in IndexedDB while records lived in OPFS SQLite. That gave the app two persistence APIs, two failure modes and two versioned schemas for one job, and the supposed security benefit was narrow: an XSS reads both, so it only protected against a partial copy. The key is now a sibling *file* in OPFS — same mechanism, still not the same artifact as the database it unlocks. One availability check now covers both: if OPFS is missing, neither persists and the workspace is honestly offline-only rather than half-persistent. Verified by a reload test.
+
+**A bug this exposed:** `refresh()` was gated on the local store being open. Since the store opens asynchronously, the first read bailed and never re-ran — and because the empty state says "Nothing needs you", a storage failure would have looked like a genuine all-clear. The task list is a server read and no longer depends on OPFS at all.
+
+### Open
+
+- **The device-side scheduler is wired and running.** `lib/scheduler.ts` ticks while the workspace is open, claims due routines and records the outcome. Proven in a browser: `e2e/proactive.spec.ts` asserts a due routine is claimed and finished, and that a future one costs no claim at all.
+- **Task rows are fetched** from `GET /api/v1/agent/tasks`, which returns signals rather than a status so the client derives state with the shared function.
+- **The routine turn is connected.** `NativeAgentAdapter.sendAndWait` sends and resolves when the turn settles, so a routine is a normal turn: same runtime, same approvals, same transcript. It reports `succeeded`, `waiting` or `failed`.
+- **`waiting` is not `failed`.** A routine that stopped for an approval has done what it should; recording it as failed would mark a task broken because it asked a question. The scheduler records `waiting` and the server already accepts it.
+- **`sendAndWait` requires seeing a busy state before it will settle.** A turn can be queued behind a busy runtime, so resolving on the first idle emit would report success before anything ran.
+- **One vacuous-test lesson worth keeping:** the "no cron" assertions originally ran inside the workerd sandbox, which cannot read the real filesystem, and a `catch { continue; }` made them pass while checking nothing. They now live in a Node script that fails loudly when it cannot find its inputs.
+
+## Design system and window chrome
+
+| Item | Outcome |
+|---|---|
+| **`DESIGN.md`** | The system in Google's open DESIGN.md format: tokens plus rationale. Grounded in the tokens the app actually uses, not aspirational ones. |
+| **Machine-checked** | `@google/design.md lint` runs in CI with `--max-warnings 0`. It found two real defects while the file was being written: titlebar text at **3.50:1** and white-on-gold at **1.97:1**, both below WCAG AA. |
+| **Both hosts, one design** | The document explicitly covers a browser tab and a frameless window: what changes is the frame, never a token. There is no desktop-only skin. |
+| Frameless window | `decorations: false`, transparent, 32px titlebar. macOS keeps native traffic lights via `titleBarStyle: Overlay`; Linux and Windows get custom controls. |
+| Drag region | A dedicated element, because `data-tauri-drag-region` does not inherit — a wrapper makes every child button a drag handle. Double-click to maximise is wired by hand, since it is not automatic. |
+| Titlebar in a tab | Renders **nothing**. Not hidden, not a spacer: a reserved band would shift every surface down for chrome the browser already draws. Asserted by e2e. |
+| No `<html>` flash | The component returns null before its effect runs, so a tab never renders a titlebar for one frame. |
+
+### Decisions
+
+- **Depth replaces borders** — now a written rule rather than a habit. Panels separate with tint and shadow; the window edge is the only hairline on the frame.
+- **The scroll hairline is information, not decoration.** A line under the titlebar appears only once content has moved beneath it.
+- **Losing focus dims the chrome to 60%.** An undecorated window has no other way to say it is not the active one; without it the app reads as a page.
+- **Three type sizes, not four.** Hierarchy comes from spacing and weight. A fourth size is a symptom that the spacing is wrong.
+
+### Open
+
+- **macOS and Windows are unverified.** The window compiles and the Linux behaviour is manual-tested here; neither of the other two platforms has a runner, and Playwright cannot assert a native window.
+- `tauri.conf.json` is strict JSON — comments are not permitted, unlike `wrangler.jsonc`.
+
 ## Chunk 3 — gateway, connectors, approvals, tenant-neutral capabilities
 
 | Item | Outcome |

@@ -13,6 +13,14 @@ export interface WorkspaceRuntimeController {
   readonly queue: readonly QueuedMessage[];
   readonly view: WorkspaceRuntimeView;
   readonly send: (text: string, attachmentNames: readonly string[]) => void;
+  /**
+   * Sends and resolves when the turn settles. The scheduler needs the outcome;
+   * the composer does not, which is why both exist.
+   */
+  readonly sendAndWait: (text: string) => Promise<{
+    readonly status: "succeeded" | "waiting" | "failed";
+    readonly error?: string;
+  }>;
   readonly stop: () => void;
   readonly removeQueued: (id: string) => void;
   readonly decideApproval: (
@@ -57,6 +65,7 @@ export function useWorkspaceRuntime(): WorkspaceRuntimeController {
     queue: state.queue.queued,
     view,
     send: (text, attachmentNames) => adapter.send(text, attachmentNames),
+    sendAndWait: (text) => adapter.sendAndWait(text),
     stop: () => adapter.stop(),
     removeQueued: (id) => adapter.removeQueued(id),
     decideApproval: (messageId, approvalRequestId, decision) =>

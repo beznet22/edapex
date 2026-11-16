@@ -1,10 +1,9 @@
-import { getCookie } from "hono/cookie";
 import type { MiddlewareHandler } from "hono";
 
 import { createService, RateLimitService, sha256Hex } from "../../services";
 import { API_RATE_LIMITS } from "../../services/auth/rate-limit-policy";
 import type { AppContext } from "../env";
-import { SESSION_COOKIE } from "./auth";
+import { readSessionCookie } from "./auth";
 
 type PolicyName = keyof typeof API_RATE_LIMITS;
 
@@ -24,8 +23,8 @@ const policyFor = (path: string): Policy => {
 };
 
 const identityOf = async (c: Parameters<MiddlewareHandler<AppContext>>[0]): Promise<string> => {
-  const token = getCookie(c, SESSION_COOKIE);
-  if (token !== undefined && token.length > 0) {
+  const token = readSessionCookie(c);
+  if (token !== null && token.length > 0) {
     return `session:${await sha256Hex(token)}`;
   }
   return `ip:${c.get("ip") ?? "unknown"}`;

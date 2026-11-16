@@ -1,0 +1,21 @@
+{
+  "id": "generic",
+  "version": "1.0.0",
+  "template": "generic",
+  "brand": {
+    "name": "EdApex",
+    "accent": "jade",
+    "tagline": "Your workspace, with an agent alongside"
+  },
+  "bots": [],
+  "channels": [
+    { "key": "chat", "name": "Chat", "surfaces": ["chat"] },
+    { "key": "tasks", "name": "Tasks", "surfaces": ["tasks"] }
+  ],
+  "model": {
+    "allowed": ["openrouter/auto"],
+    "default": "openrouter/auto",
+    "maxOutputTokens": 4096
+  },
+  "skills": []
+}

@@ -69,7 +69,9 @@ number came from the Pages rollback build (106 KB JS), which is a different bund
 and a different dependency graph; it was never evidence for the Worker build.
 
 **Measured:** 181,599 B JS gzip and 10,735 B CSS gzip on the vinext build
-(Node 26.13.1) for `/workspace`.
+(Node 26.13.1) for `/workspace`. Re-measured at **205,044 B** after chunk 4 — see the
+2026-11-14 re-measurement below, which is over ceiling and carries a recorded
+exception.
 
 **Why the old target could not be met.** The framework floor is 143,211 B on its own:
 
@@ -111,6 +113,72 @@ good connection.
 
 **Owner:** platform lead (beznet). **Revisit:** when chunk 4 adds the Task/Make
 dashboards, or on any framework upgrade, whichever comes first.
+
+### Re-measurement — chunk 4 prompted the revisit (2026-11-14)
+
+The revisit condition above fired. Measuring the tree after chunk 4's proactive wiring
+(`useProactive`, the scheduler, the store) gives **205,044 B** initial JS and
+**61,833 B** controllable JS, against ceilings of 204,800 and 61,440. It is over by
+**244 B** and **393 B**.
+
+Two things are worth recording rather than quietly raising the ceiling:
+
+1. **It is not the IronPress work.** A clean worktree at `f523373` — before any PDF
+   change — measures the identical 205,044 / 61,833. Whatever the cause, it predates
+   this chunk and is not a regression introduced by adding the exporter.
+2. **It is not the framework.** `react-dom` and the vinext runtime are byte-identical
+   to the recorded floor; the growth is in application chunks.
+
+**Recorded exception — owner: platform lead (beznet); follow-up: split the proactive
+scheduler off the initial path.** The scheduler currently mounts in the workspace
+layout, so its code and its store client are in the entry graph for every route. It
+should load after first paint: routines due on open can wait one interaction, and a
+task list that renders 244 bytes sooner is not worth breaking the gate's credibility.
+
+The ceilings stay where they are. Raising them to fit would make the gate a record of
+what shipped rather than a control on what ships, which is the failure mode this
+decision section was written to prevent.
+
+### Decision — Streamdown is on the initial path (2026-11-14)
+
+Streaming agent Markdown needs Streamdown (spec 17). Measured cost:
+
+| | gzip |
+|---|---|
+| before | 205,044 |
+| after | 353,762 |
+| **delta** | **+148,718** |
+
+That is the `unified` + `remark-gfm` + `rehype-sanitize` + `rehype-harden` pipeline.
+It is not waste — it is what correct streaming Markdown costs — but it is 2.4x the
+controllable allowance, so it needs a decision rather than a shrug.
+
+**Accepted, with the exception recorded.** Owner: platform lead (beznet). The
+alternative — rendering agent prose as plain `<p>` — means a teacher cannot read a
+marks table or a list of names the way the model wrote them, which is the feature.
+
+Three things were checked before accepting:
+
+1. **Mermaid and Shiki are not the cost.** The chunk was inspected: the strings are
+   present but neither library is imported. They stay uninstalled — **a school system
+   does not need diagram rendering**, so this is not a deferred optimisation but a
+   deliberate omission.
+2. **The pipeline cannot be trimmed meaningfully.** `rehype-sanitize` and
+   `rehype-harden` are security controls for untrusted model output; removing them to
+   save bytes would trade an XSS surface for a bundle number.
+3. **Lazy-loading was rejected.** `React.lazy` on the renderer would save the 149 KB
+   from the first paint, but every first assistant message would flash unformatted
+   text and then reflow. On a slow phone that reflow lands mid-read. The cost is paid
+   once, on the route that already loads the chat runtime.
+
+**Follow-up (not a blocker):** re-measure after the transcript itself is split from
+the workspace entry. If the chat surface ever loads behind an interaction rather than
+at boot, this exception should be withdrawn.
+
+**What this does not license.** The ceilings remain 204,800 / 61,440. This is a
+documented exception for one dependency, not a new baseline, and it does not move for
+the next thing that wants room.
+
 
 ## Loading rules
 

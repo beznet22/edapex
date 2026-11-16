@@ -76,7 +76,7 @@ export function ApprovalCard({ messageId, approval, onDecision }: ApprovalCardPr
           ) : (
             <p className="mt-2 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
               {approval.status === "allowed" ? (
-                <Check aria-hidden="true" className="size-3.5 text-emerald-400" />
+                <Check aria-hidden="true" className="size-3.5 text-success" />
               ) : (
                 <X aria-hidden="true" className="size-3.5 text-destructive" />
               )}

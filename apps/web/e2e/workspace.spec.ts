@@ -118,6 +118,48 @@ test.describe("theme", () => {
     expect(system).toEqual(explicit);
   });
 
+  test("the theme control changes the document and persists the choice", async ({ page }) => {
+    // The control used to render, accept clicks and change nothing: ThemeProvider was
+    // never mounted, and `useTheme` returned a no-op fallback that hid the bug. Every
+    // existing theme test set a cookie and reloaded, so none of them touched the
+    // control. This one does.
+    //
+    // It cycles light → dark → system from a *default* of system, so the test follows
+    // the cycle rather than assuming a starting mode: system → light → dark → system.
+    await page.goto(WORKSPACE);
+
+    // The model-setup dialog is a full-screen modal, so the shell is unclickable until
+    // it is dismissed. Dismissing it is what a real person does, not a test hack.
+    await page.getByRole("dialog", { name: "Start your workspace" })
+      .getByRole("button", { name: "Close" })
+      .click();
+
+    const isDark = (): Promise<boolean> =>
+      page.evaluate(() => document.documentElement.classList.contains("dark"));
+    const themeMode = (): Promise<string | null> =>
+      page.evaluate(() => document.documentElement.dataset.themeMode ?? null);
+
+    const startingMode = await themeMode();
+    expect(startingMode).toBe("system");
+
+    // system → light. Explicitly light means not dark even on a dark OS.
+    await page.getByRole("button", { name: /^Theme: System\./ }).click();
+    await expect.poll(themeMode).toBe("light");
+    await expect.poll(isDark).toBe(false);
+
+    // light → dark.
+    await page.getByRole("button", { name: /^Theme: Light\./ }).click();
+    await expect.poll(themeMode).toBe("dark");
+    await expect.poll(isDark).toBe(true);
+
+    const cookie = (await page.context().cookies()).find((c) => c.name === "edapex.theme");
+    expect(cookie?.value).toBe("dark");
+
+    // dark → system, which closes the cycle.
+    await page.getByRole("button", { name: /^Theme: Dark\./ }).click();
+    await expect.poll(themeMode).toBe("system");
+  });
+
   test("an explicit light preference wins over a dark OS", async ({ browser }) => {
     const context = await browser.newContext({
       javaScriptEnabled: false,
@@ -211,31 +253,68 @@ test.describe("manifest", () => {
   });
 });
 
+test.describe("host chrome", () => {
+  test("the desktop titlebar does not render in a browser tab", async ({ page }) => {
+    await page.goto(WORKSPACE);
+    await page.waitForTimeout(300);
+
+    // A fake titlebar inside a tab duplicates chrome the browser already draws,
+    // and a reserved band of empty space would shift every surface down. Asserting
+    // absence is the point: the same bundle serves both hosts.
+    await expect(page.locator("[data-tauri-drag-region]")).toHaveCount(0);
+
+    // And nothing reserves its height.
+    const top = await page.evaluate(() => {
+      const main = document.querySelector("main");
+      return main === null ? null : main.getBoundingClientRect().top;
+    });
+    expect(top).not.toBeNull();
+    expect(top as number).toBeLessThan(120);
+  });
+});
+
 test.describe("accessibility", () => {
   test("respects reduced motion", async ({ browser }) => {
     const context = await browser.newContext({ reducedMotion: "reduce" });
     const page = await context.newPage();
     await page.goto(WORKSPACE);
-    await page.waitForTimeout(500);
+    // Wait for the shell rather than a fixed delay: sampling mid-hydration catches elements
+    // before their final classes are applied, which made this test order-dependent.
+    await page.getByRole("textbox").first().waitFor({ timeout: 20_000 });
+    await page.waitForTimeout(300);
 
     const longest = await page.evaluate(() => {
       let max = 0;
+      /*
+       * Movement is what must be suppressed, not every transition.
+       *
+       * The previous rule killed `transition-duration` on `*`, which also removed opacity
+       * fades — a reduced-motion user then got instant, unanimated state changes and lost the
+       * cue that anything had happened. The rule is now scoped to `transition-property`, so a
+       * fade still resolves at its normal duration while nothing slides or scales.
+       *
+       * This assertion therefore checks the property that matters: no element may carry a
+       * transform or a slide in its transition list.
+       */
+      const offenders: string[] = [];
       for (const element of Array.from(document.querySelectorAll<HTMLElement>("body *"))) {
         const style = getComputedStyle(element);
-        for (const value of [style.animationDuration, style.transitionDuration]) {
-          for (const part of value.split(",")) {
-            const seconds = part.trim().endsWith("ms")
-              ? Number.parseFloat(part) / 1000
-              : Number.parseFloat(part);
-            if (Number.isFinite(seconds)) max = Math.max(max, seconds);
-          }
+        if (/transform|translate|scale|width|height|margin|inset/.test(style.transitionProperty)) {
+          offenders.push(`${element.tagName}.${element.className}`.slice(0, 80));
         }
+        // Animations are still fully suppressed: they are decorative, not state.
+        const animation = style.animationDuration;
+        const seconds = animation.trim().endsWith("ms")
+          ? Number.parseFloat(animation) / 1000
+          : Number.parseFloat(animation);
+        if (Number.isFinite(seconds)) max = Math.max(max, seconds);
       }
-      return max;
+      return { max, offenders: offenders.slice(0, 5) };
     });
     await context.close();
 
-    expect(longest).toBeLessThanOrEqual(0.05);
+    expect(longest.offenders).toEqual([]);
+    expect(longest.max).toBeLessThanOrEqual(0.05);
   });
 
   test("the boot skeleton announces itself and hides decoration", async ({ page }) => {

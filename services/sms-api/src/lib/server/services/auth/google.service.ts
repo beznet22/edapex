@@ -14,7 +14,6 @@ import { completeClaim } from "./claim-link";
 import { OAUTH_STATE_TTL_SECONDS } from "./claim-policy";
 import { issueSession, loadAuthUser } from "./session-issuance";
 import { signPayload } from "../crypto/signed-payload";
-import { SESSION_TTL_SECONDS } from "./types";
 import type { AuthSessionResult } from "./types";
 
 export type GooglePurpose = "signin" | "claim" | "desktop";
@@ -256,7 +255,7 @@ export class GoogleService {
 
     const token = randomToken();
     const sessionId = crypto.randomUUID();
-    const expiresAt = now + SESSION_TTL_SECONDS;
+    const expiresAt = now + this.ctx.ports.authConfig.sessionTtlSeconds;
     await this.ctx.repos.accounts.completeClaimLink(unscoped, {
       userId: user.id,
       identity: {

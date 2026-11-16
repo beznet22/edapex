@@ -1,5 +1,7 @@
 import type { CapabilityManifest } from "@edapex/contracts";
 
+import { apiFetch, hostKind, readMessage } from "@/lib/api-transport";
+
 export type Persona = "staff" | "parent";
 export type LinkStatus = "none" | "active" | "expired" | "used" | "revoked";
 
@@ -46,6 +48,14 @@ export interface SessionView {
   readonly user: SessionUser;
   readonly sessionId: string;
   readonly expiresAt: number;
+  /**
+   * The workspace this session acts in.
+   *
+   * Use this rather than `String(user.id)`: the two are equal today, but only one of them is
+   * a workspace. Every caller that reached for the user id is a place a real workspace would
+   * have to be found and fixed later.
+   */
+  readonly workspaceId: string;
 }
 
 export interface DirectoryFilters {
@@ -66,34 +76,42 @@ const API_BASE =
 
 export const apiBase = (): string => API_BASE;
 
-const request = async <T>(path: string, init?: RequestInit): Promise<T> => {
-  const response = await fetch(`${API_BASE}${path}`, {
-    ...init,
-    credentials: "include",
-    headers: {
-      "content-type": "application/json",
-      ...(init?.headers ?? {})
-    }
-  });
+/**
+ * One request on whichever transport this host has.
+ *
+ * Web uses the cookie; desktop and mobile go through the Rust `api_request` proxy, which
+ * attaches the keychain token as a Bearer header. The WebView never sees the token.
+ */
+const request = async <T>(
+  path: string,
+  init: { readonly method?: string; readonly body?: unknown; readonly headers?: Readonly<Record<string, string>> } = {}
+): Promise<T> => {
+  const response = await apiFetch(path, API_BASE, init);
   if (!response.ok) {
-    const body: unknown = await response.json().catch(() => null);
-    const message =
-      typeof body === "object" &&
-      body !== null &&
-      "message" in body &&
-      typeof body.message === "string"
-        ? body.message
-        : `Request failed (${response.status})`;
-    throw new Error(message);
+    throw new Error(readMessage(response.data, `Request failed (${response.status})`));
   }
-  return (await response.json()) as T;
+  return response.data as T;
 };
 
 export const getSession = async (): Promise<SessionView | null> => {
-  const response = await fetch(`${API_BASE}/api/v1/me`, { credentials: "include" });
-  if (response.status === 401) return null;
-  if (!response.ok) throw new Error(`Session check failed (${response.status})`);
-  return (await response.json()) as SessionView;
+  const response = await apiFetch("/api/v1/me", API_BASE);
+  // 401 is the anonymous case, not an error. On native the proxy throws instead of returning
+  // a status, so the wrapper below normalises both paths into "no session".
+  if (!response.ok) {
+    if (response.status === 401) return null;
+    throw new Error(`Session check failed (${response.status})`);
+  }
+  return response.data as SessionView;
+};
+
+export const signOut = async (): Promise<void> => {
+  // Native hosts clear the keychain token; the web clears the cookie. Both are one call.
+  if (hostKind() === "native") {
+    const { authLogout } = await import("@/lib/tauri");
+    await authLogout();
+    return;
+  }
+  await request<null>("/api/v1/auth/logout", { method: "POST" });
 };
 
 export const loadCapabilities = async (
@@ -126,11 +144,14 @@ export const createClaimLink = async (
   request<CreatedClaimLink>("/api/v1/admin/claim-links", {
     method: "POST",
     headers: { "X-Academic-Id": String(academicId) },
-    body: JSON.stringify({
+    // `request` serialises the body itself; stringifying here too sent a JSON *string*
+    // where the API expected an object, which Zod reported as "expected object, received
+    // string" — on every create and every magic-link request.
+    body: {
       subjectType: item.subjectType,
       subjectId: item.subjectId,
       ttlHours: 72
-    })
+    }
   });
 
 export const revokeClaimLink = async (
@@ -144,9 +165,16 @@ export const revokeClaimLink = async (
   });
 };
 
-export const requestMagicLink = async (email: string): Promise<void> => {
-  await request<{ status: string }>("/api/v1/auth/magic-link", {
-    method: "POST",
-    body: JSON.stringify({ email })
-  });
+/**
+ * Requests a sign-in link.
+ *
+ * Returns `devLink` when the API is running with the local console transport. In production
+ * the field is null and the real link is only ever in the email.
+ */
+export const requestMagicLink = async (email: string): Promise<{ devLink: string | null }> => {
+  const response = await request<{ status: string; devLink?: string | null }>(
+    "/api/v1/auth/magic-link",
+    { method: "POST", body: { email } }
+  );
+  return { devLink: response.devLink ?? null };
 };

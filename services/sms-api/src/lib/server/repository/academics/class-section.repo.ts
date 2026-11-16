@@ -2,9 +2,11 @@ import { and, eq, like, sql } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
 
 import {
+  smAssignClassTeachers,
   smAssignSubjects,
   smClassSections,
   smClasses,
+  smClassTeachers,
   smSections
 } from "../../db/schema";
 import { withErrorHandling } from "../base/error-handling";
@@ -209,4 +211,107 @@ export async function findAssignedClassSection(
       .limit(1);
     return row ?? null;
   }, "findAssignedClassSection");
+}
+
+/**
+ * Every class-section a teacher is attached to, by either route.
+ *
+ * A teacher reaches a section two ways and the codebase models them as separate tables:
+ *
+ * - `sm_assign_subjects` — they teach a *subject* in it (the common case)
+ * - `sm_class_teachers` → `sm_assign_class_teachers` — they are the homeroom teacher
+ *
+ * Both must count. A homeroom teacher with no subject assignment still takes attendance
+ * and knows their roster; a subject teacher may not be the homeroom teacher. Reading only
+ * the first table (as `findAssignedClassSection` and the orphaned `listStudentsByStaffId`
+ * both do) would deny a homeroom teacher their own class.
+ *
+ * Returns every row, not the first: a teacher normally has several sections, and picking
+ * one arbitrarily is how a scope check silently passes the wrong one.
+ */
+export async function listAssignedClassSections(
+  ctx: ScopedRepositoryContext,
+  staffId: number
+): Promise<readonly AssignedClassSectionRow[]> {
+  return withErrorHandling(async () => {
+    const academicId = requireAcademicId(ctx);
+    const schoolId = ctx.tenant.schoolId;
+
+    const viaSubject = ctx.db
+      .select({
+        id: smClassSections.id,
+        classId: smAssignSubjects.classId,
+        className: smClasses.className,
+        sectionId: smAssignSubjects.sectionId,
+        sectionName: smSections.sectionName,
+        academicId: smClassSections.academicId
+      })
+      .from(smAssignSubjects)
+      .leftJoin(smClasses, eq(smAssignSubjects.classId, smClasses.id))
+      .leftJoin(smSections, eq(smAssignSubjects.sectionId, smSections.id))
+      .leftJoin(
+        smClassSections,
+        and(
+          eq(smClassSections.classId, smAssignSubjects.classId),
+          eq(smClassSections.sectionId, smAssignSubjects.sectionId),
+          eq(smClassSections.academicId, academicId)
+        )
+      )
+      .where(
+        and(
+          eq(smAssignSubjects.teacherId, staffId),
+          eq(smAssignSubjects.academicId, academicId),
+          eq(smAssignSubjects.activeStatus, 1),
+          eq(smAssignSubjects.schoolId, schoolId)
+        )
+      );
+
+    const viaHomeRoom = ctx.db
+      .select({
+        id: smClassSections.id,
+        classId: smAssignClassTeachers.classId,
+        className: smClasses.className,
+        sectionId: smAssignClassTeachers.sectionId,
+        sectionName: smSections.sectionName,
+        academicId: smClassSections.academicId
+      })
+      .from(smClassTeachers)
+      .innerJoin(
+        smAssignClassTeachers,
+        eq(smClassTeachers.assignClassTeacherId, smAssignClassTeachers.id)
+      )
+      .leftJoin(smClasses, eq(smAssignClassTeachers.classId, smClasses.id))
+      .leftJoin(smSections, eq(smAssignClassTeachers.sectionId, smSections.id))
+      .leftJoin(
+        smClassSections,
+        and(
+          eq(smClassSections.classId, smAssignClassTeachers.classId),
+          eq(smClassSections.sectionId, smAssignClassTeachers.sectionId),
+          eq(smClassSections.academicId, academicId)
+        )
+      )
+      .where(
+        and(
+          eq(smClassTeachers.teacherId, staffId),
+          eq(smClassTeachers.academicId, academicId),
+          eq(smClassTeachers.activeStatus, 1),
+          eq(smClassTeachers.schoolId, schoolId),
+          eq(smAssignClassTeachers.activeStatus, 1)
+        )
+      );
+
+    // A teacher is usually both, so the union is deduped rather than concatenated: the
+    // scope check reads this list, and duplicates would make "did they teach it" ambiguous.
+    const rows = [...(await viaSubject), ...(await viaHomeRoom)];
+    const seen = new Set<string>();
+    const unique: AssignedClassSectionRow[] = [];
+    for (const row of rows) {
+      if (row.classId === null || row.sectionId === null) continue;
+      const key = `${row.classId}:${row.sectionId}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      unique.push(row);
+    }
+    return unique;
+  }, "listAssignedClassSections");
 }

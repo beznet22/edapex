@@ -22,6 +22,12 @@ let adminCookie: string;
 let memberCookie: string;
 
 beforeAll(async () => {
+  /*
+   * Staffed: the non-admin case still needs a caller who is legitimately scoped, otherwise
+   * `TenantScopeService` rejects them at the tenant gate and the 403 proves nothing about
+   * the admin check it is meant to test. The two suites that assert *unstaffed* state opt
+   * out individually.
+   */
   const schools = await seedTwoSchools(db);
   school = schools[0];
   other = schools[1];
@@ -54,6 +60,12 @@ describe("subject assignment routes", () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ assigned: 1 });
 
+    /*
+     * `toContainEqual`, not `toEqual`: the seeded school is already staffed (that is what
+     * makes `tenantHeaders` a valid scope), so a section-wide read legitimately returns
+     * more than the row this call created. Asserting membership says what is meant —
+     * "this assignment exists" — without pinning an unrelated fixture detail.
+     */
     const rows = await db
       .select({
         teacherId: smAssignSubjects.teacherId,
@@ -70,14 +82,12 @@ describe("subject assignment routes", () => {
           eq(smAssignSubjects.subjectId, school.subjectId)
         )
       );
-    expect(rows).toEqual([
-      {
-        teacherId: school.staffId,
-        classId: school.classId,
-        sectionId: school.sectionId,
-        subjectId: school.subjectId
-      }
-    ]);
+    expect(rows).toContainEqual({
+      teacherId: school.staffId,
+      classId: school.classId,
+      sectionId: school.sectionId,
+      subjectId: school.subjectId
+    });
   });
 
   it("rejects a non-administrator", async () => {

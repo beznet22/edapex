@@ -20,7 +20,7 @@ let cookie: string;
 let marksheet: Marksheet;
 
 beforeAll(async () => {
-  const [first] = await seedTwoSchools(db);
+  const [first] = await seedTwoSchools(db, { staffed: false });
   school = first;
   await setPassword(school, "secret");
   cookie = await login(app, "user1@example.test", "secret");

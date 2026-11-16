@@ -8,7 +8,9 @@ import {
 } from "../../repository/base";
 import { listStudentsByClassSection } from "../../repository/profiles";
 import { findReportSettings, upsertReportSettings } from "../../repository/school";
+import type { EmailSender } from "../ports/email-sender.port";
 import { CloudflareEmailAdapter } from "../adapters/cloudflare-email.adapter";
+import { LoggingEmailAdapter } from "../adapters/logging-email.adapter";
 import { D1ReportSettingsAdapter } from "../adapters/d1-report-settings.adapter";
 import { createAuthConfig } from "../adapters/env-auth-config.adapter";
 import { GmailEmailAdapter } from "../adapters/gmail-email.adapter";
@@ -50,13 +52,26 @@ const unavailableStudents: StudentDirectory = {
   }
 };
 
-function createEmail(env: ServiceEnv): GmailEmailAdapter | CloudflareEmailAdapter {
+/**
+ * The port type, not the concrete union.
+ *
+ * Narrowing the return to the two real adapters is what made adding the local one a type
+ * error — the factory's contract is "something that can send", and naming implementations
+ * here means every new transport edits this signature.
+ */
+function createEmail(env: ServiceEnv): EmailSender {
   const gmailPartial = [
     env.GMAIL_CLIENT_ID,
     env.GMAIL_CLIENT_SECRET,
     env.GMAIL_REFRESH_TOKEN,
     env.GMAIL_SENDER_EMAIL
   ].some((value) => value !== undefined && value.length > 0);
+
+  // Before every other branch: locally there is no binding and no Gmail credentials, and
+  // the point of the flag is that the transport never attempts a real send.
+  if (env.LOCAL_EMAIL_LOG === "true") {
+    return new LoggingEmailAdapter();
+  }
 
   if (gmailPartial) {
     return new GmailEmailAdapter({

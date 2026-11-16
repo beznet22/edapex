@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
 import { usePathname } from "next/navigation";
 
@@ -8,18 +8,24 @@ import type { CapabilityManifest } from "@edapex/contracts";
 
 import { ArtifactHost } from "@/components/artifacts/ArtifactHost";
 import { LoginPanel } from "@/components/auth/LoginPanel";
+import { useEmailSignIn } from "@/hooks/use-email-sign-in";
+import { noticeFromQuery, type LoginNotice } from "@/lib/auth-notice";
 import { apiBase, getSession, loadCapabilities, requestMagicLink } from "@/lib/api";
 import type { SessionView } from "@/lib/api";
-import {
-  DEV_AUTH_BYPASS,
-  DEV_PREVIEW_MANIFEST,
-  DEV_PREVIEW_SESSION
-} from "@/lib/dev-preview";
+
+import { useProactive } from "@/hooks/use-proactive";
 import { useWorkspaceRuntime } from "@/hooks/use-workspace-runtime";
+import { useAutoHideScrollbars } from "@/hooks/use-auto-hide-scrollbars";
 import { useRuntimeHealth } from "@/hooks/use-runtime-health";
+import { activeItemId, filterTreeForRole, treeForPath } from "@/lib/nav-tree";
+import { TEST_MANIFEST, TEST_SESSION, testSessionEnabled } from "@/lib/test-session";
 import { isDesktopViewport } from "@/lib/platform";
+import type { SidebarState } from "@/lib/sidebar-state";
+import { useSidebarState } from "@/lib/sidebar-state-hooks";
 import type { WorkspaceTab } from "@/components/openduet/tab-bar";
+import { Button } from "@/components/ui/button";
 import { ChatSurface } from "@/components/workspace/ChatSurface";
+import { CommandPalette } from "@/components/workspace/CommandPalette";
 import { WorkspaceBoot } from "@/components/workspace/WorkspaceBoot";
 import { WorkspaceProvider } from "@/components/workspace/WorkspaceContext";
 import { RuntimeSetup } from "@/components/workspace/RuntimeSetup";
@@ -32,20 +38,58 @@ function surfaceForPath(pathname: string): WorkspaceTab {
   const path = pathname.replace(/\/+$/, "") || "/";
   if (path === "/workspace/tasks") return "tasks";
   if (path === "/workspace/make") return "make";
+  if (path === "/workspace/plugins" || path.startsWith("/workspace/plugins/")) return "plugins";
+  if (path === "/workspace/search" || path.startsWith("/workspace/search/")) return "search";
+  if (path === "/workspace/settings" || path.startsWith("/workspace/settings/")) return "settings";
+  if (path === "/workspace/admin" || path.startsWith("/workspace/admin/")) return "admin";
   return "chat";
 }
 
-export function WorkspaceLayoutClient({ children }: { readonly children: ReactNode }) {
+export function WorkspaceLayoutClient({
+  children,
+  initialSidebar
+}: {
+  readonly children: ReactNode;
+  readonly initialSidebar: SidebarState;
+}) {
+  // The collapsed state is a width decision, so it comes from the server: reading a
+  // cookie in an effect renders the rail expanded and then snaps it, which is a visible
+  // layout shift on every load.
+  // No custom Cmd+B handler: shadcn's SidebarProvider binds it already. Two handlers
+  // toggle twice, so the rail appears not to respond.
+  const sidebar = useSidebarState(initialSidebar);
+
   const pathname = usePathname();
   const surface = surfaceForPath(pathname);
+  // Derived from the route, not from state: the tree must be correct on the first paint,
+  // and a `useEffect` that set it would render the workspace tree for one frame on a
+  // settings route.
+  /*
+   * `?auth_error=expired` is set by the API when a magic link cannot be verified and the
+   * request came from a browser. Read once on mount: leaving it in the URL would replay the
+   * message on every refresh, long after the person has retried.
+   */
+  const [initialNotice] = useState<LoginNotice>(() =>
+    typeof window === "undefined" ? { kind: "idle" } : noticeFromQuery(window.location.search)
+  );
+  const signIn = useEmailSignIn(initialNotice);
+
   const [sessionState, setSessionState] = useState<SessionState>("loading");
   const [session, setSession] = useState<SessionView | null>(null);
   const [manifest, setManifest] = useState<CapabilityManifest | null>(null);
+
+  /*
+   * The tree is filtered by role before anything renders, so a teacher never sees a
+   * destination that would 403. `manifest` is null while capabilities load — until then the
+   * role is unknown and role-gated items stay hidden, which is the safe direction.
+   */
+  const navTree = useMemo(
+    () => filterTreeForRole(treeForPath(pathname), manifest?.role ?? null),
+    [pathname, manifest]
+  );
+  const activeNavId = activeItemId(navTree, pathname);
+
   const [academicId, setAcademicId] = useState(5);
-  const [authMode, setAuthMode] = useState<AuthMode>("google");
-  const [email, setEmail] = useState("");
-  const [authMessage, setAuthMessage] = useState("");
-  const [authSending, setAuthSending] = useState(false);
   const [error, setError] = useState("");
   const [loadingManifest, setLoadingManifest] = useState(false);
   const [reloadToken, setReloadToken] = useState(0);
@@ -53,7 +97,14 @@ export function WorkspaceLayoutClient({ children }: { readonly children: ReactNo
   const [setupDismissed, setSetupDismissed] = useState(false);
   const [artifactSplit, setArtifactSplit] = useState(false);
   const runtime = useWorkspaceRuntime();
+  // Mounted here rather than in the Tasks page so the tick loop keeps running
+  // while the person is on Chat — a routine due at 08:00 should fire even if the
+  // Tasks tab is not open. The trade (only while a device is open) is stated in
+  // the surface copy.
+  const proactive = useProactive(session?.workspaceId ?? null, runtime.sendAndWait);
   const runtimeHealth = useRuntimeHealth();
+  // One capture-phase listener for every scroll container in the tree.
+  useAutoHideScrollbars();
 
   const closeArtifact = useCallback((): void => setArtifactOpen(false), []);
   const openArtifact = useCallback((): void => setArtifactOpen(true), []);
@@ -79,15 +130,19 @@ export function WorkspaceLayoutClient({ children }: { readonly children: ReactNo
   }, []);
 
   useEffect(() => {
-    if (!DEV_AUTH_BYPASS) return;
-    setSession(DEV_PREVIEW_SESSION);
-    setManifest(DEV_PREVIEW_MANIFEST);
-    setSessionState("authenticated");
-    runtime.restoreComplete();
-  }, []);
+    /*
+     * The browser suite needs a deterministic starting state without driving an email
+     * flow on every spec. `testSessionEnabled()` requires both the flag *and* a loopback
+     * API base, so it cannot activate a deployed bundle.
+     */
+    if (testSessionEnabled()) {
+      setSession(TEST_SESSION);
+      setManifest(TEST_MANIFEST);
+      setSessionState("authenticated");
+      runtime.restoreComplete();
+      return;
+    }
 
-  useEffect(() => {
-    if (DEV_AUTH_BYPASS) return;
     let cancelled = false;
     getSession()
       .then((current) => {
@@ -106,7 +161,9 @@ export function WorkspaceLayoutClient({ children }: { readonly children: ReactNo
   }, []);
 
   useEffect(() => {
-    if (DEV_AUTH_BYPASS || sessionState !== "authenticated") return;
+    // The fixture already resolved the manifest; fetching would hit an API the suite
+    // does not run.
+    if (testSessionEnabled() || sessionState !== "authenticated") return;
     let cancelled = false;
     setLoadingManifest(true);
     setError("");
@@ -129,24 +186,6 @@ export function WorkspaceLayoutClient({ children }: { readonly children: ReactNo
     };
   }, [academicId, reloadToken, sessionState]);
 
-  const sendMagicLink = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
-    event.preventDefault();
-    if (authSending) return;
-    setAuthMessage("");
-    if (email.trim().length === 0) {
-      setAuthMessage("Enter your school email address.");
-      return;
-    }
-    setAuthSending(true);
-    try {
-      await requestMagicLink(email.trim());
-      setAuthMessage("Check your email for a sign-in link. The link is valid for 15 minutes.");
-    } catch (cause) {
-      setAuthMessage(cause instanceof Error ? cause.message : "Could not send the sign-in link");
-    } finally {
-      setAuthSending(false);
-    }
-  };
 
   if (sessionState === "loading") {
     return <WorkspaceBoot surface={surface} />;
@@ -155,18 +194,13 @@ export function WorkspaceLayoutClient({ children }: { readonly children: ReactNo
   if (sessionState === "anonymous") {
     return (
       <LoginPanel
-        authMessage={authMessage}
-        authMode={authMode}
-        description="Sign in with the Google account linked to your school account, or request a magic link. The workspace keeps EdApex data on Cloudflare."
-        email={email}
-        error={error}
-        eyebrow="EdApex workspace"
-        onEmailChange={setEmail}
+        email={signIn.email}
+        onEmailChange={signIn.setEmail}
         onGoogle={() => window.location.assign(`${apiBase()}/api/v1/auth/google/start`)}
-        onMagicLink={(event) => void sendMagicLink(event)}
-        onModeChange={setAuthMode}
-        sending={authSending}
-        title="Sign in to your workspace"
+        onReset={signIn.reset}
+        onSubmit={signIn.submit}
+        notice={initialNotice.kind === "idle" ? signIn.notice : initialNotice}
+        sending={signIn.sending}
       />
     );
   }
@@ -180,35 +214,44 @@ export function WorkspaceLayoutClient({ children }: { readonly children: ReactNo
         <section className="w-full max-w-md rounded-xl border border-border bg-card p-6">
           <h1 className="text-lg font-semibold">Workspace unavailable</h1>
           <p className="mt-2 text-sm text-muted-foreground">{error || "Could not load the workspace."}</p>
-          <button
-            className="mt-4 inline-flex min-h-11 items-center rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground"
+          <Button
+            className="mt-4"
             onClick={() => setReloadToken((value) => value + 1)}
             type="button"
           >
             Try again
-          </button>
+          </Button>
         </section>
       </main>
     );
   }
 
   const userName = session?.user.fullName ?? session?.user.email ?? "Signed in";
-  const contextValue = { manifest, runtime, openArtifact };
+  // The session names its workspace; the fallback exists only for the pre-auth render, where
+  // no surface is mounted yet.
+  const workspaceId = session?.workspaceId ?? "workspace";
+  const contextValue = { manifest, workspaceId, academicId, runtime, proactive, openArtifact };
 
   return (
     <WorkspaceProvider value={contextValue}>
       <WorkspaceShell
         manifest={manifest}
+        activeNavId={activeNavId}
+        connecting={runtime.connecting}
         coreHealth={runtimeHealth.health}
-        devBypass={DEV_AUTH_BYPASS}
+        navTree={navTree}
+
         onConnectRuntime={() => setSetupDismissed(false)}
         onOpenArtifact={surface === "chat" ? openArtifact : undefined}
+        setSidebarOpen={sidebar.setOpen}
+        sidebarOpen={sidebar.open}
         runtime={runtime.view}
         surface={surface}
         userName={userName}
       >
         {children}
       </WorkspaceShell>
+      <CommandPalette />
       <ArtifactHost
         chat={
           surface === "chat" ? (
@@ -238,7 +281,7 @@ export function WorkspaceLayoutClient({ children }: { readonly children: ReactNo
             setSetupDismissed(true);
             runtime.restoreComplete();
           }}
-          workspaceId={String(session?.user.id ?? "workspace")}
+          workspaceId={workspaceId}
         />
       ) : null}
     </WorkspaceProvider>

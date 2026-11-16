@@ -100,14 +100,16 @@ export function Composer({
             >
               <span className="min-w-0 flex-1 truncate">{message.text}</span>
               <span className="shrink-0 text-[10px] uppercase tracking-wide">Queued</span>
-              <button
+              <Button
                 aria-label={`Remove queued message ${message.text}`}
-                className="flex size-8 shrink-0 items-center justify-center rounded-full hover:bg-background hover:text-foreground"
+                className="size-8 rounded-full hover:bg-background hover:text-foreground after:-inset-1.5"
                 onClick={() => onRemoveQueued(message.id)}
+                size="sm"
                 type="button"
+                variant="ghost"
               >
                 <X aria-hidden="true" className="size-3.5" />
-              </button>
+              </Button>
             </div>
           ))}
         </div>
@@ -121,16 +123,18 @@ export function Composer({
               key={name}
             >
               <span className="truncate">{name}</span>
-              <button
+              <Button
                 aria-label={`Remove ${name}`}
-                className="flex size-6 items-center justify-center rounded-full hover:text-foreground"
+                className="size-6 rounded-full hover:bg-transparent hover:text-foreground after:-inset-2.5"
                 onClick={() =>
                   setAttachments((current) => current.filter((item) => item !== name))
                 }
+                size="sm"
                 type="button"
+                variant="ghost"
               >
                 <X aria-hidden="true" className="size-3" />
-              </button>
+              </Button>
             </span>
           ))}
         </div>
@@ -155,7 +159,7 @@ export function Composer({
           onChange={onInput}
           onFocus={() => setFocused(true)}
           onKeyDown={onKeyDown}
-          placeholder={connected ? "Ask EdApex anything" : "Loading the workspace…"}
+          placeholder={connected ? "Ask EDAPEX anything" : "Loading the workspace…"}
           ref={textarea}
           rows={1}
           value={draft}
@@ -170,15 +174,17 @@ export function Composer({
             ref={fileInput}
             type="file"
           />
-          <button
+          <Button
             aria-label="Add attachment"
-            className="flex size-9 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
+            className="size-9 shrink-0 rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
             disabled={disabled}
             onClick={() => fileInput.current?.click()}
+            size="icon-sm"
             type="button"
+            variant="ghost"
           >
             <Paperclip aria-hidden="true" className="size-4" />
-          </button>
+          </Button>
           <span className="flex-1" />
           {stoppable ? (
             <Button

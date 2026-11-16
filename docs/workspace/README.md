@@ -141,7 +141,7 @@ Bundle caps:
 
 ## Measured baseline
 
-The backend baseline (tables, rows, indexes, auth counts, hashing cost) is measured and maintained in [`docs/cloudflare-port/README.md`](../cloudflare-port/README.md). Do not duplicate it here; refresh it with `node scripts/introspect-mysql.mjs` when the dump changes.
+The backend baseline (tables, rows, indexes, auth counts, hashing cost) is measured and maintained in [`docs/cloudflare-port/README.md`](../cloudflare-port/README.md). Do not duplicate it here; refresh it with `node legacy/scripts/introspect-mysql.mjs` when the dump changes.
 
 Workspace performance numbers (Tauri, Worker/PWA, Needle 3, iroh, GenUI, document engine and editor) belong in `specs/70-evaluation-and-rollout.md` and must be device/date-stamped. No invented benchmark numbers.
 
@@ -179,6 +179,7 @@ Spec 15 controls **where and how a surface appears**. Spec 19 controls **what it
 | [`specs/17-chat-framework.md`](./specs/17-chat-framework.md) | OpenDuet chat shell, custom xcodex runtime, OpenUI surfaces, Streamdown and Tiptap |
 | [`specs/18-operation-inventory.md`](./specs/18-operation-inventory.md) | every current endpoint, missing endpoint, agent tool and phase assignment |
 | [`specs/19-design-system.md`](./specs/19-design-system.md) | shadcn/ui + Tailwind v4, Gold tokens and WebView floor |
+| [`specs/46-proactive-work.md`](./specs/46-proactive-work.md) | routines on an open device, brief dedupe leases, derived task state, greeting and chips | chat state, routines execution |
 | [`specs/20-public-applicant-flow.md`](./specs/20-public-applicant-flow.md) | progressive applicant identity, drafts, notifications, enrollment |
 | [`specs/21-generative-ui-openui.md`](./specs/21-generative-ui-openui.md) | OpenUI Lang v1 decision, catalog, action bridge, storage and security |
 | [`specs/22-documents-and-artifacts.md`](./specs/22-documents-and-artifacts.md) | PDF/DOCX/CSV/Markdown engine, Tiptap editor and artifact renditions |
@@ -242,3 +243,4 @@ Phase 9B is approved; the workspace specs are authoritative for implementation. 
 - Keep diffs inside the workstream; no drive-by refactors.
 - One workstream per branch/PR; never push `main`.
 - If a gate is not signed, do not start the next workstream.
+| [`specs/50-native-agent-path.md`](./specs/50-native-agent-path.md) | native agent path for desktop and mobile; WASM is web-only | `46`, `48` |

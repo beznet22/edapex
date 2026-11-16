@@ -32,6 +32,11 @@ export interface AppVariables {
   sessionToken: string | null;
   user: AuthUser | null;
   tenant: ServiceContext["tenant"];
+  /** Validated by `agentModelHeaders`, never read inline in a route. */
+  providerSelector: string | null;
+  acceptHeader: string;
+  /** Resolved by `ocrConsent`; true only for an explicit `X-OCR-Consent: cloud`. */
+  cloudOcrConsented: boolean;
 }
 
 export type AppContext = {

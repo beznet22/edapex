@@ -3,12 +3,14 @@ import { Hono } from "hono";
 import { createServiceContext } from "../services/context";
 import type { AppContext } from "./env";
 import { auth, requireAuth } from "./middleware/auth";
+import { agentModelHeaders } from "./middleware/agent-model-headers";
 import { bodyLimit } from "./middleware/body-limit";
 import { contentNegotiation } from "./middleware/content-negotiation";
 import { cors } from "./middleware/cors";
 import { errorHandler } from "./middleware/error-handler";
 import { logger } from "./middleware/logger";
 import { notFound } from "./middleware/not-found";
+import { ocrConsent } from "./middleware/ocr-consent";
 import { rateLimit } from "./middleware/rate-limit";
 import { requestId } from "./middleware/request-id";
 import { createServiceContextMiddleware } from "./middleware/service-context";
@@ -54,6 +56,8 @@ export function createApp(deps: AppDependencies = {}) {
     .route("/api/v1/auth", authMagicLink)
     .route("/api/v1/auth", authCode)
     .route("/api/v1/auth", authDesktop)
+    .use("/api/v1/agent/model/*", agentModelHeaders)
+    .use("/api/v1/assessments/ocr/*", ocrConsent)
     .route("/api/v1", protectedApp);
 
   app.onError(errorHandler);

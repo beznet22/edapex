@@ -131,7 +131,7 @@ describe("Google OAuth routes", () => {
     );
     expect(callback.status).toBe(302);
 
-    const session = cookiePair(callback, "__Host-edapex_session");
+    const session = cookiePair(callback, "edapex_session");
     if (session === null) throw new Error("no session cookie");
     const me = await request(app, "/api/v1/me", { headers: { cookie: session } });
     expect(me.status).toBe(200);

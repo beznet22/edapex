@@ -8,6 +8,12 @@ import type { RateLimitAttempt, RateLimitRule } from "./rate-limit-policy";
 import { issueSession, loadAuthUser } from "./session-issuance";
 import type { AuthSessionResult } from "./types";
 
+/**
+ * The production default, kept for tests and for the DTO's `expiresMinutes`.
+ *
+ * The live value comes from `authConfig.magicLinkTtlSeconds` — a Worker has no `process.env`,
+ * and `.dev.vars` raises this to 30 days so a local link does not expire mid-debug.
+ */
 export const MAGIC_LINK_TTL_SECONDS = 15 * 60;
 
 export const MAGIC_LINK_LIMITS = {
@@ -51,7 +57,13 @@ export interface MagicLinkVerifyInput {
 export class MagicLinkService {
   constructor(private readonly ctx: ServiceContext) {}
 
-  async request(input: MagicLinkRequestInput): Promise<void> {
+  /**
+   * @returns The sign-in URL **only when the local console transport is active**, and null
+   * otherwise. Returning it in production would turn the endpoint into an account-takeover
+   * primitive: the 202 exists precisely so the response never discloses whether an address
+   * is provisioned, and a token in the body would disclose it and hand over the key.
+   */
+  async request(input: MagicLinkRequestInput): Promise<{ readonly devLink: string | null }> {
     const email = input.email.trim().toLowerCase();
     const now = this.ctx.ports.clock.now();
     await consumeLimits(this.ctx, rateLimits(email, input.ip), now);
@@ -77,7 +89,7 @@ export class MagicLinkService {
         },
         now
       );
-      return;
+      return { devLink: null };
     }
 
     const recent = await this.ctx.repos.accounts.findRecentMagicLink(
@@ -99,11 +111,12 @@ export class MagicLinkService {
         },
         now
       );
-      return;
+      return { devLink: null };
     }
 
     const token = randomToken();
-    const expiresAt = now + MAGIC_LINK_TTL_SECONDS;
+    const ttl = this.ctx.ports.authConfig.magicLinkTtlSeconds;
+    const expiresAt = now + ttl;
     await this.ctx.repos.accounts.createMagicLink(unscoped, {
       id: crypto.randomUUID(),
       userId: user.id,
@@ -118,13 +131,15 @@ export class MagicLinkService {
     const url = new URL("/api/v1/auth/magic-link/verify", input.origin);
     url.searchParams.set("token", token);
 
+    let delivered = true;
     try {
       await this.ctx.ports.email.send({
         template: "magic_link",
         to: email,
-        data: { url: url.toString(), expiresMinutes: MAGIC_LINK_TTL_SECONDS / 60 }
+        data: { url: url.toString(), expiresMinutes: Math.round(ttl / 60) }
       });
     } catch (error) {
+      delivered = false;
       this.ctx.logger.error("magic_link_email_failed", {
         message: error instanceof Error ? error.message : "unknown"
       });
@@ -142,6 +157,13 @@ export class MagicLinkService {
       },
       now
     );
+
+    /*
+     * Only the local console transport hands the URL back. `delivered` is tracked rather
+     * than returned early so the audit event is still written on a failed send — an email
+     * that did not leave is exactly the thing an audit trail needs to record.
+     */
+    return { devLink: this.ctx.ports.email.console && delivered ? url.toString() : null };
   }
 
   async verify(input: MagicLinkVerifyInput): Promise<AuthSessionResult> {
