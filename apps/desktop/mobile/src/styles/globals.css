@@ -165,3 +165,30 @@
     animation-duration: 1ms !important;
   }
 }
+
+@layer components {
+  /*
+   * The sheet's two heights.
+   *
+   * Declared here rather than as utilities because the registry panel carries `h-auto`, and a
+   * utilities-layer class beats a components-layer one whatever the class order — that is how
+   * the sheet ended up clamped to 80vh and positioned off-screen. The `[data-slot]` prefix
+   * gives these rules enough specificity that the layer no longer decides.
+   */
+  [data-slot="drawer-content"].sheet-peek {
+    height: 40dvh;
+  }
+
+  [data-slot="drawer-content"].sheet-full {
+    height: 100dvh;
+  }
+
+  /*
+   * A sheet is anchored to the bottom edge, so its content sits behind the gesture bar unless
+   * it reserves the inset itself. This is the one place outside `Screen` that writes it, and
+   * it does so for the same reason `Screen` does: a sheet has no parent to inherit from.
+   */
+  [data-slot="drawer-content"] {
+    padding-bottom: max(env(safe-area-inset-bottom), var(--platform-inset-bottom, 0px));
+  }
+}

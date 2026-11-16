@@ -12,6 +12,12 @@ import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "@edapex/ui/com
  * The panel overrides the registry's `max-h-[80vh]` with `max-h-dvh`: `vh` on Android is the
  * *largest* viewport, so a sheet sized against it sits under the keyboard and behind the
  * gesture bar.
+ *
+ * **Snap points are deliberately not used.** vaul positions a snapped sheet by translating
+ * it, and that arithmetic assumes a viewport-height sheet; with content-sized height it
+ * produced `translateY(536px)` on a 303px sheet and put an "open" drawer entirely below the
+ * viewport. The variants set a definite height instead — 40dvh peek, 100dvh full — which is
+ * also what the design asks for. Drag-between-stops returns when a surface needs it.
  */
 export function Sheet({
   open,
@@ -26,17 +32,16 @@ export function Sheet({
   readonly variant?: "peek" | "full";
   readonly children: ReactNode;
 }) {
-  const snapPoints: (number | string)[] = variant === "full" ? [1] : [0.33, 0.72, 1];
-
   return (
     <Drawer
       onOpenChange={(next: boolean) => {
         if (!next) onClose();
       }}
       open={open}
-      snapPoints={snapPoints}
     >
-      <DrawerContent className="max-h-dvh rounded-t-sheet border-border bg-card">
+      <DrawerContent
+        className={variant === "full" ? "sheet-full rounded-t-sheet" : "sheet-peek rounded-t-sheet"}
+      >
         <DrawerHeader className="px-gutter pb-2 pt-0">
           <DrawerTitle className="text-title">{title}</DrawerTitle>
         </DrawerHeader>

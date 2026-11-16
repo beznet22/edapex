@@ -107,3 +107,7 @@ boy_writing.mp4
 
 # Mobile frontend build output
 /apps/desktop/mobile/dist/
+
+# Tauri copies the frontend bundle and its config into the Android project on every build.
+# Tracked Kotlin and resources are inputs; this directory is output.
+/apps/desktop/src-tauri/gen/android/app/src/main/assets/

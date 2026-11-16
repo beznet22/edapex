@@ -34,6 +34,9 @@ import androidx.core.view.WindowInsetsCompat
 class MainActivity : TauriActivity() {
     private var webView: WebView? = null
     private var backConsumable = false
+    private var bridgeAttached = false
+    private var reloadedForBridge = false
+    private var insetsInstalled = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         val splash = installSplashScreen()
@@ -58,25 +61,81 @@ class MainActivity : TauriActivity() {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         installBackHandler()
+        /*
+         * The interface has to exist before the document does. `addJavascriptInterface`
+         * injects into the JS context at page load, so registering it from `onResume` — after
+         * the bundle has run — left `window.EdApexHost` undefined and every `setBackEnabled`
+         * call a silent no-op: the app exited on back with a sheet open. This was measured,
+         * not assumed: CDP reported `typeof window.EdApexHost === "undefined"` while
+         * `window.__edapexBack` was already a function.
+         */
+        attachHostBridge()
+    }
+
+    /**
+     * `super.onCreate` starts the page load, but the WebView is not necessarily in the view tree
+     * yet — a lookup here can miss it, and `onResume` can too. `decorView.post` runs after the
+     * first layout, which is the first moment the lookup is guaranteed to succeed.
+     */
+    override fun onPostCreate(savedInstanceState: Bundle?) {
+        super.onPostCreate(savedInstanceState)
+        window.decorView.post {
+            attachHostBridge()
+            applyInsets()
+        }
     }
 
     override fun onResume() {
         super.onResume()
-        // The WebView exists only after `super.onCreate` has built the Tauri bridge, so the
-        // lookup happens here rather than in onCreate.
-        if (webView == null) {
-            webView = findViewById<ViewGroup>(android.R.id.content)?.let { findWebView(it) }
-            webView?.addJavascriptInterface(HostBridge(), "EdApexHost")
-        }
+        // A cold start can finish `onCreate` before the WebView is attached; a resume is the
+        // last chance to catch one that appeared late.
+        attachHostBridge()
         applyInsets()
+    }
+
+    /**
+     * Wry hands the WebView over here, before the document is created. Walking the view tree
+     * from `onCreate`/`onResume` never found it: the bridge was undefined and, because the
+     * inset writer also needs the handle, `--platform-inset-*` stayed empty. This callback is
+     * the only lookup that is guaranteed to run.
+     */
+    override fun onWebViewCreate(webView: WebView) {
+        super.onWebViewCreate(webView)
+        attachHostBridge(webView)
+    }
+
+    private fun attachHostBridge(created: WebView? = null) {
+        if (bridgeAttached) return
+        val target = created ?: webView ?: findViewById<ViewGroup>(android.R.id.content)
+            ?.let { findWebView(it) }
+            ?.also { webView = it }
+            ?: return
+        webView = target
+        target.addJavascriptInterface(HostBridge(), "EdApexHost")
+        bridgeAttached = true
+        /*
+         * The interface is injected when the document loads. If the bundle had already run by
+         * the time we found the WebView, the page will never see it — so ask the page, and
+         * reload exactly once if it is missing. Without this the setter is silently absent and
+         * back exits the app with a sheet open.
+         */
+        target.evaluateJavascript("typeof window.EdApexHost") { result ->
+            if (!result.contains("object") && !reloadedForBridge) {
+                reloadedForBridge = true
+                target.reload()
+            }
+        }
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
-        if (hasFocus) applyInsets()
+        if (hasFocus) {
+            attachHostBridge()
+            applyInsets()
+        }
     }
 
-    /** Walks the view tree rather than relying on a Tauri-internal handle. */
+    /** Fallback only: `onWebViewCreate` is the hook that always fires. */
     private fun findWebView(view: View): WebView? = when (view) {
         is WebView -> view
         is ViewGroup -> (0 until view.childCount).firstNotNullOfOrNull { index ->
@@ -90,18 +149,17 @@ class MainActivity : TauriActivity() {
      * windowing caption bar all arrive through this path.
      */
     private fun applyInsets() {
-        val target = webView ?: return
-        val insets = WindowCompat.getInsetsController(window, window.decorView)
-        insets.systemBarsBehavior = insets.systemBarsBehavior
-
-        window.decorView.setOnApplyWindowInsetsListener { view, windowInsets ->
+        if (webView == null) return
+        if (!insetsInstalled) {
+            insetsInstalled = true
+            window.decorView.setOnApplyWindowInsetsListener { view, windowInsets ->
             val bars = windowInsets.getInsets(
                 WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout()
             )
             val caption = windowInsets.getInsets(WindowInsetsCompat.Type.captionBar())
             val keyboard = windowInsets.getInsets(WindowInsetsCompat.Type.ime())
 
-            target.evaluateJavascript(
+            webView?.evaluateJavascript(
                 """
                 document.documentElement.style.setProperty('--platform-inset-top', '${bars.top + caption.top}px');
                 document.documentElement.style.setProperty('--platform-inset-bottom', '${bars.bottom}px');
@@ -116,6 +174,7 @@ class MainActivity : TauriActivity() {
             // closes.
             view.onApplyWindowInsets(windowInsets)
             windowInsets
+            }
         }
         window.decorView.requestApplyInsets()
     }
