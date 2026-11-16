@@ -1285,6 +1285,7 @@ dependencies = [
  "edapex-core",
  "edapex-documents",
  "edapex-ocr",
+ "edapex-store",
  "image 0.25.10",
  "keyring",
  "open",

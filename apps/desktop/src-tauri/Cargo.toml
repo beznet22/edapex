@@ -16,6 +16,7 @@ tauri-build = { version = "2", features = [] }
 edapex-documents = { path = "../../../crates/documents" }
 edapex-agent = { path = "../../../crates/agent" }
 edapex-core = { path = "../../../crates/core" }
+edapex-store = { path = "../../../crates/store" }
 edapex-ocr = { path = "../../../crates/ocr" }
 base64 = "0.22"
 image = "0.25"

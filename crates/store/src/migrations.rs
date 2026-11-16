@@ -13,7 +13,7 @@
 //!   change that will carry it to the cloud.
 
 /// Final row shape after a decrypted read.
-pub const LATEST_VERSION: u32 = 1;
+pub const LATEST_VERSION: u32 = 2;
 
 /// The only data class this store may hold.
 pub const ALLOWED_DATA_CLASS: &str = "workspace";
@@ -24,10 +24,11 @@ pub struct Migration {
     pub sql: &'static str,
 }
 
-pub const MIGRATIONS: &[Migration] = &[Migration {
-    version: 1,
-    name: "core",
-    sql: r#"
+pub const MIGRATIONS: &[Migration] = &[
+    Migration {
+        version: 1,
+        name: "core",
+        sql: r#"
 PRAGMA foreign_keys = ON;
 
 CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -208,4 +209,49 @@ CREATE VIRTUAL TABLE IF NOT EXISTS messages_fts USING fts5 (
   body
 );
 "#,
-}];
+    },
+    Migration {
+        version: 2,
+        name: "run-journal",
+        sql: r#"
+-- A run is resumable work. v1 created the table; this adds what a worker needs
+-- to decide *whether* to resume it without opening a sealed body.
+--
+-- The table is rebuilt rather than altered because v1 declared
+-- `thread_id REFERENCES threads(id)`, and a worker resumes from the journal
+-- alone: it cannot be required to materialise a synced thread row before it can
+-- record that work is pending. v1 has no production writer for `runs`, so the
+-- rebuild starts from empty.
+CREATE TABLE runs_v2 (
+  id            TEXT PRIMARY KEY,
+  thread_id     TEXT NOT NULL,
+  workspace_id  TEXT NOT NULL,
+  status        TEXT NOT NULL,
+  body          BLOB NOT NULL,
+  data_class    TEXT NOT NULL CHECK (data_class = 'workspace'),
+  created_at    INTEGER NOT NULL,
+  updated_at    INTEGER NOT NULL,
+  attempt       INTEGER NOT NULL DEFAULT 0,
+  lease_until   INTEGER NOT NULL DEFAULT 0,
+  error         TEXT
+);
+DROP TABLE runs;
+ALTER TABLE runs_v2 RENAME TO runs;
+CREATE INDEX IF NOT EXISTS runs_open ON runs (status, lease_until);
+
+-- Append-only, sealed, and **local only**: unlike `runs`, an event never enters
+-- `sync_outbox`. It is resume state for this device's worker; syncing it would
+-- ship one device's in-flight turn to another for no benefit.
+CREATE TABLE IF NOT EXISTS run_events (
+  run_id      TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
+  seq         INTEGER NOT NULL,
+  kind        TEXT NOT NULL,
+  body        BLOB NOT NULL,
+  data_class  TEXT NOT NULL CHECK (data_class = 'workspace'),
+  created_at  INTEGER NOT NULL,
+  PRIMARY KEY (run_id, seq)
+);
+CREATE INDEX IF NOT EXISTS run_events_by_run ON run_events (run_id, seq);
+"#,
+    },
+];

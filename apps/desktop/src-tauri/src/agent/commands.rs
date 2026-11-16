@@ -9,6 +9,7 @@ use tauri::{AppHandle, State};
 
 use super::approvals::ApprovalRegistry;
 use super::env::HostEnv;
+use super::journal::RunJournal;
 use super::provider::ModelRouterProvider;
 use super::session::{AgentSession, ChannelSink};
 use super::tools::{to_host_error, HostTools};
@@ -26,6 +27,14 @@ pub async fn agent_connect(
         previous.host.close();
     }
     let env = Arc::new(HostEnv::from_app(&app)?);
+    // A keychain or disk failure degrades durability, it does not block work.
+    let recorder = match RunJournal::open(&env, &settings.workspace_id) {
+        Ok(journal) => Some(Arc::new(journal) as Arc<dyn edapex_agent::TurnRecorder>),
+        Err(error) => {
+            eprintln!("run journal unavailable: {}", error.message);
+            None
+        }
+    };
     let approvals = Arc::new(ApprovalRegistry::default());
     let sink = Arc::new(ChannelSink::new(Some(channel)));
     let tools = Arc::new(HostTools {
@@ -38,6 +47,7 @@ pub async fn agent_connect(
         tools,
         approvals: approvals.clone(),
         events: sink.clone(),
+                recorder,
     })
     .map_err(to_host_error)?;
     let status = host.status();

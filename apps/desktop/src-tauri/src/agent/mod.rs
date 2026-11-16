@@ -7,6 +7,7 @@
 mod approvals;
 pub(crate) mod commands;
 mod env;
+mod journal;
 mod provider;
 mod session;
 mod tools;

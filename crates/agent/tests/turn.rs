@@ -8,8 +8,8 @@ use std::time::Duration;
 use edapex_agent::{
     AgentConnectSettings, AgentError, AgentEvent, AgentHost, AgentHostOptions, AgentTurnInput,
     ApprovalDecision, ApprovalHandler, ApprovalRequest, ChatMessage, DynamicToolCall,
-    DynamicToolResult, EventSink, ProviderChunk, ProviderClient, ProviderRequest, ToolExecutor,
-    TurnCompletionStatus,
+    DynamicToolResult, EventSink, ProviderChunk, ProviderClient, ProviderRequest, RunStart,
+    ToolExecutor, TurnCompletionStatus, TurnRecorder,
 };
 use tokio::sync::mpsc;
 
@@ -143,6 +143,7 @@ fn host(
         tools,
         approvals,
         events: events.clone(),
+        recorder: None,
     })
     .expect("host connects");
     (host, events)
@@ -348,6 +349,7 @@ async fn interrupts_a_running_turn() {
         tools: FakeTools::new(false),
         approvals: Arc::new(FixedApproval(ApprovalDecision::AllowOnce)),
         events: events.clone(),
+        recorder: None,
     })
     .expect("host");
     let thread = host.thread_start(None).expect("thread");
@@ -389,4 +391,95 @@ async fn interrupts_a_running_turn() {
             ..
         }
     )));
+}
+
+#[derive(Default)]
+struct Recorded {
+    started: Mutex<Vec<String>>,
+    checkpoints: Mutex<Vec<usize>>,
+    finished: Mutex<Vec<TurnCompletionStatus>>,
+}
+
+impl TurnRecorder for Recorded {
+    fn started(&self, run: RunStart<'_>) {
+        self.started
+            .lock()
+            .expect("started")
+            .push(run.run_id.to_string());
+    }
+
+    fn checkpoint(&self, _run_id: &str, messages: &[ChatMessage]) {
+        self.checkpoints
+            .lock()
+            .expect("checkpoints")
+            .push(messages.len());
+    }
+
+    fn finished(&self, _run_id: &str, status: TurnCompletionStatus, _error: Option<&str>) {
+        self.finished.lock().expect("finished").push(status);
+    }
+}
+
+#[tokio::test]
+async fn a_recorder_hears_the_start_each_tool_round_and_the_end() {
+    let provider = ScriptedProvider::new(vec![
+        vec![
+            ProviderChunk::ToolCallDelta {
+                index: 0,
+                id: Some("call_1".to_string()),
+                name: Some("web_search".to_string()),
+                arguments: "{\"query\":\"school\"}".to_string(),
+            },
+            ProviderChunk::Done {
+                finish_reason: Some("tool_calls".to_string()),
+            },
+        ],
+        vec![
+            ProviderChunk::Text("done".to_string()),
+            ProviderChunk::Done {
+                finish_reason: Some("stop".to_string()),
+            },
+        ],
+    ]);
+    let tools = FakeTools::new(false);
+    let events = Arc::new(CollectedEvents::default());
+    let recorder = Arc::new(Recorded::default());
+    let host = AgentHost::connect(AgentHostOptions {
+        settings: AgentConnectSettings {
+            workspace_id: "workspace".to_string(),
+            model: "test/model".to_string(),
+            mobile_safe_tools: false,
+        },
+        provider,
+        tools,
+        approvals: Arc::new(FixedApproval(ApprovalDecision::AllowOnce)),
+        events: events.clone(),
+        recorder: Some(recorder.clone()),
+    })
+    .expect("host connects");
+
+    let thread = host.thread_start(None).expect("thread");
+    host.turn_start(AgentTurnInput {
+        thread_id: thread.thread_id,
+        text: "search".to_string(),
+        attachment_capture_ids: Vec::new(),
+    })
+    .await
+    .expect("turn");
+    events.wait_for_completion().await;
+
+    let started = recorder.started.lock().expect("started");
+    assert_eq!(started.len(), 1, "started fired once");
+    assert!(!started[0].is_empty());
+
+    // Exactly one boundary: the round whose tool calls completed. The round that
+    // returns the final answer has no tool result to resume from.
+    let checkpoints = recorder.checkpoints.lock().expect("checkpoints");
+    assert_eq!(checkpoints.len(), 1, "one checkpoint per completed tool round");
+    // system prompt + user + assistant(tool_calls) + tool result: the whole
+    // transcript as it stands at the boundary, which is what a resume replays.
+    assert_eq!(checkpoints[0], 4);
+
+    let finished = recorder.finished.lock().expect("finished");
+    assert_eq!(finished.as_slice(), &[TurnCompletionStatus::Completed]);
 }

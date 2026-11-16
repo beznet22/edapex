@@ -63,6 +63,9 @@ pub struct AgentHostOptions {
     pub tools: Arc<dyn ToolExecutor>,
     pub approvals: Arc<dyn ApprovalHandler>,
     pub events: Arc<dyn EventSink>,
+    /// Durable sink for run state. `None` keeps the runtime purely in memory,
+    /// which is what `agent-wasm` and the turn tests want.
+    pub recorder: Option<Arc<dyn crate::recorder::TurnRecorder>>,
 }
 
 struct ThreadState {
@@ -96,6 +99,7 @@ struct Inner {
     settings: AgentConnectSettings,
     provider: Arc<dyn ProviderClient>,
     tools: Arc<dyn ToolExecutor>,
+    recorder: Option<Arc<dyn crate::recorder::TurnRecorder>>,
     approvals: Arc<dyn ApprovalHandler>,
     events: Arc<dyn EventSink>,
     connected: AtomicBool,
@@ -119,6 +123,7 @@ impl AgentHost {
                 settings: options.settings,
                 provider: options.provider,
                 tools: options.tools,
+                recorder: options.recorder,
                 approvals: options.approvals,
                 events: options.events,
                 connected: AtomicBool::new(true),
@@ -191,6 +196,14 @@ impl AgentHost {
             turn_id: turn_id.clone(),
         });
 
+        if let Some(recorder) = &self.inner.recorder {
+            recorder.started(crate::recorder::RunStart {
+                run_id: &turn_id,
+                thread_id: &input.thread_id,
+                input: &input.text,
+            });
+        }
+
         history.push(ChatMessage::user(input.text));
 
         // The turn runs detached so this returns as soon as it is accepted. A UI
@@ -211,6 +224,10 @@ impl AgentHost {
                 .ok()
                 .map(|mut active| active.remove(&thread_id));
             host.save_history(&thread_id, history);
+
+            if let Some(recorder) = &host.inner.recorder {
+                recorder.finished(&spawned_turn_id, status, None);
+            }
 
             host.emit(AgentEvent::TurnCompleted {
                 thread_id,
@@ -516,6 +533,13 @@ impl AgentHost {
                     detail: result.error.as_ref().map(|error| error.message.clone()),
                 });
                 history.push(tool_message(&call.id, &result));
+            }
+
+            // A tool round is the only boundary a resume can safely restart from:
+            // every call has completed and its result is in the transcript. Writing
+            // mid-stream would checkpoint half a message that cannot be replayed.
+            if let Some(recorder) = &self.inner.recorder {
+                recorder.checkpoint(turn_id, history.as_slice());
             }
         }
 
