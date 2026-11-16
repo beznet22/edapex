@@ -1,11 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!--
-      The splash background is `--background` from the token sheet, in sRGB. It has to be a
-      literal: Android resolves this before any CSS exists. The dark pair lives in
-      values-night/colors.xml. A change here without the token changing would show as a
-      flash at the handoff, which is the one thing the splash exists to prevent.
+      The splash background is the `background` token from the token sheet, in sRGB. It has to be a
+      literal: Android resolves this before any CSS exists. The night pair lives in
+      values-night/colors.xml, and `scripts/check-splash-tokens.mjs` recomputes both from
+      `oklch()` so this cannot drift from the sheet again.
+
+      `splash_mark` is the mark's ink. It is a resource rather than a literal in the drawable for
+      the same reason the shipped PNGs have black and white variants: a shape cannot follow a
+      theme. It was hard-coded black, which made the dark-mode splash a black mark on a #181715
+      surface — a blank black screen until the app painted.
     -->
-    <color name="splash_background">#FBFBFD</color>
-    <color name="icon_background">#FBFBFD</color>
+    <color name="splash_background">#FAF9F5</color>
+    <color name="icon_background">#FAF9F5</color>
+    <color name="splash_mark">#141413</color>
 </resources>
