@@ -1,0 +1,22 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "build": {
+    "beforeDevCommand": "pnpm --dir mobile dev",
+    "devUrl": "http://localhost:5182/",
+    "beforeBuildCommand": "pnpm --dir mobile build",
+    "frontendDist": "../mobile/dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "url": "/",
+        "decorations": false,
+        "transparent": false,
+        "shadow": false,
+        "resizable": true,
+        "backgroundColor": "#fbfbfd"
+      }
+    ]
+  }
+}

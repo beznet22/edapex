@@ -1,0 +1,60 @@
+@import "tailwindcss";
+@import "@edapex/tokens/tokens.css";
+@import "@edapex/ui/styles/animate.css";
+
+/* The app's own sources, then the shared packages it renders from. */
+@source "../**/*.tsx";
+@source "../../../../../packages/ui/src";
+@source "../../../../../packages/chat/src";
+@source "../../../../../packages/genui/src";
+@source "../../../../../node_modules/streamdown/dist/*.js";
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * Height classes, because a landscape phone is `compact width × compact height` and an
+ * onboarding page that assumes vertical room is broken the moment the phone is turned.
+ */
+@custom-variant short (@media (max-height: 30rem));
+@custom-variant tall (@media (min-height: 56rem));
+
+@theme {
+  /*
+   * Material 3 window size classes, as tokens.
+   *
+   * These are the mobile host's breakpoints. The *values* — colour, type, radius, motion —
+   * come from `@edapex/tokens` and never differ per host; breakpoints may, because Android
+   * users read width in window classes and API 37 makes adaptivity mandatory rather than
+   * optional.
+   */
+  --breakpoint-medium: 37.5rem; /* 600dp  — small tablet, foldable inner */
+  --breakpoint-expanded: 52.5rem; /* 840dp  — tablet, desktop window */
+  --breakpoint-large: 75rem; /* 1200dp — large tablet, Chromebook */
+  --breakpoint-extra-large: 100rem; /* 1600dp — external display */
+
+  /*
+   * Spacing in dp. CSS pixels are dp in the WebView (`useWideViewPort` is false, so the
+   * layout width is the WebView width), which is what makes a 44dp target a `touch`.
+   */
+  --spacing-gutter: 1rem;
+  --spacing-gutter-wide: 1.5rem;
+  --spacing-touch: 2.75rem; /* 44dp minimum target */
+  --spacing-comfortable: 3rem; /* 48dp primary action */
+  --spacing-row: 3.5rem;
+  --spacing-dock: 4.5rem;
+  --spacing-rail: 4.5rem;
+  --spacing-header: 3.5rem;
+  --spacing-sheet-handle: 1.5rem;
+
+  /* Named radii for surfaces the shared ladder does not express. */
+  --radius-sheet: 1.5rem;
+  --radius-dock: 2rem;
+  --radius-field: 0.875rem;
+
+  /* Floating surfaces only; a full-bleed surface never carries a shadow. */
+  --shadow-float: var(--elevation-2);
+  --shadow-dock: var(--elevation-3);
+  --shadow-sheet: var(--elevation-3);
+
+  --ease-sheet: var(--duet-ease);
+}
