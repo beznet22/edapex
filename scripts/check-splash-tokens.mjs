@@ -20,6 +20,8 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { contrast, oklchToHex } from "./brand/core/color.mjs";
+
 const ROOT = fileURLToPath(new URL("..", import.meta.url));
 const RES = join(ROOT, "apps/desktop/src-tauri/gen/android/app/src/main/res");
 const TOKENS = join(ROOT, "packages/tokens/tokens.css");
@@ -28,30 +30,6 @@ const failures = [];
 const check = (label, ok, detail) => {
   console.log(`${ok ? "ok  " : "FAIL"} ${label}${detail === undefined ? "" : `  ${detail}`}`);
   if (!ok) failures.push(label);
-};
-
-/** oklch → sRGB, per CSS Color 4. Rounded to 8-bit because that is what a resource holds. */
-const oklchToHex = (lightness, chroma, hueDegrees) => {
-  const hue = (hueDegrees * Math.PI) / 180;
-  const a = chroma * Math.cos(hue);
-  const b = chroma * Math.sin(hue);
-  const lRoot = lightness + 0.3963377774 * a + 0.2158037573 * b;
-  const mRoot = lightness - 0.1055613458 * a - 0.0638541728 * b;
-  const sRoot = lightness - 0.0894841775 * a - 1.291485548 * b;
-  const l = lRoot ** 3;
-  const m = mRoot ** 3;
-  const s = sRoot ** 3;
-  const channels = [
-    4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
-    -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
-    -0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s
-  ];
-  const encode = (value) => {
-    const clamped = Math.min(1, Math.max(0, value));
-    const encoded = clamped <= 0.0031308 ? 12.92 * clamped : 1.055 * clamped ** (1 / 2.4) - 0.055;
-    return Math.round(encoded * 255).toString(16).padStart(2, "0");
-  };
-  return `#${channels.map(encode).join("")}`.toLowerCase();
 };
 
 const sheet = readFileSync(TOKENS, "utf8");
@@ -85,20 +63,6 @@ check("icon_background follows the splash", light.icon_background === lightToken
 const drawable = readFileSync(join(RES, "drawable", "ic_splash_mark.xml"), "utf8");
 const fills = [...drawable.matchAll(/android:fillColor="([^"]+)"/g)].map((match) => match[1]);
 check("the mark's fill is a themed resource", fills.length > 0 && fills.every((fill) => fill === "@color/splash_mark"), fills.join(", ") || "no fill");
-
-/** Relative luminance, so "the mark is visible" is a number rather than an opinion. */
-const luminance = (hex) => {
-  const [r, g, b] = [1, 3, 5].map((index) => {
-    const channel = parseInt(hex.slice(index, index + 2), 16) / 255;
-    return channel <= 0.03928 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
-  });
-  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
-};
-
-const contrast = (a, b) => {
-  const [high, low] = [luminance(a), luminance(b)].sort((left, right) => right - left);
-  return (high + 0.05) / (low + 0.05);
-};
 
 check("light mark contrasts with its surface", contrast(light.splash_mark, lightToken) >= 7, contrast(light.splash_mark, lightToken).toFixed(1) + ":1");
 check("night mark contrasts with its surface", contrast(night.splash_mark, darkToken) >= 7, contrast(night.splash_mark, darkToken).toFixed(1) + ":1");

@@ -1,0 +1,1135 @@
+{
+  "generatedBy": "pnpm brand:build",
+  "source": {
+    "mark": "apps/web/public/brand/edapex_brand_mark.svg",
+    "colors": "packages/tokens/tokens.css"
+  },
+  "assets": [
+    {
+      "file": "logo/mark-black-256.png",
+      "destination": null,
+      "consumer": "reference",
+      "format": "png",
+      "width": 256,
+      "height": 256
+    },
+    {
+      "file": "logo/mark-black-256.webp",
+      "destination": null,
+      "consumer": "reference",
+      "format": "webp",
+      "width": 256,
+      "height": 256
+    },
+    {
+      "file": "logo/mark-black-512.png",
+      "destination": null,
+      "consumer": "reference",
+      "format": "png",
+      "width": 512,
+      "height": 512
+    },
+    {
+      "file": "logo/mark-black-512.webp",
+      "destination": null,
+      "consumer": "reference",
+      "format": "webp",
+      "width": 512,
+      "height": 512
+    },
+    {
+      "file": "logo/mark-black-1024.png",
+      "destination": null,
+      "consumer": "reference",
+      "format": "png",
+      "width": 1024,
+      "height": 1024
+    },
+    {
+      "file": "logo/mark-black-1024.webp",
+      "destination": null,
+      "consumer": "reference",
+      "format": "webp",
+      "width": 1024,
+      "height": 1024
+    },
+    {
+      "file": "logo/mark-black-2048.png",
+      "destination": null,
+      "consumer": "reference",
+      "format": "png",
+      "width": 2048,
+      "height": 2048
+    },
+    {
+      "file": "logo/mark-black-2048.webp",
+      "destination": null,
+      "consumer": "reference",
+      "format": "webp",
+      "width": 2048,
+      "height": 2048
+    },
+    {
+      "file": "logo/mark-white-256.png",
+      "destination": null,
+      "consumer": "reference",
+      "format": "png",
+      "width": 256,
+      "height": 256
+    },
+    {
+      "file": "logo/mark-white-256.webp",
+      "destination": null,
+      "consumer": "reference",
+      "format": "webp",
+      "width": 256,
+      "height": 256
+    },
+    {
+      "file": "logo/mark-white-512.png",
+      "destination": null,
+      "consumer": "reference",
+      "format": "png",
+      "width": 512,
+      "height": 512
+    },
+    {
+      "file": "logo/mark-white-512.webp",
+      "destination": null,
+      "consumer": "reference",
+      "format": "webp",
+      "width": 512,
+      "height": 512
+    },
+    {
+      "file": "logo/mark-white-1024.png",
+      "destination": null,
+      "consumer": "reference",
+      "format": "png",
+      "width": 1024,
+      "height": 1024
+    },
+    {
+      "file": "logo/mark-white-1024.webp",
+      "destination": null,
+      "consumer": "reference",
+      "format": "webp",
+      "width": 1024,
+      "height": 1024
+    },
+    {
+      "file": "logo/mark-white-2048.png",
+      "destination": null,
+      "consumer": "reference",
+      "format": "png",
+      "width": 2048,
+      "height": 2048
+    },
+    {
+      "file": "logo/mark-white-2048.webp",
+      "destination": null,
+      "consumer": "reference",
+      "format": "webp",
+      "width": 2048,
+      "height": 2048
+    },
+    {
+      "file": "logo/mark-primary-256.png",
+      "destination": null,
+      "consumer": "reference",
+      "format": "png",
+      "width": 256,
+      "height": 256
+    },
+    {
+      "file": "logo/mark-primary-256.webp",
+      "destination": null,
+      "consumer": "reference",
+      "format": "webp",
+      "width": 256,
+      "height": 256
+    },
+    {
+      "file": "logo/mark-primary-512.png",
+      "destination": null,
+      "consumer": "reference",
+      "format": "png",
+      "width": 512,
+      "height": 512
+    },
+    {
+      "file": "logo/mark-primary-512.webp",
+      "destination": null,
+      "consumer": "reference",
+      "format": "webp",
+      "width": 512,
+      "height": 512
+    },
+    {
+      "file": "logo/mark-primary-1024.png",
+      "destination": null,
+      "consumer": "reference",
+      "format": "png",
+      "width": 1024,
+      "height": 1024
+    },
+    {
+      "file": "logo/mark-primary-1024.webp",
+      "destination": null,
+      "consumer": "reference",
+      "format": "webp",
+      "width": 1024,
+      "height": 1024
+    },
+    {
+      "file": "logo/mark-primary-2048.png",
+      "destination": null,
+      "consumer": "reference",
+      "format": "png",
+      "width": 2048,
+      "height": 2048
+    },
+    {
+      "file": "logo/mark-primary-2048.webp",
+      "destination": null,
+      "consumer": "reference",
+      "format": "webp",
+      "width": 2048,
+      "height": 2048
+    },
+    {
+      "file": "logo/mark.svg",
+      "destination": null,
+      "consumer": "reference",
+      "format": "svg"
+    },
+    {
+      "file": "logo/lockup-horizontal-on-light.svg",
+      "destination": "apps/web/public/brand/compositions/lockup-horizontal-on-light.svg",
+      "consumer": "web-lockup",
+      "format": "svg",
+      "note": "website header and desktop navigation"
+    },
+    {
+      "file": "logo/lockup-horizontal-on-light-1024.png",
+      "destination": "apps/web/public/brand/compositions/lockup-horizontal-on-light-1024.png",
+      "consumer": "web-lockup",
+      "format": "png",
+      "note": "website header and desktop navigation"
+    },
+    {
+      "file": "logo/lockup-horizontal-on-light-2048.png",
+      "destination": "apps/web/public/brand/compositions/lockup-horizontal-on-light-2048.png",
+      "consumer": "web-lockup",
+      "format": "png",
+      "note": "website header and desktop navigation"
+    },
+    {
+      "file": "logo/lockup-horizontal-on-light-1024.webp",
+      "destination": "apps/web/public/brand/compositions/lockup-horizontal-on-light-1024.webp",
+      "consumer": "web-lockup",
+      "format": "webp",
+      "note": "website header and desktop navigation"
+    },
+    {
+      "file": "logo/lockup-horizontal-on-dark.svg",
+      "destination": "apps/web/public/brand/compositions/lockup-horizontal-on-dark.svg",
+      "consumer": "web-lockup",
+      "format": "svg",
+      "note": "website header and desktop navigation"
+    },
+    {
+      "file": "logo/lockup-horizontal-on-dark-1024.png",
+      "destination": "apps/web/public/brand/compositions/lockup-horizontal-on-dark-1024.png",
+      "consumer": "web-lockup",
+      "format": "png",
+      "note": "website header and desktop navigation"
+    },
+    {
+      "file": "logo/lockup-horizontal-on-dark-2048.png",
+      "destination": "apps/web/public/brand/compositions/lockup-horizontal-on-dark-2048.png",
+      "consumer": "web-lockup",
+      "format": "png",
+      "note": "website header and desktop navigation"
+    },
+    {
+      "file": "logo/lockup-horizontal-on-dark-1024.webp",
+      "destination": "apps/web/public/brand/compositions/lockup-horizontal-on-dark-1024.webp",
+      "consumer": "web-lockup",
+      "format": "webp",
+      "note": "website header and desktop navigation"
+    },
+    {
+      "file": "logo/lockup-stacked-on-light.svg",
+      "destination": "apps/web/public/brand/compositions/lockup-stacked-on-light.svg",
+      "consumer": "web-lockup",
+      "format": "svg",
+      "note": "onboarding and presentation contexts with vertical room"
+    },
+    {
+      "file": "logo/lockup-stacked-on-light-1024.png",
+      "destination": "apps/web/public/brand/compositions/lockup-stacked-on-light-1024.png",
+      "consumer": "web-lockup",
+      "format": "png",
+      "note": "onboarding and presentation contexts with vertical room"
+    },
+    {
+      "file": "logo/lockup-stacked-on-light-2048.png",
+      "destination": "apps/web/public/brand/compositions/lockup-stacked-on-light-2048.png",
+      "consumer": "web-lockup",
+      "format": "png",
+      "note": "onboarding and presentation contexts with vertical room"
+    },
+    {
+      "file": "logo/lockup-stacked-on-light-1024.webp",
+      "destination": "apps/web/public/brand/compositions/lockup-stacked-on-light-1024.webp",
+      "consumer": "web-lockup",
+      "format": "webp",
+      "note": "onboarding and presentation contexts with vertical room"
+    },
+    {
+      "file": "logo/lockup-stacked-on-dark.svg",
+      "destination": "apps/web/public/brand/compositions/lockup-stacked-on-dark.svg",
+      "consumer": "web-lockup",
+      "format": "svg",
+      "note": "onboarding and presentation contexts with vertical room"
+    },
+    {
+      "file": "logo/lockup-stacked-on-dark-1024.png",
+      "destination": "apps/web/public/brand/compositions/lockup-stacked-on-dark-1024.png",
+      "consumer": "web-lockup",
+      "format": "png",
+      "note": "onboarding and presentation contexts with vertical room"
+    },
+    {
+      "file": "logo/lockup-stacked-on-dark-2048.png",
+      "destination": "apps/web/public/brand/compositions/lockup-stacked-on-dark-2048.png",
+      "consumer": "web-lockup",
+      "format": "png",
+      "note": "onboarding and presentation contexts with vertical room"
+    },
+    {
+      "file": "logo/lockup-stacked-on-dark-1024.webp",
+      "destination": "apps/web/public/brand/compositions/lockup-stacked-on-dark-1024.webp",
+      "consumer": "web-lockup",
+      "format": "webp",
+      "note": "onboarding and presentation contexts with vertical room"
+    },
+    {
+      "file": "logo/wordmark-edapex-on-light.svg",
+      "destination": "apps/web/public/brand/compositions/wordmark-edapex-on-light.svg",
+      "consumer": "web-lockup",
+      "format": "svg",
+      "note": "text-based brand placements where the symbol is already present"
+    },
+    {
+      "file": "logo/wordmark-edapex-on-light-1024.png",
+      "destination": "apps/web/public/brand/compositions/wordmark-edapex-on-light-1024.png",
+      "consumer": "web-lockup",
+      "format": "png",
+      "note": "text-based brand placements where the symbol is already present"
+    },
+    {
+      "file": "logo/wordmark-edapex-on-light-2048.png",
+      "destination": "apps/web/public/brand/compositions/wordmark-edapex-on-light-2048.png",
+      "consumer": "web-lockup",
+      "format": "png",
+      "note": "text-based brand placements where the symbol is already present"
+    },
+    {
+      "file": "logo/wordmark-edapex-on-light-1024.webp",
+      "destination": "apps/web/public/brand/compositions/wordmark-edapex-on-light-1024.webp",
+      "consumer": "web-lockup",
+      "format": "webp",
+      "note": "text-based brand placements where the symbol is already present"
+    },
+    {
+      "file": "logo/wordmark-edapex-on-dark.svg",
+      "destination": "apps/web/public/brand/compositions/wordmark-edapex-on-dark.svg",
+      "consumer": "web-lockup",
+      "format": "svg",
+      "note": "text-based brand placements where the symbol is already present"
+    },
+    {
+      "file": "logo/wordmark-edapex-on-dark-1024.png",
+      "destination": "apps/web/public/brand/compositions/wordmark-edapex-on-dark-1024.png",
+      "consumer": "web-lockup",
+      "format": "png",
+      "note": "text-based brand placements where the symbol is already present"
+    },
+    {
+      "file": "logo/wordmark-edapex-on-dark-2048.png",
+      "destination": "apps/web/public/brand/compositions/wordmark-edapex-on-dark-2048.png",
+      "consumer": "web-lockup",
+      "format": "png",
+      "note": "text-based brand placements where the symbol is already present"
+    },
+    {
+      "file": "logo/wordmark-edapex-on-dark-1024.webp",
+      "destination": "apps/web/public/brand/compositions/wordmark-edapex-on-dark-1024.webp",
+      "consumer": "web-lockup",
+      "format": "webp",
+      "note": "text-based brand placements where the symbol is already present"
+    },
+    {
+      "file": "logo/wordmark-edapex-caps-on-light.svg",
+      "destination": "apps/web/public/brand/compositions/wordmark-edapex-caps-on-light.svg",
+      "consumer": "web-lockup",
+      "format": "svg",
+      "note": "uppercase-only contexts; not the default spelling"
+    },
+    {
+      "file": "logo/wordmark-edapex-caps-on-light-1024.png",
+      "destination": "apps/web/public/brand/compositions/wordmark-edapex-caps-on-light-1024.png",
+      "consumer": "web-lockup",
+      "format": "png",
+      "note": "uppercase-only contexts; not the default spelling"
+    },
+    {
+      "file": "logo/wordmark-edapex-caps-on-light-2048.png",
+      "destination": "apps/web/public/brand/compositions/wordmark-edapex-caps-on-light-2048.png",
+      "consumer": "web-lockup",
+      "format": "png",
+      "note": "uppercase-only contexts; not the default spelling"
+    },
+    {
+      "file": "logo/wordmark-edapex-caps-on-light-1024.webp",
+      "destination": "apps/web/public/brand/compositions/wordmark-edapex-caps-on-light-1024.webp",
+      "consumer": "web-lockup",
+      "format": "webp",
+      "note": "uppercase-only contexts; not the default spelling"
+    },
+    {
+      "file": "logo/wordmark-edapex-caps-on-dark.svg",
+      "destination": "apps/web/public/brand/compositions/wordmark-edapex-caps-on-dark.svg",
+      "consumer": "web-lockup",
+      "format": "svg",
+      "note": "uppercase-only contexts; not the default spelling"
+    },
+    {
+      "file": "logo/wordmark-edapex-caps-on-dark-1024.png",
+      "destination": "apps/web/public/brand/compositions/wordmark-edapex-caps-on-dark-1024.png",
+      "consumer": "web-lockup",
+      "format": "png",
+      "note": "uppercase-only contexts; not the default spelling"
+    },
+    {
+      "file": "logo/wordmark-edapex-caps-on-dark-2048.png",
+      "destination": "apps/web/public/brand/compositions/wordmark-edapex-caps-on-dark-2048.png",
+      "consumer": "web-lockup",
+      "format": "png",
+      "note": "uppercase-only contexts; not the default spelling"
+    },
+    {
+      "file": "logo/wordmark-edapex-caps-on-dark-1024.webp",
+      "destination": "apps/web/public/brand/compositions/wordmark-edapex-caps-on-dark-1024.webp",
+      "consumer": "web-lockup",
+      "format": "webp",
+      "note": "uppercase-only contexts; not the default spelling"
+    },
+    {
+      "file": "web/favicon.svg",
+      "destination": "apps/web/public/favicon.svg",
+      "consumer": "web",
+      "format": "svg",
+      "note": "replaces the placeholder gold-E favicon; carries a prefers-color-scheme pair"
+    },
+    {
+      "file": "web/favicon.ico",
+      "destination": "apps/web/public/favicon.ico",
+      "consumer": "web",
+      "format": "ico",
+      "contains": [
+        16,
+        32,
+        48
+      ],
+      "note": "new file; the application declares only /favicon.svg today"
+    },
+    {
+      "file": "web/apple-touch-icon.png",
+      "destination": "apps/web/public/apple-touch-icon.png",
+      "consumer": "web",
+      "format": "png",
+      "width": 180,
+      "height": 180,
+      "note": "opaque, because Apple paints transparency black"
+    },
+    {
+      "file": "web/og.png",
+      "destination": "apps/web/public/og.png",
+      "consumer": "web",
+      "format": "png",
+      "width": 1200,
+      "height": 630,
+      "note": "Open Graph card; carries the symbol only — the lockups are their own family"
+    },
+    {
+      "file": "web/og.webp",
+      "destination": "apps/web/public/og.webp",
+      "consumer": "web",
+      "format": "webp",
+      "width": 1200,
+      "height": 630
+    },
+    {
+      "file": "web/favicon-16.png",
+      "destination": "apps/web/public/favicon-16.png",
+      "consumer": "web",
+      "format": "png",
+      "width": 16,
+      "height": 16
+    },
+    {
+      "file": "web/favicon-32.png",
+      "destination": "apps/web/public/favicon-32.png",
+      "consumer": "web",
+      "format": "png",
+      "width": 32,
+      "height": 32
+    },
+    {
+      "file": "web/favicon-48.png",
+      "destination": "apps/web/public/favicon-48.png",
+      "consumer": "web",
+      "format": "png",
+      "width": 48,
+      "height": 48
+    },
+    {
+      "file": "pwa/icon-192.png",
+      "destination": "apps/web/public/workspace/icons/icon-192.png",
+      "consumer": "pwa-manifest",
+      "format": "png",
+      "width": 192,
+      "height": 192
+    },
+    {
+      "file": "pwa/icon-512.png",
+      "destination": "apps/web/public/workspace/icons/icon-512.png",
+      "consumer": "pwa-manifest",
+      "format": "png",
+      "width": 512,
+      "height": 512
+    },
+    {
+      "file": "pwa/maskable-512.png",
+      "destination": "apps/web/public/workspace/icons/maskable-512.png",
+      "consumer": "pwa-manifest",
+      "format": "png",
+      "width": 512,
+      "height": 512,
+      "note": "declare with purpose: maskable"
+    },
+    {
+      "file": "desktop/32x32.png",
+      "destination": "apps/desktop/src-tauri/icons/32x32.png",
+      "consumer": "tauri-bundle",
+      "format": "png",
+      "width": 32,
+      "height": 32
+    },
+    {
+      "file": "desktop/64x64.png",
+      "destination": "apps/desktop/src-tauri/icons/64x64.png",
+      "consumer": "tauri-bundle",
+      "format": "png",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "file": "desktop/128x128.png",
+      "destination": "apps/desktop/src-tauri/icons/128x128.png",
+      "consumer": "tauri-bundle",
+      "format": "png",
+      "width": 128,
+      "height": 128
+    },
+    {
+      "file": "desktop/128x128@2x.png",
+      "destination": "apps/desktop/src-tauri/icons/128x128@2x.png",
+      "consumer": "tauri-bundle",
+      "format": "png",
+      "width": 256,
+      "height": 256
+    },
+    {
+      "file": "desktop/icon.png",
+      "destination": "apps/desktop/src-tauri/icons/icon.png",
+      "consumer": "tauri-bundle",
+      "format": "png",
+      "width": 512,
+      "height": 512
+    },
+    {
+      "file": "desktop/icon.ico",
+      "destination": "apps/desktop/src-tauri/icons/icon.ico",
+      "consumer": "windows",
+      "format": "ico",
+      "contains": [
+        16,
+        20,
+        24,
+        32,
+        40,
+        48,
+        64,
+        128,
+        256
+      ]
+    },
+    {
+      "file": "desktop/Square30x30Logo.png",
+      "destination": "apps/desktop/src-tauri/icons/Square30x30Logo.png",
+      "consumer": "msix-store",
+      "format": "png",
+      "width": 30,
+      "height": 30
+    },
+    {
+      "file": "desktop/Square44x44Logo.png",
+      "destination": "apps/desktop/src-tauri/icons/Square44x44Logo.png",
+      "consumer": "msix-store",
+      "format": "png",
+      "width": 44,
+      "height": 44
+    },
+    {
+      "file": "desktop/Square71x71Logo.png",
+      "destination": "apps/desktop/src-tauri/icons/Square71x71Logo.png",
+      "consumer": "msix-store",
+      "format": "png",
+      "width": 71,
+      "height": 71
+    },
+    {
+      "file": "desktop/Square89x89Logo.png",
+      "destination": "apps/desktop/src-tauri/icons/Square89x89Logo.png",
+      "consumer": "msix-store",
+      "format": "png",
+      "width": 89,
+      "height": 89
+    },
+    {
+      "file": "desktop/Square107x107Logo.png",
+      "destination": "apps/desktop/src-tauri/icons/Square107x107Logo.png",
+      "consumer": "msix-store",
+      "format": "png",
+      "width": 107,
+      "height": 107
+    },
+    {
+      "file": "desktop/Square142x142Logo.png",
+      "destination": "apps/desktop/src-tauri/icons/Square142x142Logo.png",
+      "consumer": "msix-store",
+      "format": "png",
+      "width": 142,
+      "height": 142
+    },
+    {
+      "file": "desktop/Square150x150Logo.png",
+      "destination": "apps/desktop/src-tauri/icons/Square150x150Logo.png",
+      "consumer": "msix-store",
+      "format": "png",
+      "width": 150,
+      "height": 150
+    },
+    {
+      "file": "desktop/Square284x284Logo.png",
+      "destination": "apps/desktop/src-tauri/icons/Square284x284Logo.png",
+      "consumer": "msix-store",
+      "format": "png",
+      "width": 284,
+      "height": 284
+    },
+    {
+      "file": "desktop/Square310x310Logo.png",
+      "destination": "apps/desktop/src-tauri/icons/Square310x310Logo.png",
+      "consumer": "msix-store",
+      "format": "png",
+      "width": 310,
+      "height": 310
+    },
+    {
+      "file": "desktop/StoreLogo.png",
+      "destination": "apps/desktop/src-tauri/icons/StoreLogo.png",
+      "consumer": "msix-store",
+      "format": "png",
+      "width": 50,
+      "height": 50
+    },
+    {
+      "file": "android/mipmap-anydpi-v26/ic_launcher.xml",
+      "destination": "apps/desktop/src-tauri/gen/android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml",
+      "consumer": "android-adaptive",
+      "format": "xml"
+    },
+    {
+      "file": "android/mipmap-anydpi-v26/ic_launcher_round.xml",
+      "destination": "apps/desktop/src-tauri/gen/android/app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml",
+      "consumer": "android-adaptive",
+      "format": "xml"
+    },
+    {
+      "file": "android/values/ic_launcher_background.xml",
+      "destination": "apps/desktop/src-tauri/gen/android/app/src/main/res/values/ic_launcher_background.xml",
+      "consumer": "android-adaptive",
+      "format": "xml",
+      "note": "delete res/drawable/ic_launcher_background.xml when applying this"
+    },
+    {
+      "file": "android/drawable/ic_splash_mark.xml",
+      "destination": "apps/desktop/src-tauri/gen/android/app/src/main/res/drawable/ic_splash_mark.xml",
+      "consumer": "android-splash",
+      "format": "xml",
+      "note": "identical to the committed file; owned by scripts/build-brand-mark.mjs"
+    },
+    {
+      "file": "android/mobile/brand-mark.svg",
+      "destination": "apps/desktop/mobile/src/assets/brand-mark.svg",
+      "consumer": "mobile",
+      "format": "svg",
+      "note": "identical to the committed file; owned by scripts/build-brand-mark.mjs"
+    },
+    {
+      "file": "android/mobile/brand-mark-paths.ts",
+      "destination": "apps/desktop/mobile/src/assets/brand-mark-paths.ts",
+      "consumer": "mobile",
+      "format": "typescript",
+      "note": "identical to the committed file; owned by scripts/build-brand-mark.mjs"
+    },
+    {
+      "file": "social/avatar-1024.png",
+      "destination": null,
+      "consumer": "marketing",
+      "format": "png",
+      "width": 1024,
+      "height": 1024
+    },
+    {
+      "file": "social/cover-1500x500.png",
+      "destination": null,
+      "consumer": "marketing",
+      "format": "png",
+      "width": 1500,
+      "height": 500
+    },
+    {
+      "file": "ios/icons/AppIcon-20x20@1x.png",
+      "destination": "apps/desktop/src-tauri/icons/ios/AppIcon-20x20@1x.png",
+      "consumer": "ios",
+      "format": "png",
+      "width": 20,
+      "height": 20
+    },
+    {
+      "file": "ios/icons/AppIcon-20x20@2x.png",
+      "destination": "apps/desktop/src-tauri/icons/ios/AppIcon-20x20@2x.png",
+      "consumer": "ios",
+      "format": "png",
+      "width": 40,
+      "height": 40
+    },
+    {
+      "file": "ios/icons/AppIcon-20x20@2x-1.png",
+      "destination": "apps/desktop/src-tauri/icons/ios/AppIcon-20x20@2x-1.png",
+      "consumer": "ios",
+      "format": "png",
+      "width": 40,
+      "height": 40
+    },
+    {
+      "file": "ios/icons/AppIcon-20x20@3x.png",
+      "destination": "apps/desktop/src-tauri/icons/ios/AppIcon-20x20@3x.png",
+      "consumer": "ios",
+      "format": "png",
+      "width": 60,
+      "height": 60
+    },
+    {
+      "file": "ios/icons/AppIcon-29x29@1x.png",
+      "destination": "apps/desktop/src-tauri/icons/ios/AppIcon-29x29@1x.png",
+      "consumer": "ios",
+      "format": "png",
+      "width": 29,
+      "height": 29
+    },
+    {
+      "file": "ios/icons/AppIcon-29x29@2x.png",
+      "destination": "apps/desktop/src-tauri/icons/ios/AppIcon-29x29@2x.png",
+      "consumer": "ios",
+      "format": "png",
+      "width": 58,
+      "height": 58
+    },
+    {
+      "file": "ios/icons/AppIcon-29x29@2x-1.png",
+      "destination": "apps/desktop/src-tauri/icons/ios/AppIcon-29x29@2x-1.png",
+      "consumer": "ios",
+      "format": "png",
+      "width": 58,
+      "height": 58
+    },
+    {
+      "file": "ios/icons/AppIcon-29x29@3x.png",
+      "destination": "apps/desktop/src-tauri/icons/ios/AppIcon-29x29@3x.png",
+      "consumer": "ios",
+      "format": "png",
+      "width": 87,
+      "height": 87
+    },
+    {
+      "file": "ios/icons/AppIcon-40x40@1x.png",
+      "destination": "apps/desktop/src-tauri/icons/ios/AppIcon-40x40@1x.png",
+      "consumer": "ios",
+      "format": "png",
+      "width": 40,
+      "height": 40
+    },
+    {
+      "file": "ios/icons/AppIcon-40x40@2x.png",
+      "destination": "apps/desktop/src-tauri/icons/ios/AppIcon-40x40@2x.png",
+      "consumer": "ios",
+      "format": "png",
+      "width": 80,
+      "height": 80
+    },
+    {
+      "file": "ios/icons/AppIcon-40x40@2x-1.png",
+      "destination": "apps/desktop/src-tauri/icons/ios/AppIcon-40x40@2x-1.png",
+      "consumer": "ios",
+      "format": "png",
+      "width": 80,
+      "height": 80
+    },
+    {
+      "file": "ios/icons/AppIcon-40x40@3x.png",
+      "destination": "apps/desktop/src-tauri/icons/ios/AppIcon-40x40@3x.png",
+      "consumer": "ios",
+      "format": "png",
+      "width": 120,
+      "height": 120
+    },
+    {
+      "file": "ios/icons/AppIcon-60x60@2x.png",
+      "destination": "apps/desktop/src-tauri/icons/ios/AppIcon-60x60@2x.png",
+      "consumer": "ios",
+      "format": "png",
+      "width": 120,
+      "height": 120
+    },
+    {
+      "file": "ios/icons/AppIcon-60x60@3x.png",
+      "destination": "apps/desktop/src-tauri/icons/ios/AppIcon-60x60@3x.png",
+      "consumer": "ios",
+      "format": "png",
+      "width": 180,
+      "height": 180
+    },
+    {
+      "file": "ios/icons/AppIcon-76x76@1x.png",
+      "destination": "apps/desktop/src-tauri/icons/ios/AppIcon-76x76@1x.png",
+      "consumer": "ios",
+      "format": "png",
+      "width": 76,
+      "height": 76
+    },
+    {
+      "file": "ios/icons/AppIcon-76x76@2x.png",
+      "destination": "apps/desktop/src-tauri/icons/ios/AppIcon-76x76@2x.png",
+      "consumer": "ios",
+      "format": "png",
+      "width": 152,
+      "height": 152
+    },
+    {
+      "file": "ios/icons/AppIcon-83.5x83.5@2x.png",
+      "destination": "apps/desktop/src-tauri/icons/ios/AppIcon-83.5x83.5@2x.png",
+      "consumer": "ios",
+      "format": "png",
+      "width": 167,
+      "height": 167
+    },
+    {
+      "file": "ios/icons/AppIcon-512@2x.png",
+      "destination": "apps/desktop/src-tauri/icons/ios/AppIcon-512@2x.png",
+      "consumer": "ios",
+      "format": "png",
+      "width": 1024,
+      "height": 1024,
+      "note": "the 1024 master, named as Tauri's per-size set expects"
+    },
+    {
+      "file": "ios/appiconset/Contents.json",
+      "destination": "apps/desktop/src-tauri/gen/apple/Assets.xcassets/AppIcon.appiconset/Contents.json",
+      "consumer": "ios-catalog",
+      "format": "json",
+      "note": "single-size catalog; `tauri ios init` creates this directory"
+    },
+    {
+      "file": "ios/appiconset/icon-1024.png",
+      "destination": "apps/desktop/src-tauri/gen/apple/Assets.xcassets/AppIcon.appiconset/icon-1024.png",
+      "consumer": "ios-catalog",
+      "format": "png",
+      "width": 1024,
+      "height": 1024,
+      "note": "the one image Xcode generates every variation from"
+    },
+    {
+      "file": "macos/icon.iconset/icon_16x16.png",
+      "destination": "apps/desktop/src-tauri/icons/macos/icon.iconset/icon_16x16.png",
+      "consumer": "macos",
+      "format": "png",
+      "width": 16,
+      "height": 16
+    },
+    {
+      "file": "macos/icon.iconset/icon_16x16@2x.png",
+      "destination": "apps/desktop/src-tauri/icons/macos/icon.iconset/icon_16x16@2x.png",
+      "consumer": "macos",
+      "format": "png",
+      "width": 32,
+      "height": 32
+    },
+    {
+      "file": "macos/icon.iconset/icon_32x32.png",
+      "destination": "apps/desktop/src-tauri/icons/macos/icon.iconset/icon_32x32.png",
+      "consumer": "macos",
+      "format": "png",
+      "width": 32,
+      "height": 32
+    },
+    {
+      "file": "macos/icon.iconset/icon_32x32@2x.png",
+      "destination": "apps/desktop/src-tauri/icons/macos/icon.iconset/icon_32x32@2x.png",
+      "consumer": "macos",
+      "format": "png",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "file": "macos/icon.iconset/icon_128x128.png",
+      "destination": "apps/desktop/src-tauri/icons/macos/icon.iconset/icon_128x128.png",
+      "consumer": "macos",
+      "format": "png",
+      "width": 128,
+      "height": 128
+    },
+    {
+      "file": "macos/icon.iconset/icon_128x128@2x.png",
+      "destination": "apps/desktop/src-tauri/icons/macos/icon.iconset/icon_128x128@2x.png",
+      "consumer": "macos",
+      "format": "png",
+      "width": 256,
+      "height": 256
+    },
+    {
+      "file": "macos/icon.iconset/icon_256x256.png",
+      "destination": "apps/desktop/src-tauri/icons/macos/icon.iconset/icon_256x256.png",
+      "consumer": "macos",
+      "format": "png",
+      "width": 256,
+      "height": 256
+    },
+    {
+      "file": "macos/icon.iconset/icon_256x256@2x.png",
+      "destination": "apps/desktop/src-tauri/icons/macos/icon.iconset/icon_256x256@2x.png",
+      "consumer": "macos",
+      "format": "png",
+      "width": 512,
+      "height": 512
+    },
+    {
+      "file": "macos/icon.iconset/icon_512x512.png",
+      "destination": "apps/desktop/src-tauri/icons/macos/icon.iconset/icon_512x512.png",
+      "consumer": "macos",
+      "format": "png",
+      "width": 512,
+      "height": 512
+    },
+    {
+      "file": "macos/icon.iconset/icon_512x512@2x.png",
+      "destination": "apps/desktop/src-tauri/icons/macos/icon.iconset/icon_512x512@2x.png",
+      "consumer": "macos",
+      "format": "png",
+      "width": 1024,
+      "height": 1024
+    },
+    {
+      "file": "macos/icon.icns",
+      "destination": "apps/desktop/src-tauri/icons/icon.icns",
+      "consumer": "macos",
+      "format": "icns",
+      "contains": [
+        16,
+        32,
+        64,
+        128,
+        256,
+        512,
+        1024
+      ],
+      "note": "packed from the same buffers as the iconset; rendering unverified here"
+    },
+    {
+      "file": "android/mipmap-mdpi/ic_launcher_foreground.png",
+      "destination": "apps/desktop/src-tauri/gen/android/app/src/main/res/mipmap-mdpi/ic_launcher_foreground.png",
+      "consumer": "android-adaptive",
+      "format": "png",
+      "width": 108,
+      "height": 108
+    },
+    {
+      "file": "android/mipmap-mdpi/ic_launcher_monochrome.png",
+      "destination": "apps/desktop/src-tauri/gen/android/app/src/main/res/mipmap-mdpi/ic_launcher_monochrome.png",
+      "consumer": "android-themed",
+      "format": "png",
+      "width": 108,
+      "height": 108
+    },
+    {
+      "file": "android/mipmap-mdpi/ic_launcher.png",
+      "destination": "apps/desktop/src-tauri/gen/android/app/src/main/res/mipmap-mdpi/ic_launcher.png",
+      "consumer": "android-legacy",
+      "format": "png",
+      "width": 48,
+      "height": 48
+    },
+    {
+      "file": "android/mipmap-mdpi/ic_launcher_round.png",
+      "destination": "apps/desktop/src-tauri/gen/android/app/src/main/res/mipmap-mdpi/ic_launcher_round.png",
+      "consumer": "android-legacy",
+      "format": "png",
+      "width": 48,
+      "height": 48
+    },
+    {
+      "file": "android/mipmap-hdpi/ic_launcher_foreground.png",
+      "destination": "apps/desktop/src-tauri/gen/android/app/src/main/res/mipmap-hdpi/ic_launcher_foreground.png",
+      "consumer": "android-adaptive",
+      "format": "png",
+      "width": 162,
+      "height": 162
+    },
+    {
+      "file": "android/mipmap-hdpi/ic_launcher_monochrome.png",
+      "destination": "apps/desktop/src-tauri/gen/android/app/src/main/res/mipmap-hdpi/ic_launcher_monochrome.png",
+      "consumer": "android-themed",
+      "format": "png",
+      "width": 162,
+      "height": 162
+    },
+    {
+      "file": "android/mipmap-hdpi/ic_launcher.png",
+      "destination": "apps/desktop/src-tauri/gen/android/app/src/main/res/mipmap-hdpi/ic_launcher.png",
+      "consumer": "android-legacy",
+      "format": "png",
+      "width": 72,
+      "height": 72
+    },
+    {
+      "file": "android/mipmap-hdpi/ic_launcher_round.png",
+      "destination": "apps/desktop/src-tauri/gen/android/app/src/main/res/mipmap-hdpi/ic_launcher_round.png",
+      "consumer": "android-legacy",
+      "format": "png",
+      "width": 72,
+      "height": 72
+    },
+    {
+      "file": "android/mipmap-xhdpi/ic_launcher_foreground.png",
+      "destination": "apps/desktop/src-tauri/gen/android/app/src/main/res/mipmap-xhdpi/ic_launcher_foreground.png",
+      "consumer": "android-adaptive",
+      "format": "png",
+      "width": 216,
+      "height": 216
+    },
+    {
+      "file": "android/mipmap-xhdpi/ic_launcher_monochrome.png",
+      "destination": "apps/desktop/src-tauri/gen/android/app/src/main/res/mipmap-xhdpi/ic_launcher_monochrome.png",
+      "consumer": "android-themed",
+      "format": "png",
+      "width": 216,
+      "height": 216
+    },
+    {
+      "file": "android/mipmap-xhdpi/ic_launcher.png",
+      "destination": "apps/desktop/src-tauri/gen/android/app/src/main/res/mipmap-xhdpi/ic_launcher.png",
+      "consumer": "android-legacy",
+      "format": "png",
+      "width": 96,
+      "height": 96
+    },
+    {
+      "file": "android/mipmap-xhdpi/ic_launcher_round.png",
+      "destination": "apps/desktop/src-tauri/gen/android/app/src/main/res/mipmap-xhdpi/ic_launcher_round.png",
+      "consumer": "android-legacy",
+      "format": "png",
+      "width": 96,
+      "height": 96
+    },
+    {
+      "file": "android/mipmap-xxhdpi/ic_launcher_foreground.png",
+      "destination": "apps/desktop/src-tauri/gen/android/app/src/main/res/mipmap-xxhdpi/ic_launcher_foreground.png",
+      "consumer": "android-adaptive",
+      "format": "png",
+      "width": 324,
+      "height": 324
+    },
+    {
+      "file": "android/mipmap-xxhdpi/ic_launcher_monochrome.png",
+      "destination": "apps/desktop/src-tauri/gen/android/app/src/main/res/mipmap-xxhdpi/ic_launcher_monochrome.png",
+      "consumer": "android-themed",
+      "format": "png",
+      "width": 324,
+      "height": 324
+    },
+    {
+      "file": "android/mipmap-xxhdpi/ic_launcher.png",
+      "destination": "apps/desktop/src-tauri/gen/android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png",
+      "consumer": "android-legacy",
+      "format": "png",
+      "width": 144,
+      "height": 144
+    },
+    {
+      "file": "android/mipmap-xxhdpi/ic_launcher_round.png",
+      "destination": "apps/desktop/src-tauri/gen/android/app/src/main/res/mipmap-xxhdpi/ic_launcher_round.png",
+      "consumer": "android-legacy",
+      "format": "png",
+      "width": 144,
+      "height": 144
+    },
+    {
+      "file": "android/mipmap-xxxhdpi/ic_launcher_foreground.png",
+      "destination": "apps/desktop/src-tauri/gen/android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_foreground.png",
+      "consumer": "android-adaptive",
+      "format": "png",
+      "width": 432,
+      "height": 432
+    },
+    {
+      "file": "android/mipmap-xxxhdpi/ic_launcher_monochrome.png",
+      "destination": "apps/desktop/src-tauri/gen/android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_monochrome.png",
+      "consumer": "android-themed",
+      "format": "png",
+      "width": 432,
+      "height": 432
+    },
+    {
+      "file": "android/mipmap-xxxhdpi/ic_launcher.png",
+      "destination": "apps/desktop/src-tauri/gen/android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png",
+      "consumer": "android-legacy",
+      "format": "png",
+      "width": 192,
+      "height": 192
+    },
+    {
+      "file": "android/mipmap-xxxhdpi/ic_launcher_round.png",
+      "destination": "apps/desktop/src-tauri/gen/android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.png",
+      "consumer": "android-legacy",
+      "format": "png",
+      "width": 192,
+      "height": 192
+    }
+  ]
+}

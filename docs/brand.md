@@ -1,236 +1,377 @@
-# Edapex Android Brand Asset Generation
+# Edapex Universal Brand Asset Generation System
 
-## Objective
+**Status:** Normative for the asset set. Generate-only in this repository — see
+[Implementation status](#15-implementation-status) and [`docs/brand/README.md`](brand/README.md).
 
-Extend the existing `scripts/build-brand-mark.mjs` pipeline to generate all required Android branding assets for the Edapex Tauri mobile application.
+## 1. Objective
 
-The implementation must use the existing canonical Edapex brand mark as its source of truth.
+Design and implement a unified, reproducible brand asset generation pipeline for Edapex.
 
-Do not manually maintain multiple independent copies of the logo.
+The pipeline must generate branding assets for:
 
-## 1. Inspect the existing project first
+- Web applications.
+- Android applications.
+- iOS applications.
+- Desktop applications (Windows, macOS and Linux).
+- Progressive Web Applications.
+- Social media and marketing.
+- Splash screens and onboarding.
+- Product documentation and presentations.
 
-Before modifying anything:
+This must be a general-purpose branding system with platform-specific asset generation adapters.
 
-1. Identify the installed Tauri version and CLI.
-2. Inspect `tauri.conf.json`.
-3. Locate the generated Android project.
-4. Inspect its current launcher icon resources.
-5. Inspect `AndroidManifest.xml`, `themes.xml`, splash-screen configuration and existing drawable resources.
-6. Identify existing build scripts and dependencies.
-7. Determine which generated Android files are managed by Tauri.
+Do not implement an Android-only solution.
 
-Do not assume the project uses the default Tauri directory structure without verifying it.
+## 2. Inspect the existing repository
 
-Preserve existing configuration and application functionality.
+Before implementation:
 
-## 2. Use the appropriate tools
+1. Inspect the existing brand assets.
+2. Identify the canonical logo and mascot artwork.
+3. Inspect the current `scripts/build-brand-mark.mjs`.
+4. Inspect existing Tauri configuration.
+5. Identify all application targets and their build systems.
+6. Inspect existing Android and iOS generated project directories.
+7. Identify existing image-processing dependencies.
+8. Identify assets currently duplicated across applications.
 
-Prefer the following tools:
+Reuse existing infrastructure where appropriate.
 
-- Tauri CLI `tauri icon`: Android and cross-platform launcher icon generation.
-- ImageMagick: image preprocessing, resizing, transparency and validation.
-- Inkscape CLI: SVG rendering and export.
+Do not introduce duplicate branding sources or unnecessary dependencies.
+
+## 3. Canonical source of truth
+
+Establish one authoritative branding source directory.
+
+It should contain:
+
+- Primary logo.
+- Symbol/logo mark.
+- Wordmark, if available.
+- Mascot/robot artwork.
+- Original PNG references.
+- Theme and colour variants.
+
+Preserve the existing Edapex logo identity and geometry.
+
+Do not invent new logo variations or redesign the existing mark as part of this task.
+
+Separate editable source artwork from generated output.
+
+Never manually maintain generated assets.
+
+## 4. Brand tokens
+
+Establish machine-readable brand tokens.
+
+At minimum:
+
+- Primary brand colours.
+- Light and dark theme colours.
+- Foreground and background colours.
+- Typography references, where available.
+- Logo variants.
+- Standard spacing and clear-space rules.
+- Icon safe-area guidelines.
+
+Use JSON or another structured format that can be consumed by the build pipeline.
+
+Do not invent brand colours or typography where these have not been established. Extract them from existing assets and configuration, then document any assumptions.
+
+## 5. Toolchain
+
+Evaluate and use the following tools:
+
+- Inkscape CLI: SVG rendering and raster export.
+- ImageMagick: image processing and conversion.
+- Potrace: initial vectorization of raster logos.
 - SVGO: SVG optimization.
-- Potrace: initial PNG-to-SVG tracing when required.
-- Android SDK build tools (`aapt2`, Gradle): Android resource validation and compilation.
+- Sharp: Node.js-based image generation and resizing.
+- Tauri CLI: application icon generation.
+- Android SDK: Android resource compilation and validation.
+- Xcode tools: iOS asset validation where macOS is available.
 
-Do not implement a custom launcher icon generator if the installed Tauri CLI already provides the required functionality.
+Prefer existing tools over adding redundant dependencies.
 
-## 3. Establish canonical source assets
+The pipeline must run on Linux wherever the target format does not require proprietary platform tooling.
 
-Use the existing canonical SVG:
+Document any macOS-only validation or packaging steps.
 
-`apps/web/public/brand/edapex_brand_mark.svg`
+## 6. Universal asset generation
 
-Preserve the original PNG files as source references.
+Generate the following asset families.
 
-Do not modify the brand identity or silhouette.
+### A. Logo assets
 
-The logo must retain:
+- Primary logo.
+- Symbol.
+- Wordmark, if available.
+- Black variant.
+- White variant.
+- Monochrome variant.
+- Transparent variants.
 
-- Open-book geometry.
-- Two knockout circles.
-- Antenna.
-- Original negative spaces.
-- Original proportions.
+Formats:
 
-Do not add a mouth, shadows, 3D effects or additional decorative elements.
+- SVG.
+- PNG.
+- WebP.
 
-## 4. Generate Android launcher icons
+Generate appropriate dimensions for intended use cases.
 
-Create a dedicated square launcher-icon composition.
+### B. Web assets
 
-Do not simply stretch the existing 624 × 540 logo into a square.
+Generate:
 
-The composition must:
+- Favicon SVG.
+- Favicon ICO.
+- Standard favicon PNG sizes.
+- PWA icons.
+- Maskable PWA icon.
+- Open Graph image.
+- Social sharing artwork.
 
-- Preserve the original logo proportions.
-- Have sufficient transparent safe space.
-- Remain recognizable when Android applies circular, squircle or other adaptive masks.
-- Avoid clipping the book's side components.
-- Remain legible at small sizes.
+Preserve transparent backgrounds where appropriate.
 
-Generate separate adaptive icon layers:
+### C. Android assets
 
-1. Foreground: Edapex logo.
-2. Background: appropriate Edapex brand background.
-3. Monochrome: simplified single-colour logo for themed Android icons.
+Generate:
 
-Use the installed Tauri CLI's icon manifest support where available.
+- Adaptive launcher foreground.
+- Adaptive launcher background.
+- Monochrome themed icon.
+- Required launcher density resources.
+- Native splash VectorDrawable.
+- Splash preview images.
 
-Generate all required Android density resources.
+Use `tauri icon` where supported by the installed Tauri version.
 
-Verify the generated output in:
+Do not assume the launcher icon generator also handles the native splash.
 
-`src-tauri/gen/android/app/src/main/res/`
+### D. iOS assets
 
-Adapt this location to the actual project structure.
+Generate:
 
-Do not assume that generating the launcher icon also configures the splash screen.
+- App icon artwork.
+- Required app icon sizes or an appropriate AppIcon asset catalog.
+- Splash artwork where applicable.
 
-## 5. Generate native Android splash assets
+Inspect the current Tauri iOS project before deciding the exact resource locations.
 
-The native Android splash must use a static logo.
+Do not generate obsolete icon formats unnecessarily.
 
-Generate a suitable Android VectorDrawable XML from the canonical SVG or a carefully prepared Android-compatible vector source.
+### E. Desktop assets
 
-Requirements:
+Generate:
 
-- Preserve knockout circles and negative spaces.
-- Use appropriate fill rules and path winding.
-- Maintain the logo's aspect ratio.
-- Use a transparent background where appropriate.
-- Avoid embedding a raster PNG inside the vector.
-- Ensure compatibility with the project's Android minimum SDK and splash implementation.
+- Windows ICO.
+- macOS ICNS.
+- Linux PNG icons.
 
-Use the existing splash resource naming and theme configuration where possible.
+Use appropriate sizes and transparency.
 
-Verify the actual rendered output through Android resource compilation and an emulator or physical device.
+Integrate with the existing Tauri configuration.
 
-Do not assume that a successful SVG preview guarantees correct Android VectorDrawable rendering.
+### F. Animation assets
 
-## 6. Preserve the animated SVG for onboarding
+Preserve editable SVG artwork for:
 
-The onboarding logo must remain a separate, editable SVG asset.
+- Onboarding logo reveal.
+- Interactive Edapex robot.
+- Web and desktop mascot animation.
 
-Preserve semantic element IDs and groups required by the existing React + GSAP animation system.
+Preserve meaningful SVG IDs and groups.
 
-The onboarding animation should support:
+Do not flatten animation-ready artwork into raster images.
 
-- Centre spine appearing first.
-- Left and right book sections revealing outward simultaneously.
-- Upper logo elements resolving into view.
-- Final logo settling into its normal position.
+### G. Marketing assets
 
-Do not flatten the animated SVG into a PNG.
+Generate reusable:
 
-The native splash and onboarding animation are separate implementations.
+- Square brand avatar.
+- Social cover artwork.
+- Open Graph preview image.
+- Presentation logo variants.
+- High-resolution transparent logo exports.
 
-## 7. Generate web and desktop assets
+Do not automatically create decorative marketing compositions that have not been designed or approved.
 
-Continue generating:
+## 7. Platform adapters
 
-- Optimized web SVG.
-- CSS-mask-compatible logo.
-- Desktop/mobile application assets where required.
+Use a modular architecture.
 
-All generated assets must originate from the same canonical source.
+The universal pipeline should not contain platform-specific assumptions everywhere.
 
-Avoid manually editing generated output files.
+Recommended architecture:
 
-## 8. Proposed output structure
+- `core/`: canonical assets, brand tokens, validation and common utilities.
+- `generators/logo/`: logo exports.
+- `generators/icons/`: icon compositions.
+- `generators/web/`: favicon and PWA outputs.
+- `generators/android/`: Android-specific outputs.
+- `generators/ios/`: iOS-specific outputs.
+- `generators/desktop/`: desktop outputs.
+- `generators/social/`: marketing outputs.
 
-Adapt this structure to the existing repository:
+Each generator should be independently executable.
 
-brand/
-├── source/
-│   └── edapex_brand_mark.svg
-│
-├── android/
-│   ├── launcher/
-│   │   ├── icon-manifest.json
-│   │   ├── edapex-app-icon.png
-│   │   ├── edapex-icon-foreground.png
-│   │   ├── edapex-icon-background.png
-│   │   └── edapex-icon-monochrome.png
-│   │
-│   ├── splash/
-│   │   └── ic_splash_mark.xml
-│   │
-│   └── preview/
-│       ├── launcher-preview.png
-│       ├── adaptive-mask-preview.png
-│       └── splash-preview.png
-│
-├── web/
-│   └── edapex_brand_mark.svg
-│
-└── scripts/
-    └── build-brand-assets.mjs
+## 8. Output organisation
 
-Generated Android resources must be placed in the actual Tauri Android project directories.
+Use a structured generated-output directory.
 
-Keep source artwork separate from generated Android resources.
+Keep the following separate:
 
-## 9. Validation requirements
+- Editable source files.
+- Intermediate files.
+- Final generated assets.
+- Platform-specific resources.
+- Preview images.
 
-The generation script must validate:
+Do not commit unnecessary temporary conversion files.
 
-- Source files exist.
-- Generated files are non-empty.
-- PNG dimensions are correct.
-- PNG transparency is preserved where required.
-- Adaptive icon layers have the expected dimensions.
-- SVG remains valid.
-- Android VectorDrawable compiles successfully.
-- Knockout circles remain transparent.
-- Logo proportions have not changed.
-- No default Tauri launcher icon remains.
+Avoid overwriting manually maintained project configuration.
 
-Render previews at multiple sizes.
+## 9. Build commands
 
-Inspect launcher icons under different Android adaptive masks.
+Expose convenient commands through the existing package manager.
 
-Test splash rendering in light and dark themes.
-
-## 10. Build integration
-
-Expose a reproducible command:
+Required interface:
 
 `pnpm brand:build`
 
-It should:
+Generate all platform-independent assets and all supported platform assets.
 
-1. Validate the canonical source.
-2. Generate the launcher icon source compositions.
-3. Invoke Tauri's icon generator.
-4. Generate the Android splash VectorDrawable.
-5. Generate web and desktop assets.
-6. Optimize generated SVG files.
-7. Produce preview images.
-8. Run validation checks.
+Also provide:
 
-Add the command to the existing package scripts.
+`pnpm brand:logos`
 
-Avoid destructive changes to manually maintained Android resources.
+`pnpm brand:icons`
 
-If Tauri regenerates or overwrites Android resources during `tauri android init`, document the regeneration procedure and ensure the asset pipeline can restore the custom resources.
+`pnpm brand:android`
 
-## 11. Deliverables
+`pnpm brand:ios`
 
-Provide:
+`pnpm brand:desktop`
 
-1. Updated generation script.
-2. Updated package scripts.
-3. Android launcher icon resources.
-4. Android splash VectorDrawable.
-5. Editable onboarding SVG.
-6. Web and desktop assets.
-7. Preview images.
-8. Validation results.
-9. Documentation explaining how to regenerate all assets.
+`pnpm brand:web`
 
-Do not consider the task complete merely because files were generated.
+`pnpm brand:social`
 
-The Android project must compile successfully, and the launcher icon and splash logo must be visually inspected on an emulator or physical device.
+`pnpm brand:validate`
+
+The commands should reuse shared generation functions rather than implement separate conversion logic.
+
+If a platform-specific tool is unavailable, clearly report that platform's generation or validation was skipped. Do not silently claim success.
+
+## 10. Validation
+
+Validate:
+
+- Source SVG correctness.
+- Transparency.
+- Dimensions.
+- Aspect ratios.
+- File formats.
+- Negative spaces.
+- Logo proportions.
+- Colour variants.
+- Adaptive icon safe areas.
+- SVG rendering fidelity.
+- Android VectorDrawable compatibility.
+- Output completeness.
+
+Generate preview sheets to make visual inspection easy.
+
+For launcher icons, preview the actual platform masks rather than only the square source image.
+
+For raster exports, compare rendered results against the canonical source.
+
+## 11. Android-specific requirements
+
+The native splash logo remains static.
+
+The onboarding animation is separate and uses the editable SVG.
+
+Verify:
+
+- Native splash theme.
+- Splash background colour.
+- Logo size and placement.
+- Android adaptive icon rendering.
+- Dark and light themes.
+- Android resource compilation.
+
+Do not introduce splash animation simply because the platform supports it.
+
+## 12. Integration requirements
+
+Integrate the generated assets with the existing Tauri application.
+
+Inspect existing configuration before changing it.
+
+Ensure:
+
+- Correct application icon paths.
+- Correct Android resource references.
+- Correct iOS asset references.
+- Correct desktop icon references.
+- No stale default Tauri icons.
+- No manually maintained duplicate assets.
+
+Do not assume every generated asset should be copied into every application package.
+
+Only package the resources actually required by each platform.
+
+## 13. Documentation
+
+Create a README explaining:
+
+- Canonical source locations.
+- Toolchain dependencies.
+- Installation instructions.
+- Generation commands.
+- Platform-specific requirements.
+- How to update the logo.
+- How to regenerate all assets.
+- How to validate generated output.
+- Which steps require macOS or Android SDK tooling.
+
+## 14. Definition of done
+
+The implementation is complete when:
+
+1. One canonical brand source generates all required asset families.
+2. The generation pipeline is reproducible.
+3. All supported targets have their correct assets.
+4. The Tauri application references the generated assets correctly.
+5. Android builds successfully.
+6. iOS resources are generated and validated where tooling permits.
+7. Desktop icon resources are generated.
+8. Web assets are generated and validated.
+9. Preview sheets are available.
+10. Documentation is complete.
+
+Do not report an asset as generated or validated when the required platform tool was unavailable.
+
+First report the existing repository structure and proposed implementation plan. Then implement incrementally, preserving the existing working pipeline.
+
+## 15. Implementation status
+
+Status: **partially implemented**, generate-only. The pipeline exists and is documented in
+[`docs/brand/README.md`](brand/README.md); the deviations from this document are deliberate.
+
+| Decision | What it means here |
+|---|---|
+| Generate-only | Every asset is written under `brand/dist/` with a `placement.json` table of destinations. Nothing in the pipeline writes into an application tree, so no Tauri config, Android resource or web manifest has been changed. Applying the set is a separate step. |
+| `tauri icon` is not used | Its `--output` redirects desktop icons only; mobile icons are always written into `gen/android`. ICO and ICNS are written by `scripts/brand/core/{ico,icns}.mjs` instead. |
+| iOS is deferred | There is no `gen/apple` project and no macOS or Xcode to validate one. `pnpm brand:ios` reports `SKIPPED` with that reason rather than claiming success (§9). |
+| Mascot | No separate robot artwork exists in this repository. The mark's committed black and white PNGs are the reference art, and the animation geometry is `apps/desktop/mobile/src/assets/brand-mark-paths.ts` (§F). No SVG ids were invented: naming the parts would be a redesign (§3). |
+| Wordmark | In scope as of this revision. Set in Plus Jakarta Sans SemiBold (SIL OFL 1.1, release 2.7.1, committed with its licence) and outlined at build time with fontkit, so the export needs no font installed while `brand/source/wordmark/` keeps the editable text. See [`brand/typography.md`](brand/typography.md). The earlier "no wordmark, because the repository has none" decision is superseded. |
+| iOS | In scope as of this revision, superseding the earlier deferral. Tauri's 18-slot per-size set and a single-size `AppIcon.appiconset` are both generated; every file is opaque, because App Store Connect rejects an app icon with alpha. Installing and running on a device still needs a Mac. |
+| macOS and Windows | Complete as files. The macOS `.iconset` is generated so `iconutil` can verify it, and the `.icns` is packed from the same buffers; Windows carries a nine-entry ICO. macOS rendering remains unverified here for want of `iconutil`. |
+| Toolchain | `sharp` for render, fit and encode; `svgo` optional for the logo SVG. The legacy `scripts/build-brand-mark.mjs` keeps the splash vector and mobile mark and is excluded from `brand:build` because it writes outside `brand/`. |
+| Colours | Derived from `packages/tokens/tokens.css` by selector (`:root`, `.dark`), not by occurrence order, because `--primary` is redefined by every accent preset. `oklchToHex` lives in one module shared with `scripts/check-splash-tokens.mjs`. |
+| Safe zones | Android adaptive art is fitted to the guaranteed-visible 66dp of the 108dp canvas. The maskable web icon is held inside the W3C circle of radius 40% of the icon. Both are measured by `brand:validate`. |
+
+Not done, and not claimed: rendering of the generated `icon.icns` on macOS, device verification of the
+iOS set, the Android Gradle build, and any application integration.

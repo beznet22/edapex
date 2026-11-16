@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 4343 985" width="4343" height="985">
+  <!--
+    EDAPEX uppercase wordmark — the editable source.
+
+    The exception, not the identity: use it only where uppercase typography is the surrounding
+    convention. All-caps at the same cap height reads heavier and tighter than mixed case, so
+    this variant is tracked out at +0.06em and set at 0.94 of the mixed-case cap height in the
+    compositions (`lockup.capsCapHeight` in brand.tokens.json).
+
+    Typeface:  Plus Jakarta Sans SemiBold (weight 600)
+    Font file: brand/source/fonts/PlusJakartaSans-SemiBold.ttf, release 2.7.1, SIL OFL 1.1
+    Frame:     ink is inset 120 units on every side; 1 unit = 1 font unit at 1000 units per em
+    Tracking:  +60 units = +0.06em
+  -->
+  <text
+    x="43"
+    y="865"
+    font-family="'Plus Jakarta Sans SemiBold', 'Plus Jakarta Sans', 'Plus Jakarta Sans Semi Bold'"
+    font-size="1000"
+    font-weight="600"
+    letter-spacing="60"
+    fill="#141413"
+  >EDAPEX</text>
+</svg>

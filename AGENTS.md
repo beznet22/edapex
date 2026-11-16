@@ -12,7 +12,7 @@ in before changing anything.
 | `packages/` | `contracts`, `chat`, `genui`, `documents`, `connectors`, **`tokens`, `ui`, `host`** | New, shared TypeScript |
 | `crates/` | `agent`, `agent-wasm`, `store`, `ocr`, `core`, `ocr-bench` | New, Rust |
 | `docs/` | `cloudflare-port`, `workspace`, `desktop`, research | New |
-| `scripts/` | New-system tooling only | New |
+| `scripts/` | New-system tooling only. Brand asset generation lives in `scripts/brand/` | New |
 
 New code goes in `apps/`, `services/`, `packages/` or `crates/`. Never add to
 `legacy/` except to keep production working. A change that has to touch both trees is
@@ -557,6 +557,9 @@ node scripts/check-boundaries.mjs
 node scripts/check-docs.mjs
 node scripts/check-tokens.mjs
 
+# brand assets — generates into brand/dist/ only, then proves what it wrote
+pnpm brand:build
+pnpm brand:validate
 pnpm --dir apps/web run check
 pnpm --dir apps/web test
 pnpm --dir apps/web exec playwright test
