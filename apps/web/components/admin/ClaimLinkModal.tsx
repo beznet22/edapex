@@ -5,11 +5,7 @@ import { AlertCircle, Check, Copy, Link2, Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
-import {
-  createClaimLink,
-  type CreatedClaimLink,
-  type DirectoryItem
-} from "@/lib/admin-api";
+import { createClaimLink, type CreatedClaimLink } from "@/lib/admin-api";
 
 /**
  * Minting a claim link.
@@ -22,12 +18,28 @@ import {
  * The expiry counts down. A 72-hour TTL is abstract; "expires in 71h 58m" tells the person
  * whether they can hand it over tomorrow morning.
  */
+/**
+ * Anything a claim link can be issued against.
+ *
+ * A structural subset rather than `DirectoryItem`: staff rows come from `/admin/staff` and
+ * carry `id` where the directory carries `subjectId`, and a claim link needs only four facts.
+ * Taking the whole directory row would have forced the staff table to fake one.
+ */
+export interface ClaimSubject {
+  readonly subjectType: "staff" | "parent";
+  readonly subjectId: number;
+  readonly fullName: string | null;
+  readonly email: string | null;
+  readonly persona: "staff" | "parent";
+  readonly userId: number | null;
+}
+
 export function ClaimLinkModal({
   item,
   academicId,
   onClose
 }: {
-  readonly item: DirectoryItem | null;
+  readonly item: ClaimSubject | null;
   readonly academicId: number;
   readonly onClose: () => void;
 }) {

@@ -676,21 +676,30 @@
    * 4.22:1; both are below the 4.5:1 AA floor, which is the "yellow on yellow" report. The
    * inks measure 4.91:1 and 5.13:1 against the same tint.
    */
+  /*
+   * The tint is 18%, not 10%.
+   *
+   * At 10% over a cream card — and against a cream page behind it — the amber pill was
+   * within a few points of the surface it sat on, so it read as coloured text rather than as
+   * a chip. The reference's Pending pill is unmistakably a shape. 18% keeps the ink above
+   * 4.5:1 while giving the fill an edge; the border is one step stronger still, because a
+   * 1px line at the same tint as the fill is not a line.
+   */
   .badge-success {
-    border-color: color-mix(in oklch, var(--success) 30%, transparent);
-    background-color: color-mix(in oklch, var(--success) 10%, var(--card));
+    border-color: color-mix(in oklch, var(--success) 38%, transparent);
+    background-color: color-mix(in oklch, var(--success) 18%, var(--card));
     color: var(--success-ink);
   }
 
   .badge-warning {
-    border-color: color-mix(in oklch, var(--warning) 30%, transparent);
-    background-color: color-mix(in oklch, var(--warning) 10%, var(--card));
+    border-color: color-mix(in oklch, var(--warning) 40%, transparent);
+    background-color: color-mix(in oklch, var(--warning) 18%, var(--card));
     color: var(--warning-ink);
   }
 
   .badge-destructive {
-    border-color: color-mix(in oklch, var(--destructive) 30%, transparent);
-    background-color: color-mix(in oklch, var(--destructive) 10%, var(--card));
+    border-color: color-mix(in oklch, var(--destructive) 38%, transparent);
+    background-color: color-mix(in oklch, var(--destructive) 18%, var(--card));
     color: var(--destructive-ink);
   }
 

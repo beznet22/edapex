@@ -30,7 +30,7 @@ import {
 import { SortableHead } from "@/components/admin/SortableHead";
 import { RowActionMenu } from "@/components/admin/RowActionMenu";
 import { TablePagination } from "@/components/admin/TablePagination";
-import { ClaimLinkModal } from "@/components/admin/ClaimLinkModal";
+import { ClaimLinkModal, type ClaimSubject } from "@/components/admin/ClaimLinkModal";
 import { DuplicatesTab } from "@/components/admin/DuplicatesTab";
 import { StaffFormModal } from "@/components/admin/StaffFormModal";
 import { StaffDetailModal } from "@/components/admin/StaffDetailModal";
@@ -98,7 +98,7 @@ export function UserManagementSurface() {
   const [error, setError] = useState("");
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<StaffRow | null>(null);
-  const [claiming, setClaiming] = useState<DirectoryItem | null>(null);
+  const [claiming, setClaiming] = useState<ClaimSubject | null>(null);
 
   /*
    * The academic id is a number in the API and a string in the workspace id, and the admin
@@ -488,6 +488,16 @@ export function UserManagementSurface() {
           <StaffTable
             allSelected={allSelected}
             loading={loading}
+            onLink={(row) =>
+              setClaiming({
+                subjectType: "staff",
+                subjectId: row.id,
+                fullName: row.fullName,
+                email: row.email,
+                persona: "staff",
+                userId: row.hasAccount ? 1 : null
+              })
+            }
             onRemove={setConfirmRemove}
             onRow={setEditing}
             onSelectAll={toggleAll}
@@ -611,6 +621,7 @@ function StaffTable({
   onSelectOne,
   onRow,
   onRemove,
+  onLink,
   onSort,
   sortKey,
   sortDirection
@@ -624,6 +635,7 @@ function StaffTable({
   readonly onSelectOne: (id: number) => void;
   readonly onRow: (row: StaffRow) => void;
   readonly onRemove: (row: StaffRow) => void;
+  readonly onLink: (row: StaffRow) => void;
   readonly onSort: (key: SortKey) => void;
   readonly sortKey: SortKey;
   readonly sortDirection: SortDirection;
@@ -750,7 +762,15 @@ function StaffTable({
                   </TableCell>
                   <TableCell className="text-right">
                     <RowActionMenu
+                      linkDisabledReason={
+                        row.email === null || row.email.length === 0
+                          ? "No email on record"
+                          : row.hasAccount
+                            ? "Already has an account"
+                            : undefined
+                      }
                       onEdit={() => onRow(row)}
+                      onLink={() => onLink(row)}
                       onRemove={() => onRemove(row)}
                     />
                   </TableCell>
@@ -949,7 +969,7 @@ function DirectoryTable({
                 </TableCell>
                 <TableCell className="text-right">
                   <RowActionMenu
-                    editLabel="View"
+                    onEdit={() => onClaim(item)}
                     linkDisabledReason={
                       blocked
                         ? item.claimStatus === "claimed"
@@ -959,7 +979,6 @@ function DirectoryTable({
                             : "No email on record"
                         : undefined
                     }
-                    onEdit={() => onClaim(item)}
                     onLink={() => onClaim(item)}
                     onRemove={() => onRevoke(item)}
                     onRevoke={item.linkStatus === "active" ? () => onRevoke(item) : undefined}
