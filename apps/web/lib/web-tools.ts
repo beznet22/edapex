@@ -9,7 +9,7 @@ import {
   type WebSearchResponse
 } from "@edapex/contracts/web";
 
-import { apiBase } from "@/lib/api";
+import { apiBase } from "@edapex/host/api";
 
 const searchSpec: DynamicToolSpec = {
   name: "web_search",

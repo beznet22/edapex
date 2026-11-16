@@ -1,7 +1,7 @@
 import type { HostCapabilities, ServerCapabilities } from "@edapex/contracts/platform";
 
-import { getHostCapabilities } from "@/lib/tauri";
-import { isTauriHost } from "@/lib/platform";
+import { getHostCapabilities } from "./tauri";
+import { isTauriHost } from "./platform";
 
 export const BROWSER_HOST_CAPABILITIES: HostCapabilities = Object.freeze({
   nativeAgent: false,

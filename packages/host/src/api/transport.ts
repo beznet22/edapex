@@ -1,5 +1,5 @@
-import { isTauriHost } from "@/lib/platform";
-import { apiRequest } from "@/lib/tauri";
+import { isTauriHost } from "../platform";
+import { apiRequest } from "../tauri";
 
 /**
  * How a request reaches the API, per host.

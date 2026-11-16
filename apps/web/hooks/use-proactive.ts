@@ -7,7 +7,7 @@ import { ROUTINE_UNAVAILABLE_NOTICE, type TaskSignals } from "@edapex/contracts"
 import { useAgentStore } from "@/hooks/use-agent-store";
 import { runProactiveTick } from "@/lib/proactive-loop";
 import { TICK_INTERVAL_MS } from "@/lib/scheduler";
-import { apiBase } from "@/lib/api";
+import { apiBase } from "@edapex/host/api";
 
 /**
  * Proactive-work wiring.

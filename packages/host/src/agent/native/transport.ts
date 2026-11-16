@@ -9,15 +9,15 @@
  * two hosts converge on one contract and one validator.
  */
 
-import { invokeCommand } from "./tauri";
+import { invokeCommand } from "../../tauri";
+import type { AgentConnectSettings } from "../transport";
 import type { AgentEvent } from "@edapex/contracts";
 
-/** Mirrors `AgentConnectSettings` in `crates/agent/src/protocol.rs`. */
-export interface NativeConnectSettings {
-  readonly workspaceId: string;
-  readonly model: string;
-  readonly mobileSafeTools: boolean;
-}
+/*
+ * The settings type is not redeclared here. It lives in `../transport` so the adapter, the
+ * web transport and the native transport cannot drift on what a connect request is.
+ */
+export type { AgentConnectSettings as NativeConnectSettings } from "../transport";
 
 /** Mirrors `AgentTurnInput`. */
 export interface NativeTurnInput {
@@ -66,7 +66,7 @@ export async function openChannel(
 
 /** Connects the native agent and streams its events. */
 export async function agentConnect(
-  settings: NativeConnectSettings,
+  settings: AgentConnectSettings,
   channel: NativeChannel
 ): Promise<void> {
   return invokeCommand<void>("agent_connect", { settings, channel });

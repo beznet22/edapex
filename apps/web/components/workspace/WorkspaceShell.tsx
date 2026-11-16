@@ -5,7 +5,7 @@ import Link from "next/link";
 import { FilePlus2, PanelLeft, Search } from "lucide-react";
 
 import type { CapabilityManifest, WorkspaceRuntimeView } from "@edapex/contracts";
-import type { CoreHealth } from "@/lib/tauri";
+import type { CoreHealth } from "@edapex/host/tauri";
 
 import { Button } from "@edapex/ui/components/button";
 import {

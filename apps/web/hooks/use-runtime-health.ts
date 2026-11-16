@@ -2,9 +2,9 @@
 
 import { useEffect, useState } from "react";
 
-import { getRuntimeHealth } from "@/lib/tauri";
-import type { CoreHealth } from "@/lib/tauri";
-import { isTauriHost } from "@/lib/platform";
+import { getRuntimeHealth } from "@edapex/host/tauri";
+import type { CoreHealth } from "@edapex/host/tauri";
+import { isTauriHost } from "@edapex/host/platform";
 
 export type RuntimeHealthStatus = "idle" | "loading" | "ready" | "error";
 

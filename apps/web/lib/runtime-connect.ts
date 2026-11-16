@@ -1,70 +1,65 @@
-import type { ConnectedNativeRuntime } from "@/lib/native-runtime";
-import type { NativeAgentClient, NativeAgentSettings } from "@/lib/native-agent";
+import {
+  startTransportTurn,
+  type AgentConnectSettings,
+  type AgentTransport,
+  type ConnectedTransport,
+  type ConnectHandlers
+} from "@edapex/host/agent/transport";
 
 import { agentHost, nativeIsDefault } from "@/lib/agent-host";
 
 /**
- * Picks a host and connects it.
+ * The web app's transport selection.
+ *
+ * This is policy, not seam. `@edapex/host/agent` takes an `AgentTransport` and calls it;
+ * *which* transport a host uses is an app decision, and it lives here. That split is what
+ * lets the Android app reuse the adapter without inheriting a `next/*` import or a cookie.
  *
  * The two branches differ only in who owns the transport — a `tauri::ipc::Channel` or the
- * wasm-bindgen bridge — and both register the same three callbacks. Keeping them inline in
- * the adapter meant the same thirteen-line handler object appeared twice, and the next
- * transport would have made it three.
- *
- * The returned `disconnect` is what the adapter calls on `stop`; the native path returns a
- * function that interrupts rather than a client to hold, because its transport is process
- * state rather than an object.
+ * wasm-bindgen bridge — and both register the same three callbacks. The returned
+ * `disconnect` is what the adapter calls on `stop`; the native path interrupts rather than
+ * holding a client, because its transport is process state rather than an object.
  */
-export interface AgentEventShape {
-  readonly type: string;
-  readonly [key: string]: unknown;
-}
+const webTransport: AgentTransport = {
+  kind: "web",
+  async connect(
+    settings: AgentConnectSettings,
+    handlers: ConnectHandlers
+  ): Promise<ConnectedTransport> {
+    // Imported statically: the wasm path is the default and lazy-loading it would only move
+    // the cost from first paint to first message.
+    const { NativeAgentClient } = await import("@/lib/native-agent");
+    const client = new NativeAgentClient(settings, {
+      onEvent: handlers.onEvent,
+      onTool: handlers.onTool,
+      onApproval: handlers.onApproval
+    });
+    await client.connect();
 
-export interface AgentToolCall {
-  readonly callId: string;
-  readonly tool: string;
-  readonly arguments: unknown;
-}
+    return {
+      client,
+      disconnect: () => {
+        void client.stop();
+      }
+    };
+  },
+  startTurn: startTransportTurn
+};
 
-export interface AgentApprovalRequest {
-  readonly approvalRequestId: string;
-  readonly title: string;
-  readonly description: string;
-  readonly risk: "read" | "write" | "destructive";
-}
-
-export interface ConnectHandlers {
-  readonly onEvent: (event: AgentEventShape) => void;
-  readonly onTool: (call: AgentToolCall) => Promise<{ success: boolean; text: string }>;
-  readonly onApproval: (request: AgentApprovalRequest) => Promise<boolean>;
-}
-
-export interface ConnectedTransport {
-  /** Null on the native path, which has no client object to hold. */
-  readonly client: NativeAgentClient | null;
-  /** Present on the native path, where the session is the transport handle. */
-  readonly connected?: ConnectedNativeRuntime;
-  /** Closes the transport. Idempotent. */
-  readonly disconnect: () => void;
-}
-
-export async function connectTransport(
-  settings: NativeAgentSettings,
-  handlers: ConnectHandlers
-): Promise<ConnectedTransport> {
-  /*
-   * Desktop and mobile run the agent natively. The WASM path remains the default until
-   * the native transport can be verified on a real host (see
-   * `specs/50-native-agent-path.md`), but the branch exists so the rule is true in code
-   * rather than aspirational.
-   */
-  if (agentHost() === "native" && nativeIsDefault()) {
-    const { connectNative } = await import("@/lib/native-runtime");
+const nativeTransport: AgentTransport = {
+  kind: "native",
+  async connect(
+    settings: AgentConnectSettings,
+    handlers: ConnectHandlers
+  ): Promise<ConnectedTransport> {
+    // Dynamic so a browser bundle never resolves the Tauri API.
+    const { connectNative } = await import("@edapex/host/agent/native");
     const session = await connectNative(settings, {
       onEvent: handlers.onEvent,
       onTool: handlers.onTool,
       onApproval: handlers.onApproval
     });
+
     return {
       client: null,
       connected: session,
@@ -72,40 +67,18 @@ export async function connectTransport(
         void session.close();
       }
     };
-  }
-
-  // Imported statically: the wasm path is the default and lazy-loading it would only move
-  // the cost from first paint to first message.
-  const { NativeAgentClient } = await import("@/lib/native-agent");
-  const client = new NativeAgentClient(settings, {
-    onEvent: handlers.onEvent,
-    onTool: handlers.onTool,
-    onApproval: handlers.onApproval
-  });
-  await client.connect();
-
-  return {
-    client,
-    disconnect: () => {
-      void client.stop();
-    }
-  };
-}
+  },
+  startTurn: startTransportTurn
+};
 
 /**
- * Starts a turn on whichever transport this is.
+ * Which transport this host uses.
  *
- * The native session takes text and returns a turn id; the wasm client takes text and
- * returns nothing useful. Both are "start a turn", so the adapter should not branch on
- * which — that is the one thing about a transport the adapter still knew.
+ * Desktop and mobile run the agent natively — that is the architecture in `docs/system.md`,
+ * not an option. The WASM branch remains because a browser tab has no native host, and the
+ * env override exists only until the native default has been verified on a device.
  */
-export async function startTransportTurn(
-  transport: ConnectedTransport,
-  text: string
-): Promise<void> {
-  if (transport.connected !== undefined) {
-    await transport.connected.send(text);
-    return;
-  }
-  await transport.client?.startTurn(text);
+export function selectAgentTransport(): AgentTransport {
+  if (agentHost() === "native" && nativeIsDefault()) return nativeTransport;
+  return webTransport;
 }

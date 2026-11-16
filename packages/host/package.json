@@ -1,0 +1,44 @@
+{
+  "name": "@edapex/host",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "The host seam: transport, API, capability guards and the agent adapter",
+  "sideEffects": false,
+  "exports": {
+    "./platform": "./src/platform.ts",
+    "./tauri": "./src/tauri.ts",
+    "./capabilities": "./src/capabilities.ts",
+    "./api": "./src/api/index.ts",
+    "./api/transport": "./src/api/transport.ts",
+    "./agent": "./src/agent/adapter.ts",
+    "./agent/transport": "./src/agent/transport.ts",
+    "./agent/streaming-buffer": "./src/agent/streaming-buffer.ts",
+    "./agent/turn-events": "./src/agent/turn-events.ts",
+    "./agent/turn-settlement": "./src/agent/turn-settlement.ts",
+    "./agent/native": "./src/agent/native/runtime.ts",
+    "./agent/native/transport": "./src/agent/native/transport.ts",
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@edapex/chat": "workspace:^",
+    "@edapex/contracts": "workspace:^"
+  },
+  "peerDependencies": {
+    "@tauri-apps/api": "^2.9.0",
+    "react": "^19.3.1"
+  },
+  "peerDependenciesMeta": {
+    "@tauri-apps/api": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@tauri-apps/api": "^2.9.0",
+    "@types/react": "^19.2.0",
+    "typescript": "^5.9.3"
+  }
+}

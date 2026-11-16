@@ -7,7 +7,7 @@ import type {
   OcrResult
 } from "@edapex/contracts/platform";
 
-import { isTauriHost } from "@/lib/platform";
+import { isTauriHost } from "./platform";
 
 export interface CoreHealth {
   readonly core_version: string;

@@ -1,6 +1,6 @@
 import type { RoutineView } from "@edapex/contracts";
 
-import { apiBase } from "@/lib/api";
+import { apiBase } from "@edapex/host/api";
 import { shouldTick, tick, type SchedulerDeps } from "@/lib/scheduler";
 
 /**

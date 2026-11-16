@@ -7,7 +7,7 @@ import type { HostCapabilities } from "@edapex/contracts/platform";
 import {
   BROWSER_HOST_CAPABILITIES,
   loadHostCapabilities
-} from "@/lib/host-capabilities";
+} from "@edapex/host/capabilities";
 
 export interface HostCapabilitiesState {
   readonly capabilities: HostCapabilities;

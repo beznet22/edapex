@@ -25,8 +25,8 @@ import {
   agentTurnStart,
   openChannel,
   type NativeChannel
-} from "@/lib/native-agent-tauri";
-import type { NativeAgentSettings } from "@/lib/native-agent";
+} from "./transport";
+import type { AgentConnectSettings } from "../transport";
 
 export interface NativeCallbacks {
   readonly onEvent: (event: AgentEvent) => void;
@@ -60,7 +60,7 @@ let connection: { channel: NativeChannel; threadId: string } | null = null;
  * argument rather than creating one it must later replace.
  */
 export async function connectNative(
-  settings: NativeAgentSettings,
+  settings: AgentConnectSettings,
   callbacks: NativeCallbacks
 ): Promise<ConnectedNativeRuntime> {
   const channel = await openChannel(callbacks.onEvent);

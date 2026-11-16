@@ -24,7 +24,7 @@
 
 import { buildCapabilityManifest } from "@edapex/contracts";
 
-import type { SessionView } from "@/lib/api";
+import type { SessionView } from "@edapex/host/api";
 
 /** True only under the browser suite, and only against a local API. */
 export function testSessionEnabled(): boolean {

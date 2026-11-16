@@ -14,17 +14,23 @@ import type {
   WorkspaceRuntimeView
 } from "@edapex/contracts";
 
-import { StreamingBuffer } from "@/lib/streaming-buffer";
-import { waitForSettlement } from "@/lib/turn-settlement";
+import { StreamingBuffer } from "./streaming-buffer";
+import { waitForSettlement } from "./turn-settlement";
 import {
   turnTransition,
   withApprovalDecision,
   withPendingApproval,
   type AgentApproval,
   type AgentEvent
-} from "@/lib/turn-events";
-import { connectTransport, startTransportTurn, type ConnectedTransport } from "@/lib/runtime-connect";
-import type { NativeAgentSettings } from "@/lib/native-agent";
+} from "./turn-events";
+import {
+  startTransportTurn,
+  type AgentApprovalRequest,
+  type AgentConnectSettings,
+  type AgentToolCall,
+  type AgentTransport,
+  type ConnectedTransport
+} from "./transport";
 
 type Listener = () => void;
 
@@ -66,12 +72,22 @@ export class NativeAgentAdapter implements WorkspaceRuntimeAdapter {
    */
   state: WorkspaceRuntimeState = createRuntimeState();
   private readonly listeners = new Set<Listener>();
-  private transport: ConnectedTransport | null = null;
+  /**
+   * Who carries the turn. Injected, not discovered (`docs/system.md` →
+   * "transport (host-injected)"). This class used to import the web app's transport
+   * selection, which is the one thing that stopped a second host reusing it.
+   */
+  private readonly host: AgentTransport;
+  private connection: ConnectedTransport | null = null;
   private connected = false;
 
   private readonly streaming = new StreamingBuffer();
   private frame: number | null = null;
   private readonly pendingApprovals = new Map<string, (allowed: boolean) => void>();
+
+  constructor(host: AgentTransport) {
+    this.host = host;
+  }
 
   get view(): WorkspaceRuntimeView {
     return {
@@ -96,8 +112,8 @@ export class NativeAgentAdapter implements WorkspaceRuntimeAdapter {
     return () => this.listeners.delete(listener);
   };
 
-  async connect(settings: NativeAgentSettings): Promise<void> {
-    const transport = await connectTransport(settings, {
+  async connect(settings: AgentConnectSettings): Promise<void> {
+    const transport = await this.host.connect(settings, {
       onEvent: (event) => this.onAgentEvent(event),
       onTool: (call) => this.runTool(call),
       onApproval: (request) =>
@@ -107,7 +123,7 @@ export class NativeAgentAdapter implements WorkspaceRuntimeAdapter {
         })
     });
 
-    this.transport = transport;
+    this.connection = transport;
     this.connected = true;
     this.state = { ...this.state, turn: { ...this.state.turn, state: "idle" } };
     this.emit();
@@ -175,7 +191,7 @@ export class NativeAgentAdapter implements WorkspaceRuntimeAdapter {
 
   stop(): void {
     if (!this.view.turn.stoppable) return;
-    this.transport?.disconnect();
+    this.connection?.disconnect();
     this.flushStreaming();
     this.state = { ...this.state, turn: { ...this.state.turn, state: "stopped", stoppable: false } };
     this.emit();
@@ -196,7 +212,7 @@ export class NativeAgentAdapter implements WorkspaceRuntimeAdapter {
   }
 
   private async startTurn(message: QueuedMessage): Promise<void> {
-    if (this.transport === null) return;
+    if (this.connection === null) return;
     this.state = {
       ...this.state,
       messages: [...this.state.messages, userMessage(message)],
@@ -204,7 +220,7 @@ export class NativeAgentAdapter implements WorkspaceRuntimeAdapter {
     };
     this.emit();
     try {
-      await startTransportTurn(this.transport, message.text);
+      await this.host.startTurn(this.connection, message.text);
     } catch (cause) {
       this.state = { ...this.state, turn: { ...this.state.turn, state: "error", stoppable: false } };
       this.emit();
@@ -266,7 +282,7 @@ export class NativeAgentAdapter implements WorkspaceRuntimeAdapter {
     readonly tool: string;
     readonly arguments: unknown;
   }): Promise<{ success: boolean; text: string }> {
-    const result = await this.transport?.client?.executeTool(call);
+    const result = await this.connection?.client?.executeTool(call);
     return result ?? { success: false, text: "The workspace runtime is not connected." };
   }
 

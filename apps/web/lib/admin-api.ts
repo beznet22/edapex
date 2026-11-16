@@ -1,5 +1,5 @@
-import { apiBase } from "@/lib/api";
-import { apiFetch, readMessage } from "@/lib/api-transport";
+import { apiBase } from "@edapex/host/api";
+import { apiFetch, readMessage } from "@edapex/host/api/transport";
 
 /**
  * The admin dashboard's data layer.

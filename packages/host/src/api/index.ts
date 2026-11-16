@@ -1,6 +1,6 @@
 import type { CapabilityManifest } from "@edapex/contracts";
 
-import { apiFetch, hostKind, readMessage } from "@/lib/api-transport";
+import { apiFetch, hostKind, readMessage } from "./transport";
 
 export type Persona = "staff" | "parent";
 export type LinkStatus = "none" | "active" | "expired" | "used" | "revoked";
@@ -107,7 +107,7 @@ export const getSession = async (): Promise<SessionView | null> => {
 export const signOut = async (): Promise<void> => {
   // Native hosts clear the keychain token; the web clears the cookie. Both are one call.
   if (hostKind() === "native") {
-    const { authLogout } = await import("@/lib/tauri");
+    const { authLogout } = await import("../tauri");
     await authLogout();
     return;
   }
