@@ -128,9 +128,29 @@ halves uncovering outward, `spatial-slow` (496ms), no overshoot, and immediate u
 
 The splash canvas is 288dp and the system masks the icon to a **192dp circle**. A bounding
 box that fits a square does not fit a circle: this mark's widest points are 98.4dp from its
-centre and would be clipped by 2.4dp. The generated VectorDrawable therefore uses a square
-629×629 viewport with the silhouette centred and scaled to a **92dp radius**, leaving 4dp
-inside the mask. `docs/design/brand/splash-preview.png` is the measured preview.
+centre, which would be clipped by 2.4dp.
+
+**The drawable must declare the 288dp canvas, not the 192dp circle.** It declared 192dp, so
+the platform scaled the whole vector up by 288/192 and a 92dp radius arrived at 138dp against
+a 96dp mask — the side tabs were cut on both sides and the launch looked distorted. The
+generated VectorDrawable is a 944×944 viewport fitted to the canvas at a **91.9dp radius**,
+and `windowSplashScreenAnimatedIcon` is where that declaration matters, because Android sizes
+the drawable from its own intrinsic size rather than from the drawable's viewport aspect.
+
+### Ink and surface
+
+Both come from the sheet, and neither can be a literal:
+
+- `splash_background` is the `background` token in sRGB — `#FAF9F5` light, `#181715` night.
+- `splash_mark` is the `foreground` token — `#141413` light, `#FAF9F5` night — referenced as
+  `@color/splash_mark` from every path. A shape cannot follow a theme, so the ink is a
+  colour resource with a night pair, exactly like the shipped black and white PNGs.
+
+`scripts/check-splash-tokens.mjs` recomputes both from `oklch()` and fails if either drifts,
+if the ink stops being the foreground token, or if either mark drops below 7:1 against its
+surface. It exists because both colours had drifted: the light value was a cool #FBFBFD
+against a warm token, and the night value was #161A24 — Tauri's scaffold blue-black — with a
+hard-coded black mark on top, which is why the dark splash read as a blank black screen.
 
 ## 9. Acceptance
 
@@ -143,3 +163,33 @@ inside the mask. `docs/design/brand/splash-preview.png` is the measured preview.
 - Matrix: 320 / 360 / 393 / 412 dp portrait, 673 dp landscape, 600 / 717 / 800 / 1280 /
   1600 dp, a 480×720 free-form window, and 200% text scale — no horizontal scroll, no
   clipped rows, every target ≥ 44dp.
+
+### Verified on a device, 2026-11-16
+
+Samsung SM-G781U, Android 13 (API 33), WebView 157.0.8103.38 — so `linear()` springs,
+`env(safe-area-inset-*)` and `clip-path` are all live and the Kotlin inset bridge is the
+fallback path rather than the primary one.
+
+| Check | Result |
+|---|---|
+| Cold start | No crash, no white flash; splash window created and destroyed |
+| Splash mark | Undistorted in both modes, ink resolved from the foreground token |
+| Insets | `--platform-inset-top: 88px`, `--platform-inset-bottom: 144px` |
+| Back, nothing open | Exits the task |
+| Back, drawer open | Drawer closes, activity keeps focus |
+| Deep link | `edapex://auth?code=test` arrives at `MainActivity` via `onNewIntent` |
+| Rotation | Dock → rail at the medium window class; no reload |
+| Density 560 | Rows grow, text wraps, nothing clipped |
+
+Three defects were found only here, and none was reachable from a desktop build:
+
+1. **`window.rs` did not compile for Android.** `start_dragging`, `minimize`, `unmaximize` and
+   `maximize` are `WindowExt` methods that do not exist on a mobile `WebviewWindow`.
+2. **The sheet opened off-screen.** vaul translates a snapped sheet, and a content-sized
+   panel made it land at `translateY(536px)` on a 303px sheet while reporting `open`.
+3. **`window.EdApexHost` was never defined.** `addJavascriptInterface` ran in `onResume`,
+   after the bundle; the view-tree walk found no WebView from `onCreate` or `onResume`, which
+   also left `--platform-inset-*` empty. `onWebViewCreate` is the hook that always fires.
+
+The lesson worth keeping: a splash and an inset bridge cannot be signed off by typecheck.
+Both needed a running process and a real display.
