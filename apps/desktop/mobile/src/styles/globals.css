@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "@edapex/tokens/tokens.css";
+@import "@edapex/tokens/motion.css";
 @import "@edapex/ui/styles/animate.css";
 
 /* The app's own sources, then the shared packages it renders from. */
@@ -57,4 +58,46 @@
   --shadow-sheet: var(--elevation-3);
 
   --ease-sheet: var(--duet-ease);
+}
+
+/*
+ * Insets resolve here and nowhere else.
+ *
+ * `env(safe-area-inset-*)` is the primary source. `--platform-inset-*` is written by
+ * `MainActivity` for WebViews older than M144, where `env()` returns 0; `max()` means the
+ * larger of the two wins and neither can subtract from the other. No component writes
+ * `env()` or a raw padding — they use `.screen-top` / `.screen-bottom`.
+ */
+:root {
+  --inset-top: max(env(safe-area-inset-top), var(--platform-inset-top, 0px));
+  --inset-bottom: max(env(safe-area-inset-bottom), var(--platform-inset-bottom, 0px));
+  --inset-left: max(env(safe-area-inset-left), var(--platform-inset-left, 0px));
+  --inset-right: max(env(safe-area-inset-right), var(--platform-inset-right, 0px));
+  --dock-height: calc(var(--spacing-dock) + var(--inset-bottom));
+}
+
+@layer components {
+  .screen-top {
+    padding-top: var(--inset-top);
+  }
+
+  .screen-bottom {
+    padding-bottom: var(--inset-bottom);
+  }
+
+  /* The dock floats above the gesture bar, so it needs the inset plus its own gap. */
+  .dock-offset {
+    bottom: calc(var(--inset-bottom) + 0.75rem);
+  }
+
+  /*
+   * Leaving the viewport has to be a transform, not a `translate-y-[calc(...)]` — an
+   * arbitrary value is a value no token can change, and this one has to clear the gesture
+   * bar's inset.
+   */
+  .dock-shift[data-hidden="true"] {
+    transform: translateY(calc(100% + var(--inset-bottom) + 1rem));
+    opacity: 0;
+    pointer-events: none;
+  }
 }
