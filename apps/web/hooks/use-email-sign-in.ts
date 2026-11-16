@@ -45,14 +45,14 @@ export function useEmailSignIn(initial: LoginNotice = IDLE): EmailSignIn {
       setSending(true);
       void (async () => {
         try {
-          await requestMagicLink(trimmed);
+          const { devLink } = await requestMagicLink(trimmed);
           /*
            * The API answers 202 for a known and an unknown address alike, so this cannot
            * distinguish "sent" from "no such account" — by design, so the screen does not
            * reveal who has an account. The confirmation therefore states what was
            * *requested*, not what was delivered.
            */
-          setNotice({ kind: "sent", email: trimmed });
+          setNotice({ kind: "sent", email: trimmed, devLink });
         } catch (cause) {
           setNotice(
             noticeFromError(

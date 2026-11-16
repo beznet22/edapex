@@ -50,7 +50,7 @@ export function RuntimeSetup({
 
   return (
     <Modal
-      description="EdApex runs the agent locally in this browser and streams from the school gateway. No API key is stored on this device."
+      description="EDAPEX runs the agent locally in this browser and streams from the school gateway. No API key is stored on this device."
       footer={
         <>
           <p className="mr-auto max-w-[28ch] text-[10px] leading-4 text-muted-foreground">

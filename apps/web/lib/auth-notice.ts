@@ -12,7 +12,7 @@
  */
 export type LoginNotice =
   | { readonly kind: "idle" }
-  | { readonly kind: "sent"; readonly email: string }
+  | { readonly kind: "sent"; readonly email: string; readonly devLink?: string | null }
   | { readonly kind: "link-expired" }
   | { readonly kind: "cancelled" }
   | { readonly kind: "mismatch" }

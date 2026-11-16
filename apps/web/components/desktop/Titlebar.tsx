@@ -76,7 +76,7 @@ export function Titlebar({ title }: { readonly title?: string }) {
           wrapper would make the buttons below draggable instead of clickable. */}
       <div className="h-full flex-1" data-tauri-drag-region />
       <span className="pointer-events-none px-2 text-[13px] text-muted-foreground">
-        {title ?? "EdApex Work"}
+        {title ?? "EDAPEX Work"}
       </span>
       <div className="h-full flex-1" data-tauri-drag-region />
       {/* Controls are Linux/Windows only. On macOS the native traffic lights are

@@ -159,7 +159,7 @@ export function Composer({
           onChange={onInput}
           onFocus={() => setFocused(true)}
           onKeyDown={onKeyDown}
-          placeholder={connected ? "Ask EdApex anything" : "Loading the workspace…"}
+          placeholder={connected ? "Ask EDAPEX anything" : "Loading the workspace…"}
           ref={textarea}
           rows={1}
           value={draft}

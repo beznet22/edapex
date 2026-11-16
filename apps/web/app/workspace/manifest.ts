@@ -2,9 +2,9 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "EdApex Work",
-    short_name: "EdApex",
-    description: "EdApex school operations and cowork workspace.",
+    name: "EDAPEX Work",
+    short_name: "EDAPEX",
+    description: "EDAPEX school operations and cowork workspace.",
     id: "/workspace/",
     start_url: "/workspace/",
     scope: "/workspace/",

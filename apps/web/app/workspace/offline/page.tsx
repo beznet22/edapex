@@ -8,7 +8,7 @@ export default function WorkspaceOfflinePage() {
         <BrandMark className="mx-auto" size={40} />
         <h1 className="mt-4 text-lg font-semibold tracking-tight">You are offline</h1>
         <p className="mt-2 text-sm leading-6 text-muted-foreground">
-          EdApex Work needs a connection to load your conversation and school data. The app shell
+          EDAPEX Work needs a connection to load your conversation and school data. The app shell
           will reopen when you are back online.
         </p>
         <Link

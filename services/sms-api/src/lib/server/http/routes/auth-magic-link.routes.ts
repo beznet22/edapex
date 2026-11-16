@@ -8,7 +8,7 @@ import { jsonBody } from "../validation";
 
 export const authMagicLink = new Hono<AppContext>()
   .post("/magic-link", jsonBody(magicLinkBody), async (c) => {
-    await createService(MagicLinkService, c.get("baseCtx")).request({
+    const result = await createService(MagicLinkService, c.get("baseCtx")).request({
       email: c.req.valid("json").email,
       ip: c.get("ip"),
       userAgent: c.get("userAgent"),
@@ -24,7 +24,13 @@ export const authMagicLink = new Hono<AppContext>()
       origin: c.get("baseCtx").ports.authConfig.appOrigin
     });
     c.header("Cache-Control", "no-store");
-    return c.json({ status: "pending" }, 202);
+    /*
+     * `devLink` is present only when the local console transport handled the mail. It is
+     * never a production field: `MagicLinkService.request` returns null unless the adapter
+     * reports itself as the console one, so the disclosure cannot be enabled by a request
+     * header or a config mistake in the wrong direction.
+     */
+    return c.json({ status: "pending", devLink: result.devLink }, 202);
   })
   .get("/magic-link/verify", async (c) => {
     const token = c.req.query("token");

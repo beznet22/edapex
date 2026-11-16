@@ -114,7 +114,7 @@ export function SettingsSurface() {
           </summary>
           <div className="mt-3 space-y-3">
             <p className="text-[13px] leading-6 text-muted-foreground">
-              EdApex uses one palette across the browser tab, the desktop window and the
+              EDAPEX uses one palette across the browser tab, the desktop window and the
               mobile app. Custom colours are not available yet — a per-device palette would
               make a screenshot impossible to reproduce on another machine.
             </p>

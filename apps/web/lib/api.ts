@@ -157,9 +157,16 @@ export const revokeClaimLink = async (
   });
 };
 
-export const requestMagicLink = async (email: string): Promise<void> => {
-  await request<{ status: string }>("/api/v1/auth/magic-link", {
-    method: "POST",
-    body: { email }
-  });
+/**
+ * Requests a sign-in link.
+ *
+ * Returns `devLink` when the API is running with the local console transport. In production
+ * the field is null and the real link is only ever in the email.
+ */
+export const requestMagicLink = async (email: string): Promise<{ devLink: string | null }> => {
+  const response = await request<{ status: string; devLink?: string | null }>(
+    "/api/v1/auth/magic-link",
+    { method: "POST", body: { email } }
+  );
+  return { devLink: response.devLink ?? null };
 };

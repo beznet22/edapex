@@ -164,7 +164,7 @@ export function WorkspaceBoot({ surface }: { readonly surface: WorkspaceTab }) {
               </div>
             </div>
             <div className="hidden items-center gap-2 text-sm lg:flex">
-              <span className="font-semibold tracking-tight">EdApex Work</span>
+              <span className="font-semibold tracking-tight">EDAPEX Work</span>
               <span className="text-muted-foreground">/</span>
               <span className="text-muted-foreground">{BOOT_LABEL[surface]}</span>
             </div>

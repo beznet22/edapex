@@ -272,7 +272,7 @@ export function WorkspaceShell({
       data-workspace-shell="true"
     >
       {/* Renders null in a browser tab: the browser draws its own chrome. */}
-      <Titlebar title="EdApex Work" />
+      <Titlebar title="EDAPEX Work" />
       <SidebarProvider onOpenChange={setSidebarOpen} open={sidebarOpen}>
         <DesktopRail
           activeNavId={activeNavId}
@@ -315,7 +315,7 @@ export function WorkspaceShell({
                 <BreadcrumbList>
                   <BreadcrumbItem className="hidden md:block">
                     <BreadcrumbLink asChild>
-                      <Link href="/workspace">EdApex</Link>
+                      <Link href="/workspace">EDAPEX</Link>
                     </BreadcrumbLink>
                   </BreadcrumbItem>
                   <BreadcrumbSeparator className="hidden md:block" />

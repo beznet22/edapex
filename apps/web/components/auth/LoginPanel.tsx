@@ -71,13 +71,17 @@ export function LoginPanel({
         <div className="flex flex-1 items-center justify-center">
           <div className="w-full max-w-[340px]">
             {notice.kind === "sent" ? (
-              <SentState email={notice.email} onReset={onReset} />
+              <SentState
+                devLink={notice.devLink ?? null}
+                email={notice.email}
+                onReset={onReset}
+              />
             ) : (
               <form className="flex flex-col gap-6" onSubmit={onSubmit}>
                 <FieldGroup>
                   <div className="flex flex-col gap-1.5">
                     <h1 className="text-[26px] font-semibold leading-tight tracking-tight">
-                      Sign in to EdApex
+                      Sign in to EDAPEX
                     </h1>
                     <p className="text-[13px] leading-6 text-muted-foreground">
                       Use the Google account linked to your school, or get a link by email.
@@ -164,14 +168,20 @@ export function LoginPanel({
           }}
         />
         <div className="relative flex h-full flex-col justify-end p-10">
-          <blockquote className="max-w-[36ch]">
-            <p className="text-[22px] font-medium leading-snug tracking-tight">
-              One workspace for the register, the marksheet and the conversation about both.
+          <div className="max-w-[42ch]">
+            <p className="text-[26px] font-semibold leading-[1.2] tracking-tight">
+              Everything connected.
+              <br />
+              Everyone empowered.
             </p>
-            <footer className="mt-3 text-[13px] text-muted-foreground">
-              EdApex — school cowork
-            </footer>
-          </blockquote>
+            <p className="mt-4 text-[14px] leading-6 text-muted-foreground">
+              From classrooms to administration, bring your entire school community into one
+              seamless workspace.
+            </p>
+            <p className="mt-6 text-[13px] font-medium tracking-[0.01em] text-foreground">
+              EDAPEX — schoolwork, reimagined.
+            </p>
+          </div>
         </div>
       </div>
     </div>
@@ -185,7 +195,21 @@ export function LoginPanel({
  * actions are "open your mail" and "I used the wrong address"; leaving a live form under a
  * confirmation invites a duplicate send.
  */
-function SentState({ email, onReset }: { readonly email: string; readonly onReset: () => void }) {
+function SentState({
+  email,
+  devLink,
+  onReset
+}: {
+  readonly email: string;
+  /**
+   * Present only under the local console transport, where no email is actually sent.
+   *
+   * Offering the button beats "check your inbox" for a message that is sitting in the API
+   * terminal. The field is null in production, so this cannot become a way to bypass email.
+   */
+  readonly devLink: string | null;
+  readonly onReset: () => void;
+}) {
   return (
     <div className="flex flex-col items-center gap-4 text-center">
       <div className="flex size-12 items-center justify-center rounded-full bg-primary/10">
@@ -213,6 +237,22 @@ function SentState({ email, onReset }: { readonly email: string; readonly onRese
           expires in 15 minutes.
         </p>
       </div>
+      {devLink === null ? null : (
+        <div className="w-full rounded-[var(--radius-md)] border border-dashed border-border bg-muted/40 p-3 text-left">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
+            Local development
+          </p>
+          <p className="mt-1 text-[12px] leading-5 text-muted-foreground">
+            No email is sent here. Open the link directly:
+          </p>
+          <a
+            className="mt-2 inline-flex h-9 w-full items-center justify-center rounded-[var(--radius-md)] bg-primary text-[13px] font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+            href={devLink}
+          >
+            Sign in now
+          </a>
+        </div>
+      )}
       <Button className="w-full" onClick={onReset} type="button" variant="outline">
         Use a different email
       </Button>

@@ -7,9 +7,9 @@ import { NextResponse } from "next/server";
  * responsive contract in spec 15.
  */
 const manifest = {
-  name: "EdApex Work",
-  short_name: "EdApex",
-  description: "EdApex school operations and cowork workspace.",
+  name: "EDAPEX Work",
+  short_name: "EDAPEX",
+  description: "EDAPEX school operations and cowork workspace.",
   id: "/workspace",
   start_url: "/workspace",
   scope: "/workspace",

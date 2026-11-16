@@ -10,7 +10,7 @@ import { readThemeCookies } from "@/lib/theme";
 
 export const metadata: Metadata = {
   title: "Workspace",
-  description: "EdApex cowork workspace.",
+  description: "EDAPEX cowork workspace.",
   manifest: "/workspace/manifest.webmanifest"
 };
 

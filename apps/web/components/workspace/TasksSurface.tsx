@@ -59,7 +59,7 @@ export function TasksSurface({
     return (
       <section className="flex flex-1 items-center justify-center">
         <EmptyState
-          description="Work the agent asks you to decide appears here. Routines run while EdApex is open, so this list fills as they report back."
+          description="Work the agent asks you to decide appears here. Routines run while EDAPEX is open, so this list fills as they report back."
           kind="blank"
           title="Nothing needs you"
         />

@@ -29,6 +29,9 @@ export interface LocalEmail {
 }
 
 export class LoggingEmailAdapter implements EmailSender {
+  /** Marks this as the local transport, which is what lets the API return the link. */
+  readonly console = true;
+
   constructor(
     private readonly options: {
       /** Sink, defaulting to `console.info`. Injected so tests can assert. */
