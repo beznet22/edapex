@@ -75,7 +75,7 @@ const toView = (row: StaffListRow): StaffView => ({
 export class StaffService {
   constructor(private readonly ctx: ServiceContext) {}
 
-  async list(input: StaffListQuery): Promise<Page<StaffView>> {
+  async list(input: StaffListQuery): Promise<Page<StaffView> & { readonly total: number }> {
     const scoped = requireScopedContext(this.ctx.repos.ctx);
     const limit = clampLimit(input.limit);
     const afterId = decodeCursor(input.cursor);
@@ -89,10 +89,16 @@ export class StaffService {
       limit
     });
 
-    // The repository fetches `limit + 1` to prove there is a next page without a count
-    // query; the extra row is dropped here rather than in every caller.
+    // The repository fetches `limit + 1` to prove there is a next page; the count is a
+    // second query because a keyset cursor cannot answer "how many pages are there".
+    const total = await this.ctx.repos.profiles.countStaff(scoped, {
+      ...(input.query === undefined ? {} : { query: input.query }),
+      ...(input.departmentId === undefined ? {} : { departmentId: input.departmentId }),
+      ...(input.designationId === undefined ? {} : { designationId: input.designationId }),
+      ...(input.includeInactive === undefined ? {} : { includeInactive: input.includeInactive })
+    });
     const page = toPage(rows, limit, (row) => row.id);
-    return { rows: page.rows.map(toView), nextCursor: page.nextCursor };
+    return { rows: page.rows.map(toView), nextCursor: page.nextCursor, total };
   }
 
   async get(staffId: number): Promise<StaffView> {

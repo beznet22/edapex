@@ -17,8 +17,5 @@
     "lib": "@/lib",
     "hooks": "@/hooks"
   },
-  "iconLibrary": "lucide",
-  "registries": {
-    "@shadcn": "https://ui.shadcn.com/r/styles/new-york/{name}.json"
-  }
+  "iconLibrary": "lucide"
 }

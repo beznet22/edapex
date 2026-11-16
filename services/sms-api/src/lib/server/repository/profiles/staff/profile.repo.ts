@@ -1,4 +1,4 @@
-import { and, eq, gt, like, or } from "drizzle-orm";
+import { and, eq, gt, like, or, sql } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
 
 import { smDesignations, smHumanDepartments, smStaffs } from "../../../db/schema";
@@ -196,6 +196,49 @@ export async function searchStaff(
       .leftJoin(smHumanDepartments, eq(smStaffs.departmentId, smHumanDepartments.id))
       .where(and(...conditions));
   }, "searchStaff");
+}
+
+/**
+ * How many rows match, for page navigation.
+ *
+ * A keyset cursor alone cannot produce "page 3 of 12": it knows the next row, not how many
+ * there are. The count is a separate small query rather than a window function because D1
+ * has no `COUNT(*) OVER ()`.
+ */
+export async function countStaff(
+  ctx: ScopedRepositoryContext,
+  options: {
+    readonly query?: string;
+    readonly departmentId?: number;
+    readonly designationId?: number;
+    readonly includeInactive?: boolean;
+  }
+): Promise<number> {
+  return withErrorHandling(async () => {
+    const conditions = [eq(smStaffs.schoolId, ctx.tenant.schoolId)];
+    if (options.includeInactive !== true) conditions.push(eq(smStaffs.activeStatus, 1));
+    if (options.departmentId !== undefined) {
+      conditions.push(eq(smStaffs.departmentId, options.departmentId));
+    }
+    if (options.designationId !== undefined) {
+      conditions.push(eq(smStaffs.designationId, options.designationId));
+    }
+    if (options.query !== undefined && options.query.trim().length > 0) {
+      const pattern = `%${options.query.trim()}%`;
+      conditions.push(
+        or(
+          like(smStaffs.fullName, pattern),
+          like(smStaffs.email, pattern),
+          like(smStaffs.mobile, pattern)
+        ) as SQL<unknown>
+      );
+    }
+    const rows = await ctx.db
+      .select({ total: sql<number>`count(*)` })
+      .from(smStaffs)
+      .where(and(...conditions));
+    return Number(rows[0]?.total ?? 0);
+  }, "countStaff");
 }
 
 /**

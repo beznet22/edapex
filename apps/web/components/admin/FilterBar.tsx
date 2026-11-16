@@ -1,6 +1,6 @@
 "use client";
 
-import { Search, SlidersHorizontal, ArrowUpDown, LayoutGrid, List } from "lucide-react";
+import { Search, SlidersHorizontal, ArrowUpDown } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,6 +28,38 @@ import { cn } from "@/lib/utils";
  * read differently.
  */
 export type SortKey = "name" | "role" | "status";
+
+/**
+ * Status filters.
+ *
+ * `active`/`inactive` are account states; the rest mirror the claim-link directory's own
+ * vocabulary. Both sets live in one control because a person reading the table does not care
+ * which endpoint produced the row — they care whether the account is claimed.
+ */
+export type StatusFilter =
+  | "all"
+  | "active"
+  | "inactive"
+  | "claimed"
+  | "unclaimed"
+  | "flagged"
+  | "no_email"
+  | "non_gmail"
+  | "duplicate"
+  | "link_active";
+
+const STATUS_LABEL: Readonly<Record<StatusFilter, string>> = {
+  all: "All",
+  active: "Active only",
+  inactive: "Inactive only",
+  claimed: "Claimed",
+  unclaimed: "Unclaimed",
+  flagged: "Flagged",
+  no_email: "No email",
+  non_gmail: "Not Gmail",
+  duplicate: "Duplicate email",
+  link_active: "Link live"
+};
 export type SortDirection = "asc" | "desc";
 
 export function FilterBar({
@@ -44,8 +76,8 @@ export function FilterBar({
 }: {
   readonly query: string;
   readonly onQueryChange: (value: string) => void;
-  readonly statusFilter: "all" | "active" | "inactive";
-  readonly onStatusChange: (value: "all" | "active" | "inactive") => void;
+  readonly statusFilter: StatusFilter;
+  readonly onStatusChange: (value: StatusFilter) => void;
   readonly includeInactive: boolean;
   readonly onIncludeInactiveChange: (value: boolean) => void;
   readonly sortKey: SortKey;
@@ -61,7 +93,16 @@ export function FilterBar({
 
   return (
     <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-      <div className="relative flex-1">
+      {/*
+        The search is capped, not stretched.
+        
+        In the reference it is a bounded field on the left — roughly a third of the table's
+        width — with Import, Filter and the view toggle sitting to its right and empty space
+        remaining. Stretching it to fill the row made it 850px wide, which reads as a page
+        title rather than a filter. `max-w-md` plus `flex-1` gives it room to shrink on narrow
+        screens without ever dominating a wide one.
+      */}
+      <div className="relative min-w-0 flex-1 sm:max-w-md">
         <Search
           aria-hidden="true"
           className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
@@ -76,7 +117,15 @@ export function FilterBar({
         />
       </div>
 
-      <div className="flex items-center gap-1.5">
+      {/*
+        The controls sit *beside* the search, not pinned to the right edge.
+
+        `ml-auto` spread them to the far end of a 1200px row, which put the Filter and Sort
+        buttons a screen away from the field they refine. The reference keeps search, Filter
+        and Sort as one cluster on the left, with the remaining width empty — a filter bar is
+        a single unit, not a header with a toolbar bolted to the corner.
+      */}
+      <div className="flex shrink-0 items-center gap-1.5">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button className="h-9 gap-1.5" size="sm" variant="outline">
@@ -91,14 +140,14 @@ export function FilterBar({
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-52">
             <DropdownMenuLabel>Status</DropdownMenuLabel>
-            {(["all", "active", "inactive"] as const).map((value) => (
+            {(Object.keys(STATUS_LABEL) as StatusFilter[]).map((value) => (
               <DropdownMenuCheckboxItem
                 checked={statusFilter === value}
                 key={value}
                 onCheckedChange={() => onStatusChange(value)}
                 onSelect={(event) => event.preventDefault()}
               >
-                {value === "all" ? "All" : value === "active" ? "Active only" : "Inactive only"}
+                {STATUS_LABEL[value]}
               </DropdownMenuCheckboxItem>
             ))}
             <DropdownMenuSeparator />
@@ -137,26 +186,6 @@ export function FilterBar({
           </DropdownMenuContent>
         </DropdownMenu>
 
-        {/*
-          The view toggle, present for parity and deliberately inert on Grid. A disabled
-          control with a title explaining why is more honest than one that silently does
-          nothing, and more useful than pretending a card grid is a good way to compare staff
-          by department.
-        */}
-        <div className="hidden items-center rounded-[var(--radius-md)] border border-border p-0.5 sm:flex">
-          <span
-            aria-current="true"
-            className="flex size-7 items-center justify-center rounded-[var(--radius-xs)] bg-primary text-primary-foreground"
-          >
-            <List aria-hidden="true" className="size-4" />
-          </span>
-          <span
-            className="flex size-7 cursor-not-allowed items-center justify-center rounded-[var(--radius-xs)] text-muted-foreground/40"
-            title="A directory is compared row by row; a grid makes two people hard to compare."
-          >
-            <LayoutGrid aria-hidden="true" className="size-4" />
-          </span>
-        </div>
       </div>
     </div>
   );
@@ -166,7 +195,7 @@ export function FilterBar({
 export function applyView<T extends { readonly fullName: string | null; readonly active: boolean; readonly designation: string | null; readonly department: string | null }>(
   rows: readonly T[],
   view: {
-    readonly statusFilter: "all" | "active" | "inactive";
+    readonly statusFilter: StatusFilter;
     readonly sortKey: SortKey;
     readonly sortDirection: SortDirection;
   }

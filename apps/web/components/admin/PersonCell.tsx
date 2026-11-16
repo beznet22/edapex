@@ -1,5 +1,7 @@
 "use client";
 
+import { Mail, Phone } from "lucide-react";
+
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -51,35 +53,24 @@ export function PersonCell({
   );
 }
 
+/**
+ * A status pill.
+ *
+ * A mapping from domain state to a Badge variant, nothing more. The colours and their
+ * contrast live in `components/ui/badge.tsx` so six call sites cannot each invent their own
+ * `bg-*` / `text-*` pair — which is exactly how "yellow on yellow" reaches production.
+ */
 export type PillTone = "claimed" | "unclaimed" | "flagged" | "neutral" | "active" | "inactive";
 
-/**
- * Status pills.
- *
- * The ink tokens (`--warning-ink`, `--destructive-ink`) exist because `--warning` and
- * `--destructive` used as 12px text on their own 10% tint measure 4.35:1 and 4.22:1 — below
- * the 4.5:1 AA floor. These land at 4.91:1 and 5.13:1 against the same tint with the hue
- * unchanged.
- */
-const TONE: Readonly<Record<PillTone, { readonly label: string; readonly className: string }>> = {
-  claimed: {
-    label: "Claimed",
-    className: "border-[color-mix(in_oklch,var(--success)_30%,transparent)] bg-[color-mix(in_oklch,var(--success)_10%,transparent)] text-[var(--success-ink)]"
-  },
-  unclaimed: {
-    label: "Unclaimed",
-    className: "border-[color-mix(in_oklch,var(--warning)_30%,transparent)] bg-[color-mix(in_oklch,var(--warning)_10%,transparent)] text-[var(--warning-ink)]"
-  },
-  flagged: {
-    label: "Flagged",
-    className: "border-[color-mix(in_oklch,var(--destructive)_30%,transparent)] bg-[color-mix(in_oklch,var(--destructive)_10%,transparent)] text-[var(--destructive-ink)]"
-  },
-  neutral: { label: "No account", className: "border-border bg-muted text-muted-foreground" },
-  active: {
-    label: "Active",
-    className: "border-[color-mix(in_oklch,var(--success)_30%,transparent)] bg-[color-mix(in_oklch,var(--success)_10%,transparent)] text-[var(--success-ink)]"
-  },
-  inactive: { label: "Inactive", className: "border-border bg-muted text-muted-foreground" }
+const TONE: Readonly<{
+  [K in PillTone]: { readonly label: string; readonly variant: "success" | "warning" | "destructive" | "neutral" | "outline" };
+}> = {
+  claimed: { label: "Claimed", variant: "success" },
+  unclaimed: { label: "Unclaimed", variant: "warning" },
+  flagged: { label: "Flagged", variant: "destructive" },
+  neutral: { label: "No account", variant: "neutral" },
+  active: { label: "Active", variant: "success" },
+  inactive: { label: "Inactive", variant: "neutral" }
 };
 
 export function StatusPill({
@@ -93,14 +84,7 @@ export function StatusPill({
 }) {
   const style = TONE[tone];
   return (
-    <Badge
-      className={cn(
-        "rounded-full border px-2 py-0.5 text-[11px] font-medium leading-4",
-        style.className,
-        className
-      )}
-      variant="outline"
-    >
+    <Badge className={className} variant={style.variant}>
       {label ?? style.label}
     </Badge>
   );
@@ -122,10 +106,16 @@ export function ContactCell({
   readonly className?: string;
 }) {
   return (
-    <div className={cn("min-w-0", className)}>
-      <div className="truncate text-[13px] leading-5 text-foreground">{email ?? "—"}</div>
+    <div className={cn("min-w-0 space-y-0.5", className)}>
+      <div className="flex items-center gap-1.5">
+        <Mail aria-hidden="true" className="size-3 shrink-0 text-muted-foreground/70" />
+        <span className="truncate text-[13px] leading-5 text-foreground">{email ?? "—"}</span>
+      </div>
       {phone === null || phone.length === 0 ? null : (
-        <div className="truncate text-[12px] leading-4 text-muted-foreground">{phone}</div>
+        <div className="flex items-center gap-1.5">
+          <Phone aria-hidden="true" className="size-3 shrink-0 text-muted-foreground/70" />
+          <span className="truncate text-[12px] leading-4 text-muted-foreground">{phone}</span>
+        </div>
       )}
     </div>
   );

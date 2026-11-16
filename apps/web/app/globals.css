@@ -665,6 +665,36 @@
   }
 
   /*
+   * Tinted badge variants.
+   *
+   * Written as classes rather than Tailwind arbitrary values: the mix arguments contain
+   * commas, which the class scanner splits, so the generated rule silently never applies —
+   * a failure that looks like "the colour is wrong" rather than "the class does not exist".
+   *
+   * The ink tokens are one lightness step below the fill tokens because these are 11px text
+   * on their own 10% tint. `--warning` as text measures 4.35:1 there and `--destructive`
+   * 4.22:1; both are below the 4.5:1 AA floor, which is the "yellow on yellow" report. The
+   * inks measure 4.91:1 and 5.13:1 against the same tint.
+   */
+  .badge-success {
+    border-color: color-mix(in oklch, var(--success) 30%, transparent);
+    background-color: color-mix(in oklch, var(--success) 10%, var(--card));
+    color: var(--success-ink);
+  }
+
+  .badge-warning {
+    border-color: color-mix(in oklch, var(--warning) 30%, transparent);
+    background-color: color-mix(in oklch, var(--warning) 10%, var(--card));
+    color: var(--warning-ink);
+  }
+
+  .badge-destructive {
+    border-color: color-mix(in oklch, var(--destructive) 30%, transparent);
+    background-color: color-mix(in oklch, var(--destructive) 10%, var(--card));
+    color: var(--destructive-ink);
+  }
+
+  /*
    * Skeleton shimmer.
    *
    * The one loading affordance, per the design spec: `skeleton-shimmer` only, never

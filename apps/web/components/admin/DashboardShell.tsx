@@ -48,51 +48,59 @@ export function DashboardShell({
  * because a rise in absences is bad — a global "up is green" rule is wrong for half the
  * metrics a school actually tracks.
  */
+/**
+ * The tone of a tile's indicator dot.
+ *
+ * A dot rather than a coloured card: the reference uses coloured dots inside one neutral card
+ * for exactly this reason — three tinted cards side by side compete for attention that only
+ * one of them has earned, and the eye has nowhere to land.
+ */
+export type StatTone = "neutral" | "success" | "warning" | "danger";
+
+const DOT: Readonly<Record<StatTone, string>> = {
+  neutral: "bg-muted-foreground/50",
+  success: "bg-[var(--success)]",
+  warning: "bg-[var(--warning)]",
+  danger: "bg-[var(--destructive)]"
+};
+
 export function StatTile({
   label,
   value,
   qualifier,
-  delta,
-  goodDirection = "up",
+  tone = "neutral",
+  /** Draws attention when the number is not zero — a problem count of 0 needs no frame. */
+  alertWhenNonZero = false,
   className
 }: {
   readonly label: string;
   readonly value: number | string;
   readonly qualifier?: string;
-  readonly delta?: number;
-  /** Which way is good for *this* metric. */
-  readonly goodDirection?: "up" | "down";
+  readonly tone?: StatTone;
+  readonly alertWhenNonZero?: boolean;
   readonly className?: string;
 }) {
-  const positive =
-    delta === undefined ? false : goodDirection === "up" ? delta > 0 : delta < 0;
+  const numeric = typeof value === "number" ? value : null;
+  const alert = alertWhenNonZero && numeric !== null && numeric > 0;
 
   return (
     <div
       className={cn(
         // On the canvas with a hairline, not nested inside another card.
-        "rounded-[var(--radius-lg)] border border-border bg-card px-4 py-3.5",
+        "rounded-[var(--radius-lg)] border bg-card px-4 py-3.5 transition-colors duration-200",
+        alert ? "border-[var(--warning)]/40" : "border-border",
         className
       )}
     >
-      <div className="text-[13px] font-medium leading-5 text-muted-foreground">{label}</div>
-      <div className="mt-1 flex items-baseline gap-2">
-        <span className="text-[28px] font-semibold leading-none tracking-[-0.02em] tabular-nums">
-          {value}
-        </span>
-        {delta === undefined ? null : (
-          <span
-            className={cn(
-              "text-[13px] font-medium tabular-nums",
-              positive ? "text-[var(--success-ink)]" : "text-[var(--destructive-ink)]"
-            )}
-          >
-            {delta > 0 ? "↑" : delta < 0 ? "↓" : "→"} {Math.abs(delta)}
-          </span>
-        )}
+      <div className="flex items-center gap-1.5">
+        <span aria-hidden="true" className={cn("size-1.5 rounded-full", DOT[tone])} />
+        <span className="text-[13px] font-medium leading-5 text-muted-foreground">{label}</span>
+      </div>
+      <div className="mt-1.5 text-[30px] font-semibold leading-none tracking-[-0.02em] tabular-nums">
+        {value}
       </div>
       {qualifier === undefined ? null : (
-        <div className="mt-1 text-[12px] leading-5 text-muted-foreground">{qualifier}</div>
+        <div className="mt-1.5 text-[12px] leading-5 text-muted-foreground">{qualifier}</div>
       )}
     </div>
   );
