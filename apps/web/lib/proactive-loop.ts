@@ -34,12 +34,21 @@ async function jsonRequest(path: string, body: unknown): Promise<Response> {
   });
 }
 
-/** The routines the server says exist for this workspace. */
-export async function fetchRoutines(workspaceId: string): Promise<readonly RoutineView[]> {
+/**
+ * The routines the server says exist for this workspace.
+ *
+ * Returns `null` when the route does not exist. That is different from an empty list: an
+ * empty list means "no routines", a missing route means "this deployment has no proactive
+ * feature", and the caller must stop asking rather than treat the absence as emptiness.
+ */
+export async function fetchRoutines(
+  workspaceId: string
+): Promise<readonly RoutineView[] | null> {
   const response = await fetch(
     `${apiBase()}/api/v1/agent/routines?workspaceId=${encodeURIComponent(workspaceId)}`,
     { credentials: "include", headers: { accept: "application/json" } }
   );
+  if (response.status === 404) return null;
   if (!response.ok) return [];
   const body = (await response.json()) as { routines?: readonly RoutineRow[] };
   return (body.routines ?? []).map((row) => ({
@@ -58,6 +67,8 @@ export async function fetchRoutines(workspaceId: string): Promise<readonly Routi
 export interface TickRun {
   /** How many routines ran. Zero is the normal case and not a failure. */
   readonly ran: number;
+  /** True when `/agent/routines` answered 404 — the feature is absent, not failing. */
+  readonly endpointMissing: boolean;
 }
 
 /**
@@ -76,6 +87,9 @@ export async function runProactiveTick(options: {
   }>;
 }): Promise<TickRun> {
   const routines = await fetchRoutines(options.workspaceId);
+  if (routines === null) {
+    return { ran: 0, endpointMissing: true };
+  }
 
   /*
    * Routines only fire while the tab is visible, which is the trade the notice states.
@@ -88,7 +102,7 @@ export async function runProactiveTick(options: {
       hasRoutines: routines.length > 0
     })
   ) {
-    return { ran: 0 };
+    return { ran: 0, endpointMissing: false };
   }
 
   const deps: SchedulerDeps = {
@@ -123,5 +137,5 @@ export async function runProactiveTick(options: {
   };
 
   const outcomes = await tick(deps, options.deviceId);
-  return { ran: outcomes.length };
+  return { ran: outcomes.length, endpointMissing: false };
 }

@@ -13,15 +13,20 @@ import { apiBase } from "@/lib/api";
  * Proactive-work wiring.
  *
  * Owns the two things that make chunk 4 real: the local store (so a task list survives a
- * reload) and the tick loop (so a routine actually fires while the tab is open). The loop
- * is the whole acceptance criterion — without it the claim protocol is a library nobody
- * calls.
+ * reload) and the tick loop (so a routine actually fires while the tab is open). The loop's
+ * transport lives in `lib/proactive-loop.ts`; what stays here is state — the store handle, the
+ * device identity and the interval.
  *
- * The loop's transport lives in `lib/proactive-loop.ts`. What stays here is state: the
- * store handle, the device identity and the interval. None of those are transport, and all
- * of them need a mounted component.
+ * # Why this file is careful about effect identity
+ *
+ * `sendAndWait` is passed from the shell and is a **new function on every render**. Listing it
+ * in the tick effect's dependencies meant the effect tore down and re-created its interval on
+ * every render: a tick fired immediately each time, so the app issued a request per render and
+ * pinned a core. Two symptoms, one cause — the console filled with 404s and the fan came on.
+ *
+ * The callback is therefore held in a ref and read through it, so the interval survives a
+ * re-render. That is the whole reason this hook is longer than it looks like it needs to be.
  */
-
 export interface TaskItem {
   readonly id: string;
   readonly title: string;
@@ -50,22 +55,27 @@ export function useProactive(
   }>
 ): ProactiveController {
   const [tasks, setTasks] = useState<readonly TaskItem[]>([]);
+
   /**
-   * Set when the endpoint answers 404.
+   * Set when either endpoint answers 404, and never cleared.
    *
-   * A 404 is not a transient failure: the route does not exist in this deployment, and
-   * retrying it every minute forever fills the console with the same error and keeps a timer
-   * alive for a feature that cannot work. `cowork-api` owns these routes; if only `sms-api`
-   * is running locally, they are legitimately absent.
+   * A 404 is not transient: the route does not exist in this deployment. `cowork-api` owns
+   * `/agent/routines` and `/agent/tasks`; when only `sms-api` is running they are legitimately
+   * absent, and retrying them every minute forever is a console full of the same error and a
+   * timer kept alive for a feature that cannot work.
    */
   const unavailable = useRef(false);
   const { deviceId, ready } = useAgentStore(workspaceId);
 
+  // Read through a ref so a new identity from the shell cannot restart the interval.
+  const sendAndWaitRef = useRef(sendAndWait);
+  sendAndWaitRef.current = sendAndWait;
+
   const refresh = useCallback(async () => {
-    // Deliberately independent of the local store: this is a server read, and
-    // gating it on OPFS meant the list stayed empty whenever storage was slow or
-    // unavailable, while still looking like "nothing needs you".
-    if (workspaceId === null) return;
+    // Deliberately independent of the local store: this is a server read, and gating it on
+    // OPFS meant the list stayed empty whenever storage was slow, while still looking like
+    // "nothing needs you".
+    if (workspaceId === null || unavailable.current) return;
 
     try {
       const response = await fetch(
@@ -81,31 +91,46 @@ export function useProactive(
       const body = (await response.json()) as { tasks?: readonly TaskItem[] };
       setTasks(body.tasks ?? []);
     } catch {
-      // A failed refresh leaves the previous list on screen. Blanking it would
-      // read as "nothing needs you", which is a different and wrong statement.
+      // A failed refresh leaves the previous list on screen. Blanking it would read as
+      // "nothing needs you", which is a different and wrong statement.
     }
   }, [workspaceId]);
 
-  // The tick loop. Routines only fire while this is mounted, which is the trade
-  // the notice states.
+  /*
+   * The tick loop.
+   *
+   * Dependencies are only `workspaceId` and `ready`: the callback comes through the ref, and
+   * `refresh` is stable for a given workspace. Anything else here re-creates the interval, and
+   * an interval that restarts on render fires a tick per render.
+   */
   useEffect(() => {
-    if (workspaceId === null || deviceId === null) return;
+    if (workspaceId === null || deviceId === null || unavailable.current) return;
 
     let stopped = false;
     let timer: ReturnType<typeof setInterval> | null = null;
 
+    const stop = (): void => {
+      stopped = true;
+      if (timer !== null) clearInterval(timer);
+      timer = null;
+    };
+
     const runTick = async (): Promise<void> => {
       if (stopped) return;
-      // The route answered 404 once; it will answer 404 again.
-      if (unavailable.current) {
-        stopped = true;
-        if (timer !== null) clearInterval(timer);
-        return;
-      }
-      // The store is not a prerequisite for the loop any more than it is for `refresh`:
-      // a tick that cannot persist is still a tick that should fire.
+
       try {
-        await runProactiveTick({ workspaceId, deviceId, sendAndWait });
+        const result = await runProactiveTick({
+          workspaceId,
+          deviceId,
+          sendAndWait: sendAndWaitRef.current
+        });
+        // The transport reports a missing route rather than throwing: a 404 is an absent
+        // feature, not a failed tick.
+        if (result.endpointMissing) {
+          unavailable.current = true;
+          stop();
+          return;
+        }
       } catch {
         // A failed pass leaves the previous list alone; the next tick retries.
         return;
@@ -113,16 +138,13 @@ export function useProactive(
       if (!stopped) await refresh();
     };
 
-    // First tick immediately: a device opened at 08:05 should not wait a minute
-    // before noticing the 08:00 routine.
+    // First tick immediately: a device opened at 08:05 should not wait a minute before
+    // noticing the 08:00 routine.
     void runTick();
     timer = setInterval(() => void runTick(), TICK_INTERVAL_MS);
 
-    return () => {
-      stopped = true;
-      if (timer !== null) clearInterval(timer);
-    };
-  }, [workspaceId, ready, refresh, sendAndWait]);
+    return stop;
+  }, [workspaceId, deviceId, ready, refresh]);
 
   useEffect(() => {
     void refresh();
