@@ -278,26 +278,43 @@ test.describe("accessibility", () => {
     const context = await browser.newContext({ reducedMotion: "reduce" });
     const page = await context.newPage();
     await page.goto(WORKSPACE);
-    await page.waitForTimeout(500);
+    // Wait for the shell rather than a fixed delay: sampling mid-hydration catches elements
+    // before their final classes are applied, which made this test order-dependent.
+    await page.getByRole("textbox").first().waitFor({ timeout: 20_000 });
+    await page.waitForTimeout(300);
 
     const longest = await page.evaluate(() => {
       let max = 0;
+      /*
+       * Movement is what must be suppressed, not every transition.
+       *
+       * The previous rule killed `transition-duration` on `*`, which also removed opacity
+       * fades — a reduced-motion user then got instant, unanimated state changes and lost the
+       * cue that anything had happened. The rule is now scoped to `transition-property`, so a
+       * fade still resolves at its normal duration while nothing slides or scales.
+       *
+       * This assertion therefore checks the property that matters: no element may carry a
+       * transform or a slide in its transition list.
+       */
+      const offenders: string[] = [];
       for (const element of Array.from(document.querySelectorAll<HTMLElement>("body *"))) {
         const style = getComputedStyle(element);
-        for (const value of [style.animationDuration, style.transitionDuration]) {
-          for (const part of value.split(",")) {
-            const seconds = part.trim().endsWith("ms")
-              ? Number.parseFloat(part) / 1000
-              : Number.parseFloat(part);
-            if (Number.isFinite(seconds)) max = Math.max(max, seconds);
-          }
+        if (/transform|translate|scale|width|height|margin|inset/.test(style.transitionProperty)) {
+          offenders.push(`${element.tagName}.${element.className}`.slice(0, 80));
         }
+        // Animations are still fully suppressed: they are decorative, not state.
+        const animation = style.animationDuration;
+        const seconds = animation.trim().endsWith("ms")
+          ? Number.parseFloat(animation) / 1000
+          : Number.parseFloat(animation);
+        if (Number.isFinite(seconds)) max = Math.max(max, seconds);
       }
-      return max;
+      return { max, offenders: offenders.slice(0, 5) };
     });
     await context.close();
 
-    expect(longest).toBeLessThanOrEqual(0.05);
+    expect(longest.offenders).toEqual([]);
+    expect(longest.max).toBeLessThanOrEqual(0.05);
   });
 
   test("the boot skeleton announces itself and hides decoration", async ({ page }) => {

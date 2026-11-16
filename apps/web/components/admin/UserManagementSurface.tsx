@@ -1,10 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { AlertCircle, Plus, Search, UserPlus } from "lucide-react";
+import { AlertCircle, Plus, UserPlus } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Table,
@@ -16,6 +15,7 @@ import {
 } from "@/components/ui/table";
 import { DashboardShell, StatTile } from "@/components/admin/DashboardShell";
 import { ContactCell, PersonCell, StatusPill } from "@/components/admin/PersonCell";
+import { applyView, FilterBar, type SortDirection, type SortKey } from "@/components/admin/FilterBar";
 import { useWorkspaceContext } from "@/components/workspace/WorkspaceContext";
 import { listStaff, type StaffRow } from "@/lib/admin-api";
 
@@ -35,6 +35,10 @@ export function UserManagementSurface() {
 
   const [tab, setTab] = useState<"staff" | "students">(isAdmin ? "staff" : "students");
   const [query, setQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("active");
+  const [includeInactive, setIncludeInactive] = useState(false);
+  const [sortKey, setSortKey] = useState<SortKey>("name");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const [rows, setRows] = useState<readonly StaffRow[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -62,6 +66,7 @@ export function UserManagementSurface() {
     try {
       const page = await listStaff(academicId, {
         ...(query.length === 0 ? {} : { query }),
+        ...(includeInactive ? { includeInactive: true } : {}),
         limit: 25
       });
       setRows(page.rows);
@@ -71,11 +76,24 @@ export function UserManagementSurface() {
     } finally {
       setLoading(false);
     }
-  }, [academicId, isAdmin, query]);
+  }, [academicId, isAdmin, query, includeInactive]);
 
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  // Re-sorting the same column flips direction, which is the behaviour every table has.
+  const toggleSort = useCallback((key: SortKey): void => {
+    setSortKey((current) => {
+      if (current === key) setSortDirection((direction) => (direction === "asc" ? "desc" : "asc"));
+      return key;
+    });
+  }, []);
+
+  const visible = useMemo(
+    () => applyView(rows, { statusFilter, sortKey, sortDirection }),
+    [rows, statusFilter, sortKey, sortDirection]
+  );
 
   const tiles = useMemo(() => {
     const active = rows.filter((row) => row.active).length;
@@ -148,21 +166,19 @@ export function UserManagementSurface() {
           <TabsTrigger value="students">Students</TabsTrigger>
         </TabsList>
 
-        <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center">
-          <div className="relative flex-1">
-            <Search
-              aria-hidden="true"
-              className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
-            />
-            <Input
-              aria-label="Search people"
-              className="h-9 pl-8"
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search name, email or phone"
-              type="search"
-              value={query}
-            />
-          </div>
+        <div className="mt-4">
+          <FilterBar
+            includeInactive={includeInactive}
+            onIncludeInactiveChange={setIncludeInactive}
+            onQueryChange={setQuery}
+            onSortChange={toggleSort}
+            onStatusChange={setStatusFilter}
+            query={query}
+            searchPlaceholder="Search name, email or phone"
+            sortDirection={sortDirection}
+            sortKey={sortKey}
+            statusFilter={statusFilter}
+          />
         </div>
 
         {error.length > 0 ? (
@@ -176,7 +192,7 @@ export function UserManagementSurface() {
           <StaffTable
             loading={loading}
             onEdit={setEditing}
-            rows={tab === "staff" ? rows : []}
+            rows={tab === "staff" ? visible : []}
           />
         </TabsContent>
 

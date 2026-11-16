@@ -8,6 +8,8 @@ import type { CapabilityManifest } from "@edapex/contracts";
 
 import { ArtifactHost } from "@/components/artifacts/ArtifactHost";
 import { LoginPanel } from "@/components/auth/LoginPanel";
+import { useEmailSignIn } from "@/hooks/use-email-sign-in";
+import { noticeFromQuery, type LoginNotice } from "@/lib/auth-notice";
 import { apiBase, getSession, loadCapabilities, requestMagicLink } from "@/lib/api";
 import type { SessionView } from "@/lib/api";
 
@@ -62,6 +64,16 @@ export function WorkspaceLayoutClient({
   // Derived from the route, not from state: the tree must be correct on the first paint,
   // and a `useEffect` that set it would render the workspace tree for one frame on a
   // settings route.
+  /*
+   * `?auth_error=expired` is set by the API when a magic link cannot be verified and the
+   * request came from a browser. Read once on mount: leaving it in the URL would replay the
+   * message on every refresh, long after the person has retried.
+   */
+  const [initialNotice] = useState<LoginNotice>(() =>
+    typeof window === "undefined" ? { kind: "idle" } : noticeFromQuery(window.location.search)
+  );
+  const signIn = useEmailSignIn(initialNotice);
+
   const [sessionState, setSessionState] = useState<SessionState>("loading");
   const [session, setSession] = useState<SessionView | null>(null);
   const [manifest, setManifest] = useState<CapabilityManifest | null>(null);
@@ -78,10 +90,6 @@ export function WorkspaceLayoutClient({
   const activeNavId = activeItemId(navTree, pathname);
 
   const [academicId, setAcademicId] = useState(5);
-  const [authMode, setAuthMode] = useState<AuthMode>("google");
-  const [email, setEmail] = useState("");
-  const [authMessage, setAuthMessage] = useState("");
-  const [authSending, setAuthSending] = useState(false);
   const [error, setError] = useState("");
   const [loadingManifest, setLoadingManifest] = useState(false);
   const [reloadToken, setReloadToken] = useState(0);
@@ -181,24 +189,6 @@ export function WorkspaceLayoutClient({
     };
   }, [academicId, reloadToken, sessionState]);
 
-  const sendMagicLink = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
-    event.preventDefault();
-    if (authSending) return;
-    setAuthMessage("");
-    if (email.trim().length === 0) {
-      setAuthMessage("Enter your school email address.");
-      return;
-    }
-    setAuthSending(true);
-    try {
-      await requestMagicLink(email.trim());
-      setAuthMessage("Check your email for a sign-in link. The link is valid for 15 minutes.");
-    } catch (cause) {
-      setAuthMessage(cause instanceof Error ? cause.message : "Could not send the sign-in link");
-    } finally {
-      setAuthSending(false);
-    }
-  };
 
   if (sessionState === "loading") {
     return <WorkspaceBoot surface={surface} />;
@@ -207,18 +197,13 @@ export function WorkspaceLayoutClient({
   if (sessionState === "anonymous") {
     return (
       <LoginPanel
-        authMessage={authMessage}
-        authMode={authMode}
-        description="Sign in with the Google account linked to your school account, or request a magic link. The workspace keeps EdApex data on Cloudflare."
-        email={email}
-        error={error}
-        eyebrow="EdApex workspace"
-        onEmailChange={setEmail}
+        email={signIn.email}
+        onEmailChange={signIn.setEmail}
         onGoogle={() => window.location.assign(`${apiBase()}/api/v1/auth/google/start`)}
-        onMagicLink={(event) => void sendMagicLink(event)}
-        onModeChange={setAuthMode}
-        sending={authSending}
-        title="Sign in to your workspace"
+        onReset={signIn.reset}
+        onSubmit={signIn.submit}
+        notice={initialNotice.kind === "idle" ? signIn.notice : initialNotice}
+        sending={signIn.sending}
       />
     );
   }

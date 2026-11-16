@@ -947,7 +947,14 @@
   *::before,
   *::after {
     scroll-behavior: auto !important;
+    /*
+     * Animations are decorative and are suppressed entirely. Transitions are not: a fade or
+     * a colour change is how a person knows something responded, and killing it removes
+     * feedback rather than removing motion.
+     */
+    animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-property: opacity, color, background-color, border-color, box-shadow, outline-color !important;
+    transition-duration: 150ms !important;
   }
 }
