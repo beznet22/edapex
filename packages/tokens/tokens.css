@@ -131,18 +131,14 @@
   --motion-enter: 220ms;
 
   /*
-   * Radius ladder, derived from the `0.625rem` base in the pasted shadcn preset.
-   * A single `--radius` forced every surface to one corner, which is why the shell read
-   * as one flat slab: a 11px rail button and a 400px canvas had identical corners.
-   * Four steps let nesting communicate itself — the outer surface is roundest, children
-   * step down.
+   * The radius ladder is declared once, in `@theme` below — the only block whose values
+   * `rounded-*` actually compile to. A second ladder used to sit here as well, and the
+   * `@theme inline` mapping further down won every rung: `rounded-lg` rendered 10px while
+   * this block said 14px, and `rounded-xs` (6px) came out rounder than `rounded-sm` (4px).
+   *
+   * `--radius` is kept as the base the ladder is reasoned from, not as a second source.
    */
-  --radius: 0.625rem;
-  --radius-xs: calc(var(--radius) - 4px);
-  --radius-sm: calc(var(--radius) - 2px);
-  --radius-md: var(--radius);
-  --radius-lg: calc(var(--radius) + 4px);
-  --radius-xl: calc(var(--radius) + 8px);
+  --radius: 1rem;
 
   /*
    * Paper. Report cards, transcripts and artifacts render on this rather than on
@@ -440,11 +436,6 @@
   --color-paper-ink: var(--paper-ink);
   --color-paper-line: var(--paper-line);
   --color-overlay: var(--overlay);
-  --radius-xs: var(--radius-xs);
-  --radius-sm: var(--radius-sm);
-  --radius-md: var(--radius-md);
-  --radius-lg: var(--radius-lg);
-  --radius-xl: var(--radius-xl);
   --shadow-paper: var(--paper-shadow);
   --ease-duet: var(--duet-ease);
   --ease-duet-spring: var(--duet-spring);
@@ -453,14 +444,27 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
-  --radius-sm: calc(var(--radius) - 6px);
-  --radius-md: calc(var(--radius) - 3px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 6px);
-  --radius-2xl: calc(var(--radius) + 14px);
 }
 
 @theme {
+  /*
+   * Radius ladder — the one source. These are the values every `rounded-*` compiles to.
+   *
+   * The scale is set for a touch surface first: a 16px card and a 28px sheet are what
+   * Material 3 Expressive and current iOS both land on. The previous 10px base was the
+   * shadcn web default, and on a 360dp screen it reads as an unstyled panel rather than a
+   * surface. Nesting still communicates itself: the outer surface is roundest, children
+   * step down.
+   */
+  --radius-xs: 0.5rem; /* 8px — inline chips, code */
+  --radius-sm: 0.75rem; /* 12px — inputs, small controls */
+  --radius-md: 1rem; /* 16px — buttons, rows, cards */
+  --radius-lg: 1.25rem; /* 20px — large cards, the composer */
+  --radius-xl: 1.75rem; /* 28px — sheets, dialogs */
+  --radius-2xl: 2rem; /* 32px — full-bleed overlays */
+  --radius-sheet: 1.75rem; /* a sheet's top corners match a dialog */
+  --radius-dock: 2rem; /* a floating dock is a pill, not a rectangle */
+
   /*
    * The type scale from DESIGN.md: three sizes, two weights. They were prose until now,
    * which is why components reached for `text-[15px]` and `text-[13px]` — an arbitrary

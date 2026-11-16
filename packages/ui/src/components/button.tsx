@@ -23,7 +23,7 @@ import { cn } from "@edapex/ui/lib/utils"
 const buttonVariants = cva(
   [
     "relative inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap font-medium outline-none",
-    "rounded-[var(--radius-md)] transition-colors",
+    "rounded-md transition-colors",
     "after:absolute after:-inset-1 after:content-['']",
     "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
     "disabled:pointer-events-none disabled:opacity-50",

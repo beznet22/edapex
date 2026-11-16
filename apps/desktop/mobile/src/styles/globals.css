@@ -47,10 +47,7 @@
   --spacing-header: 3.5rem;
   --spacing-sheet-handle: 1.5rem;
 
-  /* Named radii for surfaces the shared ladder does not express. */
-  --radius-sheet: 1.5rem;
-  --radius-dock: 2rem;
-  --radius-field: 0.875rem;
+  /* `--radius-sheet` and `--radius-dock` come from the shared ladder in @edapex/tokens. */
 
   /* Floating surfaces only; a full-bleed surface never carries a shadow. */
   --shadow-float: var(--elevation-2);

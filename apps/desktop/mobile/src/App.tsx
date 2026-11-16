@@ -205,8 +205,8 @@ export function App() {
 
       <Sheet onClose={() => setPreviewOpen(false)} open={previewOpen} title="Sheet" variant="full">
         <p className="text-body">
-          The full-height variant is the same component at one snap point. Drag it down or
-          press back to dismiss.
+          The full-height variant is the same component with a different height, not a second
+          component. Drag it down or press back to dismiss.
         </p>
       </Sheet>
 
