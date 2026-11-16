@@ -136,11 +136,14 @@ export const createClaimLink = async (
   request<CreatedClaimLink>("/api/v1/admin/claim-links", {
     method: "POST",
     headers: { "X-Academic-Id": String(academicId) },
-    body: JSON.stringify({
+    // `request` serialises the body itself; stringifying here too sent a JSON *string*
+    // where the API expected an object, which Zod reported as "expected object, received
+    // string" — on every create and every magic-link request.
+    body: {
       subjectType: item.subjectType,
       subjectId: item.subjectId,
       ttlHours: 72
-    })
+    }
   });
 
 export const revokeClaimLink = async (
@@ -157,6 +160,6 @@ export const revokeClaimLink = async (
 export const requestMagicLink = async (email: string): Promise<void> => {
   await request<{ status: string }>("/api/v1/auth/magic-link", {
     method: "POST",
-    body: JSON.stringify({ email })
+    body: { email }
   });
 };

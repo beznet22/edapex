@@ -48,7 +48,10 @@
     "cutover:missing-photo-students": "node scripts/cutover/missing-photo-students.mjs",
     "cutover:photo-audit": "node scripts/cutover/photo-audit.mjs",
     "phase9:retention-dry-run": "node scripts/phase9/retention-dry-run.mjs",
-    "phase9:archive-manifests": "node scripts/phase9/archive-manifests.mjs"
+    "phase9:archive-manifests": "node scripts/phase9/archive-manifests.mjs",
+    "dev:link": "node scripts/dev-link.mjs",
+    "db:mirror": "node scripts/mirror-remote-d1.mjs",
+    "db:import-account": "node scripts/import-account.mjs"
   },
   "dependencies": {
     "@edapex/contracts": "workspace:^",

@@ -1,18 +1,30 @@
 # Local development variables for `wrangler dev`.
 #
-# Copy to `.dev.vars` (gitignored) — `wrangler dev` reads that file, **not the shell
-# environment**, so `LOCAL_EMAIL_LOG=true pnpm dev` has no effect and the magic-link
-# adapter still throws "Email binding is not configured". That cost a debugging round.
+# Copy to `.dev.vars` (gitignored) — `wrangler dev` reads that file, **not the shell**, so
+# `LOCAL_EMAIL_LOG=true pnpm dev` has no effect and magic-link sign-in fails. That cost a
+# debugging round.
 #
 #   cp .dev.vars.example .dev.vars
 #
-# Keep this file to vars that are **not** already in `wrangler.jsonc`. `.dev.vars`
-# overrides the wrangler vars wholesale, and the vitest plugin loads it too — putting
-# CORS_ORIGINS here silently broke the CORS suite, which expects the production origin.
+# Everything here overrides `wrangler.jsonc` wholesale for the keys it names. That is why
+# `CORS_ORIGINS` is *not* repeated: putting a local value here once silently broke the CORS
+# suite, which expects the production origin.
 #
-# None of these are secrets. Anything secret belongs in `wrangler secret put` for a
-# deployed Worker, never here.
+# No secrets. Anything secret belongs in `wrangler secret put`, never here.
 
 # Writes email to the console instead of sending it, and prints the magic-link URL so
-# sign-in works locally. Without it there is no email binding and no way to sign in.
+# sign-in works locally. Without it the Cloudflare adapter throws "Email binding is not
+# configured" — `wrangler dev` has no `send_email` binding.
 LOCAL_EMAIL_LOG=true
+
+# Where a browser lands after a successful sign-in.
+#
+# These must point at the dev server, not production. `wrangler.jsonc` sets
+# `APP_ORIGIN=https://app.llacademy.ng`, and a local sign-in that redirects there looks
+# like a broken session: the cookie is set on the API host, the browser then leaves for
+# production, and the workspace there has no session for this machine.
+APP_ORIGIN=http://127.0.0.1:5181
+POST_LOGIN_REDIRECT=http://127.0.0.1:5181/workspace
+
+# The dev server proxies /api to this Worker; the browser's Origin is the Vite port.
+CORS_ORIGINS=http://127.0.0.1:5181,http://localhost:5181

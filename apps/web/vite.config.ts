@@ -27,9 +27,20 @@ export default defineConfig(({ command }) => {
       strictPort: true,
       proxy: {
         "/api": {
-          target: "https://api.llacademy.ng",
+          /*
+           * `DEV_API_TARGET` points the proxy at a local `wrangler dev` worker.
+           *
+           * Without it the dev server proxies to production, which means a local sign-in
+           * sets a `__Host-` cookie on the *API* host and then redirects to
+           * `app.llacademy.ng` — the browser leaves your machine and the workspace you land
+           * on has no session for it. Pointing at localhost keeps the whole round trip on
+           * one origin, which is what makes `LOCAL_EMAIL_LOG` usable end to end.
+           *
+           *   DEV_API_TARGET=http://127.0.0.1:8787 pnpm dev
+           */
+          target: process.env.DEV_API_TARGET ?? "https://api.llacademy.ng",
           changeOrigin: true,
-          secure: true,
+          secure: !process.env.DEV_API_TARGET?.startsWith("http://"),
           configure: (proxy) => {
             const cookie = process.env.DEV_API_COOKIE;
             if (cookie === undefined || cookie.length === 0) return;
