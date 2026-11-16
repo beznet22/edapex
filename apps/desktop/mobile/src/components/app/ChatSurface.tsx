@@ -54,15 +54,14 @@ export function ChatSurface({
       />
 
       <div className="relative flex min-h-0 flex-1 flex-col">
-        <div className="scrollbar-auto mx-auto flex min-h-0 w-full max-w-2xl flex-1 flex-col overflow-y-auto px-gutter pb-2">
+        <div className="scrollbar-auto mx-auto grid min-h-0 w-full max-w-2xl flex-1 grid-rows-1 overflow-y-auto px-gutter pb-2">
           {/*
-           * `mt-auto`, not `flex-1`. A growing composer shrinks the scroll area from the
-           * bottom, and a block that absorbs the leftover space re-centres itself every time
-           * a line is added — the whole screen drifts upward as you type. Pushed down
-           * instead, the mark and the suggestions stay pinned above the composer and move
-           * with it.
+           * Both blocks share one grid cell, one row tall. `flex-1` centred the hero against
+           * the space *above* the suggestions, which sits ~50dp high on a phone; stacked, it
+           * centres against the whole column and the suggestions pin to the same cell's
+           * bottom. Reading order is unchanged — the hero is still first in the DOM.
            */}
-          <div className="mt-auto flex flex-col items-center gap-3 py-6 text-center">
+          <div className="col-start-1 row-start-1 flex flex-col items-center justify-center gap-3 py-6 text-center">
             <BrandMark className="h-14 w-auto text-foreground" />
             <p className="text-title font-semibold tracking-tight">What are we working on?</p>
             <p className="max-w-64 text-label text-muted-foreground">
@@ -71,7 +70,12 @@ export function ChatSurface({
             </p>
           </div>
 
-          <div className={keyboardOpen ? "hidden" : "flex flex-col"}>
+          <div
+            className={cn(
+              "col-start-1 row-start-1 mt-auto flex flex-col",
+              keyboardOpen && "hidden"
+            )}
+          >
             {QUICK_ACTIONS.map((action) => {
               const Icon = ICONS[action.icon];
               return (
