@@ -30,6 +30,14 @@ pub struct SessionEventRecord {
     pub relay_position: Option<u64>,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct PendingSession {
+    pub session_id: String,
+    pub workspace_id: String,
+    pub model: String,
+    pub mobile_safe_tools: bool,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SessionAppendOutcome {
     Appended(u64),
@@ -59,18 +67,51 @@ impl<D: SqlDriver> Store<D> {
         session_id: &str,
         workspace_id: &str,
         device_id: &str,
+        model: &str,
+        mobile_safe_tools: bool,
     ) -> Result<()> {
         self.driver.execute(
-            "INSERT OR IGNORE INTO agent_sessions \
-             (session_id, workspace_id, device_id, holder_id, fence, expires_at_ms, last_seq, deleted_at_ms) \
-             VALUES (?, ?, ?, NULL, 0, 0, 0, NULL)",
+            "INSERT INTO agent_sessions \
+             (session_id, workspace_id, device_id, holder_id, fence, expires_at_ms, last_seq, deleted_at_ms, model, mobile_safe_tools, queued) \
+             VALUES (?, ?, ?, NULL, 0, 0, 0, NULL, ?, ?, 0) \
+             ON CONFLICT(session_id) DO UPDATE SET model = excluded.model, mobile_safe_tools = excluded.mobile_safe_tools",
             &[
                 SqlValue::text(session_id),
                 SqlValue::text(workspace_id),
                 SqlValue::text(device_id),
+                SqlValue::text(model),
+                SqlValue::integer(i64::from(mobile_safe_tools)),
             ],
         )?;
         Ok(())
+    }
+
+    /// Sessions a worker may pick up: queued work, no live owner.
+    pub fn agent_sessions_pending(
+        &mut self,
+        now_ms: u64,
+        limit: usize,
+    ) -> Result<Vec<PendingSession>> {
+        let rows = self.driver.query(
+            "SELECT session_id, workspace_id, model, mobile_safe_tools FROM agent_sessions \
+             WHERE deleted_at_ms IS NULL AND queued > 0 \
+             AND (holder_id IS NULL OR expires_at_ms < ?) \
+             ORDER BY session_id LIMIT ?",
+            &[to_sql_u64(now_ms)?, to_sql_u64(u64::try_from(limit).map_err(|error| StoreError::Serialisation(error.to_string()))?)?],
+        )?;
+        Ok(rows
+            .iter()
+            .map(|row| PendingSession {
+                session_id: text_at(row, 0),
+                workspace_id: text_at(row, 1),
+                model: text_at(row, 2),
+                mobile_safe_tools: row
+                    .get(3)
+                    .and_then(SqlValue::as_integer)
+                    .unwrap_or(0)
+                    != 0,
+            })
+            .collect())
     }
 
     pub fn append_agent_session_event(
@@ -153,8 +194,16 @@ impl<D: SqlDriver> Store<D> {
                 )?;
             }
             store.driver.execute(
-                "UPDATE agent_sessions SET last_seq = ? WHERE session_id = ?",
-                &[to_sql_u64(next)?, SqlValue::text(&input.session_id)],
+                "UPDATE agent_sessions SET last_seq = ?, queued = MAX(queued + ?, 0) WHERE session_id = ?",
+                &[
+                    to_sql_u64(next)?,
+                    SqlValue::integer(match input.kind.as_str() {
+                        "message_queued" => 1,
+                        "message_sent" => -1,
+                        _ => 0,
+                    }),
+                    SqlValue::text(&input.session_id),
+                ],
             )?;
             Ok(SessionAppendOutcome::Appended(next))
         })

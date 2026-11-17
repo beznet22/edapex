@@ -49,7 +49,7 @@ fn event(event_id: &str, command_id: &str, fence: u64) -> SessionEventInput {
 fn command_retry_does_not_duplicate_an_event_or_outbox_entry() {
     let mut store = memory_store();
     store
-        .ensure_agent_session(SESSION, WORKSPACE, DEVICE)
+        .ensure_agent_session(SESSION, WORKSPACE, DEVICE, "test/model", false)
         .unwrap();
     store
         .claim_agent_session(SESSION, CLIENT, 10_000, 1_000)
@@ -75,7 +75,7 @@ fn command_retry_does_not_duplicate_an_event_or_outbox_entry() {
 fn a_stale_writer_cannot_append_or_leave_a_partial_outbox_write() {
     let mut store = memory_store();
     store
-        .ensure_agent_session(SESSION, WORKSPACE, DEVICE)
+        .ensure_agent_session(SESSION, WORKSPACE, DEVICE, "test/model", false)
         .unwrap();
     store
         .claim_agent_session(SESSION, CLIENT, 10_000, 1_000)
@@ -94,7 +94,7 @@ fn a_stale_writer_cannot_append_or_leave_a_partial_outbox_write() {
 fn another_live_holder_is_not_superseded() {
     let mut store = memory_store();
     store
-        .ensure_agent_session(SESSION, WORKSPACE, DEVICE)
+        .ensure_agent_session(SESSION, WORKSPACE, DEVICE, "test/model", false)
         .unwrap();
     store
         .claim_agent_session(SESSION, CLIENT, 10_000, 1_000)
@@ -200,7 +200,7 @@ fn installation_identity_is_stable_and_client_ids_are_distinct() {
 fn acknowledgement_deduplicates_retry_and_delete_purges_local_history() {
     let mut store = memory_store();
     store
-        .ensure_agent_session(SESSION, WORKSPACE, DEVICE)
+        .ensure_agent_session(SESSION, WORKSPACE, DEVICE, "test/model", false)
         .unwrap();
     store
         .claim_agent_session(SESSION, CLIENT, 10_000, 1_000)

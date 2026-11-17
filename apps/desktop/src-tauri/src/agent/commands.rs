@@ -42,7 +42,7 @@ pub async fn agent_connect(
         .ok_or_else(|| {
             HostError::new("internal_error", "Agent database path is not UTF-8", false)
         })?;
-    let master = super::journal::master_key()?;
+    let master = super::env::agent_master_key()?;
     let context = StoreContext::open(
         &path,
         &settings.workspace_id,

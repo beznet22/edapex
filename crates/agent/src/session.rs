@@ -160,6 +160,8 @@ impl SessionRuntime {
                 self.root.as_str(),
                 &self.options.settings.workspace_id,
                 &self.options.device_id,
+                &self.options.settings.model,
+                self.options.settings.mobile_safe_tools,
             )
             .map_err(|error| storage_error(error.into()))?;
         self.next_cursor = self

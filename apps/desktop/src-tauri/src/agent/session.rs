@@ -69,12 +69,6 @@ impl ChannelSink {
     }
 }
 
-/// Delivers to the WebView and, when a journal exists, records the same event.
-pub struct FanoutSink {
-    pub primary: Arc<ChannelSink>,
-    pub journal: Option<Arc<super::journal::RunJournal>>,
-}
-
 impl EventSink for ChannelSink {
     fn emit(&self, event: AgentEvent) {
         // Record first: the ring is the durable record, the channel is best-effort.

@@ -9,8 +9,6 @@ pub(crate) mod commands;
 mod bridge;
 mod env;
 mod headless;
-mod history;
-mod journal;
 mod provider;
 mod session;
 mod tools;

@@ -13,7 +13,7 @@
 //!   change that will carry it to the cloud.
 
 /// Final row shape after a decrypted read.
-pub const LATEST_VERSION: u32 = 3;
+pub const LATEST_VERSION: u32 = 4;
 
 /// The only data class this store may hold.
 pub const ALLOWED_DATA_CLASS: &str = "workspace";
@@ -417,6 +417,20 @@ CREATE TABLE IF NOT EXISTS agent_session_outbox (
 );
 CREATE INDEX IF NOT EXISTS agent_session_outbox_pending
   ON agent_session_outbox (device_id, device_seq);
+"#,
+    },
+    Migration {
+        version: 4,
+        name: "agent-session-work",
+        sql: r#"
+-- What a headless worker needs to decide whether a session has work, without
+-- opening an encrypted payload: the model it runs with, and how many queued
+-- messages are still waiting for a turn.
+ALTER TABLE agent_sessions ADD COLUMN model TEXT NOT NULL DEFAULT '';
+ALTER TABLE agent_sessions ADD COLUMN mobile_safe_tools INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE agent_sessions ADD COLUMN queued INTEGER NOT NULL DEFAULT 0;
+CREATE INDEX IF NOT EXISTS agent_sessions_pending
+  ON agent_sessions (queued, expires_at_ms, deleted_at_ms);
 "#,
     },
 ];
