@@ -16,7 +16,6 @@
   "apps/web/components/artifacts/ArtifactHost.tsx": 3,
   "apps/web/components/auth/LoginPanel.tsx": 14,
   "apps/web/components/desktop/Titlebar.tsx": 1,
-  "apps/web/components/openduet/approval-card.tsx": 1,
   "apps/web/components/openduet/chat-transcript.tsx": 9,
   "apps/web/components/openduet/composer.tsx": 4,
   "apps/web/components/openduet/message-scroller.tsx": 1,

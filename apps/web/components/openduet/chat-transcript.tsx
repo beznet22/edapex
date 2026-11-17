@@ -22,7 +22,7 @@ import type {
 } from "@edapex/contracts";
 import { Paperclip } from "lucide-react";
 
-import { ApprovalCard } from "./approval-card";
+import { Confirmation } from "@edapex/ui/components/confirmation";
 import { Bubble, BubbleContent } from "./bubble";
 import { MessageScroller } from "./message-scroller";
 import { ToolActivity } from "./tool-activity";
@@ -99,11 +99,14 @@ function renderPart({
       return <Thinking key={`thinking-${index}`} />;
     case "approval":
       return (
-        <ApprovalCard
-          approval={part}
+        <Confirmation
+          description={part.description}
           key={part.approvalRequestId}
-          messageId={message.id}
-          onDecision={onApproval}
+          onAllow={() => onApproval(message.id, part.approvalRequestId, "allowed")}
+          onDeny={() => onApproval(message.id, part.approvalRequestId, "declined")}
+          risk={part.risk}
+          state={part.status}
+          title={part.title}
         />
       );
     case "surface":

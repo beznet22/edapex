@@ -148,6 +148,7 @@ function Part({
           description={part.description}
           onAllow={() => onDecideApproval(messageId, part.approvalRequestId, "allowed")}
           onDeny={() => onDecideApproval(messageId, part.approvalRequestId, "declined")}
+          risk={part.risk}
           state={part.status}
           title={part.title}
         />
