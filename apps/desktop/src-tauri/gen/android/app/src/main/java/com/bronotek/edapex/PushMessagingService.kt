@@ -16,12 +16,13 @@ import com.google.firebase.messaging.RemoteMessage
  * screen — drawing here as well is how one event becomes two notifications.
  */
 class PushMessagingService : FirebaseMessagingService() {
+    @Suppress("OVERRIDE_DEPRECATION") // The pinned BoM deprecates the override without a replacement.
     override fun onNewToken(token: String) {
         PushTokenStore.save(this, token)
         Log.i("EdApexPush", "token refreshed (${token.length} chars)")
     }
 
-    @Suppress("DEPRECATION") // The pinned BoM deprecates the override without a replacement.
+    @Suppress("OVERRIDE_DEPRECATION") // The pinned BoM deprecates the override without a replacement.
     override fun onMessageReceived(message: RemoteMessage) {
         val kind = message.data["kind"] ?: "unknown"
         Log.i("EdApexPush", "message ${message.messageId ?: "?"} kind=$kind")
