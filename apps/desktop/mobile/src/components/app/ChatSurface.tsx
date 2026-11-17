@@ -1,4 +1,7 @@
 import { BrandMark } from "@/components/brand/BrandMark";
+import { Button } from "@edapex/ui/components/button";
+import { Transcript } from "@/components/app/Transcript";
+import { useChat } from "@/hooks/use-chat";
 import { QUICK_ACTIONS, type SurfaceId } from "@/lib/nav";
 import { ICONS } from "@/lib/icons";
 import { cn } from "@edapex/ui/lib/utils";
@@ -27,8 +30,7 @@ export function ChatSurface({
   onModeChange,
   onOpenDrawer,
   onQuickAction,
-  onSelect,
-  onSend
+  onSelect
 }: {
   readonly approvals: number;
   readonly attachOpen: boolean;
@@ -41,8 +43,8 @@ export function ChatSurface({
   readonly onOpenDrawer: () => void;
   readonly onQuickAction: (id: "scan" | "agent") => void;
   readonly onSelect: (id: SurfaceId | "new") => void;
-  readonly onSend: (value: string) => void;
 }) {
+  const chat = useChat();
   return (
     <Screen>
       <TopBar
@@ -54,6 +56,7 @@ export function ChatSurface({
       />
 
       <div className="relative flex min-h-0 flex-1 flex-col">
+        {chat.messages.length === 0 ? (
         <div className="scrollbar-auto mx-auto grid min-h-0 w-full max-w-2xl flex-1 grid-rows-1 overflow-y-auto px-gutter pb-2">
           {/*
            * Both blocks share one grid cell, one row tall. `flex-1` centred the hero against
@@ -96,9 +99,37 @@ export function ChatSurface({
           </div>
         </div>
 
+        ) : (
+          <Transcript
+            messages={chat.messages}
+            onDecideApproval={chat.decideApproval}
+            streaming={chat.view.turn.stoppable}
+          />
+        )}
+
+        {chat.queue.length > 0 ? (
+          <p className="mx-auto w-full max-w-2xl px-gutter pb-1 text-label text-muted-foreground">
+            {chat.queue.length} queued until this turn finishes
+          </p>
+        ) : null}
+
+        {chat.error.length > 0 ? (
+          <p className="mx-auto w-full max-w-2xl px-gutter pb-2 text-label text-destructive" role="alert">
+            {chat.error}
+          </p>
+        ) : null}
+
+        {chat.view.turn.stoppable ? (
+          <div className="mx-auto w-full max-w-2xl px-gutter pb-2">
+            <Button className="w-full" onClick={chat.stop} variant="outline">
+              Stop
+            </Button>
+          </div>
+        ) : null}
+
         <AttachPanel onSelect={onAttachSelect} open={attachOpen} />
         <div className="mx-auto w-full max-w-2xl">
-          <Composer busy={busy} onAttach={onAttach} onSend={onSend} />
+          <Composer busy={busy} onAttach={onAttach} onSend={chat.send} />
         </div>
       </div>
     </Screen>

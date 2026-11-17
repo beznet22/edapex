@@ -152,7 +152,6 @@ export function Shell() {
             else setMakeOpen(true);
           }}
           onSelect={go}
-          onSend={() => undefined}
         />
       ) : null}
 

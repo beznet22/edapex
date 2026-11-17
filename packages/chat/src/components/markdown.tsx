@@ -57,7 +57,11 @@ export interface MarkdownMessageProps {
  * `raw` is intentionally missing: without it, HTML tags in model output are escaped
  * rather than parsed into elements, which removes an entire injection class.
  */
-const REHYPE_PLUGINS = [defaultRehypePlugins.sanitize, defaultRehypePlugins.harden];
+// Streamdown types both entries as possibly absent; a missing sanitizer is not a state this
+// component can render safely, so the list is narrowed here rather than optional at use.
+const REHYPE_PLUGINS = [defaultRehypePlugins.sanitize, defaultRehypePlugins.harden].filter(
+  (plugin): plugin is NonNullable<typeof plugin> => plugin !== undefined
+);
 
 /**
  * Renders agent Markdown.
