@@ -58,3 +58,14 @@ exception list cannot grow quietly:
 the sidebar is a persistent desktop rail with cookie state and a keyboard shortcut, and the
 command palette is a web-only surface. Neither belongs in a package that an Android WebView
 imports.
+
+## Composed here, not vendored
+
+Two components the registry does not publish for the `new-york` style. Both are composed
+from registry primitives and follow the AI Elements API, so the patterns above them can be
+copied in unchanged.
+
+| Component | Built from | Why not vendored |
+|---|---|---|
+| `trace` | `Collapsible` | `shadcn add trace` answers 404 on `new-york-v4`; the pattern is a documented composition of a trigger and its content |
+| `confirmation` | `Alert`, `Button` | Same — a confirmation is an alert with two actions and a resolved state |

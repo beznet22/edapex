@@ -3,7 +3,7 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 
 import type { ChatMessage, ChatMessagePart } from "@edapex/contracts";
 
-import { Button } from "@edapex/ui/components/button";
+import { Confirmation } from "@edapex/ui/components/confirmation"
 import { cn } from "@edapex/ui/lib/utils";
 
 import { isAtEnd, shouldFollow } from "@/lib/transcript";
@@ -144,31 +144,13 @@ function Part({
       );
     case "approval":
       return (
-        <div className="flex flex-col gap-2 rounded-md border border-border p-2">
-          <p className="text-body font-medium">{part.title}</p>
-          <p className="text-label text-muted-foreground">{part.description}</p>
-          {part.status === "pending" ? (
-            <div className="flex gap-2">
-              <Button
-                className="flex-1"
-                onClick={() => onDecideApproval(messageId, part.approvalRequestId, "allowed")}
-                size="sm"
-              >
-                Allow
-              </Button>
-              <Button
-                className="flex-1"
-                onClick={() => onDecideApproval(messageId, part.approvalRequestId, "declined")}
-                size="sm"
-                variant="outline"
-              >
-                Deny
-              </Button>
-            </div>
-          ) : (
-            <p className="text-label text-muted-foreground">{part.status}</p>
-          )}
-        </div>
+        <Confirmation
+          description={part.description}
+          onAllow={() => onDecideApproval(messageId, part.approvalRequestId, "allowed")}
+          onDeny={() => onDecideApproval(messageId, part.approvalRequestId, "declined")}
+          state={part.status}
+          title={part.title}
+        />
       );
     case "attachment":
       return <p className="text-label text-muted-foreground">{part.fileName}</p>;
