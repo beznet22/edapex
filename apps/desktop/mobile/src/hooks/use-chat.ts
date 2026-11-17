@@ -57,6 +57,18 @@ export function useChat(): ChatController {
   const send = useCallback(
     (text: string) => {
       if (text.trim().length === 0) return;
+      /*
+       * `adapter.send` returns silently when it has no connection: the message would be
+       * queued optimistically and then nothing would happen, which reads as "sent" to the
+       * person who pressed the button. Report it here instead, where the surface already
+       * renders a failure — until the adapter grows a typed `not_connected` event, this is
+       * the only place the two states can be told apart.
+       */
+      if (!adapter.view.connected) {
+        setError("Edapex is not connected yet. Wait a moment and send again.");
+        return;
+      }
+      setError("");
       adapter.send(text, []);
     },
     [adapter]
