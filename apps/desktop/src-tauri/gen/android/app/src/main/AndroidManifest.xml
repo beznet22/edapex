@@ -68,7 +68,7 @@
             android:resource="@xml/file_paths" />
         </provider>
         <receiver
-            android:name=".run.ApprovalActionReceiver"
+            android:name=".ApprovalActionReceiver"
             android:exported="false" />
     </application>
 </manifest>

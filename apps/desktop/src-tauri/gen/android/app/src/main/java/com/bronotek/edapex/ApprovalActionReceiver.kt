@@ -1,10 +1,9 @@
-package com.bronotek.edapex.run
+package com.bronotek.edapex
 
 import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import com.bronotek.edapex.MainActivity
 import android.net.Uri
 
 /**

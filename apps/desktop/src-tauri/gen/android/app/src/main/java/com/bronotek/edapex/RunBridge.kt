@@ -1,4 +1,4 @@
-package com.bronotek.edapex.run
+package com.bronotek.edapex
 
 import android.content.Context
 import java.io.File

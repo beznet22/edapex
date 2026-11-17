@@ -57,7 +57,7 @@ fn post_approval(request: &ApprovalRequest) {
         return;
     };
     if let Err(error) = env.call_static_method(
-        "com/bronotek/edapex/run/EdApexNotifications",
+        "com/bronotek/edapex/EdApexNotifications",
         "postApproval",
         "(Landroid/content/Context;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V",
         &[
@@ -73,7 +73,7 @@ fn post_approval(request: &ApprovalRequest) {
 
 /// `RunBridge.nativeInit(context)` — hands the application context to Rust.
 #[no_mangle]
-pub extern "system" fn Java_com_bronotek_edapex_run_RunBridge_nativeInit(
+pub extern "system" fn Java_com_bronotek_edapex_RunBridge_nativeInit(
     mut env: JNIEnv,
     _class: JClass,
     context: JObject,
@@ -94,7 +94,7 @@ pub extern "system" fn Java_com_bronotek_edapex_run_RunBridge_nativeInit(
 /// hit its deadline. The caller opens the app either way, because an expired
 /// approval has to be visible rather than silent.
 #[no_mangle]
-pub extern "system" fn Java_com_bronotek_edapex_run_RunBridge_nativeDecide(
+pub extern "system" fn Java_com_bronotek_edapex_RunBridge_nativeDecide(
     mut env: JNIEnv,
     _class: JClass,
     approval_id: JString,
@@ -116,7 +116,7 @@ pub extern "system" fn Java_com_bronotek_edapex_run_RunBridge_nativeDecide(
 
 /// `RunBridge.nativeResumeRuns(cacheDir, dataDir, resourceDir)`.
 #[no_mangle]
-pub extern "system" fn Java_com_bronotek_edapex_run_RunBridge_nativeResumeRuns(
+pub extern "system" fn Java_com_bronotek_edapex_RunBridge_nativeResumeRuns(
     mut env: JNIEnv,
     _class: JClass,
     cache: JString,
