@@ -2,6 +2,7 @@ import { useEffect, useReducer, useState } from "react";
 
 import { AppDrawer } from "@/components/app/AppDrawer";
 import { Onboarding } from "@/components/app/Onboarding";
+import { SignIn } from "@/components/app/SignIn";
 import { ChatSurface } from "@/components/app/ChatSurface";
 import { ListSurface } from "@/components/app/ListSurface";
 import { MakeSheet } from "@/components/app/MakeSheet";
@@ -13,6 +14,7 @@ import { Sheet } from "@/components/shell/Sheet";
 import { useKeyboardOpen } from "@/hooks/use-keyboard-open";
 import { usePushRegistration } from "@/hooks/use-push-registration";
 import { bootReady, onSystemBack, setBackEnabled } from "@/lib/host-bridge";
+import { exchangeCode, isAuthenticated, isHostFailure, startSignIn, watchAuthLinks } from "@/lib/auth";
 import {
   type BootState,
   bootReducer,
@@ -188,17 +190,55 @@ export function Shell() {
 /**
  * The first-run decision, and nothing else.
  *
- * Hydration is the reducer's initial state rather than an effect: a first paint
- * cannot be the workspace if the answer is already known, and a server render has
- * no `localStorage`, which `readOnboardingComplete` treats as a first run.
+ * Hydration asks the keychain whether a session exists, which is asynchronous by nature, so
+ * the first paint is the veil. That is affordable now in a way it was not before: the veil
+ * is already the surface the splash hands over to, and it is painted before the answer
+ * arrives rather than replaced by it.
  */
 export function App() {
-  const [boot, dispatch] = useReducer(
-    bootReducer,
-    undefined,
-    (): BootState =>
-      bootReducer({ status: "loading" }, { type: "hydrated", onboardingComplete: readOnboardingComplete() })
-  );
+  const [boot, dispatch] = useReducer(bootReducer, { status: "loading" } as BootState);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const authenticated = await isAuthenticated().catch(() => false);
+      if (!cancelled) {
+        dispatch({
+          type: "hydrated",
+          onboardingComplete: readOnboardingComplete(),
+          authenticated
+        });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (boot.status !== "signed_out" && boot.status !== "authenticating") return;
+    let dispose: (() => void) | null = null;
+    let cancelled = false;
+    void watchAuthLinks((code) => {
+      dispatch({ type: "auth_started" });
+      void exchangeCode(code).then(
+        () => dispatch({ type: "auth_succeeded" }),
+        (error: unknown) => dispatch({ type: "auth_failed", message: failureMessage(error) })
+      );
+    })
+      .then((un) => {
+        if (cancelled) un();
+        else dispose = un;
+      })
+      .catch(() => {
+        // No deep-link capability in this host: the sign-in screen still works, the
+        // callback simply cannot arrive until the app is rebuilt with it.
+      });
+    return () => {
+      cancelled = true;
+      dispose?.();
+    };
+  }, [boot.status]);
 
   useEffect(() => {
     return onSystemBack(() => {
@@ -209,6 +249,23 @@ export function App() {
   useEffect(() => {
     setBackEnabled(canGoBack(boot));
   }, [boot]);
+
+  const beginSignIn = () => {
+    dispatch({ type: "auth_started" });
+    void startSignIn().catch((error: unknown) =>
+      dispatch({ type: "auth_failed", message: failureMessage(error) })
+    );
+  };
+
+  // The keychain answer is asynchronous, so the first paint is the veil alone. Rendering
+  // `Shell` here would paint the workspace for a frame and then replace it with sign-in.
+  if (boot.status === "loading") {
+    return (
+      <div className="flex min-h-dvh bg-background text-foreground">
+        <BootVeil ready={false} />
+      </div>
+    );
+  }
 
   if (boot.status === "onboarding") {
     return (
@@ -230,5 +287,22 @@ export function App() {
     );
   }
 
+  if (boot.status === "signed_out" || boot.status === "authenticating") {
+    return (
+      <div className="flex min-h-dvh bg-background text-foreground">
+        <SignIn
+          error={boot.status === "signed_out" ? boot.error : null}
+          onCancel={() => dispatch({ type: "session_ended" })}
+          onStart={beginSignIn}
+          phase={boot.status === "authenticating" ? "waiting" : "idle"}
+        />
+      </div>
+    );
+  }
+
   return <Shell />;
+}
+
+function failureMessage(error: unknown): string {
+  return isHostFailure(error) ? error.message : "Sign-in could not start on this device.";
 }

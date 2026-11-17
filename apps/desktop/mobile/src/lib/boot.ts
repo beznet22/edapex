@@ -15,15 +15,30 @@ export const SKIPPABLE_FROM = 1;
 
 export type BootState =
   | { readonly status: "loading" }
-  | { readonly status: "onboarding"; readonly page: number }
+  | {
+      readonly status: "onboarding";
+      readonly page: number;
+      /** Carried through onboarding so finishing lands in the right place. */
+      readonly signedIn: boolean;
+    }
+  | { readonly status: "signed_out"; readonly error: string | null }
+  | { readonly status: "authenticating" }
   | { readonly status: "ready" };
 
 export type BootEvent =
-  | { readonly type: "hydrated"; readonly onboardingComplete: boolean }
+  | {
+      readonly type: "hydrated";
+      readonly onboardingComplete: boolean;
+      readonly authenticated: boolean;
+    }
   | { readonly type: "onboarding_next" }
   | { readonly type: "onboarding_back" }
   | { readonly type: "onboarding_skip" }
-  | { readonly type: "onboarding_finish" };
+  | { readonly type: "onboarding_finish" }
+  | { readonly type: "auth_started" }
+  | { readonly type: "auth_succeeded" }
+  | { readonly type: "auth_failed"; readonly message: string }
+  | { readonly type: "session_ended" };
 
 export const BOOT_STORAGE_KEY = "edapex.boot.onboarding";
 
@@ -31,27 +46,49 @@ export function bootReducer(state: BootState, event: BootEvent): BootState {
   switch (event.type) {
     case "hydrated":
       if (state.status !== "loading") return state;
-      return event.onboardingComplete ? { status: "ready" } : { status: "onboarding", page: 0 };
+      if (event.onboardingComplete) {
+        return event.authenticated
+          ? { status: "ready" }
+          : { status: "signed_out", error: null };
+      }
+      return { status: "onboarding", page: 0, signedIn: event.authenticated };
     case "onboarding_next": {
       if (state.status !== "onboarding") return state;
-      if (state.page >= ONBOARDING_PAGES - 1) return { status: "ready" };
-      return { status: "onboarding", page: state.page + 1 };
+      if (state.page >= ONBOARDING_PAGES - 1) return afterOnboarding(state.signedIn);
+      return { status: "onboarding", page: state.page + 1, signedIn: state.signedIn };
     }
     case "onboarding_back": {
       if (state.status !== "onboarding") return state;
       if (state.page === 0) return state;
-      return { status: "onboarding", page: state.page - 1 };
+      return { status: "onboarding", page: state.page - 1, signedIn: state.signedIn };
     }
     case "onboarding_skip":
       // A skip from page 1 is ignored rather than honoured: the first page is the
       // only place that explains what the app is for.
       if (state.status !== "onboarding") return state;
       if (state.page < SKIPPABLE_FROM) return state;
-      return { status: "ready" };
+      return afterOnboarding(state.signedIn);
     case "onboarding_finish":
       if (state.status !== "onboarding") return state;
-      return { status: "ready" };
+      return afterOnboarding(state.signedIn);
+    case "auth_started":
+      // Only a signed-out person can start a sign-in; a double tap must not open two browsers.
+      return state.status === "signed_out" ? { status: "authenticating" } : state;
+    case "auth_succeeded":
+      return state.status === "authenticating" ? { status: "ready" } : state;
+    case "auth_failed":
+      return state.status === "authenticating"
+        ? { status: "signed_out", error: event.message }
+        : state;
+    case "session_ended":
+      return state.status === "ready" || state.status === "authenticating"
+        ? { status: "signed_out", error: null }
+        : state;
   }
+}
+
+function afterOnboarding(signedIn: boolean): BootState {
+  return signedIn ? { status: "ready" } : { status: "signed_out", error: null };
 }
 
 /** Whether the arrow-key/back gesture should be consumed by the machine. */

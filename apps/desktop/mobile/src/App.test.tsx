@@ -2,6 +2,7 @@ import { renderToString } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
 import { App, Shell } from "./App";
+import { Onboarding } from "./components/app/Onboarding";
 import { windowClassFor } from "./hooks/use-window-class";
 
 /**
@@ -63,17 +64,26 @@ describe("the shell", () => {
 });
 
 describe("a first run", () => {
-  const html = renderToString(<App />);
-
-  it("reads the introduction before it shows a workspace", () => {
-    // SSR separates interpolated text with comment markers, so the step count is
-    // asserted on its parts rather than as one string.
-    expect(html).toContain("Step <!-- -->1<!-- --> of <!-- -->4");
-    expect(html).toContain("Work that finishes");
+  it("shows no workspace before it knows whether a session exists", () => {
+    // Hydration asks the keychain, so the first paint is the veil — never the workspace,
+    // and never onboarding for someone who is already signed in.
+    const html = renderToString(<App />);
     expect(html).not.toContain("What are we working on?");
+    expect(html).not.toContain("Work that finishes");
   });
 
-  it("does not offer a skip on the first page", () => {
+  it("reads the introduction before it shows a workspace, and cannot be skipped yet", () => {
+    const html = renderToString(
+      <Onboarding
+        onBack={() => undefined}
+        onFinish={() => undefined}
+        onNext={() => undefined}
+        onSkip={() => undefined}
+        page={0}
+      />
+    );
+    expect(html).toContain("Step <!-- -->1<!-- --> of <!-- -->4");
+    expect(html).toContain("Work that finishes");
     expect(html).not.toContain(">Skip<");
   });
 });
