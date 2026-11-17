@@ -1,6 +1,6 @@
 use uuid::Uuid;
 
-use super::{command_id, now_ms, PendingTurn, SessionRuntime};
+use super::{now_ms, PendingTurn, SessionRuntime};
 use crate::driver::{storage_error, SessionCommandReceipt};
 use crate::projection::ProjectionEvent;
 use crate::protocol::{AgentError, AgentErrorCode, AgentEvent};
@@ -256,3 +256,18 @@ impl SessionRuntime {
         })
     }
 }
+
+pub(super) fn command_id(command: &crate::SessionCommand) -> &str {
+    match command {
+        crate::SessionCommand::EnqueueText { command_id, .. }
+        | crate::SessionCommand::CancelTurn { command_id, .. }
+        | crate::SessionCommand::EditMessage { command_id, .. }
+        | crate::SessionCommand::Truncate { command_id, .. }
+        | crate::SessionCommand::Restore { command_id, .. }
+        | crate::SessionCommand::DeleteSession { command_id, .. }
+        | crate::SessionCommand::AcquireLease { command_id, .. }
+        | crate::SessionCommand::RenewLease { command_id, .. }
+        | crate::SessionCommand::ReleaseLease { command_id, .. } => command_id,
+    }
+}
+

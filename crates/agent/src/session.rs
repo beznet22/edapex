@@ -377,20 +377,6 @@ impl SessionRuntime {
     }
 }
 
-fn command_id(command: &crate::SessionCommand) -> &str {
-    match command {
-        crate::SessionCommand::EnqueueText { command_id, .. }
-        | crate::SessionCommand::CancelTurn { command_id, .. }
-        | crate::SessionCommand::EditMessage { command_id, .. }
-        | crate::SessionCommand::Truncate { command_id, .. }
-        | crate::SessionCommand::Restore { command_id, .. }
-        | crate::SessionCommand::DeleteSession { command_id, .. }
-        | crate::SessionCommand::AcquireLease { command_id, .. }
-        | crate::SessionCommand::RenewLease { command_id, .. }
-        | crate::SessionCommand::ReleaseLease { command_id, .. } => command_id,
-    }
-}
-
 fn now_ms() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
