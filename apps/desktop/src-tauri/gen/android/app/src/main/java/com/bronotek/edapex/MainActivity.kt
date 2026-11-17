@@ -148,6 +148,10 @@ class MainActivity : TauriActivity() {
         // Armed here rather than at turn start: without a foreground service this job is the only
         // thing that picks up a turn whose process died, and it must exist before that happens.
         com.bronotek.edapex.run.RunScheduler.ensureScheduled(this)
+        // Channels before anything can post: a notification naming a channel that does not exist
+        // falls back to the default, which is how an approval ends up sharing a toggle with a
+        // routine. Creation is idempotent and runs once per process.
+        com.bronotek.edapex.run.EdApexNotifications.ensureChannels(this)
     }
 
     private fun attachHostBridge(created: WebView? = null) {
