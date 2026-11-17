@@ -1,0 +1,28 @@
+{
+  "$comment": [
+    "The Cloudflare token this project's deploy steps need, expressed as data.",
+    "There is no dashboard upload for this; scripts/cloudflare-token.mjs resolves the names",
+    "to permission-group ids for the account and creates the token through the API.",
+    "Account API Tokens:Edit is deliberately absent: a deploy token that can mint tokens",
+    "turns one leaked secret into permanent access. Bootstrap one by hand, then rotate."
+  ],
+  "name": "edapex-deploy",
+  "zone": "llacademy.ng",
+  "accountPermissionGroups": [
+    "Workers Scripts:Edit",
+    "Workers Queues:Edit",
+    "D1:Edit",
+    "Workers R2 Storage:Edit",
+    "Account Settings:Read"
+  ],
+  "zonePermissionGroups": ["Workers Routes:Edit", "Zone:Read"],
+  "why": {
+    "Workers Scripts:Edit": "wrangler deploy for edapex-api, cowork-api and model-router, plus wrangler secret put",
+    "Workers Queues:Edit": "edapex-push and edapex-push-dead, and the PUSH_QUEUE producer/consumer binding",
+    "D1:Edit": "wrangler d1 create/migrations apply/execute for DB and AGENT_DB",
+    "Workers R2 Storage:Edit": "edapex-media and sync media buckets, object upload and the public photo route",
+    "Account Settings:Read": "account id and the membership the CLI warns about",
+    "Workers Routes:Edit": "the two custom domains: api.llacademy.ng and edapex-api.llacademy.ng",
+    "Zone:Read": "resolve the zone for those custom domains"
+  }
+}
