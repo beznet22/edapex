@@ -11,7 +11,8 @@
     "./json": "./src/json.ts",
     "./platform": "./src/platform.ts",
     "./public-applications": "./src/public-applications.ts",
-    "./web": "./src/web.ts"
+    "./web": "./src/web.ts",
+    "push": "./src/push.ts"
   },
   "dependencies": {
     "zod": "4.4.3"
