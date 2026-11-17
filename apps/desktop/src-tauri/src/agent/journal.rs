@@ -235,7 +235,7 @@ impl RunJournal {
                 .map(|(kind, payload)| (kind.as_str(), payload.as_slice()))
                 .collect();
             if let Err(error) = self.lock(|store| store.append_run_events(&run_id, &borrowed, now())) {
-                eprintln!("run journal: could not append events: {}", error.message);
+                eprintln!("run journal: could not append events for {run_id}: {}", error.message);
             }
         }
     }

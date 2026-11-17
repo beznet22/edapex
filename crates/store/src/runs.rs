@@ -72,9 +72,10 @@ impl<D: SqlDriver> Store<D> {
             settings,
         )?;
         self.driver.execute(
-            "INSERT OR IGNORE INTO runs \
+            "INSERT INTO runs \
              (id, thread_id, workspace_id, status, body, input, settings, data_class, created_at, updated_at, attempt, lease_until) \
-             VALUES (?, ?, ?, 'running', ?, ?, ?, 'workspace', ?, ?, 0, 0)",
+             VALUES (?, ?, ?, 'running', ?, ?, ?, 'workspace', ?, ?, 0, 0) \
+             ON CONFLICT(id) DO NOTHING",
             &[
                 SqlValue::text(run_id),
                 SqlValue::text(thread_id),
