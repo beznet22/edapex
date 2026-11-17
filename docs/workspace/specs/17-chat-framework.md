@@ -63,7 +63,7 @@ assistant-ui was the earlier single-chat-layer choice. It is no longer used beca
 - OpenUI covers generated surfaces without a second chat runtime.
 - The remaining work is the xcodex adapter, not a third-party chat state model.
 
-Do not add `@assistant-ui/*`, `@assistant-ui/react-markdown`, assistant-cloud or AI SDK `UIMessage` rows. If the vendored shell cannot express a required state, extend the custom runtime; do not reintroduce a second chat layer.
+Do not add `@assistant-ui/*`, `@assistant-ui/react-markdown`, assistant-cloud or AI SDK `UIMessage` rows. The runtime and the message contract stay ours; AI Elements patterns are the presentation layer and are fed from `ChatMessagePart`. If a pattern needs state the contract lacks, extend the contract — do not add a second runtime.
 
 ## Options
 
@@ -77,7 +77,7 @@ Do not add `@assistant-ui/*`, `@assistant-ui/react-markdown`, assistant-cloud or
 | **AG-UI** | Framework-neutral agent protocol; lets LangGraph/Mastra/CrewAI/ADK or hand-written agents participate | Not a chat state model; not a browser transport in v1 | **External-agent boundary** |
 | **assistant-ui** | React chat primitives, runtime adapters, tool UI | Duplicate shell/runtime; paid Cloud risk; removed | **Rejected** |
 | **AI SDK UI/RSC** | Stable React chat hooks; RSC `streamUI` | `streamUI` is experimental and Next.js/RSC-specific; the AI SDK agent runtime is not the thin core | **Rejected for v1** |
-| **shadcn AI Elements** | shadcn-native chat patterns | Duplicates the OpenDuet chat layer | **Not used** |
+| **shadcn AI Elements** | shadcn-native chat patterns | Composition only — no runtime, no package | **Adopted for presentation** |
 
 ## Runtime contract
 

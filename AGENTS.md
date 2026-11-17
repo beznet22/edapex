@@ -91,7 +91,12 @@ is a preference; these have a script or a test behind them, named where one exis
 - **No second primitive library.** No Radix directly in a shell component, no headless
   UI, no custom dialog.
 - Base chat primitives (`Bubble`, `Message`, `Message Scroller`, `Attachment`) are
-  allowed; **shadcn AI Elements and assistant-ui are not**.
+  allowed, and **AI Elements patterns are the chat presentation layer** — reasoning, tool
+  calls, plans, tasks, queues, sources, confirmations and traces. They are compositions of
+  registry primitives, copied in and owned here, not a package.
+- **The runtime stays ours.** No `@ai-sdk/react`, no `@assistant-ui/*`, no `UIMessage` rows:
+  a pattern receives `ChatMessagePart` from `packages/contracts` and nothing else. A pattern
+  that cannot be fed from that contract is built, not added.
 
 ## Imports and boundaries
 
