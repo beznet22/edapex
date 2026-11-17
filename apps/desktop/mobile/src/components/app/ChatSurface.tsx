@@ -57,14 +57,14 @@ export function ChatSurface({
 
       <div className="relative flex min-h-0 flex-1 flex-col">
         {chat.messages.length === 0 ? (
-        <div className="scrollbar-auto mx-auto grid min-h-0 w-full max-w-2xl flex-1 grid-rows-1 overflow-y-auto px-gutter pb-2">
+        <div className="scrollbar-auto mx-auto flex min-h-0 w-full max-w-2xl flex-1 flex-col overflow-y-auto px-gutter pb-2">
           {/*
-           * Both blocks share one grid cell, one row tall. `flex-1` centred the hero against
-           * the space *above* the suggestions, which sits ~50dp high on a phone; stacked, it
-           * centres against the whole column and the suggestions pin to the same cell's
-           * bottom. Reading order is unchanged — the hero is still first in the DOM.
+           * One column, not one cell. The hero and the suggestions used to share a grid cell
+           * so the suggestions pinned to the bottom; at 200% font the two blocks grew into
+           * each other and overlapped. A flex column cannot overlap — it scrolls instead,
+           * which is the correct failure for a screen whose text is twice its size.
            */}
-          <div className="col-start-1 row-start-1 flex flex-col items-center justify-center gap-3 py-6 text-center">
+          <div className="flex flex-1 flex-col items-center justify-center gap-3 py-6 text-center">
             <BrandMark className="h-14 w-auto text-foreground" />
             <p className="text-title font-semibold tracking-tight">What are we working on?</p>
             <p className="max-w-64 text-label text-muted-foreground">
@@ -74,10 +74,7 @@ export function ChatSurface({
           </div>
 
           <div
-            className={cn(
-              "col-start-1 row-start-1 mt-auto flex flex-col",
-              keyboardOpen && "hidden"
-            )}
+            className={cn("mt-auto flex flex-col", keyboardOpen && "hidden")}
           >
             {QUICK_ACTIONS.map((action) => {
               const Icon = ICONS[action.icon];
