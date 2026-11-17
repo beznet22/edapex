@@ -12,6 +12,7 @@ export const claimConfig = async (
   claimLinkEnabled: true,
   cookieSecret: COOKIE_SECRET,
   googleConfigured: true,
+  googleClientId: "test-client",
   postLoginRedirect: "/app",
   appOrigin: "https://app.example.test",
   // The TTLs live on the port now; a fixture missing them makes `now + undefined` a NaN and

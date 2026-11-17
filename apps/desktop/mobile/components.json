@@ -1,0 +1,21 @@
+{
+  "$schema": "https://ui.shadcn.com/schema.json",
+  "style": "new-york",
+  "rsc": false,
+  "tsx": true,
+  "tailwind": {
+    "config": "",
+    "css": "../../../packages/tokens/tokens.css",
+    "baseColor": "slate",
+    "cssVariables": true,
+    "prefix": ""
+  },
+  "iconLibrary": "lucide",
+  "aliases": {
+    "components": "@/components",
+    "ui": "@edapex/ui/components",
+    "lib": "@/lib",
+    "utils": "@edapex/ui/lib/utils",
+    "hooks": "@/hooks"
+  }
+}

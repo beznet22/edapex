@@ -7,6 +7,8 @@ plugins {
     id("rust")
 }
 
+apply(plugin = "com.google.gms.google-services")
+
 val tauriProperties = Properties().apply {
     val propFile = file("tauri.properties")
     if (propFile.exists()) {
@@ -16,10 +18,10 @@ val tauriProperties = Properties().apply {
 
 android {
     compileSdk = 37
-    namespace = "ng.llacademy.edapex"
+    namespace = "com.bronotek.edapex"
     defaultConfig {
         manifestPlaceholders["usesCleartextTraffic"] = "false"
-        applicationId = "ng.llacademy.edapex"
+        applicationId = "com.bronotek.edapex"
         minSdk = 24
         targetSdk = 37
         versionCode = tauriProperties.getProperty("tauri.android.versionCode", "1").toInt()
@@ -70,11 +72,19 @@ rust {
 }
 
 dependencies {
+    implementation("androidx.core:core-splashscreen:1.0.1")
     implementation("androidx.webkit:webkit:1.14.0")
     implementation("androidx.appcompat:appcompat:1.7.1")
     implementation("androidx.activity:activity-ktx:1.10.1")
     implementation("com.google.android.material:material:1.12.0")
     implementation("androidx.lifecycle:lifecycle-process:2.10.0")
+    implementation("androidx.work:work-runtime:2.10.0")
+    implementation(platform("com.google.firebase:firebase-bom:35.2.0"))
+    implementation("com.google.firebase:firebase-messaging")
+    implementation("androidx.credentials:credentials:1.5.0")
+    implementation("androidx.credentials:credentials-play-services-auth:1.5.0")
+    implementation("com.google.android.libraries.identity.googleid:googleid:1.1.1")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.1.4")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.5.0")

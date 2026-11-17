@@ -4,7 +4,7 @@ import { useCallback, useState } from "react";
 import type { FormEvent } from "react";
 
 import { IDLE, noticeFromError, type LoginNotice } from "@/lib/auth-notice";
-import { requestMagicLink } from "@/lib/api";
+import { requestMagicLink } from "@edapex/host/api";
 
 /**
  * Email sign-in state.

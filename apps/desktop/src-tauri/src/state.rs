@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 use serde::Serialize;
 
@@ -38,14 +38,66 @@ pub struct PendingAuth {
     pub verifier: String,
 }
 
+/// The captures taken in this process, keyed by the id a tool call names.
+///
+/// An `Arc` rather than a field, so the agent's tool executor can resolve a
+/// capture id without holding the Tauri state it happens to arrive through.
 #[derive(Default)]
+pub struct CaptureStore {
+    records: Mutex<HashMap<String, CaptureRecord>>,
+}
+
+impl CaptureStore {
+    pub fn insert(&self, id: String, record: CaptureRecord) -> Result<(), HostError> {
+        let mut records = self
+            .records
+            .lock()
+            .map_err(|_| HostError::new("internal_error", "Capture store is unavailable", true))?;
+        records.insert(id, record);
+        Ok(())
+    }
+
+    pub fn path_of(&self, id: &str) -> Result<PathBuf, HostError> {
+        let records = self
+            .records
+            .lock()
+            .map_err(|_| HostError::new("internal_error", "Capture store is unavailable", true))?;
+        records
+            .get(id)
+            .map(|record| record.path.clone())
+            .ok_or_else(|| HostError::new("invalid_input", "Capture not found", false))
+    }
+
+    pub fn remove(&self, id: &str) -> Result<Option<CaptureRecord>, HostError> {
+        let mut records = self
+            .records
+            .lock()
+            .map_err(|_| HostError::new("internal_error", "Capture store is unavailable", true))?;
+        Ok(records.remove(id))
+    }
+}
+
 pub struct HostState {
-    captures: Mutex<HashMap<String, CaptureRecord>>,
+    captures: Arc<CaptureStore>,
     pub pending_auth: Mutex<Option<PendingAuth>>,
     agent: Mutex<Option<AgentSession>>,
 }
 
+impl Default for HostState {
+    fn default() -> Self {
+        HostState {
+            captures: Arc::new(CaptureStore::default()),
+            pending_auth: Mutex::new(None),
+            agent: Mutex::new(None),
+        }
+    }
+}
+
 impl HostState {
+    pub fn captures(&self) -> Arc<CaptureStore> {
+        self.captures.clone()
+    }
+
     pub fn set_agent(&self, agent: AgentSession) -> Result<(), HostError> {
         let mut slot = self
             .agent
@@ -77,30 +129,14 @@ impl HostState {
     }
 
     pub fn insert_capture(&self, id: String, record: CaptureRecord) -> Result<(), HostError> {
-        let mut captures = self
-            .captures
-            .lock()
-            .map_err(|_| HostError::new("internal_error", "Capture store is unavailable", true))?;
-        captures.insert(id, record);
-        Ok(())
+        self.captures.insert(id, record)
     }
 
     pub fn capture_path(&self, id: &str) -> Result<PathBuf, HostError> {
-        let captures = self
-            .captures
-            .lock()
-            .map_err(|_| HostError::new("internal_error", "Capture store is unavailable", true))?;
-        captures
-            .get(id)
-            .map(|record| record.path.clone())
-            .ok_or_else(|| HostError::new("invalid_input", "Capture not found", false))
+        self.captures.path_of(id)
     }
 
     pub fn remove_capture(&self, id: &str) -> Result<Option<CaptureRecord>, HostError> {
-        let mut captures = self
-            .captures
-            .lock()
-            .map_err(|_| HostError::new("internal_error", "Capture store is unavailable", true))?;
-        Ok(captures.remove(id))
+        self.captures.remove(id)
     }
 }

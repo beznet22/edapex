@@ -1,32 +1,29 @@
 "use client";
 
-import { useEffect, useId, useRef } from "react";
 import type { ReactNode } from "react";
 import { X } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
+import { Button } from "@edapex/ui/components/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle
+} from "@edapex/ui/components/dialog";
 import { cn } from "@/lib/utils";
 
 /**
  * The app's modal surface.
  *
- * There is **no dialog primitive in the vendored OpenDuet set** — all ten files use
- * only `role="status"` and `role="log"`. The established pattern here is the overlay
- * in `RuntimeSetup.tsx`, and this extracts it rather than inventing a second one, so a
- * new dialog cannot drift from the existing.
+ * A **composition** over the registry `Dialog`, not a second dialog. It used to be a
+ * hand-rolled overlay with its own focus trap, Escape handling, scroll lock and
+ * click-outside test — four things Radix already implements, and four things that had to
+ * be re-audited whenever the markup moved. What is left here is the app's layout: a flat
+ * panel, a scrollable body, an optional footer bar.
  *
- * The parts that are easy to get wrong, and why each is here:
- *
- * - **Escape closes.** A modal without it traps a keyboard user.
- * - **Focus moves in and returns.** Focus lands on the panel, and on close goes back to
- *   whatever opened it — otherwise the next Tab starts from the top of the document.
- * - **Background scroll is frozen.** Without it the page scrolls behind the overlay and
- *   the dialog appears to drift.
- * - **Click-outside closes, click-inside does not.** The check is on the backdrop
- *   element, not on a coordinate, so a click that starts inside and ends outside does
- *   not dismiss.
+ * Flat, not raised: an `--elevation-3` panel on a warm canvas reads as a grey halo.
+ * Separation comes from the scrim plus a single hairline border.
  */
-
 export interface ModalProps {
   readonly open: boolean;
   readonly onClose: () => void;
@@ -38,6 +35,19 @@ export interface ModalProps {
   readonly widthClassName?: string;
 }
 
+/**
+ * `DialogContent` caps itself at `sm:max-w-lg`, and tailwind-merge will not drop that for a
+ * caller's unprefixed `max-w-xl` — they are different variants. The ladder is spelled out
+ * so every class is a literal the scanner emits, and a new width is a visible addition
+ * rather than a silently ignored one.
+ */
+const WIDTH_LADDER: Readonly<Record<string, string>> = {
+  "max-w-md": "sm:max-w-md",
+  "max-w-lg": "sm:max-w-lg",
+  "max-w-xl": "sm:max-w-xl",
+  "max-w-2xl": "sm:max-w-2xl"
+};
+
 export function Modal({
   open,
   onClose,
@@ -47,99 +57,28 @@ export function Modal({
   footer,
   widthClassName = "max-w-md"
 }: ModalProps) {
-  const titleId = useId();
-  const descriptionId = useId();
-  const panelRef = useRef<HTMLDivElement>(null);
-  const returnFocusRef = useRef<HTMLElement | null>(null);
-
-  useEffect(() => {
-    if (!open) return;
-
-    // Remembered before the panel takes focus, so closing returns to the trigger.
-    returnFocusRef.current =
-      document.activeElement instanceof HTMLElement ? document.activeElement : null;
-
-    panelRef.current?.focus();
-
-    const onKeyDown = (event: KeyboardEvent): void => {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        onClose();
-        return;
-      }
-      if (event.key !== "Tab") return;
-
-      // A focus trap by hand, because the panel is not a native <dialog>. Without it
-      // Tab walks into the page behind the overlay, which is still interactive.
-      const focusable = panelRef.current?.querySelectorAll<HTMLElement>(
-        'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
-      );
-      if (focusable === undefined || focusable.length === 0) return;
-
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-      if (first === undefined || last === undefined) return;
-
-      if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault();
-        first.focus();
-      }
-    };
-
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    document.addEventListener("keydown", onKeyDown);
-
-    return () => {
-      document.removeEventListener("keydown", onKeyDown);
-      document.body.style.overflow = previousOverflow;
-      returnFocusRef.current?.focus();
-    };
-  }, [open, onClose]);
-
-  if (!open) return null;
-
   return (
-    <div
-      className="fixed inset-0 z-[70] flex items-center justify-center bg-background/70 p-4 backdrop-blur-md"
-      onMouseDown={(event) => {
-        // Only a press that starts on the backdrop dismisses. A drag that begins in
-        // the panel and releases outside must not close the dialog and lose the draft.
-        if (event.target === event.currentTarget) onClose();
+    <Dialog
+      open={open}
+      onOpenChange={(next: boolean) => {
+        if (!next) onClose();
       }}
     >
-      <div
-        aria-describedby={description === undefined ? undefined : descriptionId}
-        aria-labelledby={titleId}
-        aria-modal="true"
-        /**
-         * Flat, not raised.
-         *
-         * The first version carried `--elevation-3`, which on a warm canvas reads as a
-         * grey halo rather than depth. Separation comes from the scrim behind the panel
-         * and a single hairline border, which is how every flat-surface app does it —
-         * a shadow on top of a scrim is depth described twice.
-         */
+      <DialogContent
         className={cn(
-          "animate-spring-in relative flex max-h-[85dvh] w-full flex-col overflow-hidden rounded-[var(--radius-xl)] border border-border bg-card",
-          widthClassName
+          "flex max-h-[85dvh] w-full flex-col gap-0 overflow-hidden rounded-[var(--radius-xl)] border-border bg-card p-0 shadow-none",
+          widthClassName,
+          WIDTH_LADDER[widthClassName]
         )}
-        ref={panelRef}
-        role="dialog"
-        tabIndex={-1}
+        showCloseButton={false}
       >
         <div className="flex items-start justify-between gap-4 px-6 pb-4 pt-6">
           <div className="min-w-0">
-            <h2 className="text-xl font-semibold tracking-tight" id={titleId}>
-              {title}
-            </h2>
+            <DialogTitle className="text-xl font-semibold tracking-tight">{title}</DialogTitle>
             {description === undefined ? null : (
-              <p className="mt-1.5 text-sm leading-6 text-muted-foreground" id={descriptionId}>
+              <DialogDescription className="mt-1.5 text-sm leading-6">
                 {description}
-              </p>
+              </DialogDescription>
             )}
           </div>
           <Button
@@ -161,7 +100,7 @@ export function Modal({
             {footer}
           </div>
         )}
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

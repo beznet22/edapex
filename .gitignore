@@ -91,6 +91,8 @@ reference-app/
 
 # Generated coverage report
 /coverage/
+uiland_chatgpt_mobile_images
+uiland_chatgpt_web_images_figma
 
 # Secrets never live in the repository, in either tree.
 .env
@@ -102,3 +104,17 @@ reference-app/
 # which is what triggered GitHub's large-file warning. Keep it on disk, out of history.
 boy_writing.mp4
 *.mp4
+
+# Mobile frontend build output
+/apps/desktop/mobile/dist/
+
+# Tauri copies the frontend bundle and its config into the Android project on every build.
+# Tracked Kotlin and resources are inputs; this directory is output.
+/apps/desktop/src-tauri/gen/android/app/src/main/assets/
+
+# Firebase: service-account keys never enter the tree
+*firebase-adminsdk*.json
+**/google-services.json
+CF_rules.json
+FCM_SDK.png
+google-services.json

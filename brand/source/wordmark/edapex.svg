@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 3759 1197" width="3759" height="1197">
+  <!--
+    Edapex wordmark — the editable source.
+
+    This file is text, not outlines, so the lockup can be re-set by changing the string. The
+    shipped exports under `brand/dist/logo/` are the same geometry converted to paths, so no
+    consumer needs the font installed.
+
+    Typeface:  Plus Jakarta Sans SemiBold (weight 600)
+    Font file: brand/source/fonts/PlusJakartaSans-SemiBold.ttf, release 2.7.1, SIL OFL 1.1
+    Frame:     ink is inset 120 units on every side; 1 unit = 1 font unit at 1000 units per em
+    Tracking:  -10 units = -0.01em
+
+    Editing notes: change the string, then re-run `pnpm brand:compositions` so the exports and
+    the token sheet follow. Do not convert to outlines by hand — the pipeline does it with the
+    committed font, which is the only way the exports stay reproducible.
+  -->
+  <text
+    x="43"
+    y="877"
+    font-family="'Plus Jakarta Sans SemiBold', 'Plus Jakarta Sans', 'Plus Jakarta Sans Semi Bold'"
+    font-size="1000"
+    font-weight="600"
+    letter-spacing="-10"
+    fill="#141413"
+  >Edapex</text>
+</svg>

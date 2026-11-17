@@ -12,7 +12,7 @@
 
   "vars": {
     // The Cloudflare account that owns the AI Gateway.
-    "CF_ACCOUNT_ID": "",
+    "CF_ACCOUNT_ID": "76846cbc170d893773979fd89e266e42",
     // The AI Gateway name, used to build the provider-passthrough URL.
     "AI_GATEWAY_ID": "edapex"
   },

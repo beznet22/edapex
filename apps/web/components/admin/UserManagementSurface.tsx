@@ -12,12 +12,12 @@ import {
   UserPlus
 } from "lucide-react";
 
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@edapex/ui/components/badge";
+import { Button } from "@edapex/ui/components/button";
+import { Checkbox } from "@edapex/ui/components/checkbox";
 import { Modal } from "@/components/ui/modal";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@edapex/ui/components/tabs";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@edapex/ui/components/table";
 import { DashboardShell } from "@/components/admin/DashboardShell";
 import { StatFigure, StatGroup } from "@/components/admin/StatGroup";
 import { ContactCell, PersonCell, StatusPill } from "@/components/admin/PersonCell";
@@ -707,8 +707,7 @@ function StaffTable({
               <TableHead className="w-10 pl-3">
                 <Checkbox
                   aria-label="Select all on this page"
-                  checked={allSelected}
-                  indeterminate={someSelected}
+                  checked={someSelected ? "indeterminate" : allSelected}
                   onCheckedChange={onSelectAll}
                 />
               </TableHead>
@@ -857,8 +856,7 @@ function DirectoryTable({
             <TableHead className="w-10 pl-3">
               <Checkbox
                 aria-label="Select all on this page"
-                checked={allSelected}
-                indeterminate={someSelected}
+                checked={someSelected ? "indeterminate" : allSelected}
                 onCheckedChange={onSelectAll}
               />
             </TableHead>

@@ -51,6 +51,22 @@ pub trait ToolExecutor: HostObject {
 
 pub trait ApprovalHandler: HostObject {
     fn request(&self, request: ApprovalRequest) -> HostFuture<'_, ApprovalDecision>;
+
+    /// Why a request ended without a person choosing to allow it.
+    ///
+    /// The decision stays `Deny` — that is what happened — but the transcript
+    /// must not tell someone they declined an action they never saw. Defaults to
+    /// a person's decision, which is every host that has no deadline of its own.
+    fn failure(&self, _approval_request_id: &str) -> Option<ApprovalFailure> {
+        None
+    }
+}
+
+/// The reason an approval ended without an answer, when that is the reason.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ApprovalFailure {
+    /// The host stopped waiting. The action was not run.
+    Timeout,
 }
 
 pub trait EventSink: HostObject {
@@ -63,6 +79,9 @@ pub struct AgentHostOptions {
     pub tools: Arc<dyn ToolExecutor>,
     pub approvals: Arc<dyn ApprovalHandler>,
     pub events: Arc<dyn EventSink>,
+    /// Durable sink for run state. `None` keeps the runtime purely in memory,
+    /// which is what `agent-wasm` and the turn tests want.
+    pub recorder: Option<Arc<dyn crate::recorder::TurnRecorder>>,
 }
 
 struct ThreadState {
@@ -96,12 +115,16 @@ struct Inner {
     settings: AgentConnectSettings,
     provider: Arc<dyn ProviderClient>,
     tools: Arc<dyn ToolExecutor>,
+    recorder: Option<Arc<dyn crate::recorder::TurnRecorder>>,
     approvals: Arc<dyn ApprovalHandler>,
     events: Arc<dyn EventSink>,
     connected: AtomicBool,
     threads: Mutex<HashMap<String, ThreadState>>,
     active_threads: Mutex<HashSet<String>>,
     turns: Mutex<HashMap<String, Arc<TurnControl>>>,
+    /// Why a turn failed, kept only until it settles. The recorder is told and the entry is
+    /// dropped, so a failed run carries its cause to the one place that can persist it.
+    errors: Mutex<HashMap<String, String>>,
 }
 
 #[derive(Clone)]
@@ -119,12 +142,14 @@ impl AgentHost {
                 settings: options.settings,
                 provider: options.provider,
                 tools: options.tools,
+                recorder: options.recorder,
                 approvals: options.approvals,
                 events: options.events,
                 connected: AtomicBool::new(true),
                 threads: Mutex::new(HashMap::new()),
                 active_threads: Mutex::new(HashSet::new()),
                 turns: Mutex::new(HashMap::new()),
+            errors: Mutex::new(HashMap::new()),
             }),
         };
         host.emit(AgentEvent::Connected { thread_id: None });
@@ -150,7 +175,7 @@ impl AgentHost {
             .insert(
                 thread_id.clone(),
                 ThreadState {
-                    messages: vec![ChatMessage::system(system_prompt())],
+                    messages: initial_history(""),
                 },
             );
         Ok(ThreadStartResult { thread_id })
@@ -186,6 +211,17 @@ impl AgentHost {
             .map_err(|_| AgentError::internal("Turn store is unavailable"))?
             .insert(turn_id.clone(), Arc::clone(&control));
 
+        if let Some(recorder) = &self.inner.recorder {
+            recorder.started(crate::recorder::RunStart {
+                run_id: &turn_id,
+                thread_id: &input.thread_id,
+                input: &input.text,
+                model: &self.inner.settings.model,
+                workspace_id: &self.inner.settings.workspace_id,
+                mobile_safe_tools: self.inner.settings.mobile_safe_tools,
+            });
+        }
+
         self.emit(AgentEvent::TurnStarted {
             thread_id: input.thread_id.clone(),
             turn_id: turn_id.clone(),
@@ -212,6 +248,16 @@ impl AgentHost {
                 .map(|mut active| active.remove(&thread_id));
             host.save_history(&thread_id, history);
 
+            if let Some(recorder) = &host.inner.recorder {
+                let message = host
+                    .inner
+                    .errors
+                    .lock()
+                    .ok()
+                    .and_then(|mut errors| errors.remove(&spawned_turn_id));
+                recorder.finished(&spawned_turn_id, status, message.as_deref());
+            }
+
             host.emit(AgentEvent::TurnCompleted {
                 thread_id,
                 turn_id: spawned_turn_id,
@@ -220,6 +266,84 @@ impl AgentHost {
         });
 
         Ok(TurnStarted { turn_id })
+    }
+
+    /// Continues a checkpointed run with no new user message.
+    ///
+    /// Only the native headless worker calls this: the WebView always starts a
+    /// turn with `turn_start`. It runs inline rather than detached, because the
+    /// caller is a WorkManager job whose only job is to finish or fail, and it
+    /// installs the replayed history as the thread's transcript so a later
+    /// `agent_attach` sees exactly what the worker saw.
+    pub async fn resume_turn(
+        &self,
+        thread_id: &str,
+        turn_id: &str,
+        history: Vec<ChatMessage>,
+    ) -> Result<TurnCompletionStatus, AgentError> {
+        {
+            let mut threads = self
+                .inner
+                .threads
+                .lock()
+                .map_err(|_| AgentError::internal("Thread store is unavailable"))?;
+            threads.insert(
+                thread_id.to_string(),
+                ThreadState {
+                    messages: history.clone(),
+                },
+            );
+        }
+        {
+            let mut active = self
+                .inner
+                .active_threads
+                .lock()
+                .map_err(|_| AgentError::internal("Turn store is unavailable"))?;
+            if !active.insert(thread_id.to_string()) {
+                return Err(AgentError::invalid_input("A turn is already active"));
+            }
+        }
+
+        let control = Arc::new(TurnControl::new());
+        self.inner
+            .turns
+            .lock()
+            .map_err(|_| AgentError::internal("Turn store is unavailable"))?
+            .insert(turn_id.to_string(), Arc::clone(&control));
+
+        self.emit(AgentEvent::TurnStarted {
+            thread_id: thread_id.to_string(),
+            turn_id: turn_id.to_string(),
+        });
+
+        let mut history = history;
+        let status = self.run_turn(thread_id, turn_id, &control, &mut history).await;
+
+        self.inner.turns.lock().ok().map(|mut turns| turns.remove(turn_id));
+        self.inner
+            .active_threads
+            .lock()
+            .ok()
+            .map(|mut active| active.remove(thread_id));
+        if let Some(recorder) = &self.inner.recorder {
+            recorder.checkpoint(turn_id, history.as_slice());
+            let message = self
+                .inner
+                .errors
+                .lock()
+                .ok()
+                .and_then(|mut errors| errors.remove(turn_id));
+            recorder.finished(turn_id, status, message.as_deref());
+        }
+        self.save_history(thread_id, history);
+
+        self.emit(AgentEvent::TurnCompleted {
+            thread_id: thread_id.to_string(),
+            turn_id: turn_id.to_string(),
+            status,
+        });
+        Ok(status)
     }
 
     pub fn interrupt(&self, _thread_id: &str, turn_id: &str) -> Result<(), AgentError> {
@@ -260,6 +384,24 @@ impl AgentHost {
         }
     }
 
+    /// Every way a turn can fail goes through here, so a settled run always carries its reason.
+    fn fail_turn(
+        &self,
+        thread_id: &str,
+        turn_id: &str,
+        error: AgentError,
+    ) -> TurnCompletionStatus {
+        if let Ok(mut errors) = self.inner.errors.lock() {
+            errors.insert(turn_id.to_string(), error.message.clone());
+        }
+        self.emit(AgentEvent::Error {
+            thread_id: Some(thread_id.to_string()),
+            turn_id: Some(turn_id.to_string()),
+            error,
+        });
+        TurnCompletionStatus::Error
+    }
+
     async fn run_turn(
         &self,
         thread_id: &str,
@@ -287,14 +429,7 @@ impl AgentHost {
             };
             let mut stream = match self.inner.provider.stream_chat(request) {
                 Ok(stream) => stream,
-                Err(error) => {
-                    self.emit(AgentEvent::Error {
-                        thread_id: Some(thread_id.to_string()),
-                        turn_id: Some(turn_id.to_string()),
-                        error,
-                    });
-                    return TurnCompletionStatus::Error;
-                }
+                Err(error) => return self.fail_turn(thread_id, turn_id, error),
             };
 
             let text_item = format!("message-{turn_id}-{round}");
@@ -364,12 +499,7 @@ impl AgentHost {
                     }
                     ProviderChunk::Done { .. } => break,
                     ProviderChunk::Failed(error) => {
-                        self.emit(AgentEvent::Error {
-                            thread_id: Some(thread_id.to_string()),
-                            turn_id: Some(turn_id.to_string()),
-                            error,
-                        });
-                        return TurnCompletionStatus::Error;
+                        return self.fail_turn(thread_id, turn_id, error);
                     }
                 }
             }
@@ -448,6 +578,9 @@ impl AgentHost {
                         decisions: request.decisions.clone(),
                     });
                     let decision = self.inner.approvals.request(request.clone()).await;
+                    // Read before the event consumes the id below.
+                    let approval_failure =
+                        self.inner.approvals.failure(&request.approval_request_id);
                     self.emit(AgentEvent::ApprovalResolved {
                         thread_id: thread_id.to_string(),
                         turn_id: turn_id.to_string(),
@@ -473,9 +606,14 @@ impl AgentHost {
                         return TurnCompletionStatus::Stopped;
                     }
                     if decision == ApprovalDecision::Deny {
+                        let timed_out = approval_failure == Some(ApprovalFailure::Timeout);
                         let result = DynamicToolResult::failure(AgentError::new(
                             crate::protocol::AgentErrorCode::PermissionDenied,
-                            "The person declined this action",
+                            if timed_out {
+                                "Nobody answered within 10 minutes, so this action was not run"
+                            } else {
+                                "The person declined this action"
+                            },
                             false,
                         ));
                         self.emit(AgentEvent::ToolCompleted {
@@ -517,15 +655,20 @@ impl AgentHost {
                 });
                 history.push(tool_message(&call.id, &result));
             }
+
+            // A tool round is the only boundary a resume can safely restart from:
+            // every call has completed and its result is in the transcript. Writing
+            // mid-stream would checkpoint half a message that cannot be replayed.
+            if let Some(recorder) = &self.inner.recorder {
+                recorder.checkpoint(turn_id, history.as_slice());
+            }
         }
 
-        let error = AgentError::internal("The agent exceeded the tool-round limit");
-        self.emit(AgentEvent::Error {
-            thread_id: Some(thread_id.to_string()),
-            turn_id: Some(turn_id.to_string()),
-            error,
-        });
-        TurnCompletionStatus::Error
+        self.fail_turn(
+            thread_id,
+            turn_id,
+            AgentError::internal("The agent exceeded the tool-round limit"),
+        )
     }
 
     fn save_history(&self, thread_id: &str, messages: Vec<ChatMessage>) {
@@ -560,6 +703,18 @@ fn summarize_arguments(arguments: &str) -> String {
     } else {
         format!("{}…", compact.chars().take(79).collect::<String>())
     }
+}
+
+/// What a conversation looks like before anything has happened.
+///
+/// One definition, because a resumed run that rebuilt this differently from a
+/// new thread would answer differently for the same question.
+pub fn initial_history(input: &str) -> Vec<ChatMessage> {
+    let mut messages = vec![ChatMessage::system(system_prompt())];
+    if !input.is_empty() {
+        messages.push(ChatMessage::user(input));
+    }
+    messages
 }
 
 fn system_prompt() -> String {

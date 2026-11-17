@@ -1,6 +1,20 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
-    <!-- Base application theme. -->
+    <!--
+      The night theme is not a restyle: the same three colours resolve from values-night, and
+      the base/parent is already DayNight. Declared separately so a future divergence has one
+      obvious place to happen rather than none.
+    -->
     <style name="Theme.edapex_desktop" parent="Theme.Material3.DayNight.NoActionBar">
-        <!-- Customize your theme here. -->
+        <item name="android:windowBackground">@color/splash_background</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+    </style>
+
+    <style name="Theme.EdApex.Starting" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/splash_background</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_splash_mark</item>
+        <item name="postSplashScreenTheme">@style/Theme.edapex_desktop</item>
     </style>
 </resources>

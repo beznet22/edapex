@@ -3,8 +3,8 @@
 import { useEffect, useState } from "react";
 import { AlertCircle, Loader2, UserPlus } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Button } from "@edapex/ui/components/button";
+import { Input } from "@edapex/ui/components/input";
 import { Modal } from "@/components/ui/modal";
 import { createStaff, type StaffRow } from "@/lib/admin-api";
 

@@ -334,6 +334,7 @@ impl WasmAgent {
             tools: Arc::new(JsToolExecutor { on_tool }),
             approvals: Arc::new(JsApprovalHandler { on_approval }),
             events: Arc::new(JsEventSink { on_event }),
+            recorder: None,
         })
         .map_err(|error| js_error(error.message))?;
 

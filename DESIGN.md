@@ -1,7 +1,7 @@
 ---
 version: alpha
 name: EdApex Gold on Slate
-description: "One design system for two hosts: a calm, warm-gold school operations workspace rendered in a browser tab and in a frameless desktop window."
+description: "One design system for three hosts: a calm, warm-gold school operations workspace rendered in a browser tab, a frameless desktop window, and an edge-to-edge Android app."
 colors:
   background: "oklch(0.982 0.0054 95.1)"
   foreground: "oklch(0.191 0.0020 106.6)"
@@ -199,7 +199,7 @@ for a product whose value is speed, and would not survive the WebView floor.
 
 ## Hosts
 
-The same interface ships in two hosts, and the design must hold in both without
+The same design ships in three hosts, and it must hold in all of them without
 being two designs.
 
 | | Browser tab | Desktop window |

@@ -6,8 +6,8 @@ import { AlertCircle, Pencil, Plus, ShieldAlert } from "lucide-react";
 import { Skeleton } from "@edapex/chat";
 
 import { useWorkspaceContext } from "@/components/workspace/WorkspaceContext";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Badge } from "@edapex/ui/components/badge";
+import { Button } from "@edapex/ui/components/button";
 import { EmptyState } from "@/components/workspace/EmptyState";
 import { AgentComposerModal } from "@/components/workspace/AgentComposerModal";
 import { AgentEditorModal } from "@/components/workspace/AgentEditorModal";

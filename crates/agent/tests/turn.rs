@@ -8,8 +8,8 @@ use std::time::Duration;
 use edapex_agent::{
     AgentConnectSettings, AgentError, AgentEvent, AgentHost, AgentHostOptions, AgentTurnInput,
     ApprovalDecision, ApprovalHandler, ApprovalRequest, ChatMessage, DynamicToolCall,
-    DynamicToolResult, EventSink, ProviderChunk, ProviderClient, ProviderRequest, ToolExecutor,
-    TurnCompletionStatus,
+    DynamicToolResult, EventSink, ProviderChunk, ProviderClient, ProviderRequest, RunStart,
+    ToolExecutor, TurnCompletionStatus, TurnRecorder,
 };
 use tokio::sync::mpsc;
 
@@ -143,6 +143,7 @@ fn host(
         tools,
         approvals,
         events: events.clone(),
+        recorder: None,
     })
     .expect("host connects");
     (host, events)
@@ -348,6 +349,7 @@ async fn interrupts_a_running_turn() {
         tools: FakeTools::new(false),
         approvals: Arc::new(FixedApproval(ApprovalDecision::AllowOnce)),
         events: events.clone(),
+        recorder: None,
     })
     .expect("host");
     let thread = host.thread_start(None).expect("thread");
@@ -389,4 +391,326 @@ async fn interrupts_a_running_turn() {
             ..
         }
     )));
+}
+
+#[derive(Default)]
+struct Recorded {
+    started: Mutex<Vec<String>>,
+    checkpoints: Mutex<Vec<usize>>,
+    finished: Mutex<Vec<TurnCompletionStatus>>,
+}
+
+impl TurnRecorder for Recorded {
+    fn started(&self, run: RunStart<'_>) {
+        self.started
+            .lock()
+            .expect("started")
+            .push(run.run_id.to_string());
+    }
+
+    fn checkpoint(&self, _run_id: &str, messages: &[ChatMessage]) {
+        self.checkpoints
+            .lock()
+            .expect("checkpoints")
+            .push(messages.len());
+    }
+
+    fn finished(&self, _run_id: &str, status: TurnCompletionStatus, _error: Option<&str>) {
+        self.finished.lock().expect("finished").push(status);
+    }
+}
+
+#[tokio::test]
+async fn a_recorder_hears_the_start_each_tool_round_and_the_end() {
+    let provider = ScriptedProvider::new(vec![
+        vec![
+            ProviderChunk::ToolCallDelta {
+                index: 0,
+                id: Some("call_1".to_string()),
+                name: Some("web_search".to_string()),
+                arguments: "{\"query\":\"school\"}".to_string(),
+            },
+            ProviderChunk::Done {
+                finish_reason: Some("tool_calls".to_string()),
+            },
+        ],
+        vec![
+            ProviderChunk::Text("done".to_string()),
+            ProviderChunk::Done {
+                finish_reason: Some("stop".to_string()),
+            },
+        ],
+    ]);
+    let tools = FakeTools::new(false);
+    let events = Arc::new(CollectedEvents::default());
+    let recorder = Arc::new(Recorded::default());
+    let host = AgentHost::connect(AgentHostOptions {
+        settings: AgentConnectSettings {
+            workspace_id: "workspace".to_string(),
+            model: "test/model".to_string(),
+            mobile_safe_tools: false,
+        },
+        provider,
+        tools,
+        approvals: Arc::new(FixedApproval(ApprovalDecision::AllowOnce)),
+        events: events.clone(),
+        recorder: Some(recorder.clone()),
+    })
+    .expect("host connects");
+
+    let thread = host.thread_start(None).expect("thread");
+    host.turn_start(AgentTurnInput {
+        thread_id: thread.thread_id,
+        text: "search".to_string(),
+        attachment_capture_ids: Vec::new(),
+    })
+    .await
+    .expect("turn");
+    events.wait_for_completion().await;
+
+    let started = recorder.started.lock().expect("started");
+    assert_eq!(started.len(), 1, "started fired once");
+    assert!(!started[0].is_empty());
+
+    // Exactly one boundary: the round whose tool calls completed. The round that
+    // returns the final answer has no tool result to resume from.
+    let checkpoints = recorder.checkpoints.lock().expect("checkpoints");
+    assert_eq!(checkpoints.len(), 1, "one checkpoint per completed tool round");
+    // system prompt + user + assistant(tool_calls) + tool result: the whole
+    // transcript as it stands at the boundary, which is what a resume replays.
+    assert_eq!(checkpoints[0], 4);
+
+    let finished = recorder.finished.lock().expect("finished");
+    assert_eq!(finished.as_slice(), &[TurnCompletionStatus::Completed]);
+}
+
+#[tokio::test]
+async fn a_resumed_run_continues_from_its_checkpoint_without_a_new_message() {
+    let provider = ScriptedProvider::new(vec![vec![
+        ProviderChunk::Text("six rows are missing".to_string()),
+        ProviderChunk::Done {
+            finish_reason: Some("stop".to_string()),
+        },
+    ]]);
+    let tools = FakeTools::new(false);
+    let (host, events) = host(
+        provider.clone(),
+        tools,
+        Arc::new(FixedApproval(ApprovalDecision::AllowOnce)),
+    );
+
+    // The checkpoint a tool round leaves behind: system, user, assistant with a
+    // call, and its result. A resume must continue this, not start over.
+    let checkpoint = vec![
+        ChatMessage::system("you are EdApex"),
+        ChatMessage::user("which marks are missing?"),
+        ChatMessage::assistant(
+            Some(std::sync::Arc::from("checking")),
+            vec![edapex_agent::ToolCall {
+                id: "call_1".to_string(),
+                name: "web_search".to_string(),
+                arguments: "{\"query\":\"JSS 2B\"}".to_string(),
+            }],
+        ),
+        ChatMessage {
+            role: edapex_agent::Role::Tool,
+            content: Some(std::sync::Arc::from("3 rows")),
+            tool_calls: Vec::new(),
+            tool_call_id: Some("call_1".to_string()),
+        },
+    ];
+
+    let status = host
+        .resume_turn("thread-1", "turn-1", checkpoint.clone())
+        .await
+        .expect("resumes");
+
+    assert_eq!(status, TurnCompletionStatus::Completed);
+    let requests = provider.requests.lock().expect("requests");
+    assert_eq!(requests.len(), 1, "a resume sends exactly one request");
+    assert_eq!(
+        requests[0].messages.len(),
+        checkpoint.len(),
+        "the transcript was re-seeded instead of continued"
+    );
+    assert!(
+        events.snapshot().iter().any(|event| matches!(
+            event,
+            AgentEvent::TurnCompleted { status: TurnCompletionStatus::Completed, .. }
+        )),
+        "the client never learned the turn finished"
+    );
+}
+
+/// The failure this prevents: the journal flushes on a 16ms window that starts when the
+/// journal is built, so a turn's first event is written the moment it is emitted. If the
+/// runtime emits `TurnStarted` before recording the run, that write hits the foreign key
+/// from `run_events` to `runs` and the turn produces no events at all.
+#[derive(Default)]
+struct OrderedLog(Mutex<Vec<String>>);
+
+impl OrderedLog {
+    fn push(&self, entry: &str) {
+        self.0.lock().expect("log").push(entry.to_string());
+    }
+    fn entries(&self) -> Vec<String> {
+        self.0.lock().expect("log").clone()
+    }
+}
+
+impl EventSink for OrderedLog {
+    fn emit(&self, event: AgentEvent) {
+        let value = serde_json::to_value(&event).expect("serialises");
+        let kind = value
+            .get("type")
+            .and_then(|kind| kind.as_str())
+            .unwrap_or("unknown")
+            .to_string();
+        self.push(&kind);
+    }
+}
+
+impl TurnRecorder for OrderedLog {
+    fn started(&self, _run: RunStart<'_>) {
+        self.push("started");
+    }
+    fn checkpoint(&self, _run_id: &str, _messages: &[ChatMessage]) {}
+    fn finished(&self, _run_id: &str, _status: TurnCompletionStatus, error: Option<&str>) {
+        self.push(&format!("finished:{}", error.unwrap_or("none")));
+    }
+}
+
+#[tokio::test]
+async fn records_the_run_before_its_first_event() {
+    let log = Arc::new(OrderedLog::default());
+    let host = AgentHost::connect(AgentHostOptions {
+        settings: AgentConnectSettings {
+            workspace_id: "workspace".to_string(),
+            model: "test/model".to_string(),
+            mobile_safe_tools: false,
+        },
+        provider: ScriptedProvider::new(vec![vec![ProviderChunk::Text("hi".to_string())]]),
+        tools: FakeTools::new(false),
+        approvals: Arc::new(FixedApproval(ApprovalDecision::AllowOnce)),
+        events: log.clone(),
+        recorder: Some(Arc::clone(&log) as Arc<dyn TurnRecorder>),
+    })
+    .expect("host connects");
+
+    let thread = host.thread_start(None).expect("thread");
+    host.turn_start(AgentTurnInput {
+        thread_id: thread.thread_id,
+        text: "hi".to_string(),
+        attachment_capture_ids: Vec::new(),
+    })
+    .await
+    .expect("turn");
+
+    tokio::time::sleep(Duration::from_millis(50)).await;
+    let entries = log.entries();
+
+    assert!(
+        entries.iter().any(|entry| entry == "turn_started"),
+        "the turn should emit an event, saw {entries:?}"
+    );
+    // `Connected` belongs to the session, not to a run, and carries no turn id for the
+    // journal to write against. The first event *of the turn* is what must follow the row.
+    let started = entries.iter().position(|entry| entry == "started");
+    let turn_started = entries.iter().position(|entry| entry == "turn_started");
+    assert!(
+        started.is_some() && started < turn_started,
+        "the run must be recorded before its first turn event, saw {entries:?}"
+    );
+}
+
+struct FailingProvider;
+
+impl ProviderClient for FailingProvider {
+    fn stream_chat(
+        &self,
+        _request: ProviderRequest,
+    ) -> Result<mpsc::Receiver<ProviderChunk>, AgentError> {
+        Err(AgentError::internal("model router refused the turn"))
+    }
+}
+
+/// The failure that produced an empty `runs.error` on the phone: the runtime settled a failed
+/// turn without carrying the reason, so the journal had nothing to write and the transcript had
+/// nothing to show.
+#[tokio::test]
+async fn a_provider_failure_is_settled_with_its_message() {
+    let log = Arc::new(OrderedLog::default());
+    let host = AgentHost::connect(AgentHostOptions {
+        settings: AgentConnectSettings {
+            workspace_id: "workspace".to_string(),
+            model: "test/model".to_string(),
+            mobile_safe_tools: false,
+        },
+        provider: Arc::new(FailingProvider),
+        tools: FakeTools::new(false),
+        approvals: Arc::new(FixedApproval(ApprovalDecision::AllowOnce)),
+        events: log.clone(),
+        recorder: Some(Arc::clone(&log) as Arc<dyn TurnRecorder>),
+    })
+    .expect("host connects");
+
+    let thread = host.thread_start(None).expect("thread");
+    host.turn_start(AgentTurnInput {
+        thread_id: thread.thread_id,
+        text: "hi".to_string(),
+        attachment_capture_ids: Vec::new(),
+    })
+    .await
+    .expect("turn");
+
+    tokio::time::sleep(Duration::from_millis(50)).await;
+    let entries = log.entries();
+
+    assert!(
+        entries
+            .iter()
+            .any(|entry| entry == "finished:model router refused the turn"),
+        "the settled run should carry the provider's message, saw {entries:?}"
+    );
+}
+
+/// The device failed at a `Failed` chunk rather than at connect, and that path settled the run
+/// with no reason — the exact shape that left `runs.error` null on the phone.
+#[tokio::test]
+async fn a_failure_chunk_is_settled_with_its_message() {
+    let log = Arc::new(OrderedLog::default());
+    let host = AgentHost::connect(AgentHostOptions {
+        settings: AgentConnectSettings {
+            workspace_id: "workspace".to_string(),
+            model: "test/model".to_string(),
+            mobile_safe_tools: false,
+        },
+        provider: ScriptedProvider::new(vec![vec![ProviderChunk::Failed(AgentError::internal(
+            "gateway said no",
+        ))]]),
+        tools: FakeTools::new(false),
+        approvals: Arc::new(FixedApproval(ApprovalDecision::AllowOnce)),
+        events: log.clone(),
+        recorder: Some(Arc::clone(&log) as Arc<dyn TurnRecorder>),
+    })
+    .expect("host connects");
+
+    let thread = host.thread_start(None).expect("thread");
+    host.turn_start(AgentTurnInput {
+        thread_id: thread.thread_id,
+        text: "hi".to_string(),
+        attachment_capture_ids: Vec::new(),
+    })
+    .await
+    .expect("turn");
+
+    tokio::time::sleep(Duration::from_millis(50)).await;
+    let entries = log.entries();
+
+    assert!(
+        entries
+            .iter()
+            .any(|entry| entry == "finished:gateway said no"),
+        "a failed chunk must be settled with its message, saw {entries:?}"
+    );
 }

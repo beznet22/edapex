@@ -19,7 +19,7 @@ import {
   type CapabilityTool
 } from "@edapex/contracts";
 
-import { apiBase } from "@/lib/api";
+import { apiBase } from "@edapex/host/api";
 
 export interface AgentView {
   readonly id: string;

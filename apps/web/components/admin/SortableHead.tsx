@@ -3,7 +3,7 @@
 import { ArrowDown, ArrowUp, ChevronsUpDown } from "lucide-react";
 import type { ReactNode } from "react";
 
-import { TableHead } from "@/components/ui/table";
+import { TableHead } from "@edapex/ui/components/table";
 import { cn } from "@/lib/utils";
 
 /**

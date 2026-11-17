@@ -19,7 +19,7 @@
  * reserved band would shift every surface down for chrome that is not there.
  */
 
-import { isTauriHost } from "@/lib/platform";
+import { isTauriHost } from "@edapex/host/platform";
 
 export interface WindowControls {
   minimize: () => Promise<void>;

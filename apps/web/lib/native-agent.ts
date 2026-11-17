@@ -2,7 +2,7 @@
 
 import type { AgentEvent } from "@edapex/contracts";
 
-import { apiBase } from "@/lib/api";
+import { apiBase } from "@edapex/host/api";
 
 /**
  * Browser transport for the shared agent core.

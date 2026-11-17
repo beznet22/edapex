@@ -13,6 +13,7 @@ pub mod crypto;
 pub mod error;
 pub mod journal;
 pub mod migrations;
+pub mod runs;
 
 pub use error::{Result, StoreError};
 pub use journal::{Journal, JournalRecord, PersistVectorMode};
@@ -141,8 +142,8 @@ const BODY_TABLES: &[&str] = &[
 ];
 
 pub struct Store<D: SqlDriver> {
-    driver: D,
-    master: MasterKey,
+    pub(crate) driver: D,
+    pub(crate) master: MasterKey,
 }
 
 impl<D: SqlDriver> Store<D> {
@@ -578,12 +579,12 @@ fn parse_operation(value: &str) -> Operation {
 /// Bringing `js-sys` into this crate to read `Date.now()` would hand the storage
 /// layer a browser dependency that desktop does not have.
 #[cfg(target_arch = "wasm32")]
-fn now() -> i64 {
+pub(crate) fn now() -> i64 {
     0
 }
 
 #[cfg(not(target_arch = "wasm32"))]
-fn now() -> i64 {
+pub(crate) fn now() -> i64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map(|duration| duration.as_secs() as i64)

@@ -5,9 +5,9 @@ import Link from "next/link";
 import { FilePlus2, PanelLeft, Search } from "lucide-react";
 
 import type { CapabilityManifest, WorkspaceRuntimeView } from "@edapex/contracts";
-import type { CoreHealth } from "@/lib/tauri";
+import type { CoreHealth } from "@edapex/host/tauri";
 
-import { Button } from "@/components/ui/button";
+import { Button } from "@edapex/ui/components/button";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -16,7 +16,7 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
-import { Separator } from "@/components/ui/separator";
+import { Separator } from "@edapex/ui/components/separator";
 import {
   Sidebar,
   SidebarContent,

@@ -3,8 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { AlertCircle, Camera, Loader2, Trash2 } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Button } from "@edapex/ui/components/button";
+import { Input } from "@edapex/ui/components/input";
 import { Modal } from "@/components/ui/modal";
 import {
   setStaffActive,
@@ -12,7 +12,7 @@ import {
   uploadPhoto,
   type StaffRow
 } from "@/lib/admin-api";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@edapex/ui/components/avatar";
 import { initialsOf } from "@/components/admin/PersonCell";
 
 /**

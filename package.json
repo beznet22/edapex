@@ -7,8 +7,35 @@
     "node": ">=22.18"
   },
   "scripts": {
+    "check": "pnpm run check:boundaries && pnpm run check:docs && pnpm run check:tokens",
+    "check:boundaries": "node scripts/check-boundaries.mjs",
+    "check:docs": "node scripts/check-docs.mjs",
+    "check:tokens": "node scripts/check-tokens.mjs",
+    "check:tokens:update": "node scripts/check-tokens.mjs --update",
     "check:agent-size": "node scripts/check-agent-size.mjs",
     "verify:ports": "node scripts/verify-port-specs.mjs",
-    "verify:schema": "node scripts/verify-schema-catalog.mjs"
+    "verify:schema": "node scripts/verify-schema-catalog.mjs",
+    "brand:build": "node scripts/brand/cli.mjs build",
+    "brand:verify": "node scripts/verify-brand-mark.mjs",
+    "brand:mark": "node scripts/build-brand-mark.mjs",
+    "brand:tokens": "node scripts/brand/cli.mjs tokens",
+    "brand:logos": "node scripts/brand/cli.mjs logos",
+    "brand:compositions": "node scripts/brand/cli.mjs compositions",
+    "brand:icons": "node scripts/brand/cli.mjs icons",
+    "brand:desktop": "node scripts/brand/cli.mjs desktop",
+    "brand:android": "node scripts/brand/cli.mjs android",
+    "brand:web": "node scripts/brand/cli.mjs web",
+    "brand:pwa": "node scripts/brand/cli.mjs pwa",
+    "brand:social": "node scripts/brand/cli.mjs social",
+    "brand:ios": "node scripts/brand/cli.mjs ios",
+    "brand:macos": "node scripts/brand/cli.mjs macos",
+    "brand:placement": "node scripts/brand/cli.mjs placement",
+    "brand:preview": "node scripts/brand/cli.mjs preview",
+    "brand:validate": "node scripts/brand/cli.mjs validate",
+    "brand:test": "node --test 'scripts/brand/**/*.test.mjs'"
+  },
+  "devDependencies": {
+    "fontkit": "3.0.0",
+    "sharp": "0.35.5"
   }
 }

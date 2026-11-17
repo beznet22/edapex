@@ -3,8 +3,8 @@
 import { useEffect, useState } from "react";
 import { AlertCircle, Loader2, Trash2 } from "lucide-react";
 
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Badge } from "@edapex/ui/components/badge";
+import { Button } from "@edapex/ui/components/button";
 import { Modal } from "@/components/ui/modal";
 import { GrantPicker } from "@/components/workspace/GrantPicker";
 import { deleteAgent, setAgentGrants, type AgentView, type GrantCatalog } from "@/lib/agents-api";

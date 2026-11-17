@@ -2,7 +2,7 @@
 
 import { Link2, MoreHorizontal, Pencil, ShieldOff, UserMinus } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
+import { Button } from "@edapex/ui/components/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -10,7 +10,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger
-} from "@/components/ui/dropdown-menu";
+} from "@edapex/ui/components/dropdown-menu";
 
 /**
  * Per-row actions.

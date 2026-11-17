@@ -102,6 +102,7 @@ fn main() {
         tools: Arc::new(FixtureTools),
         approvals: Arc::new(FixtureApprovals),
         events: events.clone(),
+        recorder: None,
     })
     .expect("size fixture host");
 

@@ -61,6 +61,7 @@ export function createAuthConfig(env: AuthConfigEnv): AuthConfigPort {
     claimLinkEnabled,
     cookieSecret,
     googleConfigured,
+    googleClientId: present(env.GOOGLE_CLIENT_ID),
     magicLinkTtlSeconds: ttlOf(env.MAGIC_LINK_TTL_SECONDS, 15 * 60),
     sessionTtlSeconds: ttlOf(env.SESSION_TTL_SECONDS, 7 * 24 * 60 * 60),
     postLoginRedirect: present(env.POST_LOGIN_REDIRECT) ?? "/",

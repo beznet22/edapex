@@ -1,6 +1,7 @@
 mod window;
 mod agent;
 mod api;
+mod native_auth;
 mod auth;
 mod capture;
 mod mcp;
@@ -47,17 +48,22 @@ fn host_capabilities(app: tauri::AppHandle) -> HostCapabilities {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_deep_link::init())
+        .plugin(tauri_plugin_opener::init())
         .manage(HostState::default())
+        .setup(|app| {
+            native_auth::set_app(app.handle().clone());
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             runtime_health,
             host_capabilities,
-            agent::agent_connect,
-            agent::agent_attach,
-            agent::agent_thread_start,
-            agent::agent_turn_start,
-            agent::agent_turn_interrupt,
-            agent::agent_approval_response,
-            agent::agent_close,
+            agent::commands::agent_connect,
+            agent::commands::agent_attach,
+            agent::commands::agent_thread_start,
+            agent::commands::agent_turn_start,
+            agent::commands::agent_turn_interrupt,
+            agent::commands::agent_approval_response,
+            agent::commands::agent_close,
             auth::auth_start,
             auth::auth_exchange,
             auth::auth_status,

@@ -1,0 +1,211 @@
+@import "tailwindcss";
+@import "@edapex/tokens/tokens.css";
+@import "@edapex/tokens/motion.css";
+@import "@edapex/ui/styles/animate.css";
+
+/* The app's own sources, then the shared packages it renders from. */
+@source "../**/*.tsx";
+@source "../../../../../packages/ui/src";
+@source "../../../../../packages/chat/src";
+@source "../../../../../packages/genui/src";
+@source "../../../../../node_modules/streamdown/dist/*.js";
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * Height classes, because a landscape phone is `compact width × compact height` and an
+ * onboarding page that assumes vertical room is broken the moment the phone is turned.
+ */
+@custom-variant short (@media (max-height: 30rem));
+@custom-variant tall (@media (min-height: 56rem));
+
+@theme {
+  /*
+   * Material 3 window size classes, as tokens.
+   *
+   * These are the mobile host's breakpoints. The *values* — colour, type, radius, motion —
+   * come from `@edapex/tokens` and never differ per host; breakpoints may, because Android
+   * users read width in window classes and API 37 makes adaptivity mandatory rather than
+   * optional.
+   */
+  --breakpoint-medium: 37.5rem; /* 600dp  — small tablet, foldable inner */
+  --breakpoint-expanded: 52.5rem; /* 840dp  — tablet, desktop window */
+  --breakpoint-large: 75rem; /* 1200dp — large tablet, Chromebook */
+  --breakpoint-extra-large: 100rem; /* 1600dp — external display */
+
+  /*
+   * Spacing in dp. CSS pixels are dp in the WebView (`useWideViewPort` is false, so the
+   * layout width is the WebView width), which is what makes a 44dp target a `touch`.
+   */
+  --spacing-gutter: 1rem;
+  --spacing-gutter-wide: 1.5rem;
+  --spacing-touch: 2.75rem; /* 44dp minimum target */
+  --spacing-comfortable: 3rem; /* 48dp primary action */
+  --spacing-row: 3.5rem;
+  --spacing-field: 3.5rem; /* 56dp — a composer field with a 40dp action inside it */
+  --spacing-dock: 4.5rem;
+  --spacing-rail: 4.5rem;
+  --spacing-header: 3.5rem;
+  --spacing-sheet-handle: 1.5rem;
+
+  /* `--radius-sheet` and `--radius-dock` come from the shared ladder in @edapex/tokens. */
+
+  /* Floating surfaces only; a full-bleed surface never carries a shadow. */
+  --shadow-float: var(--elevation-2);
+  --shadow-dock: var(--elevation-3);
+  --shadow-sheet: var(--elevation-3);
+
+  --ease-sheet: var(--duet-ease);
+}
+
+/*
+ * Insets resolve here and nowhere else.
+ *
+ * `env(safe-area-inset-*)` is the primary source. `--platform-inset-*` is written by
+ * `MainActivity` for WebViews older than M144, where `env()` returns 0; `max()` means the
+ * larger of the two wins and neither can subtract from the other. No component writes
+ * `env()` or a raw padding — they use `.screen-top` / `.screen-bottom`.
+ */
+:root {
+  --inset-top: max(env(safe-area-inset-top), var(--platform-inset-top, 0px));
+  --inset-bottom: max(env(safe-area-inset-bottom), var(--platform-inset-bottom, 0px));
+  --inset-left: max(env(safe-area-inset-left), var(--platform-inset-left, 0px));
+  --inset-right: max(env(safe-area-inset-right), var(--platform-inset-right, 0px));
+}
+
+/*
+ * Unlayered on purpose. Tailwind checks cascade layers *before* specificity, so a
+ * `@layer components` rule loses to a utilities-layer class even when it is more
+ * specific — that is why the sheet ignored its own height and the composer override
+ * needed a rule instead of a `pb-*`. These rules exist to win, so they sit outside
+ * every layer.
+ */
+.screen-top {
+  padding-top: var(--inset-top);
+}
+
+.screen-bottom {
+  padding-bottom: var(--inset-bottom);
+}
+
+/*
+ * The composer is anchored to the bottom edge, so the gesture bar is part of its height.
+ * Declared here rather than as `pb-*` on the element: a utility would win over this class
+ * and the composer would sit under the bar on exactly the devices that have one.
+ */
+.composer-dock {
+  padding-bottom: calc(var(--inset-bottom) + 1rem);
+}
+
+/* The attach panel floats clear of the composer and the gesture bar together. */
+.attach-offset {
+  bottom: calc(var(--inset-bottom) + 5.5rem);
+}
+
+/* A control pinned to the bottom of a surface. */
+.float-bottom {
+  bottom: calc(var(--inset-bottom) + 0.75rem);
+}
+
+/* The drawer runs edge to edge, so it owns both insets — the wordmark was under the status bar. */
+.app-drawer {
+  padding: 0;
+  padding-top: var(--inset-top);
+  padding-bottom: var(--inset-bottom);
+}
+
+@layer components {
+  /*
+   * The brand mark, painted in the theme's ink.
+   *
+   * A CSS mask over `--foreground` rather than an `<img>`: the generated SVG is a black
+   * silhouette, so masking it follows light and dark from the token sheet instead of
+   * needing a second file. The `-webkit-` pair is for WebViews before `mask-image` shipped
+   * unprefixed.
+   */
+  .brand-mask {
+    display: block;
+    background-color: var(--foreground);
+    mask-image: var(--brand-mark);
+    mask-repeat: no-repeat;
+    mask-position: center;
+    mask-size: contain;
+    -webkit-mask-image: var(--brand-mark);
+    -webkit-mask-repeat: no-repeat;
+    -webkit-mask-position: center;
+    -webkit-mask-size: contain;
+  }
+}
+
+@layer components {
+  /*
+   * The onboarding reveal: two copies of the mark, each clipped to one side of the spine.
+   * `clip-path` uncovers the silhouette outward from the centre — geometry, not a scale, so
+   * the logo is revealed rather than zoomed. The spine is the seam, which makes the antenna
+   * resolve last as the halves meet.
+   */
+  .brand-reveal-start,
+  .brand-reveal-end {
+    clip-path: inset(0 50% 0 50%);
+    transition-property: clip-path;
+    transition-duration: var(--motion-duration-spatial-slow);
+    transition-timing-function: var(--motion-ease-spatial-slow);
+  }
+
+  .brand-reveal[data-revealed="true"] .brand-reveal-start {
+    clip-path: inset(0 50% 0 0);
+  }
+
+  .brand-reveal[data-revealed="true"] .brand-reveal-end {
+    clip-path: inset(0 0 0 50%);
+  }
+}
+
+/*
+ * Reduced motion is *immediate*, not fast.
+ *
+ * The shared sheet floors transitions at 150ms so a fade still signals that something
+ * changed. On a surface someone opted out of motion on, that floor is a wait with nothing in
+ * it — the state has already changed. 1ms rather than 0 because a zero-duration transition
+ * never fires `transitionend`, and the boot veil unmounts on that event.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 1ms !important;
+    animation-duration: 1ms !important;
+  }
+}
+
+/*
+ * Unlayered on purpose. Tailwind checks cascade layers *before* specificity, so a
+ * `@layer components` rule loses to a utilities-layer class even when it is more
+ * specific — that is why the sheet ignored its own height and the composer override
+ * needed a rule instead of a `pb-*`. These rules exist to win, so they sit outside
+ * every layer.
+ */
+/*
+ * The sheet's two heights.
+ *
+ * Declared here rather than as utilities because the registry panel carries `h-auto`, and a
+ * utilities-layer class beats a components-layer one whatever the class order — that is how
+ * the sheet ended up clamped to 80vh and positioned off-screen. The `[data-slot]` prefix
+ * gives these rules enough specificity that the layer no longer decides.
+ */
+[data-slot="drawer-content"].sheet-peek {
+  height: 40dvh;
+}
+
+[data-slot="drawer-content"].sheet-full {
+  height: 100dvh;
+}
+
+/*
+ * A sheet is anchored to the bottom edge, so its content sits behind the gesture bar unless
+ * it reserves the inset itself. This is the one place outside `Screen` that writes it, and
+ * it does so for the same reason `Screen` does: a sheet has no parent to inherit from.
+ */
+[data-slot="drawer-content"] {
+  padding-bottom: max(env(safe-area-inset-bottom), var(--platform-inset-bottom, 0px));
+}

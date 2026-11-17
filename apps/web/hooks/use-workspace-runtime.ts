@@ -4,8 +4,9 @@ import { useCallback, useMemo, useState, useSyncExternalStore } from "react";
 
 import type { ChatMessage, QueuedMessage, WorkspaceRuntimeView } from "@edapex/contracts";
 
-import { NativeAgentAdapter } from "@/lib/agent-runtime";
-import type { NativeAgentSettings } from "@/lib/native-agent";
+import { NativeAgentAdapter } from "@edapex/host/agent";
+import type { AgentConnectSettings } from "@edapex/host/agent/transport";
+import { selectAgentTransport } from "@/lib/runtime-connect";
 
 export interface WorkspaceRuntimeController {
   readonly connected: boolean;
@@ -30,20 +31,20 @@ export interface WorkspaceRuntimeController {
   ) => void;
   readonly restoreComplete: () => void;
   readonly restoreUnavailable: () => void;
-  readonly connectAgent: (settings: NativeAgentSettings) => Promise<void>;
+  readonly connectAgent: (settings: AgentConnectSettings) => Promise<void>;
   readonly connecting: boolean;
   readonly connectError: string;
 }
 
 export function useWorkspaceRuntime(): WorkspaceRuntimeController {
-  const adapter = useMemo(() => new NativeAgentAdapter(), []);
+  const adapter = useMemo(() => new NativeAgentAdapter(selectAgentTransport()), []);
   const [connecting, setConnecting] = useState(false);
   const [connectError, setConnectError] = useState("");
   const state = useSyncExternalStore(adapter.subscribe, adapter.getSnapshot, adapter.getSnapshot);
   const view = adapter.view;
 
   const connectAgent = useCallback(
-    async (settings: NativeAgentSettings): Promise<void> => {
+    async (settings: AgentConnectSettings): Promise<void> => {
       setConnecting(true);
       setConnectError("");
       try {

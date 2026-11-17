@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { AlertCircle, Download, Loader2, Merge, ShieldAlert, UserCheck } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
+import { Button } from "@edapex/ui/components/button";
 import { StatusPill } from "@/components/admin/PersonCell";
 import { Modal } from "@/components/ui/modal";
 import {

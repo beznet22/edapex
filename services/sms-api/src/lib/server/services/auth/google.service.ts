@@ -10,6 +10,8 @@ import {
 } from "../errors";
 import type { GoogleProfile } from "../ports/google-oauth.port";
 import { emitAuthEvent } from "./auth-events";
+import { verifyGoogleIdToken } from "./google-id-token";
+import { resolveGoogleKey } from "./google-jwks";
 import { completeClaim } from "./claim-link";
 import { OAUTH_STATE_TTL_SECONDS } from "./claim-policy";
 import { issueSession, loadAuthUser } from "./session-issuance";
@@ -148,7 +150,7 @@ export class GoogleService {
         claimLinkId: input.claimLinkId ?? null,
         ip: input.ip,
         userAgent: input.userAgent,
-        fingerprint: input.fingerprint
+        fingerprint: input.fingerprint ?? null
       });
     }
 
@@ -156,9 +158,45 @@ export class GoogleService {
   }
 
   /** `04 §3.2`: identity first, then a unique verified email. No self-signup. */
+  /**
+   * The native path: a verified ID token instead of an access token.
+   *
+   * Everything after verification is the same `signIn` the browser callback uses, so a
+   * person who signs in on the phone lands on exactly the account they would reach on the
+   * web, and the audit event is identical.
+   */
+  async nativeSignIn(input: {
+    readonly idToken: string;
+    readonly ip: string | null;
+    readonly userAgent: string | null;
+    readonly fingerprint: string | null;
+  }): Promise<AuthSessionResult> {
+    const config = this.ctx.ports.authConfig;
+    if (!config.googleConfigured || config.googleClientId === null) {
+      throw new ConflictError("Google sign-in is not configured");
+    }
+
+    const claims = await verifyGoogleIdToken({
+      token: input.idToken,
+      resolveKey: (kid) => resolveGoogleKey(kid, this.ctx.ports.clock.now()),
+      audience: config.googleClientId,
+      nowSeconds: this.ctx.ports.clock.now()
+    });
+
+    return this.signIn(
+      {
+        providerUserId: claims.subject,
+        email: claims.email,
+        emailVerified: claims.emailVerified,
+        name: claims.name
+      },
+      input
+    );
+  }
+
   private async signIn(
     profile: GoogleProfile,
-    input: GoogleCallbackInput
+    input: { readonly ip: string | null; readonly userAgent: string | null; readonly fingerprint?: string | null }
   ): Promise<AuthSessionResult> {
     const unscoped = requireUnscopedContext(this.ctx.repos.ctx);
     const now = this.ctx.ports.clock.now();
@@ -182,7 +220,7 @@ export class GoogleService {
       const session = await issueSession(this.ctx, user.id, {
         ip: input.ip,
         userAgent: input.userAgent,
-        fingerprint: input.fingerprint
+        fingerprint: input.fingerprint ?? null
       });
       await emitAuthEvent(
         this.ctx,
@@ -273,7 +311,7 @@ export class GoogleService {
         userId: user.id,
         tokenHash: await sha256Hex(token),
         expiresAt,
-        deviceFingerprint: input.fingerprint,
+        deviceFingerprint: input.fingerprint ?? null,
         createdAt: now
       },
       email: profile.email,

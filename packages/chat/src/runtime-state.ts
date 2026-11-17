@@ -13,6 +13,8 @@ export interface WorkspaceRuntimeState {
   readonly turn: WorkspaceTurnView;
   readonly messages: readonly ChatMessage[];
   readonly queue: ChatQueueState;
+  /** Why the last attempt to send failed, cleared by the next successful send. */
+  readonly error?: string | null;
 }
 
 export type RuntimeEvent =
@@ -20,7 +22,8 @@ export type RuntimeEvent =
   | { readonly type: "queue"; readonly action: QueueAction }
   | { readonly type: "message"; readonly message: ChatMessage }
   | { readonly type: "history"; readonly messages: readonly ChatMessage[] }
-  | { readonly type: "clear-messages" };
+  | { readonly type: "clear-messages" }
+  | { readonly type: "error"; readonly message: string | null };
 
 export interface RuntimeResult {
   readonly state: WorkspaceRuntimeState;
@@ -71,5 +74,7 @@ export function reduceRuntime(
       return { state: { ...state, messages: event.messages }, drain: null };
     case "clear-messages":
       return { state: { ...state, messages: [] }, drain: null };
+    case "error":
+      return { state: { ...state, error: event.message }, drain: null };
   }
 }

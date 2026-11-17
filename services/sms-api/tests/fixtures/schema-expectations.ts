@@ -1991,10 +1991,25 @@ export const NEW_TABLES: readonly string[] = [
   "ocr_cache",
   "marksheet_captures",
   "grade_change_audit",
-  "public_document_tokens"
+  "public_document_tokens",
+  "push_devices",
+  "push_jobs",
+  "publish_approvals"
 ];
 
 export const NEW_TABLE_INDEXES: Readonly<Record<string, readonly IndexExpectation[]>> = {
+  "push_devices": [
+    { "name": "push_devices_platform_token_unique", "unique": true, "columns": ["platform", "token"] },
+    { "name": "push_devices_user_install_unique", "unique": true, "columns": ["user_id", "install_id"] },
+    { "name": "push_devices_user_id_index", "unique": false, "columns": ["user_id"] }
+  ],
+  "publish_approvals": [
+    { "name": "publish_approvals_school_status_index", "unique": false, "columns": ["school_id", "status"] }
+  ],
+  "push_jobs": [
+    { "name": "push_jobs_idempotency_key_unique", "unique": true, "columns": ["idempotency_key"] },
+    { "name": "push_jobs_user_created_index", "unique": false, "columns": ["user_id", "created_at"] }
+  ],
   "auth_identities": [
     {
       "name": "auth_identities_provider_provider_user_id_unique",
@@ -2304,3 +2319,4 @@ export const NEW_TABLE_INDEXES: Readonly<Record<string, readonly IndexExpectatio
 };
 
 export const ALL_TABLES: readonly string[] = [...LEGACY_TABLES, ...NEW_TABLES];
+

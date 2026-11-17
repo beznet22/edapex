@@ -1,14 +1,20 @@
 # 50 — Native Agent Path (desktop and mobile)
 
-**Status:** audit complete, implementation pending.
+**Status:** resolved. The default is now the native transport; the device
+verification is carried as a release gate in `81-mobile-shell.md`.
 **Rule being enforced** (from `AGENTS.md`): *desktop and mobile are native.
 WebAssembly is the web delivery mechanism only. A host that can run native code uses
 `crates/*` directly; adding WASM to a native host needs a written justification and a
 recorded blocker.*
 
-## Audit result: the rule is currently violated
+## Audit result (historical): the rule was violated
 
-Desktop and mobile run the **WebAssembly** agent, not the native one.
+At audit time, desktop and mobile ran the **WebAssembly** agent, not the native one.
+That is no longer true: `build:desktop` and `build:mobile` set `NEXT_PUBLIC_NATIVE_AGENT=1`,
+so a Tauri build selects the native transport, and `AgentTransport`
+(`packages/host/src/agent/transport.ts`) makes the injection explicit rather than
+environmental. The audit below is kept because the failure mode it describes — a transport
+that exists but is never called — is easy to reintroduce.
 
 | Evidence | Finding |
 |---|---|
@@ -52,12 +58,12 @@ registered. This is missing wiring, not a platform limitation.
    flag would be two artifacts and two chances to ship the wrong one.
 4. **A branch in `agent-runtime.ts`**, with 7 unit tests covering it.
 
-**Not done, and why:** the native path is *not* the default yet.
-`nativeIsDefault()` returns false unless `NEXT_PUBLIC_NATIVE_AGENT=1`, because the
-native transport **cannot be verified in CI** — there is no Tauri window in the
-runner. Making an unverified transport the default on the platform teachers use most
-would be a guess dressed as a fix. The env override lets a desktop build exercise it
-without changing the committed default.
+**The default is now native, and the honest caveat stands.** `nativeIsDefault()` reads
+`NEXT_PUBLIC_NATIVE_AGENT`, which `build:desktop` and `build:mobile` set to `1`. The
+transport still **cannot be verified in CI** — there is no Tauri window in the runner — so
+the proof remains the one this spec always specified: delete `public/agent-runtime/`, build
+the desktop shell, and run a turn. That gate is carried in `81-mobile-shell.md` §9 and in
+the mobile implementation plan; it has not been claimed here.
 
 **Still to do:**
 

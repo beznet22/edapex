@@ -81,12 +81,12 @@ Do not copy OpenDuet's purple/Inter theme. Do not change `src/routes/layout.css`
 - **OpenUI generated surfaces:** only the `packages/genui` catalog. Map each OpenUI component to a Gold-on-Slate React component. Do not use OpenUI's prebuilt chat layouts (`@openuidev/react-ui`) or chat state (`@openuidev/react-headless`).
 - **Streamdown:** chat Markdown and artifact preview. Pin the version, sanitize/allowlist links/images, and add the Tailwind v4 `@source` entries for `streamdown` and enabled plugins.
 - **Tiptap:** artifact editor; build the minimal Novel-style slash/bubble UI from Gold tokens. Use open-source extensions only. Novel is visual reference only; do not add the package or copy source (`44-reference-app-audits.md`).
-- **Do not use shadcn AI Elements in v1.** They would duplicate the OpenDuet chat/message/tool layer. The fallback is the vendored OpenDuet presentation plus custom components, not a second chat component library.
+- **AI Elements are the presentation layer for agent surfaces.** They are compositions of registry primitives, copied into `packages/ui`, restyled by token and fed from `ChatMessagePart`. The OpenDuet chat presentation is replaced by them, not kept beside them; the runtime itself is unchanged and no AI SDK type enters a bundle.
 - **Do not use assistant-ui.** It was rejected; see `17-chat-framework.md`.
 
 ## Monorepo
 
-- shadcn components live in `apps/web/components/ui` for the single web app; extract to `packages/ui` only when a second React surface needs them. The Tauri host loads the same app, so it does not need a duplicate component tree.
+- **Amended by the package extraction.** The trigger in this section has fired: a second React surface (the Android app) needed the primitives, so they now live in `packages/ui`, installed with `pnpm dlx shadcn@latest add` from the app directory and routed by `aliases.ui`. `apps/web/components/ui` holds shell chrome only. Originally this read: shadcn components live in `apps/web/components/ui` for the single web app; extract to `packages/ui` only when a second React surface needs them. The Tauri host loads the same app, so it does not need a duplicate component tree.
 - OpenDuet-derived primitives live in `packages/chat`; app composition and route-specific chrome live in `apps/web/components/openduet`.
 - OpenUI catalog/parser/action bridge live in `packages/genui`.
 - `components.json` lives with the web app that consumes it; use the shadcn monorepo CLI support when a package is extracted.

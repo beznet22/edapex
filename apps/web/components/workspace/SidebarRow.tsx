@@ -29,7 +29,7 @@ import {
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
   DropdownMenuTrigger
-} from "@/components/ui/dropdown-menu";
+} from "@edapex/ui/components/dropdown-menu";
 import { SidebarGroupLabel } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
 

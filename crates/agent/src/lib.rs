@@ -9,6 +9,7 @@ pub mod event_hub;
 pub mod interrupt;
 pub mod protocol;
 pub mod provider;
+pub mod recorder;
 pub mod runtime;
 pub mod spawn;
 pub mod stream;
@@ -26,8 +27,9 @@ pub use provider::{
     parse_openai_sse_data, tool_spec_json, ChatMessage, ProviderChunk, ProviderClient,
     ProviderRequest, Role, ToolCall,
 };
+pub use recorder::{RunStart, TurnRecorder};
 pub use runtime::{
-    AgentHost, AgentHostOptions, ApprovalHandler, EventSink, HostFuture, HostObject,
-    ToolExecutor,
+    initial_history, AgentHost, AgentHostOptions, ApprovalFailure, ApprovalHandler, EventSink,
+    HostFuture, HostObject, ToolExecutor,
 };
 pub use stream::{sse_data_line, take_sse_event, Utf8StreamDecoder};

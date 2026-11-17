@@ -15,7 +15,7 @@
  * asked for the document renders it.
  */
 
-import { isTauriHost } from "@/lib/platform";
+import { isTauriHost } from "@edapex/host/platform";
 
 export type PdfPageSize = "a4" | "letter";
 export type PdfFooter = "page" | "none";
@@ -56,7 +56,7 @@ async function renderNative(
   html: string,
   options: PdfRenderOptions
 ): Promise<Uint8Array> {
-  const { invokeCommand } = await import("@/lib/tauri");
+  const { invokeCommand } = await import("@edapex/host/tauri");
   const bytes = await invokeCommand<ArrayBuffer>("render_pdf", {
     input: {
       html,

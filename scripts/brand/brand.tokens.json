@@ -1,0 +1,331 @@
+{
+  "source": {
+    "mark": "apps/web/public/brand/edapex_brand_mark.svg",
+    "colors": "packages/tokens/tokens.css",
+    "wordmark": "brand/source/wordmark"
+  },
+  "colors": {
+    "light": {
+      "background": "#faf9f5",
+      "foreground": "#141413",
+      "primary": "#b3543b"
+    },
+    "dark": {
+      "background": "#181715",
+      "foreground": "#faf9f5",
+      "primary": "#e69275"
+    }
+  },
+  "typography": {
+    "fileFamily": "Plus Jakarta Sans SemiBold",
+    "fileStyle": "Regular",
+    "unitsPerEm": 1000,
+    "capHeight": 745,
+    "xHeight": 541,
+    "ascent": 972,
+    "descent": -228,
+    "file": "brand/source/fonts/PlusJakartaSans-SemiBold.ttf",
+    "family": "Plus Jakarta Sans",
+    "style": "SemiBold",
+    "weight": 600,
+    "release": "2.7.1",
+    "foundry": "Tokotype",
+    "licence": "SIL Open Font License 1.1",
+    "licenceFile": "brand/source/fonts/OFL.txt",
+    "sha256": "de75ddb3917c5a3f2b7d0cd65fcf63795710f2e1fd944199a73a01731e66fd43",
+    "wordmark": {
+      "lowercase": {
+        "text": "Edapex",
+        "tracking": -0.01
+      },
+      "uppercase": {
+        "text": "EDAPEX",
+        "tracking": 0.06
+      }
+    }
+  },
+  "lockup": {
+    "symbolHeight": 1.6,
+    "stackSymbolHeight": 2.2,
+    "gap": 0.5,
+    "stackGap": 0.6,
+    "opticalShift": -0.02,
+    "clearSpace": 0.5,
+    "capsCapHeight": 0.94
+  },
+  "compositionExports": {
+    "png": [
+      1024,
+      2048
+    ],
+    "webp": [
+      1024
+    ]
+  },
+  "mark": {
+    "viewBox": {
+      "x": 0,
+      "y": 0,
+      "width": 588,
+      "height": 517
+    },
+    "paths": 3,
+    "aspect": 1.137,
+    "ink": {
+      "radius": 301.256,
+      "centre": {
+        "x": 293.713,
+        "y": 258.686
+      },
+      "centroid": {
+        "x": 293.715,
+        "y": 305.668
+      },
+      "box": {
+        "minX": 8.039,
+        "minY": 8.613,
+        "maxX": 579.387,
+        "maxY": 508.758
+      }
+    }
+  },
+  "icon": {
+    "radiusFraction": 0.72,
+    "maskableRadiusFraction": 0.78,
+    "android": {
+      "canvasDp": 108,
+      "visibleDp": 72,
+      "safeDp": 66,
+      "foregroundRadiusFraction": 0.6,
+      "densities": {
+        "mdpi": 1,
+        "hdpi": 1.5,
+        "xhdpi": 2,
+        "xxhdpi": 3,
+        "xxxhdpi": 4
+      },
+      "legacySizes": {
+        "mdpi": 48,
+        "hdpi": 72,
+        "xhdpi": 96,
+        "xxhdpi": 144,
+        "xxxhdpi": 192
+      },
+      "splash": {
+        "canvasDp": 288,
+        "safeDp": 192,
+        "targetRadiusDp": 92
+      }
+    },
+    "maskableSafeRadius": 0.4
+  },
+  "sizes": {
+    "logo": [
+      256,
+      512,
+      1024,
+      2048
+    ],
+    "favicon": [
+      16,
+      32,
+      48
+    ],
+    "appleTouch": 180,
+    "pwa": [
+      192,
+      512
+    ],
+    "maskable": 512,
+    "desktop": [
+      16,
+      32,
+      48,
+      64,
+      128,
+      256,
+      512,
+      1024
+    ],
+    "ico": [
+      16,
+      20,
+      24,
+      32,
+      40,
+      48,
+      64,
+      128,
+      256
+    ],
+    "icns": [
+      {
+        "type": "icp4",
+        "size": 16
+      },
+      {
+        "type": "icp5",
+        "size": 32
+      },
+      {
+        "type": "icp6",
+        "size": 64
+      },
+      {
+        "type": "ic07",
+        "size": 128
+      },
+      {
+        "type": "ic08",
+        "size": 256
+      },
+      {
+        "type": "ic09",
+        "size": 512
+      },
+      {
+        "type": "ic10",
+        "size": 1024
+      }
+    ],
+    "windowsStore": {
+      "Square30x30Logo": 30,
+      "Square44x44Logo": 44,
+      "Square71x71Logo": 71,
+      "Square89x89Logo": 89,
+      "Square107x107Logo": 107,
+      "Square142x142Logo": 142,
+      "Square150x150Logo": 150,
+      "Square284x284Logo": 284,
+      "Square310x310Logo": 310,
+      "StoreLogo": 50
+    },
+    "og": {
+      "width": 1200,
+      "height": 630
+    },
+    "social": {
+      "avatar": 1024,
+      "cover": {
+        "width": 1500,
+        "height": 500
+      }
+    },
+    "ios": [
+      {
+        "name": "AppIcon-20x20@1x",
+        "size": 20
+      },
+      {
+        "name": "AppIcon-20x20@2x",
+        "size": 40
+      },
+      {
+        "name": "AppIcon-20x20@2x-1",
+        "size": 40
+      },
+      {
+        "name": "AppIcon-20x20@3x",
+        "size": 60
+      },
+      {
+        "name": "AppIcon-29x29@1x",
+        "size": 29
+      },
+      {
+        "name": "AppIcon-29x29@2x",
+        "size": 58
+      },
+      {
+        "name": "AppIcon-29x29@2x-1",
+        "size": 58
+      },
+      {
+        "name": "AppIcon-29x29@3x",
+        "size": 87
+      },
+      {
+        "name": "AppIcon-40x40@1x",
+        "size": 40
+      },
+      {
+        "name": "AppIcon-40x40@2x",
+        "size": 80
+      },
+      {
+        "name": "AppIcon-40x40@2x-1",
+        "size": 80
+      },
+      {
+        "name": "AppIcon-40x40@3x",
+        "size": 120
+      },
+      {
+        "name": "AppIcon-60x60@2x",
+        "size": 120
+      },
+      {
+        "name": "AppIcon-60x60@3x",
+        "size": 180
+      },
+      {
+        "name": "AppIcon-76x76@1x",
+        "size": 76
+      },
+      {
+        "name": "AppIcon-76x76@2x",
+        "size": 152
+      },
+      {
+        "name": "AppIcon-83.5x83.5@2x",
+        "size": 167
+      },
+      {
+        "name": "AppIcon-512@2x",
+        "size": 1024
+      }
+    ],
+    "macos": [
+      {
+        "name": "icon_16x16",
+        "size": 16
+      },
+      {
+        "name": "icon_16x16@2x",
+        "size": 32
+      },
+      {
+        "name": "icon_32x32",
+        "size": 32
+      },
+      {
+        "name": "icon_32x32@2x",
+        "size": 64
+      },
+      {
+        "name": "icon_128x128",
+        "size": 128
+      },
+      {
+        "name": "icon_128x128@2x",
+        "size": 256
+      },
+      {
+        "name": "icon_256x256",
+        "size": 256
+      },
+      {
+        "name": "icon_256x256@2x",
+        "size": 512
+      },
+      {
+        "name": "icon_512x512",
+        "size": 512
+      },
+      {
+        "name": "icon_512x512@2x",
+        "size": 1024
+      }
+    ]
+  }
+}

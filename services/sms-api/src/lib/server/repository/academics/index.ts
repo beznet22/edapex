@@ -8,3 +8,4 @@ export * from "./assignment-copy.repo";
 export * from "./class-teacher-copy.repo";
 export * from "./routine-copy.repo";
 export * from "./staffing.repo";
+export * from "./publish-approval.repo";

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-import { apiBase } from "@/lib/api";
+import { apiBase } from "@edapex/host/api";
 
 type ClaimState = "working" | "error" | "missing";
 

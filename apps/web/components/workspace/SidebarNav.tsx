@@ -32,8 +32,8 @@ import type {
   WorkspaceSidebarData
 } from "@/lib/nav-tree";
 import { EMPTY_SIDEBAR_DATA } from "@/lib/nav-tree";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Button } from "@edapex/ui/components/button";
+import { Input } from "@edapex/ui/components/input";
 import { Modal } from "@/components/ui/modal";
 import { SidebarRow, SidebarSectionHeader } from "@/components/workspace/SidebarRow";
 

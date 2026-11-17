@@ -19,7 +19,7 @@
  * guess dressed as a fix.
  */
 
-import { isTauriHost } from "@/lib/platform";
+import { isTauriHost } from "@edapex/host/platform";
 
 export type HostKind = "web" | "native";
 

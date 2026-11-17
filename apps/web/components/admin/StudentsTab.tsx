@@ -3,8 +3,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AlertCircle, Search } from "lucide-react";
 
-import { Input } from "@/components/ui/input";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Input } from "@edapex/ui/components/input";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@edapex/ui/components/table";
 import { ContactCell, PersonCell, StatusPill } from "@/components/admin/PersonCell";
 import { SortableHead } from "@/components/admin/SortableHead";
 import { StatFigure, StatGroup } from "@/components/admin/StatGroup";

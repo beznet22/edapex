@@ -5,15 +5,15 @@ import type { FormEvent } from "react";
 
 import { GoogleMark } from "@/components/auth/GoogleMark";
 import { BrandMark } from "@/components/workspace/BrandMark";
-import { Button } from "@/components/ui/button";
+import { Button } from "@edapex/ui/components/button";
 import {
   Field,
   FieldDescription,
   FieldGroup,
   FieldLabel,
   FieldSeparator
-} from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
+} from "@edapex/ui/components/field";
+import { Input } from "@edapex/ui/components/input";
 import { noticeMessage, type LoginNotice } from "@/lib/auth-notice";
 
 /**

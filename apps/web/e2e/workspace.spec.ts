@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import type { Page } from "@playwright/test";
 
 /**
  * Workspace surface behaviour.
@@ -9,6 +10,21 @@ import { expect, test } from "@playwright/test";
  */
 
 const WORKSPACE = "/workspace";
+
+/**
+ * Open the workspace and prove the fixture session is live.
+ *
+ * A server started without `NEXT_PUBLIC_TEST_SESSION=1` renders the sign-in screen. Every
+ * assertion after that point then passes or fails for the wrong reason — the overflow
+ * checks pass trivially on a login page, and a test that looks for the shell times out
+ * with no useful cause. Both happened. Fail here instead, with the actual symptom.
+ */
+const openWorkspace = async (page: Page): Promise<void> => {
+  await page.goto(WORKSPACE);
+  await expect(page.getByRole("heading", { name: "Sign in to EDAPEX" })).toHaveCount(0);
+  await expect(page.getByText("Loading Chat workspace")).toHaveCount(0, { timeout: 15_000 });
+  await expect(page.getByRole("textbox").first()).toBeVisible({ timeout: 15_000 });
+};
 
 test.describe("rendering", () => {
   test("the workspace route renders instead of erroring", async ({ page }) => {
@@ -32,9 +48,7 @@ test.describe("rendering", () => {
   });
 
   test("the shell resolves to the chat surface after hydration", async ({ page }) => {
-    await page.goto(WORKSPACE);
-    await expect(page.getByText("Loading Chat workspace")).toHaveCount(0, { timeout: 15_000 });
-    await expect(page.getByRole("textbox").first()).toBeVisible({ timeout: 15_000 });
+    await openWorkspace(page);
   });
 });
 
@@ -126,7 +140,7 @@ test.describe("theme", () => {
     //
     // It cycles light → dark → system from a *default* of system, so the test follows
     // the cycle rather than assuming a starting mode: system → light → dark → system.
-    await page.goto(WORKSPACE);
+    await openWorkspace(page);
 
     // The model-setup dialog is a full-screen modal, so the shell is unclickable until
     // it is dismissed. Dismissing it is what a real person does, not a test hack.

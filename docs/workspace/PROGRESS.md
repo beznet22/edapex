@@ -388,3 +388,22 @@ Phase 8 is closed. Phase 9A platform closes when migration 0006, the Worker and 
 | 2026-11-09 | Admin directory 500 fixed (D1 bound-limit query), 60s magic-link dedupe, send-button lock, Pages CSP allows Cloudflare Insights; app domain 200 |
 | 2026-11-09 | Performance spec added: static Pages + Worker API, no Pages SSR; snapshot/local pagination, parallel D1 reads, lazy document engine, PWA no school data, measurable release budgets |
 | 2026-11-09 | Snapshot D1 reads parallelized: 3.7 s → ~1.9–2.5 s for 581 rows; still above the 800 ms budget, recorded as exception with a follow-up |
+
+## Package extraction (Part I of the Android plan)
+
+The design system, the primitives and the host seam lived inside `apps/web`, which made a
+second React surface impossible without copying all three. They are now workspace packages:
+`@edapex/tokens` (CSS), `@edapex/ui` (37 shadcn primitives, CLI-installed) and
+`@edapex/host` (transport, API, agent adapter). `AGENTS.md` carries the new architecture and
+the rules that keep it; `82-package-boundaries.md` is the normative spec.
+
+| | |
+|---|---|
+| Tokens | moved verbatim; the built stylesheet is provably unchanged |
+| UI | installed by `shadcn add`, not copied; `modal`/`tabs`/`sheet` retired from the app |
+| Host | `NativeAgentAdapter` now takes an injected `AgentTransport`; the native default is set in `build:desktop` / `build:mobile` |
+| Guards | `check-boundaries`, `check-docs`, `check-tokens` — each proven to fail on a deliberate violation |
+
+Two gates in this environment fail on the untouched baseline as well, so they are not
+regressions: `check:budget` (initial JS 426 KB against 204 KB) and the "theme control" e2e
+spec, which times out waiting for the RuntimeSetup dialog. Both are queued.

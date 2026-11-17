@@ -1,11 +1,26 @@
 "use client";
 
 import { useRef, useState } from "react";
-import type { ChangeEvent, FormEvent, KeyboardEvent } from "react";
+import type { ChangeEvent, FormEvent } from "react";
 import type { QueuedMessage } from "@edapex/contracts";
-import { ArrowUp, Paperclip, Square, X } from "lucide-react";
+import { ArrowUp, Paperclip, X } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
+import {
+  Attachment,
+  AttachmentAction,
+  AttachmentActions,
+  AttachmentContent,
+  AttachmentGroup,
+  AttachmentTitle
+} from "@edapex/ui/components/attachment";
+import { Button } from "@edapex/ui/components/button";
+import {
+  Composer as ComposerSurface,
+  ComposerButton,
+  ComposerFooter,
+  ComposerSubmit,
+  ComposerTextarea
+} from "@edapex/ui/components/composer";
 import { cn } from "@/lib/utils";
 
 interface ComposerProps {
@@ -41,7 +56,6 @@ export function Composer({
   const [attachments, setAttachments] = useState<readonly string[]>([]);
   const [focused, setFocused] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
-  const textarea = useRef<HTMLTextAreaElement>(null);
 
   const canSend =
     connected && !disabled && draft.trim().length > 0 && queue.length < MAX_QUEUE;
@@ -51,28 +65,11 @@ export function Composer({
     onSend(draft.trim(), attachments);
     setDraft("");
     setAttachments([]);
-    if (textarea.current !== null) {
-      textarea.current.style.height = "auto";
-    }
   };
 
   const onSubmit = (event: FormEvent<HTMLFormElement>): void => {
     event.preventDefault();
     submit();
-  };
-
-  const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>): void => {
-    if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
-      event.preventDefault();
-      submit();
-    }
-  };
-
-  const onInput = (event: ChangeEvent<HTMLTextAreaElement>): void => {
-    setDraft(event.target.value);
-    const element = event.target;
-    element.style.height = "auto";
-    element.style.height = `${Math.min(element.scrollHeight, 176)}px`;
   };
 
   const onFiles = (event: ChangeEvent<HTMLInputElement>): void => {
@@ -83,16 +80,10 @@ export function Composer({
     event.target.value = "";
   };
 
-  return (
-    <form
-      className="shrink-0 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 lg:px-4 lg:pb-5"
-      onSubmit={onSubmit}
-    >
+  const header = (
+    <>
       {queue.length > 0 ? (
-        <div
-          aria-label="Queued messages"
-          className="mb-2 space-y-1.5"
-        >
+        <div aria-label="Queued messages" className="mb-2 space-y-1.5">
           {queue.map((message) => (
             <div
               className="flex items-center gap-2 rounded-xl bg-muted/70 px-2.5 py-1.5 text-xs text-muted-foreground"
@@ -116,108 +107,95 @@ export function Composer({
       ) : null}
 
       {attachments.length > 0 ? (
-        <div className="mb-2 flex flex-wrap gap-1.5">
+        <AttachmentGroup className="mb-2 flex flex-wrap gap-1.5">
           {attachments.map((name) => (
-            <span
-              className="inline-flex max-w-full items-center gap-1 rounded-full bg-secondary px-2.5 py-1 text-xs text-secondary-foreground"
-              key={name}
-            >
-              <span className="truncate">{name}</span>
-              <Button
-                aria-label={`Remove ${name}`}
-                className="size-6 rounded-full hover:bg-transparent hover:text-foreground after:-inset-2.5"
-                onClick={() =>
-                  setAttachments((current) => current.filter((item) => item !== name))
-                }
-                size="sm"
-                type="button"
-                variant="ghost"
-              >
-                <X aria-hidden="true" className="size-3" />
-              </Button>
-            </span>
+            <Attachment key={name} orientation="horizontal" size="xs">
+              <AttachmentContent>
+                <AttachmentTitle>{name}</AttachmentTitle>
+              </AttachmentContent>
+              <AttachmentActions>
+                <AttachmentAction
+                  aria-label={`Remove ${name}`}
+                  onClick={() =>
+                    setAttachments((current) => current.filter((item) => item !== name))
+                  }
+                  type="button"
+                >
+                  <X aria-hidden="true" className="size-3" />
+                </AttachmentAction>
+              </AttachmentActions>
+            </Attachment>
           ))}
-        </div>
+        </AttachmentGroup>
       ) : null}
+    </>
+  );
 
-      {/*
-        One surface, no per-edge rules. The ring carries the focused state, so the
-        composer does not draw a border at all.
-      */}
-      <div
-        className={cn(
-          "nested rounded-2xl bg-card p-2 transition-all duration-200 md:glass",
-          focused ? "ring-2 ring-ring/40" : "ring-1 ring-border/60",
-          "shadow-[var(--elevation-2)]"
-        )}
-      >
-        <textarea
-          aria-label="Message"
-          className="max-h-44 min-h-11 w-full resize-none bg-transparent px-2 py-2 text-[15px] leading-6 outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed"
+  return (
+    <ComposerSurface
+      className="px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 lg:px-4 lg:pb-5"
+      groupClassName={cn(
+        "nested rounded-2xl bg-card p-2 md:glass",
+        focused ? "ring-2 ring-ring/40" : "ring-1 ring-border/60",
+        "shadow-[var(--elevation-2)]"
+      )}
+      header={header}
+      onSubmit={onSubmit}
+    >
+      <ComposerTextarea
+        aria-label="Message"
+        className="w-full resize-none bg-transparent px-2 py-2 text-[15px] leading-6 outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed"
+        disabled={disabled}
+        onBlur={() => setFocused(false)}
+        onChange={(event) => setDraft(event.target.value)}
+        onFocus={() => setFocused(true)}
+        placeholder={connected ? "Ask EDAPEX anything" : "Loading the workspace…"}
+        rows={1}
+        value={draft}
+      />
+      <ComposerFooter className="mt-1 gap-1">
+        <input
+          accept=".pdf,.doc,.docx,.csv,.png,.jpg,.jpeg"
+          className="hidden"
           disabled={disabled}
-          onBlur={() => setFocused(false)}
-          onChange={onInput}
-          onFocus={() => setFocused(true)}
-          onKeyDown={onKeyDown}
-          placeholder={connected ? "Ask EDAPEX anything" : "Loading the workspace…"}
-          ref={textarea}
-          rows={1}
-          value={draft}
+          multiple
+          onChange={onFiles}
+          ref={fileInput}
+          type="file"
         />
-        <div className="mt-1 flex items-center gap-1">
-          <input
-            accept=".pdf,.doc,.docx,.csv,.png,.jpg,.jpeg"
-            className="hidden"
-            disabled={disabled}
-            multiple
-            onChange={onFiles}
-            ref={fileInput}
-            type="file"
-          />
-          <Button
-            aria-label="Add attachment"
-            className="size-9 shrink-0 rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
-            disabled={disabled}
-            onClick={() => fileInput.current?.click()}
+        <ComposerButton
+          aria-label="Add attachment"
+          className="size-9 shrink-0 rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
+          disabled={disabled}
+          onClick={() => fileInput.current?.click()}
+          size="icon-sm"
+          variant="ghost"
+        >
+          <Paperclip aria-hidden="true" className="size-4" />
+        </ComposerButton>
+        <span className="flex-1" />
+        {stoppable ? (
+          <ComposerSubmit
+            className="size-9 shrink-0 rounded-full"
+            onStop={onStop}
             size="icon-sm"
-            type="button"
-            variant="ghost"
+            status="streaming"
+            variant="secondary"
+          />
+        ) : (
+          <ComposerSubmit
+            className={cn(
+              "size-9 shrink-0 rounded-full transition-transform",
+              canSend ? "scale-100" : "scale-95 opacity-40"
+            )}
+            disabled={!canSend}
+            size="icon-sm"
+            status="idle"
           >
-            <Paperclip aria-hidden="true" className="size-4" />
-          </Button>
-          <span className="flex-1" />
-          {stoppable ? (
-            <Button
-              aria-label="Stop run"
-              className="size-9 shrink-0 rounded-full"
-              onClick={onStop}
-              size="icon"
-              type="button"
-              variant="secondary"
-            >
-              <Square aria-hidden="true" className="size-3.5 fill-current" />
-            </Button>
-          ) : (
-            <Button
-              aria-label="Send message"
-              className={cn(
-                "size-9 shrink-0 rounded-full transition-transform",
-                canSend ? "scale-100" : "scale-95 opacity-40"
-              )}
-              disabled={!canSend}
-              size="icon"
-              type="submit"
-            >
-              <ArrowUp aria-hidden="true" className="size-4" />
-            </Button>
-          )}
-        </div>
-      </div>
-      <p className="mt-2 px-1 text-[10px] leading-4 text-muted-foreground">
-        {connected
-          ? "Every action that reaches the network or your records asks first."
-          : "The local agent runtime is still loading."}
-      </p>
-    </form>
+            <ArrowUp aria-hidden="true" className="size-4" />
+          </ComposerSubmit>
+        )}
+      </ComposerFooter>
+    </ComposerSurface>
   );
 }
