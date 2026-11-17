@@ -3,6 +3,7 @@ use rand::RngCore;
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use tauri::State;
+use tauri_plugin_opener::OpenerExt;
 
 use crate::state::{HostError, HostState, PendingAuth};
 
@@ -84,7 +85,10 @@ fn client() -> Result<reqwest::Client, HostError> {
 }
 
 #[tauri::command]
-pub async fn auth_start(state: State<'_, HostState>) -> Result<AuthStartResult, HostError> {
+pub async fn auth_start(
+    app: tauri::AppHandle,
+    state: State<'_, HostState>,
+) -> Result<AuthStartResult, HostError> {
     let verifier = verifier();
     let code_challenge = challenge(&verifier);
     let response = client()?
@@ -118,7 +122,14 @@ pub async fn auth_start(state: State<'_, HostState>) -> Result<AuthStartResult, 
         .lock()
         .map_err(|_| HostError::new("internal_error", "Sign-in state is unavailable", true))?;
     *pending = Some(PendingAuth { verifier });
-    let _ = open::that(&authorize_url);
+    // `open::that` returns Ok on desktop and silently does nothing on Android — the Android
+    // backend needs an Intent, which the opener plugin issues. The `let _` is why the phone
+    // sat on "Waiting for your browser" with no browser.
+    app.opener()
+        .open_url(&authorize_url, None::<&str>)
+        .map_err(|error| {
+            HostError::new("provider_unavailable", format!("Open browser: {error}"), true)
+        })?;
     Ok(AuthStartResult { authorize_url })
 }
 

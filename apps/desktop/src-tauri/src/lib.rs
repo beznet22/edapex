@@ -47,6 +47,7 @@ fn host_capabilities(app: tauri::AppHandle) -> HostCapabilities {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_deep_link::init())
+        .plugin(tauri_plugin_opener::init())
         .manage(HostState::default())
         .invoke_handler(tauri::generate_handler![
             runtime_health,
