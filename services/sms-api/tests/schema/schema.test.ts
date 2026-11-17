@@ -103,7 +103,7 @@ describe("D1 schema gate", () => {
     const tables = await readTables();
     expect([...tables].sort()).toEqual([...ALL_TABLES].sort());
     expect(LEGACY_TABLES).toHaveLength(62);
-    expect(NEW_TABLES).toHaveLength(17);
+    expect(NEW_TABLES).toHaveLength(19);
   });
 
   it("keeps every table at or below the 100-column D1 cap", async () => {

@@ -10,7 +10,7 @@ import {
 } from "../fixtures/schema-expectations";
 import type { IndexExpectation } from "../fixtures/schema-expectations";
 
-const DECLARED_TABLE_COUNT = 79;
+const DECLARED_TABLE_COUNT = 81;
 
 interface DeclaredIndex {
   readonly name: string;
