@@ -7,6 +7,7 @@ import * as communications from "../../repository/communications";
 import * as fees from "../../repository/fees";
 import * as lifecycle from "../../repository/lifecycle";
 import * as profiles from "../../repository/profiles";
+import * as push from "../../repository/push";
 import * as queries from "../../repository/queries";
 import * as reference from "../../repository/reference";
 import * as school from "../../repository/school";
@@ -77,6 +78,7 @@ export interface RepositoryAccess {
   readonly fees: typeof fees;
   readonly archive: typeof archive;
   readonly lifecycle: typeof lifecycle;
+  readonly push: typeof push;
 }
 
 export function createRepositoryAccess(ctx: RepositoryContext): RepositoryAccess {
@@ -93,7 +95,8 @@ export function createRepositoryAccess(ctx: RepositoryContext): RepositoryAccess
     queries,
     fees,
     archive,
-    lifecycle
+    lifecycle,
+    push
   });
 }
 

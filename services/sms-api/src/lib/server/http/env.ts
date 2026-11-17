@@ -18,6 +18,13 @@ export interface AppEnv extends ServiceEnv {
   readonly MODEL_ROUTER?: Fetcher;
   /** Shared secret expected by `model-router`'s bearer check. */
   readonly MODEL_ROUTER_SECRET?: string;
+  /** Fan-out queue: one message per event, consumed by `pushDelivery`. */
+  readonly PUSH_QUEUE?: Queue<import("@edapex/contracts/push").PushEvent>;
+  /** Shared secret `cowork-api` presents on `/internal/push`. */
+  readonly INTERNAL_PUSH_SECRET?: string;
+  /** Firebase service-account JSON. A secret, never a var. */
+  readonly FCM_SERVICE_ACCOUNT?: string;
+  readonly FCM_PROJECT_ID?: string;
 }
 
 export interface AppVariables {
