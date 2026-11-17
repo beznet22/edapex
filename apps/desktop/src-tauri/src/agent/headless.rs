@@ -10,13 +10,14 @@
 
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant};
 
 use edapex_agent::{
     AgentConnectSettings, AgentEvent, ApprovalHandler, EventSink, NativeAgentDriver, StoreContext,
 };
-use edapex_store::{MasterKey, RusqliteDriver, Store};
+use edapex_store::MasterKey;
 
+use super::pending::{group, pending_sessions};
 use super::provider::ModelRouterProvider;
 use super::tools::{to_host_error, HostTools};
 use super::HostEnv;
@@ -77,7 +78,7 @@ pub async fn run_open_runs(
             HostError::new("internal_error", "Agent database path is not UTF-8", false)
         })?;
     let master = super::env::agent_master_key()?;
-    let pending = pending_sessions(&path, master)?;
+    let pending = pending_sessions(&path, master, BATCH)?;
     if pending.is_empty() {
         return Ok(0);
     }
@@ -134,62 +135,12 @@ async fn wait_for_drain(completion: &Completion) -> usize {
     completion.finished.load(Ordering::SeqCst)
 }
 
-fn pending_sessions(
-    path: &str,
-    master: [u8; 32],
-) -> Result<Vec<edapex_store::session_events::PendingSession>, HostError> {
-    let mut store = Store::new(
-        RusqliteDriver::open(path).map_err(store_error)?,
-        MasterKey::from_bytes(master),
-    );
-    store.migrate().map_err(store_error)?;
-    store
-        .agent_sessions_pending(now_ms(), BATCH)
-        .map_err(store_error)
-}
-
-type Group = (String, String, bool, Vec<String>);
-
-fn group(
-    pending: Vec<edapex_store::session_events::PendingSession>,
-) -> Vec<Group> {
-    let mut groups: Vec<Group> = Vec::new();
-    for session in pending {
-        match groups
-            .iter_mut()
-            .find(|(workspace, model, safe, _)| {
-                *workspace == session.workspace_id
-                    && *model == session.model
-                    && *safe == session.mobile_safe_tools
-            }) {
-            Some((_, _, _, sessions)) => sessions.push(session.session_id),
-            None => groups.push((
-                session.workspace_id,
-                session.model,
-                session.mobile_safe_tools,
-                vec![session.session_id],
-            )),
-        }
-    }
-    groups
-}
-
-fn store_error(error: edapex_store::StoreError) -> HostError {
-    HostError::new("storage_unavailable", error.to_string(), true)
-}
-
-fn now_ms() -> u64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_millis()
-        .try_into()
-        .unwrap_or(u64::MAX)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use super::super::pending::now_ms;
+    use std::time::{SystemTime, UNIX_EPOCH};
+    use edapex_store::{RusqliteDriver, Store};
 
     /// The driver's default lease; the tests advance past it to simulate a dead holder.
     const LEASE_MS: u64 = 60_000;

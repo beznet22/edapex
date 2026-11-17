@@ -9,6 +9,7 @@ pub(crate) mod commands;
 mod bridge;
 mod env;
 mod headless;
+mod pending;
 mod provider;
 mod session;
 mod tools;
