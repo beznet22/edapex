@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useReducer, useState } from "react";
 
 import { AppDrawer } from "@/components/app/AppDrawer";
+import { Onboarding } from "@/components/app/Onboarding";
 import { ChatSurface } from "@/components/app/ChatSurface";
 import { ListSurface } from "@/components/app/ListSurface";
 import { MakeSheet } from "@/components/app/MakeSheet";
@@ -11,6 +12,13 @@ import { BootVeil } from "@/components/shell/BootVeil";
 import { Sheet } from "@/components/shell/Sheet";
 import { useKeyboardOpen } from "@/hooks/use-keyboard-open";
 import { bootReady, onSystemBack, setBackEnabled } from "@/lib/host-bridge";
+import {
+  type BootState,
+  bootReducer,
+  canGoBack,
+  markOnboardingComplete,
+  readOnboardingComplete
+} from "@/lib/boot";
 import { SECTIONS, type SurfaceId } from "@/lib/nav";
 import { applyThemeMode, readThemeMode, watchSystemTheme } from "@/lib/theme";
 
@@ -27,7 +35,7 @@ type View = "chat" | Exclude<SurfaceId, "chat" | "make" | "tasks">;
  * Back unwinds in that order: the attach panel, then an open sheet, then the drawer, then
  * the page, and only then the app.
  */
-export function App() {
+export function Shell() {
   const keyboardOpen = useKeyboardOpen();
   const [mode, setMode] = useState<ComposeMode>("chat");
   const [view, setView] = useState<View>("chat");
@@ -72,7 +80,8 @@ export function App() {
   }, [attachOpen]);
 
   const tasksOpen = mode === "tasks";
-  const canConsumeBack = attachOpen || makeOpen || tasksOpen || drawerOpen || view !== "chat";
+  const canConsumeBack =
+    attachOpen || makeOpen || tasksOpen || drawerOpen || view !== "chat";
 
   useEffect(() => {
     setBackEnabled(canConsumeBack);
@@ -172,4 +181,52 @@ export function App() {
       <BootVeil ready={ready} />
     </div>
   );
+}
+
+/**
+ * The first-run decision, and nothing else.
+ *
+ * Hydration is the reducer's initial state rather than an effect: a first paint
+ * cannot be the workspace if the answer is already known, and a server render has
+ * no `localStorage`, which `readOnboardingComplete` treats as a first run.
+ */
+export function App() {
+  const [boot, dispatch] = useReducer(
+    bootReducer,
+    undefined,
+    (): BootState =>
+      bootReducer({ status: "loading" }, { type: "hydrated", onboardingComplete: readOnboardingComplete() })
+  );
+
+  useEffect(() => {
+    return onSystemBack(() => {
+      if (canGoBack(boot)) dispatch({ type: "onboarding_back" });
+    });
+  }, [boot]);
+
+  useEffect(() => {
+    setBackEnabled(canGoBack(boot));
+  }, [boot]);
+
+  if (boot.status === "onboarding") {
+    return (
+      <div className="flex min-h-dvh bg-background text-foreground">
+        <Onboarding
+          onBack={() => dispatch({ type: "onboarding_back" })}
+          onFinish={() => {
+            markOnboardingComplete();
+            dispatch({ type: "onboarding_finish" });
+          }}
+          onNext={() => dispatch({ type: "onboarding_next" })}
+          onSkip={() => {
+            markOnboardingComplete();
+            dispatch({ type: "onboarding_skip" });
+          }}
+          page={boot.page}
+        />
+      </div>
+    );
+  }
+
+  return <Shell />;
 }

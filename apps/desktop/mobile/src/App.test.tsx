@@ -1,7 +1,7 @@
 import { renderToString } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
-import { App } from "./App";
+import { App, Shell } from "./App";
 import { windowClassFor } from "./hooks/use-window-class";
 
 /**
@@ -16,7 +16,7 @@ import { windowClassFor } from "./hooks/use-window-class";
  * the drawer's test, not the shell's.
  */
 describe("the shell", () => {
-  const html = renderToString(<App />);
+  const html = renderToString(<Shell />);
 
   it("starts on a conversation, with Chat and Tasks in the segmented control", () => {
     expect(html).toContain("Chat");
@@ -59,6 +59,22 @@ describe("the shell", () => {
     expect(html).toContain("px-gutter");
     expect(html).toContain("text-title");
     expect(html).toContain("text-body");
+  });
+});
+
+describe("a first run", () => {
+  const html = renderToString(<App />);
+
+  it("reads the introduction before it shows a workspace", () => {
+    // SSR separates interpolated text with comment markers, so the step count is
+    // asserted on its parts rather than as one string.
+    expect(html).toContain("Step <!-- -->1<!-- --> of <!-- -->4");
+    expect(html).toContain("Work that finishes");
+    expect(html).not.toContain("What are we working on?");
+  });
+
+  it("does not offer a skip on the first page", () => {
+    expect(html).not.toContain(">Skip<");
   });
 });
 
