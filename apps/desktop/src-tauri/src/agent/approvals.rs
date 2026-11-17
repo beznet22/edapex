@@ -17,10 +17,15 @@ use crate::state::HostError;
 /// then refused with "a turn is already active".
 const APPROVAL_TIMEOUT: Duration = Duration::from_secs(10 * 60);
 
+/// Told about every request the moment it is asked, so a surface that is not
+/// the WebView — a notification, in practice — can put it in front of a person.
+pub type ApprovalNotifier = Box<dyn Fn(&ApprovalRequest) + Send + Sync>;
+
 /// The approvals a turn is waiting on, one waiter per request.
 pub struct ApprovalRegistry {
     pending: Mutex<HashMap<String, oneshot::Sender<ApprovalDecision>>>,
     failures: Mutex<HashMap<String, ApprovalFailure>>,
+    notifier: Option<ApprovalNotifier>,
     timeout: Duration,
 }
 
@@ -35,7 +40,16 @@ impl ApprovalRegistry {
         ApprovalRegistry {
             pending: Mutex::new(HashMap::new()),
             failures: Mutex::new(HashMap::new()),
+            notifier: None,
             timeout,
+        }
+    }
+
+    /// With somewhere to announce requests that is not the WebView.
+    pub fn with_notifier(notifier: ApprovalNotifier) -> Self {
+        ApprovalRegistry {
+            notifier: Some(notifier),
+            ..ApprovalRegistry::with_timeout(APPROVAL_TIMEOUT)
         }
     }
 
@@ -86,6 +100,9 @@ impl ApprovalHandler for ApprovalRegistry {
         let (sender, receiver) = oneshot::channel();
         if let Ok(mut pending) = self.pending.lock() {
             pending.insert(approval_request_id.clone(), sender);
+        }
+        if let Some(notifier) = self.notifier.as_ref() {
+            notifier(&request);
         }
         Box::pin(async move {
             match tokio::time::timeout(self.timeout, receiver).await {

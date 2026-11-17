@@ -18,7 +18,18 @@ object RunBridge {
     /** Returns how many turns finished, or a negative code the worker treats as retryable. */
     external fun nativeResumeRuns(cacheDir: String, dataDir: String, resourceDir: String): Int
 
-    external fun nativeCancel(runId: String): Int
+    /**
+     * Hands the application context to Rust, which needs it to post an approval: a run that
+     * waits for a person has to reach them through a notification, and only Kotlin can post.
+     */
+    external fun nativeInit(context: Context)
+
+    /** True when something was still waiting; false means the run already gave up. */
+    external fun nativeDecide(approvalId: String, allow: Boolean): Boolean
+
+    fun init(context: Context) = nativeInit(context.applicationContext)
+
+    fun decide(approvalId: String, allow: Boolean): Boolean = nativeDecide(approvalId, allow)
 
     fun resume(context: Context): Int {
         val dataDir = context.filesDir.also { it.mkdirs() }
