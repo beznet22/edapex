@@ -243,3 +243,29 @@ The fix is a Keystore-backed store: an AES-GCM key generated in `AndroidKeyStore
 ciphertext in private `SharedPreferences`, and Rust reaching it through the existing JNI
 seam. Until that lands, do not describe the Android session as keychain-held; the desktop
 build's keyring path is real and unaffected.
+
+## Open defect: a send can vanish (immediate next step)
+
+Measured on the SM-G781U after sign-in was fixed. A message was typed and sent: the bubble
+appeared, the composer cleared — and nothing else happened. No streamed reply, no Stop above
+the composer, no typed error, and no agent activity in logcat.
+
+`NativeAgentAdapter.send` appends the message optimistically and then returns silently when
+`this.connection === null`. That means "never connected" and "sent, waiting for the first
+event" render identically, which is the same class of bug as the `instanceof Error` check
+fixed in `a2aed4a`: the UI cannot say what failed.
+
+The fix, in this order:
+
+1. `send` with no live connection must surface a typed `not_connected` failure on the turn,
+   not a silent return. The transcript should show it where the reply would have appeared.
+2. A test asserting exactly that: a send before `connect` resolves reports the failure and
+   does not leave the message looking sent.
+3. Only then read the next attempt's message. If it says `not_connected`, the defect is the
+   connect lifecycle; if the turn starts and stays silent, the suspect is
+   `services/model-router`, whose deployed bindings print `CF_ACCOUNT_ID ("")` — an empty
+   account id, which fails at the provider boundary rather than at connect.
+
+The D2 gate ("stream, tool call, approval, stop, queue, rotation") cannot be judged until a
+turn produces events, so this comes before the rest of D2 and before the D3 font rows are
+called done.
