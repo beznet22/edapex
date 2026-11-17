@@ -2,11 +2,11 @@ import { useState } from "react";
 import { ArrowUp, Mic, Plus, Square } from "lucide-react";
 
 import {
-  InputGroup,
-  InputGroupAddon,
-  InputGroupButton,
-  InputGroupTextarea
-} from "@edapex/ui/components/input-group";
+  Composer as ComposerSurface,
+  ComposerSubmit,
+  ComposerTextarea
+} from "@edapex/ui/components/composer";
+import { InputGroupAddon, InputGroupButton } from "@edapex/ui/components/input-group";
 
 /**
  * The composer from Frame 1: one pill, a plus, the field, and a primary circle.
@@ -47,13 +47,13 @@ export function Composer({
 
   return (
     <div className="composer-dock flex flex-col gap-2 px-gutter">
-      <form
+      <ComposerSurface
+        groupClassName="min-h-field rounded-dock border-border bg-card px-1.5 shadow-none"
         onSubmit={(event) => {
           event.preventDefault();
           submit();
         }}
       >
-        <InputGroup className="min-h-field rounded-dock border-border bg-card px-1.5 shadow-none">
           <InputGroupAddon align="inline-start">
             <InputGroupButton
               aria-label="Add attachment"
@@ -65,7 +65,8 @@ export function Composer({
             </InputGroupButton>
           </InputGroupAddon>
 
-          <InputGroupTextarea
+          <ComposerTextarea
+            submitOnEnter={false}
             aria-label="Message Edapex"
             /* The keyboard's return key inserts a line break; send is the button. */
             className="max-h-40 min-h-field w-full min-w-0 resize-none py-3 text-start text-body"
@@ -84,12 +85,12 @@ export function Composer({
             >
               <Mic aria-hidden="true" className="size-5" />
             </InputGroupButton>
-            <InputGroupButton
+            <ComposerSubmit
               aria-label={busy ? "Stop" : "Send"}
               className="size-10 rounded-full text-primary-foreground"
-              onClick={busy ? onStop : undefined}
+              onStop={onStop}
               size="icon-sm"
-              type="submit"
+              status={busy ? "streaming" : "idle"}
               variant="default"
             >
               {busy ? (
@@ -97,10 +98,9 @@ export function Composer({
               ) : (
                 <ArrowUp aria-hidden="true" className="size-5" strokeWidth={2.75} />
               )}
-            </InputGroupButton>
+            </ComposerSubmit>
           </InputGroupAddon>
-        </InputGroup>
-      </form>
+      </ComposerSurface>
       <p className="px-2 text-center text-chrome text-muted-foreground">
         EDAPEX can make mistakes. Verify records.
       </p>

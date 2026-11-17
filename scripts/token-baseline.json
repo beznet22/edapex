@@ -17,7 +17,7 @@
   "apps/web/components/auth/LoginPanel.tsx": 14,
   "apps/web/components/desktop/Titlebar.tsx": 1,
   "apps/web/components/openduet/chat-transcript.tsx": 10,
-  "apps/web/components/openduet/composer.tsx": 4,
+  "apps/web/components/openduet/composer.tsx": 3,
   "apps/web/components/openduet/runtime-status.tsx": 2,
   "apps/web/components/openduet/tab-bar.tsx": 7,
   "apps/web/components/ui/command.tsx": 1,
