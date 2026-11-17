@@ -4,6 +4,8 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import type { ChatMessage, ChatMessagePart } from "@edapex/contracts";
 
 import { Confirmation } from "@edapex/ui/components/confirmation"
+import { Reasoning } from "@edapex/ui/components/reasoning"
+import { ToolCall } from "@edapex/ui/components/tool-call"
 import { cn } from "@edapex/ui/lib/utils";
 
 import { isAtEnd, shouldFollow } from "@/lib/transcript";
@@ -75,7 +77,11 @@ export function Transcript({
               ref={virtualizer.measureElement}
               style={{ transform: `translateY(${row.start}px)` }}
             >
-              <MessageRow message={message} onDecideApproval={onDecideApproval} />
+              <MessageRow
+                message={message}
+                onDecideApproval={onDecideApproval}
+                streaming={streaming && row.index === messages.length - 1}
+              />
             </div>
           );
         })}
@@ -87,9 +93,11 @@ export function Transcript({
 
 function MessageRow({
   message,
-  onDecideApproval
+  onDecideApproval,
+  streaming
 }: {
   readonly message: ChatMessage;
+  readonly streaming: boolean;
   readonly onDecideApproval: (
     messageId: string,
     approvalRequestId: string,
@@ -111,6 +119,7 @@ function MessageRow({
             messageId={message.id}
             onDecideApproval={onDecideApproval}
             part={part}
+            streaming={streaming}
           />
         ))}
       </div>
@@ -121,9 +130,11 @@ function MessageRow({
 function Part({
   messageId,
   onDecideApproval,
-  part
+  part,
+  streaming
 }: {
   readonly messageId: string;
+  readonly streaming: boolean;
   readonly onDecideApproval: (
     messageId: string,
     approvalRequestId: string,
@@ -135,12 +146,15 @@ function Part({
     case "text":
       return <p className="whitespace-pre-wrap text-pretty">{part.text}</p>;
     case "thinking":
-      return <p className="text-label text-muted-foreground">{part.text}</p>;
+      return <Reasoning running={streaming} text={part.text} />;
     case "tool":
       return (
-        <p className="text-label text-muted-foreground">
-          {part.name} · {part.summary}
-        </p>
+        <ToolCall
+          detail={part.detail}
+          name={part.name}
+          status={part.status}
+          summary={part.summary}
+        />
       );
     case "approval":
       return (

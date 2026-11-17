@@ -23,6 +23,7 @@ import type {
 import { Paperclip } from "lucide-react";
 
 import { Confirmation } from "@edapex/ui/components/confirmation";
+import { Reasoning } from "@edapex/ui/components/reasoning";
 import { Bubble, BubbleContent } from "./bubble";
 import { MessageScroller } from "./message-scroller";
 import { ToolActivity } from "./tool-activity";
@@ -96,7 +97,7 @@ function renderPart({
         </Bubble>
       );
     case "thinking":
-      return <Thinking key={`thinking-${index}`} />;
+      return <Reasoning key={`thinking-${index}`} running={streaming} text={part.text} />;
     case "approval":
       return (
         <Confirmation

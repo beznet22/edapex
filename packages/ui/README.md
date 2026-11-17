@@ -69,3 +69,5 @@ copied in unchanged.
 |---|---|---|
 | `trace` | `Collapsible` | `shadcn add trace` answers 404 on `new-york-v4`; the pattern is a documented composition of a trigger and its content |
 | `confirmation` | `Alert`, `Button` | Same — a confirmation is an alert with two actions and a resolved state |
+| `reasoning` | `Trace` | A reasoning row is a trace row that opens on itself while it streams |
+| `tool-call` | `Trace` | A tool row is a trace row whose title is a verb and whose detail is the output |
