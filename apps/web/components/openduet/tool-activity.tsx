@@ -1,58 +1,37 @@
 "use client";
 
-import type { ToolCallPart, ToolCallStatus } from "@edapex/contracts";
-import {
-  AlertTriangle,
-  Ban,
-  Check,
-  ChevronDown,
-  CircleDashed,
-  LoaderCircle,
-  ShieldQuestion,
-  X
-} from "lucide-react";
-import type { LucideIcon } from "lucide-react";
+import type { ToolCallPart } from "@edapex/contracts";
+import { CircleDashed } from "lucide-react";
 
-const STATUS: Record<ToolCallStatus, { label: string; icon: LucideIcon; className: string }> = {
-  running: { label: "Working", icon: LoaderCircle, className: "text-primary animate-spin" },
-  completed: { label: "Done", icon: Check, className: "text-success" },
-  failed: { label: "Didn’t work", icon: AlertTriangle, className: "text-destructive" },
-  blocked: { label: "Blocked", icon: Ban, className: "text-destructive" },
-  declined: { label: "You declined", icon: X, className: "text-muted-foreground" },
-  refused: { label: "Refused", icon: Ban, className: "text-destructive" },
-  waiting_for_person: { label: "Waiting for you", icon: ShieldQuestion, className: "text-primary" }
-};
+import {
+  Trace,
+  TraceCollapsible,
+  TraceCollapsibleContent,
+  TraceCollapsibleTrigger,
+  TraceDescription,
+  TraceIcon,
+  TraceTitle
+} from "@edapex/ui/components/trace";
+import { ToolCall } from "@edapex/ui/components/tool-call";
 
 interface ToolActivityProps {
   readonly tools: readonly ToolCallPart[];
 }
 
-function ToolRow({ tool }: { readonly tool: ToolCallPart }) {
-  const status = STATUS[tool.status];
-  const Icon = status.icon;
+function call(tool: ToolCallPart) {
   return (
-    <li className="flex min-w-0 items-start gap-2.5 py-1.5 text-xs">
-      <Icon aria-hidden="true" className={`mt-0.5 size-3.5 shrink-0 ${status.className}`} />
-      <div className="min-w-0 flex-1">
-        <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
-          <span className="truncate font-medium text-foreground">{tool.name}</span>
-          <span className="text-muted-foreground">{status.label}</span>
-        </div>
-        {tool.summary.length > 0 ? (
-          <p className="mt-0.5 break-words text-muted-foreground">{tool.summary}</p>
-        ) : null}
-        {tool.detail !== undefined && tool.detail.length > 0 ? (
-          <p className="mt-1 break-words text-[11px] leading-4 text-muted-foreground/80">
-            {tool.detail}
-          </p>
-        ) : null}
-      </div>
-    </li>
+    <ToolCall
+      detail={tool.detail}
+      key={tool.toolCallId}
+      name={tool.name}
+      status={tool.status}
+      summary={tool.summary}
+    />
   );
 }
 
 /**
- * Tool calls as pills.
+ * Tool calls as a trace.
  *
  * Actions needing a person stay expanded — they are the thing blocking the turn,
  * so hiding them behind a disclosure would be hostile. Settled steps collapse to
@@ -80,48 +59,35 @@ export function ToolActivity({ tools }: ToolActivityProps) {
     .join(", ");
 
   return (
-    <div className="space-y-1.5">
+    <Trace className="gap-1.5">
       {humanAction.length > 0 ? (
-        <ul className="nested bg-muted/60 px-3 shadow-[var(--elevation-1)]">
-          {humanAction.map((tool) => (
-            <ToolRow key={tool.toolCallId} tool={tool} />
-          ))}
-        </ul>
+        <div className="flex flex-col">{humanAction.map(call)}</div>
       ) : null}
 
       {settled.length > 0 ? (
-        <details className="group nested bg-muted/40 shadow-[var(--elevation-1)]">
-          <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 px-3 text-xs">
-            <CircleDashed
-              aria-hidden="true"
-              className={failed > 0 ? "size-3.5 shrink-0 text-destructive" : "size-3.5 shrink-0 text-muted-foreground"}
-            />
-            <span className="shrink-0 font-medium text-foreground">
+        <TraceCollapsible>
+          <TraceCollapsibleTrigger className="min-h-11 px-1">
+            <TraceIcon>
+              <CircleDashed className={failed > 0 ? "text-destructive" : undefined} />
+            </TraceIcon>
+            <TraceTitle className="shrink-0 font-medium text-foreground">
               {settled.length === 1 ? "1 step" : `${settled.length} steps`}
-            </span>
+            </TraceTitle>
             {preview.length > 0 ? (
-              <span className="min-w-0 truncate text-muted-foreground">
+              <TraceDescription className="truncate">
                 · {preview}
                 {settled.length > 2 ? "…" : ""}
-              </span>
+              </TraceDescription>
             ) : null}
             {failed > 0 ? (
-              <span className="shrink-0 rounded-full bg-destructive/15 px-1.5 py-0.5 text-[10px] font-semibold text-destructive">
+              <TraceDescription className="rounded-full bg-destructive/15 px-1.5 text-destructive">
                 {failed} failed
-              </span>
+              </TraceDescription>
             ) : null}
-            <ChevronDown
-              aria-hidden="true"
-              className="ml-auto size-3.5 shrink-0 text-muted-foreground transition-transform duration-200 group-open:rotate-180"
-            />
-          </summary>
-          <ul className="px-3 pb-1">
-            {settled.map((tool) => (
-              <ToolRow key={tool.toolCallId} tool={tool} />
-            ))}
-          </ul>
-        </details>
+          </TraceCollapsibleTrigger>
+          <TraceCollapsibleContent>{settled.map(call)}</TraceCollapsibleContent>
+        </TraceCollapsible>
       ) : null}
-    </div>
+    </Trace>
   );
 }
