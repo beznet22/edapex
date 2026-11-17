@@ -673,3 +673,44 @@ async fn a_provider_failure_is_settled_with_its_message() {
         "the settled run should carry the provider's message, saw {entries:?}"
     );
 }
+
+/// The device failed at a `Failed` chunk rather than at connect, and that path settled the run
+/// with no reason — the exact shape that left `runs.error` null on the phone.
+#[tokio::test]
+async fn a_failure_chunk_is_settled_with_its_message() {
+    let log = Arc::new(OrderedLog::default());
+    let host = AgentHost::connect(AgentHostOptions {
+        settings: AgentConnectSettings {
+            workspace_id: "workspace".to_string(),
+            model: "test/model".to_string(),
+            mobile_safe_tools: false,
+        },
+        provider: ScriptedProvider::new(vec![vec![ProviderChunk::Failed(AgentError::internal(
+            "gateway said no",
+        ))]]),
+        tools: FakeTools::new(false),
+        approvals: Arc::new(FixedApproval(ApprovalDecision::AllowOnce)),
+        events: log.clone(),
+        recorder: Some(Arc::clone(&log) as Arc<dyn TurnRecorder>),
+    })
+    .expect("host connects");
+
+    let thread = host.thread_start(None).expect("thread");
+    host.turn_start(AgentTurnInput {
+        thread_id: thread.thread_id,
+        text: "hi".to_string(),
+        attachment_capture_ids: Vec::new(),
+    })
+    .await
+    .expect("turn");
+
+    tokio::time::sleep(Duration::from_millis(50)).await;
+    let entries = log.entries();
+
+    assert!(
+        entries
+            .iter()
+            .any(|entry| entry == "finished:gateway said no"),
+        "a failed chunk must be settled with its message, saw {entries:?}"
+    );
+}

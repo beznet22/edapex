@@ -384,6 +384,24 @@ impl AgentHost {
         }
     }
 
+    /// Every way a turn can fail goes through here, so a settled run always carries its reason.
+    fn fail_turn(
+        &self,
+        thread_id: &str,
+        turn_id: &str,
+        error: AgentError,
+    ) -> TurnCompletionStatus {
+        if let Ok(mut errors) = self.inner.errors.lock() {
+            errors.insert(turn_id.to_string(), error.message.clone());
+        }
+        self.emit(AgentEvent::Error {
+            thread_id: Some(thread_id.to_string()),
+            turn_id: Some(turn_id.to_string()),
+            error,
+        });
+        TurnCompletionStatus::Error
+    }
+
     async fn run_turn(
         &self,
         thread_id: &str,
@@ -411,17 +429,7 @@ impl AgentHost {
             };
             let mut stream = match self.inner.provider.stream_chat(request) {
                 Ok(stream) => stream,
-                Err(error) => {
-                    if let Ok(mut errors) = self.inner.errors.lock() {
-                        errors.insert(turn_id.to_string(), error.message.clone());
-                    }
-                    self.emit(AgentEvent::Error {
-                        thread_id: Some(thread_id.to_string()),
-                        turn_id: Some(turn_id.to_string()),
-                        error,
-                    });
-                    return TurnCompletionStatus::Error;
-                }
+                Err(error) => return self.fail_turn(thread_id, turn_id, error),
             };
 
             let text_item = format!("message-{turn_id}-{round}");
@@ -491,12 +499,7 @@ impl AgentHost {
                     }
                     ProviderChunk::Done { .. } => break,
                     ProviderChunk::Failed(error) => {
-                        self.emit(AgentEvent::Error {
-                            thread_id: Some(thread_id.to_string()),
-                            turn_id: Some(turn_id.to_string()),
-                            error,
-                        });
-                        return TurnCompletionStatus::Error;
+                        return self.fail_turn(thread_id, turn_id, error);
                     }
                 }
             }
@@ -661,13 +664,11 @@ impl AgentHost {
             }
         }
 
-        let error = AgentError::internal("The agent exceeded the tool-round limit");
-        self.emit(AgentEvent::Error {
-            thread_id: Some(thread_id.to_string()),
-            turn_id: Some(turn_id.to_string()),
-            error,
-        });
-        TurnCompletionStatus::Error
+        self.fail_turn(
+            thread_id,
+            turn_id,
+            AgentError::internal("The agent exceeded the tool-round limit"),
+        )
     }
 
     fn save_history(&self, thread_id: &str, messages: Vec<ChatMessage>) {
