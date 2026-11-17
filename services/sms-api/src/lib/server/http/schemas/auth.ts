@@ -58,3 +58,15 @@ export const profilePatchBody = z
     deviceToken: z.string().nullable().optional()
   })
   .strict();
+
+/**
+ * A Google ID token from the native credential sheet.
+ *
+ * Length is a sanity bound, not validation: the token's own signature and claims are what
+ * decide whether it is real, and that happens in the service against Google's keys.
+ */
+export const googleNativeBody = z
+  .object({
+    idToken: z.string().trim().min(100).max(8192)
+  })
+  .strict();

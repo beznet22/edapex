@@ -9,6 +9,8 @@ export interface AuthConfigPort {
   readonly claimLinkEnabled: boolean;
   readonly cookieSecret: string | null;
   readonly googleConfigured: boolean;
+  /** The web client id. It is also the audience of a native Google ID token. */
+  readonly googleClientId: string | null;
   readonly postLoginRedirect: string;
   readonly appOrigin: string;
   /**

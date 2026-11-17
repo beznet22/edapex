@@ -38,6 +38,7 @@ const google: GoogleOAuthPort = {
 };
 
 const config = (googleConfigured: boolean) => ({
+  googleClientId: "test-client",
   claimEnabled: true,
   claimDigest: "a".repeat(64),
   claimLinkEnabled: true,

@@ -27,6 +27,7 @@ const config: AuthConfigPort = {
   claimLinkEnabled: true,
   cookieSecret: "claim-link-secret",
   googleConfigured: true,
+  googleClientId: "test-client",
   postLoginRedirect: "/",
   appOrigin: "https://app.example.test",
   // The TTLs live on the port now; a fixture missing them makes `now + undefined` a NaN and

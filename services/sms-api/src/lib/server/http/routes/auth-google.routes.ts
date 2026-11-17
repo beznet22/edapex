@@ -11,6 +11,9 @@ import {
   verifyPayload
 } from "../../services";
 import { AuthError } from "../../services/errors";
+import { jsonBody } from "../validation";
+import { googleNativeBody } from "../schemas/auth";
+import { toUserDto } from "../dto/auth";
 import {
   clearClaimCookie,
   clearOAuthCookie,
@@ -119,4 +122,27 @@ export const authGoogle = new Hono<AppContext>()
     setSessionCookie(c, result.token, result.expiresAt);
     c.header("Cache-Control", "no-store");
     return c.redirect(config.postLoginRedirect, 302);
+  })
+  /**
+   * Native sign-in: the app has an ID token, not an access token.
+   *
+   * Public for the same reason `/desktop/start` is — the person has no session yet — and
+   * the token is verified against Google's keys before any account is touched.
+   */
+  .post("/google/native", jsonBody(googleNativeBody), async (c) => {
+    const config = c.get("baseCtx").ports.authConfig;
+    if (!config.googleConfigured || config.googleClientId === null) return c.notFound();
+
+    const body = c.req.valid("json");
+    const result = await createService(GoogleService, c.get("baseCtx")).nativeSignIn({
+      idToken: body.idToken,
+      ip: c.get("ip"),
+      userAgent: c.get("userAgent"),
+      fingerprint: null
+    });
+    c.header("Cache-Control", "no-store");
+    return c.json(
+      { token: result.token, expiresAt: result.expiresAt, user: toUserDto(result.user) },
+      200
+    );
   });

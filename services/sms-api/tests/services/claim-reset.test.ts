@@ -41,6 +41,7 @@ beforeAll(async () => {
     claimLinkEnabled: true,
     cookieSecret: "reset-cookie-secret",
     googleConfigured: true,
+    googleClientId: "test-client",
     postLoginRedirect: "/",
     appOrigin: "https://app.example.test",
     magicLinkTtlSeconds: 15 * 60,
