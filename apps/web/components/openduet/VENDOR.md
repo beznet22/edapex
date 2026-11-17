@@ -24,17 +24,20 @@ This app starts from `vercel/chatbot` and ports selected interaction source from
 
 ### File map
 
+What still carries upstream structure:
+
 | Upstream | Local | Notes |
 |---|---|---|
-| `openbot/app/src/components/ui/bubble.tsx` | `components/openduet/bubble.tsx` | Removed Base UI render hook; EdApex tokens |
 | `openbot/app/src/components/ui/message.tsx` | `packages/chat/src/components/message.tsx` | Shared presentation primitive |
-| `openbot/app/src/components/ui/message-scroller.tsx` | `components/openduet/message-scroller.tsx` | Native scroll container |
 | `openbot/app/src/components/ui/skeleton.tsx` | `packages/chat/src/components/skeleton.tsx` | Shared presentation primitive |
 | `openbot/app/src/components/shell/tab-bar.tsx` | `components/openduet/tab-bar.tsx` | Next links; no motion dependency |
-| `openbot/app/src/components/channels/tool-activity.tsx` | `components/openduet/tool-activity.tsx` | Contract-driven; CopilotKit removed |
-| `openbot/app/src/components/channels/chat-transcript.tsx` | `components/openduet/chat-transcript.tsx` | Contract-driven transcript; no CopilotKit |
-| `openbot/app/src/components/channels/composer/composer.tsx` | `components/openduet/composer.tsx` | Contract-driven composer; no CopilotKit |
-| `openbot/app/src/components/approvals/inline-approval.tsx` | `components/openduet/approval-card.tsx` | Rebuilt on `ApprovalPart` |
+
+The chat presentation is no longer derived from this source. `bubble.tsx`,
+`message-scroller.tsx` and `approval-card.tsx` were replaced by registry primitives
+(`Bubble`, `MessageScroller`, `Confirmation`); `chat-transcript.tsx`, `tool-activity.tsx` and
+`composer.tsx` were rebuilt on those primitives and on `Trace`, `ToolCall`, `InputGroup` and
+`Attachment`. Nothing in the chat surface calls `scrollIntoView`, keeps a status table or
+draws a disclosure by hand.
 
 ### Deliberate exclusions
 

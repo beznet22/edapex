@@ -5,7 +5,20 @@ import type { ChangeEvent, FormEvent, KeyboardEvent } from "react";
 import type { QueuedMessage } from "@edapex/contracts";
 import { ArrowUp, Paperclip, Square, X } from "lucide-react";
 
+import {
+  Attachment,
+  AttachmentAction,
+  AttachmentActions,
+  AttachmentContent,
+  AttachmentGroup,
+  AttachmentTitle
+} from "@edapex/ui/components/attachment";
 import { Button } from "@edapex/ui/components/button";
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupTextarea
+} from "@edapex/ui/components/input-group";
 import { cn } from "@/lib/utils";
 
 interface ComposerProps {
@@ -89,10 +102,7 @@ export function Composer({
       onSubmit={onSubmit}
     >
       {queue.length > 0 ? (
-        <div
-          aria-label="Queued messages"
-          className="mb-2 space-y-1.5"
-        >
+        <div aria-label="Queued messages" className="mb-2 space-y-1.5">
           {queue.map((message) => (
             <div
               className="flex items-center gap-2 rounded-xl bg-muted/70 px-2.5 py-1.5 text-xs text-muted-foreground"
@@ -116,42 +126,40 @@ export function Composer({
       ) : null}
 
       {attachments.length > 0 ? (
-        <div className="mb-2 flex flex-wrap gap-1.5">
+        <AttachmentGroup className="mb-2 flex flex-wrap gap-1.5">
           {attachments.map((name) => (
-            <span
-              className="inline-flex max-w-full items-center gap-1 rounded-full bg-secondary px-2.5 py-1 text-xs text-secondary-foreground"
-              key={name}
-            >
-              <span className="truncate">{name}</span>
-              <Button
-                aria-label={`Remove ${name}`}
-                className="size-6 rounded-full hover:bg-transparent hover:text-foreground after:-inset-2.5"
-                onClick={() =>
-                  setAttachments((current) => current.filter((item) => item !== name))
-                }
-                size="sm"
-                type="button"
-                variant="ghost"
-              >
-                <X aria-hidden="true" className="size-3" />
-              </Button>
-            </span>
+            <Attachment key={name} orientation="horizontal" size="xs">
+              <AttachmentContent>
+                <AttachmentTitle>{name}</AttachmentTitle>
+              </AttachmentContent>
+              <AttachmentActions>
+                <AttachmentAction
+                  aria-label={`Remove ${name}`}
+                  onClick={() =>
+                    setAttachments((current) => current.filter((item) => item !== name))
+                  }
+                  type="button"
+                >
+                  <X aria-hidden="true" className="size-3" />
+                </AttachmentAction>
+              </AttachmentActions>
+            </Attachment>
           ))}
-        </div>
+        </AttachmentGroup>
       ) : null}
 
       {/*
         One surface, no per-edge rules. The ring carries the focused state, so the
         composer does not draw a border at all.
       */}
-      <div
+      <InputGroup
         className={cn(
-          "nested rounded-2xl bg-card p-2 transition-all duration-200 md:glass",
+          "nested rounded-2xl bg-card p-2 md:glass",
           focused ? "ring-2 ring-ring/40" : "ring-1 ring-border/60",
           "shadow-[var(--elevation-2)]"
         )}
       >
-        <textarea
+        <InputGroupTextarea
           aria-label="Message"
           className="max-h-44 min-h-11 w-full resize-none bg-transparent px-2 py-2 text-[15px] leading-6 outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed"
           disabled={disabled}
@@ -164,7 +172,7 @@ export function Composer({
           rows={1}
           value={draft}
         />
-        <div className="mt-1 flex items-center gap-1">
+        <InputGroupAddon align="block-end" className="mt-1 gap-1">
           <input
             accept=".pdf,.doc,.docx,.csv,.png,.jpg,.jpeg"
             className="hidden"
@@ -211,8 +219,8 @@ export function Composer({
               <ArrowUp aria-hidden="true" className="size-4" />
             </Button>
           )}
-        </div>
-      </div>
+        </InputGroupAddon>
+      </InputGroup>
       <p className="mt-2 px-1 text-[10px] leading-4 text-muted-foreground">
         {connected
           ? "Every action that reaches the network or your records asks first."
