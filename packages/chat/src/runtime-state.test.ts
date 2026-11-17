@@ -95,3 +95,17 @@ describe("workspace runtime projection", () => {
     expect(restored.drain).toBeNull();
   });
 });
+
+it("records a send failure without touching the transcript", () => {
+  const initial = createRuntimeState();
+
+  const failed = reduceRuntime(initial, { type: "error", message: "Not connected" });
+
+  expect(failed.state.error).toBe("Not connected");
+  expect(failed.state.messages).toEqual(initial.messages);
+  expect(failed.state.turn).toEqual(initial.turn);
+
+  const cleared = reduceRuntime(failed.state, { type: "error", message: null });
+
+  expect(cleared.state.error).toBeNull();
+});

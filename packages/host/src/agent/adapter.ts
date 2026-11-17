@@ -93,7 +93,8 @@ export class NativeAgentAdapter implements WorkspaceRuntimeAdapter {
     return {
       state: this.state.turn.state,
       connected: this.connected,
-      turn: this.state.turn
+      turn: this.state.turn,
+      error: this.state.error ?? null
     };
   }
 
@@ -140,9 +141,28 @@ export class NativeAgentAdapter implements WorkspaceRuntimeAdapter {
     this.emit();
   }
 
+  /** Surfaces a failure the adapter did not originate — a rejected connect, a transport. */
+  reportError(message: string | null): void {
+    this.state = reduceRuntime(this.state, { type: "error", message }).state;
+    this.emit();
+  }
+
   send(text: string, attachmentNames: readonly string[]): void {
     const trimmed = text.trim();
-    if (!this.connected || trimmed.length === 0) return;
+    if (trimmed.length === 0) return;
+    /*
+     * Saying nothing here would look identical to a message that was sent and is waiting for
+     * its first event. The person pressed send, so the runtime has to answer one way or the
+     * other.
+     */
+    if (!this.connected) {
+      this.state = reduceRuntime(this.state, {
+        type: "error",
+        message: "Edapex is not connected yet. Send again in a moment."
+      }).state;
+      this.emit();
+      return;
+    }
 
     const message: QueuedMessage = {
       id: crypto.randomUUID(),

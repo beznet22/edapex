@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useSyncExternalStore } from "react";
 
 import type { ChatMessage, QueuedMessage, WorkspaceRuntimeView } from "@edapex/contracts";
 import { NativeAgentAdapter } from "@edapex/host/agent";
@@ -31,7 +31,6 @@ export interface ChatController {
 export function useChat(): ChatController {
   const adapter = useMemo(() => new NativeAgentAdapter(nativeTransport), []);
   const state = useSyncExternalStore(adapter.subscribe, adapter.getSnapshot, adapter.getSnapshot);
-  const [error, setError] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -41,7 +40,7 @@ export function useChat(): ChatController {
         if (cancelled) return;
         // Rust rejects with `{ code, message, retryable }`, not an `Error` — checking
         // `instanceof Error` threw away the only text that says what went wrong.
-        setError(
+        adapter.reportError(
           isHostFailure(cause)
             ? cause.message
             : cause instanceof Error
@@ -57,18 +56,6 @@ export function useChat(): ChatController {
   const send = useCallback(
     (text: string) => {
       if (text.trim().length === 0) return;
-      /*
-       * `adapter.send` returns silently when it has no connection: the message would be
-       * queued optimistically and then nothing would happen, which reads as "sent" to the
-       * person who pressed the button. Report it here instead, where the surface already
-       * renders a failure — until the adapter grows a typed `not_connected` event, this is
-       * the only place the two states can be told apart.
-       */
-      if (!adapter.view.connected) {
-        setError("Edapex is not connected yet. Wait a moment and send again.");
-        return;
-      }
-      setError("");
       adapter.send(text, []);
     },
     [adapter]
@@ -78,7 +65,7 @@ export function useChat(): ChatController {
     messages: state.messages,
     queue: state.queue.queued,
     view: adapter.view,
-    error,
+    error: adapter.view.error ?? "",
     send,
     stop: () => adapter.stop(),
     decideApproval: (messageId, approvalRequestId, decision) =>

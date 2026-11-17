@@ -103,4 +103,6 @@ export interface WorkspaceRuntimeView {
   readonly state: WorkspaceRunState;
   readonly connected: boolean;
   readonly turn: WorkspaceTurnView;
+  /** The last send failure, or null. A surface shows this instead of guessing at silence. */
+  readonly error?: string | null;
 }
