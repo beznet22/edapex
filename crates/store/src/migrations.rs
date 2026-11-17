@@ -13,7 +13,7 @@
 //!   change that will carry it to the cloud.
 
 /// Final row shape after a decrypted read.
-pub const LATEST_VERSION: u32 = 2;
+pub const LATEST_VERSION: u32 = 3;
 
 /// The only data class this store may hold.
 pub const ALLOWED_DATA_CLASS: &str = "workspace";
@@ -336,6 +336,87 @@ CREATE TABLE IF NOT EXISTS run_events (
   PRIMARY KEY (run_id, seq)
 );
 CREATE INDEX IF NOT EXISTS run_events_by_run ON run_events (run_id, seq);
+"#,
+    },
+    Migration {
+        version: 3,
+        name: "infinity-session",
+        sql: r#"
+CREATE TABLE IF NOT EXISTS agent_identity (
+  workspace_id TEXT PRIMARY KEY,
+  device_id    TEXT NOT NULL,
+  created_at   INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS agent_thread_snapshots (
+  thread_id   TEXT NOT NULL,
+  root_thread_id TEXT NOT NULL,
+  workspace_id TEXT NOT NULL,
+  kind        TEXT NOT NULL CHECK (kind IN ('conversation', 'state')),
+  revision    INTEGER NOT NULL,
+  body        BLOB NOT NULL,
+  updated_at  INTEGER NOT NULL,
+  PRIMARY KEY (thread_id, kind)
+);
+CREATE INDEX IF NOT EXISTS agent_thread_snapshots_by_workspace
+  ON agent_thread_snapshots (workspace_id, thread_id);
+CREATE INDEX IF NOT EXISTS agent_thread_snapshots_by_root
+  ON agent_thread_snapshots (root_thread_id);
+
+CREATE TABLE IF NOT EXISTS agent_sessions (
+  session_id    TEXT PRIMARY KEY,
+  workspace_id  TEXT NOT NULL,
+  device_id     TEXT NOT NULL,
+  holder_id     TEXT,
+  fence         INTEGER NOT NULL DEFAULT 0,
+  expires_at_ms INTEGER NOT NULL DEFAULT 0,
+  last_seq      INTEGER NOT NULL DEFAULT 0,
+  deleted_at_ms INTEGER
+);
+CREATE INDEX IF NOT EXISTS agent_sessions_by_workspace
+  ON agent_sessions (workspace_id, deleted_at_ms);
+
+CREATE TABLE IF NOT EXISTS agent_session_events (
+  session_id     TEXT NOT NULL,
+  event_id       TEXT NOT NULL,
+  seq            INTEGER NOT NULL,
+  kind           TEXT NOT NULL,
+  core_message_id TEXT,
+  dedup_id       TEXT,
+  body           BLOB NOT NULL,
+  workspace_id   TEXT NOT NULL,
+  device_id      TEXT NOT NULL,
+  device_seq     INTEGER NOT NULL,
+  created_at_ms  INTEGER NOT NULL,
+  relay_position INTEGER,
+  PRIMARY KEY (session_id, event_id),
+  UNIQUE (session_id, seq),
+  UNIQUE (session_id, device_id, device_seq),
+  FOREIGN KEY (session_id) REFERENCES agent_sessions(session_id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS agent_session_events_relay
+  ON agent_session_events (session_id, relay_position);
+
+CREATE TABLE IF NOT EXISTS agent_session_commands (
+  session_id TEXT NOT NULL,
+  command_id TEXT NOT NULL,
+  event_id   TEXT NOT NULL,
+  created_at_ms INTEGER NOT NULL,
+  PRIMARY KEY (session_id, command_id)
+);
+
+CREATE TABLE IF NOT EXISTS agent_session_outbox (
+  session_id    TEXT NOT NULL,
+  event_id      TEXT NOT NULL,
+  kind          TEXT NOT NULL,
+  device_id     TEXT NOT NULL,
+  device_seq    INTEGER NOT NULL,
+  ciphertext    BLOB NOT NULL,
+  created_at_ms INTEGER NOT NULL,
+  PRIMARY KEY (session_id, event_id)
+);
+CREATE INDEX IF NOT EXISTS agent_session_outbox_pending
+  ON agent_session_outbox (device_id, device_seq);
 "#,
     },
 ];

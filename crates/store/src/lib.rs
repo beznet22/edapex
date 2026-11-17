@@ -11,9 +11,14 @@
 
 pub mod crypto;
 pub mod error;
+pub mod identity;
 pub mod journal;
 pub mod migrations;
 pub mod runs;
+pub mod session_events;
+pub mod session_lease;
+pub mod session_outbox;
+pub mod thread_snapshots;
 
 pub use error::{Result, StoreError};
 pub use journal::{Journal, JournalRecord, PersistVectorMode};

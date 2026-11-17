@@ -1496,10 +1496,16 @@ checksum = "d0881ea181b1df73ff77ffaaf9c7544ecc11e82fba9b5f27b262a3c73a332555"
 name = "edapex-agent"
 version = "0.1.0"
 dependencies = [
+ "async-stream",
+ "async-trait",
+ "edapex-store",
+ "futures-util",
  "infinity-agent-core",
  "infinity-host",
+ "infinity-provider-protocol",
  "infinity-sync",
  "memchr",
+ "rap-protocol",
  "serde",
  "serde_json",
  "thiserror 2.0.21",
