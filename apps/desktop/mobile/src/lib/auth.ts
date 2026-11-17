@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { getCurrent, onOpenUrl } from "@tauri-apps/plugin-deep-link";
 
 export interface HostFailure {
@@ -70,4 +71,24 @@ export async function watchAuthLinks(handler: (code: string) => void): Promise<(
       if (code !== null) handler(code);
     }
   });
+}
+
+/**
+ * The native sheet's answer.
+ *
+ * Kotlin hands the ID token to Rust, Rust exchanges it and writes the keychain, and only
+ * the outcome is emitted here — the page never sees a credential or a session token.
+ */
+export async function onNativeAuth(handlers: {
+  readonly succeeded: () => void;
+  readonly failed: (message: string) => void;
+}): Promise<() => void> {
+  const [changed, failed] = await Promise.all([
+    listen<boolean>("auth:changed", () => handlers.succeeded()),
+    listen<string>("auth:failed", (event) => handlers.failed(event.payload))
+  ]);
+  return () => {
+    changed();
+    failed();
+  };
 }

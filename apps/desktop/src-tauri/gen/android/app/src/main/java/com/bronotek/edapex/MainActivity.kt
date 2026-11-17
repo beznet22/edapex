@@ -303,6 +303,12 @@ class MainActivity : TauriActivity() {
         @JavascriptInterface
         fun pushToken(): String = PushTokenStore.read(this@MainActivity)
 
+        /** Opens Google's account sheet in-process; no browser, no deep link. */
+        @JavascriptInterface
+        fun signInWithGoogle() {
+            runOnUiThread { GoogleSignIn.start(this@MainActivity) }
+        }
+
         @JavascriptInterface
         fun setBackEnabled(enabled: Boolean) {
             backConsumable = enabled

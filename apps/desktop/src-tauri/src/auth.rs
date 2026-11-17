@@ -49,7 +49,7 @@ pub fn session_token() -> Result<Option<String>, HostError> {
     }
 }
 
-fn store_token(token: &str) -> Result<(), HostError> {
+pub(crate) fn store_token(token: &str) -> Result<(), HostError> {
     entry()?
         .set_password(token)
         .map_err(|error| HostError::new("auth_required", format!("Store secure token: {error}"), false))

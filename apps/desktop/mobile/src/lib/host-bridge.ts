@@ -13,6 +13,8 @@
 interface EdApexHostBridge {
   /** Empty string until Firebase has issued one; never null across the bridge. */
   pushToken(): string;
+  /** Present on Android. Shows Google's sheet in-process; no browser, no deep link. */
+  signInWithGoogle?(): void;
   setBackEnabled(enabled: boolean): void;
   setDarkTheme(dark: boolean): void;
   bootReady(): void;
@@ -70,4 +72,18 @@ export function onSystemBack(handler: () => void): () => void {
 export function readPushToken(): string | null {
   const token = window.EdApexHost?.pushToken() ?? "";
   return token.length > 0 ? token : null;
+}
+
+/**
+ * Start the native Google sheet, if this host has one.
+ *
+ * Returns false in a browser or an older build, and the caller falls back to the browser
+ * PKCE flow — the two paths end in the same session, so the fallback costs nothing but a
+ * tab.
+ */
+export function startNativeSignIn(): boolean {
+  const host = window.EdApexHost;
+  if (host?.signInWithGoogle === undefined) return false;
+  host.signInWithGoogle();
+  return true;
 }

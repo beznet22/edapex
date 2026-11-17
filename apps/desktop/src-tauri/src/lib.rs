@@ -1,6 +1,7 @@
 mod window;
 mod agent;
 mod api;
+mod native_auth;
 mod auth;
 mod capture;
 mod mcp;
@@ -49,6 +50,10 @@ pub fn run() {
         .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_opener::init())
         .manage(HostState::default())
+        .setup(|app| {
+            native_auth::set_app(app.handle().clone());
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             runtime_health,
             host_capabilities,

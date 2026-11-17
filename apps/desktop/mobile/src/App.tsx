@@ -14,7 +14,8 @@ import { Sheet } from "@/components/shell/Sheet";
 import { useKeyboardOpen } from "@/hooks/use-keyboard-open";
 import { usePushRegistration } from "@/hooks/use-push-registration";
 import { bootReady, onSystemBack, setBackEnabled } from "@/lib/host-bridge";
-import { exchangeCode, isAuthenticated, isHostFailure, startSignIn, watchAuthLinks } from "@/lib/auth";
+import { exchangeCode, isAuthenticated, isHostFailure, onNativeAuth, startSignIn, watchAuthLinks } from "@/lib/auth";
+import { startNativeSignIn } from "@/lib/host-bridge";
 import {
   type BootState,
   bootReducer,
@@ -216,6 +217,18 @@ export function App() {
 
   useEffect(() => {
     if (boot.status !== "signed_out" && boot.status !== "authenticating") return;
+    let stopNative: (() => void) | null = null;
+    void onNativeAuth({
+      succeeded: () => dispatch({ type: "auth_succeeded" }),
+      failed: (message) => dispatch({ type: "auth_failed", message })
+    })
+      .then((un) => {
+        stopNative = un;
+      })
+      .catch(() => {
+        // A host without the event bridge still has the deep-link path.
+      });
+
     let dispose: (() => void) | null = null;
     let cancelled = false;
     void watchAuthLinks((code) => {
@@ -236,6 +249,7 @@ export function App() {
     return () => {
       cancelled = true;
       dispose?.();
+      stopNative?.();
     };
   }, [boot.status]);
 
@@ -251,6 +265,10 @@ export function App() {
 
   const beginSignIn = () => {
     dispatch({ type: "auth_started" });
+    // Native first: Google's sheet appears over the app and nothing leaves it. The browser
+    // path remains for a build without the host method, and for a device without Play
+    // services, where Credential Manager has nothing to offer.
+    if (startNativeSignIn()) return;
     void startSignIn().catch((error: unknown) =>
       dispatch({ type: "auth_failed", message: failureMessage(error) })
     );
