@@ -217,10 +217,10 @@ in `packages/contracts/src/push.ts`; the sender and fan-out live in `services/sm
 - **Quiet hours are UTC today.** The school schema carries no timezone column, so a 21:00 boundary
   is wrong by at most the school's UTC offset. Fixing it means adding the column, not moving the
   comparison.
-- **An admin or teacher audience cannot be resolved by query yet.** The ported school schema has
-  no `users` or role table; `resolveAudience` returns empty for those roles rather than guessing,
-  and `userIds` is the supported path. "Notify the admins" needs a roles source first — that is a
-  data-model decision, not a sender change.
+- **An audience is a query, never a list.** `parents`/`students` resolve through the student row
+  (the unit a school talks about); `admin` resolves through `users.is_administrator`; `teacher`
+  through `sm_staffs.user_id` for the school. `userIds` is the explicit escape hatch. A resolved
+  list on the wire would be a snapshot that goes stale between composing and sending.
 - **The sender is FCM HTTP v1 with WebCrypto only.** A service account signs a short-lived RS256
   JWT, which becomes an OAuth token cached until a minute before expiry. A 404 or `UNREGISTERED`
   retires the device row; anything else is a retryable failure.
