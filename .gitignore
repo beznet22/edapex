@@ -111,3 +111,7 @@ boy_writing.mp4
 # Tauri copies the frontend bundle and its config into the Android project on every build.
 # Tracked Kotlin and resources are inputs; this directory is output.
 /apps/desktop/src-tauri/gen/android/app/src/main/assets/
+
+# Firebase: service-account keys never enter the tree
+*firebase-adminsdk*.json
+**/google-services.json

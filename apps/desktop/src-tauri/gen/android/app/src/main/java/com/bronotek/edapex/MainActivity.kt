@@ -1,5 +1,8 @@
 package com.bronotek.edapex
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import android.os.SystemClock
 import android.view.View
@@ -153,6 +156,15 @@ class MainActivity : TauriActivity() {
         // falls back to the default, which is how an approval ends up sharing a toggle with a
         // routine. Creation is idempotent and runs once per process.
         EdApexNotifications.ensureChannels(this)
+        // Android 13+ gates every notification behind a runtime grant. Asking at launch is
+        // deliberate: the alternative is a run that finishes while the app is closed and
+        // tells nobody, which is worse than one prompt.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) !=
+            PackageManager.PERMISSION_GRANTED
+        ) {
+            requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 1)
+        }
     }
 
     private fun attachHostBridge(created: WebView? = null) {
@@ -288,6 +300,9 @@ class MainActivity : TauriActivity() {
      * chose rather than reading the system's.
      */
     inner class HostBridge {
+        @JavascriptInterface
+        fun pushToken(): String = PushTokenStore.read(this@MainActivity)
+
         @JavascriptInterface
         fun setBackEnabled(enabled: Boolean) {
             backConsumable = enabled

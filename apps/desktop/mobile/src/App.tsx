@@ -11,6 +11,7 @@ import type { ComposeMode } from "@/components/app/TopBar";
 import { BootVeil } from "@/components/shell/BootVeil";
 import { Sheet } from "@/components/shell/Sheet";
 import { useKeyboardOpen } from "@/hooks/use-keyboard-open";
+import { usePushRegistration } from "@/hooks/use-push-registration";
 import { bootReady, onSystemBack, setBackEnabled } from "@/lib/host-bridge";
 import {
   type BootState,
@@ -37,6 +38,7 @@ type View = "chat" | Exclude<SurfaceId, "chat" | "make" | "tasks">;
  */
 export function Shell() {
   const keyboardOpen = useKeyboardOpen();
+  usePushRegistration();
   const [mode, setMode] = useState<ComposeMode>("chat");
   const [view, setView] = useState<View>("chat");
   const [drawerOpen, setDrawerOpen] = useState(false);

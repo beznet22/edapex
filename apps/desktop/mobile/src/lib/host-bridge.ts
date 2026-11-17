@@ -5,10 +5,14 @@
  * so every call here is a no-op — which is what lets the same bundle run in a desktop
  * WebView, on a phone, and in `vite dev`.
  *
- * The interface deliberately has no getters and no data: it carries two booleans, so a
- * compromised page cannot read a token, a path or a resource through it.
+ * The interface carries two booleans and one string. The string is the FCM registration
+ * token and it is the exception worth naming: the page has to send it to `/v1/devices`, the
+ * keychain-held session token never crosses this boundary, and a push token routes
+ * notifications to one install rather than granting access to anything.
  */
 interface EdApexHostBridge {
+  /** Empty string until Firebase has issued one; never null across the bridge. */
+  pushToken(): string;
   setBackEnabled(enabled: boolean): void;
   setDarkTheme(dark: boolean): void;
   bootReady(): void;
@@ -18,6 +22,7 @@ declare global {
   interface Window {
     EdApexHost?: EdApexHostBridge;
     __edapexBack?: () => void;
+    __TAURI_INTERNALS__?: unknown;
   }
 }
 
@@ -59,4 +64,10 @@ export function onSystemBack(handler: () => void): () => void {
   return () => {
     delete window.__edapexBack;
   };
+}
+
+/** The FCM token for this install, or null when the host has not issued one yet. */
+export function readPushToken(): string | null {
+  const token = window.EdApexHost?.pushToken() ?? "";
+  return token.length > 0 ? token : null;
 }
