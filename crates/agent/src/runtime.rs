@@ -122,6 +122,9 @@ struct Inner {
     threads: Mutex<HashMap<String, ThreadState>>,
     active_threads: Mutex<HashSet<String>>,
     turns: Mutex<HashMap<String, Arc<TurnControl>>>,
+    /// Why a turn failed, kept only until it settles. The recorder is told and the entry is
+    /// dropped, so a failed run carries its cause to the one place that can persist it.
+    errors: Mutex<HashMap<String, String>>,
 }
 
 #[derive(Clone)]
@@ -146,6 +149,7 @@ impl AgentHost {
                 threads: Mutex::new(HashMap::new()),
                 active_threads: Mutex::new(HashSet::new()),
                 turns: Mutex::new(HashMap::new()),
+            errors: Mutex::new(HashMap::new()),
             }),
         };
         host.emit(AgentEvent::Connected { thread_id: None });
@@ -245,7 +249,13 @@ impl AgentHost {
             host.save_history(&thread_id, history);
 
             if let Some(recorder) = &host.inner.recorder {
-                recorder.finished(&spawned_turn_id, status, None);
+                let message = host
+                    .inner
+                    .errors
+                    .lock()
+                    .ok()
+                    .and_then(|mut errors| errors.remove(&spawned_turn_id));
+                recorder.finished(&spawned_turn_id, status, message.as_deref());
             }
 
             host.emit(AgentEvent::TurnCompleted {
@@ -318,7 +328,13 @@ impl AgentHost {
             .map(|mut active| active.remove(thread_id));
         if let Some(recorder) = &self.inner.recorder {
             recorder.checkpoint(turn_id, history.as_slice());
-            recorder.finished(turn_id, status, None);
+            let message = self
+                .inner
+                .errors
+                .lock()
+                .ok()
+                .and_then(|mut errors| errors.remove(turn_id));
+            recorder.finished(turn_id, status, message.as_deref());
         }
         self.save_history(thread_id, history);
 
@@ -396,6 +412,9 @@ impl AgentHost {
             let mut stream = match self.inner.provider.stream_chat(request) {
                 Ok(stream) => stream,
                 Err(error) => {
+                    if let Ok(mut errors) = self.inner.errors.lock() {
+                        errors.insert(turn_id.to_string(), error.message.clone());
+                    }
                     self.emit(AgentEvent::Error {
                         thread_id: Some(thread_id.to_string()),
                         turn_id: Some(turn_id.to_string()),
