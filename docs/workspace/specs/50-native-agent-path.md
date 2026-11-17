@@ -1,11 +1,31 @@
 # 50 — Native Agent Path (desktop and mobile)
 
-**Status:** resolved. The default is now the native transport; the device
-verification is carried as a release gate in `81-mobile-shell.md`.
+**Status:** amended. Desktop and mobile run **Infinity's native core**
+(`infinity-agent-core`) as the single agent runtime; the browser runs the same core
+compiled to Wasm. This spec's earlier claim — that a separate EdApex turn loop was
+the native runtime — is superseded. Evidence and what remains blocked live in
+[`../infinity-agent-acceptance.md`](../infinity-agent-acceptance.md).
+
 **Rule being enforced** (from `AGENTS.md`): *desktop and mobile are native.
 WebAssembly is the web delivery mechanism only. A host that can run native code uses
 `crates/*` directly; adding WASM to a native host needs a written justification and a
 recorded blocker.*
+
+## What replaced the old loop
+
+| Concern | Now |
+|---|---|
+| Execution | `infinity-agent-core` through `edapex-agent::NativeAgentDriver`, on a dedicated current-thread `LocalSet` |
+| Session identity | caller-owned root `ThreadId`; child threads keep their own ids and ancestry |
+| Model context | per-thread snapshots in `agent.db` (messages, compaction summaries, thread info) |
+| Execution state | processed ids, subscriptions, pending choices, stopped flag, per root thread |
+| Projection | append-only `agent_session_events`, encrypted, paginated; **not** the model's memory |
+| Ownership | lease + fence in `agent_sessions`; a stale writer is refused, not merged |
+| Headless work | WorkManager claims sessions with queued messages and drains them through the same driver |
+| Full feature set | child threads, ancestry, compaction, tool approval, choices and subscriptions are all part of the native path — not deferred to the web |
+
+A turn's durability is a native-host concern. The worker opens the **same**
+`agent.db` the window does; two paths would be two histories.
 
 ## Audit result (historical): the rule was violated
 

@@ -1,0 +1,106 @@
+name: Infinity agent runtime
+
+# The gates this migration can actually prove in CI. Real-window desktop and
+# device gates cannot run here; they are recorded as blocked in
+# docs/workspace/infinity-agent-acceptance.md rather than implied.
+
+on:
+  pull_request:
+    paths:
+      - "crates/agent/**"
+      - "crates/store/**"
+      - "crates/agent-wasm/**"
+      - "apps/desktop/src-tauri/**"
+      - "packages/contracts/**"
+      - "apps/web/**"
+      - "services/cowork-api/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/infinity-agent.yml"
+  push:
+    branches: [main]
+    paths:
+      - "crates/agent/**"
+      - "crates/store/**"
+      - "apps/desktop/src-tauri/**"
+
+concurrency:
+  group: infinity-agent-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  native:
+    name: Native core and host (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.99.1"
+          components: rustfmt, clippy
+      - name: Linux webkit dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev
+      - uses: Swatinem/rust-cache@v2
+      - name: Agent and store tests
+        run: cargo test -p edapex-agent -p edapex-store
+      - name: Desktop host compiles
+        run: cargo check -p edapex-desktop
+      - name: Clippy
+        run: cargo clippy -p edapex-agent -p edapex-store --tests -- -D warnings
+        continue-on-error: true
+
+  wasm:
+    name: Browser core Wasm
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.99.1"
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+      - name: Build the browser runtime
+        run: cargo build --target wasm32-unknown-unknown -p edapex-agent-wasm
+      - name: Size budget
+        run: node scripts/check-agent-size.mjs
+
+  contracts:
+    name: Contracts and web typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Wire contracts
+        run: pnpm --dir apps/web exec vitest run --root ../../packages/contracts
+      - name: Web typecheck
+        run: pnpm --dir apps/web run check
+      - name: Sync service
+        run: pnpm --dir services/cowork-api run typecheck && pnpm --dir services/cowork-api test
+
+  drift:
+    name: Architecture and docs guards
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      - run: node scripts/check-boundaries.mjs
+      - run: node scripts/check-docs.mjs
