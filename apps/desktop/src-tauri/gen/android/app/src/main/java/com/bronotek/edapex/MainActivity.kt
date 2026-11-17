@@ -156,6 +156,7 @@ class MainActivity : TauriActivity() {
         // falls back to the default, which is how an approval ends up sharing a toggle with a
         // routine. Creation is idempotent and runs once per process.
         EdApexNotifications.ensureChannels(this)
+        SessionStore.attach(this)
         // Android 13+ gates every notification behind a runtime grant. Asking at launch is
         // deliberate: the alternative is a run that finishes while the app is closed and
         // tells nobody, which is worse than one prompt.

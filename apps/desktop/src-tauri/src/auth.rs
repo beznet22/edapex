@@ -30,39 +30,158 @@ pub fn api_base() -> String {
         .to_string()
 }
 
+#[cfg(target_os = "android")]
+mod android {
+    //! The Keystore-backed store, reached over JNI.
+    //!
+    //! `keyring` has no Android backend and quietly falls back to memory, so this is the one
+    //! that persists. The class is resolved once, from the JVM thread that calls
+    //! `RunBridge.nativeInit`: `FindClass` on an arbitrary thread cannot see app classes.
+
+    use jni::objects::{GlobalRef, JObject, JString, JValue};
+    use jni::JavaVM;
+    use std::sync::OnceLock;
+
+    use crate::state::HostError;
+
+    static VM: OnceLock<JavaVM> = OnceLock::new();
+    static CLASS: OnceLock<GlobalRef> = OnceLock::new();
+
+    pub fn init(env: &mut jni::JNIEnv) {
+        let Ok(vm) = env.get_java_vm() else { return };
+        let Ok(local) = env.find_class("com/bronotek/edapex/SessionStore") else {
+            return;
+        };
+        let Ok(global) = env.new_global_ref(local) else { return };
+        let _ = CLASS.set(global);
+        let _ = VM.set(vm);
+    }
+
+    fn failure(action: &str, detail: impl std::fmt::Display) -> HostError {
+        HostError::new("auth_required", format!("{action}: {detail}"), false)
+    }
+
+    fn with_env<T>(
+        action: &str,
+        body: impl FnOnce(&mut jni::JNIEnv, &jni::objects::JClass) -> Result<T, HostError>,
+    ) -> Result<T, HostError> {
+        let class = CLASS
+            .get()
+            .ok_or_else(|| failure(action, "the session store is not ready"))?;
+        let vm = VM
+            .get()
+            .ok_or_else(|| failure(action, "the session store is not ready"))?;
+        let mut env = vm.attach_current_thread().map_err(|e| failure(action, e))?;
+        let local = env
+            .new_local_ref(&**class)
+            .map_err(|e| failure(action, e))?;
+        let jclass = jni::objects::JClass::from(local);
+        body(&mut env, &jclass)
+    }
+
+    pub fn read() -> Result<String, HostError> {
+        with_env("Read session", |env, class| {
+            let value = env
+                .call_static_method(class, "read", "()Ljava/lang/String;", &[])
+                .map_err(|e| failure("Read session", e))?;
+            let object: JObject = value.l().map_err(|e| failure("Read session", e))?;
+            if object.is_null() {
+                return Ok(String::new());
+            }
+            let text: String = env
+                .get_string(&JString::from(object))
+                .map_err(|e| failure("Read session", e))?
+                .into();
+            Ok(text)
+        })
+    }
+
+    pub fn save(token: &str) -> Result<(), HostError> {
+        with_env("Store session", |env, class| {
+            let value = env
+                .new_string(token)
+                .map_err(|e| failure("Store session", e))?;
+            env.call_static_method(
+                class,
+                "save",
+                "(Ljava/lang/String;)V",
+                &[JValue::Object(&JObject::from(value))],
+            )
+            .map_err(|e| failure("Store session", e))?;
+            Ok(())
+        })
+    }
+
+    pub fn clear() -> Result<(), HostError> {
+        with_env("Clear session", |env, class| {
+            env.call_static_method(class, "clear", "()V", &[])
+                .map_err(|e| failure("Clear session", e))?;
+            Ok(())
+        })
+    }
+}
+
+#[cfg(target_os = "android")]
+pub fn android_init(env: &mut jni::JNIEnv) {
+    android::init(env);
+}
+
+#[cfg(not(target_os = "android"))]
 fn entry() -> Result<keyring::Entry, HostError> {
     keyring::Entry::new(KEYRING_SERVICE, KEYRING_USER)
         .map_err(|error| HostError::new("auth_required", format!("Secure storage: {error}"), false))
 }
 
 pub fn session_token() -> Result<Option<String>, HostError> {
-    let entry = entry()?;
-    match entry.get_password() {
-        Ok(token) if !token.is_empty() => Ok(Some(token)),
-        Ok(_) => Ok(None),
-        Err(keyring::Error::NoEntry) => Ok(None),
-        Err(error) => Err(HostError::new(
-            "auth_required",
-            format!("Read secure storage: {error}"),
-            false,
-        )),
+    #[cfg(target_os = "android")]
+    {
+        let token = android::read()?;
+        return Ok(if token.is_empty() { None } else { Some(token) });
+    }
+    #[cfg(not(target_os = "android"))]
+    {
+        let entry = entry()?;
+        match entry.get_password() {
+            Ok(token) if !token.is_empty() => Ok(Some(token)),
+            Ok(_) => Ok(None),
+            Err(keyring::Error::NoEntry) => Ok(None),
+            Err(error) => Err(HostError::new(
+                "auth_required",
+                format!("Read secure storage: {error}"),
+                false,
+            )),
+        }
     }
 }
 
 pub(crate) fn store_token(token: &str) -> Result<(), HostError> {
-    entry()?
-        .set_password(token)
-        .map_err(|error| HostError::new("auth_required", format!("Store secure token: {error}"), false))
+    #[cfg(target_os = "android")]
+    {
+        return android::save(token);
+    }
+    #[cfg(not(target_os = "android"))]
+    {
+        entry()?
+            .set_password(token)
+            .map_err(|error| HostError::new("auth_required", format!("Store secure token: {error}"), false))
+    }
 }
 
 fn clear_token() -> Result<(), HostError> {
-    match entry()?.delete_credential() {
-        Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
-        Err(error) => Err(HostError::new(
-            "auth_required",
-            format!("Clear secure token: {error}"),
-            false,
-        )),
+    #[cfg(target_os = "android")]
+    {
+        return android::clear();
+    }
+    #[cfg(not(target_os = "android"))]
+    {
+        match entry()?.delete_credential() {
+            Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
+            Err(error) => Err(HostError::new(
+                "auth_required",
+                format!("Clear secure token: {error}"),
+                false,
+            )),
+        }
     }
 }
 

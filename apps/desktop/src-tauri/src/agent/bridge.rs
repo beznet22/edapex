@@ -86,6 +86,7 @@ pub extern "system" fn Java_com_bronotek_edapex_RunBridge_nativeInit(
         return;
     };
     let _ = CONTEXT.set((vm, global));
+    crate::auth::android_init(&mut env);
 }
 
 /// `RunBridge.nativeDecide(approvalId, allow)` — the answer from a notification.
