@@ -541,3 +541,82 @@ async fn a_resumed_run_continues_from_its_checkpoint_without_a_new_message() {
         "the client never learned the turn finished"
     );
 }
+
+/// The failure this prevents: the journal flushes on a 16ms window that starts when the
+/// journal is built, so a turn's first event is written the moment it is emitted. If the
+/// runtime emits `TurnStarted` before recording the run, that write hits the foreign key
+/// from `run_events` to `runs` and the turn produces no events at all.
+#[derive(Default)]
+struct OrderedLog(Mutex<Vec<String>>);
+
+impl OrderedLog {
+    fn push(&self, entry: &str) {
+        self.0.lock().expect("log").push(entry.to_string());
+    }
+    fn entries(&self) -> Vec<String> {
+        self.0.lock().expect("log").clone()
+    }
+}
+
+impl EventSink for OrderedLog {
+    fn emit(&self, event: AgentEvent) {
+        let value = serde_json::to_value(&event).expect("serialises");
+        let kind = value
+            .get("type")
+            .and_then(|kind| kind.as_str())
+            .unwrap_or("unknown")
+            .to_string();
+        self.push(&kind);
+    }
+}
+
+impl TurnRecorder for OrderedLog {
+    fn started(&self, _run: RunStart<'_>) {
+        self.push("started");
+    }
+    fn checkpoint(&self, _run_id: &str, _messages: &[ChatMessage]) {}
+    fn finished(&self, _run_id: &str, _status: TurnCompletionStatus, _error: Option<&str>) {}
+}
+
+#[tokio::test]
+async fn records_the_run_before_its_first_event() {
+    let log = Arc::new(OrderedLog::default());
+    let host = AgentHost::connect(AgentHostOptions {
+        settings: AgentConnectSettings {
+            workspace_id: "workspace".to_string(),
+            model: "test/model".to_string(),
+            mobile_safe_tools: false,
+        },
+        provider: ScriptedProvider::new(vec![vec![ProviderChunk::Text("hi".to_string())]]),
+        tools: FakeTools::new(false),
+        approvals: Arc::new(FixedApproval(ApprovalDecision::AllowOnce)),
+        events: log.clone(),
+        recorder: Some(Arc::clone(&log) as Arc<dyn TurnRecorder>),
+    })
+    .expect("host connects");
+
+    let thread = host.thread_start(None).expect("thread");
+    host.turn_start(AgentTurnInput {
+        thread_id: thread.thread_id,
+        text: "hi".to_string(),
+        attachment_capture_ids: Vec::new(),
+    })
+    .await
+    .expect("turn");
+
+    tokio::time::sleep(Duration::from_millis(50)).await;
+    let entries = log.entries();
+
+    assert!(
+        entries.iter().any(|entry| entry == "turn_started"),
+        "the turn should emit an event, saw {entries:?}"
+    );
+    // `Connected` belongs to the session, not to a run, and carries no turn id for the
+    // journal to write against. The first event *of the turn* is what must follow the row.
+    let started = entries.iter().position(|entry| entry == "started");
+    let turn_started = entries.iter().position(|entry| entry == "turn_started");
+    assert!(
+        started.is_some() && started < turn_started,
+        "the run must be recorded before its first turn event, saw {entries:?}"
+    );
+}

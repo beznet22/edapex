@@ -207,11 +207,6 @@ impl AgentHost {
             .map_err(|_| AgentError::internal("Turn store is unavailable"))?
             .insert(turn_id.clone(), Arc::clone(&control));
 
-        self.emit(AgentEvent::TurnStarted {
-            thread_id: input.thread_id.clone(),
-            turn_id: turn_id.clone(),
-        });
-
         if let Some(recorder) = &self.inner.recorder {
             recorder.started(crate::recorder::RunStart {
                 run_id: &turn_id,
@@ -222,6 +217,11 @@ impl AgentHost {
                 mobile_safe_tools: self.inner.settings.mobile_safe_tools,
             });
         }
+
+        self.emit(AgentEvent::TurnStarted {
+            thread_id: input.thread_id.clone(),
+            turn_id: turn_id.clone(),
+        });
 
         history.push(ChatMessage::user(input.text));
 
