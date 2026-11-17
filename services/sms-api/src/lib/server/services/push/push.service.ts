@@ -99,6 +99,22 @@ export class PushService {
     );
   }
 
+  async deviceSucceeded(deviceId: number): Promise<void> {
+    return this.ctx.repos.push.recordDeliverySuccess(
+      requireScopedContext(this.ctx.repos.ctx),
+      deviceId
+    );
+  }
+
+  async deviceFailed(deviceId: number, revoke: boolean): Promise<void> {
+    return this.ctx.repos.push.recordDeliveryFailure(
+      requireScopedContext(this.ctx.repos.ctx),
+      deviceId,
+      revoke,
+      this.now()
+    );
+  }
+
   private now(): number {
     return Math.floor(Date.now() / 1000);
   }

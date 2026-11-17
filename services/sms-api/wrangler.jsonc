@@ -42,6 +42,31 @@
   ],
   // Set the shared secret outside git:
   //   pnpm exec wrangler secret put MODEL_ROUTER_SECRET
+  // Fan-out runs on a queue, not in the request: one class change is hundreds of
+  // recipients, and a request that tries to send them all drops the tail silently.
+  // Create the queues first:
+  //   pnpm exec wrangler queues create edapex-push
+  //   pnpm exec wrangler queues create edapex-push-dead
+  "queues": {
+    "producers": [
+      {
+        "binding": "PUSH_QUEUE",
+        "queue": "edapex-push"
+      }
+    ],
+    "consumers": [
+      {
+        "queue": "edapex-push",
+        "max_batch_size": 10,
+        "max_batch_timeout": 10,
+        "max_retries": 5,
+        "dead_letter_queue": "edapex-push-dead"
+      }
+    ]
+  },
+  // Push secrets, set outside git:
+  //   pnpm exec wrangler secret put FCM_SERVICE_ACCOUNT   # service-account JSON
+  //   pnpm exec wrangler secret put INTERNAL_PUSH_SECRET  # shared with cowork-api
   "r2_buckets": [
     {
       "binding": "MEDIA",
