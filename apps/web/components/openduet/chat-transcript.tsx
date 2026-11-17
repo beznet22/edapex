@@ -24,7 +24,7 @@ import { Paperclip } from "lucide-react";
 
 import { Confirmation } from "@edapex/ui/components/confirmation";
 import { Reasoning } from "@edapex/ui/components/reasoning";
-import { Bubble, BubbleContent } from "./bubble";
+import { Bubble, BubbleContent } from "@edapex/ui/components/bubble";
 import { MessageScroller } from "./message-scroller";
 import { ToolActivity } from "./tool-activity";
 import { GenUISurface } from "@/components/genui/GenUISurface";
