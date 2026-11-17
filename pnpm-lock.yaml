@@ -29,6 +29,9 @@ importers:
       '@edapex/contracts':
         specifier: workspace:^
         version: link:../../../packages/contracts
+      '@edapex/genui':
+        specifier: workspace:^
+        version: link:../../../packages/genui
       '@edapex/host':
         specifier: workspace:^
         version: link:../../../packages/host

@@ -15,6 +15,7 @@
   "dependencies": {
     "@edapex/chat": "workspace:^",
     "@edapex/contracts": "workspace:^",
+    "@edapex/genui": "workspace:^",
     "@edapex/host": "workspace:^",
     "@edapex/tokens": "workspace:^",
     "@edapex/ui": "workspace:^",

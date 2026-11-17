@@ -3,6 +3,7 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 
 import type { ChatMessage, ChatMessagePart } from "@edapex/contracts";
 
+import { SurfaceRenderer } from "@edapex/genui"
 import { Confirmation } from "@edapex/ui/components/confirmation"
 import { Reasoning } from "@edapex/ui/components/reasoning"
 import { ToolCall } from "@edapex/ui/components/tool-call"
@@ -170,6 +171,17 @@ function Part({
     case "attachment":
       return <p className="text-label text-muted-foreground">{part.fileName}</p>;
     case "surface":
-      return <p className="text-label text-muted-foreground">Generated surface</p>;
+      return (
+        <div className="rounded-xl border border-border bg-card/70 p-3">
+          <SurfaceRenderer
+            fallback={
+              <p className="text-label text-muted-foreground">
+                This generated surface could not be rendered.
+              </p>
+            }
+            surface={part}
+          />
+        </div>
+      );
   }
 }
