@@ -9,8 +9,12 @@ import tailwindcss from "@tailwindcss/vite";
  * `base: "./"` because the Tauri asset protocol serves the bundle from a virtual origin
  * (`https://tauri.localhost`) and absolute `/assets/...` URLs would escape it.
  *
- * Port 5182 so a desktop and a mobile dev server can run at once. On a device, reach it
- * with `adb reverse tcp:5182 tcp:5182` — the WebView's `localhost` is the phone.
+ * Port 5182 so a desktop and a mobile dev server can run at once.
+ *
+ * `host: "0.0.0.0"` because `tauri android dev` on a physical device rewrites `devUrl` to
+ * the machine's LAN address and waits for the bundle there; a loopback-only server leaves
+ * it waiting forever with `adb reverse` in place. The listener is a dev-server concern
+ * only — `tauri android build` embeds the bundle and never opens a port.
  */
 export default defineConfig({
   base: "./",
@@ -21,7 +25,7 @@ export default defineConfig({
     }
   },
   server: {
-    host: "127.0.0.1",
+    host: "0.0.0.0",
     port: 5182,
     strictPort: true
   },

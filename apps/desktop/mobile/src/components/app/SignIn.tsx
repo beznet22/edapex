@@ -1,5 +1,6 @@
 import { Button } from "@edapex/ui/components/button";
 import { BrandMark } from "@/components/brand/BrandMark";
+import { Screen } from "@/components/shell/Screen";
 
 /**
  * Two states, one screen.
@@ -21,11 +22,12 @@ export function SignIn({
   readonly phase: "idle" | "waiting";
 }) {
   return (
-    <div className="flex min-h-dvh flex-col bg-background px-6 text-foreground">
+    <Screen>
+      <div className="flex flex-1 flex-col px-6">
       <div className="flex flex-1 flex-col justify-center gap-4">
-        <BrandMark />
+        <BrandMark className="h-auto w-2/5 text-foreground" />
         <h1 className="text-title text-balance">
-          {phase === "waiting" ? "Waiting for your browser" : "Sign in to EdApex Work"}
+          {phase === "waiting" ? "Waiting for your browser" : "Sign in to Edapex"}
         </h1>
         <p className="text-body text-pretty text-muted-foreground">
           {phase === "waiting"
@@ -39,7 +41,7 @@ export function SignIn({
         )}
       </div>
 
-      <div className="flex flex-col gap-3 pb-8">
+      <div className="screen-bottom flex flex-col gap-3 pb-8">
         <Button className="w-full" onClick={onStart}>
           {phase === "waiting" ? "Open the browser again" : "Continue with Google"}
         </Button>
@@ -49,6 +51,7 @@ export function SignIn({
           </Button>
         ) : null}
       </div>
-    </div>
+      </div>
+    </Screen>
   );
 }

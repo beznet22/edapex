@@ -17,16 +17,16 @@ describe("boot", () => {
     ).toEqual({ status: "onboarding", page: 0, signedIn: false });
   });
 
-  it("advances to the last page and not past it", () => {
-    let state = onboarding(0);
-    for (let step = 0; step < ONBOARDING_PAGES - 1; step += 1) {
-      state = bootReducer(state, { type: "onboarding_next" });
-    }
-    expect(state).toEqual({ status: "onboarding", page: ONBOARDING_PAGES - 1, signedIn: false });
-    expect(bootReducer(state, { type: "onboarding_next" })).toEqual({
-      status: "signed_out",
-      error: null
-    });
+  it("follows a swipe, and clamps an index from the scroll position", () => {
+    expect(bootReducer(onboarding(0), { type: "onboarding_goto", page: 2 })).toEqual(
+      onboarding(2)
+    );
+    expect(bootReducer(onboarding(1), { type: "onboarding_goto", page: -3 })).toEqual(
+      onboarding(0)
+    );
+    expect(
+      bootReducer(onboarding(1), { type: "onboarding_goto", page: ONBOARDING_PAGES + 9 })
+    ).toEqual(onboarding(ONBOARDING_PAGES - 1));
   });
 
   it("refuses to skip the first page, and allows it from the second", () => {
@@ -44,7 +44,7 @@ describe("boot", () => {
 
   it("ignores onboarding events once hydrated, so a late tap cannot reopen it", () => {
     const ready: BootState = { status: "ready" };
-    expect(bootReducer(ready, { type: "onboarding_next" })).toEqual(ready);
+    expect(bootReducer(ready, { type: "onboarding_goto", page: 2 })).toEqual(ready);
     expect(bootReducer(ready, { type: "onboarding_finish" })).toEqual(ready);
   });
 

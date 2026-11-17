@@ -31,7 +31,7 @@ export type BootEvent =
       readonly onboardingComplete: boolean;
       readonly authenticated: boolean;
     }
-  | { readonly type: "onboarding_next" }
+  | { readonly type: "onboarding_goto"; readonly page: number }
   | { readonly type: "onboarding_back" }
   | { readonly type: "onboarding_skip" }
   | { readonly type: "onboarding_finish" }
@@ -52,10 +52,13 @@ export function bootReducer(state: BootState, event: BootEvent): BootState {
           : { status: "signed_out", error: null };
       }
       return { status: "onboarding", page: 0, signedIn: event.authenticated };
-    case "onboarding_next": {
+    case "onboarding_goto": {
+      // A swipe can land anywhere, so the page is clamped rather than trusted: an index
+      // from a scroll position is arithmetic, and arithmetic at the edges is where NaN and
+      // one-past-the-end arrive.
       if (state.status !== "onboarding") return state;
-      if (state.page >= ONBOARDING_PAGES - 1) return afterOnboarding(state.signedIn);
-      return { status: "onboarding", page: state.page + 1, signedIn: state.signedIn };
+      const page = Math.min(Math.max(Math.round(event.page), 0), ONBOARDING_PAGES - 1);
+      return page === state.page ? state : { status: "onboarding", page, signedIn: state.signedIn };
     }
     case "onboarding_back": {
       if (state.status !== "onboarding") return state;

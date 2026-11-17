@@ -270,12 +270,11 @@ export function App() {
     return (
       <div className="flex min-h-dvh bg-background text-foreground">
         <Onboarding
-          onBack={() => dispatch({ type: "onboarding_back" })}
           onFinish={() => {
             markOnboardingComplete();
             dispatch({ type: "onboarding_finish" });
           }}
-          onNext={() => dispatch({ type: "onboarding_next" })}
+          onPageChange={(page) => dispatch({ type: "onboarding_goto", page })}
           onSkip={() => {
             markOnboardingComplete();
             dispatch({ type: "onboarding_skip" });

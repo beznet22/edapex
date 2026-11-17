@@ -115,3 +115,6 @@ boy_writing.mp4
 # Firebase: service-account keys never enter the tree
 *firebase-adminsdk*.json
 **/google-services.json
+CF_rules.json
+FCM_SDK.png
+google-services.json

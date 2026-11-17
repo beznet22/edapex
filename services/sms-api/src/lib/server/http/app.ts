@@ -55,8 +55,8 @@ export function createApp(deps: AppDependencies = {}) {
     .route("/api/v1/auth", authClaimLink)
     .route("/api/v1/auth", authGoogle)
     .route("/api/v1/auth", authMagicLink)
-    .route("/api/v1/auth", authCode)
     .route("/api/v1/auth", authDesktop)
+    .route("/api/v1/auth", authCode)
     .use("/api/v1/agent/model/*", agentModelHeaders)
     .use("/api/v1/assessments/ocr/*", ocrConsent)
     .route("/api/v1", protectedApp);

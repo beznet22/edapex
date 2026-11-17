@@ -75,9 +75,8 @@ describe("a first run", () => {
   it("reads the introduction before it shows a workspace, and cannot be skipped yet", () => {
     const html = renderToString(
       <Onboarding
-        onBack={() => undefined}
         onFinish={() => undefined}
-        onNext={() => undefined}
+        onPageChange={() => undefined}
         onSkip={() => undefined}
         page={0}
       />
