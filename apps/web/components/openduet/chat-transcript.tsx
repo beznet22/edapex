@@ -25,7 +25,14 @@ import { Paperclip } from "lucide-react";
 import { Confirmation } from "@edapex/ui/components/confirmation";
 import { Reasoning } from "@edapex/ui/components/reasoning";
 import { Bubble, BubbleContent } from "@edapex/ui/components/bubble";
-import { MessageScroller } from "./message-scroller";
+import {
+  MessageScroller,
+  MessageScrollerButton,
+  MessageScrollerContent,
+  MessageScrollerItem,
+  MessageScrollerProvider,
+  MessageScrollerViewport
+} from "@edapex/ui/components/message-scroller";
 import { ToolActivity } from "./tool-activity";
 import { GenUISurface } from "@/components/genui/GenUISurface";
 
@@ -214,8 +221,6 @@ export function ChatTranscript({
   runtime,
   onApproval
 }: ChatTranscriptProps) {
-  const scrollKey = `${messages.length}:${queue.length}:${runtime.state}`;
-
   // Which assistant message is still being written.
   //
   // Derived rather than read from the runtime view: a turn produces exactly one
@@ -259,8 +264,16 @@ export function ChatTranscript({
   }
 
   return (
-    <MessageScroller label="Chat transcript" scrollKey={scrollKey}>
-      {messages.map((message) => {
+    <MessageScrollerProvider defaultScrollPosition="end">
+      <MessageScroller>
+        <MessageScrollerViewport
+          aria-label="Chat transcript"
+          className="scrollbar-auto px-3 pb-4 pt-5"
+          role="log"
+          tabIndex={0}
+        >
+          <MessageScrollerContent className="mx-auto w-full max-w-[672px] gap-5">
+            {messages.map((message) => {
         if (message.role === "system") {
           return (
             <p
@@ -277,7 +290,11 @@ export function ChatTranscript({
 
         const queued = message.queueState === "queued";
         return (
-          <div className={queued ? "opacity-65" : "animate-message-in"} key={message.id}>
+          <MessageScrollerItem
+            className={queued ? "opacity-65" : "animate-message-in"}
+            key={message.id}
+            messageId={message.id}
+          >
             <Message align={message.role === "user" ? "end" : "start"}>
               <MessageContent>
                 {queued ? (
@@ -313,11 +330,11 @@ export function ChatTranscript({
                 ) : null}
               </MessageContent>
             </Message>
-          </div>
+          </MessageScrollerItem>
         );
       })}
       {queue.map((message) => (
-        <div className="opacity-60" key={message.id}>
+        <MessageScrollerItem className="opacity-60" key={message.id} messageId={message.id}>
           <Message align="end">
             <MessageContent>
               <span className="self-end rounded-full border border-border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
@@ -330,13 +347,17 @@ export function ChatTranscript({
               </Bubble>
             </MessageContent>
           </Message>
-        </div>
+        </MessageScrollerItem>
       ))}
       {runtime.state === "thinking" || runtime.state === "following" ? (
-        <div className="px-1">
+        <MessageScrollerItem className="px-1">
           <Thinking />
-        </div>
+        </MessageScrollerItem>
       ) : null}
-    </MessageScroller>
+          </MessageScrollerContent>
+        </MessageScrollerViewport>
+        <MessageScrollerButton className="bottom-3 bg-card text-muted-foreground hover:bg-card hover:text-foreground" />
+      </MessageScroller>
+    </MessageScrollerProvider>
   );
 }
