@@ -198,3 +198,33 @@ Three defects were found only here, and none was reachable from a desktop build:
 
 The lesson worth keeping: a splash and an inset bridge cannot be signed off by typecheck.
 Both needed a running process and a real display.
+
+## Push delivery (Part III)
+
+The facts a future agent would otherwise rediscover the hard way. The envelope and its rules live
+in `packages/contracts/src/push.ts`; the sender and fan-out live in `services/sms-api/src/lib/server/services/push/`.
+
+- **One event, one audience, one rendered string.** Copy is rendered server-side because a lock
+  screen cannot run code. The envelope has no field for a score or a student's name: the payload
+  transits Google, so class-level subjects only. That rule is structural, not a convention.
+- **Fan-out is a Cloudflare Queue, never the request.** One class change is hundreds of
+  recipients; a request that sends them all drops the tail silently. `push_jobs` carries a unique
+  `idempotency_key` derived from `(eventId, userId)`, so a queue retry, a duplicate producer call
+  and a redelivered event all collapse onto one row.
+- **Sealed checkpoints deviate from the plan's plaintext DDL.** Every event body and every
+  checkpoint is sealed, matching `threads.body`; only `status`, `attempt`, `lease_until` and `seq`
+  stay readable. A plan that says otherwise is out of date.
+- **Quiet hours are UTC today.** The school schema carries no timezone column, so a 21:00 boundary
+  is wrong by at most the school's UTC offset. Fixing it means adding the column, not moving the
+  comparison.
+- **An admin or teacher audience cannot be resolved by query yet.** The ported school schema has
+  no `users` or role table; `resolveAudience` returns empty for those roles rather than guessing,
+  and `userIds` is the supported path. "Notify the admins" needs a roles source first — that is a
+  data-model decision, not a sender change.
+- **The sender is FCM HTTP v1 with WebCrypto only.** A service account signs a short-lived RS256
+  JWT, which becomes an OAuth token cached until a minute before expiry. A 404 or `UNREGISTERED`
+  retires the device row; anything else is a retryable failure.
+- **Nothing posts a notification until the app has a token.** `POST /v1/devices` is the only way a
+  row exists, and it needs `google-services.json` in `apps/desktop/src-tauri/gen/android/app/`.
+  Without that file the queue delivers nothing and settles `no_devices`, which is visible in
+  `push_jobs` rather than silent.
