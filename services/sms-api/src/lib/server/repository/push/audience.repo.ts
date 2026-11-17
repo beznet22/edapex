@@ -19,10 +19,10 @@ export async function resolveAudience(
   ctx: ScopedRepositoryContext,
   audience: {
     readonly role: string;
-    readonly classId?: string;
-    readonly sectionId?: string;
-    readonly studentIds?: readonly string[];
-    readonly userIds?: readonly string[];
+    readonly classId?: string | undefined;
+    readonly sectionId?: string | undefined;
+    readonly studentIds?: readonly string[] | undefined;
+    readonly userIds?: readonly string[] | undefined;
   }
 ): Promise<readonly number[]> {
   return withErrorHandling(async () => {

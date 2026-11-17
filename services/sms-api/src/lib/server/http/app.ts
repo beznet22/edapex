@@ -15,7 +15,7 @@ import { rateLimit } from "./middleware/rate-limit";
 import { requestId } from "./middleware/request-id";
 import { createServiceContextMiddleware } from "./middleware/service-context";
 import { createTenantMiddleware } from "./middleware/tenant";
-import { createProtectedRoutes, publicAuthRoutes } from "./routes";
+import { createProtectedRoutes, publicAuthRoutes, publicInternalRoutes } from "./routes";
 import { authClaim } from "./routes/auth-claim.routes";
 import { authClaimLink } from "./routes/auth-claim-link.routes";
 import { authCode } from "./routes/auth-code.routes";
@@ -45,6 +45,7 @@ export function createApp(deps: AppDependencies = {}) {
     .use("*", contentNegotiation)
     .use("*", bodyLimit)
     .route("/", health)
+    .route("/internal", publicInternalRoutes)
     .use("*", createServiceContextMiddleware(createContext))
     .use("*", rateLimit)
     .route("/", studentPhotos)

@@ -34,6 +34,7 @@ import { assessments } from "./assessments.routes";
 import { attendance } from "./attendance.routes";
 import { protectedAuth, publicAuth } from "./auth.routes";
 import { me } from "./me.routes";
+import { internalPush, pushDevices } from "./push.routes";
 import { settingsAcademic } from "./settings-academic.routes";
 import { settingsGeneral } from "./settings-general.routes";
 import { settingsReport } from "./settings-report.routes";
@@ -68,6 +69,8 @@ export const createProtectedRoutes = (
     .use("/admin", tenant)
     .use("/admin/*", tenant)
     .use("/admin/*", requireAdmin)
+    .use("/devices", tenant)
+    .use("/notification-prefs", tenant)
     .route("/auth", protectedAuth)
     // Model traffic is intentionally outside the tenant middleware: a workspace
     // with no school must still be able to run an agent, and `model-router`
@@ -75,6 +78,7 @@ export const createProtectedRoutes = (
     .route("/agent/model", agentModel)
     .route("/agent", agent)
     .route("/me", me)
+    .route("/", pushDevices)
     .route("/students", students)
     .route("/students", studentPhotos)
     .route("/students", studentLifecycle)
@@ -110,3 +114,5 @@ export const createProtectedRoutes = (
     .route("/admin", adminIssues)
     .route("/admin", adminTokens)
     .route("/admin", adminResults);
+
+export const publicInternalRoutes = internalPush;
