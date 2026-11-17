@@ -4,6 +4,7 @@ import type { ChatMessage, QueuedMessage, WorkspaceRuntimeView } from "@edapex/c
 import { NativeAgentAdapter } from "@edapex/host/agent";
 
 import { nativeTransport } from "@/lib/agent-transport";
+import { isHostFailure } from "@/lib/auth";
 import { installId } from "@/lib/push";
 
 export interface ChatController {
@@ -38,10 +39,14 @@ export function useChat(): ChatController {
       .connect({ workspaceId: installId(), model: "default", mobileSafeTools: true })
       .catch((cause: unknown) => {
         if (cancelled) return;
+        // Rust rejects with `{ code, message, retryable }`, not an `Error` — checking
+        // `instanceof Error` threw away the only text that says what went wrong.
         setError(
-          cause instanceof Error
+          isHostFailure(cause)
             ? cause.message
-            : "The agent runtime could not start on this device."
+            : cause instanceof Error
+              ? cause.message
+              : "The agent runtime could not start on this device."
         );
       });
     return () => {

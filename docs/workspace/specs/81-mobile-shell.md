@@ -228,3 +228,18 @@ in `packages/contracts/src/push.ts`; the sender and fan-out live in `services/sm
   row exists, and it needs `google-services.json` in `apps/desktop/src-tauri/gen/android/app/`.
   Without that file the queue delivers nothing and settles `no_devices`, which is visible in
   `push_jobs` rather than silent.
+
+## The session token on Android (open defect)
+
+`keyring = "3"` has no Android backend — its feature list covers Apple, Windows, Linux and
+Secret Service only. On a phone the crate therefore falls back to its in-memory store: a
+native sign-in works, the workspace opens, and the session is gone after the process dies.
+
+Measured on the SM-G781U: native sign-in completed (account sheet → token → workspace), and
+the next cold start landed on the sign-in screen with no keychain error in logcat, because
+nothing failed — there was simply nowhere to persist to.
+
+The fix is a Keystore-backed store: an AES-GCM key generated in `AndroidKeyStore`, the
+ciphertext in private `SharedPreferences`, and Rust reaching it through the existing JNI
+seam. Until that lands, do not describe the Android session as keychain-held; the desktop
+build's keyring path is real and unaffected.
