@@ -11,6 +11,14 @@ members = [
   "apps/desktop/src-tauri"
 ]
 
+[workspace.dependencies]
+# Apache-2.0. Pinned to the reviewed hybrid handoff revision; these packages
+# replace EdApex's executor rather than adding a second provider/runtime stack.
+infinity-agent-core = { git = "https://github.com/beznet22/infinity.git", rev = "f82ae44843e6b927786502ebea0910eec13640e9", version = "0.2.0", default-features = false }
+infinity-host = { git = "https://github.com/beznet22/infinity.git", rev = "f82ae44843e6b927786502ebea0910eec13640e9", version = "0.2.0", default-features = false }
+infinity-wasm = { git = "https://github.com/beznet22/infinity.git", rev = "f82ae44843e6b927786502ebea0910eec13640e9", version = "0.2.0", default-features = false }
+infinity-sync = { git = "https://github.com/beznet22/infinity.git", rev = "f82ae44843e6b927786502ebea0910eec13640e9", version = "0.2.0", default-features = false }
+
 # `mxc-sdk` was patched to a sibling checkout so an abandoned mobile experiment
 # could build here. Nothing in the workspace depends on it — it is `patch.unused`
 # in Cargo.lock — and an absolute path to one developer's home directory made every

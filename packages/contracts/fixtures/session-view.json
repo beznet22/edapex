@@ -1,0 +1,54 @@
+{
+  "sessionId": "session-root-1",
+  "threadId": "session-root-1",
+  "deviceId": "device-1",
+  "clientId": "client-tab-1",
+  "readOnly": false,
+  "holderId": "client-tab-1",
+  "fence": 3,
+  "lastSeq": 8,
+  "messages": [
+    {
+      "eventId": "event-2",
+      "messageId": "core-message-2",
+      "dedupId": "dedup-2",
+      "role": "user",
+      "text": "Compare these marks.",
+      "versions": [
+        {
+          "eventId": "event-1",
+          "messageId": "core-message-1",
+          "text": "Compare the marks.",
+          "createdAtMs": 1770000000000
+        }
+      ],
+      "replyTo": null
+    },
+    {
+      "eventId": "event-3",
+      "messageId": "core-message-3",
+      "dedupId": null,
+      "role": "assistant",
+      "text": "The totals differ by two points.",
+      "versions": [],
+      "replyTo": "event-2"
+    }
+  ],
+  "queue": [
+    {
+      "eventId": "event-4",
+      "commandId": "command-4",
+      "dedupId": "dedup-4",
+      "text": "Check the second sheet too.",
+      "enqueuedAtMs": 1770000002000
+    }
+  ],
+  "truncations": [
+    {
+      "id": "truncation-1",
+      "from": "event-1",
+      "active": false
+    }
+  ],
+  "nextCursor": "50:event-8"
+}

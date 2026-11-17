@@ -3,6 +3,7 @@ import { z } from "zod";
 import { CAPABILITY_RISKS } from "./capabilities";
 import { CAPABILITY_ERROR_CODES, type CapabilityError } from "./platform";
 import { jsonValueSchema, type JsonValue } from "./json";
+import { sessionViewSchema } from "./session";
 
 export const AGENT_CONTRACT_VERSION = 1 as const;
 
@@ -188,6 +189,13 @@ const interruptedEvent = z
   })
   .strict();
 
+const sessionSnapshotEvent = z
+  .object({
+    type: z.literal("session_snapshot"),
+    view: sessionViewSchema
+  })
+  .strict();
+
 export const agentEventSchema = z.discriminatedUnion("type", [
   connectedEvent,
   turnStartedEvent,
@@ -199,7 +207,8 @@ export const agentEventSchema = z.discriminatedUnion("type", [
   approvalResolvedEvent,
   turnCompletedEvent,
   errorEvent,
-  interruptedEvent
+  interruptedEvent,
+  sessionSnapshotEvent
 ]);
 
 export type AgentEvent = z.infer<typeof agentEventSchema>;

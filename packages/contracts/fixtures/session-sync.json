@@ -1,0 +1,62 @@
+{
+  "push": {
+    "workspaceId": "workspace-1",
+    "sessionId": "session-root-1",
+    "deviceId": "device-1",
+    "clientId": "client-tab-1",
+    "fence": 3,
+    "events": [
+      {
+        "eventId": "event-4",
+        "sessionId": "session-root-1",
+        "deviceId": "device-1",
+        "deviceSeq": 4,
+        "kind": "projection",
+        "ciphertext": "AQID",
+        "checksum": "039058c6f2c0cb492c533b0a4d14ef77cc0f78abccced5287d84a1a2011cfb81",
+        "createdAtMs": 1770000002000,
+        "relayPosition": null
+      },
+      {
+        "eventId": "snapshot-4",
+        "sessionId": "session-root-1",
+        "deviceId": "device-1",
+        "deviceSeq": 5,
+        "kind": "core_snapshot",
+        "ciphertext": "AQID",
+        "checksum": "039058c6f2c0cb492c533b0a4d14ef77cc0f78abccced5287d84a1a2011cfb81",
+        "createdAtMs": 1770000003000,
+        "relayPosition": null
+      }
+    ]
+  },
+  "pushResult": {
+    "acknowledgements": [
+      { "eventId": "event-4", "status": "accepted", "position": 41 },
+      { "eventId": "event-4", "status": "duplicate", "position": 41 },
+      { "eventId": "event-3", "status": "stale", "position": null }
+    ],
+    "nextPosition": 41
+  },
+  "pullResult": {
+    "events": [
+      {
+        "eventId": "event-4",
+        "sessionId": "session-root-1",
+        "deviceId": "device-2",
+        "deviceSeq": 9,
+        "kind": "projection",
+        "ciphertext": "AQID",
+        "checksum": "039058c6f2c0cb492c533b0a4d14ef77cc0f78abccced5287d84a1a2011cfb81",
+        "createdAtMs": 1770000002000,
+        "relayPosition": 41
+      }
+    ],
+    "nextPosition": 41,
+    "deletion": {
+      "sessionId": "session-root-1",
+      "deletionEventId": "delete-1",
+      "deletedAtMs": 1770000010000
+    }
+  }
+}

@@ -212,6 +212,10 @@ impl AgUiBridge {
                 message: error.message.clone(),
                 code: Some(error.code.as_str().to_string()),
             }],
+            AgentEvent::SessionSnapshot { view } => vec![AgUiEvent::Custom {
+                name: "edapex.session_snapshot".to_string(),
+                value: serde_json::to_value(view).expect("session view must serialize"),
+            }],
             AgentEvent::Interrupted {
                 thread_id,
                 turn_id,
@@ -368,6 +372,11 @@ impl AgUiBridge {
                 turn_id: turn_id.to_string(),
                 reason: string_field(value, "reason"),
             }],
+            "edapex.session_snapshot" => serde_json::from_value(value.clone())
+                .ok()
+                .filter(|view: &crate::SessionView| view.has_stable_identity())
+                .map(|view| vec![AgentEvent::SessionSnapshot { view }])
+                .unwrap_or_default(),
             _ => Vec::new(),
         }
     }
@@ -574,7 +583,11 @@ mod tests {
 
         let mut inbound = AgUiBridge::default();
         let restored = inbound.from_agui_event(request, "t", "r");
-        assert_eq!(restored, vec![original], "risk and decisions must survive the round trip");
+        assert_eq!(
+            restored,
+            vec![original],
+            "risk and decisions must survive the round trip"
+        );
     }
 
     #[test]
@@ -595,7 +608,11 @@ mod tests {
             let agui = outbound.from_agent_event(&original);
             let mut inbound = AgUiBridge::default();
             let restored = inbound.from_agui_event(&agui[0], "t", "r");
-            assert_eq!(restored, vec![original], "decision {decision:?} must survive");
+            assert_eq!(
+                restored,
+                vec![original],
+                "decision {decision:?} must survive"
+            );
         }
     }
 
@@ -617,7 +634,11 @@ mod tests {
             if restored.is_empty() {
                 continue;
             }
-            assert_eq!(restored, vec![original], "summary must survive the round trip");
+            assert_eq!(
+                restored,
+                vec![original],
+                "summary must survive the round trip"
+            );
             return;
         }
         panic!("no tool start event produced");
@@ -626,8 +647,14 @@ mod tests {
     #[test]
     fn unparseable_risk_and_decision_fail_closed() {
         assert_eq!(risk_from_value(None), CapabilityRisk::Destructive);
-        assert_eq!(risk_from_value(Some(&json!("nonsense"))), CapabilityRisk::Destructive);
+        assert_eq!(
+            risk_from_value(Some(&json!("nonsense"))),
+            CapabilityRisk::Destructive
+        );
         assert_eq!(decision_from_value(None), ApprovalDecision::Deny);
-        assert_eq!(decision_from_value(Some(&json!("nonsense"))), ApprovalDecision::Deny);
+        assert_eq!(
+            decision_from_value(Some(&json!("nonsense"))),
+            ApprovalDecision::Deny
+        );
     }
 }

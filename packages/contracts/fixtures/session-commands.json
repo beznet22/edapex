@@ -1,0 +1,70 @@
+[
+  {
+    "type": "enqueue_text",
+    "commandId": "command-1",
+    "sessionId": "session-root-1",
+    "clientId": "client-tab-1",
+    "threadId": "session-root-1",
+    "dedupId": "dedup-1",
+    "text": "Read the marksheet."
+  },
+  {
+    "type": "cancel_turn",
+    "commandId": "command-2",
+    "sessionId": "session-root-1",
+    "clientId": "client-tab-1",
+    "turnId": "turn-1"
+  },
+  {
+    "type": "edit_message",
+    "commandId": "command-3",
+    "sessionId": "session-root-1",
+    "clientId": "client-tab-1",
+    "eventId": "event-1",
+    "replacementMessageId": "core-message-2",
+    "replacementDedupId": "dedup-2",
+    "text": "Compare these marks."
+  },
+  {
+    "type": "truncate",
+    "commandId": "command-4",
+    "sessionId": "session-root-1",
+    "clientId": "client-tab-1",
+    "truncationId": "truncation-1",
+    "fromEventId": "event-3"
+  },
+  {
+    "type": "restore",
+    "commandId": "command-5",
+    "sessionId": "session-root-1",
+    "clientId": "client-tab-1",
+    "truncationId": "truncation-1"
+  },
+  {
+    "type": "delete_session",
+    "commandId": "command-6",
+    "sessionId": "session-root-1",
+    "clientId": "client-tab-1"
+  },
+  {
+    "type": "acquire_lease",
+    "commandId": "command-7",
+    "sessionId": "session-root-1",
+    "clientId": "client-tab-1",
+    "leaseTtlMs": 60000
+  },
+  {
+    "type": "renew_lease",
+    "commandId": "command-8",
+    "sessionId": "session-root-1",
+    "clientId": "client-tab-1",
+    "expectedFence": 3
+  },
+  {
+    "type": "release_lease",
+    "commandId": "command-9",
+    "sessionId": "session-root-1",
+    "clientId": "client-tab-1",
+    "expectedFence": 3
+  }
+]

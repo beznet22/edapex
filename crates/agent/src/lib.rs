@@ -11,6 +11,7 @@ pub mod protocol;
 pub mod provider;
 pub mod recorder;
 pub mod runtime;
+pub mod session_protocol;
 pub mod spawn;
 pub mod stream;
 
@@ -31,5 +32,11 @@ pub use recorder::{RunStart, TurnRecorder};
 pub use runtime::{
     initial_history, AgentHost, AgentHostOptions, ApprovalFailure, ApprovalHandler, EventSink,
     HostFuture, HostObject, ToolExecutor,
+};
+pub use session_protocol::{
+    SessionCommand, SessionDeletion, SessionMessage, SessionMessageRole, SessionMessageVersion,
+    SessionQueueItem, SessionSyncAcknowledgement, SessionSyncAcknowledgementStatus,
+    SessionSyncEvent, SessionSyncEventKind, SessionSyncPullResult, SessionSyncPush,
+    SessionSyncPushResult, SessionTruncation, SessionView,
 };
 pub use stream::{sse_data_line, take_sse_event, Utf8StreamDecoder};

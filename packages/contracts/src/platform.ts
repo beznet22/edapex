@@ -10,6 +10,11 @@ export const CAPABILITY_ERROR_CODES = [
   "invalid_input",
   "provider_unavailable",
   "quota_exceeded",
+  "storage_unavailable",
+  "storage_corrupted",
+  "lease_lost",
+  "sync_unavailable",
+  "session_deleted",
   "internal_error"
 ] as const;
 

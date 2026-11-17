@@ -77,5 +77,22 @@
       "message": "The local OCR model is missing.",
       "retryable": false
     }
+  },
+  {
+    "type": "session_snapshot",
+    "view": {
+      "sessionId": "thread-1",
+      "threadId": "thread-1",
+      "deviceId": "device-1",
+      "clientId": "client-1",
+      "readOnly": false,
+      "holderId": "client-1",
+      "fence": 1,
+      "lastSeq": 11,
+      "messages": [],
+      "queue": [],
+      "truncations": [],
+      "nextCursor": null
+    }
   }
 ]

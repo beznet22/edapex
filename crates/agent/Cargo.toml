@@ -6,6 +6,9 @@ license = "MIT"
 publish = false
 
 [dependencies]
+infinity-agent-core.workspace = true
+infinity-host.workspace = true
+infinity-sync.workspace = true
 memchr = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

@@ -22,5 +22,8 @@ wasm-bindgen-futures = "0.4"
 # This crate is the browser surface. On native the `HostFuture` alias requires
 # `Send`, and a `JsValue`-based future can never satisfy that, so the crate has no
 # native meaning. Building it for a native target is a mistake, not a feature.
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+infinity-wasm.workspace = true
+
 [package.metadata]
 targets = ["wasm32-unknown-unknown"]
