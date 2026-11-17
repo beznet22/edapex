@@ -1,20 +1,26 @@
 use std::sync::Arc;
 
 use edapex_agent::{
-    AgentConnectSettings, AgentEvent, AgentHost, AgentHostOptions, AgentStatus, AgentTurnInput,
-    ApprovalDecision, ThreadStartResult, TurnStarted,
+    AgentConnectSettings, AgentEvent, AgentStatus, AgentTurnInput, ApprovalDecision,
+    NativeAgentDriver, SessionCommand, StoreContext, ThreadStartResult, TurnStarted,
 };
+use edapex_store::MasterKey;
 use tauri::ipc::Channel;
 use tauri::{AppHandle, State};
+use uuid::Uuid;
 
 use super::approvals::ApprovalRegistry;
 use super::env::HostEnv;
-use super::journal::RunJournal;
 use super::provider::ModelRouterProvider;
-use super::session::{AgentSession, ChannelSink, FanoutSink};
+use super::session::{AgentSession, ChannelSink};
 use super::tools::{to_host_error, HostTools};
 use crate::state::{HostError, HostState};
 
+/// Connects the native Infinity driver for a workspace.
+///
+/// Reopening the app must not kill the run it was meant to show: an existing
+/// session is reattached, and the driver keeps its own thread and durable
+/// store. The session token stays inside the Rust host.
 #[tauri::command]
 pub async fn agent_connect(
     app: AppHandle,
@@ -22,52 +28,51 @@ pub async fn agent_connect(
     settings: AgentConnectSettings,
     channel: Channel<AgentEvent>,
 ) -> Result<AgentStatus, HostError> {
-    // Reopening the app must not kill the run it was meant to show: closing a
-    // session clears its threads and cancels its turns, and a swipe-away plus a
-    // relaunch is the ordinary way a person comes back to work in progress.
     if let Some(session) = state.agent()? {
         session.attach(0, channel);
-        return Ok(session.host.status());
+        return Ok(session.status());
     }
 
     let session_token = crate::auth::session_token()?.ok_or_else(HostError::auth_required)?;
     let env = Arc::new(HostEnv::from_app(&app)?);
-    // A keychain or disk failure degrades durability, it does not block work.
-    let journal = match RunJournal::open(&env, &settings.workspace_id) {
-        Ok(journal) => Some(Arc::new(journal)),
-        Err(error) => {
-            eprintln!("run journal unavailable: {}", error.message);
-            None
-        }
-    };
-    let recorder = journal
-        .as_ref()
-        .map(|journal| Arc::clone(journal) as Arc<dyn edapex_agent::TurnRecorder>);
+    let path = env
+        .agent_db()
+        .to_str()
+        .map(str::to_string)
+        .ok_or_else(|| {
+            HostError::new("internal_error", "Agent database path is not UTF-8", false)
+        })?;
+    let master = super::journal::master_key()?;
+    let context = StoreContext::open(
+        &path,
+        &settings.workspace_id,
+        MasterKey::from_bytes(master),
+    )
+    .map_err(store_error)?;
+
     let approvals = Arc::new(ApprovalRegistry::default());
     let sink = Arc::new(ChannelSink::new(Some(channel)));
-    let events: Arc<dyn edapex_agent::EventSink> = Arc::new(FanoutSink {
-        primary: sink.clone(),
-        journal: journal.clone(),
-    });
-    let tools = Arc::new(HostTools {
-        env,
-        captures: state.captures(),
-    });
-    let host = AgentHost::connect(AgentHostOptions {
-        settings,
-        provider: Arc::new(ModelRouterProvider::new(session_token)),
-        tools,
-        approvals: approvals.clone(),
-        events,
-        recorder,
-    })
+    let driver = NativeAgentDriver::connect(
+        settings.clone(),
+        context,
+        Arc::new(ModelRouterProvider::new(session_token)),
+        Arc::new(HostTools {
+            env,
+            captures: state.captures(),
+        }),
+        approvals.clone(),
+        sink.clone(),
+    )
     .map_err(to_host_error)?;
-    let status = host.status();
-    state.set_agent(AgentSession {
-        host,
+
+    let session = AgentSession {
+        driver: Arc::new(driver),
         approvals,
         sink,
-    })?;
+        settings,
+    };
+    let status = session.status();
+    state.set_agent(session)?;
     Ok(status)
 }
 
@@ -87,17 +92,27 @@ pub async fn agent_attach(
     Ok(session.attach(since_seq, channel))
 }
 
+/// A new root conversation.
+///
+/// The id is caller-owned from here on: every later turn and every restart uses
+/// this same `ThreadId`, which is what makes resume real rather than replayed.
 #[tauri::command]
 pub async fn agent_thread_start(
     state: State<'_, HostState>,
-    cwd: Option<String>,
+    _cwd: Option<String>,
 ) -> Result<ThreadStartResult, HostError> {
-    let session = state
+    state
         .agent()?
         .ok_or_else(|| HostError::new("auth_required", "Connect the agent first", false))?;
-    session.host.thread_start(cwd).map_err(to_host_error)
+    Ok(ThreadStartResult {
+        thread_id: Uuid::new_v4().to_string(),
+    })
 }
 
+/// Accepts a turn.
+///
+/// The command id is the turn id: a retry with the same id is deduplicated by
+/// the driver, and a cancellation names exactly one turn.
 #[tauri::command]
 pub async fn agent_turn_start(
     state: State<'_, HostState>,
@@ -106,7 +121,22 @@ pub async fn agent_turn_start(
     let session = state
         .agent()?
         .ok_or_else(|| HostError::new("auth_required", "Connect the agent first", false))?;
-    session.host.turn_start(input).await.map_err(to_host_error)
+    let command_id = Uuid::new_v4().to_string();
+    let receipt = session
+        .driver
+        .execute(SessionCommand::EnqueueText {
+            command_id: command_id.clone(),
+            session_id: input.thread_id.clone(),
+            client_id: session.driver.client_id().to_string(),
+            thread_id: input.thread_id,
+            dedup_id: Uuid::new_v4().to_string(),
+            text: input.text,
+        })
+        .await
+        .map_err(to_host_error)?;
+    Ok(TurnStarted {
+        turn_id: receipt.turn_id.unwrap_or(receipt.command_id),
+    })
 }
 
 #[tauri::command]
@@ -119,9 +149,16 @@ pub async fn agent_turn_interrupt(
         .agent()?
         .ok_or_else(|| HostError::new("auth_required", "Connect the agent first", false))?;
     session
-        .host
-        .interrupt(&thread_id, &turn_id)
-        .map_err(to_host_error)
+        .driver
+        .execute(SessionCommand::CancelTurn {
+            command_id: Uuid::new_v4().to_string(),
+            session_id: thread_id,
+            client_id: session.driver.client_id().to_string(),
+            turn_id,
+        })
+        .await
+        .map_err(to_host_error)?;
+    Ok(())
 }
 
 #[tauri::command]
@@ -136,10 +173,18 @@ pub async fn agent_approval_response(
     session.approvals.resolve(&approval_request_id, decision)
 }
 
+/// Closes the transport and settles every session it owned.
+///
+/// Dropping a UI handle is not a cancel; this is, and it releases each lease so
+/// a later launch can resume rather than wait for an expiry.
 #[tauri::command]
 pub async fn agent_close(state: State<'_, HostState>) -> Result<(), HostError> {
     if let Some(session) = state.take_agent()? {
-        session.host.close();
+        session.driver.close().await.map_err(to_host_error)?;
     }
     Ok(())
+}
+
+pub(crate) fn store_error(error: edapex_store::StoreError) -> HostError {
+    HostError::new("storage_unavailable", error.to_string(), true)
 }

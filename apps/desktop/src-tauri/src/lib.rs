@@ -1,5 +1,5 @@
 mod window;
-mod agent;
+pub mod agent;
 mod api;
 mod native_auth;
 mod auth;

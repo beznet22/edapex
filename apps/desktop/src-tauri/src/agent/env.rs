@@ -13,9 +13,9 @@ use crate::state::HostError;
 #[derive(Debug, Clone)]
 pub struct HostEnv {
     pub cache_dir: PathBuf,
-    /// The run journal opens `agent.db` here. The field exists now because it is
-    /// the seam's third path; the journal is the next commit, not this one.
-    #[allow(dead_code)]
+    /// The agent database lives here. Both the windowed host and the headless
+    /// worker open the same file, which is what makes a resumed turn the same
+    /// turn.
     pub data_dir: PathBuf,
     pub resource_dir: PathBuf,
 }
@@ -45,7 +45,10 @@ impl HostEnv {
         self.cache_dir.join("captures")
     }
 
-    #[allow(dead_code)]
+    /// The one agent database this installation has.
+    ///
+    /// The UI and a headless worker open the same path; two paths would be two
+    /// histories, and the second one is the one that loses work.
     pub fn agent_db(&self) -> PathBuf {
         self.data_dir.join("agent.db")
     }

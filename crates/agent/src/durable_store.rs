@@ -60,6 +60,13 @@ impl StoreContext {
     }
 
     pub fn open(path: &str, workspace_id: &str, master: MasterKey) -> StoreResult<Self> {
+        // First launch on a new device: the application-data directory itself may
+        // not exist yet. A missing directory is an ordinary start, not corruption.
+        if let Some(parent) = std::path::Path::new(path).parent() {
+            if !parent.as_os_str().is_empty() {
+                std::fs::create_dir_all(parent).map_err(|error| edapex_store::StoreError::Io(error.to_string()))?;
+            }
+        }
         let driver = RusqliteDriver::open(path)?;
         let mut store = Store::new(driver, master);
         store.migrate()?;

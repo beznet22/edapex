@@ -146,8 +146,8 @@ fn now() -> i64 {
         .unwrap_or(0)
 }
 
-/// Reads the journal key from the OS keychain, creating it once.
-fn master_key() -> Result<[u8; 32], HostError> {
+/// Reads the journal and agent-session key from the OS keychain, creating it once.
+pub(crate) fn master_key() -> Result<[u8; 32], HostError> {
     let entry = keyring::Entry::new(KEYRING_SERVICE, KEYRING_USER)
         .map_err(|error| HostError::new("internal_error", format!("Keychain: {error}"), true))?;
 

@@ -31,6 +31,9 @@ pub enum StoreError {
 
     #[error("the requested agent record does not exist")]
     NotFound,
+
+    #[error("filesystem: {0}")]
+    Io(String),
 }
 
 #[cfg(not(target_arch = "wasm32"))]
