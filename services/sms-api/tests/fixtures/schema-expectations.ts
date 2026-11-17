@@ -1993,7 +1993,8 @@ export const NEW_TABLES: readonly string[] = [
   "grade_change_audit",
   "public_document_tokens",
   "push_devices",
-  "push_jobs"
+  "push_jobs",
+  "publish_approvals"
 ];
 
 export const NEW_TABLE_INDEXES: Readonly<Record<string, readonly IndexExpectation[]>> = {
@@ -2001,6 +2002,9 @@ export const NEW_TABLE_INDEXES: Readonly<Record<string, readonly IndexExpectatio
     { "name": "push_devices_platform_token_unique", "unique": true, "columns": ["platform", "token"] },
     { "name": "push_devices_user_install_unique", "unique": true, "columns": ["user_id", "install_id"] },
     { "name": "push_devices_user_id_index", "unique": false, "columns": ["user_id"] }
+  ],
+  "publish_approvals": [
+    { "name": "publish_approvals_school_status_index", "unique": false, "columns": ["school_id", "status"] }
   ],
   "push_jobs": [
     { "name": "push_jobs_idempotency_key_unique", "unique": true, "columns": ["idempotency_key"] },

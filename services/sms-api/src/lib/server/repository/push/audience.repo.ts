@@ -1,6 +1,6 @@
 import { and, eq, inArray } from "drizzle-orm";
 
-import { smParents, smStudents } from "../../db/schema";
+import { smParents, smStaffs, smStudents, users } from "../../db/schema";
 import { withErrorHandling } from "../base/error-handling";
 import type { ScopedRepositoryContext } from "../base/repository-context";
 
@@ -30,6 +30,25 @@ export async function resolveAudience(
       return audience.userIds.map(Number).filter((id) => Number.isInteger(id) && id > 0);
     }
 
+    // Admin and teacher resolve through `users`, which carries the flag and the
+    // school, not through the student rows: an admin has no student to join from.
+    if (audience.role === "admin") {
+      const admins = await ctx.db
+        .select({ id: users.id })
+        .from(users)
+        .where(
+          and(eq(users.schoolId, ctx.tenant.schoolId), eq(users.isAdministrator, "yes"))
+        );
+      return unique(admins.map((row) => row.id));
+    }
+    if (audience.role === "teacher") {
+      const staff = await ctx.db
+        .select({ userId: smStaffs.userId })
+        .from(smStaffs)
+        .where(eq(smStaffs.schoolId, ctx.tenant.schoolId));
+      return unique(staff.map((row) => row.userId));
+    }
+
     const studentFilter = and(
       eq(smStudents.schoolId, ctx.tenant.schoolId),
       audience.classId === undefined ? undefined : eq(smStudents.classId, Number(audience.classId)),
@@ -49,11 +68,7 @@ export async function resolveAudience(
     if (audience.role === "student") {
       return unique(students.map((student) => student.id));
     }
-    if (audience.role !== "parent") {
-      // Teacher and admin audiences need a role join that this schema does not
-      // own; an explicit `userIds` is the supported path until that lands.
-      return [];
-    }
+    if (audience.role !== "parent") return [];
 
     const parentIds = unique(
       students

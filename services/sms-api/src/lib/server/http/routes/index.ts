@@ -15,6 +15,7 @@ import { adminIssues } from "./admin-issues.routes";
 import { adminJobs } from "./admin-jobs.routes";
 import { adminMigration } from "./admin-migration.routes";
 import { adminPromotion } from "./admin-promotion.routes";
+import { adminPublishApprovals } from "./admin-publish-approvals.routes";
 import { adminSessions } from "./admin-sessions.routes";
 import { adminStaff } from "./admin-staff.routes";
 import { adminStaffing } from "./admin-staffing.routes";
@@ -113,6 +114,7 @@ export const createProtectedRoutes = (
     .route("/admin", adminClaimLinks)
     .route("/admin", adminIssues)
     .route("/admin", adminTokens)
-    .route("/admin", adminResults);
+    .route("/admin", adminResults)
+    .route("/admin", adminPublishApprovals);
 
 export const publicInternalRoutes = internalPush;
