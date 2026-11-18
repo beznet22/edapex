@@ -20,6 +20,35 @@ and ancestry. Compaction summaries, subscriptions, pending choices and stopped
 state are persisted, so a restart resumes the conversation the model saw — not
 merely a transcript the UI can redraw.
 
+### Why the browser does not use the SQLite store
+
+Infinity declares `ConversationStore` and `StateStore` as `Send + Sync` with
+`Send` futures on every target, so a store that owns a `JsValue` cannot implement
+either. The pinned source tried relaxing those bounds and reverted it — recorded
+in `docs/docs/WASM/PROGRESS.md` (2026-11-17, "Blocked, not built"): a `!Send`
+handle fails at `event_processor.rs:209` and `system/local/router.rs:338`. Its own
+answer is the one adopted here: a `Send + Sync` actor handle whose `!Send`
+IndexedDB connection lives in a `LocalSet` task (upstream D38/D39).
+
+The browser persists in two layers, and they are not interchangeable:
+
+| Layer | Engine | Owner |
+|---|---|---|
+| Model memory (conversation, state) | IndexedDB | `infinity-wasm` actor handles |
+| Transcript, queue, projection | SQLite in OPFS | a dedicated module worker |
+
+Two workers are a constraint, not a preference: `createSyncAccessHandle()` is
+exposed only in a dedicated worker, so the OPFS worker cannot also be the shared
+authority. A shared worker proxies to it.
+
+A row may read `pass` for `agent.db` on native and `pass` for IndexedDB on web.
+No single store backs every host, and this matrix must not imply one does.
+
+`crates/agent/src/infinity_stream.rs` is shared by both: the request translation
+and the tool-call assembly are one implementation, because the pinned core does
+not assemble incremental arguments and a divergent copy would reach the model as
+malformed JSON.
+
 ## Executed
 
 | Area | Evidence | Result |

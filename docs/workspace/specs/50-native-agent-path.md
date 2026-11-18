@@ -6,6 +6,14 @@ compiled to Wasm. This spec's earlier claim — that a separate EdApex turn loop
 the native runtime — is superseded. Evidence and what remains blocked live in
 [`../infinity-agent-acceptance.md`](../infinity-agent-acceptance.md).
 
+One runtime, but **not one store**: the pinned core requires `Send + Sync` store
+handles with `Send` futures, which an OPFS-backed store cannot provide. Native
+hosts use `agent.db`; the browser uses `infinity-wasm`'s IndexedDB actor handles,
+with SQLite-in-OPFS owned by a dedicated worker for the transcript and queue. The
+reasoning and the upstream decision records are in the acceptance matrix under
+"Why the browser does not use the SQLite store". Nothing in this spec should be
+read as claiming a shared database across hosts.
+
 **Rule being enforced** (from `AGENTS.md`): *desktop and mobile are native.
 WebAssembly is the web delivery mechanism only. A host that can run native code uses
 `crates/*` directly; adding WASM to a native host needs a written justification and a
