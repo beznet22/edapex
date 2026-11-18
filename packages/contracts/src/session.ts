@@ -289,6 +289,7 @@ export type SessionLease = z.infer<typeof sessionLeaseSchema>;
 export type SessionLeaseResult = z.infer<typeof sessionLeaseResultSchema>;
 export type SessionReleaseResult = z.infer<typeof sessionReleaseResultSchema>;
 export type SessionDeletionResult = z.infer<typeof sessionDeletionResultSchema>;
+export type SessionSyncAcknowledgement = z.infer<typeof sessionSyncAcknowledgementSchema>;
 
 export function isSessionView(value: unknown): value is SessionView {
   return sessionViewSchema.safeParse(value).success;
