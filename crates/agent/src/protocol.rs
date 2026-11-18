@@ -15,6 +15,11 @@ pub enum AgentErrorCode {
     InvalidInput,
     ProviderUnavailable,
     QuotaExceeded,
+    StorageUnavailable,
+    StorageCorrupted,
+    LeaseLost,
+    SyncUnavailable,
+    SessionDeleted,
     InternalError,
 }
 
@@ -30,6 +35,11 @@ impl AgentErrorCode {
             Self::InvalidInput => "invalid_input",
             Self::ProviderUnavailable => "provider_unavailable",
             Self::QuotaExceeded => "quota_exceeded",
+            Self::StorageUnavailable => "storage_unavailable",
+            Self::StorageCorrupted => "storage_corrupted",
+            Self::LeaseLost => "lease_lost",
+            Self::SyncUnavailable => "sync_unavailable",
+            Self::SessionDeleted => "session_deleted",
             Self::InternalError => "internal_error",
         }
     }
@@ -341,5 +351,8 @@ pub enum AgentEvent {
         thread_id: String,
         turn_id: String,
         reason: String,
+    },
+    SessionSnapshot {
+        view: crate::session_protocol::SessionView,
     },
 }

@@ -9,7 +9,9 @@
 //! execution crosses into JavaScript. That is what keeps one storage scheme
 //! across native and web.
 
-use edapex_store::{MasterKey, Operation, PushItem, Result, SqlDriver, SqlValue, Store, StoreError};
+use edapex_store::{
+    MasterKey, Operation, PushItem, Result, SqlDriver, SqlValue, Store, StoreError,
+};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
 
@@ -65,12 +67,7 @@ impl JsSqlDriver {
 
 impl SqlDriver for JsSqlDriver {
     fn execute_batch(&mut self, sql: &str) -> Result<()> {
-        call(
-            &self.handle,
-            "executeBatch",
-            &[JsValue::from_str(sql)],
-        )
-        .map(|_| ())
+        call(&self.handle, "executeBatch", &[JsValue::from_str(sql)]).map(|_| ())
     }
 
     fn execute(&mut self, sql: &str, params: &[SqlValue]) -> Result<usize> {
@@ -104,9 +101,7 @@ impl SqlDriver for JsSqlDriver {
         Ok(rows
             .iter()
             .map(|row| {
-                let cells: js_sys::Array = row
-                    .dyn_into()
-                    .unwrap_or_else(|_| js_sys::Array::new());
+                let cells: js_sys::Array = row.dyn_into().unwrap_or_else(|_| js_sys::Array::new());
                 cells.iter().map(|cell| from_js(&cell)).collect()
             })
             .collect())
@@ -141,9 +136,9 @@ impl SqlStore {
     /// `master_key` must be exactly 32 bytes.
     #[wasm_bindgen(constructor)]
     pub fn new(driver: JsValue, master_key: &[u8]) -> std::result::Result<SqlStore, JsValue> {
-        let key: [u8; 32] = master_key.try_into().map_err(|_| {
-            JsValue::from_str("the master key must be exactly 32 bytes")
-        })?;
+        let key: [u8; 32] = master_key
+            .try_into()
+            .map_err(|_| JsValue::from_str("the master key must be exactly 32 bytes"))?;
         Ok(SqlStore {
             inner: Store::new(JsSqlDriver::new(driver), MasterKey::from_bytes(key)),
         })

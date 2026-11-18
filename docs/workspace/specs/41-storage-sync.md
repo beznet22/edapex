@@ -1,6 +1,6 @@
 # 41 — Storage, Memory and Cross-Device Sync
 
-**Draft.** Defines local-first persistence and the EdApex boundary. No implementation in Phase 9B.
+**Normative for the local store and the EdApex boundary; the cloud-sync sections remain Draft.** The local SQLite/OPFS store is implemented and verified for the agent path (see [`50-native-agent-path.md`](./50-native-agent-path.md) and [`../infinity-agent-acceptance.md`](../infinity-agent-acceptance.md)); CRDT/Yjs and the D1 relay are not.
 
 ## Three stores, three authorities
 
@@ -35,16 +35,55 @@ If “everything local-first” includes school records, it contradicts “EdApe
 
 ### Web PWA
 
-- **OPFS + SQLite WASM** if the browser supports the required headers/APIs; otherwise **IndexedDB** through a documented adapter.
-- OPFS is a filesystem, not a SQL database; use SQLite WASM/wa-sqlite or an IndexedDB store.
+- **OPFS + SQLite WASM in a dedicated worker.** The engine is the official
+  `@sqlite.org/sqlite-wasm` package on its `opfs-sahpool` VFS. There is no
+  IndexedDB fallback for the transcript: a browser without OPFS gets no durable
+  agent transcript rather than a second schema.
+- **Superseded decision.** This section previously named a custom `wa-sqlite`
+  build. It was replaced because a locally compiled artifact and the npm loader
+  are not interchangeable (`Module.registerVFS` exists in one and not the other),
+  `opfs-sahpool` is maintained upstream, and it is single-instance-per-origin,
+  which matches the agent's Web Lock instead of fighting it. The custom build's
+  only advantage was a locally compiled FTS5, and the official package ships it.
+- **Sync access is worker-only.** `createSyncAccessHandle()` exists only in a
+  dedicated worker, so the database is opened there and never on a page thread. A
+  store that must be opened from a page has to move into a worker; opening it
+  inline is not a supported configuration.
+- **One owner per session.** A dedicated worker per tab takes an exclusive Web
+  Lock keyed by the storage identity *before* it opens anything, and holds it for
+  the runtime's lifetime. A second tab is refused with `lease_locked` and never
+  touches the files. There is no follower RPC and no heartbeat lease.
+- **Preservation.** `preserveOnInitFailure: true`, `clearOnInit: false`, and the
+  VFS is never removed. An initialization failure must not wipe a user's history,
+  and recovery never auto-deletes.
+- **Two keys, two stores — named, because they differ.** The agent transcript's
+  32-byte data key lives in web local storage
+  (`edapex.infinity.key.<workspace>`) and each record is sealed with it. The sync
+  store's master key is a separate **OPFS file** (`lib/device-identity.ts`), not a
+  row and not the same artifact as its database. Neither is a bearer token or a
+  provider credential, and in both cases copying the database does not carry the
+  key that unlocks it. The transcript key replaces an earlier "sibling file in
+  OPFS" statement for that path: the separation goal holds, the medium changed.
+- **A corrupt key is reported, never rotated.** A stored transcript key that is
+  not 64 hex characters returns `storage_corrupted` and is left untouched, because
+  generating a replacement would orphan every record already encrypted with it.
+  Restoring the original key reopens the same transcript.
+- **Two stores, one transcript.** The transcript and queue are OPFS SQLite. The
+  pinned core's `ConversationStore`/`StateStore` require `Send + Sync` handles
+  that an OPFS store cannot implement, so model memory uses `infinity-wasm`'s
+  IndexedDB actor handles. That is a different job, not a second transcript; see
+  `50-native-agent-path.md`. The earlier "IndexedDB is not used for either" rule
+  is superseded by that constraint. Each SQLite owner opens where sync access
+  exists: the agent transcript in the agent worker, the sync store in its own
+  `worker/store.worker.ts`, with `lib/browser-store.ts` as the page-side handle.
 - Keep the same logical schema as native.
-- Do not use localStorage for chat history/memory.
-- **One storage mechanism.** The SQLite database and the device key both live in
-  OPFS; the key is a sibling file rather than a row, so a copy of the database does
-  not carry the key that unlocks it. IndexedDB is not used for either, because two
-  persistence APIs meant two failure modes and two schemas for one job. An
-  implementation that genuinely needs IndexedDB (for example a browser without
-  OPFS) should move *all* of it, not half.
+- Do not use localStorage for chat history or memory. The data key above is a
+  key, not content.
+- **FTS5.** `messages_fts` is derived, unencrypted and rebuildable. A write
+  replaces that message's row rather than appending, a delete or tombstone removes
+  it and sets `messages.deleted_at`, and `rebuild_search_index` repopulates from
+  live messages only, so it can never resurrect deleted content. Rebuilds are
+  idempotent and are the recovery path after a schema change or partial wipe.
 
 ### Chat store
 
@@ -91,8 +130,92 @@ Use CF Workers for cloud sync, but not D1 as a high-frequency CRDT room:
 
 A high-frequency Yjs update stream written row-by-row to D1 would consume the free write budget and add latency. Batch/compact updates and store blobs in R2 or DO storage. `AGENT_DB` is separate from the EdApex school `DB`; the two never share rows, keys or bindings.
 
-### iroh — deferred
+### Session relay (AGENT_DB, implemented)
 
+`services/cowork-api` relays one root conversation per session. The wire shapes are the
+shared contracts in `packages/contracts/src/session.ts`; the service imports them instead
+of defining a second copy, so a protocol change is a contracts change with its fixture
+and parity test.
+
+| Endpoint | Purpose |
+|---|---|
+| `POST /api/v1/agent/sessions/:id/commands?workspaceId=` | `acquire_lease`, `renew_lease`, `release_lease`, `delete_session`. Every other command is executed by the lease holder and is refused with 422 |
+| `POST /api/v1/agent/sessions/:id/events` | push a sealed batch (≤100 events) with the fence it was granted |
+| `GET /api/v1/agent/sessions/:id/events?workspaceId=&after=&limit=` | pull in `position` order (limit ≤100) |
+
+Clients reach these through `@edapex/host/sync`: the web uses
+`fetch(credentials: "include")`, the native hosts use a `relay_request` command
+scoped to `/api/v1/agent/sessions/` that returns `{ status, body }` — 409 and 410
+are protocol answers, not transport failures.
+
+- **One holder, one fence.** The lease is a single upsert, so two tabs cannot both
+  observe an expired lease and both take over. `fence` only increases — releasing sets
+  `holder_id` to NULL but keeps the counter — so a reconnecting writer is refused as
+  `stale` instead of merged.
+- **Order is the server's.** An accepted batch reserves a contiguous range from
+  `agent_sessions.next_position` in one `UPDATE … RETURNING`. A client cannot choose a
+  relay position; the contract rejects one in the push.
+- **Idempotent by constraint.** `(session_id, device_id, device_seq)` is unique, so a
+  retried batch answers `duplicate` without depending on the client remembering what it
+  sent.
+- **Checksums verified at the boundary.** A truncated or corrupted body fails with
+  `invalid_request` rather than on the device that later tries to decrypt it.
+- **Scoped twice.** Every query filters on `user_id`, and a workspace mismatch is refused
+  (`workspace_mismatch`) rather than moving a conversation between tenants. Another
+  user's session id answers `session_unknown`, not `forbidden`.
+- **Quota.** 10,000 events or 256 MiB of ciphertext per session, then `quota_exceeded`.
+- **Delete is a hard delete plus a tombstone.** The payload rows go; the session row
+  keeps `deleted_at_ms` and `deletion_event_id`, so a device that had not pulled yet
+  receives `deletion` instead of an empty history. A push to a deleted session answers
+  `session_deleted`.
+
+**Local execution stays local.** The relay coordinates ownership and ordering; it never
+runs the agent. `enqueue_text`, `cancel_turn`, `edit_message`, `truncate`, `restore` and
+every other execution command are executed by the lease-holding device inside its own
+tick. The command endpoint accepts only the four ownership operations and refuses the
+rest with 422, so there is no second execution path through HTTP.
+
+**What the relay does and does not deliver.**
+
+| Capability | Status |
+|---|---|
+| One user's sessions across their devices | Implemented: relay plus user/workspace scoping |
+| One active writer, fenced | Implemented |
+| Server-assigned ordering | Implemented |
+| Idempotent push and ordered pull | Implemented |
+| Tombstones for devices that were offline | Implemented |
+| Device registration and revocation | Already implemented in `sync_devices`; session sync does not require it |
+| Device discovery and management UI | Deferred (Chunk 7 surface) |
+| Automatic sync scheduling | Deferred (Chunk 7) |
+| Reconnection and offline recovery wiring | Deferred (Chunk 7) |
+| Local projection reconciliation | Deferred (Chunk 7) |
+| Conflict handling and stale local recovery | Deferred: the relay refuses a stale writer rather than merging; the client must re-lease and reload |
+| Tombstone application | Implemented: `delete_agent_session` removes local payloads, marks the session deleted and is safe to repeat; a stale append is refused |
+| Cross-device plaintext (transcript or model context) | **Blocked on key agreement** — see below |
+| Ownership transfer between devices | Protocol only: takeover works, there is no user-facing handoff |
+| User-visible sync status | Deferred |
+
+### Why a second device cannot read what it pulls
+
+Each event is sealed with the **origin device's** master key and that same
+envelope is copied into `agent_session_outbox.ciphertext`
+(`crates/store/src/session_events.rs`). The browser's key lives in web local
+storage per profile (`edapex.infinity.key.<workspace>`); the native key lives in
+the OS keychain per device. A second device therefore receives ciphertext it
+cannot open, and no code produces `core_snapshot` events at all today.
+
+This is a design gap, not a missing call. Resolving it needs a decision:
+
+1. **Session key derived from user credentials**, unwrapped on each device at
+   sign-in. Keeps the server blind; requires a key-wrap envelope per device.
+2. **Per-device pairing handshake** that wraps the session key for a new device.
+   Strongest, more UI.
+3. **Relay re-encryption.** Rejected: the service must never hold plaintext.
+
+Until one is chosen, the relay stores and orders opaque events; it does not
+restore a transcript or a model context on a new device.
+
+### iroh — deferred
 `AGENT_DB` is the **only** v1 transport. iroh is not used.
 
 Verified against the iroh documentation: iroh is a QUIC + TLS 1.3 networking stack — key-based endpoints, NAT traversal, relay fallback, DNS/DHT lookup, with blob/doc/gossip protocols on top. It is a transport, not a store, and it has **no offline mailbox**: a powered-off peer is simply unreachable, so it cannot provide offline sync.

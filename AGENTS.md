@@ -400,16 +400,17 @@ a later chunk, not a silent exception.
 | Contract | `contracts/capabilities.ts` 545 | 400 | **over** |
 | Surface component | `workspace/WorkspaceShell.tsx` 368 | 300 | **over** — split shell chrome from nav |
 | Shell / provider | `WorkspaceLayoutClient.tsx` 290 | 250 | **over** |
-| Client library | `apps/web/lib/pdf.ts` 172 | 300 | ok — `agent-runtime.ts` left in A3 |
+| Client library | `apps/web/lib/infinity-browser-client.ts` 309 | 300 | **over** — diagnostics and `restore` belong in a sibling |
 | Hook | `hooks/use-proactive.ts` 113 | 120 | ok |
 | Stylesheet | `apps/web/app/globals.css` 150 | 400 | ok — 849 lines moved to tokens |
 | E2E spec | `e2e/workspace.spec.ts` 327 | 400 | ok |
 | Rust crate root | `crates/store/src/lib.rs` 694 | 300 | **over** |
 | Rust module | `crates/agent/src/agui.rs` 633 | 400 | **over** |
+| Dedicated worker | `apps/web/worker/agent.worker.ts` 393 | 300 | **over** — protocol, model streaming and transcript recording are three concerns |
 | Tauri command | `desktop/src-tauri/src/agent.rs` 474 | 250 | **over** |
 | Test file | `cowork-api/tests/gateway.test.ts` 364 | 400 | ok |
 
-**Nine files are over, and they are a queue, not a policy.** Ordered by how much they
+**Eleven files are over, and they are a queue, not a policy.** Ordered by how much they
 cost to leave:
 
 1. ~~`AgentsSurface.tsx` 586~~ → **done**: 236 + `AgentComposerModal` 162 +
@@ -427,6 +428,10 @@ cost to leave:
 9. `db/schema/people.ts` 577 → students, guardians and staff are three families.
 10. `WorkspaceShell.tsx` 368 / `WorkspaceLayoutClient.tsx` 290 → chrome from wiring.
 11. `packages/host/src/agent/adapter.ts` 317 → settle and queue in a sibling.
+12. `apps/web/worker/agent.worker.ts` 393 → protocol, model streaming and transcript
+    recording are three modules; split when the sync wiring next touches it.
+13. `apps/web/lib/infinity-browser-client.ts` 309 → diagnostics and `restore` move to a
+    sibling, leaving the client as request plumbing.
 
 **`agent/agents.ts` is 5 lines over and stays split-unsplit deliberately.** It is one
 aggregate — read, list, create, re-grant, delete — and every function shares the same two

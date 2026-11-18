@@ -10,8 +10,8 @@
 //! durability after the fact, while aborting the turn loses the work entirely.
 //! An implementation reports its own errors where its host can see them.
 
-use crate::provider::ChatMessage;
 use crate::protocol::TurnCompletionStatus;
+use crate::provider::ChatMessage;
 
 /// What the runtime knows about a run when it starts.
 pub struct RunStart<'a> {

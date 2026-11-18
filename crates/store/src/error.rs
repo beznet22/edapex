@@ -22,6 +22,18 @@ pub enum StoreError {
 
     #[error("device sequence {0} is not greater than the last written sequence {1}")]
     SequenceOutOfOrder(u64, u64),
+
+    #[error("the session lease is owned by another writer or the fence is stale")]
+    LeaseLost,
+
+    #[error("the agent session was deleted")]
+    SessionDeleted,
+
+    #[error("the requested agent record does not exist")]
+    NotFound,
+
+    #[error("filesystem: {0}")]
+    Io(String),
 }
 
 #[cfg(not(target_arch = "wasm32"))]

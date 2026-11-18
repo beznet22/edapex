@@ -116,7 +116,7 @@ let modulePromise: Promise<AgentWasmModule> | null = null;
 export async function loadAgentModule(): Promise<AgentWasmModule> {
   if (modulePromise !== null) return modulePromise;
   modulePromise = (async () => {
-    const specifier = new URL(RUNTIME_PATH, window.location.origin).href;
+    const specifier = new URL(RUNTIME_PATH, globalThis.location.origin).href;
     const module = (await import(/* @vite-ignore */ specifier)) as AgentWasmModule;
     await module.default({ module_or_path: RUNTIME_WASM });
     return module;

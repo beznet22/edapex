@@ -8,7 +8,8 @@ use std::fs;
 use std::path::PathBuf;
 
 use edapex_agent::{
-    AgentError, AgentErrorCode, AgentEvent, ApprovalDecision, CapabilityRisk,
+    AgentError, AgentErrorCode, AgentEvent, ApprovalDecision, CapabilityRisk, SessionCommand,
+    SessionLeaseRecord, SessionSyncPullResult, SessionSyncPush, SessionSyncPushResult, SessionView,
     ToolCompletionStatus, TurnCompletionStatus,
 };
 use serde_json::Value;
@@ -77,6 +78,7 @@ fn fixture_covers_every_event_variant() {
         "approval_resolved",
         "turn_completed",
         "interrupted",
+        "session_snapshot",
         "error",
     ] {
         assert!(
@@ -144,7 +146,9 @@ fn approval_fixture_carries_a_non_read_risk() {
 
     let parsed: AgentEvent = serde_json::from_value(entry).expect("deserializes");
     match parsed {
-        AgentEvent::ApprovalRequested { risk, decisions, .. } => {
+        AgentEvent::ApprovalRequested {
+            risk, decisions, ..
+        } => {
             assert_eq!(risk, CapabilityRisk::Write);
             assert_eq!(decisions.len(), 4);
         }
@@ -156,7 +160,10 @@ fn approval_fixture_carries_a_non_read_risk() {
 #[test]
 fn error_code_strings_are_snake_case_and_complete() {
     for (code, expected) in [
-        (AgentErrorCode::UnsupportedCapability, "unsupported_capability"),
+        (
+            AgentErrorCode::UnsupportedCapability,
+            "unsupported_capability",
+        ),
         (AgentErrorCode::PermissionDenied, "permission_denied"),
         (AgentErrorCode::CameraUnavailable, "camera_unavailable"),
         (AgentErrorCode::Cancelled, "cancelled"),
@@ -165,6 +172,11 @@ fn error_code_strings_are_snake_case_and_complete() {
         (AgentErrorCode::InvalidInput, "invalid_input"),
         (AgentErrorCode::ProviderUnavailable, "provider_unavailable"),
         (AgentErrorCode::QuotaExceeded, "quota_exceeded"),
+        (AgentErrorCode::StorageUnavailable, "storage_unavailable"),
+        (AgentErrorCode::StorageCorrupted, "storage_corrupted"),
+        (AgentErrorCode::LeaseLost, "lease_lost"),
+        (AgentErrorCode::SyncUnavailable, "sync_unavailable"),
+        (AgentErrorCode::SessionDeleted, "session_deleted"),
         (AgentErrorCode::InternalError, "internal_error"),
     ] {
         assert_eq!(code.as_str(), expected);
@@ -196,4 +208,78 @@ fn error_event_matches_the_agent_error_shape() {
     let encoded = serde_json::to_value(&error).expect("serializes");
     assert_eq!(encoded["code"], "model_missing");
     assert_eq!(encoded["retryable"], false);
+}
+
+fn shared_fixture(name: &str) -> Value {
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../packages/contracts/fixtures")
+        .join(name);
+    let raw = fs::read_to_string(path).expect("shared session fixture must be readable");
+    serde_json::from_str(&raw).expect("shared session fixture must be valid JSON")
+}
+
+#[test]
+fn session_view_round_trips_and_uses_one_root_identity() {
+    let value = shared_fixture("session-view.json");
+    let view: SessionView = serde_json::from_value(value.clone()).expect("valid session view");
+    assert!(view.has_stable_identity());
+    assert_eq!(view.messages[0].message_id, "core-message-2");
+    assert_eq!(view.queue[0].dedup_id, "dedup-4");
+    assert_eq!(serde_json::to_value(view).expect("serializes"), value);
+}
+
+#[test]
+fn every_session_command_round_trips() {
+    let commands = shared_fixture("session-commands.json")
+        .as_array()
+        .expect("command fixture is an array")
+        .clone();
+    assert_eq!(commands.len(), 9);
+    for command in commands {
+        let parsed: SessionCommand =
+            serde_json::from_value(command.clone()).expect("valid session command");
+        assert_eq!(serde_json::to_value(parsed).expect("serializes"), command);
+    }
+}
+
+#[test]
+fn sync_envelopes_round_trip_including_retry_and_deletion() {
+    let value = shared_fixture("session-sync.json");
+    let push: SessionSyncPush = serde_json::from_value(value["push"].clone()).expect("valid push");
+    let push_result: SessionSyncPushResult =
+        serde_json::from_value(value["pushResult"].clone()).expect("valid push result");
+    let pull: SessionSyncPullResult =
+        serde_json::from_value(value["pullResult"].clone()).expect("valid pull result");
+    assert_eq!(push.events.len(), 2);
+    assert_eq!(push_result.acknowledgements.len(), 3);
+    assert_eq!(
+        pull.deletion.as_ref().expect("deletion fixture").session_id,
+        push.session_id
+    );
+    assert_eq!(
+        serde_json::to_value(push).expect("serializes"),
+        value["push"]
+    );
+    assert_eq!(
+        serde_json::to_value(push_result).expect("serializes"),
+        value["pushResult"]
+    );
+    assert_eq!(
+        serde_json::to_value(pull).expect("serializes"),
+        value["pullResult"]
+    );
+}
+
+#[test]
+fn session_lease_fixture_matches_the_contract() {
+    let value = shared_fixture("session-sync.json");
+    let lease: SessionLeaseRecord = serde_json::from_value(value["leaseResult"]["lease"].clone())
+        .expect("valid lease fixture");
+    assert_eq!(lease.session_id, "session-root-1");
+    assert_eq!(lease.holder_id, "client-tab-1");
+    assert!(lease.fence > 0, "the service assigns a positive fence");
+    assert_eq!(
+        serde_json::to_value(&lease).expect("serializes"),
+        value["leaseResult"]["lease"]
+    );
 }

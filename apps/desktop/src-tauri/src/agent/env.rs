@@ -1,8 +1,13 @@
 use std::path::PathBuf;
 
+use rand::RngCore;
+
 use tauri::{AppHandle, Manager};
 
 use crate::state::HostError;
+
+const KEYRING_SERVICE: &str = "com.bronotek.edapex";
+const KEYRING_USER: &str = "agent-db";
 
 /// Everything the agent runtime needs from the process it runs in.
 ///
@@ -13,9 +18,9 @@ use crate::state::HostError;
 #[derive(Debug, Clone)]
 pub struct HostEnv {
     pub cache_dir: PathBuf,
-    /// The run journal opens `agent.db` here. The field exists now because it is
-    /// the seam's third path; the journal is the next commit, not this one.
-    #[allow(dead_code)]
+    /// The agent database lives here. Both the windowed host and the headless
+    /// worker open the same file, which is what makes a resumed turn the same
+    /// turn.
     pub data_dir: PathBuf,
     pub resource_dir: PathBuf,
 }
@@ -45,7 +50,10 @@ impl HostEnv {
         self.cache_dir.join("captures")
     }
 
-    #[allow(dead_code)]
+    /// The one agent database this installation has.
+    ///
+    /// The UI and a headless worker open the same path; two paths would be two
+    /// histories, and the second one is the one that loses work.
     pub fn agent_db(&self) -> PathBuf {
         self.data_dir.join("agent.db")
     }
@@ -87,5 +95,48 @@ mod tests {
         );
         assert_eq!(env.captures_dir(), PathBuf::from("/cache/captures"));
         assert_eq!(env.agent_db(), PathBuf::from("/data/agent.db"));
+    }
+}
+
+/// The key that seals the agent database, read from the OS keychain once.
+///
+/// It lives with the environment rather than the agent runtime because both the
+/// windowed host and a headless worker need the same key for the same file.
+pub fn agent_master_key() -> Result<[u8; 32], HostError> {
+    let entry = keyring::Entry::new(KEYRING_SERVICE, KEYRING_USER)
+        .map_err(|error| HostError::new("internal_error", format!("Keychain: {error}"), true))?;
+
+    use base64::Engine as _;
+    let engine = base64::engine::general_purpose::STANDARD;
+
+    match entry.get_password() {
+        Ok(stored) => {
+            let bytes = engine.decode(stored).map_err(|error| {
+                HostError::new("internal_error", format!("Agent key: {error}"), true)
+            })?;
+            let mut key = [0u8; 32];
+            if bytes.len() != key.len() {
+                return Err(HostError::new(
+                    "internal_error",
+                    "The agent key in the keychain is the wrong length",
+                    false,
+                ));
+            }
+            key.copy_from_slice(&bytes);
+            Ok(key)
+        }
+        Err(keyring::Error::NoEntry) => {
+            let mut key = [0u8; 32];
+            rand::thread_rng().fill_bytes(&mut key);
+            entry.set_password(&engine.encode(key)).map_err(|error| {
+                HostError::new("internal_error", format!("Store agent key: {error}"), true)
+            })?;
+            Ok(key)
+        }
+        Err(error) => Err(HostError::new(
+            "internal_error",
+            format!("Read agent key: {error}"),
+            true,
+        )),
     }
 }

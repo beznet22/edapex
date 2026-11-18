@@ -87,6 +87,11 @@ export const ERROR_CODES = [
   "device_revoked",
   "device_unknown",
   "workspace_mismatch",
+  "session_unknown",
+  "session_deleted",
+  "lease_held",
+  "lease_stale",
+  "quota_exceeded",
   "internal"
 ] as const;
 

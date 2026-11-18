@@ -18,6 +18,8 @@
     "./agent/turn-settlement": "./src/agent/turn-settlement.ts",
     "./agent/native": "./src/agent/native/runtime.ts",
     "./agent/native/transport": "./src/agent/native/transport.ts",
+    "./sync": "./src/sync/index.ts",
+    "./sync/transports": "./src/sync/transports.ts",
     "./package.json": "./package.json"
   },
   "scripts": {

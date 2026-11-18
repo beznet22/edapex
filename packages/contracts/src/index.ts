@@ -10,6 +10,7 @@ export * from "./push";
 export * from "./public-applications";
 export * from "./notifications";
 export * from "./routines";
+export * from "./session";
 export * from "./tasks";
 export * from "./agents";
 export * from "./tenant";

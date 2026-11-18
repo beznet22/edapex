@@ -1,16 +1,24 @@
 use std::sync::{Arc, Mutex};
 
-use edapex_agent::{AgentEvent, AgentHost, EventSink};
+use edapex_agent::{
+    AgentConnectSettings, AgentEvent, AgentStatus, EventSink, NativeAgentDriver,
+};
 use tauri::ipc::Channel;
 
 use super::ApprovalRegistry;
 
-/// A connected host, its approvals and the channel a WebView is reading.
+/// A connected native agent: the driver, its approvals, and the channel a
+/// WebView is reading.
+///
+/// The driver owns the `!Send` Infinity machinery on its own thread, so this
+/// struct is a handle rather than the runtime itself. Cloning it is cheap and
+/// does not start or stop a session.
 #[derive(Clone)]
 pub struct AgentSession {
-    pub host: AgentHost,
+    pub driver: Arc<NativeAgentDriver>,
     pub approvals: Arc<ApprovalRegistry>,
     pub sink: Arc<ChannelSink>,
+    pub settings: AgentConnectSettings,
 }
 
 impl AgentSession {
@@ -31,6 +39,15 @@ impl AgentSession {
         }
         cursor
     }
+
+    pub fn status(&self) -> AgentStatus {
+        AgentStatus {
+            connected: true,
+            thread_id: None,
+            model: self.settings.model.clone(),
+            mobile_safe_tools: self.settings.mobile_safe_tools,
+        }
+    }
 }
 
 /// Publishes every event to the ring and, when one is attached, to the channel.
@@ -48,24 +65,6 @@ impl ChannelSink {
         ChannelSink {
             hub: Arc::new(edapex_agent::EventHub::default()),
             channel: Mutex::new(channel),
-        }
-    }
-}
-
-/// Delivers to the WebView and, when a journal exists, records the same event.
-///
-/// Both are fed from one call so the UI and the resume log cannot drift: an
-/// event the person saw is an event a resumed run can replay.
-pub struct FanoutSink {
-    pub primary: Arc<ChannelSink>,
-    pub journal: Option<Arc<super::journal::RunJournal>>,
-}
-
-impl EventSink for FanoutSink {
-    fn emit(&self, event: AgentEvent) {
-        self.primary.emit(event.clone());
-        if let Some(journal) = &self.journal {
-            journal.emit(event);
         }
     }
 }

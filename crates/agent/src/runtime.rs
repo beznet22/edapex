@@ -4,14 +4,14 @@ use std::pin::Pin;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
-use serde_json::{json, Value};
+use serde_json::Value;
 use tokio::sync::Notify;
 use uuid::Uuid;
 
 use crate::protocol::{
     AgentConnectSettings, AgentError, AgentEvent, AgentStatus, AgentTurnInput, ApprovalDecision,
-    ApprovalRequest, DynamicToolCall, DynamicToolName, DynamicToolResult,
-    DynamicToolSpec, ThreadStartResult, ToolCompletionStatus, TurnCompletionStatus, TurnStarted,
+    ApprovalRequest, DynamicToolCall, DynamicToolName, DynamicToolResult, ThreadStartResult,
+    ToolCompletionStatus, TurnCompletionStatus, TurnStarted,
 };
 use crate::provider::{ChatMessage, ProviderChunk, ProviderClient, ProviderRequest, ToolCall};
 
@@ -149,7 +149,7 @@ impl AgentHost {
                 threads: Mutex::new(HashMap::new()),
                 active_threads: Mutex::new(HashSet::new()),
                 turns: Mutex::new(HashMap::new()),
-            errors: Mutex::new(HashMap::new()),
+                errors: Mutex::new(HashMap::new()),
             }),
         };
         host.emit(AgentEvent::Connected { thread_id: None });
@@ -240,7 +240,11 @@ impl AgentHost {
                 .run_turn(&thread_id, &spawned_turn_id, &control, &mut history)
                 .await;
 
-            host.inner.turns.lock().ok().map(|mut turns| turns.remove(&spawned_turn_id));
+            host.inner
+                .turns
+                .lock()
+                .ok()
+                .map(|mut turns| turns.remove(&spawned_turn_id));
             host.inner
                 .active_threads
                 .lock()
@@ -318,9 +322,15 @@ impl AgentHost {
         });
 
         let mut history = history;
-        let status = self.run_turn(thread_id, turn_id, &control, &mut history).await;
+        let status = self
+            .run_turn(thread_id, turn_id, &control, &mut history)
+            .await;
 
-        self.inner.turns.lock().ok().map(|mut turns| turns.remove(turn_id));
+        self.inner
+            .turns
+            .lock()
+            .ok()
+            .map(|mut turns| turns.remove(turn_id));
         self.inner
             .active_threads
             .lock()
@@ -385,12 +395,7 @@ impl AgentHost {
     }
 
     /// Every way a turn can fail goes through here, so a settled run always carries its reason.
-    fn fail_turn(
-        &self,
-        thread_id: &str,
-        turn_id: &str,
-        error: AgentError,
-    ) -> TurnCompletionStatus {
+    fn fail_turn(&self, thread_id: &str, turn_id: &str, error: AgentError) -> TurnCompletionStatus {
         if let Ok(mut errors) = self.inner.errors.lock() {
             errors.insert(turn_id.to_string(), error.message.clone());
         }
@@ -424,7 +429,7 @@ impl AgentHost {
                 // Cheap snapshot: the transcript is only cloned when it actually
                 // changes, not once per tool round.
                 messages: std::sync::Arc::from(history.as_slice()),
-                tools: tool_specs(),
+                tools: tool_specs().into_iter().map(Into::into).collect(),
                 temperature: None,
             };
             let mut stream = match self.inner.provider.stream_chat(request) {
@@ -506,7 +511,11 @@ impl AgentHost {
 
             if calls.is_empty() {
                 history.push(ChatMessage::assistant(
-                    if text.is_empty() { None } else { Some(std::sync::Arc::from(text.as_str())) },
+                    if text.is_empty() {
+                        None
+                    } else {
+                        Some(std::sync::Arc::from(text.as_str()))
+                    },
                     Vec::new(),
                 ));
                 return TurnCompletionStatus::Completed;
@@ -521,7 +530,11 @@ impl AgentHost {
                 })
                 .collect();
             history.push(ChatMessage::assistant(
-                if text.is_empty() { None } else { Some(std::sync::Arc::from(text.as_str())) },
+                if text.is_empty() {
+                    None
+                } else {
+                    Some(std::sync::Arc::from(text.as_str()))
+                },
                 tool_calls.clone(),
             ));
 
@@ -724,43 +737,6 @@ fn system_prompt() -> String {
         .to_string()
 }
 
-fn tool_specs() -> Vec<DynamicToolSpec> {
-    vec![
-        DynamicToolSpec {
-            name: DynamicToolName::WebSearch,
-            description: "Search the web through the EdApex API. Staff only.".to_string(),
-            input_schema: json!({
-                "type": "object",
-                "required": ["query"],
-                "properties": {
-                    "query": {"type": "string", "minLength": 1},
-                    "domains": {"type": "array", "items": {"type": "string"}},
-                    "recency": {"type": "string"},
-                    "maxResults": {"type": "integer", "minimum": 1, "maximum": 10}
-                },
-                "additionalProperties": false
-            }),
-        },
-        DynamicToolSpec {
-            name: DynamicToolName::WebFetch,
-            description: "Fetch one public HTTP(S) URL through the EdApex API. Staff only."
-                .to_string(),
-            input_schema: json!({
-                "type": "object",
-                "required": ["url"],
-                "properties": {"url": {"type": "string", "format": "uri"}},
-                "additionalProperties": false
-            }),
-        },
-        DynamicToolSpec {
-            name: DynamicToolName::OcrExtract,
-            description: "Run local RustO OCR on a capture created by the person.".to_string(),
-            input_schema: json!({
-                "type": "object",
-                "required": ["captureId"],
-                "properties": {"captureId": {"type": "string", "minLength": 1}},
-                "additionalProperties": false
-            }),
-        },
-    ]
+fn tool_specs() -> Vec<crate::DynamicToolSpec> {
+    crate::tool_bridge::edapex_tool_specs()
 }

@@ -11,6 +11,14 @@ crate-type = ["cdylib", "rlib"]
 [dependencies]
 edapex-agent = { path = "../agent" }
 edapex-store = { path = "../store" }
+# The browser provider implements Infinity's `ModelProvider` directly, so it
+# needs the protocol types and `async_trait` the trait is declared with.
+async-trait = { version = "0.1", default-features = false }
+# The browser session drives Infinity's local system directly, so the crate needs
+# the core and its thread-id type in addition to the protocol.
+infinity-agent-core.workspace = true
+infinity-provider-protocol.workspace = true
+rap-protocol.workspace = true
 js-sys = "0.3"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
@@ -22,5 +30,8 @@ wasm-bindgen-futures = "0.4"
 # This crate is the browser surface. On native the `HostFuture` alias requires
 # `Send`, and a `JsValue`-based future can never satisfy that, so the crate has no
 # native meaning. Building it for a native target is a mistake, not a feature.
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+infinity-wasm.workspace = true
+
 [package.metadata]
 targets = ["wasm32-unknown-unknown"]

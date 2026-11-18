@@ -1,6 +1,7 @@
 mod window;
-mod agent;
+pub mod agent;
 mod api;
+mod relay;
 mod native_auth;
 mod auth;
 mod capture;
@@ -69,6 +70,7 @@ pub fn run() {
             auth::auth_status,
             auth::auth_logout,
             api::api_request,
+            relay::relay_request,
             api::ocr_mistral,
             window::window_start_dragging,
             window::window_minimize,

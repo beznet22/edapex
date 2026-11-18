@@ -78,6 +78,23 @@ impl ChatMessage {
     }
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct ProviderToolSpec {
+    pub name: String,
+    pub description: String,
+    pub input_schema: Value,
+}
+
+impl From<DynamicToolSpec> for ProviderToolSpec {
+    fn from(spec: DynamicToolSpec) -> Self {
+        Self {
+            name: spec.name.as_str().to_string(),
+            description: spec.description,
+            input_schema: spec.input_schema,
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct ProviderRequest {
     pub model: String,
@@ -87,7 +104,7 @@ pub struct ProviderRequest {
     /// `Vec` forced a deep copy of the whole conversation per tool round; this
     /// is O(1) to clone and immutable for the duration of the request.
     pub messages: std::sync::Arc<[ChatMessage]>,
-    pub tools: Vec<DynamicToolSpec>,
+    pub tools: Vec<ProviderToolSpec>,
     pub temperature: Option<f32>,
 }
 
@@ -204,11 +221,11 @@ pub fn parse_openai_sse_data(data: &str) -> Result<Vec<ProviderChunk>, AgentErro
 }
 
 /// Serialize a tool spec to the OpenAI-compatible function shape.
-pub fn tool_spec_json(spec: &DynamicToolSpec) -> Value {
+pub fn tool_spec_json(spec: &ProviderToolSpec) -> Value {
     serde_json::json!({
         "type": "function",
         "function": {
-            "name": spec.name.as_str(),
+            "name": spec.name,
             "description": spec.description,
             "parameters": spec.input_schema,
         }

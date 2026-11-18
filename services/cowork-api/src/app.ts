@@ -4,6 +4,7 @@ import { authenticate } from "./auth";
 import type { AppContext } from "./env";
 import { agentCapabilities } from "./routes/agent-capabilities.routes";
 import { agentSync } from "./routes/agent-sync.routes";
+import { agentSessions } from "./routes/agent-sessions.routes";
 import { connectors } from "./routes/connectors.routes";
 import { agentRoutes } from "./routes/agents.routes";
 import { proactiveRoutes } from "./routes/proactive.routes";
@@ -21,6 +22,7 @@ export function createApp() {
   app.use("/api/v1/agent/*", authenticate);
   app.route("/api/v1/agent", agentCapabilities);
   app.route("/api/v1/agent", agentSync);
+  app.route("/api/v1/agent", agentSessions);
   app.route("/api/v1/agent/connectors", connectors);
   app.route("/api/v1/agent", proactiveRoutes);
   app.route("/api/v1/agent", agentRoutes);

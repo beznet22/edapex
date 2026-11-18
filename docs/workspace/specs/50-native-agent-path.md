@@ -1,11 +1,66 @@
 # 50 — Native Agent Path (desktop and mobile)
 
-**Status:** resolved. The default is now the native transport; the device
-verification is carried as a release gate in `81-mobile-shell.md`.
+**Status:** amended. Desktop and mobile run **Infinity's native core**
+(`infinity-agent-core`) as the single agent runtime; the browser runs the same core
+compiled to Wasm. This spec's earlier claim — that a separate EdApex turn loop was
+the native runtime — is superseded. Evidence and what remains blocked live in
+[`../infinity-agent-acceptance.md`](../infinity-agent-acceptance.md).
+
+One runtime, but **not one store**: the pinned core requires `Send + Sync` store
+handles with `Send` futures, which an OPFS-backed store cannot provide. Native
+hosts use `agent.db`; the browser uses `infinity-wasm`'s IndexedDB actor handles,
+with SQLite-in-OPFS owned by a dedicated worker for the transcript and queue. The
+reasoning and the upstream decision records are in the acceptance matrix under
+"Why the browser does not use the SQLite store". Nothing in this spec should be
+read as claiming a shared database across hosts.
+
 **Rule being enforced** (from `AGENTS.md`): *desktop and mobile are native.
 WebAssembly is the web delivery mechanism only. A host that can run native code uses
 `crates/*` directly; adding WASM to a native host needs a written justification and a
 recorded blocker.*
+
+## What replaced the old loop
+
+| Concern | Now |
+|---|---|
+| Execution | `infinity-agent-core` through `edapex-agent::NativeAgentDriver`, on a dedicated current-thread `LocalSet` |
+| Session identity | caller-owned root `ThreadId`; child threads keep their own ids and ancestry |
+| Model context | per-thread snapshots in `agent.db` (messages, compaction summaries, thread info) |
+| Execution state | processed ids, subscriptions, pending choices, stopped flag, per root thread |
+| Projection | append-only `agent_session_events`, encrypted, paginated; **not** the model's memory |
+| Ownership | lease + fence in `agent_sessions`; a stale writer is refused, not merged |
+| Headless work | WorkManager claims sessions with queued messages and drains them through the same driver |
+| Full feature set | child threads, ancestry, compaction, tool approval, choices and subscriptions are all part of the native path — not deferred to the web |
+
+A turn's durability is a native-host concern. The worker opens the **same**
+`agent.db` the window does; two paths would be two histories.
+
+## What EdApex changes in the Wasm crate
+
+`crates/agent-wasm` is an adapter over `infinity-wasm` and `infinity-agent-core`,
+not a fork of either. Every change it carries was forced by a measured failure:
+
+| Change | Why |
+|---|---|
+| Stream ids are `u32`, not `u64` | wasm-bindgen requires a `BigInt` for `u64`, so a JavaScript `number` threw before any chunk reached the core |
+| `BrowserTurnLifecycle::set_root` runs before the first turn | every event carries the root thread id, and the contract rejects an empty one |
+| `observe` drains its history once | appending twice emitted duplicate `turn_started`/`turn_completed` |
+| The session holds a `ChannelSender`, not the running system | the router and pump must share one `LocalSet` for the session's lifetime; a nested `LocalSet` cancels them when its `run_until` returns |
+| `BrowserProvider` holds a numeric registry handle | the provider must be `Send + Sync` while the fetch runs in `spawn_local` |
+| A bounded `browser_trace` ring (64 marks) | a worker's console never reaches the page, which is what made a stalled turn invisible |
+
+The trace records stage names, worker-side timestamps and small integer outcomes
+(queue lengths, append outcomes, byte counts). It never records prompts, message
+text, keys, tokens or tool payloads; the one note that formatted a core event was
+removed for putting user text in it. It is readable only by the page that owns the
+worker.
+| `BrowserObserver`/`BrowserSubscription` removed | the system is attached with `thread_handle`, so the observer path was dead code |
+
+The inference-provider boundary is `ModelProvider`. `crates/agent/src/infinity_stream.rs`
+translates a completion request and maps chunks back, including assembling tool-call
+deltas, because the pinned core does not assemble them itself. The browser's mock
+provider is a test double for that boundary: it exists only in `e2e/`, it never
+ships, and it does not replace the EdApex model-router call.
 
 ## Audit result (historical): the rule was violated
 
