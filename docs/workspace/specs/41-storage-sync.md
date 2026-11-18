@@ -162,8 +162,31 @@ and parity test.
   receives `deletion` instead of an empty history. A push to a deleted session answers
   `session_deleted`.
 
-### iroh — deferred
+**Local execution stays local.** The relay coordinates ownership and ordering; it never
+runs the agent. `enqueue_text`, `cancel_turn`, `edit_message`, `truncate`, `restore` and
+every other execution command are executed by the lease-holding device inside its own
+tick. The command endpoint accepts only the four ownership operations and refuses the
+rest with 422, so there is no second execution path through HTTP.
 
+**What the relay does and does not deliver.**
+
+| Capability | Status |
+|---|---|
+| One user's sessions across their devices | Implemented: relay plus user/workspace scoping |
+| One active writer, fenced | Implemented |
+| Server-assigned ordering | Implemented |
+| Idempotent push and ordered pull | Implemented |
+| Tombstones for devices that were offline | Implemented |
+| Device registration and revocation | Already implemented in `sync_devices`; session sync does not require it |
+| Device discovery and management UI | Deferred (Chunk 7 surface) |
+| Automatic sync scheduling | Deferred (Chunk 7) |
+| Reconnection and offline recovery wiring | Deferred (Chunk 7) |
+| Local projection reconciliation | Deferred (Chunk 7) |
+| Conflict handling and stale local recovery | Deferred: the relay refuses a stale writer rather than merging; the client must re-lease and reload |
+| Ownership transfer between devices | Protocol only: takeover works, there is no user-facing handoff |
+| User-visible sync status | Deferred |
+
+### iroh — deferred
 `AGENT_DB` is the **only** v1 transport. iroh is not used.
 
 Verified against the iroh documentation: iroh is a QUIC + TLS 1.3 networking stack — key-based endpoints, NAT traversal, relay fallback, DNS/DHT lookup, with blob/doc/gossip protocols on top. It is a transport, not a store, and it has **no offline mailbox**: a powered-off peer is simply unreachable, so it cannot provide offline sync.

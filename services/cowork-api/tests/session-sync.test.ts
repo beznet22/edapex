@@ -264,6 +264,95 @@ describe("session relay", () => {
     );
   });
 
+  it("settles concurrent acquires on exactly one holder", async () => {
+    const [first, second] = await Promise.all([acquire("client-a"), acquire("client-b")]);
+    const statuses = [first.status, second.status].sort((left, right) => left - right);
+    expect(statuses).toEqual([200, 409]);
+  });
+
+  it("lets a second device take over only after the lease expires", async () => {
+    const first = (await (await acquire("client-a", 1)).json()) as {
+      lease: { fence: number };
+    };
+    await new Promise((resolve) => setTimeout(resolve, 5));
+
+    const takeover = await acquire("client-b");
+    expect(takeover.status).toBe(200);
+    const second = (await takeover.json()) as { lease: { fence: number } };
+    // The fence advances across the takeover, which is what makes the old one stale.
+    expect(second.lease.fence).toBe(first.lease.fence + 1);
+
+    const late = await push(first.lease.fence, [await event(1)], "client-a");
+    const body = (await late.json()) as { acknowledgements: { status: string }[] };
+    expect(body.acknowledgements[0]?.status).toBe("stale");
+  });
+
+  it("renews only with the fence it was granted", async () => {
+    const lease = (await (await acquire("client-a")).json()) as {
+      lease: { fence: number; expiresAtMs: number };
+    };
+    const renewed = await request(commandsPath(), {
+      method: "POST",
+      body: JSON.stringify({
+        type: "renew_lease",
+        commandId: "renew-1",
+        sessionId,
+        clientId: "client-a",
+        expectedFence: lease.lease.fence
+      })
+    });
+    expect(renewed.status).toBe(200);
+    const renewedBody = (await renewed.json()) as {
+      lease: { fence: number; expiresAtMs: number };
+    };
+    expect(renewedBody.lease.fence).toBe(lease.lease.fence);
+    expect(renewedBody.lease.expiresAtMs).toBeGreaterThanOrEqual(lease.lease.expiresAtMs);
+
+    const wrong = await request(commandsPath(), {
+      method: "POST",
+      body: JSON.stringify({
+        type: "renew_lease",
+        commandId: "renew-2",
+        sessionId,
+        clientId: "client-a",
+        expectedFence: lease.lease.fence + 1
+      })
+    });
+    expect(wrong.status).toBe(409);
+    expect(((await wrong.json()) as { error: { code: string } }).error.code).toBe("lease_stale");
+  });
+
+  it("refuses a batch above the contract limit", async () => {
+    const lease = (await (await acquire("client-a")).json()) as { lease: { fence: number } };
+    const events = await Promise.all(
+      Array.from({ length: 101 }, (_, index) => event(index + 1))
+    );
+    const response = await push(lease.lease.fence, events);
+    expect(response.status).toBe(400);
+  });
+
+  it("pages a whole backlog without gaps or duplicates", async () => {
+    const lease = (await (await acquire("client-a")).json()) as { lease: { fence: number } };
+    await push(
+      lease.lease.fence,
+      await Promise.all(Array.from({ length: 5 }, (_, index) => event(index + 1)))
+    );
+
+    const positions: number[] = [];
+    let cursor = 0;
+    for (;;) {
+      const page = await request(eventsPath(`&after=${cursor}&limit=2`));
+      const body = (await page.json()) as {
+        events: { relayPosition: number }[];
+        nextPosition: number;
+      };
+      if (body.events.length === 0) break;
+      positions.push(...body.events.map((item) => item.relayPosition));
+      cursor = body.nextPosition;
+    }
+    expect(positions).toEqual([1, 2, 3, 4, 5]);
+  });
+
   it("computes its quota at the boundary, not past it", () => {
     expect(quotaExceeded({ eventCount: MAX_SESSION_EVENTS, payloadBytes: 0 }, 1, 0)).toBe(true);
     expect(quotaExceeded({ eventCount: MAX_SESSION_EVENTS - 1, payloadBytes: 0 }, 1, 0)).toBe(false);

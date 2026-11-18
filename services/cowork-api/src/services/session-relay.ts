@@ -76,6 +76,19 @@ interface EventRow {
   readonly created_at_ms: number;
 }
 
+/**
+ * Reads `next_position` out of a batch result's RETURNING row. `db.batch` returns
+ * one result per statement, and the tombstone is always the first.
+ */
+function positionFrom(result: unknown): number | null {
+  if (typeof result !== "object" || result === null || !("results" in result)) return null;
+  const rows = result.results;
+  if (!Array.isArray(rows)) return null;
+  const first: unknown = rows[0];
+  if (typeof first !== "object" || first === null || !("next_position" in first)) return null;
+  return typeof first.next_position === "number" ? first.next_position : null;
+}
+
 function toKind(value: string): SessionSyncEventKind {
   if (value === "core_snapshot" || value === "deletion") return value;
   return "projection";
@@ -183,12 +196,41 @@ export async function pushSessionEvents(
        SET next_position = next_position + ?, event_count = event_count + ?, \
            payload_bytes = payload_bytes + ?, updated_at_ms = ? \
        WHERE session_id = ? AND deleted_at_ms IS NULL \
+         AND EXISTS (SELECT 1 FROM agent_session_leases l \
+                     WHERE l.session_id = ? AND l.holder_id = ? AND l.fence = ? \
+                       AND l.expires_at_ms > ?) \
        RETURNING next_position"
     )
-    .bind(fresh.length, fresh.length, bytes, nowMs, owner.sessionId)
+    .bind(
+      fresh.length,
+      fresh.length,
+      bytes,
+      nowMs,
+      owner.sessionId,
+      owner.sessionId,
+      input.clientId,
+      input.fence,
+      nowMs
+    )
     .first<{ readonly next_position: number }>();
 
-  const end = reserved?.next_position ?? session.session.nextPosition + fresh.length;
+  // The lease was valid when this batch started; the reservation re-checks it, so
+  // a takeover that landed in between cannot let this write through.
+  if (reserved === null) {
+    return {
+      ok: true,
+      result: {
+        acknowledgements: input.events.map((event) => ({
+          eventId: event.eventId,
+          status: "stale" as const,
+          position: null
+        })),
+        nextPosition: session.session.nextPosition
+      }
+    };
+  }
+
+  const end = reserved.next_position;
   const start = end - fresh.length + 1;
   const positionBySeq = new Map<number, number>();
   fresh.forEach((event, index) => positionBySeq.set(event.deviceSeq, start + index));
@@ -305,18 +347,19 @@ export async function deleteSession(
     };
   }
 
-  const reserved = await db
-    .prepare(
-      "UPDATE agent_sessions \
-       SET deleted_at_ms = ?, deletion_event_id = ?, next_position = next_position + 1, \
-           event_count = 0, payload_bytes = 0, updated_at_ms = ? \
-       WHERE session_id = ? AND deleted_at_ms IS NULL \
-       RETURNING next_position"
-    )
-    .bind(nowMs, deletionEventId, nowMs, owner.sessionId)
-    .first<{ readonly next_position: number }>();
-
-  await db.batch([
+  // One batch: the tombstone, the payload removal and the lease release commit
+  // together. A partial failure could otherwise mark a session deleted while its
+  // ciphertext is still stored, which is the one state a hard delete must not leave.
+  const results = await db.batch([
+    db
+      .prepare(
+        "UPDATE agent_sessions \
+         SET deleted_at_ms = ?, deletion_event_id = ?, next_position = next_position + 1, \
+             event_count = 0, payload_bytes = 0, updated_at_ms = ? \
+         WHERE session_id = ? AND deleted_at_ms IS NULL \
+         RETURNING next_position"
+      )
+      .bind(nowMs, deletionEventId, nowMs, owner.sessionId),
     db.prepare("DELETE FROM agent_session_events WHERE session_id = ?").bind(owner.sessionId),
     db
       .prepare(
@@ -327,7 +370,7 @@ export async function deleteSession(
 
   return {
     ok: true,
-    position: reserved?.next_position ?? session.session.nextPosition + 1,
+    position: positionFrom(results[0]) ?? session.session.nextPosition + 1,
     deletionEventId
   };
 }

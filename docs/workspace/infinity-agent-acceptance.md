@@ -230,8 +230,16 @@ Evidence, all from the suite rather than reading code:
 - **Gates:** `verify-port-specs` 0 failures, `verify-schema-catalog` 0 broken
   files, `check-docs` ok, both typechecks clean.
 
-Deferred: the client side of the relay (chunks 7) and the browser sync store
-moving into a worker (#19).
+The relay refuses a stale writer rather than merging, so a device that lost its
+lease must re-lease and reload; there is no conflict merge.
+
+**Not implemented by Chunk 6, despite the relay supporting the protocol:**
+automatic sync scheduling, reconnection and offline-recovery wiring, device
+discovery/management UI, local projection reconciliation, a user-facing
+ownership handoff, and any sync-status surface. Device registration and
+revocation already exist in `sync_devices`, but session sync does not require a
+registered device. The client side is Chunk 7; the browser sync store moving
+into a worker is #19.
 
 ## Reproduce
 
