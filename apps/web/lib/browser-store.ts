@@ -40,6 +40,8 @@ export interface BrowserStore {
   acknowledge(deviceId: string, workspaceId: string, throughSeq: number): void;
   cursor(deviceId: string, workspaceId: string): number;
   search(query: string, limit: number): string[];
+  /** Rebuilds the derived index from the sealed records. */
+  rebuildSearchIndex(): number;
   /** Adapter for `SyncClient`, so the loop needs no knowledge of the store. */
   asOutbox(workspaceId: string): Outbox;
   close(): void;
@@ -92,7 +94,7 @@ export async function openBrowserStore(options: OpenStoreOptions): Promise<Brows
 
   const [executor, module] = await Promise.all([
     openBrowserSqlite(
-      options.filename === undefined ? {} : { filename: options.filename }
+      options.filename === undefined ? { identity: "legacy" } : { identity: "legacy", filename: options.filename }
     ),
     loadAgentModule()
   ]);
@@ -141,6 +143,10 @@ export async function openBrowserStore(options: OpenStoreOptions): Promise<Brows
 
     search(query, limit) {
       return JSON.parse(store.search(query, limit)) as string[];
+    },
+
+    rebuildSearchIndex() {
+      return store.rebuildSearchIndex();
     },
 
     asOutbox(workspaceId) {

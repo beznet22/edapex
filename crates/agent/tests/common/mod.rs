@@ -14,8 +14,8 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use edapex_agent::{
     AgentConnectSettings, AgentError, AgentEvent, ApprovalDecision, ApprovalHandler,
     ApprovalRequest, DynamicToolCall, DynamicToolResult, EventSink, NativeAgentDriver,
-    ProviderChunk, ProviderClient, ProviderRequest, SessionCommand, StoreContext,
-    ToolExecutor, TurnCompletionStatus,
+    ProviderChunk, ProviderClient, ProviderRequest, SessionCommand, StoreContext, ToolExecutor,
+    TurnCompletionStatus,
 };
 use edapex_store::MasterKey;
 use tokio::sync::mpsc;
@@ -154,8 +154,7 @@ impl ToolExecutor for Tools {
         &self,
         _call: DynamicToolCall,
     ) -> Pin<Box<dyn Future<Output = DynamicToolResult> + Send>> {
-        self.calls
-            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        self.calls.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         Box::pin(async { DynamicToolResult::text("secret tool result") })
     }
 }

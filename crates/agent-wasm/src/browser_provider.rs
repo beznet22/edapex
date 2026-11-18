@@ -13,7 +13,8 @@
 
 use std::cell::RefCell;
 use std::collections::HashMap;
-use std::sync::Arc;
+use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
 use infinity_provider_protocol::{
@@ -65,12 +66,65 @@ fn lookup(id: u64) -> Option<Function> {
 #[derive(Clone)]
 pub struct BrowserProvider {
     id: u64,
-    queue: Arc<ChunkQueue>,
+    queues: Arc<Mutex<HashMap<u32, Arc<ChunkQueue>>>>,
+    next_stream: Arc<AtomicU32>,
+    current_stream: Arc<AtomicU32>,
 }
 
 impl BrowserProvider {
+    pub fn id(&self) -> u64 {
+        self.id
+    }
+
     pub fn new(id: u64, queue: Arc<ChunkQueue>) -> Self {
-        Self { id, queue }
+        let queues = Arc::new(Mutex::new(HashMap::from([(0, queue)])));
+        Self {
+            id,
+            queues,
+            next_stream: Arc::new(AtomicU32::new(1)),
+            current_stream: Arc::new(AtomicU32::new(0)),
+        }
+    }
+
+    /// Routes a chunk to the model call that asked for it.
+    pub fn push(
+        &self,
+        stream_id: u32,
+        item: Result<ProviderChunk, AgentError>,
+    ) -> Result<(), AgentError> {
+        let Some(queue) = self
+            .queues
+            .lock()
+            .map_err(|_| AgentError::internal("The stream registry is unavailable"))?
+            .get(&stream_id)
+            .cloned()
+        else {
+            return Err(AgentError::provider(
+                "The provider stream is not registered",
+            ));
+        };
+        queue.push(item);
+        Ok(())
+    }
+
+    pub fn current_stream_id(&self) -> u32 {
+        self.current_stream.load(Ordering::Acquire)
+    }
+
+    pub fn end_stream(&self, stream_id: u32) {
+        if let Ok(mut queues) = self.queues.lock() {
+            if let Some(queue) = queues.remove(&stream_id) {
+                queue.close();
+            }
+        }
+    }
+
+    pub fn close_all(&self) {
+        if let Ok(peers) = self.queues.lock() {
+            for queue in peers.values() {
+                queue.close();
+            }
+        }
     }
 
     /// Hands the request to JavaScript and returns the channel it will fill.
@@ -82,17 +136,37 @@ impl BrowserProvider {
         &self,
         request: ProviderRequest,
     ) -> Result<tokio::sync::mpsc::Receiver<ProviderChunk>, AgentError> {
+        
+        crate::browser_trace::mark_global("provider.start");
         let encoded = serde_json::to_string(&ProviderRequestWire::from(&request))
             .map_err(|error| AgentError::provider(format!("Encode request: {error}")))?;
 
-        let callback = lookup(self.id).ok_or_else(|| {
-            AgentError::provider("The browser transport was closed before the turn started")
-        })?;
+        let stream_id = self.next_stream.fetch_add(1, Ordering::Relaxed);
+        self.current_stream.store(stream_id, Ordering::Release);
+        let queue = Arc::new(ChunkQueue::default());
+        self.queues
+            .lock()
+            .map_err(|_| AgentError::internal("The stream registry is unavailable"))?
+            .insert(stream_id, Arc::clone(&queue));
+        let callback = match lookup(self.id) {
+            Some(callback) => callback,
+            None => {
+                self.end_stream(stream_id);
+                return Err(AgentError::provider(
+                    "The browser transport was closed before the turn started",
+                ));
+            }
+        };
+        crate::browser_trace::mark_global("provider.callback");
         callback
-            .call1(&JsValue::NULL, &JsValue::from_str(&encoded))
+            .call2(
+                &JsValue::NULL,
+                &JsValue::from_str(&encoded),
+                &JsValue::from_f64(f64::from(stream_id)),
+            )
             .map_err(|_| AgentError::provider("The browser transport failed"))?;
 
-        let queue = Arc::clone(&self.queue);
+        crate::browser_trace::mark_global("provider.invoked");
         let (sender, receiver) = tokio::sync::mpsc::channel::<ProviderChunk>(64);
         wasm_bindgen_futures::spawn_local(async move {
             while let Some(item) = queue.recv().await {
@@ -146,5 +220,26 @@ impl ModelProvider for BrowserProvider {
         // the stream holds, and it is `Send`.
         let receiver = self.start(request).map_err(completion_error)?;
         Ok(chunk_stream(receiver))
+    }
+}
+
+#[derive(Clone)]
+pub struct BrowserModelSource {
+    pub provider: Arc<BrowserProvider>,
+    pub model: String,
+}
+
+#[async_trait(?Send)]
+impl infinity_agent_core::system::ModelSource for BrowserModelSource {
+    async fn resolve(
+        &self,
+        _thread_id: &rap_protocol::ThreadId<str>,
+    ) -> Result<infinity_agent_core::system::ResolvedModel, BoxError> {
+        Ok(infinity_agent_core::system::ResolvedModel {
+            provider: self.provider.clone(),
+            model_id: self.model.clone(),
+            context_window: 0,
+            supports_image_input: false,
+        })
     }
 }

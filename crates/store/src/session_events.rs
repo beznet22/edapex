@@ -17,7 +17,8 @@ pub struct SessionEventInput {
     pub created_at_ms: u64,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct SessionEventRecord {
     pub session_id: String,
     pub event_id: String,

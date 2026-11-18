@@ -1,6 +1,6 @@
 # 41 — Storage, Memory and Cross-Device Sync
 
-**Draft.** Defines local-first persistence and the EdApex boundary. No implementation in Phase 9B.
+**Normative for the local store and the EdApex boundary; the cloud-sync sections remain Draft.** The local SQLite/OPFS store is implemented and verified for the agent path (see [`50-native-agent-path.md`](./50-native-agent-path.md) and [`../infinity-agent-acceptance.md`](../infinity-agent-acceptance.md)); CRDT/Yjs and the D1 relay are not.
 
 ## Three stores, three authorities
 
@@ -35,16 +35,53 @@ If “everything local-first” includes school records, it contradicts “EdApe
 
 ### Web PWA
 
-- **OPFS + SQLite WASM** if the browser supports the required headers/APIs; otherwise **IndexedDB** through a documented adapter.
-- OPFS is a filesystem, not a SQL database; use SQLite WASM/wa-sqlite or an IndexedDB store.
+- **OPFS + SQLite WASM in a dedicated worker.** The engine is the official
+  `@sqlite.org/sqlite-wasm` package on its `opfs-sahpool` VFS. There is no
+  IndexedDB fallback for the transcript: a browser without OPFS gets no durable
+  agent transcript rather than a second schema.
+- **Superseded decision.** This section previously named a custom `wa-sqlite`
+  build. It was replaced because a locally compiled artifact and the npm loader
+  are not interchangeable (`Module.registerVFS` exists in one and not the other),
+  `opfs-sahpool` is maintained upstream, and it is single-instance-per-origin,
+  which matches the agent's Web Lock instead of fighting it. The custom build's
+  only advantage was a locally compiled FTS5, and the official package ships it.
+- **Sync access is worker-only.** `createSyncAccessHandle()` exists only in a
+  dedicated worker, so the database is opened there and never on a page thread. A
+  store that must be opened from a page has to move into a worker; opening it
+  inline is not a supported configuration.
+- **One owner per session.** A dedicated worker per tab takes an exclusive Web
+  Lock keyed by the storage identity *before* it opens anything, and holds it for
+  the runtime's lifetime. A second tab is refused with `lease_locked` and never
+  touches the files. There is no follower RPC and no heartbeat lease.
+- **Preservation.** `preserveOnInitFailure: true`, `clearOnInit: false`, and the
+  VFS is never removed. An initialization failure must not wipe a user's history,
+  and recovery never auto-deletes.
+- **Two keys, two stores — named, because they differ.** The agent transcript's
+  32-byte data key lives in web local storage
+  (`edapex.infinity.key.<workspace>`) and each record is sealed with it. The sync
+  store's master key is a separate **OPFS file** (`lib/device-identity.ts`), not a
+  row and not the same artifact as its database. Neither is a bearer token or a
+  provider credential, and in both cases copying the database does not carry the
+  key that unlocks it. The transcript key replaces an earlier "sibling file in
+  OPFS" statement for that path: the separation goal holds, the medium changed.
+- **A corrupt key is reported, never rotated.** A stored transcript key that is
+  not 64 hex characters returns `storage_corrupted` and is left untouched, because
+  generating a replacement would orphan every record already encrypted with it.
+  Restoring the original key reopens the same transcript.
+- **Two stores, one transcript.** The transcript and queue are OPFS SQLite. The
+  pinned core's `ConversationStore`/`StateStore` require `Send + Sync` handles
+  that an OPFS store cannot implement, so model memory uses `infinity-wasm`'s
+  IndexedDB actor handles. That is a different job, not a second transcript; see
+  `50-native-agent-path.md`. The earlier "IndexedDB is not used for either" rule
+  is superseded by that constraint.
 - Keep the same logical schema as native.
-- Do not use localStorage for chat history/memory.
-- **One storage mechanism.** The SQLite database and the device key both live in
-  OPFS; the key is a sibling file rather than a row, so a copy of the database does
-  not carry the key that unlocks it. IndexedDB is not used for either, because two
-  persistence APIs meant two failure modes and two schemas for one job. An
-  implementation that genuinely needs IndexedDB (for example a browser without
-  OPFS) should move *all* of it, not half.
+- Do not use localStorage for chat history or memory. The data key above is a
+  key, not content.
+- **FTS5.** `messages_fts` is derived, unencrypted and rebuildable. A write
+  replaces that message's row rather than appending, a delete or tombstone removes
+  it and sets `messages.deleted_at`, and `rebuild_search_index` repopulates from
+  live messages only, so it can never resurrect deleted content. Rebuilds are
+  idempotent and are the recovery path after a schema change or partial wipe.
 
 ### Chat store
 

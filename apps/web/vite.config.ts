@@ -16,6 +16,7 @@ export default defineConfig(({ command }) => {
   }
 
   return {
+    worker: { format: "es" },
     plugins,
     resolve: {
       alias: {

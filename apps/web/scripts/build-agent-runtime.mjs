@@ -26,7 +26,7 @@ const wasmArtifact = join(
   workspaceRoot,
   "target",
   "wasm32-unknown-unknown",
-  "release",
+  "agent-release",
   `${wasmName}.wasm`
 );
 
@@ -42,7 +42,7 @@ const run = (command, args, cwd = root) =>
 console.log(`Building ${crate} for wasm32-unknown-unknown…`);
 run(
   "cargo",
-  ["build", "--target", "wasm32-unknown-unknown", "--release", "-p", crate],
+  ["build", "--target", "wasm32-unknown-unknown", "--profile", "agent-release", "-p", crate],
   workspaceRoot
 );
 
@@ -58,6 +58,18 @@ run("wasm-bindgen", [
   "--out-name",
   wasmName,
   wasmArtifact
+]);
+
+// The pinned Rust target emits bulk-memory and saturating-conversion instructions.
+run("wasm-opt", [
+  join(outDir, `${wasmName}_bg.wasm`),
+  "-Oz",
+  "--enable-bulk-memory-opt",
+  "--enable-nontrapping-float-to-int",
+  "--strip-dwarf",
+  "--strip-debug",
+  "-o",
+  join(outDir, `${wasmName}_bg.wasm`)
 ]);
 
 const measure = (name) => {

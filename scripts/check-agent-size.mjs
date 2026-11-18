@@ -1,29 +1,38 @@
 #!/usr/bin/env node
 /**
- * Size gate for both agent artifacts.
- *
- * Two budgets, because the browser does not ship the native binary and a gate
- * that measures the wrong one reads as a pass while the shipped bundle grows
- * unchecked:
+ * Size gates for both agent artifacts.
  *
  * 1. **Native core** — the `agent_size` example in the `agent-release` profile.
- * 2. **Browser core** — the `wasm32` release build of `edapex-agent-wasm`.
+ * 2. **Browser core** — the artifact that actually ships:
+ *    `apps/web/public/agent-runtime/`, produced by `build:agent-runtime`
+ *    (wasm-bindgen, then `wasm-opt -Oz --strip-dwarf --strip-debug`).
  *
- * The wasm figure is an upper bound, not the bundle: `[profile.release]` keeps
- * `strip = "none"` on purpose (wasm-bindgen needs the `target_features` section)
- * and the shipped size comes from `wasm-opt`. Measuring the cargo artefact still
- * catches the thing that matters — a dependency or a code path that makes the
- * browser runtime balloon — without needing the wasm-bindgen toolchain here.
+ * The browser gate used to measure the raw `wasm32` cargo artifact against a
+ * 5 MiB budget. That number described nothing a user downloads: the artifact
+ * carries `.debug_*` and `name` sections (~2.75 MiB of the 8.39 MiB measured)
+ * that `wasm-opt` removes, and the real production ceiling — 1.2 MB gzipped —
+ * lives on the shipped file. Measuring the intermediate artifact read as a
+ * failure while the bundle was comfortably inside its budget, so the gate is
+ * now the same file the web app fetches, and the budget is unchanged.
+ *
+ * The shipped artifact must be built first; CI runs this after
+ * `pnpm --dir apps/web run build:agent-runtime`.
  */
 import { execFileSync } from "node:child_process";
-import { existsSync, statSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
+import { gzipSync } from "node:zlib";
 
 const CORE_LIMIT = 10 * 1024 * 1024;
-const WASM_LIMIT = 5 * 1024 * 1024;
+// Same ceilings the production build enforces, kept here so a hand-built or
+// stale bundle cannot pass a gate the build would have failed.
+const WASM_GZIP_LIMIT = 1_200_000;
+const GLUE_GZIP_LIMIT = 60_000;
 const targetDir = process.env.CARGO_TARGET_DIR ?? "target";
+const runtimeDir = join("apps", "web", "public", "agent-runtime");
 
 const mib = (bytes) => (bytes / (1024 * 1024)).toFixed(2);
+const kib = (bytes) => (bytes / 1024).toFixed(0);
 
 const build = (args) => execFileSync("cargo", args, { stdio: "inherit" });
 
@@ -31,15 +40,54 @@ const build = (args) => execFileSync("cargo", args, { stdio: "inherit" });
 function measure(path, label, limit) {
   if (!existsSync(path)) {
     console.error(`${label}: artifact missing at ${path}`);
-    return false;
+    return null;
   }
-  const bytes = statSync(path).size;
-  console.log(`${label}: ${bytes} bytes (${mib(bytes)} MiB), budget ${mib(limit)} MiB`);
-  if (bytes > limit) {
-    console.error(`${label} exceeds its ${mib(limit)} MiB budget`);
-    return false;
+  const bytes = readFileSync(path);
+  const gzip = gzipSync(bytes, { level: 9 }).byteLength;
+  console.log(
+    `${label}: ${bytes.byteLength} raw, ${gzip} gzip (budget ${limit}) — ${
+      gzip <= limit ? "ok" : "OVER BUDGET"
+    }`
+  );
+  return gzip <= limit;
+}
+
+/**
+ * Custom-section names in a Wasm module. Used to prove the shipped artifact
+ * carries no debug metadata, rather than trusting the build flags.
+ */
+function customSections(bytes) {
+  const names = [];
+  let at = 8;
+  while (at < bytes.length) {
+    const id = bytes[at];
+    at += 1;
+    let size = 0;
+    let shift = 0;
+    let byte;
+    do {
+      byte = bytes[at];
+      at += 1;
+      size |= (byte & 0x7f) << shift;
+      shift += 7;
+    } while (byte & 0x80);
+    if (id === 0) {
+      // Custom sections carry a name prefixed by its own LEB128 length.
+      let length = 0;
+      let bits = 0;
+      let index = at;
+      let current;
+      do {
+        current = bytes[index];
+        index += 1;
+        length |= (current & 0x7f) << bits;
+        bits += 7;
+      } while (current & 0x80);
+      names.push(bytes.toString("utf8", index, Math.min(bytes.length, index + length)));
+    }
+    at += size;
   }
-  return true;
+  return names;
 }
 
 build([
@@ -59,19 +107,38 @@ const nativeFits = measure(
   CORE_LIMIT
 );
 
-build([
-  "build",
-  "--target",
-  "wasm32-unknown-unknown",
-  "--release",
-  "-p",
-  "edapex-agent-wasm"
-]);
+const wasmPath = join(runtimeDir, "edapex_agent_wasm_bg.wasm");
+const gluePath = join(runtimeDir, "edapex_agent_wasm.js");
+if (!existsSync(wasmPath) || !existsSync(gluePath)) {
+  console.error(
+    `Browser runtime missing at ${runtimeDir}.\n` +
+      "Build it first: pnpm --dir apps/web run build:agent-runtime"
+  );
+  process.exit(1);
+}
 
-const wasmFits = measure(
-  join(targetDir, "wasm32-unknown-unknown", "release", "edapex_agent_wasm.wasm"),
-  "agent core (wasm32, pre-wasm-opt)",
-  WASM_LIMIT
+const shipped = readFileSync(wasmPath);
+const debugSections = customSections(shipped).filter(
+  (name) => name.startsWith(".debug") || name === "name" || name === "external_debug_info"
 );
+if (debugSections.length > 0) {
+  console.error(
+    `Browser runtime still carries debug metadata (${debugSections.join(", ")}); ` +
+      "it must be produced by build:agent-runtime, which strips it."
+  );
+  process.exit(1);
+}
 
-if (!nativeFits || !wasmFits) process.exit(1);
+const wasmFits = measure(wasmPath, "agent core (browser, shipped)", WASM_GZIP_LIMIT);
+const glueFits = measure(gluePath, "agent glue (browser, shipped)", GLUE_GZIP_LIMIT);
+
+const total =
+  gzipSync(readFileSync(wasmPath), { level: 9 }).byteLength +
+  gzipSync(readFileSync(gluePath), { level: 9 }).byteLength;
+console.log(`browser runtime total: ${total} gzip (${kib(total)} KiB)`);
+console.log(`native core: ${mib(statSync(join(targetDir, "agent-release", "examples", nativeExecutable)).size)} MiB`);
+
+if (!nativeFits || !wasmFits || !glueFits) {
+  console.error("Agent artifacts exceeded their size budgets.");
+  process.exit(1);
+}

@@ -11,8 +11,10 @@ import type {
   ChatMessage,
   ChatMessagePart,
   QueuedMessage,
-  WorkspaceRuntimeView
+  WorkspaceRuntimeView,
+  SessionView
 } from "@edapex/contracts";
+import { sessionViewSchema } from "@edapex/contracts";
 
 import { StreamingBuffer } from "./streaming-buffer";
 import { waitForSettlement } from "./turn-settlement";
@@ -127,6 +129,37 @@ export class NativeAgentAdapter implements WorkspaceRuntimeAdapter {
     this.connection = transport;
     this.connected = true;
     this.state = { ...this.state, turn: { ...this.state.turn, state: "idle" } };
+    this.emit();
+  }
+
+  private restoreSession(view: SessionView): void {
+    const messages: ChatMessage[] = view.messages.flatMap((message) => {
+      if (message.role === "tool") return [];
+      return [{
+        id: message.eventId,
+        role: message.role,
+        createdAt: message.versions[message.versions.length - 1]?.createdAtMs ?? 0,
+        parts: [{ kind: "text" as const, text: message.text }]
+      }];
+    });
+    const queued: QueuedMessage[] = view.queue.map((item) => ({
+      id: item.commandId,
+      text: item.text,
+      attachmentIds: [],
+      attachmentNames: [],
+      createdAt: item.enqueuedAtMs
+    }));
+    this.state = {
+      ...this.state,
+      messages,
+      queue: { queued },
+      turn: {
+        ...this.state.turn,
+        queueCount: queued.length,
+        state: queued.length > 0 ? "thinking" : "idle",
+        stoppable: queued.length > 0
+      }
+    };
     this.emit();
   }
 
@@ -249,6 +282,11 @@ export class NativeAgentAdapter implements WorkspaceRuntimeAdapter {
   }
 
   private onAgentEvent(event: AgentEvent): void {
+    if (event.type === "session_snapshot") {
+      const view = event.view as ReturnType<typeof import("@edapex/contracts").sessionViewSchema.parse>;
+      this.restoreSession(view);
+      return;
+    }
     if (event.type === "message_delta") {
       this.streaming.append(String(event.itemId), String(event.delta));
       this.scheduleFlush();

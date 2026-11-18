@@ -31,7 +31,25 @@ export default defineConfig({
   projects: [
     {
       name: "chromium",
+      // The Infinity suite runs in its own explicit Chromium/Firefox/WebKit
+      // projects; without this it also executes here and every test is doubled.
+      testIgnore: "infinity-*.spec.ts",
       use: { ...devices["Desktop Chrome"] }
+    },
+    {
+      name: "infinity-chromium",
+      testMatch: "infinity-*.spec.ts",
+      use: { ...devices["Desktop Chrome"], browserName: "chromium" }
+    },
+    {
+      name: "infinity-firefox",
+      testMatch: "infinity-*.spec.ts",
+      use: { ...devices["Desktop Firefox"], browserName: "firefox" }
+    },
+    {
+      name: "infinity-webkit",
+      testMatch: "infinity-*.spec.ts",
+      use: { ...devices["Desktop Safari"], browserName: "webkit" }
     }
   ],
 

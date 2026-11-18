@@ -18,7 +18,6 @@ pub mod event_hub;
 pub mod infinity_provider;
 pub mod infinity_stream;
 pub mod interrupt;
-#[cfg(not(target_arch = "wasm32"))]
 pub mod projection;
 pub mod protocol;
 pub mod provider;

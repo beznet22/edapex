@@ -270,4 +270,3 @@ pub(super) fn command_id(command: &crate::SessionCommand) -> &str {
         | crate::SessionCommand::ReleaseLease { command_id, .. } => command_id,
     }
 }
-

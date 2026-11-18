@@ -88,7 +88,7 @@
     ╔══════════════════════════════════════════════════════════════════════════════╗
     ║  LOCAL STORE  (crates/store)   OPFS SQLite (web) · rusqlite (native)         ║
     ║  per-record XChaCha20 · outbox · journal · FTS (derived)                     ║
-    ║  key = sibling OPFS file / OS keychain                                       ║
+    ║  key = web local storage / OS keychain                                       ║
     ╚══════════════════════════════════════════════════════════════════════════════╝
     ── What this diagram does not show ───────────────────────────────────────────
 

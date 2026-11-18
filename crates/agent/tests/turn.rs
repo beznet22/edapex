@@ -475,7 +475,11 @@ async fn a_recorder_hears_the_start_each_tool_round_and_the_end() {
     // Exactly one boundary: the round whose tool calls completed. The round that
     // returns the final answer has no tool result to resume from.
     let checkpoints = recorder.checkpoints.lock().expect("checkpoints");
-    assert_eq!(checkpoints.len(), 1, "one checkpoint per completed tool round");
+    assert_eq!(
+        checkpoints.len(),
+        1,
+        "one checkpoint per completed tool round"
+    );
     // system prompt + user + assistant(tool_calls) + tool result: the whole
     // transcript as it stands at the boundary, which is what a resume replays.
     assert_eq!(checkpoints[0], 4);
@@ -536,7 +540,10 @@ async fn a_resumed_run_continues_from_its_checkpoint_without_a_new_message() {
     assert!(
         events.snapshot().iter().any(|event| matches!(
             event,
-            AgentEvent::TurnCompleted { status: TurnCompletionStatus::Completed, .. }
+            AgentEvent::TurnCompleted {
+                status: TurnCompletionStatus::Completed,
+                ..
+            }
         )),
         "the client never learned the turn finished"
     );

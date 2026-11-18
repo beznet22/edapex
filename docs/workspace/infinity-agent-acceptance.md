@@ -90,13 +90,138 @@ malformed JSON.
   execution is WorkManager + foreground service + `agent.db`. Push only carries
   approval and completion notifications while the app is backgrounded.
 
+## Browser turn: the five defects that kept it from the provider
+
+A turn that is accepted and never reaches the model looks identical to a healthy
+one from the page, because a worker's console never reaches
+`page.on("console")`. The trace that made this observable is
+`crates/agent-wasm/src/browser_trace.rs`, bounded to 64 marks and read through
+`WasmSession::debug_trace` via the worker's `diagnostics` request and
+`InfinityBrowserClient.debugTrace()`. What it proved, in order:
+
+1. **The spec never sent a turn.** `probe(page, id)` was called without
+   `{ send: true }`, so `startTurn` never ran and the assertions on provider
+   invocation and completion could not pass. Every conclusion drawn before this
+   was measured against a test that never exercised the path. The shared probe
+   now returns `submitted`, set only when `startTurn` resolves, and the
+   regression asserts it before asserting the provider.
+2. **Stream ids could not cross the boundary.** `push_chunk`, `push_error` and
+   `end_stream` took `u64`, which wasm-bindgen satisfies only with a `BigInt`,
+   so every chunk threw `Cannot convert 1 to a BigInt` and the turn ended
+   silently. They are `u32` end to end; a per-session counter has no business
+   being wider than the only caller language can express.
+3. **Every event carried `threadId: ""`.** `BrowserTurnLifecycle::set_root` was
+   dropped while adding instrumentation, and the contract rejects an empty
+   thread id (`z.string().min(1)`), so the client discarded `turn_started`,
+   `message_delta` and `turn_completed` as malformed.
+4. **History was appended twice.** `observe` ended with
+   `events.append(&mut self.history)` twice, emitting duplicate
+   `turn_started`/`turn_completed` rows for one turn.
+5. **A corrupt data key was silently replaced.** `dataKey` generated a fresh
+   32-byte key whenever the stored one was unreadable, which would make every
+   record already encrypted with the old key permanently unreadable. It now
+   reports `storage_corrupted` and never rewrites the key, and restoring the
+   real key reopens the same transcript.
+
+Each has a regression in `e2e/infinity-regressions.spec.ts`; error propagation
+and interruption are in `e2e/infinity-turn-failure.spec.ts`; the shared probe is
+`e2e/support/browser-probe.ts`.
+
+### The derived search index had two desyncs
+
+Found by the FTS5 acceptance work, both fixed in `crates/store`:
+
+- `write_record` appended to `messages_fts` instead of replacing the row for that
+  message, so an update kept matching text the record no longer contained, and a
+  delete left the record findable. It now deletes the message's rows first, and
+  only indexes `messages`, the table the rebuild reads.
+- `rebuild_search_index` indexed every `messages` row, so it made deleted
+  content findable again. The durable marker is the existing `deleted_at`
+  column — the outbox cannot serve, because it is pruned once a deletion is
+  acknowledged.
+
+Both are covered by `search_index_follows_updates_and_deletes` in
+`crates/store/tests/store.rs`.
+
+### FTS5 in the browser is verified in the engine, not through the page store
+
+The worker proves the engine it actually runs: the `diagnostics` response
+carries `fts`, read from `sqlite_compileoption_used('ENABLE_FTS5')` plus the
+existence of `messages_fts` in `sqlite_master`. It is asserted in
+`e2e/infinity-regressions.spec.ts`.
+
+The full search API (`search`, `rebuildSearchIndex`) cannot be exercised from a
+page: `opfs-sahpool` needs `createSyncAccessHandle`, which browsers only expose
+in dedicated workers. That is why the pre-existing `e2e/browser-store.spec.ts`
+fails with `Missing required OPFS APIs` (2 of 4 tests) and why
+`apps/web/hooks/use-agent-store.ts` cannot open the store on the page. The FTS
+semantics themselves are verified against real SQLite in `crates/store` (42 tests
+across targets), and the browser store moves into a worker as part of the sync
+work — **deferred, not passed**.
+
+### WebKit cannot open a sync access handle, and it is not our code
+
+`e2e/infinity-opfs-probe.spec.ts` runs twenty lines that touch no EdApex code:
+`navigator.storage.getDirectory()` → `createSyncAccessHandle()` → write → read.
+Chromium and Firefox write and read back `"hi"`; Playwright's WebKit throws
+`UnknownError: The operation failed for an unknown transient reason (e.g. out of
+memory)`, the same error every WebKit runtime test reports (13 failed, 1 skipped
+in the last run). The engine is the limitation here, and **Safari remains
+unverified** until it is measured on a real device — the Playwright build is not
+evidence either way for shipped Safari. The probe worker is a test fixture in
+`e2e/fixtures/`, served by route interception so it never ships.
+
+### The size gate measured an artifact nobody downloads
+
+`check-agent-size.mjs` measured the raw `wasm32` cargo artifact against 5 MiB.
+That file carries 2.75 MiB of `.debug_*` and `name` sections that `wasm-opt`
+strips, so it read as a failure (8.39 MiB) while the shipped bundle was well
+inside its budget. The gate now measures the artifact the browser fetches,
+`apps/web/public/agent-runtime/`, against the unchanged production ceilings
+(1,200,000 gzip wasm, 60,000 gzip glue), asserts the shipped wasm carries no
+debug or `name` metadata, and CI runs it after `build:agent-runtime`. Measured:
+
+```
+agent core (browser, shipped): 3,050,320 raw / 966,846 gzip (budget 1,200,000) — ok
+agent glue (browser, shipped):    97,931 raw /  14,139 gzip (budget    60,000) — ok
+browser runtime total: 980,985 gzip (958 KiB)
+```
+
+## Acceptance matrix
+
+| Area | Result |
+|---|---|
+| Chromium agent turn | Pass |
+| Firefox agent turn | Pass |
+| Mock provider invocation | Pass |
+| Assistant delta propagation | Pass |
+| Turn completion | Pass |
+| Error propagation (typed code, settles as error) | Pass |
+| Cancellation (`interrupted`, settles as stopped) | Pass |
+| Five defect regressions | Pass |
+| FTS5 semantics (real SQLite: MATCH, update, delete, rebuild, idempotent) | Pass, native |
+| FTS5 present in the Wasm engine | Pass, worker probe |
+| FTS5 `search()`/`rebuildSearchIndex()` from a page store | **Deferred** — SAH is worker-only |
+| Database close/reopen (session store, new worker) | Pass |
+| Page reload persistence | Pass |
+| Encryption-key integrity | Pass |
+| Playwright WebKit OPFS | Documented environment limitation |
+| Production bundle | Pass — 958 KiB gzip total |
+
 ## Reproduce
 
 ```bash
 cargo test -p edapex-agent -p edapex-store
 cargo test -p edapex-desktop
 cargo build --target wasm32-unknown-unknown -p edapex-agent-wasm
+pnpm --dir apps/web run build:agent-runtime
 node scripts/check-agent-size.mjs
 pnpm --dir apps/web exec vitest run --root ../../packages/contracts tests/session.test.ts
 pnpm --dir apps/web run check
+pnpm --dir apps/web exec playwright test --project=infinity-chromium --project=infinity-firefox
 ```
+
+Engines exercised: Chromium 158.0.8127.18, Firefox 159.0, Playwright WebKit 27.2.
+The browser command excludes the WebKit project on purpose: `infinity-opfs-probe`
+shows that Playwright's WebKit cannot create an OPFS sync access handle, so its
+suite fails for the engine's reason, not the runtime's. Safari is unverified.

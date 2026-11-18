@@ -1,10 +1,12 @@
 use async_trait::async_trait;
+#[cfg(not(target_arch = "wasm32"))]
 use edapex_store::session_events::{SessionAppendOutcome, SessionEventInput};
 use infinity_agent_core::system::{AgentEvent as InfinityEvent, ReplaySnapshot, ThreadObserver};
 use rap_protocol::ThreadId;
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 
+#[cfg(not(target_arch = "wasm32"))]
 use crate::durable_store::{DurableStoreError, StoreContext};
 use crate::session_protocol::{SessionMessage, SessionQueueItem, SessionTruncation, SessionView};
 
@@ -132,6 +134,7 @@ impl SessionProjection {
         }
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn append(
         &mut self,
         context: &StoreContext,
@@ -170,6 +173,7 @@ impl SessionProjection {
         Ok(outcome)
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn restore(&mut self, context: &StoreContext) -> Result<Option<String>, DurableStoreError> {
         let latest = context
             .lock()?
@@ -183,9 +187,7 @@ impl SessionProjection {
             .filter(|record| record.sequence > 1)
             .map(|record| record.sequence.saturating_sub(1).to_string());
         for record in records {
-            let event = serde_json::from_slice::<ProjectionEvent>(&record.payload)?;
-            self.last_seq = record.sequence;
-            self.apply(event);
+            self.replay_record(&record)?;
         }
         Ok(next_cursor)
     }
@@ -241,6 +243,17 @@ impl SessionProjection {
             truncations: self.truncations.clone(),
             next_cursor,
         }
+    }
+
+    /// Replays records already loaded by a host's own driver.
+    pub fn replay_record(
+        &mut self,
+        record: &edapex_store::session_events::SessionEventRecord,
+    ) -> Result<(), serde_json::Error> {
+        let event = serde_json::from_slice::<ProjectionEvent>(&record.payload)?;
+        self.last_seq = record.sequence;
+        self.apply(event);
+        Ok(())
     }
 
     fn apply(&mut self, event: ProjectionEvent) {

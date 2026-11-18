@@ -26,10 +26,8 @@ const webTransport: AgentTransport = {
     settings: AgentConnectSettings,
     handlers: ConnectHandlers
   ): Promise<ConnectedTransport> {
-    // Imported statically: the wasm path is the default and lazy-loading it would only move
-    // the cost from first paint to first message.
-    const { NativeAgentClient } = await import("@/lib/native-agent");
-    const client = new NativeAgentClient(settings, {
+    const { InfinityBrowserClient } = await import("@/lib/infinity-browser-client");
+    const client = new InfinityBrowserClient(settings, {
       onEvent: handlers.onEvent,
       onTool: handlers.onTool,
       onApproval: handlers.onApproval

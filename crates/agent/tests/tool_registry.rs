@@ -11,8 +11,9 @@ use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
 use common::{cleanup, command, driver, path, Events, Provider, Tools};
-use edapex_agent::{AgentEvent, ApprovalDecision, ProviderChunk, ToolCompletionStatus,
-    TurnCompletionStatus};
+use edapex_agent::{
+    AgentEvent, ApprovalDecision, ProviderChunk, ToolCompletionStatus, TurnCompletionStatus,
+};
 
 #[tokio::test(flavor = "multi_thread")]
 async fn denied_approval_never_executes_and_returns_a_tool_failure_to_the_model() {
@@ -77,7 +78,11 @@ async fn denied_approval_never_executes_and_returns_a_tool_failure_to_the_model(
             ..
         }
     )));
-    assert_eq!(provider.request_count(), 2, "the model never saw the denial");
+    assert_eq!(
+        provider.request_count(),
+        2,
+        "the model never saw the denial"
+    );
     {
         let requests = provider.request_contents();
         assert!(

@@ -10,8 +10,8 @@ use uuid::Uuid;
 
 use crate::protocol::{
     AgentConnectSettings, AgentError, AgentEvent, AgentStatus, AgentTurnInput, ApprovalDecision,
-    ApprovalRequest, DynamicToolCall, DynamicToolName, DynamicToolResult, ThreadStartResult, ToolCompletionStatus,
-    TurnCompletionStatus, TurnStarted,
+    ApprovalRequest, DynamicToolCall, DynamicToolName, DynamicToolResult, ThreadStartResult,
+    ToolCompletionStatus, TurnCompletionStatus, TurnStarted,
 };
 use crate::provider::{ChatMessage, ProviderChunk, ProviderClient, ProviderRequest, ToolCall};
 
@@ -149,7 +149,7 @@ impl AgentHost {
                 threads: Mutex::new(HashMap::new()),
                 active_threads: Mutex::new(HashSet::new()),
                 turns: Mutex::new(HashMap::new()),
-            errors: Mutex::new(HashMap::new()),
+                errors: Mutex::new(HashMap::new()),
             }),
         };
         host.emit(AgentEvent::Connected { thread_id: None });
@@ -240,7 +240,11 @@ impl AgentHost {
                 .run_turn(&thread_id, &spawned_turn_id, &control, &mut history)
                 .await;
 
-            host.inner.turns.lock().ok().map(|mut turns| turns.remove(&spawned_turn_id));
+            host.inner
+                .turns
+                .lock()
+                .ok()
+                .map(|mut turns| turns.remove(&spawned_turn_id));
             host.inner
                 .active_threads
                 .lock()
@@ -318,9 +322,15 @@ impl AgentHost {
         });
 
         let mut history = history;
-        let status = self.run_turn(thread_id, turn_id, &control, &mut history).await;
+        let status = self
+            .run_turn(thread_id, turn_id, &control, &mut history)
+            .await;
 
-        self.inner.turns.lock().ok().map(|mut turns| turns.remove(turn_id));
+        self.inner
+            .turns
+            .lock()
+            .ok()
+            .map(|mut turns| turns.remove(turn_id));
         self.inner
             .active_threads
             .lock()
@@ -385,12 +395,7 @@ impl AgentHost {
     }
 
     /// Every way a turn can fail goes through here, so a settled run always carries its reason.
-    fn fail_turn(
-        &self,
-        thread_id: &str,
-        turn_id: &str,
-        error: AgentError,
-    ) -> TurnCompletionStatus {
+    fn fail_turn(&self, thread_id: &str, turn_id: &str, error: AgentError) -> TurnCompletionStatus {
         if let Ok(mut errors) = self.inner.errors.lock() {
             errors.insert(turn_id.to_string(), error.message.clone());
         }
@@ -506,7 +511,11 @@ impl AgentHost {
 
             if calls.is_empty() {
                 history.push(ChatMessage::assistant(
-                    if text.is_empty() { None } else { Some(std::sync::Arc::from(text.as_str())) },
+                    if text.is_empty() {
+                        None
+                    } else {
+                        Some(std::sync::Arc::from(text.as_str()))
+                    },
                     Vec::new(),
                 ));
                 return TurnCompletionStatus::Completed;
@@ -521,7 +530,11 @@ impl AgentHost {
                 })
                 .collect();
             history.push(ChatMessage::assistant(
-                if text.is_empty() { None } else { Some(std::sync::Arc::from(text.as_str())) },
+                if text.is_empty() {
+                    None
+                } else {
+                    Some(std::sync::Arc::from(text.as_str()))
+                },
                 tool_calls.clone(),
             ));
 

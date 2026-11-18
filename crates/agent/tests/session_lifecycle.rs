@@ -10,8 +10,10 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use common::{cleanup, command, driver, path, Events, Provider, Tools};
-use edapex_agent::{AgentErrorCode, AgentEvent, ApprovalDecision, ProviderChunk, SessionCommand,
-    TurnCompletionStatus};
+use edapex_agent::{
+    AgentErrorCode, AgentEvent, ApprovalDecision, ProviderChunk, SessionCommand,
+    TurnCompletionStatus,
+};
 
 #[tokio::test(flavor = "multi_thread")]
 async fn cancellation_emits_interrupted_and_plain_user_text_resumes() {
@@ -64,7 +66,11 @@ async fn cancellation_emits_interrupted_and_plain_user_text_resumes() {
     events
         .wait_for("turn-resumed", TurnCompletionStatus::Completed)
         .await;
-    assert_eq!(provider.request_count(), 2, "the resume never reached the model");
+    assert_eq!(
+        provider.request_count(),
+        2,
+        "the resume never reached the model"
+    );
     driver.close().await.unwrap();
     cleanup(&path);
 }

@@ -35,6 +35,33 @@ recorded blocker.*
 A turn's durability is a native-host concern. The worker opens the **same**
 `agent.db` the window does; two paths would be two histories.
 
+## What EdApex changes in the Wasm crate
+
+`crates/agent-wasm` is an adapter over `infinity-wasm` and `infinity-agent-core`,
+not a fork of either. Every change it carries was forced by a measured failure:
+
+| Change | Why |
+|---|---|
+| Stream ids are `u32`, not `u64` | wasm-bindgen requires a `BigInt` for `u64`, so a JavaScript `number` threw before any chunk reached the core |
+| `BrowserTurnLifecycle::set_root` runs before the first turn | every event carries the root thread id, and the contract rejects an empty one |
+| `observe` drains its history once | appending twice emitted duplicate `turn_started`/`turn_completed` |
+| The session holds a `ChannelSender`, not the running system | the router and pump must share one `LocalSet` for the session's lifetime; a nested `LocalSet` cancels them when its `run_until` returns |
+| `BrowserProvider` holds a numeric registry handle | the provider must be `Send + Sync` while the fetch runs in `spawn_local` |
+| A bounded `browser_trace` ring (64 marks) | a worker's console never reaches the page, which is what made a stalled turn invisible |
+
+The trace records stage names, worker-side timestamps and small integer outcomes
+(queue lengths, append outcomes, byte counts). It never records prompts, message
+text, keys, tokens or tool payloads; the one note that formatted a core event was
+removed for putting user text in it. It is readable only by the page that owns the
+worker.
+| `BrowserObserver`/`BrowserSubscription` removed | the system is attached with `thread_handle`, so the observer path was dead code |
+
+The inference-provider boundary is `ModelProvider`. `crates/agent/src/infinity_stream.rs`
+translates a completion request and maps chunks back, including assembling tool-call
+deltas, because the pinned core does not assemble them itself. The browser's mock
+provider is a test double for that boundary: it exists only in `e2e/`, it never
+ships, and it does not replace the EdApex model-router call.
+
 ## Audit result (historical): the rule was violated
 
 At audit time, desktop and mobile ran the **WebAssembly** agent, not the native one.

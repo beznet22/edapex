@@ -11,7 +11,12 @@
 
 #![cfg(target_arch = "wasm32")]
 
+mod browser_engine;
+mod browser_trace;
+mod browser_projection;
 mod browser_provider;
+mod session;
+mod session_lifecycle;
 mod sql;
 
 use std::collections::VecDeque;
@@ -23,8 +28,7 @@ use edapex_agent::{
     parse_openai_sse_data, sse_data_line, take_sse_event, AgentConnectSettings, AgentError,
     AgentErrorCode, AgentEvent, AgentHost, AgentHostOptions, AgentTurnInput, ApprovalDecision,
     ApprovalHandler, ApprovalRequest, DynamicToolCall, DynamicToolName, DynamicToolResult,
-    EventSink, HostFuture, ProviderChunk, ProviderRequest, ToolExecutor,
-    Utf8StreamDecoder,
+    EventSink, HostFuture, ProviderChunk, ProviderRequest, ToolExecutor, Utf8StreamDecoder,
 };
 use js_sys::Function;
 use tokio::sync::oneshot;
@@ -46,7 +50,7 @@ struct QueueState {
 }
 
 impl ChunkQueue {
-    fn push(&self, item: QueueItem) {
+    pub(crate) fn push(&self, item: QueueItem) {
         let mut state = self.state.lock().expect("queue mutex");
         state.items.push_back(item);
         if let Some(waker) = state.waker.take() {
@@ -54,7 +58,7 @@ impl ChunkQueue {
         }
     }
 
-    fn close(&self) {
+    pub(crate) fn close(&self) {
         let mut state = self.state.lock().expect("queue mutex");
         state.closed = true;
         if let Some(waker) = state.waker.take() {
@@ -189,8 +193,9 @@ fn js_error(message: impl Into<String>) -> JsValue {
 }
 
 /// Events are forwarded to JavaScript, which owns every rendering decision.
+#[derive(Clone)]
 struct JsEventSink {
-    on_event: Function,
+    pub(crate) on_event: Function,
 }
 
 impl EventSink for JsEventSink {
@@ -205,7 +210,7 @@ impl EventSink for JsEventSink {
 
 /// Tools run in the host, which holds the EdApex session.
 struct JsToolExecutor {
-    on_tool: Function,
+    pub(crate) on_tool: Function,
 }
 
 impl ToolExecutor for JsToolExecutor {
@@ -230,7 +235,7 @@ impl ToolExecutor for JsToolExecutor {
 }
 
 struct JsApprovalHandler {
-    on_approval: Function,
+    pub(crate) on_approval: Function,
 }
 
 impl ApprovalHandler for JsApprovalHandler {
@@ -257,7 +262,7 @@ impl ApprovalHandler for JsApprovalHandler {
 #[wasm_bindgen]
 pub struct WasmAgent {
     host: AgentHost,
-    queue: Arc<ChunkQueue>,
+    provider: browser_provider::BrowserProvider,
     /// The registry handle for `on_request`, so `close` can drop the page function.
     provider_id: u64,
 }
@@ -289,12 +294,10 @@ impl WasmAgent {
 
         let queue = Arc::new(ChunkQueue::default());
         let provider_id = browser_provider::register(on_request);
+        let provider = browser_provider::BrowserProvider::new(provider_id, queue);
         let host = AgentHost::connect(AgentHostOptions {
             settings,
-            provider: Arc::new(browser_provider::BrowserProvider::new(
-                provider_id,
-                Arc::clone(&queue),
-            )),
+            provider: Arc::new(provider.clone()),
             tools: Arc::new(JsToolExecutor { on_tool }),
             approvals: Arc::new(JsApprovalHandler { on_approval }),
             events: Arc::new(JsEventSink { on_event }),
@@ -302,29 +305,38 @@ impl WasmAgent {
         })
         .map_err(|error| js_error(error.message))?;
 
-        Ok(Self { host, queue, provider_id })
+        Ok(Self {
+            host,
+            provider,
+            provider_id,
+        })
     }
 
     /// Queue one provider chunk (a serialized `ProviderChunk`).
     pub fn push_chunk(&self, chunk: &str) -> Result<(), JsValue> {
         let chunk: ProviderChunk = serde_json::from_str(chunk)
             .map_err(|error| js_error(format!("Invalid chunk: {error}")))?;
-        self.queue.push(Ok(chunk));
+        self.provider
+            .push(self.provider.current_stream_id(), Ok(chunk))
+            .map_err(|error| js_error(error.message))?;
         Ok(())
     }
 
     /// Queue a provider failure.
     pub fn push_error(&self, code: &str, message: &str) {
-        self.queue.push(Err(AgentError::new(
-            error_code_from_str(code),
-            message.to_string(),
-            true,
-        )));
+        let _ = self.provider.push(
+            self.provider.current_stream_id(),
+            Err(AgentError::new(
+                error_code_from_str(code),
+                message.to_string(),
+                true,
+            )),
+        );
     }
 
     /// Signal that the provider stream has ended.
     pub fn end_stream(&self) {
-        self.queue.close();
+        self.provider.end_stream(self.provider.current_stream_id());
     }
 
     /// Start a thread and return its id.
@@ -364,13 +376,13 @@ impl WasmAgent {
     }
 
     pub fn close(&self) {
-        self.queue.close();
+        self.provider.close_all();
         browser_provider::release(self.provider_id);
         self.host.close();
     }
 }
 
-fn error_code_from_str(value: &str) -> AgentErrorCode {
+pub(crate) fn error_code_from_str(value: &str) -> AgentErrorCode {
     match value {
         "unsupported_capability" => AgentErrorCode::UnsupportedCapability,
         "permission_denied" => AgentErrorCode::PermissionDenied,

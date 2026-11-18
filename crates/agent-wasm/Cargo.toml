@@ -14,7 +14,11 @@ edapex-store = { path = "../store" }
 # The browser provider implements Infinity's `ModelProvider` directly, so it
 # needs the protocol types and `async_trait` the trait is declared with.
 async-trait = { version = "0.1", default-features = false }
+# The browser session drives Infinity's local system directly, so the crate needs
+# the core and its thread-id type in addition to the protocol.
+infinity-agent-core.workspace = true
 infinity-provider-protocol.workspace = true
+rap-protocol.workspace = true
 js-sys = "0.3"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

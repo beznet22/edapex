@@ -66,10 +66,12 @@ jobs:
           toolchain: "1.99.1"
           targets: wasm32-unknown-unknown
       - uses: Swatinem/rust-cache@v2
+      # Compiles the crate for the browser target. The size budget is measured on
+      # the shipped artifact in web.yml, which builds it with wasm-bindgen and
+      # wasm-opt first; the raw cargo artifact carries debug metadata the browser
+      # never receives, so gating it measured the wrong file.
       - name: Build the browser runtime
         run: cargo build --target wasm32-unknown-unknown -p edapex-agent-wasm
-      - name: Size budget
-        run: node scripts/check-agent-size.mjs
 
   contracts:
     name: Contracts and web typecheck

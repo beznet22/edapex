@@ -105,13 +105,15 @@ jobs:
       - name: Core tests
         run: cargo test -p edapex-agent
 
-      - name: Native size gate
-        run: node scripts/check-agent-size.mjs
-
       # Builds the bundle, runs wasm-bindgen, and fails if either the wasm or the
       # JS glue exceeds its compressed budget.
       - name: Build agent runtime
         run: pnpm --dir apps/web run build:agent-runtime
+
+      # Measures the artifact the browser downloads, after wasm-opt has stripped
+      # the debug metadata, plus the native core example.
+      - name: Size gates
+        run: node scripts/check-agent-size.mjs
 
       - name: Agent runtime must exist
         run: |
