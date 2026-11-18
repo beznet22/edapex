@@ -121,6 +121,8 @@ class FakeStore implements SessionSyncStore {
   applied: SessionSyncEvent[] = [];
   deletion: SessionDeletion | null = null;
   cursorValue = 0;
+  failApply = false;
+  failCursor = false;
   readonly acknowledged: SessionSyncAcknowledgement[] = [];
 
   async pendingEvents(limit: number): Promise<readonly SessionSyncEvent[]> {
@@ -142,6 +144,7 @@ class FakeStore implements SessionSyncStore {
   }
 
   async applyEvents(events: readonly SessionSyncEvent[]): Promise<void> {
+    if (this.failApply) throw new Error("projection is locked");
     this.applied.push(...events);
   }
 
@@ -151,6 +154,7 @@ class FakeStore implements SessionSyncStore {
   }
 
   async setCursor(position: number): Promise<void> {
+    if (this.failCursor) throw new Error("cursor write failed");
     this.cursorValue = position;
   }
 }
@@ -330,6 +334,116 @@ describe("session sync pass", () => {
     await expect(
       syncOnce({ client: relayClient, lease, store: new FakeStore() })
     ).rejects.toMatchObject({ code: "contract_mismatch" });
+  });
+
+  it("renews mid-pass when one batch outlives the renewal window", async () => {
+    let now = 0;
+    let pushes = 0;
+    const wired = relay({
+      acquire: (count) => leaseResponse(count, 3_000),
+      renew: () => leaseResponse(1, 8_500),
+      push: (body) => {
+        pushes += 1;
+        // The first batch took long enough to open the renewal window.
+        if (pushes === 1) now = 2_500;
+        return acceptedResponse(body, () => 1);
+      }
+    });
+    const store = new FakeStore();
+    store.pending = [event(1), event(2)];
+    const relayClient = client(wired.transport);
+    const lease = new LeaseKeeper(relayClient, 3_000, () => now);
+
+    const report = await syncOnce({ client: relayClient, lease, store, batchLimit: 1 });
+
+    expect(report.pushed).toBe(2);
+    expect(wired.recorded.counts.renew).toBe(1);
+    expect(wired.recorded.counts.acquire).toBe(1);
+  });
+
+  it("does not advance the cursor when local application fails", async () => {
+    const wired = relay({
+      pull: () => ({
+        status: 200,
+        body: { events: [event(1, { relayPosition: 1 })], nextPosition: 1, deletion: null }
+      })
+    });
+    const store = new FakeStore();
+    store.failApply = true;
+    const relayClient = client(wired.transport);
+    const lease = new LeaseKeeper(relayClient, 60_000, () => 0);
+
+    await expect(syncOnce({ client: relayClient, lease, store })).rejects.toThrow(
+      "projection is locked"
+    );
+    expect(store.cursorValue).toBe(0);
+  });
+
+  it("replays the page when the cursor write fails, before advancing it", async () => {
+    const wired = relay({
+      pull: (after) =>
+        after === 0
+          ? {
+              status: 200,
+              body: { events: [event(1, { relayPosition: 1 })], nextPosition: 1, deletion: null }
+            }
+          : { status: 200, body: { events: [], nextPosition: after, deletion: null } }
+    });
+    const store = new FakeStore();
+    store.failCursor = true;
+    const relayClient = client(wired.transport);
+    const lease = new LeaseKeeper(relayClient, 60_000, () => 0);
+
+    await expect(syncOnce({ client: relayClient, lease, store })).rejects.toThrow(
+      "cursor write failed"
+    );
+    // The page was applied and not lost; the cursor is what failed.
+    expect(store.applied).toHaveLength(1);
+    expect(store.cursorValue).toBe(0);
+
+    // Second pass replays it, because the cursor never advanced. This is why
+    // `applyEvents` must be idempotent by eventId.
+    store.failCursor = false;
+    const second = await syncOnce({ client: relayClient, lease, store });
+    expect(second.cursor).toBe(1);
+    expect(store.applied).toHaveLength(2);
+  });
+
+  it("reports a transport failure as a typed relay error", async () => {
+    const transport: RelayTransport = async () => {
+      throw new Error("offline");
+    };
+    const relayClient = new SessionRelayClient({
+      transport,
+      workspaceId: WORKSPACE,
+      sessionId: SESSION,
+      deviceId: DEVICE,
+      clientId: CLIENT,
+      newCommandId: () => "command-1"
+    });
+
+    await expect(relayClient.pull(0, 100)).rejects.toMatchObject({
+      code: "transport_unavailable",
+      status: 0
+    });
+  });
+
+  it("keeps the transport boundary credential-safe and host-agnostic", async () => {
+    const wired = relay();
+    const store = new FakeStore();
+    store.pending = [event(1)];
+    const relayClient = client(wired.transport);
+    const lease = new LeaseKeeper(relayClient, 60_000, () => 0);
+
+    await syncOnce({ client: relayClient, lease, store });
+
+    // Nothing but method, path and body crosses the seam: no headers, no token,
+    // no origin. Each host decides how the request is authenticated.
+    expect(wired.recorded.calls.length).toBeGreaterThan(0);
+    for (const call of wired.recorded.calls) {
+      expect(Object.keys(call).every((key) => ["method", "path", "body"].includes(key))).toBe(true);
+      expect(call.path.startsWith("/api/v1/agent/sessions/")).toBe(true);
+    }
   });
 
   it("surfaces a refused lease as a typed failure, not a silent no-op", async () => {

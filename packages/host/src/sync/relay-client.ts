@@ -114,7 +114,15 @@ export class SessionRelayClient {
   }
 
   private async send(request: RelayRequest): Promise<RelayResponse> {
-    const response = await this.transport(request);
+    let response: RelayResponse;
+    try {
+      response = await this.transport(request);
+    } catch (cause) {
+      // A rejected transport (offline, killed WebView, a Tauri command error) is a
+      // relay failure like any other, and status 0 says no response arrived.
+      const message = cause instanceof Error ? cause.message : "The relay transport failed.";
+      throw new RelayError("transport_unavailable", message, 0);
+    }
     if (response.status >= 400) {
       if (isErrorEnvelope(response.body)) {
         throw new RelayError(

@@ -24,8 +24,17 @@ export interface SessionSyncStore {
   pendingEvents(limit: number): Promise<readonly SessionSyncEvent[]>;
   acknowledge(acknowledgements: readonly SessionSyncAcknowledgement[]): Promise<void>;
   cursor(): Promise<number>;
+  /**
+   * Applies remote events to the local projection.
+   *
+   * MUST be idempotent by `eventId`. The pass applies a page and only then writes
+   * the cursor, so an interruption between the two replays that page next time —
+   * correct recovery, provided applying twice is a no-op.
+   */
   applyEvents(events: readonly SessionSyncEvent[]): Promise<void>;
+  /** Applied before the cursor moves; it is what makes a deleted session unreachable. */
   applyDeletion(deletion: SessionDeletion): Promise<void>;
+  /** Called only after `applyEvents` or `applyDeletion` has resolved. */
   setCursor(position: number): Promise<void>;
 }
 
