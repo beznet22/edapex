@@ -227,3 +227,33 @@ fn acknowledgement_deduplicates_retry_and_delete_purges_local_history() {
         Err(StoreError::SessionDeleted)
     ));
 }
+
+#[test]
+fn a_repeated_tombstone_is_safe_and_clears_local_payloads() {
+    let mut store = memory_store();
+    store
+        .ensure_agent_session(SESSION, WORKSPACE, DEVICE, "model-1", false)
+        .unwrap();
+    store
+        .claim_agent_session(SESSION, CLIENT, 60_000, 0)
+        .unwrap();
+    store
+        .append_agent_session_event(event("event-1", "command-1", 1))
+        .unwrap();
+    assert_eq!(store.pending_session_events(DEVICE, 10).unwrap().len(), 1);
+
+    store.delete_agent_session(SESSION, 2_000).unwrap();
+    // The tombstone removes the local payloads a deletion must not leave behind.
+    assert!(store.pending_session_events(DEVICE, 10).unwrap().is_empty());
+    assert!(store.agent_session_events(SESSION, 0, 50).unwrap().is_empty());
+
+    // A replayed deletion signal from another device must be a no-op, not an error.
+    store.delete_agent_session(SESSION, 2_000).unwrap();
+    assert!(store.agent_session_events(SESSION, 0, 50).unwrap().is_empty());
+
+    // And the tombstone must keep a stale append from resurrecting the session.
+    assert!(matches!(
+        store.append_agent_session_event(event("event-2", "command-2", 1)),
+        Err(StoreError::SessionDeleted)
+    ));
+}

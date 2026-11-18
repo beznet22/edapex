@@ -265,9 +265,22 @@ What landed, each with tests:
   `core_snapshot` (model context) and `deletion` (tombstone) apart, so a host
   cannot apply model context to the transcript.
 
-Still open in Chunk 7: hosts persisting pulled snapshots into their conversation
-stores, automatic scheduling, reconnection/offline recovery and sync status.
-Those remain deferred, not implied.
+**Tombstones are now durable:** `delete_agent_session` removes local payloads and
+marks the session deleted in one transaction, a replayed deletion is a no-op, and
+a stale append cannot resurrect the session — covered by
+`a_repeated_tombstone_is_safe_and_clears_local_payloads`. The browser store
+exposes the same operation as `apply_deletion`.
+
+**Blocked: cross-device plaintext.** Every event is sealed with the origin
+device's master key and that envelope is what the relay stores, so a second
+device cannot decrypt a projection or a snapshot. Nothing produces
+`core_snapshot` events yet either. Restoring a transcript or a model context on
+a new device needs a key-agreement decision (session key derived from credentials,
+a pairing handshake, or relay re-encryption — the last is rejected because the
+service must not hold plaintext). Spec 41 records the options.
+
+Still open in Chunk 7: host persistence of pulled plaintext once a key exists,
+automatic scheduling, reconnection/offline recovery and sync status.
 
 ## Reproduce
 

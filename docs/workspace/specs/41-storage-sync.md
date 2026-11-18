@@ -190,8 +190,30 @@ rest with 422, so there is no second execution path through HTTP.
 | Reconnection and offline recovery wiring | Deferred (Chunk 7) |
 | Local projection reconciliation | Deferred (Chunk 7) |
 | Conflict handling and stale local recovery | Deferred: the relay refuses a stale writer rather than merging; the client must re-lease and reload |
+| Tombstone application | Implemented: `delete_agent_session` removes local payloads, marks the session deleted and is safe to repeat; a stale append is refused |
+| Cross-device plaintext (transcript or model context) | **Blocked on key agreement** — see below |
 | Ownership transfer between devices | Protocol only: takeover works, there is no user-facing handoff |
 | User-visible sync status | Deferred |
+
+### Why a second device cannot read what it pulls
+
+Each event is sealed with the **origin device's** master key and that same
+envelope is copied into `agent_session_outbox.ciphertext`
+(`crates/store/src/session_events.rs`). The browser's key lives in web local
+storage per profile (`edapex.infinity.key.<workspace>`); the native key lives in
+the OS keychain per device. A second device therefore receives ciphertext it
+cannot open, and no code produces `core_snapshot` events at all today.
+
+This is a design gap, not a missing call. Resolving it needs a decision:
+
+1. **Session key derived from user credentials**, unwrapped on each device at
+   sign-in. Keeps the server blind; requires a key-wrap envelope per device.
+2. **Per-device pairing handshake** that wraps the session key for a new device.
+   Strongest, more UI.
+3. **Relay re-encryption.** Rejected: the service must never hold plaintext.
+
+Until one is chosen, the relay stores and orders opaque events; it does not
+restore a transcript or a model context on a new device.
 
 ### iroh — deferred
 `AGENT_DB` is the **only** v1 transport. iroh is not used.

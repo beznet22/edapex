@@ -183,6 +183,17 @@ impl BrowserSessionStore {
         )
     }
 
+    /// Applies a tombstone pulled from the relay.
+    ///
+    /// Deletes the local payloads and marks the session deleted, in one
+    /// transaction, so a stale projection cannot resurrect it. Repeating it is a
+    /// no-op, which is what makes a replayed deletion signal safe.
+    pub fn apply_deletion(&mut self, deleted_at_ms: f64) -> Result<(), JsValue> {
+        self.store
+            .delete_agent_session(self.root.as_str(), deleted_at_ms as u64)
+            .map_err(store_error)
+    }
+
     /// Proves the Wasm engine has FTS5 and the derived table, without writing.
     pub fn fts_available(&mut self) -> Result<bool, JsValue> {
         self.store.fts_available().map_err(store_error)
