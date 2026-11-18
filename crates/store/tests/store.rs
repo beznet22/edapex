@@ -223,6 +223,52 @@ fn search_index_finds_and_rebuilds() {
 }
 
 #[test]
+fn search_index_follows_updates_and_deletes() {
+    let mut store = store();
+    thread(&mut store, "t-1");
+    message(&mut store, "m-1", "algebra marks for AY4");
+    message(&mut store, "m-2", "geometry homework for AY3");
+
+    assert_eq!(store.search("algebra", 10).unwrap(), vec!["m-1"]);
+    assert_eq!(store.search("geometry", 10).unwrap(), vec!["m-2"]);
+    // A bare prefix is not a token match, so the index is searched with MATCH
+    // rather than a substring scan.
+    assert!(store.search("alge", 10).unwrap().is_empty());
+    assert!(store.search("absentterm", 10).unwrap().is_empty());
+
+    // An update must replace the indexed text, not add to it.
+    message(&mut store, "m-1", "physics marks for AY4");
+    assert!(store.search("algebra", 10).unwrap().is_empty());
+    assert_eq!(store.search("physics", 10).unwrap(), vec!["m-1"]);
+
+    // A delete must remove the row, even with no search text supplied.
+    store
+        .write_record(
+            "messages",
+            "m-2",
+            "ws-1",
+            Operation::Delete,
+            &[
+                ("thread_id", SqlValue::text("t-1")),
+                ("role", SqlValue::text("user")),
+                ("device_seq", SqlValue::integer(3)),
+            ],
+            b"geometry homework for AY3",
+            None,
+            "device-a",
+            103,
+        )
+        .unwrap();
+    assert!(store.search("geometry", 10).unwrap().is_empty());
+
+    // Repeated rebuilds are idempotent and do not duplicate rows.
+    for _ in 0..2 {
+        assert_eq!(store.rebuild_search_index().unwrap(), 1);
+        assert_eq!(store.search("marks", 10).unwrap(), vec!["m-1"]);
+    }
+}
+
+#[test]
 fn outbox_ciphertext_matches_the_stored_envelope() {
     let mut store = store();
     thread(&mut store, "t-1");

@@ -298,11 +298,29 @@ impl<D: SqlDriver> Store<D> {
         let result = (|| -> Result<()> {
             self.driver.execute(&entity_sql, &params)?;
 
-            if let Some(text) = search_text {
+            // The index is keyed by message id, so a write replaces that key
+            // instead of appending: an update that left the previous row would
+            // keep matching text the record no longer contains, and a delete
+            // that left it would keep the record findable. Only `messages` is
+            // indexed, because the rebuild repopulates from that table alone.
+            // `deleted_at` is the durable marker: the outbox is pruned once a
+            // deletion is acknowledged, so it cannot tell a rebuild what is gone.
+            if entity_type == "messages" {
                 self.driver.execute(
-                    "INSERT INTO messages_fts (message_id, body) VALUES (?, ?)",
-                    &[SqlValue::text(entity_id), SqlValue::text(text)],
+                    "DELETE FROM messages_fts WHERE message_id = ?",
+                    &[SqlValue::text(entity_id)],
                 )?;
+                if matches!(operation, Operation::Delete | Operation::Tombstone) {
+                    self.driver.execute(
+                        "UPDATE messages SET deleted_at = ? WHERE id = ?",
+                        &[SqlValue::integer(created_at), SqlValue::text(entity_id)],
+                    )?;
+                } else if let Some(text) = search_text {
+                    self.driver.execute(
+                        "INSERT INTO messages_fts (message_id, body) VALUES (?, ?)",
+                        &[SqlValue::text(entity_id), SqlValue::text(text)],
+                    )?;
+                }
             }
 
             self.driver.execute(
@@ -501,9 +519,15 @@ impl<D: SqlDriver> Store<D> {
     /// The index is never synced and never trusted: this is the recovery path
     /// after a schema change or a partial wipe.
     pub fn rebuild_search_index(&mut self) -> Result<usize> {
+        // Deleted records keep their sealed body so the deletion can still be
+        // pushed, so the rebuild must exclude them explicitly. Without this a
+        // rebuild would make deleted content findable again.
         let rows = self
             .driver
-            .query("SELECT id, body FROM messages", &[])?;
+            .query(
+                "SELECT id, body FROM messages WHERE deleted_at IS NULL",
+                &[],
+            )?;
         let mut count = 0;
 
         self.driver.begin()?;
@@ -541,6 +565,25 @@ impl<D: SqlDriver> Store<D> {
                 Err(error)
             }
         }
+    }
+
+    /// Whether this SQLite build has FTS5 and the derived table is present.
+    ///
+    /// Read-only evidence for the engine actually in use: the browser cannot
+    /// open the store on a page thread, so this is how the Wasm build proves it
+    /// has the index rather than inheriting a native build's guarantees.
+    pub fn fts_available(&mut self) -> Result<bool> {
+        let rows = self.driver.query(
+            "SELECT sqlite_compileoption_used('ENABLE_FTS5') \
+             AND EXISTS (SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'messages_fts')",
+            &[],
+        )?;
+        Ok(rows
+            .first()
+            .and_then(|row| row.first())
+            .and_then(SqlValue::as_integer)
+            .unwrap_or(0)
+            != 0)
     }
 
     pub fn search(&mut self, query: &str, limit: usize) -> Result<Vec<String>> {
