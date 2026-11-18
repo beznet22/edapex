@@ -208,6 +208,31 @@ browser runtime total: 980,985 gzip (958 KiB)
 | Playwright WebKit OPFS | Documented environment limitation |
 | Production bundle | Pass — 958 KiB gzip total |
 
+## Chunk 6 — session relay
+
+`services/cowork-api` now relays agent sessions into `AGENT_DB`: migration
+`0006_agent_sessions.sql` adds `agent_sessions`, `agent_session_leases` and
+`agent_session_events`. The wire shapes are the Chunk 1 contracts, not copies.
+
+Evidence, all from the suite rather than reading code:
+
+- **cowork-api: 96 tests pass**, 8 of them in `tests/session-sync.test.ts` —
+  one holder at a time (`lease_held`), a fence that advances across holders,
+  retry answered `duplicate`, stale fence answering `stale` and writing nothing,
+  checksum mismatch refused `invalid_request`, ordered pull with a cursor,
+  hard delete plus tombstone (`session_deleted` afterwards), user and workspace
+  scoping, a holder-only command refused with 422, and the quota boundary.
+- **contracts: 83 tests pass**, including the lease envelope added to
+  `fixtures/session-sync.json` and a fence check that rejects zero.
+- **Rust parity: 11 tests pass**, including
+  `session_lease_fixture_matches_the_contract`, so the lease is one shape in
+  three places.
+- **Gates:** `verify-port-specs` 0 failures, `verify-schema-catalog` 0 broken
+  files, `check-docs` ok, both typechecks clean.
+
+Deferred: the client side of the relay (chunks 7) and the browser sync store
+moving into a worker (#19).
+
 ## Reproduce
 
 ```bash

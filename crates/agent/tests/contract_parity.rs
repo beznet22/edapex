@@ -9,7 +9,7 @@ use std::path::PathBuf;
 
 use edapex_agent::{
     AgentError, AgentErrorCode, AgentEvent, ApprovalDecision, CapabilityRisk, SessionCommand,
-    SessionSyncPullResult, SessionSyncPush, SessionSyncPushResult, SessionView,
+    SessionLeaseRecord, SessionSyncPullResult, SessionSyncPush, SessionSyncPushResult, SessionView,
     ToolCompletionStatus, TurnCompletionStatus,
 };
 use serde_json::Value;
@@ -267,5 +267,19 @@ fn sync_envelopes_round_trip_including_retry_and_deletion() {
     assert_eq!(
         serde_json::to_value(pull).expect("serializes"),
         value["pullResult"]
+    );
+}
+
+#[test]
+fn session_lease_fixture_matches_the_contract() {
+    let value = shared_fixture("session-sync.json");
+    let lease: SessionLeaseRecord = serde_json::from_value(value["leaseResult"]["lease"].clone())
+        .expect("valid lease fixture");
+    assert_eq!(lease.session_id, "session-root-1");
+    assert_eq!(lease.holder_id, "client-tab-1");
+    assert!(lease.fence > 0, "the service assigns a positive fence");
+    assert_eq!(
+        serde_json::to_value(&lease).expect("serializes"),
+        value["leaseResult"]["lease"]
     );
 }

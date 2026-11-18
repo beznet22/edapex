@@ -49,6 +49,19 @@ pub struct SessionTruncation {
     pub active: bool,
 }
 
+/// The relay's lease as the service returns it.
+///
+/// The fence is assigned by the service, so a client cannot choose one: a
+/// reconnecting device proves it is current by echoing the fence it was granted.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionLeaseRecord {
+    pub session_id: String,
+    pub holder_id: String,
+    pub fence: u64,
+    pub expires_at_ms: u64,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionView {

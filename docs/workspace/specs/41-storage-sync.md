@@ -128,6 +128,40 @@ Use CF Workers for cloud sync, but not D1 as a high-frequency CRDT room:
 
 A high-frequency Yjs update stream written row-by-row to D1 would consume the free write budget and add latency. Batch/compact updates and store blobs in R2 or DO storage. `AGENT_DB` is separate from the EdApex school `DB`; the two never share rows, keys or bindings.
 
+### Session relay (AGENT_DB, implemented)
+
+`services/cowork-api` relays one root conversation per session. The wire shapes are the
+shared contracts in `packages/contracts/src/session.ts`; the service imports them instead
+of defining a second copy, so a protocol change is a contracts change with its fixture
+and parity test.
+
+| Endpoint | Purpose |
+|---|---|
+| `POST /api/v1/agent/sessions/:id/commands?workspaceId=` | `acquire_lease`, `renew_lease`, `release_lease`, `delete_session`. Every other command is executed by the lease holder and is refused with 422 |
+| `POST /api/v1/agent/sessions/:id/events` | push a sealed batch (≤100 events) with the fence it was granted |
+| `GET /api/v1/agent/sessions/:id/events?workspaceId=&after=&limit=` | pull in `position` order (limit ≤100) |
+
+- **One holder, one fence.** The lease is a single upsert, so two tabs cannot both
+  observe an expired lease and both take over. `fence` only increases — releasing sets
+  `holder_id` to NULL but keeps the counter — so a reconnecting writer is refused as
+  `stale` instead of merged.
+- **Order is the server's.** An accepted batch reserves a contiguous range from
+  `agent_sessions.next_position` in one `UPDATE … RETURNING`. A client cannot choose a
+  relay position; the contract rejects one in the push.
+- **Idempotent by constraint.** `(session_id, device_id, device_seq)` is unique, so a
+  retried batch answers `duplicate` without depending on the client remembering what it
+  sent.
+- **Checksums verified at the boundary.** A truncated or corrupted body fails with
+  `invalid_request` rather than on the device that later tries to decrypt it.
+- **Scoped twice.** Every query filters on `user_id`, and a workspace mismatch is refused
+  (`workspace_mismatch`) rather than moving a conversation between tenants. Another
+  user's session id answers `session_unknown`, not `forbidden`.
+- **Quota.** 10,000 events or 256 MiB of ciphertext per session, then `quota_exceeded`.
+- **Delete is a hard delete plus a tombstone.** The payload rows go; the session row
+  keeps `deleted_at_ms` and `deletion_event_id`, so a device that had not pulled yet
+  receives `deletion` instead of an empty history. A push to a deleted session answers
+  `session_deleted`.
+
 ### iroh — deferred
 
 `AGENT_DB` is the **only** v1 transport. iroh is not used.

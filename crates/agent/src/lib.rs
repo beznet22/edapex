@@ -60,7 +60,8 @@ pub use runtime::{
     HostFuture, HostObject, ToolExecutor,
 };
 pub use session_protocol::{
-    SessionCommand, SessionDeletion, SessionMessage, SessionMessageRole, SessionMessageVersion,
+    SessionCommand, SessionDeletion, SessionLeaseRecord, SessionMessage, SessionMessageRole,
+    SessionMessageVersion,
     SessionQueueItem, SessionSyncAcknowledgement, SessionSyncAcknowledgementStatus,
     SessionSyncEvent, SessionSyncEventKind, SessionSyncPullResult, SessionSyncPush,
     SessionSyncPushResult, SessionTruncation, SessionView,

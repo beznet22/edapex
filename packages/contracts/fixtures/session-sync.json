@@ -58,5 +58,19 @@
       "deletionEventId": "delete-1",
       "deletedAtMs": 1770000010000
     }
+  },
+  "leaseResult": {
+    "lease": {
+      "sessionId": "session-root-1",
+      "holderId": "client-tab-1",
+      "fence": 3,
+      "expiresAtMs": 1770000060000
+    }
+  },
+  "released": { "released": true },
+  "deletionResult": {
+    "sessionId": "session-root-1",
+    "deletionEventId": "delete-1",
+    "position": 42
   }
 }

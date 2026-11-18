@@ -176,6 +176,8 @@ export const sessionSyncEventKindSchema = z.enum([
   "deletion"
 ] as const);
 
+export type SessionSyncEventKind = z.infer<typeof sessionSyncEventKindSchema>;
+
 export const sessionSyncEventSchema = z
   .object({
     eventId: idSchema,
@@ -255,6 +257,38 @@ export type SessionSyncPush = z.infer<typeof sessionSyncPushSchema>;
 export type SessionSyncPushResult = z.infer<typeof sessionSyncPushResultSchema>;
 export type SessionSyncPullResult = z.infer<typeof sessionSyncPullResultSchema>;
 export type SessionDeletion = z.infer<typeof sessionDeletionSchema>;
+
+/**
+ * The relay's lease. The fence is the server's, not the device's: after another
+ * device takes over, a reconnecting client must be refused (`stale`) rather
+ * than merged, and it can only prove that with the fence it was granted.
+ */
+export const sessionLeaseSchema = z
+  .object({
+    sessionId: idSchema,
+    holderId: idSchema,
+    fence: z.number().int().positive(),
+    expiresAtMs: z.number().int().nonnegative()
+  })
+  .strict();
+
+export const sessionLeaseResultSchema = z.object({ lease: sessionLeaseSchema }).strict();
+
+export const sessionReleaseResultSchema = z.object({ released: z.literal(true) }).strict();
+
+/** Where the tombstone landed in the relay's order, so a pulling device resumes after it. */
+export const sessionDeletionResultSchema = z
+  .object({
+    sessionId: idSchema,
+    deletionEventId: idSchema,
+    position: z.number().int().positive()
+  })
+  .strict();
+
+export type SessionLease = z.infer<typeof sessionLeaseSchema>;
+export type SessionLeaseResult = z.infer<typeof sessionLeaseResultSchema>;
+export type SessionReleaseResult = z.infer<typeof sessionReleaseResultSchema>;
+export type SessionDeletionResult = z.infer<typeof sessionDeletionResultSchema>;
 
 export function isSessionView(value: unknown): value is SessionView {
   return sessionViewSchema.safeParse(value).success;

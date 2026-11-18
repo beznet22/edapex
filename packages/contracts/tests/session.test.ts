@@ -9,6 +9,9 @@ import {
   isSessionCommand,
   isSessionView,
   sessionCommandSchema,
+  sessionDeletionResultSchema,
+  sessionLeaseResultSchema,
+  sessionReleaseResultSchema,
   sessionSyncPullResultSchema,
   sessionSyncPushSchema,
   sessionSyncPushResultSchema,
@@ -23,7 +26,10 @@ const syncFixtureSchema = z
   .object({
     push: sessionSyncPushSchema,
     pushResult: sessionSyncPushResultSchema,
-    pullResult: sessionSyncPullResultSchema
+    pullResult: sessionSyncPullResultSchema,
+    leaseResult: sessionLeaseResultSchema,
+    released: sessionReleaseResultSchema,
+    deletionResult: sessionDeletionResultSchema
   })
   .strict();
 
@@ -72,6 +78,21 @@ describe("session wire contracts", () => {
       "stale"
     ]);
     expect(fixture.pullResult.deletion?.sessionId).toBe(fixture.push.sessionId);
+  });
+
+  it("requires a server-assigned positive fence and a tombstone position", () => {
+    const { leaseResult, released, deletionResult } = syncFixtureSchema.parse(
+      readFixture("session-sync.json")
+    );
+    const first = leaseResult.lease;
+    expect(first.fence).toBeGreaterThan(0);
+    // The fence is the server's; zero or negative would let a stale writer look current.
+    expect(sessionLeaseResultSchema.safeParse({ lease: { ...first, fence: 0 } }).success).toBe(
+      false
+    );
+    expect(released.released).toBe(true);
+    // A puller resumes after the tombstone, so it must sit beyond every lease fence.
+    expect(deletionResult.position).toBeGreaterThan(first.fence);
   });
 
   it("rejects forged relay positions and cross-session/device push events", () => {
