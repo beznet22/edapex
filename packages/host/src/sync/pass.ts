@@ -32,7 +32,14 @@ export interface SessionSyncStore {
    * correct recovery, provided applying twice is a no-op.
    */
   applyEvents(events: readonly SessionSyncEvent[]): Promise<void>;
-  /** Applied before the cursor moves; it is what makes a deleted session unreachable. */
+  // Route with `splitEvents`: `projection` is transcript, `core_snapshot` is the
+  // model's context store, and a `deletion` event is a tombstone. Applying a
+  // snapshot to the transcript would make the replay look like memory.
+  /**
+   * Applied before the cursor moves; it is what makes a deleted session
+   * unreachable. Must also refuse to resurrect it locally: no new turn, no new
+   * queued message, for a session the relay reports as deleted.
+   */
   applyDeletion(deletion: SessionDeletion): Promise<void>;
   /** Called only after `applyEvents` or `applyDeletion` has resolved. */
   setCursor(position: number): Promise<void>;
@@ -66,21 +73,33 @@ export async function syncOnce(options: SyncOptions): Promise<SyncReport> {
 
   let pushed = 0;
   let stalled = 0;
+  let deletedRemotely = false;
 
   for (;;) {
     const pending = await store.pendingEvents(batchLimit);
     if (pending.length === 0) break;
 
     const current = await lease.ensure();
-    const result = await client.push({
+    let result;
+    try {
+      result = await client.push({
       workspaceId: client.workspaceId,
       sessionId: client.sessionId,
       deviceId: client.deviceId,
       clientId: client.clientId,
       fence: current.fence,
-      events: pending.map((event) => ({ ...event, relayPosition: null }))
-    });
-    await store.acknowledge(result.acknowledgements);
+        events: pending.map((event) => ({ ...event, relayPosition: null }))
+      });
+    } catch (error) {
+      // Deleting the session elsewhere makes the push fail before the pull that
+      // carries the tombstone would run. Stop pushing and let the pull report it.
+      if (error instanceof RelayError && error.code === "session_deleted") {
+        deletedRemotely = true;
+        break;
+      }
+      throw error;
+    }
+    await store.acknowledge(result!.acknowledgements);
 
     const progressed = accepted(result.acknowledgements);
     pushed += progressed;
@@ -124,5 +143,5 @@ export async function syncOnce(options: SyncOptions): Promise<SyncReport> {
     if (result.events.length < pageLimit) break;
   }
 
-  return { pushed, pulled, deleted, cursor };
+  return { pushed, pulled, deleted: deleted || deletedRemotely, cursor };
 }

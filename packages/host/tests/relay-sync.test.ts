@@ -446,6 +446,38 @@ describe("session sync pass", () => {
     }
   });
 
+  it("stops pushing and applies the tombstone when the session was deleted elsewhere", async () => {
+    const wired = relay({
+      push: () => ({
+        status: 410,
+        body: { error: { code: "session_deleted", message: "Session was deleted." } }
+      }),
+      pull: () => ({
+        status: 200,
+        body: {
+          events: [],
+          nextPosition: 4,
+          deletion: { sessionId: SESSION, deletionEventId: "delete-9", deletedAtMs: 1_770_000_000_900 }
+        }
+      })
+    });
+    const store = new FakeStore();
+    store.pending = [event(1)];
+    const relayClient = client(wired.transport);
+    const lease = new LeaseKeeper(relayClient, 60_000, () => 0);
+
+    const report = await syncOnce({ client: relayClient, lease, store });
+
+    // The push is attempted once and abandoned; the pull still runs.
+    expect(wired.recorded.counts.push).toBe(1);
+    expect(wired.recorded.counts.pull).toBe(1);
+    expect(report.deleted).toBe(true);
+    expect(report.cursor).toBe(4);
+    expect(store.deletion?.deletionEventId).toBe("delete-9");
+    // Nothing was acknowledged, because nothing was accepted.
+    expect(store.acknowledged).toHaveLength(0);
+  });
+
   it("surfaces a refused lease as a typed failure, not a silent no-op", async () => {
     const wired = relay({
       acquire: () => ({

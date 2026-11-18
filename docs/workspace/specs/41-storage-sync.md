@@ -143,6 +143,11 @@ and parity test.
 | `POST /api/v1/agent/sessions/:id/events` | push a sealed batch (≤100 events) with the fence it was granted |
 | `GET /api/v1/agent/sessions/:id/events?workspaceId=&after=&limit=` | pull in `position` order (limit ≤100) |
 
+Clients reach these through `@edapex/host/sync`: the web uses
+`fetch(credentials: "include")`, the native hosts use a `relay_request` command
+scoped to `/api/v1/agent/sessions/` that returns `{ status, body }` — 409 and 410
+are protocol answers, not transport failures.
+
 - **One holder, one fence.** The lease is a single upsert, so two tabs cannot both
   observe an expired lease and both take over. `fence` only increases — releasing sets
   `holder_id` to NULL but keeps the counter — so a reconnecting writer is refused as

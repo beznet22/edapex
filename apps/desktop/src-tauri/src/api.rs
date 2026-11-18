@@ -16,14 +16,14 @@ pub struct TenantHeaders {
     pub section_id: i64,
 }
 
-fn allowed_path(path: &str) -> bool {
+pub(crate) fn allowed_path(path: &str) -> bool {
     path.starts_with("/api/v1/")
         && !path.contains("..")
         && !path.contains("://")
         && !path.contains('\\')
 }
 
-fn method_of(value: &str) -> Result<Method, HostError> {
+pub(crate) fn method_of(value: &str) -> Result<Method, HostError> {
     match value.to_ascii_uppercase().as_str() {
         "GET" => Ok(Method::GET),
         "POST" => Ok(Method::POST),
@@ -37,7 +37,7 @@ fn method_of(value: &str) -> Result<Method, HostError> {
     }
 }
 
-fn error_for_status(status: reqwest::StatusCode, body: &serde_json::Value) -> HostError {
+pub(crate) fn error_for_status(status: reqwest::StatusCode, body: &serde_json::Value) -> HostError {
     let message = body
         .get("message")
         .and_then(serde_json::Value::as_str)
@@ -49,12 +49,16 @@ fn error_for_status(status: reqwest::StatusCode, body: &serde_json::Value) -> Ho
     }
 }
 
-pub(crate) async fn send(
+/// Performs the request and returns the status with the body, whatever the status.
+///
+/// Status policy belongs to the caller: `send` maps a rejection to `HostError`,
+/// while the session relay treats 409 and 410 as protocol answers.
+pub(crate) async fn exchange(
     method: Method,
     path: String,
     body: Option<serde_json::Value>,
     headers: Option<HashMap<String, String>>,
-) -> Result<serde_json::Value, HostError> {
+) -> Result<(reqwest::StatusCode, serde_json::Value), HostError> {
     if !allowed_path(&path) {
         return Err(HostError::new(
             "invalid_input",
@@ -82,14 +86,24 @@ pub(crate) async fn send(
         .send()
         .await
         .map_err(|error| HostError::new("provider_unavailable", format!("API request: {error}"), true))?;
-    if response.status() == reqwest::StatusCode::NO_CONTENT {
-        return Ok(serde_json::Value::Null);
-    }
     let status = response.status();
+    if status == reqwest::StatusCode::NO_CONTENT {
+        return Ok((status, serde_json::Value::Null));
+    }
     let body: serde_json::Value = response
         .json()
         .await
         .map_err(|error| HostError::new("provider_unavailable", format!("API response: {error}"), true))?;
+    Ok((status, body))
+}
+
+pub(crate) async fn send(
+    method: Method,
+    path: String,
+    body: Option<serde_json::Value>,
+    headers: Option<HashMap<String, String>>,
+) -> Result<serde_json::Value, HostError> {
+    let (status, body) = exchange(method, path, body, headers).await?;
     if !status.is_success() {
         return Err(error_for_status(status, &body));
     }

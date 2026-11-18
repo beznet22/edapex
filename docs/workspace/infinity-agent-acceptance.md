@@ -241,6 +241,34 @@ revocation already exist in `sync_devices`, but session sync does not require a
 registered device. The client side is Chunk 7; the browser sync store moving
 into a worker is #19.
 
+## Chunk 7 — client wiring (in progress)
+
+What landed, each with tests:
+
+- **Relay client and sync pass** (`@edapex/host/sync`): contract-validated
+  responses, typed failures including `transport_unavailable`, lease reuse and
+  mid-pass renewal, push-then-pull with cursor written only after application,
+  one retry after a takeover, tombstone handling. 14 tests.
+- **Browser store in a dedicated worker** (#19): `worker/store.worker.ts` owns
+  OPFS SQLite; `lib/browser-store.ts` is the async page handle. The spec that had
+  been failing 2 of 4 now passes 8/8 on Chromium and a new `store-firefox`
+  project, covering search, rebuild, atomic write and reload.
+- **Both transports**: `createFetchTransport` (cookies, no token) and
+  `createInvokeTransport` over the new Rust `relay_request` command, which is
+  path-scoped to the relay and returns the status the client branches on. Path
+  guard asserted in Rust; wire behaviour asserted in TypeScript.
+- **Deletion across devices**: a push that answers `session_deleted` stops
+  pushing and lets the pull deliver the tombstone, so the deletion is applied
+  rather than lost. Local resurrection refusal is required by the store contract
+  and already enforced by `crates/store`'s `reject_deleted_session`.
+- **Snapshot routing**: `splitEvents` keeps `projection` (transcript),
+  `core_snapshot` (model context) and `deletion` (tombstone) apart, so a host
+  cannot apply model context to the transcript.
+
+Still open in Chunk 7: hosts persisting pulled snapshots into their conversation
+stores, automatic scheduling, reconnection/offline recovery and sync status.
+Those remain deferred, not implied.
+
 ## Reproduce
 
 ```bash
@@ -251,7 +279,8 @@ pnpm --dir apps/web run build:agent-runtime
 node scripts/check-agent-size.mjs
 pnpm --dir apps/web exec vitest run --root ../../packages/contracts tests/session.test.ts
 pnpm --dir apps/web run check
-pnpm --dir apps/web exec vitest run --root ../../packages/host
+pnpm --dir apps/web exec vitest run --root ../../packages/host   # 20 tests
+cargo test -p edapex-desktop --lib                               # relay path guard
 pnpm --dir apps/web exec playwright test --project=chromium --project=store-firefox browser-store.spec.ts
 pnpm --dir apps/web exec playwright test --project=infinity-chromium --project=infinity-firefox
 ```
