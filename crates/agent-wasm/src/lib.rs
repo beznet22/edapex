@@ -23,11 +23,11 @@ use edapex_agent::{
     parse_openai_sse_data, sse_data_line, take_sse_event, AgentConnectSettings, AgentError,
     AgentErrorCode, AgentEvent, AgentHost, AgentHostOptions, AgentTurnInput, ApprovalDecision,
     ApprovalHandler, ApprovalRequest, DynamicToolCall, DynamicToolName, DynamicToolResult,
-    EventSink, HostFuture, ProviderChunk, ProviderClient, ProviderRequest, ToolExecutor,
+    EventSink, HostFuture, ProviderChunk, ProviderRequest, ToolExecutor,
     Utf8StreamDecoder,
 };
 use js_sys::Function;
-use tokio::sync::{mpsc, oneshot};
+use tokio::sync::oneshot;
 use wasm_bindgen::prelude::*;
 
 pub(crate) type QueueItem = Result<ProviderChunk, AgentError>;
