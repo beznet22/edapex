@@ -5,10 +5,7 @@ use crate::session_protocol::{SessionMessage, SessionMessageRole};
 use crate::TurnCompletionStatus;
 use infinity_agent_core::system::AgentEvent as InfinityEvent;
 
-impl<D> SessionRuntime<D>
-where
-    D: edapex_store::SqlDriver + Send + 'static,
-{
+impl SessionRuntime {
     pub(super) async fn on_infinity(&mut self, event: InfinityEvent) {
         match event {
             InfinityEvent::TextChunk { text } => {

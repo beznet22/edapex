@@ -36,12 +36,10 @@ enum DriverRequest {
     Close,
 }
 
-pub(crate) struct SessionRuntimeOptions<D = edapex_store::RusqliteDriver>
-where
-    D: edapex_store::SqlDriver,
-{
+#[derive(Clone)]
+pub(crate) struct SessionRuntimeOptions {
     pub settings: AgentConnectSettings,
-    pub context: StoreContext<D>,
+    pub context: StoreContext,
     pub provider: Arc<dyn ProviderClient>,
     pub tools: Arc<dyn ToolExecutor>,
     pub approvals: Arc<dyn ApprovalHandler>,
@@ -49,25 +47,6 @@ where
     pub client_id: Arc<str>,
     pub device_id: Arc<str>,
     pub turn_timeout_ms: Arc<std::sync::atomic::AtomicU64>,
-}
-
-impl<D> Clone for SessionRuntimeOptions<D>
-where
-    D: edapex_store::SqlDriver,
-{
-    fn clone(&self) -> Self {
-        Self {
-            settings: self.settings.clone(),
-            context: self.context.clone(),
-            provider: Arc::clone(&self.provider),
-            tools: Arc::clone(&self.tools),
-            approvals: Arc::clone(&self.approvals),
-            events: Arc::clone(&self.events),
-            client_id: Arc::clone(&self.client_id),
-            device_id: Arc::clone(&self.device_id),
-            turn_timeout_ms: Arc::clone(&self.turn_timeout_ms),
-        }
-    }
 }
 
 pub struct NativeAgentDriver {

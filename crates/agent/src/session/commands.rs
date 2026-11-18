@@ -10,10 +10,7 @@ use crate::session_protocol::{
 };
 use crate::TurnCompletionStatus;
 
-impl<D> SessionRuntime<D>
-where
-    D: edapex_store::SqlDriver + Send + 'static,
-{
+impl SessionRuntime {
     pub(super) async fn execute(
         &mut self,
         command: SessionCommand,

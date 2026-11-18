@@ -4,6 +4,8 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use edapex_store::{MasterKey, Result as StoreResult, RusqliteDriver, Store, StoreError};
 use infinity_agent_core::stores::InMemoryStoreError;
 
+pub type SharedNativeStore = Arc<Mutex<Store<RusqliteDriver>>>;
+
 #[derive(Debug, thiserror::Error)]
 pub enum DurableStoreError {
     #[error(transparent)]
@@ -34,46 +36,41 @@ impl DurableStoreError {
     }
 }
 
-pub struct StoreContext<D = RusqliteDriver>
-where
-    D: edapex_store::SqlDriver,
-{
-    pub store: Arc<Mutex<Store<D>>>,
+#[derive(Clone)]
+pub struct StoreContext {
+    pub store: SharedNativeStore,
     pub workspace_id: Arc<str>,
     poisoned: Arc<AtomicBool>,
     thread_roots: Arc<Mutex<std::collections::HashMap<String, String>>>,
 }
 
-impl<D> Clone for StoreContext<D>
-where
-    D: edapex_store::SqlDriver,
-{
-    fn clone(&self) -> Self {
-        Self {
-            store: Arc::clone(&self.store),
-            workspace_id: Arc::clone(&self.workspace_id),
-            poisoned: Arc::clone(&self.poisoned),
-            thread_roots: Arc::clone(&self.thread_roots),
-        }
-    }
+pub struct DurableAgentStores {
+    pub conversation: crate::durable_conversation::DurableConversationStore,
+    pub state: crate::durable_state::DurableStateStore,
 }
 
-pub struct DurableAgentStores<D = RusqliteDriver>
-where
-    D: edapex_store::SqlDriver,
-{
-    pub conversation: crate::durable_conversation::DurableConversationStore<D>,
-    pub state: crate::durable_state::DurableStateStore<D>,
-}
-
-impl<D: edapex_store::SqlDriver> StoreContext<D> {
-    pub fn new(store: Store<D>, workspace_id: &str) -> Self {
+impl StoreContext {
+    pub fn new(store: Store<RusqliteDriver>, workspace_id: &str) -> Self {
         Self {
             store: Arc::new(Mutex::new(store)),
             workspace_id: Arc::from(workspace_id),
             poisoned: Arc::new(AtomicBool::new(false)),
             thread_roots: Arc::new(Mutex::new(std::collections::HashMap::new())),
         }
+    }
+
+    pub fn open(path: &str, workspace_id: &str, master: MasterKey) -> StoreResult<Self> {
+        // First launch on a new device: the application-data directory itself may
+        // not exist yet. A missing directory is an ordinary start, not corruption.
+        if let Some(parent) = std::path::Path::new(path).parent() {
+            if !parent.as_os_str().is_empty() {
+                std::fs::create_dir_all(parent).map_err(|error| edapex_store::StoreError::Io(error.to_string()))?;
+            }
+        }
+        let driver = RusqliteDriver::open(path)?;
+        let mut store = Store::new(driver, master);
+        store.migrate()?;
+        Ok(Self::new(store, workspace_id))
     }
 
     pub fn check(&self) -> Result<(), DurableStoreError> {
@@ -83,7 +80,7 @@ impl<D: edapex_store::SqlDriver> StoreContext<D> {
         Ok(())
     }
 
-    pub fn lock(&self) -> Result<MutexGuard<'_, Store<D>>, DurableStoreError> {
+    pub fn lock(&self) -> Result<MutexGuard<'_, Store<RusqliteDriver>>, DurableStoreError> {
         self.check()?;
         self.store.lock().map_err(|_| DurableStoreError::Lock)
     }
@@ -108,29 +105,13 @@ impl<D: edapex_store::SqlDriver> StoreContext<D> {
     }
 }
 
-impl StoreContext<RusqliteDriver> {
-    /// Opens the native store, creating the application-data directory if needed.
-    pub fn open(path: &str, workspace_id: &str, master: MasterKey) -> StoreResult<StoreContext> {
-        if let Some(parent) = std::path::Path::new(path).parent() {
-            if !parent.as_os_str().is_empty() {
-                std::fs::create_dir_all(parent)
-                    .map_err(|error| edapex_store::StoreError::Io(error.to_string()))?;
-            }
-        }
-        let driver = RusqliteDriver::open(path)?;
-        let mut store = Store::new(driver, master);
-        store.migrate()?;
-        Ok(StoreContext::new(store, workspace_id))
-    }
-}
-
-impl<D: edapex_store::SqlDriver + 'static> DurableAgentStores<D> {
-    pub fn from_store(store: Store<D>, workspace_id: &str) -> Self {
+impl DurableAgentStores {
+    pub fn from_store(store: Store<RusqliteDriver>, workspace_id: &str) -> Self {
         let context = StoreContext::new(store, workspace_id);
         Self::from_context(context)
     }
 
-    pub fn from_context(context: StoreContext<D>) -> Self {
+    pub fn from_context(context: StoreContext) -> Self {
         Self {
             conversation: crate::durable_conversation::DurableConversationStore::new(
                 context.clone(),

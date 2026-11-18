@@ -13,28 +13,16 @@ use rap_protocol::ThreadId;
 use crate::provider::{ChatMessage, ProviderChunk, ProviderRequest, ProviderToolSpec, ToolCall};
 use crate::{AgentError, ProviderClient};
 
-impl<C> ProviderClient for Arc<C>
-where
-    C: ProviderClient + ?Sized,
-{
-    fn stream_chat(
-        &self,
-        request: ProviderRequest,
-    ) -> Result<tokio::sync::mpsc::Receiver<ProviderChunk>, AgentError> {
-        (**self).stream_chat(request)
-    }
-}
-
 type BoxError = Box<dyn std::error::Error + Send + Sync>;
 
 #[derive(Clone)]
-pub struct EdApexModelProvider<C = Arc<dyn ProviderClient>> {
-    client: C,
+pub struct EdApexModelProvider {
+    client: Arc<dyn ProviderClient>,
     model: String,
 }
 
-impl<C> EdApexModelProvider<C> {
-    pub fn new(client: C, model: impl Into<String>) -> Self {
+impl EdApexModelProvider {
+    pub fn new(client: Arc<dyn ProviderClient>, model: impl Into<String>) -> Self {
         Self {
             client,
             model: model.into(),
@@ -43,13 +31,13 @@ impl<C> EdApexModelProvider<C> {
 }
 
 #[derive(Clone)]
-pub struct EdApexModelSource<C = Arc<dyn ProviderClient>> {
-    provider: Arc<EdApexModelProvider<C>>,
+pub struct EdApexModelSource {
+    provider: Arc<EdApexModelProvider>,
     model: String,
 }
 
-impl<C: ProviderClient> EdApexModelSource<C> {
-    pub fn new(client: C, model: impl Into<String>) -> Self {
+impl EdApexModelSource {
+    pub fn new(client: Arc<dyn ProviderClient>, model: impl Into<String>) -> Self {
         let model = model.into();
         Self {
             provider: Arc::new(EdApexModelProvider::new(client, model.clone())),
@@ -59,10 +47,7 @@ impl<C: ProviderClient> EdApexModelSource<C> {
 }
 
 #[async_trait(?Send)]
-impl<C> ModelSource for EdApexModelSource<C>
-where
-    C: ProviderClient + Send + Sync + 'static,
-{
+impl ModelSource for EdApexModelSource {
     async fn resolve(&self, _thread_id: &ThreadId<str>) -> Result<ResolvedModel, BoxError> {
         Ok(ResolvedModel {
             provider: self.provider.clone(),
@@ -74,10 +59,7 @@ where
 }
 
 #[async_trait]
-impl<C> ModelProvider for EdApexModelProvider<C>
-where
-    C: ProviderClient + Send + Sync + 'static,
-{
+impl ModelProvider for EdApexModelProvider {
     async fn list_models(&self) -> Result<Vec<ModelEntry>, BoxError> {
         Ok(vec![ModelEntry {
             model_id: self.model.clone(),
