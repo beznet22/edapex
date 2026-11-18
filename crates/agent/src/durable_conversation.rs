@@ -21,15 +21,30 @@ struct ConversationSnapshot {
     summaries: Vec<CompactionSummary>,
 }
 
-#[derive(Clone)]
-pub struct DurableConversationStore {
-    context: StoreContext,
+pub struct DurableConversationStore<D = edapex_store::RusqliteDriver>
+where
+    D: edapex_store::SqlDriver,
+{
+    context: StoreContext<D>,
     inner: InMemoryConversationStore,
     loaded: Arc<Mutex<HashSet<String>>>,
 }
 
-impl DurableConversationStore {
-    pub fn new(context: StoreContext) -> Self {
+impl<D> Clone for DurableConversationStore<D>
+where
+    D: edapex_store::SqlDriver,
+{
+    fn clone(&self) -> Self {
+        Self {
+            context: self.context.clone(),
+            inner: self.inner.clone(),
+            loaded: Arc::clone(&self.loaded),
+        }
+    }
+}
+
+impl<D: edapex_store::SqlDriver> DurableConversationStore<D> {
+    pub fn new(context: StoreContext<D>) -> Self {
         Self {
             context,
             inner: InMemoryConversationStore::new(),
@@ -99,7 +114,7 @@ impl DurableConversationStore {
     }
 }
 
-impl DurableConversationStore {
+impl<D: edapex_store::SqlDriver> DurableConversationStore<D> {
     pub fn latest_message_id(&self, thread_id: &ThreadId<str>) -> Option<String> {
         self.inner
             .thread_messages(thread_id)?
@@ -126,7 +141,10 @@ impl DurableConversationStore {
 }
 
 #[async_trait]
-impl ConversationStore for DurableConversationStore {
+impl<D> ConversationStore for DurableConversationStore<D>
+where
+    D: edapex_store::SqlDriver + Send + 'static,
+{
     type Error = DurableStoreError;
 
     async fn ensure_root_thread(&self, thread_id: &ThreadId<str>) -> Result<()> {

@@ -132,11 +132,14 @@ impl SessionProjection {
         }
     }
 
-    pub fn append(
+    pub fn append<D>(
         &mut self,
-        context: &StoreContext,
+        context: &StoreContext<D>,
         append: ProjectionAppend,
-    ) -> Result<SessionAppendOutcome, DurableStoreError> {
+    ) -> Result<SessionAppendOutcome, DurableStoreError>
+    where
+        D: edapex_store::SqlDriver,
+    {
         let ProjectionAppend {
             event,
             event_id,
@@ -170,7 +173,13 @@ impl SessionProjection {
         Ok(outcome)
     }
 
-    pub fn restore(&mut self, context: &StoreContext) -> Result<Option<String>, DurableStoreError> {
+    pub fn restore<D>(
+        &mut self,
+        context: &StoreContext<D>,
+    ) -> Result<Option<String>, DurableStoreError>
+    where
+        D: edapex_store::SqlDriver,
+    {
         let latest = context
             .lock()?
             .agent_session_latest_sequence(&self.session_id)?;

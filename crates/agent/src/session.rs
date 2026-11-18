@@ -38,14 +38,17 @@ struct ActiveTurn {
     pending_tool_calls: usize,
 }
 
-pub(crate) struct SessionRuntime {
+pub(crate) struct SessionRuntime<D = edapex_store::RusqliteDriver>
+where
+    D: edapex_store::SqlDriver + Send + 'static,
+{
     root: ThreadId,
-    options: SessionRuntimeOptions,
+    options: SessionRuntimeOptions<D>,
     receiver: tokio::sync::mpsc::UnboundedReceiver<SessionSignal>,
     observed: tokio::sync::mpsc::UnboundedReceiver<ObservedEvent>,
     observed_sender: tokio::sync::mpsc::UnboundedSender<ObservedEvent>,
-    conversation: DurableConversationStore,
-    state: DurableStateStore,
+    conversation: DurableConversationStore<D>,
+    state: DurableStateStore<D>,
     running: Option<RunningSystem<SessionSubscription>>,
     pending: VecDeque<PendingTurn>,
     active: Option<ActiveTurn>,
@@ -55,10 +58,13 @@ pub(crate) struct SessionRuntime {
     active_turns: Arc<ActiveTurnRegistry>,
 }
 
-impl SessionRuntime {
+impl<D> SessionRuntime<D>
+where
+    D: edapex_store::SqlDriver + Send + 'static,
+{
     pub fn new(
         root: String,
-        options: SessionRuntimeOptions,
+        options: SessionRuntimeOptions<D>,
         receiver: tokio::sync::mpsc::UnboundedReceiver<SessionSignal>,
     ) -> Self {
         let (observed_sender, observed) = tokio::sync::mpsc::unbounded_channel();

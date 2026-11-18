@@ -19,16 +19,32 @@ struct StateSnapshot {
     stopped: bool,
 }
 
-#[derive(Clone)]
-pub struct DurableStateStore {
-    context: StoreContext,
+pub struct DurableStateStore<D = edapex_store::RusqliteDriver>
+where
+    D: edapex_store::SqlDriver,
+{
+    context: StoreContext<D>,
     inner: InMemoryStateStore,
     loaded: Arc<Mutex<HashSet<String>>>,
     stopped: Arc<Mutex<HashMap<String, bool>>>,
 }
 
-impl DurableStateStore {
-    pub fn new(context: StoreContext) -> Self {
+impl<D> Clone for DurableStateStore<D>
+where
+    D: edapex_store::SqlDriver,
+{
+    fn clone(&self) -> Self {
+        Self {
+            context: self.context.clone(),
+            inner: self.inner.clone(),
+            loaded: Arc::clone(&self.loaded),
+            stopped: Arc::clone(&self.stopped),
+        }
+    }
+}
+
+impl<D: edapex_store::SqlDriver> DurableStateStore<D> {
+    pub fn new(context: StoreContext<D>) -> Self {
         Self {
             context,
             inner: InMemoryStateStore::new(),
@@ -111,7 +127,10 @@ impl DurableStateStore {
 }
 
 #[async_trait]
-impl StateStore for DurableStateStore {
+impl<D> StateStore for DurableStateStore<D>
+where
+    D: edapex_store::SqlDriver + Send + 'static,
+{
     type Error = DurableStoreError;
 
     async fn get_processed_ids(&self, thread_id: &ThreadId<str>) -> Result<HashSet<String>> {
