@@ -73,7 +73,9 @@ If “everything local-first” includes school records, it contradicts “EdApe
   that an OPFS store cannot implement, so model memory uses `infinity-wasm`'s
   IndexedDB actor handles. That is a different job, not a second transcript; see
   `50-native-agent-path.md`. The earlier "IndexedDB is not used for either" rule
-  is superseded by that constraint.
+  is superseded by that constraint. Each SQLite owner opens where sync access
+  exists: the agent transcript in the agent worker, the sync store in its own
+  `worker/store.worker.ts`, with `lib/browser-store.ts` as the page-side handle.
 - Keep the same logical schema as native.
 - Do not use localStorage for chat history or memory. The data key above is a
   key, not content.

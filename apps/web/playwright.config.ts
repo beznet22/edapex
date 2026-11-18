@@ -37,6 +37,14 @@ export default defineConfig({
       use: { ...devices["Desktop Chrome"] }
     },
     {
+      // The store worker is engine-sensitive: OPFS sync access handles exist in
+      // workers on both engines, and this proves the worker boundary on Firefox,
+      // not just Chromium.
+      name: "store-firefox",
+      testMatch: "browser-store.spec.ts",
+      use: { ...devices["Desktop Firefox"], browserName: "firefox" }
+    },
+    {
       name: "infinity-chromium",
       testMatch: "infinity-*.spec.ts",
       use: { ...devices["Desktop Chrome"], browserName: "chromium" }

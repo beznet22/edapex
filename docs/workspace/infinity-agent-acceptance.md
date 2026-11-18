@@ -201,7 +201,7 @@ browser runtime total: 980,985 gzip (958 KiB)
 | Five defect regressions | Pass |
 | FTS5 semantics (real SQLite: MATCH, update, delete, rebuild, idempotent) | Pass, native |
 | FTS5 present in the Wasm engine | Pass, worker probe |
-| FTS5 `search()`/`rebuildSearchIndex()` from a page store | **Deferred** — SAH is worker-only |
+| FTS5 `search()`/`rebuildSearchIndex()` | Pass — worker-hosted store; `browser-store.spec.ts` 8/8 on Chromium and Firefox |
 | Database close/reopen (session store, new worker) | Pass |
 | Page reload persistence | Pass |
 | Encryption-key integrity | Pass |
@@ -251,6 +251,8 @@ pnpm --dir apps/web run build:agent-runtime
 node scripts/check-agent-size.mjs
 pnpm --dir apps/web exec vitest run --root ../../packages/contracts tests/session.test.ts
 pnpm --dir apps/web run check
+pnpm --dir apps/web exec vitest run --root ../../packages/host
+pnpm --dir apps/web exec playwright test --project=chromium --project=store-firefox browser-store.spec.ts
 pnpm --dir apps/web exec playwright test --project=infinity-chromium --project=infinity-firefox
 ```
 

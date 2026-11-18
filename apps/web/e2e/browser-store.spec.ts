@@ -38,7 +38,7 @@ test.describe("browser store", () => {
       });
 
       // `messages.thread_id` is a foreign key, so the thread has to exist.
-      store.writeRecord({
+      await store.writeRecord({
         entityType: "threads",
         entityId: "t-1",
         workspaceId: "ws-1",
@@ -49,7 +49,7 @@ test.describe("browser store", () => {
         createdAt: 100
       });
 
-      const written = store.writeRecord({
+      const written = await store.writeRecord({
         entityType: "messages",
         entityId: "m-1",
         workspaceId: "ws-1",
@@ -65,14 +65,14 @@ test.describe("browser store", () => {
         createdAt: 101
       });
 
-      const readBack = new TextDecoder().decode(store.readRecord("messages", "m-1"));
-      const batch = store.pushBatch("device-a", 10);
-      const found = store.search("AY4", 10);
-      const cursorBefore = store.cursor("device-a", "ws-1");
+      const readBack = new TextDecoder().decode(await store.readRecord("messages", "m-1"));
+      const batch = await store.pushBatch("device-a", 10);
+      const found = await store.search("AY4", 10);
+      const cursorBefore = await store.cursor("device-a", "ws-1");
 
-      store.acknowledge("device-a", "ws-1", batch[batch.length - 1]!.deviceSeq);
-      const afterAck = store.pushBatch("device-a", 10);
-      const cursorAfter = store.cursor("device-a", "ws-1");
+      await store.acknowledge("device-a", "ws-1", batch[batch.length - 1]!.deviceSeq);
+      const afterAck = await store.pushBatch("device-a", 10);
+      const cursorAfter = await store.cursor("device-a", "ws-1");
 
       return {
         persistent: store.persistent,
@@ -92,7 +92,10 @@ test.describe("browser store", () => {
     // OPFS may be unavailable in an unusual environment; the store must still
     // work, but say so rather than pretending it persists.
     expect(typeof result.persistent).toBe("boolean");
-    expect(result.version).toBe(1);
+    // A fresh database must be fully migrated. The number belongs to the
+    // migration list (schema v4 today), so assert that it ran rather than pinning
+    // it — a stale pin here sat unexecuted for as long as the store could not open.
+    expect(result.version).toBeGreaterThanOrEqual(1);
 
     // Encryption round-trips through the Rust bridge.
     expect(result.readBack).toBe("marks for AY4 are in");
@@ -127,11 +130,11 @@ test.describe("browser store", () => {
         filename: "/e2e-store-atomic.db"
       });
 
-      const before = store.pushBatch("device-a", 100).length;
+      const before = (await store.pushBatch("device-a", 100)).length;
       let threw = false;
       try {
         // `thread_id` is NOT NULL, so this write fails inside the transaction.
-        store.writeRecord({
+        await store.writeRecord({
           entityType: "messages",
           entityId: "m-orphan",
           workspaceId: "ws-1",
@@ -144,7 +147,7 @@ test.describe("browser store", () => {
       } catch {
         threw = true;
       }
-      return { threw, before, after: store.pushBatch("device-a", 100).length };
+      return { threw, before, after: (await store.pushBatch("device-a", 100)).length };
     }, MODULE);
 
     expect(result.threw).toBe(true);
