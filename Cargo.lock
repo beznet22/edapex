@@ -1518,8 +1518,10 @@ dependencies = [
 name = "edapex-agent-wasm"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
  "edapex-agent",
  "edapex-store",
+ "infinity-provider-protocol",
  "infinity-wasm",
  "js-sys",
  "serde",

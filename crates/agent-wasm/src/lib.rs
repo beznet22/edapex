@@ -11,6 +11,7 @@
 
 #![cfg(target_arch = "wasm32")]
 
+mod browser_provider;
 mod sql;
 
 use std::collections::VecDeque;
@@ -29,11 +30,11 @@ use js_sys::Function;
 use tokio::sync::{mpsc, oneshot};
 use wasm_bindgen::prelude::*;
 
-type QueueItem = Result<ProviderChunk, AgentError>;
+pub(crate) type QueueItem = Result<ProviderChunk, AgentError>;
 
 /// Rendezvous between a running turn and the JavaScript transport.
 #[derive(Default)]
-struct ChunkQueue {
+pub(crate) struct ChunkQueue {
     state: Mutex<QueueState>,
 }
 
@@ -83,53 +84,13 @@ impl ChunkQueue {
     }
 }
 
-struct JsProvider {
-    queue: Arc<ChunkQueue>,
-    on_request: Function,
-}
-
-impl ProviderClient for JsProvider {
-    fn stream_chat(
-        &self,
-        request: ProviderRequest,
-    ) -> Result<mpsc::Receiver<ProviderChunk>, AgentError> {
-        let encoded = serde_json::to_string(&ProviderRequestWire::from(&request))
-            .map_err(|error| AgentError::provider(format!("Encode request: {error}")))?;
-
-        // Hand the request to JavaScript. The fetch it starts calls back into
-        // `push_chunk`, so this must return without waiting.
-        self.on_request
-            .call1(&JsValue::NULL, &JsValue::from_str(&encoded))
-            .map_err(|_| AgentError::provider("The browser transport failed"))?;
-
-        let queue = Arc::clone(&self.queue);
-        let (tx, rx) = mpsc::channel::<ProviderChunk>(64);
-        wasm_bindgen_futures::spawn_local(async move {
-            while let Some(item) = queue.recv().await {
-                match item {
-                    Ok(chunk) => {
-                        if tx.send(chunk).await.is_err() {
-                            return;
-                        }
-                    }
-                    Err(error) => {
-                        let _ = tx.send(ProviderChunk::Failed(error)).await;
-                        return;
-                    }
-                }
-            }
-        });
-        Ok(rx)
-    }
-}
-
 /// Wire shape sent to JavaScript, and forwarded verbatim to the provider.
 ///
 /// This is OpenAI's schema, not a local envelope: `model-router` hands the body
 /// straight to the upstream provider, so a camelCase field here would be dropped
 /// as an unknown key and tool results would silently lose their correlation id.
 #[derive(serde::Serialize)]
-struct ProviderRequestWire {
+pub(crate) struct ProviderRequestWire {
     model: String,
     messages: Vec<MessageWire>,
     tools: Vec<serde_json::Value>,
@@ -297,6 +258,8 @@ impl ApprovalHandler for JsApprovalHandler {
 pub struct WasmAgent {
     host: AgentHost,
     queue: Arc<ChunkQueue>,
+    /// The registry handle for `on_request`, so `close` can drop the page function.
+    provider_id: u64,
 }
 
 #[wasm_bindgen]
@@ -325,12 +288,13 @@ impl WasmAgent {
         .map_err(|error| js_error(format!("Invalid settings: {error}")))?;
 
         let queue = Arc::new(ChunkQueue::default());
+        let provider_id = browser_provider::register(on_request);
         let host = AgentHost::connect(AgentHostOptions {
             settings,
-            provider: Arc::new(JsProvider {
-                queue: Arc::clone(&queue),
-                on_request,
-            }),
+            provider: Arc::new(browser_provider::BrowserProvider::new(
+                provider_id,
+                Arc::clone(&queue),
+            )),
             tools: Arc::new(JsToolExecutor { on_tool }),
             approvals: Arc::new(JsApprovalHandler { on_approval }),
             events: Arc::new(JsEventSink { on_event }),
@@ -338,7 +302,7 @@ impl WasmAgent {
         })
         .map_err(|error| js_error(error.message))?;
 
-        Ok(Self { host, queue })
+        Ok(Self { host, queue, provider_id })
     }
 
     /// Queue one provider chunk (a serialized `ProviderChunk`).
@@ -401,6 +365,7 @@ impl WasmAgent {
 
     pub fn close(&self) {
         self.queue.close();
+        browser_provider::release(self.provider_id);
         self.host.close();
     }
 }

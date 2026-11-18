@@ -16,6 +16,7 @@ pub mod durable_store;
 pub mod event_hub;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod infinity_provider;
+pub mod infinity_stream;
 pub mod interrupt;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod projection;
@@ -42,6 +43,7 @@ pub use durable_store::{DurableAgentStores, DurableStoreError, StoreContext};
 pub use event_hub::{EventHub, DEFAULT_CAPACITY};
 #[cfg(not(target_arch = "wasm32"))]
 pub use infinity_provider::{EdApexModelProvider, EdApexModelSource};
+pub use infinity_stream::{chunk_stream, completion_error, provider_request};
 pub use interrupt::InterruptSignal;
 pub use protocol::{
     AgentConnectSettings, AgentError, AgentErrorCode, AgentEvent, AgentStatus, AgentTurnInput,
