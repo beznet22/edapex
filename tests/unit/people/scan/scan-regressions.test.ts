@@ -208,3 +208,27 @@ describe("regression: the scanner opens on the student that was tapped", () => {
     expect(source).toContain("?? data.student");
   });
 });
+
+describe("regression: both roster layouts expose the same actions", () => {
+  // Found from a screenshot: consolidating the menus left the desktop row with no way to open
+  // the student dialog at all, and pushed the mobile overflow to the far edge of the card.
+  it("passes onEdit in the desktop row and the mobile card", async () => {
+    const source = await readFile("src/lib/components/people/students-tab.svelte", "utf8");
+
+    const row = source.slice(source.indexOf("{#snippet row("), source.indexOf("{#snippet card("));
+    const card = source.slice(source.indexOf("{#snippet card("));
+
+    expect(row).toContain("onEdit=");
+    expect(card).toContain("onEdit=");
+  });
+
+  it("keeps the primary action and its overflow in one cluster on mobile", async () => {
+    const source = await readFile("src/lib/components/people/students-tab.svelte", "utf8");
+    const card = source.slice(source.indexOf("{#snippet card("));
+
+    // `justify-between` pushed the button and the 3-dot to opposite edges, so they read as two
+    // unrelated controls rather than one action plus its menu.
+    expect(card).not.toContain('class="mt-3 flex items-center justify-between gap-2"');
+    expect(card).toContain('class="mt-3 flex items-center gap-2"');
+  });
+});

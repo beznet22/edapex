@@ -189,6 +189,7 @@
             onPublish={() => onpublishall()}
             onRepublish={() => onreview(entry)}
             onViewError={() => onreview(entry)}
+            onEdit={() => openDetail(entry)}
           />
         {/if}
       </td>
@@ -209,9 +210,11 @@
           />
         </div>
 
-        <div class="mt-3 flex items-center justify-between gap-2">
+        <div class="mt-3 flex items-center gap-2">
           {#if selectedExamTypeId === null}
-            <span class="text-xs text-muted-foreground">Pick a term to scan marks</span>
+            <span class="min-w-0 flex-1 text-xs text-muted-foreground">
+              Pick a term to scan marks
+            </span>
             <Button variant="ghost" size="icon" class="size-11 rounded-full sm:size-9"
               aria-label={`Actions for ${entry.fullName ?? "student"}`}
               onclick={() => openDetail(entry)}>
