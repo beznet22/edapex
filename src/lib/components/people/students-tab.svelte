@@ -1,6 +1,5 @@
 <script lang="ts">
   import { invalidateAll } from "$app/navigation";
-  import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
   import { Button } from "$lib/components/ui/button";
   import EllipsisVertical from "@lucide/svelte/icons/ellipsis-vertical";
   import PeopleTable from "./people-table.svelte";
@@ -213,6 +212,11 @@
         <div class="mt-3 flex items-center justify-between gap-2">
           {#if selectedExamTypeId === null}
             <span class="text-xs text-muted-foreground">Pick a term to scan marks</span>
+            <Button variant="ghost" size="icon" class="size-11 rounded-full sm:size-9"
+              aria-label={`Actions for ${entry.fullName ?? "student"}`}
+              onclick={() => openDetail(entry)}>
+              <EllipsisVertical class="size-4" />
+            </Button>
           {:else}
             <ScanRowActions
               status={entry.scanStatus ?? "not_uploaded"}
@@ -226,35 +230,10 @@
               onPublish={() => onpublishall()}
               onRepublish={() => onreview(entry)}
               onViewError={() => onreview(entry)}
+              onEdit={() => openDetail(entry)}
             />
           {/if}
-          <DropdownMenu.Root>
-            <DropdownMenu.Trigger>
-              {#snippet child({ props })}
-                <Button
-                  {...props}
-                  variant="ghost"
-                  size="icon"
-                  class="size-11 rounded-full text-muted-foreground sm:size-9"
-                  aria-label={`Actions for ${entry.fullName ?? "student"}`}
-                >
-                  <EllipsisVertical class="size-4" />
-                </Button>
-              {/snippet}
-            </DropdownMenu.Trigger>
-            <DropdownMenu.Content
-              align="end"
-              sideOffset={6}
-              class="w-44 rounded-xl border border-border bg-popover p-1"
-            >
-              <DropdownMenu.Item
-                class="min-h-11 cursor-pointer rounded-lg px-3 py-2 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 sm:min-h-9"
-                onclick={() => openDetail(entry)}
-              >
-                View / edit
-              </DropdownMenu.Item>
-            </DropdownMenu.Content>
-          </DropdownMenu.Root>
+
         </div>
       </div>
     {/snippet}

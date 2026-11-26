@@ -31,6 +31,7 @@
     onPublish,
     onRepublish,
     onViewError,
+    onEdit,
     busy = false,
   }: {
     status: ScanUiStatus;
@@ -44,6 +45,8 @@
     onPublish?: () => void;
     onRepublish?: () => void;
     onViewError?: () => void;
+    /** Opens the student detail dialog. Owned here so the row renders exactly one menu. */
+    onEdit?: () => void;
     busy?: boolean;
   } = $props();
 
@@ -121,6 +124,12 @@
           <DropdownMenu.Item class={itemClass} onclick={() => onCapture?.()}>Re-scan</DropdownMenu.Item>
           <DropdownMenu.Item class={itemClass} onclick={() => onViewError?.()}>
             View Error
+          </DropdownMenu.Item>
+        {/if}
+        {#if onEdit}
+          <DropdownMenu.Separator />
+          <DropdownMenu.Item class={itemClass} onclick={() => onEdit?.()}>
+            View / edit
           </DropdownMenu.Item>
         {/if}
       </DropdownMenu.Content>
