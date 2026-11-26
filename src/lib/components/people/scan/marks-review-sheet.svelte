@@ -158,7 +158,7 @@
   }
 
   const stickyCode =
-    "sticky left-0 z-10 bg-card px-3 py-2 text-left text-xs font-bold uppercase tracking-wide text-foreground";
+    "sticky left-0 z-20 bg-background px-3 py-2 text-left text-xs font-bold uppercase tracking-wide text-foreground border-r border-border";
 </script>
 
 <ResponsiveSheet
@@ -285,11 +285,13 @@
           {/each}
         </div>
       {:else}
-        <div class="-mx-4 overflow-x-auto px-4">
+        <!-- Negate the body's `px-4` so the sticky column lands on the scrollport edge; the
+             padding is re-applied inside the cells below. -->
+        <div class="-mx-4 overflow-x-auto overscroll-x-contain">
           <table class="min-w-full border-separate border-spacing-0 text-sm">
             <thead>
               <tr>
-                <th class="{stickyCode} border-b border-border">Code</th>
+                <th class="{stickyCode} border-b border-border pl-4">Code</th>
                 {#each titles as title (title)}
                   <th
                     class="border-b border-border px-2 py-2 text-center text-xs font-semibold uppercase text-muted-foreground"
@@ -310,7 +312,7 @@
             <tbody>
               {#each draft.records as record, rowIndex (record.subjectId || record.subjectCode)}
                 <tr>
-                  <td class="{stickyCode} border-b border-border/60 whitespace-nowrap">
+                  <td class="{stickyCode} border-b border-border/60 whitespace-nowrap pl-4">
                     {record.subjectCode}
                     {#if record.subjectId === 0}
                       <span class="ml-1 text-[10px] font-normal text-destructive">unmatched</span>
@@ -339,7 +341,7 @@
             </tbody>
             <tfoot>
               <tr>
-                <td class="{stickyCode} font-bold">All</td>
+                <td class="{stickyCode} pl-4 font-bold">All</td>
                 <td class="px-2 py-2 text-xs text-muted-foreground" colspan={titles.length}>
                   {totals.percentage}% of {totals.full}
                 </td>
