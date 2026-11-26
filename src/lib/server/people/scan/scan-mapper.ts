@@ -85,7 +85,7 @@ export function composeRecords(input: ComposeInput): ComposeOutput {
       warnings.push(`Expected column "${title}" was not found on the page`);
     }
   }
-  if (titles.length === 0) {
+  if (titles.length === 0 && category !== "DAYCARE") {
     errors.push(`The page has no columns from the ${category} mark scheme`);
   }
 
@@ -134,6 +134,44 @@ export function composeRecords(input: ComposeInput): ComposeOutput {
      */
     const percentage = fullTotal === 0 ? 0 : Math.round((totalScore / fullTotal) * 10000) / 100;
     const grade = gradeFor(percentage, category);
+
+    /**
+     * DAYCARE has no numeric marks. `AssessmentService.doProcessMarks` branches on
+     * `examTitles.length === 0` and writes the narrative to `sm_result_stores.teacher_remarks`
+     * with `total_marks = 0` and no `sm_mark_stores` rows. Verified against live data: every
+     * DAYCARE result has `total_marks = 0.00`, a populated `teacher_remarks`, and zero mark rows.
+     *
+     * `recordSchema` requires `learningOutcome` to be non-empty and HTML-free, so a blank cell is
+     * surfaced as an error for the teacher to fill in the grid rather than silently dropped.
+     */
+    if (category === "DAYCARE") {
+      const outcome = (row.subjectRemark ?? "").trim();
+      if (outcome === "") {
+        errors.push(`${row.subjectCode}: a learning outcome is required for DAYCARE`);
+      } else if (/<[^>]+>/.test(outcome)) {
+        errors.push(`${row.subjectCode}: the learning outcome contains markup`);
+      }
+
+      records.push({
+        studentId,
+        resultId: 0,
+        subjectId: match.subjectId ?? 0,
+        subject: match.subjectName ?? row.subjectCode,
+        subjectCode: match.subjectCode,
+        objectives: null,
+        titleIds: [],
+        titles: [],
+        markIds: [],
+        marks: [],
+        fullMarks: [],
+        totalScore: 0,
+        grade: "",
+        color: undefined,
+        category,
+        learningOutcome: outcome,
+      });
+      continue;
+    }
 
     records.push({
       studentId,
@@ -237,10 +275,6 @@ export function buildMarksheet(
     examTypeId: facts.student.examTypeId,
     examTitles: facts.examTitles,
   });
-
-  if (facts.category === "DAYCARE") {
-    composed.errors.push("DAYCARE has no numeric marks; the scanner does not support it");
-  }
 
   const marksheet: Marksheet = {
     school: facts.school,

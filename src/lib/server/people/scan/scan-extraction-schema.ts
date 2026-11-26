@@ -32,7 +32,13 @@ export const scanRecordSchema = z.object({
   marks: z
     .array(integer.nonnegative().nullable())
     .describe("One entry per column in columnTitles order; null when the cell is blank"),
-  subjectRemark: z.string().nullable().describe("Per-subject remark when printed, else null"),
+  subjectRemark: z
+    .string()
+    .nullable()
+    .describe(
+      "The free-text cell beside this subject, verbatim. For DAYCARE sheets this is the learning " +
+        "outcome narrative; for graded sheets it is a short remark. Null when the cell is blank."
+    ),
 });
 
 export const scanRatingSchema = z.object({

@@ -401,9 +401,13 @@ describe("buildMarksheet", () => {
     expect(marksheet.student.daysAbsent).toBe(0);
   });
 
-  it("refuses a DAYCARE roster row instead of emitting empty records", () => {
+  it("treats a DAYCARE roster row as learning outcomes, not an error", () => {
+    // Superseded: DAYCARE is supported. The narrative is carried in `learningOutcome`;
+    // see the "DAYCARE — learning outcomes, not marks" suite below.
     const { errors } = buildMarksheet(extraction(), { ...facts, category: "DAYCARE" });
-    expect(errors).toContain("DAYCARE has no numeric marks; the scanner does not support it");
+    expect(errors).not.toContain(
+      "DAYCARE has no numeric marks; the scanner does not support it"
+    );
   });
 
   it("keeps records and subjects aligned so marksheetSchema's refine passes", () => {
@@ -487,16 +491,16 @@ describe("composeMarksheet — the single composition entry point", () => {
     expect(result.errors[0]).toMatch(/must be selected before saving/);
   });
 
-  it("fails with SCHEMA when the composed result is internally inconsistent", async () => {
-    const result = await composeMarksheet(nurseryPage, {
-      ...facts,
-      category: "DAYCARE",
-    });
+  it("fails with UNRESOLVED when a subject cannot be matched on a DAYCARE sheet", async () => {
+    const result = await composeMarksheet(
+      extraction({ records: [{ subjectCode: "ASTRONOMY", marks: [], subjectRemark: "Text" }] }),
+      { ...facts, category: "DAYCARE" }
+    );
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(result.reason).toBe("UNRESOLVED");
-    expect(result.errors).toContain(
-      "DAYCARE has no numeric marks; the scanner does not support it"
+    expect(result.errors.some((error) => error.includes("must be selected before saving"))).toBe(
+      true
     );
   });
 
@@ -515,5 +519,81 @@ describe("composeMarksheet — the single composition entry point", () => {
     const result = await composeMarksheet(withBonus, facts);
     expect(result.warnings.length).toBeGreaterThan(0);
     expect(result.ok).toBe(true);
+  });
+});
+
+describe("DAYCARE — learning outcomes, not marks", () => {
+  // Verified against live data: every DAYCARE result row has `total_marks = 0.00`, a populated
+  // `teacher_remarks`, and zero `sm_mark_stores` rows. `doProcessMarks` branches on
+  // `examTitles.length === 0` to take that path, so titles/marks must be empty here.
+  const facts = {
+    school: {
+      id: 1, name: "S", email: "e", phone: "p", city: "", state: "", title: "T", vacation_date: "",
+    },
+    student: {
+      id: 893, examTypeId: 5, fullName: "SHIEKUMA", gender: "Male", parentEmail: "p@b.c",
+      parentName: "P", term: "2025/2026", title: "T", className: "DAYCARE", sectionName: "A",
+      adminNo: 100, sessionYear: "2025", token: "tok",
+    },
+    category: "DAYCARE" as const,
+    assignedSubjects: [
+      { subjectId: 24, subjectCode: "BIBLE", subjectName: "Bible" },
+      { subjectId: 36, subjectCode: "PSED/PD", subjectName: "Social" },
+    ],
+  };
+
+  const daycarePage = (): ScanExtraction => ({
+    student: { fullName: "SHIEKUMA", admissionNo: 100, className: "DAYCARE A" },
+    daysOpened: 90, daysPresent: 88, daysAbsent: 2,
+    columnTitles: [],
+    records: [
+      { subjectCode: "BIBLE", marks: [], subjectRemark: "SHOWS GROWING INTEREST IN BIBLE TIME." },
+      { subjectCode: "PSED/PD", marks: [], subjectRemark: "PLAYS WILLINGLY NEAR OTHER CHILDREN." },
+    ],
+    ratings: [], teacherRemark: null, pageConfidence: "high",
+  });
+
+  it("no longer errors on DAYCARE", async () => {
+    const result = await composeMarksheet(daycarePage(), facts);
+    expect(result.errors).not.toContain(
+      "DAYCARE has no numeric marks; the scanner does not support it"
+    );
+  });
+
+  it("emits records with empty titles and marks, so doProcessMarks takes the outcome branch", async () => {
+    const result = await composeMarksheet(daycarePage(), facts);
+    for (const record of result.ok ? result.marksheet.records : []) {
+      expect(record.titles).toEqual([]);
+      expect(record.marks).toEqual([]);
+      expect(record.totalScore).toBe(0);
+    }
+  });
+
+  it("maps the printed remark into learningOutcome", async () => {
+    const result = await composeMarksheet(daycarePage(), facts);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.marksheet.records[0].learningOutcome).toBe(
+      "SHOWS GROWING INTEREST IN BIBLE TIME."
+    );
+  });
+
+  it("requires a learning outcome per subject", async () => {
+    const blank = daycarePage();
+    blank.records[0].subjectRemark = null;
+    const result = await composeMarksheet(blank, facts);
+    expect(result.errors).toContain("BIBLE: a learning outcome is required for DAYCARE");
+  });
+
+  it("rejects an outcome containing markup, matching recordSchema", async () => {
+    const html = daycarePage();
+    html.records[0].subjectRemark = "<b>bold</b>";
+    const result = await composeMarksheet(html, facts);
+    expect(result.errors).toContain("BIBLE: the learning outcome contains markup");
+  });
+
+  it("does not warn that the page lacks mark columns", async () => {
+    const result = await composeMarksheet(daycarePage(), facts);
+    expect(result.warnings.some((w) => w.includes("no columns"))).toBe(false);
   });
 });

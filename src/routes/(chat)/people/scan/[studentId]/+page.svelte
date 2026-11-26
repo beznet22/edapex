@@ -6,6 +6,7 @@
   import { Alert, AlertDescription } from "$lib/components/ui/alert";
   import { Spinner } from "$lib/components/ui/spinner";
   import ScanViewfinder from "$lib/components/people/scan/scan-viewfinder.svelte";
+  import MarksReviewSheet from "$lib/components/people/scan/marks-review-sheet.svelte";
   import {
     assessQuality,
     frameDelta,
@@ -26,6 +27,7 @@
     createQueuedCaptureId,
     enqueueCapture,
   } from "$lib/people/scan/scan-queue";
+  import type { Marksheet } from "$lib/schema/marksheet";
   import type { PageData } from "./$types";
 
   let { data }: { data: PageData } = $props();
@@ -41,6 +43,19 @@
   let countdown = $state<number | null>(null);
   let errorMessage = $state<string | null>(null);
   let statusLine = $state<string | null>(null);
+  /**
+   * After a capture the teacher lands in the review grid for THAT student, on top of the camera.
+   * Nothing advances automatically: closing the drawer returns to the viewfinder, where Prev/Next
+   * is the teacher's own decision.
+   */
+  let reviewOpen = $state(false);
+  let reviewMarksheet = $state<Marksheet | null>(null);
+  let reviewWarnings = $state<string[]>([]);
+  let reviewErrors = $state<string[]>([]);
+  let reviewImageUrl = $state<string | null>(null);
+  let reviewSaving = $state(false);
+  let reviewLoading = $state(false);
+  let reviewStudentId = $state<number | null>(null);
   let activeIndex = $state(0);
 
   const roster = $derived(data.roster);
@@ -163,6 +178,7 @@
   /** Sends the JPEG, then asks the server to extract. Both steps are separate by design. */
   async function uploadAndExtract(file: File): Promise<void> {
     if (!student || data.examTypeId === null) return;
+    const targetStudentId = student.id;
 
     // Offline: hold the JPEG locally and let the banner replay it. The queued capture uses a
     // pre-generated id so the replay is idempotent even if this device comes back online while the
@@ -221,6 +237,125 @@
       throw new Error(extracted.failure?.message ?? "Extraction failed");
     }
     statusLine = "Draft ready";
+    await openReview(targetStudentId);
+  }
+
+  /**
+   * Slides the review grid in over the camera for one student.
+   *
+   * Opens immediately with a skeleton — extraction is still running in most cases, and a blank
+   * sheet would look broken. Polls until the draft lands, then fills the grid. The camera stays
+   * mounted underneath, so closing returns to a live viewfinder rather than a cold start.
+   */
+  async function openReview(studentId: number): Promise<void> {
+    if (data.examTypeId === null) return;
+    reviewStudentId = studentId;
+    reviewMarksheet = null;
+    reviewWarnings = [];
+    reviewErrors = [];
+    reviewImageUrl = null;
+    reviewLoading = true;
+    reviewOpen = true;
+
+    const deadline = Date.now() + 45_000;
+    while (Date.now() < deadline) {
+      const payload = await fetchDraft(studentId);
+      if (payload === null) break;
+
+      if (payload.marksheet) {
+        reviewMarksheet = payload.marksheet;
+        reviewWarnings = payload.warnings ?? [];
+        reviewErrors = payload.errors ?? [];
+        reviewImageUrl = payload.imageUrl ?? null;
+        reviewLoading = false;
+        return;
+      }
+
+      // `failed` is terminal — stop polling and show the reason.
+      if (payload.status === "failed") {
+        reviewErrors = [
+          payload.failure?.message ?? "Extraction failed. Re-scan or retry this student.",
+        ];
+        reviewLoading = false;
+        return;
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 1200));
+    }
+
+    reviewErrors = ["Extraction is taking longer than expected. You can review it from the roster."];
+    reviewLoading = false;
+  }
+
+  async function fetchDraft(studentId: number): Promise<{
+    status?: string;
+    marksheet?: Marksheet | null;
+    warnings?: string[];
+    errors?: string[];
+    imageUrl?: string | null;
+    failure?: { message?: string };
+  } | null> {
+    if (data.examTypeId === null) return null;
+    try {
+      const response = await fetch(
+        `/api/people/marks/draft?student=${studentId}&exam=${data.examTypeId}`,
+        { headers: { accept: "application/json" } }
+      );
+      if (!response.ok) return null;
+      return (await response.json()) as {
+        status?: string;
+        marksheet?: Marksheet | null;
+        warnings?: string[];
+        errors?: string[];
+        imageUrl?: string | null;
+        failure?: { message?: string };
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  /** Next student with nothing saved yet, wrapping past the end. -1 when the class is done. */
+  function nextUngradedIndex(from: number): number {
+    for (let offset = 1; offset <= roster.length; offset += 1) {
+      const index = (from + offset) % roster.length;
+      const row = roster[index];
+      if (row && (row.status === "not_uploaded" || row.status === "failed" || row.status === "draft")) {
+        return index;
+      }
+    }
+    return -1;
+  }
+
+  async function saveReview(marksheet: Marksheet): Promise<void> {
+    if (reviewStudentId === null || data.examTypeId === null) return;
+    reviewSaving = true;
+    try {
+      const response = await fetch("/api/people/marks/commit", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          studentId: reviewStudentId,
+          examTypeId: data.examTypeId,
+          marksheet,
+        }),
+      });
+      if (!response.ok) {
+        const failure = (await response.json().catch(() => ({}))) as { error?: string };
+        reviewErrors = [failure.error ?? "Could not save these marks"];
+        return;
+      }
+      const savedName = reviewMarksheet?.student.fullName ?? "marks";
+      toast.success(`Saved ${savedName}`);
+      reviewOpen = false;
+
+      // Verified → move to the next student who still needs marks.
+      const next = nextUngradedIndex(activeIndex);
+      if (next >= 0) activeIndex = next;
+      else toast.info("Every student in this class has been scanned");
+    } finally {
+      reviewSaving = false;
+    }
   }
 
   async function capture(): Promise<void> {
@@ -240,18 +375,9 @@
 
       captureFeedback();
       await uploadAndExtract(file);
+      // No auto-advance. The review drawer is open in front of the camera; the teacher closes it
+      // when they are done, then moves on with Prev/Next or the next row.
       advanceFeedback();
-
-      // Confirmation only, no Undo: extraction is dispatched immediately, so by the time a
-      // teacher could tap anything the request is already in flight and there is no safe cancel.
-      // A fake Undo affordance would be worse than none — `Re-scan` is the real recovery path.
-      if (student) {
-        toast.success(`Sent ${student.fullName} — Re-scan if wrong`, { duration: 3000 });
-      }
-
-      // Auto-advance only after the capture is durably queued server-side.
-      const next = activeIndex + 1;
-      if (next < roster.length) activeIndex = next;
     } catch (cause) {
       errorMessage = cause instanceof Error ? cause.message : "Capture failed";
     } finally {
@@ -322,6 +448,28 @@
   aria-hidden="true"
   tabindex={-1}
   onchange={(event) => void onGallery(event)}
+/>
+
+<MarksReviewSheet
+  bind:open={reviewOpen}
+  marksheet={reviewMarksheet}
+  loading={reviewLoading}
+  status={reviewLoading ? "extracting" : "draft"}
+  imageUrl={reviewImageUrl}
+  warnings={reviewWarnings}
+  errors={reviewErrors}
+  busy={reviewSaving}
+  onsave={(marksheet) => void saveReview(marksheet)}
+  onrescan={() => {
+    reviewOpen = false;
+    void capture();
+  }}
+  onclose={() => {
+    // Draft is kept server-side; the teacher is simply back on the camera.
+    reviewMarksheet = null;
+    reviewErrors = [];
+    reviewWarnings = [];
+  }}
 />
 
 {#if errorMessage || capturing || statusLine}
