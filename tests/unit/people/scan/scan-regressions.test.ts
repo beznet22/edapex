@@ -184,3 +184,27 @@ describe("regression: leaving the scanner keeps the selected class", () => {
     expect(source).toContain("data.student.sectionId");
   });
 });
+
+describe("regression: the scanner opens on the student that was tapped", () => {
+  // Found on staging: clicking a pupil showed the first row of the class instead, because
+  // `activeIndex` was hardcoded to 0 and the URL's student id was never consulted.
+  it("seeds the active index from the clicked student, not roster[0]", async () => {
+    const source = await readFile(
+      "src/routes/(chat)/people/scan/[studentId]/+page.svelte",
+      "utf8"
+    );
+
+    expect(source).toContain("indexOfStudent");
+    expect(source).toContain("data.student.id");
+    // The old shape resolved the student purely from index 0.
+    expect(source).not.toMatch(/const student = \$derived\(roster\[activeIndex\] \?\? data\.roster\[0\]\);/);
+  });
+
+  it("falls back to the clicked student when the roster omits them", async () => {
+    const source = await readFile(
+      "src/routes/(chat)/people/scan/[studentId]/+page.svelte",
+      "utf8"
+    );
+    expect(source).toContain("?? data.student");
+  });
+});

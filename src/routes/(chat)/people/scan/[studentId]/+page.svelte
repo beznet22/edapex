@@ -44,7 +44,26 @@
   let activeIndex = $state(0);
 
   const roster = $derived(data.roster);
-  const student = $derived(roster[activeIndex] ?? data.roster[0]);
+
+  /**
+   * Start on the student that was actually tapped, not the first row of the class.
+   *
+   * The URL carries the student id (that is what `Upload Mark` links to) and the server has already
+   * resolved it into `data.student`, but the page ignored both and always opened on `roster[0]`.
+   * Clicking a pupil therefore showed a different child's name, and a capture would have been filed
+   * against the wrong student.
+   */
+  function indexOfStudent(studentId: number): number {
+    const index = data.roster.findIndex((row) => row.id === studentId);
+    return index >= 0 ? index : 0;
+  }
+
+  $effect(() => {
+    const target = indexOfStudent(data.student.id);
+    if (target !== activeIndex) activeIndex = target;
+  });
+
+  const student = $derived(roster[activeIndex] ?? data.roster[0] ?? data.student);
 
   /**
    * Return to the exact roster the teacher came from. Dropping `classId`/`sectionId` sent admins
