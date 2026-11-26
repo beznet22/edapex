@@ -232,3 +232,102 @@ describe("regression: both roster layouts expose the same actions", () => {
     expect(card).toContain('class="mt-3 flex items-center gap-2"');
   });
 });
+
+describe("View Mark — correcting an already-saved marksheet", () => {
+  // Spec §4A labels the Uploaded primary action "View Mark (Edit)". Re-saving is therefore
+  // allowed from `committed`, but never from `published`: a result a parent has received must go
+  // through Edit & Re-publish so the PDF is re-sent.
+  it("allows re-commit from committed, draft and failed", async () => {
+    const { canCommitFrom } = await import("$lib/server/people/scan/scan-status");
+    expect(canCommitFrom("committed")).toBe(true);
+    expect(canCommitFrom("draft")).toBe(true);
+    expect(canCommitFrom("failed")).toBe(true);
+  });
+
+  it("refuses re-commit from published, queued and extracting", async () => {
+    const { canCommitFrom } = await import("$lib/server/people/scan/scan-status");
+    for (const status of ["published", "queued", "extracting", "not_uploaded"] as const) {
+      expect(canCommitFrom(status)).toBe(false);
+    }
+  });
+
+  it("commits through the shared predicate rather than an inline status check", async () => {
+    const source = await readFile("src/lib/server/people/scan/scan-commit.ts", "utf8");
+    expect(source).toContain("canCommitFrom");
+    expect(source).not.toMatch(/current\.status !== "draft" && current\.status !== "failed"/);
+  });
+
+  it("renders the review and PDF sheets on the roster page", async () => {
+    const source = await readFile(
+      "src/routes/(chat)/people/+page.svelte",
+      "utf8"
+    );
+    // Both were previously unreferenced: handleReview set state that nothing rendered.
+    expect(source).toMatch(/<MarksReviewSheet/);
+    expect(source).toMatch(/<PdfPreviewSheet/);
+  });
+
+  it("routes View Result to the PDF viewer, not the edit grid", async () => {
+    const source = await readFile(
+      "src/lib/components/people/students-tab.svelte",
+      "utf8"
+    );
+    expect(source).toContain("onViewResult={() => onviewresult(entry)}");
+    expect(source).not.toContain("onViewResult={() => onreview(entry)}");
+  });
+});
+
+describe("draft route falls back to committed results", () => {
+  // 647 of 648 students with marks predate this feature and have no `teacher_remarks.metadata`.
+  // Reading only the envelope left `View Mark` showing "No draft marks" for almost the whole
+  // school. The route now falls back to `getStudentResult`.
+  it("reads the envelope first and the result stores second", async () => {
+    const source = await readFile("src/routes/api/people/marks/draft/+server.ts", "utf8");
+
+    const envelopeAt = source.indexOf("readScanEnvelope");
+    const fallbackAt = source.indexOf("getStudentResult");
+    expect(envelopeAt).toBeGreaterThan(-1);
+    expect(fallbackAt).toBeGreaterThan(envelopeAt);
+  });
+
+  it("marks published results read-only", async () => {
+    const source = await readFile("src/routes/api/people/marks/draft/+server.ts", "utf8");
+    expect(source).toContain("readOnly: envelope.status === \"published\"");
+  });
+});
+
+describe("review sheet refuses to open on a row with nothing to show", () => {
+  it("guards not_uploaded before opening", async () => {
+    const source = await readFile(
+      "src/routes/(chat)/people/+page.svelte",
+      "utf8"
+    );
+    const review = source.slice(source.indexOf("async function handleReview"));
+    const guardAt = review.indexOf('status === "not_uploaded"');
+    const openAt = review.indexOf("reviewOpen = true");
+
+    expect(guardAt).toBeGreaterThan(-1);
+    expect(openAt).toBeGreaterThan(guardAt);
+  });
+
+  it("closes the sheet when the payload has no marksheet", async () => {
+    const source = await readFile(
+      "src/routes/(chat)/people/+page.svelte",
+      "utf8"
+    );
+    expect(source).toContain("if (!reviewMarkSheet)");
+    expect(source).toContain("No marks found for this student");
+  });
+});
+
+describe("published rows are read-only in the grid", () => {
+  it("disables every editing surface", async () => {
+    const source = await readFile(
+      "src/lib/components/people/scan/marks-review-sheet.svelte",
+      "utf8"
+    );
+    expect(source).toContain("readOnly");
+    expect(source).toContain("disabled={readOnly}");
+    expect(source).toContain("!readOnly");
+  });
+});

@@ -1,6 +1,7 @@
 <script lang="ts">
   import { goto, invalidateAll } from "$app/navigation";
   import { navigating, page } from "$app/state";
+  import { toast } from "svelte-sonner";
   import ChatHeader from "$lib/components/chat-header.svelte";
   import PeopleHeader from "$lib/components/people/people-header.svelte";
   import PeopleTabs from "$lib/components/people/people-tabs.svelte";
@@ -121,6 +122,19 @@
 
   async function handleReview(row: StudentRosterRow): Promise<void> {
     if (selectedExamTypeId === null) return;
+
+    const status = row.scanStatus ?? "not_uploaded";
+    // Only rows that actually hold something are reviewable. `not_uploaded` has no draft and no
+    // committed result; opening the sheet there produced an empty grid reading "No draft marks".
+    if (status === "not_uploaded" || status === "queued" || status === "extracting") {
+      toast.info(
+        status === "not_uploaded"
+          ? `${row.fullName ?? "This student"} has no marks yet — upload a scan first`
+          : "Still extracting — try again in a moment"
+      );
+      return;
+    }
+
     reviewRow = row;
     reviewExamTypeId = selectedExamTypeId;
     reviewMarkSheet = null;
@@ -128,30 +142,40 @@
     reviewErrors = [];
     reviewPaperName = null;
     reviewImageUrl = null;
+    reviewReadOnly = false;
     reviewLoading = true;
     reviewOpen = true;
 
     try {
-      // The draft lives in the envelope; there is no separate read endpoint yet, so it is read
-      // back through the status route's student payload on demand.
       const response = await fetch(
         `/api/people/marks/draft?student=${row.id}&exam=${selectedExamTypeId}`,
         { headers: { accept: "application/json" } }
       );
-      if (response.ok) {
-        const payload = (await response.json()) as {
-          marksheet?: typeof reviewMarkSheet;
-          warnings?: string[];
-          errors?: string[];
-          imageUrl?: string | null;
-        };
-        reviewMarkSheet = payload.marksheet ?? null;
-        reviewWarnings = payload.warnings ?? [];
-        reviewErrors = payload.errors ?? [];
-        // The paper's own name is not persisted in the envelope (identity always comes from the
-        // DB), so the grid can only warn once extraction surfaces it. Left null for now.
-        reviewPaperName = null;
-        reviewImageUrl = payload.imageUrl ?? null;
+      if (!response.ok) {
+        reviewErrors = ["Those marks could not be loaded"];
+        return;
+      }
+
+      const payload = (await response.json()) as {
+        status?: string;
+        marksheet?: typeof reviewMarkSheet;
+        warnings?: string[];
+        errors?: string[];
+        imageUrl?: string | null;
+        readOnly?: boolean;
+      };
+
+      reviewMarkSheet = payload.marksheet ?? null;
+      reviewWarnings = payload.warnings ?? [];
+      reviewErrors = payload.errors ?? [];
+      reviewReadOnly = payload.readOnly ?? false;
+      reviewImageUrl = payload.imageUrl ?? null;
+
+      // Nothing came back for a row the roster claimed was reviewable — say so instead of
+      // presenting an empty grid.
+      if (!reviewMarkSheet) {
+        reviewOpen = false;
+        toast.info("No marks found for this student in this term");
       }
     } finally {
       reviewLoading = false;
@@ -221,6 +245,7 @@
   let reviewPaperName = $state<string | null>(null);
   let reviewImageUrl = $state<string | null>(null);
   let reviewLoading = $state(false);
+  let reviewReadOnly = $state(false);
   let reviewSaving = $state(false);
   let pdfOpen = $state(false);
   let pdfStudent = $state<StudentRosterRow | null>(null);
@@ -372,6 +397,7 @@
               onexam={handleExamSelect}
               oncapture={handleCapture}
               onreview={handleReview}
+              onviewresult={openResult}
               onpublishall={() => void handlePublishAll()}
             />
           {/if}
@@ -380,6 +406,33 @@
     </div>
   </div>
 </div>
+
+<MarksReviewSheet
+  bind:open={reviewOpen}
+  marksheet={reviewMarkSheet}
+  loading={reviewLoading}
+  status={reviewRow?.scanStatus ?? "draft"}
+  readOnly={reviewReadOnly}
+  imageUrl={reviewImageUrl}
+  warnings={reviewWarnings}
+  errors={reviewErrors}
+  paperName={reviewPaperName}
+  busy={reviewSaving}
+  onsave={(marksheet) => void handleSaveReview(marksheet)}
+  onrescan={() => {
+    reviewOpen = false;
+    if (reviewRow) handleCapture(reviewRow);
+  }}
+/>
+
+<PdfPreviewSheet
+  bind:open={pdfOpen}
+  studentName={pdfStudent?.fullName ?? ""}
+  {pdfUrl}
+  canPublish={pdfStudent?.scanStatus === "committed"}
+  {publishing}
+  onpublish={() => void handlePublishOne()}
+/>
 
 <ManageAssignmentsDialog
   bind:open={manageOpen}

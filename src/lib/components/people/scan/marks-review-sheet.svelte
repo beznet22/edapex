@@ -37,6 +37,7 @@
     paperName = null,
     busy = false,
     loading = false,
+    readOnly = false,
     onsave,
     onrescan,
     onclose,
@@ -51,6 +52,8 @@
     busy?: boolean;
     /** Extraction is still running; show a skeleton rather than an empty grid. */
     loading?: boolean;
+    /** Published results are read-only until `Edit & Re-publish` unlocks them. */
+    readOnly?: boolean;
     onsave: (marksheet: Marksheet) => void;
     onrescan: () => void;
     /** Back: the draft is kept and the teacher returns to the camera. */
@@ -104,9 +107,19 @@
     (draft?.records ?? []).every((record) => (record.learningOutcome ?? "").trim() !== "")
   );
 
+  /**
+   * `committed` means the marksheet is already saved and this is a correction, so the button says
+   * "Update marks" rather than "Verify & Continue" — the latter would imply nothing is stored yet.
+   */
+  const isUpdate = $derived(status === "committed");
+  const primaryLabel = $derived(
+    busy ? "Saving…" : readOnly ? "Published" : isUpdate ? "Update marks" : "Verify & Continue"
+  );
+
   const canSave = $derived(
     draft !== null &&
       !busy &&
+      !readOnly &&
       (isDaycare
         ? draft.records.length > 0 && outcomesComplete && outcomeIssues.size === 0
         : cellIssues.size === 0 &&
@@ -157,6 +170,7 @@
       ? "Extracting…"
       : "No draft available"}
   contentClass="md:max-w-3xl"
+  mobilePresentation="right"
 >
   {#snippet prefix()}
     <Button
@@ -187,9 +201,11 @@
 
   {#snippet footer()}
     <div class="flex flex-col gap-2 sm:flex-row sm:justify-end">
-      <Button variant="outline" onclick={onrescan} disabled={busy}>Re-scan</Button>
+      {#if !readOnly}
+        <Button variant="outline" onclick={onrescan} disabled={busy}>Re-scan</Button>
+      {/if}
       <Button onclick={() => draft && onsave(draft)} disabled={!canSave}>
-        {busy ? "Saving…" : "Verify & Continue"}
+        {primaryLabel}
       </Button>
     </div>
   {/snippet}
@@ -261,6 +277,7 @@
                 rows={3}
                 value={record.learningOutcome ?? ""}
                 aria-invalid={outcomeIssues.has(rowIndex)}
+                disabled={readOnly}
                 class={outcomeIssues.has(rowIndex) ? "border-destructive" : ""}
                 oninput={(event) => updateOutcome(rowIndex, event.currentTarget.value)}
               />
@@ -307,6 +324,7 @@
                         label="{record.subjectCode} {title}"
                         edited={edited.has(`${rowIndex}:${columnIndex}`)}
                         flagged={cellIssues.has(`${rowIndex}:${columnIndex}`)}
+                        disabled={readOnly}
                         onchange={(value) => updateMark(rowIndex, columnIndex, value)}
                       />
                     </td>
@@ -339,6 +357,7 @@
         <Textarea
           id="scan-remark"
           rows={2}
+          disabled={readOnly}
           value={draft.remark?.remark ?? ""}
           oninput={(event) => {
             if (!draft) return;

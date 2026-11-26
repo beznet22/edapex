@@ -19,6 +19,7 @@
         footer,
         class: className,
         contentClass,
+        mobilePresentation = "bottom",
     }: {
         open: boolean;
         onOpenChange?: (open: boolean) => void;
@@ -31,6 +32,13 @@
         footer?: Snippet;
         class?: string;
         contentClass?: string;
+        /**
+         * `bottom` (default) uses the vaul drawer — the iOS-native pattern already in use across
+         * the app. `right` uses the shadcn Sheet, which slides in from the edge and can cover the
+         * full screen; the scanner's review grid needs that, because a bottom sheet leaves the
+         * camera visible and the marks squeezed.
+         */
+        mobilePresentation?: "bottom" | "right";
     } = $props();
 
     const isMobile = new IsMobile();
@@ -78,7 +86,7 @@
     });
 </script>
 
-{#if isMobile.current}
+{#if isMobile.current && mobilePresentation !== "right"}
     <Drawer.Root
         bind:open
         onOpenChange={(val) => {
@@ -191,7 +199,8 @@
         <Sheet.Content
             side="right"
             class={cn(
-                "transition-all duration-500 w-full border-l border-border/60 sm:max-w-[30vw]",
+                "transition-all duration-500 w-full border-l border-border/60",
+                mobilePresentation === "right" ? "sm:max-w-3xl" : "sm:max-w-[30vw]",
                 className,
             )}
         >

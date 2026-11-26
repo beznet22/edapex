@@ -34,6 +34,7 @@
     onexam,
     oncapture,
     onreview,
+    onviewresult,
     onpublishall,
   }: {
     classes: ClassOption[];
@@ -60,6 +61,7 @@
     onexam: (examTypeId: number) => void;
     oncapture: (row: StudentRosterRow) => void;
     onreview: (row: StudentRosterRow) => void;
+    onviewresult: (row: StudentRosterRow) => void;
     onpublishall: () => void;
   } = $props();
 
@@ -185,7 +187,7 @@
             onReview={() => onreview(entry)}
             onRetry={() => oncapture(entry)}
             onViewMark={() => onreview(entry)}
-            onViewResult={() => onreview(entry)}
+            onViewResult={() => onviewresult(entry)}
             onPublish={() => onpublishall()}
             onRepublish={() => onreview(entry)}
             onViewError={() => onreview(entry)}
@@ -229,7 +231,7 @@
               onReview={() => onreview(entry)}
               onRetry={() => oncapture(entry)}
               onViewMark={() => onreview(entry)}
-              onViewResult={() => onreview(entry)}
+              onViewResult={() => onviewresult(entry)}
               onPublish={() => onpublishall()}
               onRepublish={() => onreview(entry)}
               onViewError={() => onreview(entry)}

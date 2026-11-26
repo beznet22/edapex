@@ -3,6 +3,7 @@ import { createTenantContext } from "$lib/server/mastra/tenant-context";
 import { marksheetSchema, type Marksheet } from "$lib/schema/marksheet";
 import { EXAM_MARK_MAXIMUMS } from "$lib/constants/assessment";
 import { readScanEnvelope, writeScanEnvelope } from "./scan-store";
+import { canCommitFrom } from "./scan-status";
 import { advanceEnvelope, type ScanEnvelope } from "./scan-types";
 import { loadScanFacts } from "./scan-facts";
 
@@ -99,7 +100,14 @@ export async function commitScan(input: CommitInput): Promise<CommitOutput> {
   if (!current) {
     throw new CommitRejectedError("No scan draft for this student", "NOT_FOUND");
   }
-  if (current.status !== "draft" && current.status !== "failed") {
+  /**
+   * `committed` is re-savable: `View Mark` opens the same grid so a teacher can correct a mark
+   * after saving (spec §4A labels it "View Mark (Edit)"). `published` is not — changing a result
+   * a parent has already received must go through `Edit & Re-publish`, which re-sends the PDF.
+   * Re-committing overwrites through `upsertMarksheet`, which is already idempotent per
+   * (student, exam, academic).
+   */
+  if (!canCommitFrom(current.status)) {
     throw new CommitRejectedError(
       `Cannot save from status "${current.status}"`,
       "NOT_DRAFT"

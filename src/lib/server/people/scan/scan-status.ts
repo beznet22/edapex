@@ -188,6 +188,16 @@ export const canReExtract = (status: ScanUiStatus): boolean => !isVerified(statu
 export const canRecapture = (status: ScanUiStatus | null): boolean =>
   status === null || !isVerified(status);
 
+/**
+ * Statuses a marksheet may be saved from.
+ *
+ * `committed` is included so `View Mark` can correct an already-saved row — the spec labels that
+ * action "(Edit)". `published` is deliberately excluded: a result a parent has received must be
+ * changed through `Edit & Re-publish`, which re-sends the PDF, not silently overwritten here.
+ */
+export const canCommitFrom = (status: ScanUiStatus): boolean =>
+  status === "draft" || status === "failed" || status === "committed";
+
 /** The poll runs only while something is actually in flight. */
 export function shouldPoll(statuses: ScanStatusMap): boolean {
   for (const status of statuses.values()) {
