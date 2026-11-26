@@ -130,7 +130,7 @@
   </div>
 
   {#if studentLine}
-    <div class="relative mx-auto mt-1 flex max-w-[92%] items-center gap-2">
+    <div class="relative mx-auto mt-2 flex max-w-[92%] items-center gap-2 sm:mt-1">
       <Button
         variant="ghost"
         size="icon-sm"
@@ -160,10 +160,10 @@
   {/if}
 
   <!-- Static A4 portrait guide (1:1.414). No contour detection, no snapping polygon. -->
-  <div class="relative flex flex-1 items-center justify-center px-6">
+  <div class="relative flex min-h-0 flex-1 items-center justify-center px-6 py-4">
     <div
       class={cn(
-        "aspect-[1/1.414] h-full max-h-[62vh] w-auto max-w-full rounded-md border-2 transition-colors",
+        "aspect-[1/1.414] max-h-[52vh] w-auto max-w-full rounded-md border-2 transition-colors sm:max-h-[62vh]",
         guideTone
       )}
     ></div>
